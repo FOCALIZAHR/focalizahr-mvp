@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { 
         error: 'Error interno del servidor',
-        debug: process.env.NODE_ENV === 'development' ? error.message : undefined
+        debug: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
       },
       { status: 500 }
     )

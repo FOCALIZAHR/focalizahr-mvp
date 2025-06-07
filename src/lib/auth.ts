@@ -278,4 +278,58 @@ export async function validateAuthToken(authHeader: string | null, request?: Nex
     console.error('JWT verification error:', error)
     return { success: false, error: 'Error de autenticación interno' }
   }
+  export async function registerAccount(data: {
+  companyName: string
+  adminEmail: string
+  adminName: string
+  password: string
+}) {
+  try {
+    // Check if account already exists
+    const existingAccount = await prisma.account.findUnique({
+      where: { adminEmail: data.adminEmail }
+    })
+
+    if (existingAccount) {
+      return { success: false, error: 'Email ya está registrado' }
+    }
+
+    // Hash password
+    const passwordHash = await hashPassword(data.password)
+
+    // Create account
+    const account = await prisma.account.create({
+      data: {
+        companyName: data.companyName,
+        adminEmail: data.adminEmail,
+        adminName: data.adminName,
+        passwordHash
+      }
+    })
+
+    // Generate JWT
+    const token = generateJWT({
+      id: account.id,
+      adminEmail: account.adminEmail,
+      adminName: account.adminName,
+      companyName: account.companyName,
+      subscriptionTier: account.subscriptionTier
+    })
+
+    return {
+      success: true,
+      token,
+      account: {
+        id: account.id,
+        adminEmail: account.adminEmail,
+        adminName: account.adminName,
+        companyName: account.companyName,
+        subscriptionTier: account.subscriptionTier
+      }
+    }
+  } catch (error) {
+    console.error('Register error:', error)
+    return { success: false, error: 'Error interno del servidor' }
+  }
+}
 }
