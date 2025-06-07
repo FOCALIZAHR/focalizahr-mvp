@@ -8,9 +8,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-/**
- * Formatea fechas en español para Chile
- */
 export function formatDate(date: Date | string): string {
   const d = new Date(date)
   return d.toLocaleDateString('es-CL', {
@@ -168,7 +165,8 @@ export function parseCSVEmails(csvText: string): string[] {
   })
   
   // Remover duplicados
-  return [...new Set(emails)].filter(email => isValidEmail(email))
+  // Remover duplicados  
+return Array.from(new Set(emails)).filter(email => isValidEmail(email))  // ← FIX
 }
 
 /**

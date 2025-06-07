@@ -214,8 +214,8 @@ export async function debugAuth() {
     }
   } catch (error) {
     return {
-      error: error.message,
-      details: error instanceof Error ? error.stack : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Error desconocido',  // ← FIX
+    details: error instanceof Error ? error.stack : 'Unknown error'
     }
     }
   }

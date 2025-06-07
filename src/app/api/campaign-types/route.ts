@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       questionCount: type._count.questions,
       estimatedCompletionTime: `${type.estimatedDuration} minutos`,
       categories: includeQuestions 
-        ? [...new Set(type.questions?.map(q => q.category) || [])]
+        ? Array.from(new Set(type.questions?.map(q => q.category) || []))
         : null
     }))
 

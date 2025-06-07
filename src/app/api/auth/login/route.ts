@@ -187,7 +187,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     return NextResponse.json({
       status: 'error',
-      error: error.message
+     error: error instanceof Error ? error.message : 'Error desconocido'  // ← FIX MÍNIMO
     }, { status: 500 })
   }
 }
