@@ -214,68 +214,64 @@ export async function debugAuth() {
     }
   } catch (error) {
     return {
-      error: error.message,
+      error: error instanceof Error ? error.message : 'Error desconocido',
       details: error instanceof Error ? error.stack : 'Unknown error'
     }
-    }
   }
-
-export async function validateAuthToken(authHeader: string | null, request?: NextRequest): Promise<{
-  success: boolean
-  account?: any
-  error?: string
-}> {
+}
+// FUNCIONES FALTANTES PARA AUTH.TS
+export function validateAuthToken(token: string): JWTPayload | null {
   try {
-    let token: string | null = null
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      issuer: 'focalizahr-mvp'
+    }) as JWTPayload
+    return decoded
+  } catch (error) {
+    console.error('Error validating JWT token:', error)
+    return null
+  }
+}
 
-    // Prioridad 1: Authorization header
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7)
-    }
-    // Prioridad 2: Cookie focalizahr_token (para requests del navegador)
-    else if (request && request.cookies.get('focalizahr_token')) {
-      token = request.cookies.get('focalizahr_token')?.value || null
+export async function registerAccount(data: {
+  company_name: string
+  admin_name: string
+  admin_email: string
+  password: string
+  industry?: string
+  company_size?: string
+}) {
+  try {
+    const existing = await prisma.accounts.findUnique({
+      where: { admin_email: data.admin_email }
+    })
+
+    if (existing) {
+      throw new Error('Ya existe una cuenta con este email')
     }
 
-    if (!token) {
-      return { success: false, error: 'Token de autenticación requerido' }
-    }
+    const password_hash = await hashPassword(data.password)
 
-    const verification = verifyJWTToken(token)
-    
-    if (!verification.success || !verification.payload) {
-      return { success: false, error: verification.error || 'Token inválido' }
-    }
-
-    // Verify user still exists and is active
-    const account = await prisma.account.findUnique({
-      where: { id: verification.payload.id },
-      select: {
-        id: true,
-        adminEmail: true,
-        adminName: true,
-        companyName: true,
-        subscriptionTier: true
+    const account = await prisma.accounts.create({
+      data: {
+        company_name: data.company_name,
+        admin_name: data.admin_name,
+        admin_email: data.admin_email,
+        password_hash,
+        industry: data.industry,
+        company_size: data.company_size || 'pequeña',
+        subscription_tier: 'free'
       }
     })
 
-    if (!account) {
-      return { success: false, error: 'Cuenta no encontrada' }
-    }
-
-    return { 
-      success: true, 
-      account: {
-        ...verification.payload,
-        // Update with current account data
-        adminEmail: account.adminEmail,
-        adminName: account.adminName,
-        companyName: account.companyName,
-        subscriptionTier: account.subscriptionTier
-      }
+    return {
+      id: account.id,
+      adminEmail: account.admin_email,
+      adminName: account.admin_name,
+      companyName: account.company_name,
+      subscriptionTier: account.subscription_tier
     }
   } catch (error) {
-    console.error('JWT verification error:', error)
-    return { success: false, error: 'Error de autenticación interno' }
+    console.error('Error registering account:', error)
+    throw error
   }
 }

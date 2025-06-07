@@ -110,7 +110,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, onSuccess }) => {
       if (data.success) {
         // Guardar token en localStorage
         localStorage.setItem('focalizahr_token', data.token)
-        localStorage.setItem('focalizahr_account', JSON.stringify(data.account))
+        localStorage.setItem('focalizahr_account', JSON.stringify(data.user || data.account))
         
         // Callback de éxito
         onSuccess?.()

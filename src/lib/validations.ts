@@ -1,6 +1,32 @@
 // src/lib/validations.ts
 import { z } from 'zod'
+// AGREGAR ESTAS LÍNEAS AL INICIO DE src/lib/validations.ts (después del import de zod)
 
+// Auth validations
+export const loginSchema = z.object({
+  email: z.string()
+    .email('Email inválido')
+    .toLowerCase(),
+  password: z.string()
+    .min(1, 'Password requerido')
+})
+
+export const registerSchema = z.object({
+  companyName: z.string()
+    .min(1, 'Nombre de empresa requerido')
+    .max(255, 'Nombre muy largo')
+    .regex(/^[a-zA-Z0-9\s\-_áéíóúñÁÉÍÓÚÑ]+$/, 'Solo letras, números, espacios y guiones'),
+  adminEmail: z.string()
+    .email('Email inválido')
+    .toLowerCase(),
+  adminName: z.string()
+    .min(1, 'Nombre requerido')
+    .max(255, 'Nombre muy largo')
+    .regex(/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/, 'Solo letras y espacios'),
+  password: z.string()
+    .min(8, 'Mínimo 8 caracteres')
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Debe contener al menos 1 minúscula, 1 mayúscula y 1 número')
+})
 // Campaign validations
 export const createCampaignSchema = z.object({
   name: z.string()

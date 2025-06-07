@@ -23,27 +23,41 @@ export default function DashboardLayout({
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  useEffect(() => {
-    // Verificar autenticación
-    const token = localStorage.getItem('focalizahr_token')
-    const accountData = localStorage.getItem('focalizahr_account')
+  // REEMPLAZAR LA SECCIÓN PROBLEMÁTICA EN src/app/dashboard/layout.tsx
 
-    if (!token || !accountData) {
-      router.push('/login')
-      return
-    }
+useEffect(() => {
+  // Verificar autenticación
+  const token = localStorage.getItem('focalizahr_token')
+  const accountData = localStorage.getItem('focalizahr_account')
 
-    try {
+  if (!token || !accountData) {
+    router.push('/login')
+    return
+  }
+
+  try {
+    // VALIDACIÓN SEGURA antes de JSON.parse
+    if (accountData && accountData !== 'undefined' && accountData !== 'null') {
       const parsedAccount = JSON.parse(accountData)
       setAccount(parsedAccount)
-    } catch (error) {
-      console.error('Error parsing account data:', error)
+    } else {
+      // Si no hay datos válidos, limpiar y redirigir
+      localStorage.removeItem('focalizahr_token')
+      localStorage.removeItem('focalizahr_account')
       router.push('/login')
       return
     }
+  } catch (error) {
+    console.error('Error parsing account data:', error)
+    // Limpiar localStorage corrupto y redirigir
+    localStorage.removeItem('focalizahr_token')
+    localStorage.removeItem('focalizahr_account')
+    router.push('/login')
+    return
+  }
 
-    setLoading(false)
-  }, [router])
+  setLoading(false)
+}, [router])
 
   const handleLogout = () => {
     localStorage.removeItem('focalizahr_token')

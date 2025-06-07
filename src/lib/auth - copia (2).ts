@@ -217,8 +217,8 @@ export async function debugAuth() {
       error: error.message,
       details: error instanceof Error ? error.stack : 'Unknown error'
     }
-    }
   }
+ 
 
 export async function validateAuthToken(authHeader: string | null, request?: NextRequest): Promise<{
   success: boolean
@@ -278,4 +278,5 @@ export async function validateAuthToken(authHeader: string | null, request?: Nex
     console.error('JWT verification error:', error)
     return { success: false, error: 'Error de autenticación interno' }
   }
+}
 }
