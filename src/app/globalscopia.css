@@ -1,0 +1,185 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Variables CSS usando sistema FocalizaHR */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 186 100% 53%; /* #22D3EE */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 258 69% 76%; /* #A78BFA */
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 186 100% 53%; /* #22D3EE */
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Tema oscuro FocalizaHR */
+    --background: 220 13% 7%; /* #0D1117 */
+    --foreground: 218 11% 91%; /* #E6EDF3 */
+    --card: 218 11% 11%; /* #161B22 */
+    --card-foreground: 218 11% 91%; /* #E6EDF3 */
+    --popover: 218 11% 11%; /* #161B22 */
+    --popover-foreground: 218 11% 91%; /* #E6EDF3 */
+    --primary: 186 100% 53%; /* #22D3EE */
+    --primary-foreground: 220 13% 7%;
+    --secondary: 258 69% 76%; /* #A78BFA */
+    --secondary-foreground: 220 13% 7%;
+    --muted: 217 19% 27%;
+    --muted-foreground: 215 15% 57%; /* #7D8590 */
+    --accent: 217 19% 27%;
+    --accent-foreground: 218 11% 91%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 218 11% 91%;
+    --border: 217 19% 27%;
+    --input: 217 19% 27%;
+    --ring: 186 100% 53%; /* #22D3EE */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Scrollbar personalizado */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ring;
+  }
+}
+
+@layer components {
+  /* Componentes personalizados FocalizaHR */
+  .focalizahr-gradient {
+    @apply bg-gradient-to-r from-focalizahr-primary to-focalizahr-secondary;
+  }
+
+  .focalizahr-gradient-text {
+    @apply bg-gradient-to-r from-focalizahr-primary to-focalizahr-secondary bg-clip-text text-transparent;
+  }
+
+  .glass-card {
+    @apply bg-white/10 backdrop-blur-md border border-white/20;
+  }
+
+  .dark .glass-card {
+    @apply bg-black/20 backdrop-blur-md border border-white/10;
+  }
+
+  /* Animaciones suaves */
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  /* Estados de botones con gradiente */
+  .btn-gradient {
+    @apply focalizahr-gradient text-white font-medium transition-all duration-300;
+  }
+
+  .btn-gradient:hover {
+    @apply shadow-lg transform -translate-y-0.5 scale-[1.02];
+  }
+
+  .btn-gradient:active {
+    @apply transform translate-y-0 scale-100;
+  }
+
+  /* Layout principal */
+  .main-layout {
+    min-height: 100vh;
+    @apply bg-background;
+  }
+
+  /* Cards profesionales */
+  .professional-card {
+    @apply bg-card border border-border rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+
+  .dark .professional-card {
+    @apply shadow-lg hover:shadow-xl;
+  }
+}
+
+/* Keyframes personalizados */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Mejoras de accesibilidad */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Focus states mejorados */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
+}
+
+/* Responsive utilities */
+@layer utilities {
+  .safe-area-inset {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}

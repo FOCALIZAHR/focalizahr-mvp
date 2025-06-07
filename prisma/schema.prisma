@@ -1,0 +1,285 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// TABLA 1: Cuentas empresa (multi-tenancy)
+model Account {
+  id                              String   @id @default(cuid())
+  companyName                     String   @map("company_name")
+  industry                        String?
+  companySize                     String?  @map("company_size") // micro/pequeña/mediana
+  adminEmail                      String   @unique @map("admin_email")
+  adminName                       String   @map("admin_name")
+  passwordHash                    String   @map("password_hash")
+  subscriptionTier                String   @default("free") @map("subscription_tier")
+  
+  // Configuraciones parametrizables:
+  maxActiveCampaigns              Int      @default(1) @map("max_active_campaigns")
+  maxParticipantsPerCampaign      Int      @default(500) @map("max_participants_per_campaign")
+  maxCampaignDurationDays         Int      @default(30) @map("max_campaign_duration_days")
+  
+  createdAt                       DateTime @default(now()) @map("created_at")
+  updatedAt                       DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  campaigns                       Campaign[]
+  auditLogs                       AuditLog[]
+
+  @@map("accounts")
+  @@index([adminEmail], map: "idx_accounts_email")
+  @@index([subscriptionTier], map: "idx_accounts_tier")
+}
+
+// TABLA 2: Tipos de campaña/estudio
+model CampaignType {
+  id                              String   @id @default(cuid())
+  name                            String
+  slug                            String   @unique // pulso-express, experiencia-full
+  description                     String?
+  estimatedDuration               Int?     @map("estimated_duration") // minutos
+  questionCount                   Int?     @map("question_count")
+  methodology                     String?
+  category                        String?  // clima, experiencia, beneficios
+  isActive                        Boolean  @default(true) @map("is_active")
+  sortOrder                       Int      @default(0) @map("sort_order")
+  createdAt                       DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  campaigns                       Campaign[]
+  questions                       Question[]
+
+  @@map("campaign_types")
+  @@index([isActive], map: "idx_campaign_types_active")
+  @@index([category], map: "idx_campaign_types_category")
+}
+
+// TABLA 3: Campañas/estudios
+model Campaign {
+  id                              String   @id @default(cuid())
+  accountId                       String   @map("account_id")
+  campaignTypeId                  String   @map("campaign_type_id")
+  name                            String
+  description                     String?
+  startDate                       DateTime @map("start_date") @db.Date
+  endDate                         DateTime @map("end_date") @db.Date
+  status                          String   @default("draft") // draft, active, completed, cancelled
+  
+  // Configuración campaña:
+  sendReminders                   Boolean  @default(true) @map("send_reminders")
+  anonymousResults                Boolean  @default(true) @map("anonymous_results")
+  
+  // Metadatos:
+  createdByName                   String?  @map("created_by_name")
+  activatedAt                     DateTime? @map("activated_at")
+  completedAt                     DateTime? @map("completed_at")
+  totalInvited                    Int      @default(0) @map("total_invited")
+  totalResponded                  Int      @default(0) @map("total_responded")
+  
+  createdAt                       DateTime @default(now()) @map("created_at")
+  updatedAt                       DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  account                         Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  campaignType                    CampaignType @relation(fields: [campaignTypeId], references: [id])
+  participants                    Participant[]
+  campaignResults                 CampaignResult?
+  auditLogs                       AuditLog[]
+
+  @@map("campaigns")
+  @@index([accountId], map: "idx_campaigns_account")
+  @@index([status], map: "idx_campaigns_status")
+  @@index([campaignTypeId], map: "idx_campaigns_type")
+  @@index([startDate, endDate], map: "idx_campaigns_dates")
+}
+
+// TABLA 4: Participantes (carga manual backend)
+model Participant {
+  id                              String   @id @default(cuid())
+  campaignId                      String   @map("campaign_id")
+  email                           String
+  uniqueToken                     String   @unique @map("unique_token")
+  
+  // Segmentación básica (carga manual):
+  department                      String?
+  position                        String?
+  seniorityLevel                  String?  @map("seniority_level") // junior, mid, senior, executive
+  location                        String?
+  
+  // Estados:
+  hasResponded                    Boolean  @default(false) @map("has_responded")
+  responseDate                    DateTime? @map("response_date")
+  startedAt                       DateTime? @map("started_at")
+  reminderCount                   Int      @default(0) @map("reminder_count")
+  lastReminderSent                DateTime? @map("last_reminder_sent")
+  
+  // Metadatos:
+  ipAddress                       String?  @map("ip_address")
+  userAgent                       String?  @map("user_agent")
+  createdAt                       DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  campaign                        Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  responses                       Response[]
+
+  @@map("participants")
+  @@unique([campaignId, email])
+  @@index([campaignId], map: "idx_participants_campaign")
+  @@index([uniqueToken], map: "idx_participants_token")
+  @@index([email], map: "idx_participants_email")
+  @@index([hasResponded], map: "idx_participants_responded")
+  @@index([department], map: "idx_participants_department")
+}
+
+// TABLA 5: Preguntas por tipo campaña
+model Question {
+  id                              String   @id @default(cuid())
+  campaignTypeId                  String   @map("campaign_type_id")
+  text                            String
+  category                        String   // liderazgo, ambiente, desarrollo, bienestar
+  subcategory                     String?  // feedback, reconocimiento, autonomia, etc.
+  questionOrder                   Int      @map("question_order")
+  responseType                    String   @default("rating") @map("response_type") // rating, text, choice
+  
+  // Configuración pregunta:
+  isRequired                      Boolean  @default(true) @map("is_required")
+  isActive                        Boolean  @default(true) @map("is_active")
+  minValue                        Int      @default(1) @map("min_value")
+  maxValue                        Int      @default(5) @map("max_value")
+  
+  // Metadatos:
+  methodologyReference            String?  @map("methodology_reference")
+  createdAt                       DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  campaignType                    CampaignType @relation(fields: [campaignTypeId], references: [id])
+  responses                       Response[]
+
+  @@map("questions")
+  @@index([campaignTypeId], map: "idx_questions_campaign_type")
+  @@index([category], map: "idx_questions_category")
+  @@index([questionOrder], map: "idx_questions_order")
+  @@index([isActive], map: "idx_questions_active")
+}
+
+// TABLA 6: Respuestas colaboradores
+model Response {
+  id                              String   @id @default(cuid())
+  participantId                   String   @map("participant_id")
+  questionId                      String   @map("question_id")
+  
+  // Respuestas:
+  rating                          Int?
+  textResponse                    String?  @map("text_response")
+  choiceResponse                  String?  @map("choice_response")
+  
+  // Metadatos:
+  responseTimeSeconds             Int?     @map("response_time_seconds")
+  createdAt                       DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  participant                     Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  question                        Question @relation(fields: [questionId], references: [id])
+
+  @@map("responses")
+  @@index([participantId], map: "idx_responses_participant")
+  @@index([questionId], map: "idx_responses_question")
+  @@index([rating], map: "idx_responses_rating")
+  @@index([createdAt], map: "idx_responses_created")
+}
+
+// TABLA 7: Resultados agregados + Kit Comunicación
+model CampaignResult {
+  id                              String   @id @default(cuid())
+  campaignId                      String   @unique @map("campaign_id")
+  
+  // Métricas principales:
+  participationRate               Decimal  @map("participation_rate") @db.Decimal(5,2)
+  overallScore                    Decimal  @map("overall_score") @db.Decimal(3,2)
+  totalResponses                  Int      @map("total_responses")
+  
+  // Análisis por categoría:
+  categoryScores                  Json     @map("category_scores") // {liderazgo: 3.2, ambiente: 4.1, ...}
+  categoryResponseCounts          Json?    @map("category_response_counts")
+  
+  // Análisis básico por segmentación:
+  segmentAnalysis                 Json?    @map("segment_analysis")
+  departmentScores                Json?    @map("department_scores")
+  positionScores                  Json?    @map("position_scores")
+  
+  // Kit comunicación:
+  communicationInsights           Json     @map("communication_insights")
+  keyStrengths                    Json?    @map("key_strengths")
+  keyOpportunities                Json?    @map("key_opportunities")
+  
+  // Benchmarking básico:
+  benchmarkComparison             Json?    @map("benchmark_comparison")
+  industryBenchmark               Decimal? @map("industry_benchmark") @db.Decimal(3,2)
+  
+  // Metadatos:
+  resultsData                     Json?    @map("results_data")
+  confidenceLevel                 String?  @map("confidence_level") // high, medium, low
+  generatedAt                     DateTime @default(now()) @map("generated_at")
+  updatedAt                       DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  campaign                        Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@map("campaign_results")
+  @@index([campaignId], map: "idx_results_campaign")
+  @@index([generatedAt], map: "idx_results_generated")
+}
+
+// TABLA 8: Templates Kit Comunicación
+model CommunicationTemplate {
+  id                              String   @id @default(cuid())
+  templateType                    String   @map("template_type") // fortaleza, oportunidad, benchmark_superior, etc.
+  category                        String?  // liderazgo, ambiente, desarrollo, bienestar, general
+  conditionRule                   String   @map("condition_rule") // "score >= 4.0", "participation < 50"
+  templateText                    String   @map("template_text")
+  variablesRequired               Json?    @map("variables_required") // ["category", "score"]
+  priority                        Int      @default(0)
+  isActive                        Boolean  @default(true) @map("is_active")
+  
+  // Metadatos:
+  usageCount                      Int      @default(0) @map("usage_count")
+  createdAt                       DateTime @default(now()) @map("created_at")
+
+  @@map("communication_templates")
+  @@index([templateType], map: "idx_templates_type")
+  @@index([category], map: "idx_templates_category")
+  @@index([isActive], map: "idx_templates_active")
+  @@index([priority], map: "idx_templates_priority")
+}
+
+// TABLA 9: Audit Log (Para debugging y compliance)
+model AuditLog {
+  id                              String   @id @default(cuid())
+  accountId                       String?  @map("account_id")
+  campaignId                      String?  @map("campaign_id")
+  action                          String   // campaign_created, campaign_activated, participant_added, etc.
+  entityType                      String?  @map("entity_type") // campaign, participant, response
+  entityId                        String?  @map("entity_id")
+  oldValues                       Json?    @map("old_values")
+  newValues                       Json?    @map("new_values")
+  userInfo                        Json?    @map("user_info") // IP, user agent, etc.
+  createdAt                       DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  account                         Account? @relation(fields: [accountId], references: [id])
+  campaign                        Campaign? @relation(fields: [campaignId], references: [id])
+
+  @@map("audit_logs")
+  @@index([accountId], map: "idx_audit_account")
+  @@index([campaignId], map: "idx_audit_campaign")
+  @@index([action], map: "idx_audit_action")
+  @@index([createdAt], map: "idx_audit_created")
+}
