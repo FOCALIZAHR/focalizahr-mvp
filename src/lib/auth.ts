@@ -278,7 +278,9 @@ export async function validateAuthToken(authHeader: string | null, request?: Nex
     console.error('JWT verification error:', error)
     return { success: false, error: 'Error de autenticación interno' }
   }
-  export async function registerAccount(data: {
+ 
+}
+ export async function registerAccount(data: {
   companyName: string
   adminEmail: string
   adminName: string
@@ -331,5 +333,4 @@ export async function validateAuthToken(authHeader: string | null, request?: Nex
     console.error('Register error:', error)
     return { success: false, error: 'Error interno del servidor' }
   }
-}
 }
