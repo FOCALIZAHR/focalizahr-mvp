@@ -1,0 +1,29 @@
+
+> focalizahr-mvp@1.0.0 build
+> next build
+
+  Ôû▓ Next.js 14.2.3
+  - Environments: .env
+
+   Creating an optimized production build ...
+ ÔÜá Compiled with warnings
+
+./src/app/api/auth/register/route.ts
+Attempted import error: 'registerAccount' is not exported from '@/lib/auth' (imported as 'registerAccount').
+
+Import trace for requested module:
+./src/app/api/auth/register/route.ts
+
+   Linting and checking validity of types ...
+Failed to compile.
+
+./src/app/api/auth/login/route.ts:144:57
+Type error: 'error' is of type 'unknown'.
+
+  142 |       { 
+  143 |         error: 'Error interno del servidor',
+> 144 |         debug: process.env.NODE_ENV === 'development' ? error.message : undefined
+      |                                                         ^
+  145 |       },
+  146 |       { status: 500 }
+  147 |     )
