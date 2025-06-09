@@ -1,6 +1,11 @@
-// src/lib/validations.ts
+// src/lib/validations.ts - EXTENSIÓN PARA CHAT 3B
+// PRESERVANDO 100% EL CONTENIDO EXISTENTE + AGREGANDO SCHEMAS WIZARD
+
 import { z } from 'zod'
-// AGREGAR ESTAS LÍNEAS AL INICIO DE src/lib/validations.ts (después del import de zod)
+
+// ========================================
+// VALIDACIONES EXISTENTES (PRESERVADAS)
+// ========================================
 
 // Auth validations
 export const loginSchema = z.object({
@@ -27,6 +32,7 @@ export const registerSchema = z.object({
     .min(8, 'Mínimo 8 caracteres')
     .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Debe contener al menos 1 minúscula, 1 mayúscula y 1 número')
 })
+
 // Campaign validations
 export const createCampaignSchema = z.object({
   name: z.string()
@@ -125,3 +131,532 @@ export const updateAccountSchema = z.object({
     'grande'     // 251+
   ]).optional()
 })
+
+// ========================================
+// NUEVAS VALIDACIONES WIZARD CHAT 3B
+// ========================================
+
+// Wizard Step 1 - Información Básica
+export const wizardStep1Schema = z.object({
+  name: z.string()
+    .min(3, 'Nombre debe tener al menos 3 caracteres')
+    .max(100, 'Nombre muy largo (máximo 100 caracteres)')
+    .regex(/^[a-zA-Z0-9\s\-_áéíóúñÁÉÍÓÚÑ().,]+$/, 'Caracteres no válidos en el nombre')
+    .refine((name) => name.trim().length > 0, 'Nombre no puede estar vacío'),
+  
+  description: z.string()
+    .max(500, 'Descripción muy larga (máximo 500 caracteres)')
+    .optional()
+    .transform(val => val?.trim() || undefined),
+  
+  campaignTypeId: z.string()
+    .min(1, 'Selecciona un tipo de estudio')
+    .cuid('ID de tipo de campaña inválido'),
+  
+  startDate: z.string()
+    .min(1, 'Fecha de inicio es requerida')
+    .transform((str) => {
+      const date = new Date(str);
+      if (isNaN(date.getTime())) {
+        throw new Error('Fecha de inicio inválida');
+      }
+      return date;
+    })
+    .refine((date) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return date >= today;
+    }, 'Fecha de inicio no puede ser en el pasado'),
+  
+  endDate: z.string()
+    .min(1, 'Fecha de fin es requerida')
+    .transform((str) => {
+      const date = new Date(str);
+      if (isNaN(date.getTime())) {
+        throw new Error('Fecha de fin inválida');
+      }
+      return date;
+    })
+}).refine((data) => {
+  if (data.startDate && data.endDate) {
+    const diffTime = data.endDate.getTime() - data.startDate.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays >= 1 && diffDays <= 60;
+  }
+  return true;
+}, {
+  message: 'La campaña debe durar entre 1 y 60 días',
+  path: ['endDate']
+}).refine((data) => {
+  return data.endDate > data.startDate;
+}, {
+  message: 'Fecha de fin debe ser posterior a fecha de inicio',
+  path: ['endDate']
+});
+
+// Wizard Step 2 - Participantes (Enfoque Concierge)
+export const wizardStep2Schema = z.object({
+  estimatedParticipants: z.number()
+    .int('Debe ser un número entero')
+    .min(5, 'Mínimo 5 participantes requeridos para validez estadística')
+    .max(500, 'Máximo 500 participantes permitidos en esta versión')
+    .refine((num) => num > 0, 'Número de participantes debe ser positivo'),
+  
+  participantInstructions: z.string()
+    .max(1000, 'Instrucciones muy largas (máximo 1000 caracteres)')
+    .optional()
+    .transform(val => val?.trim() || ''),
+  
+  // Validaciones para el enfoque concierge
+  dataQualityRequirements: z.object({
+    requireDepartment: z.boolean().default(false),
+    requirePosition: z.boolean().default(false),
+    requireSeniority: z.boolean().default(false),
+    requireLocation: z.boolean().default(false)
+  }).optional(),
+  
+  segmentationPreferences: z.array(z.enum([
+    'department',
+    'position', 
+    'seniority',
+    'location',
+    'none'
+  ])).default(['department'])
+});
+
+// Wizard Step 3 - Configuración Final
+export const wizardStep3Schema = z.object({
+  sendReminders: z.boolean().default(true),
+  anonymousResults: z.boolean().default(true),
+  
+  // Configuraciones adicionales
+  reminderSettings: z.object({
+    firstReminder: z.number().int().min(1).max(7).default(3), // días antes del cierre
+    secondReminder: z.number().int().min(1).max(5).default(1), // días antes del cierre
+    enableFinalReminder: z.boolean().default(true)
+  }).optional(),
+  
+  privacySettings: z.object({
+    anonymousResults: z.boolean().default(true),
+    allowDataExport: z.boolean().default(true),
+    retentionPeriodMonths: z.number().int().min(6).max(24).default(12)
+  }).optional(),
+  
+  // Confirmaciones requeridas
+  confirmations: z.object({
+    dataProcessingAgreement: z.boolean()
+      .refine(val => val === true, 'Debe aceptar el procesamiento de datos'),
+    participantNotification: z.boolean()
+      .refine(val => val === true, 'Debe confirmar que notificará a los participantes'),
+    resultSharing: z.boolean()
+      .refine(val => val === true, 'Debe confirmar cómo compartirá los resultados')
+  })
+});
+
+// Schema completo del wizard (todos los pasos)
+export const completeWizardSchema = z.object({
+  // Paso 1
+  name: wizardStep1Schema.shape.name,
+  description: wizardStep1Schema.shape.description,
+  campaignTypeId: wizardStep1Schema.shape.campaignTypeId,
+  startDate: wizardStep1Schema.shape.startDate,
+  endDate: wizardStep1Schema.shape.endDate,
+  
+  // Paso 2
+  estimatedParticipants: wizardStep2Schema.shape.estimatedParticipants,
+  participantInstructions: wizardStep2Schema.shape.participantInstructions,
+  dataQualityRequirements: wizardStep2Schema.shape.dataQualityRequirements,
+  segmentationPreferences: wizardStep2Schema.shape.segmentationPreferences,
+  
+  // Paso 3
+  sendReminders: wizardStep3Schema.shape.sendReminders,
+  anonymousResults: wizardStep3Schema.shape.anonymousResults,
+  reminderSettings: wizardStep3Schema.shape.reminderSettings,
+  privacySettings: wizardStep3Schema.shape.privacySettings,
+  confirmations: wizardStep3Schema.shape.confirmations
+});
+
+// ========================================
+// VALIDACIONES GESTIÓN DE ESTADOS
+// ========================================
+
+// Transición de estados de campaña
+export const campaignStateTransitionSchema = z.object({
+  campaignId: z.string().cuid('ID de campaña inválido'),
+  fromStatus: z.enum(['draft', 'active', 'completed', 'cancelled']),
+  toStatus: z.enum(['draft', 'active', 'completed', 'cancelled']),
+  action: z.enum(['activate', 'complete', 'cancel', 'reopen']),
+  reason: z.string()
+    .max(500, 'Razón muy larga')
+    .optional(),
+  forceTransition: z.boolean().default(false)
+}).refine((data) => {
+  // Validar transiciones válidas
+  const validTransitions = {
+    draft: ['active'],
+    active: ['completed', 'cancelled'],
+    completed: [], // No se puede cambiar desde completada (excepto con force)
+    cancelled: [] // No se puede cambiar desde cancelada (excepto con force)
+  };
+  
+  const allowedTargets = validTransitions[data.fromStatus as keyof typeof validTransitions];
+  return data.forceTransition || allowedTargets.includes(data.toStatus);
+}, {
+  message: 'Transición de estado no válida',
+  path: ['toStatus']
+});
+
+// Validación para activación de campaña
+export const campaignActivationSchema = z.object({
+  campaignId: z.string().cuid(),
+  minimumParticipants: z.number().int().min(5).default(5),
+  validateDates: z.boolean().default(true),
+  sendNotifications: z.boolean().default(true),
+  
+  // Pre-validaciones requeridas
+  preValidations: z.object({
+    hasParticipants: z.boolean(),
+    validDateRange: z.boolean(), 
+    configurationComplete: z.boolean(),
+    noConflictingCampaigns: z.boolean()
+  }).refine((data) => {
+    return Object.values(data).every(val => val === true);
+  }, 'No se cumplen todos los requisitos para activar la campaña')
+});
+
+// ========================================
+// VALIDACIONES PARTICIPANTES CONCIERGE
+// ========================================
+
+// Validación de participante individual (extendida)
+export const participantExtendedSchema = z.object({
+  email: z.string()
+    .email('Email inválido')
+    .toLowerCase()
+    .refine((email) => {
+      // Validaciones adicionales de email
+      const domain = email.split('@')[1];
+      const blockedDomains = ['example.com', 'test.com', 'invalid.com'];
+      return !blockedDomains.includes(domain);
+    }, 'Dominio de email no válido'),
+  
+  department: z.string()
+    .max(100, 'Departamento muy largo')
+    .optional()
+    .transform(val => val?.trim() || undefined),
+  
+  position: z.string()
+    .max(100, 'Posición muy larga')
+    .optional()
+    .transform(val => val?.trim() || undefined),
+  
+  seniorityLevel: z.enum(['junior', 'mid', 'senior', 'executive'])
+    .optional(),
+  
+  location: z.string()
+    .max(100, 'Ubicación muy larga')
+    .optional()
+    .transform(val => val?.trim() || undefined),
+  
+  // Campos adicionales para enfoque concierge
+  status: z.enum(['pending', 'validated', 'error']).default('pending'),
+  errorMessage: z.string().optional(),
+  processedAt: z.date().optional(),
+  processedBy: z.string().optional()
+});
+
+// Validación de carga masiva de participantes (enfoque concierge)
+export const conciergeParticipantsSchema = z.object({
+  campaignId: z.string().cuid(),
+  participants: z.array(participantExtendedSchema)
+    .min(5, 'Mínimo 5 participantes requeridos')
+    .max(500, 'Máximo 500 participantes permitidos')
+    .refine((participants) => {
+      // Validar emails únicos
+      const emails = participants.map(p => p.email);
+      return new Set(emails).size === emails.length;
+    }, 'Se encontraron emails duplicados')
+    .refine((participants) => {
+      // Validar calidad mínima de datos
+      const validEmails = participants.filter(p => p.status !== 'error').length;
+      return validEmails >= 5;
+    }, 'Debe haber al menos 5 participantes con emails válidos'),
+  
+  // Metadatos del procesamiento concierge
+  processingMetadata: z.object({
+    originalFileName: z.string().optional(),
+    uploadedAt: z.date().default(() => new Date()),
+    processedBy: z.string(), // ID del admin de FocalizaHR que procesó
+    dataQuality: z.object({
+      totalRows: z.number().int(),
+      validRows: z.number().int(),
+      duplicatesRemoved: z.number().int(),
+      errorsFound: z.number().int()
+    }),
+    segmentationApplied: z.array(z.string()).default([])
+  }),
+  
+  // Configuraciones de validación
+  validationSettings: z.object({
+    strictEmailValidation: z.boolean().default(true),
+    allowPartialData: z.boolean().default(true),
+    autoCorrectCommonErrors: z.boolean().default(true),
+    preserveOriginalData: z.boolean().default(true)
+  }).optional()
+});
+
+// ========================================
+// VALIDACIONES DE PREVIEW Y ESTADÍSTICAS
+// ========================================
+
+// Schema para estadísticas de participantes
+export const participantSummarySchema = z.object({
+  total: z.number().int().min(0),
+  byDepartment: z.record(z.string(), z.number().int().min(0)),
+  byPosition: z.record(z.string(), z.number().int().min(0)),
+  bySeniority: z.record(z.string(), z.number().int().min(0)),
+  byLocation: z.record(z.string(), z.number().int().min(0)),
+  validEmails: z.number().int().min(0),
+  duplicates: z.number().int().min(0),
+  errors: z.number().int().min(0)
+}).refine((data) => {
+  // Validar consistencia de datos
+  return data.validEmails + data.errors <= data.total;
+}, 'Inconsistencia en estadísticas de participantes');
+
+// ========================================
+// HELPERS Y UTILIDADES DE VALIDACIÓN
+// ========================================
+
+// Función helper para validar pasos del wizard
+export const validateWizardStep = (step: number, data: any) => {
+  switch (step) {
+    case 1:
+      return wizardStep1Schema.safeParse(data);
+    case 2:
+      return wizardStep2Schema.safeParse(data);
+    case 3:
+      return wizardStep3Schema.safeParse(data);
+    default:
+      return { success: false, error: { errors: [{ message: 'Paso de wizard inválido' }] } };
+  }
+};
+
+// Función helper para validar transiciones de estado
+export const validateStateTransition = (
+  fromStatus: string, 
+  toStatus: string, 
+  campaignData?: any
+) => {
+  const transitionData = {
+    campaignId: campaignData?.id || 'temp',
+    fromStatus,
+    toStatus,
+    action: getActionFromTransition(fromStatus, toStatus),
+    forceTransition: false
+  };
+  
+  return campaignStateTransitionSchema.safeParse(transitionData);
+};
+
+// Helper para obtener acción desde transición
+const getActionFromTransition = (from: string, to: string): string => {
+  const actionMap: Record<string, string> = {
+    'draft->active': 'activate',
+    'active->completed': 'complete',
+    'active->cancelled': 'cancel'
+  };
+  
+  return actionMap[`${from}->${to}`] || 'unknown';
+};
+
+// ========================================
+// VALIDACIONES DE CONFIGURACIÓN AVANZADA
+// ========================================
+
+// Schema para configuraciones avanzadas del wizard
+export const advancedCampaignConfigSchema = z.object({
+  // Configuraciones de email
+  emailSettings: z.object({
+    customInvitationTemplate: z.string().optional(),
+    customReminderTemplate: z.string().optional(),
+    fromName: z.string().max(50).default('FocalizaHR'),
+    replyToEmail: z.string().email().optional(),
+    trackOpens: z.boolean().default(true),
+    trackClicks: z.boolean().default(true)
+  }).optional(),
+  
+  // Configuraciones de seguridad
+  securitySettings: z.object({
+    requireStrongPasswords: z.boolean().default(false),
+    enableTwoFactor: z.boolean().default(false),
+    sessionTimeout: z.number().int().min(15).max(480).default(60), // minutos
+    allowedIpRanges: z.array(z.string()).optional()
+  }).optional(),
+  
+  // Configuraciones de análisis
+  analyticsSettings: z.object({
+    enableAdvancedAnalytics: z.boolean().default(true),
+    includeOpenTextAnalysis: z.boolean().default(false),
+    generatePredictiveInsights: z.boolean().default(false),
+    compareWithBenchmarks: z.boolean().default(true)
+  }).optional(),
+  
+  // Configuraciones de integración
+  integrationSettings: z.object({
+    webhookUrl: z.string().url().optional(),
+    apiNotifications: z.boolean().default(false),
+    exportFormats: z.array(z.enum(['csv', 'excel', 'json', 'pdf'])).default(['csv', 'pdf']),
+    autoExportOnCompletion: z.boolean().default(false)
+  }).optional()
+});
+
+// ========================================
+// VALIDACIONES DE ERRORES Y FEEDBACK
+// ========================================
+
+// Schema para manejo de errores del wizard
+export const wizardErrorSchema = z.object({
+  step: z.number().int().min(1).max(3),
+  field: z.string(),
+  message: z.string(),
+  code: z.string().optional(),
+  severity: z.enum(['error', 'warning', 'info']).default('error')
+});
+
+// Schema para feedback y sugerencias
+export const wizardFeedbackSchema = z.object({
+  type: z.enum(['suggestion', 'warning', 'tip', 'requirement']),
+  message: z.string(),
+  actionRequired: z.boolean().default(false),
+  dismissible: z.boolean().default(true)
+});
+
+// ========================================
+// CONSTANTES DE VALIDACIÓN
+// ========================================
+
+export const VALIDATION_CONSTANTS = {
+  // Límites de participantes
+  MIN_PARTICIPANTS: 5,
+  MAX_PARTICIPANTS_FREE: 100,
+  MAX_PARTICIPANTS_PRO: 500,
+  MAX_PARTICIPANTS_ENTERPRISE: 2000,
+  
+  // Límites de duración
+  MIN_CAMPAIGN_DAYS: 1,
+  MAX_CAMPAIGN_DAYS: 60,
+  RECOMMENDED_MIN_DAYS: 3,
+  RECOMMENDED_MAX_DAYS: 30,
+  
+  // Límites de texto
+  MAX_CAMPAIGN_NAME_LENGTH: 100,
+  MAX_DESCRIPTION_LENGTH: 500,
+  MAX_INSTRUCTIONS_LENGTH: 1000,
+  
+  // Configuraciones de validación
+  EMAIL_REGEX: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  DOMAIN_BLACKLIST: ['example.com', 'test.com', 'invalid.com'],
+  
+  // Códigos de error
+  ERROR_CODES: {
+    INVALID_EMAIL: 'INVALID_EMAIL',
+    DUPLICATE_EMAIL: 'DUPLICATE_EMAIL',
+    INVALID_DATE_RANGE: 'INVALID_DATE_RANGE',
+    INSUFFICIENT_PARTICIPANTS: 'INSUFFICIENT_PARTICIPANTS',
+    INVALID_TRANSITION: 'INVALID_TRANSITION',
+    MISSING_REQUIRED_FIELD: 'MISSING_REQUIRED_FIELD'
+  }
+} as const;
+
+// ========================================
+// TIPOS TYPESCRIPT DERIVADOS
+// ========================================
+
+// Tipos derivados de los schemas para TypeScript
+export type WizardStep1Data = z.infer<typeof wizardStep1Schema>;
+export type WizardStep2Data = z.infer<typeof wizardStep2Schema>;
+export type WizardStep3Data = z.infer<typeof wizardStep3Schema>;
+export type CompleteWizardData = z.infer<typeof completeWizardSchema>;
+
+export type ParticipantExtended = z.infer<typeof participantExtendedSchema>;
+export type ConciergeParticipantsData = z.infer<typeof conciergeParticipantsSchema>;
+export type ParticipantSummary = z.infer<typeof participantSummarySchema>;
+
+export type CampaignStateTransition = z.infer<typeof campaignStateTransitionSchema>;
+export type CampaignActivation = z.infer<typeof campaignActivationSchema>;
+
+export type WizardError = z.infer<typeof wizardErrorSchema>;
+export type WizardFeedback = z.infer<typeof wizardFeedbackSchema>;
+
+// ========================================
+// FUNCIONES DE VALIDACIÓN PERSONALIZADAS
+// ========================================
+
+// Validador personalizado para fechas de campaña
+export const validateCampaignDates = (startDate: Date, endDate: Date) => {
+  const errors: string[] = [];
+  
+  if (startDate >= endDate) {
+    errors.push('Fecha de fin debe ser posterior a fecha de inicio');
+  }
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (startDate < today) {
+    errors.push('Fecha de inicio no puede ser en el pasado');
+  }
+  
+  const diffDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < VALIDATION_CONSTANTS.MIN_CAMPAIGN_DAYS) {
+    errors.push(`Duración mínima: ${VALIDATION_CONSTANTS.MIN_CAMPAIGN_DAYS} día(s)`);
+  }
+  if (diffDays > VALIDATION_CONSTANTS.MAX_CAMPAIGN_DAYS) {
+    errors.push(`Duración máxima: ${VALIDATION_CONSTANTS.MAX_CAMPAIGN_DAYS} días`);
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors,
+    duration: diffDays
+  };
+};
+
+// Validador personalizado para calidad de participantes
+export const validateParticipantQuality = (participants: ParticipantExtended[]) => {
+  const summary = {
+    total: participants.length,
+    valid: 0,
+    errors: 0,
+    duplicates: 0,
+    issues: [] as string[]
+  };
+  
+  const emails = new Set<string>();
+  
+  participants.forEach((participant, index) => {
+    // Verificar duplicados
+    if (emails.has(participant.email)) {
+      summary.duplicates++;
+      summary.issues.push(`Email duplicado en línea ${index + 1}: ${participant.email}`);
+    } else {
+      emails.add(participant.email);
+    }
+    
+    // Verificar validez
+    if (participant.status === 'error') {
+      summary.errors++;
+      if (participant.errorMessage) {
+        summary.issues.push(`Error en línea ${index + 1}: ${participant.errorMessage}`);
+      }
+    } else {
+      summary.valid++;
+    }
+  });
+  
+  return {
+    ...summary,
+    qualityScore: summary.total > 0 ? Math.round((summary.valid / summary.total) * 100) : 0,
+    meetsMinimum: summary.valid >= VALIDATION_CONSTANTS.MIN_PARTICIPANTS
+  };
+};

@@ -1,5 +1,5 @@
 'use client'
-
+import './dashboard.css'
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Logo from '@/components/common/Logo'

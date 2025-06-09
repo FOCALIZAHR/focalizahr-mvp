@@ -85,12 +85,44 @@ export function generateJWT(payload: Omit<JWTPayload, 'iat' | 'exp'>): string {
   }
 }
 
+// REEMPLAZAR la función verifyJWTToken en src/lib/auth.ts
+// LÍNEAS APROXIMADAS 87-102
+
 export function verifyJWTToken(token: string): { success: boolean; payload?: JWTPayload; error?: string } {
   try {
     console.log('🎫 Verifying JWT token...')
-    const payload = jwt.verify(token, JWT_SECRET) as JWTPayload
-    console.log('✅ JWT token verified successfully')
-    return { success: true, payload }
+    
+    // Verificación básica para cliente (browser)
+    if (typeof window !== 'undefined') {
+      // En el cliente, solo verificamos formato básico
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        return { success: false, error: 'Invalid token format' };
+      }
+      
+      try {
+        // Decodificar payload sin verificar firma (solo en cliente)
+        const payloadBase64 = parts[1];
+        const payloadString = atob(payloadBase64);
+        const payload = JSON.parse(payloadString) as JWTPayload;
+        
+        // Verificar expiración
+        if (payload.exp && payload.exp < Date.now() / 1000) {
+          return { success: false, error: 'Token expired' };
+        }
+        
+        console.log('✅ JWT token verified successfully (client-side)')
+        return { success: true, payload };
+      } catch (decodeError) {
+        return { success: false, error: 'Invalid token encoding' };
+      }
+    }
+    
+    // Verificación completa para servidor
+    const payload = jwt.verify(token, JWT_SECRET) as JWTPayload;
+    console.log('✅ JWT token verified successfully (server-side)')
+    return { success: true, payload };
+    
   } catch (error) {
     console.error('❌ JWT verification error:', error)
     
@@ -332,5 +364,71 @@ export async function validateAuthToken(authHeader: string | null, request?: Nex
   } catch (error) {
     console.error('Register error:', error)
     return { success: false, error: 'Error interno del servidor' }
+  }
+}
+// AGREGAR ESTA FUNCIÓN AL FINAL DEL ARCHIVO src/lib/auth.ts
+// (después de la función registerAccount)
+
+// Función para verificar autenticación en el cliente
+export function isAuthenticated(): boolean {
+  try {
+    // En el navegador, verificar si hay token en localStorage
+    if (typeof window === 'undefined') {
+      return false; // En el servidor, no está autenticado
+    }
+
+    const token = localStorage.getItem('focalizahr_token');
+    
+    if (!token) {
+      return false;
+    }
+
+    // Verificar que el token no esté expirado
+    const verification = verifyJWTToken(token);
+    return verification.success;
+    
+  } catch (error) {
+    console.error('Error checking authentication:', error);
+    return false;
+  }
+}
+
+// Función para obtener datos del usuario autenticado
+export function getCurrentUser(): JWTPayload | null {
+  try {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    const token = localStorage.getItem('focalizahr_token');
+    
+    if (!token) {
+      return null;
+    }
+
+    const verification = verifyJWTToken(token);
+    
+    if (verification.success && verification.payload) {
+      return verification.payload;
+    }
+
+    return null;
+    
+  } catch (error) {
+    console.error('Error getting current user:', error);
+    return null;
+  }
+}
+
+// Función para logout
+export function logout(): void {
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('focalizahr_token');
+      // Opcional: redireccionar
+      window.location.href = '/';
+    }
+  } catch (error) {
+    console.error('Error during logout:', error);
   }
 }

@@ -1,0 +1,239 @@
+/* 
+ * FocalizaHR Dashboard - Layout Styles Only
+ * Archivo: src/app/dashboard/dashboard.css
+ * 
+ * IMPORTANTE: Este archivo solo contiene estilos de layout exclusivos del dashboard.
+ * Todos los colores, fuentes y efectos se heredan de globals.css
+ */
+
+/* Layout específico del dashboard */
+.neural-dashboard {
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Grid layouts específicos del dashboard */
+.campaigns-list {
+  position: relative;
+}
+
+/* Layout de métricas en grid */
+.metrics-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+/* Layout específico para cards de campaña */
+.campaign-card-layout {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Indicador de estado lateral - solo posicionamiento */
+.campaign-status-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Layout para barras de progreso */
+.progress-container {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Layout para mini iconos */
+.mini-icon-container {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* REFINAMIENTOS VISUALES PREMIUM */
+
+/* Tarjetas métricas elegantes con bordes laterales (MÉTODO ORIGINAL) */
+.metric-card-elegant {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 24px;
+  position: relative;
+  border: 1px solid rgba(71, 85, 105, 0.3);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.3s ease;
+}
+
+/* Bordes laterales directos (COMO ANTES) */
+.metric-card-elegant.accent-cyan {
+  border-left: 4px solid #22D3EE;
+}
+
+.metric-card-elegant.accent-purple {
+  border-left: 4px solid #A78BFA;
+}
+
+.metric-card-elegant.accent-blue {
+  border-left: 4px solid #3B82F6;
+}
+
+.metric-card-elegant.accent-green {
+  border-left: 4px solid #10B981;
+}
+
+.metric-card-elegant:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  border-color: rgba(34, 211, 238, 0.4);
+}
+
+/* Iconos con transición de opacidad */
+.metric-icon {
+  opacity: 0.7;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.metric-card-elegant:hover .metric-icon {
+  opacity: 1;
+}
+
+/* Status bar elegante */
+.status-bar-elegant {
+  background: rgba(30, 41, 59, 0.6);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(71, 85, 105, 0.2);
+  border-radius: 12px;
+  padding: 12px 20px;
+}
+
+/* Badges con degradados sutiles */
+.badge-gradient-draft {
+  background: linear-gradient(135deg, rgba(156, 163, 175, 0.2), rgba(107, 114, 128, 0.3));
+  border: 1px solid rgba(156, 163, 175, 0.4);
+}
+
+.badge-gradient-active {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.3));
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.badge-gradient-completed {
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.2), rgba(6, 182, 212, 0.3));
+  border: 1px solid rgba(34, 211, 238, 0.4);
+}
+
+.badge-gradient-cancelled {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(220, 38, 38, 0.3));
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+/* BARRA DE SCROLL ELEGANTE CON GRADIENTE CORPORATIVO */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #22D3EE, #A78BFA);
+  border-radius: 4px;
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.3);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #A78BFA, #22D3EE);
+  box-shadow: 0 0 15px rgba(34, 211, 238, 0.5);
+}
+
+/* Layout para status widgets */
+.status-widget-layout {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+
+/* Layout responsivo específico del dashboard */
+@media (max-width: 768px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .status-widget-layout {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .neural-dashboard {
+    padding: 0 12px;
+  }
+  
+  .campaign-card-layout {
+    margin: 0 4px;
+  }
+}
+
+/* Estados de loading específicos del layout */
+.skeleton-layout {
+  border-radius: 4px;
+}
+
+/* Layout para separadores */
+.separator-layout {
+  height: 1px;
+  margin: 32px 0;
+}
+
+/* Utilities de layout específicas */
+.layout-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.layout-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.layout-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.layout-gap-2 {
+  gap: 0.5rem;
+}
+
+.layout-gap-4 {
+  gap: 1rem;
+}

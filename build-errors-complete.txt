@@ -1,29 +1,15 @@
 
 > focalizahr-mvp@1.0.0 build
-> next build
+> prisma generate && next build
 
-  Ôû▓ Next.js 14.2.3
-  - Environments: .env
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+Error: 
+EPERM: operation not permitted, rename 'C:\Users\PC\focalizahr-mvp\node_modules\.prisma\client\query_engine-windows.dll.node.tmp22068' -> 'C:\Users\PC\focalizahr-mvp\node_modules\.prisma\client\query_engine-windows.dll.node'
 
-   Creating an optimized production build ...
- ÔÜá Compiled with warnings
 
-./src/app/api/auth/register/route.ts
-Attempted import error: 'registerAccount' is not exported from '@/lib/auth' (imported as 'registerAccount').
-
-Import trace for requested module:
-./src/app/api/auth/register/route.ts
-
-   Linting and checking validity of types ...
-Failed to compile.
-
-./src/app/api/auth/login/route.ts:144:57
-Type error: 'error' is of type 'unknown'.
-
-  142 |       { 
-  143 |         error: 'Error interno del servidor',
-> 144 |         debug: process.env.NODE_ENV === 'development' ? error.message : undefined
-      |                                                         ^
-  145 |       },
-  146 |       { status: 500 }
-  147 |     )
+npm notice
+npm notice New major version of npm available! 10.9.2 -> 11.4.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.4.1
+npm notice To update run: npm install -g npm@11.4.1
+npm notice
