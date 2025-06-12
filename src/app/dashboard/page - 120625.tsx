@@ -31,7 +31,6 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import DashboardNavigation from '@/components/dashboard/DashboardNavigation';
-import CampaignActionButtons from '@/components/dashboard/CampaignActionButtons';
 import './dashboard.css'; // Solo estilos de layout
 
 // Tipos básicos (MANTENIDOS EXACTOS)
@@ -469,13 +468,13 @@ function CampaignsList() {
       console.log('🚀 Activando campaña:', campaignId);
       
       const token = localStorage.getItem('focalizahr_token');
-      const response = await fetch(`/api/campaigns/${campaignId}`, {
+      const response = await fetch(`/api/campaigns/${campaignId}/activate`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ status: 'active', action: 'activate' })
+        body: JSON.stringify({ action: 'activate' })
       });
 
       if (response.ok) {
@@ -854,11 +853,7 @@ function CampaignsList() {
                   </div>
                   
                   <div className="flex items-center gap-2 ml-4">
-                    <CampaignActionButtons
-                    campaign={campaign}
-                    onActivateCampaign={handleActivateCampaign}
-                    onCampaignAction={handleCampaignAction}
-                    />
+                    {getActionButton(campaign)}
                   </div>
                 </CardContent>
 
