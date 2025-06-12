@@ -1,5 +1,5 @@
-// src/lib/validations.ts - EXTENSIÓN PARA CHAT 3B
-// PRESERVANDO 100% EL CONTENIDO EXISTENTE + AGREGANDO SCHEMAS WIZARD
+// src/lib/validations.ts - FIX CRÍTICO WIZARD SCHEMA
+// PRESERVANDO 100% EL CONTENIDO EXISTENTE + CORRIGIENDO SCHEMA WIZARD
 
 import { z } from 'zod'
 
@@ -133,7 +133,7 @@ export const updateAccountSchema = z.object({
 })
 
 // ========================================
-// NUEVAS VALIDACIONES WIZARD CHAT 3B
+// 🔧 FIX CRÍTICO: WIZARD SCHEMAS CORREGIDOS
 // ========================================
 
 // Wizard Step 1 - Información Básica
@@ -253,27 +253,103 @@ export const wizardStep3Schema = z.object({
   })
 });
 
-// Schema completo del wizard (todos los pasos)
+// 🚨 SOLUCIÓN DEFINITIVA: Schema completo reconstruido manualmente
 export const completeWizardSchema = z.object({
-  // Paso 1
-  name: wizardStep1Schema.shape.name,
-  description: wizardStep1Schema.shape.description,
-  campaignTypeId: wizardStep1Schema.shape.campaignTypeId,
-  startDate: wizardStep1Schema.shape.startDate,
-  endDate: wizardStep1Schema.shape.endDate,
+  // Paso 1: Información Básica
+  name: z.string()
+    .min(3, 'Nombre debe tener al menos 3 caracteres')
+    .max(100, 'Nombre muy largo (máximo 100 caracteres)')
+    .regex(/^[a-zA-Z0-9\s\-_áéíóúñÁÉÍÓÚÑ().,]+$/, 'Caracteres no válidos en el nombre')
+    .refine((name) => name.trim().length > 0, 'Nombre no puede estar vacío'),
   
-  // Paso 2
-  estimatedParticipants: wizardStep2Schema.shape.estimatedParticipants,
-  participantInstructions: wizardStep2Schema.shape.participantInstructions,
-  dataQualityRequirements: wizardStep2Schema.shape.dataQualityRequirements,
-  segmentationPreferences: wizardStep2Schema.shape.segmentationPreferences,
+  description: z.string()
+    .max(500, 'Descripción muy larga (máximo 500 caracteres)')
+    .optional()
+    .transform(val => val?.trim() || undefined),
   
-  // Paso 3
-  sendReminders: wizardStep3Schema.shape.sendReminders,
-  anonymousResults: wizardStep3Schema.shape.anonymousResults,
-  reminderSettings: wizardStep3Schema.shape.reminderSettings,
-  privacySettings: wizardStep3Schema.shape.privacySettings,
-  confirmations: wizardStep3Schema.shape.confirmations
+  campaignTypeId: z.string()
+    .min(1, 'Selecciona un tipo de estudio')
+    .cuid('ID de tipo de campaña inválido'),
+  
+  startDate: z.string()
+    .min(1, 'Fecha de inicio es requerida'),
+  
+  endDate: z.string()
+    .min(1, 'Fecha de fin es requerida'),
+
+  // Paso 2: Participantes (Enfoque Concierge)
+  estimatedParticipants: z.number()
+    .int('Debe ser un número entero')
+    .min(5, 'Mínimo 5 participantes requeridos para validez estadística')
+    .max(500, 'Máximo 500 participantes permitidos en esta versión')
+    .refine((num) => num > 0, 'Número de participantes debe ser positivo'),
+  
+  participantInstructions: z.string()
+    .max(1000, 'Instrucciones muy largas (máximo 1000 caracteres)')
+    .optional()
+    .transform(val => val?.trim() || ''),
+  
+  dataQualityRequirements: z.object({
+    requireDepartment: z.boolean().default(false),
+    requirePosition: z.boolean().default(false),
+    requireSeniority: z.boolean().default(false),
+    requireLocation: z.boolean().default(false)
+  }).optional(),
+  
+  segmentationPreferences: z.array(z.enum([
+    'department',
+    'position', 
+    'seniority',
+    'location',
+    'none'
+  ])).default(['department']),
+
+  // Paso 3: Configuración Final
+  sendReminders: z.boolean().default(true),
+  anonymousResults: z.boolean().default(true),
+  
+  reminderSettings: z.object({
+    firstReminder: z.number().int().min(1).max(7).default(3),
+    secondReminder: z.number().int().min(1).max(5).default(1),
+    enableFinalReminder: z.boolean().default(true)
+  }).optional(),
+  
+  privacySettings: z.object({
+    anonymousResults: z.boolean().default(true),
+    allowDataExport: z.boolean().default(true),
+    retentionPeriodMonths: z.number().int().min(6).max(24).default(12)
+  }).optional(),
+  
+  confirmations: z.object({
+    dataProcessingAgreement: z.boolean()
+      .refine(val => val === true, 'Debe aceptar el procesamiento de datos'),
+    participantNotification: z.boolean()
+      .refine(val => val === true, 'Debe confirmar que notificará a los participantes'),
+    resultSharing: z.boolean()
+      .refine(val => val === true, 'Debe confirmar cómo compartirá los resultados')
+  }).optional()
+}).refine((data) => {
+  // Validación de fechas
+  const startDate = new Date(data.startDate);
+  const endDate = new Date(data.endDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  return startDate >= today && endDate > startDate;
+}, {
+  message: 'Fechas inválidas: inicio debe ser hoy o futuro, fin debe ser posterior a inicio',
+  path: ['endDate']
+}).refine((data) => {
+  // Validación de duración
+  const startDate = new Date(data.startDate);
+  const endDate = new Date(data.endDate);
+  const diffTime = endDate.getTime() - startDate.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  return diffDays >= 1 && diffDays <= 60;
+}, {
+  message: 'La campaña debe durar entre 1 y 60 días',
+  path: ['endDate']
 });
 
 // ========================================

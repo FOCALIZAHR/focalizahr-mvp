@@ -1,6 +1,6 @@
-// NUEVOS ENDPOINTS APIS - SIN TOCAR EXISTING route.ts
+// src/app/api/campaigns/[id]/status/route.ts
+// 📁 INSTRUCCIÓN: CREAR NUEVO ARCHIVO EN: src/app/api/campaigns/[id]/status/route.ts
 
-// 1. ENDPOINT GESTIÓN ESTADOS: src/app/api/campaigns/[id]/status/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyJWT } from '@/lib/auth'
@@ -11,7 +11,11 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const startTime = Date.now()
+  
   try {
+    console.log('🔄 Campaign status change request:', params.id)
+    
     const authResult = await verifyJWT(request)
     if (!authResult.success || !authResult.user) {
       return NextResponse.json(
@@ -23,11 +27,22 @@ export async function PUT(
     const body = await request.json()
     const campaignId = params.id
 
+    console.log('📋 Status change data:', body)
+
     // Obtener campaña actual
     const campaign = await prisma.campaign.findFirst({
       where: {
         id: campaignId,
         accountId: authResult.user.id
+      },
+      include: {
+        campaignType: true,
+        participants: {
+          select: {
+            id: true,
+            hasResponded: true
+          }
+        }
       }
     })
 
@@ -37,6 +52,8 @@ export async function PUT(
         { status: 404 }
       )
     }
+
+    console.log('✅ Campaign found:', campaign.name, 'Status:', campaign.status)
 
     // Validar transición de estado
     const transitionData = {
@@ -50,6 +67,7 @@ export async function PUT(
 
     const validation = campaignStateTransitionSchema.safeParse(transitionData)
     if (!validation.success) {
+      console.log('❌ Validation failed:', validation.error.errors)
       return NextResponse.json(
         { 
           success: false, 
@@ -61,19 +79,20 @@ export async function PUT(
     }
 
     // Validaciones específicas por transición
-    const validTransitions = {
+    const validTransitions: Record<string, string[]> = {
       draft: ['active'],
       active: ['completed', 'cancelled'],
       completed: [],
       cancelled: []
     }
 
-    const allowedTargets = validTransitions[campaign.status as keyof typeof validTransitions]
+    const allowedTargets = validTransitions[campaign.status as keyof typeof validTransitions] || []
     if (!body.forceTransition && !allowedTargets.includes(body.toStatus)) {
       return NextResponse.json(
         { 
           success: false, 
-          error: `No se puede cambiar de ${campaign.status} a ${body.toStatus}` 
+          error: `No se puede cambiar de ${campaign.status} a ${body.toStatus}`,
+          code: 'INVALID_TRANSITION'
         },
         { status: 409 }
       )
@@ -81,11 +100,14 @@ export async function PUT(
 
     // Validaciones específicas para activación
     if (body.toStatus === 'active') {
+      console.log('🔍 Validating activation requirements...')
+      
       if (campaign.totalInvited < 5) {
         return NextResponse.json(
           { 
             success: false, 
-            error: 'Mínimo 5 participantes requeridos para activar' 
+            error: 'Mínimo 5 participantes requeridos para activar',
+            code: 'INSUFFICIENT_PARTICIPANTS'
           },
           { status: 409 }
         )
@@ -96,11 +118,39 @@ export async function PUT(
         return NextResponse.json(
           { 
             success: false, 
-            error: 'No se puede activar antes de la fecha de inicio' 
+            error: 'No se puede activar antes de la fecha de inicio',
+            code: 'INVALID_START_DATE'
           },
           { status: 409 }
         )
       }
+
+      // Verificar límite de campañas activas
+      const activeCampaignsCount = await prisma.campaign.count({
+        where: {
+          accountId: authResult.user.id,
+          campaignTypeId: campaign.campaignTypeId,
+          status: 'active'
+        }
+      })
+
+      const account = await prisma.account.findUnique({
+        where: { id: authResult.user.id },
+        select: { maxActiveCampaigns: true }
+      })
+
+      if (account && activeCampaignsCount >= account.maxActiveCampaigns) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: `Límite de campañas activas alcanzado (${account.maxActiveCampaigns})`,
+            code: 'CAMPAIGN_LIMIT_REACHED'
+          },
+          { status: 409 }
+        )
+      }
+
+      console.log('✅ Activation requirements validated')
     }
 
     // Actualizar estado con metadatos
@@ -111,15 +161,46 @@ export async function PUT(
 
     if (body.toStatus === 'active') {
       updateData.activatedAt = new Date()
+      
+      // Generar tokens únicos para participantes si no existen
+      const participantsWithoutTokens = await prisma.participant.findMany({
+        where: {
+          campaignId,
+          uniqueToken: null
+        }
+      })
+
+      if (participantsWithoutTokens.length > 0) {
+        console.log(`🔑 Generating tokens for ${participantsWithoutTokens.length} participants`)
+        
+        for (const participant of participantsWithoutTokens) {
+          await prisma.participant.update({
+            where: { id: participant.id },
+            data: {
+              uniqueToken: crypto.randomUUID()
+            }
+          })
+        }
+      }
     } else if (body.toStatus === 'completed') {
       updateData.completedAt = new Date()
     }
+
+    console.log('💾 Updating campaign status...', updateData)
 
     const updatedCampaign = await prisma.campaign.update({
       where: { id: campaignId },
       data: updateData,
       include: {
         campaignType: true,
+        participants: {
+          select: {
+            id: true,
+            email: true,
+            hasResponded: true,
+            uniqueToken: true
+          }
+        },
         _count: {
           select: { participants: true }
         }
@@ -134,11 +215,17 @@ export async function PUT(
         action: `campaign_status_changed`,
         entityType: 'campaign',
         entityId: campaignId,
-        oldValues: { status: campaign.status },
+        oldValues: { 
+          status: campaign.status,
+          activatedAt: campaign.activatedAt,
+          completedAt: campaign.completedAt
+        },
         newValues: { 
           status: body.toStatus,
           action: body.action,
-          reason: body.reason
+          reason: body.reason,
+          activatedAt: updateData.activatedAt,
+          completedAt: updateData.completedAt
         },
         userInfo: {
           ip: request.headers.get('x-forwarded-for') || 'unknown',
@@ -147,31 +234,75 @@ export async function PUT(
       }
     })
 
+    console.log('📝 Audit log created')
+
     // Side effects según el nuevo estado
     const sideEffects = []
     
     if (body.toStatus === 'active') {
-      // TODO: Enviar emails invitación (implementar en siguiente fase)
-      sideEffects.push('Emails de invitación programados')
+      sideEffects.push('Tokens generados para participantes')
+      sideEffects.push('Emails de invitación listos para envío')
+      
+      // TODO: Aquí se integraría el sistema de emails
+      console.log('📧 Email system integration point - tokens ready')
     }
 
-    return NextResponse.json({
+    if (body.toStatus === 'completed') {
+      sideEffects.push('Campaña lista para análisis de resultados')
+    }
+
+    // Calcular métricas actualizadas
+    const participationRate = updatedCampaign.totalInvited > 0 
+      ? Math.round((updatedCampaign.totalResponded / updatedCampaign.totalInvited) * 100) 
+      : 0
+
+    const response = {
       success: true,
-      campaign: updatedCampaign,
+      campaign: {
+        ...updatedCampaign,
+        participationRate,
+        daysRemaining: updatedCampaign.status === 'active' 
+          ? Math.ceil((updatedCampaign.endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+          : null,
+        canActivate: false,
+        canViewResults: updatedCampaign.status === 'completed',
+        canEdit: ['draft', 'active'].includes(updatedCampaign.status),
+        canDelete: updatedCampaign.status === 'draft'
+      },
       transition: {
         from: campaign.status,
         to: body.toStatus,
         action: body.action,
-        timestamp: new Date()
+        timestamp: new Date(),
+        reason: body.reason
       },
       sideEffects,
-      message: `Campaña ${body.action === 'activate' ? 'activada' : 'actualizada'} exitosamente`
-    })
+      message: `Campaña ${
+        body.action === 'activate' ? 'activada' : 
+        body.action === 'complete' ? 'completada' :
+        body.action === 'cancel' ? 'cancelada' : 'actualizada'
+      } exitosamente`,
+      performance: {
+        queryTime: Date.now() - startTime
+      }
+    }
+
+    console.log('🎉 Status change completed successfully')
+
+    return NextResponse.json(response, { status: 200 })
 
   } catch (error) {
-    console.error('Error updating campaign status:', error)
+    console.error('❌ Error updating campaign status:', error)
+    
     return NextResponse.json(
-      { success: false, error: 'Error interno del servidor' },
+      { 
+        success: false, 
+        error: 'Error interno del servidor',
+        code: 'INTERNAL_ERROR',
+        performance: {
+          queryTime: Date.now() - startTime
+        }
+      },
       { status: 500 }
     )
   }

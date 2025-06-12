@@ -400,7 +400,6 @@ const CampaignStateManager: React.FC<CampaignStateManagerProps> = ({
               {/* Información adicional */}
               {showConfirmation.action === 'activate' && (
                 <Alert>
-                  <Info className="h-4 w-4" />
                   <AlertDescription className="text-sm">
                     Al activar la campaña, se enviarán emails de invitación a todos los participantes.
                     Esta acción no se puede deshacer.

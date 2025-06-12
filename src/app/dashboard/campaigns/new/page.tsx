@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -122,7 +122,55 @@ export default function NewCampaignPage() {
     anonymousResults: true
   });
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [campaignTypes, setCampaignTypes] = useState<CampaignType[]>([]);
+  const [isLoadingTypes, setIsLoadingTypes] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Cargar tipos de campaña desde API
+  useEffect(() => {
+    const fetchCampaignTypes = async () => {
+      try {
+        setIsLoadingTypes(true);
+        const token = localStorage.getItem('focalizahr_token');
+        
+        if (!token) {
+          console.error('No authentication token found');
+          setCampaignTypes(mockCampaignTypes);
+          return;
+        }
+
+        const response = await fetch('/api/campaign-types', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.success && data.campaignTypes) {
+          setCampaignTypes(data.campaignTypes);
+          console.log('✅ Campaign types loaded:', data.campaignTypes.length);
+        } else {
+          throw new Error('Invalid response format');
+        }
+
+      } catch (error) {
+        console.error('❌ Error loading campaign types:', error);
+        // Fallback a mock data si API falla
+        setCampaignTypes(mockCampaignTypes);
+      } finally {
+        setIsLoadingTypes(false);
+      }
+    };
+
+    fetchCampaignTypes();
+  }, []);
 
   const steps: WizardStep[] = [
     {
@@ -151,6 +199,7 @@ export default function NewCampaignPage() {
   // Validaciones por paso
   const validateStep = (step: number): boolean => {
     const errors: Record<string, string> = {};
+    setSubmitError(null); // Limpiar error de submit
 
     if (step === 1) {
       if (!formData.name.trim()) errors.name = 'Nombre es requerido';
@@ -205,29 +254,103 @@ export default function NewCampaignPage() {
   };
 
   // Obtener tipo de campaña seleccionado
-  const selectedCampaignType = mockCampaignTypes.find(type => type.id === formData.campaignTypeId);
+  const selectedCampaignType = (campaignTypes.length > 0 ? campaignTypes : mockCampaignTypes).find(type => type.id === formData.campaignTypeId);
 
-  // Envío del formulario (mock - será conectado a API)
+  // Envío del formulario - CONECTADO CON API REAL
   const handleSubmit = async () => {
     if (!validateStep(3)) return;
 
     setIsSubmitting(true);
+    setSubmitError(null);
     
     try {
-      // Simular API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 🔥 INTEGRACIÓN REAL CON BACKEND API
+      const token = localStorage.getItem('focalizahr_token');
       
-      // Aquí se conectará con la API real
-      console.log('Campaign data to submit:', formData);
+      if (!token) {
+        throw new Error('Token de autenticación no encontrado');
+      }
+
+      // Preparar datos para la API según schema existente
+      const campaignData = {
+        name: formData.name.trim(),
+        description: formData.description?.trim() || undefined,
+        campaignTypeId: formData.campaignTypeId,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        sendReminders: formData.sendReminders,
+        anonymousResults: formData.anonymousResults
+      };
+
+      console.log('🚀 Enviando datos a API:', campaignData);
+
+      // LLAMADA REAL A LA API
+      const response = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(campaignData)
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(responseData.error || `Error ${response.status}: ${response.statusText}`);
+      }
+
+      console.log('✅ Campaña creada exitosamente:', responseData);
+
+      // ✨ ÉXITO: Procesar respuesta del backend
+      const createdCampaign = responseData.campaign;
       
-      // Redirect al dashboard con mensaje de éxito
-      router.push('/dashboard?created=true');
+      // Guardar ID de campaña para próximos pasos del enfoque concierge
+      if (createdCampaign?.id) {
+        localStorage.setItem('lastCreatedCampaignId', createdCampaign.id);
+      }
+
+      // Redirect con parámetros de éxito
+      const redirectUrl = `/dashboard?` + new URLSearchParams({
+        created: 'true',
+        campaign: createdCampaign.id,
+        name: createdCampaign.name,
+        step: 'concierge-instructions'
+      }).toString();
+
+      router.push(redirectUrl);
+
     } catch (error) {
-      console.error('Error creating campaign:', error);
+      console.error('❌ Error creating campaign:', error);
+      
+      // Manejo específico de errores
+      let errorMessage = 'Error desconocido al crear la campaña';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('401')) {
+          errorMessage = 'Sesión expirada. Por favor, inicia sesión nuevamente.';
+          router.push('/');
+          return;
+        } else if (error.message.includes('409')) {
+          errorMessage = 'Ya existe una campaña con este nombre o se alcanzó el límite de campañas activas.';
+        } else if (error.message.includes('400')) {
+          errorMessage = 'Datos de campaña inválidos. Revisa la información ingresada.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      // Mostrar error en la UI
+      setSubmitError(errorMessage);
+
+      // Scroll to top para mostrar error
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
     } finally {
       setIsSubmitting(false);
-      }
+    }
   };
+
   return (
     <div className="main-layout">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -309,57 +432,74 @@ export default function NewCampaignPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {mockCampaignTypes.map((type) => (
-                  <Card 
-                    key={type.id}
-                    className={`cursor-pointer transition-all hover:shadow-md ${
-                      formData.campaignTypeId === type.id 
-                        ? 'ring-2 ring-primary border-primary' 
-                        : 'hover:border-primary/50'
-                    }`}
-                    onClick={() => setFormData(prev => ({ ...prev, campaignTypeId: type.id }))}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex items-center gap-3">
-                          <h3 className="font-semibold">{type.name}</h3>
-                          {type.isRecommended && (
-                            <Badge className="bg-primary/20 text-primary">
-                              <Zap className="h-3 w-3 mr-1" />
-                              Recomendado
-                            </Badge>
+                {isLoadingTypes ? (
+                  <div className="space-y-4">
+                    {[1, 2].map((i) => (
+                      <Card key={i} className="animate-pulse">
+                        <CardContent className="p-4">
+                          <div className="h-4 bg-muted rounded w-32 mb-2"></div>
+                          <div className="h-3 bg-muted rounded w-48 mb-3"></div>
+                          <div className="flex gap-2">
+                            <div className="h-6 bg-muted rounded w-16"></div>
+                            <div className="h-6 bg-muted rounded w-20"></div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  (campaignTypes.length > 0 ? campaignTypes : mockCampaignTypes).map((type) => (
+                    <Card 
+                      key={type.id}
+                      className={`cursor-pointer transition-all hover:shadow-md ${
+                        formData.campaignTypeId === type.id 
+                          ? 'ring-2 ring-primary border-primary' 
+                          : 'hover:border-primary/50'
+                      }`}
+                      onClick={() => setFormData(prev => ({ ...prev, campaignTypeId: type.id }))}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex items-center gap-3">
+                            <h3 className="font-semibold">{type.name}</h3>
+                            {type.isRecommended && (
+                              <Badge className="bg-primary/20 text-primary">
+                                <Zap className="h-3 w-3 mr-1" />
+                                Recomendado
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-right text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {type.estimatedDuration} min
+                            </div>
+                            <div>{type.questionCount} preguntas</div>
+                          </div>
+                        </div>
+                        
+                        <p className="text-sm text-muted-foreground mb-3">
+                          {type.description}
+                        </p>
+                        
+                        <div className="flex gap-2 flex-wrap">
+                          {type.features.quickSetup && (
+                            <Badge variant="outline">Setup Rápido</Badge>
+                          )}
+                          {type.features.timeEfficient && (
+                            <Badge variant="outline">Tiempo Eficiente</Badge>
+                          )}
+                          {type.features.scientificBasis && (
+                            <Badge variant="outline">Base Científica</Badge>
+                          )}
+                          {type.features.deepInsights && (
+                            <Badge variant="outline">Insights Profundos</Badge>
                           )}
                         </div>
-                        <div className="text-right text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {type.estimatedDuration} min
-                          </div>
-                          <div>{type.questionCount} preguntas</div>
-                        </div>
-                      </div>
-                      
-                      <p className="text-sm text-muted-foreground mb-3">
-                        {type.description}
-                      </p>
-                      
-                      <div className="flex gap-2 flex-wrap">
-                        {type.features.quickSetup && (
-                          <Badge variant="outline">Setup Rápido</Badge>
-                        )}
-                        {type.features.timeEfficient && (
-                          <Badge variant="outline">Tiempo Eficiente</Badge>
-                        )}
-                        {type.features.scientificBasis && (
-                          <Badge variant="outline">Base Científica</Badge>
-                        )}
-                        {type.features.deepInsights && (
-                          <Badge variant="outline">Insights Profundos</Badge>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
                 {validationErrors.campaignTypeId && (
                   <Alert className="border-destructive">
                     <AlertTriangle className="h-4 w-4" />
@@ -697,6 +837,16 @@ export default function NewCampaignPage() {
               </AlertDescription>
             </Alert>
           </div>
+        )}
+
+        {/* Error de Submit */}
+        {submitError && (
+          <Alert className="border-destructive mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Error al crear campaña:</strong> {submitError}
+            </AlertDescription>
+          </Alert>
         )}
 
         {/* Navegación */}
