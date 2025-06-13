@@ -60,19 +60,33 @@ function usePendingCampaigns() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('/api/admin/campaigns?status=draft&withoutParticipants=true', {
+      const token = localStorage.getItem('focalizahr_token');
+      if (!token) {
+        throw new Error('Token de autenticación no encontrado');
+      }
+
+      const response = await fetch('/api/campaigns?status=draft', {
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
-          // TODO: Agregar autenticación admin real
         }
       });
       
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Sesión expirada');
+        }
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
-      setCampaigns(data.campaigns || []);
+      
+      // Filtrar campañas draft sin participantes
+      const pendingCampaigns = (data.campaigns || []).filter((campaign: any) => 
+        campaign.status === 'draft' && campaign.totalInvited === 0
+      );
+      
+      setCampaigns(pendingCampaigns);
       setLastUpdated(new Date());
     } catch (error) {
       console.error('Error loading campaigns:', error);
