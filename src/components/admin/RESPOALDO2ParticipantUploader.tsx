@@ -133,13 +133,26 @@ export default function ParticipantUploader({
         setUploadProgress(prev => Math.min(prev + 10, 90));
       }, 200);
 
+      // ...alrededor de la línea 148
+
+      // ---- INICIO DEL CÓDIGO A AGREGAR ----
+      const token = localStorage.getItem('focalizahr_token');
+      const headers = new Headers();
+      if (token) {
+        headers.append('Authorization', `Bearer ${token}`);
+      }
+      // ---- FIN DEL CÓDIGO A AGREGAR ----
+
       const formData = new FormData();
       formData.append('file', uploadFile);
       formData.append('campaignId', campaignId);
       formData.append('action', 'preview');
-      
-      // ---- INICIO DE LA CORRECCIÓN #1 ----
+
+   // ---- INICIO DEL BLOQUE NUEVO ----
       const token = localStorage.getItem('focalizahr_token');
+
+      // Esta es la línea clave para "espiar" el valor del token
+      console.log('DEBUG: Valor del token justo antes de enviar:', token);
 
       const response = await fetch('/api/admin/participants', {
         method: 'POST',
@@ -148,7 +161,8 @@ export default function ParticipantUploader({
         },
         body: formData,
       });
-      // ---- FIN DE LA CORRECCIÓN #1 ----
+      // ---- FIN DEL BLOQUE NUEVO ----
+// ...
 
       clearInterval(progressInterval);
       setUploadProgress(100);
@@ -189,17 +203,16 @@ export default function ParticipantUploader({
       formData.append('campaignId', campaignId);
       formData.append('action', 'confirm');
 
-      // ---- INICIO DE LA CORRECCIÓN #2 ----
-      const token = localStorage.getItem('focalizahr_token');
+      // CÓDIGO NUEVO (CORREGIDO)
+const token = localStorage.getItem('focalizahr_token'); // Obtenemos el token
 
-      const response = await fetch('/api/admin/participants', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
-      });
-      // ---- FIN DE LA CORRECCIÓN #2 ----
+const response = await fetch('/api/admin/participants', {
+  method: 'POST',
+  headers: { // <-- AÑADIMOS LOS HEADERS AQUÍ
+    'Authorization': `Bearer ${token}`,
+  },
+  body: formData,
+});
 
       const result = await response.json();
 
@@ -516,7 +529,6 @@ export default function ParticipantUploader({
 
               {/* Botones de acción */}
               <div className="flex justify-between items-center pt-6 border-t">
-
                 <Button
                   variant="outline"
                   onClick={handleClearForm}
@@ -581,7 +593,7 @@ export default function ParticipantUploader({
                   <FileText className="h-4 w-4 text-blue-600" />
                 </div>
                 <div className="space-y-2">
-                <h4 className="font-medium text-blue-800">Consejos para mejores resultados:</h4>
+                  <h4 className="font-medium text-blue-800">Consejos para mejores resultados:</h4>
                   <ul className="text-sm text-blue-700 space-y-1">
                     <li>• Asegúrate que todos los emails sean válidos y únicos</li>
                     <li>• Incluye departamento y cargo para análisis segmentado</li>

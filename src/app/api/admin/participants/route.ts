@@ -1,6 +1,7 @@
 // src/app/api/admin/participants/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { verifyJWTToken } from '@/lib/auth'
 import { z } from 'zod';
 import { generateUniqueToken } from '@/lib/auth';
 import * as XLSX from 'xlsx';
@@ -261,7 +262,14 @@ export async function POST(request: NextRequest) {
   try {
     // Verificar autenticación admin (simplificado para MVP)
     const authHeader = request.headers.get('authorization');
-    // TODO: Implementar verificación de admin role real
+if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  return NextResponse.json({ error: 'Token requerido' }, { status: 401 });
+}
+const token = authHeader.substring(7);
+const verification = verifyJWTToken(token);
+if (!verification.success) {
+  return NextResponse.json({ error: 'Token inválido' }, { status: 401 });
+}
     
     const formData = await request.formData();
     const file = formData.get('file') as File;

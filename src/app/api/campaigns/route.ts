@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { verifyJWT } from '@/lib/auth'
 import { z } from 'zod'
 
+
 // Schema de validación para crear campaña (mantenido igual)
 const createCampaignSchema = z.object({
   name: z.string().min(1, 'Nombre es requerido').max(255, 'Nombre muy largo'),
@@ -141,6 +142,12 @@ export async function GET(request: NextRequest) {
       prisma.campaign.findMany({
         where,
         include: {
+           account: {
+    select: {
+      companyName: true,
+      adminEmail: true
+    }
+  },
           campaignType: {
             select: {
               id: true,

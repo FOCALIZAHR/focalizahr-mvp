@@ -30,6 +30,7 @@ import {
 import ParticipantUploader from '@/components/admin/ParticipantUploader';
 
 // Tipos para el admin panel
+// ESTA ES LA INTERFACE CORRECTA QUE SOLUCIONA EL PROBLEMA
 interface Campaign {
   id: string;
   name: string;
@@ -38,9 +39,9 @@ interface Campaign {
     name: string;
     slug: string;
   };
-  company: {
-    name: string;
-    admin_email: string;
+  company: { // <--- Correcto
+    name: string; // <--- Correcto
+    admin_email: string; // <--- Correcto
   };
   totalInvited: number;
   startDate: string;
@@ -65,7 +66,8 @@ function usePendingCampaigns() {
         throw new Error('Token de autenticación no encontrado');
       }
 
-      const response = await fetch('/api/campaigns?status=draft', {
+      const response = await fetch('/api/admin/participants?status=draft&withoutParticipants=true', {
+
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -261,7 +263,7 @@ export default function AdminParticipantsPage() {
                           {campaign.name}
                         </h3>
                         <p className="text-gray-600 font-medium">
-                          {campaign.company.name}
+                         {campaign.company.name}
                         </p>
                         <div className="flex items-center gap-6 mt-3 text-sm text-gray-500">
                           <div className="flex items-center gap-1">
@@ -281,7 +283,7 @@ export default function AdminParticipantsPage() {
                           </div>
                         </div>
                         <div className="mt-2 text-sm text-gray-600">
-                          <span className="font-medium">Email cliente:</span> {campaign.company.admin_email}
+                        <span className="font-medium">Email cliente:</span> {campaign.company.admin_email}
                         </div>
                       </div>
                       
