@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
+import { randomBytes } from 'crypto';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key-focalizahr-2024'
 
@@ -431,4 +432,14 @@ export function logout(): void {
   } catch (error) {
     console.error('Error during logout:', error);
   }
+  
+}
+// --- CÓDIGO NUEVO AGREGADO AL FINAL ---
+/**
+ * Generates a secure, unique, random token.
+ * Used for things like participant survey links.
+ * @returns {string} A 64-character hex token.
+ */
+export function generateUniqueToken(): string {
+  return randomBytes(32).toString('hex');
 }

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyJWTToken } from '@/lib/auth'
 import { z } from 'zod';
-import { generateUniqueToken } from '@/lib/auth';
+import { generateSecureToken } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 
 // Esquema de validación para participantes
@@ -210,7 +210,7 @@ async function loadParticipantsToDatabase(
     const participantsToInsert = newParticipants.map(participant => ({
       campaignId,
       email: participant.email,
-      uniqueToken: generateUniqueToken(),
+      uniqueToken: generateSecureToken(),
       name: participant.name || null,
       department: participant.department || null,
       position: participant.position || null,

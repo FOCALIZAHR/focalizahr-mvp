@@ -107,6 +107,9 @@ model Participant {
   campaignId                      String   @map("campaign_id")
   email                           String
   uniqueToken                     String   @unique @map("unique_token")
+   // ✅ AGREGAR ESTA LÍNEA
+  name                            String?
+
   
   // Segmentación básica (carga manual):
   department                      String?
