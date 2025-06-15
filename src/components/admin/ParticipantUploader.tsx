@@ -361,7 +361,19 @@ export default function ParticipantUploader({
             </div>
           )}
         </div>
-
+{/* Mensaje de error validación mínimo participantes */}
+              {uploadResult && uploadResult.validRecords > 0 && uploadResult.validRecords < 5 && (
+                <Alert className="border-amber-200 bg-amber-50">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-800">
+                    <div className="font-medium">Participantes insuficientes</div>
+                    <div className="text-sm mt-1">
+                      Se requiere un mínimo de 5 participantes para activar la campaña. 
+                      Actualmente hay {uploadResult.validRecords} participante{uploadResult.validRecords !== 1 ? 's' : ''} válido{uploadResult.validRecords !== 1 ? 's' : ''}.
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
         {/* Mostrar errores */}
         {uploadError && (
           <Alert variant="destructive">
@@ -540,7 +552,7 @@ export default function ParticipantUploader({
                   
                   <Button
                     onClick={handleConfirmUpload}
-                    disabled={processing || uploadResult.validRecords === 0}
+                    disabled={processing || uploadResult.validRecords === 0 || uploadResult.validRecords < 5}
                     className="flex items-center gap-2"
                   >
                     {processing ? (
@@ -551,7 +563,10 @@ export default function ParticipantUploader({
                     ) : (
                       <>
                         <Send className="h-4 w-4" />
-                        Confirmar Carga ({uploadResult.validRecords} participantes)
+                        {uploadResult.validRecords < 5 
+  ? `Insuficientes participantes (${uploadResult.validRecords}/5 mín.)`
+  : `Confirmar Carga (${uploadResult.validRecords} participantes)`
+}
                       </>
                     )}
                   </Button>

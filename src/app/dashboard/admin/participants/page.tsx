@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import '@/app/dashboard/dashboard.css';
 import { Separator } from '@/components/ui/separator';
 import { 
   Upload, 
@@ -137,7 +138,7 @@ export default function AdminParticipantsPage() {
   // Renderizar estado de carga
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center neural-dashboard">
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
           <span className="text-lg font-medium">Cargando admin panel...</span>
@@ -147,50 +148,52 @@ export default function AdminParticipantsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header del admin panel */}
-      <div className="bg-white border-b border-gray-200 p-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push('/dashboard')}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Volver al Dashboard
-              </Button>
+    <div className="min-h-screen neural-dashboard">
+      {/* Header del admin panel - como Card */}
+      <div className="max-w-6xl mx-auto px-6">
+        <Card className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/dashboard')}
+                  className="flex items-center gap-2 border-gray-600 text-gray-300 hover:border-gray-500 hover:bg-gray-700/50"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Volver al Dashboard
+                </Button>
+                
+                <div>
+                  <h1 className="text-3xl font-bold text-white">
+                    Admin Panel - Carga Participantes
+                  </h1>
+                  <p className="text-gray-300 mt-1">
+                    Gestión de participantes para campañas FocalizaHR (Enfoque Concierge)
+                  </p>
+                </div>
+              </div>
               
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                  Admin Panel - Carga Participantes
-                </h1>
-                <p className="text-gray-600 mt-1">
-                  Gestión de participantes para campañas FocalizaHR (Enfoque Concierge)
-                </p>
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={refetch}
+                  className="flex items-center gap-2 border-gray-600 text-gray-300 hover:border-gray-500 hover:bg-gray-700/50"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Actualizar
+                </Button>
+                
+                <div className="flex items-center gap-2 text-sm text-gray-400">
+                  <Activity className="h-4 w-4" />
+                  <span>Admin: team@focalizahr.com</span>
+                </div>
               </div>
             </div>
-            
-            <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={refetch}
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Actualizar
-              </Button>
-              
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <Activity className="h-4 w-4" />
-                <span>Admin: team@focalizahr.com</span>
-              </div>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -214,7 +217,7 @@ export default function AdminParticipantsPage() {
         )}
 
         {/* Lista de campañas disponibles */}
-        <Card>
+        <Card className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
@@ -338,23 +341,23 @@ export default function AdminParticipantsPage() {
         )}
 
         {/* Información del workflow concierge */}
-        <Card className="bg-blue-50 border-blue-200">
+        <Card className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50">
           <CardContent className="p-6">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                 <Activity className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-blue-800 mb-2">
+                <h3 className="font-semibold text-white mb-2">
                   Workflow Concierge FocalizaHR
                 </h3>
-                <div className="space-y-2 text-blue-700 text-sm">
+                <div className="space-y-2 text-gray-300 text-sm">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-xs font-semibold">1</div>
+                    <div className="w-6 h-6 rounded-full bg-blue-500/20 text-white flex items-center justify-center text-xs font-semibold">1</div>
                     <span>Cliente crea campaña via wizard → queda en estado 'draft'</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-xs font-semibold">2</div>
+                    <div className="w-6 h-6 rounded-full bg-blue-500/20 text-white flex items-center justify-center text-xs font-semibold">2</div>
                     <span>Cliente envía CSV participantes por email</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -362,11 +365,11 @@ export default function AdminParticipantsPage() {
                     <span><strong>FocalizaHR procesa y carga participantes (este panel)</strong></span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-xs font-semibold">4</div>
+                    <div className="w-6 h-6 rounded-full bg-cyan-500/20 text-white flex items-center justify-center text-xs font-semibold">4</div>
                     <span>Sistema notifica cliente automáticamente</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-xs font-semibold">5</div>
+                    <div className="w-6 h-6 rounded-full bg-blue-500/20 text-white flex items-center justify-center text-xs font-semibold">5</div>
                     <span>Cliente activa campaña → emails automáticos</span>
                   </div>
                 </div>
