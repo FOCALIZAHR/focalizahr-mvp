@@ -82,9 +82,9 @@ export default function DashboardNavigation({
     {
       id: 'participants',
       label: 'Participantes',
-      href: '/dashboard/participants',
+      href: '/dashboard/admin/participants',
       icon: Users,
-      active: pathname.startsWith('/dashboard/participants')
+      active: pathname.startsWith('/dashboard/admin/participants') // <-- Corregido también para el estado activo
     },
     {
       id: 'settings',
