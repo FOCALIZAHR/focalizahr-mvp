@@ -126,7 +126,19 @@
   .animate-spin-slow {
     animation: spin 2s linear infinite;
   }
+/* Fix íconos calendarios internos date picker */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: brightness(0) saturate(100%) invert(70%) sepia(98%) saturate(1952%) hue-rotate(180deg) brightness(101%) contrast(94%);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  transition: filter 0.2s ease;
+}
 
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  filter: brightness(0) saturate(100%) invert(60%) sepia(98%) saturate(2000%) hue-rotate(180deg) brightness(110%) contrast(100%);
+  transform: scale(1.05);
+}
   /* ============================================================================
      CONTENEDORES DE CONTEXTO
      ============================================================================ */

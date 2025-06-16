@@ -3,6 +3,7 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -114,20 +115,24 @@ export default function AdminParticipantsPage() {
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
 
   // Manejar éxito de upload
-  const handleUploadComplete = useCallback((result: { totalLoaded: number; participants: any[] }) => {
-    setUploadSuccess(`✅ ${result.totalLoaded} participantes cargados exitosamente`);
-    
-    // Remover campaña de la lista ya que ya tiene participantes
-    if (selectedCampaign) {
-      refetch(); // Refrescar lista de campañas
-      setSelectedCampaign(null); // Limpiar selección
-    }
+ const handleUploadComplete = useCallback((result: { totalLoaded: number; participants: any[] }) => {
+  // Mostrar Toast de éxito con Sonner
+  toast.success("¡Participantes cargados exitosamente!", {
+    description: `${result.totalLoaded} participantes han sido añadidos a la campaña.`,
+    duration: 3000,
+  });
+  
+  // Remover campaña de la lista ya que ya tiene participantes
+  if (selectedCampaign) {
+    refetch(); // Refrescar lista de campañas
+    setSelectedCampaign(null); // Limpiar selección
+  }
 
-    // Limpiar mensaje después de unos segundos
-    setTimeout(() => {
-      setUploadSuccess(null);
-    }, 5000);
-  }, [selectedCampaign, refetch]);
+  // Redirección automática al dashboard principal con delay para UX
+  setTimeout(() => {
+    router.push('/dashboard');
+  }, 2500);
+}, [selectedCampaign, refetch, router]);
 
   // Manejar errores de upload
   const handleUploadError = useCallback((error: string) => {
@@ -353,11 +358,11 @@ export default function AdminParticipantsPage() {
                 </h3>
                 <div className="space-y-2 text-gray-300 text-sm">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-blue-500/20 text-white flex items-center justify-center text-xs font-semibold">1</div>
+                    <div className="w-6 h-6 rounded-full bg-cyan-500/20 text-white flex items-center justify-center text-xs font-semibold">1</div>
                     <span>Cliente crea campaña via wizard → queda en estado 'draft'</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-blue-500/20 text-white flex items-center justify-center text-xs font-semibold">2</div>
+                    <div className="w-6 h-6 rounded-full bg-cyan-500/20 text-white flex items-center justify-center text-xs font-semibold">2</div>
                     <span>Cliente envía CSV participantes por email</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -369,7 +374,7 @@ export default function AdminParticipantsPage() {
                     <span>Sistema notifica cliente automáticamente</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-blue-500/20 text-white flex items-center justify-center text-xs font-semibold">5</div>
+                    <div className="w-6 h-6 rounded-full bg-cyan-500/20 text-white flex items-center justify-center text-xs font-semibold">5</div>
                     <span>Cliente activa campaña → emails automáticos</span>
                   </div>
                 </div>

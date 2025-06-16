@@ -550,7 +550,7 @@ export default function NewCampaignPage() {
             <Card className="professional-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
+                 <Calendar className="h-5 w-5 text-primary" />
                   Fechas de la Campaña
                 </CardTitle>
               </CardHeader>
