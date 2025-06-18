@@ -39,13 +39,18 @@ interface DashboardMetrics {
   totalCampaigns: number;
   activeCampaigns: number;
   completedCampaigns: number;
+  draftCampaigns: number;
+  cancelledCampaigns: number;
   globalParticipationRate: number;
   totalResponses: number;
   totalParticipants: number;
+  recentResponses?: number; // Puede no haber respuestas recientes
+  
+  // Estos campos pueden ser nulos o no existir, por eso llevan '?'
   weeklyGrowth?: number;
   monthlyGrowth?: number;
-  averageCompletionTime?: number;
-  topPerformingCampaign?: string;
+  averageCompletionTime?: number | null;
+  topPerformingCampaign?: string | null;
 }
 
 interface Campaign {
@@ -110,7 +115,7 @@ function useMetrics() {
       }
 
       const data = await response.json();
-      setMetrics(data.overview);
+        setMetrics(data);
       setLastUpdated(new Date());
     } catch (err) {
       console.error('Error fetching metrics:', err);
