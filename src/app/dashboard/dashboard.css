@@ -237,3 +237,78 @@
 .layout-gap-4 {
   gap: 1rem;
 }
+/* Botones touch-friendly móvil */
+.mobile-touch-target {
+  min-height: 48px !important;
+  padding: 12px 16px !important;
+  font-size: 0.875rem !important;
+}
+
+/* Layout responsivo mejorado */
+@media (max-width: 640px) {
+  .dashboard-actions-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+  }
+}
+/* Arreglo botones campañas - FocalizaHR */
+.campaign-actions-fix {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.campaign-actions-fix button {
+  min-width: 100px;
+  height: 36px;
+  font-size: 0.875rem;
+  padding: 8px 12px;
+}
+
+/* Responsive para pantallas medianas */
+@media (max-width: 1024px) {
+  .campaign-actions-fix {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .campaign-actions-fix button {
+    width: 100%;
+    margin-bottom: 0.25rem;
+  }
+}
+
+/* Layout card consistente */
+.campaign-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.campaign-info-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.campaign-meta-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.campaign-status-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}

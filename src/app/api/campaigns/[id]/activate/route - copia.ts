@@ -1,30 +1,49 @@
 // src/app/api/campaigns/[id]/activate/route.ts
-// SOLUCIÓN QUIRÚRGICA FINAL: Preserva TODAS las funcionalidades originales
-// Fix específico: Solo neutraliza la consulta problemática generateMissingTokens
-
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyJWT } from '@/lib/auth';
+import { generateUniqueToken } from '@/lib/auth';
 import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// ✅ FIX QUIRÚRGICO: Función modificada para evitar consulta problemática Prisma
+// Función para generar tokens únicos para participantes que no los tienen
 async function generateMissingTokens(campaignId: string): Promise<number> {
   try {
-    console.log('✅ [FIX QUIRÚRGICO] Verificación de tokens omitida para evitar error Prisma desincronizado.');
-    console.log('📝 ASUMIENDO: Todos los participantes tienen uniqueToken desde su creación en admin/participants');
-    
-    // Función neutralizada - no ejecuta consulta problemática findMany con uniqueToken
-    // Los participantes ya obtienen tokens durante su creación inicial
-    return 0;
+    // Buscar participantes sin token
+    const participantsWithoutToken = await prisma.participant.findMany({
+      where: {
+        campaignId,
+        OR: [
+          { uniqueToken: null },
+          { uniqueToken: '' }
+        ]
+      },
+      select: { id: true }
+    });
+
+    if (participantsWithoutToken.length === 0) {
+      return 0;
+    }
+
+    // Generar tokens únicos
+    const updatePromises = participantsWithoutToken.map(participant => 
+      prisma.participant.update({
+        where: { id: participant.id },
+        data: { uniqueToken: generateUniqueToken() }
+      })
+    );
+
+    await Promise.all(updatePromises);
+    return participantsWithoutToken.length;
+
   } catch (error) {
-    console.error('Error en generateMissingTokens (función segura):', error);
-    throw new Error('Error en verificación de tokens');
+    console.error('Error generating missing tokens:', error);
+    throw new Error('Error generando tokens únicos');
   }
 }
 
-// ✅ PRESERVADA: Función completa emails original con templates HTML corporativos
+// Función para enviar emails de invitación (simplificada para MVP)
 async function queueCampaignEmails(campaignId: string): Promise<{ queued: number; errors: string[] }> {
   try {
     // Obtener datos de la campaña y participantes
@@ -50,63 +69,74 @@ async function queueCampaignEmails(campaignId: string): Promise<{ queued: number
     let queuedCount = 0;
     const errors: string[] = [];
 
-    // ✅ PRESERVADO: Template de email HTML corporativo completo
+    // Template de email básico
     const getEmailTemplate = (participant: any, token: string) => `
       <!DOCTYPE html>
-      <html lang="es">
+      <html>
         <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Invitación Encuesta - ${account.companyName}</title>
+          <meta charset="utf-8">
+          <title>Tu opinión importa - ${account.companyName}</title>
           <style>
-            .header { background: linear-gradient(90deg, #22D3EE 0%, #A78BFA 100%); padding: 30px; border-radius: 10px; text-align: center; }
-            .content { padding: 30px 0; }
-            .button { background: linear-gradient(90deg, #22D3EE 0%, #A78BFA 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; }
-            .info-box { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
-            .footer { text-align: center; font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 20px; }
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+            .button { display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+            .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
           </style>
         </head>
-        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div class="header">
-            <h1 style="color: white; margin: 0;">Tu opinión importa</h1>
-            <p style="color: white; margin: 10px 0 0 0;">Encuesta de Clima Organizacional</p>
-          </div>
-          
-          <div class="content">
-            <p>Hola ${participant.name || 'Estimado/a colaborador/a'},</p>
-            
-            <p>Te invitamos a participar en nuestra encuesta de <strong>${campaignType.name}</strong> en ${account.companyName}.</p>
-            
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${surveyUrl}?token=${token}" class="button">
-                Responder Encuesta
-              </a>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Tu Opinión Importa</h1>
+              <p>Ayúdanos a mejorar ${account.companyName}</p>
             </div>
             
-            <div class="info-box">
-              <h3 style="margin-top: 0;">Detalles importantes:</h3>
-              <p><strong>Duración estimada:</strong> ${campaignType.estimatedDuration} minutos</p>
-              <p><strong>Confidencialidad:</strong> Tus respuestas son completamente anónimas</p>
-              <p><strong>Objetivo:</strong> Mejorar nuestro ambiente de trabajo</p>
+            <div class="content">
+              <h2>Hola${participant.name ? ` ${participant.name}` : ''},</h2>
+              
+              <p>Hemos iniciado una medición de clima organizacional en ${account.companyName} y tu participación es fundamental para entender cómo podemos mejorar como equipo.</p>
+              
+              <div style="background: white; padding: 20px; border-radius: 6px; margin: 20px 0;">
+                <h3 style="margin-top: 0;">Detalles de la Encuesta:</h3>
+                <p><strong>Tipo:</strong> ${campaignType.name}</p>
+                <p><strong>Duración estimada:</strong> ${campaignType.estimatedDuration || 10} minutos</p>
+                <p><strong>Período:</strong> ${new Date(campaignData.startDate).toLocaleDateString()} - ${new Date(campaignData.endDate).toLocaleDateString()}</p>
+                <p><strong>Confidencialidad:</strong> Tus respuestas son completamente anónimas</p>
+              </div>
+              
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${surveyUrl}/${token}" class="button">
+                  Completar Encuesta →
+                </a>
+              </div>
+              
+              <p><strong>¿Por qué es importante tu participación?</strong></p>
+              <ul>
+                <li>Ayudas a identificar fortalezas organizacionales</li>
+                <li>Contribuyes a detectar oportunidades de mejora</li>
+                <li>Participas en la construcción de un mejor ambiente laboral</li>
+              </ul>
+              
+              <div style="background: #e8f4f8; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                <p style="margin: 0;"><strong>💡 Tip:</strong> La encuesta está optimizada para móvil. Puedes completarla desde cualquier dispositivo en el momento que prefieras.</p>
+              </div>
+              
+              <p>Si tienes alguna pregunta sobre este proceso, no dudes en contactar a tu área de Recursos Humanos.</p>
+              
+              <p>¡Gracias por ser parte del crecimiento de ${account.companyName}!</p>
             </div>
             
-            <p>Tu participación es voluntaria pero muy valiosa para nosotros. 
-               Puedes completarla desde cualquier dispositivo en el momento que prefieras.</p>
-            
-            <p>Si tienes alguna pregunta sobre este proceso, no dudes en contactar a tu área de Recursos Humanos.</p>
-            
-            <p>¡Gracias por ser parte del crecimiento de ${account.companyName}!</p>
-          </div>
-          
-          <div class="footer">
-            <p>Esta encuesta es anónima y confidencial</p>
-            <p>Powered by FocalizaHR - Inteligencia Organizacional</p>
+            <div class="footer">
+              <p>Esta encuesta es anónima y confidencial</p>
+              <p>Powered by FocalizaHR - Inteligencia Organizacional</p>
+            </div>
           </div>
         </body>
       </html>
     `;
 
-    // ✅ PRESERVADO: Envío emails en batches para rate limiting
+    // Enviar emails en batches para evitar límites de rate
     const batchSize = 10;
     for (let i = 0; i < participants.length; i += batchSize) {
       const batch = participants.slice(i, i + batchSize);
@@ -147,7 +177,7 @@ async function queueCampaignEmails(campaignId: string): Promise<{ queued: number
   }
 }
 
-// ✅ PRESERVADO: Handler PUT completo original con todas las validaciones y funcionalidades
+// Handler PUT para activación de campaña
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -155,7 +185,7 @@ export async function PUT(
   try {
     console.log('🚀 Campaign activation request:', params.id);
     
-    // ✅ PRESERVADO: Verificación autenticación JWT
+    // Verificar autenticación
     const authResult = await verifyJWT(request);
     if (!authResult.success || !authResult.user) {
       return NextResponse.json(
@@ -176,7 +206,7 @@ export async function PUT(
 
     const campaignId = params.id;
 
-    // ✅ PRESERVADO: Búsqueda campaña con validaciones completas
+    // Buscar la campaña con todas las validaciones
     const campaign = await prisma.campaign.findFirst({
       where: {
         id: campaignId,
@@ -214,7 +244,7 @@ export async function PUT(
 
     console.log('✅ Campaign found:', campaign.name, 'Status:', campaign.status);
 
-    // ✅ PRESERVADO: Validaciones exhaustivas previas a activación
+    // Validaciones previas a la activación
     const validationErrors: string[] = [];
 
     // 1. Estado debe ser 'draft'
@@ -269,13 +299,13 @@ export async function PUT(
 
     console.log('🔄 Starting activation process...');
 
-    // ✅ PRESERVADO: Proceso activación en transacción completa
+    // Proceso de activación en transacción
     const activationResult = await prisma.$transaction(async (tx) => {
-      // 1. Generar tokens únicos - FUNCIÓN AHORA SEGURA
+      // 1. Generar tokens únicos para participantes que no los tienen
       const tokensGenerated = await generateMissingTokens(campaignId);
-      console.log(`🎫 Generated ${tokensGenerated} missing tokens (función segura)`);
+      console.log(`🎫 Generated ${tokensGenerated} missing tokens`);
 
-      // 2. ✅ PRESERVADO: Actualizar estado de la campaña
+      // 2. Actualizar estado de la campaña
       const updatedCampaign = await tx.campaign.update({
         where: { id: campaignId },
         data: {
@@ -298,10 +328,10 @@ export async function PUT(
         }
       });
 
-      // 3. ✅ PRESERVADO: Crear audit log completo
+      // 3. Crear audit log
       await tx.auditLog.create({
         data: {
-         campaign: { connect: { id: campaignId } },
+          campaignId,
           action: 'campaign_activated',
           userInfo: JSON.stringify({
             userId: authResult.user.id,
@@ -309,21 +339,21 @@ export async function PUT(
             participantsCount: campaign.participants.length,
             activatedAt: new Date().toISOString()
           }),
-       
+          timestamp: new Date()
         }
       });
 
       return { updatedCampaign, tokensGenerated };
     });
 
-    console.log('📧 Queueing campaign emails...');
+    console.log('📧 Iniciando envío de emails en segundo plano...')
 
-    // ✅ PRESERVADO: Envío emails de invitación
-    const emailResult = await queueCampaignEmails(campaignId);
+    // 3. Enviar emails de invitación
+    queueCampaignEmails(campaignId);
     
-    console.log(`✅ Emails queued: ${emailResult.queued}, Errors: ${emailResult.errors.length}`);
+    console.log('✅ Proceso de activación completado. La respuesta se envía al cliente ahora.');
 
-    // ✅ PRESERVADO: Notificación al cliente
+    // 4. Enviar notificación al cliente
     try {
       await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/admin/notifications`, {
         method: 'POST',
@@ -340,10 +370,10 @@ export async function PUT(
       // No fallar si la notificación falla
     }
 
-    // ✅ PRESERVADO: Respuesta exitosa completa original
+    // Respuesta exitosa
     return NextResponse.json({
       success: true,
-      message: `Campaña "${activationResult.updatedCampaign.name}" activada exitosamente`,
+      message: `Campaña "${campaign.name}" activada exitosamente`,
       campaign: {
         id: activationResult.updatedCampaign.id,
         name: activationResult.updatedCampaign.name,
@@ -352,8 +382,6 @@ export async function PUT(
         company: activationResult.updatedCampaign.account.companyName
       },
       participantsCount: campaign.participants.length,
-      emailsQueued: emailResult.queued,
-      emailErrors: emailResult.errors.length,
       tokensGenerated: activationResult.tokensGenerated,
       nextSteps: [
         'Los participantes recibirán emails de invitación',

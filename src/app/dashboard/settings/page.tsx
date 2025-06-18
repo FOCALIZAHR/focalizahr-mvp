@@ -1,137 +1,133 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { isAuthenticated, getCurrentUser } from '@/lib/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
+// Switch component no disponible - usando Button como toggle
 import { 
-  Settings, 
   User, 
   Building, 
-  Mail, 
-  Bell,
-  Shield,
-  Palette,
-  Download,
-  Trash2,
+  Bell, 
+  Shield, 
+  Database,
+  Mail,
+  Globe,
   Save,
-  Edit
+  ArrowLeft
 } from 'lucide-react';
-import DashboardNavigation from '@/components/dashboard/DashboardNavigation';
-import '../dashboard.css'; // Estilos corporativos
+import { isAuthenticated } from '@/lib/auth';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [notifications, setNotifications] = useState({
+    email: true,
+    browser: false,
+    mobile: true
+  });
+
+  const toggleNotification = (key: 'email' | 'browser' | 'mobile') => {
+    setNotifications(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
 
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push('/');
       return;
     }
-    
-    const currentUser = getCurrentUser();
-    setUser(currentUser);
+    setMounted(true);
   }, [router]);
 
-  if (!user) {
-    return <div>Cargando...</div>;
+  if (!mounted) {
+    return (
+      <div className="min-h-screen layout-center">
+        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
   }
 
   return (
-    <div className="neural-dashboard">
-      <DashboardNavigation />
-      
-      <div className="lg:ml-64 p-6">
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">
-              Configuración
-            </h1>
-            <p className="text-white/70">
-              Administra tu perfil y preferencias de la plataforma.
+    <div className="neural-dashboard main-layout min-h-screen">
+      <div className="container mx-auto px-4 py-8">
+        
+        {/* Header */}
+        <div className="layout-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold focalizahr-gradient-text">Configuración</h1>
+            <p className="text-muted-foreground mt-2">
+              Gestiona tu cuenta y preferencias del sistema
             </p>
           </div>
+          <Button 
+            variant="outline" 
+            onClick={() => router.push('/dashboard')}
+            className="focus-ring"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver al Dashboard
+          </Button>
+        </div>
 
-          {/* Account Information */}
-          <Card className="professional-card mb-6">
+        <div className="space-y-6">
+          {/* Profile Settings */}
+          <Card className="professional-card">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <User className="h-5 w-5 text-primary mr-3" />
-                  <div>
-                    <CardTitle className="text-white">Información de Cuenta</CardTitle>
-                    <CardDescription className="text-white/70">
-                      Gestiona tu perfil y datos de contacto
-                    </CardDescription>
-                  </div>
+              <div className="flex items-center">
+                <User className="h-5 w-5 text-primary mr-3" />
+                <div>
+                  <CardTitle className="text-white">Configuración de Perfil</CardTitle>
+                  <CardDescription className="text-white/70">
+                    Actualiza tu información personal y de contacto
+                  </CardDescription>
                 </div>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setIsEditing(!isEditing)}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  {isEditing ? 'Cancelar' : 'Editar'}
-                </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="adminName" className="text-white/80">Nombre Completo</Label>
+                  <Label className="text-sm font-medium text-white">Nombre Completo</Label>
                   <Input 
-                    id="adminName"
-                    value={user.adminName || ''}
-                    disabled={!isEditing}
-                    className="mt-1 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                    placeholder="Tu nombre completo"
+                    className="mt-2 form-input"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="adminEmail" className="text-white/80">Email</Label>
+                  <Label className="text-sm font-medium text-white">Email</Label>
                   <Input 
-                    id="adminEmail"
                     type="email"
-                    value={user.adminEmail || ''}
-                    disabled={!isEditing}
-                    className="mt-1 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                    placeholder="tu@email.com"
+                    className="mt-2 form-input"
                   />
                 </div>
               </div>
-
+              
               <div>
-                <Label htmlFor="companyName" className="text-white/80">Empresa</Label>
+                <Label className="text-sm font-medium text-white">Empresa</Label>
                 <Input 
-                  id="companyName"
-                  value={user.companyName || ''}
-                  disabled={!isEditing}
-                  className="mt-1 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                  placeholder="Nombre de tu empresa"
+                  className="mt-2 form-input"
                 />
               </div>
-
-              {isEditing && (
-                <div className="flex justify-end space-x-2 pt-4">
-                  <Button variant="outline" onClick={() => setIsEditing(false)}>
-                    Cancelar
-                  </Button>
-                  <Button>
-                    <Save className="h-4 w-4 mr-2" />
-                    Guardar Cambios
-                  </Button>
-                </div>
-              )}
+              
+              <div className="pt-4">
+                <Button className="btn-gradient focus-ring">
+                  <Save className="h-4 w-4 mr-2" />
+                  Guardar Cambios
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
           {/* Company Settings */}
-          <Card className="professional-card mb-6">
+          <Card className="professional-card">
             <CardHeader>
               <div className="flex items-center">
                 <Building className="h-5 w-5 text-primary mr-3" />
@@ -169,14 +165,14 @@ export default function SettingsPage() {
           </Card>
 
           {/* Notifications */}
-          <Card className="professional-card mb-6">
+          <Card className="professional-card">
             <CardHeader>
               <div className="flex items-center">
                 <Bell className="h-5 w-5 text-primary mr-3" />
                 <div>
                   <CardTitle className="text-white">Notificaciones</CardTitle>
                   <CardDescription className="text-white/70">
-                    Controla cómo y cuándo recibir notificaciones
+                    Configura cómo y cuándo recibir notificaciones
                   </CardDescription>
                 </div>
               </div>
@@ -184,45 +180,70 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-sm font-medium">Campañas Completadas</Label>
-                  <p className="text-sm text-gray-500">
-                    Notificar cuando una campaña termine
+                  <Label className="text-sm font-medium text-white">Notificaciones por Email</Label>
+                  <p className="text-sm text-white/60">
+                    Recibe actualizaciones importantes por correo
                   </p>
                 </div>
-                <input type="checkbox" defaultChecked className="rounded" />
+                <Button 
+                  size="sm"
+                  variant={notifications.email ? "default" : "outline"}
+                  onClick={() => toggleNotification('email')}
+                  className="focus-ring"
+                >
+                  {notifications.email ? "Activado" : "Desactivado"}
+                </Button>
               </div>
+              
+              <Separator className="bg-white/20" />
               
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-sm font-medium">Recordatorios de Participación</Label>
-                  <p className="text-sm text-gray-500">
-                    Alertas sobre baja participación
+                  <Label className="text-sm font-medium text-white">Notificaciones del Navegador</Label>
+                  <p className="text-sm text-white/60">
+                    Alertas emergentes en tiempo real
                   </p>
                 </div>
-                <input type="checkbox" defaultChecked className="rounded" />
+                <Button 
+                  size="sm"
+                  variant={notifications.browser ? "default" : "outline"}
+                  onClick={() => toggleNotification('browser')}
+                  className="focus-ring"
+                >
+                  {notifications.browser ? "Activado" : "Desactivado"}
+                </Button>
               </div>
+              
+              <Separator className="bg-white/20" />
               
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-sm font-medium">Reportes Semanales</Label>
-                  <p className="text-sm text-gray-500">
-                    Resumen semanal de actividad
+                  <Label className="text-sm font-medium text-white">Notificaciones Móviles</Label>
+                  <p className="text-sm text-white/60">
+                    Push notifications en dispositivos móviles
                   </p>
                 </div>
-                <input type="checkbox" className="rounded" />
+                <Button 
+                  size="sm"
+                  variant={notifications.mobile ? "default" : "outline"}
+                  onClick={() => toggleNotification('mobile')}
+                  className="focus-ring"
+                >
+                  {notifications.mobile ? "Activado" : "Desactivado"}
+                </Button>
               </div>
             </CardContent>
           </Card>
 
-          {/* Data & Privacy */}
-          <Card className="professional-card mb-6">
+          {/* Security */}
+          <Card className="professional-card">
             <CardHeader>
               <div className="flex items-center">
                 <Shield className="h-5 w-5 text-primary mr-3" />
                 <div>
-                  <CardTitle className="text-white">Datos y Privacidad</CardTitle>
+                  <CardTitle className="text-white">Seguridad</CardTitle>
                   <CardDescription className="text-white/70">
-                    Gestiona tus datos y configuraciones de privacidad
+                    Gestiona tu contraseña y configuraciones de seguridad
                   </CardDescription>
                 </div>
               </div>
@@ -230,50 +251,62 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-sm font-medium">Exportar Datos</Label>
-                  <p className="text-sm text-gray-500">
-                    Descarga todos tus datos en formato CSV
+                  <Label className="text-sm font-medium text-white">Cambiar Contraseña</Label>
+                  <p className="text-sm text-white/60">
+                    Actualiza tu contraseña de acceso
                   </p>
                 </div>
-                <Button variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar
-                </Button>
+                <Button variant="outline" size="sm" className="border-white/20 text-white hover:bg-white/10">Cambiar</Button>
               </div>
               
-              <Separator />
+              <Separator className="bg-white/20" />
               
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-sm font-medium">Eliminar Cuenta</Label>
-                  <p className="text-sm text-gray-500">
-                    Eliminar permanentemente tu cuenta y datos
+                  <Label className="text-sm font-medium text-white">Autenticación de Dos Factores</Label>
+                  <p className="text-sm text-white/60">
+                    Añade una capa extra de seguridad
                   </p>
                 </div>
-                <Button variant="destructive" size="sm">
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Eliminar
-                </Button>
+                <Badge variant="secondary" className="bg-white/20 text-white">Próximamente</Badge>
               </div>
             </CardContent>
           </Card>
 
-          {/* Support */}
-          <Card className="professional-card border-cyan-500/30">
-            <CardContent className="pt-6">
+          {/* Data Management */}
+          <Card className="professional-card">
+            <CardHeader>
+              <div className="flex items-center">
+                <Database className="h-5 w-5 text-primary mr-3" />
+                <div>
+                  <CardTitle className="text-white">Gestión de Datos</CardTitle>
+                  <CardDescription className="text-white/70">
+                    Controla tus datos y configuraciones de privacidad
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-cyan-400">
-                    ¿Necesitas ayuda?
-                  </h3>
-                  <p className="text-sm text-white/70 mt-1">
-                    Contacta a nuestro equipo de soporte para resolver dudas.
+                  <Label className="text-sm font-medium text-white">Exportar Datos</Label>
+                  <p className="text-sm text-white/60">
+                    Descarga todos tus datos en formato CSV/JSON
                   </p>
                 </div>
-                <Button className="btn-gradient">
-                  <Mail className="h-4 w-4 mr-2" />
-                  Contactar Soporte
-                </Button>
+                <Button variant="outline" size="sm" className="border-white/20 text-white hover:bg-white/10">Exportar</Button>
+              </div>
+              
+              <Separator className="bg-white/20" />
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium text-white text-destructive">Eliminar Cuenta</Label>
+                  <p className="text-sm text-white/60">
+                    Elimina permanentemente tu cuenta y todos los datos
+                  </p>
+                </div>
+                <Button variant="destructive" size="sm">Eliminar</Button>
               </div>
             </CardContent>
           </Card>

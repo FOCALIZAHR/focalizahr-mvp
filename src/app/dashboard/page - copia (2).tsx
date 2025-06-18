@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import './dashboard.css' 
 import { 
   BarChart3, 
   Users, 
@@ -449,53 +450,44 @@ function AlertsPanel() {
 }
 
 // Componente para Lista de Campañas (MIGRADO AL SISTEMA GLOBAL)
+// =======================================================================
+// 👇 REEMPLAZA LA FUNCIÓN ANTIGUA CON ESTE BLOQUE COMPLETO 👇
+// =======================================================================
 function CampaignsList() {
   const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'draft'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const router = useRouter();
   const { campaigns, loading, error, lastUpdated, refetch } = useCampaigns();
 
-  // 🔥 FUNCIONES NUEVAS AGREGADAS - INCREMENTAL SEGURO
-  
-  // Función para activar campaña
   const handleActivateCampaign = async (campaignId: string, campaignName: string) => {
     const confirmed = window.confirm(
       `¿Activar la campaña "${campaignName}"?\n\nEsta acción enviará emails a participantes.`
     );
-    
     if (!confirmed) return;
-
     try {
-      console.log('🚀 Activando campaña:', campaignId);
-      
       const token = localStorage.getItem('focalizahr_token');
-      const response = await fetch(`/api/campaigns/${campaignId}/activate`, {
+      const response = await fetch(`/api/campaigns/${campaignId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ action: 'activate' })
+        body: JSON.stringify({ status: 'active', action: 'activate' })
       });
-
       if (response.ok) {
         alert(`✅ Campaña "${campaignName}" activada!`);
         refetch();
       } else {
-        // Simulación mientras no existe API
         alert(`🧪 SIMULACIÓN: Campaña "${campaignName}" activada`);
       }
-      
     } catch (error) {
       console.error('Error:', error);
       alert(`🧪 SIMULACIÓN: Campaña "${campaignName}" activada`);
     }
   };
 
-  // Función para otras acciones
   const handleCampaignAction = async (campaignId: string, action: string, campaignName: string) => {
     console.log('🎯 Acción:', action, 'para campaña:', campaignName);
-    
     switch (action) {
       case 'monitor':
         router.push(`/dashboard/campaigns/${campaignId}/monitor`);
@@ -518,10 +510,8 @@ function CampaignsList() {
       completed: { label: 'Completada', variant: 'outline' as const, icon: CheckCircle, badgeClass: 'badge-gradient-completed' },
       cancelled: { label: 'Cancelada', variant: 'destructive' as const, icon: Clock, badgeClass: 'badge-gradient-cancelled' }
     };
-    
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
     const Icon = config.icon;
-    
     return (
       <div className="flex items-center gap-2">
         <Badge className={config.badgeClass}>
@@ -541,7 +531,6 @@ function CampaignsList() {
     );
   };
 
-  // 🔥 FUNCIÓN ACTUALIZADA - getActionButton CON NUEVAS FUNCIONES
   const getActionButton = (campaign: Campaign) => {
     switch (campaign.status) {
       case 'draft':
@@ -599,7 +588,6 @@ function CampaignsList() {
 
   const getTrendIcon = (trend?: string) => {
     if (!trend) return null;
-    
     switch (trend) {
       case 'up':
         return (
@@ -631,7 +619,6 @@ function CampaignsList() {
     return matchesFilter && matchesSearch;
   });
 
-  // Ordenar campañas: activas primero, luego por fecha de creación
   const sortedCampaigns = filteredCampaigns.sort((a, b) => {
     if (a.status === 'active' && b.status !== 'active') return -1;
     if (a.status !== 'active' && b.status === 'active') return 1;
@@ -769,16 +756,15 @@ function CampaignsList() {
                 key={campaign.id} 
                 className="professional-card campaign-card-layout hover:shadow-md transition-shadow"
               >
-                {/* Indicador de estado lateral */}
                 <div className={`campaign-status-indicator ${
                   campaign.status === 'active' ? 'bg-green-500' :
                   campaign.status === 'completed' ? 'bg-blue-500' :
                   campaign.status === 'draft' ? 'bg-gray-400' : 'bg-red-500'
                 }`}></div>
 
-                <CardContent className="layout-between p-4">
-                  <div className="flex-1 ml-4">
-                    <div className="flex items-center gap-3 mb-3">
+                <CardContent className="layout-between flex-wrap gap-y-4 p-4">
+                  <div className="flex-1 ml-4" style={{ minWidth: '250px' }}>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-3">
                       <h3 className="font-semibold text-lg focalizahr-gradient-text">
                         {campaign.name}
                       </h3>
@@ -854,15 +840,10 @@ function CampaignsList() {
                   </div>
                   
                   <div className="flex items-center gap-2 ml-4">
-                    <CampaignActionButtons
-                    campaign={campaign}
-                    onActivateCampaign={handleActivateCampaign}
-                    onCampaignAction={handleCampaignAction}
-                    />
+                    {getActionButton(campaign)}
                   </div>
                 </CardContent>
 
-                {/* Barra de progreso visual */}
                 {campaign.status === 'active' && (
                   <div className="mt-3 pt-3 border-t mx-4 pb-4">
                     <div className="layout-between text-xs text-muted-foreground mb-1">
@@ -937,9 +918,9 @@ export default function DashboardPage() {
         <div className="neural-dashboard main-layout min-h-screen">      
           <div className="container mx-auto px-4 py-8 space-y-8 relative z-10">
             {/* Header */}
-            <div className="layout-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <h1 className="text-4xl font-bold focalizahr-gradient-text">
+                <h1 className="text-3xl md:text-4xl font-bold focalizahr-gradient-text">
                   Dashboard FocalizaHR
                 </h1>
                 <p className="text-muted-foreground mt-2 flex items-center gap-2">
@@ -948,7 +929,7 @@ export default function DashboardPage() {
                 </p>
               </div>
               
-              <div className="flex items-center gap-4">
+              <div className="hidden md:flex items-center gap-4">
                 <Card className="glass-card">
                   <CardContent className="status-widget-layout p-4">
                     <div className="flex items-center gap-2">
@@ -970,7 +951,25 @@ export default function DashboardPage() {
                 </Button>
               </div>
             </div>
-
+{/* Acciones móviles */}
+              <div className="flex md:hidden flex-col gap-3">
+                <Button 
+                  size="sm"
+                  variant="outline"
+                  onClick={() => router.push('/dashboard/settings')}
+                  className="mobile-touch-target w-full"
+                >
+                  Configuración
+                </Button>
+                <Card className="glass-card">
+                  <CardContent className="p-3 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm font-medium">Sistema Activo</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             {/* Métricas Cards */}
             <MetricsCards />
 

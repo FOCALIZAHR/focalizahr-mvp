@@ -469,13 +469,13 @@ function CampaignsList() {
       console.log('🚀 Activando campaña:', campaignId);
       
       const token = localStorage.getItem('focalizahr_token');
-      const response = await fetch(`/api/campaigns/${campaignId}/activate`, {
+      const response = await fetch(`/api/campaigns/${campaignId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ action: 'activate' })
+        body: JSON.stringify({ status: 'active', action: 'activate' })
       });
 
       if (response.ok) {

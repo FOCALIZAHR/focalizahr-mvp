@@ -138,7 +138,6 @@ export default function ParticipantUploader({
       formData.append('campaignId', campaignId);
       formData.append('action', 'preview');
       
-      // ---- INICIO DE LA CORRECCIÓN #1 ----
       const token = localStorage.getItem('focalizahr_token');
 
       const response = await fetch('/api/admin/participants', {
@@ -148,7 +147,6 @@ export default function ParticipantUploader({
         },
         body: formData,
       });
-      // ---- FIN DE LA CORRECCIÓN #1 ----
 
       clearInterval(progressInterval);
       setUploadProgress(100);
@@ -189,7 +187,6 @@ export default function ParticipantUploader({
       formData.append('campaignId', campaignId);
       formData.append('action', 'confirm');
 
-      // ---- INICIO DE LA CORRECCIÓN #2 ----
       const token = localStorage.getItem('focalizahr_token');
 
       const response = await fetch('/api/admin/participants', {
@@ -199,7 +196,6 @@ export default function ParticipantUploader({
         },
         body: formData,
       });
-      // ---- FIN DE LA CORRECCIÓN #2 ----
 
       const result = await response.json();
 
@@ -255,14 +251,14 @@ export default function ParticipantUploader({
   }, [campaignName]);
 
   return (
-    <Card className="w-full">
+    <Card className="professional-card w-full">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Upload className="h-5 w-5" />
+        <CardTitle className="flex items-center gap-2 text-cyan-400">
+          <Upload className="h-5 w-5 text-cyan-400" />
           Cargar Participantes
         </CardTitle>
-        <CardDescription>
-          Campaña: <strong>{campaignName}</strong> • Máximo {maxParticipants} participantes
+        <CardDescription className="text-white/70">
+          Campaña: <strong className="text-white">{campaignName}</strong> • Máximo {maxParticipants} participantes
         </CardDescription>
       </CardHeader>
       
@@ -270,8 +266,8 @@ export default function ParticipantUploader({
         
         {/* Instrucciones y template */}
         <div className="space-y-4">
-          <Alert>
-            <FileText className="h-4 w-4" />
+          <Alert className="context-container-info">
+            <FileText className="h-4 w-4 text-cyan-400" />
             <AlertDescription>
               <div className="space-y-2">
                 <p><strong>Formato requerido:</strong> CSV o Excel con las siguientes columnas:</p>
@@ -287,14 +283,14 @@ export default function ParticipantUploader({
           </Alert>
 
           <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-white/70">
               ¿Necesitas un ejemplo? Descarga nuestro template
             </div>
             <Button 
               variant="outline" 
               size="sm"
               onClick={handleDownloadTemplate}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border-white/20 text-white hover:bg-white/10"
             >
               <Download className="h-4 w-4" />
               Descargar Template
@@ -304,7 +300,7 @@ export default function ParticipantUploader({
 
         {/* Selector de archivo */}
         <div className="space-y-4">
-          <Label htmlFor="file-upload" className="text-base font-medium">
+         <Label htmlFor="file-upload" className="text-white/80 text-base font-medium">
             Seleccionar Archivo
           </Label>
           
@@ -315,14 +311,14 @@ export default function ParticipantUploader({
               type="file"
               accept={allowedFormats.join(',')}
               onChange={handleFileSelect}
-              className="flex-1"
+              className="flex-1 bg-white/5 border-white/30 text-white file:bg-white/20 file:text-white file:border-0 file:rounded-md"
               disabled={uploading || processing}
             />
             
             <Button
               onClick={handleFilePreview}
               disabled={!uploadFile || uploading || processing}
-              className="min-w-[120px]"
+              className="min-w-[120px] btn-gradient focus-ring"
             >
               {uploading ? (
                 <div className="flex items-center gap-2">
@@ -341,13 +337,13 @@ export default function ParticipantUploader({
           {/* Progreso de upload */}
           {uploadProgress > 0 && uploadProgress < 100 && (
             <div className="space-y-2">
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between text-sm text-white/70">
                 <span>Procesando archivo...</span>
                 <span>{uploadProgress}%</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="progress-container bg-white/20">
                 <div 
-                  className="bg-primary h-2 rounded-full transition-all duration-300" 
+                  className="progress-fill bg-gradient-to-r from-cyan-500 to-purple-500 transition-all duration-300" 
                   style={{ width: `${uploadProgress}%` }}
                 ></div>
               </div>
@@ -355,28 +351,30 @@ export default function ParticipantUploader({
           )}
           
           {uploadFile && !uploading && (
-            <div className="text-sm text-gray-600 flex items-center gap-2">
+            <div className="text-sm text-white/70 flex items-center gap-2">
               <FileText className="h-4 w-4" />
               <span>{uploadFile.name} ({(uploadFile.size / 1024).toFixed(1)} KB)</span>
             </div>
           )}
         </div>
-{/* Mensaje de error validación mínimo participantes */}
-              {uploadResult && uploadResult.validRecords > 0 && uploadResult.validRecords < 5 && (
-                <Alert className="border-amber-200 bg-amber-50">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <AlertDescription className="text-amber-800">
-                    <div className="font-medium">Participantes insuficientes</div>
-                    <div className="text-sm mt-1">
-                      Se requiere un mínimo de 5 participantes para activar la campaña. 
-                      Actualmente hay {uploadResult.validRecords} participante{uploadResult.validRecords !== 1 ? 's' : ''} válido{uploadResult.validRecords !== 1 ? 's' : ''}.
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
+
+        {/* Mensaje de error validación mínimo participantes */}
+        {uploadResult && uploadResult.validRecords > 0 && uploadResult.validRecords < 5 && (
+          <Alert className="context-container-warning">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertDescription>
+              <div className="font-medium">Participantes insuficientes</div>
+              <div className="text-sm mt-1">
+                Se requiere un mínimo de 5 participantes para activar la campaña. 
+                Actualmente hay {uploadResult.validRecords} participante{uploadResult.validRecords !== 1 ? 's' : ''} válido{uploadResult.validRecords !== 1 ? 's' : ''}.
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Mostrar errores */}
         {uploadError && (
-          <Alert variant="destructive">
+          <Alert className="context-container-error">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>{uploadError}</AlertDescription>
           </Alert>
@@ -384,9 +382,9 @@ export default function ParticipantUploader({
 
         {/* Resultados del preview */}
         {uploadResult && showPreview && (
-          <Card className="border-green-200 bg-green-50">
+          <Card className="professional-card border-green-500/30">
             <CardHeader>
-              <CardTitle className="text-green-800 flex items-center gap-2">
+              <CardTitle className="text-green-400 flex items-center gap-2">
                 <CheckCircle className="h-5 w-5" />
                 Resultado del Procesamiento
               </CardTitle>
@@ -396,34 +394,34 @@ export default function ParticipantUploader({
               {/* Estadísticas */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">
+                  <div className="text-2xl font-bold text-green-400">
                     {uploadResult.totalProcessed}
                   </div>
-                  <div className="text-sm text-gray-600">Total procesados</div>
+                  <div className="text-sm text-white/70">Total procesados</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">
+                  <div className="text-2xl font-bold text-cyan-400">
                     {uploadResult.validRecords}
                   </div>
-                  <div className="text-sm text-gray-600">Registros válidos</div>
+                  <div className="text-sm text-white/70">Registros válidos</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-yellow-600">
+                  <div className="text-2xl font-bold text-yellow-400">
                     {uploadResult.duplicates}
                   </div>
-                  <div className="text-sm text-gray-600">Duplicados</div>
+                  <div className="text-sm text-white/70">Duplicados</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-red-600">
+                  <div className="text-2xl font-bold text-red-400">
                     {uploadResult.errors.length}
                   </div>
-                  <div className="text-sm text-gray-600">Errores</div>
+                  <div className="text-sm text-white/70">Errores</div>
                 </div>
               </div>
 
               {/* Mostrar errores si los hay */}
               {uploadResult.errors.length > 0 && (
-                <Alert variant="destructive" className="mb-4">
+                <Alert className="context-container-error mb-4">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
                     <div className="font-medium mb-2">Errores encontrados:</div>
@@ -432,7 +430,7 @@ export default function ParticipantUploader({
                         <li key={index}>{error}</li>
                       ))}
                       {uploadResult.errors.length > 5 && (
-                        <li className="text-gray-600">
+                        <li className="text-white/60">
                           ... y {uploadResult.errors.length - 5} errores más
                         </li>
                       )}
@@ -445,39 +443,39 @@ export default function ParticipantUploader({
               {previewData.length > 0 && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-medium flex items-center gap-2">
+                    <h4 className="font-medium flex items-center gap-2 text-cyan-400">
                       <Users className="h-4 w-4" />
                       Preview Participantes
                     </h4>
-                    <Badge variant="secondary">
+                    <Badge className="badge-gradient-active">
                       Mostrando {Math.min(previewData.length, 10)} de {previewData.length}
                     </Badge>
                   </div>
                   
-                  <div className="max-h-64 overflow-y-auto border rounded">
+                  <div className="max-h-64 overflow-y-auto border rounded border-white/20">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-100 sticky top-0">
+                      <thead className="bg-white/10 sticky top-0">
                         <tr>
-                          <th className="text-left p-3 font-medium">Email</th>
-                          <th className="text-left p-3 font-medium">Nombre</th>
-                          <th className="text-left p-3 font-medium">Departamento</th>
-                          <th className="text-left p-3 font-medium">Cargo</th>
+                          <th className="text-left p-3 font-medium text-white/90">Email</th>
+                          <th className="text-left p-3 font-medium text-white/90">Nombre</th>
+                          <th className="text-left p-3 font-medium text-white/90">Departamento</th>
+                          <th className="text-left p-3 font-medium text-white/90">Cargo</th>
                         </tr>
                       </thead>
                       <tbody>
                         {previewData.slice(0, 10).map((participant, index) => (
-                          <tr key={index} className="border-b hover:bg-gray-50">
-                            <td className="p-3">{participant.email}</td>
-                            <td className="p-3">{participant.name || '-'}</td>
-                            <td className="p-3">{participant.department || '-'}</td>
-                            <td className="p-3">{participant.position || '-'}</td>
+                          <tr key={index} className="border-b border-white/10 hover:bg-white/5">
+                            <td className="p-3 text-white/80">{participant.email}</td>
+                            <td className="p-3 text-white/80">{participant.name || '-'}</td>
+                            <td className="p-3 text-white/80">{participant.department || '-'}</td>
+                            <td className="p-3 text-white/80">{participant.position || '-'}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                     
                     {previewData.length > 10 && (
-                      <div className="text-center text-gray-500 py-3 bg-gray-50">
+                      <div className="text-center text-white/60 py-3 bg-white/5">
                         ... y {previewData.length - 10} participantes más
                       </div>
                     )}
@@ -487,52 +485,51 @@ export default function ParticipantUploader({
 
               {/* Análisis de segmentación */}
               {previewData.length > 0 && (
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                  <h4 className="font-medium text-blue-800 mb-2 flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
-                    Análisis de Segmentación
-                  </h4>
-                  
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-blue-700 font-medium">Departamentos únicos:</span>
-                      <span className="ml-2">
-                        {new Set(previewData.filter(p => p.department).map(p => p.department)).size}
-                      </span>
+                <div className="context-container-info mt-4">
+                  <BarChart3 className="h-4 w-4 text-cyan-400" />
+                  <div>
+                    <h4 className="font-medium text-cyan-400 mb-2">Análisis de Segmentación</h4>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-cyan-400 font-medium">Departamentos únicos:</span>
+                        <span className="ml-2 text-white/80">
+                          {new Set(previewData.filter(p => p.department).map(p => p.department)).size}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-cyan-400 font-medium">Cargos únicos:</span>
+                        <span className="ml-2 text-white/80">
+                          {new Set(previewData.filter(p => p.position).map(p => p.position)).size}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-cyan-400 font-medium">Con info completa:</span>
+                        <span className="ml-2 text-white/80">
+                          {previewData.filter(p => p.name && p.department && p.position).length}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-cyan-400 font-medium">Solo email:</span>
+                        <span className="ml-2 text-white/80">
+                          {previewData.filter(p => !p.name && !p.department && !p.position).length}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-blue-700 font-medium">Cargos únicos:</span>
-                      <span className="ml-2">
-                        {new Set(previewData.filter(p => p.position).map(p => p.position)).size}
-                      </span>
+                    
+                    <div className="mt-2 text-xs text-cyan-400">
+                      💡 Más información demográfica permite análisis más detallados
                     </div>
-                    <div>
-                      <span className="text-blue-700 font-medium">Con info completa:</span>
-                      <span className="ml-2">
-                        {previewData.filter(p => p.name && p.department && p.position).length}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-blue-700 font-medium">Solo email:</span>
-                      <span className="ml-2">
-                        {previewData.filter(p => !p.name && !p.department && !p.position).length}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-2 text-xs text-blue-600">
-                    💡 Más información demográfica permite análisis más detallados
                   </div>
                 </div>
               )}
 
               {/* Botones de acción */}
-              <div className="flex justify-between items-center pt-6 border-t">
-
+              <div className="flex justify-between items-center pt-6 border-t border-white/20">
                 <Button
                   variant="outline"
                   onClick={handleClearForm}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 border-white/20 text-white hover:bg-white/10"
                   disabled={processing}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -544,7 +541,7 @@ export default function ParticipantUploader({
                     variant="outline"
                     onClick={handleFilePreview}
                     disabled={!uploadFile || uploading || processing}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 border-white/20 text-white hover:bg-white/10"
                   >
                     <Eye className="h-4 w-4" />
                     Re-procesar
@@ -553,7 +550,7 @@ export default function ParticipantUploader({
                   <Button
                     onClick={handleConfirmUpload}
                     disabled={processing || uploadResult.validRecords === 0 || uploadResult.validRecords < 5}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 btn-gradient focus-ring"
                   >
                     {processing ? (
                       <>
@@ -564,9 +561,9 @@ export default function ParticipantUploader({
                       <>
                         <Send className="h-4 w-4" />
                         {uploadResult.validRecords < 5 
-  ? `Insuficientes participantes (${uploadResult.validRecords}/5 mín.)`
-  : `Confirmar Carga (${uploadResult.validRecords} participantes)`
-}
+                          ? `Insuficientes participantes (${uploadResult.validRecords}/5 mín.)`
+                          : `Confirmar Carga (${uploadResult.validRecords} participantes)`
+                        }
                       </>
                     )}
                   </Button>
@@ -575,12 +572,14 @@ export default function ParticipantUploader({
 
               {/* Información adicional para modo admin */}
               {mode === 'admin' && (
-                <div className="mt-4 p-3 bg-gray-100 rounded text-sm">
-                  <div className="font-medium text-gray-700 mb-1">Siguiente paso:</div>
-                  <p className="text-gray-600">
-                    Después de confirmar la carga, se enviará una notificación automática al cliente 
-                    para que pueda revisar y activar la campaña desde su dashboard.
-                  </p>
+                <div className="context-container-info mt-4">
+                  <div>
+                    <div className="font-medium text-cyan-400 mb-1">Siguiente paso:</div>
+                    <p className="text-white/80 text-sm">
+                      Después de confirmar la carga, se enviará una notificación automática al cliente 
+                      para que pueda revisar y activar la campaña desde su dashboard.
+                    </p>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -589,15 +588,13 @@ export default function ParticipantUploader({
 
         {/* Información de ayuda */}
         {!uploadResult && (
-          <Card className="bg-blue-50 border-blue-200">
+          <Card className="professional-card border-cyan-500/30">
             <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <FileText className="h-4 w-4 text-blue-600" />
-                </div>
-                <div className="space-y-2">
-                <h4 className="font-medium text-blue-800">Consejos para mejores resultados:</h4>
-                  <ul className="text-sm text-blue-700 space-y-1">
+              <div className="context-container-info">
+                <FileText className="h-4 w-4 text-cyan-400" />
+                <div>
+                  <h4 className="font-medium text-cyan-400">Consejos para mejores resultados:</h4>
+                  <ul className="text-sm text-white/80 space-y-1 mt-2">
                     <li>• Asegúrate que todos los emails sean válidos y únicos</li>
                     <li>• Incluye departamento y cargo para análisis segmentado</li>
                     <li>• Usa formato consistente en nombres y departamentos</li>

@@ -655,7 +655,7 @@ export default function NewCampaignPage() {
 
                 {/* Proceso Concierge */}
                 <Card className="glass-card">
-                  <CardContent className="p-4">
+                  <CardContent className="p-6">
                     <h3 className="font-semibold mb-3 flex items-center gap-2">
                       <Upload className="h-4 w-4" />
                       Proceso de Carga de Participantes

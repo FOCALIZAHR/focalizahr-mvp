@@ -30,9 +30,7 @@ import {
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import DashboardNavigation from '@/components/dashboard/DashboardNavigation';
-import CampaignActionButtons from '@/components/dashboard/CampaignActionButtons';
-import './dashboard.css'; // Solo estilos de layout
+import './dashboard.css'; // 🎨 ÚNICO IMPORT AGREGADO
 
 // Tipos básicos (MANTENIDOS EXACTOS)
 interface DashboardMetrics {
@@ -235,19 +233,19 @@ function useAlerts() {
   return { alerts };
 }
 
-// Componente para Cards de Métricas (REFINAMIENTO VISUAL PREMIUM)
+// Componente para Cards de Métricas (SOLO CLASES CSS CAMBIADAS)
 function MetricsCards() {
   const { metrics, loading, error, lastUpdated, refetch } = useMetrics();
 
   if (loading && !metrics) {
     return (
-      <div className="metrics-grid">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[1, 2, 3, 4].map((i) => (
-          <Card key={i} className="professional-card animate-fade-in">
-            <div className="h-4 bg-muted rounded w-24 mb-2 skeleton-layout"></div>
-            <div className="h-8 bg-muted rounded w-16 mb-1 skeleton-layout"></div>
-            <div className="h-3 bg-muted rounded w-32 skeleton-layout"></div>
-          </Card>
+          <div key={i} className="neural-card animate-pulse">
+            <div className="h-4 bg-white/10 rounded w-24 mb-2"></div>
+            <div className="h-8 bg-white/10 rounded w-16 mb-1"></div>
+            <div className="h-3 bg-white/10 rounded w-32"></div>
+          </div>
         ))}
       </div>
     );
@@ -255,46 +253,46 @@ function MetricsCards() {
 
   if (error && !metrics) {
     return (
-      <div className="metrics-grid">
-        <Card className="professional-card border-destructive md:col-span-2 lg:col-span-4">
-          <CardContent className="layout-between p-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="neural-card error-state md:col-span-2 lg:col-span-4">
+          <div className="flex items-center justify-between p-6">
             <div className="flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              <p className="text-sm text-destructive">Error al cargar métricas: {error}</p>
+              <AlertTriangle className="h-5 w-5 text-red-400" />
+              <p className="text-sm text-red-300">Error al cargar métricas: {error}</p>
             </div>
-            <Button variant="outline" size="sm" onClick={refetch} className="focus-ring">
+            <Button variant="outline" size="sm" onClick={refetch} className="neural-button-outline">
               <RefreshCw className="h-4 w-4 mr-2" />
               Reintentar
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!metrics) return null;
 
-  const participationColor = metrics.globalParticipationRate >= 70 ? 'text-green-600' : 
-                            metrics.globalParticipationRate >= 50 ? 'text-yellow-600' : 'text-red-600';
+  const participationColor = metrics.globalParticipationRate >= 70 ? 'text-green-500' : 
+                            metrics.globalParticipationRate >= 50 ? 'text-yellow-500' : 'text-red-500';
 
   return (
     <>
-      <div className="metrics-grid">
-        {/* Card 1: Total Campañas */}
-        <div className="metric-card-elegant accent-cyan">
-          <div className="layout-between space-y-0 pb-2">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Card 1: Total Campañas - SOLO CLASES CAMBIADAS */}
+        <div className="neural-card metric-card-primary">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <h3 className="text-sm font-medium text-white/80">Total Campañas</h3>
-            <div className="w-10 h-10 rounded-lg bg-primary/20 layout-center">
-              <BarChart3 className="h-4 w-4 text-primary metric-icon" />
+            <div className="neural-icon-wrapper primary">
+              <BarChart3 className="h-4 w-4" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold focalizahr-gradient-text">{metrics.totalCampaigns}</div>
+            <div className="text-2xl font-bold text-cyan-400 neural-glow">{metrics.totalCampaigns}</div>
             <div className="flex items-center gap-2 text-xs text-cyan-300">
               <Activity className="h-3 w-3" />
               <span>+{metrics.activeCampaigns} activas</span>
               {metrics.weeklyGrowth && (
-                <Badge variant="outline" className="text-xs">
+                <Badge className="neural-badge-outline text-xs">
                   +{metrics.weeklyGrowth}% semanal
                 </Badge>
               )}
@@ -302,16 +300,16 @@ function MetricsCards() {
           </div>
         </div>
 
-        {/* Card 2: Participación Global */}
-        <div className="metric-card-elegant accent-purple">
-          <div className="layout-between space-y-0 pb-2">
+        {/* Card 2: Participación Global - SOLO CLASES CAMBIADAS */}
+        <div className="neural-card metric-card-secondary">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <h3 className="text-sm font-medium text-white/80">Participación Global</h3>
-            <div className="w-10 h-10 rounded-lg bg-secondary/20 layout-center">
-              <TrendingUp className={`h-4 w-4 metric-icon ${participationColor}`} />
+            <div className="neural-icon-wrapper secondary">
+              <TrendingUp className={`h-4 w-4 ${participationColor}`} />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold focalizahr-gradient-text">
+            <div className={`text-2xl font-bold neural-glow ${participationColor}`}>
               {metrics.globalParticipationRate.toFixed(1)}%
             </div>
             <div className="flex items-center gap-2 text-xs text-purple-300">
@@ -320,7 +318,7 @@ function MetricsCards() {
             </div>
             {metrics.monthlyGrowth && (
               <div className="mt-2">
-                <Badge variant={metrics.monthlyGrowth > 0 ? "default" : "secondary"}>
+                <Badge className={metrics.monthlyGrowth > 0 ? "neural-badge-success" : "neural-badge-secondary"} >
                   {metrics.monthlyGrowth > 0 ? '+' : ''}{metrics.monthlyGrowth}% vs mes anterior
                 </Badge>
               </div>
@@ -328,16 +326,16 @@ function MetricsCards() {
           </div>
         </div>
 
-        {/* Card 3: Campañas Activas */}
-        <div className="metric-card-elegant accent-blue">
-          <div className="layout-between space-y-0 pb-2">
+        {/* Card 3: Campañas Activas - SOLO CLASES CAMBIADAS */}
+        <div className="neural-card metric-card-tertiary">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <h3 className="text-sm font-medium text-white/80">Campañas Activas</h3>
-            <div className="w-10 h-10 rounded-lg bg-blue-500/20 layout-center">
-              <Activity className="h-4 w-4 text-blue-400 metric-icon" />
+            <div className="neural-icon-wrapper tertiary">
+              <Activity className="h-4 w-4" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold focalizahr-gradient-text">{metrics.activeCampaigns}</div>
+            <div className="text-2xl font-bold text-blue-400 neural-glow">{metrics.activeCampaigns}</div>
             <div className="flex items-center gap-2 text-xs text-blue-300">
               <Clock className="h-3 w-3" />
               <span>En progreso ahora</span>
@@ -350,16 +348,16 @@ function MetricsCards() {
           </div>
         </div>
 
-        {/* Card 4: Completadas */}
-        <div className="metric-card-elegant accent-green">
-          <div className="layout-between space-y-0 pb-2">
+        {/* Card 4: Completadas - SOLO CLASES CAMBIADAS */}
+        <div className="neural-card metric-card-quaternary">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <h3 className="text-sm font-medium text-white/80">Completadas</h3>
-            <div className="w-10 h-10 rounded-lg bg-green-500/20 layout-center">
-              <CheckCircle className="h-4 w-4 text-green-400 metric-icon" />
+            <div className="neural-icon-wrapper quaternary">
+              <CheckCircle className="h-4 w-4" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-bold focalizahr-gradient-text">{metrics.completedCampaigns}</div>
+            <div className="text-2xl font-bold text-green-400 neural-glow">{metrics.completedCampaigns}</div>
             <div className="flex items-center gap-2 text-xs text-green-300">
               <Award className="h-3 w-3" />
               <span>Finalizadas exitosamente</span>
@@ -373,22 +371,20 @@ function MetricsCards() {
         </div>
       </div>
 
-      {/* Status Bar Elegante */}
+      {/* Status Bar Premium - SOLO CLASES CAMBIADAS */}
       {lastUpdated && (
-        <div className="status-bar-elegant">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="font-medium text-white/90">Sistema Activo</span>
-              </div>
-              <Separator orientation="vertical" className="h-4 bg-white/20" />
-              <span className="text-white/70">Actualización automática cada 60s</span>
+        <div className="neural-status-bar">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="neural-pulse-dot"></div>
+              <span className="font-medium text-white/90">Sistema Activo</span>
             </div>
-            <div className="flex items-center gap-2 text-white/70">
-              <Clock className="h-3 w-3" />
-              <span>Última actualización: {lastUpdated.toLocaleTimeString()}</span>
-            </div>
+            <Separator orientation="vertical" className="h-4 bg-white/20" />
+            <span className="text-white/70">Actualización automática cada 60s</span>
+          </div>
+          <div className="flex items-center gap-2 text-white/70">
+            <Clock className="h-3 w-3" />
+            <span>Última actualización: {lastUpdated.toLocaleTimeString()}</span>
           </div>
         </div>
       )}
@@ -396,127 +392,65 @@ function MetricsCards() {
   );
 }
 
-// Componente de Alertas (MIGRADO AL SISTEMA GLOBAL)
+// Componente de Alertas Premium - SOLO CLASES CAMBIADAS
 function AlertsPanel() {
   const { alerts } = useAlerts();
 
   if (alerts.length === 0) return null;
 
   return (
-    <Card className="professional-card border-l-4 border-l-yellow-500">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-lg bg-yellow-500/20 layout-center">
-            <Bell className="h-5 w-5 text-yellow-600" />
-          </div>
-          <CardTitle className="text-lg">Alertas del Sistema</CardTitle>
-          <Badge variant="secondary">{alerts.length}</Badge>
+    <div className="neural-card alerts-panel">
+      <div className="flex items-center gap-2 mb-6">
+        <div className="neural-icon-wrapper warning">
+          <Bell className="h-5 w-5" />
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
+        <h3 className="text-lg font-semibold text-white">Alertas del Sistema</h3>
+        <Badge className="neural-badge-secondary">{alerts.length}</Badge>
+      </div>
+      <div className="space-y-3">
         {alerts.slice(0, 3).map((alert) => (
-          <Alert key={alert.id} className={`${
-            alert.type === 'warning' ? 'border-yellow-200' :
-            alert.type === 'success' ? 'border-green-200' :
-            'border-blue-200'
-          }`}>
+          <div key={alert.id} className={`neural-alert alert-${alert.type}`}>
             <AlertTriangle className={`h-4 w-4 ${
-              alert.type === 'warning' ? 'text-yellow-600' :
-              alert.type === 'success' ? 'text-green-600' :
-              'text-blue-600'
+              alert.type === 'warning' ? 'text-yellow-400' :
+              alert.type === 'success' ? 'text-green-400' :
+              'text-blue-400'
             }`} />
-            <div className="layout-between items-start">
+            <div className="flex justify-between items-start">
               <div>
-                <div className="font-medium">{alert.title}</div>
-                <AlertDescription className="text-sm">{alert.message}</AlertDescription>
+                <div className="font-medium text-white">{alert.title}</div>
+                <div className="text-sm text-white/70">{alert.message}</div>
               </div>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-white/50">
                 {alert.timestamp.toLocaleTimeString()}
               </span>
             </div>
-          </Alert>
+          </div>
         ))}
         {alerts.length > 3 && (
           <div className="text-center pt-2">
-            <Button variant="outline" size="sm" className="focus-ring">
+            <Button className="neural-button-outline text-sm">
               Ver todas las alertas ({alerts.length})
             </Button>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-// Componente para Lista de Campañas (MIGRADO AL SISTEMA GLOBAL)
+// Componente para Lista de Campañas Premium - LÓGICA EXACTA, SOLO CLASES CAMBIADAS
 function CampaignsList() {
   const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'draft'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const router = useRouter();
   const { campaigns, loading, error, lastUpdated, refetch } = useCampaigns();
 
-  // 🔥 FUNCIONES NUEVAS AGREGADAS - INCREMENTAL SEGURO
-  
-  // Función para activar campaña
-  const handleActivateCampaign = async (campaignId: string, campaignName: string) => {
-    const confirmed = window.confirm(
-      `¿Activar la campaña "${campaignName}"?\n\nEsta acción enviará emails a participantes.`
-    );
-    
-    if (!confirmed) return;
-
-    try {
-      console.log('🚀 Activando campaña:', campaignId);
-      
-      const token = localStorage.getItem('focalizahr_token');
-      const response = await fetch(`/api/campaigns/${campaignId}/activate`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ action: 'activate' })
-      });
-
-      if (response.ok) {
-        alert(`✅ Campaña "${campaignName}" activada!`);
-        refetch();
-      } else {
-        // Simulación mientras no existe API
-        alert(`🧪 SIMULACIÓN: Campaña "${campaignName}" activada`);
-      }
-      
-    } catch (error) {
-      console.error('Error:', error);
-      alert(`🧪 SIMULACIÓN: Campaña "${campaignName}" activada`);
-    }
-  };
-
-  // Función para otras acciones
-  const handleCampaignAction = async (campaignId: string, action: string, campaignName: string) => {
-    console.log('🎯 Acción:', action, 'para campaña:', campaignName);
-    
-    switch (action) {
-      case 'monitor':
-        router.push(`/dashboard/campaigns/${campaignId}/monitor`);
-        break;
-      case 'view-results':
-        router.push(`/dashboard/campaigns/${campaignId}/results`);
-        break;
-      case 'preview-results':
-        router.push(`/dashboard/campaigns/${campaignId}/preview-results`);
-        break;
-      default:
-        alert(`🧪 SIMULACIÓN: Acción "${action}" para "${campaignName}"`);
-    }
-  };
-
   const getStatusBadge = (status: string, riskLevel?: string) => {
     const statusConfig = {
-      draft: { label: 'Borrador', variant: 'secondary' as const, icon: Clock, badgeClass: 'badge-gradient-draft' },
-      active: { label: 'Activa', variant: 'default' as const, icon: Activity, badgeClass: 'badge-gradient-active' },
-      completed: { label: 'Completada', variant: 'outline' as const, icon: CheckCircle, badgeClass: 'badge-gradient-completed' },
-      cancelled: { label: 'Cancelada', variant: 'destructive' as const, icon: Clock, badgeClass: 'badge-gradient-cancelled' }
+      draft: { label: 'Borrador', className: 'neural-badge-secondary', icon: Clock },
+      active: { label: 'Activa', className: 'neural-badge-success', icon: Activity },
+      completed: { label: 'Completada', className: 'neural-badge-primary', icon: CheckCircle },
+      cancelled: { label: 'Cancelada', className: 'neural-badge-error', icon: Clock }
     };
     
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
@@ -524,15 +458,15 @@ function CampaignsList() {
     
     return (
       <div className="flex items-center gap-2">
-        <Badge className={config.badgeClass}>
+        <Badge className={config.className}>
           <Icon className="h-3 w-3 mr-1" />
           {config.label}
         </Badge>
         {riskLevel && status === 'active' && (
-          <Badge variant={
-            riskLevel === 'high' ? 'destructive' :
-            riskLevel === 'medium' ? 'secondary' : 'outline'
-          }>
+          <Badge className={`${
+            riskLevel === 'high' ? 'neural-badge-error' :
+            riskLevel === 'medium' ? 'neural-badge-warning' : 'neural-badge-outline'
+          }`}>
             <Shield className="h-3 w-3 mr-1" />
             Riesgo {riskLevel === 'high' ? 'Alto' : riskLevel === 'medium' ? 'Medio' : 'Bajo'}
           </Badge>
@@ -541,7 +475,6 @@ function CampaignsList() {
     );
   };
 
-  // 🔥 FUNCIÓN ACTUALIZADA - getActionButton CON NUEVAS FUNCIONES
   const getActionButton = (campaign: Campaign) => {
     switch (campaign.status) {
       case 'draft':
@@ -549,8 +482,8 @@ function CampaignsList() {
           <Button 
             size="sm" 
             disabled={!campaign.canActivate}
-            onClick={() => handleActivateCampaign(campaign.id, campaign.name)}
-            className="btn-gradient focus-ring"
+            onClick={() => router.push(`/dashboard/campaigns/${campaign.id}/activate`)}
+            className="neural-button-primary"
           >
             <Play className="h-3 w-3 mr-1" />
             Activar
@@ -561,8 +494,8 @@ function CampaignsList() {
           <div className="flex gap-2">
             <Button 
               size="sm" 
-              onClick={() => handleCampaignAction(campaign.id, 'monitor', campaign.name)}
-              className="focus-ring"
+              onClick={() => router.push(`/dashboard/campaigns/${campaign.id}/monitor`)}
+              className="neural-button-secondary"
             >
               <Eye className="h-3 w-3 mr-1" />
               Monitorear
@@ -570,9 +503,8 @@ function CampaignsList() {
             {campaign.participationRate > 20 && (
               <Button 
                 size="sm" 
-                variant="outline"
-                onClick={() => handleCampaignAction(campaign.id, 'preview-results', campaign.name)}
-                className="focus-ring"
+                onClick={() => router.push(`/dashboard/campaigns/${campaign.id}/preview-results`)}
+                className="neural-button-outline"
               >
                 <BarChart3 className="h-3 w-3 mr-1" />
                 Vista Previa
@@ -585,8 +517,8 @@ function CampaignsList() {
           <Button 
             size="sm" 
             disabled={!campaign.canViewResults}
-            onClick={() => handleCampaignAction(campaign.id, 'view-results', campaign.name)}
-            className="focus-ring"
+            onClick={() => router.push(`/dashboard/campaigns/${campaign.id}/results`)}
+            className="neural-button-tertiary"
           >
             <BarChart3 className="h-3 w-3 mr-1" />
             Ver Resultados
@@ -602,23 +534,25 @@ function CampaignsList() {
     
     switch (trend) {
       case 'up':
-        return (
-          <span title="Tendencia positiva">
-            <TrendingUp className="h-3 w-3 text-green-600" />
-          </span>
-        );
+        // LÍNEA CORREGIDA:
+return (
+  <span title="Tendencia positiva">
+    <TrendingUp className="h-3 w-3 text-green-400 neural-glow" />
+  </span>
+);
       case 'down':
         return (
-          <span title="Tendencia negativa">
-            <TrendingUp className="h-3 w-3 text-red-600 rotate-180" />
-          </span>
-        );
+  <span title="Tendencia negativa">
+    <TrendingUp className="h-3 w-3 text-red-400 rotate-180 neural-glow" />
+  </span>
+);
       case 'stable':
-        return (
-          <span title="Tendencia estable">
-            <Target className="h-3 w-3 text-blue-600" />
-          </span>
-        );
+        // LÍNEA CORREGIDA:
+return (
+  <span title="Tendencia estable">
+    <Target className="h-3 w-3 text-blue-400 neural-glow" />
+  </span>
+);
       default:
         return null;
     }
@@ -640,46 +574,43 @@ function CampaignsList() {
 
   if (loading && campaigns.length === 0) {
     return (
-      <Card className="professional-card">
-        <CardHeader>
-          <div className="h-6 bg-muted rounded w-32 mb-2 animate-pulse skeleton-layout"></div>
-          <div className="h-4 bg-muted rounded w-48 animate-pulse skeleton-layout"></div>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <div className="neural-card">
+        <div className="h-6 bg-white/10 rounded w-32 mb-2 animate-pulse"></div>
+        <div className="h-4 bg-white/10 rounded w-48 animate-pulse mb-4"></div>
+        <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-20 bg-muted rounded animate-pulse skeleton-layout"></div>
+            <div key={i} className="h-20 bg-white/5 rounded animate-pulse"></div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card className="professional-card campaigns-list">
-      <CardHeader>
-        <div className="layout-between">
+    <div className="neural-card campaigns-list">
+      <div className="neural-card-header">
+        <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-xl flex items-center gap-2 focalizahr-gradient-text">
-              <BarChart3 className="h-5 w-5" />
+            <h3 className="text-xl font-semibold flex items-center gap-2 text-white neural-glow">
+              <BarChart3 className="h-5 w-5 text-cyan-400" />
               Mis Campañas
-            </CardTitle>
-            <CardDescription className="mt-1">
+            </h3>
+            <p className="text-white/60 mt-1">
               Gestiona y monitorea tus mediciones de clima organizacional
-            </CardDescription>
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Button 
               size="sm" 
-              variant="outline"
               onClick={refetch}
               disabled={loading}
-              className="focus-ring"
+              className="neural-button-outline"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
             <Button 
               onClick={() => router.push('/dashboard/campaigns/new')}
-              className="btn-gradient focus-ring"
+              className="neural-button-primary"
             >
               <Plus className="h-4 w-4 mr-2" />
               Nueva Campaña
@@ -689,12 +620,12 @@ function CampaignsList() {
 
         <div className="flex flex-col sm:flex-row gap-4 mt-4">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/40" />
             <Input 
               placeholder="Buscar campañas..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 focus-ring"
+              className="neural-input pl-9"
             />
           </div>
 
@@ -708,14 +639,13 @@ function CampaignsList() {
               <Button
                 key={key}
                 size="sm"
-                variant={filter === key ? "default" : "outline"}
                 onClick={() => setFilter(key as any)}
-                className="focus-ring"
+                className={filter === key ? 'neural-button-primary' : 'neural-button-outline'}
               >
                 <Filter className="h-3 w-3 mr-1" />
                 {label}
                 {count > 0 && (
-                  <Badge variant="secondary" className="ml-1 text-xs">
+                  <Badge className="neural-badge-secondary ml-1 text-xs">
                     {count}
                   </Badge>
                 )}
@@ -723,30 +653,29 @@ function CampaignsList() {
             ))}
           </div>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent>
+      <div className="p-6">
         {error && (
-          <Alert className="mb-4 border-destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <div className="layout-between">
-              <AlertDescription>{error}</AlertDescription>
-              <Button size="sm" variant="outline" onClick={refetch} className="focus-ring">
+          <div className="neural-alert alert-error mb-4">
+            <div className="flex items-center justify-between">
+              <span className="text-white">{error}</span>
+              <Button size="sm" onClick={refetch} className="neural-button-outline">
                 <RefreshCw className="h-4 w-4" />
               </Button>
             </div>
-          </Alert>
+          </div>
         )}
 
         {sortedCampaigns.length === 0 && !loading ? (
           <div className="text-center py-12">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-muted/50 layout-center">
-              <BarChart3 className="h-10 w-10 text-muted-foreground" />
+            <div className="neural-icon-wrapper large mx-auto mb-4">
+              <BarChart3 className="h-10 w-10" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">
+            <h3 className="text-lg font-semibold mb-2 text-white">
               {filter === 'all' ? '¡Comienza tu primera medición!' : 'No se encontraron campañas'}
             </h3>
-            <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+            <p className="text-white/60 mb-4 max-w-md mx-auto">
               {filter === 'all' 
                 ? 'Crea tu primera campaña de clima organizacional y obtén insights valiosos sobre tu equipo.'
                 : `No hay campañas en estado "${filter}" que coincidan con tu búsqueda.`
@@ -755,7 +684,7 @@ function CampaignsList() {
             {filter === 'all' && (
               <Button 
                 onClick={() => router.push('/dashboard/campaigns/new')}
-                className="btn-gradient focus-ring"
+                className="neural-button-primary"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Crear Primera Campaña
@@ -765,29 +694,25 @@ function CampaignsList() {
         ) : (
           <div className="space-y-4">
             {sortedCampaigns.map((campaign) => (
-              <Card 
+              <div 
                 key={campaign.id} 
-                className="professional-card campaign-card-layout hover:shadow-md transition-shadow"
+                className="neural-campaign-card"
               >
                 {/* Indicador de estado lateral */}
-                <div className={`campaign-status-indicator ${
-                  campaign.status === 'active' ? 'bg-green-500' :
-                  campaign.status === 'completed' ? 'bg-blue-500' :
-                  campaign.status === 'draft' ? 'bg-gray-400' : 'bg-red-500'
-                }`}></div>
+                <div className={`campaign-status-indicator status-${campaign.status}`}></div>
 
-                <CardContent className="layout-between p-4">
+                <div className="flex items-center justify-between p-4">
                   <div className="flex-1 ml-4">
                     <div className="flex items-center gap-3 mb-3">
-                      <h3 className="font-semibold text-lg focalizahr-gradient-text">
+                      <h3 className="font-semibold text-lg text-white neural-glow">
                         {campaign.name}
                       </h3>
                       {getStatusBadge(campaign.status, campaign.riskLevel)}
-                      <Badge variant="outline">
+                      <Badge className="neural-badge-outline">
                         {campaign.campaignType.name}
                       </Badge>
                       {campaign.isOverdue && (
-                        <Badge variant="destructive" className="animate-pulse">
+                        <Badge className="neural-badge-error animate-pulse">
                           <AlertTriangle className="h-3 w-3 mr-1" />
                           Vencida
                         </Badge>
@@ -797,22 +722,22 @@ function CampaignsList() {
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div className="flex items-center gap-2">
-                        <div className="mini-icon-container bg-primary/20">
-                          <Users className="h-3 w-3 text-primary" />
+                        <div className="neural-mini-icon primary">
+                          <Users className="h-3 w-3" />
                         </div>
-                        <span className="text-muted-foreground font-normal">
-                          <span className="font-semibold text-foreground">{campaign.totalResponded}</span>/{campaign.totalInvited} participantes
+                        <span className="text-white/70">
+                          <span className="font-medium text-white">{campaign.totalResponded}</span>/{campaign.totalInvited} participantes
                         </span>
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        <div className="mini-icon-container bg-secondary/20">
-                          <TrendingUp className="h-3 w-3 text-secondary" />
+                        <div className="neural-mini-icon secondary">
+                          <TrendingUp className="h-3 w-3" />
                         </div>
-                        <span className="text-muted-foreground font-normal">
-                          <span className={`font-semibold ${
-                            campaign.participationRate >= 70 ? 'text-green-600' :
-                            campaign.participationRate >= 50 ? 'text-yellow-600' : 'text-red-600'
+                        <span className="text-white/70">
+                          <span className={`font-medium ${
+                            campaign.participationRate >= 70 ? 'text-green-400' :
+                            campaign.participationRate >= 50 ? 'text-yellow-400' : 'text-red-400'
                           }`}>
                             {campaign.participationRate.toFixed(1)}%
                           </span> participación
@@ -820,21 +745,21 @@ function CampaignsList() {
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        <div className="mini-icon-container bg-blue-500/20">
-                          <Calendar className="h-3 w-3 text-blue-600" />
+                        <div className="neural-mini-icon tertiary">
+                          <Calendar className="h-3 w-3" />
                         </div>
-                        <span className="text-muted-foreground font-normal">
+                        <span className="text-white/70">
                           {new Date(campaign.startDate).toLocaleDateString()} - {new Date(campaign.endDate).toLocaleDateString()}
                         </span>
                       </div>
                       
                       {campaign.status === 'active' && campaign.daysRemaining !== undefined && (
                         <div className="flex items-center gap-2">
-                          <div className={`mini-icon-container ${campaign.daysRemaining > 0 ? 'bg-blue-500/20' : 'bg-red-500/20'}`}>
-                            <Clock className={`h-3 w-3 ${campaign.daysRemaining > 0 ? 'text-blue-600' : 'text-red-600'}`} />
+                          <div className={`neural-mini-icon ${campaign.daysRemaining > 0 ? 'primary' : 'error'}`}>
+                            <Clock className="h-3 w-3" />
                           </div>
-                          <span className={`text-sm font-semibold ${
-                            campaign.daysRemaining > 0 ? 'text-blue-600' : 'text-red-600'
+                          <span className={`text-sm font-medium ${
+                            campaign.daysRemaining > 0 ? 'text-blue-400' : 'text-red-400'
                           }`}>
                             {campaign.daysRemaining > 0 
                               ? `${campaign.daysRemaining} días restantes` 
@@ -845,7 +770,7 @@ function CampaignsList() {
                       )}
 
                       {campaign.lastActivity && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground font-normal">
+                        <div className="flex items-center gap-2 text-xs text-white/60">
                           <Zap className="h-3 w-3" />
                           <span>Última actividad: {campaign.lastActivity}</span>
                         </div>
@@ -854,56 +779,51 @@ function CampaignsList() {
                   </div>
                   
                   <div className="flex items-center gap-2 ml-4">
-                    <CampaignActionButtons
-                    campaign={campaign}
-                    onActivateCampaign={handleActivateCampaign}
-                    onCampaignAction={handleCampaignAction}
-                    />
+                    {getActionButton(campaign)}
                   </div>
-                </CardContent>
+                </div>
 
                 {/* Barra de progreso visual */}
                 {campaign.status === 'active' && (
-                  <div className="mt-3 pt-3 border-t mx-4 pb-4">
-                    <div className="layout-between text-xs text-muted-foreground mb-1">
+                  <div className="mt-3 pt-3 border-t border-white/10 mx-4 pb-4">
+                    <div className="flex items-center justify-between text-xs text-white/60 mb-1">
                       <span>Progreso de participación</span>
                       <span>{campaign.participationRate.toFixed(1)}%</span>
                     </div>
-                    <div className="progress-container bg-muted">
+                    <div className="neural-progress-bar">
                       <div 
-                        className={`progress-fill ${
-                          campaign.participationRate >= 70 ? 'bg-green-500' :
-                          campaign.participationRate >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                        className={`neural-progress-fill ${
+                          campaign.participationRate >= 70 ? 'success' :
+                          campaign.participationRate >= 50 ? 'warning' : 'error'
                         }`}
                         style={{ width: `${Math.min(campaign.participationRate, 100)}%` }}
                       ></div>
                     </div>
                   </div>
                 )}
-              </Card>
+              </div>
             ))}
           </div>
         )}
 
         {lastUpdated && sortedCampaigns.length > 0 && (
-          <div className="mt-6 pt-4 border-t layout-between text-xs text-muted-foreground">
+          <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-white/60">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <div className="neural-pulse-dot small"></div>
               <span>Datos actualizados automáticamente</span>
             </div>
             <span>Última actualización: {lastUpdated.toLocaleTimeString()}</span>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-// Componente Principal del Dashboard (🔥 ACTUALIZADO CON NAVEGACIÓN)
+// Componente Principal del Dashboard - LÓGICA EXACTA, SOLO CLASES CAMBIADAS
 export default function DashboardPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -915,86 +835,72 @@ export default function DashboardPage() {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen layout-center">
-        <div className="layout-column items-center layout-gap-4">
-          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-lg font-medium mt-4">Cargando dashboard...</span>
+      <div className="neural-loading-screen">
+        <div className="neural-loader">
+          <div className="neural-spinner"></div>
+          <span className="text-lg font-medium text-white mt-4">Cargando dashboard...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* 🔥 NAVEGACIÓN INTEGRADA */}
-      <DashboardNavigation 
-        showMobileMenu={showMobileMenu}
-        onMobileMenuToggle={() => setShowMobileMenu(!showMobileMenu)}
-      />
+    <div className="neural-dashboard">
+      <div className="neural-background"></div>
       
-      {/* 🔥 CONTENIDO PRINCIPAL CON OFFSET PARA NAVEGACIÓN */}
-      <div className="lg:ml-64">
-        <div className="neural-dashboard main-layout min-h-screen">      
-          <div className="container mx-auto px-4 py-8 space-y-8 relative z-10">
-            {/* Header */}
-            <div className="layout-between">
-              <div>
-                <h1 className="text-4xl font-bold focalizahr-gradient-text">
-                  Dashboard FocalizaHR
-                </h1>
-                <p className="text-muted-foreground mt-2 flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-primary" />
-                  Inteligencia organizacional en tiempo real
-                </p>
+      <div className="container mx-auto px-4 py-8 space-y-8 relative z-10">
+        {/* Header Premium - SOLO CLASES CAMBIADAS */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold neural-gradient-text">
+              Dashboard FocalizaHR
+            </h1>
+            <p className="text-white/70 mt-2 flex items-center gap-2">
+              <Activity className="h-4 w-4 text-cyan-400" />
+              Inteligencia organizacional en tiempo real
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div className="neural-status-widget">
+              <div className="flex items-center gap-2">
+                <div className="neural-pulse-dot"></div>
+                <span className="font-medium text-white/90">Sistema Activo</span>
               </div>
-              
-              <div className="flex items-center gap-4">
-                <Card className="glass-card">
-                  <CardContent className="status-widget-layout p-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="font-medium">Sistema Activo</span>
-                    </div>
-                    <Separator orientation="vertical" className="h-4" />
-                    <span className="text-muted-foreground">{new Date().toLocaleDateString()}</span>
-                  </CardContent>
-                </Card>
-                
-                <Button 
-                  size="sm"
-                  variant="outline"
-                  onClick={() => router.push('/dashboard/settings')}
-                  className="focus-ring hidden lg:flex"
-                >
-                  Configuración
-                </Button>
-              </div>
+              <Separator orientation="vertical" className="h-4 bg-white/20" />
+              <span className="text-white/70">{new Date().toLocaleDateString()}</span>
             </div>
+            
+            <Button 
+              size="sm"
+              onClick={() => router.push('/dashboard/settings')}
+              className="neural-button-outline"
+            >
+              Configuración
+            </Button>
+          </div>
+        </div>
 
-            {/* Métricas Cards */}
-            <MetricsCards />
+        {/* Métricas Cards Premium */}
+        <MetricsCards />
 
-            {/* Alertas */}
-            <AlertsPanel />
+        {/* Alertas Premium */}
+        <AlertsPanel />
 
-            {/* Separador */}
-            <div className="separator-layout bg-border"></div>
+        {/* Separador Neural */}
+        <div className="neural-separator"></div>
 
-            {/* Lista de Campañas */}
-            <CampaignsList />
+        {/* Lista de Campañas Premium */}
+        <CampaignsList />
 
-            {/* Footer del Dashboard */}
-            <Card className="glass-card">
-              <CardContent className="layout-center p-4">
-                <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
-                  <span>© {new Date().getFullYear()} FocalizaHR</span>
-                  <Separator orientation="vertical" className="h-3" />
-                  <span>Versión 1.0.0</span>
-                  <Separator orientation="vertical" className="h-3" />
-                  <span>Inteligencia Organizacional</span>
-                </div>
-              </CardContent>
-            </Card>
+        {/* Footer del Dashboard */}
+        <div className="neural-footer">
+          <div className="flex items-center justify-center gap-4 text-xs text-white/50">
+            <span>© {new Date().getFullYear()} FocalizaHR</span>
+            <Separator orientation="vertical" className="h-3 bg-white/20" />
+            <span>Versión 1.0.0</span>
+            <Separator orientation="vertical" className="h-3 bg-white/20" />
+            <span>Inteligencia Organizacional</span>
           </div>
         </div>
       </div>
