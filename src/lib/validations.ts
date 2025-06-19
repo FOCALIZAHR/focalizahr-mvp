@@ -2,7 +2,7 @@
 // PRESERVANDO 100% EL CONTENIDO EXISTENTE + CORRIGIENDO SCHEMA WIZARD
 
 import { z } from 'zod'
-
+import type { CampaignStatus } from '@/types';
 // ========================================
 // VALIDACIONES EXISTENTES (PRESERVADAS)
 // ========================================
@@ -368,12 +368,12 @@ export const campaignStateTransitionSchema = z.object({
   forceTransition: z.boolean().default(false)
 }).refine((data) => {
   // Validar transiciones válidas
-  const validTransitions = {
-    draft: ['active'],
-    active: ['completed', 'cancelled'],
-    completed: [], // No se puede cambiar desde completada (excepto con force)
-    cancelled: [] // No se puede cambiar desde cancelada (excepto con force)
-  };
+  const validTransitions: Record<CampaignStatus, CampaignStatus[]> = {
+  draft: ['active'],
+  active: ['completed', 'cancelled'],
+  completed: [],
+  cancelled: []
+};
   
   const allowedTargets = validTransitions[data.fromStatus as keyof typeof validTransitions];
   return data.forceTransition || allowedTargets.includes(data.toStatus);

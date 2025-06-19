@@ -242,7 +242,8 @@ function useAlerts() {
 
 // Componente para Cards de Métricas (REFINAMIENTO VISUAL PREMIUM)
 function MetricsCards() {
-  const { metrics, loading, error, lastUpdated, refetch } = useMetrics();
+ const { metrics, loading, error, lastUpdated, refetch } = useMetrics();
+
 
   if (loading && !metrics) {
     return (

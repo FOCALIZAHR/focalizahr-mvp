@@ -162,26 +162,7 @@ export async function PUT(
     if (body.toStatus === 'active') {
       updateData.activatedAt = new Date()
       
-      // Generar tokens únicos para participantes si no existen
-      const participantsWithoutTokens = await prisma.participant.findMany({
-        where: {
-          campaignId,
-          uniqueToken: null
-        }
-      })
-
-      if (participantsWithoutTokens.length > 0) {
-        console.log(`🔑 Generating tokens for ${participantsWithoutTokens.length} participants`)
-        
-        for (const participant of participantsWithoutTokens) {
-          await prisma.participant.update({
-            where: { id: participant.id },
-            data: {
-              uniqueToken: crypto.randomUUID()
-            }
-          })
-        }
-      }
+  
     } else if (body.toStatus === 'completed') {
       updateData.completedAt = new Date()
     }

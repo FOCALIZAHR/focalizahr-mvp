@@ -104,8 +104,12 @@ export async function GET(request: NextRequest) {
 
       // Determinar nivel de recomendación
       let recommendationLevel: 'beginner' | 'intermediate' | 'advanced' = 'beginner'
-      if (type.questionCount > 25) recommendationLevel = 'advanced'
-      else if (type.questionCount > 15) recommendationLevel = 'intermediate'
+      if (type.questionCount && type.questionCount > 25) {
+      recommendationLevel = 'advanced'
+      } else if (type.questionCount && type.questionCount > 15) {
+          recommendationLevel = 'intermediate'
+}
+
 
       // Calcular tiempo estimado en formato legible
       const estimatedTimeText = type.estimatedDuration 
@@ -136,7 +140,7 @@ export async function GET(request: NextRequest) {
         // Features/capabilities
         features: {
           quickSetup: type.slug === 'pulso-express',
-          deepInsights: type.questionCount > 25,
+          deepInsights: type.questionCount ? type.questionCount > 25 : false,
           scientificBasis: !!type.methodology,
           timeEfficient: (type.estimatedDuration || 0) <= 10
         }
@@ -158,7 +162,7 @@ export async function GET(request: NextRequest) {
       totalTypes: enrichedCampaignTypes.length,
       totalUsage: enrichedCampaignTypes.reduce((sum, t) => sum + t.usageCount, 0),
       averageQuestions: Math.round(
-        enrichedCampaignTypes.reduce((sum, t) => sum + t.questionCount, 0) / enrichedCampaignTypes.length
+        enrichedCampaignTypes.reduce((sum, t) => sum + (t.questionCount || 0), 0) / enrichedCampaignTypes.length
       ),
       categories: Object.keys(categorizedTypes).length,
       mostPopular: enrichedCampaignTypes.reduce((prev, current) => 
@@ -244,10 +248,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Función utilitaria para invalidar cache (para uso futuro)
-export function invalidateCampaignTypesCache() {
-  campaignTypesCache = null
-}
+
 
 // Health check específico para campaign types
 export async function HEAD(request: NextRequest) {

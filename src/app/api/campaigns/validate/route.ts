@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
       validationWarnings.push('Se recomienda mínimo 10 participantes para resultados estadísticamente significativos')
     }
 
-    if (campaignType && data.estimatedParticipants > 500 && campaignType.questionCount > 30) {
+    if (campaignType && data.estimatedParticipants > 500 && campaignType.questionCount && campaignType.questionCount > 30) {
       validationWarnings.push('Muchas preguntas + muchos participantes puede reducir tasa de respuesta')
     }
 

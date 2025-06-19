@@ -614,4 +614,5 @@ export interface ConfirmationModalProps {
   onCancel: () => void
   isLoading?: boolean
   requiresInput?: boolean
-  inputPl
+  inputPlaceholder?: string  // ← CORREGIDO: Completar la propiedad
+}

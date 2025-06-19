@@ -312,17 +312,21 @@ if (!verification.success) {
 
     // Si es preview, retornar solo resultados del procesamiento
     if (action === 'preview') {
-      return NextResponse.json({
-        success: true,
-        message: 'Archivo procesado exitosamente',
-        campaign: {
-          id: campaign.id,
-          name: campaign.name,
-          company: campaign.account.companyName
-        },
-        ...processingResult
-      });
-    }
+  return NextResponse.json({
+    success: true,
+    message: 'Archivo procesado exitosamente',
+    campaign: {
+      id: campaign.id,
+      name: campaign.name,
+      company: campaign.account.companyName
+    },
+    // Propiedades específicas del processingResult
+    participants: processingResult.participants,
+    validRecords: processingResult.validRecords,
+    errors: processingResult.errors,
+    duplicates: processingResult.duplicates
+  });
+}
 
     // Si es confirm, cargar participantes a BD
     if (action === 'confirm') {

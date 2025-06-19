@@ -285,7 +285,6 @@ export async function POST(request: NextRequest) {
             emailId: emailResult.emailId,
             sentAt: new Date().toISOString()
           }),
-          timestamp: new Date()
         }
       });
     } catch (logError) {

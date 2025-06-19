@@ -292,12 +292,16 @@ export async function PUT(
           },
           campaignType: { 
             select: { 
+              
               name: true 
             } 
           }
         }
       });
-
+// Verificación seguridad para TypeScript
+      if (!authResult.user) {
+        throw new Error('Error crítico: Usuario no disponible en transacción');
+      }
       // 3. ✅ PRESERVADO: Crear audit log completo
       await tx.auditLog.create({
         data: {
@@ -305,7 +309,7 @@ export async function PUT(
           action: 'campaign_activated',
           userInfo: JSON.stringify({
             userId: authResult.user.id,
-            userEmail: authResult.user.email,
+            userEmail: authResult.user.adminEmail,
             participantsCount: campaign.participants.length,
             activatedAt: new Date().toISOString()
           }),

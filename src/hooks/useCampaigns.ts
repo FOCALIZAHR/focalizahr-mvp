@@ -42,6 +42,7 @@ interface Campaign {
 interface CampaignsResponse {
   success: boolean
   campaigns: Campaign[]
+  error?: string  // ← AGREGAR ESTA LÍNEA
   pagination: {
     page: number
     limit: number
@@ -223,3 +224,29 @@ export function useCampaigns(initialFilters: CampaignFilters = {}) {
     )
   }
 }
+// 🎯 AGREGAR AL FINAL de src/hooks/useCampaigns.ts
+// DESPUÉS de la función useCampaigns, ANTES del final del archivo
+
+// ========================================
+// INTERFAZ PÚBLICA DEL HOOK (Solución Gemini)
+// ========================================
+
+// Interfaz para los parámetros que el hook recibe/podría recibir
+export interface UseCampaignsParams {
+  autoRefresh?: boolean;
+  refreshInterval?: number;
+  initialFilters?: CampaignFilters;
+}
+
+// Tipo para el valor de retorno del hook
+export type UseCampaignsReturn = ReturnType<typeof useCampaigns>;
+
+// ========================================
+// 🔍 JUSTIFICACIÓN ARQUITECTURAL:
+// 
+// 1. Define interfaz pública clara del hook
+// 2. Permite que index.ts funcione como directorio centralizado
+// 3. Facilita evolución futura del hook (nuevos parámetros)
+// 4. Sigue principios de diseño de APIs internas
+// 5. Arregla causa raíz vs síntoma
+// ========================================

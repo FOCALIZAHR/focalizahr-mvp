@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
 
       // Verificar que las sugerencias también estén disponibles
       const suggestionsToCheck = suggestions.map(suggestion => ({
-        accountId: authResult.user.id,
+          accountId: authResult.user!.id,  // ← FIX: Agregado !
         name: { equals: suggestion, mode: 'insensitive' as const },
         status: { not: 'cancelled' as const }
       }))
