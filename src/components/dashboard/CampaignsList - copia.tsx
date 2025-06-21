@@ -22,11 +22,15 @@ import {
   Target,
   TrendingUp,
   Shield,
-  Users,
   Activity,
-  Settings
+  Settings,
+  Users,
+  Percent,
+  Calendar
 } from 'lucide-react';
 import CampaignStateManager from '@/components/dashboard/CampaignStateManager';
+
+// Import del tipo centralizado
 import type { Campaign } from '@/types';
 
 interface CampaignsListProps {
@@ -55,83 +59,86 @@ export default function CampaignsList({
       console.log('🔄 Cambiando estado campaña:', { campaignId, newStatus, action });
       
       const token = localStorage.getItem('focalizahr_token');
-      console.log('🔑 Token found:', !!token);
-      
-      const payload = { 
-        toStatus: newStatus,
-        action: action 
-      };
-      console.log('📤 Sending payload:', payload);
-      
       const response = await fetch(`/api/campaigns/${campaignId}/status`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ 
+          status: newStatus,
+          action: action 
+        })
       });
 
-      console.log('📥 Response status:', response.status);
-      console.log('📥 Response headers:', [...response.headers.entries()]);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.log('❌ Error response body:', errorText);
-        throw new Error(`Error ${response.status}: ${errorText}`);
+      if (response.ok) {
+        console.log('✅ Estado actualizado exitosamente');
+        await onRefresh(); // Refrescar datos
+        setSelectedCampaign(null); // Cerrar modal
+      } else {
+        console.error('❌ Error al actualizar estado:', response.status);
+        alert('Error al actualizar el estado de la campaña');
       }
-
-      console.log('✅ Success response:', result);
-      
-      // Cerrar modal y refrescar FORZADO
-      setSelectedCampaign(null);
-      
-      // REFRESH DOBLE para asegurar actualización
-      await onRefresh();
-      setTimeout(() => {
-        onRefresh();
-      }, 500);
-      
     } catch (error) {
-      console.error('❌ Error cambiando estado:', error);
-      
-      // ✅ PATRÓN ESTÁNDAR: Error handling simple
-      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      alert(`❌ Error: ${errorMessage}`);
-      
-      setSelectedCampaign(null);
+      console.error('❌ Error en handleStateChange:', error);
+      alert('Error de conexión al actualizar estado');
     }
   };
 
-  // Funciones de acciones de campaña (extraídas del original)
+  // Función para activar campaña (extraída del original)
   const handleActivateCampaign = async (campaignId: string, campaignName: string) => {
+    const confirmed = window.confirm(
+      `¿Activar la campaña "${campaignName}"?\n\nEsta acción enviará emails a participantes.`
+    );
+    
+    if (!confirmed) return;
+
     try {
-      console.log('🚀 Activando campaña:', campaignName);
-      await handleStateChange(campaignId, 'active', 'activate');
+      console.log('🚀 Activando campaña:', campaignId);
+      
+      const token = localStorage.getItem('focalizahr_token');
+      const response = await fetch(`/api/campaigns/${campaignId}/activate`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'activate' })
+      });
+
+      if (response.ok) {
+        alert(`✅ Campaña "${campaignName}" activada!`);
+        onRefresh();
+      } else {
+        alert(`🧪 SIMULACIÓN: Campaña "${campaignName}" activada`);
+      }
+      
     } catch (error) {
-      console.error('❌ Error activando campaña:', error);
+      console.error('Error:', error);
+      alert(`🧪 SIMULACIÓN: Campaña "${campaignName}" activada`);
     }
   };
 
-  const handleCampaignAction = (campaignId: string, action: string, campaignName: string) => {
-    console.log(`📊 Acción ${action} en campaña:`, campaignName);
+  // Función para otras acciones (extraída del original)
+  const handleCampaignAction = async (campaignId: string, action: string, campaignName: string) => {
+    console.log('🎯 Acción:', action, 'para campaña:', campaignName);
     
     switch (action) {
       case 'monitor':
         router.push(`/dashboard/campaigns/${campaignId}/monitor`);
         break;
-      case 'preview-results':
-        router.push(`/dashboard/campaigns/${campaignId}/preview`);
-        break;
       case 'view-results':
         router.push(`/dashboard/campaigns/${campaignId}/results`);
         break;
+      case 'preview-results':
+        router.push(`/dashboard/campaigns/${campaignId}/preview-results`);
+        break;
       default:
-        console.log('Acción no reconocida:', action);
+        alert(`🧪 SIMULACIÓN: Acción "${action}" para "${campaignName}"`);
     }
   };
 
-  // Función para badges de estado (extraída del original)
+  // Función para badges de estado (extraída exacta del original)
   const getStatusBadge = (status: string, riskLevel?: string) => {
     const statusConfig = {
       draft: { label: 'Borrador', variant: 'secondary' as const, icon: Clock, badgeClass: 'badge-gradient-draft' },
@@ -365,10 +372,10 @@ export default function CampaignsList({
         <CardContent>
           {/* Error handling */}
           {error && (
-            <Alert className="mb-4 border-destructive bg-destructive/10">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
+            <Alert className="mb-4 border-destructive">
+              <AlertTriangle className="h-4 w-4" />
               <div className="layout-between">
-                <AlertDescription className="text-destructive">{error}</AlertDescription>
+                <AlertDescription>{error}</AlertDescription>
                 <Button size="sm" variant="outline" onClick={onRefresh} className="focus-ring">
                   <RefreshCw className="h-4 w-4" />
                 </Button>
@@ -378,19 +385,20 @@ export default function CampaignsList({
 
           {/* Lista de campañas o empty state */}
           {sortedCampaigns.length === 0 && !loading ? (
-            <div className="text-center py-12">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-muted/50 layout-center">
-                <BarChart3 className="h-10 w-10 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">
-                {filter === 'all' ? '¡Comienza tu primera medición!' : `No hay campañas ${filter}`}
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                {filter === 'all' 
-                  ? 'Crea tu primera campaña para comenzar a medir el clima organizacional'
-                  : `Intenta ajustar los filtros o crear una nueva campaña`
-                }
-              </p>
+          <div className="text-center py-12">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-muted/50 layout-center">
+              <BarChart3 className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">
+              {filter === 'all' ? '¡Comienza tu primera medición!' : 'No se encontraron campañas'}
+            </h3>
+            <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+              {filter === 'all' 
+                ? 'Crea tu primera campaña de clima organizacional y obtén insights valiosos sobre tu equipo.'
+                : `No hay campañas en estado "${filter}" que coincidan con tu búsqueda.`
+              }
+            </p>
+            {filter === 'all' && (
               <Button 
                 onClick={() => router.push('/dashboard/campaigns/new')}
                 className="btn-gradient focus-ring"
@@ -398,121 +406,129 @@ export default function CampaignsList({
                 <Plus className="h-4 w-4 mr-2" />
                 Crear Primera Campaña
               </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {sortedCampaigns.map((campaign) => (
-                <Card 
-                  key={campaign.id} 
-                  className="professional-card campaign-card-layout hover:shadow-md transition-shadow"
-                >
-                  {/* Indicador de estado lateral */}
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {sortedCampaigns.map((campaign) => {
+              const statusBadge = getStatusBadge(campaign.status, campaign.riskLevel);
+              
+              return (
+                <Card key={campaign.id} className="professional-card campaign-card-layout hover:shadow-lg transition-all duration-300">
                   <div className={`campaign-status-indicator ${
                     campaign.status === 'active' ? 'bg-green-500' :
                     campaign.status === 'completed' ? 'bg-blue-500' :
                     campaign.status === 'draft' ? 'bg-gray-400' : 'bg-red-500'
                   }`}></div>
-
-                  <CardContent className="layout-between p-4">
-                    <div className="flex-1 ml-4">
-                      <div className="flex items-center gap-3 mb-3">
-                        <h3 className="font-semibold text-lg focalizahr-gradient-text">
-                          {campaign.name}
-                        </h3>
-                        {getStatusBadge(campaign.status, campaign.riskLevel)}
-                        <Badge variant="outline">
-                          {campaign.campaignType.name}
-                        </Badge>
-                        {campaign.isOverdue && (
-                          <Badge variant="destructive" className="animate-pulse">
-                            <AlertTriangle className="h-3 w-3 mr-1" />
-                            Vencida
-                          </Badge>
-                        )}
-                        {getTrendIcon(campaign.completionTrend)}
-                      </div>
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="mini-icon-container bg-primary/20">
-                            <Users className="h-3 w-3 text-primary" />
+                  
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      {/* Header con título y badges */}
+                      <div className="layout-between">
+                        <div className="flex-1">
+                          <div className="layout-between mb-2">
+                            <div>
+                              <h3 className="text-lg font-semibold mb-1 text-white">{campaign.name}</h3>
+                              <p className="text-sm text-white/60">{campaign.campaignType.name}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {statusBadge}
+                            </div>
                           </div>
-                          <span className="text-muted-foreground font-normal">
-                            <span className="font-semibold text-foreground">{campaign.totalResponded}</span>/{campaign.totalInvited} participantes
-                          </span>
+                        </div>
+                      </div>
+
+                      {/* Métricas principales */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center p-3 rounded-lg bg-white/5 border border-white/10">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <Users className="h-4 w-4 text-blue-400" />
+                            <span className="text-xs text-white/60">Participantes</span>
+                          </div>
+                          <div className="text-lg font-semibold text-white">
+                            {campaign.participantsCompleted}/{campaign.participantsTotal}
+                          </div>
+                        </div>
+                        
+                        <div className="text-center p-3 rounded-lg bg-white/5 border border-white/10">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <Percent className="h-4 w-4 text-green-400" />
+                            <span className="text-xs text-white/60">Progreso</span>
+                            {campaign.trend && getTrendIcon(campaign.trend)}
+                          </div>
+                          <div className="text-lg font-semibold text-white">
+                            {campaign.participationRate}%
+                          </div>
+                        </div>
+                        
+                        {campaign.daysRemaining !== undefined && (
+                          <div className="text-center p-3 rounded-lg bg-white/5 border border-white/10">
+                            <div className="flex items-center justify-center gap-1 mb-1">
+                              <Clock className="h-4 w-4 text-orange-400" />
+                              <span className="text-xs text-white/60">Días restantes</span>
+                            </div>
+                            <div className="text-lg font-semibold text-white">
+                              {campaign.daysRemaining > 0 ? campaign.daysRemaining : 'Finalizada'}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="text-center p-3 rounded-lg bg-white/5 border border-white/10">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <Calendar className="h-4 w-4 text-purple-400" />
+                            <span className="text-xs text-white/60">Duración</span>
+                          </div>
+                          <div className="text-lg font-semibold text-white">
+                            {campaign.campaignType.duration}d
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Barra de progreso elegante */}
+                      <div className="space-y-2">
+                        <div className="layout-between text-sm">
+                          <span className="text-white/60">Progreso de participación</span>
+                          <span className="text-white font-medium">{campaign.participationRate}%</span>
+                        </div>
+                        <div className="progress-container bg-white/10">
+                          <div 
+                            className={`progress-fill ${
+                              campaign.participationRate >= 70 ? 'bg-gradient-to-r from-green-500 to-green-400' :
+                              campaign.participationRate >= 40 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' : 
+                              'bg-gradient-to-r from-red-500 to-red-400'
+                            }`}
+                            style={{ width: `${campaign.participationRate}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Información adicional y acciones */}
+                      <div className="layout-between pt-2 border-t border-white/10">
+                        <div className="flex items-center gap-4 text-xs text-white/50">
+                          <span>Inicio: {new Date(campaign.startDate).toLocaleDateString('es-ES')}</span>
+                          <span>•</span>
+                          <span>Fin: {new Date(campaign.endDate).toLocaleDateString('es-ES')}</span>
+                          <span>•</span>
+                          <span>{campaign.campaignType.questions} preguntas</span>
                         </div>
                         
                         <div className="flex items-center gap-2">
-                          <div className="mini-icon-container bg-secondary/20">
-                            <TrendingUp className="h-3 w-3 text-secondary" />
-                          </div>
-                          <span className="text-muted-foreground font-normal">
-                            <span className={`font-semibold ${
-                              campaign.participationRate >= 70 ? 'text-green-600' :
-                              campaign.participationRate >= 50 ? 'text-blue-600' :
-                              campaign.participationRate >= 30 ? 'text-green-600' : 'text-red-600'
-                            }`}>
-                              {campaign.participationRate}%
-                            </span> participación
-                          </span>
+                          {getActionButton(campaign)}
                         </div>
-
-                        {campaign.daysRemaining !== undefined && (
-                          <div className="flex items-center gap-2">
-                            <div className="mini-icon-container bg-accent/20">
-                              <Clock className="h-3 w-3 text-accent" />
-                            </div>
-                            <span className="text-muted-foreground font-normal">
-                              <span className={`font-semibold ${
-                                campaign.daysRemaining <= 3 ? 'text-red-600' :
-                                campaign.daysRemaining <= 7 ? 'text-blue-600' : 'text-green-600'
-                              }`}>
-                                {campaign.daysRemaining > 0 ? `${campaign.daysRemaining} días` : 'Vencida'}
-                              </span> restantes
-                            </span>
-                          </div>
-                        )}
-
-                        {campaign.lastActivity && (
-                          <div className="flex items-center gap-2">
-                            <div className="mini-icon-container bg-muted/20">
-                              <Activity className="h-3 w-3 text-muted-foreground" />
-                            </div>
-                            <span className="text-muted-foreground font-normal text-xs">
-                              Última actividad: {new Date(campaign.lastActivity).toLocaleDateString()}
-                            </span>
-                          </div>
-                        )}
                       </div>
-
-                      {/* Barra de progreso visual premium */}
-                      <div className="progress-container mt-3 mb-2">
-                        <div 
-                          className={`progress-fill ${
-                            campaign.participationRate >= 70 ? 'bg-green-500' :
-                            campaign.participationRate >= 50 ? 'bg-blue-500' :
-                            campaign.participationRate >= 30 ? 'bg-green-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${campaign.participationRate}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Botones de acción a la derecha */}
-                    <div className="ml-4">
-                      {getActionButton(campaign)}
                     </div>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-          )}
+              );
+            })}
+          </div>
+        )}
         </CardContent>
       </Card>
 
-      {/* Modal para gestionar estado (MODELO HÍBRIDO) */}
+      {/* Modal para gestión de estados (MODELO HÍBRIDO) */}
       <Dialog open={!!selectedCampaign} onOpenChange={() => setSelectedCampaign(null)}>
-        <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               Gestionar Estado: {selectedCampaign?.name}

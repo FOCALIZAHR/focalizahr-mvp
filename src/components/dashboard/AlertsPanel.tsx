@@ -4,70 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Bell, 
-  AlertTriangle,
-  CheckCircle,
-  Info
-} from 'lucide-react';
+import { AlertTriangle, Bell } from 'lucide-react';
+import type { Alert } from '@/types';
 
-// Interfaz para alertas (extraída de page.tsx)
-interface Alert {
-  id: string;
-  type: 'warning' | 'info' | 'success';
-  title: string;
-  message: string;
-  timestamp: Date;
-  campaignId?: string;
-}
-
-// Props del componente
 interface AlertsPanelProps {
   alerts: Alert[];
 }
 
+// Componente AlertsPanel extraído exacto del original
 export default function AlertsPanel({ alerts }: AlertsPanelProps) {
-  if (alerts.length === 0) {
-    return null;
-  }
-
-  // Función para obtener ícono según tipo de alerta
-  const getAlertIcon = (type: Alert['type']) => {
-    switch (type) {
-      case 'warning':
-        return AlertTriangle;
-      case 'success':
-        return CheckCircle;
-      case 'info':
-      default:
-        return Info;
-    }
-  };
-
-  // Función para obtener clases CSS según tipo
-  const getAlertClasses = (type: Alert['type']) => {
-    switch (type) {
-      case 'warning':
-        return {
-          border: 'border-yellow-200',
-          icon: 'text-yellow-600',
-          bg: 'bg-yellow-50'
-        };
-      case 'success':
-        return {
-          border: 'border-green-200',
-          icon: 'text-green-600',
-          bg: 'bg-green-50'
-        };
-      case 'info':
-      default:
-        return {
-          border: 'border-blue-200',
-          icon: 'text-blue-600',
-          bg: 'bg-blue-50'
-        };
-    }
-  };
+  if (alerts.length === 0) return null;
 
   return (
     <Card className="professional-card border-l-4 border-l-yellow-500">
@@ -80,33 +26,29 @@ export default function AlertsPanel({ alerts }: AlertsPanelProps) {
           <Badge variant="secondary">{alerts.length}</Badge>
         </div>
       </CardHeader>
-      
       <CardContent className="space-y-3">
-        {alerts.slice(0, 3).map((alert) => {
-          const AlertIcon = getAlertIcon(alert.type);
-          const classes = getAlertClasses(alert.type);
-          
-          return (
-            <Alert 
-              key={alert.id} 
-              className={`${classes.border} ${classes.bg}`}
-            >
-              <AlertIcon className={`h-4 w-4 ${classes.icon}`} />
-              <div className="layout-between items-start">
-                <div>
-                  <div className="font-medium">{alert.title}</div>
-                  <AlertDescription className="text-sm">
-                    {alert.message}
-                  </AlertDescription>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {alert.timestamp.toLocaleTimeString()}
-                </span>
+        {alerts.slice(0, 3).map((alert) => (
+          <Alert key={alert.id} className={`${
+            alert.type === 'warning' ? 'border-yellow-200' :
+            alert.type === 'success' ? 'border-green-200' :
+            'border-blue-200'
+          }`}>
+            <AlertTriangle className={`h-4 w-4 ${
+              alert.type === 'warning' ? 'text-yellow-600' :
+              alert.type === 'success' ? 'text-green-600' :
+              'text-blue-600'
+            }`} />
+            <div className="layout-between items-start">
+              <div>
+                <div className="font-medium">{alert.title}</div>
+                <AlertDescription className="text-sm">{alert.message}</AlertDescription>
               </div>
-            </Alert>
-          );
-        })}
-        
+              <span className="text-xs text-muted-foreground">
+                {alert.timestamp.toLocaleTimeString()}
+              </span>
+            </div>
+          </Alert>
+        ))}
         {alerts.length > 3 && (
           <div className="text-center pt-2">
             <Button variant="outline" size="sm" className="focus-ring">

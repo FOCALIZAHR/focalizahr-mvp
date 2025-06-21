@@ -45,12 +45,21 @@ export function useMetrics(params: UseMetricsParams = {}): UseMetricsReturn {
       // Resetear estado de stale al comenzar fetch
       setIsStale(false);
       
-      const response = await fetch('/api/campaigns/metrics', {
-        method: 'GET',
-        headers: {
-          'Cache-Control': 'no-cache'
-        }
-      });
+      // CAMBIAR A ESTO:
+const token = localStorage.getItem('focalizahr_token');
+      
+if (!token) {
+  throw new Error('Token de autenticación no encontrado');
+}
+
+const response = await fetch('/api/campaigns/metrics', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache'
+  }
+});
 
       if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`);

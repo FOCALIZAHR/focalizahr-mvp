@@ -16,24 +16,25 @@ export interface Account {
 }
 
 export interface Campaign {
-  id: string
-  accountId: string
-  name: string
-  description?: string
-  startDate: Date
-  endDate: Date
-  status: CampaignStatus
-  createdAt: Date
-  updatedAt: Date
-  // Relaciones opcionales
-  account?: Account
-  participants?: Participant[]
-  results?: CampaignResult
-  // Estadísticas calculadas
-  totalParticipants?: number
-  totalResponses?: number
-  participationRate?: number
-  daysRemaining?: number
+  id: string;
+  name: string;
+  status: 'draft' | 'active' | 'completed' | 'cancelled';
+  campaignType: {
+    name: string;
+    slug: string;
+  };
+  totalInvited: number;
+  totalResponded: number;
+  participationRate: number;
+  startDate: string;
+  endDate: string;
+  canActivate?: boolean;
+  canViewResults?: boolean;
+  isOverdue?: boolean;
+  daysRemaining?: number;
+  riskLevel?: 'low' | 'medium' | 'high';
+  lastActivity?: string;
+  completionTrend?: 'up' | 'down' | 'stable';
 }
 
 export interface Participant {
@@ -118,11 +119,30 @@ export interface CampaignStats {
 }
 
 export interface DashboardMetrics {
-  totalCampaigns: number
-  activeCampaigns: number
-  completedCampaigns: number
-  totalResponses: number
-  averageParticipation: number
+  totalCampaigns: number;
+  activeCampaigns: number;
+  completedCampaigns: number;
+  draftCampaigns: number;
+  cancelledCampaigns: number;
+  globalParticipationRate: number;
+  totalResponses: number;
+  totalParticipants: number;
+  recentResponses?: number; // Puede no haber respuestas recientes
+  
+  // Estos campos pueden ser nulos o no existir, por eso llevan '?'
+  weeklyGrowth?: number;
+  monthlyGrowth?: number;
+  averageCompletionTime?: number | null;
+  topPerformingCampaign?: string | null;
+}
+
+export interface Alert {
+  id: string;
+  type: 'warning' | 'info' | 'success';
+  title: string;
+  message: string;
+  timestamp: Date;
+  campaignId?: string;
 }
 
 // Tipos para formularios
@@ -323,296 +343,300 @@ export interface WizardFormData {
     enableFinalReminder: boolean
   }
   privacySettings?: {
-    anonymousResults: boolean
     allowDataExport: boolean
-    retentionPeriodMonths: number
-  }
-  confirmations?: {
-    dataProcessingAgreement: boolean
-    participantNotification: boolean
-    resultSharing: boolean
+    requireConsent: boolean
+    dataRetentionDays: number
   }
 }
 
-export interface CampaignType {
-  id: string
-  name: string
-  slug: string
-  description: string
-  estimatedDuration: number // minutos
-  questionCount: number
-  methodology: string
-  category: string
-  sortOrder?: number
-  isActive?: boolean
-  isRecommended?: boolean
+export interface WizardContextType {
+  currentStep: number
+  formData: Partial<WizardFormData>
+  steps: WizardStep[]
+  isValid: boolean
+  isLoading: boolean
+  error: string | null
   
-  // Características del tipo
-  features: {
-    quickSetup: boolean
-    deepInsights: boolean
-    scientificBasis: boolean
-    timeEfficient: boolean
-  }
-  
-  // Estadísticas de uso
-  usageCount?: number
-  popularityScore?: number
-  recommendationLevel?: 'beginner' | 'intermediate' | 'advanced'
-  estimatedTimeText?: string
-  isPopular?: boolean
+  // Acciones
+  goToStep: (stepId: number) => void
+  nextStep: () => void
+  previousStep: () => void
+  updateFormData: (data: Partial<WizardFormData>) => void
+  validateStep: (stepId: number) => boolean
+  submitWizard: () => Promise<boolean>
+  resetWizard: () => void
 }
 
-// ========================================
-// TIPOS GESTIÓN DE ESTADOS
-// ========================================
-
-export interface StateTransition {
-  from: CampaignStatus
-  to: CampaignStatus
-  action: StateAction
-  requiresConfirmation: boolean
-  validationRules: string[]
-  buttonText: string
-  buttonIcon: React.ReactNode
-  buttonVariant: 'default' | 'destructive' | 'outline' | 'secondary'
-  description: string
-  allowedRoles?: string[]
-  confirmationMessage?: string
+// Estados para manejo de UI avanzada
+export interface LoadingState {
+  isLoading: boolean
+  loadingText?: string
+  progress?: number
 }
 
-export type StateAction = 'activate' | 'complete' | 'cancel' | 'reopen' | 'archive'
-
-export interface StateTransitionRequest {
-  campaignId: string
-  fromStatus: CampaignStatus
-  toStatus: CampaignStatus
-  action: StateAction
-  reason?: string
-  forceTransition?: boolean
-  userId?: string
+export interface ErrorState {
+  hasError: boolean
+  errorMessage?: string
+  errorCode?: string
+  canRetry?: boolean
+  retryAction?: () => void
 }
 
-export interface StateTransitionResult {
-  success: boolean
-  campaignId: string
-  previousStatus: CampaignStatus
-  newStatus: CampaignStatus
-  action: StateAction
-  timestamp: Date
-  message?: string
-  error?: string
-  sideEffects?: string[]
+export interface SuccessState {
+  isSuccess: boolean
+  successMessage?: string
+  redirectUrl?: string
+  autoRedirect?: boolean
 }
 
-// ========================================
-// TIPOS PARTICIPANTES CONCIERGE
-// ========================================
-
-export interface ParticipantExtended {
+export interface NotificationState {
   id: string
+  type: 'info' | 'success' | 'warning' | 'error'
+  title: string
+  message: string
+  autoClose?: boolean
+  duration?: number
+  actionLabel?: string
+  actionCallback?: () => void
+}
+
+// Tipos para manejo de archivos (CSV/Excel upload)
+export interface FileUploadState {
+  file: File | null
+  isUploading: boolean
+  uploadProgress: number
+  uploadError: string | null
+  uploadSuccess: boolean
+  previewData?: any[]
+  validationErrors?: string[]
+}
+
+export interface CsvParseResult {
+  data: any[]
+  errors: string[]
+  meta: {
+    totalRows: number
+    validRows: number
+    invalidRows: number
+    duplicates: number
+    fields: string[]
+  }
+}
+
+// Tipos para participantes y gestión de datos
+export interface ParticipantUpload {
   email: string
+  firstName?: string
+  lastName?: string
   department?: string
   position?: string
-  seniorityLevel?: 'junior' | 'mid' | 'senior' | 'executive'
   location?: string
-  status: 'pending' | 'validated' | 'error'
-  errorMessage?: string
-  processedAt?: Date
-  processedBy?: string
-  
-  // Metadatos adicionales
-  originalRowNumber?: number
-  validationNotes?: string[]
-  dataSource?: 'csv' | 'excel' | 'manual' | 'api'
+  customFields?: Record<string, any>
 }
 
-export interface ParticipantSummary {
-  total: number
-  byDepartment: Record<string, number>
-  byPosition: Record<string, number>
-  bySeniority: Record<string, number>
-  byLocation: Record<string, number>
-  validEmails: number
-  duplicates: number
-  errors: number
-  
-  // Métricas de calidad
-  qualityScore: number // 0-100
-  completenessScore: number // 0-100
-  diversityIndex: number // 0-100
-  
-  // Recomendaciones
-  recommendations: string[]
-  warnings: string[]
-}
-
-export interface ConciergeProcessingResult {
-  campaignId: string
-  originalFile?: {
-    name: string
-    size: number
-    uploadedAt: Date
-  }
-  participants: ParticipantExtended[]
-  summary: ParticipantSummary
-  processingLog: ProcessingLogEntry[]
-  
-  // Estado del procesamiento
-  status: 'processing' | 'completed' | 'error' | 'review_required'
-  processedBy: string
-  processedAt: Date
-  reviewRequired: boolean
-  
-  // Acciones recomendadas
-  recommendedActions: {
-    type: 'fix_errors' | 'review_duplicates' | 'add_participants' | 'confirm_data'
-    description: string
-    priority: 'low' | 'medium' | 'high'
-    automated: boolean
-  }[]
-}
-
-export interface ProcessingLogEntry {
-  timestamp: Date
-  type: 'info' | 'warning' | 'error' | 'success'
-  message: string
-  details?: any
-  rowNumber?: number
-  fieldName?: string
-}
-
-// ========================================
-// TIPOS EXTENDIDOS DE CAMPAÑA
-// ========================================
-
-export interface CampaignExtended extends Campaign {
-  // Información adicional del estado
-  canActivate?: boolean
-  canViewResults?: boolean
-  canEdit?: boolean
-  canDelete?: boolean
-  canCancel?: boolean
-  
-  // Métricas de riesgo
-  isOverdue?: boolean
-  riskLevel?: 'low' | 'medium' | 'high'
-  riskFactors?: string[]
-  lastActivity?: string
-  completionTrend?: 'up' | 'down' | 'stable'
-  
-  // Información del tipo de campaña
-  campaignType: CampaignType
-  
-  // Estadísticas avanzadas
-  advancedStats?: {
-    averageCompletionTime?: number // minutos
-    responseRate24h?: number
-    peakResponseHours?: number[]
-    deviceBreakdown?: {
-      mobile: number
-      desktop: number
-      tablet: number
-    }
-    completionBySegment?: Record<string, number>
-  }
-  
-  // Configuraciones específicas
-  wizardConfig?: WizardFormData
-  conciergeData?: ConciergeProcessingResult
-  
-  // Metadatos de auditoría
-  auditTrail?: AuditEntry[]
-}
-
-export interface AuditEntry {
+export interface ParticipantBatch {
   id: string
-  timestamp: Date
-  action: string
-  userId: string
-  userType: 'admin' | 'client' | 'system'
-  details: any
-  ipAddress?: string
-  userAgent?: string
-}
-
-// ========================================
-// TIPOS PARA VALIDACIONES Y ERRORES
-// ========================================
-
-export interface WizardValidationError {
-  step: number
-  field: string
-  message: string
-  code?: string
-  severity: 'error' | 'warning' | 'info'
-}
-
-export interface WizardValidationResult {
-  valid: boolean
-  errors: WizardValidationError[]
-  warnings: WizardValidationError[]
-  suggestions: WizardValidationError[]
-}
-
-export interface FormFieldError {
-  field: string
-  message: string
-  type: 'required' | 'format' | 'length' | 'custom'
-}
-
-export interface StepValidationConfig {
-  step: number
-  requiredFields: string[]
-  customValidators: Record<string, (value: any) => string | null>
-  dependencies: Record<string, string[]> // field -> dependent fields
-}
-
-// ========================================
-// TIPOS PARA UI COMPONENTS AVANZADOS
-// ========================================
-
-export interface WizardProps {
-  steps: WizardStep[]
-  currentStep: number
-  formData: WizardFormData
-  onStepChange: (step: number) => void
-  onDataChange: (data: Partial<WizardFormData>) => void
-  onComplete: (data: WizardFormData) => Promise<void>
-  isSubmitting?: boolean
-  validationErrors?: Record<string, string>
-}
-
-export interface StateManagerProps {
-  campaign: CampaignExtended
-  onStateChange: (campaignId: string, newStatus: CampaignStatus, action: StateAction) => Promise<void>
-  availableTransitions?: StateTransition[]
-  isLoading?: boolean
-  showAdvancedOptions?: boolean
-}
-
-export interface ParticipantPreviewProps {
   campaignId: string
-  participants: ParticipantExtended[]
-  summary: ParticipantSummary
-  onParticipantUpdate: (participant: ParticipantExtended) => void
-  onParticipantRemove: (participantId: string) => void
-  onBulkAction: (action: string, participantIds: string[]) => void
-  isEditable: boolean
-  isLoading?: boolean
-  viewMode?: 'list' | 'summary' | 'analytics'
+  totalCount: number
+  validCount: number
+  invalidCount: number
+  processedCount: number
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  errors?: string[]
+  createdAt: Date
+  completedAt?: Date
 }
 
-export interface ConfirmationModalProps {
-  isOpen: boolean
-  title: string
-  description: string
-  confirmText?: string
-  cancelText?: string
-  variant?: 'default' | 'destructive' | 'warning'
-  onConfirm: () => void
-  onCancel: () => void
-  isLoading?: boolean
-  requiresInput?: boolean
-  inputPlaceholder?: string  // ← CORREGIDO: Completar la propiedad
+// Tipos para configuración de formularios avanzados
+export interface FormFieldConfig {
+  name: string
+  label: string
+  type: 'text' | 'email' | 'number' | 'select' | 'multiselect' | 'date' | 'textarea'
+  required: boolean
+  placeholder?: string
+  options?: SelectOption[]
+  validation?: {
+    minLength?: number
+    maxLength?: number
+    pattern?: string
+    min?: number
+    max?: number
+    customValidator?: (value: any) => string | null
+  }
+  helpText?: string
+  conditional?: {
+    field: string
+    value: any
+    operator: 'equals' | 'not_equals' | 'contains' | 'greater_than' | 'less_than'
+  }
 }
+
+export interface DynamicFormConfig {
+  id: string
+  title: string
+  description?: string
+  fields: FormFieldConfig[]
+  submitLabel?: string
+  resetLabel?: string
+  enableAutoSave?: boolean
+  showProgress?: boolean
+}
+
+// Tipos para analytics y reportes avanzados
+export interface AdvancedMetrics {
+  responseRate: {
+    overall: number
+    byDepartment: Record<string, number>
+    byPosition: Record<string, number>
+    trend: Array<{ date: string; rate: number }>
+  }
+  engagementScore: {
+    average: number
+    distribution: Record<string, number>
+    topPerformers: string[]
+    improvementAreas: string[]
+  }
+  completionTimes: {
+    average: number
+    median: number
+    distribution: Record<string, number>
+  }
+  dropOffPoints: Array<{
+    questionId: number
+    questionText: string
+    dropOffRate: number
+  }>
+}
+
+export interface ComparisonReport {
+  baseline: {
+    campaignId: string
+    campaignName: string
+    date: string
+    metrics: any
+  }
+  current: {
+    campaignId: string
+    campaignName: string
+    date: string
+    metrics: any
+  }
+  differences: {
+    improvements: string[]
+    declines: string[]
+    noChange: string[]
+    significantChanges: Array<{
+      metric: string
+      change: number
+      significance: 'low' | 'medium' | 'high'
+    }>
+  }
+}
+
+// Tipos para configuración de sistema
+export interface SystemConfig {
+  email: {
+    enabled: boolean
+    provider: 'smtp' | 'sendgrid' | 'mailgun'
+    settings: Record<string, any>
+  }
+  storage: {
+    provider: 'local' | 'aws-s3' | 'gcp-storage'
+    settings: Record<string, any>
+  }
+  analytics: {
+    enabled: boolean
+    provider?: 'google-analytics' | 'mixpanel' | 'amplitude'
+    trackingId?: string
+  }
+  security: {
+    requireTwoFactor: boolean
+    sessionTimeout: number
+    maxLoginAttempts: number
+    passwordPolicy: {
+      minLength: number
+      requireNumbers: boolean
+      requireSymbols: boolean
+      requireUppercase: boolean
+    }
+  }
+}
+
+// Tipos para permisos y roles
+export interface Permission {
+  id: string
+  name: string
+  description: string
+  resource: string
+  action: 'create' | 'read' | 'update' | 'delete' | 'manage'
+}
+
+export interface Role {
+  id: string
+  name: string
+  description: string
+  permissions: Permission[]
+  isDefault: boolean
+}
+
+export interface UserPermissions {
+  userId: string
+  accountId: string
+  roles: Role[]
+  directPermissions: Permission[]
+  effectivePermissions: Permission[]
+}
+
+// Tipos para auditoría y logs
+export interface AuditLog {
+  id: string
+  userId: string
+  action: string
+  resource: string
+  resourceId: string
+  details: Record<string, any>
+  ipAddress: string
+  userAgent: string
+  timestamp: Date
+}
+
+export interface SystemLog {
+  id: string
+  level: 'debug' | 'info' | 'warn' | 'error' | 'fatal'
+  message: string
+  context: Record<string, any>
+  timestamp: Date
+  source: string
+}
+
+// Tipos para integraciones
+export interface Integration {
+  id: string
+  name: string
+  type: 'webhook' | 'api' | 'sso' | 'storage' | 'analytics'
+  status: 'active' | 'inactive' | 'error'
+  config: Record<string, any>
+  lastSync?: Date
+  errorMessage?: string
+}
+
+export interface WebhookEvent {
+  id: string
+  event: string
+  payload: Record<string, any>
+  url: string
+  status: 'pending' | 'sent' | 'failed' | 'retrying'
+  attempts: number
+  lastAttempt?: Date
+  nextAttempt?: Date
+  response?: {
+    status: number
+    body: string
+    headers: Record<string, string>
+  }
+}
+
+// Exportar todos los tipos del módulo
+export * from './wizard'
+export * from './forms'
+export * from './api'

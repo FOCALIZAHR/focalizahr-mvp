@@ -106,7 +106,7 @@ export function useCampaigns(initialFilters: CampaignFilters = {}) {
       // Construir URL solo con parámetros válidos
       const url = buildQueryUrl('/api/campaigns', activeFilters)
 
-      const token = localStorage.getItem('token')
+      const token = localStorage.getItem('focalizahr_token');
       if (!token) {
         throw new Error('No hay token de autenticación')
       }
