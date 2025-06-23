@@ -12,7 +12,7 @@ export default function useAlerts(campaigns: Campaign[]) {
 
       // Alertas por campañas que vencen pronto
       campaigns.forEach(campaign => {
-        if (campaign.daysRemaining !== undefined && campaign.daysRemaining <= 3 && campaign.daysRemaining > 0) {
+        if (campaign.status === 'active' && campaign.daysRemaining !== undefined && campaign.daysRemaining <= 3 && campaign.daysRemaining > 0) {
           newAlerts.push({
             id: `expiring-${campaign.id}`,
             type: 'warning',
@@ -41,19 +41,19 @@ export default function useAlerts(campaigns: Campaign[]) {
             id: `low-participation-${campaign.id}`,
             type: 'warning',
             title: 'Baja participación',
-            message: `La campaña "${campaign.name}" tiene solo ${campaign.participationRate}% de participación`,
+            message: `La campaña "${campaign.name}" tiene solo ${campaign.participationRate.toFixed(1)}% de participación`,
             timestamp: new Date(),
             campaignId: campaign.id
           });
         }
 
         // Alertas por alta participación
-        if (campaign.participationRate >= 90 && campaign.status === 'active') {
+        if (campaign.participationRate >= 75 && campaign.status === 'active') {
           newAlerts.push({
             id: `high-participation-${campaign.id}`,
             type: 'success',
             title: 'Excelente participación',
-            message: `La campaña "${campaign.name}" alcanzó ${campaign.participationRate}% de participación`,
+            message: `La campaña "${campaign.name}" alcanzó ${campaign.participationRate.toFixed(1)}% de participación`,
             timestamp: new Date(),
             campaignId: campaign.id
           });

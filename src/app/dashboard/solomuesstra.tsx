@@ -54,17 +54,12 @@ export default function CampaignsList({
   const handleStateChange = async (campaignId: string, newStatus: string, action: string) => {
     try {
       const token = localStorage.getItem('focalizahr_token');
-        console.log('🔍 Enviando:', { campaignId, newStatus, action });
       const response = await fetch(`/api/campaigns/${campaignId}/status`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ toStatus: newStatus, action: action })
+        body: JSON.stringify({ status: newStatus, action: action })
       });
-      if (!response.ok) {
-      const errorText = await response.text();
-      console.log('❌ Error exacto:', errorText);
-      throw new Error(errorText);
-    }
+
       // Leer el cuerpo de la respuesta, sea exitosa o no, ANTES de cualquier condición.
       const result = await response.json();
 
@@ -220,41 +215,7 @@ export default function CampaignsList({
       </Card>
 
       <Dialog open={!!selectedCampaign} onOpenChange={() => setSelectedCampaign(null)}>
-        <DialogContent className="max-w-6xl h-[80vh] bg-slate-900 border-slate-700 text-white overflow-y-auto">
-          <DialogHeader className="pb-4 border-b border-slate-700">
-            <DialogTitle className="text-white text-xl flex items-center gap-2">
-              <Settings className="h-5 w-5 text-cyan-400" />
-              Gestionar Estado: {selectedCampaign?.name}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            {selectedCampaign && (
-              <div className="bg-slate-900 text-white space-y-4">
-                <style jsx>{`
-                  .professional-card {
-                    background: rgb(30 41 59 / 0.9) !important;
-                    border: 1px solid rgb(71 85 105 / 0.3) !important;
-                    color: white !important;
-                  }
-                  .text-muted-foreground {
-                    color: rgb(148 163 184) !important;
-                  }
-                  .bg-gray-100 {
-                    background: rgb(51 65 85) !important;
-                  }
-                  .text-gray-600 {
-                    color: rgb(148 163 184) !important;
-                  }
-                `}</style>
-                <CampaignStateManager 
-                  campaign={selectedCampaign} 
-                  onStateChange={handleStateChange} 
-                  isLoading={false} 
-                />
-              </div>
-            )}
-          </div>
-        </DialogContent>
+        <DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Gestionar Estado: {selectedCampaign?.name}</DialogTitle></DialogHeader>{selectedCampaign && <CampaignStateManager campaign={selectedCampaign} onStateChange={handleStateChange} isLoading={false} />}</DialogContent>
       </Dialog>
     </div>
   );

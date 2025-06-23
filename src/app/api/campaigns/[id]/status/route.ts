@@ -80,7 +80,7 @@ export async function PUT(
 
     // Validaciones específicas por transición
     const validTransitions: Record<string, string[]> = {
-      draft: ['active'],
+      draft: ['active', 'cancelled'],
       active: ['completed', 'cancelled'],
       completed: [],
       cancelled: []
@@ -114,11 +114,12 @@ export async function PUT(
       }
 
       const now = new Date()
-      if (campaign.startDate > now) {
-        return NextResponse.json(
+      const hoursDiff = (campaign.startDate.getTime() - now.getTime()) / (1000 * 60 * 60)
+        if (hoursDiff > 24) {
+          return NextResponse.json(
           { 
             success: false, 
-            error: 'No se puede activar antes de la fecha de inicio',
+            error: 'No se puede activar más de 24 horas antes de la fecha de inicio',
             code: 'INVALID_START_DATE'
           },
           { status: 409 }

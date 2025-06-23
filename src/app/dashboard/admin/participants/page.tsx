@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import '@/app/dashboard/dashboard.css';
+import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { 
   Upload, 
@@ -111,23 +112,27 @@ export default function AdminParticipantsPage() {
   const router = useRouter();
   const { campaigns, loading, error, lastUpdated, refetch } = usePendingCampaigns();
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
-  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  
 
   // Manejar éxito de upload
   const handleUploadComplete = useCallback((result: { totalLoaded: number; participants: any[] }) => {
-    setUploadSuccess(`✅ ${result.totalLoaded} participantes cargados exitosamente`);
-    
-    // Remover campaña de la lista ya que ya tiene participantes
-    if (selectedCampaign) {
-      refetch(); // Refrescar lista de campañas
-      setSelectedCampaign(null); // Limpiar selección
-    }
+  // Mostrar toast de éxito (profesional y visible)
+  toast.success(`✅ ${result.totalLoaded} participantes cargados exitosamente`, {
+    description: "Redirigiendo al dashboard principal...",
+    duration: 3000,
+  });
+  
+  // Remover campaña de la lista ya que ya tiene participantes
+  if (selectedCampaign) {
+    refetch(); // Refrescar lista de campañas
+    setSelectedCampaign(null); // Limpiar selección
+  }
 
-    // Limpiar mensaje después de unos segundos
-    setTimeout(() => {
-      setUploadSuccess(null);
-    }, 5000);
-  }, [selectedCampaign, refetch]);
+  // Redirección automática al dashboard después de 2.5 segundos
+  setTimeout(() => {
+    router.push('/dashboard');
+  }, 5000);
+}, [selectedCampaign, refetch, router]);
 
   // Manejar errores de upload
   const handleUploadError = useCallback((error: string) => {
@@ -156,17 +161,15 @@ export default function AdminParticipantsPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Button
-                  variant="outline"
-                  size="sm"
                   onClick={() => router.push('/dashboard')}
-                  className="flex items-center gap-2 border-gray-600 text-gray-300 hover:border-gray-500 hover:bg-gray-700/50"
+                  className="btn-gradient flex items-center gap-2"
                 >
-                  <ArrowLeft className="h-4 w-4" />
+                  <ArrowLeft className="h-4 w-4 text-cyan-400" />
                   Volver al Dashboard
                 </Button>
                 
                 <div>
-                  <h1 className="text-3xl font-bold text-white">
+                  <h1 className="text-3xl font-bold focalizahr-gradient-text">
                     Admin Panel - Carga Participantes
                   </h1>
                   <p className="text-gray-300 mt-1">
@@ -180,7 +183,7 @@ export default function AdminParticipantsPage() {
                   variant="outline"
                   size="sm"
                   onClick={refetch}
-                  className="flex items-center gap-2 border-gray-600 text-gray-300 hover:border-gray-500 hover:bg-gray-700/50"
+                  className="flex items-center gap-2 border-cyan-500/30 text-cyan-400 hover:border-cyan-400 hover:bg-cyan-500/10 transition-all"
                 >
                   <RefreshCw className="h-4 w-4" />
                   Actualizar
@@ -199,14 +202,7 @@ export default function AdminParticipantsPage() {
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         
         {/* Mostrar mensaje de éxito global */}
-        {uploadSuccess && (
-          <Alert className="border-green-200 bg-green-50">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-800">
-              {uploadSuccess}
-            </AlertDescription>
-          </Alert>
-        )}
+      
 
         {/* Mostrar error global */}
         {error && (
@@ -220,7 +216,7 @@ export default function AdminParticipantsPage() {
         <Card className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
+              <Clock className="h-5 w-5 text-cyan-400" />
               Campañas Pendientes de Participantes
               {campaigns.length > 0 && (
                 <Badge variant="secondary">{campaigns.length}</Badge>
@@ -233,16 +229,14 @@ export default function AdminParticipantsPage() {
           <CardContent>
             {campaigns.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
-                <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                <Users className="h-16 w-16 mx-auto mb-4 text-cyan-400/50" />
                 <p className="text-lg font-medium">No hay campañas pendientes</p>
                 <p className="text-sm mt-2">
                   Todas las campañas activas ya tienen participantes cargados
                 </p>
                 <Button
-                  variant="outline"
-                  size="sm"
                   onClick={refetch}
-                  className="mt-4 flex items-center gap-2"
+                  className="mt-4 btn-gradient flex items-center gap-2"
                 >
                   <RefreshCw className="h-4 w-4" />
                   Actualizar Lista
@@ -345,7 +339,7 @@ export default function AdminParticipantsPage() {
           <CardContent className="p-6">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <Activity className="h-5 w-5 text-blue-600" />
+                <Activity className="h-5 w-5 text-cyan-400" />
               </div>
               <div>
                 <h3 className="font-semibold text-white mb-2">
@@ -353,7 +347,7 @@ export default function AdminParticipantsPage() {
                 </h3>
                 <div className="space-y-2 text-gray-300 text-sm">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-blue-500/20 text-white flex items-center justify-center text-xs font-semibold">1</div>
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-r from-cyan-500 to-purple-500 text-white flex items-center justify-center text-xs font-semibold shadow-lg">1</div>
                     <span>Cliente crea campaña via wizard → queda en estado 'draft'</span>
                   </div>
                   <div className="flex items-center gap-2">
