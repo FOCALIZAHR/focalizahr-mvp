@@ -248,8 +248,10 @@ export default function CampaignsList({
                 `}</style>
                 <CampaignStateManager 
                   campaign={selectedCampaign} 
-                  onStateChange={handleStateChange} 
-                  isLoading={false} 
+                   onSuccess={() => {
+                    onRefresh();
+                    setSelectedCampaign(null);
+                    }}
                 />
               </div>
             )}
