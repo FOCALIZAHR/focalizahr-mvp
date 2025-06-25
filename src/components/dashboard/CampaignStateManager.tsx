@@ -1,330 +1,319 @@
 'use client';
-
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Play, 
-  Square, 
-  CheckCircle, 
-  Clock, 
-  Activity, 
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useCampaignsContext } from '@/context/CampaignsContext';
+import { useCampaignState, StateTransition, CampaignForState } from '@/hooks/useCampaignState';
+import { toast } from 'sonner';
+import {
+  Play,
+  Pause,
+  Square,
+  CheckCircle,
+  Clock,
   AlertTriangle,
-  Eye,
+  Activity,
   BarChart3,
+  Eye,
+  Settings,
   Users,
-  Calendar
+  Calendar,
+  TrendingUp,
+  Shield,
 } from 'lucide-react';
-import { useCampaignState } from '@/hooks/useCampaignState';
+import type { Campaign } from '@/types';
 
-// Interfaces
-interface Campaign {
-  id: string;
-  name: string;
-  status: 'draft' | 'active' | 'completed' | 'cancelled';
-  campaignType: {
-    name: string;
-    slug: string;
-  };
-  totalInvited: number;
-  totalResponded: number;
-  participationRate: number;
-  startDate: string;
-  endDate: string;
-  canActivate?: boolean;
-  canViewResults?: boolean;
-  isOverdue?: boolean;
-  daysRemaining?: number;
-  riskLevel?: 'low' | 'medium' | 'high';
-  lastActivity?: string;
-  completionTrend?: 'up' | 'down' | 'stable';
-}
-
-interface CampaignStateManagerProps {
-  campaign: Campaign;
-  onCampaignUpdate: () => void;
-}
-
-// Modal de confirmación simple
-const ConfirmationModal = ({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  transition,
-  isTransitioning 
-}: {
-  isOpen: boolean;
-  onClose: () => void;
+// ✅ MODAL DE CONFIRMACIÓN MEJORADO
+const ConfirmationModal: React.FC<{
+  transition: StateTransition;
+  campaign: CampaignForState;
   onConfirm: () => void;
-  transition: any;
+  onCancel: () => void;
   isTransitioning: boolean;
+  validationErrors: string[];
+}> = ({ 
+  transition, 
+  campaign, 
+  onConfirm, 
+  onCancel, 
+  isTransitioning, 
+  validationErrors 
 }) => {
-  if (!isOpen || !transition) return null;
-
+  const ButtonIcon = transition.buttonIcon;
+  
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <CardHeader>
-          <CardTitle className="text-lg">{transition.buttonText}</CardTitle>
-          <CardDescription>{transition.description}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {transition.action === 'cancel' && (
-            <Alert className="border-yellow-500 bg-yellow-50">
-              <AlertTriangle className="h-4 w-4 text-yellow-600" />
-              <AlertDescription className="text-sm">
-                Las respuestas recibidas hasta ahora se preservarán, pero no se podrán recopilar más datos.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <div className="flex gap-3 pt-4">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              className="flex-1"
-              disabled={isTransitioning}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant={transition.buttonVariant}
-              onClick={onConfirm}
-              disabled={isTransitioning}
-              className="flex-1"
-            >
-              {isTransitioning ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                  Procesando...
-                </>
-              ) : (
-                `Sí, ${transition.buttonText}`
-              )}
-            </Button>
+    <Card className="border-orange-200 bg-orange-50">
+      <CardHeader>
+        <CardTitle className="text-sm font-medium text-orange-800 flex items-center gap-2">
+          <ButtonIcon className="h-4 w-4" />
+          Confirmar: {transition.buttonText}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-4 pt-0">
+        <p className="text-sm text-orange-700 mb-3">
+          {transition.description}
+        </p>
+        
+        {/* ✅ VALIDACIONES EN TIEMPO REAL */}
+        {validationErrors.length > 0 && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="space-y-1">
+                <p className="font-medium">Requisitos pendientes:</p>
+                <ul className="text-xs space-y-1">
+                  {validationErrors.map((error, index) => (
+                    <li key={index} className="flex items-center gap-1">
+                      <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                      {error}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {/* ✅ REQUISITOS CUMPLIDOS */}
+        {validationErrors.length === 0 && transition.validationRules.length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs font-medium text-green-800 mb-1">Requisitos cumplidos:</p>
+            <ul className="text-xs text-green-700 space-y-1">
+              {transition.validationRules.map((rule, index) => (
+                <li key={index} className="flex items-center gap-1">
+                  <CheckCircle className="h-3 w-3 text-green-600" />
+                  {rule}
+                </li>
+              ))}
+            </ul>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        )}
+
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={onCancel}
+            className="flex-1"
+            disabled={isTransitioning}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant={transition.buttonVariant}
+            onClick={onConfirm}
+            disabled={isTransitioning || validationErrors.length > 0}
+            className="flex-1"
+          >
+            {isTransitioning ? (
+              <>
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                Procesando...
+              </>
+            ) : (
+              `Sí, ${transition.buttonText}`
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
-export default function CampaignStateManager({ 
-  campaign, 
-  onCampaignUpdate
-}: CampaignStateManagerProps) {
-  const [showConfirmation, setShowConfirmation] = useState<any>(null);
+// ✅ PROPS SIMPLIFICADAS CON CONTEXT
+interface CampaignStateManagerProps {
+  campaign: Campaign;
+  onClose?: () => void;
+}
 
-  // ✅ ARQUITECTURA CORRECTA: Usar el hook centralizado
+const CampaignStateManager: React.FC<CampaignStateManagerProps> = ({
+  campaign,
+  onClose
+}) => {
+  // ✅ CONTEXT API INTEGRATION
+  const { fetchCampaigns } = useCampaignsContext();
+  
+  // ✅ HOOK CON LÓGICA CORREGIDA
   const { 
     isTransitioning, 
     transitionError, 
     executeTransition, 
     getPossibleTransitions, 
-    getStatusConfig 
+    getStatusConfig,
+    validateTransition 
   } = useCampaignState({ 
-    onSuccess: onCampaignUpdate
+    onSuccess: async () => {
+      toast.success('Estado actualizado con éxito.');
+      await fetchCampaigns();
+      if (onClose) onClose();
+    }
   });
 
-  // Obtener configuración visual del estado
+  const [showConfirmation, setShowConfirmation] = useState<StateTransition | null>(null);
+
+  // ✅ CONFIGURACIÓN VISUAL DEL ESTADO ACTUAL
   const statusConfig = getStatusConfig(campaign.status);
   const StatusIcon = statusConfig.icon;
 
-  // Obtener transiciones posibles
+  // ✅ TRANSICIONES POSIBLES CON VALIDACIÓN
   const possibleTransitions = getPossibleTransitions(campaign.status);
 
-  // Manejar clic en acción
-  const handleActionClick = async (transition: any) => {
-    if (transition.action === 'cancel' || transition.action === 'activate') {
+  // ✅ MANEJAR CONFIRMACIÓN CON VALIDACIÓN
+  const handleActionClick = async (transition: StateTransition) => {
+    const validation = validateTransition(campaign, transition);
+    
+    if (transition.requiresConfirmation) {
       setShowConfirmation(transition);
     } else {
-      // Otras acciones sin confirmación
       await executeTransition(campaign.id, transition);
     }
   };
 
-  // Confirmar acción
   const handleConfirmAction = async () => {
     if (!showConfirmation) return;
     await executeTransition(campaign.id, showConfirmation);
     setShowConfirmation(null);
   };
-
-  // Renderizar botones de acción según estado (FLUJO ORIGINAL)
-  const renderActionButtons = () => {
-    switch (campaign.status) {
-      case 'draft':
-        return (
-          <Button 
-            size="sm" 
-            disabled={!campaign.canActivate || isTransitioning}
-            onClick={() => {
-              const activateTransition = possibleTransitions.find(t => t.action === 'activate');
-              if (activateTransition) handleActionClick(activateTransition);
-            }}
-            className="btn-gradient focus-ring"
-            title={!campaign.canActivate ? 'Se requieren al menos 5 participantes para activar' : 'Activar campaña'}
-          >
-            <Play className="h-3 w-3 mr-1" />
-            Activar Campaña
-          </Button>
-        );
-
-      case 'active':
-        return (
-          <div className="flex items-center gap-2">
-            <Button 
-              size="sm" 
-              onClick={() => window.open(`/dashboard/campaigns/${campaign.id}/monitor`, '_blank')}
-              className="focus-ring"
-            >
-              <Eye className="h-3 w-3 mr-1" />
-              Monitorear
-            </Button>
-            {campaign.participationRate > 20 && (
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={() => window.open(`/dashboard/campaigns/${campaign.id}/preview-results`, '_blank')}
-                className="focus-ring"
-              >
-                <BarChart3 className="h-3 w-3 mr-1" />
-                Vista Previa
-              </Button>
-            )}
-            <Button 
-              size="sm" 
-              variant="destructive"
-              onClick={() => {
-                const cancelTransition = possibleTransitions.find(t => t.action === 'cancel');
-                if (cancelTransition) handleActionClick(cancelTransition);
-              }}
-              disabled={isTransitioning}
-              className="focus-ring"
-            >
-              <Square className="h-3 w-3 mr-1" />
-              Cancelar
-            </Button>
-          </div>
-        );
-
-      case 'completed':
-        return (
-          <Button 
-            size="sm" 
-            disabled={!campaign.canViewResults}
-            onClick={() => window.open(`/dashboard/campaigns/${campaign.id}/results`, '_blank')}
-            className="focus-ring"
-          >
-            <BarChart3 className="h-3 w-3 mr-1" />
-            Ver Resultados
-          </Button>
-        );
-
-      default:
-        return null;
-    }
-  };
-
   return (
-    <>
-      <Card className="professional-card">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg font-semibold">
-                {campaign.name}
-              </CardTitle>
-              <CardDescription className="text-sm text-gray-600">
-                {campaign.campaignType.name}
-              </CardDescription>
+    <div className="space-y-4">
+      {/* ✅ MINICARD ESTADO ACTUAL - TU IDEA IMPLEMENTADA */}
+      <Card className={`${statusConfig.bgColor} border-2`}>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg ${statusConfig.bgColor} border-2 border-current flex items-center justify-center`}>
+                <StatusIcon className={`h-5 w-5 ${statusConfig.color}`} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">Estado Actual</h3>
+                  <Badge className={statusConfig.badgeClass}>
+                    <StatusIcon className="h-3 w-3 mr-1" />
+                    {statusConfig.text}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">{statusConfig.description}</p>
+              </div>
             </div>
-            <Badge className={statusConfig.badgeClass}>
-              <StatusIcon className="h-3 w-3 mr-1" />
-              {statusConfig.text}
-            </Badge>
-          </div>
-        </CardHeader>
 
-        <CardContent className="space-y-4">
-          {/* Información del estado actual */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-gray-500" />
-              <span>
-                {campaign.totalResponded}/{campaign.totalInvited} respuestas
-                {campaign.totalInvited > 0 && (
-                  <span className="text-gray-500 ml-1">
-                    ({campaign.participationRate}%)
-                  </span>
-                )}
-              </span>
-            </div>
-            
-            {campaign.daysRemaining !== undefined && campaign.status === 'active' && (
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-gray-500" />
-                <span>
-                  {campaign.daysRemaining > 0 
-                    ? `${campaign.daysRemaining} días restantes`
-                    : campaign.daysRemaining === 0 
-                    ? 'Termina hoy'
-                    : 'Vencida'
-                  }
-                </span>
+            {/* ✅ INDICADORES VISUALES CONTEXTUALES */}
+            {campaign.status === 'active' && (
+              <div className="text-right">
+                <div className="flex items-center gap-1 text-green-600 mb-1">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs font-medium">En vivo</span>
+                </div>
+                <div className="space-y-1 text-xs text-green-700">
+                  <div className="flex items-center gap-1">
+                    <Users className="h-3 w-3" />
+                    <span>{campaign.totalResponded}/{campaign.totalInvited} respuestas</span>
+                  </div>
+                  {campaign.daysRemaining !== undefined && (
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      <span>{campaign.daysRemaining > 0 ? `${campaign.daysRemaining} días restantes` : 'Expirada'}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
-          </div>
 
-          {/* Alertas de riesgo */}
-          {campaign.riskLevel && campaign.riskLevel !== 'low' && campaign.status === 'active' && (
-            <Alert className={
-              campaign.riskLevel === 'high' 
-                ? 'border-red-500 bg-red-50' 
-                : 'border-yellow-500 bg-yellow-50'
-            }>
-              <AlertTriangle className={`h-4 w-4 ${
-                campaign.riskLevel === 'high' ? 'text-red-600' : 'text-yellow-600'
-              }`} />
-              <AlertDescription className="text-sm">
-                {campaign.riskLevel === 'high' 
-                  ? 'Baja participación detectada. Se recomienda enviar recordatorios.'
-                  : 'Participación moderada. Considere enviar recordatorios si es necesario.'
-                }
-              </AlertDescription>
-            </Alert>
-          )}
+            {campaign.status === 'draft' && (
+              <div className="text-right text-xs text-yellow-700">
+                {campaign.totalInvited >= 5 ? (
+                  <div className="flex items-center gap-1 text-green-700">
+                    <CheckCircle className="h-3 w-3" />
+                    <span>Lista para activar</span>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <div>Faltan {5 - campaign.totalInvited} participantes</div>
+                    <div className="text-yellow-600">Mínimo: 5 participantes</div>
+                  </div>
+                )}
+              </div>
+            )}
 
-          {/* Error de transición */}
-          {transitionError && (
-            <Alert className="border-red-500 bg-red-50">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-              <AlertDescription className="text-sm text-red-700">
-                {transitionError}
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Botones de acción */}
-          <div className="pt-2 border-t">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">Acciones disponibles:</span>
-              {renderActionButtons()}
-            </div>
+            {campaign.status === 'completed' && (
+              <div className="text-right text-xs text-blue-700">
+                <div className="flex items-center gap-1 mb-1">
+                  <BarChart3 className="h-3 w-3" />
+                  <span>Resultados disponibles</span>
+                </div>
+                <div>{campaign.participationRate}% participación final</div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Modal de confirmación */}
-      <ConfirmationModal
-        isOpen={!!showConfirmation}
-        onClose={() => setShowConfirmation(null)}
-        onConfirm={handleConfirmAction}
-        transition={showConfirmation}
-        isTransitioning={isTransitioning}
-      />
-    </>
+      {/* ✅ ERROR DE TRANSICIÓN */}
+      {transitionError && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{transitionError}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* ✅ ACCIONES DISPONIBLES CON VALIDACIÓN */}
+      {possibleTransitions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Acciones Disponibles</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="space-y-3">
+              {possibleTransitions.map((transition) => {
+                const validation = validateTransition(campaign, transition);
+                const ButtonIcon = transition.buttonIcon;
+                
+                return (
+                  <div key={transition.action} className="space-y-2">
+                    <Button
+                      variant={transition.buttonVariant}
+                      className="w-full justify-start"
+                      onClick={() => handleActionClick(transition)}
+                      disabled={isTransitioning || !validation.valid}
+                    >
+                      <ButtonIcon className="h-4 w-4 mr-2" />
+                      <span>{transition.buttonText}</span>
+                    </Button>
+                    
+                    {/* ✅ MOSTRAR ERRORES DE VALIDACIÓN */}
+                    {!validation.valid && validation.errors && validation.errors.length > 0 && (
+                       <Alert variant="destructive" className="text-xs">
+                        <AlertTriangle className="h-3 w-3" />
+                        <AlertDescription>
+                          <ul className="space-y-1">
+                            {validation.errors.map((error, index) => (
+                              <li key={index}>• {error}</li>
+                            ))}
+                          </ul>
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ✅ MODAL DE CONFIRMACIÓN CON VALIDACIÓN */}
+      {showConfirmation && (
+        <ConfirmationModal
+          transition={showConfirmation}
+          campaign={campaign}
+          onConfirm={handleConfirmAction}
+          onCancel={() => setShowConfirmation(null)}
+          isTransitioning={isTransitioning}
+          validationErrors={validateTransition(campaign, showConfirmation).errors}
+        />
+      )}
+    </div>
   );
-}
+};
+
+export default CampaignStateManager;

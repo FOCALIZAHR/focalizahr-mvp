@@ -1,148 +1,119 @@
-import { useState, useMemo, useCallback } from 'react';
-import { Play, Square, Clock, Activity, CheckCircle, AlertTriangle } from 'lucide-react';
+import { useState, useCallback, useMemo } from 'react';
+import { Play, CheckCircle, Square, Clock, Activity } from 'lucide-react';
 
-// Definiciones de Tipos Expandidas
 export interface StateTransition {
   from: string;
   to: string;
   action: string;
   buttonText: string;
-  buttonIcon: React.ElementType; // Componente del ícono, no JSX
-  buttonVariant: 'default' | 'destructive' | 'outline' | 'secondary';
+  buttonIcon: any;
+  buttonVariant: 'default' | 'outline' | 'destructive';
   description: string;
   requiresConfirmation: boolean;
   validationRules: string[];
 }
 
-export interface Campaign {
+interface CampaignForState {
   id: string;
-  name: string;
   status: 'draft' | 'active' | 'completed' | 'cancelled';
-  campaignType: {
-    name: string;
-    slug: string;
-  };
-  totalInvited: number;
-  totalResponded: number;
-  participationRate: number;
-  startDate: string;
-  endDate: string;
-  canActivate?: boolean;
-  canViewResults?: boolean;
-  isOverdue?: boolean;
-  daysRemaining?: number;
-  riskLevel?: 'low' | 'medium' | 'high';
-  lastActivity?: string;
-  completionTrend?: 'up' | 'down' | 'stable';
+  participant_count?: number;
+  start_date?: string;
+  end_date?: string;
 }
 
-// TYPES ADICIONALES RESTAURADOS
-export interface CampaignForState {
-  id: string;
-  name: string;
-  status: 'draft' | 'active' | 'completed' | 'cancelled';
-  campaignType: {
-    name: string;
-    slug: string;
-  };
-  totalInvited: number;
-  totalResponded: number;
-  participationRate: number;
-  startDate: string;
-  endDate: string;
-  canActivate?: boolean;
-  canViewResults?: boolean;
-  isOverdue?: boolean;
-  daysRemaining?: number;
-  riskLevel?: 'low' | 'medium' | 'high';
-  lastActivity?: string;
-  completionTrend?: 'up' | 'down' | 'stable';
+interface UseCampaignStateProps {
+  onSuccess?: () => void;
 }
 
-// HOOK PRINCIPAL CONSOLIDADO - COMPATIBLE CON AMBAS VERSIONES
-export const useCampaignState = ({ 
-  onSuccess 
-}: { 
-  onSuccess: () => Promise<void> | void 
-}) => {
+export const useCampaignState = ({ onSuccess }: UseCampaignStateProps = {}) => {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
 
-  // FUNCIÓN DE VALIDACIÓN ROBUSTA
-  const validateTransition = useCallback((campaign: Campaign, transition: StateTransition): { valid: boolean; errors: string[] } => {
+  // VALIDACIONES MEJORADAS
+  const validateTransition = useCallback((campaign: CampaignForState, transition: StateTransition): string[] => {
     const errors: string[] = [];
-
+    
+    // Validaciones específicas por transición
     if (transition.action === 'activate') {
-      if (campaign.totalInvited < 5) {
-        errors.push('Se requieren al menos 5 participantes para activar la campaña');
+      if (!campaign.participant_count || campaign.participant_count < 5) {
+        errors.push('La campaña debe tener al menos 5 participantes para ser activada');
       }
       
-      const startDate = new Date(campaign.startDate);
-      const now = new Date();
-      if (startDate < now) {
-        errors.push('La fecha de inicio no puede ser en el pasado');
+      if (!campaign.start_date || !campaign.end_date) {
+        errors.push('Las fechas de inicio y fin deben estar definidas');
       }
       
-      if (!campaign.canActivate) {
-        errors.push('La campaña no cumple con los requisitos para ser activada');
+      if (campaign.start_date && campaign.end_date) {
+        const startDate = new Date(campaign.start_date);
+        const endDate = new Date(campaign.end_date);
+        const now = new Date();
+        
+        if (startDate < now) {
+          errors.push('La fecha de inicio no puede ser en el pasado');
+        }
+        
+        if (endDate <= startDate) {
+          errors.push('La fecha de fin debe ser posterior a la fecha de inicio');
+        }
       }
     }
-
+    
     if (transition.action === 'complete') {
-      const endDate = new Date(campaign.endDate);
-      const now = new Date();
-      if (endDate > now && campaign.participationRate < 50) {
-        errors.push('Se recomienda esperar más respuestas antes de completar la campaña');
+      if (campaign.status !== 'active') {
+        errors.push('Solo se pueden completar campañas activas');
       }
     }
-
-    if (transition.action === 'cancel') {
-      if (campaign.status === 'active' && campaign.participationRate > 0) {
-        // Advertencia, pero no error bloqueante
-        errors.push('Se preservarán las respuestas recibidas hasta ahora');
-      }
-    }
-
-    return {
-      valid: errors.length === 0 || (transition.action === 'cancel' && errors.length === 1),
-      errors
-    };
+    
+    return errors;
   }, []);
 
-  // FUNCIÓN DE EJECUCIÓN DE TRANSICIONES
-  const executeTransition = useCallback(async (campaignId: string, transition: StateTransition) => {
+  // EJECUCIÓN DE TRANSICIÓN CON VALIDACIÓN COMPLETA
+  const executeTransition = useCallback(async (
+    campaign: CampaignForState, 
+    transition: StateTransition
+  ): Promise<boolean> => {
     setIsTransitioning(true);
     setTransitionError(null);
 
     try {
-      const token = localStorage.getItem('focalizahr_token');
-      const response = await fetch(`/api/campaigns/${campaignId}/status`, {
-        method: 'PUT',
+      // Validar transición antes de ejecutar
+      const validationErrors = validateTransition(campaign, transition);
+      if (validationErrors.length > 0) {
+        throw new Error(validationErrors.join('. '));
+      }
+
+      const response = await fetch(`/api/campaigns/${campaign.id}/transition`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          toStatus: transition.to,
-          action: transition.action
+          action: transition.action,
+          to: transition.to
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al cambiar estado de campaña');
+        throw new Error(errorData.error || 'Error al ejecutar transición');
       }
 
-      await onSuccess(); // Callback para actualizar UI padre
+      // Ejecutar callback de éxito si existe
+      if (onSuccess) {
+        onSuccess();
+      }
 
+      return true;
     } catch (error) {
-      setTransitionError(error instanceof Error ? error.message : 'Error desconocido');
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      setTransitionError(errorMessage);
+      return false;
     } finally {
       setIsTransitioning(false);
     }
-  }, [onSuccess]);
+  }, [onSuccess, validateTransition]);
 
-  // TRANSICIONES DISPONIBLES POR ESTADO - COMPLETAMENTE RESTAURADAS
+  // TRANSICIONES DISPONIBLES - LÓGICA CORREGIDA
   const getPossibleTransitions = useMemo(() => (status: string): StateTransition[] => {
     const allTransitions: Record<string, StateTransition[]> = {
       draft: [{
@@ -165,7 +136,7 @@ export const useCampaignState = ({
           from: 'active',
           to: 'completed',
           action: 'complete',
-          buttonText: 'Marcar Completada',
+          buttonText: 'Completar',
           buttonIcon: CheckCircle,
           buttonVariant: 'outline',
           description: 'Finalizar la campaña manualmente y procesar resultados finales.',
@@ -178,67 +149,19 @@ export const useCampaignState = ({
           from: 'active',
           to: 'cancelled',
           action: 'cancel',
-          buttonText: 'Cancelar Campaña',
+          buttonText: 'Cancelar',
           buttonIcon: Square,
           buttonVariant: 'destructive',
-          description: 'Cancelar la campaña. Los datos recibidos se preservarán pero no se enviarán más invitaciones.',
+          description: 'Cancelar la campaña. Los datos recibidos se preservarán.',
           requiresConfirmation: true,
           validationRules: [
             'Esta acción preservará las respuestas recibidas hasta ahora'
           ]
         }
-      ]
-    };
-
-    return allTransitions[status] || [];
-  }, []);
-
-  // VERSIÓN ALTERNATIVA MEMOIZADA TAMBIÉN DISPONIBLE
-  const getPossibleTransitionsAlt = useMemo((): ((status: CampaignForState['status']) => StateTransition[]) => (status) => {
-    const allTransitions: Record<string, StateTransition[]> = {
-      draft: [{ 
-        from: 'draft',
-        to: 'active', 
-        action: 'activate', 
-        buttonText: 'Activar Campaña', 
-        buttonIcon: Play, 
-        buttonVariant: 'default', 
-        description: 'La campaña será enviada a todos los participantes y comenzará a recibir respuestas.', 
-        requiresConfirmation: true, 
-        validationRules: [
-          'Debe tener al menos 5 participantes',
-          'Fechas de campaña válidas',
-          'Configuración completa'
-        ] 
-      }],
-      active: [
-        { 
-          from: 'active',
-          to: 'completed', 
-          action: 'complete', 
-          buttonText: 'Marcar Completada', 
-          buttonIcon: CheckCircle, 
-          buttonVariant: 'outline', 
-          description: 'Finalizar la campaña manualmente y procesar resultados finales.', 
-          requiresConfirmation: true, 
-          validationRules: [
-            'Campaña ha alcanzado fecha fin o criterios de completitud'
-          ] 
-        },
-        { 
-          from: 'active',
-          to: 'cancelled', 
-          action: 'cancel', 
-          buttonText: 'Cancelar Campaña', 
-          buttonIcon: Square, 
-          buttonVariant: 'destructive', 
-          description: 'Cancelar la campaña. Los datos recibidos se preservarán pero no se enviarán más invitaciones.',
-          requiresConfirmation: true, 
-          validationRules: [
-            'Esta acción preservará las respuestas recibidas hasta ahora'
-          ]
-        }
-      ]
+      ],
+      // Estados terminales no tienen transiciones disponibles
+      completed: [],
+      cancelled: []
     };
 
     return allTransitions[status] || [];
@@ -252,7 +175,7 @@ export const useCampaignState = ({
         icon: Clock,
         badgeClass: 'bg-gray-100 text-gray-700 border-gray-300',
         color: 'text-gray-600',
-        bgColor: 'bg-gray-100',
+        bgColor: 'bg-gray-50',
         description: 'Campaña en preparación'
       },
       active: {
@@ -260,7 +183,7 @@ export const useCampaignState = ({
         icon: Activity,
         badgeClass: 'bg-green-100 text-green-700 border-green-300',
         color: 'text-green-600',
-        bgColor: 'bg-green-100',
+        bgColor: 'bg-green-50',
         description: 'Recibiendo respuestas'
       },
       completed: {
@@ -268,7 +191,7 @@ export const useCampaignState = ({
         icon: CheckCircle,
         badgeClass: 'bg-blue-100 text-blue-700 border-blue-300',
         color: 'text-blue-600',
-        bgColor: 'bg-blue-100',
+        bgColor: 'bg-blue-50',
         description: 'Resultados disponibles'
       },
       cancelled: {
@@ -276,7 +199,7 @@ export const useCampaignState = ({
         icon: Square,
         badgeClass: 'bg-red-100 text-red-700 border-red-300',
         color: 'text-red-600',
-        bgColor: 'bg-red-100',
+        bgColor: 'bg-red-50',
         description: 'Campaña cancelada'
       }
     };
@@ -289,7 +212,6 @@ export const useCampaignState = ({
     transitionError,
     executeTransition,
     getPossibleTransitions,
-    getPossibleTransitionsAlt, // VERSIÓN ALTERNATIVA DISPONIBLE
     getStatusConfig,
     validateTransition
   };

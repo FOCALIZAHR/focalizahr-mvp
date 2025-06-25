@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Search, Plus, Filter, RefreshCw, Settings, BarChart3, Eye, Clock, Activity, CheckCircle, AlertTriangle, Users, Calendar } from 'lucide-react';
 import CampaignStateManager from '@/components/dashboard/CampaignStateManager';
 import CampaignActionButtons from '@/components/dashboard/CampaignActionButtons';
-import type { Campaign } from '@/types'; // Asumiendo que Campaign completa está en types
+import type { Campaign } from '@/types';
 
 interface CampaignsListProps {
   campaigns: Campaign[];
@@ -25,7 +25,7 @@ export default function CampaignsList({ campaigns, onRefresh, loading, error, la
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const router = useRouter();
 
-  // 🔧 FIX STALE CLOSURE: Remover async/await
+  // ✅ FUNCIÓN ESTABILIZADA - SOLUCIÓN STALE CLOSURE
   const handleCampaignUpdate = useCallback(() => {
     console.log('🔄 Refrescando datos después de cambio exitoso...');
     onRefresh();
@@ -58,8 +58,7 @@ export default function CampaignsList({ campaigns, onRefresh, loading, error, la
 
       if (response.ok) {
         console.log('✅ Campaña activada exitosamente');
-        // 🎯 SOLUCIÓN: onRefresh() automático para actualizar UI
-        onRefresh();
+        onRefresh(); // ← SOLUCIÓN STALE CLOSURE
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al activar campaña');
@@ -71,22 +70,29 @@ export default function CampaignsList({ campaigns, onRefresh, loading, error, la
     }
   }, [onRefresh]);
 
-  // ✅ FUNCIÓN PARA OTRAS ACCIONES (Compatible con CampaignActionButtons)
-  const handleCampaignAction = useCallback(async (campaignId: string, action: string, campaignName: string) => {
-    console.log('🎯 Acción:', action, 'para campaña:', campaignName);
-    
+  // ✅ NAVEGACIÓN INTELIGENTE
+  const handleCampaignAction = useCallback((action: string, campaignId: string, campaign?: Campaign) => {
     switch (action) {
+      case 'view':
+        if (campaign?.status === 'completed') {
+          router.push(`/dashboard/campaigns/${campaignId}/results`);
+        } else if (campaign?.status === 'active') {
+          router.push(`/dashboard/campaigns/${campaignId}/monitor`);
+        } else {
+          router.push(`/dashboard/campaigns/${campaignId}/config`);
+        }
+        break;
       case 'monitor':
         router.push(`/dashboard/campaigns/${campaignId}/monitor`);
         break;
-      case 'view-results':
+      case 'results':
         router.push(`/dashboard/campaigns/${campaignId}/results`);
         break;
-      case 'preview-results':
-        router.push(`/dashboard/campaigns/${campaignId}/preview-results`);
+      case 'edit':
+        router.push(`/dashboard/campaigns/${campaignId}/edit`);
         break;
       default:
-        console.log(`Acción "${action}" para "${campaignName}"`);
+        console.warn('Acción no reconocida:', action);
     }
   }, [router]);
 
@@ -95,8 +101,22 @@ export default function CampaignsList({ campaigns, onRefresh, loading, error, la
     (campaign.name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  // ❌ FUNCIÓN ELIMINADA - CampaignActionButtons maneja badges
-  // const getStatusBadge = (status: string) => { ... }
+  const getStatusBadge = (status: string) => {
+    const config = {
+      draft: { label: 'Borrador', variant: 'secondary' as const, icon: Clock },
+      active: { label: 'Activa', variant: 'default' as const, icon: Activity },
+      completed: { label: 'Completada', variant: 'outline' as const, icon: CheckCircle },
+      cancelled: { label: 'Cancelada', variant: 'destructive' as const, icon: AlertTriangle }
+    };
+    const statusConfig = config[status as keyof typeof config] || config.draft;
+    const Icon = statusConfig.icon;
+    return (
+      <Badge variant={statusConfig.variant} className="flex items-center gap-1">
+        <Icon className="h-3 w-3" />
+        {statusConfig.label}
+      </Badge>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -105,47 +125,65 @@ export default function CampaignsList({ campaigns, onRefresh, loading, error, la
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
-                Campañas ({filteredCampaigns.length})
+                <BarChart3 className="h-5 w-5" />
+                Mis Campañas
               </CardTitle>
               <CardDescription>
-                Gestiona el estado y monitorea el progreso de tus campañas
+                Gestiona y monitorea tus mediciones organizacionales
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={onRefresh}
+                disabled={loading}
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button 
+                size="sm"
+                onClick={() => router.push('/dashboard/campaigns/new')}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nueva Campaña
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* Filtros */}
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value as any)}
+                className="border rounded px-3 py-1 text-sm"
+              >
+                <option value="all">Todas</option>
+                <option value="draft">Borrador</option>
+                <option value="active">Activas</option>
+                <option value="completed">Completadas</option>
+                <option value="cancelled">Canceladas</option>
+              </select>
+            </div>
+            <div className="flex-1 max-w-sm">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar campañas..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-64 pl-9"
+                  className="pl-8"
                 />
               </div>
-              <Button variant="outline" size="sm" onClick={onRefresh}>
-                <RefreshCw className="h-4 w-4" />
-              </Button>
             </div>
           </div>
-          
-          {/* Filtros */}
-          <div className="flex items-center gap-2 pt-4">
-            {(['all', 'draft', 'active', 'completed', 'cancelled'] as const).map((status) => (
-              <Button
-                key={status}
-                variant={filter === status ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setFilter(status)}
-              >
-                {status === 'all' ? 'Todas' : status === 'draft' ? 'Borradores' : 
-                 status === 'active' ? 'Activas' : status === 'completed' ? 'Completadas' : 'Canceladas'}
-              </Button>
-            ))}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {loading ? (
+
+          {/* Lista de campañas */}
+          <div className="space-y-3">
+            {loading && campaigns.length === 0 ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
                 <p className="text-muted-foreground mt-2">Cargando campañas...</p>
@@ -166,7 +204,7 @@ export default function CampaignsList({ campaigns, onRefresh, loading, error, la
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="font-semibold">{campaign.name}</h3>
-                          {/* ❌ BADGE ELIMINADO - CampaignActionButtons lo maneja */}
+                          {getStatusBadge(campaign.status)}
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
@@ -184,7 +222,7 @@ export default function CampaignsList({ campaigns, onRefresh, loading, error, la
                         </div>
                       </div>
                       
-                      {/* 🎯 CAMBIO PRINCIPAL: Usar CampaignActionButtons + Modal complementario */}
+                      {/* Botones de acción */}
                       <div className="flex items-center gap-2">
                         <CampaignActionButtons
                           campaign={campaign}
@@ -192,7 +230,7 @@ export default function CampaignsList({ campaigns, onRefresh, loading, error, la
                           onCampaignAction={handleCampaignAction}
                         />
                         
-                        {/* Modal complementario para casos especiales */}
+                        {/* Modal complementario para gestión avanzada */}
                         <Button 
                           size="sm" 
                           variant="outline" 
@@ -211,7 +249,7 @@ export default function CampaignsList({ campaigns, onRefresh, loading, error, la
         </CardContent>
       </Card>
 
-      {/* Modal para gestión avanzada (preservado) */}
+      {/* Modal para gestión avanzada */}
       <Dialog open={!!selectedCampaign} onOpenChange={() => setSelectedCampaign(null)}>
         <DialogContent className="professional-dialog max-w-4xl">
           <DialogHeader>
