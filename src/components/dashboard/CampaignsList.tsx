@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Search, Plus, Filter, RefreshCw, Settings, BarChart3, Eye, Clock, Activity, CheckCircle, AlertTriangle, Users, Calendar } from 'lucide-react';
 import CampaignStateManager from '@/components/dashboard/CampaignStateManager';
+import CampaignActionButtons from '@/components/dashboard/CampaignActionButtons';
 import type { Campaign } from '@/types'; // Asumiendo que Campaign completa está en types
 
 interface CampaignsListProps {
@@ -24,34 +25,78 @@ export default function CampaignsList({ campaigns, onRefresh, loading, error, la
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const router = useRouter();
 
-  // 🔧 FUNCIÓN ESTABLE CON useCallback (SOLUCIÓN STALE CLOSURE):
+  // 🔧 FIX STALE CLOSURE: Remover async/await
   const handleCampaignUpdate = useCallback(() => {
     console.log('🔄 Refrescando datos después de cambio exitoso...');
     onRefresh();
     setSelectedCampaign(null);
   }, [onRefresh]);
 
+  // ✅ FUNCIÓN PARA ACTIVAR CAMPAÑA (Compatible con CampaignActionButtons)
+  const handleActivateCampaign = useCallback(async (campaignId: string, campaignName: string) => {
+    const confirmed = window.confirm(
+      `¿Activar la campaña "${campaignName}"?\n\nEsta acción enviará emails a participantes.`
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      console.log('🚀 Activando campaña:', campaignId);
+      
+      const token = localStorage.getItem('focalizahr_token');
+      const response = await fetch(`/api/campaigns/${campaignId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          toStatus: 'active',
+          action: 'activate' 
+        })
+      });
+
+      if (response.ok) {
+        console.log('✅ Campaña activada exitosamente');
+        // 🎯 SOLUCIÓN: onRefresh() automático para actualizar UI
+        onRefresh();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al activar campaña');
+      }
+      
+    } catch (error) {
+      console.error('Error:', error);
+      alert(`Error al activar campaña: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
+  }, [onRefresh]);
+
+  // ✅ FUNCIÓN PARA OTRAS ACCIONES (Compatible con CampaignActionButtons)
+  const handleCampaignAction = useCallback(async (campaignId: string, action: string, campaignName: string) => {
+    console.log('🎯 Acción:', action, 'para campaña:', campaignName);
+    
+    switch (action) {
+      case 'monitor':
+        router.push(`/dashboard/campaigns/${campaignId}/monitor`);
+        break;
+      case 'view-results':
+        router.push(`/dashboard/campaigns/${campaignId}/results`);
+        break;
+      case 'preview-results':
+        router.push(`/dashboard/campaigns/${campaignId}/preview-results`);
+        break;
+      default:
+        console.log(`Acción "${action}" para "${campaignName}"`);
+    }
+  }, [router]);
+
   const filteredCampaigns = campaigns.filter(campaign =>
     (filter === 'all' || campaign.status === filter) &&
     (campaign.name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const getStatusBadge = (status: string) => {
-    const config = {
-      draft: { label: 'Borrador', variant: 'secondary' as const, icon: Clock },
-      active: { label: 'Activa', variant: 'default' as const, icon: Activity },
-      completed: { label: 'Completada', variant: 'outline' as const, icon: CheckCircle },
-      cancelled: { label: 'Cancelada', variant: 'destructive' as const, icon: AlertTriangle }
-    };
-    const statusConfig = config[status as keyof typeof config] || config.draft;
-    const Icon = statusConfig.icon;
-    return (
-      <Badge variant={statusConfig.variant} className="flex items-center gap-1">
-        <Icon className="h-3 w-3" />
-        {statusConfig.label}
-      </Badge>
-    );
-  };
+  // ❌ FUNCIÓN ELIMINADA - CampaignActionButtons maneja badges
+  // const getStatusBadge = (status: string) => { ... }
 
   return (
     <div className="space-y-4">
@@ -116,35 +161,48 @@ export default function CampaignsList({ campaigns, onRefresh, loading, error, la
             ) : (
               filteredCampaigns.map((campaign) => (
                 <Card key={campaign.id} className="professional-card-nested hover:shadow-md transition-shadow">
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-semibold">{campaign.name}</h3>
-                        {getStatusBadge(campaign.status)}
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="font-semibold">{campaign.name}</h3>
+                          {/* ❌ BADGE ELIMINADO - CampaignActionButtons lo maneja */}
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            {campaign.totalInvited} participantes
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <BarChart3 className="h-3 w-3" />
+                            {campaign.participationRate}% participación
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(campaign.startDate).toLocaleDateString()}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Users className="h-3 w-3" />
-                          {campaign.totalInvited} participantes
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <BarChart3 className="h-3 w-3" />
-                          {campaign.participationRate}% participación
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(campaign.startDate).toLocaleDateString()}
-                        </span>
+                      
+                      {/* 🎯 CAMBIO PRINCIPAL: Usar CampaignActionButtons + Modal complementario */}
+                      <div className="flex items-center gap-2">
+                        <CampaignActionButtons
+                          campaign={campaign}
+                          onActivateCampaign={handleActivateCampaign}
+                          onCampaignAction={handleCampaignAction}
+                        />
+                        
+                        {/* Modal complementario para casos especiales */}
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => setSelectedCampaign(campaign)}
+                          title="Gestionar estado avanzado"
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={() => setSelectedCampaign(campaign)}
-                    >
-                      <Settings className="h-4 w-4 mr-2" />
-                      Gestionar
-                    </Button>
                   </CardContent>
                 </Card>
               ))
@@ -153,6 +211,7 @@ export default function CampaignsList({ campaigns, onRefresh, loading, error, la
         </CardContent>
       </Card>
 
+      {/* Modal para gestión avanzada (preservado) */}
       <Dialog open={!!selectedCampaign} onOpenChange={() => setSelectedCampaign(null)}>
         <DialogContent className="professional-dialog max-w-4xl">
           <DialogHeader>
