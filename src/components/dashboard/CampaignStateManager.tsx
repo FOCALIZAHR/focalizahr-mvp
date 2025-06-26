@@ -103,7 +103,7 @@ const ConfirmationModal: React.FC<{
           <Button
             variant={transition.buttonVariant}
             onClick={onConfirm}
-            disabled={isTransitioning || validationErrors.length > 0}
+            disabled={isTransitioning} // Solo disabled durante transición
             className="flex-1"
           >
             {isTransitioning ? (
@@ -124,12 +124,12 @@ const ConfirmationModal: React.FC<{
 // ✅ PROPS SIMPLIFICADAS CON CONTEXT
 interface CampaignStateManagerProps {
   campaign: Campaign;
-  onClose?: () => void;
+  onCampaignUpdate?: () => void;
 }
 
 const CampaignStateManager: React.FC<CampaignStateManagerProps> = ({
   campaign,
-  onClose
+  onCampaignUpdate
 }) => {
   // ✅ CONTEXT API INTEGRATION
   const { fetchCampaigns } = useCampaignsContext();
@@ -142,13 +142,9 @@ const CampaignStateManager: React.FC<CampaignStateManagerProps> = ({
     getPossibleTransitions, 
     getStatusConfig,
     validateTransition 
-  } = useCampaignState({ 
-    onSuccess: async () => {
-      toast.success('Estado actualizado con éxito.');
-      await fetchCampaigns();
-      if (onClose) onClose();
-    }
-  });
+ } = useCampaignState({ 
+  onSuccess: onCampaignUpdate
+});
 
   const [showConfirmation, setShowConfirmation] = useState<StateTransition | null>(null);
 
@@ -308,7 +304,7 @@ const CampaignStateManager: React.FC<CampaignStateManagerProps> = ({
           campaign={campaign}
           onConfirm={handleConfirmAction}
           onCancel={() => setShowConfirmation(null)}
-          isTransitioning={isTransitioning}
+          disabled={isTransitioning}
           validationErrors={validateTransition(campaign, showConfirmation).errors}
         />
       )}

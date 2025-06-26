@@ -69,9 +69,9 @@ export const useCampaignState = ({ onSuccess }: UseCampaignStateProps = {}) => {
 
   // EJECUCIÓN DE TRANSICIÓN CON VALIDACIÓN COMPLETA
   const executeTransition = useCallback(async (
-    campaign: CampaignForState, 
-    transition: StateTransition
-  ): Promise<boolean> => {
+  campaignId: string, 
+  transition: StateTransition
+): Promise<boolean> => {
     setIsTransitioning(true);
     setTransitionError(null);
 
@@ -82,7 +82,7 @@ export const useCampaignState = ({ onSuccess }: UseCampaignStateProps = {}) => {
         throw new Error(validationErrors.join('. '));
       }
 
-      const response = await fetch(`/api/campaigns/${campaign.id}/transition`, {
+      const response = await fetch(`/api/campaigns/${campaignId}/transition`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -99,18 +99,26 @@ export const useCampaignState = ({ onSuccess }: UseCampaignStateProps = {}) => {
       }
 
       // Ejecutar callback de éxito si existe
-      if (onSuccess) {
-        onSuccess();
-      }
-
-      return true;
+       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       setTransitionError(errorMessage);
       return false;
     } finally {
       setIsTransitioning(false);
+      
+      // Ejecutar callback de éxito DESPUÉS de resetear estado
+      if (onSuccess) {
+        try {
+          onSuccess();
+        } catch (callbackError) {
+          console.error('Error en onSuccess callback:', callbackError);
+        }
+      }
     }
+
+// ESTO GARANTIZA que isTransitioning SIEMPRE se resetee
+// Sin importar si onSuccess funciona o falla
   }, [onSuccess, validateTransition]);
 
   // TRANSICIONES DISPONIBLES - LÓGICA CORREGIDA
