@@ -1,3 +1,6 @@
+// ✅ SOLUCIÓN GEMINI APLICADA AL ARCHIVO CORRECTO
+// COPY-PASTE ESTE CÓDIGO COMPLETO EN: src/components/dashboard/CampaignStateManager.tsx
+
 'use client';
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -5,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCampaignsContext } from '@/context/CampaignsContext';
-import { useCampaignState, StateTransition, CampaignForState } from '@/hooks/useCampaignState';
+import { useCampaignState, StateTransition } from '@/hooks/useCampaignState';
 import { toast } from 'sonner';
 import {
   Play,
@@ -28,7 +31,7 @@ import type { Campaign } from '@/types';
 // ✅ MODAL DE CONFIRMACIÓN MEJORADO
 const ConfirmationModal: React.FC<{
   transition: StateTransition;
-  campaign: CampaignForState;
+  campaign: Campaign;
   onConfirm: () => void;
   onCancel: () => void;
   isTransitioning: boolean;
@@ -103,7 +106,7 @@ const ConfirmationModal: React.FC<{
           <Button
             variant={transition.buttonVariant}
             onClick={onConfirm}
-            disabled={isTransitioning} // Solo disabled durante transición
+            disabled={isTransitioning || validationErrors.length > 0}
             className="flex-1"
           >
             {isTransitioning ? (
@@ -121,20 +124,22 @@ const ConfirmationModal: React.FC<{
   );
 };
 
-// ✅ PROPS SIMPLIFICADAS CON CONTEXT
+// ✅ INTERFACE CORREGIDA - SOLUCIÓN GEMINI EXACTA
 interface CampaignStateManagerProps {
   campaign: Campaign;
-  onCampaignUpdate?: () => void;
+  onClose?: () => void;
+  onCampaignUpdate?: () => void; // ← ESTA ES LA LÍNEA QUE GEMINI DIAGNOSTICÓ QUE FALTABA!
 }
 
 const CampaignStateManager: React.FC<CampaignStateManagerProps> = ({
   campaign,
-  onCampaignUpdate
+  onClose,
+  onCampaignUpdate // ✅ RECIBIR EL CALLBACK DE CampaignsList
 }) => {
   // ✅ CONTEXT API INTEGRATION
   const { fetchCampaigns } = useCampaignsContext();
   
-  // ✅ HOOK CON LÓGICA CORREGIDA
+  // ✅ HOOK CON SOLUCIÓN GEMINI APLICADA
   const { 
     isTransitioning, 
     transitionError, 
@@ -142,9 +147,22 @@ const CampaignStateManager: React.FC<CampaignStateManagerProps> = ({
     getPossibleTransitions, 
     getStatusConfig,
     validateTransition 
- } = useCampaignState({ 
-  onSuccess: onCampaignUpdate
-});
+  } = useCampaignState({ 
+    onSuccess: async () => {
+      toast.success('Estado actualizado con éxito.');
+      
+      // ✅ SOLUCIÓN GEMINI: Usar onCampaignUpdate estabilizado con useCallback
+      if (onCampaignUpdate) {
+        console.log('🔄 Usando handleCampaignUpdate estabilizado de CampaignsList');
+        onCampaignUpdate(); // ← ESTA LÍNEA EJECUTA EL CALLBACK CORRECTO
+      } else {
+        console.log('🔄 Fallback: usando fetchCampaigns del contexto');
+        await fetchCampaigns();
+      }
+      
+      if (onClose) onClose();
+    }
+  });
 
   const [showConfirmation, setShowConfirmation] = useState<StateTransition | null>(null);
 
@@ -155,25 +173,28 @@ const CampaignStateManager: React.FC<CampaignStateManagerProps> = ({
   // ✅ TRANSICIONES POSIBLES CON VALIDACIÓN
   const possibleTransitions = getPossibleTransitions(campaign.status);
 
-  // ✅ MANEJAR CONFIRMACIÓN CON VALIDACIÓN
+  // ✅ MANEJAR CONFIRMACIÓN CON VALIDACIÓN CORREGIDA
   const handleActionClick = async (transition: StateTransition) => {
     const validation = validateTransition(campaign, transition);
     
     if (transition.requiresConfirmation) {
       setShowConfirmation(transition);
     } else {
+      console.log('✅ Executing transition with campaignId:', campaign.id);
       await executeTransition(campaign.id, transition);
     }
   };
 
   const handleConfirmAction = async () => {
     if (!showConfirmation) return;
+    console.log('✅ Confirming transition with campaignId:', campaign.id);
     await executeTransition(campaign.id, showConfirmation);
     setShowConfirmation(null);
   };
+
   return (
     <div className="space-y-4">
-      {/* ✅ MINICARD ESTADO ACTUAL - TU IDEA IMPLEMENTADA */}
+      {/* ✅ MINICARD ESTADO ACTUAL */}
       <Card className={`${statusConfig.bgColor} border-2`}>
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-3">
@@ -203,7 +224,7 @@ const CampaignStateManager: React.FC<CampaignStateManagerProps> = ({
                 <div className="space-y-1 text-xs text-green-700">
                   <div className="flex items-center gap-1">
                     <Users className="h-3 w-3" />
-                    <span>{campaign.totalResponded}/{campaign.totalInvited} respuestas</span>
+                    <span>{campaign.totalResponded || 0}/{campaign.totalInvited || 0} respuestas</span>
                   </div>
                   {campaign.daysRemaining !== undefined && (
                     <div className="flex items-center gap-1">
@@ -217,27 +238,17 @@ const CampaignStateManager: React.FC<CampaignStateManagerProps> = ({
 
             {campaign.status === 'draft' && (
               <div className="text-right text-xs text-yellow-700">
-                {campaign.totalInvited >= 5 ? (
+                {(campaign.totalInvited || 0) >= 5 ? (
                   <div className="flex items-center gap-1 text-green-700">
                     <CheckCircle className="h-3 w-3" />
                     <span>Lista para activar</span>
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    <div>Faltan {5 - campaign.totalInvited} participantes</div>
+                    <div>Faltan {5 - (campaign.totalInvited || 0)} participantes</div>
                     <div className="text-yellow-600">Mínimo: 5 participantes</div>
                   </div>
                 )}
-              </div>
-            )}
-
-            {campaign.status === 'completed' && (
-              <div className="text-right text-xs text-blue-700">
-                <div className="flex items-center gap-1 mb-1">
-                  <BarChart3 className="h-3 w-3" />
-                  <span>Resultados disponibles</span>
-                </div>
-                <div>{campaign.participationRate}% participación final</div>
               </div>
             )}
           </div>
@@ -252,8 +263,20 @@ const CampaignStateManager: React.FC<CampaignStateManagerProps> = ({
         </Alert>
       )}
 
+      {/* ✅ MODAL DE CONFIRMACIÓN */}
+      {showConfirmation && (
+        <ConfirmationModal
+          transition={showConfirmation}
+          campaign={campaign}
+          onConfirm={handleConfirmAction}
+          onCancel={() => setShowConfirmation(null)}
+          isTransitioning={isTransitioning}
+          validationErrors={validateTransition(campaign, showConfirmation)}
+        />
+      )}
+
       {/* ✅ ACCIONES DISPONIBLES CON VALIDACIÓN */}
-      {possibleTransitions.length > 0 && (
+      {possibleTransitions.length > 0 && !showConfirmation && (
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium">Acciones Disponibles</CardTitle>
@@ -270,25 +293,30 @@ const CampaignStateManager: React.FC<CampaignStateManagerProps> = ({
                       variant={transition.buttonVariant}
                       className="w-full justify-start"
                       onClick={() => handleActionClick(transition)}
-                      disabled={isTransitioning || !validation.valid}
+                      disabled={isTransitioning || validation.length > 0}
                     >
                       <ButtonIcon className="h-4 w-4 mr-2" />
                       <span>{transition.buttonText}</span>
                     </Button>
                     
                     {/* ✅ MOSTRAR ERRORES DE VALIDACIÓN */}
-                    {!validation.valid && validation.errors && validation.errors.length > 0 && (
-                       <Alert variant="destructive" className="text-xs">
-                        <AlertTriangle className="h-3 w-3" />
+                    {validation.length > 0 && (
+                      <Alert variant="destructive" className="mt-2">
+                        <AlertTriangle className="h-4 w-4" />
                         <AlertDescription>
-                          <ul className="space-y-1">
-                            {validation.errors.map((error, index) => (
+                          <ul className="text-xs space-y-1">
+                            {validation.map((error, index) => (
                               <li key={index}>• {error}</li>
                             ))}
                           </ul>
                         </AlertDescription>
                       </Alert>
                     )}
+
+                    {/* ✅ INFORMACIÓN ADICIONAL */}
+                    <p className="text-xs text-muted-foreground px-2">
+                      {transition.description}
+                    </p>
                   </div>
                 );
               })}
@@ -297,16 +325,16 @@ const CampaignStateManager: React.FC<CampaignStateManagerProps> = ({
         </Card>
       )}
 
-      {/* ✅ MODAL DE CONFIRMACIÓN CON VALIDACIÓN */}
-      {showConfirmation && (
-        <ConfirmationModal
-          transition={showConfirmation}
-          campaign={campaign}
-          onConfirm={handleConfirmAction}
-          onCancel={() => setShowConfirmation(null)}
-          disabled={isTransitioning}
-          validationErrors={validateTransition(campaign, showConfirmation).errors}
-        />
+      {/* ✅ SIN ACCIONES DISPONIBLES */}
+      {possibleTransitions.length === 0 && (
+        <Card>
+          <CardContent className="p-4 text-center">
+            <Shield className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">
+              No hay acciones disponibles para el estado actual.
+            </p>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

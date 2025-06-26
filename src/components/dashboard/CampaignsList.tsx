@@ -9,28 +9,31 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Search, Plus, Filter, RefreshCw, Settings, BarChart3, Eye, Clock, Activity, CheckCircle, AlertTriangle, Users, Calendar } from 'lucide-react';
 import CampaignStateManager from '@/components/dashboard/CampaignStateManager';
 import CampaignActionButtons from '@/components/dashboard/CampaignActionButtons';
+import { useCampaignsContext } from '@/context/CampaignsContext';
 import type { Campaign } from '@/types';
 
 interface CampaignsListProps {
   campaigns: Campaign[];
-  onRefresh: () => void;
   loading: boolean;
   error: string | null;
   lastUpdated: Date | null;
 }
 
-export default function CampaignsList({ campaigns, onRefresh, loading, error, lastUpdated }: CampaignsListProps) {
+export default function CampaignsList({ campaigns, loading, error, lastUpdated }: CampaignsListProps) {
   const [filter, setFilter] = useState<'all' | 'active' | 'draft' | 'completed' | 'cancelled'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const router = useRouter();
 
+  // ✅ USAR CONTEXT EN LUGAR DE PROPS
+  const { fetchCampaigns } = useCampaignsContext();
+
   // ✅ FUNCIÓN ESTABILIZADA - SOLUCIÓN STALE CLOSURE
   const handleCampaignUpdate = useCallback(() => {
     console.log('🔄 Refrescando datos después de cambio exitoso...');
-    onRefresh();
+    fetchCampaigns();
     setSelectedCampaign(null);
-  }, [onRefresh]);
+  }, [fetchCampaigns]);
 
   // ✅ FUNCIÓN PARA ACTIVAR CAMPAÑA (Compatible con CampaignActionButtons)
   const handleActivateCampaign = useCallback(async (campaignId: string, campaignName: string) => {
@@ -58,7 +61,7 @@ export default function CampaignsList({ campaigns, onRefresh, loading, error, la
 
       if (response.ok) {
         console.log('✅ Campaña activada exitosamente');
-        onRefresh(); // ← SOLUCIÓN STALE CLOSURE
+        fetchCampaigns(); // ← USAR fetchCampaigns del context
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al activar campaña');
@@ -68,7 +71,7 @@ export default function CampaignsList({ campaigns, onRefresh, loading, error, la
       console.error('Error:', error);
       alert(`Error al activar campaña: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
-  }, [onRefresh]);
+  }, [fetchCampaigns]);
 
   // ✅ NAVEGACIÓN INTELIGENTE
   const handleCampaignAction = useCallback((action: string, campaignId: string, campaign?: Campaign) => {
@@ -136,15 +139,13 @@ export default function CampaignsList({ campaigns, onRefresh, loading, error, la
               <Button 
                 size="sm" 
                 variant="outline"
-                onClick={onRefresh}
+                onClick={fetchCampaigns}
                 disabled={loading}
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                Actualizar
               </Button>
-              <Button 
-                size="sm"
-                onClick={() => router.push('/dashboard/campaigns/new')}
-              >
+              <Button size="sm" className="focus-ring">
                 <Plus className="h-4 w-4 mr-2" />
                 Nueva Campaña
               </Button>
@@ -152,38 +153,36 @@ export default function CampaignsList({ campaigns, onRefresh, loading, error, la
           </div>
         </CardHeader>
         <CardContent>
-          {/* Filtros */}
-          <div className="flex items-center gap-4 mb-6">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <select
-                value={filter}
-                onChange={(e) => setFilter(e.target.value as any)}
-                className="border rounded px-3 py-1 text-sm"
-              >
-                <option value="all">Todas</option>
-                <option value="draft">Borrador</option>
-                <option value="active">Activas</option>
-                <option value="completed">Completadas</option>
-                <option value="cancelled">Canceladas</option>
-              </select>
+          {/* Filtros y búsqueda */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar campañas..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
             </div>
-            <div className="flex-1 max-w-sm">
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar campañas..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
+            <div className="flex gap-2">
+              {['all', 'active', 'draft', 'completed', 'cancelled'].map((status) => (
+                <Button
+                  key={status}
+                  size="sm"
+                  variant={filter === status ? 'default' : 'outline'}
+                  onClick={() => setFilter(status as typeof filter)}
+                  className="capitalize"
+                >
+                  <Filter className="h-3 w-3 mr-1" />
+                  {status === 'all' ? 'Todas' : status}
+                </Button>
+              ))}
             </div>
           </div>
 
           {/* Lista de campañas */}
           <div className="space-y-3">
-            {loading && campaigns.length === 0 ? (
+            {loading ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
                 <p className="text-muted-foreground mt-2">Cargando campañas...</p>

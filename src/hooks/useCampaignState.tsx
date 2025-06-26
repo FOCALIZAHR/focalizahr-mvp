@@ -67,29 +67,27 @@ export const useCampaignState = ({ onSuccess }: UseCampaignStateProps = {}) => {
     return errors;
   }, []);
 
-  // EJECUCIÓN DE TRANSICIÓN CON VALIDACIÓN COMPLETA
+  // ✅ EJECUCIÓN DE TRANSICIÓN CORREGIDA - FIRMA DESACOPLADA + URL CORREGIDA
   const executeTransition = useCallback(async (
-  campaignId: string, 
-  transition: StateTransition
-): Promise<boolean> => {
+    campaignId: string, 
+    transition: StateTransition
+  ): Promise<boolean> => {
+    console.log('✅ executeTransition - campaignId received:', campaignId);
+    console.log('✅ executeTransition - transition action:', transition.action);
     setIsTransitioning(true);
     setTransitionError(null);
 
     try {
-      // Validar transición antes de ejecutar
-      const validationErrors = validateTransition(campaign, transition);
-      if (validationErrors.length > 0) {
-        throw new Error(validationErrors.join('. '));
-      }
-
-      const response = await fetch(`/api/campaigns/${campaignId}/transition`, {
-        method: 'POST',
+      // ✅ URL CORREGIDA: /status en lugar de /transition
+      const response = await fetch(`/api/campaigns/${campaignId}/status`, {
+        method: 'PUT', // ✅ MÉTODO CORREGIDO según el endpoint existente
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('focalizahr_token')}` // ✅ AUTH HEADER
         },
         body: JSON.stringify({
-          action: transition.action,
-          to: transition.to
+          toStatus: transition.to,  // ✅ PAYLOAD CORREGIDO según endpoint
+          action: transition.action
         }),
       });
 
@@ -99,27 +97,19 @@ export const useCampaignState = ({ onSuccess }: UseCampaignStateProps = {}) => {
       }
 
       // Ejecutar callback de éxito si existe
-       return true;
+      if (onSuccess) {
+        onSuccess();
+      }
+
+      return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       setTransitionError(errorMessage);
       return false;
     } finally {
       setIsTransitioning(false);
-      
-      // Ejecutar callback de éxito DESPUÉS de resetear estado
-      if (onSuccess) {
-        try {
-          onSuccess();
-        } catch (callbackError) {
-          console.error('Error en onSuccess callback:', callbackError);
-        }
-      }
     }
-
-// ESTO GARANTIZA que isTransitioning SIEMPRE se resetee
-// Sin importar si onSuccess funciona o falla
-  }, [onSuccess, validateTransition]);
+  }, [onSuccess]);
 
   // TRANSICIONES DISPONIBLES - LÓGICA CORREGIDA
   const getPossibleTransitions = useMemo(() => (status: string): StateTransition[] => {
