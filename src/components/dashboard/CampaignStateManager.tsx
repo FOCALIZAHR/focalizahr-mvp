@@ -210,56 +210,34 @@ const CampaignStateManager: React.FC<CampaignStateManagerProps> = ({
                     {statusConfig.text}
                   </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground">{statusConfig.description}</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {statusConfig.description}
+                </p>
               </div>
             </div>
+          </div>
 
-            {/* ✅ INDICADORES VISUALES CONTEXTUALES */}
-            {campaign.status === 'active' && (
-              <div className="text-right">
-                <div className="flex items-center gap-1 text-green-600 mb-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-xs font-medium">En vivo</span>
-                </div>
-                <div className="space-y-1 text-xs text-green-700">
-                  <div className="flex items-center gap-1">
-                    <Users className="h-3 w-3" />
-                    <span>{campaign.totalResponded || 0}/{campaign.totalInvited || 0} respuestas</span>
-                  </div>
-                  {campaign.daysRemaining !== undefined && (
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      <span>{campaign.daysRemaining > 0 ? `${campaign.daysRemaining} días restantes` : 'Expirada'}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {campaign.status === 'draft' && (
-              <div className="text-right text-xs text-yellow-700">
-                {(campaign.totalInvited || 0) >= 5 ? (
-                  <div className="flex items-center gap-1 text-green-700">
-                    <CheckCircle className="h-3 w-3" />
-                    <span>Lista para activar</span>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    <div>Faltan {5 - (campaign.totalInvited || 0)} participantes</div>
-                    <div className="text-yellow-600">Mínimo: 5 participantes</div>
-                  </div>
-                )}
-              </div>
-            )}
+          {/* ✅ INFORMACIÓN ADICIONAL DE LA CAMPAÑA */}
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <span><strong>{campaign.totalInvited}</strong> participantes</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <span><strong>{campaign.participationRate}%</strong> participación</span>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* ✅ ERROR DE TRANSICIÓN */}
+      {/* ✅ ERROR HANDLING */}
       {transitionError && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>{transitionError}</AlertDescription>
+          <AlertDescription>
+            <strong>Error al cambiar estado:</strong> {transitionError}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -275,63 +253,53 @@ const CampaignStateManager: React.FC<CampaignStateManagerProps> = ({
         />
       )}
 
-      {/* ✅ ACCIONES DISPONIBLES CON VALIDACIÓN */}
-      {possibleTransitions.length > 0 && !showConfirmation && (
+      {/* ✅ ACCIONES DISPONIBLES */}
+      {!showConfirmation && possibleTransitions.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Acciones Disponibles</CardTitle>
+            <CardTitle className="text-lg">Acciones Disponibles</CardTitle>
+            <CardDescription>
+              Selecciona una acción para cambiar el estado de la campaña
+            </CardDescription>
           </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="space-y-3">
-              {possibleTransitions.map((transition) => {
-                const validation = validateTransition(campaign, transition);
-                const ButtonIcon = transition.buttonIcon;
-                
-                return (
-                  <div key={transition.action} className="space-y-2">
-                    <Button
-                      variant={transition.buttonVariant}
-                      className="w-full justify-start"
-                      onClick={() => handleActionClick(transition)}
-                      disabled={isTransitioning || validation.length > 0}
-                    >
-                      <ButtonIcon className="h-4 w-4 mr-2" />
-                      <span>{transition.buttonText}</span>
-                    </Button>
-                    
-                    {/* ✅ MOSTRAR ERRORES DE VALIDACIÓN */}
-                    {validation.length > 0 && (
-                      <Alert variant="destructive" className="mt-2">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertDescription>
-                          <ul className="text-xs space-y-1">
-                            {validation.map((error, index) => (
-                              <li key={index}>• {error}</li>
-                            ))}
-                          </ul>
-                        </AlertDescription>
-                      </Alert>
-                    )}
-
-                    {/* ✅ INFORMACIÓN ADICIONAL */}
-                    <p className="text-xs text-muted-foreground px-2">
-                      {transition.description}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
+          <CardContent className="space-y-3">
+            {possibleTransitions.map((transition) => {
+              const TransitionIcon = transition.buttonIcon;
+              const validationErrors = validateTransition(campaign, transition);
+              const isValid = validationErrors.length === 0;
+              
+              return (
+                <div key={`${transition.from}-${transition.to}`} className="space-y-2">
+                  <Button
+                    variant={transition.buttonVariant}
+                    className="w-full justify-start"
+                    onClick={() => handleActionClick(transition)}
+                    disabled={isTransitioning || !isValid}
+                  >
+                    <TransitionIcon className="h-4 w-4 mr-2" />
+                    {transition.buttonText}
+                  </Button>
+                  
+                  {!isValid && (
+                    <div className="text-xs text-muted-foreground ml-6">
+                      Requisitos: {validationErrors.join(', ')}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       )}
 
       {/* ✅ SIN ACCIONES DISPONIBLES */}
-      {possibleTransitions.length === 0 && (
+      {!showConfirmation && possibleTransitions.length === 0 && (
         <Card>
-          <CardContent className="p-4 text-center">
-            <Shield className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+          <CardContent className="p-6 text-center">
+            <Shield className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+            <h3 className="font-medium mb-2">No hay acciones disponibles</h3>
             <p className="text-sm text-muted-foreground">
-              No hay acciones disponibles para el estado actual.
+              Esta campaña está en un estado final y no puede ser modificada.
             </p>
           </CardContent>
         </Card>

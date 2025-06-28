@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import type { Campaign } from '@/types';
 
 interface CampaignsContextType {
@@ -13,7 +13,7 @@ const CampaignsContext = createContext<CampaignsContextType | undefined>(undefin
 
 export const CampaignsProvider = ({ children }: { children: ReactNode }) => {
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);  // ← false inicialmente, no true
     const [error, setError] = useState<string | null>(null);
 
     const fetchCampaigns = useCallback(async () => {
@@ -42,10 +42,7 @@ export const CampaignsProvider = ({ children }: { children: ReactNode }) => {
         }
     }, []);
 
-    useEffect(() => {
-        // Carga inicial de las campañas cuando el proveedor se monta
-        fetchCampaigns();
-    }, [fetchCampaigns]);
+    // ❌ SIN useEffect automático - carga manual controlada
 
     return (
         <CampaignsContext.Provider value={{ campaigns, isLoading, error, fetchCampaigns }}>

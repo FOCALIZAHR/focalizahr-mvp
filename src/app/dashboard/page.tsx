@@ -4,42 +4,32 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated } from '@/lib/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { 
   BarChart3, 
   Users, 
   Activity, 
   TrendingUp, 
-  Search, 
   Plus,
-  Eye,
-  Play,
-  CheckCircle,
-  Clock,
-  Filter,
-  RefreshCw,
-  AlertTriangle,
   Bell,
   Calendar,
   Target,
   Zap,
   Shield,
-  Award
+  Award,
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import DashboardNavigation from '@/components/dashboard/DashboardNavigation';
-import CampaignActionButtons from '@/components/dashboard/CampaignActionButtons';
-import { useCampaigns, useMetrics } from '@/hooks';
+import { useMetrics } from '@/hooks';
 import useAlerts from '@/hooks/useAlerts';
 import MetricsCards from '@/components/dashboard/MetricsCards';
 import AlertsPanel from '@/components/dashboard/AlertsPanel';
 import CampaignsList from '@/components/dashboard/CampaignsList';
-import './dashboard.css'; // Solo estilos de layout
+import './dashboard.css';
 
-// Tipos básicos (MANTENIDOS EXACTOS)
+// ✅ TIPOS MÉTRICAS (Responsabilidad Dashboard Principal)
 interface DashboardMetrics {
   totalCampaigns: number;
   activeCampaigns: number;
@@ -49,35 +39,11 @@ interface DashboardMetrics {
   globalParticipationRate: number;
   totalResponses: number;
   totalParticipants: number;
-  recentResponses?: number; // Puede no haber respuestas recientes
-  
-  // Estos campos pueden ser nulos o no existir, por eso llevan '?'
+  recentResponses?: number;
   weeklyGrowth?: number;
   monthlyGrowth?: number;
   averageCompletionTime?: number | null;
   topPerformingCampaign?: string | null;
-}
-
-interface Campaign {
-  id: string;
-  name: string;
-  status: 'draft' | 'active' | 'completed' | 'cancelled';
-  campaignType: {
-    name: string;
-    slug: string;
-  };
-  totalInvited: number;
-  totalResponded: number;
-  participationRate: number;
-  startDate: string;
-  endDate: string;
-  canActivate?: boolean;
-  canViewResults?: boolean;
-  isOverdue?: boolean;
-  daysRemaining?: number;
-  riskLevel?: 'low' | 'medium' | 'high';
-  lastActivity?: string;
-  completionTrend?: 'up' | 'down' | 'stable';
 }
 
 interface Alert {
@@ -89,19 +55,19 @@ interface Alert {
   campaignId?: string;
 }
 
-// Todos los hooks y componentes ahora son externos - archivo limpio como orquestador
-
-// Componente Principal del Dashboard (🔥 ACTUALIZADO CON NAVEGACIÓN)
+// ✅ DASHBOARD PRINCIPAL - ARQUITECTURA v3.0
 export default function DashboardPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
-  // Hooks para datos del dashboard - ahora externos
+  // ✅ SEPARACIÓN RESPONSABILIDADES CLARA - SOLO MÉTRICAS
   const { metrics, loading: metricsLoading, error: metricsError, lastUpdated, refetch: refetchMetrics } = useMetrics();
-  const { campaigns, loading: campaignsLoading, error: campaignsError, refetch: refetchCampaigns } = useCampaigns();
-  const { alerts } = useAlerts(campaigns || []);
+  
+  // ✅ ALERTAS SIN CAMPAIGNS - EVITA LOOP INFINITO
+  const { alerts } = useAlerts([]);
 
+  // ✅ AUTENTICACIÓN Y MONTAJE
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push('/');
@@ -110,88 +76,273 @@ export default function DashboardPage() {
     setMounted(true);
   }, [router]);
 
+  // ✅ LOADING STATE
   if (!mounted) {
     return (
-      <div className="min-h-screen layout-center">
-        <div className="layout-column items-center layout-gap-4">
-          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-lg font-medium mt-4">Cargando dashboard...</span>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <span className="text-xl font-medium text-white">Cargando FocalizaHR...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* 🔥 NAVEGACIÓN INTEGRADA */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+      {/* ✅ NAVEGACIÓN INTEGRADA */}
       <DashboardNavigation 
         showMobileMenu={showMobileMenu}
         onMobileMenuToggle={() => setShowMobileMenu(!showMobileMenu)}
       />
       
-      {/* 🔥 CONTENIDO PRINCIPAL CON OFFSET PARA NAVEGACIÓN */}
-      <div className="lg:ml-64">
-        <div className="neural-dashboard main-layout min-h-screen">      
-          <div className="container mx-auto px-4 py-8 space-y-8 relative z-10">
-            {/* Header */}
-            <div className="layout-between">
+      {/* ✅ CONTENIDO PRINCIPAL */}
+      <div className="main-layout">
+        <div className="container mx-auto px-4 py-8">
+          
+          {/* ✅ HEADER DASHBOARD */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-4xl font-bold focalizahr-gradient-text">
-                  Dashboard FocalizaHR
+                <h1 className="text-3xl font-bold focalizahr-gradient-text mb-2">
+                  Dashboard Principal
                 </h1>
-                <p className="text-muted-foreground mt-2 flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-primary" />
-                  Inteligencia organizacional en tiempo real
+                <p className="text-white/60">
+                  Gestiona y monitorea tus mediciones organizacionales
                 </p>
               </div>
               
-              <div className="flex items-center gap-4">
-                <Card className="glass-card">
-                  <CardContent className="status-widget-layout p-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="font-medium">Sistema Activo</span>
-                    </div>
-                    <Separator orientation="vertical" className="h-4" />
-                    <span className="text-muted-foreground">{new Date().toLocaleDateString()}</span>
-                  </CardContent>
-                </Card>
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={refetchMetrics}
+                  disabled={metricsLoading}
+                  className="border-white/20 text-white hover:bg-white/10"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${metricsLoading ? 'animate-spin' : ''}`} />
+                  Actualizar
+                </Button>
                 
                 <Button 
                   size="sm"
-                  variant="outline"
-                  onClick={() => router.push('/dashboard/settings')}
-                  className="focus-ring hidden lg:flex"
+                  onClick={() => router.push('/dashboard/campaigns/new')}
+                  className="btn-gradient focus-ring"
                 >
-                  Configuración
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nueva Campaña
                 </Button>
               </div>
             </div>
+            
+            {/* ✅ INFORMACIÓN ÚLTIMA ACTUALIZACIÓN */}
+            {lastUpdated && (
+              <div className="mt-3 text-sm text-white/40">
+                Última actualización: {lastUpdated.toLocaleString()}
+              </div>
+            )}
+          </div>
 
-            {/* Métricas Cards */}
-            <MetricsCards metrics={metrics} loading={metricsLoading} error={metricsError} lastUpdated={lastUpdated} />
+          {/* ✅ ERROR STATE MÉTRICAS */}
+          {metricsError && (
+            <Alert className="mb-8 bg-red-500/10 border-red-500/20">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="text-red-200">
+                Error al cargar métricas: {metricsError}
+              </AlertDescription>
+            </Alert>
+          )}
 
-            {/* Alertas */}
-            <AlertsPanel alerts={alerts} />
+          {/* ✅ MÉTRICAS PRINCIPALES - RESPONSABILIDAD DASHBOARD */}
+          <div className="mb-8">
+            <MetricsCards 
+              metrics={metrics}
+              loading={metricsLoading}
+              error={metricsError}
+            />
+          </div>
 
-            {/* Separador */}
-            <div className="separator-layout bg-border"></div>
+          {/* ✅ LAYOUT PRINCIPAL - GRID RESPONSIVO */}
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+            
+            {/* ✅ SECCIÓN PRINCIPAL - GESTIÓN CAMPAÑAS */}
+            <div className="xl:col-span-3 space-y-6">
+              
+              {/* ✅ PANEL ALERTAS - SIN CAMPAIGNS PARA EVITAR LOOP */}
+              {alerts && alerts.length > 0 && (
+                <AlertsPanel alerts={alerts} />
+              )}
 
-            {/* Lista de Campañas */}
-            <CampaignsList campaigns={campaigns} loading={campaignsLoading} error={campaignsError} onRefresh={refetchCampaigns} />
+              {/* ✅ LISTA CAMPAÑAS - COMPONENTE AUTÓNOMO v3.0 SIN PROPS */}
+              <CampaignsList />
+              
+            </div>
 
-            {/* Footer del Dashboard */}
-            <Card className="glass-card">
-              <CardContent className="layout-center p-4">
-                <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
-                  <span>© {new Date().getFullYear()} FocalizaHR</span>
-                  <Separator orientation="vertical" className="h-3" />
-                  <span>Versión 1.0.0</span>
-                  <Separator orientation="vertical" className="h-3" />
-                  <span>Inteligencia Organizacional</span>
-                </div>
-              </CardContent>
-            </Card>
+            {/* ✅ SIDEBAR DERECHA - INSIGHTS Y ACCESOS RÁPIDOS */}
+            <div className="xl:col-span-1 space-y-6">
+              
+              {/* ✅ ACCESOS RÁPIDOS */}
+              <Card className="professional-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-white">
+                    <Zap className="h-5 w-5" />
+                    Accesos Rápidos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start border-white/20 text-white hover:bg-white/10"
+                    onClick={() => router.push('/dashboard/campaigns/new')}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nueva Medición
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start border-white/20 text-white hover:bg-white/10"
+                    onClick={() => router.push('/dashboard/admin/participants')}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Cargar Participantes
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start border-white/20 text-white hover:bg-white/10"
+                    onClick={() => router.push('/dashboard/analytics')}
+                  >
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Ver Analytics
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start border-white/20 text-white hover:bg-white/10"
+                    onClick={() => router.push('/dashboard/reports')}
+                  >
+                    <Target className="h-4 w-4 mr-2" />
+                    Generar Reportes
+                  </Button>
+                  
+                </CardContent>
+              </Card>
+
+              {/* ✅ INSIGHTS RÁPIDOS */}
+              <Card className="professional-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-white">
+                    <Award className="h-5 w-5" />
+                    Insights Destacados
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  
+                  {metrics && (
+                    <>
+                      {/* Participación Global */}
+                      <div className="p-3 bg-white/5 rounded-lg">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-white/70">Participación Global</span>
+                          <span className={`text-sm font-medium ${
+                            metrics.globalParticipationRate >= 70 ? 'text-green-400' :
+                            metrics.globalParticipationRate >= 50 ? 'text-yellow-400' :
+                            'text-red-400'
+                          }`}>
+                            {metrics.globalParticipationRate?.toFixed(1) || 0}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-white/10 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              metrics.globalParticipationRate >= 70 ? 'bg-green-400' :
+                              metrics.globalParticipationRate >= 50 ? 'bg-yellow-400' :
+                              'bg-red-400'
+                            }`}
+                            style={{ width: `${metrics.globalParticipationRate || 0}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Actividad Reciente */}
+                      {metrics.recentResponses !== undefined && (
+                        <div className="p-3 bg-white/5 rounded-lg">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Activity className="h-4 w-4 text-cyan-400" />
+                            <span className="text-sm text-white/70">Últimas 24h</span>
+                          </div>
+                          <div className="text-lg font-semibold text-white">
+                            {metrics.recentResponses} respuestas
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Crecimiento */}
+                      {metrics.weeklyGrowth !== undefined && (
+                        <div className="p-3 bg-white/5 rounded-lg">
+                          <div className="flex items-center gap-2 mb-1">
+                            <TrendingUp className="h-4 w-4 text-green-400" />
+                            <span className="text-sm text-white/70">Crecimiento Semanal</span>
+                          </div>
+                          <div className={`text-lg font-semibold ${
+                            metrics.weeklyGrowth >= 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {metrics.weeklyGrowth >= 0 ? '+' : ''}{metrics.weeklyGrowth}%
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* Recordatorio */}
+                  <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Shield className="h-4 w-4 text-cyan-400" />
+                      <span className="text-sm font-medium text-cyan-400">Tip del Día</span>
+                    </div>
+                    <p className="text-xs text-white/70">
+                      Mantén una participación &gt;70% para obtener insights más precisos y valiosos.
+                    </p>
+                  </div>
+                  
+                </CardContent>
+              </Card>
+
+              {/* ✅ CALENDARIO RÁPIDO */}
+              <Card className="professional-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-white">
+                    <Calendar className="h-5 w-5" />
+                    Próximas Fechas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex items-center justify-between p-2 bg-white/5 rounded">
+                      <span className="text-white/70">Campañas activas</span>
+                      <span className="font-medium text-white">{metrics?.activeCampaigns || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-white/5 rounded">
+                      <span className="text-white/70">Por completar</span>
+                      <span className="font-medium text-cyan-400">{metrics?.draftCampaigns || 0}</span>
+                    </div>
+                    <div className="text-center pt-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="w-full border-white/20 text-white hover:bg-white/10"
+                        onClick={() => router.push('/dashboard/calendar')}
+                      >
+                        Ver Calendario Completo
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+            </div>
           </div>
         </div>
       </div>

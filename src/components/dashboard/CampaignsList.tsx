@@ -12,21 +12,15 @@ import CampaignActionButtons from '@/components/dashboard/CampaignActionButtons'
 import { useCampaignsContext } from '@/context/CampaignsContext';
 import type { Campaign } from '@/types';
 
-interface CampaignsListProps {
-  campaigns: Campaign[];
-  loading: boolean;
-  error: string | null;
-  lastUpdated: Date | null;
-}
-
-export default function CampaignsList({ campaigns, loading, error, lastUpdated }: CampaignsListProps) {
+// ✅ ELIMINAR PROPS - SOLO CONTEXT
+export default function CampaignsList() {
   const [filter, setFilter] = useState<'all' | 'active' | 'draft' | 'completed' | 'cancelled'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const router = useRouter();
 
-  // ✅ USAR CONTEXT EN LUGAR DE PROPS
-  const { fetchCampaigns } = useCampaignsContext();
+  // ✅ USAR CONTEXT ÚNICAMENTE
+  const { campaigns, isLoading: loading, error, fetchCampaigns } = useCampaignsContext();
 
   // ✅ FUNCIÓN ESTABILIZADA - SOLUCIÓN STALE CLOSURE
   const handleCampaignUpdate = useCallback(() => {
@@ -145,36 +139,42 @@ export default function CampaignsList({ campaigns, loading, error, lastUpdated }
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 Actualizar
               </Button>
-              <Button size="sm" className="focus-ring">
-                <Plus className="h-4 w-4 mr-2" />
+              <Button size="sm" onClick={() => router.push('/dashboard/campaigns/new')}>
+                <Plus className="h-4 w-4 mr-1" />
                 Nueva Campaña
               </Button>
             </div>
           </div>
         </CardHeader>
+        
         <CardContent>
-          {/* Filtros y búsqueda */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar campañas..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+          {/* Controles de filtrado */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar campañas..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
             </div>
-            <div className="flex gap-2">
-              {['all', 'active', 'draft', 'completed', 'cancelled'].map((status) => (
+            
+            <div className="flex gap-2 flex-wrap">
+              {(['all', 'active', 'draft', 'completed', 'cancelled'] as const).map((status) => (
                 <Button
                   key={status}
                   size="sm"
                   variant={filter === status ? 'default' : 'outline'}
-                  onClick={() => setFilter(status as typeof filter)}
+                  onClick={() => setFilter(status)}
                   className="capitalize"
                 >
-                  <Filter className="h-3 w-3 mr-1" />
-                  {status === 'all' ? 'Todas' : status}
+                  {status === 'all' ? 'Todas' : 
+                   status === 'active' ? 'Activas' :
+                   status === 'draft' ? 'Borrador' :
+                   status === 'completed' ? 'Completadas' : 'Canceladas'}
                 </Button>
               ))}
             </div>
@@ -189,11 +189,30 @@ export default function CampaignsList({ campaigns, loading, error, lastUpdated }
               </div>
             ) : error ? (
               <div className="text-center py-8">
-                <p className="text-destructive">{error}</p>
+                <div className="text-center space-y-2">
+                  <AlertTriangle className="h-8 w-8 text-destructive mx-auto" />
+                  <p className="text-destructive font-medium">Error al cargar campañas</p>
+                  <p className="text-sm text-muted-foreground">{error}</p>
+                  <Button size="sm" variant="outline" onClick={fetchCampaigns}>
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                    Reintentar
+                  </Button>
+                </div>
               </div>
             ) : filteredCampaigns.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-muted-foreground">No se encontraron campañas</p>
+                <div className="space-y-2">
+                  <BarChart3 className="h-8 w-8 text-muted-foreground mx-auto" />
+                  <p className="text-muted-foreground">
+                    {campaigns.length === 0 ? 'No tienes campañas aún' : 'No se encontraron campañas con los filtros aplicados'}
+                  </p>
+                  {campaigns.length === 0 && (
+                    <Button size="sm" onClick={() => router.push('/dashboard/campaigns/new')}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Crear primera campaña
+                    </Button>
+                  )}
+                </div>
               </div>
             ) : (
               filteredCampaigns.map((campaign) => (
@@ -250,18 +269,17 @@ export default function CampaignsList({ campaigns, loading, error, lastUpdated }
 
       {/* Modal para gestión avanzada */}
       <Dialog open={!!selectedCampaign} onOpenChange={() => setSelectedCampaign(null)}>
-        <DialogContent className="professional-dialog max-w-4xl">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Gestionar: {selectedCampaign?.name}</DialogTitle>
+            <DialogTitle>Gestión Avanzada - {selectedCampaign?.name}</DialogTitle>
           </DialogHeader>
-          <div className="py-4">
-            {selectedCampaign && (
-              <CampaignStateManager
-                campaign={selectedCampaign}
-                onCampaignUpdate={handleCampaignUpdate}
-              />
-            )}
-          </div>
+          {selectedCampaign && (
+            <CampaignStateManager
+              campaign={selectedCampaign}
+              onClose={() => setSelectedCampaign(null)}
+              onCampaignUpdate={handleCampaignUpdate}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
