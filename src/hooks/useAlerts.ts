@@ -3,13 +3,16 @@
 import { useState, useEffect } from 'react';
 import type { Alert, Campaign } from '@/types';
 
-export default function useAlerts(campaigns: Campaign[]) {
+export default function useAlerts(campaigns: Campaign[] | undefined) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
 
   useEffect(() => {
     const generateAlerts = () => {
       const newAlerts: Alert[] = [];
-
+  if (!campaigns || campaigns.length === 0) {
+        setAlerts([]);
+        return;
+      }
       // Alertas por campañas que vencen pronto
       campaigns.forEach(campaign => {
         if (campaign.status === 'active' && campaign.daysRemaining !== undefined && campaign.daysRemaining <= 3 && campaign.daysRemaining > 0) {
