@@ -41,12 +41,12 @@ export default function CampaignsList() {
       
       const token = localStorage.getItem('focalizahr_token');
       const response = await fetch(`/api/campaigns/${campaignId}/status`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ status: newStatus, action })
+        body: JSON.stringify({ toStatus: newStatus, action })
       });
 
       if (!response.ok) {
