@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { 
   Plus, 
   Search, 
@@ -12,68 +13,129 @@ import {
   BarChart3, 
   AlertTriangle,
   Users,
-  Calendar
+  Calendar,
+  CheckCircle,
+  Play,
+  Clock,
+  Square,
+  Eye,
+  Settings
 } from 'lucide-react';
 import { useCampaignsContext } from '@/context/CampaignsContext';
-// ✅ COMPONENTES ESPECIALIZADOS v3.0 - DOCUMENTO MAESTRO
-import CampaignStateTransition from '@/components/campaign-states/CampaignStateTransition';
-import type { Campaign } from '@/types';
+import { useToast, useParticipantsNotifications } from '@/components/ui/toast-system';
+import { useConfirmationDialog, confirmationActions } from '@/components/ui/confirmation-dialog';
+import CampaignStatusGuide from '@/components/ui/campaign-status-guide';
 
-// ✅ ELIMINAR PROPS - SOLO CONTEXT
-export default function CampaignsList() {
+interface Campaign {
+  id: string;
+  name: string;
+  status: 'draft' | 'active' | 'completed' | 'cancelled';
+  campaignType: {
+    name: string;
+    slug: string;
+  };
+  totalInvited: number;
+  totalResponded: number;
+  participationRate: number;
+  startDate: string;
+  endDate: string;
+  canActivate?: boolean;
+  canViewResults?: boolean;
+  isOverdue?: boolean;
+  daysRemaining?: number;
+  riskLevel?: 'low' | 'medium' | 'high';
+  lastActivity?: string;
+  completionTrend?: 'up' | 'down' | 'stable';
+}
+
+export default function EnhancedCampaignsList() {
   const [filter, setFilter] = useState<'all' | 'active' | 'draft' | 'completed' | 'cancelled'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   const router = useRouter();
 
-  // ✅ USAR SOLO CONTEXT - NO PROPS
+  // Context y hooks
   const { campaigns, loading, error, fetchCampaigns } = useCampaignsContext();
+  const { success, error: showError } = useToast();
+  const { showConfirmation, ConfirmationDialog } = useConfirmationDialog();
 
-  // ✅ CARGA INICIAL AUTOMÁTICA
+  // Hook para notificaciones automáticas de participantes
+  useParticipantsNotifications(campaigns);
+
+  // Carga inicial automática
   useEffect(() => {
     fetchCampaigns();
   }, [fetchCampaigns]);
 
-  // ✅ FUNCIÓN CAMBIO ESTADO - COMPATIBLE CON API MAESTRO
+  // Función para cambio de estado con confirmación y feedback
   const handleStateChange = useCallback(async (campaignId: string, newStatus: string, action: string) => {
-    try {
-      console.log(`🔄 Cambiando estado: ${action} → ${newStatus}`);
-      
-      const token = localStorage.getItem('focalizahr_token');
-      const response = await fetch(`/api/campaigns/${campaignId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ toStatus: newStatus, action })
-      });
+    const campaign = campaigns.find(c => c.id === campaignId);
+    if (!campaign) return;
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al cambiar estado');
-      }
-
-      console.log('✅ Estado cambiado exitosamente');
-      fetchCampaigns(); // Refrescar lista
-      
-    } catch (error) {
-      console.error('❌ Error cambiando estado:', error);
-      throw error;
+    // Crear acción de confirmación apropiada
+    let confirmAction;
+    switch (action) {
+      case 'activate':
+        confirmAction = confirmationActions.activateCampaign(campaign.name, campaign.totalInvited);
+        break;
+      case 'cancel':
+        confirmAction = confirmationActions.cancelCampaign(campaign.name, campaign.totalResponded);
+        break;
+      case 'complete':
+        confirmAction = confirmationActions.completeCampaign(campaign.name, campaign.participationRate);
+        break;
+      default:
+        return;
     }
-  }, [fetchCampaigns]);
 
-  // ✅ NAVEGACIÓN INTELIGENTE
-  const handleCampaignAction = useCallback((action: string, campaignId: string, campaign?: Campaign) => {
+    // Mostrar diálogo de confirmación
+    showConfirmation(confirmAction, async () => {
+      try {
+        console.log(`🔄 Cambiando estado: ${action} → ${newStatus}`);
+        
+        const token = localStorage.getItem('focalizahr_token');
+        const response = await fetch(`/api/campaigns/${campaignId}/status`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ toStatus: newStatus, action })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Error al cambiar estado');
+        }
+
+        console.log('✅ Estado cambiado exitosamente');
+        
+        // Success feedback específico por acción
+        const successMessages = {
+          activate: `✅ Campaña "${campaign.name}" activada. Invitaciones enviadas a ${campaign.totalInvited} participantes.`,
+          complete: `✅ Campaña "${campaign.name}" completada. Resultados disponibles.`,
+          cancel: `✅ Campaña "${campaign.name}" cancelada exitosamente.`
+        };
+        
+        success(successMessages[action as keyof typeof successMessages] || 'Operación completada exitosamente');
+        
+        // Refrescar lista
+        fetchCampaigns();
+        
+      } catch (error) {
+        console.error('❌ Error cambiando estado:', error);
+        showError(error instanceof Error ? error.message : 'Error desconocido al cambiar estado');
+        throw error;
+      }
+    });
+  }, [campaigns, fetchCampaigns, success, showError, showConfirmation]);
+
+  // Navegación inteligente
+  const handleCampaignAction = useCallback((action: string, campaignId: string, campaignName?: string) => {
     switch (action) {
       case 'view':
-        if (campaign?.status === 'completed') {
-          router.push(`/dashboard/campaigns/${campaignId}/results`);
-        } else if (campaign?.status === 'active') {
-          router.push(`/dashboard/campaigns/${campaignId}/monitor`);
-        } else {
-          router.push(`/dashboard/campaigns/${campaignId}/config`);
-        }
+        router.push(`/dashboard/campaigns/${campaignId}`);
         break;
       case 'monitor':
         router.push(`/dashboard/campaigns/${campaignId}/monitor`);
@@ -85,44 +147,153 @@ export default function CampaignsList() {
         router.push(`/dashboard/campaigns/${campaignId}/edit`);
         break;
       default:
-        console.warn('Acción no reconocida:', action);
+        console.log(`Acción: ${action} para campaña ${campaignName}`);
     }
   }, [router]);
 
-  const filteredCampaigns = campaigns.filter(campaign =>
-    (filter === 'all' || campaign.status === filter) &&
-    (campaign.name.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // Refresh manual con feedback
+  const handleRefresh = useCallback(async () => {
+    setIsUpdating(true);
+    try {
+      await fetchCampaigns();
+      success('Lista de campañas actualizada');
+    } catch (error) {
+      showError('Error al actualizar las campañas');
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [fetchCampaigns, success, showError]);
+
+  // Filtrado de campañas
+  const filteredCampaigns = campaigns.filter(campaign => {
+    const matchesSearch = campaign.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filter === 'all' || campaign.status === filter;
+    return matchesSearch && matchesFilter;
+  });
+
+  // Obtener badge de estado
+  const getStatusBadge = (status: string, riskLevel?: string) => {
+    const variants = {
+      active: 'default',
+      draft: 'secondary',
+      completed: 'outline',
+      cancelled: 'destructive'
+    } as const;
+
+    const labels = {
+      active: 'Activa',
+      draft: 'Borrador',
+      completed: 'Completada',
+      cancelled: 'Cancelada'
+    };
+
+    return (
+      <Badge variant={variants[status as keyof typeof variants] || 'secondary'}>
+        {labels[status as keyof typeof labels] || status}
+      </Badge>
+    );
+  };
+
+  // Obtener acciones disponibles para cada campaña
+  const getAvailableActions = (campaign: Campaign) => {
+    const actions = [];
+
+    // Acción ver siempre disponible
+    actions.push({
+      id: 'view',
+      label: 'Ver Detalles',
+      icon: Eye,
+      variant: 'outline' as const,
+      onClick: () => handleCampaignAction('view', campaign.id, campaign.name)
+    });
+
+    // Acciones basadas en estado
+    switch (campaign.status) {
+      case 'draft':
+        if (campaign.totalInvited > 0 && campaign.canActivate) {
+          actions.push({
+            id: 'activate',
+            label: 'Activar',
+            icon: Play,
+            variant: 'default' as const,
+            onClick: () => handleStateChange(campaign.id, 'active', 'activate')
+          });
+        }
+        actions.push({
+          id: 'edit',
+          label: 'Editar',
+          icon: Settings,
+          variant: 'outline' as const,
+          onClick: () => handleCampaignAction('edit', campaign.id, campaign.name)
+        });
+        break;
+
+      case 'active':
+        actions.push({
+          id: 'monitor',
+          label: 'Monitorear',
+          icon: BarChart3,
+          variant: 'outline' as const,
+          onClick: () => handleCampaignAction('monitor', campaign.id, campaign.name)
+        });
+        actions.push({
+          id: 'complete',
+          label: 'Completar',
+          icon: CheckCircle,
+          variant: 'secondary' as const,
+          onClick: () => handleStateChange(campaign.id, 'completed', 'complete')
+        });
+        actions.push({
+          id: 'cancel',
+          label: 'Cancelar',
+          icon: Square,
+          variant: 'destructive' as const,
+          onClick: () => handleStateChange(campaign.id, 'cancelled', 'cancel')
+        });
+        break;
+
+      case 'completed':
+        if (campaign.canViewResults) {
+          actions.push({
+            id: 'results',
+            label: 'Ver Resultados',
+            icon: BarChart3,
+            variant: 'default' as const,
+            onClick: () => handleCampaignAction('results', campaign.id, campaign.name)
+          });
+        }
+        break;
+    }
+
+    return actions;
+  };
 
   return (
-    <div className="space-y-4">
-      <Card className="professional-card">
+    <>
+      <Card className="w-full">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Mis Campañas
-              </CardTitle>
+              <CardTitle className="text-xl">Gestión de Campañas</CardTitle>
               <CardDescription>
-                Gestiona y monitorea tus mediciones organizacionales
+                Administra y monitorea tus campañas de análisis organizacional
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <Button 
                 size="sm" 
-                variant="outline"
-                onClick={fetchCampaigns}
-                disabled={loading}
+                variant="outline" 
+                onClick={handleRefresh}
+                disabled={isUpdating}
                 className="focus-ring"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 mr-2 ${isUpdating ? 'animate-spin' : ''}`} />
                 Actualizar
               </Button>
               <Button 
                 size="sm" 
                 onClick={() => router.push('/dashboard/campaigns/new')}
-                className="btn-gradient focus-ring"
+                className="focus-ring"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Nueva Campaña
@@ -133,7 +304,7 @@ export default function CampaignsList() {
         
         <CardContent>
           {/* Controles de filtrado */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-4">
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -165,102 +336,118 @@ export default function CampaignsList() {
           </div>
 
           {/* Lista de campañas */}
-          <div className="space-y-3">
+          <div className="space-y-4">
             {loading ? (
-              <div className="text-center py-8">
+              <div className="text-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="text-muted-foreground mt-2">Cargando campañas...</p>
+                <p className="text-muted-foreground mt-4">Cargando campañas...</p>
               </div>
             ) : error ? (
-              <div className="text-center py-8">
-                <div className="text-center space-y-2">
-                  <AlertTriangle className="h-8 w-8 text-destructive mx-auto" />
-                  <p className="text-destructive font-medium">Error al cargar campañas</p>
-                  <p className="text-sm text-muted-foreground">{error}</p>
+              <div className="text-center py-12">
+                <div className="text-center space-y-4">
+                  <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
+                  <div>
+                    <h3 className="text-lg font-medium text-destructive">Error al cargar campañas</h3>
+                    <p className="text-sm text-muted-foreground mt-1">{error}</p>
+                  </div>
                   <Button size="sm" variant="outline" onClick={fetchCampaigns}>
-                    <RefreshCw className="h-4 w-4 mr-1" />
+                    <RefreshCw className="h-4 w-4 mr-2" />
                     Reintentar
                   </Button>
                 </div>
               </div>
             ) : filteredCampaigns.length === 0 ? (
               <div className="text-center py-12">
-                <div className="space-y-4">
-                  <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center">
-                    <BarChart3 className="h-8 w-8 text-cyan-500" />
-                  </div>
+                <div className="text-center space-y-4">
+                  <Users className="h-12 w-12 text-muted-foreground mx-auto" />
                   <div>
-                    <h3 className="text-lg font-semibold text-foreground mb-2">
-                      {campaigns.length === 0 ? 'No tienes campañas aún' : 'No se encontraron campañas'}
-                    </h3>
-                    <p className="text-muted-foreground mb-4">
-                      {campaigns.length === 0 
-                        ? 'Crea tu primera campaña de medición organizacional'
-                        : 'Ajusta los filtros para encontrar lo que buscas'
+                    <h3 className="text-lg font-medium">No se encontraron campañas</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {filter === 'all' 
+                        ? 'Comienza creando tu primera campaña de análisis'
+                        : `No hay campañas en estado "${filter}"`
                       }
                     </p>
-                    {campaigns.length === 0 && (
-                      <Button 
-                        onClick={() => router.push('/dashboard/campaigns/new')}
-                        className="btn-gradient"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Crear primera campaña
-                      </Button>
-                    )}
                   </div>
+                  {filter === 'all' && (
+                    <Button onClick={() => router.push('/dashboard/campaigns/new')}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Crear Primera Campaña
+                    </Button>
+                  )}
                 </div>
               </div>
             ) : (
               filteredCampaigns.map((campaign) => (
-                <Card key={campaign.id} className="professional-card hover:shadow-lg transition-all duration-300 border-l-4 border-l-transparent hover:border-l-cyan-500">
+                <Card 
+                  key={campaign.id}
+                  className={`transition-all duration-200 hover:shadow-md ${selectedCampaign?.id === campaign.id ? 'ring-2 ring-primary' : ''}`}
+                >
                   <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 space-y-3">
-                        <div className="flex items-center gap-3">
-                          <h3 className="font-bold text-lg text-foreground">{campaign.name}</h3>
+                    <div className="space-y-4">
+                      {/* Header de campaña */}
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-3">
+                            <h3 className="font-semibold text-lg">{campaign.name}</h3>
+                            {getStatusBadge(campaign.status, campaign.riskLevel)}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {campaign.campaignType.name}
+                          </p>
                         </div>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <div className="w-5 h-5 rounded bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center">
-                              <Users className="h-3 w-3 text-cyan-600" />
-                            </div>
-                            <span><strong className="text-foreground">{campaign.totalInvited}</strong> participantes</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <div className="w-5 h-5 rounded bg-gradient-to-br from-green-500/20 to-blue-500/20 flex items-center justify-center">
-                              <BarChart3 className="h-3 w-3 text-green-600" />
-                            </div>
-                            <span><strong className="text-foreground">{campaign.participationRate}%</strong> participación</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <div className="w-5 h-5 rounded bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
-                              <Calendar className="h-3 w-3 text-purple-600" />
-                            </div>
-                            <span>{new Date(campaign.startDate).toLocaleDateString('es-ES')}</span>
-                          </div>
+                        <div className="flex items-center gap-2">
+                          {getAvailableActions(campaign).map((action) => {
+                            const IconComponent = action.icon;
+                            return (
+                              <Button
+                                key={action.id}
+                                size="sm"
+                                variant={action.variant}
+                                onClick={action.onClick}
+                                className="focus-ring"
+                              >
+                                <IconComponent className="h-4 w-4 mr-1" />
+                                {action.label}
+                              </Button>
+                            );
+                          })}
                         </div>
                       </div>
-                      
-                      {/* ✅ GESTIÓN ESTADOS v3.0 - COMPONENTE ESPECIALIZADO */}
-                      <div className="flex items-center gap-3 ml-6">
-                        <CampaignStateTransition
-                          campaign={campaign}
-                          onStateChange={handleStateChange}
-                          variant="compact"
-                          showValidation={false}
-                        />
-                        
-                        {/* Botón gestión avanzada opcional */}
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          onClick={() => setSelectedCampaign(selectedCampaign?.id === campaign.id ? null : campaign)}
-                          className="text-muted-foreground hover:text-foreground focus-ring"
-                        >
-                          <BarChart3 className="h-4 w-4" />
-                        </Button>
+
+                      {/* Panel de estado guía */}
+                      <CampaignStatusGuide 
+                        campaign={campaign}
+                        className="bg-muted/50"
+                      />
+
+                      {/* Métricas de campaña */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t">
+                        <div className="flex items-center gap-2 text-sm">
+                          <div className="w-5 h-5 rounded bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center">
+                            <Users className="h-3 w-3 text-cyan-600" />
+                          </div>
+                          <span>
+                            <strong className="text-foreground">{campaign.totalInvited}</strong> participantes
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <div className="w-5 h-5 rounded bg-gradient-to-br from-green-500/20 to-blue-500/20 flex items-center justify-center">
+                            <BarChart3 className="h-3 w-3 text-green-600" />
+                          </div>
+                          <span>
+                            <strong className="text-foreground">{campaign.participationRate}%</strong> participación
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <div className="w-5 h-5 rounded bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
+                            <Calendar className="h-3 w-3 text-purple-600" />
+                          </div>
+                          <span>
+                            {new Date(campaign.startDate).toLocaleDateString('es-ES')}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -271,28 +458,8 @@ export default function CampaignsList() {
         </CardContent>
       </Card>
 
-      {/* ✅ MODAL GESTIÓN AVANZADA OPCIONAL */}
-      {selectedCampaign && (
-        <Card className="mt-4 professional-card">
-          <CardContent className="p-6">
-            <h3 className="font-semibold mb-4">Gestión Avanzada - {selectedCampaign.name}</h3>
-            <CampaignStateTransition
-              campaign={selectedCampaign}
-              onStateChange={handleStateChange}
-              variant="default"
-              showValidation={true}
-            />
-            <div className="mt-4 flex justify-end">
-              <Button 
-                variant="outline" 
-                onClick={() => setSelectedCampaign(null)}
-              >
-                Cerrar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+      {/* Diálogo de confirmación */}
+      <ConfirmationDialog />
+    </>
   );
 }

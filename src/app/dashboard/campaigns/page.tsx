@@ -31,7 +31,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import DashboardNavigation from '@/components/dashboard/DashboardNavigation';
-import CampaignActionButtons from '@/components/dashboard/CampaignActionButtons';
+import CampaignActionButtons from '@/components/campaign-states/CampaignActionButtons';
 import { useCampaignsContext } from '@/context/CampaignsContext';
 import '../dashboard.css'; // Estilos corporativos (un nivel arriba)
 
