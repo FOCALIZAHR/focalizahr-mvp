@@ -32,6 +32,7 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import DashboardNavigation from '@/components/dashboard/DashboardNavigation';
 import CampaignActionButtons from '@/components/dashboard/CampaignActionButtons';
+import { useCampaignsContext } from '@/context/CampaignsContext';
 import '../dashboard.css'; // Estilos corporativos (un nivel arriba)
 
 // Tipos de datos (consistentes con plataforma)
@@ -59,62 +60,22 @@ interface Campaign {
 
 export default function CampaignsPage() {
   const router = useRouter();
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  // ✅ USAR ÚNICAMENTE CONTEXT - NO ESTADO LOCAL
+  const { campaigns, isLoading: loading, error, fetchCampaigns } = useCampaignsContext();
 
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push('/');
       return;
     }
+    // ✅ CARGAR INICIAL USANDO CONTEXT
     fetchCampaigns();
-  }, [router]);
+  }, [router, fetchCampaigns]);
 
-  const fetchCampaigns = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const token = localStorage.getItem('focalizahr_token');
-      if (!token) {
-        throw new Error('Token de autenticación no encontrado');
-      }
-
-      const response = await fetch('/api/campaigns', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          router.push('/');
-          return;
-        }
-        throw new Error('Error al cargar campañas');
-      }
-
-      const data = await response.json();
-      setCampaigns(data.campaigns || []);
-    } catch (error) {
-      console.error('Error:', error);
-      setError(error instanceof Error ? error.message : 'Error desconocido');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Filtrar campañas
-  const filteredCampaigns = campaigns.filter(campaign => {
-    const matchesSearch = campaign.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === 'all' || campaign.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
-
+  // ✅ FUNCIÓN PARA ACTIVAR CAMPAÑA - USAR CONTEXT
   const handleActivateCampaign = async (campaignId: string, campaignName: string) => {
     const confirmed = window.confirm(
       `¿Activar la campaña "${campaignName}"?\n\nEsta acción enviará emails a participantes.`
@@ -124,27 +85,32 @@ export default function CampaignsPage() {
 
     try {
       const token = localStorage.getItem('focalizahr_token');
-      const response = await fetch(`/api/campaigns/${campaignId}/activate`, {
+      const response = await fetch(`/api/campaigns/${campaignId}/status`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ action: 'activate' })
+        body: JSON.stringify({ 
+          toStatus: 'active',
+          action: 'activate' 
+        })
       });
 
       if (response.ok) {
         alert(`✅ Campaña "${campaignName}" activada!`);
-        fetchCampaigns();
+        fetchCampaigns(); // ✅ REFRESH VIA CONTEXT
       } else {
-        alert(`🧪 SIMULACIÓN: Campaña "${campaignName}" activada`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al activar campaña');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert(`🧪 SIMULACIÓN: Campaña "${campaignName}" activada`);
+      alert(`Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   };
 
+  // ✅ FUNCIÓN PARA OTRAS ACCIONES - USAR CONTEXT
   const handleCampaignAction = (campaignId: string, action: string, campaignName: string) => {
     switch (action) {
       case 'monitor':
@@ -158,8 +124,19 @@ export default function CampaignsPage() {
         break;
       default:
         alert(`🧪 SIMULACIÓN: Acción "${action}" para "${campaignName}"`);
+        // ✅ REFRESH PARA ACCIONES DE API
+        if (['complete', 'cancel', 'pause'].includes(action)) {
+          fetchCampaigns();
+        }
     }
   };
+
+  // Filtrar campañas
+  const filteredCampaigns = campaigns.filter(campaign => {
+    const matchesSearch = campaign.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filterStatus === 'all' || campaign.status === filterStatus;
+    return matchesSearch && matchesFilter;
+  });
 
   const getStatusBadge = (status: string, riskLevel?: string) => {
     const statusConfig = {
@@ -206,102 +183,102 @@ export default function CampaignsPage() {
                 </p>
               </div>
               
-              <Button 
-                onClick={() => router.push('/dashboard/campaigns/new')}
-                className="btn-gradient focus-ring"
-                size="lg"
-              >
-                <Plus className="h-5 w-5 mr-2" />
-                Nueva Campaña
-              </Button>
-            </div>
-
-            {/* Filters and Search */}
-            <div className="professional-card p-6 mb-6">
-              <div className="layout-between mb-4">
-                <div className="flex items-center space-x-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/40" />
-                    <Input
-                      placeholder="Buscar campañas..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/40"
-                    />
-                  </div>
-                  
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-sm focus-ring backdrop-blur-sm"
-                    style={{ 
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      backdropFilter: 'blur(10px)'
-                    }}
-                  >
-                    <option value="all" style={{ background: '#1e293b', color: 'white' }}>Todas</option>
-                    <option value="draft" style={{ background: '#1e293b', color: 'white' }}>Borradores</option>
-                    <option value="active" style={{ background: '#1e293b', color: 'white' }}>Activas</option>
-                    <option value="completed" style={{ background: '#1e293b', color: 'white' }}>Completadas</option>
-                  </select>
-                </div>
-                
-                <Button variant="outline" size="sm" onClick={fetchCampaigns}>
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => fetchCampaigns()}
+                  className="border-white/20 text-white hover:bg-white/10"
+                >
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Actualizar
                 </Button>
-              </div>
-              
-              <div className="text-sm text-white/60">
-                {filteredCampaigns.length} campaña{filteredCampaigns.length !== 1 ? 's' : ''} 
-                {filterStatus !== 'all' && ` (filtrado por: ${filterStatus})`}
+                <Button 
+                  onClick={() => router.push('/dashboard/campaigns/new')}
+                  className="bg-white text-black hover:bg-white/90"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nueva Campaña
+                </Button>
               </div>
             </div>
           </div>
 
+          {/* Filters */}
+          <div className="mb-6">
+            <Card className="bg-white/5 border-white/10">
+              <CardContent className="p-4">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+                    <Input
+                      placeholder="Buscar campañas..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-9 bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-white/60" />
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="rounded-md border border-white/20 bg-white/5 text-white px-3 py-2 text-sm"
+                    >
+                      <option value="all">Todas</option>
+                      <option value="draft">Borradores</option>
+                      <option value="active">Activas</option>
+                      <option value="completed">Completadas</option>
+                      <option value="cancelled">Canceladas</option>
+                    </select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Error State */}
           {error && (
-            <Alert className="mb-6 bg-red-500/10 border-red-500/20">
+            <Alert className="mb-6 bg-red-500/10 border-red-500/20 text-red-400">
               <AlertTriangle className="h-4 w-4" />
-              <AlertDescription className="text-red-200">
-                {error}
-              </AlertDescription>
+              <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
-          {/* Campaigns List */}
-          {filteredCampaigns.length === 0 ? (
-            <div className="professional-card p-12 text-center">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-white/5 layout-center">
-                <BarChart3 className="h-10 w-10 text-white/40" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2 text-white">
-                {searchTerm || filterStatus !== 'all' ? 'No se encontraron campañas' : '¡Comienza tu primera medición!'}
-              </h3>
-              <p className="text-white/60 mb-4 max-w-md mx-auto">
-                {searchTerm || filterStatus !== 'all' 
-                  ? 'Intenta ajustar los filtros de búsqueda.'
-                  : 'Crea tu primera campaña de clima organizacional y obtén insights valiosos sobre tu equipo.'
-                }
-              </p>
-              {(!searchTerm && filterStatus === 'all') && (
-                <Button 
-                  onClick={() => router.push('/dashboard/campaigns/new')}
-                  className="btn-gradient focus-ring"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear Primera Campaña
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredCampaigns.map((campaign) => {
+          {/* Campaigns Grid */}
+          <div className="grid gap-6">
+            {filteredCampaigns.length === 0 ? (
+              <Card className="bg-white/5 border-white/10">
+                <CardContent className="text-center py-12">
+                  <div className="mb-4">
+                    <Target className="h-12 w-12 text-white/40 mx-auto" />
+                  </div>
+                  <h3 className="text-lg font-medium text-white mb-2">
+                    {searchTerm || filterStatus !== 'all' ? 'No se encontraron campañas' : 'No hay campañas creadas'}
+                  </h3>
+                  <p className="text-white/60 mb-6">
+                    {searchTerm || filterStatus !== 'all' 
+                      ? 'Intenta ajustar los filtros de búsqueda'
+                      : 'Comienza creando tu primera campaña de análisis'
+                    }
+                  </p>
+                  {!searchTerm && filterStatus === 'all' && (
+                    <Button 
+                      onClick={() => router.push('/dashboard/campaigns/new')}
+                      className="bg-white text-black hover:bg-white/90"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Crear Primera Campaña
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              filteredCampaigns.map((campaign) => {
                 const statusBadge = getStatusBadge(campaign.status, campaign.riskLevel);
                 
                 return (
-                  <Card key={campaign.id} className="professional-card campaign-card-layout hover:shadow-lg transition-all duration-300">
-                    <div className={`campaign-status-indicator ${
+                  <Card key={campaign.id} className="bg-white/5 border-white/10 hover:bg-white/10 transition-colors">
+                    <div className={`h-1 ${
                       campaign.status === 'active' ? 'bg-green-500' :
                       campaign.status === 'completed' ? 'bg-blue-500' :
                       campaign.status === 'draft' ? 'bg-yellow-500' : 'bg-red-500'
@@ -344,58 +321,25 @@ export default function CampaignsPage() {
                               campaign.participationRate >= 80 ? 'bg-green-500' :
                               campaign.participationRate >= 50 ? 'bg-yellow-500' : 'bg-red-500'
                             }`}
-                            style={{ width: `${Math.min(campaign.participationRate, 100)}%` }}
+                            style={{ width: `${campaign.participationRate}%` }}
                           />
                         </div>
                       </div>
 
-                      {/* Actions */}
-                      <div className="layout-between">
-                        <div className="flex items-center space-x-3">
-                          {campaign.status === 'draft' && campaign.totalInvited > 0 && (
-                            <Button 
-                              onClick={() => handleActivateCampaign(campaign.id, campaign.name)}
-                              size="sm"
-                              className="btn-gradient"
-                            >
-                              <Play className="h-4 w-4 mr-1" />
-                              Activar
-                            </Button>
-                          )}
-                          
-                          {campaign.status === 'active' && (
-                            <Button 
-                              onClick={() => handleCampaignAction(campaign.id, 'monitor', campaign.name)}
-                              size="sm"
-                              variant="outline"
-                            >
-                              <Activity className="h-4 w-4 mr-1" />
-                              Monitor
-                            </Button>
-                          )}
-                          
-                          {campaign.canViewResults && (
-                            <Button 
-                              onClick={() => handleCampaignAction(campaign.id, 'view-results', campaign.name)}
-                              size="sm"
-                              variant="outline"
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              Resultados
-                            </Button>
-                          )}
-                        </div>
-                        
-                        <div className="text-xs text-white/40">
-                          {campaign.lastActivity && `Última actividad: ${campaign.lastActivity}`}
-                        </div>
+                      {/* Action Buttons */}
+                      <div className="flex justify-end">
+                        <CampaignActionButtons
+                          campaign={campaign}
+                          onActivateCampaign={handleActivateCampaign}
+                          onCampaignAction={handleCampaignAction}
+                        />
                       </div>
                     </CardContent>
                   </Card>
                 );
-              })}
-            </div>
-          )}
+              })
+            )}
+          </div>
         </div>
       </div>
     </div>

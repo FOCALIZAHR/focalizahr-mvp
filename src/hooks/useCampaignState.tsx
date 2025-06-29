@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Play, CheckCircle, Square, Clock, Activity } from 'lucide-react';
+import { useCampaignsContext } from '@/context/CampaignsContext';
 
 export interface StateTransition {
   from: string;
@@ -28,6 +29,9 @@ interface UseCampaignStateProps {
 export const useCampaignState = ({ onSuccess }: UseCampaignStateProps = {}) => {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
+  
+  // ✅ INTEGRACIÓN CONTEXT PARA SINCRONIZACIÓN AUTOMÁTICA
+  const { fetchCampaigns } = useCampaignsContext();
 
   // VALIDACIONES MEJORADAS
   const validateTransition = useCallback((campaign: CampaignForState, transition: StateTransition): string[] => {
@@ -96,6 +100,9 @@ export const useCampaignState = ({ onSuccess }: UseCampaignStateProps = {}) => {
         throw new Error(errorData.error || 'Error al ejecutar transición');
       }
 
+      // ✅ SINCRONIZACIÓN AUTOMÁTICA CONTEXT
+      await fetchCampaigns();
+
       // Ejecutar callback de éxito si existe
       if (onSuccess) {
         onSuccess();
@@ -109,7 +116,7 @@ export const useCampaignState = ({ onSuccess }: UseCampaignStateProps = {}) => {
     } finally {
       setIsTransitioning(false);
     }
-  }, [onSuccess]);
+  }, [fetchCampaigns, onSuccess]); // ✅ DEPENDENCIA CONTEXT
 
   // TRANSICIONES DISPONIBLES - LÓGICA CORREGIDA
   const getPossibleTransitions = useMemo(() => (status: string): StateTransition[] => {

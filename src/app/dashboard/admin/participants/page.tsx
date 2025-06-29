@@ -30,6 +30,7 @@ import {
 
 // Importar el componente ParticipantUploader reutilizable
 import ParticipantUploader from '@/components/admin/ParticipantUploader';
+import { useCampaignsContext } from '@/context/CampaignsContext';
 
 // Tipos para el admin panel
 // ESTA ES LA INTERFACE CORRECTA QUE SOLUCIONA EL PROBLEMA
@@ -111,7 +112,11 @@ function usePendingCampaigns() {
 export default function AdminParticipantsPage() {
   const router = useRouter();
   const { campaigns, loading, error, lastUpdated, refetch } = usePendingCampaigns();
-  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  // DESPUÉS:
+const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+
+// ✅ INTEGRACIÓN CONTEXT PARA SINCRONIZACIÓN GLOBAL
+const { fetchCampaigns: syncGlobal } = useCampaignsContext();
   
 
   // Manejar éxito de upload
@@ -123,10 +128,12 @@ export default function AdminParticipantsPage() {
   });
   
   // Remover campaña de la lista ya que ya tiene participantes
-  if (selectedCampaign) {
-    refetch(); // Refrescar lista de campañas
-    setSelectedCampaign(null); // Limpiar selección
-  }
+  // ✅ SINCRONIZACIÓN DUAL: Local + Global
+if (selectedCampaign) {
+  refetch(); // Refrescar lista local admin
+  syncGlobal(); // Sincronizar dashboard principal  
+  setSelectedCampaign(null); // Limpiar selección
+}
 
   // Redirección automática al dashboard después de 2.5 segundos
   setTimeout(() => {
