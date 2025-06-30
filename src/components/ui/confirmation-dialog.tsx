@@ -63,11 +63,9 @@ export function ConfirmationDialog({
             }} />
           </DialogTitle>
           <DialogDescription className="text-base leading-relaxed">
-            {/* Formatear descripción destacando nombre campaña */}
             <span dangerouslySetInnerHTML={{
               __html: action.description
-                // Destacar texto entre comillas (nombre campaña) - "80"
-                .replace(/"([^"]+)"/g, '<span style="font-weight: bold; font-size: 1.25rem; color: #22D3EE;">$1</span>')
+                .replace(/(la campaña\s)"([^"]+)"/gi, '<span style="font-weight: bold; font-size: 1.25rem; color: #22D3EE;">$1$2</span>')
             }} />
           </DialogDescription>
         </DialogHeader>
@@ -83,9 +81,7 @@ export function ConfirmationDialog({
                     <CheckCircle className="h-3 w-3 mt-0.5 text-green-600 flex-shrink-0" />
                     <span dangerouslySetInnerHTML={{
                       __html: detail
-                        // Destacar número + participantes - "6 participantes"
                         .replace(/(\d+)\s+(participantes?)/gi, '<span style="font-weight: bold; font-size: 1.25rem; color: #A78BFA;">$1 $2</span>')
-                        // Destacar número + respuestas - "0 respuestas"
                         .replace(/(\d+)\s+(respuestas?)/gi, '<span style="font-weight: bold; font-size: 1.25rem; color: #A78BFA;">$1 $2</span>')
                     }} />
                   </li>
@@ -94,31 +90,31 @@ export function ConfirmationDialog({
             </div>
           )}
 
-          {/* Advertencias - Colores corporativos */}
+          {/* Advertencias - Colores corporativos mejorados */}
           {action.warnings && action.warnings.length > 0 && (
-            <div className="space-y-2 border-l-4 border-cyan-400 pl-4 bg-gradient-to-r from-cyan-50 to-purple-50 p-3 rounded-r-lg">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-cyan-600" />
-                <span className="text-sm font-medium text-cyan-700">Importante:</span>
-              </div>
-              <div className="space-y-1">
-                {action.warnings.map((warning, index) => (
-                  <p key={index} className="text-sm text-slate-700 font-medium">{warning}</p>
-                ))}
-              </div>
-            </div>
+            <Alert className="border-l-4 border-cyan-400 pl-4 bg-gradient-to-r from-cyan-200 to-blue-200 p-3 rounded-r-lg">
+              <AlertTriangle className="h-4 w-4 text-cyan-700" />
+              <AlertDescription>
+                <div className="space-y-1">
+                  <span className="text-sm font-medium text-cyan-900">Importante:</span>
+                  {action.warnings.map((warning, index) => (
+                    <p key={index} className="text-sm text-slate-900 font-medium">{warning}</p>
+                  ))}
+                </div>
+              </AlertDescription>
+            </Alert>
           )}
 
-          {/* Consecuencias - Estilo corporativo para cancelar */}
+          {/* Consecuencias - Estilo corporativo mejorado para cancelar */}
           {action.consequences && action.consequences.length > 0 && (
-            <div className="border-l-4 border-red-400 pl-4 bg-gradient-to-r from-red-50 to-pink-50 p-3 rounded-r-lg">
+            <div className="border-l-4 border-red-400 pl-4 bg-gradient-to-r from-red-200 to-pink-200 p-3 rounded-r-lg">
               <div className="flex items-center gap-2 mb-2">
-                <Shield className="h-4 w-4 text-red-600" />
-                <span className="text-sm font-medium text-red-700">Importante:</span>
+                <Shield className="h-4 w-4 text-red-700" />
+                <span className="text-sm font-medium text-red-900">Importante:</span>
               </div>
               <div className="space-y-1">
                 {action.consequences.map((consequence, index) => (
-                  <p key={index} className="text-sm text-red-700 font-medium">{consequence}</p>
+                  <p key={index} className="text-sm text-red-900 font-medium">{consequence}</p>
                 ))}
               </div>
             </div>

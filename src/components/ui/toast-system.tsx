@@ -1,7 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, AlertTriangle, Info, X } from 'lucide-react';
 
 interface Toast {
@@ -100,7 +99,7 @@ function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-md">
+    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 w-96 max-w-[calc(100vw-2rem)]">
       {toasts.map((toast) => (
         <ToastItem
           key={toast.id}
@@ -122,23 +121,27 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
     switch (type) {
       case 'success':
         return {
-          className: 'bg-green-50 border-green-200 text-green-800',
-          icon: <CheckCircle className="h-4 w-4 text-green-600" />
+          className: 'bg-gradient-to-r from-slate-900/95 to-gray-900/95 border border-cyan-400/70 text-white backdrop-blur-md shadow-xl shadow-cyan-400/30',
+          icon: <CheckCircle className="h-5 w-5 text-cyan-400" />,
+          accentBorder: 'border-l-cyan-400'
         };
       case 'error':
         return {
-          className: 'bg-red-50 border-red-200 text-red-800',
-          icon: <AlertTriangle className="h-4 w-4 text-red-600" />
+          className: 'bg-gradient-to-r from-slate-900/95 to-gray-900/95 border border-red-400/70 text-white backdrop-blur-md shadow-xl shadow-red-400/30',
+          icon: <AlertTriangle className="h-5 w-5 text-red-400" />,
+          accentBorder: 'border-l-red-400'
         };
       case 'warning':
         return {
-          className: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-          icon: <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          className: 'bg-gradient-to-r from-slate-900/95 to-gray-900/95 border border-purple-400/70 text-white backdrop-blur-md shadow-xl shadow-purple-400/30',
+          icon: <AlertTriangle className="h-5 w-5 text-purple-400" />,
+          accentBorder: 'border-l-purple-400'
         };
       case 'info':
         return {
-          className: 'bg-blue-50 border-blue-200 text-blue-800',
-          icon: <Info className="h-4 w-4 text-blue-600" />
+          className: 'bg-gradient-to-r from-slate-900/95 to-gray-900/95 border border-cyan-400/70 text-white backdrop-blur-md shadow-xl shadow-cyan-400/30',
+          icon: <Info className="h-5 w-5 text-cyan-400" />,
+          accentBorder: 'border-l-cyan-400'
         };
     }
   };
@@ -146,29 +149,42 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
   const styles = getToastStyles(toast.type);
 
   return (
-    <Alert className={`${styles.className} relative animate-in slide-in-from-right-full duration-300`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-2 flex-1">
-          {styles.icon}
+    <div className={`${styles.className} ${styles.accentBorder} relative animate-in slide-in-from-right-full duration-500 ease-out rounded-xl p-5 border-l-4`}>
+      {/* Neural glow interior */}
+      <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-purple-500/5 rounded-xl pointer-events-none" />
+      
+      <div className="relative flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3 flex-1">
+          <div className="mt-0.5 p-2 rounded-lg bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-400/30">
+            {styles.icon}
+          </div>
           <div className="flex-1 min-w-0">
             {toast.title && (
-              <div className="font-medium text-sm mb-1">{toast.title}</div>
+              <div className="font-bold text-base mb-1 bg-gradient-to-r from-cyan-300 to-purple-300 bg-clip-text text-transparent">
+                {toast.title}
+              </div>
             )}
-            <AlertDescription className="text-sm leading-relaxed">
-              {toast.message}
-            </AlertDescription>
+            <div className="text-sm leading-relaxed text-white/90 font-medium">
+              {/* Destacar elementos clave con colores corporativos */}
+              <span dangerouslySetInnerHTML={{
+                __html: toast.message
+                  .replace(/"([^"]+)"/g, '<span class="text-cyan-300 font-bold">$1</span>')
+                  .replace(/(\d+)\s+(participantes?)/gi, '<span class="text-purple-300 font-bold">$1 $2</span>')
+                  .replace(/(activada|cancelada|cargaron|enviadas)/gi, '<span class="text-cyan-400 font-semibold">$1</span>')
+              }} />
+            </div>
           </div>
         </div>
         
         <button
           onClick={() => onRemove(toast.id)}
-          className="flex-shrink-0 opacity-70 hover:opacity-100 transition-opacity p-1 -m-1 rounded"
+          className="flex-shrink-0 opacity-60 hover:opacity-100 transition-all duration-200 p-2 rounded-lg hover:bg-gradient-to-r hover:from-cyan-500/20 hover:to-purple-500/20 group border border-transparent hover:border-cyan-400/30"
           aria-label="Cerrar notificación"
         >
-          <X className="h-3 w-3" />
+          <X className="h-4 w-4 text-cyan-300 group-hover:rotate-90 transition-transform duration-200" />
         </button>
       </div>
-    </Alert>
+    </div>
   );
 }
 
