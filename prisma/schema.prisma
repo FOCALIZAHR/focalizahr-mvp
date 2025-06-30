@@ -151,6 +151,8 @@ model Question {
   subcategory                     String?  // feedback, reconocimiento, autonomia, etc.
   questionOrder                   Int      @map("question_order")
   responseType                    String   @default("rating") @map("response_type") // rating, text, choice
+  choiceOptions      Json?    @map("choice_options")
+  conditionalLogic   Json?    @map("conditional_logic")
   
   // Configuración pregunta:
   isRequired                      Boolean  @default(true) @map("is_required")

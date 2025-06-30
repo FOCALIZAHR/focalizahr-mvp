@@ -26,6 +26,7 @@ import useAlerts from '@/hooks/useAlerts';
 import MetricsCards from '@/components/dashboard/MetricsCards';
 import AlertsPanel from '@/components/dashboard/AlertsPanel';
 import CampaignsList from '@/components/dashboard/CampaignsList';
+import DashboardWidget_ExitInsights from '@/components/dashboard/DashboardWidget_ExitInsights';
 import './dashboard.css';
 
 // ✅ TIPOS MÉTRICAS EXPANDIDAS v3.0
@@ -71,14 +72,13 @@ export default function DashboardPage() {
     
     const totalParticipants = campaignsList.reduce((sum, c) => sum + (c.totalInvited || 0), 0);
     const totalResponses = campaignsList.reduce((sum, c) => sum + (c.totalResponded || 0), 0);
-    const globalParticipationRate = totalParticipants > 0 ? (totalResponses / totalParticipants) * 100 : 0;
-    
-    const completedCampaignsWithData = campaignsList.filter(c => 
-      c.status === 'completed' && c.participationRate > 0
-    );
-    const topPerformingCampaign = completedCampaignsWithData.length > 0 
-      ? completedCampaignsWithData.sort((a, b) => b.participationRate - a.participationRate)[0]?.name
-      : null;
+    const globalParticipationRate = totalParticipants > 0 ? 
+      (totalResponses / totalParticipants) * 100 : 0;
+
+    // Mock data para campos adicionales
+    const recentResponses = Math.floor(Math.random() * 50) + 10;
+    const weeklyGrowth = (Math.random() * 20) + 5;
+    const monthlyGrowth = (Math.random() * 40) + 10;
 
     return {
       totalCampaigns,
@@ -86,34 +86,33 @@ export default function DashboardPage() {
       completedCampaigns,
       draftCampaigns,
       cancelledCampaigns,
-      globalParticipationRate: Math.round(globalParticipationRate * 10) / 10,
+      globalParticipationRate: Number(globalParticipationRate.toFixed(1)),
       totalResponses,
       totalParticipants,
-      recentResponses: Math.floor(Math.random() * 50) + 10, // Simulado
-      weeklyGrowth: Math.floor(Math.random() * 20) + 5, // Simulado
-      monthlyGrowth: Math.floor(Math.random() * 50) + 10, // Simulado
-      averageCompletionTime: 8.5, // Simulado
-      topPerformingCampaign
+      recentResponses,
+      weeklyGrowth: Number(weeklyGrowth.toFixed(1)),
+      monthlyGrowth: Number(monthlyGrowth.toFixed(1)),
+      averageCompletionTime: null,
+      topPerformingCampaign: completedCampaigns > 0 ? campaignsList.find(c => c.status === 'completed')?.name || null : null
     };
   };
 
-  // ✅ CARGAR MÉTRICAS
+  // ✅ FUNCIÓN CARGAR MÉTRICAS
   const loadMetrics = async () => {
+    if (!campaigns || campaigns.length === 0) return;
+    
+    setMetricsLoading(true);
+    setMetricsError(null);
+    
     try {
-      setMetricsLoading(true);
-      setMetricsError(null);
-      
-      // Asegurar que tenemos campaigns actualizadas
-      if (campaigns.length === 0) {
-        await fetchCampaigns();
-      }
+      // Simular procesamiento
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       const calculatedMetrics = calculateMetrics(campaigns);
       setMetrics(calculatedMetrics);
       setLastUpdated(new Date());
-      
-    } catch (error) {
-      setMetricsError(error instanceof Error ? error.message : 'Error desconocido');
+    } catch (error: any) {
+      setMetricsError(error.message || 'Error desconocido');
     } finally {
       setMetricsLoading(false);
     }
@@ -142,10 +141,10 @@ export default function DashboardPage() {
     }
   }, [mounted, fetchCampaigns]);
 
-  // ✅ LOADING STATE PREMIUM
+  // ✅ LOADING STATE CON FONDO CORPORATIVO
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[#0D1117] flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
           <h2 className="text-2xl font-bold focalizahr-gradient-text mb-2">FocalizaHR</h2>
@@ -156,7 +155,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+    <div className="min-h-screen bg-[#0D1117]">
       {/* ✅ NAVEGACIÓN LATERAL PREMIUM */}
       <DashboardNavigation 
         showMobileMenu={showMobileMenu}
@@ -250,7 +249,7 @@ export default function DashboardPage() {
             {/* ✅ SIDEBAR DERECHA - INSIGHTS Y ACCESOS RÁPIDOS PREMIUM */}
             <div className="xl:col-span-1 space-y-6">
               
-              {/* ✅ ACCESOS RÁPIDOS PREMIUM */}
+              {/* ✅ ACCESOS RÁPIDOS SIN REDUNDANCIA */}
               <Card className="professional-card border-l-4 border-l-cyan-500">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-white">
@@ -263,27 +262,28 @@ export default function DashboardPage() {
                   <Button 
                     variant="outline" 
                     className="w-full justify-start border-white/20 text-white hover:bg-white/10 focus-ring transition-all duration-200"
-                    onClick={() => router.push('/dashboard/campaigns/new')}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nueva Medición
-                  </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start border-white/20 text-white hover:bg-white/10 focus-ring transition-all duration-200"
-                    onClick={() => router.push('/dashboard/admin/participants')}
-                  >
-                    <Users className="h-4 w-4 mr-2" />
-                    Cargar Participantes
-                  </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start border-white/20 text-white hover:bg-white/10 focus-ring transition-all duration-200"
+                    onClick={() => router.push('/dashboard/results')}
                   >
                     <BarChart3 className="h-4 w-4 mr-2" />
-                    Analytics Avanzado
+                    Ver Resultados
+                  </Button>
+
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start border-white/20 text-white hover:bg-white/10 focus-ring transition-all duration-200"
+                    onClick={() => router.push('/dashboard/reports')}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Exportar Reportes
+                  </Button>
+
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start border-white/20 text-white hover:bg-white/10 focus-ring transition-all duration-200"
+                    onClick={() => router.push('/dashboard/analytics')}
+                  >
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Analytics
                   </Button>
 
                   <Button 
@@ -313,85 +313,94 @@ export default function DashboardPage() {
                       <div className="p-3 bg-white/5 rounded-lg border border-white/10">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <span className="text-sm font-medium text-white">Participación Global</span>
+                          <span className="text-sm font-medium text-white">Risk Scoring</span>
                         </div>
                         <p className="text-xs text-white/70">
-                          Tu tasa del {metrics.globalParticipationRate}% está 
-                          {metrics.globalParticipationRate >= 70 ? ' excelente' : 
-                           metrics.globalParticipationRate >= 50 ? ' por encima del promedio' : ' necesita atención'}
+                          {metrics.activeCampaigns > 0 
+                            ? 'Sistema monitoreando riesgos culturales en tiempo real'
+                            : 'Activa una campaña para análisis predictivo de riesgos'}
                         </p>
                       </div>
 
                       <div className="p-3 bg-white/5 rounded-lg border border-white/10">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          <span className="text-sm font-medium text-white">Tendencia</span>
+                          <span className="text-sm font-medium text-white">Analytics Histórico</span>
                         </div>
                         <p className="text-xs text-white/70">
-                          Crecimiento del {metrics.weeklyGrowth}% esta semana. 
-                          {metrics.weeklyGrowth > 10 ? ' ¡Excelente momentum!' : ' Mantén el ritmo.'}
+                          {metrics.completedCampaigns > 0
+                            ? `Análisis evolutivo disponible: ${metrics.completedCampaigns} estudios completados`
+                            : 'Completa más estudios para trends analysis histórico'}
                         </p>
                       </div>
 
-                      {metrics.topPerformingCampaign && (
-                        <div className="p-3 bg-white/5 rounded-lg border border-white/10">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                            <span className="text-sm font-medium text-white">Top Performer</span>
-                          </div>
-                          <p className="text-xs text-white/70">
-                            "{metrics.topPerformingCampaign}" es tu campaña estrella
-                          </p>
+                      <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                          <span className="text-sm font-medium text-white">Recomendaciones IA</span>
                         </div>
-                      )}
-
+                        <p className="text-xs text-white/70">
+                          {metrics.activeCampaigns > 0
+                            ? 'Monitorea alertas automáticas y progreso en tiempo real'
+                            : metrics.completedCampaigns > 0
+                              ? 'Considera nueva medición trimestral para análisis evolutivo'
+                              : 'Inicia con Pulso Express para diagnóstico organizacional rápido'}
+                        </p>
+                      </div>
+                      
                     </div>
                   )}
+
+                  <div className="pt-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      className="w-full text-xs border-white/20 text-white hover:bg-white/10 focus-ring"
+                    >
+                      Ver Insights Detallados
+                    </Button>
+                  </div>
                   
                 </CardContent>
               </Card>
 
-              {/* ✅ AGENDA RÁPIDA */}
-              <Card className="professional-card border-l-4 border-l-green-500">
+              {/* ✅ TIPS RECOMENDACIONES */}
+              <Card className="professional-card border-l-4 border-l-orange-500">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-white">
-                    <Calendar className="h-5 w-5 text-green-400" />
-                    Próximas Acciones
+                    <Calendar className="h-5 w-5 text-orange-400" />
+                    Kit Inteligente Comunicación
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 text-sm">
-                    
-                    {metrics && metrics.draftCampaigns > 0 && (
-                      <div className="flex items-center gap-3 p-2 bg-white/5 rounded border border-white/10">
-                        <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                        <span className="text-white/80">
-                          {metrics.draftCampaigns} campaña{metrics.draftCampaigns !== 1 ? 's' : ''} pendiente{metrics.draftCampaigns !== 1 ? 's' : ''} de activar
-                        </span>
-                      </div>
-                    )}
-
-                    {metrics && metrics.activeCampaigns > 0 && (
-                      <div className="flex items-center gap-3 p-2 bg-white/5 rounded border border-white/10">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-white/80">
-                          {metrics.activeCampaigns} campaña{metrics.activeCampaigns !== 1 ? 's' : ''} en progreso
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-3 p-2 bg-white/5 rounded border border-white/10">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <span className="text-white/80">
-                        Revisar insights semanales
-                      </span>
-                    </div>
-                    
+                <CardContent className="space-y-3">
+                  
+                  <div className="text-xs text-white/70 space-y-2">
+                    <p>• Realiza pulsos trimestrales para mantener el engagement</p>
+                    <p>• Segmenta por departamentos para insights específicos</p>
+                    <p>• Comunica resultados para cerrar el loop de feedback</p>
                   </div>
+                  
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="w-full text-xs border-white/20 text-white hover:bg-white/10 focus-ring"
+                  >
+                    Mejores Prácticas
+                  </Button>
+                  
                 </CardContent>
               </Card>
-              
+
             </div>
+          </div>
+              {/* ✅ NUEVO: Widget Insights Retención Predictiva */}
+          <div className="mt-8">
+            {campaigns.some(c => c.campaignType?.slug === 'retencion-predictiva') && (
+             <DashboardWidget_ExitInsights 
+             campaignId={campaigns.find(c => c.campaignType?.slug === 'retencion-predictiva')?.id}
+             className="w-full"
+             />
+            )}
           </div>
         </div>
       </div>
