@@ -397,20 +397,40 @@ export default function EnhancedCampaignsList() {
                           </p>
                         </div>
                         
-                        <div className="flex items-center gap-2">
+                        {/* SECCIÓN BOTONES OPTIMIZADA - TAMAÑOS UNIFORMES */}
+                        {/* SECCIÓN BOTONES OPTIMIZADA - ESTILO SITIO OFICIAL FOCALIZAHR */}
+                        <div className="flex items-center gap-3 flex-wrap">
                           {getAvailableActions(campaign).map((action) => {
                             const IconComponent = action.icon;
+                            
+                            // Determinar si es botón primario según estado campaña
+                            const isPrimary = (campaign.status === 'active' && action.id === 'monitor') || 
+                                            (campaign.status === 'draft' && action.id === 'activate') ||
+                                            (campaign.status === 'completed' && action.id === 'results');
+                            
                             return (
-                              <Button
+                              <button
                                 key={action.id}
-                                size="sm"
-                                variant={action.variant}
                                 onClick={action.onClick}
-                                className="focus-ring"
+                                className={`
+                                  inline-flex items-center justify-center
+                                  font-semibold text-sm whitespace-nowrap
+                                  border-radius-12 transition-all duration-300
+                                  min-w-[130px] h-[40px]
+                                  ${isPrimary 
+                                    ? 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white border-0 shadow-lg hover:shadow-xl hover:scale-105 hover:-translate-y-0.5' 
+                                    : action.variant === 'destructive'
+                                      ? 'bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 hover:scale-105'
+                                      : action.variant === 'secondary' 
+                                        ? 'bg-purple-500/10 text-purple-400 border border-purple-500/30 hover:bg-purple-500/20 hover:scale-105'
+                                        : 'bg-white/5 text-gray-300 border border-white/20 hover:bg-white/10 hover:border-cyan-400 hover:scale-105'
+                                  }
+                                `}
+                                style={{ borderRadius: '12px' }}
                               >
-                                <IconComponent className="h-4 w-4 mr-1" />
-                                {action.label}
-                              </Button>
+                                <IconComponent className="h-4 w-4 mr-2" />
+                                {action.label === 'Completar' ? 'Finalizar' : action.label}
+                              </button>
                             );
                           })}
                         </div>

@@ -6,13 +6,25 @@ declare global {
 }
 
 export const prisma = globalThis.prisma || new PrismaClient({
-  log: ['query', 'error', 'warn'],
+  // 🚀 CONNECTION POOLING OPTIMIZADO
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL + "?connection_limit=20&pool_timeout=30&connect_timeout=60"
+    }
+  },
+  // 🔇 LOGGING SOLO ERRORES (no queries)
+  log: process.env.NODE_ENV === 'development' ? ['error'] : [],
   errorFormat: 'pretty',
 })
 
 if (process.env.NODE_ENV !== 'production') {
   globalThis.prisma = prisma
 }
+
+// 🔧 GRACEFUL SHUTDOWN
+process.on('beforeExit', async () => {
+  await prisma.$disconnect()
+})
 
 // Utility functions for database operations
 export async function checkDatabaseConnection() {

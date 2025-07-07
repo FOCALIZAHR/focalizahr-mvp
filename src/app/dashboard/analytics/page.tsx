@@ -110,7 +110,7 @@ const COLORS = {
 
 export default function AnalyticsDashboardMock() {
   const [activeTab, setActiveTab] = useState('overview');
-  const [copiedTemplate, setCopiedTemplate] = useState(null);
+  const [copiedTemplate, setCopiedTemplate] = useState<number | null>(null)
 
   // Preparar datos para visualizaciones
   const categoryData = Object.entries(campaignData.category_scores)
@@ -130,7 +130,7 @@ export default function AnalyticsDashboardMock() {
       fill: data.score >= 4.0 ? COLORS.success : data.score >= 3.5 ? COLORS.warning : COLORS.danger
     }));
 
-  const handleCopyTemplate = (index) => {
+  const handleCopyTemplate = (index: number) => {
     const template = communicationTemplates[index];
     navigator.clipboard.writeText(template.text);
     setCopiedTemplate(index);

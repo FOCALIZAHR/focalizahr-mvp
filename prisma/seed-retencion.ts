@@ -167,7 +167,7 @@ async function seedRetencionPredictiva() {
           templateType: templateData.templateType,
           category: templateData.category,
           conditionRule: templateData.conditionRule,
-          templateText: templateData.templateText,
+          templateText: JSON.stringify(templateData.templateText),
           variablesRequired: templateData.variablesRequired,
           priority: templateData.priority,
           isActive: true,

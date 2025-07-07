@@ -128,6 +128,7 @@ const ConditionalSurveyComponent: React.FC<ConditionalSurveyProps> = ({
         const completedAspects = Object.keys(response.matrixResponses || {}).length;
         return completedAspects === requiredAspects && requiredAspects > 0;
       case 'rating_scale':
+      case 'rating':  // ← AGREGAR ESTA LÍNEA
         return response.rating && response.rating >= 1 && response.rating <= 5;
       default:
         return false;

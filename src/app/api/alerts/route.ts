@@ -1,7 +1,8 @@
 // src/app/api/alerts/route.ts
+// 🎯 ARCHIVO COMPLETO CORREGIDO - Todas las funciones auth + schema Prisma
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAuth } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { verifyJWT } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
 interface Alert {
   id: string;
@@ -14,34 +15,37 @@ interface Alert {
 
 export async function GET(request: NextRequest) {
   try {
-    // Verificar autenticación
-    const authResult = await verifyAuth(request);
-    if (!authResult.success || !authResult.accountId) {
+    // ✅ CORRECCIÓN 1: verifyAuth → verifyJWT (función correcta)
+    const authResult = await verifyJWT(request);
+    
+    // ✅ CORRECCIÓN 2: authResult.accountId → authResult.user (estructura correcta)
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const accountId = authResult.accountId;
+    // ✅ CORRECCIÓN 3: authResult.accountId → authResult.user.id
+    const accountId = authResult.user.id;
 
-    // Consultar campañas desde BD
+    // ✅ CORRECCIÓN 4-6: Todos los campos Prisma en camelCase
     const campaigns = await prisma.campaign.findMany({
-      where: { account_id: accountId },
+      where: { accountId: accountId },          // account_id → accountId
       include: {
-        campaign_type: {
+        campaignType: {                         // campaign_type → campaignType
           select: { name: true, slug: true }
         }
       },
-      orderBy: { created_at: 'desc' }
+      orderBy: { createdAt: 'desc' }           // created_at → createdAt
     });
 
-    // Calcular métricas para cada campaña
+    // ✅ CORRECCIÓN 7-9: Mapeo con campos camelCase
     const campaignsWithMetrics = campaigns.map(campaign => {
       const now = new Date();
-      const endDate = new Date(campaign.end_date);
+      const endDate = new Date(campaign.endDate);        // end_date → endDate
       const timeDiff = endDate.getTime() - now.getTime();
       const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
       const isOverdue = campaign.status === 'active' && daysRemaining < 0;
-      const participationRate = campaign.total_invited > 0 
-        ? (campaign.total_responded / campaign.total_invited) * 100 
+      const participationRate = campaign.totalInvited > 0     // total_invited → totalInvited
+        ? (campaign.totalResponded / campaign.totalInvited) * 100  // total_responded → totalResponded
         : 0;
 
       return {
@@ -51,12 +55,12 @@ export async function GET(request: NextRequest) {
         participationRate,
         daysRemaining: campaign.status === 'active' ? daysRemaining : undefined,
         isOverdue,
-        totalInvited: campaign.total_invited,
-        totalResponded: campaign.total_responded
+        totalInvited: campaign.totalInvited,        // total_invited → totalInvited
+        totalResponded: campaign.totalResponded     // total_responded → totalResponded
       };
     });
 
-    // Generar alertas
+    // ✅ LÓGICA ALERTAS PRESERVADA 100% (funcionalidad original mantenida)
     const alerts: Alert[] = [];
 
     campaignsWithMetrics.forEach(campaign => {
@@ -124,6 +128,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // ✅ RESPONSE ORIGINAL PRESERVADO
     return NextResponse.json({
       success: true,
       alerts,

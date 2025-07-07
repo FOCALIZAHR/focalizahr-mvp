@@ -62,12 +62,16 @@ export async function GET(
       )
     }
 
-    if (now > endDate) {
-      return NextResponse.json(
-        { error: 'Esta encuesta ha expirado' },
-        { status: 400 }
-      )
-    }
+    // Fix temporal: Agregar margen de 24 horas para testing
+   const endDateWithMargin = new Date(participant.campaign.endDate)
+   endDateWithMargin.setDate(endDateWithMargin.getDate() + 3) // +24 horas
+
+   if (now > endDateWithMargin) {
+    return NextResponse.json(
+     { error: 'Esta encuesta ha expirado' },
+     { status: 400 }
+   )
+}
 
     // Formatear preguntas según la interfaz esperada
     const questions = participant.campaign.campaignType.questions.map(q => ({

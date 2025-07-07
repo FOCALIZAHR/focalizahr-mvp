@@ -51,11 +51,14 @@ export interface Participant {
 }
 
 export interface Question {
-  id: number
+  id: string
   text: string
   category: QuestionCategory
   questionOrder: number
   isActive: boolean
+  responseType?: 'text_open' | 'multiple_choice' | 'rating_matrix_conditional' | 'rating_scale'
+  choiceOptions?: string[] | null
+  conditionalLogic?: any | null
 }
 
 export interface Response {
