@@ -1,39 +1,28 @@
-// SURVEY COMPONENT - Lógica Condicional Q2→Q3
-// Adaptación para FocalizaHR Retención Predictiva
-// Archivo: src/components/survey/ConditionalSurveyComponent.tsx
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { 
   CheckCircle2, 
   ArrowRight, 
   ArrowLeft, 
   Star,
-  AlertCircle,
-  Target,
-  Users
+  AlertCircle
 } from 'lucide-react';
 
-// Interfaces para las preguntas
+// Interfaces
 interface Question {
   id: string;
   text: string;
   category: string;
   questionOrder: number;
   responseType: 'text_open' | 'multiple_choice' | 'rating_matrix_conditional' | 'rating_scale';
-  choiceOptions?: string[];
-  conditionalLogic?: {
-    dependsOnQuestion: number;
-    matrixType: string;
-  };
+  choiceOptions?: string[] | null;
+  conditionalLogic?: any | null;
 }
 
 interface SurveyResponse {
@@ -44,38 +33,23 @@ interface SurveyResponse {
   matrixResponses?: { [key: string]: number };
 }
 
-// Props del componente
-interface ConditionalSurveyProps {
-  campaignId: string;
-  participantToken: string;
+// Props del componente SurveyForm
+interface SurveyFormProps {
   questions: Question[];
-  onSubmit: (responses: SurveyResponse[]) => void;
-  onSave?: (responses: SurveyResponse[]) => void;
+  onSubmit: (responses: SurveyResponse[]) => Promise<void>;
+  isSubmitting?: boolean;
 }
 
-const ConditionalSurveyComponent: React.FC<ConditionalSurveyProps> = ({
-  campaignId,
-  participantToken,
+const SurveyForm: React.FC<SurveyFormProps> = ({
   questions,
   onSubmit,
-  onSave
+  isSubmitting = false
 }) => {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [responses, setResponses] = useState<SurveyResponse[]>([]);
-  const [selectedAspects, setSelectedAspects] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Opciones para Q2 (Valoración Aspectos)
-  const aspectOptions = [
-    'Oportunidades de Crecimiento',
-    'Flexibilidad y Equilibrio', 
-    'Autonomía y Confianza',
-    'Reconocimiento y Valoración',
-    'Liderazgo de Apoyo',
-    'Compensación y Beneficios'
-  ];
-
-  // Inicializar responses array
+  // Inicializar responses
   useEffect(() => {
     const initialResponses = questions.map(q => ({
       questionId: q.id,
@@ -99,202 +73,59 @@ const ConditionalSurveyComponent: React.FC<ConditionalSurveyProps> = ({
   };
 
   // Actualizar respuesta
-  const updateResponse = (update: Partial<SurveyResponse>) => {
-    const newResponses = [...responses];
-    newResponses[currentQuestion] = {
-      ...newResponses[currentQuestion],
-      ...update
-    };
-    setResponses(newResponses);
-
-    // Si es Q2, actualizar aspectos seleccionados para Q3
-    if (questions[currentQuestion]?.questionOrder === 2 && update.choiceResponse) {
-      setSelectedAspects(update.choiceResponse);
-    }
+  const updateResponse = (questionId: string, update: Partial<SurveyResponse>) => {
+    setResponses(prev => {
+      const existingIndex = prev.findIndex(r => r.questionId === questionId);
+      const newResponses = [...prev];
+      
+      if (existingIndex >= 0) {
+        newResponses[existingIndex] = { ...newResponses[existingIndex], ...update };
+      } else {
+        newResponses.push({ questionId, ...update });
+      }
+      
+      return newResponses;
+    });
   };
 
-  // Validar respuesta actual
+  // Validar si la respuesta actual es válida
   const isCurrentResponseValid = () => {
     const question = questions[currentQuestion];
     const response = getCurrentResponse();
+    
+    if (!question) return false;
 
     switch (question.responseType) {
-      case 'text_open':
-        return response.textResponse && response.textResponse.trim().length > 0;
-      case 'multiple_choice':
-        return response.choiceResponse && response.choiceResponse.length === 3; // Exactamente 3
-      case 'rating_matrix_conditional':
-        const requiredAspects = selectedAspects.length;
-        const completedAspects = Object.keys(response.matrixResponses || {}).length;
-        return completedAspects === requiredAspects && requiredAspects > 0;
       case 'rating_scale':
-        return response.rating && response.rating >= 1 && response.rating <= 5;
+        return response.rating !== undefined && response.rating > 0;
+      case 'text_open':
+        return response.textResponse !== undefined && response.textResponse.trim().length > 0;
+      case 'multiple_choice':
+        return response.choiceResponse !== undefined && response.choiceResponse.length > 0;
       default:
-        return false;
+        return true;
     }
   };
 
-  // Renderizar pregunta text_open (Q1)
-  const renderTextOpenQuestion = () => {
-    const response = getCurrentResponse();
-    return (
-      <div className="space-y-4">
-        <Textarea
-          value={response.textResponse || ''}
-          onChange={(e) => updateResponse({ textResponse: e.target.value })}
-          placeholder="Escribe tu respuesta aquí... (mínimo 10 caracteres)"
-          className="min-h-[120px] bg-slate-800 border-slate-600 text-white resize-none"
-          maxLength={500}
-        />
-        <div className="text-sm text-gray-400 text-right">
-          {response.textResponse?.length || 0}/500 caracteres
-        </div>
-      </div>
-    );
-  };
-
-  // Renderizar pregunta multiple_choice (Q2)
-  const renderMultipleChoiceQuestion = () => {
-    const response = getCurrentResponse();
-    const selectedChoices = response.choiceResponse || [];
-
-    return (
-      <div className="space-y-4">
-        <Alert className="border-blue-500/50 bg-blue-500/10">
-          <Target className="h-4 w-4 text-blue-400" />
-          <AlertDescription className="text-blue-200">
-            <strong>Instrucción:</strong> Selecciona exactamente 3 aspectos que más valores. 
-            Seleccionados: {selectedChoices.length}/3
-          </AlertDescription>
-        </Alert>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {aspectOptions.map((option) => {
-            const isSelected = selectedChoices.includes(option);
-            const canSelect = selectedChoices.length < 3 || isSelected;
-
-            return (
-              <div
-                key={option}
-                className={`
-                  p-4 rounded-lg border cursor-pointer transition-all
-                  ${isSelected 
-                    ? 'border-cyan-500 bg-cyan-500/20 text-cyan-100' 
-                    : canSelect 
-                      ? 'border-slate-600 bg-slate-800 hover:border-slate-500 text-white'
-                      : 'border-slate-700 bg-slate-900 text-gray-500 cursor-not-allowed'
-                  }
-                `}
-                onClick={() => {
-                  if (!canSelect && !isSelected) return;
-                  
-                  let newChoices: string[];
-                  if (isSelected) {
-                    newChoices = selectedChoices.filter(c => c !== option);
-                  } else {
-                    newChoices = [...selectedChoices, option];
-                  }
-                  updateResponse({ choiceResponse: newChoices });
-                }}
-              >
-                <div className="flex items-center space-x-3">
-                  <Checkbox 
-                    checked={isSelected}
-                    disabled={!canSelect && !isSelected}
-                    readOnly
-                  />
-                  <span className="font-medium">{option}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  // Renderizar pregunta rating_matrix_conditional (Q3)
-  const renderRatingMatrixQuestion = () => {
-    const response = getCurrentResponse();
-    const matrixResponses = response.matrixResponses || {};
-
-    if (selectedAspects.length === 0) {
-      return (
-        <Alert className="border-yellow-500/50 bg-yellow-500/10">
-          <AlertCircle className="h-4 w-4 text-yellow-400" />
-          <AlertDescription className="text-yellow-200">
-            Primero debes completar la pregunta anterior para continuar.
-          </AlertDescription>
-        </Alert>
-      );
-    }
-
-    return (
-      <div className="space-y-6">
-        <Alert className="border-green-500/50 bg-green-500/10">
-          <CheckCircle2 className="h-4 w-4 text-green-400" />
-          <AlertDescription className="text-green-200">
-            <strong>Evaluando los aspectos que seleccionaste:</strong> {selectedAspects.join(', ')}
-          </AlertDescription>
-        </Alert>
-
-        {selectedAspects.map((aspect) => (
-          <div key={aspect} className="p-4 rounded-lg border border-slate-600 bg-slate-800">
-            <div className="mb-3">
-              <h4 className="font-medium text-white">{aspect}</h4>
-              <p className="text-sm text-gray-400">
-                ¿Cómo calificarías la calidad con la que la empresa entregó este aspecto?
-              </p>
-            </div>
-            
-            <div className="flex justify-between items-center gap-2">
-              <span className="text-xs text-gray-400">Muy malo</span>
-              <div className="flex gap-2">
-                {[1, 2, 3, 4, 5].map((rating) => (
-                  <button
-                    key={rating}
-                    onClick={() => {
-                      const newMatrix = { ...matrixResponses, [aspect]: rating };
-                      updateResponse({ matrixResponses: newMatrix });
-                    }}
-                    className={`
-                      w-10 h-10 rounded-full border-2 transition-all flex items-center justify-center
-                      ${matrixResponses[aspect] === rating
-                        ? 'border-cyan-500 bg-cyan-500 text-white'
-                        : 'border-slate-500 text-slate-400 hover:border-cyan-400'
-                      }
-                    `}
-                  >
-                    {rating}
-                  </button>
-                ))}
-              </div>
-              <span className="text-xs text-gray-400">Excelente</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  // Renderizar pregunta rating_scale (Q4-Q7)
-  const renderRatingScaleQuestion = () => {
+  // Renderizar pregunta de rating
+  const renderRatingQuestion = (question: Question) => {
     const response = getCurrentResponse();
     
     return (
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-400">Totalmente en desacuerdo</span>
-          <span className="text-sm text-gray-400">Totalmente de acuerdo</span>
+      <div className="space-y-6">
+        <div className="text-center">
+          <h3 className="text-xl font-semibold text-gray-100 mb-4">
+            {question.text}
+          </h3>
         </div>
         
-        <div className="flex justify-center gap-4">
+        <div className="flex justify-center gap-3">
           {[1, 2, 3, 4, 5].map((rating) => (
             <button
               key={rating}
-              onClick={() => updateResponse({ rating })}
+              onClick={() => updateResponse(question.id, { rating })}
               className={`
-                w-16 h-16 rounded-full border-2 transition-all flex items-center justify-center text-lg font-semibold
+                w-12 h-12 rounded-full border-2 font-semibold transition-all duration-200
                 ${response.rating === rating
                   ? 'border-cyan-500 bg-cyan-500 text-white scale-110'
                   : 'border-slate-500 text-slate-400 hover:border-cyan-400 hover:scale-105'
@@ -318,22 +149,44 @@ const ConditionalSurveyComponent: React.FC<ConditionalSurveyProps> = ({
     );
   };
 
+  // Renderizar pregunta de texto
+  const renderTextQuestion = (question: Question) => {
+    const response = getCurrentResponse();
+    
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h3 className="text-xl font-semibold text-gray-100 mb-4">
+            {question.text}
+          </h3>
+        </div>
+        
+        <Textarea
+          value={response.textResponse || ''}
+          onChange={(e) => updateResponse(question.id, { textResponse: e.target.value })}
+          placeholder="Escribe tu respuesta aquí..."
+          className="min-h-[120px] bg-slate-800 border-slate-600 text-gray-100"
+        />
+      </div>
+    );
+  };
+
   // Renderizar pregunta según tipo
   const renderCurrentQuestion = () => {
     const question = questions[currentQuestion];
     if (!question) return null;
 
     switch (question.responseType) {
-      case 'text_open':
-        return renderTextOpenQuestion();
-      case 'multiple_choice':
-        return renderMultipleChoiceQuestion();
-      case 'rating_matrix_conditional':
-        return renderRatingMatrixQuestion();
       case 'rating_scale':
-        return renderRatingScaleQuestion();
+        return renderRatingQuestion(question);
+      case 'text_open':
+        return renderTextQuestion(question);
       default:
-        return <div>Tipo de pregunta no soportado</div>;
+        return (
+          <div className="text-center text-gray-400">
+            Tipo de pregunta no soportado: {question.responseType}
+          </div>
+        );
     }
   };
 
@@ -350,91 +203,69 @@ const ConditionalSurveyComponent: React.FC<ConditionalSurveyProps> = ({
     }
   };
 
+  // Enviar encuesta
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      await onSubmit(responses.filter(r => 
-        r.rating || r.textResponse || (r.choiceResponse && r.choiceResponse.length > 0) || 
-        (r.matrixResponses && Object.keys(r.matrixResponses).length > 0)
-      ));
+      // Filtrar solo respuestas válidas
+      const validResponses = responses.filter(r => 
+        r.rating || 
+        (r.textResponse && r.textResponse.trim().length > 0) || 
+        (r.choiceResponse && r.choiceResponse.length > 0)
+      );
+      
+      await onSubmit(validResponses);
     } catch (error) {
-      console.error('Error submitting survey:', error);
+      console.error('Error enviando encuesta:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const question = questions[currentQuestion];
+  if (!questions.length) {
+    return (
+      <div className="text-center text-gray-400">
+        No hay preguntas disponibles
+      </div>
+    );
+  }
+
+  const currentQuestionData = questions[currentQuestion];
   const progress = ((currentQuestion + 1) / questions.length) * 100;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Users className="h-6 w-6 text-cyan-400" />
-            <h1 className="text-2xl font-bold text-white">
-              FocalizaHR Retención Predictiva
-            </h1>
-          </div>
-          <p className="text-gray-400">
-            Instrumento estratégico para identificar causas de rotación de talento
-          </p>
-        </div>
-
-        {/* Progress */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-2">
+    <div className="max-w-4xl mx-auto">
+      <Card className="bg-slate-900 border-slate-700">
+        <CardHeader className="text-center border-b border-slate-700">
+          <div className="flex items-center justify-between mb-4">
+            <Badge variant="outline" className="text-cyan-400 border-cyan-400">
+              {currentQuestionData?.category || 'General'}
+            </Badge>
             <span className="text-sm text-gray-400">
-              Pregunta {currentQuestion + 1} de {questions.length}
-            </span>
-            <span className="text-sm text-gray-400">
-              {Math.round(progress)}% completado
+              {currentQuestion + 1} de {questions.length}
             </span>
           </div>
-          <Progress value={progress} className="h-2" />
-        </div>
+          
+          <Progress 
+            value={progress} 
+            className="h-2 bg-slate-800"
+          />
+        </CardHeader>
 
-        {/* Question Card */}
-        <Card className="bg-slate-800/50 border-slate-700 mb-8">
-          <CardHeader>
-            <div className="flex items-start gap-3">
-              <Badge variant="outline" className="border-cyan-500/50 text-cyan-400">
-                Q{question?.questionOrder}
-              </Badge>
-              <CardTitle className="text-white text-lg leading-relaxed">
-                {question?.text}
-              </CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {renderCurrentQuestion()}
-          </CardContent>
-        </Card>
-
-        {/* Navigation */}
-        <div className="flex justify-between items-center">
-          <Button
-            onClick={goToPrevious}
-            disabled={currentQuestion === 0}
-            variant="outline"
-            className="border-slate-600 text-gray-300"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Anterior
-          </Button>
-
-          <div className="flex gap-2">
-            {onSave && (
-              <Button
-                onClick={() => onSave(responses)}
-                variant="outline"
-                className="border-slate-600 text-gray-300"
-              >
-                Guardar progreso
-              </Button>
-            )}
+        <CardContent className="pt-8">
+          {renderCurrentQuestion()}
+          
+          {/* Botones de navegación */}
+          <div className="flex justify-between items-center mt-8 pt-6 border-t border-slate-700">
+            <Button
+              onClick={goToPrevious}
+              disabled={currentQuestion === 0}
+              variant="outline"
+              className="border-slate-600 text-gray-300 hover:bg-slate-800"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Anterior
+            </Button>
 
             {currentQuestion < questions.length - 1 ? (
               <Button
@@ -448,30 +279,27 @@ const ConditionalSurveyComponent: React.FC<ConditionalSurveyProps> = ({
             ) : (
               <Button
                 onClick={handleSubmit}
-                disabled={!isCurrentResponseValid() || isLoading}
+                disabled={!isCurrentResponseValid() || isLoading || isSubmitting}
                 className="bg-green-600 hover:bg-green-700 text-white"
               >
-                {isLoading ? 'Enviando...' : 'Finalizar Encuesta'}
+                {isLoading || isSubmitting ? 'Enviando...' : 'Finalizar Encuesta'}
                 <CheckCircle2 className="h-4 w-4 ml-2" />
               </Button>
             )}
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Debug info - Remover en producción */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mt-4 p-3 bg-slate-900 rounded border border-slate-700">
-            <div className="text-xs text-gray-400">
-              Debug: Q{currentQuestion + 1} | Type: {question?.responseType} | Valid: {isCurrentResponseValid() ? '✅' : '❌'}
-              {currentQuestion === 1 && (
-                <div>Selected: {selectedAspects.join(', ')}</div>
-              )}
-            </div>
+      {/* Debug info - Solo en desarrollo */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-4 p-3 bg-slate-900 rounded border border-slate-700">
+          <div className="text-xs text-gray-400">
+            Debug: Q{currentQuestion + 1} | Type: {currentQuestionData?.responseType} | Valid: {isCurrentResponseValid() ? '✅' : '❌'}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default ConditionalSurveyComponent;
+export default SurveyForm;

@@ -5,10 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle, Bell } from 'lucide-react';
-import type { Alert } from '@/types';
+import type { Alert as AlertType } from '@/types';
 
 interface AlertsPanelProps {
-  alerts: Alert[];
+  alerts: AlertType[];
 }
 
 // Componente AlertsPanel extraído exacto del original

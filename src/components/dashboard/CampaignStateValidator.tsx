@@ -54,7 +54,7 @@ const CampaignStateValidator: React.FC<CampaignStateValidatorProps> = ({
         id: 'has_name',
         label: 'Nombre de campaña',
         description: 'La campaña debe tener un nombre válido',
-        isValid: campaign.name && campaign.name.trim().length > 0,
+        isValid: Boolean(campaign.name && campaign.name.trim().length > 0),
         isRequired: true,
         severity: 'error',
         icon: Settings

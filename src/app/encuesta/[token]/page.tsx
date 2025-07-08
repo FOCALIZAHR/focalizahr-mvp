@@ -301,7 +301,6 @@ export default function SurveyPage() {
                 />
               ) : (
                 <SurveyForm
-                  token={token}
                   questions={questions}
                   onSubmit={handleSubmit}
                   isSubmitting={isSubmitting}

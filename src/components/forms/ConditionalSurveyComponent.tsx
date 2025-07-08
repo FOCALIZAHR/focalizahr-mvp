@@ -29,7 +29,7 @@ interface Question {
   category: string;
   questionOrder: number;
   responseType: 'text_open' | 'multiple_choice' | 'rating_matrix_conditional' | 'rating_scale';
-  choiceOptions?: string[];
+  choiceOptions?: string[] | null;
   conditionalLogic?: {
     dependsOnQuestion: number;
     matrixType: string;
@@ -128,7 +128,6 @@ const ConditionalSurveyComponent: React.FC<ConditionalSurveyProps> = ({
         const completedAspects = Object.keys(response.matrixResponses || {}).length;
         return completedAspects === requiredAspects && requiredAspects > 0;
       case 'rating_scale':
-      case 'rating':  // ← AGREGAR ESTA LÍNEA
         return response.rating && response.rating >= 1 && response.rating <= 5;
       default:
         return false;
@@ -202,7 +201,7 @@ const ConditionalSurveyComponent: React.FC<ConditionalSurveyProps> = ({
                   <Checkbox 
                     checked={isSelected}
                     disabled={!canSelect && !isSelected}
-                    readOnly
+                    
                   />
                   <span className="font-medium">{option}</span>
                 </div>

@@ -56,7 +56,7 @@ export default function EnhancedCampaignsList() {
   const router = useRouter();
 
   // Context y hooks
-  const { campaigns, loading, error, fetchCampaigns } = useCampaignsContext();
+  const { campaigns, isLoading, error, fetchCampaigns } = useCampaignsContext();
   const { success, error: showError } = useToast();
   const { showConfirmation, ConfirmationDialog } = useConfirmationDialog();
 
@@ -337,7 +337,7 @@ export default function EnhancedCampaignsList() {
 
           {/* Lista de campañas */}
           <div className="space-y-4">
-            {loading ? (
+            {isLoading ? (
               <div className="text-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
                 <p className="text-muted-foreground mt-4">Cargando campañas...</p>
