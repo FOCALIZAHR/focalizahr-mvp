@@ -1,4 +1,5 @@
 // src/app/api/campaigns/metrics/route.ts - OPTIMIZADO CON COMPATIBILIDAD 100%
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyJWT } from '@/lib/auth'

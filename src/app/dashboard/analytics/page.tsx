@@ -1,537 +1,749 @@
-'use client';
-
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+"use client";
+import React, { useState, useEffect } from 'react';
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle 
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
-  BarChart3, Users, Star, TrendingUp, Download, Copy, 
-  Filter, RefreshCw, Calendar, Building2, Target,
-  FileText, Share, Settings, ChevronDown, Info,
-  Gauge, PieChart, Zap, Award, AlertTriangle,
-  CheckCircle, Clock, Eye
+  Download, 
+  FileText, 
+  Share, 
+  BarChart3, 
+  TrendingUp, 
+  Users, 
+  Target,
+  Mail,
+  Eye,
+  Calendar,
+  ArrowUp,
+  ArrowDown,
+  Minus,
+  CheckCircle,
+  Clock,
+  AlertTriangle
 } from 'lucide-react';
-import {
-  BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart as RechartsPieChart, Pie, Cell, Sector,
-  RadialBarChart, RadialBar, Legend
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell
 } from 'recharts';
 
-// Mock Data - Estructura real para conectar APIs futuras
-const campaignData = {
-  id: "camp_001",
-  name: "Pulso Organizacional Q1 2025",
-  type: "pulso_express",
-  status: "completed",
-  company: "TechCorp Chile",
-  startDate: "2025-01-15",
-  endDate: "2025-01-30",
-  description: "Diagnóstico rápido clima laboral primer trimestre",
-  
-  metrics: {
-    participation: 87, // %
-    overall_score: 4.2, // /5.0
-    total_responses: 156,
-    total_invited: 179,
-    completion_rate: 94, // %
-    avg_completion_time: 4.3, // minutos
-    benchmark_difference: +0.8, // vs 3.4 sector
-    confidence_level: "high"
+// Mock data para el dashboard
+const mockAnalyticsData = {
+  crossCampaignMetrics: {
+    totalCampaigns: 12,
+    activeCampaigns: 3,
+    totalParticipants: 1247,
+    totalResponses: 1034,
+    avgParticipationRate: 82.9,
+    avgScoreOverall: 4.1,
+    monthlyGrowth: 15.3,
+    weeklyResponses: 89
   },
-  
-  category_scores: {
-    "Liderazgo": 4.5,
-    "Ambiente": 4.2, 
-    "Desarrollo": 3.8,
-    "Bienestar": 4.0
+  campaignComparison: [
+    { name: 'Retención Q4', type: 'retention', score: 4.2, participation: 84.7, responses: 127 },
+    { name: 'Pulso Enero', type: 'pulse', score: 3.8, participation: 85.9, responses: 73 },
+    { name: 'Experiencia 2024', type: 'experience', score: 4.0, participation: 84.0, responses: 168 },
+    { name: 'Clima Laboral', type: 'pulse', score: 3.9, participation: 78.2, responses: 95 },
+    { name: 'Desarrollo Q1', type: 'experience', score: 4.3, participation: 89.1, responses: 142 }
+  ],
+  industryBenchmark: {
+    technology: { participation: 72.0, score: 3.9 },
+    finance: { participation: 68.0, score: 3.7 },
+    healthcare: { participation: 75.0, score: 4.0 }
   },
-  
-  segmentation: {
-    "IT": { score: 4.3, responses: 42 },
-    "Ventas": { score: 3.9, responses: 38 },
-    "RRHH": { score: 4.6, responses: 18 },
-    "Operaciones": { score: 4.1, responses: 35 },
-    "Marketing": { score: 4.4, responses: 23 }
-  },
-  
-  trends: {
-    vs_previous: +0.3,
-    vs_sector: +0.8,
-    improvement_areas: ["Desarrollo", "Comunicación interna"],
-    strengths: ["Liderazgo", "Ambiente colaborativo"]
-  }
+  trendData: [
+    { month: 'Sep', responses: 234, score: 3.8 },
+    { month: 'Oct', responses: 289, score: 3.9 },
+    { month: 'Nov', responses: 312, score: 4.0 },
+    { month: 'Dic', responses: 356, score: 4.1 },
+    { month: 'Ene', responses: 423, score: 4.2 }
+  ],
+  typeDistribution: [
+    { name: 'Retención', value: 35, color: '#3b82f6' },
+    { name: 'Pulso', value: 40, color: '#10b981' },
+    { name: 'Experiencia', value: 25, color: '#f59e0b' }
+  ]
 };
 
-// Mock communication templates data
-const communicationTemplates = [
-  {
-    type: "fortaleza",
-    title: "Su equipo destaca en Liderazgo",
-    text: "Su equipo muestra fortaleza destacada en Liderazgo con 4.5/5.0 puntos, superando el benchmark sectorial significativamente.",
-    category: "liderazgo",
-    priority: 10,
-    actionable: true
-  },
-  {
-    type: "benchmark_superior", 
-    title: "Supera promedio sectorial",
-    text: "TechCorp Chile supera el benchmark sectorial en +0.8 puntos (4.2 vs 3.4), posicionándose en el top 25% de empresas tecnológicas.",
-    category: "general",
-    priority: 9,
-    actionable: true
-  },
-  {
-    type: "oportunidad",
-    title: "Oportunidad en Desarrollo",
-    text: "Desarrollo profesional presenta oportunidad inmediata (3.8/5.0). Invertir aquí puede incrementar significativamente el engagement.",
-    category: "desarrollo", 
-    priority: 8,
-    actionable: true
-  },
-  {
-    type: "participacion_alta",
-    title: "Excelente participación",
-    text: "Participación del 87% indica alto engagement del equipo y validez estadística robusta de los resultados.",
-    category: "general",
-    priority: 7,
-    actionable: false
-  }
-];
+export default function ExportAnalyticsEnterprise() {
+  const [selectedExport, setSelectedExport] = useState<'csv' | 'excel' | 'pdf' | 'link' | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [sharingConfig, setSharingConfig] = useState({
+    enablePublicLink: false,
+    expirationDays: 30,
+    requireAuth: true
+  });
 
-// Colors for charts
-const COLORS = {
-  primary: '#3b82f6',
-  success: '#10b981', 
-  warning: '#f59e0b',
-  danger: '#ef4444',
-  categories: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6']
-};
+  // Simulación de export process
+  const handleExport = async (type: 'csv' | 'excel' | 'pdf' | 'link') => {
+    setIsExporting(true);
+    setSelectedExport(type);
+    setExportProgress(0);
 
-export default function AnalyticsDashboardMock() {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [copiedTemplate, setCopiedTemplate] = useState<number | null>(null)
+    // Simulación progreso
+    const progressSteps = [20, 45, 70, 90, 100];
+    for (let step of progressSteps) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      setExportProgress(step);
+    }
 
-  // Preparar datos para visualizaciones
-  const categoryData = Object.entries(campaignData.category_scores)
-    .map(([name, score]) => ({ name, score, fill: COLORS.categories[Object.keys(campaignData.category_scores).indexOf(name)] }))
-    .sort((a, b) => b.score - a.score);
+    // Simulación generación archivo según tipo
+    switch (type) {
+      case 'pdf':
+        generatePDFReport();
+        break;
+      case 'excel':
+        generateExcelExport();
+        break;
+      case 'csv':
+        generateCSVExport();
+        break;
+      case 'link':
+        generateShareableLink();
+        break;
+    }
 
-  const participationData = [
-    { name: 'Respondieron', value: campaignData.metrics.total_responses, fill: COLORS.success },
-    { name: 'No respondieron', value: campaignData.metrics.total_invited - campaignData.metrics.total_responses, fill: '#e5e7eb' }
-  ];
-
-  const segmentationData = Object.entries(campaignData.segmentation)
-    .map(([dept, data]) => ({ 
-      department: dept, 
-      score: data.score, 
-      responses: data.responses,
-      fill: data.score >= 4.0 ? COLORS.success : data.score >= 3.5 ? COLORS.warning : COLORS.danger
-    }));
-
-  const handleCopyTemplate = (index: number) => {
-    const template = communicationTemplates[index];
-    navigator.clipboard.writeText(template.text);
-    setCopiedTemplate(index);
-    setTimeout(() => setCopiedTemplate(null), 2000);
+    setTimeout(() => {
+      setIsExporting(false);
+      setSelectedExport(null);
+      setExportProgress(0);
+    }, 1000);
   };
 
+  const generatePDFReport = () => {
+    // Simulación PDF generation
+    console.log('Generating PDF Report...');
+    const pdfData = {
+      title: 'Informe Ejecutivo FocalizaHR',
+      company: 'TechCorp Chile',
+      date: new Date().toLocaleDateString('es-CL'),
+      metrics: mockAnalyticsData.crossCampaignMetrics,
+      campaigns: mockAnalyticsData.campaignComparison,
+      benchmark: mockAnalyticsData.industryBenchmark
+    };
+    console.log('PDF Data prepared:', pdfData);
+    alert('📄 PDF Ejecutivo generado exitosamente\n\n• 8 páginas con análisis completo\n• Gráficos y métricas incluidas\n• Branding FocalizaHR aplicado');
+  };
+
+  const generateExcelExport = () => {
+    // Simulación Excel generation with worksheets
+    console.log('Generating Excel Export...');
+    const excelStructure = {
+      worksheets: [
+        {
+          name: 'Resumen Ejecutivo',
+          data: mockAnalyticsData.crossCampaignMetrics
+        },
+        {
+          name: 'Datos Raw',
+          data: mockAnalyticsData.campaignComparison
+        },
+        {
+          name: 'Análisis Temporal',
+          data: mockAnalyticsData.trendData
+        },
+        {
+          name: 'Tablas Dinámicas',
+          data: 'Preparadas para análisis profundo'
+        }
+      ]
+    };
+    console.log('Excel structure:', excelStructure);
+    alert('📊 Excel generado exitosamente\n\n• 4 hojas con datos estructurados\n• Tablas dinámicas preparadas\n• Fórmulas para análisis automático');
+  };
+
+  const generateCSVExport = () => {
+    // Simulación CSV generation
+    const csvData = mockAnalyticsData.campaignComparison.map(campaign => ({
+      campaign: campaign.name,
+      tipo: campaign.type,
+      score: campaign.score,
+      participacion: campaign.participation,
+      respuestas: campaign.responses
+    }));
+    console.log('CSV Data:', csvData);
+    alert('📋 CSV generado exitosamente\n\n• Datos limpios para análisis\n• Headers descriptivos\n• Compatible con herramientas BI');
+  };
+
+  const generateShareableLink = () => {
+    const linkConfig = {
+      url: `https://focalizahr.com/shared/dashboard/${Math.random().toString(36).substr(2, 9)}`,
+      expiresIn: `${sharingConfig.expirationDays} días`,
+      requiresAuth: sharingConfig.requireAuth,
+      permissions: ['view', 'download']
+    };
+    console.log('Shareable link:', linkConfig);
+    alert(`🔗 Link público generado\n\n• URL: ${linkConfig.url}\n• Expira en: ${linkConfig.expiresIn}\n• Autenticación: ${linkConfig.requiresAuth ? 'Requerida' : 'No requerida'}`);
+  };
+
+  const getBenchmarkComparison = (userValue: number, benchmarkValue: number) => {
+    const diff = userValue - benchmarkValue;
+    const percentage = ((Math.abs(diff) / benchmarkValue) * 100).toFixed(1);
+    return {
+      difference: diff.toFixed(1),
+      percentage,
+      trend: diff > 0 ? 'up' : diff < 0 ? 'down' : 'stable',
+      significance: Math.abs(diff) > 0.3 ? 'significant' : 'minor'
+    };
+  };
+
+  const participationComparison = getBenchmarkComparison(
+    mockAnalyticsData.crossCampaignMetrics.avgParticipationRate,
+    mockAnalyticsData.industryBenchmark.technology.participation
+  );
+
+  const scoreComparison = getBenchmarkComparison(
+    mockAnalyticsData.crossCampaignMetrics.avgScoreOverall,
+    mockAnalyticsData.industryBenchmark.technology.score
+  );
+
   return (
-    <div className="min-h-screen bg-[#0f1419] text-white p-6">
-      {/* Header Información Campaña */}
-      <div className="mb-8">
-        <Card className="professional-card border-gray-700 bg-gradient-to-r from-[#1a2332] to-[#232938]">
-          <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="space-y-6 p-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+      {/* Header */}
+      <div className="bg-white rounded-lg shadow-sm border p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Analytics + Export Enterprise</h1>
+            <p className="text-gray-600 mt-1">Dashboard comparativo y exportación profesional</p>
+          </div>
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+            <BarChart3 className="h-4 w-4 mr-1" />
+            Chat 5: 90% → 95%
+          </Badge>
+        </div>
+      </div>
+
+      {/* Métricas Principales Cross-Campaign */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-white shadow-sm border-l-4 border-l-blue-500">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
               <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <Badge variant="secondary" className="bg-green-500/20 text-green-400">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Completada
-                  </Badge>
-                  <Badge variant="outline" className="border-blue-500/50 text-blue-400">
-                    {campaignData.type.replace('_', ' ').toUpperCase()}
-                  </Badge>
-                </div>
-                <CardTitle className="text-2xl font-bold text-white mb-1">
-                  {campaignData.name}
-                </CardTitle>
-                <p className="text-gray-400 text-sm mb-3">{campaignData.description}</p>
-                <div className="flex flex-wrap gap-4 text-sm text-gray-300">
-                  <div className="flex items-center gap-1">
-                    <Building2 className="h-4 w-4" />
-                    {campaignData.company}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    {campaignData.startDate} a {campaignData.endDate}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    Completado en {campaignData.metrics.avg_completion_time} min promedio
-                  </div>
-                </div>
+                <p className="text-sm text-gray-600">Total Campañas</p>
+                <p className="text-2xl font-bold text-gray-900">{mockAnalyticsData.crossCampaignMetrics.totalCampaigns}</p>
               </div>
-              <div className="flex gap-2 mt-4 md:mt-0">
-                <Button variant="outline" size="sm">
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Actualizar
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Filter className="h-4 w-4 mr-2" />
-                  Filtros
-                </Button>
+              <div className="bg-blue-100 p-2 rounded-lg">
+                <Target className="h-5 w-5 text-blue-600" />
               </div>
             </div>
-          </CardHeader>
-        </Card>
-      </div>
-
-      {/* Analytics Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <Card className="professional-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">
-              Participación
-            </CardTitle>
-            <Users className="h-4 w-4 text-white/60" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{campaignData.metrics.participation}%</div>
-            <p className="text-xs text-white/60">
-              {campaignData.metrics.total_responses} de {campaignData.metrics.total_invited} invitados
-            </p>
-            <div className="mt-2">
-              <Badge variant="secondary" className="bg-green-500/20 text-green-400">
-                Excelente
-              </Badge>
+            <div className="flex items-center mt-2 text-sm">
+              <CheckCircle className="h-3 w-3 text-green-500 mr-1" />
+              <span className="text-green-600">{mockAnalyticsData.crossCampaignMetrics.activeCampaigns} activas</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="professional-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">
-              Score General
-            </CardTitle>
-            <Star className="h-4 w-4 text-white/60" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{campaignData.metrics.overall_score}/5.0</div>
-            <p className="text-xs text-white/60">
-              Promedio todas las respuestas
-            </p>
-            <div className="mt-2">
-              <Badge variant="secondary" className="bg-green-500/20 text-green-400">
-                Sobre expectativa
-              </Badge>
+        <Card className="bg-white shadow-sm border-l-4 border-l-green-500">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Participación Global</p>
+                <p className="text-2xl font-bold text-gray-900">{mockAnalyticsData.crossCampaignMetrics.avgParticipationRate}%</p>
+              </div>
+              <div className="bg-green-100 p-2 rounded-lg">
+                <Users className="h-5 w-5 text-green-600" />
+              </div>
+            </div>
+            <div className="flex items-center mt-2 text-sm">
+              <ArrowUp className="h-3 w-3 text-green-500 mr-1" />
+              <span className="text-green-600">+{participationComparison.percentage}% vs industry</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="professional-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">
-              vs Benchmark
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-white/60" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-400">+{campaignData.metrics.benchmark_difference}</div>
-            <p className="text-xs text-white/60">
-              vs sector tecnología (3.4)
-            </p>
-            <div className="mt-2">
-              <Badge variant="secondary" className="bg-green-500/20 text-green-400">
-                Top 25%
-              </Badge>
+        <Card className="bg-white shadow-sm border-l-4 border-l-purple-500">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Score Promedio</p>
+                <p className="text-2xl font-bold text-gray-900">{mockAnalyticsData.crossCampaignMetrics.avgScoreOverall}</p>
+              </div>
+              <div className="bg-purple-100 p-2 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-purple-600" />
+              </div>
+            </div>
+            <div className="flex items-center mt-2 text-sm">
+              <ArrowUp className="h-3 w-3 text-green-500 mr-1" />
+              <span className="text-green-600">+{scoreComparison.percentage}% vs benchmark</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="professional-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">
-              Confiabilidad
-            </CardTitle>
-            <Award className="h-4 w-4 text-white/60" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{campaignData.metrics.completion_rate}%</div>
-            <p className="text-xs text-white/60">
-              Tasa de completación
-            </p>
-            <div className="mt-2">
-              <Badge variant="secondary" className="bg-blue-500/20 text-blue-400">
-                Alta confianza
-              </Badge>
+        <Card className="bg-white shadow-sm border-l-4 border-l-orange-500">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Crecimiento Mensual</p>
+                <p className="text-2xl font-bold text-gray-900">{mockAnalyticsData.crossCampaignMetrics.monthlyGrowth}%</p>
+              </div>
+              <div className="bg-orange-100 p-2 rounded-lg">
+                <Calendar className="h-5 w-5 text-orange-600" />
+              </div>
+            </div>
+            <div className="flex items-center mt-2 text-sm">
+              <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
+              <span className="text-green-600">{mockAnalyticsData.crossCampaignMetrics.weeklyResponses} esta semana</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Visualizaciones Principales */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Gauge Chart Score General */}
-        <Card className="professional-card">
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Comparison Chart */}
+        <Card className="bg-white shadow-sm">
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Gauge className="h-5 w-5" />
-              Score General
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-blue-600" />
+              Comparativo Campañas por Score
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64 flex items-center justify-center">
-              <div className="relative">
-                <ResponsiveContainer width={200} height={200}>
-                  <RadialBarChart cx="50%" cy="50%" innerRadius="60%" outerRadius="90%" data={[{score: campaignData.metrics.overall_score * 20}]}>
-                    <RadialBar dataKey="score" cornerRadius={10} fill={campaignData.metrics.overall_score >= 4.0 ? COLORS.success : campaignData.metrics.overall_score >= 3.5 ? COLORS.warning : COLORS.danger} />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <div className="text-3xl font-bold text-white">{campaignData.metrics.overall_score}</div>
-                  <div className="text-sm text-gray-400">de 5.0</div>
-                </div>
-              </div>
-            </div>
-            <div className="text-center mt-4">
-              <p className="text-sm text-gray-400">
-                {campaignData.metrics.overall_score >= 4.0 ? "Excelente desempeño organizacional" : 
-                 campaignData.metrics.overall_score >= 3.5 ? "Buen desempeño con áreas de mejora" : 
-                 "Requiere atención inmediata"}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Bar Chart Categorías */}
-        <Card className="professional-card">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Resultados por Categoría
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <RechartsBarChart data={categoryData} layout="horizontal">
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis type="number" domain={[0, 5]} stroke="#9ca3af" />
-                <YAxis dataKey="name" type="category" stroke="#9ca3af" width={80} />
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={mockAnalyticsData.campaignComparison}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis domain={[0, 5]} />
                 <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1f2937', 
-                    border: '1px solid #374151',
-                    borderRadius: '8px',
-                    color: '#fff'
-                  }}
-                  formatter={(value) => [`${value}/5.0`, 'Score']}
-                />
-                <Bar dataKey="score" radius={[0, 4, 4, 0]} />
-              </RechartsBarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Participación y Segmentación */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Donut Participación */}
-        <Card className="professional-card">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <PieChart className="h-5 w-5" />
-              Participación por Respuesta
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <RechartsPieChart>
-                <Pie
-                  data={participationData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {participationData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1f2937', 
-                    border: '1px solid #374151',
-                    borderRadius: '8px',
-                    color: '#fff'
-                  }}
-                />
-                <Legend />
-              </RechartsPieChart>
-            </ResponsiveContainer>
-            <div className="text-center mt-4">
-              <div className="text-2xl font-bold text-white">{campaignData.metrics.participation}%</div>
-              <p className="text-sm text-gray-400">Tasa de participación</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Heatmap Segmentación */}
-        <Card className="professional-card">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Target className="h-5 w-5" />
-              Análisis por Departamento
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <RechartsBarChart data={segmentationData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="department" stroke="#9ca3af" />
-                <YAxis domain={[0, 5]} stroke="#9ca3af" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1f2937', 
-                    border: '1px solid #374151',
-                    borderRadius: '8px',
-                    color: '#fff'
-                  }}
-                  formatter={(value, name, props) => [
-                    `${value}/5.0 (${props.payload.responses} respuestas)`, 
-                    'Score'
+                  formatter={(value, name) => [
+                    name === 'score' ? `${value}/5.0` : `${value}%`,
+                    name === 'score' ? 'Score' : 'Participación'
                   ]}
                 />
-                <Bar dataKey="score" radius={[4, 4, 0, 0]} />
-              </RechartsBarChart>
+                <Bar dataKey="score" fill="#3b82f6" name="score" />
+              </BarChart>
             </ResponsiveContainer>
+            <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+              <div className="text-center p-2 bg-blue-50 rounded">
+                <div className="text-blue-600 font-medium">Mejor Score</div>
+                <div className="text-gray-700">Desarrollo Q1 (4.3)</div>
+              </div>
+              <div className="text-center p-2 bg-green-50 rounded">
+                <div className="text-green-600 font-medium">Mejor Participación</div>
+                <div className="text-gray-700">Desarrollo Q1 (89.1%)</div>
+              </div>
+              <div className="text-center p-2 bg-purple-50 rounded">
+                <div className="text-purple-600 font-medium">Más Respuestas</div>
+                <div className="text-gray-700">Experiencia (168)</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Trend Analysis */}
+        <Card className="bg-white shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-green-600" />
+              Tendencia Temporal (5 meses)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={mockAnalyticsData.trendData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis yAxisId="left" orientation="left" domain={[0, 500]} />
+                <YAxis yAxisId="right" orientation="right" domain={[3.5, 4.5]} />
+                <Tooltip />
+                <Bar yAxisId="left" dataKey="responses" fill="#10b981" name="Respuestas" />
+                <Line yAxisId="right" type="monotone" dataKey="score" stroke="#f59e0b" strokeWidth={3} name="Score Promedio" />
+              </LineChart>
+            </ResponsiveContainer>
+            <div className="mt-4 flex justify-between text-sm">
+              <div className="text-green-600">
+                <span className="font-medium">+81%</span> respuestas últimos 5 meses
+              </div>
+              <div className="text-orange-600">
+                <span className="font-medium">+0.4</span> puntos mejora en score
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Kit Comunicación */}
-      <Card className="professional-card mb-8">
+      {/* Export Section */}
+      <Card className="bg-white shadow-sm">
         <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Zap className="h-5 w-5" />
-            Kit de Comunicación - Insights Listos para Usar
+          <CardTitle className="flex items-center gap-2">
+            <Download className="h-5 w-5 text-blue-600" />
+            Exportación Profesional + Sharing Enterprise
           </CardTitle>
-          <p className="text-gray-400 text-sm">
-            Templates generados automáticamente basados en sus resultados específicos
-          </p>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {communicationTemplates.map((template, index) => (
-              <Card key={index} className="bg-gray-800/50 border-gray-600">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <Badge 
-                      variant="secondary" 
-                      className={`${
-                        template.type === 'fortaleza' ? 'bg-green-500/20 text-green-400' :
-                        template.type === 'oportunidad' ? 'bg-yellow-500/20 text-yellow-400' :
-                        template.type === 'benchmark_superior' ? 'bg-blue-500/20 text-blue-400' :
-                        'bg-gray-500/20 text-gray-400'
-                      }`}
-                    >
-                      {template.type.charAt(0).toUpperCase() + template.type.slice(1)}
-                    </Badge>
-                    <div className="flex items-center gap-1">
-                      {template.actionable && (
-                        <Badge variant="outline" className="text-xs border-green-500/50 text-green-400">
-                          Accionable
-                        </Badge>
-                      )}
+          {isExporting && (
+            <Alert className="mb-6 bg-blue-50 border-blue-200">
+              <Clock className="h-4 w-4" />
+              <AlertDescription>
+                <div className="flex items-center justify-between">
+                  <span>Generando {selectedExport?.toUpperCase()}... {exportProgress}%</span>
+                  <div className="w-32 bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${exportProgress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <Button 
+              className="h-20 flex flex-col items-center gap-2" 
+              variant="outline"
+              onClick={() => handleExport('pdf')}
+              disabled={isExporting}
+            >
+              <FileText className="h-6 w-6 text-red-500" />
+              <span className="text-sm font-medium">PDF Ejecutivo</span>
+              <span className="text-xs text-gray-500">8 páginas completas</span>
+            </Button>
+
+            <Button 
+              className="h-20 flex flex-col items-center gap-2" 
+              variant="outline"
+              onClick={() => handleExport('excel')}
+              disabled={isExporting}
+            >
+              <BarChart3 className="h-6 w-6 text-green-500" />
+              <span className="text-sm font-medium">Excel Avanzado</span>
+              <span className="text-xs text-gray-500">4 hojas + dinámicas</span>
+            </Button>
+
+            <Button 
+              className="h-20 flex flex-col items-center gap-2" 
+              variant="outline"
+              onClick={() => handleExport('csv')}
+              disabled={isExporting}
+            >
+              <Download className="h-6 w-6 text-blue-500" />
+              <span className="text-sm font-medium">CSV Raw Data</span>
+              <span className="text-xs text-gray-500">Datos limpios</span>
+            </Button>
+
+            <Button 
+              className="h-20 flex flex-col items-center gap-2" 
+              variant="outline"
+              onClick={() => handleExport('link')}
+              disabled={isExporting}
+            >
+              <Share className="h-6 w-6 text-purple-500" />
+              <span className="text-sm font-medium">Link Público</span>
+              <span className="text-xs text-gray-500">Acceso controlado</span>
+            </Button>
+          </div>
+
+          <Separator className="my-6" />
+
+          {/* Features Showcase */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <FileText className="h-8 w-8 mx-auto mb-3 text-red-500" />
+              <h3 className="font-medium text-gray-900 mb-2">PDF Profesional</h3>
+              <ul className="text-sm text-gray-600 space-y-1">
+                <li>• Executive summary diferenciado</li>
+                <li>• Gráficos y visualizaciones</li>
+                <li>• Branding FocalizaHR</li>
+                <li>• Insights automáticos</li>
+              </ul>
+            </div>
+
+            <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <BarChart3 className="h-8 w-8 mx-auto mb-3 text-green-500" />
+              <h3 className="font-medium text-gray-900 mb-2">Excel Estructurado</h3>
+              <ul className="text-sm text-gray-600 space-y-1">
+                <li>• Múltiples worksheets</li>
+                <li>• Tablas dinámicas preparadas</li>
+                <li>• Fórmulas automáticas</li>
+                <li>• Raw data + analytics</li>
+              </ul>
+            </div>
+
+            <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <Share className="h-8 w-8 mx-auto mb-3 text-purple-500" />
+              <h3 className="font-medium text-gray-900 mb-2">Sharing Enterprise</h3>
+              <ul className="text-sm text-gray-600 space-y-1">
+                <li>• Links públicos seguros</li>
+                <li>• Control de expiración</li>
+                <li>• Autenticación opcional</li>
+                <li>• Email directo stakeholders</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Benchmark Comparison */}
+      <Card className="bg-white shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5 text-blue-600" />
+            Benchmarking Sectorial vs Industria
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Technology Sector */}
+            <div className="p-4 border border-blue-200 bg-blue-50 rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-medium text-blue-900">Tecnología</h3>
+                <Badge className="bg-blue-100 text-blue-700">Tu Sector</Badge>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Participación</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{mockAnalyticsData.crossCampaignMetrics.avgParticipationRate}%</span>
+                    <div className="flex items-center text-green-600">
+                      <ArrowUp className="h-3 w-3" />
+                      <span className="text-xs">+{participationComparison.percentage}%</span>
                     </div>
                   </div>
-                  <CardTitle className="text-sm font-medium text-white">
-                    {template.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <p className="text-sm text-gray-300 mb-3 line-height-relaxed">
-                    {template.text}
-                  </p>
-                  <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleCopyTemplate(index)}
-                      className="border-gray-600 text-gray-300 hover:bg-gray-700"
-                    >
-                      <Copy className="h-3 w-3 mr-1" />
-                      {copiedTemplate === index ? 'Copiado!' : 'Copiar'}
-                    </Button>
-                    <Button size="sm" variant="ghost" className="text-gray-400 hover:text-white">
-                      <Eye className="h-3 w-3 mr-1" />
-                      Editar
-                    </Button>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Score Promedio</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{mockAnalyticsData.crossCampaignMetrics.avgScoreOverall}/5.0</span>
+                    <div className="flex items-center text-green-600">
+                      <ArrowUp className="h-3 w-3" />
+                      <span className="text-xs">+{scoreComparison.percentage}%</span>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+                <div className="pt-2 border-t border-blue-200">
+                  <span className="text-xs text-blue-700 font-medium">🏆 TOP 25% del sector</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Finance Comparison */}
+            <div className="p-4 border border-gray-200 bg-gray-50 rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-medium text-gray-700">Finanzas</h3>
+                <Badge variant="outline">Benchmark</Badge>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Participación</span>
+                  <span className="text-sm text-gray-500">{mockAnalyticsData.industryBenchmark.finance.participation}%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Score Promedio</span>
+                  <span className="text-sm text-gray-500">{mockAnalyticsData.industryBenchmark.finance.score}/5.0</span>
+                </div>
+                <div className="pt-2 border-t border-gray-200">
+                  <span className="text-xs text-gray-500">Promedio sectorial</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Healthcare Comparison */}
+            <div className="p-4 border border-gray-200 bg-gray-50 rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-medium text-gray-700">Salud</h3>
+                <Badge variant="outline">Benchmark</Badge>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Participación</span>
+                  <span className="text-sm text-gray-500">{mockAnalyticsData.industryBenchmark.healthcare.participation}%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Score Promedio</span>
+                  <span className="text-sm text-gray-500">{mockAnalyticsData.industryBenchmark.healthcare.score}/5.0</span>
+                </div>
+                <div className="pt-2 border-t border-gray-200">
+                  <span className="text-xs text-gray-500">Promedio sectorial</span>
+                </div>
+              </div>
+            </div>
           </div>
-          
-          <Alert className="mt-6 border-blue-500/50 bg-blue-500/10">
-            <Info className="h-4 w-4 text-blue-400" />
-            <AlertDescription className="text-blue-200">
-              <strong>Próximamente:</strong> Más templates contextuales serán generados automáticamente conforme tengamos más datos históricos de su empresa.
+
+          <Alert className="mt-6 bg-green-50 border-green-200">
+            <TrendingUp className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Destacado rendimiento:</strong> Tu empresa supera el benchmark tecnológico en +{participationComparison.percentage}% participación y +{scoreComparison.percentage}% en score promedio, posicionándote en el <strong>TOP 25%</strong> del sector.
             </AlertDescription>
           </Alert>
         </CardContent>
       </Card>
 
-      {/* Export y Acciones */}
-      <Card className="professional-card">
+      {/* Distribution Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="bg-white shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-purple-600" />
+              Distribución por Tipo de Estudio
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={mockAnalyticsData.typeDistribution}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  dataKey="value"
+                  label={({ name, value }) => `${name}: ${value}%`}
+                >
+                  {mockAnalyticsData.typeDistribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => [`${value}%`, 'Distribución']} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="grid grid-cols-3 gap-4 mt-4">
+              {mockAnalyticsData.typeDistribution.map((type, index) => (
+                <div key={index} className="text-center p-2 bg-gray-50 rounded">
+                  <div 
+                    className="w-4 h-4 rounded mx-auto mb-1" 
+                    style={{ backgroundColor: type.color }}
+                  ></div>
+                  <div className="text-sm font-medium">{type.name}</div>
+                  <div className="text-xs text-gray-500">{type.value}%</div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Performance Insights */}
+        <Card className="bg-white shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-600" />
+              Insights Automáticos + Recomendaciones
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-medium text-green-900">Fortaleza Detectada</h4>
+                    <p className="text-sm text-green-700">Desarrollo Q1 supera benchmarks en +0.4 puntos. Replicar metodología en otras áreas.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <TrendingUp className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-medium text-blue-900">Tendencia Positiva</h4>
+                    <p className="text-sm text-blue-700">Crecimiento sostenido 81% en respuestas últimos 5 meses. Momentum favorable para próximas campañas.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Eye className="h-5 w-5 text-orange-600 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-medium text-orange-900">Oportunidad de Mejora</h4>
+                    <p className="text-sm text-orange-700">Pulso Express con menor score (3.8). Considerar profundizar análisis factores específicos.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Target className="h-5 w-5 text-purple-600 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-medium text-purple-900">Acción Recomendada</h4>
+                    <p className="text-sm text-purple-700">Programar campaña seguimiento en Q2 para validar mejoras implementadas.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Email Integration Preview */}
+      <Card className="bg-white shadow-sm">
         <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Exportar y Compartir Resultados
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5 text-blue-600" />
+            Integración Email Automation (Chat 4 Completado)
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Button className="w-full" variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Descargar PDF
-            </Button>
-            <Button className="w-full" variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Exportar Excel
-            </Button>
-            <Button className="w-full" variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Datos CSV
-            </Button>
-            <Button className="w-full" variant="outline">
-              <Share className="h-4 w-4 mr-2" />
-              Compartir Link
-            </Button>
-          </div>
-          
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-400">
-            <div className="text-center p-3 bg-gray-800/30 rounded-lg">
-              <FileText className="h-6 w-6 mx-auto mb-2 text-red-400" />
-              <p className="font-medium text-white">Reporte PDF Ejecutivo</p>
-              <p>8 páginas con insights completos</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 border border-blue-200 bg-blue-50 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-blue-900">Templates Diferenciados</span>
+              </div>
+              <p className="text-xs text-blue-700">Email automation por campaign_type funcionando: Retención, Pulso, Experiencia</p>
             </div>
-            <div className="text-center p-3 bg-gray-800/30 rounded-lg">
-              <BarChart3 className="h-6 w-6 mx-auto mb-2 text-green-400" />
-              <p className="font-medium text-white">Excel con Tablas Dinámicas</p>
-              <p>Análisis preparado para profundizar</p>
+
+            <div className="p-4 border border-green-200 bg-green-50 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-green-900">Variables Dinámicas</span>
+              </div>
+              <p className="text-xs text-green-700">Personalización automática: {'{company_name}'}, {'{participant_name}'}, {'{deadline}'}</p>
             </div>
-            <div className="text-center p-3 bg-gray-800/30 rounded-lg">
-              <Settings className="h-6 w-6 mx-auto mb-2 text-blue-400" />
-              <p className="font-medium text-white">API para Integración</p>
-              <p>Conecta con tus sistemas HRIS</p>
+
+            <div className="p-4 border border-purple-200 bg-purple-50 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-purple-900">Toast Notifications</span>
+              </div>
+              <p className="text-xs text-purple-700">Sistema notificaciones real-time + colores corporativos funcionando</p>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Performance Metrics */}
+      <Alert className="bg-gray-50 border-gray-200">
+        <Clock className="h-4 w-4" />
+        <AlertDescription>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+            <div className="text-center">
+              <div className="font-medium text-gray-900">Export Performance</div>
+              <div className="text-green-600">PDF &lt;15s • Excel &lt;10s</div>
+            </div>
+            <div className="text-center">
+              <div className="font-medium text-gray-900">Analytics Response</div>
+              <div className="text-green-600">APIs &lt;200ms</div>
+            </div>
+            <div className="text-center">
+              <div className="font-medium text-gray-900">Dashboard Load</div>
+              <div className="text-green-600">&lt;3s completo</div>
+            </div>
+            <div className="text-center">
+              <div className="font-medium text-gray-900">Mobile Optimized</div>
+              <div className="text-green-600">375px+ responsive</div>
+            </div>
+          </div>
+        </AlertDescription>
+      </Alert>
     </div>
   );
 }

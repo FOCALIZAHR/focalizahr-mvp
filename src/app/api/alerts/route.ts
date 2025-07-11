@@ -1,5 +1,6 @@
 // src/app/api/alerts/route.ts
 // 🎯 ARCHIVO COMPLETO CORREGIDO - Todas las funciones auth + schema Prisma
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyJWT } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';

@@ -1,4 +1,5 @@
 // src/app/api/campaign-types/route.ts - OPTIMIZADO CHAT 3A
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 

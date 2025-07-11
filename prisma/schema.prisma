@@ -93,6 +93,8 @@ model Campaign {
   participants                    Participant[]
   campaignResults                 CampaignResult?
   auditLogs                       AuditLog[]
+  emailLogs                       EmailLog[]
+  emailAutomations                EmailAutomation[]
 
   @@map("campaigns")
   @@index([accountId], map: "idx_campaigns_account")
@@ -132,6 +134,7 @@ model Participant {
   // Relaciones
   campaign                        Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   responses                       Response[]
+  emailLogs                       EmailLog[]
 
   @@map("participants")
   @@unique([campaignId, email])
@@ -287,4 +290,52 @@ model AuditLog {
   @@index([campaignId], map: "idx_audit_campaign")
   @@index([action], map: "idx_audit_action")
   @@index([createdAt], map: "idx_audit_created")
+}
+
+// TABLA 10: Email Logs para tracking
+model EmailLog {
+  id            String   @id @default(cuid())
+  participantId String   @map("participant_id")
+  campaignId    String   @map("campaign_id")
+  emailType     String   @map("email_type") // 'invitation', 'reminder_1', 'reminder_2'
+  templateId    String   @map("template_id")
+  sentAt        DateTime @map("sent_at")
+  deliveredAt   DateTime? @map("delivered_at")
+  openedAt      DateTime? @map("opened_at")
+  clickedAt     DateTime? @map("clicked_at")
+  bouncedAt     DateTime? @map("bounced_at")
+  complainedAt  DateTime? @map("complained_at")
+  openCount     Int      @default(0) @map("open_count")
+  clickCount    Int      @default(0) @map("click_count")
+  status        String   @default("sent") // 'sent', 'delivered', 'bounced', 'complained'
+  bounceReason  String?  @map("bounce_reason")
+  
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  campaign      Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  @@map("email_logs")
+  @@index([participantId], map: "idx_email_logs_participant")
+  @@index([campaignId], map: "idx_email_logs_campaign")
+  @@index([emailType], map: "idx_email_logs_type")
+  @@index([status], map: "idx_email_logs_status")
+  @@index([sentAt], map: "idx_email_logs_sent")
+}
+
+// TABLA 11: Email Automation Rules
+model EmailAutomation {
+  id          String    @id @default(cuid())
+  campaignId  String    @map("campaign_id")
+  triggerType String    @map("trigger_type") // 'reminder_1', 'reminder_2'
+  triggerAt   DateTime  @map("trigger_at")
+  processedAt DateTime? @map("processed_at")
+  enabled     Boolean   @default(true)
+  templateId  String    @map("template_id")
+  
+  campaign    Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  @@map("email_automations")
+  @@index([campaignId], map: "idx_email_automation_campaign")
+  @@index([triggerType], map: "idx_email_automation_type")
+  @@index([triggerAt], map: "idx_email_automation_trigger")
+  @@index([enabled], map: "idx_email_automation_enabled")
 }

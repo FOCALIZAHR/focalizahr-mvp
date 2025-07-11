@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { isAuthenticated } from '@/lib/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useSidebar } from '@/hooks/useSidebar';
 import { Badge } from '@/components/ui/badge';
 import { 
   BarChart3, 
@@ -78,7 +79,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  
+  const { isCollapsed } = useSidebar();
   // Context campaigns
   const { campaigns, isLoading: campaignsLoading, error: campaignsError, fetchCampaigns } = useCampaignsContext();
   
@@ -203,7 +204,7 @@ export default function DashboardPage() {
       />
       
       {/* ✅ CONTENIDO PRINCIPAL */}
-      <div className="md:ml-64 min-h-screen relative z-10">
+      <div className={`min-h-screen relative z-10 transition-all duration-300 ${isCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
         <div className="container mx-auto px-6 py-8">
           
           {/* ✅ HEADER DASHBOARD INTELIGENTE SIMPLE */}
