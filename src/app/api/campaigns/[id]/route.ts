@@ -1,52 +1,72 @@
-
 // src/app/api/campaigns/[id]/route.ts
+// ARCHIVO FALTANTE - IMPLEMENTACIÓN BASADA EN PATRONES EXISTENTES
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyJWT } from '@/lib/auth'
 
-// GET /api/campaigns/[id] - Obtener campaña específica
+export const dynamic = 'force-dynamic'
+
+// GET /api/campaigns/[id] - Detalles campaña individual
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const startTime = Date.now()
+  
   try {
+    console.log('📊 Campaign details request:', params.id)
+    
     const authResult = await verifyJWT(request)
     if (!authResult.success || !authResult.user) {
       return NextResponse.json(
-        { error: 'No autorizado' },
+        { success: false, error: 'No autorizado' },
         { status: 401 }
       )
     }
 
-    const campaign = await prisma.campaign.findFirst({
-      where: {
-        id: params.id,
-        accountId: authResult.user.id
+    const campaignId = params.id
+    const accountId = authResult.user.id
+
+    // Buscar campaña con multi-tenancy isolation
+    const campaign = await prisma.campaign.findUnique({
+      where: { 
+        id: campaignId,
+        accountId: accountId // Aislamiento multi-tenant
       },
       include: {
+        account: {
+          select: {
+            id: true,
+            companyName: true,
+            adminEmail: true,
+            subscriptionTier: true
+          }
+        },
         campaignType: {
-          include: {
-            questions: {
-              where: { isActive: true },
-              orderBy: { questionOrder: 'asc' }
-            }
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            questionCount: true,
+            estimatedDuration: true
           }
         },
         participants: {
           select: {
             id: true,
             email: true,
-            department: true,
-            position: true,
             hasResponded: true,
             responseDate: true,
+            department: true,
+            position: true,
             createdAt: true
           }
         },
-        campaignResults: true,
         _count: {
           select: {
-            participants: true
+            participants: true,
+            responses: true
           }
         }
       }
@@ -54,191 +74,106 @@ export async function GET(
 
     if (!campaign) {
       return NextResponse.json(
-        { error: 'Campaña no encontrada' },
+        { 
+          success: false,
+          error: 'Campaña no encontrada',
+          code: 'NOT_FOUND'
+        },
         { status: 404 }
       )
     }
 
-    // Calcular métricas adicionales
-    const participationRate = campaign.totalInvited > 0 
-      ? Math.round((campaign.totalResponded / campaign.totalInvited) * 100) 
-      : 0
-
+    // Calcular métricas
+    const totalInvited = campaign._count.participants
+    const totalResponded = campaign.participants.filter(p => p.hasResponded).length
+    const participationRate = totalInvited > 0 ? (totalResponded / totalInvited) * 100 : 0
+    
+    // Estado inteligente
+    const now = new Date()
+    const endDate = new Date(campaign.endDate)
+    const isOverdue = now > endDate && campaign.status === 'active'
     const daysRemaining = campaign.status === 'active' 
-      ? Math.ceil((campaign.endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      ? Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
       : null
 
-    const responsesByDay = campaign.participants
-      .filter(p => p.hasResponded && p.responseDate)
-      .reduce((acc: any, p) => {
-        const day = p.responseDate!.toISOString().split('T')[0]
-        acc[day] = (acc[day] || 0) + 1
-        return acc
-      }, {})
-
-    return NextResponse.json({
-      ...campaign,
-      participationRate,
-      daysRemaining,
-      responsesByDay,
-      isEditable: campaign.status === 'draft',
-      canActivate: campaign.status === 'draft' && campaign.totalInvited >= 5
-    })
-
-  } catch (error) {
-    console.error('Error fetching campaign:', error)
-    return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
-    )
-  }
-}
-
-// PUT /api/campaigns/[id]/activate - Activar campaña
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const authResult = await verifyJWT(request)
-    if (!authResult.success || !authResult.user) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      )
+    // Risk level básico
+    let riskLevel = 'low'
+    if (campaign.status === 'active') {
+      if (participationRate < 30) riskLevel = 'high'
+      else if (participationRate < 60) riskLevel = 'medium'
     }
 
-    const { action } = await request.json()
-
-    if (action !== 'activate') {
-      return NextResponse.json(
-        { error: 'Acción no válida' },
-        { status: 400 }
-      )
-    }
-
-    // Buscar la campaña
-    const campaign = await prisma.campaign.findFirst({
-      where: {
-        id: params.id,
-        accountId: authResult.user.id
-      },
-      include: {
-        campaignType: true,
-        _count: {
-          select: { participants: true }
-        }
-      }
-    })
-
-    if (!campaign) {
-      return NextResponse.json(
-        { error: 'Campaña no encontrada' },
-        { status: 404 }
-      )
-    }
-
-    // Validaciones pre-activación
-    if (campaign.status !== 'draft') {
-      return NextResponse.json(
-        { error: 'Solo se pueden activar campañas en estado borrador' },
-        { status: 409 }
-      )
-    }
-
-    if (campaign._count.participants < 5) {
-      return NextResponse.json(
-        { error: 'Mínimo 5 participantes requeridos para activar' },
-        { status: 409 }
-      )
-    }
-
-    // Verificar límites de cuenta
-    const account = await prisma.account.findUnique({
-      where: { id: authResult.user.id }
-    })
-
-    if (!account) {
-      return NextResponse.json(
-        { error: 'Cuenta no encontrada' },
-        { status: 404 }
-      )
-    }
-
-    // Verificar límite de campañas activas
-    const activeCampaignsCount = await prisma.campaign.count({
-      where: {
-        accountId: authResult.user.id,
-        campaignTypeId: campaign.campaignTypeId,
-        status: 'active'
-      }
-    })
-
-    if (activeCampaignsCount >= account.maxActiveCampaigns) {
-      return NextResponse.json(
-        { error: 'Límite de campañas activas alcanzado' },
-        { status: 409 }
-      )
-    }
-
-    // Activar la campaña
-    const updatedCampaign = await prisma.campaign.update({
-      where: { id: params.id },
-      data: {
-        status: 'active',
-        activatedAt: new Date(),
-        totalInvited: campaign._count.participants
-      },
-      include: {
-        campaignType: true,
-        participants: {
-          select: {
-            id: true,
-            email: true,
-            uniqueToken: true
-          }
-        }
-      }
-    })
-
-    // Crear audit log
-    await prisma.auditLog.create({
-      data: {
-        accountId: authResult.user.id,
-        campaignId: campaign.id,
-        action: 'campaign_activated',
-        entityType: 'campaign',
-        entityId: campaign.id,
-        newValues: {
-          status: 'active',
-          totalInvited: campaign._count.participants,
-          activatedAt: new Date()
+    // Respuesta compatible con frontend existente
+    const response = {
+      success: true,
+      campaign: {
+        id: campaign.id,
+        name: campaign.name,
+        description: campaign.description,
+        status: campaign.status,
+        startDate: campaign.startDate,
+        endDate: campaign.endDate,
+        createdAt: campaign.createdAt,
+        updatedAt: campaign.updatedAt,
+        activatedAt: campaign.activatedAt,
+        completedAt: campaign.completedAt,
+        
+        // Company info (estructura compatible)
+        company: {
+          name: campaign.account.companyName,
+          admin_email: campaign.account.adminEmail
         },
-        userInfo: {
-          ip: request.headers.get('x-forwarded-for') || 'unknown',
-          userAgent: request.headers.get('user-agent') || 'unknown'
-        }
+        
+        // Campaign type
+        campaignType: campaign.campaignType,
+        
+        // Métricas calculadas
+        totalInvited,
+        totalResponded,
+        participationRate: Math.round(participationRate * 100) / 100,
+        
+        // Estados inteligentes
+        isOverdue,
+        daysRemaining,
+        riskLevel,
+        
+        // Participants summary
+        participants: campaign.participants.map(p => ({
+          id: p.id,
+          hasResponded: p.hasResponded,
+          responseDate: p.responseDate,
+          department: p.department,
+          position: p.position,
+          createdAt: p.createdAt
+          // Email omitido por privacy
+        }))
+      },
+      performance: {
+        queryTime: Date.now() - startTime
+      }
+    }
+
+    console.log(`✅ Campaign details retrieved: ${campaign.name}`)
+
+    return NextResponse.json(response, { 
+      status: 200,
+      headers: {
+        'Cache-Control': 'private, max-age=30'
       }
     })
 
-    // TODO: Aquí se enviarían los emails de invitación
-    // Para MVP, retornamos success con información para envío manual
-
-    return NextResponse.json({
-      campaign: updatedCampaign,
-      message: 'Campaña activada exitosamente',
-      emailsToSend: updatedCampaign.participants.length,
-      nextSteps: [
-        'Emails de invitación se enviarán automáticamente',
-        'Dashboard actualizado con métricas en tiempo real',
-        'Recordatorios programados según configuración'
-      ]
-    })
-
   } catch (error) {
-    console.error('Error activating campaign:', error)
+    console.error('❌ Error fetching campaign details:', error)
+    
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
+      { 
+        success: false,
+        error: 'Error interno del servidor',
+        code: 'INTERNAL_ERROR',
+        performance: {
+          queryTime: Date.now() - startTime
+        }
+      },
       { status: 500 }
     )
   }

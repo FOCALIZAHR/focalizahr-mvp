@@ -156,7 +156,7 @@ await prisma.account.deleteMany(); // <-- Esta línea soluciona el error y limpi
         subcategory: q.subcategory,
         questionOrder: q.order,
         methodologyReference: q.methodology,
-        responseType: 'rating',
+        responseType: 'rating_scale',
         isRequired: true,
         minValue: 1,
         maxValue: 5
@@ -398,7 +398,7 @@ await prisma.account.deleteMany(); // <-- Esta línea soluciona el error y limpi
         subcategory: q.subcategory,
         questionOrder: q.order,
         methodologyReference: 'Employee Experience Framework',
-        responseType: 'rating',
+        responseType: 'rating_scale',
         isRequired: true,
         minValue: 1,
         maxValue: 5

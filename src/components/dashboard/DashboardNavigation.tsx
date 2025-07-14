@@ -82,9 +82,9 @@ export default function DashboardNavigation({
     {
       id: 'email-automation',
       label: 'Email Automation',
-      href: '/dashboard/email-automation',
+      href: '/admin/email-automation',
       icon: Mail,
-      active: pathname.startsWith('/dashboard/email-automation')
+      active: pathname.startsWith('/admin/email-automation')
     },
     {
       id: 'analytics',
