@@ -246,10 +246,11 @@ model CampaignResult {
   @@index([generatedAt], map: "idx_results_generated")
 }
 
-// TABLA 8: Templates Kit Comunicación
+// TABLA 8: Templates Kit Comunicación - ARQUITECTURA CONTEXTUAL
 model CommunicationTemplate {
   id                              String   @id @default(cuid())
   templateType                    String   @map("template_type") // fortaleza, oportunidad, benchmark_superior, etc.
+  productContext                  String   @default("general") @map("product_context") // NUEVO CAMPO
   category                        String?  // liderazgo, ambiente, desarrollo, bienestar, general
   conditionRule                   String   @map("condition_rule") // "score >= 4.0", "participation < 50"
   templateText                    String   @map("template_text")
@@ -262,10 +263,11 @@ model CommunicationTemplate {
   createdAt                       DateTime @default(now()) @map("created_at")
 
   @@map("communication_templates")
-  @@index([templateType], map: "idx_templates_type")
+  @@unique([templateType, productContext]) // REGLA DE UNICIDAD COMPUESTA
   @@index([category], map: "idx_templates_category")
   @@index([isActive], map: "idx_templates_active")
   @@index([priority], map: "idx_templates_priority")
+  @@index([productContext], map: "idx_templates_product_context")
 }
 
 // TABLA 9: Audit Log (Para debugging y compliance)

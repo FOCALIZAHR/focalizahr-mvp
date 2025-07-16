@@ -1,0 +1,193 @@
+/* ARCHIVO: src/styles/pulse-indicators-corporate.css */
+/* CSS específico para PulseIndicatorGrid con estilos corporativos */
+
+/* ✅ MEJORAS TOOLTIPS HOVER CORPORATIVOS */
+.pulse-tooltip-corporate {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.98), rgba(51, 65, 85, 0.98));
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  box-shadow: 
+    0 10px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(34, 211, 238, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  animation: tooltipFadeIn 0.2s ease-out;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ✅ EFECTOS HOVER SPARKLINES */
+.sparkline-container {
+  position: relative;
+  overflow: visible;
+}
+
+.sparkline-container:hover .sparkline-path {
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 4px currentColor);
+  animation: sparklineGlow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes sparklineGlow {
+  from {
+    opacity: 0.8;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ✅ CARDS HOVER CORPORATIVO MEJORADO */
+.pulse-card-corporate {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pulse-card-corporate::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(34, 211, 238, 0.05),
+    rgba(167, 139, 250, 0.05),
+    transparent
+  );
+  transition: left 0.6s ease;
+  z-index: 1;
+}
+
+.pulse-card-corporate:hover::before {
+  left: 100%;
+}
+
+.pulse-card-corporate:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(34, 211, 238, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* ✅ GRADIENTES DE FONDO POR ESTADO - CORPORATIVOS */
+.pulse-success-bg {
+  background: linear-gradient(135deg, 
+    rgba(16, 185, 129, 0.08) 0%,
+    rgba(5, 150, 105, 0.05) 50%,
+    rgba(4, 120, 87, 0.08) 100%
+  );
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.pulse-warning-bg {
+  background: linear-gradient(135deg, 
+    rgba(245, 158, 11, 0.08) 0%,
+    rgba(217, 119, 6, 0.05) 50%,
+    rgba(180, 83, 9, 0.08) 100%
+  );
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.pulse-danger-bg {
+  background: linear-gradient(135deg, 
+    rgba(239, 68, 68, 0.08) 0%,
+    rgba(220, 38, 38, 0.05) 50%,
+    rgba(185, 28, 28, 0.08) 100%
+  );
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+/* ✅ ICONOS CON GLOW SUTIL */
+.pulse-icon-container {
+  position: relative;
+}
+
+.pulse-icon-container::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(167, 139, 250, 0.1));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.pulse-card-corporate:hover .pulse-icon-container::after {
+  opacity: 1;
+}
+
+/* ✅ TEXTO CORPORATIVO MEJORADO */
+.pulse-title-corporate {
+  background: linear-gradient(135deg, #1e293b, #334155);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+}
+
+.pulse-value-corporate {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+/* ✅ RESPONSIVE CORPORATIVO */
+@media (max-width: 768px) {
+  .pulse-card-corporate {
+    transform: none !important;
+  }
+  
+  .pulse-card-corporate:hover {
+    transform: scale(1.02) !important;
+  }
+  
+  .pulse-tooltip-corporate {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+  }
+}
+
+/* ✅ MODO OSCURO COMPATIBLE */
+@media (prefers-color-scheme: dark) {
+  .pulse-success-bg {
+    background: linear-gradient(135deg, 
+      rgba(16, 185, 129, 0.12) 0%,
+      rgba(5, 150, 105, 0.08) 50%,
+      rgba(4, 120, 87, 0.12) 100%
+    );
+  }
+  
+  .pulse-warning-bg {
+    background: linear-gradient(135deg, 
+      rgba(245, 158, 11, 0.12) 0%,
+      rgba(217, 119, 6, 0.08) 50%,
+      rgba(180, 83, 9, 0.12) 100%
+    );
+  }
+  
+  .pulse-danger-bg {
+    background: linear-gradient(135deg, 
+      rgba(239, 68, 68, 0.12) 0%,
+      rgba(220, 38, 38, 0.08) 50%,
+      rgba(185, 28, 28, 0.12) 100%
+    );
+  }
+}

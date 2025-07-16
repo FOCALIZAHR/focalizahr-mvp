@@ -18,6 +18,7 @@ interface CampaignAnalytics {
   categoryScores?: Record<string, number>;
   responsesByDay?: Record<string, number>;
   demographicBreakdown?: any[];
+  departmentScores?: Record<string, number>;
 }
 
 // ✅ GET /api/campaigns/[id]/analytics
@@ -185,6 +186,17 @@ export async function GET(
     // ✅ TASA DE RESPUESTA ACTUAL
     const responseRate = participationRate; // En MVP son equivalentes
 
+    // ✅ CONSTRUIR DEPARTMENT_SCORES PARA KIT COMUNICACIÓN
+    const departmentScores: Record<string, number> = {};
+    if (participantBreakdown) { // Verificación de existencia según Gemini
+      for (const [department, data] of Object.entries(participantBreakdown)) {
+        // Solo incluir departamentos con datos válidos (no "Sin departamento")
+        if (department !== 'Sin departamento' && data.avgScore > 0) {
+          departmentScores[department] = Math.round(data.avgScore * 10) / 10;
+        }
+      }
+    }
+
     // ✅ CONSTRUIR RESPUESTA
     const analytics: CampaignAnalytics = {
       participationRate: Math.round(participationRate * 10) / 10,
@@ -198,7 +210,8 @@ export async function GET(
       segmentationData,
       trendData,
       demographicBreakdown: segmentationData,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
+      departmentScores: departmentScores
     };
 
     return NextResponse.json(

@@ -15,7 +15,9 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:retencion": "tsx prisma/seed-retencion.ts",
     "db:reset": "prisma migrate reset",
+    "db:seed:templates": "tsx prisma/seedTemplates.ts",
     "test:api": "node scripts/test-apis.js"
+    
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

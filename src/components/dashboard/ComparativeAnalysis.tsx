@@ -1,5 +1,6 @@
 // src/components/dashboard/ComparativeAnalysis.tsx
-// PASO 3.3: Análisis Comparativo - Gráficos y Tablas usando datos de analytics
+// COMPONENTE CORREGIDO - Estilos corporativos FocalizaHR + hover fixes
+// VERSIÓN FINAL: Sin blancos + tooltips corporativos
 
 import React, { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
@@ -30,8 +31,25 @@ interface ComparativeAnalysisProps {
 export default function ComparativeAnalysis({ analytics }: ComparativeAnalysisProps) {
   const [activeTab, setActiveTab] = useState<'categories' | 'trends' | 'daily' | 'segments'>('categories');
 
-  // Colores para gráficos
-  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#84CC16', '#F97316'];
+  // ✅ COLORES CORPORATIVOS FOCALIZAHR
+  const COLORS_CORPORATE = ['#22D3EE', '#A78BFA', '#10B981', '#F59E0B', '#EF4444', '#06B6D4', '#84CC16', '#F97316'];
+
+  // ✅ TOOLTIP PERSONALIZADO CORPORATIVO
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="fhr-card-simple bg-slate-800/95 border border-cyan-500/30 backdrop-blur-sm p-3 shadow-lg">
+          <p className="fhr-subtitle text-sm mb-2">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <p key={index} className="text-slate-200 text-sm">
+              <span className="fhr-text-accent">{entry.name}:</span> {entry.value.toFixed(1)}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
 
   // Preparar datos para gráfico de categorías
   const categoryData = analytics.categoryScores ? 
@@ -50,7 +68,7 @@ export default function ComparativeAnalysis({ analytics }: ComparativeAnalysisPr
   })) || [];
 
   // Preparar datos de respuestas por día
-  const dailyResponseData = analytics.responsesByDay ? 
+  const dailyResponseData = analytics.responsesByDay ?
     Object.entries(analytics.responsesByDay).map(([day, count]) => ({
       day: new Date(day).toLocaleDateString('es-ES', { weekday: 'short' }),
       responses: count
@@ -61,192 +79,227 @@ export default function ComparativeAnalysis({ analytics }: ComparativeAnalysisPr
     name: item.segment,
     value: item.count,
     avgScore: item.avgScore,
-    color: COLORS[index % COLORS.length]
+    color: COLORS_CORPORATE[index % COLORS_CORPORATE.length]
   })) || [];
 
-  // Helper para determinar tendencia
+  // ✅ FUNCIÓN TREND CON COLORES CORPORATIVOS
   const getTrendIcon = (current: number, previous: number) => {
-    if (current > previous) return <TrendingUp className="h-4 w-4 text-green-500" />;
-    if (current < previous) return <TrendingDown className="h-4 w-4 text-red-500" />;
-    return <Activity className="h-4 w-4 text-gray-500" />;
+    if (current > previous) return <TrendingUp className="h-4 w-4 text-green-400" />;
+    if (current < previous) return <TrendingDown className="h-4 w-4 text-red-400" />;
+    return <Activity className="h-4 w-4 text-slate-400" />;
   };
 
   return (
     <div className="space-y-6">
+      {/* ✅ HEADER CON ESTILOS CORPORATIVOS */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Análisis Comparativo</h2>
+        <h2 className="fhr-title-gradient text-2xl font-bold">Análisis Comparativo</h2>
         <div className="flex items-center space-x-4">
-          <Badge variant="outline" className="text-sm">
+          <div className="fhr-badge-active">
             Score General: {analytics.averageScore.toFixed(1)}/5.0
-          </Badge>
-          <Badge variant="outline" className="text-sm">
+          </div>
+          <div className="fhr-badge-completed">
             Participación: {analytics.participationRate.toFixed(1)}%
-          </Badge>
+          </div>
         </div>
       </div>
 
       <div className="space-y-6">
-        {/* Navigation buttons */}
-        <div className="flex space-x-2 border-b pb-4">
-          <Button
-            variant={activeTab === 'categories' ? 'default' : 'outline'}
+        {/* ✅ NAVIGATION TABS CORPORATIVOS */}
+        <div className="flex space-x-2 border-b border-slate-700 pb-4">
+          <button
+            className={`fhr-btn-${activeTab === 'categories' ? 'primary' : 'secondary'} flex items-center gap-2`}
             onClick={() => setActiveTab('categories')}
-            className="flex items-center gap-2"
           >
             <BarChart3 className="h-4 w-4" />
             Por Categorías
-          </Button>
-          <Button
-            variant={activeTab === 'trends' ? 'default' : 'outline'}
+          </button>
+          <button
+            className={`fhr-btn-${activeTab === 'trends' ? 'primary' : 'secondary'} flex items-center gap-2`}
             onClick={() => setActiveTab('trends')}
-            className="flex items-center gap-2"
           >
             <TrendingUp className="h-4 w-4" />
             Tendencias
-          </Button>
-          <Button
-            variant={activeTab === 'daily' ? 'default' : 'outline'}
+          </button>
+          <button
+            className={`fhr-btn-${activeTab === 'daily' ? 'primary' : 'secondary'} flex items-center gap-2`}
             onClick={() => setActiveTab('daily')}
-            className="flex items-center gap-2"
           >
             <Activity className="h-4 w-4" />
             Actividad Diaria
-          </Button>
-          <Button
-            variant={activeTab === 'segments' ? 'default' : 'outline'}
+          </button>
+          <button
+            className={`fhr-btn-${activeTab === 'segments' ? 'primary' : 'secondary'} flex items-center gap-2`}
             onClick={() => setActiveTab('segments')}
-            className="flex items-center gap-2"
           >
             <PieIcon className="h-4 w-4" />
             Segmentación
-          </Button>
+          </button>
         </div>
 
-        {/* Content sections */}
+        {/* ✅ TAB CATEGORÍAS - ESTILOS CORPORATIVOS */}
         {activeTab === 'categories' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Gráfico de barras comparativo */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
+            {/* Gráfico de barras con estilos corporativos */}
+            <div className="fhr-card">
+              <div className="flex items-center gap-3 mb-6">
+                <BarChart3 className="h-6 w-6 text-cyan-400" />
+                <h3 className="fhr-title-gradient text-lg font-bold">
                   Scores por Categoría vs Benchmark
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={categoryData}>
-                    <CartesianGrid strokeDasharray="3 3" />
+                </h3>
+              </div>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={categoryData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                     <XAxis 
                       dataKey="category" 
-                      angle={-45}
-                      textAnchor="end"
-                      height={80}
-                      fontSize={12}
+                      tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                      axisLine={{ stroke: '#4B5563' }}
                     />
-                    <YAxis domain={[0, 5]} />
-                    <Tooltip 
-                      formatter={(value, name) => [value, name === 'score' ? 'Score Actual' : 'Benchmark']}
+                    <YAxis 
+                      tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                      axisLine={{ stroke: '#4B5563' }}
                     />
-                    <Bar dataKey="score" fill="#3B82F6" name="score" />
-                    <Bar dataKey="benchmark" fill="#E5E7EB" name="benchmark" />
+                    <Tooltip content={<CustomTooltip />} />
+                    {/* ✅ COLORES CORPORATIVOS EN BARRAS */}
+                    <Bar dataKey="score" fill="#22D3EE" name="Score Actual" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="benchmark" fill="#6B7280" name="Benchmark" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            {/* Tabla detallada */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Detalle por Categoría</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {categoryData.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+            {/* ✅ TABLA DETALLADA CON ESTILOS CORPORATIVOS */}
+            <div className="fhr-card">
+              <h3 className="fhr-title-gradient text-lg font-bold mb-6">Detalle por Categoría</h3>
+              <div className="space-y-3">
+                {categoryData.map((item, index) => (
+                  <div 
+                    key={index} 
+                    className="fhr-card-simple bg-gradient-to-r from-slate-800/50 to-slate-700/30 border border-slate-600/50 hover:border-cyan-500/30 hover:from-cyan-500/5 hover:to-purple-500/5 transition-all duration-300 p-4"
+                  >
+                    <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <p className="font-medium text-gray-900">{item.category}</p>
-                        <p className="text-sm text-gray-500">vs benchmark: {item.benchmark}</p>
+                        <p className="fhr-subtitle text-slate-200 font-medium">{item.category}</p>
+                        <p className="text-sm text-slate-400">vs benchmark: {item.benchmark}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-bold text-gray-900">{item.score.toFixed(1)}</p>
-                        <div className="flex items-center gap-1">
+                        <p className="text-2xl font-bold text-slate-100">{item.score.toFixed(1)}</p>
+                        <div className="flex items-center gap-2 justify-end">
                           {getTrendIcon(item.score, item.benchmark)}
-                          <span className={`text-sm ${item.difference > 0 ? 'text-green-600' : item.difference < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                          <span className={`text-sm font-medium ${
+                            item.difference > 0 ? 'text-green-400' : 
+                            item.difference < 0 ? 'text-red-400' : 'text-slate-400'
+                          }`}>
                             {item.difference > 0 ? '+' : ''}{item.difference.toFixed(1)}
                           </span>
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
+        {/* ✅ TAB TENDENCIAS - ESTILOS CORPORATIVOS */}
         {activeTab === 'trends' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Evolución Temporal</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
+          <div className="fhr-card">
+            <div className="flex items-center gap-3 mb-6">
+              <TrendingUp className="h-6 w-6 text-purple-400" />
+              <h3 className="fhr-title-gradient text-lg font-bold">Evolución Temporal</h3>
+            </div>
+            <div className="h-96">
+              <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={trendData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis yAxisId="left" orientation="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                    axisLine={{ stroke: '#4B5563' }}
+                  />
+                  <YAxis 
+                    yAxisId="left" 
+                    orientation="left"
+                    tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                    axisLine={{ stroke: '#4B5563' }}
+                  />
+                  <YAxis 
+                    yAxisId="right" 
+                    orientation="right"
+                    tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                    axisLine={{ stroke: '#4B5563' }}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
                   <Line 
                     yAxisId="left"
                     type="monotone" 
                     dataKey="responses" 
-                    stroke="#3B82F6" 
-                    strokeWidth={2}
+                    stroke="#22D3EE" 
+                    strokeWidth={3}
                     name="Respuestas Diarias"
+                    dot={{ fill: '#22D3EE', strokeWidth: 2, r: 4 }}
                   />
                   <Line 
                     yAxisId="right"
                     type="monotone" 
                     dataKey="score" 
-                    stroke="#10B981" 
-                    strokeWidth={2}
+                    stroke="#A78BFA" 
+                    strokeWidth={3}
                     name="Score Promedio"
+                    dot={{ fill: '#A78BFA', strokeWidth: 2, r: 4 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
 
+        {/* ✅ TAB ACTIVIDAD DIARIA - ESTILOS CORPORATIVOS */}
         {activeTab === 'daily' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Actividad por Día de la Semana</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+          <div className="fhr-card">
+            <div className="flex items-center gap-3 mb-6">
+              <Activity className="h-6 w-6 text-green-400" />
+              <h3 className="fhr-title-gradient text-lg font-bold">Actividad por Día</h3>
+            </div>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dailyResponseData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="day" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="responses" fill="#8B5CF6" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis 
+                    dataKey="day"
+                    tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                    axisLine={{ stroke: '#4B5563' }}
+                  />
+                  <YAxis 
+                    tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                    axisLine={{ stroke: '#4B5563' }}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar 
+                    dataKey="responses" 
+                    fill="#10B981" 
+                    name="Respuestas"
+                    radius={[4, 4, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
 
-        {activeTab === 'segments' && (
+        {/* ✅ TAB SEGMENTACIÓN - ESTILOS CORPORATIVOS */}
+        {activeTab === 'segments' && segmentationPieData.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Distribución por Segmento</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+            <div className="fhr-card">
+              <div className="flex items-center gap-3 mb-6">
+                <PieIcon className="h-6 w-6 text-amber-400" />
+                <h3 className="fhr-title-gradient text-lg font-bold">Distribución por Segmento</h3>
+              </div>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={segmentationPieData}
@@ -262,39 +315,37 @@ export default function ComparativeAnalysis({ analytics }: ComparativeAnalysisPr
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip content={<CustomTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Scores por Segmento</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {segmentationPieData.map((segment, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+            <div className="fhr-card">
+              <h3 className="fhr-title-gradient text-lg font-bold mb-6">Scores por Segmento</h3>
+              <div className="space-y-3">
+                {segmentationPieData.map((item, index) => (
+                  <div 
+                    key={index}
+                    className="fhr-card-simple bg-gradient-to-r from-slate-800/50 to-slate-700/30 border border-slate-600/50 hover:border-cyan-500/30 transition-all duration-300 p-4"
+                  >
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div 
                           className="w-4 h-4 rounded-full"
-                          style={{ backgroundColor: segment.color }}
-                        />
-                        <div>
-                          <p className="font-medium">{segment.name}</p>
-                          <p className="text-sm text-gray-500">{segment.value} participantes</p>
-                        </div>
+                          style={{ backgroundColor: item.color }}
+                        ></div>
+                        <span className="fhr-subtitle text-slate-200">{item.name}</span>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-bold">{segment.avgScore.toFixed(1)}</p>
-                        <p className="text-xs text-gray-500">score promedio</p>
+                        <p className="text-lg font-bold text-slate-100">{item.avgScore.toFixed(1)}</p>
+                        <p className="text-sm text-slate-400">{item.value} participantes</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>

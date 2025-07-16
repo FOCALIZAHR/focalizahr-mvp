@@ -73,18 +73,31 @@ export interface Response {
 }
 
 export interface CampaignResult {
-  id: string
-  campaignId: string
-  participationRate?: number
-  overallScore?: number
-  highestCategory?: string
-  highestScore?: number
-  lowestCategory?: string
-  lowestScore?: number
-  resultsData?: any
-  generatedAt: Date
-  // Relación
-  campaign?: Campaign
+  // --- Campos de la versión Antigua (Preservados) ---
+  id: string;
+  campaignId: string;
+  generatedAt: Date;
+  
+  // --- Campos Consolidados y Estandarizados a camelCase ---
+  overallScore: number;
+  participationRate: number;
+  totalResponses: number;
+  totalInvited: number;
+  companyName: string;
+  industryBenchmark: number;
+  
+  // --- Campos de Análisis (Estandarizados y Opcionales) ---
+  categoryScores?: { [key: string]: number };
+  departmentScores?: { [dept: string]: number };
+  campaignType?: string;
+  industry?: string;
+  
+  // --- Campos que pueden ser eliminados si ya no se usan, pero se mantienen por seguridad ---
+  highestCategory?: string;
+  highestScore?: number;
+  lowestCategory?: string;
+  lowestScore?: number;
+  resultsData?: any;
 }
 
 // Enums y tipos literales
@@ -242,210 +255,138 @@ export interface UseApiOptions {
   onSuccess?: (data: any) => void
   onError?: (error: string) => void
   autoFetch?: boolean
+  dependencies?: any[]
 }
 
-export interface UseApiReturn<T> {
+export interface UseApiState<T = any> {
   data: T | null
   loading: boolean
   error: string | null
-  fetch: () => Promise<void>
   refetch: () => Promise<void>
 }
 
-// Tipos para validaciones
-export interface ValidationError {
-  field: string
-  message: string
+// Tipos para filtros y búsqueda
+export interface CampaignFilters {
+  status?: CampaignStatus
+  startDate?: string
+  endDate?: string
+  searchTerm?: string
+  sortBy?: 'name' | 'startDate' | 'participationRate' | 'status'
+  sortOrder?: 'asc' | 'desc'
 }
 
-export interface FormState {
-  isValid: boolean
-  errors: ValidationError[]
+export interface PaginationOptions {
+  page: number
+  limit: number
+  total?: number
+  hasMore?: boolean
+}
+
+export interface SearchOptions {
+  query: string
+  filters: Record<string, any>
+  sorting: {
+    field: string
+    direction: 'asc' | 'desc'
+  }
+  pagination: PaginationOptions
+}
+
+// Tipos para validación
+export interface ValidationRule {
+  required?: boolean
+  minLength?: number
+  maxLength?: number
+  pattern?: RegExp
+  custom?: (value: any) => string | null
+}
+
+export interface ValidationErrors {
+  [field: string]: string[]
+}
+
+export interface FormState<T = any> {
+  values: T
+  errors: ValidationErrors
   touched: Record<string, boolean>
-}
-
-// Tipos para configuración
-export interface AppConfig {
-  maxParticipantsPerCampaign: number
-  minCampaignDuration: number
-  maxCampaignDuration: number
-  minParticipants: number
-  benchmarkScore: number
-  supportEmail: string
-}
-
-// Constantes de configuración
-export const APP_CONFIG: AppConfig = {
-  maxParticipantsPerCampaign: 500,
-  minCampaignDuration: 3,
-  maxCampaignDuration: 30,
-  minParticipants: 5,
-  benchmarkScore: 3.2,
-  supportEmail: 'soporte@focalizahr.com'
-}
-
-// Mapas de traducción
-export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
-  draft: 'Borrador',
-  active: 'Activa',
-  completed: 'Completada',
-  cancelled: 'Cancelada'
-}
-
-export const QUESTION_CATEGORY_LABELS: Record<QuestionCategory, string> = {
-  liderazgo: 'Liderazgo',
-  ambiente: 'Ambiente Laboral',
-  desarrollo: 'Desarrollo',
-  bienestar: 'Bienestar'
-}
-
-// Utilidades de tipos
-export type PartialBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>
-export type RequiredBy<T, K extends keyof T> = T & Required<Pick<T, K>>
-
-// ========================================
-// NUEVOS TIPOS WIZARD CHAT 3B
-// ========================================
-
-// Tipos para el Wizard de Crear Campaña
-export interface WizardStep {
-  id: number
-  title: string
-  description: string
-  completed: boolean
-  active: boolean
-  icon?: React.ComponentType<any>
-  estimatedTime?: number // minutos
-}
-
-export interface WizardFormData {
-  // Paso 1: Información Básica
-  name: string
-  description: string
-  campaignTypeId: string
-  startDate: string
-  endDate: string
-  
-  // Paso 2: Participantes (Enfoque Concierge)
-  estimatedParticipants: number
-  participantInstructions: string
-  dataQualityRequirements?: {
-    requireDepartment: boolean
-    requirePosition: boolean
-    requireSeniority: boolean
-    requireLocation: boolean
-  }
-  segmentationPreferences: string[]
-  
-  // Paso 3: Configuración Final
-  sendReminders: boolean
-  anonymousResults: boolean
-  reminderSettings?: {
-    firstReminder: number
-    secondReminder: number
-    enableFinalReminder: boolean
-  }
-  privacySettings?: {
-    allowDataExport: boolean
-    requireConsent: boolean
-    dataRetentionDays: number
-  }
-}
-
-export interface WizardContextType {
-  currentStep: number
-  formData: Partial<WizardFormData>
-  steps: WizardStep[]
   isValid: boolean
-  isLoading: boolean
-  error: string | null
-  
-  // Acciones
-  goToStep: (stepId: number) => void
-  nextStep: () => void
-  previousStep: () => void
-  updateFormData: (data: Partial<WizardFormData>) => void
-  validateStep: (stepId: number) => boolean
-  submitWizard: () => Promise<boolean>
-  resetWizard: () => void
+  isSubmitting: boolean
+  isDirty: boolean
 }
 
-// Estados para manejo de UI avanzada
-export interface LoadingState {
-  isLoading: boolean
-  loadingText?: string
-  progress?: number
-}
-
-export interface ErrorState {
-  hasError: boolean
-  errorMessage?: string
-  errorCode?: string
-  canRetry?: boolean
-  retryAction?: () => void
-}
-
-export interface SuccessState {
-  isSuccess: boolean
-  successMessage?: string
-  redirectUrl?: string
-  autoRedirect?: boolean
-}
-
-export interface NotificationState {
+// Tipos para notificaciones
+export interface Notification {
   id: string
-  type: 'info' | 'success' | 'warning' | 'error'
+  type: 'success' | 'error' | 'warning' | 'info'
   title: string
   message: string
-  autoClose?: boolean
   duration?: number
-  actionLabel?: string
-  actionCallback?: () => void
+  actions?: Array<{
+    label: string
+    onClick: () => void
+  }>
+  createdAt: Date
 }
 
-// Tipos para manejo de archivos (CSV/Excel upload)
-export interface FileUploadState {
-  file: File | null
-  isUploading: boolean
-  uploadProgress: number
-  uploadError: string | null
-  uploadSuccess: boolean
-  previewData?: any[]
-  validationErrors?: string[]
-}
-
-export interface CsvParseResult {
-  data: any[]
-  errors: string[]
-  meta: {
-    totalRows: number
-    validRows: number
-    invalidRows: number
-    duplicates: number
-    fields: string[]
+// Tipos para configuración de aplicación
+export interface AppConfig {
+  name: string
+  version: string
+  environment: 'development' | 'staging' | 'production'
+  apiUrl: string
+  features: {
+    [key: string]: boolean
+  }
+  limits: {
+    maxCampaigns: number
+    maxParticipants: number
+    maxQuestions: number
   }
 }
 
-// Tipos para participantes y gestión de datos
-export interface ParticipantUpload {
-  email: string
-  firstName?: string
-  lastName?: string
-  department?: string
-  position?: string
-  location?: string
-  customFields?: Record<string, any>
+// Tipos para eventos del sistema
+export interface SystemEvent {
+  id: string
+  type: string
+  source: string
+  data: Record<string, any>
+  timestamp: Date
+  userId?: string
+  accountId?: string
 }
 
-export interface ParticipantBatch {
+// Tipos para métricas de rendimiento
+export interface PerformanceMetrics {
+  pageLoadTime: number
+  apiResponseTime: number
+  renderTime: number
+  memoryUsage: number
+  errorRate: number
+  userEngagement: {
+    sessionDuration: number
+    pageViews: number
+    bounceRate: number
+  }
+}
+
+// Tipos para exportación de datos
+export interface ExportOptions {
+  format: 'csv' | 'xlsx' | 'pdf' | 'json'
+  includeHeaders: boolean
+  dateRange?: {
+    start: Date
+    end: Date
+  }
+  filters?: Record<string, any>
+  columns?: string[]
+}
+
+export interface ExportJob {
   id: string
-  campaignId: string
-  totalCount: number
-  validCount: number
-  invalidCount: number
-  processedCount: number
   status: 'pending' | 'processing' | 'completed' | 'failed'
-  errors?: string[]
+  progress: number
+  downloadUrl?: string
+  error?: string
   createdAt: Date
   completedAt?: Date
 }
@@ -639,3 +580,53 @@ export interface WebhookEvent {
   }
 }
 
+// =======================================================
+// NUEVAS DEFINICIONES PARA EL "KIT DE COMUNICACIÓN v2.0"
+// =======================================================
+
+// =======================================================
+// NUEVAS DEFINICIONES PARA EL "KIT DE COMUNICACIÓN v2.0"
+// =======================================================
+
+/**
+ * Define la estructura de un template de comunicación ya procesado, listo para la UI.
+ */
+export interface CommunicationTemplate {
+  id: string;
+  type: string;
+  category: string;
+  text: string;
+  priority: number;
+}
+
+/**
+ * Define la estructura completa del objeto de análisis que produce AnalyticsService.
+ */
+export interface CampaignAnalytics {
+  overallScore: number;
+  participationRate: number;
+  benchmarkDifference: number;
+  strongestCategory: { category: string; score: number };
+  weakestCategory: { category: string; score: number };
+  departmentScores: { [dept: string]: number };
+  strongestDepartment: { name: string; score: number };
+  weakestDepartment: { name: string; score: number };
+  departmentVariability: number;
+  participationLevel: 'exceptional' | 'excellent' | 'good' | 'moderate' | 'low';
+  confidenceLevel: 'high' | 'medium' | 'low';
+  campaignType?: string;
+  totalResponses: number;
+  totalInvited: number;
+  companyName: string;
+  industryBenchmark: number;
+}
+
+/**
+ * Define el objeto que retorna el hook `useTemplateSelection`.
+ */
+export interface UseTemplateSelectionResult {
+  templates: CommunicationTemplate[];
+  isLoading: boolean;
+  error: string | null;
+  analytics: CampaignAnalytics | null;
+}
