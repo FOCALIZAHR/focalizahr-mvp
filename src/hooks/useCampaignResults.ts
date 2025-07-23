@@ -1,17 +1,37 @@
 // src/hooks/useCampaignResults.ts
-// HOOK DEDICADO PARA LA LÓGICA DE LA PÁGINA DE RESULTADOS
+// NORMALIZADOR CENTRAL v3.0 - ÚNICA FUENTE VALIDACIÓN Y NORMALIZACIÓN
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
-// Definimos la interfaz para la data que devolverá el hook
-export interface ResultsData {
+// ✅ INTERFACE NORMALIZADA - DATOS LIMPIOS Y CONSISTENTES
+export interface CampaignResultsData {
   campaign: any;
-  stats: any;
-  analytics: any;
+  analytics: {
+    // Métricas principales normalizadas
+    totalInvited: number;
+    totalResponded: number;
+    totalResponses: number; // Alias para compatibilidad
+    participationRate: number;
+    averageScore: number;
+    completionTime: number;
+    responseRate: number;
+    
+    // Datos estructurados normalizados
+    categoryScores: Record<string, number>;
+    departmentScores: Record<string, number>;
+    trendData: Array<{
+      date: string;
+      responses: number;
+      score: number;
+    }>;
+    responsesByDay: Record<string, number>;
+    segmentationData: any[];
+    demographicBreakdown: any[];
+    lastUpdated: string;
+  };
 }
 
-// Función segura para obtener el token de autenticación
 const getAuthToken = () => {
   if (typeof window !== 'undefined') {
     return localStorage.getItem('focalizahr_token') || '';
@@ -19,8 +39,98 @@ const getAuthToken = () => {
   return '';
 };
 
+// ✅ FUNCIÓN NORMALIZADORA CENTRAL - TODA LA LÓGICA AQUÍ
+function normalizeAnalyticsData(rawAnalyticsData: any): CampaignResultsData {
+  const rawMetrics = rawAnalyticsData.metrics || {};
+  const rawCampaign = rawAnalyticsData.campaign || {};
+  
+  // 🔧 FASE 1 FIX: MAPEO CORRECTO CAMPAIGN.CAMPAIGNTYPE DESDE META
+  const campaignData = {
+    ...rawCampaign,
+    // ✅ CORRECCIÓN CRÍTICA: Mapear campaignType desde meta si no existe
+    campaignType: rawCampaign.campaignType || rawAnalyticsData.meta?.campaignType || null,
+    name: rawCampaign.name || rawAnalyticsData.meta?.campaignName || 'Campaña',
+    company: rawCampaign.company || { name: 'Empresa' }
+  };
+  
+  // ✅ NORMALIZACIÓN MÉTRICAS PRINCIPALES CON VALIDACIÓN ESTRICTA
+  const totalInvited = Number(rawMetrics.totalInvited) || 
+                      Number(rawCampaign.participants?.length) || 0;
+  const totalResponded = Number(rawMetrics.totalResponded) || 0;
+  const participationRate = Number(rawMetrics.participationRate) || 0;
+  const averageScore = Number(rawMetrics.averageScore) || 0;
+  const completionTime = Number(rawMetrics.completionTime) || 480; // 8 min default
+  const responseRate = Number(rawMetrics.responseRate) || participationRate;
+
+  // ✅ NORMALIZACIÓN SCORES CATEGORÍAS - SOLO NÚMEROS VÁLIDOS
+  const categoryScores: Record<string, number> = {};
+  if (rawMetrics.categoryScores && typeof rawMetrics.categoryScores === 'object') {
+    Object.entries(rawMetrics.categoryScores).forEach(([category, score]) => {
+      const normalizedScore = Number(score);
+      if (!isNaN(normalizedScore) && isFinite(normalizedScore)) {
+        categoryScores[category] = normalizedScore;
+      }
+    });
+  }
+
+  // ✅ NORMALIZACIÓN DEPARTMENT SCORES - SOLO NÚMEROS VÁLIDOS
+  const departmentScores: Record<string, number> = {};
+  if (rawMetrics.departmentScores && typeof rawMetrics.departmentScores === 'object') {
+    Object.entries(rawMetrics.departmentScores).forEach(([dept, score]) => {
+      const normalizedScore = Number(score);
+      if (!isNaN(normalizedScore) && isFinite(normalizedScore)) {
+        departmentScores[dept] = normalizedScore;
+      }
+    });
+  }
+
+  // ✅ NORMALIZACIÓN TREND DATA - VALIDACIÓN ARRAYS
+  const trendData = Array.isArray(rawMetrics.trendData) 
+    ? rawMetrics.trendData.map((item: any) => ({
+        date: String(item?.date || ''),
+        responses: Number(item?.responses) || 0,
+        score: Number(item?.score) || 0
+      }))
+    : [];
+
+  // ✅ NORMALIZACIÓN RESPONSES BY DAY
+  const responsesByDay: Record<string, number> = {};
+  if (rawMetrics.responsesByDay && typeof rawMetrics.responsesByDay === 'object') {
+    Object.entries(rawMetrics.responsesByDay).forEach(([day, count]) => {
+      const normalizedCount = Number(count);
+      if (!isNaN(normalizedCount)) {
+        responsesByDay[day] = normalizedCount;
+      }
+    });
+  }
+
+  // ✅ CONSTRUCCIÓN OBJETO NORMALIZADO
+  return {
+    campaign: campaignData, // ← CAMPAÑA CON MAPEO CORRECTO
+    analytics: {
+      // Métricas principales validadas
+      totalInvited,
+      totalResponded,
+      totalResponses: totalResponded, // Alias para compatibilidad
+      participationRate,
+      averageScore,
+      completionTime,
+      responseRate,
+      
+      // Datos estructurados validados
+      categoryScores,
+      departmentScores,
+      trendData,
+      responsesByDay,
+      segmentationData: Array.isArray(rawMetrics.segmentationData) ? rawMetrics.segmentationData : [],
+      demographicBreakdown: Array.isArray(rawMetrics.demographicBreakdown) ? rawMetrics.demographicBreakdown : [],
+      lastUpdated: rawMetrics.lastUpdated || new Date().toISOString()
+    }
+  };
+}
+
 export function useCampaignResults(campaignId: string) {
-  const [data, setData] = useState<ResultsData | null>(null);
+  const [data, setData] = useState<CampaignResultsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -41,30 +151,22 @@ export function useCampaignResults(campaignId: string) {
         return;
       }
 
-      // Ejecutamos ambas llamadas a las APIs que necesita la página
-      const [statsRes, analyticsRes] = await Promise.all([
-        fetch(`/api/campaigns/${campaignId}/stats`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`/api/campaigns/${campaignId}/analytics`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-      ]);
+      const analyticsRes = await fetch(`/api/campaigns/${campaignId}/analytics`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
 
-      if (!statsRes.ok) {
-        if (statsRes.status === 401) router.push('/login');
-        const errorData = await statsRes.json();
+      if (!analyticsRes.ok) {
+        if (analyticsRes.status === 401) router.push('/login');
+        const errorData = await analyticsRes.json();
         throw new Error(errorData.error || 'No se pudieron cargar las estadísticas de la campaña.');
       }
 
-      const statsData = await statsRes.json();
-      const analyticsData = analyticsRes.ok ? await analyticsRes.json() : null;
+      const rawAnalyticsData = await analyticsRes.json();
 
-      setData({
-        campaign: statsData.campaign,
-        stats: statsData.metrics,
-        analytics: analyticsData?.metrics || null
-      });
+      // ✅ NORMALIZACIÓN CENTRAL - ÚNICA RESPONSABILIDAD DEL HOOK
+      const normalizedData = normalizeAnalyticsData(rawAnalyticsData);
+      
+      setData(normalizedData);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ocurrió un error desconocido.');
@@ -77,6 +179,5 @@ export function useCampaignResults(campaignId: string) {
     fetchData();
   }, [fetchData]);
 
-  // El hook devuelve los datos, el estado de carga, el error y una función para refrescar
   return { data, isLoading, error, refreshData: fetchData };
 }
