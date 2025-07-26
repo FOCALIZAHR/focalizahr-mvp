@@ -22,6 +22,9 @@ interface ComparativeAnalysisProps {
       count: number;
       avgScore: number;
     }>;
+    // ✅ FASE 3B: Soporte nomenclatura cliente
+    departmentScoresDisplay?: Record<string, number>;
+    departmentMapping?: Record<string, string>;
     participationRate: number;
     averageScore: number;
   };
@@ -29,6 +32,10 @@ interface ComparativeAnalysisProps {
 
 export default function ComparativeAnalysis({ analytics }: ComparativeAnalysisProps) {
   const [activeTab, setActiveTab] = useState<'categories' | 'trends' | 'daily' | 'segments'>('categories');
+
+  // 🔍 DEBUG: Verificar que el componente se ejecuta
+  console.log('🔍 COMPONENT ComparativeAnalysis MOUNTED:', !!analytics);
+  console.log('🔍 ANALYTICS OBJECT:', analytics);
 
   // Colores para gráficos
   const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#84CC16', '#F97316'];
@@ -56,13 +63,40 @@ export default function ComparativeAnalysis({ analytics }: ComparativeAnalysisPr
       responses: count
     })) : [];
 
-  // Datos de segmentación para pie chart
-  const segmentationPieData = analytics.segmentationData?.map((item, index) => ({
-    name: item.segment,
-    value: item.count,
-    avgScore: item.avgScore,
-    color: COLORS[index % COLORS.length]
-  })) || [];
+  // Datos de segmentación para pie chart - PRIORIZA NOMENCLATURA CLIENTE
+  const segmentationPieData = React.useMemo(() => {
+    // 🔍 DEBUG: Ver qué datos están llegando
+    console.log('🔍 DEBUG ComparativeAnalysis segmentationPieData:', {
+      departmentScoresDisplay: analytics.departmentScoresDisplay,
+      departmentScoresDisplayType: typeof analytics.departmentScoresDisplay,
+      departmentScoresDisplayKeys: analytics.departmentScoresDisplay ? Object.keys(analytics.departmentScoresDisplay) : 'undefined',
+      segmentationData: analytics.segmentationData,
+      hasDepartmentScores: !!analytics.departmentScoresDisplay,
+      departmentScoresLength: analytics.departmentScoresDisplay ? Object.keys(analytics.departmentScoresDisplay).length : 0
+    });
+
+    // PRIORIDAD 1: Usar departmentScoresDisplay (nomenclatura cliente)
+    if (analytics.departmentScoresDisplay && Object.keys(analytics.departmentScoresDisplay).length > 0) {
+      console.log('✅ Usando departmentScoresDisplay (nomenclatura cliente)');
+      return Object.entries(analytics.departmentScoresDisplay).map(([displayName, score], index) => ({
+        name: displayName, // ← "Equipo Comercial" vs "ventas"
+        value: Math.round(score * 10), // Convertir score a valor visual
+        avgScore: score,
+        color: COLORS[index % COLORS.length],
+        isClientNomenclature: true
+      }));
+    }
+    
+    // FALLBACK: Usar segmentationData (datos técnicos)
+    console.log('❌ Fallback a segmentationData (datos técnicos)');
+    return analytics.segmentationData?.map((item, index) => ({
+      name: item.segment,
+      value: item.count,
+      avgScore: item.avgScore,
+      color: COLORS[index % COLORS.length],
+      isClientNomenclature: false
+    })) || [];
+  }, [analytics.departmentScoresDisplay, analytics.segmentationData]);
 
   // Helper para determinar tendencia
   const getTrendIcon = (current: number, previous: number) => {
@@ -82,6 +116,12 @@ export default function ComparativeAnalysis({ analytics }: ComparativeAnalysisPr
           <Badge variant="outline" className="text-sm">
             Participación: {analytics.participationRate.toFixed(1)}%
           </Badge>
+          {/* ✅ FASE 3B: Indicador nomenclatura cliente */}
+          {segmentationPieData.length > 0 && segmentationPieData[0]?.isClientNomenclature && (
+            <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+              ✨ Nomenclatura Cliente
+            </Badge>
+          )}
         </div>
       </div>
 

@@ -6,6 +6,7 @@
 // src/app/api/export/excel/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter';
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,6 +38,33 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    // ✅ OBTENER DEPARTMENT MAPPING OPTIMIZADO (FASE 2 INTEGRATION)
+    // 1. Obtener IDs de cuenta únicos
+    const uniqueAccountIds = [...new Set(campaigns.map(c => c.accountId))];
+
+    // 2. Obtener todos los departamentos en una sola consulta
+    const allDepartments = await prisma.department.findMany({
+        where: {
+            accountId: { in: uniqueAccountIds },
+            isActive: true,
+        },
+        select: {
+            accountId: true,
+            displayName: true,
+            standardCategory: true,
+        },
+    });
+
+    // 3. Construir el mapeo en memoria
+    const departmentMappings: { [accountId: string]: { [key: string]: string } } = {};
+    uniqueAccountIds.forEach(id => { departmentMappings[id] = {}; });
+
+    allDepartments.forEach(dept => {
+        if (dept.standardCategory) {
+            departmentMappings[dept.accountId][dept.standardCategory] = dept.displayName;
+        }
+    });
+
     // ✅ ESTRUCTURA EXCEL WORKSHEETS
     // Flatten responses from all campaigns and participants
     const allResponses = campaigns.flatMap(campaign => 
@@ -49,13 +77,29 @@ export async function POST(request: NextRequest) {
       )
     );
 
+    // ✅ ENRIQUECER DATOS CON NOMENCLATURA CLIENTE
+    const enrichedResponses = allResponses.map(response => {
+      const departmentMapping = departmentMappings[response.campaign.accountId];
+      
+      // 🎯 ENRIQUECIMIENTO: Usar display name si está disponible
+      let departmentDisplay = response.participant?.department || 'No especificado';
+      if (departmentMapping && response.participant?.department) {
+        departmentDisplay = departmentMapping[response.participant.department] || departmentDisplay;
+      }
+
+      return {
+        ...response,
+        departmentDisplay // ← CAMPO ENRIQUECIDO AGREGADO
+      };
+    });
+
     const excelStructure = {
       worksheets: [
         {
           name: 'Resumen Ejecutivo',
           description: 'Métricas agregadas y KPIs principales',
           data: campaigns.map(campaign => {
-            const campaignResponses = allResponses.filter(r => r.campaign.id === campaign.id);
+            const campaignResponses = enrichedResponses.filter(r => r.campaign.id === campaign.id);
             return {
               Campaña: campaign.name,
               Tipo: campaign.campaignType.name,
@@ -89,12 +133,12 @@ export async function POST(request: NextRequest) {
         {
           name: 'Datos Raw',
           description: 'Datos completos para análisis personalizado',
-          data: includeRawData ? allResponses.map(response => ({
+          data: includeRawData ? enrichedResponses.map(response => ({
               'Campaign ID': response.campaign.id,
               'Campaña': response.campaign.name,
               'Tipo Campaña': response.campaign.campaignType.name,
               'Participant ID': response.participantId,
-              'Departamento': response.participant?.department || 'No especificado',
+              'Departamento': response.departmentDisplay, // ← NOMENCLATURA CLIENTE INTEGRADA
               'Posición': response.participant?.position || 'No especificado',
               'Pregunta ID': response.questionId,
               'Pregunta': response.question.text,
@@ -114,7 +158,7 @@ export async function POST(request: NextRequest) {
           name: 'Analytics Avanzado',
           description: 'Cálculos estadísticos y métricas derivadas',
           data: campaigns.map(campaign => {
-            const campaignResponses = allResponses.filter(r => r.campaign.id === campaign.id && r.rating !== null);
+            const campaignResponses = enrichedResponses.filter(r => r.campaign.id === campaign.id && r.rating !== null);
             const stats = {
               campaign: campaign.name,
               n: campaignResponses.length,
@@ -194,8 +238,11 @@ export async function POST(request: NextRequest) {
         campaignsIncluded: campaigns.length,
         totalDataPoints: allResponses.length,
         format: format,
-        version: 'FocalizaHR Export v2.0',
-        compatibility: 'Excel 2016+, Google Sheets, LibreOffice Calc'
+        version: 'FocalizaHR Export v3.0', // ← VERSIÓN ACTUALIZADA
+        compatibility: 'Excel 2016+, Google Sheets, LibreOffice Calc',
+        departmentEnrichment: Object.keys(departmentMappings).some(accountId => 
+          Object.keys(departmentMappings[accountId]).length > 0
+        ) // ← NUEVA METADATA
       }
     };
 
@@ -212,11 +259,13 @@ export async function POST(request: NextRequest) {
           'Tablas dinámicas preparadas', 
           'Formato condicional aplicado',
           'Fórmulas estadísticas incluidas',
+          'Nomenclatura personalizada departamentos', // ← NUEVA FEATURE
           'Datos anonimizados manteniendo utilidad'
         ]
       },
       meta: {
         campaignIds,
+        departmentEnrichment: 'enabled', // ← NUEVA META
         processingTime: '1.8s',
         generatedAt: new Date().toISOString()
       }

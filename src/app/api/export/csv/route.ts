@@ -6,6 +6,8 @@
 // src/app/api/export/csv/route.ts
 import { NextRequest, NextResponse } from 'next/server'; // <== AÑADIR ESTA LÍNEA
 import { prisma } from '@/lib/prisma';
+import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -41,6 +43,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ✅ OBTENER DEPARTMENT MAPPING (FASE 2 INTEGRATION)
+    const departmentMapping = await DepartmentAdapter.getDepartmentMapping(campaign.accountId);
+
     // ✅ PREPARAR DATOS CSV - Flatten responses from participants
     const allResponses = campaign.participants.flatMap(participant => 
       participant.responses.map(response => ({
@@ -68,9 +73,16 @@ export async function POST(request: NextRequest) {
 
     const csvData = allResponses.map(response => {
       const responseDate = new Date(response.createdAt);
+      
+      // 🎯 ENRIQUECIMIENTO: Usar display name si está disponible
+      let departmentDisplay = response.participant?.department || 'No especificado';
+      if (departmentMapping && response.participant?.department) {
+        departmentDisplay = departmentMapping[response.participant.department] || departmentDisplay;
+      }
+      
       const department = anonymize 
         ? `Dept_${response.participant?.department?.charAt(0) || 'X'}`
-        : response.participant?.department || 'No especificado';
+        : departmentDisplay; // ← AQUÍ USAMOS EL DISPLAY NAME
       const position = anonymize
         ? response.participant?.position?.includes('Manager') || response.participant?.position?.includes('Director') ? 'Leadership' : 'Individual Contributor'
         : response.participant?.position || 'No especificado';
@@ -114,11 +126,13 @@ export async function POST(request: NextRequest) {
         commentsIncluded: includeComments,
         temporalFields: ['response_week', 'response_month'],
         categoricalFields: ['campaign_type', 'question_category', 'department', 'position'],
-        numericFields: ['rating']
+        numericFields: ['rating'],
+        clientNomenclature: departmentMapping ? Object.keys(departmentMapping).length > 0 : false // ← NUEVO
       },
       qualityChecks: {
         missingValues: csvData.filter(row => row.some(cell => cell === '')).length,
         duplicateRows: 0, // Could implement duplicate detection
+        departmentMapping: departmentMapping ? `${Object.keys(departmentMapping).length} departments personalizados` : 'Nomenclatura estándar', // ← NUEVO
         dataTypes: {
           rating: 'numeric (1-5)',
           dates: 'ISO 8601 format',
@@ -130,7 +144,7 @@ export async function POST(request: NextRequest) {
         'Usar rating como variable dependiente',
         'Agrupar por question_category para análisis',
         'Filtrar por response_month para tendencias',
-        'Usar department_anonymized para segmentación'
+        departmentMapping ? 'Departamentos usan nomenclatura personalizada del cliente' : 'Usar department_anonymized para segmentación' // ← ACTUALIZADO
       ]
     };
 
@@ -147,6 +161,7 @@ export async function POST(request: NextRequest) {
       meta: {
         campaignId,
         campaignName: campaign.name,
+        departmentEnrichment: departmentMapping ? 'enabled' : 'disabled', // ← NUEVO
         exportedAt: new Date().toISOString(),
         processingTime: '0.8s'
       }

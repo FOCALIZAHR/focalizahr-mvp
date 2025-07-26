@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jsPDF } from 'jspdf';
 import { prisma } from '@/lib/prisma';
+import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter';
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,6 +53,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ✅ OBTENER DEPARTMENT MAPPING (FASE 2 INTEGRATION)
+    const departmentMapping = await DepartmentAdapter.getDepartmentMapping(campaign.accountId);
+
     // ✅ FLATTEN RESPONSES FROM PARTICIPANTS
     const allResponses = campaign.participants.flatMap(participant =>
       participant.responses.map(response => ({
@@ -59,6 +63,19 @@ export async function POST(request: NextRequest) {
         participant
       }))
     );
+
+    // ✅ ENRIQUECER RESPONSES CON NOMENCLATURA CLIENTE
+    const enrichedResponses = allResponses.map(response => {
+      let departmentDisplay = response.participant?.department || 'No especificado';
+      if (departmentMapping && response.participant?.department) {
+        departmentDisplay = departmentMapping[response.participant.department] || departmentDisplay;
+      }
+      
+      return {
+        ...response,
+        departmentDisplay
+      };
+    });
 
     // ✅ CONFIGURACIÓN PDF POR TIPO
     const pdfConfigs = {
@@ -87,12 +104,12 @@ export async function POST(request: NextRequest) {
     // ✅ CÁLCULOS ESTADÍSTICOS
     const stats = {
       totalParticipants: campaign.participants.length,
-      totalResponses: allResponses.length,
+      totalResponses: enrichedResponses.length,
       participationRate: campaign.participants.length > 0 
-        ? (allResponses.length / campaign.participants.length) * 100 
+        ? (enrichedResponses.length / campaign.participants.length) * 100 
         : 0,
-      avgScore: allResponses.length > 0 
-        ? allResponses.reduce((sum, r) => sum + (r.rating || 0), 0) / allResponses.length
+      avgScore: enrichedResponses.length > 0 
+        ? enrichedResponses.reduce((sum, r) => sum + (r.rating || 0), 0) / enrichedResponses.length
         : 0,
       completionDate: campaign.endDate || new Date(),
       createdDate: campaign.createdAt
@@ -107,7 +124,8 @@ export async function POST(request: NextRequest) {
         campaignName: campaign.name,
         generatedAt: new Date().toISOString(),
         campaignType: campaignType,
-        pages: executiveSummary && detailedAnalytics ? 8 : executiveSummary ? 4 : 6
+        pages: executiveSummary && detailedAnalytics ? 8 : executiveSummary ? 4 : 6,
+        departmentEnrichment: departmentMapping ? Object.keys(departmentMapping).length > 0 : false // ← NUEVA METADATA
       },
       executiveSummary: executiveSummary ? {
         keyMetrics: {

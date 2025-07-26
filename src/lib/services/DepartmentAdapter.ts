@@ -26,7 +26,83 @@ export interface EnrichedAnalytics {
 
 export class DepartmentAdapter {
   
-  // ✅ ENRIQUECER ANALYTICS CON DISPLAY NAMES
+  // ✅ SISTEMA MATCHING INTELIGENTE ENTERPRISE
+  private static createSmartMatcher(departments: any[]) {
+    // Crear mapas de matching múltiples
+    const exactMatch: { [key: string]: string } = {};
+    const normalizedMatch: { [key: string]: string } = {};
+    const aliasMatch: { [key: string]: string } = {};
+    
+    // Aliases predefinidos para matching inteligente enterprise
+    const aliases: { [standardCategory: string]: string[] } = {
+      'rrhh': ['rrhh', 'recursos humanos', 'hr', 'people', 'personas', 'talento'],
+      'desarrollo': ['desarrollo', 'dev', 'ti', 'it', 'tech', 'tecnologia', 'sistemas', 'personas'],
+      'ventas': ['ventas', 'sales', 'comercial', 'business'],
+      'marketing': ['marketing', 'mercadeo', 'comunicaciones', 'publicidad'],
+      'operaciones': ['operaciones', 'ops', 'operations', 'logistica'],
+      'finanzas': ['finanzas', 'finance', 'contabilidad', 'accounting']
+    };
+    
+    departments.forEach(dept => {
+      if (dept.standardCategory && dept.displayName) {
+        const stdCategory = dept.standardCategory.toLowerCase();
+        const displayName = dept.displayName;
+        
+        // 1. Matching exacto por standardCategory
+        exactMatch[stdCategory] = displayName;
+        
+        // 2. Matching normalizado
+        normalizedMatch[stdCategory.replace(/[^a-z0-9]/g, '')] = displayName;
+        
+        // 3. Matching por aliases
+        const aliasArray = aliases[stdCategory] || [];
+        aliasArray.forEach(alias => {
+          aliasMatch[alias.toLowerCase().replace(/[^a-z0-9]/g, '')] = displayName;
+        });
+      }
+    });
+    
+    return {
+      findMatch: (participantDeptName: string): string | null => {
+        if (!participantDeptName) return null;
+        
+        const normalized = participantDeptName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        
+        // 1. Intentar matching exacto
+        if (exactMatch[participantDeptName.toLowerCase()]) {
+          return exactMatch[participantDeptName.toLowerCase()];
+        }
+        
+        // 2. Intentar matching normalizado
+        if (normalizedMatch[normalized]) {
+          return normalizedMatch[normalized];
+        }
+        
+        // 3. Intentar matching por alias
+        if (aliasMatch[normalized]) {
+          return aliasMatch[normalized];
+        }
+        
+        // 4. Matching parcial (contiene)
+        for (const [alias, displayName] of Object.entries(aliasMatch)) {
+          if (normalized.includes(alias) || alias.includes(normalized)) {
+            return displayName;
+          }
+        }
+        
+        return null;
+      },
+      
+      // Para debugging enterprise
+      getMatchingInfo: () => ({
+        exactMatches: Object.keys(exactMatch).length,
+        normalizedMatches: Object.keys(normalizedMatch).length,
+        aliasMatches: Object.keys(aliasMatch).length
+      })
+    };
+  }
+  
+  // ✅ ENRIQUECER ANALYTICS CON DISPLAY NAMES (ENTERPRISE INTELLIGENT MATCHING)
   static async enrichAnalytics(
     analytics: any,
     accountId: string
@@ -43,34 +119,88 @@ export class DepartmentAdapter {
         return enriched;
       }
 
-      // Crear mapping standard category → display name
-      const standardToDisplay: { [key: string]: string } = {};
-      const displayToStandard: { [key: string]: string } = {};
+      // ✅ CREAR MATCHER INTELIGENTE ENTERPRISE
+      const smartMatcher = this.createSmartMatcher(departments);
       
+      // Crear mapping standard category → display name (para exports)
+      const standardToDisplay: { [key: string]: string } = {};
       departments.forEach(dept => {
         if (dept.standardCategory) {
           standardToDisplay[dept.standardCategory] = dept.displayName;
-          displayToStandard[dept.displayName] = dept.standardCategory;
         }
       });
 
-      // ✅ ENRIQUECER department_scores CON DISPLAY NAMES
-      if (analytics.department_scores) {
-        const displayScores: { [displayName: string]: number } = {};
+      // ✅ ENRIQUECER departmentScores CON MATCHING INTELIGENTE ENTERPRISE (FIX APLICADO)
+      console.log('🔍 DEBUGGING: analytics object keys:', Object.keys(analytics));
+      console.log('🔍 DEBUGGING: analytics.departmentScores value:', analytics.departmentScores);
+      console.log('🔍 DEBUGGING: typeof departmentScores:', typeof analytics.departmentScores);
+      
+      if (analytics.departmentScores) {
+        // ✅ FIX CRÍTICO: AGREGACIÓN PONDERADA CORRECTA
+        const scoreAccumulator: { [displayName: string]: { totalScore: number; count: number; sources: string[] } } = {};
         
-        Object.entries(analytics.department_scores).forEach(([key, score]) => {
-          // Si key es standard category, usar display name
-          const displayName = standardToDisplay[key];
-          if (displayName) {
-            displayScores[displayName] = score as number;
+        console.log('🧠 FocalizaHR Enterprise: Starting intelligent matching...');
+        console.log('📋 Available departments:', departments.map(d => `${d.displayName} (${d.standardCategory})`));
+        console.log('🎯 Participant departments to match:', Object.keys(analytics.departmentScores));
+        
+        Object.entries(analytics.departmentScores).forEach(([participantDept, score]) => {
+          let targetDisplayName: string;
+          let matchType: string;
+          
+          // 1. Intentar matching exacto tradicional
+          const exactDisplayName = standardToDisplay[participantDept.toLowerCase()];
+          if (exactDisplayName) {
+            targetDisplayName = exactDisplayName;
+            matchType = 'exact';
           } else {
-            // Si key ya es display name o department string, mantener
-            displayScores[key] = score as number;
+            // 2. Intentar matching inteligente enterprise
+            const smartDisplayName = smartMatcher.findMatch(participantDept);
+            if (smartDisplayName) {
+              targetDisplayName = smartDisplayName;
+              matchType = 'smart';
+            } else {
+              // 3. Fallback graceful: mantener nombre original
+              targetDisplayName = participantDept;
+              matchType = 'fallback';
+            }
+          }
+          
+          // ✅ AGREGACIÓN PONDERADA: Acumular scores en lugar de sobrescribir
+          if (!scoreAccumulator[targetDisplayName]) {
+            scoreAccumulator[targetDisplayName] = {
+              totalScore: 0,
+              count: 0,
+              sources: []
+            };
+          }
+          
+          scoreAccumulator[targetDisplayName].totalScore += score as number;
+          scoreAccumulator[targetDisplayName].count += 1;
+          scoreAccumulator[targetDisplayName].sources.push(participantDept);
+          
+          console.log(`${matchType === 'exact' ? '✅' : matchType === 'smart' ? '🧠' : '⚠️'} ${matchType === 'exact' ? 'Exact' : matchType === 'smart' ? 'Smart' : 'No'} match: "${participantDept}" → "${targetDisplayName}"`);
+        });
+
+        // ✅ CALCULAR PROMEDIOS PONDERADOS FINALES
+        const displayScores: { [displayName: string]: number } = {};
+        Object.entries(scoreAccumulator).forEach(([displayName, accumulator]) => {
+          const averageScore = accumulator.totalScore / accumulator.count;
+          displayScores[displayName] = Math.round(averageScore * 10) / 10; // Redondear a 1 decimal
+          
+          // 📊 LOG AGREGACIÓN PARA DEBUGGING
+          if (accumulator.count > 1) {
+            console.log(`🔢 Agregación ponderada: "${displayName}" = (${accumulator.sources.join(' + ')}) / ${accumulator.count} = ${averageScore.toFixed(1)}`);
           }
         });
 
         enriched.departmentScoresDisplay = displayScores;
         enriched.departmentMapping = standardToDisplay;
+        
+        console.log('📊 Enterprise matching results:', smartMatcher.getMatchingInfo());
+        console.log('🎯 Final departmentScoresDisplay:', displayScores);
+      } else {
+        console.log('❌ DEBUGGING: analytics.departmentScores is undefined/null/empty');
+        console.log('❌ DEBUGGING: Full analytics object:', JSON.stringify(analytics, null, 2));
       }
 
       // ✅ AGREGAR ESTADÍSTICAS DEPARTMENTS
@@ -81,9 +211,10 @@ export class DepartmentAdapter {
           departments.reduce((sum, d) => sum + d.participantCount, 0) / departments.length : 0,
       };
 
-      console.log('✅ Analytics enriched with department data:', {
+      console.log('✅ FocalizaHR Enterprise: Analytics enriched with intelligent matching:', {
         departmentsFound: departments.length,
         displayScoresGenerated: Object.keys(enriched.departmentScoresDisplay || {}).length,
+        matchingEngine: 'Intelligent Fuzzy Matching v1.0 + Weighted Aggregation'
       });
 
       return enriched;
@@ -91,6 +222,23 @@ export class DepartmentAdapter {
       console.error('❌ Error enriching analytics with departments:', error);
       // En caso de error, retornar analytics originales sin modificar
       return analytics;
+    }
+  }
+
+  // ✅ OBTENER DEPARTMENT MAPPING (FUNCIÓN FALTANTE PARA EXPORTS)
+  static async getDepartmentMapping(accountId: string): Promise<{ [key: string]: string }> {
+    try {
+      const departments = await DepartmentService.getDepartmentsByAccount(accountId);
+      const mapping: { [key: string]: string } = {};
+      departments.forEach(dept => {
+        if (dept.standardCategory) {
+          mapping[dept.standardCategory] = dept.displayName;
+        }
+      });
+      return mapping;
+    } catch (error) {
+      console.error('❌ Error getting department mapping:', error);
+      return {}; // Retornar objeto vacío en caso de error
     }
   }
 

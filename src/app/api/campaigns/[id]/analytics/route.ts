@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyJWT } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter';
 
 // ✅ INTERFACES ANALYTICS
 interface CampaignAnalytics {
@@ -18,6 +19,7 @@ interface CampaignAnalytics {
   trendData: any[];
   lastUpdated: string;
   categoryScores?: Record<string, number>;
+  departmentScores?: Record<string, number>; // ✅ AGREGADO AL INTERFACE
   responsesByDay?: Record<string, number>;
   demographicBreakdown?: any[];
 }
@@ -190,26 +192,18 @@ export async function GET(
       responsesByDay[day] = dailyResponses.length;
     }
 
-    // ✅ SEGMENTACIÓN - DB GROUPBY DEPARTAMENTOS
+    // ✅ SEGMENTACIÓN - DB GROUPBY DEPARTAMENTOS CENTRALIZADO
     const departmentStats = await prisma.participant.groupBy({
       by: ['department'],
       where: { campaignId },
       _count: { id: true }
     });
 
-    // Scores por departamento usando hasResponded
-    const departmentParticipants = await prisma.participant.findMany({
-      where: { 
-        campaignId,
-        hasResponded: true
-      },
-      select: { 
-        id: true, 
-        department: true 
-      }
-    });
-
-    const participantScores = await prisma.response.groupBy({
+    // ✅ DEPARTMENT SCORES - CÁLCULO CENTRALIZADO Y EFICIENTE (CORREGIDO)
+    const departmentScores: Record<string, number> = {};
+    
+    // Obtener scores promedio por participante - CORREGIDO: usar participantId
+    const participantAvgScores = await prisma.response.groupBy({
       by: ['participantId'],
       where: {
         participant: { campaignId },
@@ -218,41 +212,49 @@ export async function GET(
       _avg: { rating: true }
     });
 
-    const participantScoreMap = new Map(
-      participantScores.map(ps => [ps.participantId, ps._avg.rating || 0])
+    // Mapear participantId a department
+    const participantDepartments = await prisma.participant.findMany({
+      where: { campaignId },
+      select: { id: true, department: true }
+    });
+
+    const participantDeptMap = new Map(
+      participantDepartments.map(p => [p.id, p.department || 'Sin departamento'])
     );
 
+    // Calcular scores promedio por departamento
+    const deptScoreAccumulator: Record<string, { sum: number; count: number }> = {};
+    
+    participantAvgScores.forEach(item => {
+      const department = participantDeptMap.get(item.participantId);
+      const avgScore = item._avg.rating;
+      
+      if (department && avgScore !== null) {
+        if (!deptScoreAccumulator[department]) {
+          deptScoreAccumulator[department] = { sum: 0, count: 0 };
+        }
+        deptScoreAccumulator[department].sum += avgScore;
+        deptScoreAccumulator[department].count += 1;
+      }
+    });
+
+    // Calcular promedios finales por departamento
+    Object.entries(deptScoreAccumulator).forEach(([dept, stats]) => {
+      if (stats.count > 0) {
+        departmentScores[dept] = Math.round((stats.sum / stats.count) * 10) / 10;
+      }
+    });
+
+    // ✅ SEGMENTACIÓN DATA SIMPLIFICADA
     const participantBreakdown: Record<string, { count: number; avgScore: number }> = {};
 
-    // Estadísticas por departamento
+    // Estadísticas por departamento usando los scores ya calculados
     for (const deptStat of departmentStats) {
       const department = deptStat.department || 'Sin departamento';
       participantBreakdown[department] = {
         count: deptStat._count.id,
-        avgScore: 0
+        avgScore: departmentScores[department] || 0
       };
-    }
-
-    // Scores promedio por departamento
-    const deptScoreStats: Record<string, { sum: number; count: number }> = {};
-    
-    for (const participant of departmentParticipants) {
-      const department = participant.department || 'Sin departamento';
-      const score = participantScoreMap.get(participant.id);
-      
-      if (score !== undefined) {
-        if (!deptScoreStats[department]) {
-          deptScoreStats[department] = { sum: 0, count: 0 };
-        }
-        deptScoreStats[department].sum += score;
-        deptScoreStats[department].count += 1;
-      }
-    }
-
-    for (const [department, stats] of Object.entries(deptScoreStats)) {
-      if (participantBreakdown[department]) {
-        participantBreakdown[department].avgScore = stats.count > 0 ? stats.sum / stats.count : 0;
-      }
     }
 
     // ✅ DATOS TENDENCIA
@@ -272,7 +274,7 @@ export async function GET(
       percentage: Math.round((data.count / totalInvited) * 100)
     }));
 
-    // ✅ CONSTRUIR RESPUESTA - CON COMPLETITUD GARANTIZADA
+    // ✅ CONSTRUIR RESPUESTA - CON DEPARTMENT SCORES CENTRALIZADOS
     const analytics: CampaignAnalytics = {
       totalInvited,                                    // ✅ PASO 1 COMPLETADO
       totalResponded,                                  // ✅ PASO 1 COMPLETADO
@@ -283,6 +285,7 @@ export async function GET(
       categoryScores: Object.fromEntries(
         Object.entries(categoryScores).map(([cat, score]) => [cat, Math.round(score * 10) / 10])
       ),
+      departmentScores, // ✅ DEPARTMENT SCORES CENTRALIZADOS AGREGADOS
       responsesByDay,
       segmentationData,
       trendData,
@@ -290,10 +293,16 @@ export async function GET(
       lastUpdated: new Date().toISOString()
     };
 
+    // ✅ ENRIQUECER ANALYTICS CON DEPARTMENT NOMENCLATURA CLIENTE
+    const enrichedAnalytics = await DepartmentAdapter.enrichAnalytics(
+      analytics,
+      authResult.user.id
+    );
+
     return NextResponse.json(
       { 
         success: true,
-        metrics: analytics,                            // ✅ COMPLETITUD GARANTIZADA
+        metrics: enrichedAnalytics,                    // ✅ ANALYTICS ENRICHED
         meta: {
           campaignId,
           campaignName: campaignMeta.name,

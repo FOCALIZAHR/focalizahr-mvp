@@ -20,6 +20,8 @@ export interface CampaignResultsData {
     // Datos estructurados normalizados
     categoryScores: Record<string, number>;
     departmentScores: Record<string, number>;
+    departmentScoresDisplay?: Record<string, number>; // ← AGREGADO FASE 3B
+    departmentMapping?: Record<string, string>; // ← AGREGADO FASE 3A
     trendData: Array<{
       date: string;
       responses: number;
@@ -84,6 +86,17 @@ function normalizeAnalyticsData(rawAnalyticsData: any): CampaignResultsData {
     });
   }
 
+  // ✅ NORMALIZACIÓN DEPARTMENT SCORES DISPLAY - NOMENCLATURA CLIENTE
+  const departmentScoresDisplay: Record<string, number> = {};
+  if (rawMetrics.departmentScoresDisplay && typeof rawMetrics.departmentScoresDisplay === 'object') {
+    Object.entries(rawMetrics.departmentScoresDisplay).forEach(([dept, score]) => {
+      const normalizedScore = Number(score);
+      if (!isNaN(normalizedScore) && isFinite(normalizedScore)) {
+        departmentScoresDisplay[dept] = normalizedScore;
+      }
+    });
+  }
+
   // ✅ NORMALIZACIÓN TREND DATA - VALIDACIÓN ARRAYS
   const trendData = Array.isArray(rawMetrics.trendData) 
     ? rawMetrics.trendData.map((item: any) => ({
@@ -120,6 +133,8 @@ function normalizeAnalyticsData(rawAnalyticsData: any): CampaignResultsData {
       // Datos estructurados validados
       categoryScores,
       departmentScores,
+      departmentScoresDisplay, // ← AGREGADO FASE 3B
+      departmentMapping: rawMetrics.departmentMapping || {}, // ← AGREGADO FASE 3A
       trendData,
       responsesByDay,
       segmentationData: Array.isArray(rawMetrics.segmentationData) ? rawMetrics.segmentationData : [],

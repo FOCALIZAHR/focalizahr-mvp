@@ -1,13 +1,14 @@
 // src/components/admin/ParticipantUploader.tsx
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Upload, 
   FileText, 
@@ -28,6 +29,13 @@ interface ParticipantData {
   department?: string;
   position?: string;
   location?: string;
+}
+
+interface Department {
+  id: string;
+  displayName: string;
+  standardCategory: string | null;
+  isActive: boolean;
 }
 
 interface UploadResult {
@@ -61,7 +69,7 @@ export default function ParticipantUploader({
   mode = 'admin'
 }: ParticipantUploaderProps) {
   
-  // Estados del componente
+  // Estados del componente original
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -70,7 +78,47 @@ export default function ParticipantUploader({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   
+  // ✅ NUEVOS ESTADOS DEPARTMENTS
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
+  const [loadingDepartments, setLoadingDepartments] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ✅ FETCH DEPARTMENTS EFFECT
+  useEffect(() => {
+    const token = localStorage.getItem('focalizahr_token');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const accountIdFromToken = payload.accountId || payload.account?.id || payload.userId || payload.id;
+        
+        if (accountIdFromToken) {
+          setLoadingDepartments(true);
+          
+          fetch('/api/departments', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          })
+          .then(response => {
+            if (!response.ok) throw new Error('Failed to fetch departments');
+            return response.json();
+          })
+          .then(data => setDepartments(data.departments || []))
+          .catch(error => {
+            console.error('Error fetching departments:', error);
+            setDepartments([]);
+          })
+          .finally(() => setLoadingDepartments(false));
+        }
+      } catch (error) {
+        console.error('Error parsing JWT token:', error);
+        setDepartments([]);
+      }
+    }
+  }, []);
 
   // Validar archivo seleccionado
   const validateFile = useCallback((file: File): string | null => {
@@ -138,6 +186,11 @@ export default function ParticipantUploader({
       formData.append('campaignId', campaignId);
       formData.append('action', 'preview');
       
+      // ✅ AGREGAR selectedDepartmentId al context
+      if (selectedDepartmentId && selectedDepartmentId !== 'none') {
+        formData.append('defaultDepartmentId', selectedDepartmentId);
+      }
+      
       const token = localStorage.getItem('focalizahr_token');
 
       const response = await fetch('/api/admin/participants', {
@@ -169,7 +222,7 @@ export default function ParticipantUploader({
       setUploading(false);
       setTimeout(() => setUploadProgress(0), 1000);
     }
-  }, [uploadFile, campaignId, onError]);
+  }, [uploadFile, campaignId, selectedDepartmentId, onError]);
 
   // Confirmar carga definitiva
   const handleConfirmUpload = useCallback(async () => {
@@ -186,6 +239,11 @@ export default function ParticipantUploader({
       formData.append('file', uploadFile);
       formData.append('campaignId', campaignId);
       formData.append('action', 'confirm');
+
+      // ✅ AGREGAR selectedDepartmentId al context
+      if (selectedDepartmentId && selectedDepartmentId !== 'none') {
+        formData.append('defaultDepartmentId', selectedDepartmentId);
+      }
 
       const token = localStorage.getItem('focalizahr_token');
 
@@ -220,7 +278,7 @@ export default function ParticipantUploader({
     } finally {
       setProcessing(false);
     }
-  }, [uploadFile, campaignId, uploadResult, onUploadComplete, onError]);
+  }, [uploadFile, campaignId, uploadResult, selectedDepartmentId, onUploadComplete, onError]);
 
   // Limpiar formulario
   const handleClearForm = useCallback(() => {
@@ -297,6 +355,40 @@ export default function ParticipantUploader({
             </Button>
           </div>
         </div>
+
+        {/* ✅ DROPDOWN DEPARTMENTS (NUEVO) */}
+        {departments.length > 0 && (
+          <div className="space-y-2 mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <Label htmlFor="defaultDepartment" className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              Departamento por defecto (opcional)
+            </Label>
+            <Select 
+              value={selectedDepartmentId} 
+              onValueChange={setSelectedDepartmentId}
+              disabled={loadingDepartments}
+            >
+              <SelectTrigger className="w-full bg-white dark:bg-gray-800 border-blue-300 dark:border-blue-700">
+                <SelectValue placeholder="Si CSV no tiene columna departamento..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin departamento específico</SelectItem>
+                {departments.map(dept => (
+                  <SelectItem key={dept.id} value={dept.id}>
+                    {dept.displayName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-blue-600 dark:text-blue-400">
+              💡 Se aplicará a participantes sin departamento especificado en CSV
+            </p>
+            {selectedDepartmentId && selectedDepartmentId !== 'none' && (
+              <p className="text-xs text-green-600 dark:text-green-400">
+                ✅ Departamento seleccionado: {departments.find(d => d.id === selectedDepartmentId)?.displayName}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Selector de archivo */}
         <div className="space-y-4">

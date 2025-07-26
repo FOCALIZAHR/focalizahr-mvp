@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FocalizaHR - Diagnóstico JWT Token</title>
+    <style>
+        body { font-family: system-ui; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .result { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .error { background: #ffeaea; border-left: 4px solid #e74c3c; }
+        .success { background: #eafaf1; border-left: 4px solid #27ae60; }
+        .warning { background: #fef9e7; border-left: 4px solid #f39c12; }
+        button { background: #3498db; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #2980b9; }
+        pre { white-space: pre-wrap; word-break: break-all; font-size: 12px; }
+        .token-display { max-height: 200px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Diagnóstico JWT Token - FocalizaHR</h1>
+    <p>Esta herramienta te ayudará a identificar el problema exacto con tu token JWT sin modificar código.</p>
+    
+    <div>
+        <button onclick="checkAllTokens()">🔍 Analizar Todos los Tokens</button>
+        <button onclick="testLoginFlow()">🔐 Test Login Flow</button>
+        <button onclick="testAnalyticsCall()">📊 Test Analytics API</button>
+        <button onclick="clearAllTokens()">🗑️ Limpiar Todos los Tokens</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+
+        function analyzeToken(token, source) {
+            if (!token) {
+                return { valid: false, error: 'Token no encontrado', source };
+            }
+
+            try {
+                // Limpiar token
+                let cleanToken = token.trim();
+                if (cleanToken.startsWith('Bearer ')) {
+                    cleanToken = cleanToken.substring(7);
+                }
+
+                // Verificar formato básico
+                const parts = cleanToken.split('.');
+                if (parts.length !== 3) {
+                    return { valid: false, error: `Formato inválido: ${parts.length} partes`, source, token: token.substring(0, 50) + '...' };
+                }
+
+                // Decodificar header
+                const header = JSON.parse(atob(parts[0]));
+                
+                // Decodificar payload
+                const payload = JSON.parse(atob(parts[1]));
+
+                // Verificar expiración
+                const now = Math.floor(Date.now() / 1000);
+                const isExpired = payload.exp && payload.exp < now;
+
+                return {
+                    valid: !isExpired,
+                    source,
+                    header,
+                    payload: {
+                        ...payload,
+                        adminEmail: payload.adminEmail ? payload.adminEmail.substring(0, 5) + '***' : 'missing'
+                    },
+                    isExpired,
+                    expiresAt: payload.exp ? new Date(payload.exp * 1000).toLocaleString() : 'Sin expiración',
+                    tokenLength: token.length,
+                    signatureLength: parts[2].length
+                };
+
+            } catch (error) {
+                return { 
+                    valid: false, 
+                    error: `Error decodificando: ${error.message}`, 
+                    source,
+                    token: token.substring(0, 50) + '...'
+                };
+            }
+        }
+
+        function checkAllTokens() {
+            log('🔍 Iniciando análisis de todos los tokens...', 'info');
+
+            const sources = [
+                { name: 'localStorage.focalizahr_token', value: localStorage.getItem('focalizahr_token') },
+                { name: 'localStorage.token', value: localStorage.getItem('token') },
+                { name: 'sessionStorage.focalizahr_token', value: sessionStorage.getItem('focalizahr_token') },
+                { name: 'sessionStorage.token', value: sessionStorage.getItem('token') }
+            ];
+
+            let validTokens = 0;
+            let totalTokens = 0;
+
+            sources.forEach(source => {
+                if (source.value) {
+                    totalTokens++;
+                    const analysis = analyzeToken(source.value, source.name);
+                    
+                    if (analysis.valid) {
+                        validTokens++;
+                        log(`✅ <strong>${source.name}</strong>: Token válido
+                            <div class="token-display">
+                                <pre>Header: ${JSON.stringify(analysis.header, null, 2)}
+Payload: ${JSON.stringify(analysis.payload, null, 2)}
+Expira: ${analysis.expiresAt}
+Longitud: ${analysis.tokenLength} chars</pre>
+                            </div>`, 'success');
+                    } else {
+                        log(`❌ <strong>${source.name}</strong>: ${analysis.error}
+                            <div class="token-display">
+                                <pre>Token problemático: ${analysis.token || 'No disponible'}</pre>
+                            </div>`, 'error');
+                    }
+                } else {
+                    log(`⚪ <strong>${source.name}</strong>: No encontrado`, 'info');
+                }
+            });
+
+            log(`📊 <strong>Resumen</strong>: ${validTokens}/${totalTokens} tokens válidos encontrados`, validTokens > 0 ? 'success' : 'error');
+
+            if (validTokens === 0 && totalTokens > 0) {
+                log(`🚨 <strong>PROBLEMA IDENTIFICADO</strong>: Tienes tokens almacenados pero todos están corruptos o expirados. 
+                     <br><strong>SOLUCIÓN</strong>: Haz logout/login para generar tokens nuevos.`, 'error');
+            } else if (validTokens > 1) {
+                log(`⚠️ <strong>ADVERTENCIA</strong>: Múltiples tokens válidos encontrados. Esto puede causar inconsistencias.
+                     <br><strong>RECOMENDACIÓN</strong>: Limpiar y usar solo uno.`, 'warning');
+            }
+        }
+
+        async function testAnalyticsCall() {
+            log('📊 Probando llamada a Analytics API...', 'info');
+            
+            const token = localStorage.getItem('focalizahr_token') || 
+                         localStorage.getItem('token') || 
+                         sessionStorage.getItem('focalizahr_token') ||
+                         sessionStorage.getItem('token');
+
+            if (!token) {
+                log('❌ No se encontró ningún token para probar', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/campaigns/cmdet22ss0001glpfltnkmmp0/analytics', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ Analytics API respondió correctamente: ${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    log(`❌ Analytics API error ${response.status}: ${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                log(`💥 Error de red llamando Analytics: ${error.message}`, 'error');
+            }
+        }
+
+        async function testLoginFlow() {
+            log('🔐 Probando flujo de login (requiere credenciales)...', 'info');
+            
+            const email = prompt('Email:');
+            const password = prompt('Password:');
+            
+            if (!email || !password) {
+                log('❌ Credenciales no proporcionadas', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    log(`✅ Login exitoso. Token generado: ${data.token.substring(0, 50)}...`, 'success');
+                    
+                    // Analizar el nuevo token
+                    const analysis = analyzeToken(data.token, 'Login recién generado');
+                    log(`🔍 Análisis token nuevo: ${JSON.stringify(analysis, null, 2)}`, 'info');
+                } else {
+                    log(`❌ Login falló: ${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                log(`💥 Error en login: ${error.message}`, 'error');
+            }
+        }
+
+        function clearAllTokens() {
+            localStorage.removeItem('focalizahr_token');
+            localStorage.removeItem('token');
+            sessionStorage.removeItem('focalizahr_token');
+            sessionStorage.removeItem('token');
+            
+            log('🗑️ Todos los tokens han sido eliminados. Recarga la página y haz login nuevamente.', 'warning');
+        }
+
+        // Auto-ejecutar análisis al cargar
+        window.onload = function() {
+            log('🚀 Herramienta de diagnóstico cargada. Haz clic en "Analizar Todos los Tokens" para comenzar.', 'info');
+        };
+    </script>
+</body>
+</html>
