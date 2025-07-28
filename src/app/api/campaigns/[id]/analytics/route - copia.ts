@@ -1,11 +1,11 @@
-// API ANALYTICS CAMPAÑA - FIX IMPORT DEPARTMENTADAPTER
+// API ANALYTICS CAMPAÑA - RECONSTRUCCIÓN ARQUITECTÓNICA DEFINITIVA
 // src/app/api/campaigns/[id]/analytics/route.ts
-// FIX CRÍTICO: Agregar import DepartmentAdapter faltante
+// FocalizaHR MVP - Completitud + Performance según directriz
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyJWT } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter'; // ← FIX: IMPORT AGREGADO
+import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter';
 
 // ✅ INTERFACES ANALYTICS
 interface CampaignAnalytics {
@@ -95,16 +95,10 @@ export async function GET(
         lastUpdated: new Date().toISOString()
       };
 
-      // ✅ ENRIQUECER ANALYTICS VACÍO TAMBIÉN
-      const enrichedEmptyMetrics = await DepartmentAdapter.enrichAnalytics(
-        emptyMetrics,
-        authResult.user.id
-      );
-
       return NextResponse.json(
         { 
           success: true,
-          metrics: enrichedEmptyMetrics,
+          metrics: emptyMetrics,
           meta: {
             campaignId,
             campaignName: campaignMeta.name,
@@ -299,23 +293,11 @@ export async function GET(
       lastUpdated: new Date().toISOString()
     };
 
-    console.log('📊 Raw analytics before enrichment:', {
-      departmentScores: Object.keys(analytics.departmentScores || {}).length,
-      totalInvited: analytics.totalInvited,
-      accountId: authResult.user.id
-    });
-
     // ✅ ENRIQUECER ANALYTICS CON DEPARTMENT NOMENCLATURA CLIENTE
     const enrichedAnalytics = await DepartmentAdapter.enrichAnalytics(
       analytics,
       authResult.user.id
     );
-
-    console.log('✅ Analytics enriched successfully:', {
-      originalDepartments: Object.keys(analytics.departmentScores || {}).length,
-      enrichedDepartments: Object.keys(enrichedAnalytics.departmentScoresDisplay || {}).length,
-      departmentMapping: Object.keys(enrichedAnalytics.departmentMapping || {}).length
-    });
 
     return NextResponse.json(
       { 

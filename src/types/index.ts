@@ -638,4 +638,150 @@ export interface WebhookEvent {
     headers: Record<string, string>
   }
 }
+// ====================================================================
+// FOCALIZAHR TYPES - CENTRAL TYPE DEFINITIONS  
+// src/types/index.ts
+// Chat 2: Foundation Schema + Services - TIPOS CENTRALIZADOS
+// ====================================================================
 
+// ✅ PARTICIPANT INTERFACE - FUENTE DE VERDAD
+export interface Participant {
+  id: string;
+  email?: string; // Opcional por seguridad
+  department: string | null;
+  position: string | null;
+  seniorityLevel: string | null;
+  location: string | null;
+  hasResponded: boolean;
+  responseDate: Date | string | null;
+  reminderCount: number;
+  lastReminderSent: Date | string | null;
+  createdAt: Date | string;
+  responses?: Array<{
+    id: string;
+    rating: number;
+    createdAt: Date | string;
+  }>;
+}
+
+// ✅ PARTICIPANTS DATA INTERFACE - HOOK RESPONSE
+export interface ParticipantsData {
+  participants: Participant[];
+  summary: {
+    total: number;
+    responded: number;
+    pending: number;
+    participationRate: number;
+    byDepartment: Record<string, { total: number; responded: number }>;
+    byPosition: Record<string, { total: number; responded: number }>;
+    bySeniority: Record<string, { total: number; responded: number }>;
+    byLocation: Record<string, { total: number; responded: number }>;
+    reminders: {
+      noReminders: number;
+      oneReminder: number;
+      multipleReminders: number;
+    };
+  };
+  analysis: {
+    dataCompleteness: {
+      department: number;
+      position: number;
+      seniority: number;
+      location: number;
+    };
+    trends: {
+      needsReminders: number;
+      highEngagement: boolean;
+      readyForAnalysis: boolean;
+    };
+  };
+}
+
+// ✅ CAMPAIGN INTERFACE - EXISTING EXTENDED
+export interface Campaign {
+  id: string;
+  name: string;
+  status: string;
+  type?: string;
+  startDate: Date | string;
+  endDate: Date | string;
+  totalInvited: number;
+  totalResponded: number;
+  campaignType?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  company?: {
+    name: string;
+    adminEmail?: string;
+  };
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+}
+
+// ✅ ANALYTICS INTERFACE - EXISTING EXTENDED  
+export interface Analytics {
+  totalInvited: number;
+  totalResponded: number;
+  participationRate: number;
+  averageScore: number;
+  completionTime: number;
+  responseRate: number;
+  categoryScores: Record<string, number>;
+  departmentScores: Record<string, number>;
+  departmentScoresDisplay?: Record<string, number>;
+  departmentMapping?: Record<string, string>;
+  trendData: Array<{
+    date: string;
+    responses: number;
+    score?: number;
+    cumulativeParticipation?: number;
+  }>;
+  responsesByDay: Record<string, number>;
+  segmentationData: Array<{
+    segment: string;
+    count: number;
+    avgScore: number;
+    percentage: number;
+  }>;
+  demographicBreakdown?: any[];
+  lastUpdated: string;
+}
+
+// ✅ MONITOR DATA INTERFACES - TOWER CONTROL
+export interface DepartmentMonitorData {
+  invited: number;
+  responded: number;
+  rate: number;
+}
+
+export interface DailyResponse {
+  day: string;
+  responses: number;
+  date: string;
+}
+
+export interface ActivityItem {
+  id: string;
+  dept: string;
+  participant: string;
+  timestamp: string;
+  status: string;
+  action: string;
+}
+
+export interface AlertItem {
+  id: string;
+  type: string;
+  message: string;
+  department?: string;
+  timestamp?: string;
+  priority?: string;
+}
+
+// ✅ CAMPAIGN RESULTS DATA - FUSION INTERFACE
+export interface CampaignResultsData {
+  campaign: Campaign;
+  analytics: Analytics;
+}

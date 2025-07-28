@@ -1,3 +1,4 @@
+// ARCHIVO: page.tsx de la página de monitoreo (VERSIÓN FINAL CERTIFICADA)
 'use client';
 
 import { useCampaignMonitor } from '@/hooks/useCampaignMonitor';
@@ -9,22 +10,38 @@ import { ActivityFeed } from '@/components/monitor/ActivityFeed';
 import { DailyChart } from '@/components/monitor/DailyChart';
 import { AlertsPanel } from '@/components/monitor/AlertsPanel';
 import { ActionButtons } from '@/components/monitor/ActionButtons';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertTriangle } from 'lucide-react';
 
 export default function CampaignMonitorPage() {
   const router = useRouter();
   const params = useParams();
   const campaignId = params.id as string;
 
-  // La única lógica es llamar al hook refactorizado
   const monitorData = useCampaignMonitor(campaignId);
 
+  // GUARDIÁN DE CARGA: Previene el error TypeError
+  if (monitorData.isLoading) {
+    return (
+      <div className="neural-dashboard main-layout min-h-screen">
+        <div className="container mx-auto px-4 py-8 text-center text-white">
+          Cargando Torre de Control...
+        </div>
+      </div>
+    );
+  }
+
+  // MANEJO DE ERRORES
   if (monitorData.error) {
     return (
       <div className="neural-dashboard main-layout min-h-screen">
         <div className="container mx-auto px-4 py-8">
-          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-            <p className="text-white">Error cargando datos: {monitorData.error}</p>
-          </div>
+          <Alert className="bg-red-500/10 border-red-500/30">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="text-white">
+              Error cargando datos: {monitorData.error}
+            </AlertDescription>
+          </Alert>
         </div>
       </div>
     );
@@ -41,7 +58,6 @@ export default function CampaignMonitorPage() {
         <AlertsPanel {...monitorData} />
         <ActionButtons {...monitorData} />
         
-        {/* Footer con información de actualización */}
         <div className="text-center text-sm text-white/40">
           Última actualización: {monitorData.lastRefresh.toLocaleTimeString()} • 
           Próxima actualización automática en {60 - new Date().getSeconds()} segundos

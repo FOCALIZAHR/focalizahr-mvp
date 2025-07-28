@@ -35,42 +35,12 @@ export class DepartmentAdapter {
     
     // Aliases predefinidos para matching inteligente enterprise
     const aliases: { [standardCategory: string]: string[] } = {
-      'rrhh': [
-        'rrhh', 'RRHH', 'recursos humanos', 'personas', 'people', 'talento', 
-        'cultura', 'gestion de personas', 'capital humano', 'desarrollo organizacional', 'Rrhh',
-        'bienestar', 'clima', 'gente', 'equipo humano', 'cultura organizacional'
-      ],
-      'desarrollo': [
-        'desarrollo', 'dev', 'ti', 'TI', 'it', 'IT', 'tecnologia', 'sistemas', 
-        'ingenieria', 'tech', 'development', 'informatica', 'I+D', 'innovacion',
-        'I+D+i', 'tecnologias', 'digitalizacion', 'transformacion digital'
-      ],
-      'ventas': [
-        'ventas', 'Ventas', 'sales', 'comercial', 'equipo comercial', 'business development', 
-        'generacion de demanda', 'cuentas clave', 'sucursales', 'retail', 'canal',
-        'distribucion', 'territorios', 'fuerza de ventas', 'business'
-      ],
-      'marketing': [
-        'marketing', 'mercadeo', 'comunicaciones', 'publicidad', 'visual', 
-        'growth', 'marca', 'branding', 'diseno', 'comunicacion', 'rrpp',
-        'contenidos', 'digital', 'marketing digital', 'creatividad'
-      ],
-      'operaciones': [
-        'operaciones', 'ops', 'operations', 'logistica', 'urgencias', 'produccion', 
-        'supply chain', 'calidad', 'gerencia operaciones', 'plantas', 'procesos',
-        'cadena de suministro', 'mantenimiento', 'operativa'
-      ],
-      'finanzas': [
-        'finanzas', 'finance', 'contabilidad', 'accounting', 'tesoreria', 
-        'administracion y finanzas', 'gerencia finanzas', 'fin. y adm.',
-        'cobranzas', 'facturacion', 'cuentas por cobrar', 'control de gestion',
-        'administracion'
-      ],
-      'gerencia': [
-        'gerencia', 'gerencia general', 'direccion', 'dirección', 'management', 'c-level', 
-        'Direccion medica', 'jefatura', 'supervision', 'coordinacion', 'liderazgo',
-        'alta direccion', 'equipo directivo'
-      ]
+      'rrhh': ['rrhh', 'recursos humanos', 'hr', 'people', 'personas', 'talento'],
+      'desarrollo': ['desarrollo', 'dev', 'ti', 'it', 'tech', 'tecnologia', 'sistemas', 'personas'],
+      'ventas': ['ventas', 'sales', 'comercial', 'business'],
+      'marketing': ['marketing', 'mercadeo', 'comunicaciones', 'publicidad'],
+      'operaciones': ['operaciones', 'ops', 'operations', 'logistica'],
+      'finanzas': ['finanzas', 'finance', 'contabilidad', 'accounting']
     };
     
     departments.forEach(dept => {

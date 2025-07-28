@@ -141,12 +141,17 @@ export function CampaignMetricsGrid({
             </div>
           </CardContent>
         </Card>
-      </div>
 
       {/* 🚀 ELEMENTO WOW: Momentum Indicator */}
       <div className="mt-8">
-        <MomentumIndicator dailyResponses={dailyResponses} />
+        <MomentumIndicator 
+          dailyResponses={dailyResponses} 
+          lastRefresh={lastRefresh}
+        />
       </div>
+      </div>
+
+      {/* ← ELIMINADO: El div extra que tenías con MomentumIndicator fuera del grid */}
     </>
   );
 }
