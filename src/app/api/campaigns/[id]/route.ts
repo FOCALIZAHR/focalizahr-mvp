@@ -66,7 +66,6 @@ export async function GET(
         _count: {
           select: {
             participants: true,
-            responses: true
           }
         }
       }

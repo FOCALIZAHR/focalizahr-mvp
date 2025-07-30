@@ -1,7 +1,7 @@
 // ====================================================================
 // FOCALIZAHR CAMPAIGN MONITOR PAGE - REPARACIÓN QUIRÚRGICA
 // src/app/dashboard/campaigns/[id]/monitor/page.tsx
-// Chat Transición: Agregar AnomalyDetectorPanel al layout
+// Chat Transición: Agregar COMPONENTES WOW al layout
 // ====================================================================
 
 'use client';
@@ -16,8 +16,11 @@ import { DailyChart } from '@/components/monitor/DailyChart';
 import { AlertsPanel } from '@/components/monitor/AlertsPanel';
 import { ActionButtons } from '@/components/monitor/ActionButtons';
 
-// ✅ AGREGAR IMPORT ANOMALY DETECTOR PANEL
+// ✅ COMPONENTES WOW - IMPORTS AGREGADOS
 import { AnomalyDetectorPanel } from '@/components/monitor/AnomalyDetectorPanel';
+import { EngagementHeatmapCard } from '@/components/monitor/EngagementHeatmapCard';
+import { ParticipationPredictorCard } from '@/components/monitor/ParticipationPredictorCard';
+import { CrossStudyComparatorCard } from '@/components/monitor/CrossStudyComparatorCard';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
@@ -27,9 +30,19 @@ export default function CampaignMonitorPage() {
   const params = useParams();
   const campaignId = params.id as string;
 
-  // ✅ EXTRAER departmentAnomalies DEL HOOK (CONFIRMACIÓN DATOS)
+  // ✅ EXTRAER DATOS WOW DEL HOOK - COMPLETOS
   const monitorData = useCampaignMonitor(campaignId);
-  const { departmentAnomalies, isLoading } = monitorData;
+  const { 
+    departmentAnomalies,
+    positiveAnomalies,
+    negativeAnomalies, 
+    meanRate,
+    totalDepartments,
+    engagementHeatmap, 
+    participationPrediction,
+    crossStudyComparison,
+    isLoading 
+  } = monitorData;
 
   // GUARDIÁN DE CARGA: Previene el error TypeError
   if (isLoading) {
@@ -66,15 +79,42 @@ export default function CampaignMonitorPage() {
         <CampaignMonitorHeader {...monitorData} router={router} />
         <CampaignMetricsGrid {...monitorData} />
         
+        {/* 🔥 COMPONENTES WOW - SECCIÓN NUEVA AGREGADA */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* ✅ COMPONENTE WOW #1: ENGAGEMENT HEATMAP */}
+          <EngagementHeatmapCard 
+            engagementHeatmap={engagementHeatmap}
+            lastRefresh={monitorData.lastRefresh}
+          />
+          
+          {/* ✅ COMPONENTE WOW #2: PARTICIPATION PREDICTOR */}
+          <ParticipationPredictorCard 
+            participationPrediction={participationPrediction}
+            currentRate={monitorData.participationRate}
+            daysLeft={monitorData.daysRemaining}
+            lastRefresh={monitorData.lastRefresh}
+          />
+        </div>
+
+        {/* 🔥 COMPONENTE WOW #3: CROSS-STUDY COMPARATOR */}
+        <div className="w-full">
+          {crossStudyComparison && (
+            <CrossStudyComparatorCard comparison={crossStudyComparison} />
+          )}
+        </div>
+        
         {/* ✅ LAYOUT GRID PARA COMPONENTES PRINCIPALES */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <DepartmentParticipation {...monitorData} />
           
-          {/* 🔧 REPARACIÓN QUIRÚRGICA: AGREGAR ANOMALY DETECTOR PANEL */}
+          {/* ✅ COMPONENTE WOW #3: ANOMALY DETECTOR PANEL - PROPS CORREGIDAS */}
           <AnomalyDetectorPanel 
-            anomalies={departmentAnomalies}
-            onInvestigateAnomaly={(dept) => console.log('Investigating anomaly in:', dept)}
-            onApplyRecommendation={(rec) => console.log('Applying recommendation:', rec)}
+            departmentAnomalies={departmentAnomalies}
+            positiveAnomalies={positiveAnomalies}
+            negativeAnomalies={negativeAnomalies}
+            meanRate={meanRate}
+            totalDepartments={totalDepartments}
+            lastRefresh={monitorData.lastRefresh}
           />
         </div>
         

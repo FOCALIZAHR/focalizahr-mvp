@@ -785,3 +785,58 @@ export interface CampaignResultsData {
   campaign: Campaign;
   analytics: Analytics;
 }
+
+// ====================================================================
+// 🔥 COMPONENTES WOW - TIPOS PARA DATOS CALCULADOS
+// ====================================================================
+
+export interface EngagementHeatmapData {
+  hourlyData: Array<{ hour: number; count: number; intensity: number; }>;
+  recommendations: Array<{ message: string; confidence: number; }>;
+  nextOptimalWindow: { hour: number; day: string; confidence: number; };
+  totalEngagementScore: number;
+   maxHour: number;           // ← NUEVO
+  maxActivity: number;       // ← NUEVO  
+  totalActivity: number;     // ← NUEVO
+  hourBars: Array<{ hour: number; count: number; percentage: number; isPeak: boolean; }>; // ← NUEVO
+}
+
+export interface ParticipationPredictionData {
+  finalProjection: number;
+  confidence: number;
+  velocity: number;
+  riskLevel: 'low' | 'medium' | 'high';
+  recommendedActions: Array<{ action: string; impact: number; }>;
+}
+// ❌ ESTAS 2 INTERFACES NO EXISTEN EN TU ARCHIVO:
+export interface DepartmentAnomalyData {
+  department: string;
+  currentRate: number;
+  zScore: number;
+  type: 'positive_outlier' | 'negative_outlier';
+  severity: 'high' | 'medium';
+}
+
+export interface CrossStudyComparisonData {
+  lastCampaign: {
+    name: string;
+    type: string;
+    participationRate: number;
+    velocityMetrics: {
+      averageResponsesPerDay: number;
+      completionVelocity: number;
+    };
+  };
+  comparison: {
+    velocityTrend: 'faster' | 'slower' | 'similar';
+    velocityDifference: number;
+    patternSimilarity: number;
+    projectedOutcome: {
+      finalRate: number;
+      confidence: number;
+      riskLevel: 'low' | 'medium' | 'high';
+    };
+  };
+  insights: string[];
+  recommendations: string[];
+}

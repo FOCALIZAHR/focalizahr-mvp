@@ -1,32 +1,21 @@
-// ====================================================================
-// FOCALIZAHR CROSS-STUDY COMPARATOR COMPONENT - WOW COMPONENT #4
-// src/components/monitor/CrossStudyComparatorCard.tsx
-// Chat 4B: Cross-Study Comparator + Final Integration
-// ====================================================================
-
 import React, { useState } from 'react';
 import { TrendingUp, TrendingDown, BarChart3, Target, AlertTriangle, CheckCircle } from 'lucide-react';
-import type { CrossStudyComparison } from '@/hooks/useCampaignMonitor';
 
-interface CrossStudyComparatorCardProps {
-  comparison: CrossStudyComparison | null;
-  onApplyLearning?: (recommendation: string) => void;
-}
-
-export function CrossStudyComparatorCard({ comparison, onApplyLearning }: CrossStudyComparatorCardProps) {
+export function CrossStudyComparatorCard({ comparison, onApplyLearning }) {
   const [expandedInsights, setExpandedInsights] = useState(false);
 
   if (!comparison) {
     return (
-      <div className="glass-card p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <BarChart3 className="w-5 h-5 text-fhr-orange" />
-          <h3 className="text-lg font-semibold text-gray-900">Comparación Cross-Study</h3>
+      <div className="bg-gradient-to-br from-slate-900/90 to-slate-800/70 backdrop-blur-lg border border-cyan-500/20 rounded-2xl p-8 shadow-2xl hover:shadow-cyan-500/10 transition-all duration-300 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-cyan-500/10 to-transparent rounded-full blur-xl"></div>
+        <div className="flex items-center gap-3 mb-8">
+          <BarChart3 className="w-6 h-6 text-cyan-400" />
+          <h3 className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent text-lg font-semibold">Comparación Cross-Study</h3>
         </div>
-        <div className="text-center py-8 text-gray-500">
-          <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>Datos históricos insuficientes</p>
-          <p className="text-sm mt-1">Complete más campañas para análisis comparativo</p>
+        <div className="text-center py-12 text-white/70">
+          <BarChart3 className="w-16 h-16 mx-auto mb-4 opacity-30 text-cyan-400" />
+          <p className="text-lg text-white/80 font-medium">Datos históricos insuficientes</p>
+          <p className="text-sm text-white/70 font-medium uppercase tracking-wider mt-2">Complete más campañas para análisis comparativo</p>
         </div>
       </div>
     );
@@ -35,138 +24,148 @@ export function CrossStudyComparatorCard({ comparison, onApplyLearning }: CrossS
   const { lastCampaign, comparison: comp, insights, recommendations } = comparison;
   
   // Determinar color y iconos basado en tendencia
-  const getTrendColor = (trend: string) => {
+  const getTrendColor = (trend) => {
     switch (trend) {
-      case 'faster': return 'text-green-600';
-      case 'slower': return 'text-red-600';
-      default: return 'text-blue-600';
+      case 'faster': return 'text-green-400';
+      case 'slower': return 'text-red-400';
+      default: return 'text-blue-400';
     }
   };
 
-  const getTrendIcon = (trend: string) => {
+  const getTrendIcon = (trend) => {
     switch (trend) {
-      case 'faster': return <TrendingUp className="w-4 h-4" />;
-      case 'slower': return <TrendingDown className="w-4 h-4" />;
-      default: return <BarChart3 className="w-4 h-4" />;
+      case 'faster': return <TrendingUp className="w-5 h-5" />;
+      case 'slower': return <TrendingDown className="w-5 h-5" />;
+      default: return <BarChart3 className="w-5 h-5" />;
     }
   };
 
-  const getRiskIcon = (risk: string) => {
+  const getRiskIcon = (risk) => {
     switch (risk) {
-      case 'low': return <CheckCircle className="w-4 h-4 text-green-600" />;
-      case 'medium': return <Target className="w-4 h-4 text-yellow-600" />;
-      case 'high': return <AlertTriangle className="w-4 h-4 text-red-600" />;
-      default: return <Target className="w-4 h-4 text-gray-600" />;
+      case 'low': return <CheckCircle className="w-5 h-5 text-green-400" />;
+      case 'medium': return <Target className="w-5 h-5 text-yellow-400" />;
+      case 'high': return <AlertTriangle className="w-5 h-5 text-red-400" />;
+      default: return <Target className="w-5 h-5 text-gray-400" />;
     }
   };
 
-  const getRiskColor = (risk: string) => {
+  const getRiskColor = (risk) => {
     switch (risk) {
-      case 'low': return 'bg-green-50 border-green-200 text-green-800';
-      case 'medium': return 'bg-yellow-50 border-yellow-200 text-yellow-800';
-      case 'high': return 'bg-red-50 border-red-200 text-red-800';
-      default: return 'bg-gray-50 border-gray-200 text-gray-800';
+      case 'low': return 'bg-green-500/10 border-green-400/30 text-green-300';
+      case 'medium': return 'bg-yellow-500/10 border-yellow-400/30 text-yellow-300';
+      case 'high': return 'bg-red-500/10 border-red-400/30 text-red-300';
+      default: return 'bg-gray-500/10 border-gray-400/30 text-gray-300';
     }
   };
 
   return (
-    <div className="glass-card p-6 neural-glow">
+    <div className="bg-gradient-to-br from-slate-900/90 to-slate-800/70 backdrop-blur-lg border border-cyan-500/20 rounded-2xl p-6 shadow-2xl hover:shadow-cyan-500/10 transition-all duration-300 relative overflow-hidden group">
+      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-cyan-500/10 to-transparent rounded-full blur-xl"></div>
+      <div className="absolute bottom-0 left-0 w-20 h-20 bg-gradient-to-tr from-purple-500/10 to-transparent rounded-full blur-xl"></div>
+      
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 relative z-10">
         <div className="flex items-center gap-3">
-          <BarChart3 className="w-5 h-5 text-fhr-orange" />
-          <h3 className="text-lg font-semibold text-gray-900">Comparación Cross-Study</h3>
+          <div className="p-2 bg-cyan-500/20 rounded-lg">
+            <BarChart3 className="w-5 h-5 text-cyan-400" />
+          </div>
+          <h3 className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent text-lg font-semibold">Comparación Cross-Study</h3>
         </div>
-        <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+        <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-400/40 text-cyan-300 text-xs px-3 py-1 rounded-lg backdrop-blur-sm">
           vs {lastCampaign.name}
         </div>
       </div>
 
       {/* Métricas Principales */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         {/* Velocidad */}
-        <div className="bg-white/50 rounded-lg p-4 border border-gray-100">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600">Velocidad</span>
-            <div className={`flex items-center gap-1 ${getTrendColor(comp.velocityTrend)}`}>
+        <div className="bg-gradient-to-br from-slate-800/60 to-slate-700/40 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:shadow-xl transition-all duration-300 group relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-12 h-12 bg-gradient-to-br from-cyan-500/10 to-transparent rounded-full blur-lg"></div>
+          <div className="flex items-center justify-between mb-3 relative z-10">
+            <span className="text-xs text-white/70 font-medium uppercase tracking-wider">Velocidad</span>
+            <div className={`flex items-center gap-2 ${getTrendColor(comp.velocityTrend)}`}>
               {getTrendIcon(comp.velocityTrend)}
-              <span className="text-sm font-semibold">
+              <span className="text-xl font-black bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
                 {comp.velocityDifference > 0 ? '+' : ''}{comp.velocityDifference}%
               </span>
             </div>
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-white/60 font-medium">
             vs {lastCampaign.velocityMetrics.averageResponsesPerDay.toFixed(1)} resp/día histórico
           </div>
         </div>
 
         {/* Similaridad Patrón */}
-        <div className="bg-white/50 rounded-lg p-4 border border-gray-100">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600">Patrón</span>
-            <span className="text-lg font-bold text-gray-900">
+        <div className="bg-gradient-to-br from-slate-800/60 to-slate-700/40 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:shadow-xl transition-all duration-300 group relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-12 h-12 bg-gradient-to-br from-purple-500/10 to-transparent rounded-full blur-lg"></div>
+          <div className="flex items-center justify-between mb-3 relative z-10">
+            <span className="text-xs text-white/70 font-medium uppercase tracking-wider">Patrón</span>
+            <span className="text-3xl font-black bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
               {comp.patternSimilarity}%
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="bg-white/10 rounded-full h-3 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-full blur-sm"></div>
             <div 
-              className="bg-gradient-to-r from-fhr-orange to-orange-500 h-2 rounded-full transition-all duration-300"
+              className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full shadow-lg transition-all duration-300 relative z-10"
               style={{ width: `${comp.patternSimilarity}%` }}
             />
           </div>
         </div>
 
         {/* Proyección Final */}
-        <div className="bg-white/50 rounded-lg p-4 border border-gray-100">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600">Proyección</span>
-            <span className="text-lg font-bold text-gray-900">
+        <div className="bg-gradient-to-br from-slate-800/60 to-slate-700/40 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:shadow-xl transition-all duration-300 group relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-12 h-12 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full blur-lg"></div>
+          <div className="flex items-center justify-between mb-3 relative z-10">
+            <span className="text-xs text-white/70 font-medium uppercase tracking-wider">Proyección</span>
+            <span className="text-3xl font-black bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
               {comp.projectedOutcome.finalRate}%
             </span>
           </div>
           <div className="flex items-center gap-2 text-xs">
             {getRiskIcon(comp.projectedOutcome.riskLevel)}
-            <span className="text-gray-600">
-              Confianza: {comp.projectedOutcome.confidence}%
+            <span className="text-white/70 font-medium">
+              Confianza: <span className="text-white font-bold">{comp.projectedOutcome.confidence}%</span>
             </span>
           </div>
         </div>
       </div>
 
       {/* Campaña de Referencia */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 mb-6 border border-blue-100">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="font-semibold text-blue-900">Campaña de Referencia</h4>
-          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+      <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-xl p-4 mb-6 border border-blue-400/30 backdrop-blur-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full blur-xl"></div>
+        <div className="flex items-center justify-between mb-3 relative z-10">
+          <h4 className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent text-lg font-semibold">Campaña de Referencia</h4>
+          <span className="bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-400/40 text-blue-300 text-xs px-3 py-1 rounded-lg backdrop-blur-sm">
             {lastCampaign.type}
           </span>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <div className="text-sm text-blue-700 font-medium">{lastCampaign.name}</div>
-            <div className="text-xs text-blue-600">
-              Participación: {lastCampaign.participationRate}%
+            <div className="text-base font-semibold text-blue-300 mb-1">{lastCampaign.name}</div>
+            <div className="text-xs text-blue-400 font-medium">
+              Participación: <span className="text-white font-bold">{lastCampaign.participationRate}%</span>
             </div>
           </div>
           <div>
-            <div className="text-sm text-blue-700 font-medium">
+            <div className="text-base font-semibold text-blue-300 mb-1">
               {lastCampaign.velocityMetrics.averageResponsesPerDay.toFixed(1)} resp/día
             </div>
-            <div className="text-xs text-blue-600">
-              Velocity: {lastCampaign.velocityMetrics.completionVelocity}%
+            <div className="text-xs text-blue-400 font-medium">
+              Velocity: <span className="text-white font-bold">{lastCampaign.velocityMetrics.completionVelocity}%</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Insights Expandibles */}
-      <div className="space-y-3">
+      <div className="space-y-3 mb-6">
         <button
           onClick={() => setExpandedInsights(!expandedInsights)}
-          className="w-full flex items-center justify-between text-left p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+          className="w-full flex items-center justify-between text-left p-3 bg-slate-700/30 rounded-xl hover:bg-slate-600/40 transition-all duration-300 group border border-white/10 hover:scale-[1.02]"
         >
-          <span className="font-medium text-gray-900">Insights del Análisis</span>
-          <span className={`transform transition-transform ${expandedInsights ? 'rotate-180' : ''}`}>
+          <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent text-lg font-semibold">Insights del Análisis</span>
+          <span className={`transform transition-transform duration-300 text-cyan-400 text-lg ${expandedInsights ? 'rotate-180' : ''} group-hover:scale-110`}>
             ↓
           </span>
         </button>
@@ -174,9 +173,9 @@ export function CrossStudyComparatorCard({ comparison, onApplyLearning }: CrossS
         {expandedInsights && (
           <div className="space-y-3">
             {insights.map((insight, index) => (
-              <div key={index} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-100">
-                <div className="w-2 h-2 bg-fhr-orange rounded-full mt-2 flex-shrink-0" />
-                <span className="text-sm text-gray-700">{insight}</span>
+              <div key={index} className="flex items-start gap-3 p-3 bg-gradient-to-r from-slate-800/60 to-slate-700/40 rounded-xl border border-white/10 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
+                <div className="w-2 h-2 bg-gradient-to-r from-cyan-400 to-purple-400 rounded-full mt-2 flex-shrink-0 shadow-lg" />
+                <span className="text-sm text-white/80 font-medium leading-relaxed">{insight}</span>
               </div>
             ))}
           </div>
@@ -184,19 +183,19 @@ export function CrossStudyComparatorCard({ comparison, onApplyLearning }: CrossS
       </div>
 
       {/* Recomendaciones Accionables */}
-      <div className="mt-6">
-        <h4 className="font-semibold text-gray-900 mb-3">Recomendaciones</h4>
+      <div className="mb-6">
+        <h4 className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent text-lg font-semibold mb-3">Recomendaciones</h4>
         <div className="space-y-2">
           {recommendations.map((rec, index) => (
             <div
               key={index}
-              className={`flex items-center justify-between p-3 rounded-lg border ${getRiskColor(comp.projectedOutcome.riskLevel)}`}
+              className={`flex items-center justify-between p-3 rounded-xl border backdrop-blur-sm hover:shadow-lg transition-all duration-300 ${getRiskColor(comp.projectedOutcome.riskLevel)}`}
             >
               <span className="text-sm font-medium">{rec}</span>
               {onApplyLearning && (
                 <button
                   onClick={() => onApplyLearning(rec)}
-                  className="text-xs bg-white/80 hover:bg-white px-3 py-1 rounded transition-colors"
+                  className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl border border-white/20 text-white font-medium"
                 >
                   Aplicar
                 </button>
@@ -207,10 +206,10 @@ export function CrossStudyComparatorCard({ comparison, onApplyLearning }: CrossS
       </div>
 
       {/* Footer con Timestamp */}
-      <div className="mt-6 pt-4 border-t border-gray-100">
-        <div className="flex items-center justify-between text-xs text-gray-500">
+      <div className="pt-6 border-t border-white/10 relative z-10">
+        <div className="flex items-center justify-between text-xs text-white/60 font-medium">
           <span>Análisis basado en {lastCampaign.type} más reciente</span>
-          <span>Actualizado ahora</span>
+          <span className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 px-3 py-1 rounded-lg">Actualizado ahora</span>
         </div>
       </div>
     </div>

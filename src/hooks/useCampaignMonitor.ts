@@ -7,6 +7,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useCampaignResults } from './useCampaignResults';
 import { useCampaignParticipants } from './useCampaignParticipants';
+import { useCampaignHistory } from './useCampaignHistory';
 import { 
   calculateRecentActivity,
   getLastActivityDate,
@@ -15,15 +16,23 @@ import {
   formatLocalDateTime,
   getParticipationColor,
   processDailyResponses,
+  processEngagementHeatmap,
+  calculateParticipationPrediction,
+  calculateDepartmentAnomalies,
+  calculateCrossStudyComparison,
 } from '@/lib/utils/monitor-utils';
 import type { 
   DepartmentMonitorData, 
   DailyResponse, 
   ActivityItem, 
-  AlertItem 
-} from '@/types';
+  AlertItem,
+  EngagementHeatmapData,
+  ParticipationPredictionData,
+  DepartmentAnomalyData,
+  CrossStudyComparisonData,
+} from '@/types'
 
-// ✅ INTERFACE PRINCIPAL DEL MONITOR
+// ✅ INTERFACE PRINCIPAL DEL MONITOR - EXTENDIDA
 export interface CampaignMonitorData {
   isLoading: boolean;
   id: string;
@@ -42,12 +51,22 @@ export interface CampaignMonitorData {
   alerts: AlertItem[];
   recentActivity: ActivityItem[];
   lastRefresh: Date;
+  // 🔥 COMPONENTES WOW - DATOS CALCULADOS COMPLETOS
+  engagementHeatmap?: EngagementHeatmapData;
+  participationPrediction?: ParticipationPredictionData;
+  departmentAnomalies: DepartmentAnomalyData[];
+  positiveAnomalies: DepartmentAnomalyData[];
+  negativeAnomalies: DepartmentAnomalyData[];
+  meanRate: number;
+  totalDepartments: number;
+  crossStudyComparison?: CrossStudyComparisonData;
 }
 
 export function useCampaignMonitor(campaignId: string) {
   // ✅ FUSIÓN DE FUENTES DE DATOS - ARQUITECTURA HÍBRIDA CERTIFICADA
   const { data: campaignData, isLoading: resultsLoading, error, refreshData } = useCampaignResults(campaignId);
   const { data: participantsData, isLoading: participantsLoading, refreshData: refreshParticipants } = useCampaignParticipants(campaignId, { includeDetails: true });
+  const { data: historicalData, isLoading: historyLoading } = useCampaignHistory({ limit: 5 });
   
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
@@ -95,7 +114,13 @@ export function useCampaignMonitor(campaignId: string) {
         dailyResponses: [],
         alerts: [],
         recentActivity: [],
-        lastRefresh
+        lastRefresh,
+        // 🔥 COMPONENTES WOW - VALORES LOADING
+        departmentAnomalies: [],
+        positiveAnomalies: [],
+        negativeAnomalies: [],
+        meanRate: 0,
+        totalDepartments: 0,
       };
     }
 
@@ -198,6 +223,12 @@ export function useCampaignMonitor(campaignId: string) {
     const daysRemaining = calculateDaysRemaining(campaign.endDate);
     const dailyResponses = processDailyResponses(analytics.trendData);
 
+    // 🔥 COMPONENTES WOW - CÁLCULOS COMPLETOS EN HOOK
+    const anomalyData = calculateDepartmentAnomalies(byDepartment);
+    
+    // ✅ DATOS HISTÓRICOS REALES DE API (reemplaza mock)
+    const historicalCampaigns = historicalData?.campaigns || [];
+
     return {
       isLoading: false,
       id: campaignId,
@@ -215,9 +246,34 @@ export function useCampaignMonitor(campaignId: string) {
       dailyResponses,
       alerts,
       recentActivity,
-      lastRefresh
+      lastRefresh,
+      // 🔥 COMPONENTES WOW - CÁLCULOS EN HOOK COMPLETADOS
+      engagementHeatmap: recentActivity.length > 0 ? 
+        processEngagementHeatmap(recentActivity, byDepartment) : undefined,
+      participationPrediction: dailyResponses.length > 0 && daysRemaining > 0 ?
+        calculateParticipationPrediction(dailyResponses, analytics.participationRate || 0, daysRemaining) : undefined,
+      // 🔥 NUEVOS CÁLCULOS AGREGADOS
+      departmentAnomalies: anomalyData.departmentAnomalies,
+      positiveAnomalies: anomalyData.positiveAnomalies,
+      negativeAnomalies: anomalyData.negativeAnomalies,
+      meanRate: anomalyData.meanRate,
+      totalDepartments: anomalyData.totalDepartments,
+      crossStudyComparison: calculateCrossStudyComparison(campaign, historicalCampaigns),
+      // 🔍 DEBUGGING - AGREGAR ESTAS 6 LÍNEAS:
+      __debug1: console.log('🔍 DEBUGGING CROSS-STUDY:'),
+      __debug2: console.log('- campaign object:', {
+          type: campaign.type,
+          campaignType: campaign.campaignType,
+          name: campaign.name,
+          allProps: Object.keys(campaign)
+        }),
+      __debug3: console.log('- historical campaigns:', historicalCampaigns.map(h => ({name: h.name, type: h.type}))),
+      __debug4: console.log('- historicalCampaigns.length:', historicalCampaigns.length),
+      __debug5: console.log('- same type filter:', historicalCampaigns.filter(h => h.type === (campaign.campaignType?.slug || campaign.type))),
+      __debug6: console.log('- function result:', calculateCrossStudyComparison(campaign, historicalCampaigns)),
     };
-  }, [campaignData, participantsData, campaignId, lastRefresh]);
+  
+  }, [campaignData, participantsData, historicalData, campaignId, lastRefresh]);
 
   // ✅ HANDLERS Y UTILIDADES DE UI
   const handleRefresh = useCallback(() => {
@@ -293,7 +349,7 @@ export function useCampaignMonitor(campaignId: string) {
   return {
     ...monitorData,
     error: error || (participantsData && participantsData.error) || null,
-    isLoading: resultsLoading || participantsLoading,
+    isLoading: resultsLoading || participantsLoading || historyLoading,
     handleRefresh,
     handleSendReminder,
     handleExtendCampaign,

@@ -1,7 +1,7 @@
 // ====================================================================
 // FOCALIZAHR ANOMALY DETECTOR PANEL - WOW Foundation Intelligence
 // src/components/monitor/AnomalyDetectorPanel.tsx
-// Chat 4A: Foundation Intelligence Component 3/3
+// Chat 4A: Foundation Intelligence Component 3/3 - CORREGIDO SIN CÁLCULOS
 // ====================================================================
 
 import React from 'react';
@@ -11,25 +11,27 @@ import type { DepartmentAnomalyData } from '@/types';
 
 interface AnomalyDetectorPanelProps {
   departmentAnomalies: DepartmentAnomalyData[];
-  byDepartment: Record<string, { invited: number; responded: number; rate: number; }>;
+  positiveAnomalies: DepartmentAnomalyData[];      // ✅ YA CALCULADO EN HOOK
+  negativeAnomalies: DepartmentAnomalyData[];      // ✅ YA CALCULADO EN HOOK
+  meanRate: number;                                // ✅ YA CALCULADO EN HOOK
+  totalDepartments: number;                        // ✅ YA CALCULADO EN HOOK
   lastRefresh: Date;
 }
 
 export function AnomalyDetectorPanel({ 
-  departmentAnomalies, 
-  byDepartment,
+  departmentAnomalies,
+  positiveAnomalies,     // ✅ RECIBIR YA CALCULADO
+  negativeAnomalies,     // ✅ RECIBIR YA CALCULADO  
+  meanRate,              // ✅ RECIBIR YA CALCULADO
+  totalDepartments,      // ✅ RECIBIR YA CALCULADO
   lastRefresh 
 }: AnomalyDetectorPanelProps) {
   
-  // Calcular estadísticas generales para contexto
-  const departmentRates = Object.values(byDepartment).map(d => d.rate);
-  const meanRate = departmentRates.length > 0 
-    ? departmentRates.reduce((a, b) => a + b, 0) / departmentRates.length 
-    : 0;
-  
-  // Separar anomalías por tipo
-  const positiveAnomalies = departmentAnomalies.filter(a => a.type === 'positive_outlier');
-  const negativeAnomalies = departmentAnomalies.filter(a => a.type === 'negative_outlier');
+  // ❌ CÁLCULOS REMOVIDOS - AHORA VIENEN DEL HOOK
+  // const departmentRates = Object.values(byDepartment).map(d => d.rate);
+  // const meanRate = departmentRates.length > 0 ? ... : 0;
+  // const positiveAnomalies = departmentAnomalies.filter(a => a.type === 'positive_outlier');
+  // const negativeAnomalies = departmentAnomalies.filter(a => a.type === 'negative_outlier');
   
   // Componente para mostrar una anomalía individual
   const AnomalyItem = ({ anomaly }: { anomaly: DepartmentAnomalyData }) => {
@@ -117,12 +119,12 @@ export function AnomalyDetectorPanel({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* RESUMEN ESTADÍSTICO */}
+        {/* RESUMEN ESTADÍSTICO - USANDO DATOS YA CALCULADOS */}
         <div className="grid grid-cols-4 gap-3 mb-4">
           <div className="text-center p-2 bg-gradient-to-br from-slate-800/50 to-transparent 
                           rounded border border-slate-600/30">
             <div className="text-lg font-bold text-white">
-              {Object.keys(byDepartment).length}
+              {totalDepartments}
             </div>
             <div className="text-xs text-white/60">Departamentos</div>
           </div>

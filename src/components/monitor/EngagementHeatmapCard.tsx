@@ -1,7 +1,7 @@
 // ====================================================================
 // FOCALIZAHR ENGAGEMENT HEATMAP CARD - WOW Foundation Intelligence
 // src/components/monitor/EngagementHeatmapCard.tsx
-// Chat 4A: Foundation Intelligence Component 1/3
+// Chat 4A: Foundation Intelligence Component 1/3 - CORREGIDO SIN CÁLCULOS
 // ====================================================================
 
 import React from 'react';
@@ -18,20 +18,8 @@ export function EngagementHeatmapCard({
   engagementHeatmap, 
   lastRefresh 
 }: EngagementHeatmapCardProps) {
-  const { hourlyData, recommendations } = engagementHeatmap;
-
-  // Calcular hora pico
-  const maxHour = hourlyData.indexOf(Math.max(...hourlyData));
-  const maxActivity = Math.max(...hourlyData);
-  const totalActivity = hourlyData.reduce((sum, count) => sum + count, 0);
-
-  // Generar visualización de horas (0-23)
-  const hourBars = hourlyData.map((count, hour) => ({
-    hour,
-    count,
-    percentage: totalActivity > 0 ? (count / totalActivity) * 100 : 0,
-    isPeak: hour === maxHour && count > 0
-  }));
+  // ✅ USAR DATOS YA CALCULADOS DEL HOOK - NO MÁS CÁLCULOS
+  const { hourlyData, recommendations, maxHour, maxActivity, totalActivity, hourBars } = engagementHeatmap;
 
   return (
     <Card className="glass-card neural-glow border-fhr-cyan/20 bg-gradient-to-br from-slate-900/80 to-slate-800/80">
@@ -137,7 +125,7 @@ export function EngagementHeatmapCard({
                              rounded border-l-2 border-fhr-cyan/40"
                 >
                   <TrendingUp className="h-3 w-3 text-fhr-cyan mt-0.5 flex-shrink-0" />
-                  <span className="text-xs text-white/80">{rec}</span>
+                  <span className="text-xs text-white/80">{rec.message}</span>
                 </div>
               ))
             ) : (

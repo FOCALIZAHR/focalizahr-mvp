@@ -1,19 +1,21 @@
 // ====================================================================
 // FOCALIZAHR HISTORICAL CAMPAIGNS API - PROTOCOLO AGREGACIONES DB
-// src/app/api/campaigns/historical/route.ts
+// src/app/api/historical/route.ts
 // Chat 4B: Cross-Study Comparator - BACKEND CEREBRO IMPLEMENTATION
 // ====================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { verifyJWT } from '@/lib/auth';
 
 // ✅ INTERFACE DATOS HISTÓRICOS PROCESADOS
 interface HistoricalCampaignData {
   id: string;
   name: string;
-  type: string;
+  campaignType: {
+    name: string;
+    slug: string;
+  };
   startDate: string;
   endDate: string;
   totalInvited: number;
@@ -37,31 +39,32 @@ interface HistoricalCampaignData {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.companyId) {
+    const authResult = await verifyJWT(request);
+    if (!authResult.success || !authResult.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
-    const companyId = session.user.companyId;
+    const accountId = authResult.user.id;
     const limit = parseInt(searchParams.get('limit') || '10');
     const campaignType = searchParams.get('type');
 
-    console.log('[HISTORICAL API] Iniciando consulta para companyId:', companyId);
+    console.log('[HISTORICAL API] Iniciando consulta para accountId:', accountId);
 
-    // ✅ PASO 1: OBTENER CAMPAÑAS BÁSICAS (SIN PARTICIPANTS)
-    const campaignsQuery = await db.campaign.findMany({
+    // ✅ PASO 1: OBTENER CAMPAÑAS BÁSICAS (CON CAMPAIGN TYPE)
+    const campaignsQuery = await prisma.campaign.findMany({
       where: {
-        companyId,
+        accountId,
         status: 'completed',
-        ...(campaignType && { type: campaignType })
+        ...(campaignType && { campaignTypeId: campaignType })
       },
-      select: {
-        id: true,
-        name: true,
-        type: true,
-        startDate: true,
-        endDate: true
+      include: {
+        campaignType: {
+          select: {
+            name: true,
+            slug: true
+          }
+        }
       },
       orderBy: {
         endDate: 'desc'
@@ -81,7 +84,7 @@ export async function GET(request: NextRequest) {
     console.log('[HISTORICAL API] Procesando', campaignIds.length, 'campañas históricas');
 
     // ✅ PASO 2: AGREGACIONES DB - CONTEOS BÁSICOS POR CAMPAÑA
-    const participantCounts = await db.participant.groupBy({
+    const participantCounts = await prisma.participant.groupBy({
       by: ['campaignId'],
       where: {
         campaignId: { in: campaignIds }
@@ -92,12 +95,12 @@ export async function GET(request: NextRequest) {
     });
 
     // ✅ PASO 3: AGREGACIONES DB - CONTEOS COMPLETADOS POR CAMPAÑA
-    const completedCounts = await db.participant.groupBy({
+    const completedCounts = await prisma.participant.groupBy({
       by: ['campaignId'],
       where: {
         campaignId: { in: campaignIds },
-        status: 'completed',
-        completedAt: { not: null }
+        hasResponded: true,
+        responseDate: { not: null }
       },
       _count: {
         id: true
@@ -105,16 +108,16 @@ export async function GET(request: NextRequest) {
     });
 
     // ✅ PASO 4: AGREGACIONES DB - DATOS TEMPORALES PARA VELOCITY
-    const temporalData = await db.participant.findMany({
+    const temporalData = await prisma.participant.findMany({
       where: {
         campaignId: { in: campaignIds },
-        status: 'completed',
-        completedAt: { not: null }
+        hasResponded: true,
+        responseDate: { not: null }
       },
       select: {
         campaignId: true,
-        completedAt: true,
-        invitedAt: true
+        responseDate: true,
+        createdAt: true
       }
     });
 
@@ -145,7 +148,7 @@ export async function GET(request: NextRequest) {
       return {
         id: campaign.id,
         name: campaign.name,
-        type: campaign.type,
+        campaignType: campaign.campaignType,
         startDate: campaign.startDate.toISOString(),
         endDate: campaign.endDate.toISOString(),
         totalInvited: totalCount,
@@ -176,7 +179,7 @@ export async function GET(request: NextRequest) {
 
 // ✅ FUNCIÓN BACKEND - CÁLCULO VELOCITY METRICS
 function calculateVelocityMetrics(
-  temporalData: Array<{ completedAt: Date | null; invitedAt: Date | null }>,
+  temporalData: Array<{ responseDate: Date | null; createdAt: Date | null }>,
   startDate: Date,
   endDate: Date,
   durationDays: number
@@ -198,9 +201,9 @@ function calculateVelocityMetrics(
   let firstWeekResponses = 0;
 
   temporalData.forEach(participant => {
-    if (!participant.completedAt) return;
+    if (!participant.responseDate) return;
     
-    const completedDate = new Date(participant.completedAt);
+    const completedDate = new Date(participant.responseDate);
     const dayKey = completedDate.toISOString().split('T')[0];
     responsesByDay[dayKey] = (responsesByDay[dayKey] || 0) + 1;
     
@@ -217,7 +220,7 @@ function calculateVelocityMetrics(
   // Velocidad completitud: % en primera mitad vs total
   const midPoint = new Date(startDate.getTime() + (endDate.getTime() - startDate.getTime()) / 2);
   const firstHalf = temporalData.filter(p => 
-    p.completedAt && new Date(p.completedAt) <= midPoint
+    p.responseDate && new Date(p.responseDate) <= midPoint
   ).length;
   const completionVelocity = temporalData.length > 0 ? (firstHalf / temporalData.length) * 100 : 0;
   
@@ -233,7 +236,7 @@ function calculateVelocityMetrics(
 
 // ✅ FUNCIÓN BACKEND - CÁLCULO ENGAGEMENT PATTERNS
 function calculateEngagementPattern(
-  temporalData: Array<{ completedAt: Date | null }>,
+  temporalData: Array<{ responseDate: Date | null }>,
   startDate: Date,
   durationDays: number
 ) {
@@ -265,9 +268,9 @@ function calculateEngagementPattern(
   const responsesByDay: Record<number, number> = {};
 
   temporalData.forEach(participant => {
-    if (!participant.completedAt) return;
+    if (!participant.responseDate) return;
     
-    const completed = new Date(participant.completedAt);
+    const completed = new Date(participant.responseDate);
     const daysDiff = Math.floor((completed.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     
     // Agrupar por día
