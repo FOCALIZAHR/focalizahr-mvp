@@ -19,7 +19,6 @@ import {
   processEngagementHeatmap,
   calculateParticipationPrediction,
   calculateDepartmentAnomalies,
-  calculateCrossStudyComparison,
 } from '@/lib/utils/monitor-utils';
 import type { 
   DepartmentMonitorData, 
@@ -66,7 +65,10 @@ export function useCampaignMonitor(campaignId: string) {
   // ✅ FUSIÓN DE FUENTES DE DATOS - ARQUITECTURA HÍBRIDA CERTIFICADA
   const { data: campaignData, isLoading: resultsLoading, error, refreshData } = useCampaignResults(campaignId);
   const { data: participantsData, isLoading: participantsLoading, refreshData: refreshParticipants } = useCampaignParticipants(campaignId, { includeDetails: true });
-  const { data: historicalData, isLoading: historyLoading } = useCampaignHistory({ limit: 5 });
+  const { data: historicalData, isLoading: historyLoading, crossStudyComparison } = useCampaignHistory({ 
+    limit: 5, 
+    currentCampaignId: campaignId 
+  });
   
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
@@ -258,22 +260,10 @@ export function useCampaignMonitor(campaignId: string) {
       negativeAnomalies: anomalyData.negativeAnomalies,
       meanRate: anomalyData.meanRate,
       totalDepartments: anomalyData.totalDepartments,
-      crossStudyComparison: calculateCrossStudyComparison(campaign, historicalCampaigns),
-      // 🔍 DEBUGGING - AGREGAR ESTAS 6 LÍNEAS:
-      __debug1: console.log('🔍 DEBUGGING CROSS-STUDY:'),
-      __debug2: console.log('- campaign object:', {
-          type: campaign.type,
-          campaignType: campaign.campaignType,
-          name: campaign.name,
-          allProps: Object.keys(campaign)
-        }),
-      __debug3: console.log('- historical campaigns:', historicalCampaigns.map(h => ({name: h.name, type: h.type}))),
-      __debug4: console.log('- historicalCampaigns.length:', historicalCampaigns.length),
-      __debug5: console.log('- same type filter:', historicalCampaigns.filter(h => h.type === (campaign.campaignType?.slug || campaign.type))),
-      __debug6: console.log('- function result:', calculateCrossStudyComparison(campaign, historicalCampaigns)),
+      crossStudyComparison: crossStudyComparison || null,
     };
   
-  }, [campaignData, participantsData, historicalData, campaignId, lastRefresh]);
+  }, [campaignData, participantsData, historicalData, campaignId, lastRefresh, crossStudyComparison]);
 
   // ✅ HANDLERS Y UTILIDADES DE UI
   const handleRefresh = useCallback(() => {

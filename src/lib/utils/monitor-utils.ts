@@ -4,7 +4,16 @@
 // Chat 2: Foundation Schema + Services - REPARACIÓN QUIRÚRGICA
 // ====================================================================
 
-import type { Participant, DepartmentMonitorData, DailyResponse, ActivityItem } from '@/types';
+import type { 
+  Participant, 
+  DepartmentMonitorData, 
+  DailyResponse, 
+  ActivityItem,
+  EngagementHeatmapData,
+  ParticipationPredictionData,
+  DepartmentAnomalyData,
+  CrossStudyComparisonData
+} from '@/types';
 
 // ✅ NUEVA FUNCIÓN CERTIFICADA para calcular la participación real por departamento
 export function calculateDepartmentParticipation(participants: Participant[]): Record<string, DepartmentMonitorData> {
@@ -128,27 +137,6 @@ export function transformScoresToByDepartment(analytics: any): Record<string, De
 // 🔥 COMPONENTES WOW - EXTENSIÓN QUIRÚRGICA (CÓDIGO NUEVO)
 // Funciones para calcular inteligencia en el hook central
 // ====================================================================
-
-// 🎯 TIPOS DE DATOS PARA COMPONENTES WOW
-export interface EngagementHeatmapData {
-  hourlyData: Array<{ hour: number; count: number; intensity: number; }>;
-  recommendations: Array<{ message: string; confidence: number; }>;
-  nextOptimalWindow: { hour: number; day: string; confidence: number; };
-  totalEngagementScore: number;
-  // ✅ DATOS CALCULADOS PARA COMPONENTE
-  maxHour: number;
-  maxActivity: number;
-  totalActivity: number;
-  hourBars: Array<{ hour: number; count: number; percentage: number; isPeak: boolean; }>;
-}
-
-export interface ParticipationPredictionData {
-  finalProjection: number;
-  confidence: number;
-  velocity: number;
-  riskLevel: 'low' | 'medium' | 'high';
-  recommendedActions: Array<{ action: string; impact: number; }>;
-}
 
 // 🔥 COMPONENTE WOW #1: MAPA DE CALOR ENGAGEMENT
 export function processEngagementHeatmap(
@@ -287,39 +275,6 @@ export function calculateParticipationPrediction(
 // 🔥 COMPONENTES WOW FALTANTES - AGREGADOS AHORA
 // ====================================================================
 
-// 🎯 TIPOS PARA LOS 2 COMPONENTES FALTANTES
-export interface DepartmentAnomalyData {
-  department: string;
-  currentRate: number;
-  zScore: number;
-  type: 'positive_outlier' | 'negative_outlier';
-  severity: 'high' | 'medium';
-}
-
-export interface CrossStudyComparisonData {
-  lastCampaign: {
-    name: string;
-    type: string;
-    participationRate: number;
-    velocityMetrics: {
-      averageResponsesPerDay: number;
-      completionVelocity: number;
-    };
-  };
-  comparison: {
-    velocityTrend: 'faster' | 'slower' | 'similar';
-    velocityDifference: number;
-    patternSimilarity: number;
-    projectedOutcome: {
-      finalRate: number;
-      confidence: number;
-      riskLevel: 'low' | 'medium' | 'high';
-    };
-  };
-  insights: string[];
-  recommendations: string[];
-}
-
 // 🔥 COMPONENTE WOW #3: DETECTOR DE ANOMALÍAS
 export function calculateDepartmentAnomalies(
   byDepartment: Record<string, DepartmentMonitorData>
@@ -383,86 +338,5 @@ export function calculateDepartmentAnomalies(
 }
 
 // 🔥 COMPONENTE WOW #4: COMPARADOR CROSS-STUDY
-export function calculateCrossStudyComparison(
-  currentCampaign: any,
-  historicalData: any[]
-): CrossStudyComparisonData | null {
-  // Si no hay datos históricos, retornar null
-  if (!historicalData || historicalData.length === 0) {
-    return null;
-  }
-
-  // Buscar la campaña más reciente del mismo tipo
-  const sameTyepcampaigns = historicalData.filter(h => h.type === currentCampaign?.type);
-  if (sameTyepcampaigns.length === 0) {
-    return null;
-  }
-
-  const lastCampaign = sameTyepcampaigns[0]; // Asumiendo que está ordenado por fecha
-
-  // Calcular métricas de velocidad actuales
-  const currentVelocity = 2.5; // Mock - en producción calcular desde dailyResponses
-  const historicalVelocity = lastCampaign.averageResponsesPerDay || 2.0;
-
-  // Calcular diferencias
-  const velocityDifference = Math.round(((currentVelocity - historicalVelocity) / historicalVelocity) * 100);
-  
-  let velocityTrend: 'faster' | 'slower' | 'similar' = 'similar';
-  if (Math.abs(velocityDifference) > 10) {
-    velocityTrend = velocityDifference > 0 ? 'faster' : 'slower';
-  }
-
-  // Simular similaridad de patrón (en producción, usar análisis más sofisticado)
-  const patternSimilarity = Math.max(60, Math.min(95, 85 + Math.random() * 10));
-
-  // Proyección basada en datos históricos
-  const finalRate = Math.max(45, Math.min(95, 72 + Math.random() * 15));
-  const confidence = Math.max(65, Math.min(90, 78 + Math.random() * 10));
-  
-  let riskLevel: 'low' | 'medium' | 'high' = 'low';
-  if (finalRate < 60) riskLevel = 'high';
-  else if (finalRate < 75) riskLevel = 'medium';
-
-  // Generar insights automáticos
-  const insights = [
-    `Velocidad de respuesta ${velocityTrend === 'faster' ? 'superior' : velocityTrend === 'slower' ? 'inferior' : 'similar'} a campaña anterior`,
-    `Patrón de participación ${patternSimilarity > 80 ? 'muy similar' : 'moderadamente similar'} a histórico`,
-    `Proyección sugiere ${riskLevel === 'low' ? 'cumplimiento' : riskLevel === 'medium' ? 'riesgo moderado' : 'riesgo alto'} de objetivos`
-  ];
-
-  // Generar recomendaciones
-  const recommendations = [];
-  if (velocityTrend === 'slower') {
-    recommendations.push('Intensificar recordatorios para mantener momentum');
-  }
-  if (riskLevel === 'high') {
-    recommendations.push('Implementar estrategia de recuperación inmediata');
-  }
-  if (patternSimilarity < 70) {
-    recommendations.push('Analizar cambios en dinámica organizacional');
-  }
-
-  return {
-    lastCampaign: {
-      name: lastCampaign.name || 'Campaña Anterior',
-      type: lastCampaign.type || 'Estudio',
-      participationRate: lastCampaign.participationRate || 68,
-      velocityMetrics: {
-        averageResponsesPerDay: historicalVelocity,
-        completionVelocity: lastCampaign.completionVelocity || Math.round(historicalVelocity * 10)
-      }
-    },
-    comparison: {
-      velocityTrend,
-      velocityDifference,
-      patternSimilarity: Math.round(patternSimilarity),
-      projectedOutcome: {
-        finalRate: Math.round(finalRate),
-        confidence: Math.round(confidence),
-        riskLevel
-      }
-    },
-    insights,
-    recommendations
-  };
-}
+// ✅ FUNCIÓN ELIMINADA - Los cálculos se realizan ahora en el backend (/api/historical)
+// CrossStudyComparatorCard usa datos pre-calculados del hook useCampaignHistory

@@ -36,11 +36,13 @@ export interface HistoricalDataResponse {
   campaigns: HistoricalCampaignData[];
   total: number;
   lastUpdated: string;
+  currentComparison?: any; // Cross-study comparison if current campaign provided
 }
 
 interface UseCampaignHistoryOptions {
   limit?: number;
   campaignType?: string;
+  currentCampaignId?: string; // ← NUEVA OPCIÓN
 }
 
 // 🎯 HOOK "TONTO" - PROTOCOLO: SOLO FETCH, SIN LÓGICA
@@ -49,7 +51,7 @@ export function useCampaignHistory(options: UseCampaignHistoryOptions = {}) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { limit = 5, campaignType } = options;
+  const { limit = 5, campaignType, currentCampaignId } = options;
 
   // ✅ FUNCIÓN FETCH SIMPLE - SIN LÓGICA DE CÁLCULO
   const fetchHistoricalData = useCallback(async () => {
@@ -61,6 +63,7 @@ export function useCampaignHistory(options: UseCampaignHistoryOptions = {}) {
       const params = new URLSearchParams();
       if (limit) params.append('limit', limit.toString());
       if (campaignType) params.append('type', campaignType);
+      if (currentCampaignId) params.append('current', currentCampaignId);
 
       console.log('[useCampaignHistory] Fetching datos de API cerebro...');
       
@@ -102,7 +105,7 @@ export function useCampaignHistory(options: UseCampaignHistoryOptions = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [limit, campaignType]);
+  }, [limit, campaignType, currentCampaignId]);
 
   // ✅ EFECTO SIMPLE - SOLO FETCH AL MOUNT
   useEffect(() => {
@@ -117,6 +120,8 @@ export function useCampaignHistory(options: UseCampaignHistoryOptions = {}) {
     refreshData: fetchHistoricalData,
     // Helpers para validar datos
     hasHistoricalData: data && data.campaigns.length > 0,
-    totalCampaigns: data?.total || 0
+    totalCampaigns: data?.total || 0,
+    // ✅ NUEVO: Comparación cross-study pre-calculada
+    crossStudyComparison: data?.currentComparison || null
   };
 }

@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
     const accountId = authResult.user.id;
     const limit = parseInt(searchParams.get('limit') || '10');
     const campaignType = searchParams.get('type');
+    const currentCampaignId = searchParams.get('current');
 
     console.log('[HISTORICAL API] Iniciando consulta para accountId:', accountId);
 
@@ -162,10 +163,120 @@ export async function GET(request: NextRequest) {
 
     console.log('[HISTORICAL API] Procesamiento completado en backend');
 
+    // ✅ PASO 6: CALCULAR COMPARACIÓN ACTUAL SI SE PROPORCIONA
+    let currentComparison = null;
+    if (currentCampaignId && processedData.length > 0) {
+      try {
+        // Obtener datos de la campaña actual
+        const currentCampaign = await prisma.campaign.findUnique({
+          where: { id: currentCampaignId },
+          include: {
+            campaignType: {
+              select: { name: true, slug: true }
+            }
+          }
+        });
+
+        if (currentCampaign) {
+          // Obtener datos de participación actual
+          const currentParticipants = await prisma.participant.findMany({
+            where: { campaignId: currentCampaignId },
+            select: {
+              hasResponded: true,
+              responseDate: true,
+              createdAt: true
+            }
+          });
+
+          const currentTotal = currentParticipants.length;
+          const currentResponded = currentParticipants.filter(p => p.hasResponded).length;
+          const currentRate = currentTotal > 0 ? (currentResponded / currentTotal) * 100 : 0;
+
+          // Buscar campaña histórica del mismo tipo
+          const matchingHistorical = processedData.find(h => 
+            h.campaignType.slug === currentCampaign.campaignType?.slug ||
+            h.campaignType.name === currentCampaign.campaignType?.name
+          );
+
+          if (matchingHistorical) {
+            // Calcular velocidad actual
+            const currentStart = new Date(currentCampaign.startDate);
+            const now = new Date();
+            const currentDuration = Math.max(1, Math.ceil((now.getTime() - currentStart.getTime()) / (1000 * 60 * 60 * 24)));
+            const currentVelocity = currentResponded / currentDuration;
+
+            // Calcular comparación
+            const velocityDiff = matchingHistorical.velocityMetrics.averageResponsesPerDay > 0 ? 
+              ((currentVelocity - matchingHistorical.velocityMetrics.averageResponsesPerDay) / matchingHistorical.velocityMetrics.averageResponsesPerDay) * 100 : 0;
+
+            const velocityTrend: 'faster' | 'slower' | 'similar' = 
+              Math.abs(velocityDiff) <= 15 ? 'similar' : velocityDiff > 0 ? 'faster' : 'slower';
+
+            // Calcular similaridad de patrón
+            const rateAlignment = Math.abs(currentRate - matchingHistorical.participationRate);
+            const patternSimilarity = Math.max(50, Math.min(95, 90 - (rateAlignment * 1.5)));
+
+            // Proyección final
+            const baseProjection = currentRate;
+            const velocityBonus = velocityTrend === 'faster' ? 8 : velocityTrend === 'slower' ? -5 : 0;
+            const patternBonus = patternSimilarity > 80 ? 3 : patternSimilarity < 60 ? -3 : 0;
+            const finalRate = Math.max(30, Math.min(95, baseProjection + velocityBonus + patternBonus));
+
+            // Confianza
+            const dataQuality = currentParticipants.length > 5 ? 20 : 10;
+            const confidence = Math.max(50, Math.min(90, 60 + dataQuality + (patternSimilarity > 70 ? 15 : 0)));
+
+            const riskLevel: 'low' | 'medium' | 'high' = finalRate < 60 ? 'high' : finalRate < 75 ? 'medium' : 'low';
+
+            // Generar insights
+            const insights = [
+              `La velocidad de respuesta es **${Math.round(Math.abs(velocityDiff))}% ${velocityTrend === 'faster' ? 'superior' : velocityTrend === 'slower' ? 'inferior' : 'similar'}** a la campaña de referencia "${matchingHistorical.name}".`,
+              `La tasa de participación actual ${Math.abs(currentRate - matchingHistorical.participationRate) < 5 ? 'se alinea estrechamente' : 'difiere significativamente'} con el rendimiento histórico reciente.`,
+              `Proyección sugiere ${riskLevel === 'low' ? 'cumplimiento exitoso' : riskLevel === 'medium' ? 'riesgo moderado' : 'riesgo alto'} de objetivos.`
+            ];
+
+            // Generar recomendaciones
+            const recommendations = [];
+            if (velocityTrend === 'slower') {
+              recommendations.push('Considerar el envío de un recordatorio para mejorar el ritmo de respuesta.');
+            } else {
+              recommendations.push('La estrategia de comunicación actual está funcionando bien; mantener el momentum.');
+            }
+            recommendations.push('Analizar los picos de actividad del mapa de calor para optimizar futuras comunicaciones.');
+
+            currentComparison = {
+              lastCampaign: {
+                name: matchingHistorical.name,
+                type: matchingHistorical.campaignType.name,
+                participationRate: matchingHistorical.participationRate,
+                velocityMetrics: matchingHistorical.velocityMetrics
+              },
+              comparison: {
+                velocityTrend,
+                velocityDifference: Math.round(velocityDiff),
+                patternSimilarity: Math.round(patternSimilarity),
+                projectedOutcome: {
+                  finalRate: Math.round(finalRate),
+                  confidence: Math.round(confidence),
+                  riskLevel
+                }
+              },
+              insights,
+              recommendations
+            };
+          }
+        }
+      } catch (error) {
+        console.error('[HISTORICAL API] Error calculando comparación actual:', error);
+        // No fallar la API, solo omitir comparación
+      }
+    }
+
     return NextResponse.json({
       campaigns: processedData,
       total: processedData.length,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
+      ...(currentComparison && { currentComparison })
     });
 
   } catch (error) {
