@@ -147,6 +147,10 @@ export function CampaignMetricsGrid({
         <MomentumIndicator 
           dailyResponses={dailyResponses} 
           lastRefresh={lastRefresh}
+          participationRate={participationRate}
+          daysRemaining={daysRemaining}
+          totalInvited={totalInvited}
+          onActionTrigger={(action) => console.log('Acción:', action)}
         />
       </div>
       </div>

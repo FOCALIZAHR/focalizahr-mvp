@@ -43,17 +43,17 @@ export function calculateDepartmentParticipation(participants: Participant[]): R
   return result;
 }
 
-// ✅ NUEVA FUNCIÓN CERTIFICADA para obtener la actividad real y reciente
-export function calculateRecentActivity(participants: Participant[]): ActivityItem[] {
+// ✅ NUEVA FUNCIÓN CERTIFICADA para obtener la actividad real y reciente - SIGNATURA CORREGIDA
+export function calculateRecentActivity(participants: Participant[], departmentMapping?: Record<string, string>): ActivityItem[] {
   return participants
     .filter(p => p.hasResponded && p.responseDate)
     .sort((a, b) => new Date(b.responseDate!).getTime() - new Date(a.responseDate!).getTime())
     .slice(0, 5)
     .map(p => ({
       id: p.id,
-      dept: p.department || 'Sin Depto.',
-      participant: `Participante (${p.department || 'N/A'})`,
-      timestamp: new Date(p.responseDate!).toLocaleTimeString('es-CL'),
+      dept: departmentMapping?.[p.department?.toLowerCase() || ''] || p.department || 'Sin Depto.',
+      participant: `Participante (${departmentMapping?.[p.department?.toLowerCase() || ''] || p.department || 'N/A'})`,
+      timestamp: new Date(p.responseDate!).toTimeString().split(' ')[0],
       status: 'completed',
       action: 'Completó encuesta',
     }));

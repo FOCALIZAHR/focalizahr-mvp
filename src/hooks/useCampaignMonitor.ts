@@ -78,7 +78,7 @@ export function useCampaignMonitor(campaignId: string) {
       refreshData();
       refreshParticipants();
       setLastRefresh(new Date());
-    }, 300000);
+    }, 600000);
     return () => clearInterval(interval);
   }, [campaignId, refreshData, refreshParticipants]);
 
@@ -249,11 +249,9 @@ export function useCampaignMonitor(campaignId: string) {
       alerts,
       recentActivity,
       lastRefresh,
-      // 🔥 COMPONENTES WOW - CÁLCULOS EN HOOK COMPLETADOS
-      engagementHeatmap: recentActivity.length > 0 ? 
-        processEngagementHeatmap(recentActivity, byDepartment) : undefined,
-      participationPrediction: dailyResponses.length > 0 && daysRemaining > 0 ?
-        calculateParticipationPrediction(dailyResponses, analytics.participationRate || 0, daysRemaining) : undefined,
+      // 🔥 COMPONENTES WOW - CÁLCULOS EN HOOK COMPLETADOS - CORREGIDO ✅
+      engagementHeatmap: processEngagementHeatmap(recentActivity, byDepartment),
+      participationPrediction: calculateParticipationPrediction(dailyResponses, analytics.participationRate || 0, daysRemaining),
       // 🔥 NUEVOS CÁLCULOS AGREGADOS
       departmentAnomalies: anomalyData.departmentAnomalies,
       positiveAnomalies: anomalyData.positiveAnomalies,
@@ -338,7 +336,7 @@ export function useCampaignMonitor(campaignId: string) {
 
   return {
     ...monitorData,
-    error: error || (participantsData && participantsData.error) || null,
+    error: error || null,
     isLoading: resultsLoading || participantsLoading || historyLoading,
     handleRefresh,
     handleSendReminder,

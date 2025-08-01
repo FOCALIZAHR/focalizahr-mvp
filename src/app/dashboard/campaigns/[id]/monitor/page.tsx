@@ -10,7 +10,7 @@ import { useCampaignMonitor } from '@/hooks/useCampaignMonitor';
 import { useRouter, useParams } from 'next/navigation';
 import { CampaignMonitorHeader } from '@/components/monitor/CampaignMonitorHeader';
 import { CampaignMetricsGrid } from '@/components/monitor/CampaignMetricsGrid';
-import { DepartmentParticipation } from '@/components/monitor/DepartmentParticipation';
+import { DepartmentPulsePanel } from '@/components/monitor/DepartmentPulsePanel';
 import { ActivityFeed } from '@/components/monitor/ActivityFeed';
 import { DailyChart } from '@/components/monitor/DailyChart';
 import { AlertsPanel } from '@/components/monitor/AlertsPanel';
@@ -21,6 +21,7 @@ import { AnomalyDetectorPanel } from '@/components/monitor/AnomalyDetectorPanel'
 import { EngagementHeatmapCard } from '@/components/monitor/EngagementHeatmapCard';
 import { ParticipationPredictorCard } from '@/components/monitor/ParticipationPredictorCard';
 import { CrossStudyComparatorCard } from '@/components/monitor/CrossStudyComparatorCard';
+import CampaignRhythmPanel from '@/components/monitor/CampaignRhythmPanel';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
@@ -79,7 +80,17 @@ export default function CampaignMonitorPage() {
         <CampaignMonitorHeader {...monitorData} router={router} />
         <CampaignMetricsGrid {...monitorData} />
         
-        {/* 🔥 COMPONENTES WOW - SECCIÓN NUEVA AGREGADA */}
+        {/* 🔥 NUEVO COMPONENTE WOW: PANEL DE RITMO Y PROYECCIÓN */}
+        <CampaignRhythmPanel 
+          dailyResponses={monitorData.dailyResponses}
+          participationRate={monitorData.participationRate}
+          participationPrediction={monitorData.participationPrediction}
+          daysRemaining={monitorData.daysRemaining}
+          totalInvited={monitorData.totalInvited}
+          targetRate={70}
+        />
+        
+        {/* 🔥 COMPONENTES WOW - SECCIÓN EXISTENTE */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* ✅ COMPONENTE WOW #1: ENGAGEMENT HEATMAP */}
           <EngagementHeatmapCard 
@@ -104,18 +115,25 @@ export default function CampaignMonitorPage() {
         </div>
         
         {/* ✅ LAYOUT GRID PARA COMPONENTES PRINCIPALES */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <DepartmentParticipation {...monitorData} />
-          
-          {/* ✅ COMPONENTE WOW #3: ANOMALY DETECTOR PANEL - PROPS CORREGIDAS */}
-          <AnomalyDetectorPanel 
-            departmentAnomalies={departmentAnomalies}
-            positiveAnomalies={positiveAnomalies}
-            negativeAnomalies={negativeAnomalies}
-            meanRate={meanRate}
-            totalDepartments={totalDepartments}
+        <div className="grid grid-cols-1 gap-6">
+          {/* 🔥 NUEVO COMPONENTE WOW: DEPARTMENT PULSE PANEL */}
+          <DepartmentPulsePanel 
+            byDepartment={monitorData.byDepartment}
+            handleSendDepartmentReminder={monitorData.handleSendDepartmentReminder}
             lastRefresh={monitorData.lastRefresh}
           />
+          
+          {/* ✅ COMPONENTE WOW #4: ANOMALY DETECTOR PANEL */}
+          <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+            <AnomalyDetectorPanel 
+              departmentAnomalies={departmentAnomalies}
+              positiveAnomalies={positiveAnomalies}
+              negativeAnomalies={negativeAnomalies}
+              meanRate={meanRate}
+              totalDepartments={totalDepartments}
+              lastRefresh={monitorData.lastRefresh}
+            />
+          </div>
         </div>
         
         {/* ✅ COMPONENTES RESTANTES */}
@@ -129,7 +147,9 @@ export default function CampaignMonitorPage() {
         
         <div className="text-center text-sm text-white/40">
           Última actualización: {monitorData.lastRefresh.toLocaleTimeString()} • 
-          Próxima actualización automática en {60 - new Date().getSeconds()} segundos
+          <span className="text-white/50">
+            Se actualiza automáticamente cada 10 minutos
+          </span>
         </div>
       </div>
     </div>
