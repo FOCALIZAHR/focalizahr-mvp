@@ -29,6 +29,7 @@ import type {
   ParticipationPredictionData,
   DepartmentAnomalyData,
   CrossStudyComparisonData,
+  DepartmentalIntelligence,
 } from '@/types'
 
 // ✅ INTERFACE PRINCIPAL DEL MONITOR - EXTENDIDA
@@ -59,6 +60,44 @@ export interface CampaignMonitorData {
   meanRate: number;
   totalDepartments: number;
   crossStudyComparison?: CrossStudyComparisonData;
+  // 🧠 DEPARTMENTAL INTELLIGENCE - Datos procesados para componente híbrido
+  departmentalIntelligence: DepartmentalIntelligence;
+}
+
+interface DepartmentalIntelligence {
+  topPerformers: Array<{
+    name: string;
+    participationRate: number;
+    count: number;
+    total: number;
+    rank: number;        // 1, 2, 3
+    medal: string;       // 🏆, 🥈, 🥉
+    status: string;      // 'excellent'
+  }>;
+  
+  attentionNeeded: Array<{
+    name: string;
+    participationRate: number;
+    count: number;
+    total: number;
+    urgency: 'critical' | 'high' | 'medium';  // <50%, <70%, <85%
+    action: 'llamar' | 'recordar' | 'seguimiento';
+    icon: '🚨' | '⚡' | '⚠️';
+  }>;
+  
+  totalDepartments: number;
+  averageRate: number;     // 1 decimal
+  excellentCount: number;  // >=85%
+  criticalCount: number;   // <50%
+  allDepartments: Array<{
+    name: string;
+    participationRate: number;
+    count: number;
+    total: number;
+  }>;
+  hasRealData: boolean;    // ✅ CAMPO AGREGADO
+  scenarioType: 'NO_DATA' | 'ALL_ZERO' | 'MIXED_DATA';  // ✅ CAMPO QUIRÚRGICO
+  displayMessage: string;                                 // ✅ CAMPO QUIRÚRGICO
 }
 
 export function useCampaignMonitor(campaignId: string) {
@@ -123,6 +162,19 @@ export function useCampaignMonitor(campaignId: string) {
         negativeAnomalies: [],
         meanRate: 0,
         totalDepartments: 0,
+        // 🧠 DEPARTMENTAL INTELLIGENCE - Valor loading
+        departmentalIntelligence: {
+          topPerformers: [],
+          attentionNeeded: [],
+          totalDepartments: 0,
+          averageRate: 0,
+          excellentCount: 0,
+          criticalCount: 0,
+          allDepartments: [],
+          hasRealData: false, // ✅ Estado loading sin datos reales
+          scenarioType: 'NO_DATA',
+          displayMessage: 'Cargando datos departamentales...'
+        },
       };
     }
 
@@ -136,18 +188,51 @@ export function useCampaignMonitor(campaignId: string) {
     const departmentMapping = analytics.departmentMapping || {};
     const sourceSummary = participantsData.summary?.byDepartment || {};
 
-    // La fuente de verdad para los nombres de display son los datos de analytics
-    const departmentsToShow = analytics.segmentationData?.map(s => s.segment) || Object.keys(sourceSummary);
+    // 🔍 DIAGNÓSTICO SISTEMÁTICO - INSPECCIÓN COMPLETA DE AMBAS TUBERÍAS
+    console.log("🔍 [DIAGNÓSTICO SISTEMÁTICO] =====================================");
+    console.log("🔍 [TUBERÍA ANALÍTICA] analytics completo:", analytics);
+    console.log("🔍 [TUBERÍA ANALÍTICA] analytics.segmentationData:", analytics.segmentationData);
+    console.log("🔍 [TUBERÍA ANALÍTICA] analytics.departmentMapping:", analytics.departmentMapping);
+    console.log("🔍 [TUBERÍA ANALÍTICA] analytics.departmentScores:", analytics.departmentScores);
+    console.log("🔍 [TUBERÍA PARTICIPACIÓN] participantsData.summary completo:", participantsData.summary);
+    console.log("🔍 [TUBERÍA PARTICIPACIÓN] participantsData.summary.byDepartment:", participantsData.summary?.byDepartment);
+    console.log("🔍 [TUBERÍA PARTICIPACIÓN] Object.keys(summary.byDepartment):", Object.keys(participantsData.summary?.byDepartment || {}));
+    console.log("🔍 [DIAGNÓSTICO SISTEMÁTICO] =====================================");
+
+    // 🏗️ LÓGICA CONDICIONAL INTELIGENTE - SOPORTE PARA AMBAS GENERACIONES
+    let departmentsToShow: string[] = [];
+    
+    if (analytics.segmentationData && analytics.segmentationData.length > 0) {
+      // ✅ CAMPAÑA NUEVA: Usar tubería analítica + DepartmentAdapter
+      console.log("🔍 [FLUJO] Campaña NUEVA - Usando tubería analítica");
+      departmentsToShow = analytics.segmentationData.map(s => s.segment);
+    } else if (Object.keys(sourceSummary).length > 0) {
+      // ✅ CAMPAÑA ANTIGUA: Usar tubería participación directa
+      console.log("🔍 [FLUJO] Campaña ANTIGUA - Usando tubería participación");
+      departmentsToShow = Object.keys(sourceSummary);
+    }
+    
+    console.log("🔍 [FLUJO] departmentsToShow final:", departmentsToShow);
 
     departmentsToShow.forEach(standardCategory => {
-        // Usar el mapping para obtener el nombre que ve el cliente
-        const displayName = departmentMapping[standardCategory.toLowerCase()] || standardCategory;
-
-        // Usar el summary de /participants como la ÚNICA fuente de verdad para los conteos
-        const stats = sourceSummary[standardCategory];
+        // LÓGICA CONDICIONAL PARA MAPEO
+        let displayName: string;
+        let stats: any;
+        
+        if (analytics.segmentationData && analytics.segmentationData.length > 0) {
+          // CAMPAÑA NUEVA: Usar mapping + buscar en sourceSummary con standardCategory
+          displayName = departmentMapping[standardCategory.toLowerCase()] || standardCategory;
+          stats = sourceSummary[standardCategory];
+          console.log("🔍 [FLUJO NUEVO] Procesando:", standardCategory, "→", displayName, "con stats:", stats);
+        } else {
+          // CAMPAÑA ANTIGUA: Usar nombres directos (standardCategory ES el displayName)
+          displayName = standardCategory;
+          stats = sourceSummary[standardCategory];
+          console.log("🔍 [FLUJO ANTIGUO] Procesando:", standardCategory, "→", displayName, "con stats:", stats);
+        }
         
         if (stats) {
-            // Lógica de cálculo CORRECTA
+            // Lógica de cálculo UNIFICADA
             byDepartment[displayName] = {
                 invited: stats.total,
                 responded: stats.responded,
@@ -155,6 +240,8 @@ export function useCampaignMonitor(campaignId: string) {
             };
         }
     });
+
+    console.log("🔍 [DEBUG CRÍTICO] byDepartment final:", byDepartment);
 
     // 2. ✅ ACTIVIDAD RECIENTE: USAR FUNCIÓN DE UTILIDAD calculateRecentActivity
     const recentActivity: ActivityItem[] = [];
@@ -258,10 +345,134 @@ export function useCampaignMonitor(campaignId: string) {
       negativeAnomalies: anomalyData.negativeAnomalies,
       meanRate: anomalyData.meanRate,
       totalDepartments: anomalyData.totalDepartments,
-      crossStudyComparison: crossStudyComparison || null,
+      crossStudyComparison: historicalData?.crossStudyComparison || null,
     };
   
-  }, [campaignData, participantsData, historicalData, campaignId, lastRefresh, crossStudyComparison]);
+  }, [campaignData, participantsData, historicalData, campaignId, lastRefresh]);
+
+  // 🧠 DEPARTMENTAL INTELLIGENCE - Cálculo independiente con memoización propia
+  const departmentalIntelligence = useMemo(() => {
+    const byDepartment = monitorData.byDepartment;
+    
+    // 🔧 CASO 1: SIN DATOS REALES
+    if (!Object.keys(byDepartment).length) {
+      return {
+        topPerformers: [],
+        attentionNeeded: [],
+        totalDepartments: 0,
+        averageRate: 0,
+        excellentCount: 0,
+        criticalCount: 0,
+        allDepartments: [],
+        hasRealData: false,
+        scenarioType: 'NO_DATA' as const,
+        displayMessage: 'Sin datos departamentales suficientes para análisis'
+      };
+    }
+
+    // Convertir a array para procesamiento con estructura correcta
+    const deptArray = Object.entries(byDepartment).map(([name, data]) => {
+      console.log("🔍 [DEBUG] Procesando departamento:", name, "con data:", data);
+      return {
+        name,
+        participationRate: data.rate, // ✅ Usar campo correcto
+        count: data.responded,        // ✅ Usar campo correcto
+        total: data.invited,          // ✅ Usar campo correcto
+      };
+    });
+
+    // 🔧 VERIFICAR SI TODOS LOS DEPARTAMENTOS TIENEN 0% PARTICIPACIÓN
+    const allDepartmentsZero = deptArray.every(dept => dept.participationRate === 0);
+    const hasRealData = deptArray.some(dept => dept.total > 0);
+
+    console.log("🔍 [DEBUG ARQUITECTURA] allDepartmentsZero:", allDepartmentsZero);
+    console.log("🔍 [DEBUG ARQUITECTURA] hasRealData:", hasRealData);
+
+    // 🔧 CASO 2: CAMPAÑA EN CERO - TODOS LOS DEPARTAMENTOS 0%
+    if (allDepartmentsZero && hasRealData) {
+      console.log("🔍 [ARQUITECTURA] CASO 2: Todos los departamentos en 0%");
+      return {
+        topPerformers: [], // ✅ NO mostrar performers con 0%
+        attentionNeeded: deptArray
+          .slice(0, 3)
+          .map(dept => ({
+            ...dept,
+            urgency: 'critical' as const,
+            action: 'llamar' as const,
+            icon: '🚨' as const
+          })),
+        totalDepartments: deptArray.length,
+        averageRate: 0,
+        excellentCount: 0,
+        criticalCount: deptArray.length,
+        allDepartments: deptArray,
+        hasRealData: true,
+        scenarioType: 'ALL_ZERO' as const,
+        displayMessage: 'Campaña sin respuestas - todos los departamentos requieren atención inmediata'
+      };
+    }
+
+    // 🔧 CASO 3: DATOS MIXTOS - SITUACIÓN NORMAL
+    console.log("🔍 [ARQUITECTURA] CASO 3: Datos mixtos");
+
+    // TOP 3 PERFORMERS - Solo departamentos con participación > 0
+    const topPerformers = deptArray
+      .filter(dept => dept.participationRate > 0) // ✅ CORRECCIÓN: Solo con respuestas
+      .sort((a, b) => b.participationRate - a.participationRate)
+      .slice(0, 3)
+      .map((dept, index) => ({
+        ...dept,
+        rank: index + 1,
+        medal: index === 0 ? '🏆' : index === 1 ? '🥈' : '🥉',
+        status: 'excellent'
+      }));
+
+    // ATTENTION NEEDED - Departamentos <85% participación
+    const attentionNeeded = deptArray
+      .filter(dept => dept.participationRate < 85 && dept.total > 0)
+      .sort((a, b) => a.participationRate - b.participationRate)
+      .slice(0, 3)
+      .map(dept => ({
+        ...dept,
+        urgency: dept.participationRate < 50 ? 'critical' : 
+                 dept.participationRate < 70 ? 'high' : 'medium',
+        action: dept.participationRate < 50 ? 'llamar' : 
+                dept.participationRate < 70 ? 'recordar' : 'seguimiento',
+        icon: dept.participationRate < 50 ? '🚨' : 
+              dept.participationRate < 70 ? '⚡' : '⚠️'
+      }));
+
+    // MÉTRICAS AGREGADAS
+    const totalDepartments = deptArray.length;
+    const averageRate = totalDepartments > 0 
+      ? deptArray.reduce((sum, dept) => sum + dept.participationRate, 0) / totalDepartments 
+      : 0;
+    const excellentCount = deptArray.filter(dept => dept.participationRate >= 85).length;
+    const criticalCount = deptArray.filter(dept => dept.participationRate < 50).length;
+
+    // 🔧 MENSAJE DINÁMICO BASADO EN SITUACIÓN
+    let displayMessage = '';
+    if (attentionNeeded.length === 0) {
+      displayMessage = '🎉 ¡Excelente rendimiento! Todos los departamentos superan el 85% de participación';
+    } else if (criticalCount > totalDepartments / 2) {
+      displayMessage = '⚠️ Múltiples departamentos requieren atención inmediata';
+    } else {
+      displayMessage = `📊 ${attentionNeeded.length} departamento(s) requieren seguimiento`;
+    }
+
+    return {
+      topPerformers,
+      attentionNeeded,
+      totalDepartments,
+      averageRate: Math.round(averageRate * 10) / 10,
+      excellentCount,
+      criticalCount,
+      allDepartments: deptArray,
+      hasRealData: true,
+      scenarioType: 'MIXED_DATA' as const,
+      displayMessage
+    };
+  }, [monitorData.byDepartment]);
 
   // ✅ HANDLERS Y UTILIDADES DE UI
   const handleRefresh = useCallback(() => {
@@ -336,6 +547,7 @@ export function useCampaignMonitor(campaignId: string) {
 
   return {
     ...monitorData,
+    departmentalIntelligence, // ✅ Agregar datos procesados
     error: error || null,
     isLoading: resultsLoading || participantsLoading || historyLoading,
     handleRefresh,

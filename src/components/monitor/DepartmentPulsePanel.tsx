@@ -1,292 +1,314 @@
 // ====================================================================
-// DEPARTMENT PULSE PANEL - COMPONENTE WOW MEJORADO
-// /src/components/monitor/DepartmentPulsePanel.tsx
-// Integración perfecta con CampaignRhythmPanel + Accionabilidad inteligente
+// DEPARTMENT PULSE PANEL - COMPONENTE HÍBRIDO REFACTORIZADO
+// src/components/monitor/DepartmentPulsePanel.tsx
+// ARQUITECTURA: Resumen Ejecutivo + Lista Detallada
 // ====================================================================
 
 'use client';
 
-import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { 
-  Users, 
-  Send, 
-  AlertTriangle, 
-  Award, 
-  TrendingUp,
-  TrendingDown,
-  Target
-} from 'lucide-react';
-import type { DepartmentMonitorData } from '@/types';
+import { Progress } from '@/components/ui/progress';
+import { Building2, TrendingUp, AlertTriangle, Users } from 'lucide-react';
 
-// ====================================================================
-// INTERFACES - TIPADO ESTRICTO
-// ====================================================================
+interface DepartmentData {
+  name: string;
+  participationRate: number;
+  count: number;
+  total: number;
+  rank?: number;
+  medal?: string;
+  status?: string;
+  urgency?: string;
+  action?: string;
+  icon?: string;
+}
+
+interface DepartmentalIntelligence {
+  topPerformers: DepartmentData[];
+  attentionNeeded: DepartmentData[];
+  totalDepartments: number;
+  averageRate: number;
+  excellentCount: number;
+  criticalCount: number;
+  allDepartments: DepartmentData[];
+   hasRealData: boolean;    // ← AGREGAR ESTA LÍNEA
+   scenarioType: 'NO_DATA' | 'ALL_ZERO' | 'MIXED_DATA';  // ← AGREGAR
+   displayMessage: string;                                 // ← AGREGAR
+}
 
 interface DepartmentPulsePanelProps {
-  byDepartment: Record<string, DepartmentMonitorData>;
-  handleSendDepartmentReminder?: (department: string) => void;
-  lastRefresh?: Date;
+  departmentalIntelligence: DepartmentalIntelligence;
+  handleSendDepartmentReminder: (department: string) => void;
+  lastRefresh: Date;
 }
 
-interface DepartmentAnalysis {
-  name: string;
-  data: DepartmentMonitorData;
-  status: 'critical' | 'warning' | 'good' | 'excellent';
-  statusColor: string;
-  statusIcon: React.ComponentType<any>;
-  actionLabel: string;
-  actionColor: string;
-  priority: number;
-}
-
-// ====================================================================
-// COMPONENTE PRINCIPAL
-// ====================================================================
+type FilterType = 'critical' | 'progress' | 'excellent' | 'all';
 
 export function DepartmentPulsePanel({ 
-  byDepartment, 
+  departmentalIntelligence, 
   handleSendDepartmentReminder,
   lastRefresh 
 }: DepartmentPulsePanelProps) {
-  
-  // 🧠 ANÁLISIS INTELIGENTE DE DEPARTAMENTOS
-  const departmentAnalysis = useMemo((): DepartmentAnalysis[] => {
-    const departments = Object.entries(byDepartment);
-    
-    if (departments.length === 0) return [];
-    
-    return departments
-      .map(([name, data]) => {
-        let status: DepartmentAnalysis['status'];
-        let statusColor: string;
-        let statusIcon: React.ComponentType<any>;
-        let actionLabel: string;
-        let actionColor: string;
-        let priority: number;
-        
-        if (data.rate < 30) {
-          status = 'critical';
-          statusColor = 'text-red-400';
-          statusIcon = AlertTriangle;
-          actionLabel = 'Intervenir Ya';
-          actionColor = 'hover:bg-red-400/10 text-red-400 border-red-400/30';
-          priority = 1;
-        } else if (data.rate < 70) {
-          status = 'warning';
-          statusColor = 'text-yellow-400';
-          statusIcon = TrendingDown;
-          actionLabel = 'Recordar';
-          actionColor = 'hover:bg-yellow-400/10 text-yellow-400 border-yellow-400/30';
-          priority = 2;
-        } else if (data.rate < 90) {
-          status = 'good';
-          statusColor = 'text-green-400';
-          statusIcon = Target;
-          actionLabel = 'En Objetivo';
-          actionColor = 'hover:bg-green-400/10 text-green-400 border-green-400/30';
-          priority = 3;
-        } else {
-          status = 'excellent';
-          statusColor = 'text-cyan-400';
-          statusIcon = Award;
-          actionLabel = 'Felicitar';
-          actionColor = 'hover:bg-cyan-400/10 text-cyan-400 border-cyan-400/30';
-          priority = 4;
-        }
-        
-        return {
-          name,
-          data,
-          status,
-          statusColor,
-          statusIcon,
-          actionLabel,
-          actionColor,
-          priority
-        };
-      })
-      .sort((a, b) => a.priority - b.priority); // Críticos primero
-  }, [byDepartment]);
 
-  // 📊 ESTADÍSTICAS GENERALES
-  const stats = useMemo(() => {
-    if (departmentAnalysis.length === 0) return null;
-    
-    const total = departmentAnalysis.length;
-    const critical = departmentAnalysis.filter(d => d.status === 'critical').length;
-    const warning = departmentAnalysis.filter(d => d.status === 'warning').length;
-    const excellent = departmentAnalysis.filter(d => d.status === 'excellent').length;
-    
-    const avgRate = departmentAnalysis.reduce((sum, d) => sum + d.data.rate, 0) / total;
-    
-    return {
-      total,
-      critical,
-      warning,
-      excellent,
-      avgRate: Math.round(avgRate)
-    };
-  }, [departmentAnalysis]);
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
 
-  // 🎨 COMPONENTE VACÍO
-  if (departmentAnalysis.length === 0) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <Card className="bg-white/5 backdrop-blur-md border border-white/10">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-white">
-              <Users className="h-5 w-5 text-fhr-cyan" />
-              Pulso Departamental
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-white/60">
-              No hay datos departamentales para mostrar.
-            </p>
-          </CardContent>
-        </Card>
-      </motion.div>
-    );
-  }
+  // Filtrar departamentos según pestaña activa
+  const getFilteredDepartments = () => {
+    const { allDepartments } = departmentalIntelligence;
+    
+    switch (activeFilter) {
+      case 'critical':
+        return allDepartments.filter(dept => dept.participationRate < 50);
+      case 'progress': 
+        return allDepartments.filter(dept => dept.participationRate >= 50 && dept.participationRate < 85);
+      case 'excellent':
+        return allDepartments.filter(dept => dept.participationRate >= 85);
+      default:
+        return allDepartments.sort((a, b) => {
+          // Orden: Críticos -> Progreso -> Exitosos
+          if (a.participationRate < 50 && b.participationRate >= 50) return -1;
+          if (a.participationRate >= 50 && b.participationRate < 50) return 1;
+          if (a.participationRate < 85 && b.participationRate >= 85) return -1;
+          if (a.participationRate >= 85 && b.participationRate < 85) return 1;
+          return a.participationRate - b.participationRate;
+        });
+    }
+  };
+
+  const filteredDepartments = getFilteredDepartments();
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.2 }}
-      className="col-span-1 lg:col-span-2"
-    >
-      <Card className="bg-white/5 backdrop-blur-md border border-white/10 hover:border-white/20 transition-all duration-300 shadow-2xl">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-fhr-cyan" />
-              <span className="text-white font-semibold">
-                Pulso Departamental
-              </span>
-            </CardTitle>
+    <Card className="glass-card backdrop-blur-md bg-slate-800/30 border border-white/10">
+      <CardHeader>
+        <CardTitle className="text-white flex items-center gap-2">
+          <Building2 className="h-5 w-5 text-cyan-400" />
+          Pulso Departamental
+          <div className="ml-auto text-xs text-white/60">
+            Actualizado: {lastRefresh.toLocaleTimeString('es-CL')}
+          </div>
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent className="space-y-6">
+        
+        {/* ==================== PARTE SUPERIOR: RESUMEN EJECUTIVO ==================== */}
+        <div className="space-y-6">
+          
+          {/* MÉTRICAS AGREGADAS */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center p-3 bg-gradient-to-br from-slate-700/50 to-transparent rounded-lg border border-slate-600/30">
+              <div className="text-2xl font-bold text-white">{departmentalIntelligence.totalDepartments}</div>
+              <div className="text-xs text-white/60">Departamentos</div>
+            </div>
+            <div className="text-center p-3 bg-gradient-to-br from-blue-500/10 to-transparent rounded-lg border border-blue-500/20">
+              <div className="text-2xl font-bold text-blue-400">{departmentalIntelligence.averageRate}%</div>
+              <div className="text-xs text-white/60">Promedio</div>
+            </div>
+            <div className="text-center p-3 bg-gradient-to-br from-green-500/10 to-transparent rounded-lg border border-green-500/20">
+              <div className="text-2xl font-bold text-green-400">{departmentalIntelligence.excellentCount}</div>
+              <div className="text-xs text-white/60">Excelentes</div>
+            </div>
+            <div className="text-center p-3 bg-gradient-to-br from-red-500/10 to-transparent rounded-lg border border-red-500/20">
+              <div className="text-2xl font-bold text-red-400">{departmentalIntelligence.criticalCount}</div>
+              <div className="text-xs text-white/60">Críticos</div>
+            </div>
+          </div>
+
+          {/* GRID EXECUTIVE: TOP PERFORMERS + ATTENTION NEEDED */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            {/* ESTADÍSTICAS GENERALES */}
-            {stats && (
-              <div className="flex items-center gap-4 text-sm">
-                {stats.critical > 0 && (
-                  <div className="flex items-center gap-1 text-red-400">
-                    <AlertTriangle className="h-4 w-4" />
-                    <span>{stats.critical}</span>
+            {/* TOP 3 PERFORMERS */}
+            <div className="bg-gradient-to-r from-green-500/10 to-transparent p-4 rounded-lg border border-green-500/20">
+              <h3 className="text-green-400 font-medium mb-3 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                🏆 Top Performers
+              </h3>
+              <div className="space-y-3">
+                {departmentalIntelligence.topPerformers.map((dept) => (
+                  <div key={dept.name} className="flex items-center justify-between bg-white/5 p-3 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">{dept.medal}</span>
+                      <div>
+                        <div className="text-white font-medium capitalize">{dept.name}</div>
+                        <div className="text-xs text-white/60">{dept.count}/{dept.total} participantes</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-white font-bold">{dept.participationRate}%</div>
+                      <div className="text-xs text-green-400">⭐ Excelente</div>
+                    </div>
+                  </div>
+                ))}
+                {departmentalIntelligence.topPerformers.length === 0 && (
+                  <div className="text-center text-white/60 py-4">
+                    Sin datos suficientes
                   </div>
                 )}
-                {stats.warning > 0 && (
-                  <div className="flex items-center gap-1 text-yellow-400">
-                    <TrendingDown className="h-4 w-4" />
-                    <span>{stats.warning}</span>
+              </div>
+            </div>
+
+            {/* ATTENTION NEEDED */}
+            <div className="bg-gradient-to-r from-orange-500/10 to-transparent p-4 rounded-lg border border-orange-500/20">
+              <h3 className="text-orange-400 font-medium mb-3 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                ⚠️ Attention Needed
+              </h3>
+              <div className="space-y-3">
+                {departmentalIntelligence.attentionNeeded.map((dept) => (
+                  <div key={dept.name} className="flex items-center justify-between bg-white/5 p-3 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">{dept.icon}</span>
+                      <div>
+                        <div className="text-white font-medium capitalize">{dept.name}</div>
+                        <div className="text-xs text-white/60">{dept.count}/{dept.total} participantes</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-white font-bold">{dept.participationRate}%</div>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className={`text-xs mt-1 ${
+                          dept.urgency === 'critical' ? 'border-red-500/30 text-red-400 hover:bg-red-500/20' :
+                          dept.urgency === 'high' ? 'border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20' :
+                          'border-orange-500/30 text-orange-400 hover:bg-orange-500/20'
+                        }`}
+                        onClick={() => handleSendDepartmentReminder(dept.name)}
+                      >
+                        {dept.urgency === 'critical' ? '📞 Llamar' :
+                         dept.urgency === 'high' ? '📧 Recordar' : '👁️ Seguir'}
+                      </Button>
+                    </div>
                   </div>
-                )}
-                <div className="text-white/60">
-                  Promedio: <span className="text-white font-medium">{stats.avgRate}%</span>
+                ))}
+                <div className="text-center py-4">
+                 <div className="text-white/80 font-medium">
+                    {departmentalIntelligence.displayMessage}
+                  </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ==================== PARTE INFERIOR: LISTA DETALLADA ==================== */}
+        <div className="space-y-4">
+          
+          {/* PESTAÑAS DE FILTRO */}
+          <div className="flex space-x-1 bg-white/5 p-1 rounded-lg">
+            <button 
+              onClick={() => setActiveFilter('critical')}
+              className={`flex-1 py-2 px-3 rounded text-xs font-medium transition-all duration-200 ${
+                activeFilter === 'critical' 
+                  ? 'bg-gradient-to-r from-red-500/20 to-transparent text-red-400 border border-red-500/20' 
+                  : 'text-white/60 hover:bg-white/5'
+              }`}
+            >
+              🚨 Críticos ({departmentalIntelligence.allDepartments.filter(d => d.participationRate < 50).length})
+            </button>
+            <button 
+              onClick={() => setActiveFilter('progress')}
+              className={`flex-1 py-2 px-3 rounded text-xs font-medium transition-all duration-200 ${
+                activeFilter === 'progress' 
+                  ? 'bg-gradient-to-r from-yellow-500/20 to-transparent text-yellow-400 border border-yellow-500/20' 
+                  : 'text-white/60 hover:bg-white/5'
+              }`}
+            >
+              ⚡ Progreso ({departmentalIntelligence.allDepartments.filter(d => d.participationRate >= 50 && d.participationRate < 85).length})
+            </button>
+            <button 
+              onClick={() => setActiveFilter('excellent')}
+              className={`flex-1 py-2 px-3 rounded text-xs font-medium transition-all duration-200 ${
+                activeFilter === 'excellent' 
+                  ? 'bg-gradient-to-r from-green-500/20 to-transparent text-green-400 border border-green-500/20' 
+                  : 'text-white/60 hover:bg-white/5'
+              }`}
+            >
+              ✅ Exitosos ({departmentalIntelligence.excellentCount})
+            </button>
+            <button 
+              onClick={() => setActiveFilter('all')}
+              className={`flex-1 py-2 px-3 rounded text-xs font-medium transition-all duration-200 ${
+                activeFilter === 'all' 
+                  ? 'bg-gradient-to-r from-cyan-500/20 to-transparent text-cyan-400 border border-cyan-500/20' 
+                  : 'text-white/60 hover:bg-white/5'
+              }`}
+            >
+              📊 Todos ({departmentalIntelligence.totalDepartments})
+            </button>
+          </div>
+
+          {/* LISTA DETALLADA CON SCROLL FOCALIZAHR */}
+          <div className="max-h-80 overflow-y-auto focalizahr-scroll space-y-2">
+            {filteredDepartments.map((dept) => (
+              <div key={dept.name} className="bg-white/5 p-4 rounded-lg border border-white/10 hover:border-cyan-400/30 transition-all duration-200">
+                
+                {/* HEADER DEPARTAMENTO */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${
+                      dept.participationRate >= 85 ? 'bg-green-400' : 
+                      dept.participationRate >= 70 ? 'bg-yellow-400' : 
+                      dept.participationRate >= 50 ? 'bg-orange-400' : 'bg-red-400'
+                    }`}></div>
+                    <div>
+                      <span className="text-white font-medium capitalize">{dept.name}</span>
+                      <div className="text-xs text-white/60">{dept.count}/{dept.total} participantes</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-white font-bold text-lg">{dept.participationRate}%</span>
+                  </div>
+                </div>
+
+                {/* PROGRESS BAR */}
+                <div className="mb-3">
+                  <Progress 
+                    value={dept.participationRate} 
+                    className="h-2 mb-2"
+                  />
+                </div>
+
+                {/* FOOTER CON ACCIÓN */}
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-white/60">
+                    {dept.participationRate >= 85 ? '🎉 Excelente performance' :
+                     dept.participationRate >= 70 ? '⚡ Buen progreso' :
+                     dept.participationRate >= 50 ? '📈 En desarrollo' : '🚨 Requiere atención'}
+                  </div>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className={`text-xs ${
+                      dept.participationRate >= 85 
+                        ? 'border-green-500/30 text-green-400 hover:bg-green-500/20' 
+                        : dept.participationRate >= 70 
+                        ? 'border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20'
+                        : dept.participationRate >= 50
+                        ? 'border-orange-500/30 text-orange-400 hover:bg-orange-500/20'
+                        : 'border-red-500/30 text-red-400 hover:bg-red-500/20'
+                    }`}
+                    onClick={() => handleSendDepartmentReminder(dept.name)}
+                  >
+                    {dept.participationRate >= 85 ? '🎉 Felicitar' : 
+                     dept.participationRate >= 70 ? '📧 Recordar' :
+                     dept.participationRate >= 50 ? '⚡ Motivar' : '📞 Llamar'}
+                  </Button>
+                </div>
+              </div>
+            ))}
+            
+            {filteredDepartments.length === 0 && (
+              <div className="text-center text-white/60 py-8">
+                <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                <div className="text-sm">No hay departamentos en esta categoría</div>
               </div>
             )}
           </div>
-        </CardHeader>
-
-        <CardContent className="space-y-1">
-          <div className="grid grid-cols-1 gap-4">
-            {departmentAnalysis.map((dept, index) => {
-              const StatusIcon = dept.statusIcon;
-              
-              return (
-                <motion.div
-                  key={dept.name}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ 
-                    duration: 0.4, 
-                    delay: 0.1 * index 
-                  }}
-                  className="group p-4 rounded-lg bg-black/20 border border-white/5 hover:border-white/10 transition-all duration-300"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <StatusIcon className={`h-4 w-4 ${dept.statusColor}`} />
-                      <span className="font-medium text-white truncate">
-                        {dept.name}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <div className={`text-lg font-bold ${dept.statusColor}`}>
-                          {dept.data.rate}%
-                        </div>
-                        <div className="text-xs text-white/60">
-                          {dept.data.responded}/{dept.data.invited}
-                        </div>
-                      </div>
-                      
-                      {/* BOTÓN ACCIÓN CONTEXTUAL */}
-                      {handleSendDepartmentReminder && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSendDepartmentReminder(dept.name)}
-                          className={`
-                            opacity-0 group-hover:opacity-100 transition-all duration-300 
-                            border ${dept.actionColor} bg-transparent
-                            ${dept.status === 'excellent' ? 'cursor-default' : 'cursor-pointer'}
-                          `}
-                          disabled={dept.status === 'excellent'}
-                        >
-                          {dept.status === 'critical' && <AlertTriangle className="h-3 w-3 mr-1" />}
-                          {dept.status === 'warning' && <Send className="h-3 w-3 mr-1" />}
-                          {dept.status === 'excellent' && <Award className="h-3 w-3 mr-1" />}
-                          <span className="text-xs">{dept.actionLabel}</span>
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* PROGRESS BAR ANIMADO */}
-                  <div className="relative">
-                    <Progress 
-                      value={dept.data.rate} 
-                      className="h-2 bg-white/10 rounded-full overflow-hidden"
-                    />
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${dept.data.rate}%` }}
-                      transition={{ duration: 1, delay: 0.3 + (0.1 * index) }}
-                      className={`
-                        absolute top-0 left-0 h-2 rounded-full
-                        ${dept.status === 'critical' ? 'bg-gradient-to-r from-red-500 to-red-400' :
-                          dept.status === 'warning' ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
-                          dept.status === 'good' ? 'bg-gradient-to-r from-green-500 to-green-400' :
-                          'bg-gradient-to-r from-cyan-500 to-cyan-400'}
-                      `}
-                    />
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-
-          {/* FOOTER CON TIMESTAMP */}
-          {lastRefresh && (
-            <div className="mt-6 pt-4 border-t border-white/10">
-              <div className="text-center text-xs text-white/40">
-                Última actualización: {lastRefresh.toLocaleTimeString()}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </motion.div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
