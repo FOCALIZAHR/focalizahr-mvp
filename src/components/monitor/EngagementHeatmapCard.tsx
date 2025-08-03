@@ -52,14 +52,14 @@ export function EngagementHeatmapCard({
                   key={i}
                   className="flex flex-col items-center group relative"
                 >
-                  {/* Barra visual */}
+                  {/* 🔥 BARRA VISUAL - CORPORATE COLORS + GLOW PREMIUM */}
                   <div
-                    className={`w-4 rounded-t transition-all duration-300 mb-1 ${
+                    className={`w-4 rounded-t transition-all duration-300 mb-1 border ${
                       bar.isPeak 
-                        ? 'bg-gradient-to-t from-fhr-cyan to-cyan-300 shadow-lg shadow-cyan-500/30' 
+                        ? 'bg-gradient-to-t from-fhr-cyan to-cyan-300 shadow-lg shadow-cyan-500/50 border-cyan-400/60 scale-105' 
                         : bar.count > 0 
-                          ? 'bg-gradient-to-t from-fhr-purple/60 to-purple-400/60'
-                          : 'bg-slate-700/40'
+                          ? 'bg-gradient-to-t from-fhr-purple to-purple-300 shadow-md shadow-purple-500/40 border-purple-400/50'
+                          : 'bg-slate-700/40 border-slate-600/30'
                     }`}
                     style={{ height: `${height}px` }}
                   />

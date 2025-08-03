@@ -19,6 +19,7 @@ import {
   processEngagementHeatmap,
   calculateParticipationPrediction,
   calculateDepartmentAnomalies,
+  calculateDepartmentMomentum,
 } from '@/lib/utils/monitor-utils';
 import type { 
   DepartmentMonitorData, 
@@ -62,6 +63,8 @@ export interface CampaignMonitorData {
   crossStudyComparison?: CrossStudyComparisonData;
   // 🧠 DEPARTMENTAL INTELLIGENCE - Datos procesados para componente híbrido
   departmentalIntelligence: DepartmentalIntelligence;
+  // 🎯 TOP MOVERS - Nueva inteligencia momentum departamental
+  topMovers?: Array<{ name: string; momentum: number; trend: string }>;
 }
 
 interface DepartmentalIntelligence {
@@ -104,7 +107,7 @@ export function useCampaignMonitor(campaignId: string) {
   // ✅ FUSIÓN DE FUENTES DE DATOS - ARQUITECTURA HÍBRIDA CERTIFICADA
   const { data: campaignData, isLoading: resultsLoading, error, refreshData } = useCampaignResults(campaignId);
   const { data: participantsData, isLoading: participantsLoading, refreshData: refreshParticipants } = useCampaignParticipants(campaignId, { includeDetails: true });
-  const { data: historicalData, isLoading: historyLoading, crossStudyComparison } = useCampaignHistory({ 
+  const { data: historicalData, isLoading: historyLoading} = useCampaignHistory({ 
     limit: 5, 
     currentCampaignId: campaignId 
   });
@@ -315,6 +318,14 @@ export function useCampaignMonitor(campaignId: string) {
     // 🔥 COMPONENTES WOW - CÁLCULOS COMPLETOS EN HOOK
     const anomalyData = calculateDepartmentAnomalies(byDepartment);
     
+    // 🎯 TOP MOVERS - Nueva inteligencia momentum departamental
+    const topMovers = calculateDepartmentMomentum(analytics.trendDataByDepartment || {});
+    // 🧪 LOG TEMPORAL - ELIMINAR DESPUÉS DE VERIFICAR:
+     console.log('🎯 TOP MOVERS FUNCIONANDO:', {
+     inputDepartments: Object.keys(analytics.trendDataByDepartment || {}),
+     outputTopMovers: topMovers,
+      outputCount: topMovers?.length || 0
+     });
     // ✅ DATOS HISTÓRICOS REALES DE API (reemplaza mock)
     const historicalCampaigns = historicalData?.campaigns || [];
 
@@ -346,6 +357,8 @@ export function useCampaignMonitor(campaignId: string) {
       meanRate: anomalyData.meanRate,
       totalDepartments: anomalyData.totalDepartments,
       crossStudyComparison: historicalData?.crossStudyComparison || null,
+      // 🎯 TOP MOVERS - Inteligencia momentum departamental
+      topMovers,
     };
   
   }, [campaignData, participantsData, historicalData, campaignId, lastRefresh]);

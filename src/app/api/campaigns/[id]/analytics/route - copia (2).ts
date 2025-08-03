@@ -7,7 +7,7 @@ import { verifyJWT } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter'; // ← FIX: IMPORT AGREGADO
 
-// ✅ INTERFACES ANALYTICS + TREND BY DEPARTMENT
+// ✅ INTERFACES ANALYTICS
 interface CampaignAnalytics {
   totalInvited: number;
   totalResponded: number;
@@ -17,7 +17,6 @@ interface CampaignAnalytics {
   responseRate: number;
   segmentationData: any[];
   trendData: any[];
-  trendDataByDepartment?: Record<string, Array<{ date: string; responses: number }>>; // ✅ NUEVO
   lastUpdated: string;
   categoryScores?: Record<string, number>;
   departmentScores?: Record<string, number>; // ✅ AGREGADO AL INTERFACE
@@ -195,7 +194,6 @@ export async function GET(
       const startDate = new Date(`${day}T00:00:00.000Z`);
       const endDate = new Date(`${day}T23:59:59.999Z`);
       
-      // ✅ CONSULTA ORIGINAL - Mantener intacta
       const dailyResponses = await prisma.response.findMany({
         where: {
           participant: { campaignId },
@@ -211,68 +209,13 @@ export async function GET(
       responsesByDay[day] = dailyResponses.length;
     }
 
-    // ✅ NUEVA CONSULTA - TREND DATA BY DEPARTMENT (ARQUITECTURA CORRECTA)
-    const responsesByDayByDept: Record<string, Record<string, number>> = {};
-    
-    for (const day of analysisRange) {
-      const startDate = new Date(`${day}T00:00:00.000Z`);
-      const endDate = new Date(`${day}T23:59:59.999Z`);
-      
-      // Obtener respuestas del día con departamento
-      const dailyResponsesWithDept = await prisma.response.findMany({
-        where: {
-          participant: { campaignId },
-          createdAt: {
-            gte: startDate,
-            lte: endDate
-          }
-        },
-        select: { 
-          participantId: true,
-          participant: { 
-            select: { department: true } 
-          }
-        },
-        distinct: ['participantId']
-      });
-
-      // Agrupar por departamento (nombres técnicos crudos)
-      const deptCounts: Record<string, number> = {};
-      dailyResponsesWithDept.forEach(response => {
-        const department = response.participant?.department || 'Sin departamento';
-        deptCounts[department] = (deptCounts[department] || 0) + 1;
-      });
-
-      responsesByDayByDept[day] = deptCounts;
-    }
-
     console.log('📊 Campaign temporal analysis:', {
       campaignStartDate: campaignStartDate.toISOString().split('T')[0],
       actualDays,
       daysToAnalyze,
       totalResponsesInRange: Object.values(responsesByDay).reduce((sum, count) => sum + count, 0),
       totalInvited,
-      totalResponded,
-      departmentsFound: Object.keys(responsesByDayByDept).length > 0 
-        ? Object.keys(responsesByDayByDept[Object.keys(responsesByDayByDept)[0]] || {}) 
-        : []
-    });
-
-    // ✅ PROCESAR TREND DATA BY DEPARTMENT (NOMBRES TÉCNICOS CRUDOS)
-    const trendDataByDepartment: Record<string, Array<{ date: string; responses: number }>> = {};
-    
-    // Obtener todos los departamentos únicos (nombres técnicos sin procesar)
-    const allDepartments = new Set<string>();
-    Object.values(responsesByDayByDept).forEach(dayData => {
-      Object.keys(dayData).forEach(dept => allDepartments.add(dept));
-    });
-
-    // Construir series temporal por departamento (con nombres técnicos crudos)
-    allDepartments.forEach(department => {
-      trendDataByDepartment[department] = analysisRange.map(day => ({
-        date: day,
-        responses: responsesByDayByDept[day]?.[department] || 0
-      }));
+      totalResponded
     });
 
     // ✅ SEGMENTACIÓN - DB GROUPBY DEPARTAMENTOS CENTRALIZADO
@@ -364,7 +307,7 @@ export async function GET(
       percentage: Math.round((data.count / totalInvited) * 100)
     }));
 
-    // ✅ CONSTRUIR RESPUESTA - CON DEPARTMENT SCORES CENTRALIZADOS + TREND BY DEPT
+    // ✅ CONSTRUIR RESPUESTA - CON DEPARTMENT SCORES CENTRALIZADOS
     const analytics: CampaignAnalytics = {
       totalInvited,                                    // ✅ PASO 1 COMPLETADO
       totalResponded,                                  // ✅ PASO 1 COMPLETADO
@@ -379,7 +322,6 @@ export async function GET(
       responsesByDay,
       segmentationData,
       trendData,
-      trendDataByDepartment, // ✅ NUEVA TUBERÍA DE DATOS POR DEPARTAMENTO
       demographicBreakdown: segmentationData,
       lastUpdated: new Date().toISOString()
     };

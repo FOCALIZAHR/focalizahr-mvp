@@ -165,7 +165,7 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
         transition={{ delay: 0.2 }}
         className="grid grid-cols-3 gap-4"
       >
-        <Card className="bg-white/5 backdrop-blur-md border border-white/10 hover:border-white/20 transition-all duration-300">
+        <Card className="bg-gradient-to-br from-cyan-500/20 to-purple-500/15 backdrop-blur-md border border-cyan-400/30 hover:border-cyan-400/50 transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Zap className="h-4 w-4 text-fhr-cyan" />
@@ -175,7 +175,7 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
           </CardContent>
         </Card>
 
-        <Card className="bg-white/5 backdrop-blur-md border border-white/10 hover:border-white/20 transition-all duration-300">
+        <Card className="bg-gradient-to-br from-cyan-500/20 to-purple-500/15 backdrop-blur-md border border-cyan-400/30 hover:border-cyan-400/50 transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Target className="h-4 w-4 text-fhr-purple" />
@@ -187,7 +187,7 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
           </CardContent>
         </Card>
 
-        <Card className="bg-white/5 backdrop-blur-md border border-white/10 hover:border-white/20 transition-all duration-300">
+        <Card className="bg-gradient-to-br from-cyan-500/20 to-purple-500/15 backdrop-blur-md border border-cyan-400/30 hover:border-cyan-400/50 transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="h-4 w-4 text-fhr-blue" />
@@ -204,12 +204,12 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.4, duration: 0.6 }}
       >
-        <Card className="bg-white/5 backdrop-blur-md border border-white/10 hover:border-white/20 transition-all duration-300">
+        <Card className="bg-gradient-to-br from-slate-900/80 to-slate-800/80 glass-card neural-glow backdrop-blur-md border-fhr-cyan/20 hover:border-white/20 transition-all duration-300">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-fhr-cyan" />
-                <h3 className="text-white font-semibold text-lg">
+                <h3 className="fhr-title-gradient text-white font-semibold text-lg">
                   Panel de Ritmo y Proyección
                 </h3>
               </div>
@@ -243,9 +243,9 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
                   {/* LÍNEA DE OBJETIVO HORIZONTAL */}
                   <ReferenceLine 
                     y={targetRate} 
-                    stroke={COLORS.fhrBlue}
-                    strokeDasharray="5 5"
-                    strokeWidth={2}
+                    stroke="#22D3EE"
+                    strokeDasharray="8 8"
+                    strokeWidth={3}
                   />
 
                   {/* BARRAS DE RITMO (PASADO) */}
@@ -324,7 +324,7 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
           transition={{ delay: 0.6 }}
           className="grid grid-cols-1 md:grid-cols-2 gap-4"
         >
-          <Card className="bg-white/5 backdrop-blur-md border border-white/10">
+          <Card className="bg-gradient-to-br from-cyan-500/20 to-purple-500/15 backdrop-blur-md border border-cyan-400/30">
             <CardContent className="p-4">
               <h4 className="text-white font-medium mb-2">Estado de Momentum</h4>
               <div className="flex items-center gap-2">
@@ -337,7 +337,7 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
             </CardContent>
           </Card>
 
-          <Card className="bg-white/5 backdrop-blur-md border border-white/10">
+          <Card className="bg-gradient-to-br from-cyan-500/20 to-purple-500/15 backdrop-blur-md border border-cyan-400/30">
             <CardContent className="p-4">
               <h4 className="text-white font-medium mb-2">Confianza Matemática</h4>
               <div className="flex items-center gap-2">

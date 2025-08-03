@@ -80,9 +80,9 @@ export function DepartmentPulsePanel({
   const filteredDepartments = getFilteredDepartments();
 
   return (
-    <Card className="glass-card backdrop-blur-md bg-slate-800/30 border border-white/10">
+    <Card className="bg-gradient-to-br from-slate-900/80 to-slate-800/80 glass-card neural-glow backdrop-blur-md border-fhr-cyan/20">
       <CardHeader>
-        <CardTitle className="text-white flex items-center gap-2">
+        <CardTitle className="fhr-title-gradient text-white flex items-center gap-2">
           <Building2 className="h-5 w-5 text-cyan-400" />
           Pulso Departamental
           <div className="ml-auto text-xs text-white/60">
@@ -127,7 +127,7 @@ export function DepartmentPulsePanel({
               </h3>
               <div className="space-y-3">
                 {departmentalIntelligence.topPerformers.map((dept) => (
-                  <div key={dept.name} className="flex items-center justify-between bg-white/5 p-3 rounded-lg">
+                                      <div key={dept.name} className="flex items-center justify-between bg-white/5 p-3 rounded-lg">
                     <div className="flex items-center gap-3">
                       <span className="text-lg">{dept.medal}</span>
                       <div>

@@ -340,3 +340,85 @@ export function calculateDepartmentAnomalies(
 // 🔥 COMPONENTE WOW #4: COMPARADOR CROSS-STUDY
 // ✅ FUNCIÓN ELIMINADA - Los cálculos se realizan ahora en el backend (/api/historical)
 // CrossStudyComparatorCard usa datos pre-calculados del hook useCampaignHistory
+
+export function calculateDepartmentMomentum(
+  trendDataByDepartment: Record<string, Array<{ date: string; responses: number }>>
+): Array<{ name: string; momentum: number; trend: 'acelerando' | 'estable' | 'desacelerando' | 'completado' }> {
+  
+  if (!trendDataByDepartment || Object.keys(trendDataByDepartment).length === 0) {
+    return [];
+  }
+
+  const departmentMomentum = Object.entries(trendDataByDepartment).map(([name, trendArray]) => {
+    // Filtrar días con respuestas para análisis efectivo
+    const activeDays = trendArray.filter(day => day.responses > 0);
+    
+    if (activeDays.length === 0) {
+      return { name, momentum: 0, trend: 'estable' as const };
+    }
+
+    // CASO 1: Campaña con 1 solo día activo
+    if (activeDays.length === 1) {
+      return { 
+        name, 
+        momentum: activeDays[0].responses * 100, // Peso por volumen
+        trend: 'completado' as const 
+      };
+    }
+
+    // CASO 2: Campaña con múltiples días - Análisis temporal
+    const totalResponses = activeDays.reduce((sum, day) => sum + day.responses, 0);
+    
+    // Analizar distribución temporal
+    const firstHalf = activeDays.slice(0, Math.ceil(activeDays.length / 2));
+    const secondHalf = activeDays.slice(Math.ceil(activeDays.length / 2));
+    
+    const firstHalfSum = firstHalf.reduce((sum, day) => sum + day.responses, 0);
+    const secondHalfSum = secondHalf.reduce((sum, day) => sum + day.responses, 0);
+    
+    // Calcular momentum basado en distribución temporal
+    let momentum = 0;
+    let trendDirection: 'acelerando' | 'estable' | 'desacelerando' | 'completado' = 'estable';
+    
+    if (secondHalf.length > 0) {
+      const firstAvg = firstHalf.length > 0 ? firstHalfSum / firstHalf.length : 0;
+      const secondAvg = secondHalfSum / secondHalf.length;
+      
+      if (firstAvg > 0) {
+        const percentageChange = ((secondAvg - firstAvg) / firstAvg) * 100;
+        momentum = Math.abs(percentageChange);
+        
+        if (percentageChange > 25) trendDirection = 'acelerando';
+        else if (percentageChange < -25) trendDirection = 'desacelerando';
+        else trendDirection = 'estable';
+      } else {
+        // Caso especial: inicio lento, aceleración posterior
+        momentum = secondAvg * 50;
+        trendDirection = 'acelerando';
+      }
+    }
+    
+    // CASO 3: Detectar campañas completadas (últimos días sin actividad)
+    const allDays = trendArray;
+    const lastDays = allDays.slice(-3); // Últimos 3 días
+    const hasRecentActivity = lastDays.some(day => day.responses > 0);
+    
+    if (!hasRecentActivity && totalResponses > 0) {
+      // Campaña completada - momentum basado en volumen total
+      momentum = totalResponses * 25;
+      trendDirection = 'completado';
+    }
+
+    // Aplicar peso por volumen para priorizar departamentos activos
+    const volumeWeight = Math.min(totalResponses * 10, 100);
+    momentum = Math.round(momentum + volumeWeight);
+
+    return { name, momentum, trend: trendDirection };
+  });
+
+  // Filtrar y ordenar: solo departamentos con actividad significativa
+  return departmentMomentum
+    .filter(d => d.momentum > 0)
+    .sort((a, b) => b.momentum - a.momentum)
+    .slice(0, 5); // Top 5 más significativos
+}

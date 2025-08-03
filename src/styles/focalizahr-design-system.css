@@ -32,7 +32,55 @@
   --focalizahr-slate-800: #1e293b;
   --focalizahr-slate-700: #334155;
   --focalizahr-slate-600: #475569;
+  /* ========================================
+   🎯 VARIABLES PREMIUM AGREGADAS
+   Sistematización de colores únicos componentes
+   ======================================== */
+
+  /* Variables para AnomalyDetectorPanel */
+  --fhr-anomaly-critical: #EF4444;
+  --fhr-anomaly-warning: #F59E0B;
+  --fhr-anomaly-bg-critical: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(220, 38, 38, 0.04));
+  --fhr-anomaly-bg-warning: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(234, 88, 12, 0.04));
+  
+  /* Variables para ParticipationPredictorCard */
+  --fhr-prediction-low: #10B981;
+  --fhr-prediction-medium: #F59E0B;
+  --fhr-prediction-high: #EF4444;
+  --fhr-prediction-bg-low: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.04));
+  --fhr-prediction-bg-medium: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(217, 119, 6, 0.04));
+  --fhr-prediction-bg-high: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(185, 28, 28, 0.04));
+  
+  /* Variables para CrossStudyComparatorCard */
+  --fhr-comparison-historical: #3B82F6;
+  --fhr-comparison-current: #22D3EE;
+  --fhr-comparison-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(34, 211, 238, 0.04));
+  
+  /* Efectos Glow Premium */
+  --fhr-glow-cyan: 0 0 20px rgba(34, 211, 238, 0.3);
+  --fhr-glow-purple: 0 0 20px rgba(167, 139, 250, 0.3);
+  --fhr-glow-neural: 0 0 30px rgba(34, 211, 238, 0.2), 0 0 60px rgba(167, 139, 250, 0.1);
+
+  /* PARTICIPATION PREDICTOR VARIABLES */
+  --fhr-prediction-low: #10B981;
+  --fhr-prediction-medium: #F59E0B;
+  --fhr-prediction-high: #EF4444;
+  --fhr-prediction-bg-low: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.04));
+  --fhr-prediction-bg-medium: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(217, 119, 6, 0.04));
+  --fhr-prediction-bg-high: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(185, 28, 28, 0.04));
+
+  /* ANOMALY DETECTOR VARIABLES */
+  --fhr-anomaly-critical: #EF4444;
+  --fhr-anomaly-warning: #F59E0B;
+  --fhr-anomaly-bg-critical: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(220, 38, 38, 0.04));
+  --fhr-anomaly-bg-warning: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(234, 88, 12, 0.04));
+
+  /* CROSS-STUDY COMPARATOR VARIABLES */
+  --fhr-comparison-historical: #3B82F6;
+  --fhr-comparison-current: #22D3EE;
+  --fhr-comparison-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(34, 211, 238, 0.04));
 }
+
 
 /* ========================================
    TIPOGRAFÍA CORPORATIVA
@@ -275,3 +323,4 @@
     padding: 0 12px;
   }
 }
+

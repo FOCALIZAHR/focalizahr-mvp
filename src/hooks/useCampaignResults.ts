@@ -106,6 +106,9 @@ function normalizeAnalyticsData(rawAnalyticsData: any): CampaignResultsData {
       }))
     : [];
 
+  // ✅ NORMALIZACIÓN TREND DATA BY DEPARTMENT - CAUSA RAÍZ SOLUCIONADA
+  const trendDataByDepartment = rawMetrics.trendDataByDepartment || {};
+
   // ✅ NORMALIZACIÓN RESPONSES BY DAY
   const responsesByDay: Record<string, number> = {};
   if (rawMetrics.responsesByDay && typeof rawMetrics.responsesByDay === 'object') {
@@ -136,6 +139,7 @@ function normalizeAnalyticsData(rawAnalyticsData: any): CampaignResultsData {
       departmentScoresDisplay, // ← AGREGADO FASE 3B
       departmentMapping: rawMetrics.departmentMapping || {}, // ← AGREGADO FASE 3A
       trendData,
+      trendDataByDepartment, // ← AGREGADO CAUSA RAÍZ SOLUCIONADA
       responsesByDay,
       segmentationData: Array.isArray(rawMetrics.segmentationData) ? rawMetrics.segmentationData : [],
       demographicBreakdown: Array.isArray(rawMetrics.demographicBreakdown) ? rawMetrics.demographicBreakdown : [],

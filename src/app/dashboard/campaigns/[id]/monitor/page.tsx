@@ -18,6 +18,7 @@ import { ParticipationPredictorCard } from '@/components/monitor/ParticipationPr
 import { CrossStudyComparatorCard } from '@/components/monitor/CrossStudyComparatorCard';
 import CampaignRhythmPanel from '@/components/monitor/CampaignRhythmPanel';
 
+
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
