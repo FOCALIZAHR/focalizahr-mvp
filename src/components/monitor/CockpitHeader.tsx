@@ -1,340 +1,419 @@
+// ====================================================================
+// FOCALIZAHR COCKPIT HEADER - ORQUESTADOR PREMIUM BIMODAL
+// src/components/monitor/CockpitHeader.tsx
+// Chat 1-3: Fundación + Vista Predictiva + Vista Dinámica - VERSIÓN FINAL
+// ====================================================================
+
+"use client";
+
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TrendingUp, TrendingDown, AlertTriangle, Target, Activity, Clock } from 'lucide-react';
+import { Brain, Zap, Loader2 } from 'lucide-react';
 
-// Interface para datos reales del hook
-interface CockpitHeaderProps {
-  monitorData: {
+// 🎯 INTERFACE DATOS REALES - Desde useCampaignMonitor
+export interface CockpitHeaderProps {
+  // Datos principales
+  participationRate: number;
+  daysRemaining: number;
+  totalInvited: number;
+  totalResponded: number;
+  lastActivity: string;
+  
+  // Datos inteligencia departamental
+  topMovers?: Array<{
     name: string;
-    daysRemaining: number;
-    participationRate: number;
-    totalInvited: number;
-    totalResponded: number;
-    participationPrediction?: {
-      finalProjection: number;
-      confidence: number;
-      trendDirection?: string;
-    };
-    departmentAnomalies: Array<{
-      department: string;
-      severity: string;
-    }>;
-    alerts: Array<{
-      id: string | number;
-      type: string;
-      message: string;
-      priority: string;
-    }>;
+    momentum: number;
+    trend: 'completado' | 'acelerando' | 'estable' | 'desacelerando';
+  }>;
+  negativeAnomalies?: Array<{
+    department: string;
+    rate: number;
+    severity: 'high' | 'medium';
+    zScore: number;
+  }>;
+  insights?: string[];
+  recommendations?: string[];
+  participationPrediction?: any;
+  
+  // Estados
+  isLoading?: boolean;
+  error?: string | null;
+  lastRefresh: Date;
+}
+
+// Hook simple para vista activa
+function useCockpitView() {
+  const [activeView, setActiveView] = useState<'predictive' | 'dynamic'>('predictive');
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  const handleToggle = (view: 'predictive' | 'dynamic') => {
+    if (isTransitioning || activeView === view) return;
+    
+    setIsTransitioning(true);
+    setActiveView(view);
+    
+    setTimeout(() => setIsTransitioning(false), 300);
   };
-  onScrollToSection?: (section: 'anomalies' | 'departments' | 'predictions') => void;
+
+  const getViewInsight = () => {
+    return activeView === 'predictive' 
+      ? "🔮 Predicción inteligente basada en patrones de comportamiento"
+      : "⚡ Análisis dinámico para decisiones inmediatas";
+  };
+
+  return {
+    activeView,
+    handleToggle,
+    isTransitioning,
+    getViewInsight,
+    canSwitch: !isTransitioning
+  };
 }
 
-// Datos por defecto si no se pasan props
-const defaultMonitorData = {
-  name: "Campaña de Prueba",
-  daysRemaining: 0,
-  participationRate: 0,
-  totalInvited: 0,
-  totalResponded: 0,
-  participationPrediction: {
-    finalProjection: 0,
-    confidence: 0,
-    trendDirection: "neutral"
-  },
-  departmentAnomalies: [],
-  alerts: []
-};
+// Hook simple para device type
+function useDeviceType() {
+  const [deviceType, setDeviceType] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
 
-interface CockpitHeaderProps {
-  monitorData?: typeof mockMonitorData;
-  onScrollToSection?: (section: 'anomalies' | 'departments' | 'predictions') => void;
-}
-
-const CockpitHeader: React.FC<CockpitHeaderProps> = ({ 
-  monitorData = defaultMonitorData, 
-  onScrollToSection = () => {} 
-}) => {
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [currentValue, setCurrentValue] = useState(monitorData.participationRate || 0);
-  const [mounted, setMounted] = useState(false);
-
-  // Evitar hydration error con timestamp
   useEffect(() => {
-    setMounted(true);
+    const checkDevice = () => {
+      const width = window.innerWidth;
+      if (width < 768) {
+        setDeviceType('mobile');
+      } else if (width < 1024) {
+        setDeviceType('tablet');
+      } else {
+        setDeviceType('desktop');
+      }
+    };
+
+    checkDevice();
+    window.addEventListener('resize', checkDevice);
+    
+    return () => window.removeEventListener('resize', checkDevice);
   }, []);
 
-  // Actualizar cuando cambien los datos reales
-  useEffect(() => {
-    if (monitorData.participationRate !== currentValue) {
-      setIsUpdating(true);
-      setCurrentValue(monitorData.participationRate || 0);
-      setTimeout(() => setIsUpdating(false), 800);
-    }
-  }, [monitorData.participationRate]);
+  return deviceType;
+}
 
-  // Cálculos para el velocímetro Tesla simple
-  const circumference = 2 * Math.PI * 90;
-  const strokeDashoffset = circumference - (currentValue / 100) * circumference;
-  
-  // Colores dinámicos Tesla style
-  const getStatusColor = (value: number) => {
-    if (value >= 80) return { color: '#10B981', bg: 'rgba(16, 185, 129, 0.1)' }; // Verde
-    if (value >= 60) return { color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.1)' }; // Amarillo  
-    return { color: '#EF4444', bg: 'rgba(239, 68, 68, 0.1)' }; // Rojo
-  };
+export function CockpitHeader(props: CockpitHeaderProps) {
+  const { 
+    activeView, 
+    handleToggle, 
+    isTransitioning,
+    getViewInsight,
+    canSwitch 
+  } = useCockpitView();
 
-  const status = getStatusColor(currentValue);
-  const criticalAlerts = (monitorData.alerts || []).filter(a => a.priority === 'high').length;
-  const hasAnomalies = (monitorData.departmentAnomalies || []).length > 0;
-  
-  // Calcular momentum del cambio de participación
-  const projectedChange = (monitorData.participationPrediction?.finalProjection || 0) - currentValue;
-  const isPositiveTrend = projectedChange > 0;
+  const deviceType = useDeviceType();
+
+  const deviceType = useDeviceType();
+
+  // 🔄 SKELETON PREMIUM para estado loading
+  if (props.isLoading) {
+    return <CockpitSkeleton />;
+  }
+
+  // ⚠️ ERROR STATE elegante
+  if (props.error) {
+    return <CockpitError error={props.error} />;
+  }
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
-      className="w-full bg-gradient-to-r from-slate-900/95 to-slate-800/95 backdrop-blur-xl border-b border-slate-700/50 shadow-2xl"
-      style={{
-        background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.90) 100%)',
-        backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(148, 163, 184, 0.1)'
-      }}
-    >
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-          
-          {/* ====================================================================== */}
-          {/* HUD IZQUIERDA - INFORMACIÓN CONTEXTUAL */}
-          {/* ====================================================================== */}
-          <div className="lg:col-span-3 order-2 lg:order-1">
-            <div className="space-y-4">
-              {/* Información campaña */}
-              <div className="space-y-2">
-                <h1 className="text-white font-semibold text-xl lg:text-2xl truncate">
-                  {monitorData.name}
-                </h1>
-                <div className="flex flex-col gap-2 text-slate-400">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
-                    <span className="text-sm">{monitorData.daysRemaining} días restantes</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Activity className="w-4 h-4" />
-                    <span className="text-sm">{monitorData.totalResponded} de {monitorData.totalInvited} respuestas</span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Acción inmediata */}
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                className="px-4 py-3 bg-gradient-to-r from-purple-500/10 to-cyan-500/10 rounded-xl border border-purple-500/20"
-              >
-                <div className="text-xs text-cyan-400 uppercase tracking-wider font-medium mb-1">
-                  Acción Inmediata
-                </div>
-                <div className="text-sm text-white">
-                  {criticalAlerts > 0 ? 
-                    `${criticalAlerts} departamentos requieren intervención` : 
-                    "Campaña en buen curso, mantener momentum"
-                  }
-                </div>
-              </motion.div>
-            </div>
-          </div>
-
-          {/* ====================================================================== */}
-          {/* VELOCÍMETRO TESLA CENTRO - ORIGINAL + PROYECCIÓN CLARA */}
-          {/* ====================================================================== */}
-          <div className="lg:col-span-6 order-1 lg:order-2 flex justify-center">
-            <motion.div 
-              className="relative"
-              whileHover={{ scale: 1.02 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            >
-              {/* Contenedor velocímetro Tesla original */}
-              <div className="relative w-80 h-80 flex items-center justify-center">
-                
-                {/* SVG Círculo Tesla simple */}
-                <svg
-                  className="w-full h-full transform -rotate-90"
-                  viewBox="0 0 200 200"
-                >
-                  {/* Círculo base */}
-                  <circle
-                    cx="100"
-                    cy="100"
-                    r="90"
-                    stroke="rgba(100, 116, 139, 0.3)"
-                    strokeWidth="8"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-                  
-                  {/* Círculo progreso ÚNICO - Tesla style */}
-                  <circle
-                    cx="100"
-                    cy="100"
-                    r="90"
-                    stroke={status.color}
-                    strokeWidth="8"
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
-                    className={`transition-all duration-500 ease-out ${isUpdating ? 'drop-shadow-lg' : ''}`}
-                    style={{
-                      filter: isUpdating ? `drop-shadow(0 0 12px ${status.color})` : 'none'
-                    }}
-                  />
-                </svg>
-
-                {/* Contenido central Tesla */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  
-                  {/* NÚMERO GIGANTE TESLA - PRINCIPAL */}
-                  <div 
-                    className={`text-8xl lg:text-9xl font-light tracking-tight transition-all duration-300 ${isUpdating ? 'scale-105' : ''}`}
-                    style={{ color: status.color }}
-                  >
-                    {currentValue}
-                    <span className="text-5xl lg:text-6xl opacity-80">%</span>
-                  </div>
-                  
-                  {/* Momentum sutil - NO competitivo */}
-                  <div className="flex items-center gap-2 mt-2 opacity-70">
-                    {isPositiveTrend ? 
-                      <TrendingUp className="w-4 h-4 text-green-400" /> :
-                      <TrendingDown className="w-4 h-4 text-red-400" />
-                    }
-                    <span className="text-sm text-green-400 font-medium">
-                      {isPositiveTrend ? '+' : ''}{projectedChange.toFixed(1)}%
-                    </span>
-                  </div>
-
-                  {/* PROYECCIÓN - CLARA Y DIFERENCIADA */}
-                  <motion.div 
-                    className="mt-6 text-center"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.6 }}
-                  >
-                    <div className="text-xs text-cyan-400 uppercase tracking-wider font-medium mb-1">
-                      Proyección Final
-                    </div>
-                    <div className="text-3xl lg:text-4xl font-light text-cyan-400">
-                      {monitorData.participationPrediction?.finalProjection || 0}%
-                    </div>
-                    <div className="text-xs text-slate-500 mt-1">
-                      {monitorData.participationPrediction?.confidence || 0}% confianza
-                    </div>
-                  </motion.div>
-                </div>
-
-                {/* Label base */}
-                <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-center">
-                  <div className="text-sm text-slate-500 uppercase tracking-wider">
-                    Participación Actual
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-
-          {/* ====================================================================== */}
-          {/* ALERTAS DERECHA - NEURAL GLOW CONDICIONAL */}
-          {/* ====================================================================== */}
-          <div className="lg:col-span-3 order-3">
-            <div className="flex lg:flex-col gap-4 justify-center lg:justify-end items-center lg:items-end">
-              
-              {/* Alertas críticas */}
-              <AnimatePresence>
-                {criticalAlerts > 0 && (
-                  <motion.button
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => onScrollToSection('anomalies')}
-                    className="relative group"
-                  >
-                    <div className="p-4 bg-red-500/10 rounded-xl border border-red-500/30 backdrop-blur-sm">
-                      <AlertTriangle className="w-7 h-7 text-red-400" />
-                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                        <span className="text-xs font-bold text-white">{criticalAlerts}</span>
-                      </div>
-                      <div className="absolute inset-0 bg-red-500/20 rounded-xl blur-lg opacity-60 group-hover:opacity-80 transition-opacity animate-pulse" />
-                    </div>
-                  </motion.button>
-                )}
-              </AnimatePresence>
-
-              {/* Anomalías departamentales */}
-              <AnimatePresence>
-                {hasAnomalies && (
-                  <motion.button
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => onScrollToSection('departments')}
-                    className="relative group"
-                  >
-                    <div className="p-4 bg-amber-500/10 rounded-xl border border-amber-500/30 backdrop-blur-sm">
-                      <Target className="w-7 h-7 text-amber-400" />
-                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center">
-                        <span className="text-xs font-bold text-white">{monitorData.departmentAnomalies?.length || 0}</span>
-                      </div>
-                      <div className="absolute inset-0 bg-amber-500/20 rounded-xl blur-lg opacity-60 group-hover:opacity-80 transition-opacity" />
-                    </div>
-                  </motion.button>
-                )}
-              </AnimatePresence>
-
-              {/* Insights disponibles */}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => onScrollToSection('predictions')}
-                className="relative group"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.5 }}
-              >
-                <div className="p-4 bg-cyan-500/10 rounded-xl border border-cyan-500/30 backdrop-blur-sm">
-                  <Activity className="w-7 h-7 text-cyan-400" />
-                  <div className="absolute inset-0 bg-cyan-500/20 rounded-xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity" />
-                </div>
-              </motion.button>
-            </div>
+    <div className="w-full mb-8">
+      {/* 🎯 CONTENEDOR GLASS COCKPIT PREMIUM */}
+      <motion.div 
+        className="fhr-card neural-glow border border-white/10 backdrop-blur-xl bg-black/20"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: "easeIn" }}
+      >
+        {/* 🔮 TOGGLE MÁGICO NIVEL TESLA */}
+        <div className="flex justify-center mb-6 p-2">
+          <div className="relative bg-black/30 rounded-full p-1 border border-white/20 backdrop-blur-sm">
+            {/* Background animado del toggle */}
+            <motion.div
+              className="absolute top-1 w-1/2 h-[calc(100%-8px)] bg-gradient-to-r from-cyan-500/30 to-purple-500/30 rounded-full backdrop-blur-sm border border-white/10"
+              animate={{
+                x: activeView === 'predictive' ? 0 : '100%'
+              }}
+              transition={{ 
+                type: "spring", 
+                stiffness: 300, 
+                damping: 30,
+                mass: 0.8
+              }}
+            />
             
-            {/* Labels alertas */}
-            <div className="hidden lg:block mt-4 space-y-2 text-right">
-              {criticalAlerts > 0 && (
-                <div className="text-xs text-red-400">Críticas</div>
-              )}
-              {hasAnomalies && (
-                <div className="text-xs text-amber-400">Anomalías</div>
-              )}
-              <div className="text-xs text-cyan-400">Insights</div>
+            {/* Botones del toggle */}
+            <div className="relative flex">
+              <ToggleButton
+                active={activeView === 'predictive'}
+                onClick={() => canSwitch && handleToggle('predictive')}
+                icon={Brain}
+                label="Predictiva"
+                subtitle="¿Llegaremos?"
+                disabled={isTransitioning}
+                deviceType={deviceType}
+              />
+              <ToggleButton
+                active={activeView === 'dynamic'}
+                onClick={() => canSwitch && handleToggle('dynamic')}
+                icon={Zap}
+                label="Dinámica"
+                subtitle="¿Dónde actuar?"
+                disabled={isTransitioning}
+                deviceType={deviceType}
+              />
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Timestamp discreto - FIXED HYDRATION */}
-      <div className="absolute bottom-2 right-4 text-xs text-slate-600">
-        {mounted ? `Datos vivos • ${new Date().toLocaleTimeString('es-CL', { hour12: false })}` : 'Datos vivos • --:--:--'}
+        {/* 💫 INSIGHT CONTEXTUAL FLOTANTE */}
+        <motion.div 
+          className="text-center mb-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          <p className="text-sm text-cyan-400 font-medium">
+            {getViewInsight()}
+          </p>
+        </motion.div>
+
+        {/* 🎭 ÁREA DE VISTAS INTERCAMBIABLES RESPONSIVE */}
+        <div className={`relative ${
+          deviceType === 'mobile' ? 'min-h-[240px] p-4' : 'min-h-[280px] p-6'
+        }`}>
+          <AnimatePresence mode="wait">
+            {activeView === 'predictive' ? (
+              <PredictiveView 
+                key="predictive" 
+                {...props}
+                isTransitioning={isTransitioning}
+              />
+            ) : (
+              <DynamicView 
+                key="dynamic" 
+                {...props}
+                isTransitioning={isTransitioning}
+              />
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// 🎨 COMPONENTE TOGGLE BUTTON PREMIUM RESPONSIVE
+interface ToggleButtonProps {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ComponentType<any>;
+  label: string;
+  subtitle: string;
+  disabled: boolean;
+  deviceType: 'mobile' | 'tablet' | 'desktop';
+}
+
+function ToggleButton({ 
+  active, 
+  onClick, 
+  icon: Icon, 
+  label, 
+  subtitle, 
+  disabled,
+  deviceType
+}: ToggleButtonProps) {
+  const isMobile = deviceType === 'mobile';
+  
+  return (
+    <motion.button
+      className={`
+        relative rounded-full transition-all duration-300 
+        ${isMobile ? 'px-4 py-2 min-w-[100px]' : 'px-6 py-3 min-w-[140px]'}
+        ${active 
+          ? 'text-white' 
+          : 'text-white/60 hover:text-white/80'
+        }
+        ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}
+      `}
+      onClick={onClick}
+      disabled={disabled}
+      whileHover={!disabled && !isMobile ? { scale: 1.02 } : {}}
+      whileTap={!disabled ? { scale: 0.98 } : {}}
+    >
+      <div className="flex flex-col items-center gap-1">
+        <Icon className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'} ${
+          active ? 'text-cyan-400' : 'text-white/60'
+        }`} />
+        <span className={`${isMobile ? 'text-xs' : 'text-sm'} font-semibold`}>
+          {label}
+        </span>
+        {!isMobile && (
+          <span className="text-xs opacity-60">{subtitle}</span>
+        )}
+      </div>
+      
+      {/* Efecto de activación */}
+      {active && (
+        <motion.div
+          className="absolute inset-0 rounded-full bg-white/5 border border-white/10"
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.8, opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        />
+      )}
+    </motion.button>
+  );
+}
+
+// Vista Predictiva Simple
+function PredictiveView(props: CockpitHeaderProps & { isTransitioning: boolean }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      transition={{ duration: 0.3 }}
+      className="grid grid-cols-1 md:grid-cols-4 gap-6"
+    >
+      <div className="bg-black/20 rounded-lg p-4 border border-cyan-500/30">
+        <h3 className="text-cyan-400 text-sm font-medium mb-2">Participación</h3>
+        <p className="text-2xl font-bold text-white">{props.participationRate}%</p>
+      </div>
+      
+      <div className="bg-black/20 rounded-lg p-4 border border-purple-500/30">
+        <h3 className="text-purple-400 text-sm font-medium mb-2">Proyección</h3>
+        <p className="text-2xl font-bold text-white">
+          {props.participationPrediction?.finalProjection || 85}%
+        </p>
+      </div>
+      
+      <div className="bg-black/20 rounded-lg p-4 border border-yellow-500/30">
+        <h3 className="text-yellow-400 text-sm font-medium mb-2">Días Restantes</h3>
+        <p className="text-2xl font-bold text-white">{props.daysRemaining}</p>
+      </div>
+      
+      <div className="bg-black/20 rounded-lg p-4 border border-green-500/30">
+        <h3 className="text-green-400 text-sm font-medium mb-2">Respuestas</h3>
+        <p className="text-2xl font-bold text-white">{props.totalResponded}</p>
       </div>
     </motion.div>
   );
-};
+}
 
-export default CockpitHeader;
+// Vista Dinámica Simple
+function DynamicView(props: CockpitHeaderProps & { isTransitioning: boolean }) {
+  const anomalies = props.negativeAnomalies || [];
+  const topMovers = props.topMovers || [];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.3 }}
+      className="space-y-4"
+    >
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-red-500/10 rounded-lg p-4 border border-red-500/30">
+          <h3 className="text-red-400 text-sm font-medium mb-3">🚨 Alertas</h3>
+          {anomalies.length > 0 ? (
+            <div className="space-y-2">
+              {anomalies.slice(0, 2).map((anomaly, index) => (
+                <div key={index} className="text-white text-sm">
+                  {anomaly.department}: {anomaly.rate}%
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-white/60 text-sm">Sin anomalías detectadas</p>
+          )}
+        </div>
+        
+        <div className="bg-green-500/10 rounded-lg p-4 border border-green-500/30">
+          <h3 className="text-green-400 text-sm font-medium mb-3">📈 Top Performers</h3>
+          {topMovers.length > 0 ? (
+            <div className="space-y-2">
+              {topMovers.slice(0, 2).map((mover, index) => (
+                <div key={index} className="text-white text-sm">
+                  {mover.name}: {mover.momentum}%
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-white/60 text-sm">Calculando momentum...</p>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// 🔄 SKELETON PREMIUM
+function CockpitSkeleton() {
+  return (
+    <div className="w-full mb-8">
+      <div className="fhr-card bg-black/20 border border-white/10 animate-pulse">
+        {/* Toggle skeleton */}
+        <div className="flex justify-center mb-6 p-2">
+          <div className="bg-white/5 rounded-full h-16 w-80"></div>
+        </div>
+        
+        {/* Content skeleton */}
+        <div className="p-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white/5 rounded-lg h-24"></div>
+            ))}
+          </div>
+          <div className="bg-white/5 rounded-lg h-12 mt-6"></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ⚠️ ERROR STATE ELEGANTE
+interface CockpitErrorProps {
+  error: string;
+}
+
+function CockpitError({ error }: CockpitErrorProps) {
+  return (
+    <div className="w-full mb-8">
+      <motion.div 
+        className="fhr-card bg-red-500/10 border border-red-500/30"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div className="p-6 text-center">
+          <motion.div
+            className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-500/20 mb-4"
+            animate={{ rotate: [0, 10, -10, 0] }}
+            transition={{ duration: 0.5 }}
+          >
+            <Zap className="h-6 w-6 text-red-400" />
+          </motion.div>
+          <h3 className="text-lg font-semibold text-red-400 mb-2">
+            Error en Torre de Control
+          </h3>
+          <p className="text-sm text-white/80 mb-4">
+            {error}
+          </p>
+          <motion.button
+            className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg border border-red-500/30 hover:bg-red-500/30 transition-colors"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => window.location.reload()}
+          >
+            Reintentar
+          </motion.button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}

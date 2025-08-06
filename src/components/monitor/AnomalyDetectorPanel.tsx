@@ -61,7 +61,7 @@ export function AnomalyDetectorPanel({
     const IconComponent = currentConfig.icon;
     
     return (
-      <div className={`p-3 rounded-lg bg-gradient-to-r ${currentConfig.bgColor} 
+      <div data-component="AnomalyDetectorPanel" className={`p-3 rounded-lg bg-gradient-to-r ${currentConfig.bgColor}
                       border ${currentConfig.borderColor} transition-all duration-200 
                       hover:scale-[1.02]`}>
         <div className="flex items-start justify-between">

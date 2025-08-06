@@ -61,7 +61,7 @@ export function ActionButtons({
   };
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div data-component="ActionButtons" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <Button 
         onClick={handleSendReminderReal}
         className="btn-gradient"

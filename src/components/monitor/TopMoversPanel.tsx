@@ -146,6 +146,7 @@ export function TopMoversPanel({ topMovers = [], lastRefresh }: TopMoversPanelPr
 
   return (
     <motion.div
+    data-component="TopMoversPanel"  // ⭐ AGREGAR AQUÍ
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}

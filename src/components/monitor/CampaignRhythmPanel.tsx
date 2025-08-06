@@ -153,6 +153,7 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
 
   return (
     <motion.div
+    data-component="CampaignRhythmPanel"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}

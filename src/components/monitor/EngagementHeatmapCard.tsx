@@ -22,7 +22,7 @@ export function EngagementHeatmapCard({
   const { hourlyData, recommendations, maxHour, maxActivity, totalActivity, hourBars } = engagementHeatmap;
 
   return (
-    <Card className="glass-card neural-glow border-fhr-cyan/20 bg-gradient-to-br from-slate-900/80 to-slate-800/80">
+    <Card data-component="EngagementHeatmapCard" className="glass-card neural-glow border-fhr-cyan/20 bg-gradient-to-br from-slate-900/80 to-slate-800/80">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="fhr-title-gradient flex items-center gap-2">

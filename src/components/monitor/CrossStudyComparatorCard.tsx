@@ -6,7 +6,7 @@ export function CrossStudyComparatorCard({ comparison, onApplyLearning }) {
 
   if (!comparison) {
     return (
-      <div className="bg-gradient-to-br from-slate-900/90 to-slate-800/70 backdrop-blur-lg border border-cyan-500/20 rounded-2xl p-8 shadow-2xl hover:shadow-cyan-500/10 transition-all duration-300 relative overflow-hidden">
+      <div data-component="CrossStudyComparatorCard" className="bg-gradient-to-br from-slate-900/90 to-slate-800/70 backdrop-blur-lg border border-cyan-500/20 rounded-2xl p-8 shadow-2xl hover:shadow-cyan-500/10 transition-all duration-300 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-cyan-500/10 to-transparent rounded-full blur-xl"></div>
         <div className="flex items-center gap-3 mb-8">
           <BarChart3 className="w-6 h-6 text-cyan-400" />
