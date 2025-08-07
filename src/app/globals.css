@@ -849,3 +849,175 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   outline: 2px solid rgba(34, 211, 238, 0.8);
   outline-offset: 2px;
 }
+/* ====================================================================
+ * CSS COCKPIT NAVIGATION - HIGHLIGHT EFFECTS
+ * globals.css - Efectos visuales para navegación CockpitHeader
+ * ==================================================================== */
+
+/* 🎯 COCKPIT HIGHLIGHT ANIMATION */
+@keyframes cockpit-highlight {
+  0% {
+    transform: scale(1);
+    box-shadow: 
+      0 0 0 0 rgba(34, 211, 238, 0.4),
+      0 4px 20px rgba(34, 211, 238, 0.1);
+    border-color: rgba(34, 211, 238, 0.3);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 
+      0 0 0 4px rgba(34, 211, 238, 0.2),
+      0 8px 40px rgba(34, 211, 238, 0.3);
+    border-color: rgba(34, 211, 238, 0.8);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 
+      0 0 0 0 rgba(34, 211, 238, 0.1),
+      0 4px 20px rgba(34, 211, 238, 0.05);
+    border-color: rgba(34, 211, 238, 0.4);
+  }
+}
+
+/* 🚀 CLASE HIGHLIGHT APLICADA POR NAVEGACIÓN */
+.cockpit-highlight {
+  animation: cockpit-highlight 2s ease-out;
+  position: relative;
+  z-index: 10;
+}
+
+/* ⚡ HOVER EFFECTS PARA TARJETAS NAVEGABLES */
+.cockpit-nav-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.cockpit-nav-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 10px 40px rgba(0, 0, 0, 0.3),
+    0 0 20px rgba(34, 211, 238, 0.1);
+}
+
+.cockpit-nav-card:hover .nav-card-border {
+  border-color: rgba(34, 211, 238, 0.6);
+  box-shadow: inset 0 0 20px rgba(34, 211, 238, 0.1);
+}
+
+/* 🎨 TOOLTIP ANIMATIONS */
+.tooltip-enter {
+  opacity: 0;
+  transform: scale(0.95) translateY(10px);
+}
+
+.tooltip-enter-active {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  transition: all 200ms ease-out;
+}
+
+.tooltip-exit {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+.tooltip-exit-active {
+  opacity: 0;
+  transform: scale(0.95) translateY(10px);
+  transition: all 150ms ease-in;
+}
+
+/* 📱 RESPONSIVE TOOLTIP ADJUSTMENTS */
+@media (max-width: 768px) {
+  .cockpit-tooltip {
+    max-width: 90vw;
+    font-size: 0.875rem;
+  }
+  
+  .cockpit-nav-card:hover {
+    transform: none;
+  }
+  
+  .cockpit-nav-card:active {
+    transform: scale(0.98);
+  }
+}
+
+/* 🌟 PULSE ANIMATION PARA ELEMENTOS CRÍTICOS */
+@keyframes critical-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+  }
+}
+
+.critical-alert {
+  animation: critical-pulse 2s infinite;
+}
+
+/* 🎯 SUCCESS PULSE PARA ELEMENTOS POSITIVOS */
+@keyframes success-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+}
+
+.success-highlight {
+  animation: success-pulse 3s infinite;
+}
+
+/* 💫 MOMENTUM GLOW EFFECT */
+@keyframes momentum-glow {
+  0%, 100% {
+    box-shadow: 
+      0 0 20px rgba(147, 51, 234, 0.3),
+      inset 0 0 20px rgba(147, 51, 234, 0.1);
+  }
+  50% {
+    box-shadow: 
+      0 0 30px rgba(147, 51, 234, 0.5),
+      inset 0 0 30px rgba(147, 51, 234, 0.2);
+  }
+}
+
+.momentum-glow {
+  animation: momentum-glow 4s ease-in-out infinite;
+}
+
+/* 🎨 GRADIENTES DINÁMICOS */
+.gradient-momentum {
+  background: linear-gradient(135deg, 
+    rgba(147, 51, 234, 0.1) 0%,
+    rgba(79, 70, 229, 0.1) 50%,
+    rgba(59, 130, 246, 0.1) 100%
+  );
+}
+
+.gradient-projection {
+  background: linear-gradient(135deg,
+    rgba(34, 211, 238, 0.1) 0%,
+    rgba(14, 165, 233, 0.1) 50%,
+    rgba(59, 130, 246, 0.1) 100%
+  );
+}
+
+.gradient-action {
+  background: linear-gradient(135deg,
+    rgba(16, 185, 129, 0.1) 0%,
+    rgba(5, 150, 105, 0.1) 50%,
+    rgba(4, 120, 87, 0.1) 100%
+  );
+}
+
+.gradient-risk {
+  background: linear-gradient(135deg,
+    rgba(239, 68, 68, 0.1) 0%,
+    rgba(220, 38, 38, 0.1) 50%,
+    rgba(185, 28, 28, 0.1) 100%
+  );
+}

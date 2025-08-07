@@ -99,7 +99,7 @@ export function DynamicView(props: DynamicViewProps) {
       exit={{ opacity: 0, x: -20 }}
       transition={{ 
         duration: 0.5, 
-        ease: "easeOutCubic",
+        ease: "easeOut",
         delay: isTransitioning ? 0.1 : 0 
       }}
       className="w-full"

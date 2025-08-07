@@ -78,7 +78,7 @@ export function PredictiveView(props: PredictiveViewProps) {
       exit={{ opacity: 0, x: 20 }}
       transition={{ 
         duration: 0.5, 
-        ease: "easeOutCubic",
+        ease: "easeOut",
         delay: isTransitioning ? 0.1 : 0 
       }}
       className="w-full"
@@ -246,7 +246,7 @@ export function PredictiveView(props: PredictiveViewProps) {
                 className="bg-gradient-to-r from-cyan-400 to-cyan-300 h-1.5 rounded-full"
                 initial={{ width: 0 }}
                 animate={{ width: `${confianza}%` }}
-                transition={{ delay: 1, duration: 1.2, ease: "easeOutCubic" }}
+                transition={{ delay: 1, duration: 1.2, ease: "easeOut" }}
               />
             </motion.div>
             

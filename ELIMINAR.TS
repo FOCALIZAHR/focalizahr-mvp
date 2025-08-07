@@ -1,314 +1,283 @@
 // ====================================================================
-// DEPARTMENT PULSE PANEL - COMPONENTE HÍBRIDO REFACTORIZADO
-// src/components/monitor/DepartmentPulsePanel.tsx
-// ARQUITECTURA: Resumen Ejecutivo + Lista Detallada
+// FOCALIZAHR PREDICTIVE VIEW - VISTA ESTRATÉGICA AWS-STYLE
+// src/components/monitor/cockpit/PredictiveView.tsx
+// Chat 2: Vista predictiva completa con datos reales + animaciones premium
 // ====================================================================
 
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Building2, TrendingUp, AlertTriangle, Users } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { CountUpAnimation } from './CountUpAnimation';
 
-interface DepartmentData {
-  name: string;
+// 🎯 INTERFACE DATOS REALES - Desde useCampaignMonitor
+export interface PredictiveViewProps {
+  // Datos principales para vista predictiva
   participationRate: number;
-  count: number;
-  total: number;
-  rank?: number;
-  medal?: string;
-  status?: string;
-  urgency?: string;
-  action?: string;
-  icon?: string;
-}
-
-interface DepartmentalIntelligence {
-  topPerformers: DepartmentData[];
-  attentionNeeded: DepartmentData[];
-  totalDepartments: number;
-  averageRate: number;
-  excellentCount: number;
-  criticalCount: number;
-  allDepartments: DepartmentData[];
-   hasRealData: boolean;    // ← AGREGAR ESTA LÍNEA
-   scenarioType: 'NO_DATA' | 'ALL_ZERO' | 'MIXED_DATA';  // ← AGREGAR
-   displayMessage: string;                                 // ← AGREGAR
-}
-
-interface DepartmentPulsePanelProps {
-  departmentalIntelligence: DepartmentalIntelligence;
-  handleSendDepartmentReminder: (department: string) => void;
+  daysRemaining: number;
+  totalInvited: number;
+  totalResponded: number;
+  lastActivity: string;
+  
+  // Datos inteligencia (opcionales para Chat 1)
+  topMovers?: Array<{
+    name: string;
+    momentum: number;
+    trend: 'completado' | 'acelerando' | 'estable' | 'desacelerando';
+  }>;
+  insights?: string[];
+  recommendations?: string[];
+  participationPrediction?: any;
+  
+  // Estados UI
+  isLoading?: boolean;
+  isTransitioning?: boolean;
   lastRefresh: Date;
 }
 
-type FilterType = 'critical' | 'progress' | 'excellent' | 'all';
+export function PredictiveView(props: PredictiveViewProps) {
+  const {
+    participationRate,
+    daysRemaining,
+    totalInvited,
+    totalResponded,
+    lastActivity,
+    topMovers = [],
+    insights = [],
+    recommendations = [],
+    participationPrediction,
+    isTransitioning = false
+  } = props;
 
-export function DepartmentPulsePanel({ 
-  departmentalIntelligence, 
-  handleSendDepartmentReminder,
-  lastRefresh 
-}: DepartmentPulsePanelProps) {
+  // 🧮 CÁLCULOS INTELIGENTES PARA VISTA PREDICTIVA
+  const velocidadActual = totalResponded / (Math.max(1, 14 - daysRemaining)); // respuestas por día
+  const momentumPromedio = topMovers.length > 0 
+    ? Math.round(topMovers.reduce((acc, m) => acc + m.momentum, 0) / topMovers.length)
+    : 0;
+  
+  // 📊 PROYECCIÓN MATEMÁTICA (usando datos reales o cálculo simple)
+  const proyeccionFinal = participationPrediction?.finalProjection || 
+    Math.min(95, Math.round(participationRate + (velocidadActual * daysRemaining * 2.1)));
+  const confianza = participationPrediction?.confidence || 
+    Math.max(65, Math.min(90, 85 - Math.abs(participationRate - 70)));
 
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-
-  // Filtrar departamentos según pestaña activa
-  const getFilteredDepartments = () => {
-    const { allDepartments } = departmentalIntelligence;
-    
-    switch (activeFilter) {
-      case 'critical':
-        return allDepartments.filter(dept => dept.participationRate < 50);
-      case 'progress': 
-        return allDepartments.filter(dept => dept.participationRate >= 50 && dept.participationRate < 85);
-      case 'excellent':
-        return allDepartments.filter(dept => dept.participationRate >= 85);
-      default:
-        return allDepartments.sort((a, b) => {
-          // Orden: Críticos -> Progreso -> Exitosos
-          if (a.participationRate < 50 && b.participationRate >= 50) return -1;
-          if (a.participationRate >= 50 && b.participationRate < 50) return 1;
-          if (a.participationRate < 85 && b.participationRate >= 85) return -1;
-          if (a.participationRate >= 85 && b.participationRate < 85) return 1;
-          return a.participationRate - b.participationRate;
-        });
-    }
-  };
-
-  const filteredDepartments = getFilteredDepartments();
+  // 🎯 ESTADO MOMENTUM GENERAL
+  const estadoMomentum = momentumPromedio > 200 ? 'Acelerando' :
+                        momentumPromedio > 100 ? 'Estable' : 'Desacelerando';
+  
+  // 🚦 RECOMENDACIÓN INTELIGENTE
+  const recomendacionPrincipal = recommendations.length > 0 
+    ? recommendations[0] 
+    : proyeccionFinal >= 75 
+      ? 'Mantener estrategia actual'
+      : 'Intensificar comunicación';
 
   return (
-    <Card className="glass-card backdrop-blur-md bg-slate-800/30 border border-white/10">
-      <CardHeader>
-        <CardTitle className="text-white flex items-center gap-2">
-          <Building2 className="h-5 w-5 text-cyan-400" />
-          Pulso Departamental
-          <div className="ml-auto text-xs text-white/60">
-            Actualizado: {lastRefresh.toLocaleTimeString('es-CL')}
-          </div>
-        </CardTitle>
-      </CardHeader>
-
-      <CardContent className="space-y-6">
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      transition={{ 
+        duration: 0.5, 
+        ease: "easeOut",
+        delay: isTransitioning ? 0.1 : 0 
+      }}
+      className="w-full"
+    >
+      {/* 🔮 VISTA PREDICTIVA - "¿LLEGAREMOS A LA META?" */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         
-        {/* ==================== PARTE SUPERIOR: RESUMEN EJECUTIVO ==================== */}
-        <div className="space-y-6">
-          
-          {/* MÉTRICAS AGREGADAS */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-3 bg-gradient-to-br from-slate-700/50 to-transparent rounded-lg border border-slate-600/30">
-              <div className="text-2xl font-bold text-white">{departmentalIntelligence.totalDepartments}</div>
-              <div className="text-xs text-white/60">Departamentos</div>
-            </div>
-            <div className="text-center p-3 bg-gradient-to-br from-blue-500/10 to-transparent rounded-lg border border-blue-500/20">
-              <div className="text-2xl font-bold text-blue-400">{departmentalIntelligence.averageRate}%</div>
-              <div className="text-xs text-white/60">Promedio</div>
-            </div>
-            <div className="text-center p-3 bg-gradient-to-br from-green-500/10 to-transparent rounded-lg border border-green-500/20">
-              <div className="text-2xl font-bold text-green-400">{departmentalIntelligence.excellentCount}</div>
-              <div className="text-xs text-white/60">Excelentes</div>
-            </div>
-            <div className="text-center p-3 bg-gradient-to-br from-red-500/10 to-transparent rounded-lg border border-red-500/20">
-              <div className="text-2xl font-bold text-red-400">{departmentalIntelligence.criticalCount}</div>
-              <div className="text-xs text-white/60">Críticos</div>
-            </div>
-          </div>
-
-          {/* GRID EXECUTIVE: TOP PERFORMERS + ATTENTION NEEDED */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
-            {/* TOP 3 PERFORMERS */}
-            <div className="bg-gradient-to-r from-green-500/10 to-transparent p-4 rounded-lg border border-green-500/20">
-              <h3 className="text-green-400 font-medium mb-3 flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                🏆 Top Performers
+        {/* MÓDULO 1: PUNTO DE PARTIDA */}
+        <motion.div 
+          className="fhr-card-metric bg-white/5 border border-white/10 rounded-lg p-6 hover:border-white/20 transition-all duration-300"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          whileHover={{ y: -2 }}
+        >
+          <div className="text-center">
+            <div className="flex items-center justify-center mb-3">
+              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+              <h3 className="text-sm font-medium text-white/60">
+                Punto de Partida
               </h3>
-              <div className="space-y-3">
-                {departmentalIntelligence.topPerformers.map((dept) => (
-                                      <div key={dept.name} className="flex items-center justify-between bg-gradient-to-r from-cyan-500/8 to-purple-500/5 backdrop-blur-md p-3 rounded-lg border border-cyan-400/10">
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg">{dept.medal}</span>
-                      <div>
-                        <div className="text-white font-medium capitalize">{dept.name}</div>
-                        <div className="text-xs text-white/60">{dept.count}/{dept.total} participantes</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-white font-bold">{dept.participationRate}%</div>
-                      <div className="text-xs text-green-400">⭐ Excelente</div>
-                    </div>
-                  </div>
-                ))}
-                {departmentalIntelligence.topPerformers.length === 0 && (
-                  <div className="text-center text-white/60 py-4">
-                    Sin datos suficientes
-                  </div>
-                )}
-              </div>
             </div>
-
-            {/* ATTENTION NEEDED */}
-            <div className="bg-gradient-to-r from-orange-500/10 to-transparent p-4 rounded-lg border border-orange-500/20">
-              <h3 className="text-orange-400 font-medium mb-3 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                ⚠️ Attention Needed
-              </h3>
-              <div className="space-y-3">
-                {departmentalIntelligence.attentionNeeded.map((dept) => (
-                  <div key={dept.name} className="flex items-center justify-between bg-gradient-to-r from-cyan-500/8 to-purple-500/5 backdrop-blur-md p-3 rounded-lg border border-cyan-400/10">
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg">{dept.icon}</span>
-                      <div>
-                        <div className="text-white font-medium capitalize">{dept.name}</div>
-                        <div className="text-xs text-white/60">{dept.count}/{dept.total} participantes</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-white font-bold">{dept.participationRate}%</div>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className={`text-xs mt-1 ${
-                          dept.urgency === 'critical' ? 'border-red-500/30 text-red-400 hover:bg-red-500/20' :
-                          dept.urgency === 'high' ? 'border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20' :
-                          'border-orange-500/30 text-orange-400 hover:bg-orange-500/20'
-                        }`}
-                        onClick={() => handleSendDepartmentReminder(dept.name)}
-                      >
-                        {dept.urgency === 'critical' ? '📞 Llamar' :
-                         dept.urgency === 'high' ? '📧 Recordar' : '👁️ Seguir'}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-                <div className="text-center py-4">
-                 <div className="text-white/80 font-medium">
-                    {departmentalIntelligence.displayMessage}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ==================== PARTE INFERIOR: LISTA DETALLADA ==================== */}
-        <div className="space-y-4">
-          
-          {/* PESTAÑAS DE FILTRO */}
-          <div className="flex space-x-1 bg-white/5 p-1 rounded-lg">
-            <button 
-              onClick={() => setActiveFilter('critical')}
-              className={`flex-1 py-2 px-3 rounded text-xs font-medium transition-all duration-200 ${
-                activeFilter === 'critical' 
-                  ? 'bg-gradient-to-r from-red-500/20 to-transparent text-red-400 border border-red-500/20' 
-                  : 'text-white/60 hover:bg-white/5'
-              }`}
-            >
-              🚨 Críticos ({departmentalIntelligence.allDepartments.filter(d => d.participationRate < 50).length})
-            </button>
-            <button 
-              onClick={() => setActiveFilter('progress')}
-              className={`flex-1 py-2 px-3 rounded text-xs font-medium transition-all duration-200 ${
-                activeFilter === 'progress' 
-                  ? 'bg-gradient-to-r from-yellow-500/20 to-transparent text-yellow-400 border border-yellow-500/20' 
-                  : 'text-white/60 hover:bg-white/5'
-              }`}
-            >
-              ⚡ Progreso ({departmentalIntelligence.allDepartments.filter(d => d.participationRate >= 50 && d.participationRate < 85).length})
-            </button>
-            <button 
-              onClick={() => setActiveFilter('excellent')}
-              className={`flex-1 py-2 px-3 rounded text-xs font-medium transition-all duration-200 ${
-                activeFilter === 'excellent' 
-                  ? 'bg-gradient-to-r from-green-500/20 to-transparent text-green-400 border border-green-500/20' 
-                  : 'text-white/60 hover:bg-white/5'
-              }`}
-            >
-              ✅ Exitosos ({departmentalIntelligence.excellentCount})
-            </button>
-            <button 
-              onClick={() => setActiveFilter('all')}
-              className={`flex-1 py-2 px-3 rounded text-xs font-medium transition-all duration-200 ${
-                activeFilter === 'all' 
-                  ? 'bg-gradient-to-r from-cyan-500/20 to-transparent text-cyan-400 border border-cyan-500/20' 
-                  : 'text-white/60 hover:bg-white/5'
-              }`}
-            >
-              📊 Todos ({departmentalIntelligence.totalDepartments})
-            </button>
-          </div>
-
-          {/* LISTA DETALLADA CON SCROLL FOCALIZAHR */}
-          <div className="max-h-80 overflow-y-auto focalizahr-scroll space-y-2">
-            {filteredDepartments.map((dept) => (
-              <div key={dept.name} className="bg-gradient-to-br from-cyan-500/8 to-purple-500/5 backdrop-blur-md p-4 rounded-lg border border-cyan-400/15 hover:border-cyan-400/40 transition-all duration-200">
-                
-                {/* HEADER DEPARTAMENTO */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${
-                      dept.participationRate >= 85 ? 'bg-green-400' : 
-                      dept.participationRate >= 70 ? 'bg-yellow-400' : 
-                      dept.participationRate >= 50 ? 'bg-orange-400' : 'bg-red-400'
-                    }`}></div>
-                    <div>
-                      <span className="text-white font-medium capitalize">{dept.name}</span>
-                      <div className="text-xs text-white/60">{dept.count}/{dept.total} participantes</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-white font-bold text-lg">{dept.participationRate}%</span>
-                  </div>
-                </div>
-
-                {/* PROGRESS BAR */}
-                <div className="mb-3">
-                  <Progress 
-                    value={dept.participationRate} 
-                    className="h-2 mb-2"
-                  />
-                </div>
-
-                {/* FOOTER CON ACCIÓN */}
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-white/60">
-                    {dept.participationRate >= 85 ? '🎉 Excelente performance' :
-                     dept.participationRate >= 70 ? '⚡ Buen progreso' :
-                     dept.participationRate >= 50 ? '📈 En desarrollo' : '🚨 Requiere atención'}
-                  </div>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    className={`text-xs ${
-                      dept.participationRate >= 85 
-                        ? 'border-green-500/30 text-green-400 hover:bg-green-500/20' 
-                        : dept.participationRate >= 70 
-                        ? 'border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20'
-                        : dept.participationRate >= 50
-                        ? 'border-orange-500/30 text-orange-400 hover:bg-orange-500/20'
-                        : 'border-red-500/30 text-red-400 hover:bg-red-500/20'
-                    }`}
-                    onClick={() => handleSendDepartmentReminder(dept.name)}
-                  >
-                    {dept.participationRate >= 85 ? '🎉 Felicitar' : 
-                     dept.participationRate >= 70 ? '📧 Recordar' :
-                     dept.participationRate >= 50 ? '⚡ Motivar' : '📞 Llamar'}
-                  </Button>
-                </div>
-              </div>
-            ))}
             
-            {filteredDepartments.length === 0 && (
-              <div className="text-center text-white/60 py-8">
-                <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                <div className="text-sm">No hay departamentos en esta categoría</div>
-              </div>
-            )}
+            <CountUpAnimation
+              value={participationRate}
+              duration={1.2}
+              className="text-3xl font-bold text-white"
+              suffix="%"
+              delay={0.3}
+            />
+            
+            <div className="text-sm text-cyan-400 mb-1">
+              {totalResponded}/{totalInvited} respuestas
+            </div>
+            
+            <div className="text-xs text-white/50">
+              Velocidad: {velocidadActual.toFixed(1)}/día
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </motion.div>
+
+        {/* MÓDULO 2: VECTOR DE MOMENTUM */}
+        <motion.div 
+          className="fhr-card-metric bg-gradient-to-br from-purple-500/20 to-cyan-500/20 border border-purple-500/30 rounded-lg p-6 relative overflow-hidden hover:border-purple-500/50 transition-all duration-300"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          whileHover={{ y: -2 }}
+        >
+          {/* Gradiente animado de fondo */}
+          <motion.div
+            className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-cyan-500/10"
+            animate={{
+              background: [
+                "linear-gradient(90deg, rgba(168, 85, 247, 0.1) 0%, rgba(34, 211, 238, 0.1) 100%)",
+                "linear-gradient(90deg, rgba(34, 211, 238, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)",
+                "linear-gradient(90deg, rgba(168, 85, 247, 0.1) 0%, rgba(34, 211, 238, 0.1) 100%)"
+              ]
+            }}
+            transition={{ duration: 3, repeat: Infinity }}
+          />
+          
+          <div className="relative text-center">
+            <div className="flex items-center justify-center mb-3">
+              <div className="w-2 h-2 bg-purple-400 rounded-full mr-2"></div>
+              <h3 className="text-sm font-medium text-white/60">
+                Vector Momentum
+              </h3>
+            </div>
+            
+            <div className="text-2xl font-bold text-purple-400 mb-1">
+              {estadoMomentum}
+            </div>
+            
+            <div className="text-sm text-purple-300 mb-1">
+              {momentumPromedio > 0 ? `${momentumPromedio} pts` : 'Calculando...'}
+            </div>
+            
+            <div className="text-xs text-white/50">
+              {topMovers.length} departamentos activos
+            </div>
+          </div>
+        </motion.div>
+
+        {/* MÓDULO 3: PROYECCIÓN FINAL */}
+        <motion.div 
+          className="fhr-card-metric bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 rounded-lg p-6 relative overflow-hidden hover:border-cyan-500/50 transition-all duration-300"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          whileHover={{ y: -2 }}
+        >
+          {/* Partículas neural flotantes */}
+          <motion.div
+            className="absolute top-4 right-4 w-2 h-2 bg-cyan-400 rounded-full"
+            animate={{
+              opacity: [0, 1, 0],
+              scale: [0.5, 1, 0.5],
+            }}
+            transition={{ duration: 2, repeat: Infinity, delay: 0.8 }}
+          />
+          
+          <div className="relative text-center">
+            <div className="flex items-center justify-center mb-3">
+              <motion.div 
+                className="w-3 h-3 bg-cyan-400 rounded-full mr-2"
+                animate={{ 
+                  boxShadow: [
+                    "0 0 5px rgba(34, 211, 238, 0.5)",
+                    "0 0 15px rgba(34, 211, 238, 0.8)",
+                    "0 0 5px rgba(34, 211, 238, 0.5)"
+                  ]
+                }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+              <h3 className="text-sm font-medium text-cyan-400">
+                Proyección Final
+              </h3>
+            </div>
+            
+            <CountUpAnimation
+              value={proyeccionFinal}
+              duration={2}
+              className="text-4xl font-bold text-cyan-400"
+              suffix="%"
+              delay={0.6}
+            />
+            
+            <div className="text-sm text-cyan-300 mb-1">
+              Confianza IA: {confianza}%
+            </div>
+            
+            <motion.div 
+              className="w-full bg-cyan-900/30 rounded-full h-1.5 mb-2"
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ delay: 0.8, duration: 0.8 }}
+            >
+              <motion.div
+                className="bg-gradient-to-r from-cyan-400 to-cyan-300 h-1.5 rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${confianza}%` }}
+                transition={{ delay: 1, duration: 1.2, ease: "easeOut" }}
+              />
+            </motion.div>
+            
+            <div className="text-xs text-white/50">
+              {daysRemaining} días restantes
+            </div>
+          </div>
+        </motion.div>
+
+        {/* MÓDULO 4: PANEL DE ACCIÓN INTELIGENTE */}
+        <motion.div 
+          className="fhr-card-metric bg-green-500/10 border border-green-500/30 rounded-lg p-6 hover:border-green-500/50 transition-all duration-300"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          whileHover={{ y: -2 }}
+        >
+          <div className="text-center">
+            <div className="flex items-center justify-center mb-3">
+              <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+              <h3 className="text-sm font-medium text-white/60">
+                Acción Recomendada
+              </h3>
+            </div>
+            
+            <motion.div 
+              className="text-lg font-semibold text-green-400 mb-2"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.5, type: "spring" }}
+            >
+              {proyeccionFinal >= 75 ? 'Mantener Momentum' : 'Acelerar Acción'}
+            </motion.div>
+            
+            <div className="text-xs text-white/70 leading-relaxed">
+              {recomendacionPrincipal.length > 40 
+                ? recomendacionPrincipal.substring(0, 40) + '...'
+                : recomendacionPrincipal
+              }
+            </div>
+            
+            {/* Indicador de urgencia */}
+            <motion.div 
+              className="mt-3 flex justify-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.7 }}
+            >
+              <div className={`w-6 h-1 rounded-full ${
+                proyeccionFinal >= 80 ? 'bg-green-400' :
+                proyeccionFinal >= 60 ? 'bg-yellow-400' : 'bg-red-400'
+              }`} />
+            </motion.div>
+          </div>
+        </motion.div>
+      </div>
+    </motion.div>
   );
 }
