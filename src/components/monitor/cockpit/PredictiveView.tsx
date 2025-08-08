@@ -8,6 +8,7 @@
 
 import { motion } from 'framer-motion';
 import { CountUpAnimation } from './CountUpAnimation';
+import { PredictiveGauge } from './PredictiveGauge';
 
 // 🎯 INTERFACE DATOS REALES - Desde useCampaignMonitor
 export interface PredictiveViewProps {
@@ -28,6 +29,9 @@ export interface PredictiveViewProps {
   recommendations?: string[];
   participationPrediction?: any;
   
+  // Navegación
+  onNavigate?: (section: string) => void;
+  
   // Estados UI
   isLoading?: boolean;
   isTransitioning?: boolean;
@@ -45,6 +49,7 @@ export function PredictiveView(props: PredictiveViewProps) {
     insights = [],
     recommendations = [],
     participationPrediction,
+    onNavigate,
     isTransitioning = false
   } = props;
 
@@ -122,11 +127,12 @@ export function PredictiveView(props: PredictiveViewProps) {
 
         {/* MÓDULO 2: VECTOR DE MOMENTUM */}
         <motion.div 
-          className="fhr-card-metric bg-gradient-to-br from-purple-500/20 to-cyan-500/20 border border-purple-500/30 rounded-lg p-6 relative overflow-hidden hover:border-purple-500/50 transition-all duration-300"
+          className="fhr-card-metric bg-gradient-to-br from-purple-500/20 to-cyan-500/20 border border-purple-500/30 rounded-lg p-6 relative overflow-hidden hover:border-purple-500/50 transition-all duration-300 cursor-pointer"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
           whileHover={{ y: -2 }}
+          onClick={() => onNavigate?.('momentum')}
         >
           {/* Gradiente animado de fondo */}
           <motion.div
@@ -169,11 +175,12 @@ export function PredictiveView(props: PredictiveViewProps) {
 
         {/* MÓDULO 3: NÚCLEO PREDICTIVO (HERO) */}
         <motion.div 
-          className="fhr-card-metric bg-cyan-500/20 border-2 border-cyan-500/40 rounded-lg p-6 relative overflow-hidden"
+          className="fhr-card-metric bg-cyan-500/20 border-2 border-cyan-500/40 rounded-lg p-6 relative overflow-hidden cursor-pointer"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           whileHover={{ scale: 1.02, y: -3 }}
+          onClick={() => onNavigate?.('projection')}
         >
           {/* Neural glow effect mejorado */}
           <motion.div
@@ -224,13 +231,15 @@ export function PredictiveView(props: PredictiveViewProps) {
               </h3>
             </div>
             
-            <CountUpAnimation
-              value={proyeccionFinal}
-              duration={2}
-              className="text-4xl font-bold text-cyan-400"
-              suffix="%"
-              delay={0.6}
-            />
+            {/* JOYA DE LA CORONA: PredictiveGauge */}
+            <div className="flex justify-center mb-2">
+              <PredictiveGauge 
+                value={proyeccionFinal} 
+                confidence={confianza}
+                size={100}
+                showAnimation={true}
+              />
+            </div>
             
             <div className="text-sm text-cyan-300 mb-1">
               Confianza IA: {confianza}%
@@ -258,11 +267,12 @@ export function PredictiveView(props: PredictiveViewProps) {
 
         {/* MÓDULO 4: PANEL DE ACCIÓN INTELIGENTE */}
         <motion.div 
-          className="fhr-card-metric bg-green-500/10 border border-green-500/30 rounded-lg p-6 hover:border-green-500/50 transition-all duration-300"
+          className="fhr-card-metric bg-green-500/10 border border-green-500/30 rounded-lg p-6 hover:border-green-500/50 transition-all duration-300 cursor-pointer"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
           whileHover={{ y: -2 }}
+          onClick={() => onNavigate?.('action')}
         >
           <div className="text-center">
             <div className="flex items-center justify-center mb-3">

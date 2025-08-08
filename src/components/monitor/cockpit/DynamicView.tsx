@@ -8,49 +8,61 @@
 
 import { motion } from 'framer-motion';
 import { Trophy, AlertTriangle, Target, TrendingUp, Zap } from 'lucide-react';
-import { useScrollToSection } from '@/lib/utils/scrollToSection';
+import '@/styles/focalizahr-design-system.css';
 
-// 🎯 INTERFACE DATOS REALES - Desde useCampaignMonitor
-export interface DynamicViewProps {
-  // Datos inteligencia departamental
-  topMovers?: Array<{
+// 🎯 INTERFACE CORREGIDA - Extiende CockpitHeaderProps
+interface CockpitHeaderProps {
+  participationRate: number;
+  totalInvited: number; 
+  totalResponded: number;
+  daysRemaining: number;
+  velocity: number;
+  participationPrediction: {
+    finalProjection: number;
+    confidence: number;
+  };
+  topMovers: Array<{
     name: string;
     momentum: number;
-    trend: 'completado' | 'acelerando' | 'estable' | 'desacelerando';
+    trend: 'acelerando' | 'estable' | 'desacelerando';
   }>;
-  negativeAnomalies?: Array<{
-    department: string;
-    rate: number;
-    severity: 'high' | 'medium';
-    zScore: number;
+  departmentAnomalies: Array<{
+    name: string;
+    type: 'positive' | 'negative';
+    severity: 'low' | 'medium' | 'high';
+    value: number;
+    zScore?: number;
   }>;
-  
-  // Análisis patrones automáticos
-  insights?: string[];
-  recommendations?: string[];
-  
-  // Estados UI
+  alerts: Array<{
+    id: string;
+    type: 'success' | 'warning' | 'error';
+    message: string;
+  }>;
+  onScrollToSection: (sectionId: string) => void;
   isLoading?: boolean;
-  isTransitioning?: boolean;
+  error?: string | null;
   lastRefresh: Date;
+}
+
+export interface DynamicViewProps extends CockpitHeaderProps {
+  intelligence: any;
+  isTransitioning: boolean;
 }
 
 export function DynamicView(props: DynamicViewProps) {
   const {
     topMovers = [],
-    negativeAnomalies = [],
-    insights = [],
-    recommendations = [],
-    isTransitioning = false
+    departmentAnomalies = [],
+    intelligence,
+    isTransitioning = false,
+    onScrollToSection
   } = props;
-
-  // 🧭 NAVEGACIÓN INTELIGENTE
-  const { navigateToSection } = useScrollToSection();
 
   // 🎯 ANÁLISIS INTELIGENTE DE DATOS REALES
   const campeón = topMovers.length > 0 ? topMovers[0] : null;
-  const focoRiesgo = negativeAnomalies.length > 0 
-    ? negativeAnomalies.sort((a, b) => b.zScore - a.zScore)[0]
+  const focoRiesgo = departmentAnomalies.length > 0 
+    ? departmentAnomalies.filter(dept => dept.type === 'negative')
+        .sort((a, b) => (b.zScore || 0) - (a.zScore || 0))[0]
     : null;
   
   // 📊 ANÁLISIS DE PATRONES ORGANIZACIONALES
@@ -66,6 +78,10 @@ export function DynamicView(props: DynamicViewProps) {
     .filter(([_, count]) => count > 0)
     .sort(([,a], [,b]) => b - a)[0];
 
+  // 🚦 DATOS DESDE INTELLIGENCE
+  const insights = intelligence?.pattern?.insights || [];
+  const recommendations = intelligence?.action?.nextSteps || [];
+
   // 🎨 FUNCIONES HELPER PARA ESTILOS
   const getTrendIcon = (trend: string) => {
     const iconMap = {
@@ -77,7 +93,7 @@ export function DynamicView(props: DynamicViewProps) {
     return iconMap[trend] || '📊';
   };
 
-  const getSeverityColor = (severity: string, zScore: number) => {
+  const getSeverityColor = (severity: string, zScore: number = 0) => {
     if (severity === 'high' || Math.abs(zScore) > 2) {
       return {
         border: 'border-red-500/50',
@@ -114,14 +130,14 @@ export function DynamicView(props: DynamicViewProps) {
         
         {/* PANEL 1: CAMPEÓN DEL MOMENTUM */}
         <motion.div 
-          className="fhr-card-metric bg-green-500/10 border-2 border-green-500/40 rounded-lg p-6 cursor-pointer group"
+          className="fhr-card-metric cockpit-nav-card"
           variants={{
             hidden: { opacity: 0, y: 30, scale: 0.95 },
             visible: { opacity: 1, y: 0, scale: 1 }
           }}
           whileHover={{ scale: 1.03, y: -5 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => navigateToSection('champion-momentum')}
+          onClick={() => onScrollToSection('champion-momentum')}
         >
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 rounded-xl bg-green-500/25 border border-green-400/30">
@@ -169,18 +185,16 @@ export function DynamicView(props: DynamicViewProps) {
 
         {/* PANEL 2: FOCO DE RIESGO */}
         <motion.div 
-          className={`fhr-card-metric cursor-pointer group ${
-            focoRiesgo ? getSeverityColor(focoRiesgo.severity, focoRiesgo.zScore).bg : 'bg-gray-500/10'
-          } border-2 ${
-            focoRiesgo ? getSeverityColor(focoRiesgo.severity, focoRiesgo.zScore).border : 'border-gray-500/30'
-          } rounded-lg p-6 relative`}
+          className={`fhr-card-metric cockpit-nav-card ${
+            focoRiesgo ? getSeverityColor(focoRiesgo.severity, focoRiesgo.zScore).bg : ''
+          }`}
           variants={{
             hidden: { opacity: 0, y: 30, scale: 0.95 },
             visible: { opacity: 1, y: 0, scale: 1 }
           }}
           whileHover={{ scale: 1.03, y: -5 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => navigateToSection('risk-focus')}
+          onClick={() => onScrollToSection('risk-focus')}
         >
           {/* Borde pulsante para alertas críticas */}
           {focoRiesgo && focoRiesgo.severity === 'high' && (
@@ -214,18 +228,18 @@ export function DynamicView(props: DynamicViewProps) {
           {focoRiesgo ? (
             <div className="space-y-3">
               <div className="text-xl font-bold text-white">
-                ⚠️ {focoRiesgo.department}
+                ⚠️ {focoRiesgo.name}
               </div>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className={`h-4 w-4 ${getSeverityColor(focoRiesgo.severity, focoRiesgo.zScore).text}`} />
                   <span className={`text-sm font-semibold ${getSeverityColor(focoRiesgo.severity, focoRiesgo.zScore).text}`}>
-                    {focoRiesgo.rate}% participación
+                    {focoRiesgo.value}% participación
                   </span>
                 </div>
                 <div className="h-4 w-px bg-white/20"></div>
                 <span className="text-sm text-white/80">
-                  Z-Score: {focoRiesgo.zScore.toFixed(1)}
+                  Z-Score: {(focoRiesgo.zScore || 0).toFixed(1)}
                 </span>
               </div>
               <div className={`${getSeverityColor(focoRiesgo.severity, focoRiesgo.zScore).bg} rounded-lg p-2 border ${getSeverityColor(focoRiesgo.severity, focoRiesgo.zScore).border}`}>
@@ -244,14 +258,14 @@ export function DynamicView(props: DynamicViewProps) {
 
         {/* PANEL 3: PATRÓN DOMINANTE */}
         <motion.div 
-          className="fhr-card-metric bg-blue-500/10 border-2 border-blue-500/40 rounded-lg p-6 cursor-pointer group"
+          className="fhr-card-metric cockpit-nav-card"
           variants={{
             hidden: { opacity: 0, y: 30, scale: 0.95 },
             visible: { opacity: 1, y: 0, scale: 1 }
           }}
           whileHover={{ scale: 1.03, y: -5 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => navigateToSection('pattern-analysis')}
+          onClick={() => onScrollToSection('pattern-analysis')}
         >
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 rounded-xl bg-blue-500/25 border border-blue-400/30">
@@ -299,7 +313,7 @@ export function DynamicView(props: DynamicViewProps) {
 
       {/* 📊 PANEL DE RECOMENDACIONES TÁCTICAS */}
       <motion.div 
-        className="mt-8 p-6 bg-gradient-to-r from-white/5 to-white/10 rounded-lg border border-white/10"
+        className="fhr-card"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6 }}
@@ -338,7 +352,7 @@ export function DynamicView(props: DynamicViewProps) {
               </div>
               <div className="text-sm text-white/80 flex items-center gap-2">
                 <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                {focoRiesgo ? `Intervenir en ${focoRiesgo.department} (${focoRiesgo.severity} prioridad)` : 'Monitoreo preventivo continuo'}
+                {focoRiesgo ? `Intervenir en ${focoRiesgo.name} (${focoRiesgo.severity} prioridad)` : 'Monitoreo preventivo continuo'}
               </div>
             </div>
           </div>
