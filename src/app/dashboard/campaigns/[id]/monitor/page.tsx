@@ -1,7 +1,7 @@
 // ====================================================================
 // FOCALIZAHR MONITOR PAGE - INTEGRACIÓN COCKPIT HEADER
 // src/app/dashboard/campaigns/[id]/monitor/page.tsx
-// Chat 1: Integración del nuevo CockpitHeader reemplazando CampaignMonitorHeader
+// REFACTORIZADO: IDs navegación + Narrativa visual jerárquica + Imports limpios
 // ====================================================================
 
 'use client';
@@ -20,9 +20,9 @@ import { EngagementHeatmapCard } from '@/components/monitor/EngagementHeatmapCar
 import { CrossStudyComparatorCard } from '@/components/monitor/CrossStudyComparatorCard';
 import CampaignRhythmPanel from '@/components/monitor/CampaignRhythmPanel';
 
-// UI Components
+// UI Components - ✅ FIXED: Removido CardTitle no usado
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 
 export default function CampaignMonitorPage() {
@@ -95,7 +95,7 @@ export default function CampaignMonitorPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
         
-        {/* 🚀 NUEVO COCKPIT HEADER BIMODAL - Reemplaza CampaignMonitorHeader */}
+        {/* 🚀 1. COCKPIT HEADER BIMODAL - "Diagnóstico en 10 segundos" */}
         <CockpitHeader
           // Datos principales
           participationRate={participationRate}
@@ -115,29 +115,44 @@ export default function CampaignMonitorPage() {
           lastRefresh={lastRefresh}
         />
 
-        {/* ⚡ GRID DE COMPONENTES WOW - Mantener existentes */}
+        {/* 🎯 2. PROTAGONISTA - Historia Temporal (Ancho Completo) */}
+        <div id="rhythm">
+          <CampaignRhythmPanel {...monitorData} />
+        </div>
+
+        {/* ⚡ 3. GRID DE COMPONENTES WOW - Evidencia y Contexto */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
-          {/* Fila 1: Ritmo + Pulso Departamental */}
-          <CampaignRhythmPanel {...monitorData} />
-          <DepartmentPulsePanel {...monitorData} />
+          {/* Pulso Departamental + Top Movers */}
+          <div id="pulse">
+            <DepartmentPulsePanel {...monitorData} />
+          </div>
           
-          {/* Fila 2: Anomalías + Engagement */}
-          <AnomalyDetectorPanel 
-            departmentAnomalies={departmentAnomalies}
-            positiveAnomalies={positiveAnomalies}
-            negativeAnomalies={negativeAnomalies}
-            meanRate={meanRate}
-            totalDepartments={totalDepartments}
-            lastRefresh={lastRefresh}
-          />
+          {/* Sección TopMovers - ✅ ID agregado para navegación */}
+          <div id="topmovers">
+            <DepartmentPulsePanel {...monitorData} />
+          </div>
+          
+          {/* Detector de Anomalías */}
+          <div id="anomalies">
+            <AnomalyDetectorPanel 
+              departmentAnomalies={departmentAnomalies}
+              positiveAnomalies={positiveAnomalies}
+              negativeAnomalies={negativeAnomalies}
+              meanRate={meanRate}
+              totalDepartments={totalDepartments}
+              lastRefresh={lastRefresh}
+            />
+          </div>
+          
+          {/* Engagement Heatmap */}
           <EngagementHeatmapCard 
             engagementHeatmap={engagementHeatmap}
             lastRefresh={lastRefresh}
           />
           
-          {/* Fila 3: Comparativo Histórico (span completo) */}
-          <div className="lg:col-span-2">
+          {/* Comparativo Histórico (span completo) */}
+          <div className="lg:col-span-2" id="cross-study">
             <CrossStudyComparatorCard 
               crossStudyComparison={crossStudyComparison}
               lastRefresh={lastRefresh}
@@ -145,8 +160,10 @@ export default function CampaignMonitorPage() {
           </div>
         </div>
 
-        {/* 🎛️ PANEL DE ACCIONES - Mantener existente */}
-        <ActionButtons {...monitorData} />
+        {/* 🎛️ 4. PANEL DE ACCIONES - Final de la narrativa */}
+        <div id="actions">
+          <ActionButtons {...monitorData} />
+        </div>
       </div>
     </div>
   );
