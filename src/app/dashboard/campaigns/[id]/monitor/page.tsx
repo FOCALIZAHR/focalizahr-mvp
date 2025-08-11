@@ -1,7 +1,7 @@
 // ====================================================================
-// FOCALIZAHR MONITOR PAGE - INTEGRACIÓN COCKPIT HEADER
+// FOCALIZAHR MONITOR PAGE - ARQUITECTURA ORIGINAL + IDs NAVEGACIÓN
 // src/app/dashboard/campaigns/[id]/monitor/page.tsx
-// REFACTORIZADO: IDs navegación + Narrativa visual jerárquica + Imports limpios
+// SIMPLE: Patrón original que funciona + IDs para scroll
 // ====================================================================
 
 'use client';
@@ -9,10 +9,10 @@
 import { useCampaignMonitor } from '@/hooks/useCampaignMonitor';
 import { useRouter, useParams } from 'next/navigation';
 
-// 🚀 NUEVO: Import del CockpitHeader bimodal
+// 🚀 CockpitHeader bimodal
 import { CockpitHeader } from '@/components/monitor/CockpitHeader';
 
-// ✅ MANTENER: Componentes WOW existentes funcionando
+// ✅ Componentes WOW existentes
 import { DepartmentPulsePanel } from '@/components/monitor/DepartmentPulsePanel';
 import { ActionButtons } from '@/components/monitor/ActionButtons';
 import { AnomalyDetectorPanel } from '@/components/monitor/AnomalyDetectorPanel';
@@ -20,10 +20,13 @@ import { EngagementHeatmapCard } from '@/components/monitor/EngagementHeatmapCar
 import { CrossStudyComparatorCard } from '@/components/monitor/CrossStudyComparatorCard';
 import CampaignRhythmPanel from '@/components/monitor/CampaignRhythmPanel';
 
-// UI Components - ✅ FIXED: Removido CardTitle no usado
+// UI Components
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Card, CardHeader, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { AlertTriangle, Loader2 } from 'lucide-react';
+
+// ✅ CSS FocalizaHR
+import '@/styles/focalizahr-design-system.css';
 
 export default function CampaignMonitorPage() {
   const router = useRouter();
@@ -32,40 +35,16 @@ export default function CampaignMonitorPage() {
 
   // ✅ HOOK CENTRAL - Single Source of Truth
   const monitorData = useCampaignMonitor(campaignId);
-  const { 
-    isLoading,
-    error,
-    
-    // Datos para CockpitHeader
-    participationRate,
-    daysRemaining,
-    totalInvited,
-    totalResponded,
-    lastActivity,
-    topMovers,
-    negativeAnomalies,
-    insights,
-    recommendations,
-    lastRefresh,
-    
-    // Datos para otros componentes WOW
-    departmentAnomalies,
-    positiveAnomalies,
-    meanRate,
-    totalDepartments,
-    engagementHeatmap,
-    crossStudyComparison,
-    departmentalIntelligence
-  } = monitorData;
+  const { isLoading, error, lastRefresh } = monitorData;
 
   // 🔄 LOADING STATE
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <Card className="glass-card border border-white/10">
+      <div className="fhr-bg-main min-h-screen flex items-center justify-center">
+        <Card className="fhr-card border border-white/10">
           <CardContent className="p-8 text-center">
             <Loader2 className="h-8 w-8 text-cyan-400 animate-spin mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-white mb-2">
+            <h3 className="fhr-subtitle text-lg mb-2">
               Cargando Torre de Control
             </h3>
             <p className="text-white/60">
@@ -80,7 +59,7 @@ export default function CampaignMonitorPage() {
   // ⚠️ ERROR STATE
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+      <div className="fhr-bg-main min-h-screen flex items-center justify-center">
         <Alert className="max-w-md bg-red-500/10 border-red-500/30">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="text-white">
@@ -92,75 +71,50 @@ export default function CampaignMonitorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="fhr-bg-main min-h-screen">
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
         
-        {/* 🚀 1. COCKPIT HEADER BIMODAL - "Diagnóstico en 10 segundos" */}
-        <CockpitHeader
-          // Datos principales
-          participationRate={participationRate}
-          daysRemaining={daysRemaining}
-          totalInvited={totalInvited}
-          totalResponded={totalResponded}
-          lastActivity={lastActivity}
-          
-          // Inteligencia departamental
-          topMovers={topMovers}
-          negativeAnomalies={negativeAnomalies}
-          insights={insights}
-          recommendations={recommendations}
-          
-          // Estados
-          isLoading={false}
-          lastRefresh={lastRefresh}
+        {/* 🚀 COCKPIT HEADER - Simple: recibe monitorData como todos los demás */}
+        <CockpitHeader 
+          {...monitorData}
+          onScrollToSection={(sectionId) => {
+            const element = document.getElementById(sectionId);
+            if (element) {
+              element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }}
         />
 
-        {/* 🎯 2. PROTAGONISTA - Historia Temporal (Ancho Completo) */}
+        {/* 🎯 PROTAGONISTA - Historia Temporal */}
         <div id="rhythm">
           <CampaignRhythmPanel {...monitorData} />
         </div>
 
-        {/* ⚡ 3. GRID DE COMPONENTES WOW - Evidencia y Contexto */}
+        {/* ⚡ GRID COMPONENTES WOW */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
-          {/* Pulso Departamental + Top Movers */}
           <div id="pulse">
             <DepartmentPulsePanel {...monitorData} />
           </div>
           
-          {/* Sección TopMovers - ✅ ID agregado para navegación */}
           <div id="topmovers">
             <DepartmentPulsePanel {...monitorData} />
           </div>
           
-          {/* Detector de Anomalías */}
           <div id="anomalies">
-            <AnomalyDetectorPanel 
-              departmentAnomalies={departmentAnomalies}
-              positiveAnomalies={positiveAnomalies}
-              negativeAnomalies={negativeAnomalies}
-              meanRate={meanRate}
-              totalDepartments={totalDepartments}
-              lastRefresh={lastRefresh}
-            />
+            <AnomalyDetectorPanel {...monitorData} />
           </div>
           
-          {/* Engagement Heatmap */}
-          <EngagementHeatmapCard 
-            engagementHeatmap={engagementHeatmap}
-            lastRefresh={lastRefresh}
-          />
+          <div>
+            <EngagementHeatmapCard {...monitorData} />
+          </div>
           
-          {/* Comparativo Histórico (span completo) */}
           <div className="lg:col-span-2" id="cross-study">
-            <CrossStudyComparatorCard 
-              crossStudyComparison={crossStudyComparison}
-              lastRefresh={lastRefresh}
-            />
+            <CrossStudyComparatorCard {...monitorData} />
           </div>
         </div>
 
-        {/* 🎛️ 4. PANEL DE ACCIONES - Final de la narrativa */}
+        {/* 🎛️ PANEL DE ACCIONES */}
         <div id="actions">
           <ActionButtons {...monitorData} />
         </div>

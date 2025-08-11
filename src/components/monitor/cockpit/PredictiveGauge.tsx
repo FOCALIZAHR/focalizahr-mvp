@@ -1,139 +1,135 @@
 // ====================================================================
-// FOCALIZAHR PREDICTIVE GAUGE - VELOCÍMETRO PREMIUM NÚCLEO PREDICTIVO
+// PREDICTIVE GAUGE - GAUGE INTEGRADO PARA VISTA PREDICTIVA  
 // src/components/monitor/cockpit/PredictiveGauge.tsx
-// Chat 2: Velocímetro circular con animaciones para proyección final
+// RESPONSABILIDAD: Visualización gauge simple para proyecciones
 // ====================================================================
 
 "use client";
 
-import { motion } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { motion } from 'framer-motion';
 
 interface PredictiveGaugeProps {
-  value: number;
+  currentValue: number;
+  targetValue: number;
   confidence: number;
-  maxValue?: number;
-  size?: number;
-  showAnimation?: boolean;
+  size?: 'sm' | 'md' | 'lg';
 }
 
 export function PredictiveGauge({ 
-  value, 
-  confidence, 
-  maxValue = 100, 
-  size = 120,
-  showAnimation = true 
+  currentValue, 
+  targetValue, 
+  confidence,
+  size = 'md' 
 }: PredictiveGaugeProps) {
   
-  // 🎯 CÁLCULOS PARA VELOCÍMETRO
-  const percentage = Math.min(value, maxValue);
-  const confidenceLevel = Math.min(confidence, 100);
-  
-  // 🎨 COLORES BASADOS EN VALOR
-  const getColor = (val: number) => {
-    if (val >= 80) return '#10B981'; // green-500
-    if (val >= 60) return '#22D3EE'; // cyan-400  
-    if (val >= 40) return '#F59E0B'; // amber-500
-    return '#EF4444'; // red-500
+  // 📏 CONFIGURACIÓN POR TAMAÑO
+  const sizeConfig = {
+    sm: { width: 100, height: 50, fontSize: 'text-sm', strokeWidth: 8 },
+    md: { width: 140, height: 70, fontSize: 'text-base', strokeWidth: 12 },
+    lg: { width: 180, height: 90, fontSize: 'text-lg', strokeWidth: 16 }
   };
 
-  // 📊 DATOS PARA RECHARTS
-  const data = [
-    { name: 'Progress', value: percentage, fill: getColor(percentage) },
-    { name: 'Remaining', value: maxValue - percentage, fill: 'rgba(255,255,255,0.1)' }
+  const config = sizeConfig[size];
+
+  // 🎨 COLORES DINÁMICOS SEGÚN CONFIANZA
+  const getConfidenceColor = () => {
+    if (confidence >= 80) return '#10B981'; // Verde - alta confianza
+    if (confidence >= 60) return '#F59E0B'; // Amarillo - media confianza  
+    return '#EF4444'; // Rojo - baja confianza
+  };
+
+  const confidenceColor = getConfidenceColor();
+
+  // 📊 DATOS PARA SEMICÍRCULO
+  const progress = Math.min((currentValue / targetValue) * 100, 100);
+  
+  const gaugeData = [
+    { 
+      name: 'progress', 
+      value: progress, 
+      color: confidenceColor 
+    },
+    { 
+      name: 'remaining', 
+      value: 100 - progress, 
+      color: 'rgba(255, 255, 255, 0.1)' 
+    }
   ];
 
-  return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      {/* 📊 VELOCÍMETRO CIRCULAR RECHARTS */}
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            startAngle={90}
-            endAngle={-270}
-            innerRadius={size * 0.25}
-            outerRadius={size * 0.4}
-            strokeWidth={0}
-            dataKey="value"
-          >
-            {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.fill} />
-            ))}
-          </Pie>
-        </PieChart>
-      </ResponsiveContainer>
+  // 🎯 INDICADOR ESTADO PROYECCIÓN
+  const getProjectionStatus = () => {
+    if (currentValue >= targetValue) return '✅ Objetivo alcanzado';
+    if (progress >= 80) return '🎯 Muy cerca del objetivo';
+    if (progress >= 60) return '📈 En buen camino';
+    return '🚀 Necesita impulso';
+  };
 
-      {/* 🎯 INDICADOR CENTRAL */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="text-center">
+  return (
+    <div className="relative flex flex-col items-center w-full">
+      {/* 📊 SEMICÍRCULO GAUGE */}
+      <div 
+        className="relative"
+        style={{ width: config.width, height: config.height }}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={gaugeData}
+              cx="50%"
+              cy="85%" // Posición para crear semicírculo
+              startAngle={180} // Inicio semicírculo
+              endAngle={0}     // Fin semicírculo
+              innerRadius={config.strokeWidth}
+              outerRadius={config.height - 8}
+              paddingAngle={1}
+              dataKey="value"
+              stroke="none"
+            >
+              {gaugeData.map((entry, index) => (
+                <Cell 
+                  key={`cell-${index}`} 
+                  fill={entry.color}
+                />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+
+        {/* 🎯 PROGRESO CENTRAL */}
+        <div className="absolute inset-0 flex items-end justify-center pb-1">
           <motion.div
-            className="text-2xl font-bold text-cyan-400"
-            initial={showAnimation ? { scale: 0, opacity: 0 } : {}}
-            animate={showAnimation ? { scale: 1, opacity: 1 } : {}}
-            transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
+            className="text-center"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.3, duration: 0.4, type: "spring" }}
           >
-            {value}%
-          </motion.div>
-          <motion.div
-            className="text-xs text-cyan-300"
-            initial={showAnimation ? { opacity: 0 } : {}}
-            animate={showAnimation ? { opacity: 1 } : {}}
-            transition={{ delay: 0.8 }}
-          >
-            {confidence}% conf.
+            <div 
+              className={`${config.fontSize} font-bold text-white`}
+              style={{ color: confidenceColor }}
+            >
+              {Math.round(progress)}%
+            </div>
           </motion.div>
         </div>
       </div>
 
-      {/* ✨ ANILLOS DECORATIVOS ANIMADOS */}
-      {showAnimation && (
-        <>
-          <motion.div
-            className="absolute inset-0 rounded-full border border-cyan-400/20"
-            animate={{
-              scale: [1, 1.1, 1],
-              opacity: [0.3, 0.6, 0.3]
-            }}
-            transition={{ duration: 2, repeat: Infinity, delay: 1 }}
-          />
-          <motion.div
-            className="absolute inset-2 rounded-full border border-cyan-400/10"
-            animate={{
-              scale: [1, 1.05, 1],
-              opacity: [0.2, 0.4, 0.2]
-            }}
-            transition={{ duration: 2.5, repeat: Infinity, delay: 1.3 }}
-          />
-        </>
-      )}
-
-      {/* 🔮 PARTÍCULAS NEURAL */}
-      {showAnimation && (
-        <div className="absolute inset-0">
-          {[...Array(3)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-1 h-1 bg-cyan-400 rounded-full"
-              style={{
-                top: `${20 + i * 30}%`,
-                left: `${15 + i * 35}%`
-              }}
-              animate={{
-                opacity: [0, 1, 0],
-                scale: [0.5, 1, 0.5]
-              }}
-              transition={{
-                duration: 1.5,
-                repeat: Infinity,
-                delay: i * 0.4 + 1.5
-              }}
-            />
-          ))}
+      {/* 📋 INFORMACIÓN PROYECCIÓN */}
+      <div className="mt-2 text-center w-full">
+        <div className="text-xs text-white/60 leading-tight">
+          {currentValue}% → {targetValue}%
         </div>
-      )}
+        <div 
+          className="text-xs mt-1 px-2 py-1 rounded-full"
+          style={{ 
+            backgroundColor: `${confidenceColor}20`, 
+            color: confidenceColor,
+            border: `1px solid ${confidenceColor}40`
+          }}
+        >
+          {getProjectionStatus()}
+        </div>
+      </div>
     </div>
   );
 }

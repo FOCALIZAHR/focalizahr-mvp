@@ -1,90 +1,96 @@
 // ====================================================================
-// FOCALIZAHR DYNAMIC VIEW - COMPONENTE TONTO + DISEÑO PRESERVADO
+// DYNAMIC VIEW - VISTA TIEMPO REAL CON MOMENTUM GAUGE
 // src/components/monitor/cockpit/DynamicView.tsx
-// REFACTORIZADO: Solo UI + datos pre-calculados + diseño 100% igual
+// RESPONSABILIDAD: Vista presente con gauge momentum integrado
 // ====================================================================
 
 "use client";
 
 import { motion } from 'framer-motion';
-import { Trophy, AlertTriangle, Target, TrendingUp, Zap, Users, Eye } from 'lucide-react';
-import type { CockpitHeaderProps } from '@/components/monitor/CockpitHeader';
-import type { CockpitIntelligence } from '@/lib/utils/cockpit-intelligence';
-import '@/styles/focalizahr-design-system.css';
+import { Eye, AlertTriangle, TrendingUp, Activity } from 'lucide-react';
+import { useDeviceType, getDeviceAnimationConfig } from './ResponsiveEnhancements';
+import { CockpitIntelligence } from '@/lib/utils/cockpit-intelligence';
+import { MomentumGauge } from './MomentumGauge';
 
-// 🎯 INTERFACE - DATOS + INTELIGENCIA PRE-CALCULADOS
-export interface DynamicViewProps extends CockpitHeaderProps {
+// 🎯 INTERFACES
+interface DynamicViewProps {
+  topMovers?: Array<{
+    name: string;
+    momentum: number;
+    trend: 'completado' | 'acelerando' | 'estable' | 'desacelerando';
+  }>;
+  negativeAnomalies?: Array<{
+    department: string;
+    rate: number;
+    severity: 'high' | 'medium';
+    zScore: number;
+  }>;
+  participationRate: number;
   intelligence: CockpitIntelligence;
-  isTransitioning: boolean;
-  onNavigate: (section: string) => void;
+  isTransitioning?: boolean;
+  deviceType: 'mobile' | 'tablet' | 'desktop';
+  onNavigate?: (sectionId: string) => void;
 }
 
-// 🎨 COMPONENTE TACTICAL CARD - DISEÑO PRESERVADO 100%
-interface TacticalCardProps {
-  icon: React.ComponentType<any>;
+interface DynamicCardProps {
   title: string;
   value: string;
-  subtitle: string;
+  subtitle?: string;
+  color: 'cyan' | 'purple' | 'amber' | 'green' | 'red';
+  icon: React.ReactNode;
+  badge?: { text: string; color: string };
   description?: string;
-  color: string;
-  borderColor: string;
-  glowColor: string;
   onClick?: () => void;
-  badge?: {
-    text: string;
-    color: string;
-  };
+  customContent?: React.ReactNode; // Para contenido personalizado como el gauge
 }
 
-function TacticalCard({ 
-  icon: Icon, 
+// 🎯 COMPONENTE CARD DINÁMICO
+function DynamicCard({ 
   title, 
   value, 
   subtitle, 
-  description,
   color, 
-  borderColor, 
-  glowColor,
+  icon, 
+  badge, 
+  description, 
   onClick,
-  badge
-}: TacticalCardProps) {
+  customContent 
+}: DynamicCardProps) {
+  const deviceType = useDeviceType();
+  
+  const cardClass = `
+    fhr-card fhr-card-metric cursor-pointer group relative fhr-card-interactive
+    transition-all duration-300 ease-out
+    hover:bg-black/40 hover:border-${color}-500/50 
+    hover:shadow-lg hover:shadow-${color}-500/20
+    hover:translate-y-[-4px] active:translate-y-[-2px]
+    ${deviceType === 'mobile' ? 'hover-disabled active:scale-95' : ''}
+  `;
+
   return (
     <motion.div
-      className={`
-        relative p-5 rounded-xl border backdrop-blur-sm transition-all duration-300 cursor-pointer
-        bg-black/20 ${borderColor} hover:bg-black/30 hover:scale-105 hover:shadow-xl
-      `}
-      style={{
-        boxShadow: `0 0 20px ${glowColor}`
-      }}
+      className={cardClass}
+      variants={getDeviceAnimationConfig(deviceType)?.card || {}}
       onClick={onClick}
-      whileHover={{ 
-        scale: 1.02, 
-        boxShadow: `0 0 40px ${glowColor}` 
-      }}
+      whileHover={deviceType !== 'mobile' ? { scale: 1.02, y: -4 } : {}}
       whileTap={{ scale: 0.98 }}
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
     >
-      {/* Header con icono */}
-      <div className="flex items-start justify-between mb-4">
-        <div className={`p-3 rounded-xl bg-gradient-to-br ${color} shadow-lg`}>
-          <Icon className="w-6 h-6 text-white" />
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center space-x-2">
+          <div className={`w-3 h-3 rounded-full bg-${color}-400`}></div>
+          <h3 className="text-sm text-white/80 group-hover:text-white transition-colors">
+            {title}
+          </h3>
         </div>
-        {badge && (
-          <div className={`px-3 py-1 rounded-full text-xs font-medium ${badge.color}`}>
-            {badge.text}
-          </div>
-        )}
+        <div className="text-white/60 group-hover:text-white/80 transition-colors">
+          {icon}
+        </div>
       </div>
       
-      {/* Título */}
-      <h3 className="text-white font-semibold text-lg mb-2">{title}</h3>
-      
-      {/* Valor principal destacado */}
-      <div className={`text-3xl font-bold mb-2 ${
-        color.includes('cyan') ? 'text-cyan-300' : 
+      {/* Value */}
+      <div className={`text-2xl font-bold mb-2 ${
+        color === 'cyan' ? 'text-cyan-300' : 
         color.includes('purple') ? 'text-purple-300' :
         color.includes('amber') ? 'text-amber-300' :
         color.includes('green') ? 'text-green-300' :
@@ -94,11 +100,27 @@ function TacticalCard({
       </div>
       
       {/* Subtitle */}
-      <p className="text-white/80 font-medium mb-2">{subtitle}</p>
+      {subtitle && (
+        <p className="text-white/80 font-medium mb-2">{subtitle}</p>
+      )}
+      
+      {/* Badge */}
+      {badge && (
+        <div className={`inline-block px-2 py-1 text-xs rounded-full mb-3 ${badge.color}`}>
+          {badge.text}
+        </div>
+      )}
       
       {/* Description opcional */}
       {description && (
         <p className="text-white/60 text-sm leading-relaxed">{description}</p>
+      )}
+      
+      {/* Contenido personalizado (como gauge) */}
+      {customContent && (
+        <div className="mt-3">
+          {customContent}
+        </div>
       )}
       
       {/* Efecto de navegación hover */}
@@ -109,26 +131,25 @@ function TacticalCard({
   );
 }
 
-// 🎯 COMPONENTE PRINCIPAL - DISEÑO PRESERVADO + ARQUITECTURA CORRECTA
+// 🎯 COMPONENTE PRINCIPAL
 export function DynamicView({ 
   topMovers = [],
   negativeAnomalies = [],
   participationRate,
   intelligence,
   isTransitioning,
+  deviceType,
   onNavigate
 }: DynamicViewProps) {
 
+  // ✅ deviceType ya viene como prop - no llamar hook aquí
+  
   // ✅ USAR SOLO DATOS YA CALCULADOS - NO RECALCULAR
   const { pattern, action } = intelligence;
   
   // 🎯 ANÁLISIS INTELIGENTE DE DATOS REALES - SOLO FORMATEO
   const campeón = topMovers.length > 0 ? topMovers[0] : null;
   const focoRiesgo = negativeAnomalies.length > 0 ? negativeAnomalies[0] : null;
-  
-  // Formatear momentum del campeón
-  const campeónMomentum = campeón ? `${campeón.momentum} momentum` : 'Sin datos';
-  const campeónTrend = campeón?.trend || 'estable';
   
   // Formatear foco de riesgo
   const riesgoInfo = focoRiesgo 
@@ -137,150 +158,88 @@ export function DynamicView({
   
   // Determinar badge del campeón
   const campeónBadge = campeón ? {
-    text: campeónTrend === 'completado' ? 'Completado' :
-          campeónTrend === 'acelerando' ? 'Acelerando' :
-          campeónTrend === 'desacelerando' ? 'Desacelerando' : 'Estable',
-    color: campeónTrend === 'completado' ? 'bg-green-500/20 text-green-300' :
-           campeónTrend === 'acelerando' ? 'bg-cyan-500/20 text-cyan-300' :
-           campeónTrend === 'desacelerando' ? 'bg-red-500/20 text-red-300' : 'bg-gray-500/20 text-gray-300'
+    text: campeón.trend === 'completado' ? 'Completado' :
+          campeón.trend === 'acelerando' ? 'Acelerando' :
+          campeón.trend === 'desacelerando' ? 'Desacelerando' : 'Estable',
+    color: campeón.trend === 'completado' ? 'bg-green-500/20 text-green-300' :
+           campeón.trend === 'acelerando' ? 'bg-cyan-500/20 text-cyan-300' :
+           campeón.trend === 'desacelerando' ? 'bg-red-500/20 text-red-300' : 'bg-gray-500/20 text-gray-300'
   } : undefined;
   
   // Determinar badge de riesgo
   const riesgoBadge = focoRiesgo ? {
     text: focoRiesgo.severity === 'high' ? 'Crítico' : 'Moderado',
-    color: focoRiesgo.severity === 'high' ? 'bg-red-500/20 text-red-300' : 'bg-orange-500/20 text-orange-300'
-  } : {
-    text: 'Bajo Control',
-    color: 'bg-green-500/20 text-green-300'
-  };
+    color: focoRiesgo.severity === 'high' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'
+  } : undefined;
 
   return (
-    <div className="w-full">
-      {/* 🎯 TÍTULO DINÁMICO CON INSIGHTS */}
-      <motion.div
-        className="text-center mb-8"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-      >
-        <h2 className="text-2xl font-bold text-white mb-2">Vista Táctica Organizacional</h2>
-        <p className="text-white/70">Análisis en tiempo real para decisiones inmediatas</p>
-      </motion.div>
-
-      {/* 📊 GRID TÁCTICO - DISEÑO PRESERVADO 100% */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <motion.div
+      className="w-full"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.6 }}
+    >
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         
-        {/* CARD 1: CAMPEÓN MOMENTUM - DATOS YA CALCULADOS */}
-        <TacticalCard
-          icon={Trophy}
+        {/* 🏆 TARJETA 1: CAMPEÓN MOMENTUM CON GAUGE INTEGRADO */}
+        <DynamicCard
           title="Campeón Momentum"
-          value={campeón?.name || 'Sin líder'}
-          subtitle={campeónMomentum}
-          description={campeón 
-            ? `Departamento con mejor performance y tendencia ${campeónTrend}`
-            : 'No hay datos suficientes para identificar líder departamental'
-          }
-          color="from-cyan-600 to-cyan-400"
-          borderColor="border-cyan-500/30"
-          glowColor="rgba(34, 211, 238, 0.3)"
+          value={campeón ? campeón.name : 'Sin datos'}
+          subtitle={campeón ? '' : 'Calculando momentum...'}
+          color="cyan"
+          icon={<TrendingUp className="w-5 h-5" />}
           badge={campeónBadge}
-          onClick={() => onNavigate('champion')}
+          onClick={() => onNavigate?.('topmovers')}
+          customContent={
+            campeón ? (
+              <div className="mt-4 flex justify-center">
+                <MomentumGauge
+                  momentum={campeón.momentum}
+                  trend={campeón.trend}
+                  departmentName={campeón.name}
+                  size="md"
+                />
+              </div>
+            ) : null
+          }
         />
 
-        {/* CARD 2: FOCO RIESGO - DATOS YA CALCULADOS */}
-        <TacticalCard
-          icon={AlertTriangle}
+        {/* ⚠️ TARJETA 2: FOCO DE RIESGO */}
+        <DynamicCard
           title="Foco de Riesgo"
-          value={riesgoInfo}
-          subtitle={focoRiesgo 
-            ? `Z-Score: ${focoRiesgo.zScore?.toFixed(1) || 'N/A'}`
-            : 'Todos los departamentos dentro de parámetros normales'
-          }
-          description={focoRiesgo
-            ? 'Departamento que requiere atención inmediata por baja participación'
-            : 'No se detectaron departamentos con anomalías significativas'
-          }
-          color={focoRiesgo ? "from-red-600 to-red-400" : "from-green-600 to-green-400"}
-          borderColor={focoRiesgo ? "border-red-500/30" : "border-green-500/30"}
-          glowColor={focoRiesgo ? "rgba(239, 68, 68, 0.3)" : "rgba(34, 197, 94, 0.3)"}
+          value={focoRiesgo ? focoRiesgo.department : 'Sin riesgos'}
+          subtitle={focoRiesgo ? `${focoRiesgo.rate}% participación` : 'Todos los departamentos estables'}
+          color={focoRiesgo ? 'red' : 'green'}
+          icon={<AlertTriangle className="w-5 h-5" />}
           badge={riesgoBadge}
-          onClick={() => onNavigate('risk')}
+          description={focoRiesgo ? 'Requiere atención inmediata' : undefined}
+          onClick={() => onNavigate?.('anomalies')}
         />
 
-        {/* CARD 3: PATRÓN DOMINANTE - DATOS YA CALCULADOS */}
-        <TacticalCard
-          icon={TrendingUp}
+        {/* 📊 TARJETA 3: ANÁLISIS EN VIVO */}
+        <DynamicCard
+          title="Análisis en Vivo"
+          value={`${participationRate}%`}
+          subtitle="Participación actual"
+          color="purple"
+          icon={<Activity className="w-5 h-5" />}
+          description={pattern.description}
+          onClick={() => onNavigate?.('live')}
+        />
+
+        {/* 🎯 TARJETA 4: PATRÓN DOMINANTE */}
+        <DynamicCard
           title="Patrón Dominante"
           value={pattern.dominantPattern}
-          subtitle={pattern.description}
-          description={pattern.insights[0] || 'Análisis de comportamiento organizacional'}
-          color="from-purple-600 to-purple-400"
-          borderColor="border-purple-500/30"
-          glowColor="rgba(168, 85, 247, 0.3)"
-          badge={{
-            text: `${topMovers.length} Depts`,
-            color: 'bg-purple-500/20 text-purple-300'
-          }}
-          onClick={() => onNavigate('pattern')}
+          subtitle="Comportamiento organizacional"
+          color={pattern.patternColor as any || 'amber'}
+          icon={<TrendingUp className="w-5 h-5" />}
+          description="Patrón detectado automáticamente"
+          onClick={() => onNavigate?.('patterns')}
         />
 
-        {/* CARD 4: RECOMENDACIONES TÁCTICAS - DATOS YA CALCULADOS */}
-        <TacticalCard
-          icon={action.urgency === 'crítica' ? AlertTriangle : 
-                action.urgency === 'alta' ? Zap :
-                action.urgency === 'media' ? Target : Users}
-          title="Recomendación Táctica"
-          value={action.primary}
-          subtitle={action.reasoning}
-          description={action.nextSteps[0] || 'Estrategia definida basada en análisis actual'}
-          color={action.urgency === 'crítica' ? "from-red-600 to-red-400" :
-                 action.urgency === 'alta' ? "from-orange-600 to-orange-400" :
-                 action.urgency === 'media' ? "from-amber-600 to-amber-400" : "from-green-600 to-green-400"}
-          borderColor={action.urgency === 'crítica' ? "border-red-500/30" :
-                       action.urgency === 'alta' ? "border-orange-500/30" :
-                       action.urgency === 'media' ? "border-amber-500/30" : "border-green-500/30"}
-          glowColor={action.urgency === 'crítica' ? "rgba(239, 68, 68, 0.3)" :
-                     action.urgency === 'alta' ? "rgba(249, 115, 22, 0.3)" :
-                     action.urgency === 'media' ? "rgba(251, 191, 36, 0.3)" : "rgba(34, 197, 94, 0.3)"}
-          badge={{
-            text: action.urgency.toUpperCase(),
-            color: action.urgencyColor.replace('text-', 'bg-').replace('-400', '-500/20 ') + action.urgencyColor.replace('-400', '-300')
-          }}
-          onClick={() => onNavigate('action')}
-        />
       </div>
-
-      {/* 📊 PANEL DE INSIGHTS DETALLADOS - DISEÑO PRESERVADO */}
-      {pattern.insights && pattern.insights.length > 1 && (
-        <motion.div
-          className="mt-8 p-6 rounded-xl bg-black/20 border border-white/10 backdrop-blur-sm"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-        >
-          <h4 className="text-white font-semibold text-lg mb-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-600 to-purple-400">
-              <Eye className="w-5 h-5 text-white" />
-            </div>
-            Insights Organizacionales Avanzados
-          </h4>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {pattern.insights.slice(0, 4).map((insight, index) => (
-              <motion.div
-                key={index}
-                className="flex items-start gap-3 p-3 rounded-lg bg-white/5 border border-white/10"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.4, delay: 0.5 + index * 0.1 }}
-              >
-                <div className="w-2 h-2 rounded-full bg-purple-400 mt-2 flex-shrink-0" />
-                <span className="text-white/80 text-sm leading-relaxed">{insight}</span>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      )}
-    </div>
+    </motion.div>
   );
 }

@@ -2,6 +2,7 @@
 // FOCALIZAHR CAMPAIGN MONITOR - HOOK ORQUESTADOR REPARADO
 // src/hooks/useCampaignMonitor.ts
 // Chat 2: Foundation Schema + Services - REPARACIÓN QUIRÚRGICA COMPLETA
+// 🧠 TRASPLANTE DE CEREBRO DIRECTO APLICADO
 // ====================================================================
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -33,7 +34,303 @@ import type {
   DepartmentalIntelligence,
 } from '@/types'
 
-// ✅ INTERFACE PRINCIPAL DEL MONITOR - EXTENDIDA
+// ====================================================================
+// 🧠 COCKPIT INTELLIGENCE - TRASPLANTE DE CEREBRO DIRECTO
+// FUNCIONES COPIADAS DESDE cockpit-intelligence.ts AL HOOK CENTRAL
+// ====================================================================
+
+// 🎯 INTERFACES PARA COCKPIT INTELLIGENCE
+interface CockpitIntelligence {
+  vectorMomentum: string;
+  projection: {
+    finalProjection: number;
+    confidence: number;
+    methodology: string;
+    confidenceText: string;
+  };
+  action: {
+    primary: string;
+    reasoning: string;
+    urgency: 'baja' | 'media' | 'alta' | 'crítica';
+    nextSteps: string[];
+    urgencyColor: string;
+  };
+  pattern: {
+    dominantPattern: string;
+    description: string;
+    insights: string[];
+    patternColor: string;
+  };
+}
+
+// 🧠 FUNCIÓN PRINCIPAL - PROCESA DATOS YA CALCULADOS DEL HOOK
+function processCockpitIntelligence(
+  participationRate: number,
+  daysRemaining: number,
+  topMovers?: Array<{
+    name: string;
+    momentum: number;
+    trend: 'completado' | 'acelerando' | 'estable' | 'desacelerando';
+  }>,
+  negativeAnomalies?: Array<{
+    department: string;
+    rate: number;
+    severity: 'high' | 'medium';
+    zScore: number;
+  }>,
+  participationPrediction?: {
+    finalProjection: number;
+    confidence: number;
+    velocity: number;
+    riskLevel: 'low' | 'medium' | 'high';
+  },
+  crossStudyComparison?: {
+    percentileRanking: number;
+    patternSimilarity: number;
+    velocityTrend: 'faster' | 'slower' | 'similar';
+  }
+): CockpitIntelligence {
+  return {
+    vectorMomentum: getVectorMomentum(participationRate, daysRemaining, topMovers, participationPrediction),
+    projection: getProjectionIntelligence(participationRate, participationPrediction, crossStudyComparison),
+    action: getActionRecommendation(participationRate, daysRemaining, topMovers, negativeAnomalies),
+    pattern: getPatternAnalysis(topMovers, negativeAnomalies)
+  };
+}
+
+// 🎯 FUNCIÓN 1: VECTOR MOMENTUM (datos ya calculados)
+function getVectorMomentum(
+  participationRate: number,
+  daysRemaining: number,
+  topMovers?: Array<{ name: string; momentum: number; trend: string }>,
+  participationPrediction?: { velocity?: number }
+): string {
+  // Campaña cerrada
+  if (daysRemaining <= 0) {
+    if (participationRate >= 100) return "Metodología Exitosa Documentada";
+    if (participationRate >= 70) return "Campaña Finalizada - Resultados Aceptables";
+    return "Campaña Cerrada - Análisis Post-Mortem Disponible";
+  }
+  
+  // Sin actividad inicial
+  if (participationRate === 0) return "Impulso Inicial Requerido";
+  
+  // Objetivo alcanzado
+  if (participationRate >= 100) return "Objetivo Alcanzado - Mantener Momentum";
+  
+  // Usar datos ya calculados de topMovers
+  const leadMover = topMovers?.[0];
+  if (!leadMover) return "Analizando patrones...";
+  
+  // Usar velocidad ya calculada
+  const velocity = participationPrediction?.velocity || 0;
+  const trendSymbol = leadMover.trend === 'acelerando' ? '+' : 
+                     leadMover.trend === 'desacelerando' ? '⚠️' : '';
+  
+  return `${trendSymbol}${velocity.toFixed(1)}/día`;
+}
+
+// 🎯 FUNCIÓN 2: PROYECCIÓN INTELIGENCIA
+function getProjectionIntelligence(
+  participationRate: number,
+  participationPrediction?: { finalProjection: number; confidence: number },
+  crossStudyComparison?: { patternSimilarity?: number }
+) {
+  if (!participationPrediction) {
+    return {
+      finalProjection: 0,
+      confidence: 0,
+      methodology: 'Sin datos suficientes',
+      confidenceText: 'Datos insuficientes'
+    };
+  }
+  
+  // Base ya calculada en el hook
+  let adjustedConfidence = participationPrediction.confidence;
+  let methodology = 'Análisis temporal actual';
+  
+  // ✅ INTEGRAR datos históricos para mejorar confianza
+  if (crossStudyComparison?.patternSimilarity && crossStudyComparison.patternSimilarity > 0.8) {
+    adjustedConfidence = Math.min(95, adjustedConfidence + 15);
+    methodology = 'Patrón similar a campañas exitosas anteriores';
+  }
+  
+  // ✅ AJUSTAR confianza por magnitud participación
+  if (participationRate >= 80) adjustedConfidence += 10;
+  else if (participationRate >= 60) adjustedConfidence += 5;
+  else if (participationRate <= 20) adjustedConfidence -= 10;
+  
+  const finalConfidence = Math.max(30, Math.min(95, adjustedConfidence));
+  
+  // Texto confianza para UI
+  const confidenceText = finalConfidence >= 85 ? 'Muy Alta' :
+                        finalConfidence >= 70 ? 'Alta' :
+                        finalConfidence >= 50 ? 'Media' : 'Baja';
+  
+  return {
+    finalProjection: participationPrediction.finalProjection,
+    confidence: finalConfidence,
+    methodology,
+    confidenceText
+  };
+}
+
+// 🎯 FUNCIÓN 3: RECOMENDACIÓN ACCIÓN
+function getActionRecommendation(
+  participationRate: number,
+  daysRemaining: number,
+  topMovers?: Array<{ trend: string }>,
+  negativeAnomalies?: Array<{ department: string; severity: string }>
+) {
+  const critical = negativeAnomalies?.length || 0;
+  
+  // CASO 1: Crisis crítica
+  if (critical >= 3 || participationRate < 20) {
+    return {
+      primary: 'Intervención Inmediata',
+      reasoning: 'Crisis de comunicación detectada',
+      urgency: 'crítica' as const,
+      urgencyColor: 'text-red-400',
+      nextSteps: [
+        'Revisar canales comunicación inmediatamente',
+        'Contacto directo departamentos críticos',
+        'Escalar a dirección general si necesario',
+        'Análisis post-mortem activación'
+      ]
+    };
+  }
+  
+  // CASO 2: Campaña exitosa completada
+  if (participationRate >= 100) {
+    return {
+      primary: 'Éxito Documentado',
+      reasoning: 'Objetivo alcanzado completamente',
+      urgency: 'baja' as const,
+      urgencyColor: 'text-green-400',
+      nextSteps: [
+        'Documentar metodología exitosa',
+        'Análisis factores éxito para replicar',
+        'Comunicar resultados stakeholders',
+        'Preparar template futuras campañas'
+      ]
+    };
+  }
+  
+  // CASO 3: Progreso excelente
+  if (participationRate >= 70 && critical === 0) {
+    return {
+      primary: 'Mantener Momentum',
+      reasoning: 'Progreso excelente sin problemas críticos',
+      urgency: 'baja' as const,
+      urgencyColor: 'text-green-400',
+      nextSteps: [
+        'Continuar estrategia actual',
+        'Monitoreo rutinario departamentos',
+        'Preparar cierre campaña',
+        'Validar completitud antes declarar éxito'
+      ]
+    };
+  }
+  
+  // CASO 4: Requiere atención moderada
+  if (critical > 0 || participationRate < 50) {
+    return {
+      primary: 'Atención Focalizada',
+      reasoning: `${critical} departamentos requieren intervención`,
+      urgency: 'media' as const,
+      urgencyColor: 'text-yellow-400',
+      nextSteps: [
+        'Contactar departamentos específicos',
+        'Analizar barreras participación',
+        'Ajustar estrategia comunicación',
+        'Seguimiento cercano próximas 48h'
+      ]
+    };
+  }
+  
+  // CASO 5: Progreso aceptable
+  return {
+    primary: 'Monitoreo Continuo',
+    reasoning: 'Estado estable requiere seguimiento',
+    urgency: 'baja' as const,
+    urgencyColor: 'text-cyan-400',
+    nextSteps: [
+      'Mantener comunicación regular',
+      'Monitorear indicadores cada 24h',
+      'Preparado para ajustes si necesario',
+      'Seguimiento departamentos con menor participación'
+    ]
+  };
+}
+
+// 🎯 FUNCIÓN 4: ANÁLISIS PATRÓN
+function getPatternAnalysis(
+  topMovers?: Array<{ trend: string }>,
+  negativeAnomalies?: Array<{ department: string; severity: string }>
+) {
+  if (!topMovers?.length) {
+    return {
+      dominantPattern: 'Datos Insuficientes',
+      description: 'Esperando actividad departamental',
+      insights: ['Análisis disponible cuando haya datos suficientes'],
+      patternColor: 'text-gray-400'
+    };
+  }
+  
+  const totalDepts = topMovers.length;
+  const completados = topMovers.filter(tm => tm.trend === 'completado').length;
+  const acelerando = topMovers.filter(tm => tm.trend === 'acelerando').length;
+  const desacelerando = topMovers.filter(tm => tm.trend === 'desacelerando').length;
+  const critical = negativeAnomalies?.length || 0;
+  
+  // Priorizar problemas críticos
+  if (critical >= Math.ceil(totalDepts * 0.3)) {
+    return {
+      dominantPattern: 'Crisis Comunicacional',
+      description: `${critical} departamentos sin respuesta efectiva`,
+      insights: [
+        'Crisis de comunicación organizacional detectada',
+        'Revisar estrategia y canales de distribución',
+        'Intervención inmediata requerida'
+      ],
+      patternColor: 'text-red-400'
+    };
+  }
+  
+  if (completados >= Math.ceil(totalDepts * 0.6)) {
+    const message = critical > 0 
+      ? 'Éxito Mayoritario con Reservas'
+      : 'Adopción Organizacional Exitosa';
+    
+    return {
+      dominantPattern: message,
+      description: `${completados} de ${totalDepts} departamentos completaron`,
+      insights: [
+        critical > 0 
+          ? 'Éxito general con departamentos pendientes'
+          : 'Respuesta organizacional rápida y efectiva',
+        critical > 0 
+          ? 'Completar cobertura antes de declarar éxito total'
+          : 'Metodología exitosa identificada para replicar'
+      ],
+      patternColor: critical > 0 ? 'text-yellow-400' : 'text-green-400'
+    };
+  }
+  
+  // Análisis balanceado
+  return {
+    dominantPattern: 'Comportamiento Mixto',
+    description: `Patrones heterogéneos: ${completados}C/${acelerando}A/${desacelerando}D`,
+    insights: [
+      'Análisis específico por departamento requerido',
+      'Estrategia diferenciada recomendada',
+      'Identificar factores de variación organizacional'
+    ],
+    patternColor: 'text-blue-400'
+  };
+}
+
+// ✅ INTERFACE PRINCIPAL DEL MONITOR - EXTENDIDA CON COCKPIT INTELLIGENCE
 export interface CampaignMonitorData {
   isLoading: boolean;
   id: string;
@@ -65,6 +362,8 @@ export interface CampaignMonitorData {
   departmentalIntelligence: DepartmentalIntelligence;
   // 🎯 TOP MOVERS - Nueva inteligencia momentum departamental
   topMovers?: Array<{ name: string; momentum: number; trend: string }>;
+  // 🧠 COCKPIT INTELLIGENCE - CEREBRO TRASPLANTADO
+  cockpitIntelligence?: CockpitIntelligence;
 }
 
 interface DepartmentalIntelligence {
@@ -560,7 +859,16 @@ export function useCampaignMonitor(campaignId: string) {
 
   return {
     ...monitorData,
-    departmentalIntelligence, // ✅ Agregar datos procesados
+    departmentalIntelligence, // ✅ Datos procesados existentes
+    // 🧠 COCKPIT INTELLIGENCE - CEREBRO TRASPLANTADO COMPLETO
+    cockpitIntelligence: processCockpitIntelligence(
+      monitorData.participationRate,
+      monitorData.daysRemaining,
+      monitorData.topMovers,
+      monitorData.negativeAnomalies,
+      monitorData.participationPrediction,
+      monitorData.crossStudyComparison
+    ),
     error: error || null,
     isLoading: resultsLoading || participantsLoading || historyLoading,
     handleRefresh,

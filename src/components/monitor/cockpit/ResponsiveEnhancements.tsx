@@ -1,25 +1,20 @@
 // ====================================================================
 // FOCALIZAHR RESPONSIVE ENHANCEMENTS - MOBILE-FIRST OPTIMIZATION
 // src/components/monitor/cockpit/ResponsiveEnhancements.tsx
-// Chat 4: Optimizations para diferentes dispositivos
+// VERSIÓN CORREGIDA: Hook unificado + animaciones completas
 // ====================================================================
 
 "use client";
 
 import { useState, useEffect } from 'react';
 
-// 🎯 HOOK PARA DETECCIÓN DE DISPOSITIVO
-export function useDeviceType() {
+// 🎯 HOOK UNIFICADO PARA DETECCIÓN DE DISPOSITIVO - VERSIÓN CORREGIDA
+export function useDeviceType(): 'mobile' | 'tablet' | 'desktop' {
   const [deviceType, setDeviceType] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
 
   useEffect(() => {
     const checkDeviceType = () => {
       const width = window.innerWidth;
-      const isTouchCapable = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-      
-      setIsTouchDevice(isTouchCapable);
-      
       if (width < 768) {
         setDeviceType('mobile');
       } else if (width < 1024) {
@@ -31,11 +26,42 @@ export function useDeviceType() {
 
     checkDeviceType();
     window.addEventListener('resize', checkDeviceType);
-    
     return () => window.removeEventListener('resize', checkDeviceType);
   }, []);
 
-  return { deviceType, isTouchDevice };
+  return deviceType;
+}
+
+// 🎯 CONFIGURACIÓN ANIMACIONES COMPLETA CON VARIANTES - VERSIÓN CORREGIDA
+export function getDeviceAnimationConfig(deviceType: 'mobile' | 'tablet' | 'desktop') {
+  const baseCardVariants = {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -20 },
+  };
+
+  const configs = {
+    mobile: {
+      container: {
+        transition: { staggerChildren: 0.1 }
+      },
+      card: { ...baseCardVariants, transition: { duration: 0.3 } }
+    },
+    tablet: {
+      container: {
+        transition: { staggerChildren: 0.15 }
+      },
+      card: { ...baseCardVariants, transition: { duration: 0.4, type: "spring", damping: 20 } }
+    },
+    desktop: {
+      container: {
+        transition: { staggerChildren: 0.15 }
+      },
+      card: { ...baseCardVariants, transition: { duration: 0.5, type: "spring", damping: 25 } }
+    }
+  };
+
+  return configs[deviceType] || configs['desktop']; // Fallback a desktop
 }
 
 // 🎨 CLASSES RESPONSIVAS DINÁMICAS
@@ -65,7 +91,7 @@ export function getResponsiveClasses(deviceType: 'mobile' | 'tablet' | 'desktop'
     },
     desktop: {
       container: 'px-6 py-8',
-      grid: 'grid-cols-3 gap-6',
+      grid: 'grid-cols-4 gap-6', // 4 columnas para desktop
       text: {
         title: 'text-xl',
         subtitle: 'text-sm', 
@@ -77,33 +103,6 @@ export function getResponsiveClasses(deviceType: 'mobile' | 'tablet' | 'desktop'
   };
 
   return classes[deviceType];
-}
-
-// 🎯 CONFIGURACIÓN ANIMACIONES POR DISPOSITIVO
-export function getDeviceAnimationConfig(deviceType: 'mobile' | 'tablet' | 'desktop', isTouchDevice: boolean) {
-  return {
-    mobile: {
-      staggerChildren: 0.1,
-      duration: 0.3,
-      enableHover: false,
-      enableParticles: false,
-      reduceMotion: true
-    },
-    tablet: {
-      staggerChildren: 0.15,
-      duration: 0.4,
-      enableHover: !isTouchDevice,
-      enableParticles: true,
-      reduceMotion: false
-    },
-    desktop: {
-      staggerChildren: 0.15,
-      duration: 0.5,
-      enableHover: true,
-      enableParticles: true,
-      reduceMotion: false
-    }
-  }[deviceType];
 }
 
 // 📊 CONFIGURACIÓN VISTA MÓVIL OPTIMIZADA
@@ -159,22 +158,18 @@ export function getMobileViewConfig(deviceType: 'mobile' | 'tablet' | 'desktop')
   }[deviceType];
 }
 
-// 🎯 COMPONENTE OPTIMIZACIÓN TOUCH
+// 🎯 COMPONENTE OPTIMIZACIÓN TOUCH SIMPLIFICADO
 interface TouchOptimizationProps {
   children: React.ReactNode;
-  deviceType: 'mobile' | 'tablet' | 'desktop';
-  isTouchDevice: boolean;
+  isActive: boolean;
 }
 
-export function TouchOptimization({ children, deviceType, isTouchDevice }: TouchOptimizationProps) {
-  if (!isTouchDevice) return <>{children}</>;
+export function TouchOptimization({ children, isActive }: TouchOptimizationProps) {
+  if (!isActive) return <>{children}</>;
 
   return (
     <div 
-      className={`
-        ${deviceType === 'mobile' ? 'touch-pan-y' : ''}
-        ${deviceType === 'mobile' ? 'select-none' : ''}
-      `}
+      className="touch-pan-y select-none"
       style={{
         WebkitTouchCallout: 'none',
         WebkitTapHighlightColor: 'rgba(0,0,0,0)'
@@ -187,13 +182,13 @@ export function TouchOptimization({ children, deviceType, isTouchDevice }: Touch
 
 // 📱 COMPONENTE INDICADOR RESPONSIVE
 export function ResponsiveIndicator() {
-  const { deviceType, isTouchDevice } = useDeviceType();
+  const deviceType = useDeviceType();
   
   if (process.env.NODE_ENV !== 'development') return null;
 
   return (
     <div className="fixed bottom-4 left-4 z-50 bg-black/80 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
-      {deviceType} {isTouchDevice ? '(touch)' : '(mouse)'}
+      {deviceType}
     </div>
   );
 }

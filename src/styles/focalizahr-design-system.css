@@ -79,9 +79,27 @@
   --fhr-comparison-historical: #3B82F6;
   --fhr-comparison-current: #22D3EE;
   --fhr-comparison-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(34, 211, 238, 0.04));
+ 
+  /* Variables principales que necesita el Cockpit */
+
+  --focalizahr-cyan: #22D3EE;
+  --focalizahr-purple: #A78BFA;
+  --focalizahr-success: #10B981;
+  --focalizahr-warning: #F59E0B;
+  --focalizahr-error: #EF4444;
 }
 
+.neural-glow {
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.3);
+}
 
+.fhr-card {
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 24px;
+}
 /* ========================================
    TIPOGRAFÍA CORPORATIVA
    ======================================== */
