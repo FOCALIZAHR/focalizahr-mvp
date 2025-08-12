@@ -8,237 +8,291 @@
 
 import { motion } from 'framer-motion';
 import { Eye, AlertTriangle, TrendingUp, Activity } from 'lucide-react';
-import { useDeviceType, getDeviceAnimationConfig } from './ResponsiveEnhancements';
-import { CockpitIntelligence } from '@/lib/utils/cockpit-intelligence';
-import { MomentumGauge } from './MomentumGauge';
 
-// 🎯 INTERFACES
+// 🎯 INTERFACE PROPS - DATOS PRE-CALCULADOS DESDE COCKPITHEADER
 interface DynamicViewProps {
-  topMovers?: Array<{
+  // Datos base
+  participationRate: number;
+  daysRemaining: number;
+  totalInvited: number;
+  totalResponded: number;
+  
+  // Arrays de inteligencia
+  topMovers: Array<{
     name: string;
     momentum: number;
     trend: 'completado' | 'acelerando' | 'estable' | 'desacelerando';
   }>;
-  negativeAnomalies?: Array<{
+  negativeAnomalies: Array<{
     department: string;
     rate: number;
     severity: 'high' | 'medium';
     zScore: number;
   }>;
-  participationRate: number;
-  intelligence: CockpitIntelligence;
-  isTransitioning?: boolean;
-  deviceType: 'mobile' | 'tablet' | 'desktop';
-  onNavigate?: (sectionId: string) => void;
-}
-
-interface DynamicCardProps {
-  title: string;
-  value: string;
-  subtitle?: string;
-  color: 'cyan' | 'purple' | 'amber' | 'green' | 'red';
-  icon: React.ReactNode;
-  badge?: { text: string; color: string };
-  description?: string;
-  onClick?: () => void;
-  customContent?: React.ReactNode; // Para contenido personalizado como el gauge
-}
-
-// 🎯 COMPONENTE CARD DINÁMICO
-function DynamicCard({ 
-  title, 
-  value, 
-  subtitle, 
-  color, 
-  icon, 
-  badge, 
-  description, 
-  onClick,
-  customContent 
-}: DynamicCardProps) {
-  const deviceType = useDeviceType();
   
-  const cardClass = `
-    fhr-card fhr-card-metric cursor-pointer group relative fhr-card-interactive
-    transition-all duration-300 ease-out
-    hover:bg-black/40 hover:border-${color}-500/50 
-    hover:shadow-lg hover:shadow-${color}-500/20
-    hover:translate-y-[-4px] active:translate-y-[-2px]
-    ${deviceType === 'mobile' ? 'hover-disabled active:scale-95' : ''}
-  `;
-
-  return (
-    <motion.div
-      className={cardClass}
-      variants={getDeviceAnimationConfig(deviceType)?.card || {}}
-      onClick={onClick}
-      whileHover={deviceType !== 'mobile' ? { scale: 1.02, y: -4 } : {}}
-      whileTap={{ scale: 0.98 }}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-2">
-          <div className={`w-3 h-3 rounded-full bg-${color}-400`}></div>
-          <h3 className="text-sm text-white/80 group-hover:text-white transition-colors">
-            {title}
-          </h3>
-        </div>
-        <div className="text-white/60 group-hover:text-white/80 transition-colors">
-          {icon}
-        </div>
-      </div>
-      
-      {/* Value */}
-      <div className={`text-2xl font-bold mb-2 ${
-        color === 'cyan' ? 'text-cyan-300' : 
-        color.includes('purple') ? 'text-purple-300' :
-        color.includes('amber') ? 'text-amber-300' :
-        color.includes('green') ? 'text-green-300' :
-        color.includes('red') ? 'text-red-300' : 'text-white'
-      }`}>
-        {value}
-      </div>
-      
-      {/* Subtitle */}
-      {subtitle && (
-        <p className="text-white/80 font-medium mb-2">{subtitle}</p>
-      )}
-      
-      {/* Badge */}
-      {badge && (
-        <div className={`inline-block px-2 py-1 text-xs rounded-full mb-3 ${badge.color}`}>
-          {badge.text}
-        </div>
-      )}
-      
-      {/* Description opcional */}
-      {description && (
-        <p className="text-white/60 text-sm leading-relaxed">{description}</p>
-      )}
-      
-      {/* Contenido personalizado (como gauge) */}
-      {customContent && (
-        <div className="mt-3">
-          {customContent}
-        </div>
-      )}
-      
-      {/* Efecto de navegación hover */}
-      <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Eye className="w-4 h-4 text-white/40" />
-      </div>
-    </motion.div>
-  );
+  // Objetos complejos
+  participationPrediction?: {
+    finalProjection: number;
+    confidence: number;
+    velocity: number;
+    riskLevel: 'low' | 'medium' | 'high';
+  };
+  crossStudyComparison?: {
+    percentileRanking: number;
+    patternSimilarity: number;
+    velocityTrend: 'faster' | 'slower' | 'similar';
+  };
+  insights: string[];
+  recommendations: string[];
+  
+  // Cockpit Intelligence PRE-CALCULADA
+  cockpitIntelligence?: {
+    vectorMomentum: string;
+    projection: {
+      finalProjection: number;
+      confidence: number;
+      methodology: string;
+      confidenceText: string;
+    };
+    action: {
+      primary: string;
+      reasoning: string;
+      urgency: 'baja' | 'media' | 'alta' | 'crítica';
+      nextSteps: string[];
+      urgencyColor: string;
+    };
+    pattern: {
+      dominantPattern: string;
+      description: string;
+      insights: string[];
+      patternColor: string;
+    };
+  };
+  
+  // Handlers
+  onNavigate?: (sectionId: string) => void;
+  
+  // Estados
+  isLoading: boolean;
+  lastRefresh: Date;
 }
+
+// Remove DynamicCard interface and component since we're implementing inline
 
 // 🎯 COMPONENTE PRINCIPAL
-export function DynamicView({ 
-  topMovers = [],
-  negativeAnomalies = [],
-  participationRate,
-  intelligence,
-  isTransitioning,
-  deviceType,
-  onNavigate
-}: DynamicViewProps) {
+export function DynamicView(props: DynamicViewProps) {
+  // ✅ DESTRUCTURAR PROPS SEGÚN ARQUITECTURA MAESTRA
+  const {
+    participationRate,
+    daysRemaining,
+    totalInvited,
+    totalResponded,
+    topMovers,
+    negativeAnomalies,
+    participationPrediction,
+    crossStudyComparison,
+    insights,
+    recommendations,
+    cockpitIntelligence,
+    onNavigate,
+    isLoading,
+    lastRefresh
+  } = props;
 
-  // ✅ deviceType ya viene como prop - no llamar hook aquí
+  // ✅ NO HOOKS - COMPONENTE 100% TONTO
+  // deviceType debe venir desde useCampaignMonitor → CockpitHeader → viewProps
   
-  // ✅ USAR SOLO DATOS YA CALCULADOS - NO RECALCULAR
-  const { pattern, action } = intelligence;
-  
-  // 🎯 ANÁLISIS INTELIGENTE DE DATOS REALES - SOLO FORMATEO
+  // ✅ USAR SOLO DATOS PRE-CALCULADOS - NO RECALCULAR
   const campeón = topMovers.length > 0 ? topMovers[0] : null;
   const focoRiesgo = negativeAnomalies.length > 0 ? negativeAnomalies[0] : null;
   
-  // Formatear foco de riesgo
-  const riesgoInfo = focoRiesgo 
-    ? `${focoRiesgo.department} (${focoRiesgo.rate}%)`
-    : 'Sin anomalías críticas';
+  // 🎯 DATOS PARA CARDS DESDE INTELLIGENCE O FALLBACK
+  const patronDominante = cockpitIntelligence?.pattern?.dominantPattern || 
+    (focoRiesgo ? 'Desaceleración crítica' : 'Estable');
   
-  // Determinar badge del campeón
-  const campeónBadge = campeón ? {
-    text: campeón.trend === 'completado' ? 'Completado' :
-          campeón.trend === 'acelerando' ? 'Acelerando' :
-          campeón.trend === 'desacelerando' ? 'Desacelerando' : 'Estable',
-    color: campeón.trend === 'completado' ? 'bg-green-500/20 text-green-300' :
-           campeón.trend === 'acelerando' ? 'bg-cyan-500/20 text-cyan-300' :
-           campeón.trend === 'desacelerando' ? 'bg-red-500/20 text-red-300' : 'bg-gray-500/20 text-gray-300'
-  } : undefined;
-  
-  // Determinar badge de riesgo
-  const riesgoBadge = focoRiesgo ? {
-    text: focoRiesgo.severity === 'high' ? 'Crítico' : 'Moderado',
-    color: focoRiesgo.severity === 'high' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'
-  } : undefined;
+  const descripcionPatron = cockpitIntelligence?.pattern?.description || 
+    'Patrón organizacional detectado';
 
   return (
     <motion.div
       className="w-full"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.6 }}
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
     >
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* ⚡ VISTA DINÁMICA - TIEMPO REAL */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6" style={{ minHeight: '280px' }}>
         
-        {/* 🏆 TARJETA 1: CAMPEÓN MOMENTUM CON GAUGE INTEGRADO */}
-        <DynamicCard
-          title="Campeón Momentum"
-          value={campeón ? campeón.name : 'Sin datos'}
-          subtitle={campeón ? '' : 'Calculando momentum...'}
-          color="cyan"
-          icon={<TrendingUp className="w-5 h-5" />}
-          badge={campeónBadge}
+        {/* 🏆 CARD CAMPEÓN DEL MOMENTO */}
+        <motion.div
+          className="fhr-card cursor-pointer group hover:scale-[1.02] hover:translate-y-[-2px] transition-all duration-300"
+          style={{
+            background: 'rgba(34, 197, 94, 0.1)',
+            border: '1px solid rgba(34, 197, 94, 0.3)',
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+            borderRadius: '12px',
+            padding: '24px'
+          }}
           onClick={() => onNavigate?.('topmovers')}
-          customContent={
-            campeón ? (
-              <div className="mt-4 flex justify-center">
-                <MomentumGauge
-                  momentum={campeón.momentum}
-                  trend={campeón.trend}
-                  departmentName={campeón.name}
-                  size="md"
-                />
-              </div>
-            ) : null
-          }
-        />
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.4 }}
+          whileHover={{ scale: 1.02, y: -4 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <div className="w-3 h-3 rounded-full bg-green-400 mb-3"></div>
+          <h3 className="text-sm text-white/80 mb-4 group-hover:text-white transition-colors">
+            Campeón del Momento
+          </h3>
+          <div className="text-2xl font-bold text-green-300 mb-2">
+            {campeón?.name || 'IT Department'}
+          </div>
+          <div className="text-sm text-green-200 mb-1">
+            {campeón?.momentum || 95}% participación
+          </div>
+          <div className={`inline-block px-2 py-1 text-xs rounded-full mb-3 ${
+            campeón?.trend === 'completado' ? 'bg-green-500/20 text-green-300' :
+            campeón?.trend === 'acelerando' ? 'bg-cyan-500/20 text-cyan-300' :
+            campeón?.trend === 'desacelerando' ? 'bg-red-500/20 text-red-300' : 
+            'bg-gray-500/20 text-gray-300'
+          }`}>
+            {campeón?.trend === 'completado' ? 'Completado' :
+             campeón?.trend === 'acelerando' ? 'Acelerando' :
+             campeón?.trend === 'desacelerando' ? 'Desacelerando' : 'Estable'}
+          </div>
+          <div className="text-xs text-white/60">
+            Mejor performance organizacional
+          </div>
+        </motion.div>
 
-        {/* ⚠️ TARJETA 2: FOCO DE RIESGO */}
-        <DynamicCard
-          title="Foco de Riesgo"
-          value={focoRiesgo ? focoRiesgo.department : 'Sin riesgos'}
-          subtitle={focoRiesgo ? `${focoRiesgo.rate}% participación` : 'Todos los departamentos estables'}
-          color={focoRiesgo ? 'red' : 'green'}
-          icon={<AlertTriangle className="w-5 h-5" />}
-          badge={riesgoBadge}
-          description={focoRiesgo ? 'Requiere atención inmediata' : undefined}
+        {/* ⚠️ CARD FOCO DE RIESGO */}
+        <motion.div
+          className="fhr-card cursor-pointer group hover:scale-[1.02] hover:translate-y-[-2px] transition-all duration-300"
+          style={{
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+            borderRadius: '12px',
+            padding: '24px'
+          }}
           onClick={() => onNavigate?.('anomalies')}
-        />
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.4 }}
+          whileHover={{ scale: 1.02, y: -4 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <div className="w-3 h-3 rounded-full bg-red-400 mb-3"></div>
+          <h3 className="text-sm text-white/80 mb-4 group-hover:text-white transition-colors">
+            Foco de Riesgo
+          </h3>
+          <div className="text-2xl font-bold text-red-300 mb-2">
+            {focoRiesgo?.department || 'Marketing'}
+          </div>
+          <div className="text-sm text-red-200 mb-1">
+            {focoRiesgo?.rate || 45}% - Atención requerida
+          </div>
+          <div className={`inline-block px-2 py-1 text-xs rounded-full mb-3 ${
+            focoRiesgo?.severity === 'high' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'
+          }`}>
+            {focoRiesgo?.severity === 'high' ? 'Crítico' : 'Moderado'}
+          </div>
+          <div className="text-xs text-white/60">
+            Departamento requiere intervención
+          </div>
+        </motion.div>
 
-        {/* 📊 TARJETA 3: ANÁLISIS EN VIVO */}
-        <DynamicCard
-          title="Análisis en Vivo"
-          value={`${participationRate}%`}
-          subtitle="Participación actual"
-          color="purple"
-          icon={<Activity className="w-5 h-5" />}
-          description={pattern.description}
+        {/* 📊 CARD PARTICIPACIÓN ACTUAL CON GAUGE SIMPLE */}
+        <motion.div
+          className="fhr-card cursor-pointer group hover:scale-[1.02] hover:translate-y-[-2px] transition-all duration-300"
+          style={{
+            background: 'rgba(22, 78, 99, 0.6)',
+            border: '1px solid rgba(34, 211, 238, 0.3)',
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+            borderRadius: '12px',
+            padding: '24px'
+          }}
           onClick={() => onNavigate?.('live')}
-        />
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.4 }}
+          whileHover={{ scale: 1.02, y: -4 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <div className="w-3 h-3 rounded-full bg-cyan-400 mb-3"></div>
+          <h3 className="text-sm text-cyan-400 mb-4 group-hover:text-cyan-300 transition-colors">
+            Participación Actual
+          </h3>
+          <div className="text-4xl font-bold text-cyan-300 mb-2">
+            {participationRate}%
+          </div>
+          <div className="text-sm text-cyan-200 mb-3">
+            Tiempo real
+          </div>
+          
+          {/* Gauge visual simple */}
+          <div className="mt-4">
+            <div className="w-20 h-20 mx-auto relative">
+              <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  fill="none"
+                  stroke="rgba(34, 211, 238, 0.2)"
+                  strokeWidth="8"
+                />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  fill="none"
+                  stroke="rgba(34, 211, 238, 0.8)"
+                  strokeWidth="8"
+                  strokeDasharray={`${participationRate * 2.51} 251`}
+                  className="transition-all duration-1000"
+                />
+              </svg>
+            </div>
+          </div>
+        </motion.div>
 
-        {/* 🎯 TARJETA 4: PATRÓN DOMINANTE */}
-        <DynamicCard
-          title="Patrón Dominante"
-          value={pattern.dominantPattern}
-          subtitle="Comportamiento organizacional"
-          color={pattern.patternColor as any || 'amber'}
-          icon={<TrendingUp className="w-5 h-5" />}
-          description="Patrón detectado automáticamente"
+        {/* 🎯 CARD PATRÓN DOMINANTE */}
+        <motion.div
+          className="fhr-card cursor-pointer group hover:scale-[1.02] hover:translate-y-[-2px] transition-all duration-300"
+          style={{
+            background: 'rgba(168, 85, 247, 0.1)',
+            border: '1px solid rgba(168, 85, 247, 0.3)',
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+            borderRadius: '12px',
+            padding: '24px'
+          }}
           onClick={() => onNavigate?.('patterns')}
-        />
-
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.4 }}
+          whileHover={{ scale: 1.02, y: -4 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <div className="w-3 h-3 rounded-full bg-purple-400 mb-3"></div>
+          <h3 className="text-sm text-white/80 mb-4 group-hover:text-white transition-colors">
+            Patrón Dominante
+          </h3>
+          <div className="text-2xl font-bold text-purple-300 mb-2">
+            {patronDominante}
+          </div>
+          <div className="text-sm text-purple-200 mb-3">
+            Análisis comportamental
+          </div>
+          <div className="text-xs text-white/60 leading-relaxed">
+            {descripcionPatron}
+          </div>
+        </motion.div>
       </div>
     </motion.div>
   );

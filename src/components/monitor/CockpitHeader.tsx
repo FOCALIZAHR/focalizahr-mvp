@@ -157,58 +157,86 @@ function CockpitSkeleton() {
               className="loading-card border border-white/10 rounded-xl p-6"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: i * 0.1 }}
+              transition={{ delay: i * 0.1, duration: 0.4 }}
             >
-              <div className="flex items-center justify-between mb-4">
-                <div className="h-4 w-20 bg-white/10 rounded fhr-skeleton"></div>
-                <div className="h-4 w-4 bg-white/10 rounded fhr-skeleton"></div>
+              <div className="space-y-3">
+                <div className="w-3 h-3 bg-cyan-500/30 rounded-full"></div>
+                <div className="h-4 bg-white/10 rounded fhr-skeleton"></div>
+                <div className="h-8 bg-white/10 rounded fhr-skeleton"></div>
+                <div className="h-3 bg-white/10 rounded w-3/4 fhr-skeleton"></div>
               </div>
-              <div className="h-8 w-16 bg-white/10 rounded mb-2 fhr-skeleton"></div>
-              <div className="h-3 w-3/4 bg-white/10 rounded fhr-skeleton"></div>
             </motion.div>
           ))}
         </div>
+        
+        {/* Panel inferior skeleton */}
+        <motion.div 
+          className="mt-8 bg-black/40 rounded-lg p-4 border border-white/10"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="text-center space-y-2">
+                <div className="h-3 bg-white/10 rounded w-2/3 mx-auto fhr-skeleton"></div>
+                <div className="h-5 bg-white/10 rounded w-1/2 mx-auto fhr-skeleton"></div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
       </motion.div>
     </div>
   );
 }
 
-// 🎯 COMPONENTE ERROR MEJORADO
+// 🎯 ERROR STATE ENHANCED
 function CockpitError({ error }: { error: string }) {
   return (
-    <div className="w-full mb-8">
+    <div className="w-full mb-8 flex justify-center">
       <motion.div 
-        className="border border-red-500/30 backdrop-blur-xl bg-red-500/10 rounded-xl p-8 glass-enhanced"
-        initial={{ opacity: 0, y: -20, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
+        className="glass-enhanced border border-red-500/30 backdrop-blur-xl bg-red-500/5 rounded-xl p-8 max-w-md text-center"
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
       >
-        <div className="text-center">
-          <motion.div 
-            className="mx-auto w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-6"
-            animate={{ scale: [1, 1.1, 1] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        {/* Icon de error */}
+        <motion.div 
+          className="w-16 h-16 mx-auto mb-4 bg-red-500/20 rounded-full flex items-center justify-center"
+          animate={{ 
+            boxShadow: [
+              '0 0 0 0 rgba(239, 68, 68, 0.3)',
+              '0 0 0 10px rgba(239, 68, 68, 0.1)',
+              '0 0 0 0 rgba(239, 68, 68, 0)'
+            ]
+          }}
+          transition={{ duration: 2, repeat: Infinity }}
+        >
+          <AlertTriangle className="w-8 h-8 text-red-400" />
+        </motion.div>
+        
+        <h3 className="text-xl font-semibold text-red-400 mb-2">
+          Error en Cockpit Intelligence
+        </h3>
+        
+        <p className="text-white/70 mb-6 text-sm leading-relaxed">
+          Error: {error}
+        </p>
+        
+        {/* Acciones sugeridas */}
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <button
+            onClick={() => window.location.reload()}
+            className="fhr-btn-primary px-6 py-2 text-sm"
           >
-            <AlertTriangle className="w-8 h-8 text-red-400" />
-          </motion.div>
-          <h3 className="text-xl font-semibold text-white mb-3">Error en Torre de Control</h3>
-          <p className="text-white/80 mb-6 max-w-md mx-auto leading-relaxed">{error}</p>
-          
-          {/* Acciones sugeridas */}
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button
-              onClick={() => window.location.reload()}
-              className="fhr-btn-primary px-6 py-2 text-sm"
-            >
-              🔄 Reintentar
-            </button>
-            <button
-              onClick={() => console.log('Reporting error:', error)}
-              className="fhr-btn-secondary px-6 py-2 text-sm"
-            >
-              📝 Reportar Problema
-            </button>
-          </div>
+            🔄 Reintentar
+          </button>
+          <button
+            onClick={() => console.log('Reporting error:', error)}
+            className="fhr-btn-secondary px-6 py-2 text-sm"
+          >
+            📝 Reportar Problema
+          </button>
         </div>
       </motion.div>
     </div>
@@ -252,110 +280,139 @@ export function CockpitHeader(props: CockpitHeaderProps) {
     props.onScrollToSection?.(targetSection);
   };
 
-  // 🎯 ESTADOS ESPECIALES
-  if (props.isLoading) {
-    return <CockpitSkeleton />;
-  }
+  // 🎯 PROPS PARA LAS VISTAS - ARQUITECTURA CORRECTA
+  const viewProps = {
+    // Datos base
+    participationRate: props.participationRate,
+    daysRemaining: props.daysRemaining,
+    totalInvited: props.totalInvited,
+    totalResponded: props.totalResponded,
+    
+    // Arrays de inteligencia (con defaults)
+    topMovers: props.topMovers || [],
+    negativeAnomalies: props.negativeAnomalies || [],
+    
+    // Objetos complejos (opcionales)
+    participationPrediction: props.participationPrediction,
+    crossStudyComparison: props.crossStudyComparison,
+    insights: props.insights || [],
+    recommendations: props.recommendations || [],
+    
+    // Cockpit Intelligence PRE-CALCULADA
+    cockpitIntelligence: intelligence,
+    
+    // Handlers
+    onNavigate: handleNavigation,
+    
+    // Estados
+    isLoading: props.isLoading || false,
+    lastRefresh: props.lastRefresh
+  };
 
+  // Mostrar error si existe
   if (props.error) {
     return <CockpitError error={props.error} />;
   }
 
   return (
-    <div className="w-full mb-8">
+    <TouchOptimization deviceType={deviceType}>
       <motion.div 
-        className="border border-white/10 backdrop-blur-xl bg-black/20 rounded-xl p-8 glass-enhanced"
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
+        className="w-full mb-8"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
       >
-        
-        {/* 🎛️ TOGGLE BIMODAL PREMIUM */}
-        <div className="flex justify-center mb-8">
-          <div className="flex space-x-4 p-2 bg-black/20 rounded-full backdrop-blur-sm border border-white/10">
-            <ToggleButton
-              active={activeView === 'predictive'}
-              onClick={() => handleToggle('predictive')}
-              icon={Brain}
-              label="Predictiva"
-              subtitle="Futuro"
-              disabled={isTransitioning}
-            />
-            <ToggleButton
-              active={activeView === 'dynamic'}
-              onClick={() => handleToggle('dynamic')}
-              icon={Zap}
-              label="Dinámica"
-              subtitle="Presente"
-              disabled={isTransitioning}
-            />
+        {/* 🔥 CONTENEDOR PRINCIPAL TESLA-GRADE */}
+        <div className="border border-white/10 backdrop-blur-xl bg-black/20 rounded-xl p-8 glass-enhanced">
+          
+          {/* 🎛️ TOGGLE BIMODAL - ORQUESTACIÓN INTELLIGENCE */}
+          <div className="flex justify-center mb-8">
+            <motion.div 
+              className="relative bg-black/30 rounded-full p-1 border border-white/20 backdrop-blur-sm"
+              layout
+            >
+              {/* Background animado del toggle */}
+              <motion.div
+                className="absolute top-1 w-1/2 h-[calc(100%-8px)] bg-gradient-to-r from-cyan-500/30 to-purple-500/30 rounded-full backdrop-blur-sm border border-white/10"
+                animate={{
+                  x: activeView === 'predictive' ? 0 : '100%'
+                }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              />
+              
+              {/* Botones del toggle */}
+              <div className="relative flex">
+                <ToggleButton
+                  active={activeView === 'predictive'}
+                  onClick={() => handleToggle('predictive')}
+                  icon={Brain}
+                  label="Predictiva"
+                  subtitle="¿Llegaremos?"
+                  disabled={!canSwitch || isTransitioning}
+                />
+                <ToggleButton
+                  active={activeView === 'dynamic'}
+                  onClick={() => handleToggle('dynamic')}
+                  icon={Zap}
+                  label="Dinámica"
+                  subtitle="¿Dónde actuar?"
+                  disabled={!canSwitch || isTransitioning}
+                />
+              </div>
+            </motion.div>
           </div>
-        </div>
 
-        {/* 🎯 VISTAS BIMODALES CON TRANSICIONES PERFECTAS */}
-        <TouchOptimization isActive={deviceType === 'mobile'}>
-          <AnimatePresence mode="wait" initial={false}>
-            {activeView === 'predictive' ? (
-              <motion.div
-                key="predictive"
-                initial={{ opacity: 0, x: -20, scale: 0.98 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: 20, scale: 0.98 }}
-                transition={{ 
-                  duration: 0.3, 
-                  ease: [0.25, 0.1, 0.25, 1],
-                  layout: { duration: 0.2 }
-                }}
-              >
-                <PredictiveView
-                  participationRate={props.participationRate}
-                  daysRemaining={props.daysRemaining}
-                  intelligence={intelligence}
-                  isTransitioning={isTransitioning}
-                  onNavigate={handleNavigation}
-                />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="dynamic"
-                initial={{ opacity: 0, x: 20, scale: 0.98 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: -20, scale: 0.98 }}
-                transition={{ 
-                  duration: 0.3, 
-                  ease: [0.25, 0.1, 0.25, 1],
-                  layout: { duration: 0.2 }
-                }}
-              >
-                <DynamicView
-                  topMovers={props.topMovers}
-                  negativeAnomalies={props.negativeAnomalies}
-                  participationRate={props.participationRate}
-                  intelligence={intelligence}
-                  isTransitioning={isTransitioning}
-                  onNavigate={handleNavigation}
-                />
-              </motion.div>
-            )}
+          {/* 🎯 SISTEMA VISTAS BIMODALES */}
+          <AnimatePresence mode="wait" key={activeView}>
+            <motion.div
+              key={activeView}
+              initial={{ opacity: 0, x: activeView === 'predictive' ? -20 : 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: activeView === 'predictive' ? 20 : -20 }}
+              transition={{ 
+                duration: 0.4, 
+                ease: "easeInOut",
+                opacity: { duration: 0.2 }
+              }}
+            >
+              {activeView === 'predictive' ? (
+                <PredictiveView {...viewProps} />
+              ) : (
+                <DynamicView {...viewProps} />
+              )}
+            </motion.div>
           </AnimatePresence>
-        </TouchOptimization>
 
-        {/* 📊 METADATA Y ÚLTIMA ACTUALIZACIÓN */}
-        <motion.div
-          className="mt-6 pt-4 border-t border-white/10 flex justify-between items-center text-xs text-white/40"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8, duration: 0.5 }}
-        >
-          <div>
-            Torre de Control FocalizaHR • Inteligencia Predictiva
-          </div>
-          <div>
-            Última actualización: {props.lastRefresh.toLocaleTimeString('es-CL')}
-          </div>
-        </motion.div>
-
+          {/* 📊 PANEL CONTEXTO INFERIOR */}
+          <motion.div 
+            className="mt-8 bg-black/40 backdrop-blur-lg rounded-lg p-4 border border-white/10"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+              <div>
+                <div className="text-sm text-white/60">Vista Estratégica</div>
+                <div className="text-lg font-semibold text-cyan-400">
+                  Proyección organizacional con IA predictiva
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-white/60">Sistema Avanzado</div>
+                <div className="text-lg font-semibold text-purple-400">
+                  Algoritmo v4.0 + ML Analytics
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-white/60">Actualización</div>
+                <div className="text-lg font-semibold text-green-400">
+                  {props.lastRefresh?.toLocaleTimeString() || 'En tiempo real'}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       </motion.div>
-    </div>
+    </TouchOptimization>
   );
 }
