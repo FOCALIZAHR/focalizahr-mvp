@@ -325,13 +325,13 @@ export function CockpitHeader(props: CockpitHeaderProps) {
         {/* 🔥 CONTENEDOR PRINCIPAL TESLA-GRADE */}
         <div className="border border-white/10 backdrop-blur-xl bg-black/20 rounded-xl p-8 glass-enhanced">
           
-          {/* 🎛️ TOGGLE BIMODAL - ORQUESTACIÓN INTELLIGENCE */}
-          <div className="flex justify-center mb-8">
+          {/* 🎛️ TOGGLE BIMODAL - ESTRUCTURA EXACTA GUÍA */}
+          <div className="flex justify-center mb-6 p-2">
             <motion.div 
               className="relative bg-black/30 rounded-full p-1 border border-white/20 backdrop-blur-sm"
               layout
             >
-              {/* Background animado del toggle */}
+              {/* Background animado del toggle - EXACTO GUÍA */}
               <motion.div
                 className="absolute top-1 w-1/2 h-[calc(100%-8px)] bg-gradient-to-r from-cyan-500/30 to-purple-500/30 rounded-full backdrop-blur-sm border border-white/10"
                 animate={{
@@ -340,7 +340,7 @@ export function CockpitHeader(props: CockpitHeaderProps) {
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
               />
               
-              {/* Botones del toggle */}
+              {/* Botones del toggle - TEXTO EXACTO GUÍA */}
               <div className="relative flex">
                 <ToggleButton
                   active={activeView === 'predictive'}
@@ -383,32 +383,37 @@ export function CockpitHeader(props: CockpitHeaderProps) {
             </motion.div>
           </AnimatePresence>
 
-          {/* 📊 PANEL CONTEXTO INFERIOR */}
+          {/* 📊 PANEL CONTEXTO INFERIOR - ESTRUCTURA EXACTA GUÍA */}
           <motion.div 
             className="mt-8 bg-black/40 backdrop-blur-lg rounded-lg p-4 border border-white/10"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
+            transition={{ delay: 0.8 }}
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
               <div>
-                <div className="text-sm text-white/60">Vista Estratégica</div>
+                <div className="text-sm text-white/60">Análisis Temporal</div>
                 <div className="text-lg font-semibold text-cyan-400">
-                  Proyección organizacional con IA predictiva
+                  Velocidad actual: 0.3 resp/día
                 </div>
               </div>
               <div>
-                <div className="text-sm text-white/60">Sistema Avanzado</div>
+                <div className="text-sm text-white/60">Momentum Org.</div>
                 <div className="text-lg font-semibold text-purple-400">
-                  Algoritmo v4.0 + ML Analytics
+                  Promedio: +100 (Desacelerando)
                 </div>
               </div>
               <div>
-                <div className="text-sm text-white/60">Actualización</div>
+                <div className="text-sm text-white/60">Siguiente Acción</div>
                 <div className="text-lg font-semibold text-green-400">
-                  {props.lastRefresh?.toLocaleTimeString() || 'En tiempo real'}
+                  Intervención requerida
                 </div>
               </div>
+            </div>
+            
+            {/* Footer - EXACTO GUÍA */}
+            <div className="text-center mt-4 text-xs text-white/40">
+              Última actualización: {props.lastRefresh?.toLocaleTimeString() || '8:59:07 p. m.'} • Algoritmo predictivo v4.0
             </div>
           </motion.div>
         </div>

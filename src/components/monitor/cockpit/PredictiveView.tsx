@@ -136,10 +136,10 @@ export function PredictiveView(props: PredictiveViewProps) {
       exit={{ opacity: 0, x: 20 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
     >
-      {/* 🔮 VISTA PREDICTIVA - 4 CARDS HORIZONTALES */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6" style={{ minHeight: '280px' }}>
+      {/* 🔮 VISTA PREDICTIVA - ESTRUCTURA EXACTA GUÍA */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8" style={{ minHeight: '280px' }}>
         
-        {/* 🎯 CARD 1: PUNTO DE PARTIDA */}
+        {/* 🎯 CARD 1: PUNTO DE PARTIDA - ESTRUCTURA GUÍA */}
         <motion.div
           className="fhr-card cursor-pointer group hover:scale-[1.02] hover:translate-y-[-2px] transition-all duration-300"
           style={{
@@ -220,7 +220,7 @@ export function PredictiveView(props: PredictiveViewProps) {
           </div>
         </motion.div>
 
-        {/* 🎯 CARD 3: PROYECCIÓN FINAL CON NEURAL PULSE */}
+        {/* 🎯 CARD 3: PROYECCIÓN FINAL - COLOR EXACTO GUÍA */}
         <motion.div
           className="fhr-card cursor-pointer group hover:scale-[1.02] hover:translate-y-[-2px] transition-all duration-300 relative"
           style={{
@@ -238,7 +238,7 @@ export function PredictiveView(props: PredictiveViewProps) {
           whileHover={{ scale: 1.02, y: -4 }}
           whileTap={{ scale: 0.98 }}
         >
-          {/* Neural pulse effect */}
+          {/* Neural pulse effect - DOCUMENTADO GUÍA */}
           <motion.div
             className="absolute inset-0 rounded-lg border border-cyan-400/30"
             animate={{
@@ -268,7 +268,7 @@ export function PredictiveView(props: PredictiveViewProps) {
           </div>
         </motion.div>
 
-        {/* 🎯 CARD 4: ACCIÓN RECOMENDADA */}
+        {/* 🎯 CARD 4: ACCIÓN RECOMENDADA - LÍNEA ROJA PROMINENTE */}
         <motion.div
           className="fhr-card cursor-pointer group hover:scale-[1.02] hover:translate-y-[-2px] transition-all duration-300"
           style={{
@@ -297,12 +297,12 @@ export function PredictiveView(props: PredictiveViewProps) {
             {razonamiento}
           </div>
           
-          {/* Línea de urgencia dinámica */}
+          {/* Línea de urgencia dinámica - MÁS PROMINENTE SEGÚN IMAGEN */}
           <motion.div 
-            className="w-6 h-1 rounded-full mb-4"
+            className="w-8 h-1.5 rounded-full mb-4"
             style={{ background: colorUrgencia }}
             initial={{ opacity: 0, width: 0 }}
-            animate={{ opacity: 1, width: 24 }}
+            animate={{ opacity: 1, width: 32 }}
             transition={{ delay: 0.7, duration: 0.5 }}
           />
 
