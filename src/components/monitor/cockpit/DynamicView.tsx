@@ -1,4 +1,3 @@
-
 // ====================================================================
 // DYNAMIC VIEW - VISTA TIEMPO REAL CON MOMENTUM GAUGE ESPECTACULAR
 // src/components/monitor/cockpit/DynamicView.tsx
@@ -241,10 +240,10 @@ export function DynamicView(props: DynamicViewProps) {
             Campeón del Momento
           </h3>
           <div className="text-2xl font-bold text-green-300 mb-2">
-            {campeón?.name || 'IT Department'}
+            {campeón ? campeón.name : 'Sin datos suficientes'}
           </div>
           <div className="text-sm text-green-200 mb-1">
-            {campeón?.momentum || 95}% participación
+            {campeón ? `${campeón.momentum}%` : 'Esperando actividad'} participación
           </div>
           <div className={`inline-block px-2 py-1 text-xs rounded-full mb-3 ${
             campeón?.trend === 'completado' ? 'bg-green-500/20 text-green-300' :
@@ -257,7 +256,7 @@ export function DynamicView(props: DynamicViewProps) {
              campeón?.trend === 'desacelerando' ? 'Desacelerando' : 'Estable'}
           </div>
           <div className="text-xs text-white/60">
-            Mejor performance organizacional
+            {campeón ? 'Mejor performance organizacional' : 'Análisis disponible con más datos'}
           </div>
         </motion.div>
 
@@ -284,10 +283,10 @@ export function DynamicView(props: DynamicViewProps) {
             Foco de Riesgo
           </h3>
           <div className="text-2xl font-bold text-red-300 mb-2">
-            {focoRiesgo?.department || 'Marketing'}
+            {focoRiesgo ? focoRiesgo.department : '✅ Sin riesgos detectados'}
           </div>
           <div className="text-sm text-red-200 mb-1">
-            {focoRiesgo?.rate || 45}% - Atención requerida
+            {focoRiesgo ? `${focoRiesgo.rate}%` : 'Todas las áreas normales'} {focoRiesgo ? '- Atención requerida' : ''}
           </div>
           <div className={`inline-block px-2 py-1 text-xs rounded-full mb-3 ${
             focoRiesgo?.severity === 'high' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'
@@ -295,7 +294,7 @@ export function DynamicView(props: DynamicViewProps) {
             {focoRiesgo?.severity === 'high' ? 'Crítico' : 'Moderado'}
           </div>
           <div className="text-xs text-white/60">
-            Departamento requiere intervención
+            {focoRiesgo ? 'Departamento requiere intervención' : 'Monitoreo continuo activo'}
           </div>
         </motion.div>
 
