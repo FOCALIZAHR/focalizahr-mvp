@@ -725,14 +725,24 @@ export function useCampaignMonitor(campaignId: string) {
     // 🔥 COMPONENTES WOW - CÁLCULOS COMPLETOS EN HOOK
     const anomalyData = calculateDepartmentAnomalies(byDepartment);
     
-    // 🎯 TOP MOVERS - Nueva inteligencia momentum departamental
-    const topMovers = calculateDepartmentMomentum(analytics.trendDataByDepartment || {});
-    // 🧪 LOG TEMPORAL - ELIMINAR DESPUÉS DE VERIFICAR:
-     console.log('🎯 TOP MOVERS FUNCIONANDO:', {
-     inputDepartments: Object.keys(analytics.trendDataByDepartment || {}),
-     outputTopMovers: topMovers,
-      outputCount: topMovers?.length || 0
-     });
+    // 🎯 DEPARTMENTAL PERFORMANCE - Basado en participación real (Vista Dinámica)
+    const departmentsByParticipation = Object.entries(byDepartment)
+      .map(([name, data]) => ({
+        name: data.displayName || name,
+        momentum: data.rate,  // Usar participación como momentum
+        trend: data.rate >= 80 ? 'completado' :
+               data.rate >= 60 ? 'acelerando' :
+               data.rate >= 40 ? 'estable' : 'desacelerando'
+      }))
+      .sort((a, b) => b.momentum - a.momentum);
+
+    // 📊 LOG VERIFICACIÓN - Datos reales por participación:
+    console.log('🎯 [Glass Cockpit] Departmental Performance:', {
+      inputByDepartment: Object.keys(byDepartment),
+      outputRanking: departmentsByParticipation,
+      totalDepartments: departmentsByParticipation.length
+    });
+    
     // ✅ DATOS HISTÓRICOS REALES DE API (reemplaza mock)
     const historicalCampaigns = historicalData?.campaigns || [];
 
@@ -760,14 +770,32 @@ export function useCampaignMonitor(campaignId: string) {
       // 🔥 NUEVOS CÁLCULOS AGREGADOS
       departmentAnomalies: anomalyData.departmentAnomalies,
       positiveAnomalies: anomalyData.positiveAnomalies,
-      negativeAnomalies: anomalyData.negativeAnomalies,
+      
+      // 🔥 VISTA DINÁMICA - Datos basados en participación real
+      topMovers: departmentsByParticipation,
+      
+      // 🚨 ANOMALÍAS NEGATIVAS - Departamentos baja participación
+      negativeAnomalies: departmentsByParticipation
+        .filter(d => d.momentum < 50) // < 50% participación
+        .map(d => ({ 
+          department: d.name, 
+          rate: d.momentum, 
+          severity: d.momentum < 30 ? 'high' : 'medium',
+          zScore: d.momentum < 30 ? -2.5 : -1.5 // Simulado para compatibilidad
+        })),
+      
       meanRate: anomalyData.meanRate,
       totalDepartments: anomalyData.totalDepartments,
       crossStudyComparison: historicalData?.crossStudyComparison || null,
-      // 🎯 TOP MOVERS - Inteligencia momentum departamental
-      topMovers,
+      
       // ✅ AGREGAR NUEVA LÍNEA - MOMENTUM DEPARTAMENTAL VISUAL
-      departmentMomentum: generateDepartmentMomentumData(topMovers, anomalyData.negativeAnomalies),
+      departmentMomentum: generateDepartmentMomentumData(departmentsByParticipation, departmentsByParticipation
+        .filter(d => d.momentum < 50) // < 50% participación
+        .map(d => ({ 
+          department: d.name, 
+          rate: d.momentum, 
+          severity: d.momentum < 30 ? 'high' : 'medium'
+        }))),
     };
   
   }, [campaignData, participantsData, historicalData, campaignDetails, campaignId, lastRefresh]);
