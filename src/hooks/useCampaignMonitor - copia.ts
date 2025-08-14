@@ -9,7 +9,6 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useCampaignResults } from './useCampaignResults';
 import { useCampaignParticipants } from './useCampaignParticipants';
 import { useCampaignHistory } from './useCampaignHistory';
-import { useCampaignDetails } from './useCampaignDetails';
 import { 
   calculateRecentActivity,
   getLastActivityDate,
@@ -34,8 +33,6 @@ import type {
   DepartmentAnomalyData,
   CrossStudyComparisonData,
   DepartmentalIntelligence,
-  TacticalRecommendation,  // ← AGREGAR ESTA LÍNEA
-  DepartmentMomentumData,  // ← AGREGAR ESTA LÍNEA
 } from '@/types'
 
 // ====================================================================
@@ -65,132 +62,6 @@ interface CockpitIntelligence {
     insights: string[];
     patternColor: string;
   };
-  // ✅ AGREGAR AQUÍ:
-  tacticalAction: TacticalRecommendation;
-}
-
-// 🎯 NUEVA FUNCIÓN - GENERAR RECOMENDACIÓN TÁCTICA
-function generateTacticalRecommendation(
-  topMovers: Array<{ name: string; momentum: number; trend: string }> = [],
-  negativeAnomalies: Array<{ department: string; rate: number; severity: string }> = []
-): TacticalRecommendation {
-  
-  const champion = topMovers[0];
-  const risk = negativeAnomalies[0];
-  
-  // Escenario 1: Campeón + Riesgo = Replicar éxito
-  if (champion && risk) {
-    return {
-      primary: `Replicar éxito de ${champion.name} en ${risk.department}`,
-      reasoning: `${champion.name} tiene momentum superior vs ${risk.rate}% de ${risk.department}`,
-      urgency: risk.severity === 'high' ? 'crítica' : 'alta',
-      action: 'tactical',
-      urgencyColor: risk.severity === 'high' ? 'red' : 'purple'
-    };
-  }
-  
-  // Escenario 2: Solo campeón = Documentar mejores prácticas
-  if (champion && !risk) {
-    return {
-      primary: `Documentar mejores prácticas de ${champion.name}`,
-      reasoning: `${champion.name} lidera con momentum excepcional`,
-      urgency: 'media',
-      action: 'tactical',
-      urgencyColor: 'green'
-    };
-  }
-  
-  // Escenario 3: Solo riesgo = Intervención inmediata
-  if (!champion && risk) {
-    return {
-      primary: `Intervención inmediata en ${risk.department}`,
-      reasoning: `${risk.department} requiere atención urgente (${risk.rate}%)`,
-      urgency: risk.severity === 'high' ? 'crítica' : 'alta',
-      action: 'tactical',
-      urgencyColor: risk.severity === 'high' ? 'red' : 'orange'
-    };
-  }
-  
-  // Escenario 4: Sin datos claros = Análisis profundo
-  return {
-    primary: 'Análisis departamental profundo necesario',
-    reasoning: 'Patrones no suficientemente claros para recomendación específica',
-    urgency: 'baja',
-    action: 'tactical',
-    urgencyColor: 'gray'
-  };
-}
-
-// ✅ NUEVA FUNCIÓN - GENERAR MOMENTUM DEPARTAMENTAL VISUAL
-function generateDepartmentMomentumData(
-  topMovers: Array<{ name: string; momentum: number; trend: string }> = [],
-  negativeAnomalies: Array<{ department: string; rate: number; severity: string }> = []
-): DepartmentMomentumData {
-  
-  // Combinar datos para análisis completo
-  const allDepartments = [
-    ...topMovers.map(m => ({ 
-      name: m.name, 
-      rate: m.momentum, 
-      trend: m.trend,
-      velocity: calculateVelocity(m.momentum, m.trend),
-      status: 'positive' as const
-    })),
-    ...negativeAnomalies.map(a => ({ 
-      name: a.department, 
-      rate: a.rate, 
-      trend: 'declining',
-      velocity: -Math.abs(a.rate - 50) / 10, // Velocidad negativa
-      status: a.severity === 'high' ? 'critical' as const : 'warning' as const
-    }))
-  ].slice(0, 5); // Top 5 para visual limpio
-
-  const accelerating = allDepartments.filter(d => d.velocity > 0).length;
-  const critical = allDepartments.filter(d => d.status === 'critical').length;
-  const stable = allDepartments.filter(d => Math.abs(d.velocity) < 0.5).length;
-
-  return {
-    departments: allDepartments,
-    summary: {
-      accelerating,
-      stable,
-      critical,
-      total: allDepartments.length
-    },
-    insights: generateMomentumInsights(allDepartments),
-    sparklineData: allDepartments.map(d => ({ 
-      name: d.name.slice(0, 3), 
-      value: d.rate,
-      velocity: d.velocity 
-    }))
-  };
-}
-
-// ✅ FUNCIONES AUXILIARES PARA MOMENTUM
-function calculateVelocity(momentum: number, trend: string): number {
-  const baseVelocity = momentum / 10;
-  switch(trend) {
-    case 'acelerando': return baseVelocity * 1.5;
-    case 'completado': return baseVelocity;
-    case 'estable': return baseVelocity * 0.5;
-    case 'desacelerando': return -baseVelocity * 0.5;
-    default: return 0;
-  }
-}
-
-function generateMomentumInsights(departments: any[]): string[] {
-  if (departments.length === 0) return ['Sin datos suficientes para análisis'];
-  
-  const critical = departments.filter(d => d.status === 'critical').length;
-  const accelerating = departments.filter(d => d.velocity > 0).length;
-  
-  if (critical > 0) {
-    return [`${critical} departamentos requieren intervención inmediata`];
-  }
-  if (accelerating >= departments.length * 0.7) {
-    return ['Momentum organizacional excepcional detectado'];
-  }
-  return ['Análisis de momentum en progreso'];
 }
 
 // 🧠 FUNCIÓN PRINCIPAL - PROCESA DATOS YA CALCULADOS DEL HOOK
@@ -224,9 +95,7 @@ function processCockpitIntelligence(
     vectorMomentum: getVectorMomentum(participationRate, daysRemaining, topMovers, participationPrediction),
     projection: getProjectionIntelligence(participationRate, participationPrediction, crossStudyComparison),
     action: getActionRecommendation(participationRate, daysRemaining, topMovers, negativeAnomalies),
-    pattern: getPatternAnalysis(topMovers, negativeAnomalies),
-    // ✅ AGREGAR ESTA LÍNEA:
-    tacticalAction: generateTacticalRecommendation(topMovers, negativeAnomalies)
+    pattern: getPatternAnalysis(topMovers, negativeAnomalies)
   };
 }
 
@@ -499,8 +368,6 @@ export interface CampaignMonitorData {
   topMovers: Array<{ name: string; momentum: number; trend: TopMoverTrend }>;
   // 🧠 COCKPIT INTELLIGENCE - CEREBRO TRASPLANTADO
   cockpitIntelligence?: CockpitIntelligence;
-  // ✅ AGREGAR NUEVO CAMPO - MOMENTUM DEPARTAMENTAL
-  departmentMomentum?: DepartmentMomentumData;
 }
 
 
@@ -513,7 +380,6 @@ export function useCampaignMonitor(campaignId: string) {
     limit: 5, 
     currentCampaignId: campaignId 
   });
-  const { campaignDetails, isLoading: detailsLoading } = useCampaignDetails(campaignId);
   
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
@@ -543,7 +409,7 @@ export function useCampaignMonitor(campaignId: string) {
     // FIN DEL CÓDIGO DE DIAGNÓSTICO
     // ==========================================================
     
-    if (!campaignData || !participantsData || !campaignDetails) {
+    if (!campaignData || !participantsData) {
       return {
         isLoading: true,
         id: campaignId,
@@ -587,9 +453,6 @@ export function useCampaignMonitor(campaignId: string) {
 
     const { campaign, analytics } = campaignData;
     const { participants, summary } = participantsData;
-    
-    // 🎭 FUSIÓN DE METADATOS COMPLETOS - CHEF EJECUTIVO
-    const completeCampaign = { ...campaign, ...campaignDetails };
     
     // --- REPARACIÓN QUIRÚRGICA: FUSIÓN CORRECTA DE DATOS ---
 
@@ -719,7 +582,7 @@ export function useCampaignMonitor(campaignId: string) {
     });
 
     // ✅ UTILIZAR UTILIDADES PURAS PARA RESTO DE TRANSFORMACIONES
-    const daysRemaining = calculateDaysRemaining(completeCampaign.endDate);
+    const daysRemaining = calculateDaysRemaining(campaign.endDate);
     const dailyResponses = processDailyResponses(analytics.trendData);
 
     // 🔥 COMPONENTES WOW - CÁLCULOS COMPLETOS EN HOOK
@@ -739,16 +602,16 @@ export function useCampaignMonitor(campaignId: string) {
     return {
       isLoading: false,
       id: campaignId,
-      name: completeCampaign.name || 'Campaña',
-      type: completeCampaign.campaignType?.name || completeCampaign.type || 'Estudio',
-      status: completeCampaign.status || 'active',
+      name: campaign.name || 'Campaña',
+      type: campaign.campaignType?.name || campaign.type || 'Estudio',
+      status: campaign.status || 'active',
       participationRate: summary?.participationRate || analytics.participationRate || 0,
       totalInvited: summary?.total || analytics.totalInvited || 0,
       totalResponded: summary?.responded || analytics.totalResponded || 0,
       daysRemaining,
       lastActivity,
-      startDate: formatLocalDate(completeCampaign.startDate || new Date()),
-      endDate: formatLocalDate(completeCampaign.endDate || new Date()),
+      startDate: formatLocalDate(campaign.startDate || new Date()),
+      endDate: formatLocalDate(campaign.endDate || new Date()),
       byDepartment,
       dailyResponses,
       alerts,
@@ -766,11 +629,9 @@ export function useCampaignMonitor(campaignId: string) {
       crossStudyComparison: historicalData?.crossStudyComparison || null,
       // 🎯 TOP MOVERS - Inteligencia momentum departamental
       topMovers,
-      // ✅ AGREGAR NUEVA LÍNEA - MOMENTUM DEPARTAMENTAL VISUAL
-      departmentMomentum: generateDepartmentMomentumData(topMovers, anomalyData.negativeAnomalies),
     };
   
-  }, [campaignData, participantsData, historicalData, campaignDetails, campaignId, lastRefresh]);
+  }, [campaignData, participantsData, historicalData, campaignId, lastRefresh]);
 
   // 🧠 DEPARTMENTAL INTELLIGENCE - Cálculo independiente con memoización propia
   const departmentalIntelligence = useMemo(() => {
@@ -981,7 +842,7 @@ export function useCampaignMonitor(campaignId: string) {
       monitorData.crossStudyComparison
     ),
     error: error || null,
-    isLoading: resultsLoading || participantsLoading || historyLoading || detailsLoading,
+    isLoading: resultsLoading || participantsLoading || historyLoading,
     handleRefresh,
     handleSendReminder,
     handleExtendCampaign,

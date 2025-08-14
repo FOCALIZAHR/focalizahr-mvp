@@ -1,7 +1,8 @@
 // ====================================================================
-// PREDICTIVE VIEW - VISTA PREDICTIVA CON REFINAMIENTOS
+// PREDICTIVE VIEW - VISTA PREDICTIVA POST-TRASPLANTE ARQUITECTÓNICO
 // src/components/monitor/cockpit/PredictiveView.tsx
-// RESPONSABILIDAD: Vista futura con gauge integrado y animaciones CountUp
+// RESPONSABILIDAD: Vista futura 100% TONTA - Solo presentación, NO cálculos
+// ✅ ARQUITECTURA CORREGIDA: Usa exclusivamente datos pre-calculados
 // ====================================================================
 
 "use client";
@@ -97,37 +98,31 @@ export function PredictiveView(props: PredictiveViewProps) {
     lastRefresh
   } = props;
 
-  // ✅ NO HOOKS - COMPONENTE 100% TONTO
-  // deviceType debe venir desde useCampaignMonitor → CockpitHeader → viewProps
+  // ✅ NO HOOKS - COMPONENTE 100% TONTO POST-TRASPLANTE
+  // Solo presenta datos - NO calcula, NO transforma, NO procesa
 
-  // 🧮 USAR SOLO DATOS PRE-CALCULADOS - NO RECALCULAR
-  const velocidadActual = totalResponded / Math.max(1, 14 - daysRemaining);
-  const momentumPromedio = topMovers.length > 0 
-    ? Math.round(topMovers.reduce((acc, m) => acc + m.momentum, 0) / topMovers.length)
-    : 100;
-  
-  // 📊 PROYECCIÓN Y CONFIANZA DESDE INTELLIGENCE O FALLBACK
+  // ✅ ARQUITECTURA POST-TRASPLANTE: SOLO DATOS PRE-CALCULADOS
+  // NO recalcular nada - usar exclusivamente datos del hook central
+  const velocidadActual = participationPrediction?.velocity || 0;
   const proyeccionFinal = cockpitIntelligence?.projection?.finalProjection || 
     participationPrediction?.finalProjection || 
-    Math.min(95, Math.round(participationRate + (velocidadActual * daysRemaining * 2.1)));
+    participationRate; // Fallback simple sin cálculos
   
   const confianza = cockpitIntelligence?.projection?.confidence || 
     participationPrediction?.confidence || 
-    Math.max(65, Math.min(90, 85 - Math.abs(participationRate - 70)));
+    0; // Fallback simple sin algoritmos
 
-  // 🎯 DATOS PARA CARDS
-  const vectorMomentum = cockpitIntelligence?.vectorMomentum || `${momentumPromedio}`;
-  const estadoMomentum = cockpitIntelligence?.pattern?.dominantPattern || 
-    (momentumPromedio > 200 ? 'Acelerando' : momentumPromedio > 100 ? 'Estable' : 'Desacelerando');
+  // 🎯 DATOS PARA CARDS - SOLO DESDE INTELLIGENCE PRE-CALCULADA
+  const vectorMomentum = cockpitIntelligence?.vectorMomentum || 'Sin datos';
+  const estadoMomentum = cockpitIntelligence?.pattern?.dominantPattern || 'Analizando...';
   
   const accionPrincipal = cockpitIntelligence?.action?.primary || 
-    (recommendations.length > 0 ? recommendations[0] : 
-     proyeccionFinal >= 75 ? 'Mantener estrategia actual' : 'Acelerar Acción');
+    (recommendations.length > 0 ? recommendations[0] : 'Sin recomendación disponible');
   
   const razonamiento = cockpitIntelligence?.action?.reasoning || 
-    (proyeccionFinal >= 75 ? 'Momentum positivo detectado' : 'Intensificar comunicación');
+    'Esperando análisis de inteligencia artificial';
   
-  const colorUrgencia = cockpitIntelligence?.action?.urgencyColor || '#EF4444';
+  const colorUrgencia = cockpitIntelligence?.action?.urgencyColor || '#6B7280';
   return (
     <motion.div
       className="w-full"

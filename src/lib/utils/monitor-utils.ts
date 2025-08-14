@@ -70,11 +70,35 @@ export function getLastActivityDate(participants: Participant[]): Date | null {
   return new Date(Math.max(...responseDates));
 }
 
-// ✅ FUNCIONES PURAS EXISTENTES PRESERVADAS
 export function calculateDaysRemaining(endDate: string | Date): number {
-  const end = endDate ? new Date(endDate) : new Date();
+  // ✅ VALIDACIÓN ROBUSTA - Proteger contra datos inválidos
+  if (!endDate) {
+    console.warn('⚠️ calculateDaysRemaining: endDate is null/undefined');
+    return 0;
+  }
+  
+  const end = new Date(endDate);
   const now = new Date();
-  return Math.max(0, Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+  
+  // ✅ VALIDACIÓN FECHA VÁLIDA
+  if (isNaN(end.getTime())) {
+    console.warn('⚠️ calculateDaysRemaining: Invalid endDate format:', endDate);
+    return 0;
+  }
+  
+  const diffTime = end.getTime() - now.getTime();
+  const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  // ✅ DEBUG TEMPORAL - Remover después de verificar
+  console.log('🔍 calculateDaysRemaining:', {
+    endDate: endDate,
+    endDateParsed: end.toISOString(),
+    now: now.toISOString(),
+    diffTime,
+    daysRemaining
+  });
+  
+  return Math.max(0, daysRemaining);
 }
 
 export function formatLocalDate(date: string | Date): string {
@@ -341,9 +365,12 @@ export function calculateDepartmentAnomalies(
 // ✅ FUNCIÓN ELIMINADA - Los cálculos se realizan ahora en el backend (/api/historical)
 // CrossStudyComparatorCard usa datos pre-calculados del hook useCampaignHistory
 
+// ✅ DEFINIR TIPO ESPECÍFICO PARA CLARIDAD
+export type TopMoverTrend = 'completado' | 'acelerando' | 'estable' | 'desacelerando';
+
 export function calculateDepartmentMomentum(
   trendDataByDepartment: Record<string, Array<{ date: string; responses: number }>>
-): Array<{ name: string; momentum: number; trend: 'acelerando' | 'estable' | 'desacelerando' | 'completado' }> {
+): Array<{ name: string; momentum: number; trend: TopMoverTrend }> {
   
   if (!trendDataByDepartment || Object.keys(trendDataByDepartment).length === 0) {
     return [];
@@ -378,7 +405,7 @@ export function calculateDepartmentMomentum(
     
     // Calcular momentum basado en distribución temporal
     let momentum = 0;
-    let trendDirection: 'acelerando' | 'estable' | 'desacelerando' | 'completado' = 'estable';
+    let trendDirection: TopMoverTrend = 'estable';
     
     if (secondHalf.length > 0) {
       const firstAvg = firstHalf.length > 0 ? firstHalfSum / firstHalf.length : 0;

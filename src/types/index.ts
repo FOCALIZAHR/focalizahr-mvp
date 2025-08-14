@@ -840,3 +840,112 @@ export interface CrossStudyComparisonData {
   insights: string[];
   recommendations: string[];
 }
+// ✅ DEPARTMENTAL INTELLIGENCE - MOVIDO DESDE useCampaignMonitor.ts
+export interface DepartmentalIntelligence {
+  topPerformers: Array<{
+    name: string;
+    participationRate: number;
+    count: number;
+    total: number;
+    rank: number;        // 1, 2, 3
+    medal: string;       // 🏆, 🥈, 🥉
+    status: string;      // 'excellent'
+  }>;
+  
+  attentionNeeded: Array<{
+    name: string;
+    participationRate: number;
+    count: number;
+    total: number;
+    urgency: 'critical' | 'high' | 'medium';  // <50%, <70%, <85%
+    action: 'llamar' | 'recordar' | 'seguimiento';
+    icon: '🚨' | '⚡' | '⚠️';
+  }>;
+  
+  totalDepartments: number;
+  averageRate: number;     // 1 decimal
+  excellentCount: number;  // >=85%
+  criticalCount: number;   // <50%
+  allDepartments: Array<{
+    name: string;
+    participationRate: number;
+    count: number;
+    total: number;
+  }>;
+  hasRealData: boolean;    // ✅ CAMPO AGREGADO
+  scenarioType: 'NO_DATA' | 'ALL_ZERO' | 'MIXED_DATA';  // ✅ CAMPO QUIRÚRGICO
+  displayMessage: string;                                 // ✅ CAMPO QUIRÚRGICO
+}
+
+// ✅ AGREGAR ESTAS DOS INTERFACES QUE FALTAN
+export interface DepartmentAnomalyData {
+  department: string;
+  currentRate: number;
+  zScore: number;
+  type: 'positive_outlier' | 'negative_outlier';
+  severity: 'high' | 'medium';
+}
+
+export interface CrossStudyComparisonData {
+  lastCampaign: {
+    name: string;
+    type: string;
+    participationRate: number;
+    velocityMetrics: {
+      averageResponsesPerDay: number;
+      completionVelocity: number;
+    };
+  };
+  comparison: {
+    velocityTrend: 'faster' | 'slower' | 'similar';
+    velocityDifference: number;
+    patternSimilarity: number;
+    projectedOutcome: {
+      finalRate: number;
+      confidence: number;
+      riskLevel: 'low' | 'medium' | 'high';
+    };
+  };
+  insights: string[];
+  recommendations: string[];
+}
+// ====================================================================
+// 🎯 NUEVAS INTERFACES - EXTENSIÓN TÁCTICA VISTA DINÁMICA
+// ====================================================================
+
+// ✅ RECOMENDACIÓN TÁCTICA - Para Card 4 espectacular
+export interface TacticalRecommendation {
+  primary: string;           // "Replicar éxito de RRHH en Marketing"
+  reasoning: string;         // "RRHH tiene 95% vs 45% de Marketing"
+  urgency: 'baja' | 'media' | 'alta' | 'crítica';
+  action: 'tactical';        // Identificador tipo acción
+  urgencyColor: string;      // Color dinámico para UI
+}
+
+// ✅ MOMENTUM DEPARTAMENTAL - Para Card 3 visual espectacular
+export interface DepartmentMomentumData {
+  departments: Array<{
+    name: string;
+    rate: number;
+    trend: string;
+    velocity: number;
+    status: 'positive' | 'warning' | 'critical';
+  }>;
+  summary: {
+    accelerating: number;
+    stable: number;
+    critical: number;
+    total: number;
+  };
+  insights: string[];
+  sparklineData: Array<{ name: string; value: number; velocity: number }>;
+}
+interface CardState {
+  title: string;        // Dinámico según contexto
+  department: string;   // Nombre real o estado
+  content: string;      // Contenido coherente
+  severity: string;     // Badge apropiado
+  action: string;       // Descripción lógica
+  style: 'danger' | 'success' | 'healthy' | 'warning';
+  icon: 'alert' | 'trending' | 'check' | 'activity';
+}
