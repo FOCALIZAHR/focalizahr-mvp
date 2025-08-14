@@ -12,7 +12,7 @@ import type {
   EngagementHeatmapData,
   ParticipationPredictionData,
   DepartmentAnomalyData,
-  CrossStudyComparisonData
+  CrossStudyComparisonData,
 } from '@/types';
 
 // ✅ NUEVA FUNCIÓN CERTIFICADA para calcular la participación real por departamento
@@ -449,3 +449,4 @@ export function calculateDepartmentMomentum(
     .sort((a, b) => b.momentum - a.momentum)
     .slice(0, 5); // Top 5 más significativos
 }
+

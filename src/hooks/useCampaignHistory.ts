@@ -5,6 +5,7 @@
 // ====================================================================
 
 import { useState, useEffect, useCallback } from 'react';
+import type { CrossStudyComparisonData } from '@/types';
 
 // ✅ INTERFACES DATOS HISTÓRICOS (RECIBIDOS DE API CEREBRO)
 export interface HistoricalCampaignData {
@@ -37,6 +38,8 @@ export interface HistoricalDataResponse {
   total: number;
   lastUpdated: string;
   currentComparison?: any; // Cross-study comparison if current campaign provided
+  crossStudyComparison?: CrossStudyComparisonData; // ← AGREGAR ESTA LÍNEA
+
 }
 
 interface UseCampaignHistoryOptions {

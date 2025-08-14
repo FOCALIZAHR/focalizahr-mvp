@@ -754,6 +754,7 @@ export interface DepartmentMonitorData {
   invited: number;
   responded: number;
   rate: number;
+  displayName?: string; // <-- AÑADIR ESTA LÍNEA
 }
 
 export interface DailyResponse {
@@ -940,7 +941,7 @@ export interface DepartmentMomentumData {
   insights: string[];
   sparklineData: Array<{ name: string; value: number; velocity: number }>;
 }
-interface CardState {
+export interface CardState {
   title: string;        // Dinámico según contexto
   department: string;   // Nombre real o estado
   content: string;      // Contenido coherente
@@ -948,4 +949,10 @@ interface CardState {
   action: string;       // Descripción lógica
   style: 'danger' | 'success' | 'healthy' | 'warning';
   icon: 'alert' | 'trending' | 'check' | 'activity';
+}
+export interface CampaignMonitorData {
+  // ... propiedades existentes ...
+  riskTrendData: Array<{date: string, rate: number}>;
+  departmentSizes: Record<string, number>;
+  momentumGaugeData: Array<{value: number, fill: string}>;
 }

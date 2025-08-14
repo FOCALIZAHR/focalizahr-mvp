@@ -27,6 +27,7 @@ export interface CampaignResultsData {
       responses: number;
       score: number;
     }>;
+    trendDataByDepartment?: Record<string, Array<{ date: string; responses: number }>>;  // ← AGREGAR ESTA LÍNEA
     responsesByDay: Record<string, number>;
     segmentationData: any[];
     demographicBreakdown: any[];

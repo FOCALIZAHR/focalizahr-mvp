@@ -3,6 +3,7 @@
 // src/hooks/useCampaignMonitor.ts
 // Chat 2: Foundation Schema + Services - REPARACIÓN QUIRÚRGICA COMPLETA
 // 🧠 TRASPLANTE DE CEREBRO DIRECTO APLICADO
+// ✅ EXTENSIÓN TARJETAS VIVAS AGREGADA QUIRÚRGICAMENTE
 // ====================================================================
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -37,6 +38,14 @@ import type {
   TacticalRecommendation,  // ← AGREGAR ESTA LÍNEA
   DepartmentMomentumData,  // ← AGREGAR ESTA LÍNEA
 } from '@/types'
+
+// ✅ INTERFACE EXTENDIDA PARA CORREGIR ERROR TYPESCRIPT
+interface HistoricalDataResponse {
+  campaigns: any[];
+  total: number;
+  lastUpdated: string;
+  crossStudyComparison?: CrossStudyComparisonData; // ← AGREGAR ESTA LÍNEA
+}
 
 // ====================================================================
 // 🧠 COCKPIT INTELLIGENCE - TRASPLANTE DE CEREBRO DIRECTO
@@ -192,6 +201,41 @@ function generateMomentumInsights(departments: any[]): string[] {
   }
   return ['Análisis de momentum en progreso'];
 }
+
+// ====================================================================
+// ✅ NUEVAS FUNCIONES AUXILIARES PARA TARJETAS VIVAS
+// ====================================================================
+
+// Función auxiliar para datos del gauge momentum
+const prepareMomentumGaugeData = (topMover: any) => {
+  if (!topMover) return [{ value: 0, fill: '#6B7280' }];
+  
+  const momentum = topMover.momentum || 0;
+  return [
+    { value: momentum, fill: '#22C55E' },           // Verde para momentum actual
+    { value: Math.max(0, 100 - momentum), fill: '#374151' }  // Gris para el resto
+  ];
+};
+
+// Función auxiliar para datos de tendencia de riesgo
+const calculateRiskTrendData = (department: string, analytics: any) => {
+  if (!department || !analytics?.trendData) return [];
+  
+  // Simular tendencia descendente para el departamento en riesgo
+  return analytics.trendData.slice(-7).map((item: any, index: number) => ({
+    date: item.date,
+    rate: Math.max(20, 60 - (index * 5)) // Tendencia descendente simulada
+  }));
+};
+
+// Función auxiliar para tamaños departamentales
+const calculateDepartmentSizes = (byDepartment: any) => {
+  const sizes: Record<string, number> = {};
+  Object.entries(byDepartment).forEach(([dept, data]: [string, any]) => {
+    sizes[dept] = data.invited || 0;
+  });
+  return sizes;
+};
 
 // 🧠 FUNCIÓN PRINCIPAL - PROCESA DATOS YA CALCULADOS DEL HOOK
 function processCockpitIntelligence(
@@ -479,7 +523,7 @@ export interface CampaignMonitorData {
   lastActivity: string;
   startDate: string;
   endDate: string;
-  byDepartment: Record<string, DepartmentMonitorData>;
+  byDepartment: Record<string, DepartmentMonitorData & { displayName?: string }>;
   dailyResponses: DailyResponse[];
   alerts: AlertItem[];
   recentActivity: ActivityItem[];
@@ -501,6 +545,10 @@ export interface CampaignMonitorData {
   cockpitIntelligence?: CockpitIntelligence;
   // ✅ AGREGAR NUEVO CAMPO - MOMENTUM DEPARTAMENTAL
   departmentMomentum?: DepartmentMomentumData;
+  // ✅ EXTENSIÓN TARJETAS VIVAS - NUEVAS PROPIEDADES
+  riskTrendData: Array<{date: string, rate: number}>;
+  departmentSizes: Record<string, number>;
+  momentumGaugeData: Array<{value: number, fill: string}>;
 }
 
 
@@ -578,10 +626,14 @@ export function useCampaignMonitor(campaignId: string) {
           criticalCount: 0,
           allDepartments: [],
           hasRealData: false, // ✅ Estado loading sin datos reales
-          scenarioType: 'NO_DATA',
+          scenarioType: 'NO_DATA' as const,
           displayMessage: 'Cargando datos departamentales...'
         },
          topMovers: [],  // ✅ AGREGAR AQUÍ EN LÍNEA 450
+         // ✅ VALORES LOADING PARA EXTENSIÓN TARJETAS VIVAS
+         riskTrendData: [],
+         departmentSizes: {},
+         momentumGaugeData: [],
       };
     }
 
@@ -647,6 +699,7 @@ export function useCampaignMonitor(campaignId: string) {
                 invited: stats.total,
                 responded: stats.responded,
                 rate: stats.total > 0 ? Math.round((stats.responded / stats.total) * 100) : 0,
+                displayName: displayName // ✅ AGREGADO PARA COMPATIBILIDAD
             };
         }
     });
@@ -730,9 +783,9 @@ export function useCampaignMonitor(campaignId: string) {
       .map(([name, data]) => ({
         name: data.displayName || name,
         momentum: data.rate,  // Usar participación como momentum
-        trend: data.rate >= 80 ? 'completado' :
+        trend: (data.rate >= 80 ? 'completado' :
                data.rate >= 60 ? 'acelerando' :
-               data.rate >= 40 ? 'estable' : 'desacelerando'
+               data.rate >= 40 ? 'estable' : 'desacelerando') as TopMoverTrend // <-- AÑADIR "as TopMoverTrend"
       }))
       .sort((a, b) => b.momentum - a.momentum);
 
@@ -740,7 +793,9 @@ export function useCampaignMonitor(campaignId: string) {
     console.log('🎯 [Glass Cockpit] Departmental Performance:', {
       inputByDepartment: Object.keys(byDepartment),
       outputRanking: departmentsByParticipation,
-      totalDepartments: departmentsByParticipation.length
+      totalDepartments: departmentsByParticipation.length,
+      // ✅ VERIFICAR ACCESO A TRENDDATA BY DEPARTMENT
+      trendDataByDepartmentExists: !!analytics.trendDataByDepartment
     });
     
     // ✅ DATOS HISTÓRICOS REALES DE API (reemplaza mock)
@@ -779,9 +834,10 @@ export function useCampaignMonitor(campaignId: string) {
         .filter(d => d.momentum < 50) // < 50% participación
         .map(d => ({ 
           department: d.name, 
-          rate: d.momentum, 
-          severity: d.momentum < 30 ? 'high' : 'medium',
-          zScore: d.momentum < 30 ? -2.5 : -1.5 // Simulado para compatibilidad
+          rate: d.momentum, // ✅ CORRECCIÓN: Usar "rate" consistentemente
+          type: 'negative_outlier' as const,
+          severity: (d.momentum < 30 ? 'high' : 'medium') as const,
+          zScore: d.momentum < 30 ? -2.5 : -1.5 
         })),
       
       meanRate: anomalyData.meanRate,
@@ -796,6 +852,16 @@ export function useCampaignMonitor(campaignId: string) {
           rate: d.momentum, 
           severity: d.momentum < 30 ? 'high' : 'medium'
         }))),
+      
+      // ✅ EXTENSIÓN TARJETAS VIVAS - NUEVOS DATOS PRE-CALCULADOS
+      riskTrendData: calculateRiskTrendData(
+        departmentsByParticipation.length > 0 ? departmentsByParticipation[departmentsByParticipation.length - 1].name : '',
+        analytics
+      ),
+      departmentSizes: calculateDepartmentSizes(byDepartment),
+      momentumGaugeData: prepareMomentumGaugeData(
+        departmentsByParticipation.length > 0 ? departmentsByParticipation[0] : null
+      ),
     };
   
   }, [campaignData, participantsData, historicalData, campaignDetails, campaignId, lastRefresh]);
