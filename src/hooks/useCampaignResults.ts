@@ -1,5 +1,5 @@
 // src/hooks/useCampaignResults.ts
-// NORMALIZADOR CENTRAL v3.0 - ÚNICA FUENTE VALIDACIÓN Y NORMALIZACIÓN
+// HOOK CORREGIDO - FUNCIÓN normalizeAnalyticsData COMPLETA
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -20,14 +20,14 @@ export interface CampaignResultsData {
     // Datos estructurados normalizados
     categoryScores: Record<string, number>;
     departmentScores: Record<string, number>;
-    departmentScoresDisplay?: Record<string, number>; // ← AGREGADO FASE 3B
-    departmentMapping?: Record<string, string>; // ← AGREGADO FASE 3A
+    departmentScoresDisplay?: Record<string, number>;
+    departmentMapping?: Record<string, string>;
     trendData: Array<{
       date: string;
       responses: number;
       score: number;
     }>;
-    trendDataByDepartment?: Record<string, Array<{ date: string; responses: number }>>;  // ← AGREGAR ESTA LÍNEA
+    trendDataByDepartment?: Record<string, Array<{ date: string; responses: number }>>;
     responsesByDay: Record<string, number>;
     segmentationData: any[];
     demographicBreakdown: any[];
@@ -42,15 +42,16 @@ const getAuthToken = () => {
   return '';
 };
 
-// ✅ FUNCIÓN NORMALIZADORA CENTRAL - TODA LA LÓGICA AQUÍ
+// ✅ FUNCIÓN NORMALIZADORA CENTRAL COMPLETA - CAUSA RAÍZ SOLUCIONADA
 function normalizeAnalyticsData(rawAnalyticsData: any): CampaignResultsData {
+  console.log('🔍 Iniciando normalización de datos:', rawAnalyticsData);
+  
   const rawMetrics = rawAnalyticsData.metrics || {};
   const rawCampaign = rawAnalyticsData.campaign || {};
   
-  // 🔧 FASE 1 FIX: MAPEO CORRECTO CAMPAIGN.CAMPAIGNTYPE DESDE META
+  // 🔧 MAPEO CORRECTO CAMPAIGN.CAMPAIGNTYPE DESDE META
   const campaignData = {
     ...rawCampaign,
-    // ✅ CORRECCIÓN CRÍTICA: Mapear campaignType desde meta si no existe
     campaignType: rawCampaign.campaignType || rawAnalyticsData.meta?.campaignType || null,
     name: rawCampaign.name || rawAnalyticsData.meta?.campaignName || 'Campaña',
     company: rawCampaign.company || { name: 'Empresa' }
@@ -98,7 +99,7 @@ function normalizeAnalyticsData(rawAnalyticsData: any): CampaignResultsData {
     });
   }
 
-  // ✅ NORMALIZACIÓN TREND DATA - VALIDACIÓN ARRAYS
+  // ✅ NORMALIZACIÓN TREND DATA COMPLETA - FIX PRINCIPAL
   const trendData = Array.isArray(rawMetrics.trendData) 
     ? rawMetrics.trendData.map((item: any) => ({
         date: String(item?.date || ''),
@@ -107,7 +108,7 @@ function normalizeAnalyticsData(rawAnalyticsData: any): CampaignResultsData {
       }))
     : [];
 
-  // ✅ NORMALIZACIÓN TREND DATA BY DEPARTMENT - CAUSA RAÍZ SOLUCIONADA
+  // ✅ NORMALIZACIÓN TREND DATA BY DEPARTMENT
   const trendDataByDepartment = rawMetrics.trendDataByDepartment || {};
 
   // ✅ NORMALIZACIÓN RESPONSES BY DAY
@@ -121,9 +122,9 @@ function normalizeAnalyticsData(rawAnalyticsData: any): CampaignResultsData {
     });
   }
 
-  // ✅ CONSTRUCCIÓN OBJETO NORMALIZADO
-  return {
-    campaign: campaignData, // ← CAMPAÑA CON MAPEO CORRECTO
+  // ✅ CONSTRUCCIÓN OBJETO NORMALIZADO FINAL
+  const normalizedData = {
+    campaign: campaignData,
     analytics: {
       // Métricas principales validadas
       totalInvited,
@@ -137,16 +138,19 @@ function normalizeAnalyticsData(rawAnalyticsData: any): CampaignResultsData {
       // Datos estructurados validados
       categoryScores,
       departmentScores,
-      departmentScoresDisplay, // ← AGREGADO FASE 3B
-      departmentMapping: rawMetrics.departmentMapping || {}, // ← AGREGADO FASE 3A
+      departmentScoresDisplay,
+      departmentMapping: rawMetrics.departmentMapping || {},
       trendData,
-      trendDataByDepartment, // ← AGREGADO CAUSA RAÍZ SOLUCIONADA
+      trendDataByDepartment,
       responsesByDay,
       segmentationData: Array.isArray(rawMetrics.segmentationData) ? rawMetrics.segmentationData : [],
       demographicBreakdown: Array.isArray(rawMetrics.demographicBreakdown) ? rawMetrics.demographicBreakdown : [],
       lastUpdated: rawMetrics.lastUpdated || new Date().toISOString()
     }
   };
+
+  console.log('✅ Datos normalizados exitosamente:', normalizedData);
+  return normalizedData;
 }
 
 export function useCampaignResults(campaignId: string) {
@@ -165,8 +169,11 @@ export function useCampaignResults(campaignId: string) {
     setError(null);
 
     try {
+      console.log('🔄 Iniciando fetch de analytics para campaignId:', campaignId);
+      
       const token = getAuthToken();
       if (!token) {
+        console.error('❌ No token found, redirecting to login');
         router.push('/login');
         return;
       }
@@ -175,20 +182,29 @@ export function useCampaignResults(campaignId: string) {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
+      console.log('📡 Response status:', analyticsRes.status);
+
       if (!analyticsRes.ok) {
-        if (analyticsRes.status === 401) router.push('/login');
+        if (analyticsRes.status === 401) {
+          console.error('❌ 401 Unauthorized, redirecting to login');
+          router.push('/login');
+          return;
+        }
         const errorData = await analyticsRes.json();
         throw new Error(errorData.error || 'No se pudieron cargar las estadísticas de la campaña.');
       }
 
       const rawAnalyticsData = await analyticsRes.json();
+      console.log('📊 Raw analytics data received:', rawAnalyticsData);
 
       // ✅ NORMALIZACIÓN CENTRAL - ÚNICA RESPONSABILIDAD DEL HOOK
       const normalizedData = normalizeAnalyticsData(rawAnalyticsData);
       
+      console.log('🎯 Setting normalized data to state');
       setData(normalizedData);
 
     } catch (err) {
+      console.error('❌ Error in useCampaignResults:', err);
       setError(err instanceof Error ? err.message : 'Ocurrió un error desconocido.');
     } finally {
       setIsLoading(false);
@@ -198,6 +214,16 @@ export function useCampaignResults(campaignId: string) {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // ✅ LOGGING DE ESTADO PARA DEBUGGING
+  useEffect(() => {
+    console.log('📊 useCampaignResults state update:', {
+      hasData: !!data,
+      isLoading,
+      error,
+      campaignId
+    });
+  }, [data, isLoading, error, campaignId]);
 
   return { data, isLoading, error, refreshData: fetchData };
 }

@@ -16,16 +16,16 @@ import { Brain, Zap, Loader2, AlertTriangle } from 'lucide-react';
 import '@/styles/focalizahr-design-system.css';
 import '@/styles/cockpit-polish.css';
 
-// 🎯 INTERFACE PROPS - DATOS PRE-CALCULADOS DEL HOOK
+// ðŸŽ¯ INTERFACE PROPS - DATOS PRE-CALCULADOS DEL HOOK
 export interface CockpitHeaderProps {
-  // ✅ DATOS PRINCIPALES YA CALCULADOS
+  // âœ… DATOS PRINCIPALES YA CALCULADOS
   participationRate: number;
   daysRemaining: number;
   totalInvited: number;
   totalResponded: number;
   lastActivity: string;
   
-  // ✅ INTELIGENCIA YA PROCESADA EN HOOK (no recalcular)
+  // âœ… INTELIGENCIA YA PROCESADA EN HOOK (no recalcular)
   topMovers?: Array<{
     name: string;
     momentum: number;
@@ -50,8 +50,12 @@ export interface CockpitHeaderProps {
   };
   insights?: string[];
   recommendations?: string[];
-  
-  // 🧠 COCKPIT INTELLIGENCE - DATOS PRE-CALCULADOS
+  // ðŸ"§ DATOS GRÃFICOS FALTANTES (AGREGAR PARA GRÃFICOS)
+  riskTrendData?: Array<{ date: string; rate: number; }>;
+  departmentSizes?: Record<string, number>;
+  momentumGaugeData?: Array<{ value: number; fill: string; }>;
+
+  // ðŸ§  COCKPIT INTELLIGENCE - DATOS PRE-CALCULADOS
   cockpitIntelligence?: {
     vectorMomentum: string;
     projection: {
@@ -63,7 +67,7 @@ export interface CockpitHeaderProps {
     action: {
       primary: string;
       reasoning: string;
-      urgency: 'baja' | 'media' | 'alta' | 'crítica';
+      urgency: 'baja' | 'media' | 'alta' | 'crÃ­tica';
       nextSteps: string[];
       urgencyColor: string;
     };
@@ -75,16 +79,16 @@ export interface CockpitHeaderProps {
     };
   };
   
-  // ✅ HANDLERS
+  // âœ… HANDLERS
   onScrollToSection?: (sectionId: string) => void;
   
-  // ✅ ESTADOS
+  // âœ… ESTADOS
   isLoading?: boolean;
   error?: string | null;
   lastRefresh: Date;
 }
 
-// 🎯 COMPONENTE TOGGLE ENHANCED
+// ðŸŽ¯ COMPONENTE TOGGLE ENHANCED
 interface ToggleButtonProps {
   active: boolean;
   onClick: () => void;
@@ -131,7 +135,7 @@ function ToggleButton({ active, onClick, icon: Icon, label, subtitle, disabled }
   );
 }
 
-// 🎯 COMPONENTE SKELETON MEJORADO
+// ðŸŽ¯ COMPONENTE SKELETON MEJORADO
 function CockpitSkeleton() {
   return (
     <div className="w-full mb-8">
@@ -190,7 +194,7 @@ function CockpitSkeleton() {
   );
 }
 
-// 🎯 ERROR STATE ENHANCED
+// ðŸŽ¯ ERROR STATE ENHANCED
 function CockpitError({ error }: { error: string }) {
   return (
     <div className="w-full mb-8 flex justify-center">
@@ -229,13 +233,13 @@ function CockpitError({ error }: { error: string }) {
             onClick={() => window.location.reload()}
             className="fhr-btn-primary px-6 py-2 text-sm"
           >
-            🔄 Reintentar
+            ðŸ"„ Reintentar
           </button>
           <button
             onClick={() => console.log('Reporting error:', error)}
             className="fhr-btn-secondary px-6 py-2 text-sm"
           >
-            📝 Reportar Problema
+            ðŸ" Reportar Problema
           </button>
         </div>
       </motion.div>
@@ -243,9 +247,9 @@ function CockpitError({ error }: { error: string }) {
   );
 }
 
-// 🎯 COMPONENTE PRINCIPAL - EXPERIENCIA PREMIUM COMPLETADA
+// ðŸŽ¯ COMPONENTE PRINCIPAL - EXPERIENCIA PREMIUM COMPLETADA
 export function CockpitHeader(props: CockpitHeaderProps) {
-  // ✅ RECIBIR DATOS PRE-CALCULADOS - NO RECALCULAR
+  // âœ… RECIBIR DATOS PRE-CALCULADOS - NO RECALCULAR
   const intelligence = props.cockpitIntelligence;
 
   // Si la inteligencia no ha llegado, muestra loading
@@ -253,7 +257,7 @@ export function CockpitHeader(props: CockpitHeaderProps) {
     return <CockpitSkeleton />;
   }
   
-  // ✅ HOOKS UI - DISEÑO PRESERVADO
+  // âœ… HOOKS UI - DISEÃ'O PRESERVADO
   const { 
     activeView, 
     handleToggle, 
@@ -263,7 +267,7 @@ export function CockpitHeader(props: CockpitHeaderProps) {
 
   const deviceType = useDeviceType();
 
-  // 🧭 NAVEGACIÓN UNIVERSAL - FUNCIONALIDAD PRESERVADA
+  // ðŸ§­ NAVEGACIÃ"N UNIVERSAL - FUNCIONALIDAD PRESERVADA
   const handleNavigation = (section: string) => {
     const sectionMap: Record<string, string> = {
       'momentum': 'topmovers',
@@ -280,7 +284,7 @@ export function CockpitHeader(props: CockpitHeaderProps) {
     props.onScrollToSection?.(targetSection);
   };
 
-  // 🎯 PROPS PARA LAS VISTAS - ARQUITECTURA CORRECTA
+  // ðŸŽ¯ PROPS PARA LAS VISTAS - ARQUITECTURA CORRECTA
   const viewProps = {
     // Datos base
     participationRate: props.participationRate,
@@ -297,6 +301,11 @@ export function CockpitHeader(props: CockpitHeaderProps) {
     crossStudyComparison: props.crossStudyComparison,
     insights: props.insights || [],
     recommendations: props.recommendations || [],
+    
+    // 🔧 DATOS GRÁFICOS PARA DYNAMICVIEW (AGREGAR ESTAS 3 LÍNEAS)
+    riskTrendData: props.riskTrendData || [],
+    departmentSizes: props.departmentSizes || {},
+    momentumGaugeData: props.momentumGaugeData || [],
     
     // Cockpit Intelligence PRE-CALCULADA
     cockpitIntelligence: intelligence,
@@ -322,16 +331,16 @@ export function CockpitHeader(props: CockpitHeaderProps) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
       >
-        {/* 🔥 CONTENEDOR PRINCIPAL TESLA-GRADE */}
+        {/* ðŸ"¥ CONTENEDOR PRINCIPAL TESLA-GRADE */}
         <div className="border border-white/10 backdrop-blur-xl bg-black/20 rounded-xl p-8 glass-enhanced">
           
-          {/* 🎛️ TOGGLE BIMODAL - ESTRUCTURA EXACTA GUÍA */}
+          {/* ðŸŽ›ï¸ TOGGLE BIMODAL - ESTRUCTURA EXACTA GUÃA */}
           <div className="flex justify-center mb-6 p-2">
             <motion.div 
               className="relative bg-black/30 rounded-full p-1 border border-white/20 backdrop-blur-sm"
               layout
             >
-              {/* Background animado del toggle - EXACTO GUÍA */}
+              {/* Background animado del toggle - EXACTO GUÃA */}
               <motion.div
                 className="absolute top-1 w-1/2 h-[calc(100%-8px)] bg-gradient-to-r from-cyan-500/30 to-purple-500/30 rounded-full backdrop-blur-sm border border-white/10"
                 animate={{
@@ -340,29 +349,29 @@ export function CockpitHeader(props: CockpitHeaderProps) {
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
               />
               
-              {/* Botones del toggle - TEXTO EXACTO GUÍA */}
+              {/* Botones del toggle - TEXTO EXACTO GUÃA */}
               <div className="relative flex">
                 <ToggleButton
                   active={activeView === 'predictive'}
                   onClick={() => handleToggle('predictive')}
                   icon={Brain}
                   label="Predictiva"
-                  subtitle="¿Llegaremos?"
+                  subtitle="Â¿Llegaremos?"
                   disabled={!canSwitch || isTransitioning}
                 />
                 <ToggleButton
                   active={activeView === 'dynamic'}
                   onClick={() => handleToggle('dynamic')}
                   icon={Zap}
-                  label="Dinámica"
-                  subtitle="¿Dónde actuar?"
+                  label="DinÃ¡mica"
+                  subtitle="Â¿DÃ³nde actuar?"
                   disabled={!canSwitch || isTransitioning}
                 />
               </div>
             </motion.div>
           </div>
 
-          {/* 🎯 SISTEMA VISTAS BIMODALES */}
+          {/* ðŸŽ¯ SISTEMA VISTAS BIMODALES */}
           <AnimatePresence mode="wait" key={activeView}>
             <motion.div
               key={activeView}
@@ -383,7 +392,7 @@ export function CockpitHeader(props: CockpitHeaderProps) {
             </motion.div>
           </AnimatePresence>
 
-          {/* 📊 PANEL CONTEXTO INFERIOR - ESTRUCTURA EXACTA GUÍA */}
+          {/* ðŸ"Š PANEL CONTEXTO INFERIOR - ESTRUCTURA EXACTA GUÃA */}
           <motion.div 
             className="mt-8 bg-black/40 backdrop-blur-lg rounded-lg p-4 border border-white/10"
             initial={{ opacity: 0, y: 20 }}
@@ -392,9 +401,9 @@ export function CockpitHeader(props: CockpitHeaderProps) {
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
               <div>
-                <div className="text-sm text-white/60">Análisis Temporal</div>
+                <div className="text-sm text-white/60">AnÃ¡lisis Temporal</div>
                 <div className="text-lg font-semibold text-cyan-400">
-                  Velocidad actual: 0.3 resp/día
+                  Velocidad actual: 0.3 resp/dÃ­a
                 </div>
               </div>
               <div>
@@ -404,16 +413,16 @@ export function CockpitHeader(props: CockpitHeaderProps) {
                 </div>
               </div>
               <div>
-                <div className="text-sm text-white/60">Siguiente Acción</div>
+                <div className="text-sm text-white/60">Siguiente AcciÃ³n</div>
                 <div className="text-lg font-semibold text-green-400">
-                  Intervención requerida
+                  IntervenciÃ³n requerida
                 </div>
               </div>
             </div>
             
-            {/* Footer - EXACTO GUÍA */}
+            {/* Footer - EXACTO GUÃA */}
             <div className="text-center mt-4 text-xs text-white/40">
-              Última actualización: {props.lastRefresh?.toLocaleTimeString() || '8:59:07 p. m.'} • Algoritmo predictivo v4.0
+              Ãšltima actualizaciÃ³n: {props.lastRefresh?.toLocaleTimeString() || '8:59:07 p. m.'} â€¢ Algoritmo predictivo v4.0
             </div>
           </motion.div>
         </div>

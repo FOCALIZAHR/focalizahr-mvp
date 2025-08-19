@@ -4,7 +4,7 @@
 // Chat 4B: Cross-Study Comparator - Hook sin lógica, solo fetch API
 // ====================================================================
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { CrossStudyComparisonData } from '@/types';
 
 // ✅ INTERFACES DATOS HISTÓRICOS (RECIBIDOS DE API CEREBRO)
@@ -115,8 +115,8 @@ export function useCampaignHistory(options: UseCampaignHistoryOptions = {}) {
     fetchHistoricalData();
   }, [fetchHistoricalData]);
 
-  // ✅ RETURN SIMPLE - DATOS + ESTADOS
-  return {
+  // ✅ ESTABILIZAR RETURN PARA EVITAR BUCLE INFINITO
+  const stableReturn = useMemo(() => ({
     data,
     isLoading,
     error,
@@ -126,5 +126,7 @@ export function useCampaignHistory(options: UseCampaignHistoryOptions = {}) {
     totalCampaigns: data?.total || 0,
     // ✅ NUEVO: Comparación cross-study pre-calculada
     crossStudyComparison: data?.currentComparison || null
-  };
+  }), [data, isLoading, error, fetchHistoricalData]);
+
+  return stableReturn;
 }

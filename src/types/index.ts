@@ -812,7 +812,7 @@ export interface ParticipationPredictionData {
 // ❌ ESTAS 2 INTERFACES NO EXISTEN EN TU ARCHIVO:
 export interface DepartmentAnomalyData {
   department: string;
-  currentRate: number;
+  rate: number; // ← CAMBIAR DE currentRate A rate
   zScore: number;
   type: 'positive_outlier' | 'negative_outlier';
   severity: 'high' | 'medium';
@@ -919,7 +919,7 @@ export interface TacticalRecommendation {
   primary: string;           // "Replicar éxito de RRHH en Marketing"
   reasoning: string;         // "RRHH tiene 95% vs 45% de Marketing"
   urgency: 'baja' | 'media' | 'alta' | 'crítica';
-  action: 'tactical';        // Identificador tipo acción
+  action: 'tactical' | 'post-campaign' | 'emergency';      // Identificador tipo acción
   urgencyColor: string;      // Color dinámico para UI
 }
 

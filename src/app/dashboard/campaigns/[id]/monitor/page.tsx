@@ -1,7 +1,7 @@
 // ====================================================================
-// FOCALIZAHR MONITOR PAGE - ARQUITECTURA ORIGINAL + IDs NAVEGACIÓN
+// FOCALIZAHR MONITOR PAGE - ARQUITECTURA ORIGINAL + IDs NAVEGACIÃ"N
 // src/app/dashboard/campaigns/[id]/monitor/page.tsx
-// SIMPLE: Patrón original que funciona + IDs para scroll
+// SIMPLE: PatrÃ³n original que funciona + IDs para scroll
 // ====================================================================
 
 'use client';
@@ -9,10 +9,10 @@
 import { useCampaignMonitor } from '@/hooks/useCampaignMonitor';
 import { useRouter, useParams } from 'next/navigation';
 
-// 🚀 CockpitHeader bimodal
+// ðŸš€ CockpitHeader bimodal
 import { CockpitHeader } from '@/components/monitor/CockpitHeader';
 
-// ✅ Componentes WOW existentes
+// âœ… Componentes WOW existentes
 import { DepartmentPulsePanel } from '@/components/monitor/DepartmentPulsePanel';
 import { ActionButtons } from '@/components/monitor/ActionButtons';
 import { AnomalyDetectorPanel } from '@/components/monitor/AnomalyDetectorPanel';
@@ -25,7 +25,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 
-// ✅ CSS FocalizaHR
+// âœ… CSS FocalizaHR
 import '@/styles/focalizahr-design-system.css';
 
 export default function CampaignMonitorPage() {
@@ -33,11 +33,11 @@ export default function CampaignMonitorPage() {
   const params = useParams();
   const campaignId = params.id as string;
 
-  // ✅ HOOK CENTRAL - Single Source of Truth
+  // âœ… HOOK CENTRAL - Single Source of Truth
   const monitorData = useCampaignMonitor(campaignId);
   const { isLoading, error, lastRefresh } = monitorData;
 
-  // 🔄 LOADING STATE
+  // ðŸ"„ LOADING STATE
   if (isLoading) {
     return (
       <div className="fhr-bg-main min-h-screen flex items-center justify-center">
@@ -48,7 +48,7 @@ export default function CampaignMonitorPage() {
               Cargando Torre de Control
             </h3>
             <p className="text-white/60">
-              Procesando datos de campaña...
+              Procesando datos de campaÃ±a...
             </p>
           </CardContent>
         </Card>
@@ -56,7 +56,7 @@ export default function CampaignMonitorPage() {
     );
   }
 
-  // ⚠️ ERROR STATE
+  // âš ï¸ ERROR STATE
   if (error) {
     return (
       <div className="fhr-bg-main min-h-screen flex items-center justify-center">
@@ -74,7 +74,7 @@ export default function CampaignMonitorPage() {
     <div className="fhr-bg-main min-h-screen">
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
         
-        {/* 🚀 COCKPIT HEADER - Simple: recibe monitorData como todos los demás */}
+        {/* ðŸš€ COCKPIT HEADER - Recibe TODOS los datos del hook incluyendo gráficos */}
         <CockpitHeader 
           {...monitorData}
           onScrollToSection={(sectionId) => {
@@ -85,12 +85,12 @@ export default function CampaignMonitorPage() {
           }}
         />
 
-        {/* 🎯 PROTAGONISTA - Historia Temporal */}
+        {/* ðŸŽ¯ PROTAGONISTA - Historia Temporal */}
         <div id="rhythm">
           <CampaignRhythmPanel {...monitorData} />
         </div>
 
-        {/* ⚡ GRID COMPONENTES WOW */}
+        {/* âš¡ GRID COMPONENTES WOW */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           <div id="pulse">
@@ -114,7 +114,7 @@ export default function CampaignMonitorPage() {
           </div>
         </div>
 
-        {/* 🎛️ PANEL DE ACCIONES */}
+        {/* ðŸŽ›ï¸ PANEL DE ACCIONES */}
         <div id="actions">
           <ActionButtons {...monitorData} />
         </div>

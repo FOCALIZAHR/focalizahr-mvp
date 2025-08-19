@@ -2,6 +2,7 @@
 // Archivo: src/hooks/useCampaignDetails.ts
 
 import useSWR from 'swr';
+import { useMemo } from 'react';
 
 // 🚀 FETCHER SIMPLE
 const fetcher = (url: string) => {
@@ -43,9 +44,12 @@ export function useCampaignDetails(campaignId: string) {
     });
   }
 
-  return {
+  // ✅ ESTABILIZAR RETURN PARA EVITAR BUCLE INFINITO
+  const stableReturn = useMemo(() => ({
     campaignDetails: data?.campaign,
     isLoading,
     error
-  };
+  }), [data?.campaign, isLoading, error]);
+
+  return stableReturn;
 }

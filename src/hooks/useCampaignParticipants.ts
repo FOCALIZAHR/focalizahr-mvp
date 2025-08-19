@@ -4,7 +4,7 @@
 // Chat 2: Foundation Schema + Services - ACTUALIZACIÓN IMPORT PATHS
 // ====================================================================
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Participant, ParticipantsData } from '@/types'; // ✅ IMPORT CENTRALIZADO
 
 export function useCampaignParticipants(campaignId: string, options?: { includeDetails?: boolean }) {
@@ -102,10 +102,13 @@ export function useCampaignParticipants(campaignId: string, options?: { includeD
     fetchParticipants();
   }, [fetchParticipants]);
 
-  return {
+  // ✅ ESTABILIZAR RETURN PARA EVITAR BUCLE INFINITO
+  const stableReturn = useMemo(() => ({
     data,
     isLoading,
     error,
     refreshData
-  };
+  }), [data, isLoading, error, refreshData]);
+
+  return stableReturn;
 }

@@ -112,17 +112,56 @@ export function PredictiveView(props: PredictiveViewProps) {
     participationPrediction?.confidence || 
     0; // Fallback simple sin algoritmos
 
-  // 🎯 DATOS PARA CARDS - SOLO DESDE INTELLIGENCE PRE-CALCULADA
-  const vectorMomentum = cockpitIntelligence?.vectorMomentum || 'Sin datos';
-  const estadoMomentum = cockpitIntelligence?.pattern?.dominantPattern || 'Analizando...';
-  
-  const accionPrincipal = cockpitIntelligence?.action?.primary || 
-    (recommendations.length > 0 ? recommendations[0] : 'Sin recomendación disponible');
-  
-  const razonamiento = cockpitIntelligence?.action?.reasoning || 
-    'Esperando análisis de inteligencia artificial';
-  
-  const colorUrgencia = cockpitIntelligence?.action?.urgencyColor || '#6B7280';
+  // ✅ FUNCIÓN AUXILIAR: DIAGNÓSTICO COMPRENSIBLE
+  const getRealDiagnostic = (vectorMomentum: string): string => {
+    if (vectorMomentum?.includes('⚠️') || vectorMomentum?.includes('Crisis')) return 'Ritmo Crítico Detectado';
+    if (vectorMomentum?.includes('⚡') || vectorMomentum?.includes('Aceleración')) return 'Momentum Positivo';
+    if (vectorMomentum?.includes('✅') || vectorMomentum?.includes('Éxito')) return 'Ritmo Óptimo';
+    if (vectorMomentum?.includes('Metodología')) return 'Campaña Completada';
+    return 'Ritmo Constante';
+  };
+
+  // ✅ FUNCIÓN AUXILIAR: ACCIÓN ESPECÍFICA EJECUTIVA
+  const getSpecificAction = (primaryAction: string): string => {
+    if (primaryAction?.includes('Intervención') || primaryAction?.includes('Inmediata')) {
+      return 'Llamar directores HOY';
+    }
+    if (primaryAction?.includes('Replicar') || primaryAction?.includes('éxito')) {
+      return 'Transferir mejores prácticas';
+    }
+    if (primaryAction?.includes('Mantener') || primaryAction?.includes('Momentum')) {
+      return 'Continuar estrategia actual';
+    }
+    if (primaryAction?.includes('Extensión') || primaryAction?.includes('Urgente')) {
+      return 'Extender campaña 5 días';
+    }
+    if (primaryAction?.includes('Documentar') || primaryAction?.includes('Metodología')) {
+      return 'Documentar lecciones aprendidas';
+    }
+    return primaryAction || 'Revisar estrategia general';
+  };
+
+  // ✅ FUNCIÓN AUXILIAR: CONTEXTO ACCIÓN ESPECÍFICO
+  const getActionContext = (
+    negativeAnomalies: any[], 
+    daysRemaining: number, 
+    topMovers: any[]
+  ): string => {
+    const criticalDepts = negativeAnomalies?.filter(a => a.severity === 'high')?.length || 0;
+    const totalAnomalies = negativeAnomalies?.length || 0;
+    const leadingDepts = topMovers?.length || 0;
+    
+    if (criticalDepts > 0) {
+      return `${criticalDepts} departamentos en riesgo crítico - ${daysRemaining} días restantes`;
+    }
+    if (totalAnomalies > 0) {
+      return `${totalAnomalies} departamentos requieren atención - ${daysRemaining} días restantes`;
+    }
+    if (leadingDepts > 0) {
+      return `${leadingDepts} departamentos lideran - replicar metodología`;
+    }
+    return `Monitorear progreso - ${daysRemaining} días para completar`;
+  };
   return (
     <motion.div
       className="w-full"
@@ -154,16 +193,16 @@ export function PredictiveView(props: PredictiveViewProps) {
         >
           <div className="w-3 h-3 rounded-full bg-cyan-400 mb-3"></div>
           <h3 className="text-sm text-cyan-400 mb-4 group-hover:text-cyan-300 transition-colors">
-            Punto de Partida
+            Situación Actual
           </h3>
           <div className="text-4xl font-bold text-white mb-2">
             {participationRate}%
           </div>
           <div className="text-sm text-cyan-300 mb-1">
-            {totalResponded}/{totalInvited} respuestas
+            Día {21 - daysRemaining} de 21 - {totalResponded}/{totalInvited} respuestas
           </div>
           <div className="text-xs text-white/60">
-            Velocidad: {velocidadActual.toFixed(1)}/día
+            Ritmo: {velocidadActual.toFixed(1)} respuestas/día
           </div>
         </motion.div>
 
@@ -201,16 +240,16 @@ export function PredictiveView(props: PredictiveViewProps) {
           <div className="relative">
             <div className="w-3 h-3 rounded-full bg-purple-400 mb-3"></div>
             <h3 className="text-sm text-white/80 mb-4 group-hover:text-white transition-colors">
-              Vector Momentum
+              Diagnóstico IA
             </h3>
-            <div className="text-4xl font-bold text-purple-300 mb-2">
-              {vectorMomentum}
+            <div className="text-lg font-bold text-white mb-2">
+              {getRealDiagnostic(cockpitIntelligence?.vectorMomentum || '')}
             </div>
             <div className="text-sm text-purple-200 mb-1">
-              {estadoMomentum}
+              {cockpitIntelligence?.vectorMomentum || 'Calculando...'}
             </div>
             <div className="text-xs text-white/60">
-              {topMovers.length} dept. activos
+              Meta: {((totalInvited - totalResponded) / Math.max(1, daysRemaining)).toFixed(1)} resp/día
             </div>
           </div>
         </motion.div>
@@ -249,16 +288,24 @@ export function PredictiveView(props: PredictiveViewProps) {
           <div className="relative">
             <div className="w-3 h-3 rounded-full bg-cyan-400 mb-3"></div>
             <h3 className="text-sm text-cyan-400 mb-4 group-hover:text-cyan-300 transition-colors">
-              Proyección Final
+              Escenarios Proyectados
             </h3>
-            <div className="text-4xl font-bold text-cyan-300 mb-2">
-              {proyeccionFinal}%
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-white/70">Sin cambios:</span>
+                <span className="text-lg font-bold text-yellow-400">
+                  {proyeccionFinal}%
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-white/70">Con intervención:</span>
+                <span className="text-lg font-bold text-green-400">
+                  {Math.min(85, proyeccionFinal + 25)}%
+                </span>
+              </div>
             </div>
-            <div className="text-sm text-cyan-400/80 mb-1">
-              Confianza IA: {confianza}%
-            </div>
-            <div className="text-xs text-white/60">
-              {daysRemaining} días restantes
+            <div className="text-xs text-white/60 mt-2">
+              Confianza: {confianza}% - {daysRemaining} días restantes
             </div>
           </div>
         </motion.div>
@@ -283,19 +330,24 @@ export function PredictiveView(props: PredictiveViewProps) {
         >
           <div className="w-3 h-3 rounded-full bg-green-400 mb-3"></div>
           <h3 className="text-sm text-white/80 mb-4 group-hover:text-white transition-colors">
-            Acción Recomendada
+            Acción Específica
           </h3>
-          <div className="text-lg font-semibold text-green-400 mb-3">
-            {accionPrincipal}
-          </div>
-          <div className="text-xs text-white/70 mb-3">
-            {razonamiento}
+          <div className="space-y-2">
+            <div className="text-lg font-bold text-white">
+              {getSpecificAction(cockpitIntelligence?.action?.primary || '')}
+            </div>
+            <div className="text-sm text-green-300">
+              {getActionContext(negativeAnomalies, daysRemaining, topMovers)}
+            </div>
+            <div className="text-xs text-white/60">
+              Urgencia: {cockpitIntelligence?.action?.urgency || 'media'} - Ejecutar hoy
+            </div>
           </div>
           
           {/* Línea de urgencia dinámica - MÁS PROMINENTE SEGÚN IMAGEN */}
           <motion.div 
             className="w-8 h-1.5 rounded-full mb-4"
-            style={{ background: colorUrgencia }}
+            style={{ background: cockpitIntelligence?.action?.urgencyColor || '#6B7280' }}
             initial={{ opacity: 0, width: 0 }}
             animate={{ opacity: 1, width: 32 }}
             transition={{ delay: 0.7, duration: 0.5 }}
