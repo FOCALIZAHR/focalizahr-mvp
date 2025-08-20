@@ -15,6 +15,19 @@ interface PredictiveViewProps {
   totalInvited: number;
   totalResponded: number;
   
+  topMovers?: Array<{
+    name: string;
+    momentum: number;
+    trend: string;
+  }>;
+  
+  negativeAnomalies?: Array<{
+    department: string;
+    rate: number;
+    severity: string;
+    zScore?: number;
+  }>;
+  
   cockpitIntelligence?: {
     vectorMomentum: string;
     projection: {
@@ -45,6 +58,8 @@ export function PredictiveView({
   daysRemaining, 
   totalInvited, 
   totalResponded,
+  topMovers,
+  negativeAnomalies,
   cockpitIntelligence,
   participationPrediction,
   onNavigate,
@@ -71,13 +86,13 @@ export function PredictiveView({
             <Target className="h-5 w-5 text-fhr-cyan" />
           </div>
           <div className="fhr-title-gradient text-3xl font-bold mb-2">
-            {participationRate.toFixed(0)}%
+            Día {Math.max(1, Math.ceil((Date.now() - (Date.now() - (daysRemaining * 24 * 60 * 60 * 1000))) / (24 * 60 * 60 * 1000)))} de {Math.ceil((Date.now() - (Date.now() - (daysRemaining * 24 * 60 * 60 * 1000))) / (24 * 60 * 60 * 1000)) + daysRemaining} - {participationRate.toFixed(0)}%
           </div>
           <div className="text-sm text-white/70 mb-1">
             {totalResponded}/{totalInvited} respuestas
           </div>
           <div className="text-sm text-white/60">
-            Ritmo: {participationPrediction?.velocity?.toFixed(1) || '0.0'} resp/día
+            Velocidad: {participationPrediction?.velocity?.toFixed(1) || '0.0'} resp/día
           </div>
         </div>
 
@@ -88,33 +103,30 @@ export function PredictiveView({
             <Zap className="h-5 w-5 text-purple-400" />
           </div>
           <div className="text-lg font-bold text-white mb-2">
-            {cockpitIntelligence?.action?.primary || 'Analizando...'}
+            {cockpitIntelligence?.action?.primary || 'Evaluando situación...'}
           </div>
           <div className="text-sm text-white/70 mb-1">
-            {cockpitIntelligence?.vectorMomentum || 'Calculando momentum...'}
+            {cockpitIntelligence?.vectorMomentum || 'Analizando patrones...'}
           </div>
           <div className="text-sm text-white/60">
-            {cockpitIntelligence?.projection?.methodology || 'Datos insuficientes'}
+            {cockpitIntelligence?.projection?.methodology || 'Calculando proyección'}
           </div>
         </div>
 
-        {/* CARD 3: PROYECCIÓN */}
+        {/* CARD 3: FACTORES CRÍTICOS */}
         <div className="fhr-card-metric p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="fhr-subtitle">Proyección</h3>
+            <h3 className="fhr-subtitle">Factores Críticos</h3>
             <TrendingUp className="h-5 w-5 text-green-400" />
           </div>
-          <div className="text-3xl font-bold text-green-400 mb-2">
-            {cockpitIntelligence?.projection?.finalProjection?.toFixed(0) || 
-             participationPrediction?.finalProjection?.toFixed(0) || 
-             participationRate.toFixed(0)}%
+          <div className="text-sm text-green-400 mb-2">
+            ✅ {topMovers?.length || 0} departamentos acelerando
           </div>
-          <div className="text-sm text-white/70 mb-1">
-            Confianza: {cockpitIntelligence?.projection?.confidence?.toFixed(0) || 
-                       participationPrediction?.confidence?.toFixed(0) || '0'}%
+          <div className="text-sm text-amber-400 mb-2">
+            ⚠️ {negativeAnomalies?.length || 0} área(s) requieren atención {negativeAnomalies?.[0]?.department ? `(${negativeAnomalies[0].department})` : ''}
           </div>
-          <div className="text-sm text-white/60">
-            {daysRemaining} días restantes
+          <div className="text-sm text-cyan-400">
+            🎯 Factor de éxito: {topMovers?.[0]?.name || 'Analizando'} metodología replicable
           </div>
         </div>
 
@@ -125,10 +137,10 @@ export function PredictiveView({
             <ArrowRight className="h-5 w-5 text-orange-400" />
           </div>
           <div className="text-lg font-bold text-white mb-2">
-            {cockpitIntelligence?.action?.primary || 'Mantener monitoreo'}
+            {cockpitIntelligence?.action?.primary || 'Continuar seguimiento regular'}
           </div>
           <div className="text-sm text-white/70 mb-1">
-            {cockpitIntelligence?.action?.reasoning || 'Continuar seguimiento regular'}
+            {cockpitIntelligence?.action?.reasoning || 'Monitoreo estratégico continuo'}
           </div>
           <div className={`text-sm ${cockpitIntelligence?.action?.urgencyColor || 'text-cyan-400'}`}>
             Urgencia: {cockpitIntelligence?.action?.urgency || 'media'}

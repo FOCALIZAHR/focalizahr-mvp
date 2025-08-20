@@ -24,6 +24,7 @@ interface DynamicViewProps {
     department: string;
     rate: number;
     severity: string;
+    zScore?: number; // ✅ AGREGAR zScore para mostrar datos estadísticos
   }>;
   
   cockpitIntelligence?: {
@@ -36,6 +37,12 @@ interface DynamicViewProps {
     pattern: {
       dominantPattern: string;
       description: string;
+    };
+    tacticalAction?: { // ✅ AGREGAR tacticalAction del hook
+      primary: string;
+      reasoning: string;
+      urgency: string;
+      urgencyColor: string;
     };
   };
   
@@ -85,7 +92,7 @@ export function DynamicView({
                 {leader.name}
               </div>
               <div className="text-lg text-white mb-2">
-                {leader.momentum}% participación
+                {leader.momentum} Pts desempeño superior
               </div>
               <div className="fhr-badge-completed text-xs mb-2">
                 {leader.trend}
@@ -112,13 +119,13 @@ export function DynamicView({
                 {risk.department}
               </div>
               <div className="text-lg text-white mb-2">
-                {risk.rate}% participación
+                {risk.zScore ? `${risk.zScore} desviación crítica, ${Math.round(risk.rate)}% participación` : `${risk.rate}% bajo expectativa`}
               </div>
               <div className="fhr-badge-warning text-xs mb-2">
                 {risk.severity === 'high' ? 'Crítico' : 'Moderado'}
               </div>
               <div className="text-sm text-white/70">
-                Intervención requerida
+                Requiere atención inmediata
               </div>
             </>
           ) : (
@@ -149,7 +156,7 @@ export function DynamicView({
             {participationRate.toFixed(0)}% total
           </div>
           <div className="text-sm text-white/70">
-            {cockpitIntelligence?.pattern?.dominantPattern || 'Análisis en progreso'}
+            {cockpitIntelligence?.pattern?.dominantPattern || 'Evaluando patrones de respuesta'}
           </div>
         </div>
 
@@ -160,13 +167,13 @@ export function DynamicView({
             <Target className="h-5 w-5 text-purple-400" />
           </div>
           <div className="text-lg font-bold text-white mb-2">
-            {cockpitIntelligence?.action?.primary || 'Mantener monitoreo'}
+            {cockpitIntelligence?.tacticalAction?.primary || cockpitIntelligence?.action?.primary || 'Continuar seguimiento regular'}
           </div>
           <div className="text-sm text-white/70 mb-2">
-            {cockpitIntelligence?.action?.reasoning || 'Seguimiento regular'}
+            {cockpitIntelligence?.tacticalAction?.reasoning || cockpitIntelligence?.action?.reasoning || 'Monitoreo estratégico continuo'}
           </div>
-          <div className={`text-sm ${cockpitIntelligence?.action?.urgencyColor || 'text-cyan-400'}`}>
-            {cockpitIntelligence?.action?.urgency || 'Media'}
+          <div className={`text-sm ${cockpitIntelligence?.tacticalAction?.urgencyColor || cockpitIntelligence?.action?.urgencyColor || 'text-cyan-400'}`}>
+            {cockpitIntelligence?.tacticalAction?.urgency || cockpitIntelligence?.action?.urgency || 'Media'}
           </div>
           
           {onNavigate && (
