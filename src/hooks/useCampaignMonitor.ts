@@ -379,11 +379,11 @@ function getVectorMomentum(
                    leadMover.trend === 'desacelerando' ? '⚠️' : 
                    leadMover.trend === 'completado' ? '✅' : '';
 
-  console.log('🧠 [getVectorMomentum] CORREGIDO:', { 
-  campaignDays, 
-  realVelocity: realVelocity.toFixed(2), 
-  adjustedVelocity: adjustedVelocity.toFixed(2),
-  leadTrend: leadMover.trend
+   console.log('🧠 [getVectorMomentum] CORREGIDO:', { 
+   campaignDays, 
+   realVelocity: realVelocity.toFixed(2), 
+   adjustedVelocity: adjustedVelocity.toFixed(2),
+   leadTrend: leadMover.trend
 });
 
 return `${trendSymbol}${adjustedVelocity.toFixed(1)}/día`;
@@ -620,7 +620,7 @@ export interface CampaignMonitorData {
   // 🧠 DEPARTMENTAL INTELLIGENCE - Datos procesados para componente híbrido
   departmentalIntelligence: DepartmentalIntelligence;
   // 🎯 TOP MOVERS - Nueva inteligencia momentum departamental
-  topMovers: Array<{ name: string; momentum: number; trend: TopMoverTrend }>;
+  topMovers: Array<{ name: string; momentum: number; trend: TopMoverTrend; isFallback?: boolean }>;
   // 🧠 COCKPIT INTELLIGENCE - CEREBRO TRASPLANTADO
   cockpitIntelligence?: CockpitIntelligence;
   // ✅ AGREGAR NUEVO CAMPO - MOMENTUM DEPARTAMENTAL
@@ -848,16 +848,40 @@ export function useCampaignMonitor(campaignId: string) {
     // 🔥 COMPONENTES WOW - CÁLCULOS COMPLETOS EN HOOK - PRESERVADOS
     const anomalyData = calculateDepartmentAnomalies(byDepartment);
     
-    // 🎯 TOP MOVERS - VOLVER A LA LÓGICA QUE FUNCIONABA
-    const topMovers = Object.entries(byDepartment)
-      .map(([name, data]) => ({
-        name: data.displayName || name,
-        momentum: data.rate,  // PARTICIPACIÓN REAL (0-100%)
-        trend: (data.rate >= 80 ? 'completado' :
-               data.rate >= 60 ? 'acelerando' :
-               data.rate >= 40 ? 'estable' : 'desacelerando') as TopMoverTrend
-      }))
-      .sort((a, b) => b.momentum - a.momentum);
+    // ====================================================================
+    // 🎯 UNIFICACIÓN LÓGICA DE TOP MOVERS CON "FALLBACK HONESTO" v3.0
+    // ====================================================================
+    console.log('🔍 [UNIFICACIÓN] Intentando calcular topMovers con momentum temporal real...');
+
+    let topMovers: Array<{ name: string; momentum: number; trend: TopMoverTrend; isFallback?: boolean }> = [];
+
+    try {
+      // 🧠 MÉTODO PRINCIPAL: Intentar usar el algoritmo de momentum temporal real
+      const calculatedTopMovers = calculateDepartmentMomentum(analytics.trendDataByDepartment || {});
+      
+      if (calculatedTopMovers && calculatedTopMovers.length > 0) {
+        topMovers = calculatedTopMovers.map(mover => ({ ...mover, isFallback: false }));
+        console.log('✅ [ÉXITO] topMovers calculado con momentum temporal:', topMovers.length);
+      } else {
+        throw new Error('calculateDepartmentMomentum retornó un array vacío o inválido.');
+      }
+    } catch (error) {
+      // 🚨 FALLBACK HONESTO Y SEGURO:
+      console.warn('⚠️ [FALLBACK ACTIVADO] La lógica de momentum temporal falló. Usando participación simple como respaldo. Error:', error);
+      
+      const departmentsByParticipation = Object.entries(byDepartment)
+        .map(([name, data]) => ({
+          name: data.displayName || name,
+          momentum: data.rate, // Se usa la participación, pero la propiedad se llama momentum para consistencia del 'contrato'
+          trend: (data.rate >= 80 ? 'completado' :
+                 data.rate >= 60 ? 'acelerando' :
+                 data.rate >= 40 ? 'estable' : 'desacelerando') as TopMoverTrend,
+          isFallback: true // ✅ FLAG DE TRANSPARENCIA
+        }))
+        .sort((a, b) => b.momentum - a.momentum);
+      
+      topMovers = departmentsByParticipation;
+    }
 
     // 📊 LOG VERIFICACIÓN - Datos reales por momentum temporal:
     console.log('🎯 [Glass Cockpit] Top Movers - Momentum Temporal:', {

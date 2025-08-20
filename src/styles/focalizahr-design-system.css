@@ -87,6 +87,35 @@
   --focalizahr-success: #10B981;
   --focalizahr-warning: #F59E0B;
   --focalizahr-error: #EF4444;
+   /* ========================================
+     🎯 VARIABLES BIMODAL ASIMÉTRICO
+     Sistema Panel de Mando Neural Morphing
+     ======================================== */
+  
+  /* Transiciones Neural Morphing */
+  --fhr-bimodal-transition: cubic-bezier(0.4, 0, 0.2, 1);
+  --fhr-bimodal-duration: 300ms;
+  --fhr-bimodal-spring: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  
+  /* Estados Velocímetro Neural */
+  --fhr-bimodal-scale-predictive: 1;
+  --fhr-bimodal-scale-dynamic: 0.4;
+  --fhr-bimodal-position-x-predictive: 0;
+  --fhr-bimodal-position-y-predictive: 0;
+  --fhr-bimodal-position-x-dynamic: -200px;
+  --fhr-bimodal-position-y-dynamic: -100px;
+  
+  /* Efectos Tesla-Apple Fusion */
+  --fhr-neural-glow: 0 0 30px rgba(34, 211, 238, 0.2), 0 0 60px rgba(167, 139, 250, 0.1);
+  --fhr-neural-pulse: rgba(34, 211, 238, 0.4);
+  --fhr-glassmorphism-neural: rgba(255, 255, 255, 0.08);
+  --fhr-backdrop-neural: blur(20px) saturate(180%);
+  
+  /* Colores Modos Específicos */
+  --fhr-predictive-primary: var(--focalizahr-cyan);
+  --fhr-predictive-glow: rgba(34, 211, 238, 0.3);
+  --fhr-dynamic-primary: var(--focalizahr-purple);
+  --fhr-dynamic-glow: rgba(167, 139, 250, 0.3);
 }
 
 .neural-glow {
@@ -341,4 +370,289 @@
     padding: 0 12px;
   }
 }
+/* ========================================
+   SISTEMA BIMODAL ASIMÉTRICO
+   Panel de Mando Neural Morphing
+   ======================================== */
 
+/* Contenedor Principal Bimodal */
+.fhr-bimodal-container {
+  position: relative;
+  width: 100%;
+  min-height: 320px;
+  background: var(--fhr-glassmorphism-neural);
+  backdrop-filter: var(--fhr-backdrop-neural);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 32px;
+  overflow: hidden;
+  transition: all var(--fhr-bimodal-duration) var(--fhr-bimodal-transition);
+}
+
+.fhr-bimodal-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--focalizahr-gradient);
+  opacity: 0.02;
+  pointer-events: none;
+}
+
+/* Toggle Tesla-Style */
+.fhr-bimodal-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: 120px;
+  height: 36px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all var(--fhr-bimodal-duration) var(--fhr-bimodal-transition);
+  z-index: 10;
+}
+
+.fhr-bimodal-toggle:hover {
+  border-color: var(--focalizahr-cyan);
+  box-shadow: var(--fhr-neural-glow);
+  transform: scale(1.05);
+}
+
+.fhr-bimodal-toggle-indicator {
+  position: absolute;
+  width: 50px;
+  height: 28px;
+  background: var(--focalizahr-gradient);
+  border-radius: 16px;
+  transition: all var(--fhr-bimodal-duration) var(--fhr-bimodal-spring);
+  left: 4px;
+}
+
+.fhr-bimodal-toggle[data-mode="dynamic"] .fhr-bimodal-toggle-indicator {
+  transform: translateX(62px);
+}
+
+.fhr-bimodal-toggle-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color var(--fhr-bimodal-duration);
+  z-index: 1;
+}
+
+.fhr-bimodal-toggle[data-mode="predictive"] .fhr-bimodal-toggle-label:first-child,
+.fhr-bimodal-toggle[data-mode="dynamic"] .fhr-bimodal-toggle-label:last-child {
+  color: #FFFFFF;
+}
+
+/* Layout Modo Predictivo - Mission Control */
+.fhr-bimodal-predictive {
+  display: grid;
+  grid-template-columns: 1fr 400px 200px;
+  grid-template-rows: auto 1fr;
+  grid-template-areas: 
+    "header header hud"
+    "gauge gauge hud";
+  gap: 24px;
+  height: 100%;
+  min-height: 280px;
+}
+
+.fhr-predictive-header {
+  grid-area: header;
+  margin-bottom: 16px;
+}
+
+.fhr-predictive-gauge-zone {
+  grid-area: gauge;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.fhr-predictive-hud {
+  grid-area: hud;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-left: 24px;
+  border-left: 1px solid rgba(34, 211, 238, 0.2);
+}
+
+/* Layout Modo Dinámico - War Room */
+.fhr-bimodal-dynamic {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 20px;
+  height: 100%;
+  min-height: 280px;
+}
+
+/* Gauge Neural Morphing */
+.fhr-gauge-neural {
+  position: relative;
+  transition: all 800ms var(--fhr-bimodal-spring);
+  will-change: transform;
+}
+
+.fhr-gauge-neural[data-mode="predictive"] {
+  width: 300px;
+  height: 300px;
+  transform: scale(var(--fhr-bimodal-scale-predictive));
+}
+
+.fhr-gauge-neural[data-mode="dynamic"] {
+  width: 120px;
+  height: 120px;
+  transform: scale(var(--fhr-bimodal-scale-dynamic)) 
+             translateX(var(--fhr-bimodal-position-x-dynamic)) 
+             translateY(var(--fhr-bimodal-position-y-dynamic));
+}
+
+/* HUD Periférico Predictivo */
+.fhr-hud-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(71, 85, 105, 0.3);
+  border-radius: 12px;
+  transition: all var(--fhr-bimodal-duration);
+}
+
+.fhr-hud-item:hover {
+  border-color: var(--fhr-predictive-glow);
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.fhr-hud-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.fhr-hud-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--focalizahr-cyan);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Tarjetas Dinámicas War Room */
+.fhr-dynamic-card {
+  background: var(--fhr-glassmorphism-neural);
+  backdrop-filter: var(--fhr-backdrop-neural);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  transition: all var(--fhr-bimodal-duration) var(--fhr-bimodal-transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.fhr-dynamic-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--focalizahr-gradient);
+  opacity: 0.6;
+  transition: opacity var(--fhr-bimodal-duration);
+}
+
+.fhr-dynamic-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(34, 211, 238, 0.3);
+  box-shadow: var(--fhr-neural-glow);
+}
+
+.fhr-dynamic-card:hover::before {
+  opacity: 1;
+}
+
+/* Cluster Alertas Dormido */
+.fhr-alert-cluster {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #FCA5A5;
+  opacity: 0;
+  transition: all var(--fhr-bimodal-duration);
+  pointer-events: none;
+}
+
+.fhr-alert-cluster[data-active="true"] {
+  opacity: 1;
+  pointer-events: auto;
+  animation: neural-pulse 2s ease-in-out infinite alternate;
+}
+
+/* Animaciones Neural */
+@keyframes neural-pulse {
+  0% { 
+    box-shadow: 0 0 10px var(--fhr-neural-pulse);
+  }
+  100% { 
+    box-shadow: 0 0 20px var(--fhr-neural-pulse), 0 0 40px var(--fhr-neural-pulse);
+  }
+}
+
+/* Responsive Bimodal */
+@media (max-width: 1024px) {
+  .fhr-bimodal-predictive {
+    grid-template-columns: 1fr 180px;
+    grid-template-areas: 
+      "header hud"
+      "gauge hud";
+  }
+  
+  .fhr-gauge-neural[data-mode="predictive"] {
+    width: 240px;
+    height: 240px;
+  }
+}
+
+@media (max-width: 768px) {
+  .fhr-bimodal-predictive {
+    grid-template-columns: 1fr;
+    grid-template-areas: 
+      "header"
+      "gauge"
+      "hud";
+  }
+  
+  .fhr-bimodal-dynamic {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(4, auto);
+  }
+  
+  .fhr-predictive-hud {
+    border-left: none;
+    border-top: 1px solid rgba(34, 211, 238, 0.2);
+    padding-left: 0;
+    padding-top: 24px;
+  }
+}
