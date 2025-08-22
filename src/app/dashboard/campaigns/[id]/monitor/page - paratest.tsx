@@ -1,7 +1,7 @@
 // ====================================================================
-// FOCALIZAHR MONITOR PAGE - ARQUITECTURA ORIGINAL + IDs NAVEGACIÃ"N
+// FOCALIZAHR MONITOR PAGE - ARQUITECTURA FUNCIONANDO RESTAURADA
 // src/app/dashboard/campaigns/[id]/monitor/page.tsx
-// SIMPLE: PatrÃ³n original que funciona + IDs para scroll
+// ✅ SOLUCIÓN: Combinar lo mejor de ambas versiones
 // ====================================================================
 
 'use client';
@@ -9,10 +9,10 @@
 import { useCampaignMonitor } from '@/hooks/useCampaignMonitor';
 import { useRouter, useParams } from 'next/navigation';
 
-// ðŸš€ CockpitHeader bimodal
-import { CockpitHeaderBimodal } from '@/components/monitor/CockpitHeaderBimodal';
+// 🚀 CockpitHeader - usando import que funciona
+import CockpitHeader from '@/components/monitor/CockpitHeader';
 
-// âœ… Componentes WOW existentes
+// ✅ Componentes WOW existentes
 import { DepartmentPulsePanel } from '@/components/monitor/DepartmentPulsePanel';
 import { ActionButtons } from '@/components/monitor/ActionButtons';
 import { AnomalyDetectorPanel } from '@/components/monitor/AnomalyDetectorPanel';
@@ -25,7 +25,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 
-// âœ… CSS FocalizaHR
+// ✅ CSS FocalizaHR
 import '@/styles/focalizahr-design-system.css';
 
 export default function CampaignMonitorPage() {
@@ -33,11 +33,26 @@ export default function CampaignMonitorPage() {
   const params = useParams();
   const campaignId = params.id as string;
 
-  // âœ… HOOK CENTRAL - Single Source of Truth
+  // ✅ HOOK CENTRAL - Single Source of Truth
   const monitorData = useCampaignMonitor(campaignId);
   const { isLoading, error, lastRefresh } = monitorData;
 
-  // ðŸ"„ LOADING STATE
+  // 🔄 NAVEGACIÓN INTELIGENTE (de la versión nueva)
+  const handleScrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'start',
+        inline: 'nearest'
+      });
+      // Highlight temporal
+      element.classList.add('highlight-section');
+      setTimeout(() => element.classList.remove('highlight-section'), 2000);
+    }
+  };
+
+  // 📄 LOADING STATE
   if (isLoading) {
     return (
       <div className="fhr-bg-main min-h-screen flex items-center justify-center">
@@ -48,7 +63,7 @@ export default function CampaignMonitorPage() {
               Cargando Torre de Control
             </h3>
             <p className="text-white/60">
-              Procesando datos de campaÃ±a...
+              Procesando datos de campaña...
             </p>
           </CardContent>
         </Card>
@@ -56,7 +71,7 @@ export default function CampaignMonitorPage() {
     );
   }
 
-  // âš ï¸ ERROR STATE
+  // ⚠️ ERROR STATE
   if (error) {
     return (
       <div className="fhr-bg-main min-h-screen flex items-center justify-center">
@@ -74,23 +89,18 @@ export default function CampaignMonitorPage() {
     <div className="fhr-bg-main min-h-screen">
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
         
-        {/* ðŸš€ COCKPIT HEADER - Recibe TODOS los datos del hook incluyendo gráficos */}
-        <CockpitHeaderBimodal 
+        {/* 🚀 COCKPIT HEADER - USANDO SPREAD QUE FUNCIONABA */}
+        <CockpitHeader 
           {...monitorData}
-          onScrollToSection={(sectionId) => {
-            const element = document.getElementById(sectionId);
-            if (element) {
-              element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-          }}
+          onScrollToSection={handleScrollToSection}
         />
 
-        {/* ðŸŽ¯ PROTAGONISTA - Historia Temporal */}
+        {/* 🎯 PROTAGONISTA - Historia Temporal */}
         <div id="rhythm">
           <CampaignRhythmPanel {...monitorData} />
         </div>
 
-        {/* âš¡ GRID COMPONENTES WOW */}
+        {/* ⚡ GRID COMPONENTES WOW - USANDO SPREAD QUE FUNCIONABA */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           <div id="pulse">
@@ -114,9 +124,41 @@ export default function CampaignMonitorPage() {
           </div>
         </div>
 
-        {/* ðŸŽ›ï¸ PANEL DE ACCIONES */}
+        {/* 🎛️ PANEL DE ACCIONES */}
         <div id="actions">
           <ActionButtons {...monitorData} />
+        </div>
+
+        {/* ✅ RESUMEN EJECUTIVO (de la versión nueva) */}
+        <div id="overview" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="fhr-card">
+            <CardContent className="p-6">
+              <h3 className="fhr-subtitle mb-4">Resumen Ejecutivo</h3>
+              <div className="space-y-2 text-sm text-white/70">
+                <p>Participación actual: {monitorData.participationRate}%</p>
+                <p>Días restantes: {monitorData.daysRemaining}</p>
+                <p>Respuestas: {monitorData.totalResponded} de {monitorData.totalInvited}</p>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="fhr-card">
+            <CardContent className="p-6">
+              <h3 className="fhr-subtitle mb-4">Próximos Pasos</h3>
+              <div className="space-y-2 text-sm text-white/70">
+                {monitorData.recommendations?.slice(0, 3).map((rec, index) => (
+                  <p key={index}>• {rec}</p>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ✅ FOOTER INFORMACIÓN */}
+        <div className="text-center text-xs text-white/40 pt-8 border-t border-white/10">
+          Última actualización: {lastRefresh?.toLocaleString()} • 
+          Torre de Control FocalizaHR v4.0 • 
+          Campaña ID: {campaignId}
         </div>
       </div>
     </div>
