@@ -451,3 +451,26 @@
 .neural-glow-red {
   box-shadow: var(--glow-red);
 }
+/* ====================================================================
+   PREDICTIVE HEADER TESLA UPGRADE - Estilos Adicionales Necesarios
+   Agregado: [Fecha hoy]
+   ==================================================================== */
+
+.bg-gradient-radial {
+  background: radial-gradient(ellipse at center, var(--tw-gradient-stops));
+}
+
+@keyframes neural-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+/* Backdrop blur enhanced */
+.backdrop-blur-3xl {
+  backdrop-filter: blur(64px);
+}
+
+/* Enhanced shadows for Tesla style */
+.drop-shadow-2xl {
+  filter: drop-shadow(0 25px 25px rgb(0 0 0 / 0.15));
+}

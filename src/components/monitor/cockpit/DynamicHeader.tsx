@@ -1,22 +1,28 @@
 // ====================================================================
-// MODO DINÁMICO - WAR ROOM EJECUTIVO REAL
+// DYNAMIC HEADER - VERSIÓN LIMPIA TESLA/APPLE LEVEL
 // src/components/monitor/cockpit/DynamicHeader.tsx
-// ✅ IMPLEMENTA: Grid 4 tarjetas especializadas inteligencia
-// ✅ NEURAL MORPHING: gauge compacto recibe layoutId="main-gauge"
+// 🎯 PRINCIPIO: Elegancia a través de microanimaciones sutiles + datos reales
 // ====================================================================
 
 "use client";
 
+import React from 'react';
 import { motion } from 'framer-motion';
-import { Crown, AlertTriangle, Users, Target, TrendingUp, TrendingDown } from 'lucide-react';
-import { ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, BarChart, Bar } from 'recharts';
+import { Crown, AlertTriangle, Users, Target, Clock } from 'lucide-react';
+import { 
+  ProgressCircle, 
+  SparkAreaChart,
+  Metric,
+  Text
+} from '@tremor/react';
 
-// 🎯 INTERFACE PROPS - ARQUITECTURA NEURAL DOCUMENTADA
+// 🎯 INTERFACE PROPS - DEL HOOK useCampaignMonitor
 interface DynamicHeaderProps {
   participationRate: number;
   daysRemaining: number;
   totalInvited: number;
   totalResponded: number;
+  lastActivity: string;
   topMovers: Array<{
     name: string;
     momentum: number;
@@ -28,9 +34,6 @@ interface DynamicHeaderProps {
     severity: 'high' | 'medium';
     zScore: number;
   }>;
-  riskTrendData?: Array<{date: string, rate: number}>;
-  departmentSizes?: Record<string, number>;
-  momentumGaugeData?: Array<{value: number, fill: string}>;
   byDepartment?: Record<string, {
     invited: number;
     responded: number;
@@ -68,454 +71,356 @@ interface DynamicHeaderProps {
   onNavigate?: (section: string) => void;
 }
 
-// 🎯 MODO DINÁMICO - WAR ROOM GRID INTELIGENCIA
-export function DynamicHeader(props: DynamicHeaderProps) {
-  const {
-    participationRate,
-    daysRemaining,
-    topMovers,
-    negativeAnomalies,
-    riskTrendData = [],
-    byDepartment = {},
-    cockpitIntelligence,
-    onNavigate,
-  } = props;
+// 🎯 COMPONENTE DINÁMICO - ELEGANCIA SUTIL
+export function DynamicHeader({
+  participationRate,
+  daysRemaining,
+  totalInvited,
+  totalResponded,
+  lastActivity,
+  topMovers,
+  negativeAnomalies,
+  byDepartment,
+  cockpitIntelligence,
+  onNavigate
+}: DynamicHeaderProps) {
 
-  // ✅ VALIDACIÓN DATOS REALES - NO SIMULACIÓN
-  const hasValidTopMovers = topMovers && topMovers.length > 0;
-  const hasValidAnomalies = negativeAnomalies && negativeAnomalies.length > 0;
-  const hasValidDepartmentData = byDepartment && Object.keys(byDepartment).length > 0;
+  // ✅ DATOS REALES DEL HOOK
+  const campeón = topMovers && topMovers.length > 0 ? {
+    name: topMovers[0].name,
+    momentum: topMovers[0].momentum,
+    trend: topMovers[0].trend
+  } : null;
 
-  // ✅ USAR SOLO DATOS REALES DEL HOOK
-  const campeón = hasValidTopMovers ? topMovers[0] : null;
-  const focoRiesgo = hasValidAnomalies ? negativeAnomalies[0] : null;
+  const focoRiesgo = negativeAnomalies && negativeAnomalies.length > 0 ? {
+    department: negativeAnomalies[0].department,
+    participation: negativeAnomalies[0].rate,
+    benchmark: participationRate,
+    severity: negativeAnomalies[0].severity === 'high' ? 'crítica' : 'media',
+    zScore: negativeAnomalies[0].zScore
+  } : null;
+
+  // ✅ ESTADÍSTICAS REALES
+  const completados = topMovers ? topMovers.filter(m => m.trend === 'completado').length : 0;
+  const acelerando = topMovers ? topMovers.filter(m => m.trend === 'acelerando').length : 0;
+  const enRiesgo = negativeAnomalies ? negativeAnomalies.length : 0;
   
-  // ✅ PANORAMA BASADO EN DATOS REALES
-  const departamentosTotal = hasValidDepartmentData ? Object.keys(byDepartment).length : topMovers.length;
-  const completados = hasValidTopMovers ? topMovers.filter(m => m.trend === 'completado').length : 0;
-  const enRiesgo = hasValidAnomalies ? negativeAnomalies.length : 0;
-  const acelerando = hasValidTopMovers ? topMovers.filter(m => m.trend === 'acelerando').length : 0;
-
-  // ✅ ERROR SI NO HAY DATOS SUFICIENTES
-  if (!hasValidTopMovers && !hasValidAnomalies && !hasValidDepartmentData) {
-    console.warn('DynamicHeader: Datos insuficientes del hook central');
-    return (
-      <div className="dinamico-error" style={{ padding: '2rem', textAlign: 'center', color: '#EF4444' }}>
-        <div>Error: Datos de análisis departamental no disponibles</div>
-        <div style={{ fontSize: '0.875rem', marginTop: '8px', color: 'rgba(255,255,255,0.6)' }}>
-          Verificar topMovers, negativeAnomalies del hook
-        </div>
-      </div>
-    );
-  }
-
-  // ✅ RECOMENDACIÓN TÁCTICA INTELIGENTE
-  const recomendaciónTáctica = cockpitIntelligence?.tacticalAction || {
-    primary: campeón && focoRiesgo 
-      ? `Replicar éxito de ${campeón.name} en ${focoRiesgo.department}`
-      : focoRiesgo 
-      ? `Intervención inmediata en ${focoRiesgo.department}`
-      : 'Mantener momentum actual',
-    reasoning: campeón && focoRiesgo 
-      ? `${campeón.name} 89% vs ${focoRiesgo.department} ${focoRiesgo.rate}%`
-      : 'Estrategia basada en datos tiempo real',
-    urgency: focoRiesgo?.severity === 'high' ? 'crítica' : 'media',
-    timeline: 'Ejecutar en próximas 24-48 horas'
+  // ✅ ACCIÓN TÁCTICA REAL
+  const acciónTáctica = {
+    title: cockpitIntelligence?.tacticalAction?.primary || 
+           cockpitIntelligence?.action?.primary || 
+           'Analizar departamentos críticos',
+    description: cockpitIntelligence?.tacticalAction?.reasoning ||
+                cockpitIntelligence?.action?.reasoning ||
+                'Revisar participación baja y tendencias negativas',
+    urgency: cockpitIntelligence?.tacticalAction?.urgency ||
+             cockpitIntelligence?.action?.urgency ||
+             'media'
   };
 
-  // ✅ USAR DATOS REALES DE RIESGO - NO SIMULACIÓN
-  const riskSparklineData = riskTrendData && riskTrendData.length > 0 
-    ? riskTrendData.slice(-7) 
-    : null; // No simular datos
-
-  if (!riskSparklineData && focoRiesgo) {
-    console.warn('DynamicHeader: riskTrendData no disponible para sparkline');
-  }
-
-  // ✅ DATOS VISUALIZACIONES REALES
-  const gaugeCompactoData = campeón ? [
-    { value: campeón.momentum, fill: '#10B981' },
-    { value: Math.max(0, 100 - campeón.momentum), fill: 'rgba(71, 85, 105, 0.2)' }
-  ] : [
-    { value: 0, fill: 'rgba(71, 85, 105, 0.2)' },
-    { value: 100, fill: 'rgba(71, 85, 105, 0.1)' }
-  ];
-
-  const panoramaDonutData = [
-    { name: 'Completados', value: completados, fill: '#10B981' },
-    { name: 'Acelerando', value: acelerando, fill: '#3B82F6' },
-    { name: 'En Riesgo', value: enRiesgo, fill: '#EF4444' },
-    { name: 'Otros', value: Math.max(0, departamentosTotal - completados - acelerando - enRiesgo), fill: '#6B7280' }
-  ].filter(item => item.value > 0); // Solo mostrar valores reales
+  // ✅ VERIFICAR SI HAY ACTIVIDAD RECIENTE REAL
+  const isRecentActivity = lastActivity && 
+    (lastActivity.includes('minutos') || lastActivity.includes('hace 1 hora'));
 
   return (
-    <div 
-      className="dinamico-layout"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
-        gap: '1.5rem',
-        minHeight: '320px'
-      }}
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      className="w-full"
     >
-      {/* 👑 TARJETA 1: DEPARTAMENTO LÍDER (con gauge compacto) */}
-      <motion.div
-        layoutId="main-gauge"
-        className="tarjeta-campeon"
-        style={{
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.04))',
-          border: '1px solid rgba(16, 185, 129, 0.3)',
-          borderRadius: '16px',
-          padding: '1.5rem',
-          cursor: 'pointer',
-          backdropFilter: 'blur(10px)',
-          position: 'relative',
-          overflow: 'hidden'
-        }}
-        onClick={() => onNavigate?.('departamento-lider')}
-        whileHover={{ 
-          scale: 1.02,
-          borderColor: 'rgba(16, 185, 129, 0.5)',
-          boxShadow: '0 8px 32px rgba(16, 185, 129, 0.15)'
-        }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
-      >
-        {/* HEADER TARJETA */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Crown className="w-5 h-5 text-green-400" />
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#10B981' }}>
-              Departamento Líder
-            </span>
-          </div>
-          <motion.div
-            className="w-2 h-2 rounded-full bg-green-400"
-            animate={{ 
-              scale: [1, 1.3, 1],
-              opacity: [1, 0.7, 1]
-            }}
-            transition={{ repeat: Infinity, duration: 2 }}
-          />
-        </div>
-
-        {campeón ? (
-          <div className="flex items-center gap-4">
-            {/* GAUGE COMPACTO (proviene de velocímetro masivo) */}
-            <div style={{ width: '80px', height: '80px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={gaugeCompactoData}
-                    cx="50%"
-                    cy="50%"
-                    startAngle={90}
-                    endAngle={450}
-                    innerRadius={25}
-                    outerRadius={35}
-                    dataKey="value"
-                    strokeWidth={0}
-                  >
-                    {gaugeCompactoData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              {/* Centro gauge compacto */}
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '40px',
-                transform: 'translate(-50%, -50%)',
-                textAlign: 'center',
-                pointerEvents: 'none'
-              }}>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#10B981' }}>
-                  {(campeón.momentum || 0).toFixed(0)}%
-                </div>
-              </div>
+      {/* ✅ LAYOUT HORIZONTAL 4 CARDS - MISMO QUE PREDICTIVEVIEW */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6" style={{ minHeight: '280px' }}>
+        
+        {/* CARD 1: DEPARTAMENTO LÍDER */}
+        <motion.div
+          className="relative p-6 cursor-pointer"
+          style={{
+            background: 'rgba(15, 23, 42, 0.6)',
+            border: '1px solid rgba(71, 85, 105, 0.3)',
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+            borderRadius: '16px'
+          }}
+          onClick={() => onNavigate?.('departamento-lider')}
+          whileHover={{ 
+            scale: 1.02,
+            y: -4,
+            borderColor: 'rgba(16, 185, 129, 0.5)',
+            boxShadow: '0 8px 32px rgba(16, 185, 129, 0.15)'
+          }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        >
+          {/* Header elegante */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Crown className="w-4 h-4 text-green-400" />
+              <h3 className="text-sm font-semibold text-green-400">
+                Departamento Líder
+              </h3>
             </div>
+            {/* Indicador de actividad reciente REAL */}
+            {isRecentActivity && campeón?.trend === 'acelerando' && (
+              <motion.div
+                className="w-2 h-2 rounded-full bg-green-400"
+                animate={{ 
+                  scale: [1, 1.3, 1],
+                  opacity: [0.7, 1, 0.7]
+                }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+            )}
+          </div>
 
-            {/* INFO DEPARTAMENTO */}
-            <div className="flex-1">
-              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#ffffff', marginBottom: '4px' }}>
+          {campeón ? (
+            <>
+              {/* Título principal */}
+              <div className="text-4xl font-bold text-green-300 mb-2">
                 {campeón.name}
               </div>
-              <div className="flex items-center gap-2">
-                <div 
-                  style={{
-                    padding: '2px 8px',
-                    borderRadius: '12px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    background: campeón.trend === 'completado' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(59, 130, 246, 0.2)',
-                    color: campeón.trend === 'completado' ? '#10B981' : '#3B82F6',
-                    border: `1px solid ${campeón.trend === 'completado' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`
-                  }}
+              
+              <div className="text-sm text-green-400 mb-3 flex items-center gap-2">
+                {/* Contador animado SOLO si hay cambio real */}
+                <motion.span
+                  key={campeón.momentum} // Re-anima solo cuando cambia
+                  initial={{ scale: 1.05, color: '#22D3EE' }}
+                  animate={{ scale: 1, color: '#10B981' }}
+                  transition={{ duration: 0.3 }}
+                  className="font-semibold"
                 >
-                  {campeón.trend}
+                  {campeón.momentum}%
+                </motion.span>
+                <span>participación</span>
+                
+                {/* Badge SOLO si over-performance real */}
+                {campeón.momentum > 150 && (
+                  <motion.span
+                    className="px-2 py-1 text-xs bg-green-500/20 border border-green-500/30 rounded-full text-green-300"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    🚀 {campeón.momentum}%
+                  </motion.span>
+                )}
+              </div>
+              
+              {/* Gauge central */}
+              <div className="flex justify-center mb-4">
+                <ProgressCircle 
+                  value={Math.min(campeón.momentum, 100)} 
+                  size="md"
+                  color="emerald"
+                >
+                  <Text className="text-xs text-white font-medium">
+                    {campeón.momentum}%
+                  </Text>
+                </ProgressCircle>
+              </div>
+              
+              {/* Status con mini progress real */}
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-green-300 capitalize flex items-center gap-2">
+                  {/* Mini progress bar basado en momentum real */}
+                  <div className="w-8 h-1 bg-white/10 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-green-400 rounded-full"
+                      animate={{ width: `${Math.min(campeón.momentum, 100)}%` }}
+                      transition={{ duration: 1.5, ease: "easeOut" }}
+                    />
+                  </div>
+                  <span>{campeón.trend}</span>
                 </div>
-                <TrendingUp className="w-4 h-4 text-green-400" />
               </div>
-              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginTop: '4px' }}>
-                Replicar metodología exitosa
-              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-center h-24">
+              <Text className="text-gray-400 text-sm">Sin datos disponibles</Text>
             </div>
-          </div>
-        ) : (
-          <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.6)' }}>
-            <div style={{ fontSize: '0.875rem' }}>Analizando departamentos...</div>
-            <div style={{ fontSize: '0.75rem', marginTop: '4px' }}>Datos en proceso</div>
-          </div>
-        )}
-      </motion.div>
+          )}
+        </motion.div>
 
-      {/* 🚨 TARJETA 2: ATENCIÓN REQUERIDA (con sparkline) */}
-      <motion.div
-        className="tarjeta-riesgo"
-        style={{
-          background: focoRiesgo 
-            ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(185, 28, 28, 0.04))'
-            : 'linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.04))',
-          border: focoRiesgo?.severity === 'high' 
-            ? '1px solid rgba(239, 68, 68, 0.5)' 
-            : focoRiesgo 
-            ? '1px solid rgba(245, 158, 11, 0.3)'
-            : '1px solid rgba(16, 185, 129, 0.3)',
-          borderRadius: '16px',
-          padding: '1.5rem',
-          cursor: 'pointer',
-          backdropFilter: 'blur(10px)',
-          position: 'relative'
-        }}
-        onClick={() => onNavigate?.('atencion-requerida')}
-        whileHover={{ 
-          scale: 1.02,
-          borderColor: focoRiesgo?.severity === 'high' ? 'rgba(239, 68, 68, 0.7)' : 'rgba(245, 158, 11, 0.5)'
-        }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
-      >
-        {/* HEADER TARJETA */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className={`w-5 h-5 ${focoRiesgo ? (focoRiesgo.severity === 'high' ? 'text-red-400' : 'text-yellow-400') : 'text-green-400'}`} />
-            <span style={{ 
-              fontSize: '0.875rem', 
-              fontWeight: 600, 
-              color: focoRiesgo ? (focoRiesgo.severity === 'high' ? '#EF4444' : '#F59E0B') : '#10B981'
-            }}>
-              {focoRiesgo ? 'Atención Requerida' : 'Todo Nominal'}
-            </span>
-          </div>
-          {focoRiesgo && (
+        {/* CARD 2: FOCO DE RIESGO */}
+        <motion.div
+          className="relative p-6 cursor-pointer"
+          style={{
+            background: 'rgba(15, 23, 42, 0.6)',
+            border: `1px solid ${focoRiesgo?.severity === 'crítica' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(71, 85, 105, 0.3)'}`,
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+            borderRadius: '16px'
+          }}
+          onClick={() => onNavigate?.('foco-riesgo')}
+          whileHover={{ scale: 1.02, y: -4 }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        >
+          {/* Pulso sutil SOLO si severity crítica */}
+          {focoRiesgo?.severity === 'crítica' && (
             <motion.div
-              className={`w-2 h-2 rounded-full ${focoRiesgo.severity === 'high' ? 'bg-red-400' : 'bg-yellow-400'}`}
+              className="absolute inset-0 rounded-2xl border border-red-500/30"
               animate={{ 
-                scale: [1, 1.4, 1],
-                opacity: [1, 0.6, 1]
+                borderColor: ['rgba(239, 68, 68, 0.2)', 'rgba(239, 68, 68, 0.5)', 'rgba(239, 68, 68, 0.2)']
               }}
-              transition={{ repeat: Infinity, duration: 1.5 }}
+              transition={{ duration: 2.5, repeat: Infinity }}
             />
           )}
-        </div>
 
-        {focoRiesgo ? (
-          <div className="flex items-center gap-4">
-            {/* SPARKLINE DESCENDENTE - SOLO SI HAY DATOS REALES */}
-            {riskSparklineData ? (
-              <div style={{ width: '100px', height: '60px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={riskSparklineData}>
-                    <Line 
-                      type="monotone" 
-                      dataKey="rate" 
-                      stroke={focoRiesgo.severity === 'high' ? '#EF4444' : '#F59E0B'}
-                      strokeWidth={3}
-                      dot={false}
-                      strokeDasharray={focoRiesgo.severity === 'high' ? "0" : "5 5"}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div style={{ width: '100px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>
-                  Sin histórico
-                </div>
-              </div>
-            )}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-400" />
+              <h3 className="text-sm font-semibold text-red-400">
+                Foco de Riesgo
+              </h3>
+            </div>
+          </div>
 
-            {/* INFO DEPARTAMENTO RIESGO */}
-            <div className="flex-1">
-              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#ffffff', marginBottom: '4px' }}>
+          {focoRiesgo ? (
+            <>
+              <div className="text-4xl font-bold text-red-300 mb-2">
                 {focoRiesgo.department}
               </div>
-              <div className="flex items-center gap-2">
-                <div style={{ 
-                  fontSize: '1rem', 
-                  fontWeight: 700, 
-                  color: focoRiesgo.severity === 'high' ? '#EF4444' : '#F59E0B' 
-                }}>
-                  {focoRiesgo.rate}%
+              <div className="text-sm text-red-400 mb-3">
+                {focoRiesgo.participation}% vs {focoRiesgo.benchmark.toFixed(1)}% esperado
+              </div>
+              
+              {/* Sparkline SOLO si hay datos zScore reales */}
+              {focoRiesgo.zScore && (
+                <div className="mb-4">
+                  <SparkAreaChart
+                    data={[
+                      { day: 'Benchmark', valor: 0 },
+                      { day: 'Actual', valor: focoRiesgo.zScore }
+                    ]}
+                    categories={['valor']}
+                    index="day"
+                    colors={['red']}
+                    className="h-8 w-full"
+                  />
                 </div>
-                <TrendingDown className={`w-4 h-4 ${focoRiesgo.severity === 'high' ? 'text-red-400' : 'text-yellow-400'}`} />
+              )}
+              
+              <div className="text-xs text-red-300">
+                Severidad: {focoRiesgo.severity}
               </div>
-              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginTop: '4px' }}>
-                {focoRiesgo.severity === 'high' ? 'Intervención crítica' : 'Monitoreo estrecho'}
-              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-center h-24">
+              <Text className="text-gray-400 text-sm">Sin anomalías detectadas</Text>
+            </div>
+          )}
+        </motion.div>
+
+        {/* CARD 3: PANORAMA GLOBAL */}
+        <motion.div
+          className="relative p-6 cursor-pointer"
+          style={{
+            background: 'rgba(22, 78, 99, 0.8)', // Color especial como PredictiveView
+            border: '1px solid rgba(34, 211, 238, 0.4)',
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 4px 20px rgba(34, 211, 238, 0.15)',
+            borderRadius: '16px'
+          }}
+          onClick={() => onNavigate?.('panorama-organizacional')}
+          whileHover={{ scale: 1.02, y: -4 }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-cyan-400" />
+              <h3 className="text-sm font-semibold text-cyan-400">
+                Panorama Global
+              </h3>
             </div>
           </div>
-        ) : (
-          <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.6)' }}>
-            <div style={{ fontSize: '0.875rem', color: '#10B981' }}>Todos los departamentos</div>
-            <div style={{ fontSize: '0.875rem', color: '#10B981' }}>en buen ritmo</div>
-            <div style={{ fontSize: '0.75rem', marginTop: '4px' }}>Continuar monitoreo</div>
-          </div>
-        )}
-      </motion.div>
 
-      {/* 🌐 TARJETA 3: PANORAMA ORGANIZACIONAL (con donut) */}
-      <motion.div
-        className="tarjeta-patron"
-        style={{
-          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(34, 211, 238, 0.04))',
-          border: '1px solid rgba(59, 130, 246, 0.3)',
-          borderRadius: '16px',
-          padding: '1.5rem',
-          cursor: 'pointer',
-          backdropFilter: 'blur(10px)'
-        }}
-        onClick={() => onNavigate?.('panorama-organizacional')}
-        whileHover={{ 
-          scale: 1.02,
-          borderColor: 'rgba(59, 130, 246, 0.5)'
-        }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
-      >
-        {/* HEADER TARJETA */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-400" />
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#3B82F6' }}>
-              Panorama Organizacional
-            </span>
+          <div className="text-4xl font-bold text-cyan-300 mb-2">
+            {cockpitIntelligence?.pattern?.dominantPattern || 'Progreso Variable'}
           </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          {/* DONUT CHART DISTRIBUCIÓN */}
-          <div style={{ width: '80px', height: '80px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={panoramaDonutData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={25}
-                  outerRadius={35}
-                  dataKey="value"
-                  strokeWidth={0}
-                >
-                  {panoramaDonutData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* MÉTRICAS PANORAMA */}
-          <div className="flex-1">
-            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#ffffff', marginBottom: '8px' }}>
-              {cockpitIntelligence?.pattern?.dominantPattern || 'Progreso Variable'}
-            </div>
-            <div style={{ fontSize: '0.875rem', color: '#3B82F6', marginBottom: '8px' }}>
-              {departamentosTotal} departamentos monitoreados
-            </div>
-            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-              <div>✓ Completados: {completados}</div>
-              <div>⚡ Acelerando: {acelerando}</div>
-              <div>⚠ En riesgo: {enRiesgo}</div>
-              <div>📊 Total: {departamentosTotal}</div>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* ⚡ TARJETA 4: ACCIÓN RECOMENDADA (prominente) */}
-      <motion.div
-        className="tarjeta-accion"
-        style={{
-          background: 'linear-gradient(135deg, rgba(167, 139, 250, 0.08), rgba(139, 92, 246, 0.04))',
-          border: `1px solid ${recomendaciónTáctica.urgency === 'crítica' ? 'rgba(239, 68, 68, 0.5)' : 'rgba(167, 139, 250, 0.3)'}`,
-          borderRadius: '16px',
-          padding: '1.5rem',
-          cursor: 'pointer',
-          backdropFilter: 'blur(10px)',
-          position: 'relative'
-        }}
-        onClick={() => onNavigate?.('accion-recomendada')}
-        whileHover={{ 
-          scale: 1.02,
-          borderColor: recomendaciónTáctica.urgency === 'crítica' ? 'rgba(239, 68, 68, 0.7)' : 'rgba(167, 139, 250, 0.5)'
-        }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
-      >
-        {/* HEADER TARJETA */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Target className="w-5 h-5 text-purple-400" />
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#A78BFA' }}>
-              Acción Recomendada
-            </span>
-          </div>
-          <motion.div
-            className={`w-2 h-2 rounded-full ${
-              recomendaciónTáctica.urgency === 'crítica' ? 'bg-red-400' :
-              recomendaciónTáctica.urgency === 'alta' ? 'bg-yellow-400' :
-              'bg-green-400'
-            }`}
-            animate={{ 
-              scale: [1, 1.3, 1],
-              opacity: [1, 0.7, 1]
-            }}
-            transition={{ repeat: Infinity, duration: 2.5 }}
-          />
-        </div>
-
-        {/* CONTENIDO ACCIÓN */}
-        <div>
-          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#ffffff', marginBottom: '8px', lineHeight: 1.3 }}>
-            {recomendaciónTáctica.primary}
-          </div>
-          <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', marginBottom: '12px', lineHeight: 1.4 }}>
-            {recomendaciónTáctica.reasoning}
+          <div className="text-sm text-cyan-400 mb-3">
+            {Object.keys(byDepartment || {}).length || topMovers?.length || 0} departamentos
           </div>
           
-          {/* URGENCIA Y TIMELINE */}
-          <div className="flex items-center justify-between">
-            <div 
-              style={{
-                padding: '4px 12px',
-                borderRadius: '12px',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                background: recomendaciónTáctica.urgency === 'crítica' ? 'rgba(239, 68, 68, 0.2)' : 
-                           recomendaciónTáctica.urgency === 'alta' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                color: recomendaciónTáctica.urgency === 'crítica' ? '#EF4444' : 
-                       recomendaciónTáctica.urgency === 'alta' ? '#F59E0B' : '#10B981',
-                border: `1px solid ${recomendaciónTáctica.urgency === 'crítica' ? 'rgba(239, 68, 68, 0.3)' : 
-                                     recomendaciónTáctica.urgency === 'alta' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`
-              }}
-            >
-              {recomendaciónTáctica.urgency.toUpperCase()}
-            </div>
-            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>
-              {recomendaciónTáctica.timeline}
+          {/* Progress bar basado en participación real */}
+          <div className="mb-4">
+            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-cyan-400 to-cyan-300"
+                animate={{ width: `${participationRate}%` }}
+                transition={{ duration: 2, ease: "easeOut" }}
+              />
             </div>
           </div>
-        </div>
-      </motion.div>
-    </div>
+          
+          <div className="text-xs text-cyan-300">
+            {completados} completados • {acelerando} acelerando • {enRiesgo} en riesgo
+          </div>
+        </motion.div>
+
+        {/* CARD 4: ACCIÓN RECOMENDADA */}
+        <motion.div
+          className="relative p-6 cursor-pointer"
+          style={{
+            background: 'rgba(15, 23, 42, 0.6)',
+            border: '1px solid rgba(71, 85, 105, 0.3)',
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+            borderRadius: '16px'
+          }}
+          onClick={() => onNavigate?.('accion-recomendada')}
+          whileHover={{ scale: 1.02, y: -4 }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        >
+          {/* Glow sutil SOLO si urgencia alta/crítica */}
+          {(acciónTáctica.urgency === 'crítica' || acciónTáctica.urgency === 'alta') && (
+            <motion.div
+              className="absolute inset-0 rounded-2xl"
+              animate={{
+                boxShadow: [
+                  '0 0 10px rgba(167, 139, 250, 0.2)',
+                  '0 0 20px rgba(167, 139, 250, 0.4)',
+                  '0 0 10px rgba(167, 139, 250, 0.2)'
+                ]
+              }}
+              transition={{ duration: 3, repeat: Infinity }}
+            />
+          )}
+
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-purple-400" />
+              <h3 className="text-sm font-semibold text-purple-400">
+                Acción Recomendada
+              </h3>
+            </div>
+            {daysRemaining > 0 && (
+              <div className="flex items-center gap-1 text-xs text-purple-300">
+                <Clock className="w-3 h-3" />
+                {daysRemaining}d
+              </div>
+            )}
+          </div>
+
+          <div className="text-2xl font-bold text-green-400 mb-2 leading-tight">
+            {acciónTáctica.title}
+          </div>
+          <div className="text-sm text-green-300 mb-3 leading-tight">
+            {acciónTáctica.description.slice(0, 60)}...
+          </div>
+          
+          {/* Línea característica PredictiveView */}
+          <div className="w-full h-1 bg-red-500 rounded-full opacity-80 mb-3"></div>
+          
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-purple-300">
+              Urgencia: {acciónTáctica.urgency}
+            </div>
+            <div className="text-xs text-purple-200">
+              Ejecutar HOY
+            </div>
+          </div>
+        </motion.div>
+
+      </div>
+    </motion.div>
   );
 }

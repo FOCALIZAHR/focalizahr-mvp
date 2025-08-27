@@ -1,191 +1,334 @@
-// ====================================================================
-// DYNAMIC VIEW - COMPONENTE 100% TONTO FINAL
-// src/components/monitor/cockpit/DynamicView.tsx
-// RESPONSABILIDAD: Solo presentación de datos pre-calculados del hook
-// ====================================================================
-
 "use client";
 
+import React from 'react';
 import { motion } from 'framer-motion';
-import { Eye, AlertTriangle, Activity, Target } from 'lucide-react';
+import { Crown, AlertTriangle, Users, Target } from 'lucide-react';
+import { 
+  DonutChart, 
+  ProgressCircle, 
+  SparkAreaChart,
+  Metric,
+  Text,
+  Flex,
+  BadgeDelta
+} from '@tremor/react';
 
 interface DynamicViewProps {
-  participationRate: number;
-  daysRemaining: number;
-  totalInvited: number;
-  totalResponded: number;
-  
-  topMovers: Array<{
-    name: string;
-    momentum: number;
-    trend: string;
-  }>;
-  negativeAnomalies: Array<{
-    department: string;
-    rate: number;
-    severity: string;
-    zScore?: number; // ✅ AGREGAR zScore para mostrar datos estadísticos
-  }>;
-  
   cockpitIntelligence?: {
-    action: {
-      primary: string;
-      reasoning: string;
-      urgency: string;
-      urgencyColor: string;
+    champion?: {
+      name: string;
+      momentum: number;
+      trend: string;
     };
-    pattern: {
+    risk?: {
+      department: string;
+      participation: number;
+      benchmark: number;
+      severity: 'crítica' | 'media' | 'baja';
+      trend?: number[];
+    };
+    stats?: {
+      completedDepartments: number;
+      acceleratingDepartments: number;
+      riskDepartments: number;
+    };
+    pattern?: {
       dominantPattern: string;
-      description: string;
     };
-    tacticalAction?: { // ✅ AGREGAR tacticalAction del hook
-      primary: string;
-      reasoning: string;
-      urgency: string;
-      urgencyColor: string;
+    action?: {
+      title: string;
+      description: string;
+      urgency: 'crítica' | 'media' | 'baja';
     };
   };
-  
   onNavigate?: (section: string) => void;
-  isLoading: boolean;
 }
 
-export function DynamicView({ 
-  participationRate,
-  daysRemaining,
-  totalInvited, 
-  totalResponded,
-  topMovers,
-  negativeAnomalies,
-  cockpitIntelligence,
-  onNavigate,
-  isLoading 
-}: DynamicViewProps) {
-  
-  if (isLoading) {
-    return <div className="w-full animate-pulse fhr-card h-32"></div>;
-  }
+export const DynamicView: React.FC<DynamicViewProps> = ({ 
+  cockpitIntelligence, 
+  onNavigate 
+}) => {
+  const campeón = cockpitIntelligence?.champion;
+  const focoRiesgo = cockpitIntelligence?.risk;
+  const completados = cockpitIntelligence?.stats?.completedDepartments || 0;
+  const acelerando = cockpitIntelligence?.stats?.acceleratingDepartments || 0;
+  const enRiesgo = cockpitIntelligence?.stats?.riskDepartments || 0;
+  const departamentosTotal = completados + acelerando + enRiesgo;
 
-  // ✅ USAR SOLO DATOS DEL HOOK - SIN CÁLCULOS
-  const leader = topMovers[0] || null;
-  const risk = negativeAnomalies[0] || null;
+  const riskTrendData = focoRiesgo?.trend?.map((value, index) => ({
+    day: `Día ${index + 1}`,
+    riesgo: value
+  })) || [];
+
+  const panoramaData = [
+    { name: 'Completados', value: completados },
+    { name: 'Acelerando', value: acelerando },
+    { name: 'En Riesgo', value: enRiesgo }
+  ].filter(item => item.value > 0);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      className="w-full"
+    <div 
+      className="dinamico-layout"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: '1.5rem',
+        minHeight: '320px'
+      }}
     >
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        
-        {/* CARD 1: DEPARTAMENTO LÍDER */}
-        <div className="fhr-card-metric p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="fhr-subtitle">Departamento Líder</h3>
-            <Eye className="h-5 w-5 text-green-400" />
+      
+      <motion.div
+        layoutId="main-gauge"
+        className="tarjeta-campeon"
+        style={{
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.04))',
+          border: '1px solid rgba(16, 185, 129, 0.3)',
+          borderRadius: '16px',
+          padding: '1.5rem',
+          cursor: 'pointer',
+          backdropFilter: 'blur(10px)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}
+        onClick={() => onNavigate?.('departamento-lider')}
+        whileHover={{ 
+          scale: 1.02,
+          borderColor: 'rgba(16, 185, 129, 0.5)',
+          boxShadow: '0 8px 32px rgba(16, 185, 129, 0.15)'
+        }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Crown className="w-5 h-5 text-green-400" />
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#10B981' }}>
+              Departamento Líder
+            </span>
           </div>
-          
-          {leader ? (
-            <>
-              <div className="fhr-title-gradient text-xl font-bold mb-2">
-                {leader.name}
-              </div>
-              <div className="text-lg text-white mb-2">
-                {leader.momentum} Pts desempeño superior
-              </div>
-              <div className="fhr-badge-completed text-xs mb-2">
-                {leader.trend}
-              </div>
-              <div className="text-sm text-white/70">
-                Metodología replicable
-              </div>
-            </>
-          ) : (
-            <div className="text-white/60">Sin datos disponibles</div>
-          )}
+          <motion.div
+            className="w-2 h-2 rounded-full bg-green-400"
+            animate={{ 
+              scale: [1, 1.3, 1],
+              opacity: [1, 0.7, 1]
+            }}
+            transition={{ repeat: Infinity, duration: 2 }}
+          />
         </div>
 
-        {/* CARD 2: ATENCIÓN REQUERIDA */}
-        <div className="fhr-card-metric p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="fhr-subtitle">Atención Requerida</h3>
-            <AlertTriangle className="h-5 w-5 text-red-400" />
+        {campeón ? (
+          <div className="flex items-center gap-4">
+            <div style={{ width: '80px', height: '80px' }}>
+              <ProgressCircle 
+                value={campeón.momentum} 
+                size="lg"
+                color="emerald"
+                className="flex-shrink-0"
+              >
+                <Text className="text-xs text-white font-medium">
+                  {campeón.momentum}%
+                </Text>
+              </ProgressCircle>
+            </div>
+
+            <div className="flex-1">
+              <Metric className="text-white mb-2">{campeón.name}</Metric>
+              <Text className="text-green-400 text-sm mb-1">
+                Lidera con {campeón.momentum}% participación
+              </Text>
+              <BadgeDelta 
+                deltaType="moderateIncrease" 
+                size="xs"
+                className="text-xs"
+              >
+                Tendencia {campeón.trend}
+              </BadgeDelta>
+            </div>
           </div>
-          
-          {risk ? (
-            <>
-              <div className="text-xl font-bold text-red-400 mb-2">
-                {risk.department}
-              </div>
-              <div className="text-lg text-white mb-2">
-                {risk.zScore ? `${risk.zScore} desviación crítica, ${Math.round(risk.rate)}% participación` : `${risk.rate}% bajo expectativa`}
-              </div>
-              <div className="fhr-badge-warning text-xs mb-2">
-                {risk.severity === 'high' ? 'Crítico' : 'Moderado'}
-              </div>
-              <div className="text-sm text-white/70">
-                Requiere atención inmediata
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="text-xl font-bold text-green-400 mb-2">
-                ✅ Sin riesgos
-              </div>
-              <div className="text-lg text-white/70 mb-2">
-                Todas las áreas normales
-              </div>
-              <div className="fhr-badge-completed text-xs">
-                Estado óptimo
-              </div>
-            </>
-          )}
+        ) : (
+          <div className="flex items-center justify-center h-20">
+            <Text className="text-gray-400">Sin datos suficientes</Text>
+          </div>
+        )}
+      </motion.div>
+
+      <motion.div
+        className="tarjeta-riesgo"
+        style={{
+          background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(220, 38, 38, 0.04))',
+          border: `1px solid ${focoRiesgo?.severity === 'crítica' ? 'rgba(239, 68, 68, 0.5)' : 'rgba(251, 191, 36, 0.3)'}`,
+          borderRadius: '16px',
+          padding: '1.5rem',
+          cursor: 'pointer',
+          backdropFilter: 'blur(10px)',
+          position: 'relative'
+        }}
+        onClick={() => onNavigate?.('atencion-requerida')}
+        whileHover={{ 
+          scale: 1.02,
+          borderColor: focoRiesgo?.severity === 'crítica' ? 'rgba(239, 68, 68, 0.7)' : 'rgba(251, 191, 36, 0.5)'
+        }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className={`w-5 h-5 ${focoRiesgo?.severity === 'crítica' ? 'text-red-400' : 'text-amber-400'}`} />
+            <span style={{ 
+              fontSize: '0.875rem', 
+              fontWeight: 600, 
+              color: focoRiesgo?.severity === 'crítica' ? '#EF4444' : '#F59E0B' 
+            }}>
+              Atención Requerida
+            </span>
+          </div>
         </div>
 
-        {/* CARD 3: PANORAMA */}
-        <div className="fhr-card-metric p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="fhr-subtitle">Panorama</h3>
-            <Activity className="h-5 w-5 text-blue-400" />
-          </div>
-          <div className="fhr-title-gradient text-xl font-bold mb-2">
-            {totalResponded}/{totalInvited}
-          </div>
-          <div className="text-lg text-white mb-2">
-            {participationRate.toFixed(0)}% total
-          </div>
-          <div className="text-sm text-white/70">
-            {cockpitIntelligence?.pattern?.dominantPattern || 'Evaluando patrones de respuesta'}
-          </div>
-        </div>
-
-        {/* CARD 4: ACCIÓN */}
-        <div className="fhr-card-metric p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="fhr-subtitle">Acción</h3>
-            <Target className="h-5 w-5 text-purple-400" />
-          </div>
-          <div className="text-lg font-bold text-white mb-2">
-            {cockpitIntelligence?.tacticalAction?.primary || cockpitIntelligence?.action?.primary || 'Continuar seguimiento regular'}
-          </div>
-          <div className="text-sm text-white/70 mb-2">
-            {cockpitIntelligence?.tacticalAction?.reasoning || cockpitIntelligence?.action?.reasoning || 'Monitoreo estratégico continuo'}
-          </div>
-          <div className={`text-sm ${cockpitIntelligence?.tacticalAction?.urgencyColor || cockpitIntelligence?.action?.urgencyColor || 'text-cyan-400'}`}>
-            {cockpitIntelligence?.tacticalAction?.urgency || cockpitIntelligence?.action?.urgency || 'Media'}
-          </div>
-          
-          {onNavigate && (
-            <button
-              onClick={() => onNavigate('action-buttons')}
-              className="fhr-btn-primary w-full mt-3 text-sm"
+        {focoRiesgo ? (
+          <div>
+            <Metric className="text-white mb-2">{focoRiesgo.department}</Metric>
+            <Text className="text-red-400 text-sm mb-3">
+              {focoRiesgo.participation}% vs benchmark {focoRiesgo.benchmark}%
+            </Text>
+            
+            {riskTrendData.length > 0 && (
+              <div className="mb-3">
+                <SparkAreaChart
+                  data={riskTrendData}
+                  categories={['riesgo']}
+                  index="day"
+                  colors={['red']}
+                  className="h-10 w-full"
+                />
+              </div>
+            )}
+            
+            <BadgeDelta 
+              deltaType="decrease"
+              size="xs"
             >
-              Ejecutar
-            </button>
-          )}
+              Severidad: {focoRiesgo.severity}
+            </BadgeDelta>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-20">
+            <Text className="text-gray-400">Sin anomalías detectadas</Text>
+          </div>
+        )}
+      </motion.div>
+
+      <motion.div
+        className="tarjeta-panorama"
+        style={{
+          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(37, 99, 235, 0.04))',
+          border: '1px solid rgba(59, 130, 246, 0.3)',
+          borderRadius: '16px',
+          padding: '1.5rem',
+          cursor: 'pointer',
+          backdropFilter: 'blur(10px)',
+          position: 'relative'
+        }}
+        onClick={() => onNavigate?.('panorama-organizacional')}
+        whileHover={{ 
+          scale: 1.02,
+          borderColor: 'rgba(59, 130, 246, 0.5)'
+        }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-blue-400" />
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#3B82F6' }}>
+              Panorama Organizacional
+            </span>
+          </div>
         </div>
-      </div>
-    </motion.div>
+
+        <div className="flex items-center gap-4">
+          <div style={{ width: '100px', height: '100px' }}>
+            <DonutChart
+              data={panoramaData}
+              category="value"
+              index="name"
+              colors={['emerald', 'blue', 'rose']}
+              showLabel={false}
+              showAnimation={true}
+            />
+          </div>
+
+          <div className="flex-1">
+            <Metric className="text-white mb-2">
+              {cockpitIntelligence?.pattern?.dominantPattern || 'Progreso Variable'}
+            </Metric>
+            <Text className="text-blue-400 text-sm mb-2">
+              {departamentosTotal} departamentos monitoreados
+            </Text>
+            
+            <div className="space-y-1">
+              <Flex className="text-xs">
+                <Text className="text-emerald-400">✓ Completados</Text>
+                <Text className="text-white font-medium">{completados}</Text>
+              </Flex>
+              <Flex className="text-xs">
+                <Text className="text-blue-400">⚡ Acelerando</Text>
+                <Text className="text-white font-medium">{acelerando}</Text>
+              </Flex>
+              <Flex className="text-xs">
+                <Text className="text-red-400">⚠ En riesgo</Text>
+                <Text className="text-white font-medium">{enRiesgo}</Text>
+              </Flex>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      <motion.div
+        className="tarjeta-accion"
+        style={{
+          background: 'linear-gradient(135deg, rgba(167, 139, 250, 0.08), rgba(139, 92, 246, 0.04))',
+          border: '1px solid rgba(167, 139, 250, 0.3)',
+          borderRadius: '16px',
+          padding: '1.5rem',
+          cursor: 'pointer',
+          backdropFilter: 'blur(10px)',
+          position: 'relative'
+        }}
+        onClick={() => onNavigate?.('accion-recomendada')}
+        whileHover={{ 
+          scale: 1.02,
+          borderColor: 'rgba(167, 139, 250, 0.5)'
+        }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Target className="w-5 h-5 text-purple-400" />
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#A855F7' }}>
+              Acción Recomendada
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <Metric className="text-white mb-2">
+            {cockpitIntelligence?.action?.title || 'Analizar departamentos críticos'}
+          </Metric>
+          <Text className="text-purple-300 text-sm mb-3">
+            {cockpitIntelligence?.action?.description || 'Revisar participación baja y tendencias negativas'}
+          </Text>
+          
+          <BadgeDelta 
+            deltaType={cockpitIntelligence?.action?.urgency === 'crítica' ? 'decrease' : 'moderateIncrease'}
+            size="sm"
+            className="text-xs"
+          >
+            Urgencia: {cockpitIntelligence?.action?.urgency || 'media'}
+          </BadgeDelta>
+          
+          <Text className="text-xs text-purple-200 mt-2">
+            Ejecutar en próximas 24-48 horas
+          </Text>
+        </div>
+      </motion.div>
+
+    </div>
   );
-}
+};

@@ -11,6 +11,14 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ✅ ENUM GENDER - AGREGADO PARA DEMOGRAFÍA
+enum Gender {
+  MALE
+  FEMALE
+  NON_BINARY
+  PREFER_NOT_TO_SAY
+}
+
 // TABLA 1: Cuentas empresa (multi-tenancy)
 model Account {
   id               String  @id @default(cuid())
@@ -130,6 +138,10 @@ model Participant {
   ipAddress String?  @map("ip_address")
   userAgent String?  @map("user_agent")
   createdAt DateTime @default(now()) @map("created_at")
+
+  // ✅ CAMPOS DEMOGRÁFICOS - AGREGADOS PARA PARTICIPANTUPLOADER v2.0
+  dateOfBirth DateTime? @map("date_of_birth")
+  gender      Gender?
 
   // ✅ DEPARTMENT RELATION FIELD ADDED
   departmentId String? @map("department_id")

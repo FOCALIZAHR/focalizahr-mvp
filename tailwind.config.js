@@ -6,6 +6,7 @@ module.exports = {
     './src/components/**/*.{ts,tsx}',
     './src/app/**/*.{ts,tsx}',
     './src/**/*.{ts,tsx}',
+    './node_modules/@tremor/**/*.{js,ts,jsx,tsx}',
   ],
   prefix: "",
   theme: {
@@ -60,7 +61,12 @@ module.exports = {
           surface: "#161B22", // Superficie oscura
           text: "#E6EDF3", // Texto claro
           "text-secondary": "#7D8590", // Texto secundario
-        }
+        },
+        // ✅ COLORES TREMOR CORPORATIVOS AGREGADOS
+        'focalizahr-cyan': '#22D3EE',
+        'focalizahr-purple': '#A78BFA',
+        'focalizahr-slate': '#334155',
+        'focalizahr-slate-600': '#475569',
       },
       backgroundImage: {
         // Gradiente principal FocalizaHR
