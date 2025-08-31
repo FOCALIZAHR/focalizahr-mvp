@@ -195,17 +195,17 @@ export async function GET(
       const startDate = new Date(`${day}T00:00:00.000Z`);
       const endDate = new Date(`${day}T23:59:59.999Z`);
       
-      // ✅ CONSULTA ORIGINAL - Mantener intacta
-      const dailyResponses = await prisma.response.findMany({
+      // ✅ CONSULTA CORREGIDA - Usar participant.responseDate
+      const dailyResponses = await prisma.participant.findMany({
         where: {
-          participant: { campaignId },
-          createdAt: {
+          campaignId,
+          hasResponded: true,
+          responseDate: {  // ← AHORA USA responseDate CORRECTAMENTE
             gte: startDate,
             lte: endDate
           }
         },
-        select: { participantId: true },
-        distinct: ['participantId']
+        select: { id: true }
       });
       
       responsesByDay[day] = dailyResponses.length;
@@ -219,27 +219,25 @@ export async function GET(
       const endDate = new Date(`${day}T23:59:59.999Z`);
       
       // Obtener respuestas del día con departamento
-      const dailyResponsesWithDept = await prisma.response.findMany({
+      const dailyResponsesWithDept = await prisma.participant.findMany({
         where: {
-          participant: { campaignId },
-          createdAt: {
+          campaignId,
+          hasResponded: true,
+          responseDate: {  // ← AHORA USA responseDate CORRECTAMENTE
             gte: startDate,
             lte: endDate
           }
         },
         select: { 
-          participantId: true,
-          participant: { 
-            select: { department: true } 
-          }
-        },
-        distinct: ['participantId']
+          id: true,
+          department: true
+        }
       });
 
       // Agrupar por departamento (nombres técnicos crudos)
       const deptCounts: Record<string, number> = {};
-      dailyResponsesWithDept.forEach(response => {
-        const department = response.participant?.department || 'Sin departamento';
+      dailyResponsesWithDept.forEach(participant => {
+        const department = participant.department || 'Sin departamento';
         deptCounts[department] = (deptCounts[department] || 0) + 1;
       });
 

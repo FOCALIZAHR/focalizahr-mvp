@@ -40,9 +40,9 @@ interface CampaignRhythmPanelProps {
 interface ChartDataPoint {
   day: string;
   date: string;
-  responses: number;
-  cumulativeRate: number;
-  projectedRate?: number;
+  responses?: number;  // Opcional para puntos futuros
+  cumulativeRate?: number;  // Opcional para puntos futuros
+  projectedRate?: number;  // Opcional para puntos históricos
   isPrediction: boolean;
 }
 
@@ -79,6 +79,7 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
   
   // 🧠 PREPARACIÓN DE DATOS PARA CHART (Solo transformación, no cálculos de negocio)
   const chartData = useMemo((): ChartDataPoint[] => {
+    // Datos históricos con todas las métricas
     const historical = dailyResponses.map((day, index) => {
       // Calcular tasa acumulativa hasta este día
       const responsesUpToDay = dailyResponses
@@ -91,13 +92,14 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
         date: day.date,
         responses: day.responses,
         cumulativeRate: Math.round(cumulativeRate * 10) / 10,
+        projectedRate: undefined,  // No hay proyección en datos históricos
         isPrediction: false
       };
     });
 
     // Agregar puntos de proyección futura (máximo 7 días)
     const projectionData: ChartDataPoint[] = [];
-    if (participationPrediction && daysRemaining > 0) {
+    if (participationPrediction && daysRemaining > 0 && historical.length > 0) {
       const lastDay = historical[historical.length - 1];
       const currentRate = lastDay?.cumulativeRate || participationRate;
       
@@ -105,15 +107,21 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
       const projectionDays = Math.min(7, daysRemaining);
       const dailyIncrement = (participationPrediction.finalProjection - currentRate) / projectionDays;
       
-      // Generar puntos intermedios para que la línea púrpura se dibuje
+      // PUNTO PUENTE: Conectar histórico con proyección
+      // Este punto especial tiene AMBOS valores para crear continuidad visual
+      historical[historical.length - 1] = {
+        ...lastDay,
+        projectedRate: currentRate  // Agregar punto inicial de proyección
+      };
+      
+      // Generar puntos de proyección futura
       for (let i = 1; i <= projectionDays; i++) {
         const projectedValue = currentRate + (dailyIncrement * i);
         
         projectionData.push({
           day: i === projectionDays && daysRemaining <= 7 ? 'Fin' : `+${i}d`,
           date: new Date(Date.now() + (i * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
-          responses: 0, // No barras en proyección
-          cumulativeRate: currentRate, // MANTENER línea cyan plana en el último valor
+          // NO incluir responses ni cumulativeRate en puntos futuros
           projectedRate: Math.round(projectedValue * 10) / 10,
           isPrediction: true
         });
@@ -151,10 +159,21 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
           className="bg-black/80 backdrop-blur-md border border-white/20 rounded-lg p-3 shadow-xl"
         >
           <p className="text-white/90 font-medium">{data.day}</p>
-          <p className="text-fhr-cyan text-sm">
-            {data.isPrediction ? 'Proyección: ' : 'Respuestas: '}
-            {data.isPrediction ? `${data.projectedRate}%` : `${data.responses} (+${data.cumulativeRate}%)`}
-          </p>
+          {data.responses !== undefined && (
+            <p className="text-fhr-cyan text-sm">
+              Respuestas: {data.responses}
+            </p>
+          )}
+          {data.cumulativeRate !== undefined && (
+            <p className="text-fhr-cyan text-sm">
+              Acumulado: {data.cumulativeRate}%
+            </p>
+          )}
+          {data.projectedRate !== undefined && data.isPrediction && (
+            <p className="text-fhr-purple text-sm">
+              Proyección: {data.projectedRate}%
+            </p>
+          )}
         </motion.div>
       );
     }
@@ -256,10 +275,11 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
                     y={targetRate} 
                     stroke="#22D3EE"
                     strokeDasharray="8 8"
-                    strokeWidth={3}
+                    strokeWidth={2}
+                    label={{ value: `Objetivo ${targetRate}%`, position: "right", fill: '#22D3EE', fontSize: 11 }}
                   />
 
-                  {/* BARRAS DE RITMO (PASADO) */}
+                  {/* BARRAS DE RITMO (SOLO DATOS HISTÓRICOS) */}
                   <Bar
                     dataKey="responses"
                     fill={`url(#barGradient)`}
@@ -268,7 +288,7 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
                     animationBegin={200}
                   />
 
-                  {/* LÍNEA DE PROGRESO (PRESENTE) */}
+                  {/* LÍNEA DE PROGRESO ACUMULADO (SOLO DATOS HISTÓRICOS) */}
                   <Line
                     type="monotone"
                     dataKey="cumulativeRate"
@@ -278,9 +298,10 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
                     activeDot={{ r: 8, fill: COLORS.fhrCyan }}
                     animationDuration={1500}
                     animationBegin={800}
+                    connectNulls={false}  // No conectar valores undefined
                   />
 
-                  {/* LÍNEA DE PROYECCIÓN (FUTURO) */}
+                  {/* LÍNEA DE PROYECCIÓN FUTURA */}
                   <Line
                     type="monotone"
                     dataKey="projectedRate"
@@ -291,6 +312,7 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
                     activeDot={{ r: 8, fill: COLORS.fhrPurple }}
                     animationDuration={1500}
                     animationBegin={1200}
+                    connectNulls={true}  // Conectar el punto puente con la proyección
                   />
 
                   {/* GRADIENTES PARA BARRAS */}
@@ -315,12 +337,8 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
                 <span className="text-white/70">Progreso Acumulado</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-0.5 bg-fhr-purple border-t border-dashed border-fhr-purple rounded"></div>
+                <div className="w-4 h-0.5 bg-fhr-purple" style={{ borderTop: '2px dashed #A78BFA' }}></div>
                 <span className="text-white/70">Proyección Futura</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-0.5 bg-fhr-blue border-t border-dashed border-fhr-blue rounded"></div>
-                <span className="text-white/70">Objetivo {targetRate}%</span>
               </div>
             </div>
           </CardContent>

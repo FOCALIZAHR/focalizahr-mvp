@@ -148,10 +148,10 @@ export default function LeadershipFingerprintPanel({ leadershipAnalysis }: Leade
       </Card>
 
       {/* Grid de Departamentos Críticos y Ejemplares */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 w-full">
         {/* Departamentos Críticos */}
         {data.criticalDepartments.length > 0 && (
-          <div className="space-y-4">
+          <div className="space-y-4 w-full">
             <div className="flex items-center gap-2 mb-2">
               <AlertCircle className="h-5 w-5 text-red-400" />
               <h3 className="text-lg font-semibold text-gray-100">Atención Urgente Requerida</h3>
@@ -182,7 +182,7 @@ export default function LeadershipFingerprintPanel({ leadershipAnalysis }: Leade
 
         {/* Departamentos Ejemplares */}
         {data.exemplaryDepartments.length > 0 && (
-          <div className="space-y-4">
+          <div className="space-y-4 w-full">
             <div className="flex items-center gap-2 mb-2">
               <Trophy className="h-5 w-5 text-green-400" />
               <h3 className="text-lg font-semibold text-gray-100">Liderazgo Ejemplar</h3>
