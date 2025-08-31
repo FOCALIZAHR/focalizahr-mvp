@@ -95,19 +95,29 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
       };
     });
 
-    // Agregar punto de proyección futura si existe predicción
+    // Agregar puntos de proyección futura (máximo 7 días)
     const projectionData: ChartDataPoint[] = [];
     if (participationPrediction && daysRemaining > 0) {
       const lastDay = historical[historical.length - 1];
-      const projectionDay = {
-        day: `+${daysRemaining}d`,
-        date: new Date(Date.now() + daysRemaining * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        responses: 0, // No barras para proyección
-        cumulativeRate: lastDay?.cumulativeRate || participationRate,
-        projectedRate: participationPrediction.finalProjection,
-        isPrediction: true
-      };
-      projectionData.push(projectionDay);
+      const currentRate = lastDay?.cumulativeRate || participationRate;
+      
+      // Limitar proyección a 7 días máximo
+      const projectionDays = Math.min(7, daysRemaining);
+      const dailyIncrement = (participationPrediction.finalProjection - currentRate) / projectionDays;
+      
+      // Generar puntos intermedios para que la línea púrpura se dibuje
+      for (let i = 1; i <= projectionDays; i++) {
+        const projectedValue = currentRate + (dailyIncrement * i);
+        
+        projectionData.push({
+          day: i === projectionDays && daysRemaining <= 7 ? 'Fin' : `+${i}d`,
+          date: new Date(Date.now() + (i * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
+          responses: 0, // No barras en proyección
+          cumulativeRate: currentRate, // MANTENER línea cyan plana en el último valor
+          projectedRate: Math.round(projectedValue * 10) / 10,
+          isPrediction: true
+        });
+      }
     }
 
     return [...historical, ...projectionData];

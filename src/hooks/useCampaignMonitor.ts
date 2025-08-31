@@ -25,6 +25,7 @@ import {
   calculateDepartmentMomentum,
   TopMoverTrend // ✅ AGREGAR ESTO
 } from '@/lib/utils/monitor-utils';
+import { PatternDetector } from '@/lib/services/PatternDetector';
 import type { 
   DepartmentMonitorData, 
   DailyResponse, 
@@ -642,7 +643,11 @@ export function useCampaignMonitor(campaignId: string) {
   const { data: historicalData, isLoading: historyLoading} = useCampaignHistory({ 
     limit: 5, 
     currentCampaignId: campaignId 
+    
   });
+  
+  console.log('🔍 MONITOR historicalData:', historicalData, 'loading:', historyLoading);
+  
   const { campaignDetails, isLoading: detailsLoading } = useCampaignDetails(campaignId);
   
   const [lastRefresh, setLastRefresh] = useState(new Date());
@@ -1011,10 +1016,139 @@ export function useCampaignMonitor(campaignId: string) {
     const momentumGaugeDataCalculated = prepareMomentumGaugeData(topMover);
 
     // ✅ PARTICIPATION PREDICTION - PRESERVADO
-    const participationPredictionCalculated = calculateParticipationPrediction(dailyResponses, analytics.participationRate || 0, daysRemaining);
+       const participationPredictionCalculated = calculateParticipationPrediction(
+       dailyResponses, 
+       analytics.participationRate || 0, 
+       daysRemaining,
+       summary?.total || analytics.totalInvited || 0  // ← AGREGAR ESTE 4TO PARÁMETRO
+       );
 
     // ✅ DEPARTMENT MOMENTUM - BASADO EN TOPMOVERS UNIFICADOS
     const departmentMomentumCalculated = generateDepartmentMomentumData(topMovers, negativeAnomaliesCalculated);
+
+    // 🧠 ANÁLISIS DE LIDERAZGO CON PATTERNDETECTOR
+    const leadershipAnalysisCalculated = (() => {
+      // Validar que tengamos participantes con datos
+      if (!participants?.length) {
+        return {
+          byDepartment: {},
+          global: {
+            pattern: null,
+            anomaly: null,
+            insight: 'Sin datos suficientes para análisis de liderazgo.',
+            fingerprint: null,
+            hasData: false
+          },
+          criticalDepartments: [],
+          exemplaryDepartments: []
+        };
+      }
+
+      // Analizar por cada departamento
+      const departmentAnalyses: Record<string, any> = {};
+      
+      // Agrupar participantes por departamento
+      const participantsByDept = participants.reduce((acc: any, p: any) => {
+        const dept = p.department || 'Sin Departamento';
+        if (!acc[dept]) acc[dept] = [];
+        acc[dept].push(p);
+        return acc;
+      }, {} as Record<string, typeof participants>);
+
+      // Calcular promedio empresa para comparación
+      const companyAverage = {
+        participationRate: summary?.participationRate || 
+          (participants.filter((p: any) => p.hasResponded).length / participants.length),
+        avgResponseDays: 3 // Valor por defecto, ajustar según datos reales
+      };
+
+      // Analizar cada departamento
+      Object.entries(participantsByDept).forEach(([dept, deptParticipants]: [string, any]) => {
+        // Mínimo 5 personas para análisis significativo
+        if (deptParticipants.length < 5) {
+          departmentAnalyses[dept] = {
+            pattern: null,
+            anomaly: null,
+            insight: `${dept}: Muestra insuficiente (${deptParticipants.length} personas). Se requieren mínimo 5 para análisis.`,
+            fingerprint: null,
+            hasData: false
+          };
+          return;
+        }
+
+        // Detectar patrones demográficos
+        const pattern = PatternDetector.detectDemographicPatterns(deptParticipants);
+        
+        // Encontrar anomalías de participación
+        const anomaly = PatternDetector.findParticipationAnomalies(deptParticipants);
+        
+        // Generar insight integrado
+        const insight = PatternDetector.generateLeadershipInsight(
+          pattern, 
+          anomaly, 
+          deptParticipants
+        );
+        
+        // Detectar huella de liderazgo
+        const fingerprint = PatternDetector.detectLeadershipFingerprint(
+          deptParticipants,
+          companyAverage
+        );
+
+        departmentAnalyses[dept] = {
+          pattern,
+          anomaly,
+          insight,
+          fingerprint,
+          hasData: true
+        };
+      });
+
+      // Análisis global de la organización
+      const globalPattern = PatternDetector.detectDemographicPatterns(participants);
+      const globalAnomaly = PatternDetector.findParticipationAnomalies(participants);
+      const globalInsight = PatternDetector.generateLeadershipInsight(
+        globalPattern,
+        globalAnomaly,
+        participants
+      );
+
+      return {
+        byDepartment: departmentAnalyses,
+        global: {
+          pattern: globalPattern,
+          anomaly: globalAnomaly,
+          insight: globalInsight,
+          fingerprint: null, // No aplica fingerprint a nivel global
+          hasData: participants.length >= 5
+        },
+        // Identificar departamentos críticos
+        criticalDepartments: Object.entries(departmentAnalyses)
+          .filter(([_, analysis]: [string, any]) => 
+            analysis.hasData && 
+            (analysis.pattern?.severity === 'CRITICAL' || 
+             analysis.pattern?.severity === 'HIGH' ||
+             analysis.fingerprint?.overallImpact === 'BLOCKER')
+          )
+          .map(([dept, analysis]: [string, any]) => ({
+            department: dept,
+            issue: analysis.pattern?.type || 'LEADERSHIP_FRICTION',
+            severity: analysis.pattern?.severity || 'HIGH',
+            insight: analysis.insight
+          })),
+        // Identificar departamentos ejemplares
+        exemplaryDepartments: Object.entries(departmentAnalyses)
+          .filter(([_, analysis]: [string, any]) => 
+            analysis.hasData && 
+            analysis.fingerprint?.overallImpact === 'ACCELERATOR'
+          )
+          .map(([dept, analysis]: [string, any]) => ({
+            department: dept,
+            impactScore: analysis.fingerprint?.impactScore || 0,
+            insight: analysis.insight
+          }))
+      };
+    })();
 
     // 🧠 COCKPIT INTELLIGENCE - BASADO EN TOPMOVERS UNIFICADOS
     const cockpitIntelligenceCalculated = processCockpitIntelligence(
@@ -1062,7 +1196,7 @@ export function useCampaignMonitor(campaignId: string) {
       
       meanRate: anomalyData.meanRate,
       totalDepartments: anomalyData.totalDepartments,
-      crossStudyComparison: historicalData?.crossStudyComparison || null,
+      crossStudyComparison: historicalData?.crossStudyComparison,
       
       // ✅ MOMENTUM DEPARTAMENTAL VISUAL - PRESERVADO
       departmentMomentum: departmentMomentumCalculated,
@@ -1077,6 +1211,9 @@ export function useCampaignMonitor(campaignId: string) {
       
       // 🧠 COCKPIT INTELLIGENCE - PRESERVADO
       cockpitIntelligence: cockpitIntelligenceCalculated,
+      
+      // 🧠 LEADERSHIP ANALYSIS - PATTERNDETECTOR
+      leadershipAnalysis: leadershipAnalysisCalculated,
     };
   
   }, [campaignData, participantsData, historicalData, campaignDetails, campaignId]);// ✅ DEPENDENCIAS DIRECTAS

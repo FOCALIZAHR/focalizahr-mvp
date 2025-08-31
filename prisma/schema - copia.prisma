@@ -142,7 +142,7 @@ model Participant {
   // ✅ CAMPOS DEMOGRÁFICOS - AGREGADOS PARA PARTICIPANTUPLOADER v2.0
   dateOfBirth DateTime? @map("date_of_birth")
   gender      Gender?
-  hireDate     DateTime? @map("hire_date") @db.Date
+
   // ✅ DEPARTMENT RELATION FIELD ADDED
   departmentId String? @map("department_id")
 

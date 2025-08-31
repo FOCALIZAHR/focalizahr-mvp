@@ -299,7 +299,6 @@ export function PredictiveHeader({
               </div>
             </HudCard>
           </motion.div>
-
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -341,7 +340,6 @@ export function PredictiveHeader({
     </div>
   );
 }
-
 const HudCard = ({ icon: Icon, title, isActionable = false, urgency = 'baja', onClick, children }: any) => {
     const urgencyColor = {
         'crítica': 'var(--focalizahr-error)',
@@ -349,7 +347,6 @@ const HudCard = ({ icon: Icon, title, isActionable = false, urgency = 'baja', on
         'media': 'var(--focalizahr-info)',
         'baja': 'var(--focalizahr-cyan)'
     }[urgency];
-
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}

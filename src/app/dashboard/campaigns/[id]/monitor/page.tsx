@@ -1,7 +1,7 @@
 // ====================================================================
-// FOCALIZAHR MONITOR PAGE - ARQUITECTURA ORIGINAL + IDs NAVEGACIÃ"N
+// FOCALIZAHR MONITOR PAGE - ARQUITECTURA ORIGINAL + IDs NAVEGACIÓN
 // src/app/dashboard/campaigns/[id]/monitor/page.tsx
-// SIMPLE: PatrÃ³n original que funciona + IDs para scroll
+// SIMPLE: Patrón original que funciona + IDs para scroll
 // ====================================================================
 
 'use client';
@@ -9,23 +9,24 @@
 import { useCampaignMonitor } from '@/hooks/useCampaignMonitor';
 import { useRouter, useParams } from 'next/navigation';
 
-// ðŸš€ CockpitHeader bimodal
+// 🚀 CockpitHeader bimodal
 import { CockpitHeaderBimodal } from '@/components/monitor/CockpitHeaderBimodal';
 
-// âœ… Componentes WOW existentes
+// ✅ Componentes WOW existentes
 import { DepartmentPulsePanel } from '@/components/monitor/DepartmentPulsePanel';
 import { ActionButtons } from '@/components/monitor/ActionButtons';
 import { AnomalyDetectorPanel } from '@/components/monitor/AnomalyDetectorPanel';
 import { EngagementHeatmapCard } from '@/components/monitor/EngagementHeatmapCard';
 import { CrossStudyComparatorCard } from '@/components/monitor/CrossStudyComparatorCard';
 import CampaignRhythmPanel from '@/components/monitor/CampaignRhythmPanel';
+import LeadershipFingerprintPanel from '@/components/monitor/LeadershipFingerprintPanel';
 
 // UI Components
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 
-// âœ… CSS FocalizaHR
+// ✅ CSS FocalizaHR
 import '@/styles/focalizahr-design-system.css';
 
 export default function CampaignMonitorPage() {
@@ -33,11 +34,11 @@ export default function CampaignMonitorPage() {
   const params = useParams();
   const campaignId = params.id as string;
 
-  // âœ… HOOK CENTRAL - Single Source of Truth
+  // ✅ HOOK CENTRAL - Single Source of Truth
   const monitorData = useCampaignMonitor(campaignId);
   const { isLoading, error, lastRefresh } = monitorData;
 
-  // ðŸ"„ LOADING STATE
+  // 🔄 LOADING STATE
   if (isLoading) {
     return (
       <div className="fhr-bg-main min-h-screen flex items-center justify-center">
@@ -48,7 +49,7 @@ export default function CampaignMonitorPage() {
               Cargando Torre de Control
             </h3>
             <p className="text-white/60">
-              Procesando datos de campaÃ±a...
+              Procesando datos de campaña...
             </p>
           </CardContent>
         </Card>
@@ -56,7 +57,7 @@ export default function CampaignMonitorPage() {
     );
   }
 
-  // âš ï¸ ERROR STATE
+  // ⚠️ ERROR STATE
   if (error) {
     return (
       <div className="fhr-bg-main min-h-screen flex items-center justify-center">
@@ -74,7 +75,7 @@ export default function CampaignMonitorPage() {
     <div className="fhr-bg-main min-h-screen">
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
         
-        {/* ðŸš€ COCKPIT HEADER - Recibe TODOS los datos del hook incluyendo gráficos */}
+        {/* 🚀 COCKPIT HEADER - Recibe TODOS los datos del hook incluyendo gráficos */}
         <CockpitHeaderBimodal 
           {...monitorData}
           onScrollToSection={(sectionId) => {
@@ -85,12 +86,12 @@ export default function CampaignMonitorPage() {
           }}
         />
 
-        {/* ðŸŽ¯ PROTAGONISTA - Historia Temporal */}
+        {/* 🎯 PROTAGONISTA - Historia Temporal */}
         <div id="rhythm">
           <CampaignRhythmPanel {...monitorData} />
         </div>
 
-        {/* âš¡ GRID COMPONENTES WOW */}
+        {/* ⚡ GRID COMPONENTES WOW */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           <div id="pulse">
@@ -114,7 +115,14 @@ export default function CampaignMonitorPage() {
           </div>
         </div>
 
-        {/* ðŸŽ›ï¸ PANEL DE ACCIONES */}
+        {/* 🧠 LEADERSHIP FINGERPRINT - Análisis de Liderazgo Organizacional */}
+        <div id="leadership-analysis" className="lg:col-span-2">
+          <LeadershipFingerprintPanel 
+            leadershipAnalysis={monitorData.leadershipAnalysis} 
+          />
+        </div>
+
+        {/* 🎛️ PANEL DE ACCIONES */}
         <div id="actions">
           <ActionButtons {...monitorData} />
         </div>

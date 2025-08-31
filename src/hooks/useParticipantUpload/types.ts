@@ -16,6 +16,7 @@ export interface ParticipantData {
   position?: string;
   location?: string;
   dateOfBirth?: string;  // ISO string o formato DD/MM/YYYY
+  hireDate?: Date;
   gender?: Gender | string;
 }
 

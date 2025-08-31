@@ -5,6 +5,7 @@ import { verifyJWTToken } from '@/lib/auth'
 import { z } from 'zod';
 import { generateSecureToken } from '@/lib/utils';
 import * as XLSX from 'xlsx';
+import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter';
 
 // Esquema de validación para participantes
 const participantSchema = z.object({
@@ -13,7 +14,101 @@ const participantSchema = z.object({
   department: z.string().optional(),
   position: z.string().optional(),
   location: z.string().optional(),
+  gender: z.string().optional(),
+  dateOfBirth: z.date().optional(),
+  hireDate: z.date().optional(),
 });
+
+// ============= FUNCIONES AUXILIARES DE PARSEO =============
+
+/**
+ * Parsea género con variaciones comunes
+ */
+function parseGender(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  
+  const normalized = value.toLowerCase().trim();
+  
+  const genderMap: Record<string, string> = {
+    'm': 'MALE',
+    'masculino': 'MALE',
+    'male': 'MALE',
+    'hombre': 'MALE',
+    'man': 'MALE',
+    'h': 'MALE',
+    'f': 'FEMALE',
+    'femenino': 'FEMALE',
+    'female': 'FEMALE',
+    'mujer': 'FEMALE',
+    'woman': 'FEMALE',
+    'nb': 'NON_BINARY',
+    'no binario': 'NON_BINARY',
+    'nobinario': 'NON_BINARY',
+    'non-binary': 'NON_BINARY',
+    'other': 'NON_BINARY',
+    'otro': 'NON_BINARY',
+    'ns': 'PREFER_NOT_TO_SAY',
+    'prefiero no decir': 'PREFER_NOT_TO_SAY',
+    'no especifica': 'PREFER_NOT_TO_SAY',
+    'n/a': 'PREFER_NOT_TO_SAY'
+  };
+  
+  return genderMap[normalized] || undefined;
+}
+
+/**
+ * Parsea fecha flexible (DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, Excel serial)
+ */
+function parseDate(value: any): Date | undefined {
+  if (!value) return undefined;
+  
+  try {
+    // Si es un número de Excel (días desde 30/12/1899) - CORREGIDO
+    if (typeof value === 'number') {
+      const excelEpoch = new Date(1899, 11, 30); // 30 dic 1899 - CORRECCIÓN CRÍTICA
+      const date = new Date(excelEpoch.getTime() + value * 24 * 60 * 60 * 1000);
+      return isValidDate(date) ? date : undefined;
+    }
+    
+    // Convertir a string para procesar
+    const dateStr = value.toString().trim();
+    
+    // Formato DD/MM/YYYY o DD-MM-YYYY (acepta AMBOS con barras o guiones)
+    const ddmmyyyy = /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/.exec(dateStr);
+    if (ddmmyyyy) {
+      const [, day, month, year] = ddmmyyyy;
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      return isValidDate(date) ? date : undefined;
+    }
+    
+    // Formato YYYY-MM-DD o YYYY/MM/DD
+    const yyyymmdd = /^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/.exec(dateStr);
+    if (yyyymmdd) {
+      const [, year, month, day] = yyyymmdd;
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      return isValidDate(date) ? date : undefined;
+    }
+    
+    // Fallback: usar constructor Date
+    const date = new Date(value);
+    return isValidDate(date) ? date : undefined;
+    
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Valida que una fecha sea válida y razonable
+ */
+function isValidDate(date: Date): boolean {
+  return date instanceof Date && 
+         !isNaN(date.getTime()) && 
+         date.getFullYear() > 1900 && 
+         date.getFullYear() < 2030;
+}
+
+// ============= FIN FUNCIONES AUXILIARES =============
 
 // Interfaz para resultados de procesamiento
 interface ProcessingResult {
@@ -28,6 +123,9 @@ interface ProcessingResult {
     department?: string;
     position?: string;
     location?: string;
+    gender?: string;
+    dateOfBirth?: Date;
+    hireDate?: Date;
   }>;
 }
 
@@ -91,6 +189,21 @@ async function processFile(file: File): Promise<ProcessingResult> {
     const locationIndex = headers.findIndex(h => 
       h && (h.toLowerCase().includes('location') || h.toLowerCase().includes('ubicacion'))
     );
+    
+    // NUEVOS CAMPOS - Detección de columnas
+    const genderIndex = headers.findIndex(h => 
+      h && (h.toLowerCase().includes('gender') || h.toLowerCase().includes('genero') || h.toLowerCase().includes('género') || h.toLowerCase().includes('sexo'))
+    );
+    const dateOfBirthIndex = headers.findIndex(h => 
+      h && (h.toLowerCase().includes('fecha') && h.toLowerCase().includes('nacimiento')) || 
+      h.toLowerCase().includes('birthday') || 
+      h.toLowerCase().includes('birth')
+    );
+    const hireDateIndex = headers.findIndex(h => 
+      h && (h.toLowerCase().includes('fecha') && h.toLowerCase().includes('ingreso')) || 
+      h.toLowerCase().includes('hire') || 
+      h.toLowerCase().includes('contrat')
+    );
 
     if (emailIndex === -1) {
       result.errors.push('No se encontró columna de email/correo en el archivo');
@@ -122,13 +235,17 @@ async function processFile(file: File): Promise<ProcessingResult> {
         }
         emailsSeen.add(email);
 
-        // Crear objeto participante
+        // Crear objeto participante con TODOS los campos
         const participant = {
           email,
           name: nameIndex >= 0 ? row[nameIndex]?.toString().trim() : undefined,
           department: departmentIndex >= 0 ? row[departmentIndex]?.toString().trim() : undefined,
           position: positionIndex >= 0 ? row[positionIndex]?.toString().trim() : undefined,
           location: locationIndex >= 0 ? row[locationIndex]?.toString().trim() : undefined,
+          // NUEVOS CAMPOS - Parsear con funciones auxiliares
+          gender: genderIndex >= 0 ? parseGender(row[genderIndex]?.toString().trim()) : undefined,
+          dateOfBirth: dateOfBirthIndex >= 0 ? parseDate(row[dateOfBirthIndex]) : undefined,
+          hireDate: hireDateIndex >= 0 ? parseDate(row[hireDateIndex]) : undefined,
         };
 
         // Validar con schema
@@ -166,6 +283,9 @@ async function loadParticipantsToDatabase(
     department?: string;
     position?: string;
     location?: string;
+    gender?: string;
+    dateOfBirth?: Date;
+    hireDate?: Date;
   }>
 ): Promise<{ success: boolean; totalLoaded: number; duplicatesInDB: number; error?: string }> {
   
@@ -173,7 +293,12 @@ async function loadParticipantsToDatabase(
     // Verificar que la campaña existe y está en estado draft
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
-      select: { id: true, status: true, totalInvited: true }
+      select: { 
+        id: true, 
+        status: true, 
+        totalInvited: true,
+        accountId: true  // NECESARIO para DepartmentAdapter
+      }
     });
 
     if (!campaign) {
@@ -188,6 +313,33 @@ async function loadParticipantsToDatabase(
     if (participants.length > 500) {
       return { success: false, totalLoaded: 0, duplicatesInDB: 0, error: 'Máximo 500 participantes permitidos por campaña' };
     }
+
+    // ============= INTEGRACIÓN DEPARTMENTADAPTER =============
+    
+    // Obtener todos los departamentos únicos del CSV
+    const departmentNames = [...new Set(
+      participants
+        .map(p => p.department)
+        .filter(Boolean) as string[]
+    )];
+
+    let departmentMapping: Record<string, string | null> = {};
+    
+    if (departmentNames.length > 0) {
+      // Auto-crear departments que no existan
+      await DepartmentAdapter.autoCreateDepartmentsFromParticipants(
+        campaign.accountId,
+        departmentNames
+      );
+      
+      // Obtener mapeo de nombres a IDs
+      departmentMapping = await DepartmentAdapter.convertParticipantDepartments(
+        campaign.accountId,
+        departmentNames
+      );
+    }
+    
+    // ============= FIN INTEGRACIÓN DEPARTMENTADAPTER =============
 
     // Verificar duplicados existentes en BD
     const existingEmails = await prisma.participant.findMany({
@@ -206,15 +358,19 @@ async function loadParticipantsToDatabase(
       return { success: false, totalLoaded: 0, duplicatesInDB, error: 'Todos los participantes ya existen en la campaña' };
     }
 
-    // Preparar datos para inserción
+    // Preparar datos para inserción con TODOS los campos nuevos
     const participantsToInsert = newParticipants.map(participant => ({
       campaignId,
       email: participant.email,
       uniqueToken: generateSecureToken(),
       name: participant.name || null,
       department: participant.department || null,
+      departmentId: participant.department ? departmentMapping[participant.department] || null : null, // NUEVO
       position: participant.position || null,
       location: participant.location || null,
+      gender: participant.gender || null,           // NUEVO
+      dateOfBirth: participant.dateOfBirth || null, // NUEVO
+      hireDate: participant.hireDate || null,       // NUEVO
       hasResponded: false,
       createdAt: new Date(),
     }));
@@ -262,14 +418,14 @@ export async function POST(request: NextRequest) {
   try {
     // Verificar autenticación admin (simplificado para MVP)
     const authHeader = request.headers.get('authorization');
-if (!authHeader || !authHeader.startsWith('Bearer ')) {
-  return NextResponse.json({ error: 'Token requerido' }, { status: 401 });
-}
-const token = authHeader.substring(7);
-const verification = verifyJWTToken(token);
-if (!verification.success) {
-  return NextResponse.json({ error: 'Token inválido' }, { status: 401 });
-}
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Token requerido' }, { status: 401 });
+    }
+    const token = authHeader.substring(7);
+    const verification = verifyJWTToken(token);
+    if (!verification.success) {
+      return NextResponse.json({ error: 'Token inválido' }, { status: 401 });
+    }
     
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -312,21 +468,21 @@ if (!verification.success) {
 
     // Si es preview, retornar solo resultados del procesamiento
     if (action === 'preview') {
-  return NextResponse.json({
-    success: true,
-    message: 'Archivo procesado exitosamente',
-    campaign: {
-      id: campaign.id,
-      name: campaign.name,
-      company: campaign.account.companyName
-    },
-    // Propiedades específicas del processingResult
-    participants: processingResult.participants,
-    validRecords: processingResult.validRecords,
-    errors: processingResult.errors,
-    duplicates: processingResult.duplicates
-  });
-}
+      return NextResponse.json({
+        success: true,
+        message: 'Archivo procesado exitosamente',
+        campaign: {
+          id: campaign.id,
+          name: campaign.name,
+          company: campaign.account.companyName
+        },
+        // Propiedades específicas del processingResult
+        participants: processingResult.participants,
+        validRecords: processingResult.validRecords,
+        errors: processingResult.errors,
+        duplicates: processingResult.duplicates
+      });
+    }
 
     // Si es confirm, cargar participantes a BD
     if (action === 'confirm') {

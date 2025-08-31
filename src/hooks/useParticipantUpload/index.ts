@@ -146,14 +146,14 @@ export function useParticipantUpload(
     dispatch({ type: 'SET_FILE', payload: file });
   }, [validateFile]);
   
-  // Generar template CSV con nuevos campos
+  // Generar template CSV con nuevos campos incluyendo FechaIngreso
   const handleDownloadTemplate = useCallback(() => {
     const csvContent = [
-      'Email,Nombre,Departamento,Cargo,Ubicacion,FechaNacimiento,Genero',
-      'juan.perez@empresa.com,Juan Pérez,Ventas,Ejecutivo Comercial,Santiago,15/03/1985,M',
-      'maria.gonzalez@empresa.com,María González,RRHH,Analista,Valparaíso,22/08/1990,F',
-      'carlos.lopez@empresa.com,Carlos López,TI,Desarrollador,Santiago,10/12/1988,M',
-      'ana.silva@empresa.com,Ana Silva,Marketing,Coordinadora,Concepción,05/07/1992,F'
+      'Email,Nombre,Departamento,Cargo,Ubicacion,FechaNacimiento,Genero,FechaIngreso',
+      'juan.perez@empresa.com,Juan Pérez,Ventas,Ejecutivo Comercial,Santiago,15/03/1985,M,01/06/2015',
+      'maria.gonzalez@empresa.com,María González,RRHH,Analista,Valparaíso,22/08/1990,F,15/03/2018',
+      'carlos.lopez@empresa.com,Carlos López,TI,Desarrollador,Santiago,10/12/1988,M,01/06/2005',
+      'ana.silva@empresa.com,Ana Silva,Marketing,Coordinadora,Concepción,05/07/1992,F,20/01/2020'
     ].join('\n');
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -163,10 +163,11 @@ export function useParticipantUpload(
     link.click();
   }, [campaignName]);
   
-  // Calcular estadísticas demográficas
+  // Calcular estadísticas demográficas incluyendo antigüedad
   const calculateDemographics = useCallback((participants: ParticipantData[]): DemographicsStats => {
     const totalWithGender = participants.filter(p => p.gender).length;
     const totalWithAge = participants.filter(p => p.dateOfBirth).length;
+    const totalWithSeniority = participants.filter(p => p.hireDate).length;
     
     const genderDistribution = {
       male: participants.filter(p => 
@@ -218,12 +219,39 @@ export function useParticipantUpload(
       '56+': ages.filter(age => age >= 56).length
     };
     
+    // Calcular antigüedad promedio
+    const seniorityYears = participants
+      .filter(p => p.hireDate)
+      .map(p => {
+        let hireDate: Date;
+        const dateStr = p.hireDate!;
+        
+        // Manejar diferentes formatos de fecha
+        if (dateStr.includes('/')) {
+          // Formato DD/MM/YYYY
+          const parts = dateStr.split('/');
+          hireDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+        } else {
+          // Formato ISO
+          hireDate = new Date(dateStr);
+        }
+        
+        const yearsDiff = (today.getTime() - hireDate.getTime()) / (1000 * 60 * 60 * 24 * 365);
+        return Math.floor(yearsDiff);
+      })
+      .filter(years => years >= 0 && years < 50); // Filtrar valores válidos
+    
+    const averageSeniority = seniorityYears.length > 0 
+      ? Math.round(seniorityYears.reduce((a, b) => a + b, 0) / seniorityYears.length * 10) / 10
+      : null;
+    
     return {
       totalParticipants: participants.length,
-      withDemographics: Math.max(totalWithGender, totalWithAge),
+      withDemographics: Math.max(totalWithGender, totalWithAge, totalWithSeniority),
       genderDistribution,
       ageDistribution,
-      averageAge: ages.length > 0 ? Math.round(ages.reduce((a, b) => a + b, 0) / ages.length) : 0
+      averageAge: ages.length > 0 ? Math.round(ages.reduce((a, b) => a + b, 0) / ages.length) : 0,
+      averageSeniority
     };
   }, []);
   

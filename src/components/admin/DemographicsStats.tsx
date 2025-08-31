@@ -43,62 +43,102 @@ export default function DemographicsStats({ stats }: DemographicsStatsProps) {
     .reduce((prev, current) => current[1] > prev[1] ? current : prev, ['', 0]);
   
   return (
-    <Card className="professional-card">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <Card className="bg-black/40 border-white/10 backdrop-blur-sm">
+      <CardHeader className="border-b border-white/10">
+        <CardTitle className="text-lg font-medium text-white flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-cyan-400" />
-          <span className="text-cyan-400">Análisis Demográfico</span>
+          Análisis Demográfico
         </CardTitle>
       </CardHeader>
       
-      <CardContent className="space-y-6">
-        {/* Resumen general */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white/5 rounded-lg border border-white/10 p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Users className="h-4 w-4 text-cyan-400" />
-              <p className="text-xs text-cyan-400">Total</p>
+      <CardContent className="p-6 space-y-6">
+        
+        {/* Resumen de participantes */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white/5 rounded-lg border border-white/10 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-cyan-400 flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Total Participantes
+              </h3>
             </div>
             <p className="text-2xl font-bold text-white">{stats.totalParticipants}</p>
           </div>
           
-          <div className="bg-white/5 rounded-lg border border-white/10 p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="h-4 w-4 text-cyan-400" />
-              <p className="text-xs text-cyan-400">Con Demografía</p>
+          <div className="bg-white/5 rounded-lg border border-white/10 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-cyan-400 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Con Datos Demográficos
+              </h3>
             </div>
-            <p className="text-2xl font-bold text-white">{stats.withDemographics}</p>
-            <p className="text-xs text-white/60">
-              {Math.round((stats.withDemographics / stats.totalParticipants) * 100)}%
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-2xl font-bold text-white">{stats.withDemographics}</p>
+              <Badge variant="secondary" className="text-xs">
+                {Math.round((stats.withDemographics / stats.totalParticipants) * 100)}%
+              </Badge>
+            </div>
           </div>
           
-          <div className="bg-white/5 rounded-lg border border-white/10 p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Calendar className="h-4 w-4 text-cyan-400" />
-              <p className="text-xs text-cyan-400">Edad Promedio</p>
+          <div className="bg-white/5 rounded-lg border border-white/10 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-cyan-400 flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Edad Promedio
+              </h3>
             </div>
-            <p className="text-2xl font-bold text-white">
-              {stats.averageAge > 0 ? `${stats.averageAge} años` : 'N/D'}
-            </p>
-          </div>
-          
-          <div className="bg-white/5 rounded-lg border border-white/10 p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <User className="h-4 w-4 text-cyan-400" />
-              <p className="text-xs text-cyan-400">Rango Principal</p>
+            <div className="flex items-center gap-2">
+              <p className="text-2xl font-bold text-white">
+                {stats.averageAge > 0 ? stats.averageAge : '-'}
+              </p>
+              <span className="text-sm text-white/60">años</span>
             </div>
-            <p className="text-2xl font-bold text-white">
-              {mostCommonAgeRange[1] > 0 ? mostCommonAgeRange[0] : 'N/D'}
-            </p>
           </div>
         </div>
+
+        {/* Card de Antigüedad Promedio - NUEVO */}
+        {stats.averageSeniority !== undefined && stats.averageSeniority !== null && (
+          <div className="bg-white/5 rounded-lg border border-white/10 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-cyan-400 flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Antigüedad Promedio
+              </h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <p className="text-2xl font-bold text-white">
+                {stats.averageSeniority.toFixed(1)}
+              </p>
+              <span className="text-sm text-white/60">años</span>
+            </div>
+            {stats.seniorityDistribution && (
+              <div className="mt-3 space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-white/60">0-1 año</span>
+                  <span className="text-white">{stats.seniorityDistribution['0-1'] || 0}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-white/60">1-3 años</span>
+                  <span className="text-white">{stats.seniorityDistribution['1-3'] || 0}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-white/60">3-5 años</span>
+                  <span className="text-white">{stats.seniorityDistribution['3-5'] || 0}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-white/60">5+ años</span>
+                  <span className="text-white">{stats.seniorityDistribution['5+'] || 0}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         
         {/* Distribución por género */}
-        {stats.genderDistribution && (
+        {stats.genderDistribution && Object.values(stats.genderDistribution).some(v => v > 0) && (
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-cyan-400 flex items-center gap-2">
-              <User className="h-4 w-4" />
+              <Users className="h-4 w-4" />
               Distribución por Género
             </h3>
             
@@ -109,11 +149,11 @@ export default function DemographicsStats({ stats }: DemographicsStatsProps) {
                 
                 return (
                   <div key={gender} className="space-y-1">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-white/80">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-white/80">
                         {genderLabels[gender as keyof typeof genderLabels]}
                       </span>
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-white font-medium">
                         {count} ({percentage}%)
                       </span>
                     </div>
@@ -166,6 +206,9 @@ export default function DemographicsStats({ stats }: DemographicsStatsProps) {
             <ul className="text-xs text-white/80 space-y-1">
               {stats.averageAge > 0 && (
                 <li>• La edad promedio del equipo es de {stats.averageAge} años</li>
+              )}
+              {stats.averageSeniority !== undefined && stats.averageSeniority > 0 && (
+                <li>• La antigüedad promedio es de {stats.averageSeniority.toFixed(1)} años en la empresa</li>
               )}
               {mostCommonAgeRange[1] > 0 && (
                 <li>• El {Math.round((mostCommonAgeRange[1] as number / stats.totalParticipants) * 100)}% del equipo tiene entre {mostCommonAgeRange[0]} años</li>

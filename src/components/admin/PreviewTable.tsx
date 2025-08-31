@@ -69,6 +69,22 @@ export default function PreviewTable({
     return age;
   };
   
+  // Calcular antigüedad
+  const calculateSeniority = (hireDate: string | undefined): string => {
+    if (!hireDate) return '-';
+    
+    const today = new Date();
+    const hire = hireDate.includes('-') 
+      ? new Date(hireDate)
+      : new Date(hireDate.split('/').reverse().join('-'));
+    
+    const years = Math.floor((today.getTime() - hire.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+    
+    if (years < 1) return '< 1 año';
+    if (years === 1) return '1 año';
+    return `${years} años`;
+  };
+  
   return (
     <Card className="professional-card">
       <CardHeader>
@@ -123,6 +139,13 @@ export default function PreviewTable({
                         <User className="h-4 w-4 inline mr-1" />
                         Género
                       </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-cyan-400 uppercase tracking-wider">
+                        <Briefcase className="h-4 w-4 inline mr-1" />
+                        F. Ingreso
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-cyan-400 uppercase tracking-wider">
+                        Antigüedad
+                      </th>
                     </>
                   )}
                 </tr>
@@ -131,6 +154,7 @@ export default function PreviewTable({
               <tbody className="divide-y divide-white/5">
                 {participants.map((participant, index) => {
                   const age = calculateAge(participant.dateOfBirth);
+                  const seniority = calculateSeniority(participant.hireDate);
                   
                   return (
                     <tr key={index} className="hover:bg-white/5 transition-colors">
@@ -165,6 +189,14 @@ export default function PreviewTable({
                               {formatGender(participant.gender)}
                             </Badge>
                           </td>
+                          <td className="px-4 py-3 text-sm text-white/80">
+                            {formatDate(participant.hireDate)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-white/80">
+                            <Badge variant="secondary" className="text-xs">
+                              {seniority}
+                            </Badge>
+                          </td>
                         </>
                       )}
                     </tr>
@@ -195,7 +227,7 @@ export default function PreviewTable({
                 <div className="bg-white/5 rounded-lg border border-white/10 p-3">
                   <p className="text-xs text-cyan-400 mb-1">Con Demografía</p>
                   <p className="text-lg font-bold text-white">
-                    {participants.filter(p => p.dateOfBirth || p.gender).length}
+                    {participants.filter(p => p.dateOfBirth || p.gender || p.hireDate).length}
                   </p>
                 </div>
                 
@@ -209,7 +241,7 @@ export default function PreviewTable({
             )}
           </div>
           
-          {showDemographics && participants.some(p => p.dateOfBirth || p.gender) && (
+          {showDemographics && participants.some(p => p.dateOfBirth || p.gender || p.hireDate) && (
             <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
               <p className="text-xs text-blue-600 dark:text-blue-400">
                 💡 Datos demográficos detectados. Esto permitirá análisis más detallados de diversidad e inclusión.

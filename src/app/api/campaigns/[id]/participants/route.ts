@@ -1,11 +1,84 @@
 // src/app/api/campaigns/[id]/participants/route.ts
-// 📁 INSTRUCCIÓN: CREAR NUEVO ARCHIVO EN: src/app/api/campaigns/[id]/participants/route.ts
+// ✅ VERSIÓN EXTENDIDA CON CAMPOS DEMOGRÁFICOS - ZERO BREAKING CHANGES
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyJWT } from '@/lib/auth'
 import { conciergeParticipantsSchema } from '@/lib/validations'
 import crypto from 'crypto'
+
+// ✅ FUNCIONES DE PARSING IMPORTADAS (CONSISTENCIA CON ADMIN/PARTICIPANTS)
+function parseGender(value: string): string | undefined {
+  if (!value) return undefined;
+  
+  const normalized = value.toLowerCase().trim();
+  
+  if (['m', 'male', 'masculino', 'hombre', 'man'].includes(normalized)) {
+    return 'MALE';
+  }
+  
+  if (['f', 'female', 'femenino', 'mujer', 'woman'].includes(normalized)) {
+    return 'FEMALE';
+  }
+  
+  if (['nb', 'non-binary', 'no binario', 'nobinario', 'other', 'otro'].includes(normalized)) {
+    return 'NON_BINARY';
+  }
+  
+  if (['prefer not to say', 'prefiero no decir', 'no especifica', 'n/a'].includes(normalized)) {
+    return 'PREFER_NOT_TO_SAY';
+  }
+  
+  return undefined;
+}
+
+function parseDate(value: any): Date | undefined {
+  if (!value) return undefined;
+  
+  try {
+    // Si es un número de Excel (días desde 1900) - FÓRMULA CORREGIDA
+    if (typeof value === 'number') {
+      const excelEpoch = new Date(1899, 11, 30); // 30 dic 1899
+      const date = new Date(excelEpoch.getTime() + value * 24 * 60 * 60 * 1000);
+      return isValidDate(date) ? date : undefined;
+    }
+    
+    if (typeof value === 'string') {
+      const dateStr = value.trim();
+      
+      // ✅ FORMATO DD/MM/YYYY o DD-MM-YYYY (AMBOS)
+      const ddmmyyyy = /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/.exec(dateStr);
+      if (ddmmyyyy) {
+        const [, day, month, year] = ddmmyyyy;
+        const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        return isValidDate(date) ? date : undefined;
+      }
+      
+      // ✅ FORMATO YYYY-MM-DD (ISO)
+      const yyyymmdd = /^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/.exec(dateStr);
+      if (yyyymmdd) {
+        const [, year, month, day] = yyyymmdd;
+        const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        return isValidDate(date) ? date : undefined;
+      }
+    }
+    
+    const date = new Date(value);
+    return isValidDate(date) ? date : undefined;
+    
+  } catch (error) {
+    return undefined;
+  }
+}
+
+function isValidDate(date: Date): boolean {
+  return date instanceof Date && 
+         !isNaN(date.getTime()) && 
+         date.getFullYear() > 1900 && 
+         date.getFullYear() < 2030;
+}
+
+// ✅ FUNCIONES DE PARSING SOLAMENTE (NO CÁLCULOS DE NEGOCIO)
 
 // POST /api/campaigns/[id]/participants - Carga participantes enfoque concierge
 export async function POST(
@@ -131,9 +204,14 @@ export async function POST(
       })
     }
 
-    // Procesar y crear participantes con tokens únicos
+    // ✅ PROCESAR PARTICIPANTES CON CAMPOS DEMOGRÁFICOS EXTENDIDOS
     const participantsToCreate = validatedData.participants.map(participant => {
       const uniqueToken = crypto.randomBytes(32).toString('hex')
+      
+      // ✅ PARSEAR CAMPOS DEMOGRÁFICOS (CONSISTENTE CON ADMIN/PARTICIPANTS)
+      const parsedGender = participant.gender ? parseGender(participant.gender) : null;
+      const parsedDateOfBirth = participant.dateOfBirth ? parseDate(participant.dateOfBirth) : null;
+      const parsedHireDate = participant.hireDate ? parseDate(participant.hireDate) : null;
       
       return {
         campaignId,
@@ -143,6 +221,10 @@ export async function POST(
         position: participant.position?.trim() || null,
         seniorityLevel: participant.seniorityLevel || null,
         location: participant.location?.trim() || null,
+        // ✅ CAMPOS DEMOGRÁFICOS NUEVOS (OPCIONALES)
+        gender: parsedGender,
+        dateOfBirth: parsedDateOfBirth,
+        hireDate: parsedHireDate,
         hasResponded: false,
         reminderCount: 0
       }
@@ -176,7 +258,7 @@ export async function POST(
 
     console.log('📊 Campaign counters updated')
 
-    // Generar estadísticas de procesamiento
+    // ✅ GENERAR ESTADÍSTICAS EXTENDIDAS CON DEMOGRAFÍA
     const statistics = {
       total: totalCreated,
       byDepartment: {} as Record<string, number>,
@@ -186,7 +268,11 @@ export async function POST(
       withDepartment: 0,
       withPosition: 0,
       withSeniority: 0,
-      withLocation: 0
+      withLocation: 0,
+      // ✅ ESTADÍSTICAS DEMOGRÁFICAS NUEVAS
+      withGender: 0,
+      withDateOfBirth: 0,
+      withHireDate: 0
     }
 
     participantsToCreate.forEach(participant => {
@@ -206,6 +292,10 @@ export async function POST(
         statistics.byLocation[participant.location] = (statistics.byLocation[participant.location] || 0) + 1
         statistics.withLocation++
       }
+      // ✅ CONTAR CAMPOS DEMOGRÁFICOS
+      if (participant.gender) statistics.withGender++
+      if (participant.dateOfBirth) statistics.withDateOfBirth++
+      if (participant.hireDate) statistics.withHireDate++
     })
 
     // Crear audit log
@@ -230,7 +320,7 @@ export async function POST(
 
     console.log('📝 Audit log created')
 
-    // Generar recomendaciones basadas en los datos
+    // Recomendaciones básicas existentes
     const recommendations = []
     
     if (statistics.withDepartment / statistics.total > 0.8) {
@@ -339,7 +429,7 @@ export async function GET(
 
     console.log('✅ Campaign found:', campaign.name)
 
-    // Obtener participantes
+    // ✅ OBTENER PARTICIPANTES CON CAMPOS DEMOGRÁFICOS EXTENDIDOS
     const participants = await prisma.participant.findMany({
       where: { campaignId },
       select: {
@@ -354,6 +444,10 @@ export async function GET(
         reminderCount: true,
         lastReminderSent: true,
         createdAt: true,
+        // ✅ CAMPOS DEMOGRÁFICOS NUEVOS
+        gender: true,
+        dateOfBirth: true,
+        hireDate: true,
         // No incluir uniqueToken por seguridad
         ...(includeDetails && {
           responses: {
@@ -373,7 +467,7 @@ export async function GET(
 
     console.log(`📊 Found ${participants.length} participants`)
 
-    // Calcular estadísticas detalladas
+    // ✅ CALCULAR ESTADÍSTICAS BÁSICAS (SIN LÓGICA DE NEGOCIO)
     const summary = {
       total: participants.length,
       responded: participants.filter(p => p.hasResponded).length,
@@ -389,6 +483,12 @@ export async function GET(
         noReminders: participants.filter(p => p.reminderCount === 0).length,
         oneReminder: participants.filter(p => p.reminderCount === 1).length,
         multipleReminders: participants.filter(p => p.reminderCount > 1).length
+      },
+      // ✅ CONTEOS DEMOGRÁFICOS BÁSICOS (NO CÁLCULOS COMPLEJOS)
+      demographicFields: {
+        withGender: participants.filter(p => p.gender).length,
+        withDateOfBirth: participants.filter(p => p.dateOfBirth).length,
+        withHireDate: participants.filter(p => p.hireDate).length
       }
     }
 
@@ -418,7 +518,7 @@ export async function GET(
       }
     })
 
-    // Análisis adicional
+    // Análisis simplificado (solo indicadores básicos)
     const analysis = {
       dataCompleteness: {
         department: Math.round((Object.values(summary.byDepartment).reduce((sum, dept) => sum + dept.total, 0) / summary.total) * 100),
@@ -435,6 +535,7 @@ export async function GET(
 
     const response = {
       success: true,
+      // ✅ DATOS CRUDOS SIN ENRIQUECIMIENTO
       participants: includeDetails ? participants : [],
       summary,
       analysis,

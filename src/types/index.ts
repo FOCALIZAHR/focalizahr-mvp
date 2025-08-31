@@ -808,6 +808,14 @@ export interface ParticipationPredictionData {
   velocity: number;
   riskLevel: 'low' | 'medium' | 'high';
   recommendedActions: Array<{ action: string; impact: number; }>;
+// AGREGAR ESTOS CAMPOS OPCIONALES:
+  projectionPoints?: Array<{
+    dayLabel: string;
+    rate: number;
+  }>;
+  methodology?: string;
+  slope?: number;
+  intercept?: number;
 }
 // ❌ ESTAS 2 INTERFACES NO EXISTEN EN TU ARCHIVO:
 export interface DepartmentAnomalyData {
@@ -955,4 +963,24 @@ export interface CampaignMonitorData {
   riskTrendData: Array<{date: string, rate: number}>;
   departmentSizes: Record<string, number>;
   momentumGaugeData: Array<{value: number, fill: string}>;
+}
+// PatternDetector Types
+import type { 
+  DemographicPattern, 
+  ParticipationAnomaly, 
+  LeadershipFingerprint 
+} from '@/lib/services/PatternDetector';
+
+export type { 
+  DemographicPattern, 
+  ParticipationAnomaly, 
+  LeadershipFingerprint 
+};
+
+export interface LeadershipAnalysis {
+  pattern: DemographicPattern | null;
+  anomaly: ParticipationAnomaly | null;
+  insight: string;
+  fingerprint: LeadershipFingerprint | null;
+  hasData: boolean;
 }

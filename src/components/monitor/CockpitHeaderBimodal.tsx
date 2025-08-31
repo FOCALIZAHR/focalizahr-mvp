@@ -200,41 +200,113 @@ export function CockpitHeaderBimodal(props: CockpitHeaderBimodalProps) {
               </p>
             </div>
             
-            {/* 🩺 ECG ÚNICO CONTINUO - Sin saltos que creen múltiples segmentos */}
+            {/* ECG Enterprise con 3 ciclos: cyan → purple → mezclado */}
             <motion.div
               style={{
                 marginTop: '-4px',
-                alignSelf: 'flex-start'
+                alignSelf: 'flex-start',
+                display: 'inline-flex',
+                alignItems: 'center',
+                background: 'rgba(15, 23, 42, 0.4)',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                border: '1px solid rgba(34, 211, 238, 0.2)',
+                backdropFilter: 'blur(8px)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
               }}
-              whileHover={{ scale: 1.01 }}
-              transition={{ duration: 0.3 }}
+              whileHover={{
+                borderColor: 'rgba(34, 211, 238, 0.4)',
+                boxShadow: '0 4px 20px rgba(34, 211, 238, 0.1)',
+                y: -1
+              }}
             >
-              <svg width="180" height="40" viewBox="0 0 180 40">
-                {/* Path ECG CONTINUO sin saltos - Una sola línea fluida */}
-                <path
-                  d="M0 20 L20 20 L22 18 L24 22 L26 20 L28 8 L30 32 L32 20 L34 14 L36 26 L38 20 L40 19 L42 21 L44 20 L46 18 L48 22 L50 20 L52 16 L54 24 L56 20 L58 19.5 L60 20.5 L62 20 L64 17 L66 23 L68 20 L70 18.5 L72 21.5 L74 20 L76 6 L78 34 L80 20 L82 13 L84 27 L86 20 L88 19.2 L90 20.8 L92 20 L94 18.8 L96 21.2 L98 20 L100 19.6 L102 20.4 L104 20 L106 18.3 L108 21.7 L110 20 L112 7 L114 33 L116 20 L118 15 L120 25 L122 20 L124 19.4 L126 20.6 L128 20 L130 18.9 L132 21.1 L134 20 L136 19.7 L138 20.3 L140 20 L142 18.6 L144 21.4 L146 20 L148 19.8 L150 20.2 L152 20 L154 9 L156 31 L158 20 L160 16 L162 24 L164 20 L166 19.9 L168 20.1 L170 20 L172 19.5 L174 20.5 L176 20 L180 20"
+              <svg
+                width="140"
+                height="40"
+                viewBox="0 0 140 40"
+                style={{ overflow: 'visible' }}
+              >
+                <defs>
+                  <linearGradient id="ecg-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#22D3EE" />
+                    <stop offset="50%" stopColor="#A78BFA" />
+                    <stop offset="100%" stopColor="#22D3EE" />
+                  </linearGradient>
+                </defs>
+                
+                {/* Main ECG trace - 3 ciclos diferentes */}
+                <motion.path
+                  d="M0,20 L14,20 Q17,17 20,20 L35,20 L38,22 L40,8 L42,32 L44,20 L70,20 Q73,17 76,20 L91,20 L94,22 L96,6 L98,34 L100,20 L126,20 Q129,17 132,20 L140,20"
                   fill="none"
-                  strokeWidth="1.8"
+                  stroke="#22D3EE"
+                  strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  opacity="0.85"
-                >
-                  {/* ✅ Animación continua única - Ciclo extendido perfecto */}
-                  <animate
-                    attributeName="stroke-dasharray"
-                    values="0 180;20 160;40 140;60 120;80 100;100 80;120 60;140 40;160 20;180 0;160 20;140 40;120 60;100 80;80 100;60 120;40 140;20 160;0 180"
-                    dur="8s"
-                    repeatCount="indefinite"
-                  />
-                  
-                  {/* 🎨 Color alternante más suave y lento */}
-                  <animate
-                    attributeName="stroke"
-                    values="#22D3EE;#A78BFA;#22D3EE"
-                    dur="12s"
-                    repeatCount="indefinite"
-                  />
-                </path>
+                  animate={{
+                    strokeDasharray: [
+                      "0 280",      // Inicio
+                      "70 210",     // Primer tercio
+                      "140 140",    // Medio
+                      "210 70",     // Dos tercios
+                      "280 0",      // Completo
+                      "210 70",     // Vuelta
+                      "140 140",    // Reset
+                      "70 210",     // Reset
+                      "0 280"       // Inicio
+                    ],
+                    stroke: [
+                      "#22D3EE",    // Cyan puro
+                      "#22D3EE", 
+                      "#22D3EE",
+                      "#A78BFA",    // Purple puro
+                      "#A78BFA", 
+                      "#A78BFA",
+                      "url(#ecg-gradient)", // Mezclado
+                      "url(#ecg-gradient)",
+                      "#22D3EE"     // Vuelta a cyan
+                    ]
+                  }}
+                  transition={{
+                    duration: 8,  // Más lento: 8 segundos total
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                  style={{
+                    filter: "drop-shadow(0 0 4px rgba(34, 211, 238, 0.4))"
+                  }}
+                />
+                
+                {/* Glow layer sutil */}
+                <motion.path
+                  d="M0,20 L14,20 Q17,17 20,20 L35,20 L38,22 L40,8 L42,32 L44,20 L70,20 Q73,17 76,20 L91,20 L94,22 L96,6 L98,34 L100,20 L126,20 Q129,17 132,20 L140,20"
+                  fill="none"
+                  stroke="url(#ecg-gradient)"
+                  strokeWidth="1"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity="0.4"
+                  animate={{
+                    strokeDasharray: [
+                      "0 280",
+                      "70 210", 
+                      "140 140", 
+                      "210 70",
+                      "280 0",
+                      "210 70",
+                      "140 140",
+                      "70 210",
+                      "0 280"
+                    ]
+                  }}
+                  transition={{
+                    duration: 8,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                  style={{
+                    filter: "blur(1px)"
+                  }}
+                />
               </svg>
             </motion.div>
           </motion.div>

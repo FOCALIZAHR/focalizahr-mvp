@@ -245,56 +245,174 @@ export function processEngagementHeatmap(
   };
 }
 
-// 🔥 COMPONENTE WOW #2: PREDICTOR PARTICIPACIÓN
+// 🔥 COMPONENTE WOW #2: PREDICTOR PARTICIPACIÓN - VERSIÓN PROFESIONAL
 export function calculateParticipationPrediction(
   dailyResponses: DailyResponse[],
   participationRate: number,
-  daysRemaining: number
+  daysRemaining: number,
+  totalInvited: number  // ← NUEVO PARÁMETRO
 ): ParticipationPredictionData {
-  // Calcular velocidad promedio diaria
-  const responses = dailyResponses.map(d => d.responses).filter(r => r > 0);
-  const avgDaily = responses.length > 0 ? 
-    responses.reduce((sum, r) => sum + r, 0) / responses.length : 0;
+  
+  // Validación de entrada
+  if (!dailyResponses.length || totalInvited === 0 || daysRemaining <= 0) {
+    return {
+      finalProjection: participationRate,
+      confidence: 0,
+      velocity: 0,
+      riskLevel: 'high',
+      recommendedActions: [],
+      projectionPoints: []
+    };
+  }
 
-  // Proyección matemática simple
-  const projectedNewResponses = avgDaily * daysRemaining;
-  const currentTotal = participationRate; // Ya es porcentaje
-  const finalProjection = Math.min(100, currentTotal + (projectedNewResponses / 10));
+  // 1. CALCULAR TASAS ACUMULATIVAS REALES
+  let cumulativeResponses = 0;
+  const cumulativeRates = dailyResponses.map((day, index) => {
+    cumulativeResponses += day.responses;
+    return (cumulativeResponses / totalInvited) * 100;
+  });
 
-  // Calcular confianza basada en consistencia
-  const variance = responses.length > 1 ? 
-    responses.reduce((sum, r) => sum + Math.pow(r - avgDaily, 2), 0) / responses.length : 0;
-  const confidence = Math.max(40, Math.min(95, 90 - (variance * 5)));
+  // 2. REGRESIÓN LINEAL (Least Squares Method)
+  const n = cumulativeRates.length;
+  if (n < 2) {
+    // No hay suficientes datos para regresión
+    const simpleVelocity = participationRate / Math.max(1, n);
+    const simpleFinalProjection = Math.min(100, participationRate + (simpleVelocity * daysRemaining));
+    
+    return {
+      finalProjection: Math.round(simpleFinalProjection),
+      confidence: 40, // Baja confianza con pocos datos
+      velocity: Math.round(simpleVelocity * 10) / 10,
+      riskLevel: simpleFinalProjection < 60 ? 'high' : simpleFinalProjection < 75 ? 'medium' : 'low',
+      recommendedActions: [],
+      projectionPoints: [
+        { dayLabel: `+${daysRemaining}d`, rate: simpleFinalProjection }
+      ]
+    };
+  }
 
-  // Determinar nivel de riesgo
+  // Cálculo de regresión lineal
+  const sumX = (n * (n + 1)) / 2;  // Suma de 1..n
+  const sumY = cumulativeRates.reduce((a, b) => a + b, 0);
+  const sumXY = cumulativeRates.reduce((sum, y, x) => sum + ((x + 1) * y), 0);
+  const sumX2 = (n * (n + 1) * (2 * n + 1)) / 6;  // Suma de cuadrados
+  
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+  
+  // 3. COEFICIENTE DE DETERMINACIÓN (R²) - Calidad del modelo
+  const yMean = sumY / n;
+  const ssTotal = cumulativeRates.reduce((sum, y) => sum + Math.pow(y - yMean, 2), 0);
+  const ssResidual = cumulativeRates.reduce((sum, y, x) => {
+    const predicted = intercept + slope * (x + 1);
+    return sum + Math.pow(y - predicted, 2);
+  }, 0);
+  const r2 = ssTotal > 0 ? Math.max(0, 1 - (ssResidual / ssTotal)) : 0;
+  
+  // 4. PROYECCIÓN FINAL
+  const finalDay = n + daysRemaining;
+  const rawProjection = intercept + slope * finalDay;
+  const finalProjection = Math.min(100, Math.max(participationRate, rawProjection));
+  
+  // 5. VELOCIDAD DIARIA (respuestas/día)
+  const avgDailyResponses = dailyResponses
+    .map(d => d.responses)
+    .filter(r => r > 0);
+  const velocity = avgDailyResponses.length > 0 
+    ? avgDailyResponses.reduce((sum, r) => sum + r, 0) / avgDailyResponses.length 
+    : slope * totalInvited / 100; // Convertir slope de % a respuestas
+  
+  // 6. GENERAR PUNTOS DE PROYECCIÓN PARA EL GRÁFICO
+  const projectionPoints = [];
+  const intervals = Math.min(7, daysRemaining); // Máximo 7 puntos
+  
+  for (let i = 1; i <= intervals; i++) {
+    const projectionDay = n + Math.floor((i * daysRemaining) / intervals);
+    const projectedRate = intercept + slope * projectionDay;
+    
+    projectionPoints.push({
+      dayLabel: `+${Math.floor((i * daysRemaining) / intervals)}d`,
+      rate: Math.round(Math.min(100, Math.max(0, projectedRate)) * 10) / 10
+    });
+  }
+  
+  // 7. CALCULAR CONFIANZA AJUSTADA
+  let confidence = Math.round(r2 * 100);
+  
+  // Ajustar confianza por cantidad de datos
+  if (n >= 7) confidence = Math.min(95, confidence + 10);
+  else if (n >= 5) confidence = Math.min(90, confidence + 5);
+  else if (n <= 2) confidence = Math.max(40, confidence - 20);
+  
+  // Ajustar por consistencia de datos
+  const avgResponses = avgDailyResponses.reduce((a, b) => a + b, 0) / avgDailyResponses.length;
+  const variance = avgDailyResponses.reduce((sum, r) => sum + Math.pow(r - avgResponses, 2), 0) / avgDailyResponses.length;
+  const coefficientOfVariation = avgResponses > 0 ? Math.sqrt(variance) / avgResponses : 1;
+  
+  if (coefficientOfVariation < 0.3) confidence = Math.min(95, confidence + 5);
+  else if (coefficientOfVariation > 0.7) confidence = Math.max(40, confidence - 10);
+  
+  // 8. DETERMINAR NIVEL DE RIESGO
   let riskLevel: 'low' | 'medium' | 'high' = 'low';
   if (finalProjection < 60) riskLevel = 'high';
   else if (finalProjection < 75) riskLevel = 'medium';
-
-  // Generar recomendaciones automáticas
+  
+  // También considerar velocidad
+  const requiredDailyRate = (70 - participationRate) / daysRemaining;
+  if (slope < requiredDailyRate * 0.8) riskLevel = 'high';
+  else if (slope < requiredDailyRate) riskLevel = 'medium';
+  
+  // 9. GENERAR RECOMENDACIONES INTELIGENTES
   const recommendedActions = [];
+  
+  // Recomendación basada en proyección
   if (riskLevel === 'high') {
+    const gapToTarget = Math.max(0, 70 - finalProjection);
+    const additionalResponsesNeeded = Math.ceil((gapToTarget / 100) * totalInvited);
+    
     recommendedActions.push({
-      action: `Enviar recordatorios inmediatos (+${Math.ceil((75 - finalProjection) * 2)} respuestas necesarias)`,
-      impact: 85
+      action: `Acción urgente: ${additionalResponsesNeeded} respuestas adicionales necesarias`,
+      impact: 90
+    });
+    
+    if (daysRemaining > 3) {
+      recommendedActions.push({
+        action: 'Activar protocolo de escalamiento a gerencia',
+        impact: 85
+      });
+    }
+  }
+  
+  // Recomendación basada en velocidad
+  if (velocity < 5 && daysRemaining > 5) {
+    recommendedActions.push({
+      action: `Aumentar ritmo: actual ${velocity.toFixed(1)}/día, necesario ${(requiredDailyRate * totalInvited / 100).toFixed(1)}/día`,
+      impact: 75
     });
   }
-  if (avgDaily < 2 && daysRemaining > 3) {
+  
+  // Recomendación basada en tendencia
+  if (slope < 0 && participationRate > 30) {
     recommendedActions.push({
-      action: 'Intensificar comunicación departamentos rezagados',
-      impact: 70
+      action: 'Tendencia negativa detectada - revisar estrategia de comunicación',
+      impact: 80
     });
   }
-
+  
+  // 10. RETORNAR RESULTADO COMPLETO
   return {
-    finalProjection: Math.round(finalProjection),
-    confidence: Math.round(confidence),
-    velocity: Math.round(avgDaily * 10) / 10,
+    finalProjection: Math.round(finalProjection * 10) / 10,
+    confidence: Math.max(40, Math.min(95, confidence)),
+    velocity: Math.round(velocity * 10) / 10,
     riskLevel,
-    recommendedActions
+    recommendedActions,
+    projectionPoints, // ← NUEVO: Array para el gráfico
+    // Campos opcionales para debugging/explicación
+    methodology: `Regresión lineal (R²=${(r2 * 100).toFixed(1)}%, n=${n} días)`,
+    slope: Math.round(slope * 100) / 100,
+    intercept: Math.round(intercept * 100) / 100
   };
 }
-
 // ====================================================================
 // 🔥 COMPONENTES WOW FALTANTES - AGREGADOS AHORA
 // ====================================================================
