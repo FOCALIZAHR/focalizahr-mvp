@@ -458,7 +458,7 @@ export function calculateDepartmentAnomalies(
     if (absZScore > 1.5) {
       anomalies.push({
         department: deptName,
-        currentRate: data.rate,
+        rate: data.rate,
         zScore: Math.round(zScore * 100) / 100,
         type: zScore > 0 ? 'positive_outlier' : 'negative_outlier',
         severity: absZScore > 2.0 ? 'high' : 'medium'

@@ -126,13 +126,13 @@ export default function PulseIndicatorGrid({ analytics }: PulseIndicatorGridProp
     trend: score > 3.5 ? 'up' : 'down',
     sparklineData: [3.0, 3.2, 3.5, 3.8, 3.6, 3.9, score],
     color: getScoreColor(score)
-  })).slice(0, 4);
+  }));
 
   const allCards = [...indicators, ...categoryCards];
 
   // ✅ RENDERIZADO SIMPLIFICADO - DATOS GARANTIZADOS VÁLIDOS
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
       {allCards.map((indicator) => {
         const Icon = indicator.icon;
         const TrendIcon = indicator.trend === 'up' ? TrendingUp : 

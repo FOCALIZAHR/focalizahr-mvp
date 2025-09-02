@@ -1,7 +1,7 @@
 // ====================================================================
 // FOCALIZAHR MONITOR PAGE - ARQUITECTURA ORIGINAL + IDs NAVEGACIÓN
 // src/app/dashboard/campaigns/[id]/monitor/page.tsx
-// SIMPLE: Patrón original que funciona + IDs para scroll
+// VERSIÓN CORREGIDA: Props específicas y TopMoversPanel integrado
 // ====================================================================
 
 'use client';
@@ -14,6 +14,7 @@ import { CockpitHeaderBimodal } from '@/components/monitor/CockpitHeaderBimodal'
 
 // ✅ Componentes WOW existentes
 import { DepartmentPulsePanel } from '@/components/monitor/DepartmentPulsePanel';
+import { TopMoversPanel } from '@/components/monitor/TopMoversPanel'; // ✅ AGREGADO
 import { ActionButtons } from '@/components/monitor/ActionButtons';
 import { AnomalyDetectorPanel } from '@/components/monitor/AnomalyDetectorPanel';
 import { EngagementHeatmapCard } from '@/components/monitor/EngagementHeatmapCard';
@@ -94,24 +95,45 @@ export default function CampaignMonitorPage() {
         {/* ⚡ GRID COMPONENTES WOW */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
+          {/* Pulso Departamental */}
           <div id="pulse">
             <DepartmentPulsePanel {...monitorData} />
           </div>
           
+          {/* ✅ TOP MOVERS - CORREGIDO: Era DepartmentPulsePanel duplicado */}
           <div id="topmovers">
-            <DepartmentPulsePanel {...monitorData} />
+            <TopMoversPanel 
+              topMovers={monitorData.topMovers}
+              lastRefresh={monitorData.lastRefresh}
+            />
           </div>
           
+          {/* ✅ ANOMALÍAS - CORREGIDO: Props específicas en lugar de spread */}
           <div id="anomalies">
-            <AnomalyDetectorPanel {...monitorData} />
+            <AnomalyDetectorPanel 
+              departmentAnomalies={monitorData.departmentAnomalies || []}
+              positiveAnomalies={monitorData.positiveAnomalies || []}
+              negativeAnomalies={monitorData.negativeAnomalies || []}
+              meanRate={monitorData.meanRate || 0}
+              totalDepartments={monitorData.totalDepartments || 0}
+              lastRefresh={monitorData.lastRefresh}
+            />
           </div>
           
+          {/* Mapa de Calor Engagement */}
           <div>
             <EngagementHeatmapCard {...monitorData} />
           </div>
           
+          {/* ✅ CROSS STUDY - CORREGIDO: Prop 'comparison' correcta */}
           <div className="lg:col-span-2" id="cross-study">
-            <CrossStudyComparatorCard {...monitorData} />
+            <CrossStudyComparatorCard 
+              comparison={monitorData.crossStudyComparison}
+              onApplyLearning={() => {
+                console.log('Apply learning from historical data');
+                // TODO: Implementar lógica de aplicar aprendizajes
+              }}
+            />
           </div>
         </div>
 

@@ -1,59 +1,68 @@
 // ====================================================================
-// FOCALIZAHR ANOMALY DETECTOR PANEL - WOW Foundation Intelligence
+// ANOMALY DETECTOR PANEL - VERSIÓN WOW CORPORATIVA
 // src/components/monitor/AnomalyDetectorPanel.tsx
-// Chat 4A: Foundation Intelligence Component 3/3 - CORREGIDO SIN CÁLCULOS
+// Inteligencia de variaciones departamentales significativas
 // ====================================================================
 
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { AlertTriangle, TrendingUp, TrendingDown, Activity, Search } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { AlertTriangle, TrendingUp, TrendingDown, Activity, Search, BarChart3 } from 'lucide-react';
 import type { DepartmentAnomalyData } from '@/types';
 
 interface AnomalyDetectorPanelProps {
   departmentAnomalies: DepartmentAnomalyData[];
-  positiveAnomalies: DepartmentAnomalyData[];      // ✅ YA CALCULADO EN HOOK
-  negativeAnomalies: DepartmentAnomalyData[];      // ✅ YA CALCULADO EN HOOK
-  meanRate: number;                                // ✅ YA CALCULADO EN HOOK
-  totalDepartments: number;                        // ✅ YA CALCULADO EN HOOK
+  positiveAnomalies: DepartmentAnomalyData[];
+  negativeAnomalies: DepartmentAnomalyData[];
+  meanRate: number;
+  totalDepartments: number;
   lastRefresh: Date;
 }
 
 export function AnomalyDetectorPanel({ 
   departmentAnomalies,
-  positiveAnomalies,     // ✅ RECIBIR YA CALCULADO
-  negativeAnomalies,     // ✅ RECIBIR YA CALCULADO  
-  meanRate,              // ✅ RECIBIR YA CALCULADO
-  totalDepartments,      // ✅ RECIBIR YA CALCULADO
+  positiveAnomalies,
+  negativeAnomalies,
+  meanRate,
+  totalDepartments,
   lastRefresh 
 }: AnomalyDetectorPanelProps) {
   
-  // ❌ CÁLCULOS REMOVIDOS - AHORA VIENEN DEL HOOK
-  // const departmentRates = Object.values(byDepartment).map(d => d.rate);
-  // const meanRate = departmentRates.length > 0 ? ... : 0;
-  // const positiveAnomalies = departmentAnomalies.filter(a => a.type === 'positive_outlier');
-  // const negativeAnomalies = departmentAnomalies.filter(a => a.type === 'negative_outlier');
+  // DEBUG ESPECÍFICO: Ver estructura exacta
+  if (departmentAnomalies.length > 0) {
+    console.log('🔍 AnomalyDetector - Estructura primer elemento:', {
+      primerAnomalía: departmentAnomalies[0],
+      tieneType: 'type' in departmentAnomalies[0],
+      valorType: departmentAnomalies[0].type,
+      propiedades: Object.keys(departmentAnomalies[0])
+    });
+  }
   
-  // Componente para mostrar una anomalía individual
+  // Componente para mostrar una variación individual
   const AnomalyItem = ({ anomaly }: { anomaly: DepartmentAnomalyData }) => {
-    const isPositive = anomaly.type === 'positive_outlier';
+    // FALLBACK: Si no tiene type, inferir del zScore
+    const inferredType = anomaly.type || (anomaly.zScore > 0 ? 'positive_outlier' : 'negative_outlier');
+    const isPositive = inferredType === 'positive_outlier';
     const isHigh = anomaly.severity === 'high';
     
     const config = {
       positive: {
         color: 'text-green-400',
-        bgColor: 'from-green-500/10 to-emerald-500/5',
+        bgColor: 'from-green-950/30 to-emerald-950/20',
         borderColor: 'border-green-500/30',
         icon: TrendingUp,
-        label: 'Rendimiento Superior',
-        badgeColor: 'bg-green-500/20 text-green-300'
+        label: 'Desempeño Superior',
+        badgeColor: 'bg-green-500/20 text-green-300 border-green-500/30',
+        badgeText: isHigh ? 'Excepcional' : 'Destacado'
       },
       negative: {
-        color: 'text-red-400', 
-        bgColor: 'from-red-500/10 to-pink-500/5',
-        borderColor: 'border-red-500/30',
+        color: 'text-orange-400', 
+        bgColor: 'from-orange-950/30 to-amber-950/20',
+        borderColor: 'border-orange-500/30',
         icon: TrendingDown,
-        label: 'Rendimiento Inferior',
-        badgeColor: 'bg-red-500/20 text-red-300'
+        label: 'Requiere Atención',
+        badgeColor: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+        badgeText: isHigh ? 'Prioritario' : 'Seguimiento'
       }
     };
     
@@ -61,42 +70,42 @@ export function AnomalyDetectorPanel({
     const IconComponent = currentConfig.icon;
     
     return (
-      <div data-component="AnomalyDetectorPanel" className={`p-3 rounded-lg bg-gradient-to-r ${currentConfig.bgColor}
+      <div className={`p-3 rounded-lg bg-gradient-to-r ${currentConfig.bgColor}
                       border ${currentConfig.borderColor} transition-all duration-200 
-                      hover:scale-[1.02]`}>
+                      hover:scale-[1.01]`}>
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-3 flex-1">
             <IconComponent className={`h-5 w-5 ${currentConfig.color} mt-0.5 flex-shrink-0`} />
             
             <div className="space-y-1 flex-1">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-white text-sm">
+                <span className="font-semibold text-gray-100 capitalize">
                   {anomaly.department}
                 </span>
-                <span className={`px-2 py-0.5 rounded text-xs ${currentConfig.badgeColor}`}>
-                  {isHigh ? 'Crítico' : 'Moderado'}
-                </span>
+                <Badge variant="secondary" className={`${currentConfig.badgeColor} text-xs`}>
+                  {currentConfig.badgeText}
+                </Badge>
               </div>
               
-              <div className="text-xs text-white/70">
-                {currentConfig.label}: {anomaly.currentRate}% 
-                {isPositive ? ' sobre' : ' bajo'} promedio ({meanRate.toFixed(1)}%)
+              <div className="text-xs text-gray-400">
+                {currentConfig.label}: {anomaly.rate}% 
+                {isPositive ? ' sobre' : ' bajo'} el promedio ({meanRate.toFixed(1)}%)
               </div>
               
-              <div className="text-xs text-white/50">
-                Z-Score: {anomaly.zScore} | 
-                Desviación: {Math.abs(anomaly.currentRate - meanRate).toFixed(1)} puntos
+              <div className="text-xs text-gray-500">
+                Variación estadística: {Math.abs(anomaly.zScore).toFixed(1)}σ | 
+                Diferencia: {Math.abs(anomaly.rate - meanRate).toFixed(1)} puntos
               </div>
             </div>
           </div>
           
-          {/* Indicador visual rate */}
+          {/* Indicador visual de tasa */}
           <div className="text-right">
-            <div className={`text-lg font-bold ${currentConfig.color}`}>
-              {anomaly.currentRate}%
+            <div className={`text-xl font-bold ${currentConfig.color}`}>
+              {anomaly.rate}%
             </div>
-            <div className="text-xs text-white/50">
-              Participación
+            <div className="text-xs text-gray-500">
+              participación
             </div>
           </div>
         </div>
@@ -105,121 +114,132 @@ export function AnomalyDetectorPanel({
   };
 
   return (
-    <Card className="glass-card neural-glow border-orange-500/20 bg-gradient-to-br from-slate-900/80 to-slate-800/80">
-      <CardHeader className="pb-3">
+    <Card 
+      data-component="AnomalyDetectorPanel"
+      className="fhr-card glass-card backdrop-blur-xl border border-blue-500/20 bg-gradient-to-br from-slate-900/90 to-slate-800/90"
+    >
+      <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="fhr-title-gradient flex items-center gap-2">
-            <Search className="h-5 w-5 text-orange-400" />
-            Detector de Anomalías Departamentales
-          </CardTitle>
-          <div className="text-xs text-white/60">
-            Actualizado: {lastRefresh.toLocaleTimeString('es-CL')}
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-600/30 to-purple-600/20 backdrop-blur-sm">
+              <BarChart3 className="h-6 w-6 text-blue-400" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                Análisis de Variaciones
+              </h3>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Detección estadística de outliers • {lastRefresh.toLocaleTimeString('es-CL')}
+              </p>
+            </div>
           </div>
+          {departmentAnomalies.length > 0 && (
+            <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs">
+              <Activity className="h-3 w-3 mr-1" />
+              {departmentAnomalies.length} detectadas
+            </Badge>
+          )}
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* RESUMEN ESTADÍSTICO - USANDO DATOS YA CALCULADOS */}
-        <div className="grid grid-cols-4 gap-3 mb-4">
-          <div className="text-center p-2 bg-gradient-to-br from-slate-800/50 to-transparent 
-                          rounded border border-slate-600/30">
-            <div className="text-lg font-bold text-white">
+        {/* MÉTRICAS ESTADÍSTICAS */}
+        <div className="grid grid-cols-4 gap-3">
+          <div className="text-center p-2.5 bg-gradient-to-br from-gray-800/50 to-transparent 
+                          rounded-lg border border-gray-700/30">
+            <div className="text-lg font-bold text-gray-100">
               {totalDepartments}
             </div>
-            <div className="text-xs text-white/60">Departamentos</div>
+            <div className="text-xs text-gray-400 font-medium">Total</div>
           </div>
           
-          <div className="text-center p-2 bg-gradient-to-br from-blue-500/10 to-transparent 
-                          rounded border border-blue-500/20">
+          <div className="text-center p-2.5 bg-gradient-to-br from-blue-900/30 to-transparent 
+                          rounded-lg border border-blue-500/20">
             <div className="text-lg font-bold text-blue-400">
               {meanRate.toFixed(1)}%
             </div>
-            <div className="text-xs text-white/60">Promedio</div>
+            <div className="text-xs text-gray-400 font-medium">Promedio</div>
           </div>
           
-          <div className="text-center p-2 bg-gradient-to-br from-green-500/10 to-transparent 
-                          rounded border border-green-500/20">
+          <div className="text-center p-2.5 bg-gradient-to-br from-green-900/30 to-transparent 
+                          rounded-lg border border-green-500/20">
             <div className="text-lg font-bold text-green-400">
               {positiveAnomalies.length}
             </div>
-            <div className="text-xs text-white/60">Superiores</div>
+            <div className="text-xs text-gray-400 font-medium">Superiores</div>
           </div>
           
-          <div className="text-center p-2 bg-gradient-to-br from-red-500/10 to-transparent 
-                          rounded border border-red-500/20">
-            <div className="text-lg font-bold text-red-400">
+          <div className="text-center p-2.5 bg-gradient-to-br from-orange-900/30 to-transparent 
+                          rounded-lg border border-orange-500/20">
+            <div className="text-lg font-bold text-orange-400">
               {negativeAnomalies.length}
             </div>
-            <div className="text-xs text-white/60">Inferiores</div>
+            <div className="text-xs text-gray-400 font-medium">Atención</div>
           </div>
         </div>
 
-        {/* LISTA DE ANOMALÍAS */}
-        <div className="space-y-3">
+        {/* LISTA DE VARIACIONES SIGNIFICATIVAS */}
+        <div className="space-y-2">
           {departmentAnomalies.length > 0 ? (
             <>
-              {/* Anomalías positivas primero */}
+              {/* Outliers positivos primero */}
               {positiveAnomalies.length > 0 && (
                 <div className="space-y-2">
-                  <div className="text-sm font-medium text-green-400 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" />
-                    Departamentos con Rendimiento Superior
-                  </div>
-                  {positiveAnomalies.map((anomaly, index) => (
-                    <AnomalyItem key={`positive-${index}`} anomaly={anomaly} />
+                  <h4 className="text-xs font-semibold text-green-400 uppercase tracking-wider pl-1">
+                    Desempeño Excepcional
+                  </h4>
+                  {positiveAnomalies.map((anomaly) => (
+                    <AnomalyItem key={anomaly.department} anomaly={anomaly} />
                   ))}
                 </div>
               )}
               
-              {/* Anomalías negativas */}
+              {/* Separador si hay ambos tipos */}
+              {positiveAnomalies.length > 0 && negativeAnomalies.length > 0 && (
+                <div className="border-t border-gray-800/50 my-3" />
+              )}
+              
+              {/* Outliers negativos */}
               {negativeAnomalies.length > 0 && (
                 <div className="space-y-2">
-                  <div className="text-sm font-medium text-red-400 flex items-center gap-2">
-                    <TrendingDown className="h-4 w-4" />
-                    Departamentos con Rendimiento Inferior
-                  </div>
-                  {negativeAnomalies.map((anomaly, index) => (
-                    <AnomalyItem key={`negative-${index}`} anomaly={anomaly} />
+                  <h4 className="text-xs font-semibold text-orange-400 uppercase tracking-wider pl-1">
+                    Requieren Intervención
+                  </h4>
+                  {negativeAnomalies.map((anomaly) => (
+                    <AnomalyItem key={anomaly.department} anomaly={anomaly} />
                   ))}
                 </div>
               )}
             </>
           ) : (
-            /* Sin anomalías detectadas */
-            <div className="text-center py-8 space-y-2">
-              <Activity className="h-12 w-12 text-white/30 mx-auto" />
-              <div className="text-sm text-white/60">
-                No se detectaron anomalías significativas
+            <div className="text-center py-8">
+              <Search className="h-10 w-10 mx-auto mb-3 text-gray-600" />
+              <div className="text-gray-400 font-medium">
+                Sin variaciones significativas detectadas
               </div>
-              <div className="text-xs text-white/40">
-                Todas las departamentales dentro de rango normal (Z-Score {'<'} 1.5)
+              <div className="text-xs text-gray-500 mt-2">
+                Todos los departamentos dentro de rangos esperados
               </div>
             </div>
           )}
         </div>
 
-        {/* INFORMACIÓN METODOLÓGICA */}
+        {/* INSIGHT ESTADÍSTICO */}
         {departmentAnomalies.length > 0 && (
-          <div className="mt-4 p-3 bg-gradient-to-r from-slate-800/30 to-transparent 
-                          rounded-lg border border-slate-600/20">
-            <div className="text-xs text-white/70">
-              <strong>Metodología:</strong> Análisis estadístico Z-Score. 
-              Anomalías detectadas cuando |Z| {'>'} 1.5 (moderadas) o |Z| {'>'} 2.0 (críticas).
-              Basado en desviación estándar de participación departamental.
+          <div className="mt-4 p-3 bg-gradient-to-r from-blue-950/20 to-purple-950/20 rounded-lg border border-blue-500/20">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-gray-300">
+                <span className="font-semibold">Análisis estadístico:</span> Se detectaron {departmentAnomalies.length} departamentos 
+                con variaciones significativas (|z| > 1.5). {positiveAnomalies.length > 0 && `${positiveAnomalies.length} superan expectativas.`} 
+                {negativeAnomalies.length > 0 && ` ${negativeAnomalies.length} requieren seguimiento estratégico.`}
+              </div>
             </div>
           </div>
         )}
-
-        {/* FOOTER ALGORITMO */}
-        <div className="flex justify-between items-center pt-2 border-t border-white/10">
-          <div className="text-xs text-white/40">
-            Algoritmo: Statistical Z-Score Analysis
-          </div>
-          <div className="text-xs text-orange-400/80">
-            🔍 Anomaly Detection Engine
-          </div>
-        </div>
       </CardContent>
     </Card>
   );
 }
+
+export default AnomalyDetectorPanel;

@@ -999,16 +999,15 @@ export function useCampaignMonitor(campaignId: string) {
       };
     })();
 
-    // ✅ ANOMALÍAS NEGATIVAS - CORREGIDO PARA USAR byDepartment REAL
     const negativeAnomaliesCalculated = Object.entries(byDepartment)
-      .filter(([name, data]) => data.rate < 50 && data.invited > 0) // < 50% participación real
+     .filter(([name, data]) => data.rate < 50 && data.invited > 0)
       .map(([name, data]) => ({ 
-        department: data.displayName || name, 
-        rate: data.rate, // PARTICIPACIÓN REAL 0-100%
-        type: 'negative_outlier' as const,
-        severity: (data.rate < 30 ? 'high' : 'medium') as const,
-        zScore: data.rate < 30 ? -2.5 : -1.5 
-      }));
+     department: data.displayName || name,
+     rate: data.rate,  // ← VOLVER A "rate" (no currentRate)
+     type: 'negative_outlier' as const,
+     severity: data.rate < 30 ? 'high' : 'medium' as const,
+     zScore: data.rate < 30 ? -2.5 : -1.5 
+  }));
 
     // ✅ EXTENSIÓN TARJETAS VIVAS - DATOS PRE-CALCULADOS - PRESERVADOS
     const riskTrendDataCalculated = calculateRiskTrendData(riskDepartment, analytics);
@@ -1196,7 +1195,7 @@ export function useCampaignMonitor(campaignId: string) {
       
       meanRate: anomalyData.meanRate,
       totalDepartments: anomalyData.totalDepartments,
-      crossStudyComparison: historicalData?.crossStudyComparison,
+      crossStudyComparison: historicalData?.currentComparison,
       
       // ✅ MOMENTUM DEPARTAMENTAL VISUAL - PRESERVADO
       departmentMomentum: departmentMomentumCalculated,

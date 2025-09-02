@@ -19,8 +19,9 @@ import {
   ResponsiveContainer,
   ReferenceLine 
 } from 'recharts';
-import { Card, CardContent } from '@/components/ui/card';
-import { TrendingUp, Target, Clock, Zap } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { TrendingUp, Activity, Sparkles } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import type { DailyResponse, ParticipationPredictionData } from '@/types';
 
 // ====================================================================
@@ -131,23 +132,6 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
     return [...historical, ...projectionData];
   }, [dailyResponses, participationRate, participationPrediction, daysRemaining, totalInvited]);
 
-  // 🎨 MÉTRICAS DESTACADAS
-  const metrics = useMemo(() => {
-    const velocity = participationPrediction?.velocity || 0;
-    const projection = participationPrediction?.finalProjection || participationRate;
-    const riskLevel = participationPrediction?.riskLevel || 'low';
-    
-    return {
-      velocity: `+${velocity.toFixed(1)}/día`,
-      projection: `${projection}%`,
-      daysLeft: `${daysRemaining} días`,
-      riskColor: riskLevel === 'high' ? 'text-red-400' : 
-                 riskLevel === 'medium' ? 'text-yellow-400' : 'text-green-400',
-      projectionColor: projection >= targetRate ? 'text-green-400' : 
-                      projection >= targetRate * 0.9 ? 'text-yellow-400' : 'text-red-400'
-    };
-  }, [participationPrediction, participationRate, targetRate, daysRemaining]);
-
   // 🎯 TOOLTIP PERSONALIZADO
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -160,17 +144,17 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
         >
           <p className="text-white/90 font-medium">{data.day}</p>
           {data.responses !== undefined && (
-            <p className="text-fhr-cyan text-sm">
+            <p className="text-cyan-400 text-sm">
               Respuestas: {data.responses}
             </p>
           )}
           {data.cumulativeRate !== undefined && (
-            <p className="text-fhr-cyan text-sm">
+            <p className="text-cyan-400 text-sm">
               Acumulado: {data.cumulativeRate}%
             </p>
           )}
           {data.projectedRate !== undefined && data.isPrediction && (
-            <p className="text-fhr-purple text-sm">
+            <p className="text-purple-400 text-sm">
               Proyección: {data.projectedRate}%
             </p>
           )}
@@ -180,205 +164,190 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
     return null;
   };
 
+  // Calcular insight único no visible en header
+  const uniqueInsight = useMemo(() => {
+    if (!participationPrediction) return null;
+    
+    const daysToTarget = participationPrediction.finalProjection >= targetRate
+      ? Math.ceil((targetRate - participationRate) / participationPrediction.velocity)
+      : null;
+    
+    const momentum = participationPrediction.velocity > 0 ? 'acelerando' : 
+                    participationPrediction.velocity < 0 ? 'desacelerando' : 'estable';
+    
+    return {
+      daysToTarget,
+      momentum,
+      needsBoost: participationPrediction.finalProjection < targetRate * 0.9
+    };
+  }, [participationPrediction, participationRate, targetRate]);
+
   return (
     <motion.div
-    data-component="CampaignRhythmPanel"
+      data-component="CampaignRhythmPanel"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="space-y-6"
+      className="space-y-4"
     >
-      {/* HEADER CON MÉTRICAS DESTACADAS */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="grid grid-cols-3 gap-4"
-      >
-        <Card className="bg-gradient-to-br from-cyan-500/20 to-purple-500/15 backdrop-blur-md border border-cyan-400/30 hover:border-cyan-400/50 transition-all duration-300">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Zap className="h-4 w-4 text-fhr-cyan" />
-              <span className="text-white/70 text-sm font-medium">Velocidad Actual</span>
-            </div>
-            <div className="text-2xl font-bold text-white">{metrics.velocity}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-cyan-500/20 to-purple-500/15 backdrop-blur-md border border-cyan-400/30 hover:border-cyan-400/50 transition-all duration-300">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Target className="h-4 w-4 text-fhr-purple" />
-              <span className="text-white/70 text-sm font-medium">Proyección Final</span>
-            </div>
-            <div className={`text-2xl font-bold ${metrics.projectionColor}`}>
-              {metrics.projection}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-cyan-500/20 to-purple-500/15 backdrop-blur-md border border-cyan-400/30 hover:border-cyan-400/50 transition-all duration-300">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="h-4 w-4 text-fhr-blue" />
-              <span className="text-white/70 text-sm font-medium">Días Restantes</span>
-            </div>
-            <div className="text-2xl font-bold text-white">{metrics.daysLeft}</div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* GRÁFICO PRINCIPAL COMBINADO */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.4, duration: 0.6 }}
-      >
-        <Card className="bg-gradient-to-br from-slate-900/80 to-slate-800/80 glass-card neural-glow backdrop-blur-md border-fhr-cyan/20 hover:border-white/20 transition-all duration-300">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-fhr-cyan" />
-                <h3 className="fhr-title-gradient text-white font-semibold text-lg">
-                  Panel de Ritmo y Proyección
+      {/* GRÁFICO PRINCIPAL COMO ÚNICO ELEMENTO */}
+      <Card className="fhr-card glass-card backdrop-blur-xl border border-blue-500/20 bg-gradient-to-br from-slate-900/90 to-slate-800/90">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-600/30 to-purple-600/20 backdrop-blur-sm">
+                <TrendingUp className="h-6 w-6 text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                  Ritmo y Proyección Temporal
                 </h3>
-              </div>
-              <div className="text-white/60 text-sm">
-                Pasado → Presente → Futuro
+                <p className="text-xs text-gray-400 mt-0.5">Análisis predictivo con machine learning</p>
               </div>
             </div>
+            {uniqueInsight && uniqueInsight.momentum && (
+              <Badge 
+                variant={uniqueInsight.momentum === 'acelerando' ? 'default' : 'secondary'}
+                className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-blue-500/30"
+              >
+                <Activity className="h-3 w-3 mr-1" />
+                {uniqueInsight.momentum}
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        
+        <CardContent className="p-6 pt-2">
+          {/* CHART RESPONSIVO */}
+          <div className="h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={chartData}
+                margin={CHART_CONFIG.margin}
+              >
+                <CartesianGrid 
+                  strokeDasharray="3 3" 
+                  stroke="rgba(255,255,255,0.1)" 
+                />
+                <XAxis 
+                  dataKey="day" 
+                  stroke="rgba(255,255,255,0.6)"
+                  fontSize={12}
+                />
+                <YAxis 
+                  stroke="rgba(255,255,255,0.6)"
+                  fontSize={12}
+                />
+                <Tooltip content={<CustomTooltip />} />
 
-            {/* CHART RESPONSIVO */}
-            <div className="h-80 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart
-                  data={chartData}
-                  margin={CHART_CONFIG.margin}
-                >
-                  <CartesianGrid 
-                    strokeDasharray="3 3" 
-                    stroke="rgba(255,255,255,0.1)" 
-                  />
-                  <XAxis 
-                    dataKey="day" 
-                    stroke="rgba(255,255,255,0.6)"
-                    fontSize={12}
-                  />
-                  <YAxis 
-                    stroke="rgba(255,255,255,0.6)"
-                    fontSize={12}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
+                {/* LÍNEA DE OBJETIVO HORIZONTAL */}
+                <ReferenceLine 
+                  y={targetRate} 
+                  stroke="#22D3EE"
+                  strokeDasharray="8 8"
+                  strokeWidth={2}
+                  label={{ value: `Objetivo ${targetRate}%`, position: "right", fill: '#22D3EE', fontSize: 11 }}
+                />
 
-                  {/* LÍNEA DE OBJETIVO HORIZONTAL */}
-                  <ReferenceLine 
-                    y={targetRate} 
-                    stroke="#22D3EE"
-                    strokeDasharray="8 8"
-                    strokeWidth={2}
-                    label={{ value: `Objetivo ${targetRate}%`, position: "right", fill: '#22D3EE', fontSize: 11 }}
-                  />
+                {/* BARRAS DE RITMO (SOLO DATOS HISTÓRICOS) */}
+                <Bar
+                  dataKey="responses"
+                  fill={`url(#barGradient)`}
+                  radius={CHART_CONFIG.barRadius}
+                  animationDuration={1000}
+                  animationBegin={200}
+                />
 
-                  {/* BARRAS DE RITMO (SOLO DATOS HISTÓRICOS) */}
-                  <Bar
-                    dataKey="responses"
-                    fill={`url(#barGradient)`}
-                    radius={CHART_CONFIG.barRadius}
-                    animationDuration={1000}
-                    animationBegin={200}
-                  />
+                {/* LÍNEA DE PROGRESO ACUMULADO (SOLO DATOS HISTÓRICOS) */}
+                <Line
+                  type="monotone"
+                  dataKey="cumulativeRate"
+                  stroke={COLORS.fhrCyan}
+                  strokeWidth={CHART_CONFIG.strokeWidth}
+                  dot={{ fill: COLORS.fhrCyan, strokeWidth: 2, r: CHART_CONFIG.dotSize }}
+                  activeDot={{ r: 8, fill: COLORS.fhrCyan }}
+                  animationDuration={1500}
+                  animationBegin={800}
+                  connectNulls={false}  // No conectar valores undefined
+                />
 
-                  {/* LÍNEA DE PROGRESO ACUMULADO (SOLO DATOS HISTÓRICOS) */}
-                  <Line
-                    type="monotone"
-                    dataKey="cumulativeRate"
-                    stroke={COLORS.fhrCyan}
-                    strokeWidth={CHART_CONFIG.strokeWidth}
-                    dot={{ fill: COLORS.fhrCyan, strokeWidth: 2, r: CHART_CONFIG.dotSize }}
-                    activeDot={{ r: 8, fill: COLORS.fhrCyan }}
-                    animationDuration={1500}
-                    animationBegin={800}
-                    connectNulls={false}  // No conectar valores undefined
-                  />
+                {/* LÍNEA DE PROYECCIÓN FUTURA */}
+                <Line
+                  type="monotone"
+                  dataKey="projectedRate"
+                  stroke={COLORS.fhrPurple}
+                  strokeWidth={CHART_CONFIG.strokeWidth}
+                  strokeDasharray="8 4"
+                  dot={{ fill: COLORS.fhrPurple, strokeWidth: 2, r: CHART_CONFIG.dotSize }}
+                  activeDot={{ r: 8, fill: COLORS.fhrPurple }}
+                  animationDuration={1500}
+                  animationBegin={1200}
+                  connectNulls={true}  // Conectar el punto puente con la proyección
+                />
 
-                  {/* LÍNEA DE PROYECCIÓN FUTURA */}
-                  <Line
-                    type="monotone"
-                    dataKey="projectedRate"
-                    stroke={COLORS.fhrPurple}
-                    strokeWidth={CHART_CONFIG.strokeWidth}
-                    strokeDasharray="8 4"
-                    dot={{ fill: COLORS.fhrPurple, strokeWidth: 2, r: CHART_CONFIG.dotSize }}
-                    activeDot={{ r: 8, fill: COLORS.fhrPurple }}
-                    animationDuration={1500}
-                    animationBegin={1200}
-                    connectNulls={true}  // Conectar el punto puente con la proyección
-                  />
+                {/* GRADIENTES PARA BARRAS */}
+                <defs>
+                  <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={COLORS.fhrPurple} stopOpacity={0.8} />
+                    <stop offset="100%" stopColor={COLORS.fhrPurple} stopOpacity={0.3} />
+                  </linearGradient>
+                </defs>
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
 
-                  {/* GRADIENTES PARA BARRAS */}
-                  <defs>
-                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={COLORS.fhrPurple} stopOpacity={0.8} />
-                      <stop offset="100%" stopColor={COLORS.fhrPurple} stopOpacity={0.3} />
-                    </linearGradient>
-                  </defs>
-                </ComposedChart>
-              </ResponsiveContainer>
+          {/* LEYENDA VISUAL MINIMALISTA */}
+          <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-800/50">
+            <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-2.5 bg-gradient-to-b from-purple-500/80 to-purple-500/30 rounded"></div>
+                <span className="text-gray-400">Respuestas diarias</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-0.5 bg-cyan-400 rounded"></div>
+                <span className="text-gray-400">Acumulado real</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-0.5 border-t border-dashed border-purple-400"></div>
+                <span className="text-gray-400">Proyección ML</span>
+              </div>
             </div>
+            
+            {/* Solo mostrar si hay dato único no redundante */}
+            {uniqueInsight && uniqueInsight.daysToTarget && (
+              <div className="flex items-center gap-2 text-xs">
+                <Sparkles className="h-3 w-3 text-yellow-400" />
+                <span className="text-gray-400">
+                  Alcanzará objetivo en ~{uniqueInsight.daysToTarget} días
+                </span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
-            {/* LEYENDA VISUAL */}
-            <div className="flex items-center justify-center gap-6 mt-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-3 bg-gradient-to-b from-fhr-purple/80 to-fhr-purple/30 rounded"></div>
-                <span className="text-white/70">Ritmo Diario</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-0.5 bg-fhr-cyan rounded"></div>
-                <span className="text-white/70">Progreso Acumulado</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-0.5 bg-fhr-purple" style={{ borderTop: '2px dashed #A78BFA' }}></div>
-                <span className="text-white/70">Proyección Futura</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* INSIGHTS CONTEXTUALES */}
-      {participationPrediction && (
+      {/* Solo mostrar insight si necesita intervención */}
+      {uniqueInsight && uniqueInsight.needsBoost && participationPrediction && (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
         >
-          <Card className="bg-gradient-to-br from-cyan-500/20 to-purple-500/15 backdrop-blur-md border border-cyan-400/30">
+          <Card className="bg-gradient-to-r from-orange-950/20 to-red-950/20 backdrop-blur-sm border border-orange-500/20">
             <CardContent className="p-4">
-              <h4 className="text-white font-medium mb-2">Estado de Momentum</h4>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${metrics.riskColor.replace('text-', 'bg-')}`}></div>
-                <span className="text-white/80 text-sm capitalize">
-                  {participationPrediction.riskLevel === 'high' ? 'Riesgo Alto' :
-                   participationPrediction.riskLevel === 'medium' ? 'Riesgo Medio' : 'En Objetivo'}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-cyan-500/20 to-purple-500/15 backdrop-blur-md border border-cyan-400/30">
-            <CardContent className="p-4">
-              <h4 className="text-white font-medium mb-2">Confianza Matemática</h4>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-white/10 rounded-full h-2">
-                  <div 
-                    className="h-2 bg-gradient-to-r from-fhr-cyan to-fhr-purple rounded-full transition-all duration-1000"
-                    style={{ width: `${participationPrediction.confidence || 75}%` }}
-                  ></div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-orange-600/20 to-red-600/20">
+                  <Activity className="h-4 w-4 text-orange-400" />
                 </div>
-                <span className="text-white/80 text-sm">
-                  {participationPrediction.confidence || 75}%
-                </span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-100">
+                    Intervención Recomendada
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Proyección {participationPrediction.finalProjection}% está {(targetRate - participationPrediction.finalProjection).toFixed(1)}% bajo el objetivo. 
+                    Considerar acciones de impulso.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -889,7 +889,7 @@ export interface DepartmentalIntelligence {
 // ✅ AGREGAR ESTAS DOS INTERFACES QUE FALTAN
 export interface DepartmentAnomalyData {
   department: string;
-  currentRate: number;
+  rate: number;
   zScore: number;
   type: 'positive_outlier' | 'negative_outlier';
   severity: 'high' | 'medium';
