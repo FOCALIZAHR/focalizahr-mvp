@@ -32,12 +32,12 @@ export interface CategoryConfig {
 }
 
 export interface ConditionalRule {
-  id: string;
   triggerQuestionOrder: number;
   targetQuestionOrder: number;
   type: string;
   condition?: any;
   action?: any;
+  textMapping?: { [key: string]: string }; // AGREGADO para modify_text
 }
 
 export interface UISettings {
@@ -87,6 +87,9 @@ export function useSurveyEngine(
   const [showCategoryIntro, setShowCategoryIntro] = useState(false);
   const [selectedAspects, setSelectedAspects] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // NUEVO: Estado para textos dinámicos modify_text
+  const [dynamicTexts, setDynamicTexts] = useState<{ [questionOrder: number]: string }>({});
 
   // Configuración por defecto
   const defaultConfig: SurveyConfiguration = {
@@ -118,7 +121,21 @@ export function useSurveyEngine(
 
   // Determinar pregunta actual con memoización
   const currentQuestionIndex = useMemo(() => currentStep, [currentStep]);
-  const currentQuestion = useMemo(() => questions[currentQuestionIndex], [questions, currentQuestionIndex]);
+  const currentQuestion = useMemo(() => {
+    const baseQuestion = questions[currentQuestionIndex];
+    if (!baseQuestion) return baseQuestion;
+
+    // NUEVO: Aplicar texto dinámico si existe para modify_text
+    const dynamicText = dynamicTexts[baseQuestion.questionOrder];
+    if (dynamicText) {
+      return {
+        ...baseQuestion,
+        text: dynamicText
+      };
+    }
+    
+    return baseQuestion;
+  }, [questions, currentQuestionIndex, dynamicTexts]);
 
   // Verificar si debemos mostrar intro de categoría (memoizado)
   const isCategoryIntroStep = useCallback((step: number) => {
@@ -130,22 +147,52 @@ export function useSurveyEngine(
   useEffect(() => {
     if (!currentQuestion) return;
     
-    const rule = config.conditionalRules.find(
+    // Buscar reglas que apunten a la pregunta actual
+    const applicableRules = config.conditionalRules.filter(
       r => r.targetQuestionOrder === currentQuestion.questionOrder
     );
 
-    if (rule && rule.type === 'matrix_from_selection') {
+    applicableRules.forEach(rule => {
+      // Encontrar la respuesta del trigger
       const triggerResponse = responses.find(
         r => questions.find(q => q.id === r.questionId)?.questionOrder === rule.triggerQuestionOrder
       );
 
-      if (triggerResponse?.choiceResponse && triggerResponse.choiceResponse.length > 0) {
-        if (JSON.stringify(selectedAspects) !== JSON.stringify(triggerResponse.choiceResponse)) {
-          setSelectedAspects(triggerResponse.choiceResponse);
+      if (!triggerResponse) return;
+
+      // LÓGICA EXISTENTE: matrix_from_selection
+      if (rule.type === 'matrix_from_selection') {
+        if (triggerResponse?.choiceResponse && triggerResponse.choiceResponse.length > 0) {
+          if (JSON.stringify(selectedAspects) !== JSON.stringify(triggerResponse.choiceResponse)) {
+            setSelectedAspects(triggerResponse.choiceResponse);
+          }
         }
       }
-    }
-  }, [currentQuestion, config.conditionalRules, responses, questions]);
+
+      // NUEVA LÓGICA: modify_text
+      if (rule.type === 'modify_text') {
+        if (triggerResponse.choiceResponse && triggerResponse.choiceResponse.length > 0) {
+          const selectedChoice = triggerResponse.choiceResponse[0]; // Primera selección
+          
+          // Buscar textMapping en diferentes estructuras (compatibilidad)
+          let textMapping = null;
+          if (rule.textMapping) {
+            textMapping = rule.textMapping;
+          } else if (rule.action?.textMapping) {
+            textMapping = rule.action.textMapping;
+          }
+          
+          if (textMapping && textMapping[selectedChoice]) {
+            const newText = textMapping[selectedChoice];
+            setDynamicTexts(prev => ({
+              ...prev,
+              [rule.targetQuestionOrder]: newText
+            }));
+          }
+        }
+      }
+    });
+  }, [currentQuestion, config.conditionalRules, responses, questions, selectedAspects]);
 
   // Obtener categoría actual (memoizado)
   const getCurrentCategory = useCallback(() => {

@@ -100,7 +100,7 @@ async function crearPulsoAmbientesSanos() {
             isActive: true
           },
           {
-            text: '¿Cómo calificarías la gestión de tu líder en ese aspecto?',
+            text: 'Calificación del liderazgo (se ajustará según tu respuesta anterior)',
             category: 'liderazgo',
             questionOrder: 7,
             responseType: 'rating_scale',
@@ -177,8 +177,10 @@ async function crearPulsoAmbientesSanos() {
           triggerQuestionOrder: 6,
           targetQuestionOrder: 7,
           type: "modify_text",
-          condition: "response.choiceResponse[0]",
-          textTemplate: "¿Cómo calificarías la gestión de tu líder en {selection}?"
+          textMapping: {
+            "Un feedback claro y respetuoso": "¿Cómo calificarías la claridad y respeto del feedback de tu líder?",
+            "Autonomía y confianza": "¿Cómo calificarías la confianza y autonomía que te da tu líder?"
+          }
         }],
         uiSettings: {
           showCategoryIntros: true,

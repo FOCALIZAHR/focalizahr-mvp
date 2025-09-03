@@ -343,6 +343,73 @@ const MultipleChoiceRenderer: React.FC<{
 };
 
 // ========================================
+// SINGLE CHOICE RENDERER (NUEVO - SOLUCIÓN ARQUITECTÓNICA)
+// ========================================
+const SingleChoiceRenderer: React.FC<{
+  question: Question;
+  response: SurveyResponse;
+  updateResponse: (update: Partial<SurveyResponse>) => void;
+}> = ({ question, response, updateResponse }) => {
+  const selectedChoice = response.choiceResponse?.[0] || null;
+  const options = question.choiceOptions || [];
+
+  return (
+    <motion.div variants={scaleIn} initial="initial" animate="animate" className="space-y-3">
+      <Alert className="border-purple-500/30 bg-purple-500/5">
+        <Target className="h-4 w-4 text-purple-400" />
+        <AlertDescription className="text-purple-300 text-sm">
+          Selecciona una opción
+        </AlertDescription>
+      </Alert>
+      
+      <div className="space-y-2">
+        {options.map((option) => {
+          const isSelected = selectedChoice === option;
+          
+          return (
+            <button
+              key={option}
+              className={`
+                w-full p-4 rounded-xl border text-left
+                transition-all duration-200
+                ${isSelected
+                  ? 'bg-purple-600/20 border-purple-500 text-purple-100'
+                  : 'bg-slate-800/50 border-slate-700 hover:border-purple-600/50 hover:bg-slate-800/70 text-white'
+                }
+              `}
+              onClick={() => {
+                // Single choice: solo una opción seleccionada
+                updateResponse({
+                  choiceResponse: [option]
+                });
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm">{option}</span>
+                <div className={`
+                  w-5 h-5 rounded-full border-2 flex items-center justify-center
+                  transition-all duration-200
+                  ${isSelected
+                    ? 'bg-purple-500 border-purple-500'
+                    : 'border-slate-600'
+                  }
+                `}>
+                  {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      
+      <p className="text-center text-xs text-slate-500">
+        {selectedChoice ? '✓ Opción seleccionada' : 'Elige una opción'}
+      </p>
+    </motion.div>
+  );
+};
+
+// ========================================
 // TEXT OPEN SIMPLIFICADO
 // ========================================
 const TextOpenRenderer: React.FC<{
@@ -525,6 +592,12 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
           response={response} 
           updateResponse={updateResponse}
           validationRule={validationRule}
+        />;
+      case 'single_choice':
+        return <SingleChoiceRenderer 
+          question={currentQuestion} 
+          response={response} 
+          updateResponse={updateResponse}
         />;
       case 'rating_scale':
         return <RatingScaleRenderer response={response} updateResponse={updateResponse} />;
