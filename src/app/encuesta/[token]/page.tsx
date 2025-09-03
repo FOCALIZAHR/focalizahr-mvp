@@ -11,6 +11,8 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import SurveyForm from '@/components/forms/SurveyForm'
 import ConditionalSurveyComponent from '@/components/forms/ConditionalSurveyComponent'
+import UnifiedSurveyComponent from '@/components/survey/UnifiedSurveyComponent'
+import { useSurveyConfiguration } from '@/hooks/useSurveyConfiguration'
 
 interface Campaign {
   id: string
@@ -65,6 +67,11 @@ export default function SurveyPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCompleted, setIsCompleted] = useState(false)
+
+  // Hook para obtener la configuración de la encuesta
+  const { configuration } = useSurveyConfiguration(
+    surveyData?.participant.campaign.campaignType.slug || null
+  )
 
   // Cargar datos de la encuesta
   useEffect(() => {
@@ -214,9 +221,6 @@ export default function SurveyPage() {
   const { participant, questions } = surveyData
   const { campaign } = participant
 
-  // LÓGICA CONDICIONAL CRÍTICA: Determinar qué componente usar
-  const isRetentionPredictive = campaign.campaignType.slug === 'retencion-predictiva'
-
   return (
     <div className="min-h-screen bg-slate-900">
       {/* Contenido principal */}
@@ -277,7 +281,7 @@ export default function SurveyPage() {
                 </AlertDescription>
               </Alert>
 
-              {isRetentionPredictive && (
+              {campaign.campaignType.slug === 'retencion-predictiva' && (
                 <Alert className="border-cyan-600 bg-slate-700 bg-opacity-50">
                   <AlertCircle className="h-4 w-4 text-cyan-400" />
                   <AlertDescription className="text-cyan-200">
@@ -289,23 +293,17 @@ export default function SurveyPage() {
             </CardContent>
           </Card>
 
-          {/* Componente de encuesta - LÓGICA CONDICIONAL IMPLEMENTADA */}
+          {/* Componente de encuesta - USANDO COMPONENTE UNIFICADO */}
           <Card className="bg-slate-800 border-slate-700">
             <CardContent className="pt-6">
-              {isRetentionPredictive ? (
-                <ConditionalSurveyComponent
-                  campaignId={campaign.id}
-                  participantToken={token}
-                  questions={questions}
-                  onSubmit={handleSubmit}
-                />
-              ) : (
-                <SurveyForm
-                  questions={questions}
-                  onSubmit={handleSubmit}
-                  isSubmitting={isSubmitting}
-                />
-              )}
+              <UnifiedSurveyComponent
+                campaignId={campaign.id}
+                participantToken={token}
+                questions={questions}
+                configuration={configuration || undefined}
+                onSubmit={handleSubmit}
+                isSubmitting={isSubmitting}
+              />
             </CardContent>
           </Card>
 

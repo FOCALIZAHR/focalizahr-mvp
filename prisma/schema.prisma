@@ -65,6 +65,7 @@ model CampaignType {
   // Relaciones
   campaigns Campaign[]
   questions Question[]
+  surveyConfiguration SurveyConfiguration?
 
   @@index([isActive], map: "idx_campaign_types_active")
   @@index([category], map: "idx_campaign_types_category")
@@ -359,7 +360,7 @@ model EmailAutomation {
   @@map("email_automations")
 }
 
-// ✅ TABLA 12: DEPARTMENTS (NUEVA - AGREGADA AL FINAL)
+// TABLA 12: DEPARTMENTS
 model Department {
   id               String   @id @default(cuid())
   accountId        String   @map("account_id")
@@ -377,4 +378,21 @@ model Department {
   @@index([standardCategory], map: "idx_departments_category")
   @@index([isActive], map: "idx_departments_active")
   @@map("departments")
+}
+
+// ========== NUEVA TABLA PARA CONFIGURACIÓN DE ENCUESTAS ==========
+// TABLA 13: Survey Configurations
+model SurveyConfiguration {
+  id               String   @id @default(uuid())
+  campaignTypeId   String   @unique @map("campaign_type_id")
+  categoryConfigs  Json     @default("{}") @map("category_configs")
+  conditionalRules Json     @default("[]") @map("conditional_rules")
+  uiSettings       Json     @default("{}") @map("ui_settings")
+  validationRules  Json     @default("[]") @map("validation_rules")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  
+  campaignType CampaignType @relation(fields: [campaignTypeId], references: [id], onDelete: Cascade)
+  
+  @@map("survey_configurations")
 }
