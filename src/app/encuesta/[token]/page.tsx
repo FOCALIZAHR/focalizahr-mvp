@@ -30,7 +30,13 @@ interface Campaign {
     estimatedDuration: number
     methodology: string
     category: string
+    account?: Account  // AGREGAR ESTA LÍNEA
   }
+}
+interface Account {
+  id: string
+  companyName: string
+  adminEmail: string
 }
 
 interface Participant {

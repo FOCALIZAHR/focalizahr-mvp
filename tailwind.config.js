@@ -7,6 +7,8 @@ module.exports = {
     './src/app/**/*.{ts,tsx}',
     './src/**/*.{ts,tsx}',
     './node_modules/@tremor/**/*.{js,ts,jsx,tsx}',
+    // AGREGADO: Path específico para componentes de encuesta
+    './src/components/survey/**/*.{js,ts,jsx,tsx}',
   ],
   prefix: "",
   theme: {
@@ -67,6 +69,16 @@ module.exports = {
         'focalizahr-purple': '#A78BFA',
         'focalizahr-slate': '#334155',
         'focalizahr-slate-600': '#475569',
+        
+        // 🎨 NUEVO: Colores específicos para sistema de encuestas premium
+        'survey': {
+          cyan: '#22D3EE',
+          'cyan-light': '#22D3EE20',
+          'cyan-dark': '#0891B2',
+          purple: '#A78BFA',
+          'purple-light': '#A78BFA20',
+          'purple-dark': '#7C3AED',
+        }
       },
       backgroundImage: {
         // Gradiente principal FocalizaHR
@@ -77,6 +89,15 @@ module.exports = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      // 🎯 NUEVO: Altura específica para header de encuestas
+      spacing: {
+        '15': '3.75rem', // 60px para header
+      },
+      // 💫 NUEVO: Sombras premium para encuestas
+      boxShadow: {
+        'survey-glow': '0 0 20px rgba(34, 211, 238, 0.15)',
+        'survey-glow-lg': '0 0 40px rgba(34, 211, 238, 0.2)',
       },
       keyframes: {
         "accordion-down": {
@@ -103,12 +124,43 @@ module.exports = {
             transform: "translateX(0)",
           },
         },
+        
+        // 🚀 NUEVO: Animaciones premium para encuestas
+        'survey-shimmer': {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' }
+        },
+        'survey-ripple': {
+          '0%': { 
+            transform: 'scale(1)', 
+            opacity: '0.3' 
+          },
+          '100%': { 
+            transform: 'scale(2)', 
+            opacity: '0' 
+          }
+        },
+        'survey-pulse': {
+          '0%, 100%': { 
+            opacity: '1',
+            transform: 'scale(1)'
+          },
+          '50%': { 
+            opacity: '0.8',
+            transform: 'scale(1.05)'
+          }
+        }
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-soft": "pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         "slide-in": "slide-in 0.3s ease-out",
+        
+        // 🎬 NUEVO: Animaciones de encuestas
+        'survey-shimmer': 'survey-shimmer 2s ease-in-out infinite',
+        'survey-ripple': 'survey-ripple 1.5s ease-out infinite',
+        'survey-pulse': 'survey-pulse 2s ease-in-out infinite',
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],

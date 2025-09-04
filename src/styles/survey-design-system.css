@@ -1,0 +1,681 @@
+/* 
+================================================================
+FOCALIZAHR SURVEY DESIGN SYSTEM v1.0
+================================================================
+Sistema de diseño modular para encuestas premium
+Basado en la filosofía de diseño FocalizaHR
+
+USO:
+1. Importar este archivo en tu componente React/Next.js
+2. Aplicar las clases con prefijo fhr-* 
+3. Personalizar variables CSS según necesidad
+================================================================
+*/
+
+/* ========================================
+   1. VARIABLES Y FUNDACIONES
+   ======================================== */
+.fhr-survey-root {
+    /* Paleta de Colores FocalizaHR */
+    --fhr-cyan: #22D3EE;
+    --fhr-purple: #A78BFA;
+    --fhr-blue: #3B82F6;
+    
+    /* Gradientes Marca */
+    --fhr-gradient-primary: linear-gradient(135deg, #22D3EE, #A78BFA);
+    --fhr-gradient-subtle: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(167, 139, 250, 0.1));
+    
+    /* Backgrounds */
+    --fhr-bg-dark: #0F172A;
+    --fhr-bg-card: #1E293B;
+    --fhr-bg-card-hover: #334155;
+    --fhr-border-color: #475569;
+    
+    /* Textos */
+    --fhr-text-primary: #F1F5F9;
+    --fhr-text-secondary: #94A3B8;
+    --fhr-text-muted: #64748B;
+    
+    /* Estados Semánticos */
+    --fhr-success: #10B981;
+    --fhr-warning: #F59E0B;
+    --fhr-error: #EF4444;
+    
+    /* Espaciados */
+    --fhr-space-xs: 0.5rem;
+    --fhr-space-sm: 0.75rem;
+    --fhr-space-md: 1rem;
+    --fhr-space-lg: 1.5rem;
+    --fhr-space-xl: 2rem;
+    --fhr-space-2xl: 3rem;
+    
+    /* Border Radius */
+    --fhr-radius-sm: 6px;
+    --fhr-radius-md: 12px;
+    --fhr-radius-lg: 16px;
+    --fhr-radius-xl: 20px;
+    --fhr-radius-full: 50%;
+    
+    /* Transiciones */
+    --fhr-transition-fast: 0.2s ease;
+    --fhr-transition-base: 0.3s ease;
+    --fhr-transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Reset base para encuestas */
+.fhr-survey-container * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.fhr-survey-container {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+    background: var(--fhr-bg-dark);
+    color: var(--fhr-text-primary);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ========================================
+   2. LAYOUT BASE
+   ======================================== */
+.fhr-survey-layout {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.fhr-survey-content {
+    flex: 1;
+    padding-top: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-left: var(--fhr-space-lg);
+    padding-right: var(--fhr-space-lg);
+}
+
+.fhr-survey-wrapper {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+/* ========================================
+   3. COMPONENTE: HEADER
+   ======================================== */
+.fhr-survey-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(71, 85, 105, 0.2);
+    height: 60px;
+}
+
+.fhr-survey-header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 var(--fhr-space-lg);
+    height: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.fhr-survey-logo {
+    font-size: 1.125rem;
+    font-weight: 700;
+    background: var(--fhr-gradient-primary);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-decoration: none;
+}
+
+.fhr-survey-header-info {
+    display: flex;
+    align-items: center;
+    gap: var(--fhr-space-lg);
+    font-size: 0.75rem;
+    color: var(--fhr-text-muted);
+}
+
+.fhr-confidence-badge {
+    display: flex;
+    align-items: center;
+    gap: var(--fhr-space-xs);
+}
+
+.fhr-shield-icon {
+    width: 14px;
+    height: 14px;
+    color: var(--fhr-cyan);
+}
+
+/* ========================================
+   4. COMPONENTE: PROGRESS BAR
+   ======================================== */
+.fhr-survey-progress {
+    position: fixed;
+    top: 60px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: rgba(71, 85, 105, 0.2);
+    z-index: 99;
+}
+
+.fhr-survey-progress-bar {
+    height: 100%;
+    background: var(--fhr-gradient-primary);
+    transition: width var(--fhr-transition-slow);
+    position: relative;
+    overflow: hidden;
+}
+
+.fhr-survey-progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: fhr-shimmer 2s infinite;
+}
+
+/* ========================================
+   5. COMPONENTE: PORTADAS
+   ======================================== */
+
+/* Portada Principal de Bienvenida */
+.fhr-welcome-screen {
+    min-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: var(--fhr-space-2xl) var(--fhr-space-lg);
+    animation: fhr-fadeInUp 0.8s ease-out;
+}
+
+.fhr-welcome-title {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: var(--fhr-space-md);
+    background: var(--fhr-gradient-primary);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.fhr-welcome-subtitle {
+    font-size: 1.125rem;
+    color: var(--fhr-text-secondary);
+    max-width: 600px;
+    margin: 0 auto var(--fhr-space-2xl);
+    line-height: 1.8;
+}
+
+/* Portada de Categoría */
+.fhr-category-intro {
+    text-align: center;
+    padding: var(--fhr-space-2xl) var(--fhr-space-lg);
+    animation: fhr-fadeInUp 0.6s ease-out;
+}
+
+.fhr-category-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto var(--fhr-space-xl);
+    background: var(--fhr-gradient-subtle);
+    border-radius: var(--fhr-radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform var(--fhr-transition-base);
+}
+
+.fhr-category-icon:hover {
+    transform: rotate(-3deg) scale(1.05);
+}
+
+.fhr-category-title {
+    font-size: 2.25rem;
+    font-weight: 800;
+    background: var(--fhr-gradient-primary);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: var(--fhr-space-md);
+}
+
+/* ========================================
+   6. COMPONENTE: CARDS DE PREGUNTA
+   ======================================== */
+.fhr-question-card {
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid rgba(71, 85, 105, 0.3);
+    border-radius: var(--fhr-radius-xl);
+    padding: var(--fhr-space-2xl);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    animation: fhr-fadeInUp 0.6s ease-out;
+}
+
+.fhr-question-category {
+    display: inline-block;
+    padding: var(--fhr-space-xs) var(--fhr-space-sm);
+    background: rgba(34, 211, 238, 0.1);
+    color: var(--fhr-cyan);
+    border: 1px solid rgba(34, 211, 238, 0.2);
+    border-radius: var(--fhr-radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--fhr-space-md);
+}
+
+.fhr-question-number {
+    font-size: 0.875rem;
+    color: var(--fhr-text-muted);
+    margin-bottom: var(--fhr-space-sm);
+}
+
+.fhr-question-text {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--fhr-text-primary);
+    line-height: 1.4;
+    margin-bottom: var(--fhr-space-xl);
+}
+
+/* ========================================
+   7. COMPONENTE: BOTONES DE ESCALA
+   ======================================== */
+.fhr-scale-buttons {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--fhr-space-md);
+    margin-bottom: var(--fhr-space-md);
+}
+
+.fhr-scale-button {
+    aspect-ratio: 1;
+    background: rgba(30, 41, 59, 0.3);
+    border: 2px solid rgba(71, 85, 105, 0.3);
+    border-radius: var(--fhr-radius-full);
+    cursor: pointer;
+    transition: all var(--fhr-transition-base);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.fhr-scale-button:hover {
+    transform: translateY(-6px) scale(1.05);
+    border-color: rgba(34, 211, 238, 0.5);
+    background: rgba(30, 41, 59, 0.5);
+    box-shadow: 0 12px 24px rgba(34, 211, 238, 0.15);
+}
+
+.fhr-scale-button.selected {
+    background: rgba(34, 211, 238, 0.15);
+    border-color: var(--fhr-cyan);
+    transform: scale(1.1);
+    box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.1),
+                0 8px 24px rgba(34, 211, 238, 0.2);
+}
+
+.fhr-scale-button-number {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--fhr-text-muted);
+    transition: all var(--fhr-transition-base);
+}
+
+.fhr-scale-button:hover .fhr-scale-button-number {
+    color: var(--fhr-text-secondary);
+    transform: scale(1.1);
+}
+
+.fhr-scale-button.selected .fhr-scale-button-number {
+    color: var(--fhr-cyan);
+    font-size: 2rem;
+}
+
+/* Efecto ripple para seleccionado */
+.fhr-scale-button.selected::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--fhr-cyan), transparent);
+    opacity: 0.2;
+    animation: fhr-ripple 1.5s ease-out infinite;
+}
+
+.fhr-scale-labels {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 var(--fhr-space-sm);
+    font-size: 0.75rem;
+    color: var(--fhr-text-muted);
+}
+
+/* ========================================
+   8. COMPONENTE: OPCIONES MÚLTIPLES
+   ======================================== */
+.fhr-options-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fhr-space-sm);
+}
+
+.fhr-option-button {
+    padding: var(--fhr-space-lg);
+    background: rgba(30, 41, 59, 0.3);
+    border: 2px solid rgba(71, 85, 105, 0.3);
+    border-radius: var(--fhr-radius-md);
+    cursor: pointer;
+    transition: all var(--fhr-transition-base);
+    display: flex;
+    align-items: center;
+    gap: var(--fhr-space-md);
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+}
+
+.fhr-option-button:hover {
+    border-color: rgba(34, 211, 238, 0.5);
+    background: rgba(30, 41, 59, 0.5);
+    transform: translateX(8px);
+}
+
+.fhr-option-button.selected {
+    background: rgba(34, 211, 238, 0.1);
+    border-color: var(--fhr-cyan);
+}
+
+.fhr-option-checkbox {
+    width: 24px;
+    height: 24px;
+    border: 2px solid rgba(71, 85, 105, 0.5);
+    border-radius: var(--fhr-radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--fhr-transition-base);
+    flex-shrink: 0;
+}
+
+.fhr-option-button.selected .fhr-option-checkbox {
+    background: var(--fhr-cyan);
+    border-color: var(--fhr-cyan);
+}
+
+.fhr-option-button.selected .fhr-option-checkbox::after {
+    content: '\2713';
+    color: var(--fhr-bg-dark);
+    font-weight: bold;
+}
+
+.fhr-option-text {
+    flex: 1;
+    color: var(--fhr-text-secondary);
+    font-size: 1rem;
+    transition: color var(--fhr-transition-base);
+}
+
+.fhr-option-button:hover .fhr-option-text,
+.fhr-option-button.selected .fhr-option-text {
+    color: var(--fhr-text-primary);
+}
+
+/* ========================================
+   9. COMPONENTE: BOTONES BINARIOS
+   ======================================== */
+.fhr-binary-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--fhr-space-md);
+}
+
+.fhr-binary-button {
+    padding: var(--fhr-space-xl);
+    background: rgba(30, 41, 59, 0.3);
+    border: 2px solid rgba(71, 85, 105, 0.3);
+    border-radius: var(--fhr-radius-lg);
+    cursor: pointer;
+    transition: all var(--fhr-transition-base);
+    text-align: center;
+}
+
+.fhr-binary-button:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+}
+
+.fhr-binary-button.yes:hover {
+    border-color: var(--fhr-success);
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.fhr-binary-button.no:hover {
+    border-color: var(--fhr-error);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.fhr-binary-button.selected.yes {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: var(--fhr-success);
+}
+
+.fhr-binary-button.selected.no {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: var(--fhr-error);
+}
+
+.fhr-binary-text {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--fhr-text-secondary);
+}
+
+/* ========================================
+   10. COMPONENTE: NAVEGACIÓN
+   ======================================== */
+.fhr-navigation {
+    display: flex;
+    justify-content: space-between;
+    margin-top: var(--fhr-space-2xl);
+    padding-top: var(--fhr-space-xl);
+    border-top: 1px solid rgba(71, 85, 105, 0.2);
+}
+
+.fhr-nav-button {
+    padding: var(--fhr-space-sm) var(--fhr-space-lg);
+    border: none;
+    border-radius: var(--fhr-radius-md);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--fhr-transition-base);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fhr-space-sm);
+    font-size: 0.95rem;
+}
+
+.fhr-nav-button-prev {
+    background: transparent;
+    color: var(--fhr-text-secondary);
+    border: 1px solid rgba(71, 85, 105, 0.3);
+}
+
+.fhr-nav-button-prev:hover {
+    color: var(--fhr-cyan);
+    border-color: rgba(34, 211, 238, 0.5);
+    transform: translateX(-4px);
+}
+
+.fhr-nav-button-next {
+    background: var(--fhr-cyan);
+    color: var(--fhr-bg-dark);
+    position: relative;
+    overflow: hidden;
+}
+
+.fhr-nav-button-next:hover {
+    transform: translateX(4px);
+    box-shadow: 0 8px 20px rgba(34, 211, 238, 0.3);
+}
+
+/* Efecto espejo en botón siguiente */
+.fhr-nav-button-next::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left var(--fhr-transition-slow);
+}
+
+.fhr-nav-button-next:hover::before {
+    left: 100%;
+}
+
+.fhr-nav-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.fhr-nav-button:disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* ========================================
+   11. ANIMACIONES
+   ======================================== */
+@keyframes fhr-fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fhr-shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+@keyframes fhr-ripple {
+    0% {
+        transform: scale(1);
+        opacity: 0.2;
+    }
+    100% {
+        transform: scale(1.8);
+        opacity: 0;
+    }
+}
+
+@keyframes fhr-scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ========================================
+   12. UTILIDADES
+   ======================================== */
+.fhr-text-gradient {
+    background: var(--fhr-gradient-primary);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.fhr-hidden {
+    display: none !important;
+}
+
+/* Márgenes */
+.fhr-mt-1 { margin-top: var(--fhr-space-sm); }
+.fhr-mt-2 { margin-top: var(--fhr-space-md); }
+.fhr-mt-3 { margin-top: var(--fhr-space-lg); }
+.fhr-mt-4 { margin-top: var(--fhr-space-xl); }
+
+.fhr-mb-1 { margin-bottom: var(--fhr-space-sm); }
+.fhr-mb-2 { margin-bottom: var(--fhr-space-md); }
+.fhr-mb-3 { margin-bottom: var(--fhr-space-lg); }
+.fhr-mb-4 { margin-bottom: var(--fhr-space-xl); }
+
+/* ========================================
+   13. RESPONSIVE
+   ======================================== */
+@media (max-width: 768px) {
+    .fhr-scale-buttons {
+        gap: var(--fhr-space-sm);
+    }
+
+    .fhr-scale-button-number {
+        font-size: 1.25rem;
+    }
+
+    .fhr-scale-button.selected .fhr-scale-button-number {
+        font-size: 1.5rem;
+    }
+
+    .fhr-question-text {
+        font-size: 1.25rem;
+    }
+
+    .fhr-binary-buttons {
+        grid-template-columns: 1fr;
+    }
+
+    .fhr-survey-header-info {
+        font-size: 0.625rem;
+    }
+
+    .fhr-question-card {
+        padding: var(--fhr-space-lg);
+    }
+
+    .fhr-category-title {
+        font-size: 1.75rem;
+    }
+
+    .fhr-welcome-title {
+        font-size: 2rem;
+    }
+}

@@ -1291,3 +1291,192 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   transform: translateY(-2px) scale(1.01);
   transition: all 0.3s ease;
 }
+/* ========================================
+   SISTEMA DE ENCUESTAS PREMIUM FOCALIZAHR
+   Agregar este bloque completo al FINAL de globals.css
+   ======================================== */
+
+@layer components {
+  /* Container principal */
+  .survey-container {
+    @apply min-h-screen bg-slate-900 text-white;
+  }
+
+  /* Header fijo con confidencialidad */
+  .survey-header {
+    @apply fixed top-0 left-0 right-0 z-50 h-15
+           bg-slate-900/95 backdrop-blur-md 
+           border-b border-slate-800/50;
+  }
+
+  .survey-header-content {
+    @apply h-full max-w-7xl mx-auto px-4 
+           flex items-center justify-between;
+  }
+
+  .survey-confidence-badge {
+    @apply flex items-center gap-2 text-xs text-slate-500;
+  }
+
+  /* Progress bar delgada */
+  .survey-progress {
+    @apply fixed top-15 left-0 right-0 h-1 
+           bg-slate-800/50 z-40;
+  }
+
+  .survey-progress-bar {
+    @apply h-full bg-gradient-to-r from-survey-cyan to-survey-purple
+           transition-all duration-500 ease-out relative overflow-hidden;
+  }
+
+  .survey-progress-bar::after {
+    @apply content-[''] absolute inset-0
+           bg-gradient-to-r from-transparent via-white/20 to-transparent
+           animate-survey-shimmer;
+  }
+
+  /* Cards de pregunta */
+  .survey-question-card {
+    @apply bg-slate-800/50 backdrop-blur-sm
+           border border-slate-700/50 rounded-2xl
+           p-6 md:p-8 transition-all duration-300
+           hover:border-slate-600/50 hover:bg-slate-800/60;
+  }
+
+  .survey-question-category {
+    @apply inline-flex items-center px-3 py-1
+           bg-survey-cyan-light text-survey-cyan
+           border border-survey-cyan/30 rounded-lg
+           text-xs font-semibold uppercase tracking-wider
+           mb-4;
+  }
+
+  .survey-question-text {
+    @apply text-xl md:text-2xl font-semibold text-white
+           leading-relaxed mb-8;
+  }
+
+  /* Botones de escala circulares */
+  .survey-scale-button {
+    @apply relative rounded-full aspect-square
+           bg-slate-800/30 border-2 border-slate-700
+           flex items-center justify-center
+           cursor-pointer transition-all duration-300
+           hover:scale-110 hover:-translate-y-1
+           hover:border-survey-cyan/50 hover:bg-slate-800/50
+           focus:outline-none focus:ring-2 focus:ring-survey-cyan/50
+           min-w-[60px] min-h-[60px] md:min-w-[80px] md:min-h-[80px];
+  }
+
+  .survey-scale-button.selected {
+    @apply bg-survey-cyan-light border-survey-cyan
+           scale-110 shadow-survey-glow;
+  }
+
+  .survey-scale-button-number {
+    @apply text-2xl md:text-3xl font-bold text-slate-400
+           transition-all duration-300;
+  }
+
+  .survey-scale-button.selected .survey-scale-button-number {
+    @apply text-survey-cyan text-3xl md:text-4xl;
+  }
+
+  /* Efecto ripple para botón seleccionado */
+  .survey-scale-ripple {
+    @apply absolute inset-0 rounded-full pointer-events-none
+           bg-survey-cyan/30 animate-survey-ripple;
+  }
+
+  /* Opciones múltiples */
+  .survey-option-button {
+    @apply flex items-center gap-4 p-4
+           bg-slate-800/30 border-2 border-slate-700
+           rounded-xl cursor-pointer
+           transition-all duration-300
+           hover:bg-slate-800/50 hover:border-survey-cyan/50
+           hover:translate-x-1;
+  }
+
+  .survey-option-button.selected {
+    @apply bg-survey-cyan-light border-survey-cyan;
+  }
+
+  .survey-option-checkbox {
+    @apply w-6 h-6 rounded-md border-2 border-slate-600
+           flex items-center justify-center
+           transition-all duration-300;
+  }
+
+  .survey-option-button.selected .survey-option-checkbox {
+    @apply bg-survey-cyan border-survey-cyan;
+  }
+
+/* Navegación */
+.survey-nav-button {
+  @apply px-5 py-2.5 rounded-xl font-medium text-sm
+         transition-all duration-300 
+         flex items-center gap-2;
+}
+
+.survey-nav-prev {
+  @apply px-5 py-2.5 rounded-xl font-medium text-sm
+         transition-all duration-300 
+         flex items-center gap-2
+         bg-slate-800/30 text-slate-400 
+         border border-slate-700
+         hover:text-white hover:border-slate-600 hover:bg-slate-800/50
+         hover:-translate-x-1;
+}
+
+.survey-nav-next {
+  @apply px-6 py-2.5 rounded-xl font-medium text-sm
+         transition-all duration-300 
+         flex items-center gap-2
+         bg-survey-cyan text-slate-900
+         hover:bg-survey-cyan-dark hover:shadow-survey-glow
+         hover:translate-x-1 relative overflow-hidden;
+}
+
+.survey-nav-next::before {
+  @apply content-[''] absolute inset-0
+         bg-gradient-to-r from-transparent via-white/20 to-transparent
+         -translate-x-full transition-transform duration-500;
+}
+
+.survey-nav-next:hover::before {
+  @apply translate-x-full;
+}
+
+  /* Portada de categoría */
+  .survey-category-intro {
+    @apply text-center py-12 px-6
+           animate-in fade-in slide-in-from-bottom-4 duration-500;
+  }
+
+  .survey-category-icon {
+    @apply w-20 h-20 mx-auto mb-6
+           bg-gradient-to-br from-survey-cyan-light to-survey-purple-light
+           rounded-2xl flex items-center justify-center
+           transform rotate-3 transition-transform duration-300
+           hover:rotate-0 hover:scale-110;
+  }
+
+  .survey-category-title {
+    @apply text-3xl md:text-4xl font-bold
+           bg-gradient-to-r from-survey-cyan to-survey-purple
+           bg-clip-text text-transparent mb-4;
+  }
+}
+
+@layer utilities {
+  /* Utilidades específicas de encuesta */
+  .survey-glass {
+    @apply backdrop-blur-md bg-white/5;
+  }
+
+  .survey-text-gradient {
+    @apply bg-gradient-to-r from-survey-cyan to-survey-purple 
+           bg-clip-text text-transparent;
+  }
+}
