@@ -21,6 +21,11 @@ interface Campaign {
   status: string
   startDate: string
   endDate: string
+  account?: {
+    id: string
+    companyName: string
+    adminEmail: string
+  }
   campaignType: {
     id: string
     name: string
@@ -30,13 +35,7 @@ interface Campaign {
     estimatedDuration: number
     methodology: string
     category: string
-    account?: Account  // AGREGAR ESTA LÍNEA
   }
-}
-interface Account {
-  id: string
-  companyName: string
-  adminEmail: string
 }
 
 interface Participant {
@@ -61,8 +60,6 @@ interface SurveyData {
     conditionalLogic?: any | null
   }>
 }
-
-
 
 export default function SurveyPage() {
   const params = useParams()
@@ -227,103 +224,20 @@ export default function SurveyPage() {
   const { participant, questions } = surveyData
   const { campaign } = participant
 
+  // LA PÁGINA SOLO PASA EL COMPONENTE, SIN CONTENIDO ADICIONAL
   return (
-    <div className="min-h-screen bg-slate-900">
-      {/* Contenido principal */}
-      <div className="max-w-3xl mx-auto px-4 py-6">
-        {/* Header como card del mismo ancho */}
-        <Card className="bg-slate-800 border-slate-700 mb-6">
-          <CardContent className="p-6">
-            {/* Primera línea: Logo prominente + Info alineada */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-4">
-                <Image
-                  src="/images/focalizahr-logo2.svg"
-                  alt="FocalizaHR"
-                  width={200}
-                  height={60}
-                  className=""
-                  priority
-                />
-                <div className="text-sm text-slate-400 hidden lg:block">
-                  Pulso de Bienestar
-                </div>
-              </div>
-              
-              <div className="text-xs text-slate-500 text-right">
-                <div className="flex items-center space-x-1 mb-1">
-                  <Clock className="h-3 w-3" />
-                  <span>~{campaign.campaignType.estimatedDuration} min</span>
-                </div>
-                <div className="opacity-75">
-                  {campaign.campaignType.questionCount} preguntas
-                </div>
-              </div>
-            </div>
-            
-            {/* Segunda línea: Nombre del estudio MÁS GRANDE */}
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-cyan-400">
-                {campaign.name}
-              </h1>
-            </div>
-          </CardContent>
-        </Card>
-        <div className="space-y-6">
-          {/* Información metodológica */}
-          <Card className="bg-slate-800 border-slate-700">
-            <CardHeader>
-              <CardTitle className="text-lg text-white">Información de la encuesta</CardTitle>
-              <CardDescription className="text-slate-300">
-                Metodología: {campaign.campaignType.methodology}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Alert className="mb-4 bg-slate-700 border-slate-600">
-                <CheckCircle className="h-4 w-4 text-cyan-400" />
-                <AlertDescription className="text-slate-200">
-                  <strong>Confidencialidad garantizada:</strong> Tus respuestas son completamente anónimas. 
-                  Los resultados se analizan en conjunto para proteger tu privacidad.
-                </AlertDescription>
-              </Alert>
-
-              {campaign.campaignType.slug === 'retencion-predictiva' && (
-                <Alert className="border-cyan-600 bg-slate-700 bg-opacity-50">
-                  <AlertCircle className="h-4 w-4 text-cyan-400" />
-                  <AlertDescription className="text-cyan-200">
-                    <strong>Encuesta estratégica:</strong> Este instrumento está diseñado para identificar 
-                    y predecir las causas de rotación de talento, ayudando a crear un mejor ambiente laboral.
-                  </AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Componente de encuesta - USANDO COMPONENTE UNIFICADO */}
-          <Card className="bg-slate-800 border-slate-700">
-            <CardContent className="pt-6">
-              <UnifiedSurveyComponent
-                campaignId={campaign.id}
-                participantToken={token}
-                questions={questions}
-                configuration={configuration || undefined}
-                onSubmit={handleSubmit}
-                isSubmitting={isSubmitting}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Footer con información adicional */}
-          <div className="text-center text-sm text-slate-400 pt-4">
-            <p>
-              Si tienes dudas sobre esta encuesta, contacta con tu departamento de RRHH.
-            </p>
-            <p className="mt-2">
-              Encuesta válida hasta: {new Date(campaign.endDate).toLocaleDateString('es-ES')}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+    <UnifiedSurveyComponent
+      campaignId={campaign.id}
+      participantToken={token}
+      questions={questions}
+      configuration={configuration || undefined}
+      campaignName={campaign.name}
+      campaignTypeName={campaign.campaignType.name}
+      companyName={campaign.account?.companyName || 'La empresa'}
+      estimatedDuration={campaign.campaignType.estimatedDuration}
+      questionCount={campaign.campaignType.questionCount}
+      onSubmit={handleSubmit}
+      isSubmitting={isSubmitting}
+    />
   )
 }

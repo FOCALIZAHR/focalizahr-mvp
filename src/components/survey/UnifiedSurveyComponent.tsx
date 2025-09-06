@@ -1,4 +1,3 @@
-// src/components/survey/UnifiedSurveyComponent.tsx
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -15,6 +14,7 @@ import {
 // Import refactored components
 import { SurveyHeader } from './sections/SurveyHeader';
 import { CategoryIntroCard } from './sections/CategoryIntroCard';
+import { WelcomeScreen } from './sections/WelcomeScreen'; // IMPORTAMOS TU COMPONENTE SEPARADO
 import { fadeIn } from './constants/animations';
 
 // Import all renderers from index barrel
@@ -42,6 +42,11 @@ interface UnifiedSurveyProps {
   participantToken: string;
   questions: Question[];
   configuration?: SurveyConfiguration;
+  companyName?: string;
+  campaignName?: string; // Nombre personalizado de la campaña
+  campaignTypeName?: string; // Tipo de campaña
+  questionCount?: number;
+  estimatedDuration?: number;
   onSubmit: (responses: SurveyResponse[]) => void;
   onSave?: (responses: SurveyResponse[]) => void;
   isSubmitting?: boolean;
@@ -55,10 +60,18 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
   participantToken,
   questions,
   configuration,
+  companyName = "Empresa Demo",
+  campaignName = "Encuesta",
+  campaignTypeName = "Evaluación de Clima",
+  questionCount = questions.length,
+  estimatedDuration = 10,
   onSubmit,
   onSave,
   isSubmitting = false
 }) => {
+  // Estado para controlar la pantalla de bienvenida
+  const [showWelcome, setShowWelcome] = useState(true);
+
   // Hook principal con toda la lógica
   const {
     currentStep,
@@ -135,13 +148,8 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
       case 'text_open':
         return <TextOpenRenderer response={response} updateResponse={updateResponse} />;
       
-      case 'multiple_choice':
-        return <MultipleChoiceRenderer 
-          question={currentQuestion} 
-          response={response} 
-          updateResponse={updateResponse}
-          validationRule={validationRule}
-        />;
+      case 'rating_scale':
+        return <RatingScaleRenderer response={response} updateResponse={updateResponse} />;
       
       case 'single_choice':
         return <SingleChoiceRenderer 
@@ -150,8 +158,13 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
           updateResponse={updateResponse}
         />;
       
-      case 'rating_scale':
-        return <RatingScaleRenderer response={response} updateResponse={updateResponse} />;
+      case 'multiple_choice':
+        return <MultipleChoiceRenderer 
+          question={currentQuestion} 
+          response={response} 
+          updateResponse={updateResponse}
+          validationRule={validationRule}
+        />;
       
       case 'rating_matrix_conditional':
         return <RatingMatrixRenderer 
@@ -162,34 +175,55 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
         />;
       
       default:
-        return <div className="text-slate-500">Tipo de pregunta no soportado: {currentQuestion.responseType}</div>;
+        return <div className="text-slate-500">
+          Tipo de pregunta no soportado: {currentQuestion.responseType}
+        </div>;
     }
   };
 
-  // Calcular tiempo restante estimado
-  const timeRemaining = Math.ceil((questions.length - currentQuestionIndex) * 0.5);
+  // Calcular tiempo restante
+  const timeRemaining = useMemo(() => {
+    const remainingQuestions = questions.length - currentQuestionIndex;
+    const avgTimePerQuestion = 0.5; // minutos
+    return Math.ceil(remainingQuestions * avgTimePerQuestion);
+  }, [currentQuestionIndex, questions.length]);
 
-  // Determinar milestone de progreso
+  // Determinar milestone para celebración
   const progressMilestone = useMemo(() => {
-    if (progress.percentage >= 100) return "¡Completado!";
+    if (progress.percentage === 100) return "¡Completado!";
     if (progress.percentage >= 75) return "¡Casi terminas!";
     if (progress.percentage >= 50) return "¡Vas a la mitad!";
     if (progress.percentage >= 25) return "¡Buen comienzo!";
     return null;
   }, [progress.percentage]);
 
+  // Render condicional para la pantalla de bienvenida
+  if (showWelcome) {
+    return (
+      <WelcomeScreen
+        campaignName={campaignName}
+        companyName={companyName}
+        companyLogo={undefined} // Agregar si tienes logo disponible
+        estimatedTime={estimatedDuration}
+        questionCount={questionCount}
+        onStart={() => setShowWelcome(false)}
+      />
+    );
+  }
+
   return (
     <div className="survey-container">
       {/* Header fijo con progress bar */}
       <SurveyHeader 
-        companyName={companyName}  // Ahora usa el prop con valor por defecto
-        campaignName={configuration?.displayName || "Encuesta de Bienestar"}
+        companyName={companyName}
+        campaignName={campaignName}
+        campaignTypeName={campaignTypeName}
         progress={progress}
-        tagline="Evaluación independiente y confidencial"
+        estimatedDuration={estimatedDuration}
       />
 
       {/* Contenido principal con padding para header */}
-      <div className="pt-20">
+      <div className="survey-content">   
         <AnimatePresence mode="wait">
           {/* Portada de categoría */}
           {shouldShowCategoryIntro && currentQuestion && (
@@ -216,113 +250,84 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
               className="px-4 py-6 md:py-8"
             >
               <div className="max-w-2xl mx-auto">
-                {/* Milestone notification */}
-                {progressMilestone && progress.percentage % 25 === 0 && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-center mb-4"
-                  >
-                    <Badge className="bg-survey-cyan-light text-survey-cyan border-survey-cyan/50">
-                      {progressMilestone}
-                    </Badge>
-                  </motion.div>
-                )}
-
-                {/* Card de pregunta */}
-                <div className="survey-question-card">
-                  {/* Header de pregunta */}
+                {/* Card de pregunta mejorado */}
+                <div className="bg-slate-900/50 border border-slate-800 rounded-2xl backdrop-blur-sm">
+                  {/* Header de pregunta simplificado */}
                   <div className="px-6 pt-6 pb-4 border-b border-slate-800/50">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="survey-question-category">
-                        Pregunta {currentQuestionIndex + 1} de {questions.length}
+                      <span className="text-sm text-slate-500">
+                        {currentQuestionIndex + 1} / {questions.length}
                       </span>
                       <span className="text-xs text-slate-500">
-                        {currentQuestion.category}
+                        ~{timeRemaining} min restantes
                       </span>
                     </div>
-                    <h3 className="survey-question-text">
+                    
+                    {/* Texto de la pregunta */}
+                    <h2 className="text-xl md:text-2xl font-light text-white leading-relaxed">
                       {currentQuestion.text}
-                    </h3>
+                    </h2>
                   </div>
 
-                  {/* Área de respuesta */}
-                  <div className="p-6">
+                  {/* Cuerpo con renderer específico */}
+                  <div className="px-6 pt-6 pb-6">
                     {renderQuestion()}
                   </div>
-                </div>
-
-                {/* Controles de navegación */}
-                <div className="flex items-center justify-between mt-6">
-                  {/* Botón anterior */}
-                  <button
-                    onClick={goToPrevious}
-                    disabled={currentStep === 0}
-                    className="survey-nav-prev"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    Anterior
-                  </button>
-
-                  {/* Progress dots indicator */}
-                  <div className="flex gap-1">
-                    {Array.from({ length: Math.min(5, questions.length) }, (_, i) => (
-                      <div 
-                        key={i}
-                        className={`h-1.5 rounded-full transition-all duration-300 ${
-                          i === Math.min(currentQuestionIndex, 4)
-                            ? 'w-6 bg-survey-cyan' 
-                            : i < currentQuestionIndex
-                            ? 'w-1.5 bg-survey-cyan/50'
-                            : 'w-1.5 bg-slate-700'
-                        }`}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Botones de acción */}
-                  <div className="flex items-center gap-3">
-                    {/* Botón guardar (opcional) */}
-                    {onSave && (
+                  
+                  {/* Navegación mejorada */}
+                  <div className="px-6 pb-6">
+                    <div className="flex justify-between items-center">
+                      {/* Botón Anterior */}
                       <button
-                        onClick={handleSave}
-                        className="px-4 py-2 bg-slate-800/50 border border-survey-purple/30 
-                                 text-survey-purple rounded-xl hover:bg-slate-800 
+                        onClick={goToPrevious}
+                        disabled={currentQuestionIndex === 0}
+                        className="px-8 py-2.5 text-sm font-medium text-slate-400 
+                                 border border-slate-700 rounded-full
+                                 hover:border-slate-600 hover:text-slate-300
+                                 disabled:opacity-30 disabled:cursor-not-allowed
                                  transition-all duration-200"
                       >
-                        Guardar
+                        Anterior
                       </button>
-                    )}
 
-                    {/* Botón siguiente o finalizar */}
-                    {currentQuestionIndex < questions.length - 1 ? (
-                      <button
-                        onClick={goToNext}
-                        disabled={!isCurrentResponseValid()}
-                        className="survey-nav-next"
-                      >
-                        Siguiente
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleSubmit}
-                        disabled={!isCurrentResponseValid() || isLoading || isSubmitting}
-                        className="survey-nav-next"
-                      >
-                        {isLoading || isSubmitting ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Enviando...
-                          </>
-                        ) : (
-                          <>
-                            Finalizar
-                            <CheckCircle2 className="w-4 h-4" />
-                          </>
-                        )}
-                      </button>
-                    )}
+                      {/* Botón Siguiente/Finalizar */}
+                      {currentQuestionIndex < questions.length - 1 ? (
+                        <button
+                          onClick={goToNext}
+                          disabled={!isCurrentResponseValid()}
+                          className="px-8 py-2.5 text-sm font-medium
+                                   bg-transparent border border-[#22D3EE]/50
+                                   text-[#22D3EE] rounded-full
+                                   hover:bg-[#22D3EE]/10 hover:border-[#22D3EE]
+                                   disabled:opacity-30 disabled:cursor-not-allowed
+                                   transition-all duration-200"
+                        >
+                          Siguiente
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleSubmit}
+                          disabled={!isCurrentResponseValid() || isSubmitting}
+                          className="px-8 py-2.5 text-sm font-medium
+                                   bg-[#22D3EE] text-[#0F172A] rounded-full
+                                   hover:bg-[#A78BFA] hover:shadow-lg
+                                   disabled:opacity-30 disabled:cursor-not-allowed
+                                   transition-all duration-200 flex items-center gap-2"
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Enviando...
+                            </>
+                          ) : (
+                            <>
+                              Finalizar
+                              <CheckCircle2 className="w-4 h-4" />
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

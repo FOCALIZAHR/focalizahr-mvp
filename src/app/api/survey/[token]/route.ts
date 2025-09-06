@@ -34,6 +34,13 @@ export async function GET(
             status: true,
             startDate: true,
             endDate: true,
+            account: {  // ✅ CAMBIO 1: AGREGADO - Relación con account para obtener companyName
+              select: {
+                id: true,
+                companyName: true,
+                adminEmail: true
+              }
+            },
             campaignType: {
               select: {
                 id: true,
@@ -133,6 +140,7 @@ export async function GET(
           status: participant.campaign.status,
           startDate: participant.campaign.startDate,
           endDate: participant.campaign.endDate,
+          account: participant.campaign.account,  // ✅ CAMBIO 2: AGREGADO - Include account data in response
           campaignType: participant.campaign.campaignType
         }
       },
