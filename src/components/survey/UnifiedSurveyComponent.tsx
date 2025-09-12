@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
+
 import { 
   ArrowRight, 
   ArrowLeft,
@@ -14,7 +15,7 @@ import {
 // Import refactored components
 import { SurveyHeader } from './sections/SurveyHeader';
 import { CategoryIntroCard } from './sections/CategoryIntroCard';
-import { WelcomeScreen } from './sections/WelcomeScreen'; // IMPORTAMOS TU COMPONENTE SEPARADO
+import  WelcomeScreen  from './sections/WelcomeScreen'; // IMPORTAMOS TU COMPONENTE SEPARADO
 import { fadeIn } from './constants/animations';
 
 // Import all renderers from index barrel
@@ -44,6 +45,7 @@ interface UnifiedSurveyProps {
   configuration?: SurveyConfiguration;
   companyName?: string;
   campaignName?: string; // Nombre personalizado de la campaña
+  companyLogo?: string;
   campaignTypeName?: string; // Tipo de campaña
   questionCount?: number;
   estimatedDuration?: number;
@@ -61,6 +63,7 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
   questions,
   configuration,
   companyName = "Empresa Demo",
+  companyLogo,
   campaignName = "Encuesta",
   campaignTypeName = "Evaluación de Clima",
   questionCount = questions.length,
@@ -202,8 +205,8 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
     return (
       <WelcomeScreen
         campaignName={campaignName}
-        companyName={companyName}
-        companyLogo={undefined} // Agregar si tienes logo disponible
+        companyName={companyName}  // ← USAR LA PROP DIRECTA
+        companyLogo={companyLogo}   // ← NECESITAS AGREGAR ESTA PROP
         estimatedTime={estimatedDuration}
         questionCount={questionCount}
         onStart={() => setShowWelcome(false)}
@@ -247,22 +250,13 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
               initial="initial"
               animate="animate"
               exit="exit"
-              className="px-4 py-6 md:py-8"
+              className="px-4 py-4"
             >
               <div className="max-w-2xl mx-auto">
                 {/* Card de pregunta mejorado */}
                 <div className="bg-slate-900/50 border border-slate-800 rounded-2xl backdrop-blur-sm">
                   {/* Header de pregunta simplificado */}
                   <div className="px-6 pt-6 pb-4 border-b border-slate-800/50">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm text-slate-500">
-                        {currentQuestionIndex + 1} / {questions.length}
-                      </span>
-                      <span className="text-xs text-slate-500">
-                        ~{timeRemaining} min restantes
-                      </span>
-                    </div>
-                    
                     {/* Texto de la pregunta */}
                     <h2 className="text-xl md:text-2xl font-light text-white leading-relaxed">
                       {currentQuestion.text}

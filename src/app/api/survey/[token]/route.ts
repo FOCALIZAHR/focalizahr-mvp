@@ -38,6 +38,7 @@ export async function GET(
               select: {
                 id: true,
                 companyName: true,
+                companyLogo: true,  // ← AGREGAR ESTA LÍNEA
                 adminEmail: true
               }
             },

@@ -23,6 +23,7 @@ enum Gender {
 model Account {
   id               String  @id @default(cuid())
   companyName      String  @map("company_name")
+  companyLogo      String? @map("company_logo") // ← ESTO ES CORRECTO
   industry         String?
   companySize      String? @map("company_size") // micro/pequeña/mediana
   adminEmail       String  @unique @map("admin_email")
@@ -369,6 +370,19 @@ model Department {
   isActive         Boolean  @default(true) @map("is_active")
   createdAt        DateTime @default(now()) @map("created_at")
 
+  // NUEVOS CAMPOS - Jerarquía
+  parentId             String?  @map("parent_id")
+  parent               Department? @relation("DepartmentHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children             Department[] @relation("DepartmentHierarchy")
+  unitType             String   @default("departamento") @map("unit_type")
+  level                Int      @default(3)
+  employeeCount        Int      @default(0) @map("employee_count")
+  
+  // NUEVOS CAMPOS - Contexto organizacional
+  technicalComplexity   String   @default("media") @map("technical_complexity")
+  emotionalComplexity   String   @default("media") @map("emotional_complexity")
+  marketScarcity        String   @default("normal") @map("market_scarcity")
+
   // Relaciones
   account      Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
   participants Participant[]
@@ -383,7 +397,7 @@ model Department {
 // ========== NUEVA TABLA PARA CONFIGURACIÓN DE ENCUESTAS ==========
 // TABLA 13: Survey Configurations
 model SurveyConfiguration {
-  id               String   @id @default(uuid())
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   campaignTypeId   String   @unique @map("campaign_type_id")
   categoryConfigs  Json     @default("{}") @map("category_configs")
   conditionalRules Json     @default("[]") @map("conditional_rules")

@@ -15,46 +15,45 @@ export const TextOpenRenderer: React.FC<TextOpenRendererProps> = ({
 }) => {
   const characterCount = (response?.textResponse || '').length;
   const minCharacters = 10;
+  const maxCharacters = 500;
 
   return (
     <motion.div 
       variants={fadeIn} 
       initial="initial" 
-      animate="animate" 
+      animate="animate"
       className="space-y-4"
     >
       <textarea
         value={response?.textResponse || ''}
-        onChange={(e) => updateResponse({ textResponse: e.target.value })}
+        onChange={(e) => {
+          if (e.target.value.length <= maxCharacters) {
+            updateResponse({ textResponse: e.target.value });
+          }
+        }}
         placeholder="Comparte tu experiencia..."
-        className="w-full min-h-[150px] p-4 
-                   bg-slate-800/30 
-                   border-2 border-slate-700 
+        className="w-full min-h-[140px] p-4
+                   bg-slate-900/40
+                   border border-slate-700/50
                    rounded-xl
                    text-white placeholder-slate-500
-                   focus:border-survey-cyan/50 focus:bg-slate-800/50
-                   focus:outline-none focus:ring-2 focus:ring-survey-cyan/20
+                   focus:border-[#22D3EE]/50 
+                   focus:outline-none focus:ring-1 focus:ring-[#22D3EE]/20
                    transition-all duration-200
                    resize-none"
-        aria-label="Campo de respuesta de texto"
+        maxLength={maxCharacters}
       />
       
       <div className="flex justify-between text-sm">
-        <span className={`transition-colors duration-200 ${
+        <span className={`${
           characterCount < minCharacters 
-            ? 'text-slate-500' 
-            : 'text-survey-cyan'
+            ? 'text-[#22D3EE]/70' 
+            : 'text-transparent'
         }`}>
-          Mín. {minCharacters} caracteres
+          {characterCount < minCharacters && `Mín. ${minCharacters} caracteres`}
         </span>
-        <span className={`transition-colors duration-200 ${
-          characterCount === 0
-            ? 'text-slate-600'
-            : characterCount < 500 
-            ? 'text-slate-400' 
-            : 'text-survey-purple'
-        }`}>
-          {characterCount}/500
+        <span className="text-slate-500">
+          {characterCount}/{maxCharacters}
         </span>
       </div>
     </motion.div>

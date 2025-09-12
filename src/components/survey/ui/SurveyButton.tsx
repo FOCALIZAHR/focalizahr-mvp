@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { motion, HTMLMotionProps } from 'framer-motion';
-import { cn } from '@/constants/survey-design-constants';
+import { cn } from '@/lib/utils';
 
 interface SurveyButtonProps extends Omit<HTMLMotionProps<"button">, 'type'> {
   variant?: 'primary' | 'secondary' | 'solid';

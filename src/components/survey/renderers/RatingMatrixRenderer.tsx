@@ -40,7 +40,7 @@ export const RatingMatrixRenderer: React.FC<RatingMatrixRendererProps> = ({
       variants={fadeIn} 
       initial="initial" 
       animate="animate"
-      className="space-y-6"
+      className="space-y-4"
     >
       {selectedAspects.map((aspect, index) => (
         <motion.div 
@@ -48,7 +48,7 @@ export const RatingMatrixRenderer: React.FC<RatingMatrixRendererProps> = ({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: index * 0.1 }}
-          className="space-y-3 p-4 bg-slate-800/20 rounded-xl border border-slate-800/50"
+          className="space-y-3 p-3 bg-slate-800/20 rounded-xl border border-slate-800/50"
         >
           <h4 className="text-sm font-medium text-slate-300">
             {aspect}
@@ -62,11 +62,21 @@ export const RatingMatrixRenderer: React.FC<RatingMatrixRendererProps> = ({
                 <button
                   key={value}
                   onClick={() => updateMatrixValue(aspect, value)}
-                  className={`survey-scale-button ${isSelected ? 'selected' : ''}`}
-                  style={{ minWidth: '50px', minHeight: '50px' }}
+                  className={`
+                    relative group
+                    w-10 h-10 
+                    rounded-full 
+                    border-2 
+                    transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
+                    
+                    ${isSelected 
+                      ? 'bg-[#A78BFA] border-transparent text-white scale-110 shadow-[0_4px_12px_rgba(167,139,250,0.3)]' 
+                      : 'bg-slate-800/30 border-slate-700 text-slate-400 hover:bg-[#22D3EE] hover:border-transparent hover:text-[#0F172A] hover:-translate-y-[1px] hover:shadow-[0_4px_12px_rgba(34,211,238,0.3)]'
+                    }
+                  `}
                   aria-label={`${aspect} - Calificación ${value}`}
                 >
-                  <span className="text-lg font-semibold">
+                  <span className="text-sm font-medium">
                     {value}
                   </span>
                 </button>
@@ -75,10 +85,6 @@ export const RatingMatrixRenderer: React.FC<RatingMatrixRendererProps> = ({
           </div>
         </motion.div>
       ))}
-      
-      <div className="text-center text-sm text-slate-500 mt-4">
-        Evalúa cada aspecto del 1 (Muy malo) al 5 (Excelente)
-      </div>
     </motion.div>
   );
 };

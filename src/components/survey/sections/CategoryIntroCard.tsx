@@ -32,16 +32,21 @@ export const CategoryIntroCard: React.FC<CategoryIntroCardProps> = ({
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
       >
         
-        {/* Indicador de sección mejorado */}
+        {/* Indicador de progreso con puntos */}
         {currentSection && totalSections && (
-          <div className="flex items-center gap-3 mb-12">
-            <div className="h-px flex-1 bg-slate-800" />
-            <span className="text-xs text-slate-500 tracking-wider uppercase">
-              Sección {currentSection} de {totalSections}
-            </span>
-            <div className="h-px flex-1 bg-slate-800" />
-          </div>
-        )}
+         <div className="flex justify-center gap-2 mb-12">
+          {Array.from({ length: totalSections }, (_, i) => (
+           <div
+             key={i}
+             className={
+              i === currentSection - 1
+                ? "w-2 h-2 rounded-full bg-[#A78BFA] shadow-lg shadow-purple-500/50"
+                : "w-1.5 h-1.5 rounded-full bg-slate-700"
+             }
+           />
+         ))}
+         </div>
+       )} 
         
         {/* Línea decorativa minimalista */}
         <div className="w-px h-12 bg-gradient-to-b from-transparent via-slate-700 to-transparent mx-auto mb-10" />

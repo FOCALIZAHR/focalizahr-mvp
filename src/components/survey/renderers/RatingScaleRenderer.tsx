@@ -29,7 +29,7 @@ export const RatingScaleRenderer: React.FC<RatingScaleRendererProps> = ({
       className="space-y-6"
     >
       {/* Botones de escala */}
-      <div className="flex flex-wrap gap-4 justify-center">
+      <div className="flex justify-center gap-3">
         {[1, 2, 3, 4, 5].map((value) => (
           <button
             key={value}
@@ -47,11 +47,14 @@ export const RatingScaleRenderer: React.FC<RatingScaleRendererProps> = ({
         ))}
       </div>
 
-      {/* Labels de los extremos */}
-      <div className="flex justify-between text-sm text-slate-500 px-4 max-w-lg mx-auto">
-        <span>{scaleLabels[0]}</span>
-        <span>{scaleLabels[4]}</span>
-      </div>
+      {/* Mostrar label del valor seleccionado */}
+      {response?.rating && (
+        <div className="text-center">
+          <span className="text-sm text-cyan-400 font-medium">
+            {scaleLabels[response.rating - 1]}
+          </span>
+        </div>
+      )}
     </motion.div>
   );
 };

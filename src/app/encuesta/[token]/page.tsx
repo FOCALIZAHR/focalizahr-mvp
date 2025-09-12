@@ -24,6 +24,7 @@ interface Campaign {
   account?: {
     id: string
     companyName: string
+    companyLogo?: string  // ← AGREGAR ESTA LÍNEA
     adminEmail: string
   }
   campaignType: {
@@ -230,6 +231,7 @@ export default function SurveyPage() {
       campaignId={campaign.id}
       participantToken={token}
       questions={questions}
+      companyLogo={campaign.account?.companyLogo} // CORRECTO// AGREGAR ESTA LÍNEA
       configuration={configuration || undefined}
       campaignName={campaign.name}
       campaignTypeName={campaign.campaignType.name}
