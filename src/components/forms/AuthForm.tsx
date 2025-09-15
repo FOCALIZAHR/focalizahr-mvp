@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,6 +17,7 @@ interface AuthFormProps {
 
 const AuthForm: React.FC<AuthFormProps> = ({ mode, onSuccess }) => {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [formData, setFormData] = useState({
@@ -102,21 +103,31 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, onSuccess }) => {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        credentials: 'same-origin' // Importante: permite que el servidor establezca cookies
       })
 
       const data = await response.json()
 
       if (data.success) {
-        // Guardar token en localStorage
+        // Guardar token en localStorage (para compatibilidad con código existente)
+        // El token viene del body de la respuesta como siempre
         localStorage.setItem('focalizahr_token', data.token)
         localStorage.setItem('focalizahr_account', JSON.stringify(data.user || data.account))
         
-        // Callback de éxito
+        // NO creamos cookie aquí - el servidor ya la estableció como HttpOnly
+        
+        // Callback de éxito si fue proporcionado
         onSuccess?.()
         
-        // Redirigir al dashboard
-        router.push('/dashboard')
+        // Obtener URL de redirección del parámetro 'from' o usar dashboard por defecto
+        const redirectTo = searchParams?.get('from') || '/dashboard'
+        
+        // Pequeño delay para asegurar que el navegador procese la cookie del servidor
+        setTimeout(() => {
+          router.push(redirectTo)
+        }, 100)
+        
       } else {
         setErrors({ general: data.error || 'Error en la autenticación' })
       }

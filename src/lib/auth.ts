@@ -13,6 +13,7 @@ export interface JWTPayload {
   adminName: string
   companyName: string
   subscriptionTier: string
+  role?: string  // ← AGREGAR ESTA LÍNEA
   iat?: number
   exp?: number
 }
@@ -163,7 +164,8 @@ export async function verifyJWT(request: NextRequest): Promise<{
         adminEmail: true,
         adminName: true,
         companyName: true,
-        subscriptionTier: true
+        subscriptionTier: true,
+        role: true  // ← AGREGAR
       }
     })
 
@@ -179,7 +181,8 @@ export async function verifyJWT(request: NextRequest): Promise<{
         adminEmail: account.adminEmail,
         adminName: account.adminName,
         companyName: account.companyName,
-        subscriptionTier: account.subscriptionTier
+        subscriptionTier: account.subscriptionTier,
+        role: account.role  // ← AGREGAR
       }
     }
   } catch (error) {
@@ -288,7 +291,8 @@ export async function validateAuthToken(authHeader: string | null, request?: Nex
         adminEmail: true,
         adminName: true,
         companyName: true,
-        subscriptionTier: true
+        subscriptionTier: true,
+         role: true  // ← AGREGAR
       }
     })
 
@@ -304,7 +308,8 @@ export async function validateAuthToken(authHeader: string | null, request?: Nex
         adminEmail: account.adminEmail,
         adminName: account.adminName,
         companyName: account.companyName,
-        subscriptionTier: account.subscriptionTier
+        subscriptionTier: account.subscriptionTier,
+        role: account.role  // ← AGREGAR
       }
     }
   } catch (error) {
@@ -348,7 +353,8 @@ export async function validateAuthToken(authHeader: string | null, request?: Nex
       adminEmail: account.adminEmail,
       adminName: account.adminName,
       companyName: account.companyName,
-      subscriptionTier: account.subscriptionTier
+      subscriptionTier: account.subscriptionTier,
+      role: account.role  // ← AGREGAR
     })
 
     return {
@@ -359,7 +365,8 @@ export async function validateAuthToken(authHeader: string | null, request?: Nex
         adminEmail: account.adminEmail,
         adminName: account.adminName,
         companyName: account.companyName,
-        subscriptionTier: account.subscriptionTier
+        subscriptionTier: account.subscriptionTier,
+        role: account.role  // ← AGREGAR
       }
     }
   } catch (error) {
@@ -442,4 +449,29 @@ export function logout(): void {
  */
 export function generateUniqueToken(): string {
   return randomBytes(32).toString('hex');
+}
+// Funciones helper para roles
+export function isAdmin(payload: JWTPayload | null | undefined): boolean {
+  return payload?.role === 'FOCALIZAHR_ADMIN';
+}
+
+export function getUserFromHeaders(request: Request): JWTPayload | null {
+  try {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return null;
+    }
+
+    const token = authHeader.substring(7);
+    const verification = verifyJWTToken(token);
+    
+    if (verification.success && verification.payload) {
+      return verification.payload;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error getting user from headers:', error);
+    return null;
+  }
 }

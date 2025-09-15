@@ -1,0 +1,178 @@
+/* ====================================================================
+   STRUCTURE WIZARD - PREMIUM DARK THEME OVERRIDE v2
+   Versión corregida - Solo afecta elementos específicos
+   ==================================================================== */
+
+/* 1️⃣ CONTENEDOR PRINCIPAL - MÁS ESPECÍFICO */
+.min-h-screen.bg-gradient-to-br.from-gray-50.to-gray-100 {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
+}
+
+/* 2️⃣ CARDS - SOLO LAS QUE NECESITAMOS */
+.max-w-4xl .shadow-xl,
+.max-w-md .shadow-xl,
+div[class*="card"][class*="shadow"] {
+  background: rgba(30, 41, 59, 0.9) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(71, 85, 105, 0.3) !important;
+}
+
+/* 3️⃣ TEXTOS - SOLO DENTRO DE CARDS */
+.shadow-xl h1,
+.shadow-xl h2,
+.shadow-xl h3,
+.shadow-xl p,
+.shadow-xl span,
+.shadow-xl label {
+  color: #E2E8F0 !important;
+}
+
+/* Títulos principales con gradiente */
+.text-3xl.font-bold,
+.text-2xl.font-bold {
+  background: linear-gradient(135deg, #22D3EE, #3B82F6, #A78BFA) !important;
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* 4️⃣ INPUTS - SOLO LOS DE FORMULARIO */
+form input[type="text"],
+form input[type="email"],
+form input[type="password"],
+form input[type="url"],
+form textarea {
+  background: rgba(15, 23, 42, 0.8) !important;
+  border: 1px solid rgba(71, 85, 105, 0.5) !important;
+  color: #F1F5F9 !important;
+}
+
+/* 5️⃣ SELECTS - CORREGIDO SIN DUPLICAR FLECHA */
+form select {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+  color: #F1F5F9 !important;
+  border: 1px solid rgba(71, 85, 105, 0.5) !important;
+  /* NO agregamos background-image para evitar duplicar la flecha */
+}
+
+form select option {
+  background: #0f172a !important;
+  color: #F1F5F9 !important;
+}
+
+/* 6️⃣ BOTONES ESPECÍFICOS */
+/* Botón principal con gradiente */
+button[type="submit"].w-full.bg-gradient-to-r {
+  /* Mantener su gradiente original, solo mejorar hover */
+  transition: all 0.3s ease !important;
+}
+
+button[type="submit"].w-full.bg-gradient-to-r:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 10px 30px rgba(34, 211, 238, 0.4) !important;
+}
+
+/* Link "Iniciar sesión" */
+.text-cyan-400 {
+  color: #22D3EE !important;
+}
+
+.text-cyan-400:hover {
+  color: #A78BFA !important;
+}
+
+/* Botones outline */
+button[class*="outline"] {
+  background: transparent !important;
+  border: 1px solid rgba(71, 85, 105, 0.5) !important;
+  color: #E2E8F0 !important;
+}
+
+button[class*="outline"]:hover {
+  border-color: #22D3EE !important;
+  background: rgba(34, 211, 238, 0.1) !important;
+}
+
+/* 7️⃣ PLACEHOLDERS */
+form input::placeholder,
+form textarea::placeholder {
+  color: #64748B !important;
+  opacity: 0.8 !important;
+}
+
+/* 8️⃣ FOCUS STATES */
+form input:focus,
+form textarea:focus,
+form select:focus {
+  outline: none !important;
+  border-color: #22D3EE !important;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.1) !important;
+}
+
+/* 9️⃣ CHECKBOXES */
+form input[type="checkbox"] {
+  background: rgba(15, 23, 42, 0.5) !important;
+  border: 2px solid rgba(71, 85, 105, 0.5) !important;
+}
+
+form input[type="checkbox"]:checked {
+  background: #22D3EE !important;
+  border-color: #22D3EE !important;
+}
+
+/* 🔟 TEXTOS SECUNDARIOS */
+.text-muted-foreground {
+  color: #94A3B8 !important;
+}
+
+.text-gray-400 {
+  color: #94A3B8 !important;
+}
+
+/* SECCIÓN INFORMACIÓN ADICIONAL */
+h3.text-gray-700 {
+  color: #22D3EE !important;
+}
+
+.border-t {
+  border-top-color: rgba(71, 85, 105, 0.3) !important;
+}
+
+/* BADGES */
+.shadow-xl [class*="badge"] {
+  background: rgba(34, 211, 238, 0.1) !important;
+  color: #22D3EE !important;
+  border: 1px solid rgba(34, 211, 238, 0.3) !important;
+}
+
+/* SCROLLBAR SOLO PARA FORMS */
+form::-webkit-scrollbar {
+  width: 8px;
+}
+
+form::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+form::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.5);
+  border-radius: 4px;
+}
+/* Fix para badges con fondo blanco */
+.fhr-structure-tree [class*="badge"],
+.fhr-wizard [class*="badge"] {
+  background-color: rgba(30, 41, 59, 0.7) !important;
+}
+
+/* Específico para badges de categorías */
+[class*="bg-blue-500/20"],
+[class*="bg-green-500/20"],
+[class*="bg-purple-500/20"],
+[class*="bg-orange-500/20"],
+[class*="bg-yellow-500/20"],
+[class*="bg-indigo-500/20"],
+[class*="bg-pink-500/20"],
+[class*="bg-gray-500/20"],
+[class*="bg-red-500/20"] {
+  background-color: rgba(30, 41, 59, 0.5) !important;
+}

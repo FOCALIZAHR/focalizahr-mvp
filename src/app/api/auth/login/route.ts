@@ -42,7 +42,8 @@ export async function POST(request: NextRequest) {
         adminName: true,
         companyName: true,
         passwordHash: true,
-        subscriptionTier: true
+        subscriptionTier: true,
+        role: true  // Incluir role para el JWT
       }
     })
 
@@ -58,7 +59,8 @@ export async function POST(request: NextRequest) {
       id: account.id, 
       email: account.adminEmail,
       name: account.adminName,
-      hasPasswordHash: !!account.passwordHash
+      hasPasswordHash: !!account.passwordHash,
+      role: account.role  // AGREGADO: Mostrar role en log
     })
 
     // Verify password
@@ -92,7 +94,8 @@ export async function POST(request: NextRequest) {
         adminEmail: account.adminEmail,
         adminName: account.adminName,
         companyName: account.companyName,
-        subscriptionTier: account.subscriptionTier
+        subscriptionTier: account.subscriptionTier,
+        role: account.role  // Incluir role en el JWT
       }
       
       const token = generateJWT(jwtPayload)
@@ -102,21 +105,42 @@ export async function POST(request: NextRequest) {
       console.log('🎉 Login successful for:', {
         accountId: account.id,
         email: account.adminEmail,
-        company: account.companyName
+        company: account.companyName,
+        role: account.role
       })
 
-      return NextResponse.json({
+      // Crear la respuesta con el token en el body (compatibilidad)
+      const responseBody = {
         success: true,
         message: 'Login exitoso',
-        token,
+        token, // Token en el body para compatibilidad con localStorage
         user: {
           id: account.id,
           email: account.adminEmail,
           name: account.adminName,
           company: account.companyName,
-          subscriptionTier: account.subscriptionTier
+          subscriptionTier: account.subscriptionTier,
+          role: account.role  // ✅ CAMBIO 4: Incluir role en respuesta
         }
+      }
+
+      // NUEVO: Crear respuesta con cookie HttpOnly segura
+      const response = NextResponse.json(responseBody)
+      
+      // Establecer cookie HttpOnly (solo accesible por el servidor)
+      response.cookies.set({
+        name: 'focalizahr_token',
+        value: token,
+        httpOnly: true,  // Cookie no accesible desde JavaScript (previene XSS)
+        secure: process.env.NODE_ENV === 'production', // HTTPS en producción
+        sameSite: 'strict', // Protección CSRF
+        maxAge: 60 * 60 * 24 * 7, // 7 días
+        path: '/' // Disponible en toda la aplicación
       })
+
+      console.log('🍪 HttpOnly cookie set successfully')
+
+      return response
 
     } catch (jwtError) {
       console.error('❌ JWT generation error:', jwtError)
@@ -166,7 +190,8 @@ export async function GET(request: NextRequest) {
         adminEmail: true,
         adminName: true,
         companyName: true,
-        passwordHash: true
+        passwordHash: true,
+        role: true
       }
     })
     
@@ -181,13 +206,14 @@ export async function GET(request: NextRequest) {
         name: demoAccount.adminName,
         company: demoAccount.companyName,
         hasPasswordHash: !!demoAccount.passwordHash,
-        passwordHashLength: demoAccount.passwordHash?.length
+        passwordHashLength: demoAccount.passwordHash?.length,
+        role: demoAccount.role
       } : null
     })
   } catch (error) {
     return NextResponse.json({
       status: 'error',
-     error: error instanceof Error ? error.message : 'Error desconocido'  // ← FIX MÍNIMO
+      error: error instanceof Error ? error.message : 'Error desconocido'
     }, { status: 500 })
   }
 }

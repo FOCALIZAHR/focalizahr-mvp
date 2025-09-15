@@ -18,7 +18,13 @@ enum Gender {
   NON_BINARY
   PREFER_NOT_TO_SAY
 }
-
+// ✅ ENUM ACCOUNT STATUS - AGREGADO PARA GESTIÓN DE CUENTAS
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  TRIAL
+  INACTIVE
+}
 // TABLA 1: Cuentas empresa (multi-tenancy)
 model Account {
   id               String  @id @default(cuid())
@@ -30,6 +36,11 @@ model Account {
   adminName        String  @map("admin_name")
   passwordHash     String  @map("password_hash")
   subscriptionTier String  @default("free") @map("subscription_tier")
+
+  // 👇 AGREGAR SOLO ESTA LÍNEA
+  role              String    @default("CLIENT")  // Valores: CLIENT, FOCALIZAHR_ADMIN
+  // 👇 NUEVA LÍNEA - Agregar aquí
+  status            AccountStatus @default(ACTIVE) @map("status")
 
   // Configuraciones parametrizables:
   maxActiveCampaigns         Int @default(1) @map("max_active_campaigns")
