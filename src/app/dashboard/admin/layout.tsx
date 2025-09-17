@@ -1,33 +1,31 @@
-// /app/dashboard/admin/layout.tsx
+// src/app/dashboard/admin/layout.tsx
 'use client';
 
 import AdminNavigation from '@/components/admin/AdminNavigation';
-import '@/styles/sidebar-premium.css';
-import '@/styles/focalizahr-design-system.css';
+import { useSidebar } from '@/hooks/useSidebar';
+import { cn } from '@/lib/utils';
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { isCollapsed } = useSidebar();
+  
   return (
-    <div className="flex min-h-screen bg-background">
-      {/* Sidebar - Fixed width */}
-      <div className="hidden lg:block w-72 flex-shrink-0">
-        <div className="fixed inset-y-0 left-0 w-72">
-          <AdminNavigation />
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <AdminNavigation />
+      
+      {/* Main Content - IMPORTANTE: margin-left dinámico */}
+      <main className={cn(
+        "transition-all duration-300",
+        isCollapsed ? "lg:ml-20" : "lg:ml-72",
+        "min-h-screen"
+      )}>
+        <div className="p-6">
+          {children}
         </div>
-      </div>
-      
-      {/* Main Content - Takes remaining space */}
-      <main className="flex-1 min-h-screen">
-        {children}
       </main>
-      
-      {/* Mobile */}
-      <div className="lg:hidden">
-        <AdminNavigation />
-      </div>
     </div>
   );
 }

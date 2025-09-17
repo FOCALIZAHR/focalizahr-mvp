@@ -41,7 +41,7 @@ interface AccountData {
   subscriptionTier: string;
   industry?: string;
   companySize?: string;
-  logoUrl?: string;
+ companyLogo?: string;
   status?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -77,7 +77,7 @@ export default function EditAccountPage() {
     subscriptionTier: 'basic',
     industry: '',
     companySize: '',
-    logoUrl: '',
+    companyLogo: '',
     status: 'ACTIVE'
   });
 
@@ -137,50 +137,55 @@ export default function EditAccountPage() {
   };
 
   // Guardar cambios
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setError('');
-    setSuccess('');
+// 🟢 ESTA ES LA FUNCIÓN CORREGIDA
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setSaving(true);
+  setError('');
+  setSuccess('');
 
-    try {
-      const token = localStorage.getItem('focalizahr_token');
-      
-      if (!token) {
-        throw new Error('No autorizado');
-      }
-
-      // Preparar datos para enviar (sin el id y stats)
-      const { id, stats, createdAt, updatedAt, ...updateData } = formData;
-
-      const response = await fetch(`/api/admin/accounts/${accountId}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updateData),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Error al actualizar');
-      }
-
-      setSuccess('Cuenta actualizada exitosamente');
-      
-      // Redirigir después de 2 segundos
-      setTimeout(() => {
-        router.push('/dashboard/admin/accounts');
-      }, 2000);
-      
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al guardar');
-    } finally {
-      setSaving(false);
+  try {
+    const token = localStorage.getItem('focalizahr_token');
+    if (!token) {
+      throw new Error('No autorizado');
     }
-  };
+
+    // Hacemos una copia de los datos para poder modificarlos de forma segura
+    const { id, stats, createdAt, updatedAt, ...updateData } = formData;
+
+    // ✅ ¡AQUÍ ESTÁ LA CORRECCIÓN CLAVE!
+    // Si companyLogo es un string vacío, lo convertimos a null antes de enviar.
+    if (updateData.companyLogo === '') {
+      updateData.companyLogo = null;
+    }
+
+    const response = await fetch(`/api/admin/accounts/${accountId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updateData),
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      // Si la API devuelve detalles de validación, los mostramos
+      const errorDetails = result.details ? JSON.stringify(result.details) : '';
+      throw new Error(result.error || 'Error al actualizar' + ` ${errorDetails}`);
+    }
+
+    setSuccess('Cuenta actualizada exitosamente');
+    setTimeout(() => {
+      router.push('/dashboard/admin/accounts');
+    }, 2000);
+
+  } catch (err) {
+    setError(err instanceof Error ? err.message : 'Error al guardar');
+  } finally {
+    setSaving(false);
+  }
+};
 
   if (loading) {
     return (
@@ -334,18 +339,18 @@ export default function EditAccountPage() {
                 <Label htmlFor="logoUrl">URL del Logo</Label>
                 <div className="flex gap-2">
                   <Input
-                    id="logoUrl"
-                    name="logoUrl"
+                    id="companyLogo"
+                    name="companyLogo"
                     type="url"
-                    value={formData.logoUrl || ''}
+                    value={formData.companyLogo || ''}
                     onChange={handleChange}
                     placeholder="https://ejemplo.com/logo.png"
                   />
-                  {formData.logoUrl && (
+                  {formData.companyLogo && (
                     <div className="w-10 h-10 rounded border flex items-center justify-center bg-muted">
-                      {formData.logoUrl.startsWith('http') ? (
+                      {formData.companyLogo.startsWith('http') ? (
                         <img 
-                          src={formData.logoUrl} 
+                          src={formData.companyLogo} 
                           alt="Logo" 
                           className="w-8 h-8 object-contain"
                           onError={(e) => {

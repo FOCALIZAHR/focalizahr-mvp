@@ -17,19 +17,12 @@ import {
   TrendingUp,
   Settings,
   LogOut,
-  Shield,
   ChevronLeft,
   ChevronRight,
-  Users,
-  AlertTriangle,
   Sparkles,
   Menu,
   X
 } from 'lucide-react';
-
-// NO MÁS IMPORTS DE CSS ESPECÍFICOS - Usar los existentes
-import '@/styles/focalizahr-design-system.css';
-import '@/styles/sidebar-premium.css';
 
 interface NavigationItem {
   id: string;
@@ -37,39 +30,27 @@ interface NavigationItem {
   href: string;
   icon: React.ComponentType<any>;
   badge?: string | number;
-  badgeVariant?: 'default' | 'success' | 'warning' | 'info' | 'new';
+  badgeVariant?: 'default' | 'success' | 'warning' | 'new';
   description?: string;
-  active?: boolean;
 }
 
-interface AdminNavigationProps {
-  showMobileMenu?: boolean;
-  onMobileMenuToggle?: () => void;
-}
-
+// Hook para métricas
 function useAdminMetrics() {
   const [metrics, setMetrics] = useState({
     totalAccounts: 0,
     activeAccounts: 0,
     pendingMappings: 0,
-    activeCampaigns: 0,
-    newAlerts: 0
+    activeCampaigns: 0
   });
 
   useEffect(() => {
     const fetchMetrics = async () => {
       try {
         const token = localStorage.getItem('focalizahr_token');
-        
-        if (!token) {
-          console.error('No token found for metrics');
-          return;
-        }
+        if (!token) return;
 
         const response = await fetch('/api/admin/accounts?limit=1', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: { 'Authorization': `Bearer ${token}` },
         });
 
         if (response.ok) {
@@ -78,12 +59,11 @@ function useAdminMetrics() {
             totalAccounts: data.data?.pagination?.totalAccounts || 0,
             activeAccounts: data.data?.metrics?.activeAccounts || 0,
             pendingMappings: 0,
-            activeCampaigns: 0,
-            newAlerts: 0
+            activeCampaigns: 0
           });
         }
       } catch (error) {
-        console.error('Error fetching admin metrics:', error);
+        console.error('Error fetching metrics:', error);
       }
     };
 
@@ -93,14 +73,12 @@ function useAdminMetrics() {
   return metrics;
 }
 
-export default function AdminNavigation({ 
-  showMobileMenu = false, 
-  onMobileMenuToggle 
-}: AdminNavigationProps) {
+export default function AdminNavigation() {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
   const [isAdminUser, setIsAdminUser] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   
   const { isCollapsed, toggleSidebar } = useSidebar();
   const metrics = useAdminMetrics();
@@ -125,8 +103,7 @@ export default function AdminNavigation({
       label: 'Dashboard',
       href: '/dashboard/admin',
       icon: BarChart3,
-      description: 'Vista general del sistema',
-      active: pathname === '/dashboard/admin'
+      description: 'Vista general'
     },
     {
       id: 'accounts',
@@ -134,9 +111,7 @@ export default function AdminNavigation({
       href: '/dashboard/admin/accounts',
       icon: Building2,
       badge: metrics.totalAccounts,
-      badgeVariant: 'default',
-      description: 'Gestión de empresas cliente',
-      active: pathname.startsWith('/dashboard/admin/accounts')
+      description: 'Gestión de empresas cliente'
     },
     {
       id: 'structures',
@@ -144,9 +119,7 @@ export default function AdminNavigation({
       href: '/dashboard/admin/structures',
       icon: FolderTree,
       badge: metrics.pendingMappings > 0 ? metrics.pendingMappings : undefined,
-      badgeVariant: 'warning',
-      description: 'Jerarquías organizacionales',
-      active: pathname.startsWith('/dashboard/admin/structures')
+      badgeVariant: 'warning'
     },
     {
       id: 'campaigns',
@@ -154,17 +127,13 @@ export default function AdminNavigation({
       href: '/dashboard/admin/campaigns',
       icon: Activity,
       badge: metrics.activeCampaigns,
-      badgeVariant: 'success',
-      description: 'Supervisión global',
-      active: pathname.startsWith('/dashboard/admin/campaigns')
+      badgeVariant: 'success'
     },
     {
       id: 'templates',
       label: 'Templates',
       href: '/dashboard/admin/templates',
-      icon: FileText,
-      description: 'Gestión de plantillas',
-      active: pathname.startsWith('/dashboard/admin/templates')
+      icon: FileText
     },
     {
       id: 'benchmarks',
@@ -172,17 +141,13 @@ export default function AdminNavigation({
       href: '/dashboard/admin/benchmarks',
       icon: TrendingUp,
       badge: 'NEW',
-      badgeVariant: 'new',
-      description: 'Análisis comparativo',
-      active: pathname.startsWith('/dashboard/admin/benchmarks')
+      badgeVariant: 'new'
     },
     {
       id: 'settings',
       label: 'Configuración',
       href: '/dashboard/admin/settings',
-      icon: Settings,
-      description: 'Ajustes del sistema',
-      active: pathname.startsWith('/dashboard/admin/settings')
+      icon: Settings
     }
   ];
 
@@ -191,274 +156,278 @@ export default function AdminNavigation({
     router.push('/');
   };
 
-  const handleNavigation = (href: string) => {
-    if (href) {
-      router.push(href);
-      if (onMobileMenuToggle) {
-        onMobileMenuToggle();
-      }
-    }
+  const isActive = (href: string) => {
+    if (href === '/dashboard/admin') return pathname === href;
+    return pathname.startsWith(href);
   };
 
-  if (!isAdminUser) {
-    return null;
-  }
+  if (!isAdminUser) return null;
 
   return (
     <>
-      {/* Desktop Navigation - Usando clases existentes fhr-* y Tailwind */}
-      <div className={cn(
-        "hidden lg:block fixed inset-y-0 left-0 z-50",
-        "fhr-bg-main sidebar-premium", // Clases existentes
-        "border-r border-slate-800/50",
-        "transition-all duration-300 ease-in-out",
-        // IMPORTANTE: Anchos fijos para que el layout funcione correctamente
+      {/* Mobile Toggle */}
+      <button
+        onClick={() => setIsMobileOpen(true)}
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 professional-card"
+      >
+        <Menu className="h-5 w-5 text-white" />
+      </button>
+
+      {/* Desktop Sidebar */}
+      <aside className={cn(
+        "hidden lg:flex flex-col",
+        "fixed inset-y-0 left-0 z-40",
+        "bg-slate-900 border-r border-slate-800/50",
+        "transition-all duration-300",
         isCollapsed ? "w-20" : "w-72"
       )}>
-        <div className="flex flex-col h-full">
-          {/* Header con clases existentes */}
-          <div className="sidebar-header p-4 border-b border-slate-800/50">
-            <div className="flex items-center justify-between">
-              {!isCollapsed && (
-                <div className="flex items-center gap-3">
-                  <div className="sidebar-logo-container">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center shadow-lg">
-                      <Shield className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
-                  <div>
-                    <span className="fhr-title-gradient text-lg font-bold">Admin Panel</span>
-                    <span className="block text-xs text-slate-500">FocalizaHR</span>
-                  </div>
+        
+        {/* Header */}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800/50">
+          <div className={cn(
+            "flex items-center gap-3",
+            isCollapsed && "w-full justify-center"
+          )}>
+            <img 
+              src="/focalizahr-logo.svg" 
+              alt="FHR"
+              className="w-8 h-8 flex-shrink-0"
+            />
+            <span className={cn(
+              "font-bold text-white transition-opacity duration-300",
+              isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
+            )}>
+              HR
+            </span>
+          </div>
+          
+          {!isCollapsed && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleSidebar}
+              className="hover:bg-slate-800/50 text-slate-400 hover:text-white"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+
+        {/* User Section - Solo si no está colapsado */}
+        {!isCollapsed && user && (
+          <div className="px-4 py-3 border-b border-slate-800/50">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-semibold">
+                  {user.adminName?.charAt(0)?.toUpperCase() || 'A'}
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-white truncate">
+                  {user.adminName}
                 </div>
-              )}
-              {isCollapsed && (
-                <div className="mx-auto">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center shadow-lg">
-                    <Shield className="w-6 h-6 text-white" />
-                  </div>
+                <div className="text-xs text-slate-400 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-yellow-500" />
+                  Super Admin
                 </div>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleSidebar}
-                className="ml-auto hover:bg-slate-800/50"
-              >
-                {isCollapsed ? (
-                  <ChevronRight className="h-4 w-4 text-slate-400" />
-                ) : (
-                  <ChevronLeft className="h-4 w-4 text-slate-400" />
-                )}
-              </Button>
+              </div>
             </div>
           </div>
+        )}
 
-          {/* User Info con clases existentes */}
-          {!isCollapsed && user && (
-            <div className="p-4 border-b border-slate-800/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                  <span className="text-white font-semibold">
-                    {user.adminName?.charAt(0)?.toUpperCase() || 'A'}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-white">{user.adminName}</p>
-                  <p className="text-xs text-slate-400 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-yellow-500" />
-                    Super Admin
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Alertas con clases fhr-* */}
-          {!isCollapsed && metrics.newAlerts > 0 && (
-            <div className="px-4 py-3">
-              <div className="fhr-card-metric p-3 bg-yellow-500/10 border border-yellow-500/20">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                  <span className="text-xs text-yellow-200">
-                    {metrics.newAlerts} alertas nuevas requieren atención
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Navigation Items con clases sidebar-* existentes */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {/* Navigation con scrollbar */}
+        <nav className="flex-1 overflow-y-auto custom-scrollbar">
+          <div className="px-3 py-4 space-y-1">
             {navigationItems.map((item) => {
               const Icon = item.icon;
-              const isActive = item.active;
+              const active = isActive(item.href);
               
               return (
                 <button
                   key={item.id}
-                  onClick={() => handleNavigation(item.href)}
+                  onClick={() => router.push(item.href)}
                   className={cn(
-                    "sidebar-nav-item w-full", // Clase existente
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg",
+                    "w-full flex items-center rounded-lg",
                     "transition-all duration-200",
                     "hover:bg-slate-800/50 group relative",
-                    isActive && "sidebar-nav-item-active bg-slate-800/30 border-l-2 border-cyan-500"
+                    active ? "bg-slate-800/50 text-white" : "text-slate-400 hover:text-white",
+                    isCollapsed ? "justify-center p-3" : "justify-start px-3 py-2.5 gap-3"
                   )}
                 >
                   <Icon className={cn(
-                    "flex-shrink-0 transition-transform",
+                    "flex-shrink-0",
                     isCollapsed ? "h-5 w-5" : "h-4 w-4",
-                    isActive ? "text-cyan-400" : "text-slate-400 group-hover:text-white"
+                    active && "text-cyan-400"
                   )} />
                   
-                  {!isCollapsed && (
-                    <>
-                      <div className="flex-1 text-left">
-                        <div className="flex items-center gap-2">
-                          <span className={cn(
-                            "text-sm font-medium",
-                            isActive ? "text-white" : "text-slate-300 group-hover:text-white"
-                          )}>
-                            {item.label}
-                          </span>
-                          {item.badge !== undefined && (
-                            <Badge 
-                              variant={item.badgeVariant === 'success' ? 'default' : 'secondary'}
-                              className={cn(
-                                "text-xs px-1.5 py-0 h-5",
-                                item.badgeVariant === 'success' && "bg-green-500/20 text-green-400 border-green-500/30",
-                                item.badgeVariant === 'warning' && "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-                                item.badgeVariant === 'new' && "bg-purple-500/20 text-purple-400 border-purple-500/30"
-                              )}
-                            >
-                              {item.badge}
-                            </Badge>
-                          )}
-                        </div>
-                        {item.description && isActive && (
-                          <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
-                        )}
-                      </div>
-                    </>
+                  <span className={cn(
+                    "font-medium transition-all duration-300",
+                    isCollapsed ? "w-0 opacity-0 overflow-hidden" : "opacity-100 flex-1 text-left text-sm"
+                  )}>
+                    {item.label}
+                  </span>
+                  
+                  {!isCollapsed && item.badge !== undefined && (
+                    <Badge 
+                      className={cn(
+                        "text-xs",
+                        item.badgeVariant === 'success' && "bg-green-500/20 text-green-300 border-green-500/30",
+                        item.badgeVariant === 'warning' && "bg-amber-500/20 text-amber-300 border-amber-500/30", 
+                        item.badgeVariant === 'new' && "bg-purple-500/20 text-purple-300 border-purple-500/30",
+                        !item.badgeVariant && "bg-slate-700/50 text-slate-300 border-slate-600/50"
+                      )}
+                    >
+                      {item.badge}
+                    </Badge>
                   )}
 
-                  {/* Tooltip para modo colapsado */}
+                  {/* Tooltip solo cuando está colapsado */}
                   {isCollapsed && (
-                    <div className="sidebar-tooltip">
+                    <div className="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-sm rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">
                       {item.label}
-                      {item.badge !== undefined && (
-                        <span className="ml-2 text-xs opacity-75">({item.badge})</span>
-                      )}
+                      {item.badge !== undefined && ` (${item.badge})`}
                     </div>
                   )}
                 </button>
               );
             })}
-          </nav>
+          </div>
+        </nav>
 
-          {/* Footer Stats con clases fhr-* */}
-          {!isCollapsed && (
-            <div className="p-4 border-t border-slate-800/50">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="fhr-card-simple p-3 text-center">
-                  <div className="text-lg font-bold fhr-text-accent">{metrics.activeAccounts}</div>
-                  <div className="text-xs text-slate-500">Activas</div>
-                </div>
-                <div className="fhr-card-simple p-3 text-center">
-                  <div className="text-lg font-bold fhr-text-accent">{metrics.activeCampaigns}</div>
-                  <div className="text-xs text-slate-500">Campañas</div>
-                </div>
+        {/* Footer Stats - Solo cuando no está colapsado */}
+        {!isCollapsed && (
+          <div className="p-4 border-t border-slate-800/50">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="metric-card p-3 text-center">
+                <div className="text-lg font-bold text-cyan-400">{metrics.activeAccounts}</div>
+                <div className="text-xs text-slate-500">Activas</div>
+              </div>
+              <div className="metric-card p-3 text-center">
+                <div className="text-lg font-bold text-purple-400">{metrics.activeCampaigns}</div>
+                <div className="text-xs text-slate-500">Campañas</div>
               </div>
             </div>
-          )}
-
-          {/* Logout Button */}
-          <div className="p-3 border-t border-slate-800/50">
-            <Button
-              variant="ghost"
-              onClick={handleLogout}
-              className={cn(
-                "w-full fhr-btn-secondary",
-                isCollapsed ? "justify-center px-0" : "justify-start"
-              )}
-            >
-              <LogOut className="h-4 w-4" />
-              {!isCollapsed && <span className="ml-3">Cerrar Sesión</span>}
-            </Button>
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Mobile Navigation */}
-      {showMobileMenu && (
-        <div className="lg:hidden fixed inset-0 z-50 bg-black/50" onClick={onMobileMenuToggle}>
-          <div 
-            className="fixed inset-y-0 left-0 w-72 fhr-bg-main sidebar-premium"
+        {/* Logout Button */}
+        <div className="p-3 border-t border-slate-800/50">
+          <Button
+            variant="ghost"
+            onClick={handleLogout}
+            className={cn(
+              "w-full hover:bg-slate-800/50 text-slate-400 hover:text-white",
+              isCollapsed ? "justify-center p-3" : "justify-start"
+            )}
+          >
+            <LogOut className={cn(
+              "flex-shrink-0",
+              !isCollapsed && "mr-3",
+              "h-4 w-4"
+            )} />
+            <span className={cn(
+              "transition-all duration-300",
+              isCollapsed ? "w-0 opacity-0" : "opacity-100"
+            )}>
+              Salir
+            </span>
+          </Button>
+        </div>
+
+        {/* Botón de expandir cuando está colapsado */}
+        {isCollapsed && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleSidebar}
+            className="absolute top-4 right-2 hover:bg-slate-800/50"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        )}
+      </aside>
+
+      {/* Mobile Menu Overlay */}
+      {isMobileOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 z-50 bg-black/50"
+          onClick={() => setIsMobileOpen(false)}
+        >
+          <aside 
+            className="fixed inset-y-0 left-0 w-72 bg-slate-900"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between h-16 px-4 border-b border-slate-800/50">
-              <div className="flex items-center gap-2">
-                <Shield className="h-8 w-8 text-cyan-500" />
-                <span className="fhr-title-gradient text-lg font-bold">Admin Panel</span>
+            {/* Mobile Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-800/50">
+              <div className="flex items-center gap-3">
+                <img 
+                  src="/focalizahr-logo.svg" 
+                  alt="FocalizaHR"
+                  className="w-8 h-8"
+                />
+                <h2 className="text-lg font-bold text-white">Admin Panel</h2>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={onMobileMenuToggle}
-                className="text-slate-400 hover:text-white"
+                onClick={() => setIsMobileOpen(false)}
               >
                 <X className="h-5 w-5" />
               </Button>
             </div>
 
-            {/* Mobile Menu Content */}
-            <nav className="px-3 py-4 space-y-1 overflow-y-auto">
+            {/* Mobile Navigation */}
+            <nav className="px-3 py-4 space-y-1">
               {navigationItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = item.active;
+                const active = isActive(item.href);
                 
                 return (
                   <button
                     key={item.id}
-                    onClick={() => handleNavigation(item.href)}
+                    onClick={() => {
+                      router.push(item.href);
+                      setIsMobileOpen(false);
+                    }}
                     className={cn(
-                      "sidebar-nav-item w-full",
-                      "flex items-center gap-3 px-3 py-2.5 rounded-lg",
+                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg",
                       "transition-all duration-200",
                       "hover:bg-slate-800/50",
-                      isActive && "sidebar-nav-item-active bg-slate-800/30"
+                      active && "bg-slate-800/50 text-white"
                     )}
                   >
-                    <Icon className={cn(
-                      "h-4 w-4",
-                      isActive ? "text-cyan-400" : "text-slate-400"
-                    )} />
-                    <div className="flex-1 text-left">
-                      <div className="flex items-center gap-2">
-                        <span className={cn(
-                          "text-sm font-medium",
-                          isActive ? "text-white" : "text-slate-300"
-                        )}>
-                          {item.label}
-                        </span>
-                        {item.badge !== undefined && (
-                          <Badge 
-                            variant="secondary"
-                            className="text-xs px-1.5 py-0 h-5"
-                          >
-                            {item.badge}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+                    <Icon className="h-4 w-4" />
+                    <span className="flex-1 text-left text-sm">{item.label}</span>
+                    {item.badge && (
+                      <Badge className="text-xs">{item.badge}</Badge>
+                    )}
                   </button>
                 );
               })}
             </nav>
-          </div>
+          </aside>
         </div>
       )}
+
+      {/* Estilos CSS para scrollbar */}
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #475569;
+          border-radius: 2px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #64748b;
+        }
+      `}</style>
     </>
   );
 }

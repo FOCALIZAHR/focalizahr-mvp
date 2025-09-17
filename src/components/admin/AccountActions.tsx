@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Eye, Edit2, Building2 } from 'lucide-react';
+import { MoreHorizontal, Eye, Edit2, Building2, Network } from 'lucide-react';
 
 interface AccountActionsProps {
   accountId: string;
@@ -26,6 +26,11 @@ export default function AccountActions({ accountId }: AccountActionsProps) {
 
   const handleEdit = () => {
     router.push(`/dashboard/admin/accounts/${accountId}/edit`);
+  };
+  
+  // NUEVA FUNCIÓN: Navegar a estructura
+  const handleStructure = () => {
+    router.push(`/dashboard/admin/accounts/${accountId}/structure`);
   };
 
   return (
@@ -51,6 +56,12 @@ export default function AccountActions({ accountId }: AccountActionsProps) {
         <DropdownMenuItem onClick={handleEdit} className="cursor-pointer">
           <Edit2 className="mr-2 h-4 w-4" />
           Editar
+        </DropdownMenuItem>
+        
+        {/* NUEVO BOTÓN: Estructura Organizacional */}
+        <DropdownMenuItem onClick={handleStructure} className="cursor-pointer">
+          <Network className="mr-2 h-4 w-4" />
+          Estructura
         </DropdownMenuItem>
 
         {/* Futuras acciones - comentadas para Fase 2 */}

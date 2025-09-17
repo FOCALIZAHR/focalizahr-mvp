@@ -1,48 +1,52 @@
 // /app/api/admin/accounts/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { verifyJWTToken } from '@/lib/auth';
+import { validateAuthToken } from '@/lib/auth';
 import { z } from 'zod';
 
-// Schema de validación para actualización
+// Schema de validación para actualización (camelCase)
 const updateAccountSchema = z.object({
   companyName: z.string().min(1).optional(),
   adminName: z.string().min(1).optional(),
   adminEmail: z.string().email().optional(),
-  subscriptionTier: z.enum(['basic', 'pro', 'enterprise']).optional(),
+  subscriptionTier: z.enum(['free', 'basic', 'pro', 'enterprise']).optional(),
   industry: z.string().optional().nullable(),
   companySize: z.string().optional().nullable(),
-  company_logo: z.string().url().optional().nullable(),
+  companyLogo: z.string().url().optional().nullable(), // camelCase correcto
   status: z.enum(['ACTIVE', 'SUSPENDED', 'TRIAL', 'INACTIVE']).optional(),
 });
 
-// GET - Obtener datos de una cuenta específica
+// 🟢 INICIO DEL BLOQUE DE REEMPLAZO 🟢
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    // Verificar autenticación y rol admin
+    // 🟢 INICIO DEL BLOQUE DE REEMPLAZO (en la función GET) 🟢
+    // SEGURIDAD: Usar validateAuthToken de lib/auth.ts
     const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    
-    if (!token) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      );
-    }
+    const validation = await validateAuthToken(authHeader, undefined);
 
-    const payload = await verifyJWTToken(token);
-    
-    if (!payload || payload.role !== 'FOCALIZAHR_ADMIN') {
+    if (!validation.success || !validation.account) {
       return NextResponse.json(
-        { error: 'Acceso denegado' },
-        { status: 403 }
-      );
-    }
+       { error: validation.error || 'No autorizado' },
+       { status: 401 }
+  );
+}
 
-    // Buscar la cuenta
+// Verificar rol admin
+if (validation.account.role !== 'FOCALIZAHR_ADMIN') {
+  return NextResponse.json(
+    { error: 'Acceso denegado - Se requiere rol FOCALIZAHR_ADMIN' },
+    { status: 403 }
+  );
+}
+// 🟢 FIN DEL BLOQUE DE REEMPLAZO 🟢
+
+    // --- INICIO DE LA CORRECCIÓN ARQUITECTÓNICA ---
+
+    // Paso 1: Obtener la cuenta y sus relaciones DIRECTAS.
+    // Se elimina el conteo de 'participants' y se usa el nombre correcto 'companyLogo'.
     const account = await prisma.account.findUnique({
       where: { id: params.id },
       select: {
@@ -53,28 +57,34 @@ export async function GET(
         subscriptionTier: true,
         industry: true,
         companySize: true,
-        company_logo: true,
+        companyLogo: true, // Nombre correcto según schema.prisma
         status: true,
         createdAt: true,
         updatedAt: true,
-        // Agregar contadores útiles
         _count: {
           select: {
-            campaigns: true,
-            participants: true,
-          }
-        }
-      }
+            campaigns: true, // Esto es correcto porque es una relación directa
+            departments: true, // Esto también es correcto
+          },
+        },
+      },
     });
 
     if (!account) {
-      return NextResponse.json(
-        { error: 'Cuenta no encontrada' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Cuenta no encontrada' }, { status: 404 });
     }
 
-    // Formatear respuesta para el frontend
+    // Paso 2: Obtener el conteo de participantes con una consulta separada y eficiente.
+    // Esto respeta la arquitectura: Account -> Campaign -> Participant
+    const participantCount = await prisma.participant.count({
+      where: {
+        campaign: {
+          accountId: params.id,
+        },
+      },
+    });
+
+    // Paso 3: Combinar los resultados en la respuesta final.
     const formattedAccount = {
       id: account.id,
       companyName: account.companyName,
@@ -83,19 +93,22 @@ export async function GET(
       subscriptionTier: account.subscriptionTier || 'basic',
       industry: account.industry || '',
       companySize: account.companySize || '',
-      logoUrl: account.company_logo || '', // Mapeo a logoUrl para el frontend
+      companyLogo: account.companyLogo || '', // Usamos el nombre correcto
       status: account.status || 'ACTIVE',
       createdAt: account.createdAt,
       updatedAt: account.updatedAt,
       stats: {
         totalCampaigns: account._count.campaigns,
-        totalParticipants: account._count.participants,
-      }
+        totalDepartments: account._count.departments,
+        totalParticipants: participantCount, // Usamos el conteo correcto
+      },
     };
+
+    // --- FIN DE LA CORRECCIÓN ARQUITECTÓNICA ---
 
     return NextResponse.json({
       success: true,
-      data: formattedAccount
+      data: formattedAccount,
     });
 
   } catch (error) {
@@ -106,6 +119,7 @@ export async function GET(
     );
   }
 }
+// 🟢 FIN DEL BLOQUE DE REEMPLAZO 🟢
 
 // PATCH - Actualizar datos de una cuenta
 export async function PATCH(
@@ -113,22 +127,21 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Verificar autenticación y rol admin
+    // SEGURIDAD: Usar validateAuthToken de lib/auth.ts
     const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const validation = await validateAuthToken(authHeader, undefined);
     
-    if (!token) {
+    if (!validation.success || !validation.account) {
       return NextResponse.json(
-        { error: 'No autorizado' },
+        { error: validation.error || 'No autorizado' },
         { status: 401 }
       );
     }
 
-    const payload = await verifyJWTToken(token);
-    
-    if (!payload || payload.role !== 'FOCALIZAHR_ADMIN') {
+    // Verificar rol admin
+    if (validation.account.role !== 'FOCALIZAHR_ADMIN') {
       return NextResponse.json(
-        { error: 'Acceso denegado' },
+        { error: 'Acceso denegado - Se requiere rol FOCALIZAHR_ADMIN' },
         { status: 403 }
       );
     }
@@ -136,13 +149,7 @@ export async function PATCH(
     // Parsear y validar datos del body
     const body = await request.json();
     
-    // Mapear logoUrl a company_logo si viene del frontend
-    if ('logoUrl' in body) {
-      body.company_logo = body.logoUrl;
-      delete body.logoUrl;
-    }
-
-    // Validar datos
+    // Validar datos con schema camelCase
     const validationResult = updateAccountSchema.safeParse(body);
     
     if (!validationResult.success) {
@@ -183,7 +190,7 @@ export async function PATCH(
       }
     }
 
-    // Actualizar la cuenta
+    // Actualizar la cuenta en la base de datos
     const updatedAccount = await prisma.account.update({
       where: { id: params.id },
       data: updateData,
@@ -195,16 +202,17 @@ export async function PATCH(
         subscriptionTier: true,
         industry: true,
         companySize: true,
-        company_logo: true,
+        companyLogo: true, // camelCase consistente
         status: true,
         updatedAt: true,
       }
     });
 
-    // Log de auditoría (opcional)
-    console.log(`[ADMIN] Cuenta ${params.id} actualizada por ${payload.adminEmail}`);
+    // Log de auditoría
+    // Corrección en la función PATCH
+    console.log(`[ADMIN] Cuenta ${params.id} actualizada por ${validation.account.adminEmail}`);
 
-    // Formatear respuesta
+    // Respuesta con camelCase consistente
     const formattedResponse = {
       id: updatedAccount.id,
       companyName: updatedAccount.companyName,
@@ -213,7 +221,7 @@ export async function PATCH(
       subscriptionTier: updatedAccount.subscriptionTier,
       industry: updatedAccount.industry,
       companySize: updatedAccount.companySize,
-      logoUrl: updatedAccount.company_logo, // Mapeo inverso
+      companyLogo: updatedAccount.companyLogo, // camelCase directo
       status: updatedAccount.status,
       updatedAt: updatedAccount.updatedAt,
     };
