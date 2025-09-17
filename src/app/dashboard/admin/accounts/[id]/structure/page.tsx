@@ -18,12 +18,10 @@ import {
   Loader2,
   AlertCircle,
   Briefcase,
-  BarChart3,
-  Target,
-  TrendingUp
+  FolderTree,
+  ArrowLeft
 } from 'lucide-react';
 
-// SOLO usar estilos existentes
 import '@/styles/focalizahr-design-system.css';
 import '@/app/dashboard/dashboard.css';
 
@@ -41,9 +39,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 export default function StructurePage() {
   const params = useParams();
+  const router = useRouter();
   const accountId = params.id as string;
 
   const {
@@ -58,10 +59,14 @@ export default function StructurePage() {
     handleOpenCreate,
     handleOpenEdit,
     updateFormField,
-    setIsModalOpen
+    setIsModalOpen,
+    fetchStructure, // Necesitamos exponer esta función desde el hook
+    handleCreateGeneralManager,    // ← AGREGAR SI NO ESTÁ
+    handleApplyStandardTemplate,    // ← AGREGAR SI NO ESTÁ
   } = useStructureManager(accountId);
 
-  // Loading state con estilo FocalizaHR
+
+  // Estado de carga
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -75,46 +80,177 @@ export default function StructurePage() {
     );
   }
 
-  // Empty state con diseño premium
-  if (!structure || (structure.gerencias.length === 0 && structure.orphanDepartments.length === 0)) {
+  // NUEVO: Detectar si necesita configuración inicial
+  const needsInitialSetup = !loading && 
+    structure.gerencias.length === 0 && 
+    structure.orphanDepartments && 
+    structure.orphanDepartments.length > 0;
+
+  // VISTA DE DECISIÓN PARA EL CONCIERGE
+  if (needsInitialSetup) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
-        <div className="container mx-auto max-w-7xl">
-          <Card className="professional-card border-slate-700/50 bg-slate-800/50 backdrop-blur">
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <div className="p-4 bg-gradient-to-br from-cyan-400/10 to-purple-400/10 rounded-2xl mb-4">
-                <Building2 className="h-12 w-12 text-cyan-400" />
+        <div className="container mx-auto max-w-5xl">
+          {/* Header con navegación */}
+          <div className="mb-8">
+            <Button
+              variant="ghost"
+              onClick={() => router.push('/dashboard/admin/structures')}
+              className="mb-4 text-gray-400 hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Volver a Torre de Control
+            </Button>
+            
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+              Configuración Inicial de Estructura
+            </h1>
+            <p className="text-gray-400 mt-2">
+              Empresa: {structure.companyName || 'Cliente'}
+            </p>
+          </div>
+
+          {/* Info Card del Concierge */}
+          <Card className="professional-card border-amber-500/30 bg-amber-950/20 mb-8">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <AlertCircle className="h-6 w-6 text-amber-400 mt-1" />
+                <div>
+                  <h3 className="text-lg font-semibold text-amber-300 mb-2">
+                    Protocolo Concierge - Acción Requerida
+                  </h3>
+                  <p className="text-amber-200/80 mb-3">
+                    Se detectaron <span className="font-bold">{structure.orphanDepartments.length}</span> departamentos 
+                    sin estructura definida.
+                  </p>
+                  <div className="bg-slate-800/50 rounded-lg p-4 mt-4">
+                    <p className="text-sm text-amber-200 mb-2 font-semibold">
+                      📞 Antes de continuar, contacta al cliente:
+                    </p>
+                    <p className="text-sm text-gray-300 italic">
+                      "Hemos recibido su lista de departamentos. Para asegurar que los análisis 
+                      sean lo más precisos posible, ¿podría confirmarnos si estos reportan a 
+                      gerencias específicas o si su estructura es plana, reportando a un único 
+                      líder (como un Gerente General o Dueño)?"
+                    </p>
+                  </div>
+                </div>
               </div>
-              <h3 className="text-xl font-semibold mb-2 text-white">Sin estructura organizacional</h3>
-              <p className="text-gray-400 text-center mb-8 max-w-md">
-                Comienza creando las gerencias principales de la organización para gestionar departamentos y visualizar métricas.
-              </p>
-              <Button 
-                onClick={() => handleOpenCreate('gerencia')}
-                className="btn-gradient"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Crear Primera Gerencia
-              </Button>
             </CardContent>
           </Card>
+
+          {/* Lista de departamentos detectados */}
+          <Card className="professional-card border-slate-700/50 bg-slate-800/50 mb-8">
+            <CardContent className="p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">
+                Departamentos Detectados ({structure.orphanDepartments.length})
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {structure.orphanDepartments.map((dept: any) => (
+                  <Badge 
+                    key={dept.id}
+                    className="bg-slate-700/50 text-slate-300 border-slate-600/50"
+                  >
+                    {dept.displayName}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tarjetas de decisión */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Opción A: Estructura Plana */}
+            <Card 
+              className="professional-card border-slate-700/50 bg-slate-800/50 hover:border-cyan-400/30 transition-all cursor-pointer"
+              onClick={handleCreateGeneralManager}
+            >
+              <CardContent className="p-8 text-center">
+                <div className="mb-6">
+                  <div className="w-20 h-20 mx-auto bg-gradient-to-br from-cyan-400/20 to-blue-400/20 rounded-2xl flex items-center justify-center">
+                    <Building2 className="h-10 w-10 text-cyan-400" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3">
+                  Crear Gerencia General
+                </h3>
+                <p className="text-gray-400 mb-6">
+                  Para empresas con estructura plana donde todos los departamentos 
+                  reportan a un único líder (CEO, Gerente General, Dueño)
+                </p>
+                <div className="space-y-2 text-left text-sm text-gray-500">
+                  <p>✓ Crea una única gerencia contenedora</p>
+                  <p>✓ Asigna todos los departamentos automáticamente</p>
+                  <p>✓ Ideal para PyMEs y startups</p>
+                </div>
+                <Button className="btn-gradient w-full mt-6">
+                  Aplicar Estructura Plana
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Opción B: Estructura Jerárquica */}
+            <Card 
+              className="professional-card border-slate-700/50 bg-slate-800/50 hover:border-purple-400/30 transition-all cursor-pointer"
+              onClick={handleApplyStandardTemplate}
+            >
+              <CardContent className="p-8 text-center">
+                <div className="mb-6">
+                  <div className="w-20 h-20 mx-auto bg-gradient-to-br from-purple-400/20 to-pink-400/20 rounded-2xl flex items-center justify-center">
+                    <FolderTree className="h-10 w-10 text-purple-400" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3">
+                  Aplicar Estructura Estándar
+                </h3>
+                <p className="text-gray-400 mb-6">
+                  Para empresas con estructura jerárquica donde los departamentos 
+                  reportan a diferentes gerencias especializadas
+                </p>
+                <div className="space-y-2 text-left text-sm text-gray-500">
+                  <p>✓ Crea las 8 gerencias estándar</p>
+                  <p>✓ Requiere personalización posterior</p>
+                  <p>✓ Ideal para empresas medianas y grandes</p>
+                </div>
+                <div className="bg-purple-950/30 rounded-lg p-3 mt-4">
+                  <p className="text-xs text-purple-300">
+                    ⚠️ Recuerda: Después debes editar cada gerencia para 
+                    usar la terminología exacta del cliente
+                  </p>
+                </div>
+                <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white w-full mt-6">
+                  Aplicar 8 Gerencias
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     );
   }
 
+  // VISTA NORMAL: Árbol de estructura existente (tu código original mejorado)
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <div className="container mx-auto p-6 max-w-7xl">
-        {/* Header con estilo dashboard FocalizaHR */}
+        {/* Header */}
         <div className="mb-8">
+          <Button
+            variant="ghost"
+            onClick={() => router.push('/dashboard/admin/structures')}
+            className="mb-4 text-gray-400 hover:text-white"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver a Torre de Control
+          </Button>
+          
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
                 Estructura Organizacional
               </h1>
               <p className="text-gray-400 mt-2">
-                Gestiona las gerencias y departamentos de la organización
+                {structure.companyName || 'Gestiona las gerencias y departamentos de la organización'}
               </p>
             </div>
             <Button 
@@ -126,7 +262,7 @@ export default function StructurePage() {
             </Button>
           </div>
 
-          {/* Métricas resumen al estilo dashboard */}
+          {/* Métricas resumen */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
             <Card className="metric-card border-slate-700/50 bg-slate-800/30">
               <CardContent className="p-4">
@@ -170,14 +306,14 @@ export default function StructurePage() {
           </div>
         </div>
 
-        {/* Gerencias con diseño FocalizaHR mejorado */}
+        {/* Gerencias existentes */}
         <div className="space-y-4">
           {structure.gerencias.map((gerencia) => (
             <Card 
               key={gerencia.id} 
               className="professional-card border-slate-700/50 bg-slate-800/50 backdrop-blur overflow-hidden hover:border-cyan-400/30 transition-all duration-300"
             >
-              {/* Header de Gerencia con gradiente sutil */}
+              {/* Header de Gerencia */}
               <div className="bg-gradient-to-r from-slate-800/50 to-slate-700/30 p-4 border-b border-slate-700/50">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
@@ -189,10 +325,7 @@ export default function StructurePage() {
                         {gerencia.displayName}
                       </h3>
                       <div className="flex items-center gap-2 mt-1">
-                        <Badge 
-                          variant="secondary" 
-                          className="bg-gradient-to-r from-cyan-400/10 to-purple-400/10 text-cyan-300 border-cyan-400/20"
-                        >
+                        <Badge className="bg-slate-700/50 text-slate-300 border-slate-600/50">
                           {gerencia.standardCategory}
                         </Badge>
                         {gerencia.participantCount > 0 && (
@@ -224,7 +357,7 @@ export default function StructurePage() {
                 </div>
               </div>
 
-              {/* Departamentos con mejor jerarquía visual */}
+              {/* Departamentos de la gerencia */}
               {gerencia.children && gerencia.children.length > 0 && (
                 <div className="bg-slate-900/30">
                   {gerencia.children.map((dept, index) => (
@@ -244,17 +377,9 @@ export default function StructurePage() {
                             <span className="text-white/90 font-medium">
                               {dept.displayName}
                             </span>
-                            <Badge 
-                              variant="outline" 
-                              className="text-xs border-slate-600 text-gray-400"
-                            >
+                            <Badge variant="outline" className="text-xs border-slate-600 text-gray-400">
                               {dept.standardCategory}
                             </Badge>
-                            {dept.participantCount > 0 && (
-                              <span className="text-xs text-gray-500">
-                                {dept.participantCount} participantes
-                              </span>
-                            )}
                           </div>
                         </div>
                         <Button
@@ -271,7 +396,7 @@ export default function StructurePage() {
                 </div>
               )}
 
-              {/* Botón agregar departamento con hover effect */}
+              {/* Botón agregar departamento */}
               <div className="p-3 bg-slate-900/20 border-t border-slate-700/30">
                 <Button 
                   variant="ghost" 
@@ -286,18 +411,18 @@ export default function StructurePage() {
           ))}
         </div>
 
-        {/* Departamentos Huérfanos con diseño de alerta premium */}
+        {/* Departamentos huérfanos si existen */}
         {structure.orphanDepartments && structure.orphanDepartments.length > 0 && (
           <div className="mt-8">
-            <Card className="professional-card border-yellow-500/30 bg-gradient-to-br from-yellow-900/10 to-orange-900/10">
-              <div className="p-4 border-b border-yellow-500/20">
+            <Card className="professional-card border-amber-500/20 bg-gradient-to-br from-amber-950/20 to-orange-950/10">
+              <div className="p-4 border-b border-amber-500/10">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-yellow-500/20 rounded-xl">
-                    <AlertCircle className="h-5 w-5 text-yellow-400" />
+                  <div className="p-2 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-xl">
+                    <AlertCircle className="h-5 w-5 text-amber-400" />
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-white">Departamentos sin Gerencia</h3>
-                    <p className="text-sm text-gray-400 mt-1">
+                    <p className="text-sm text-amber-200/60 mt-1">
                       Requieren asignación a una gerencia para análisis completo
                     </p>
                   </div>
@@ -308,24 +433,20 @@ export default function StructurePage() {
                   {structure.orphanDepartments.map((dept) => (
                     <div 
                       key={dept.id} 
-                      className="p-3 rounded-lg bg-slate-800/50 border border-yellow-500/20 hover:border-yellow-400/30 transition-all"
+                      className="p-3 rounded-lg bg-amber-950/20 border border-amber-500/20 hover:bg-amber-950/30 transition-all"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <Briefcase className="h-4 w-4 text-yellow-400/70" />
+                          <Briefcase className="h-4 w-4 text-amber-400/70" />
                           <span className="text-white/90">{dept.displayName}</span>
-                          <Badge 
-                            variant="outline" 
-                            className="border-yellow-500/30 text-yellow-400"
-                          >
+                          <Badge className="border-amber-500/30 text-amber-300 bg-amber-950/30">
                             {dept.standardCategory || 'sin_asignar'}
                           </Badge>
                         </div>
                         <Button
                           size="sm"
-                          variant="outline"
                           onClick={() => handleOpenEdit(dept)}
-                          className="border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20"
+                          className="bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30"
                         >
                           Asignar a Gerencia
                         </Button>
@@ -338,7 +459,7 @@ export default function StructurePage() {
           </div>
         )}
 
-        {/* Modal con estilo FocalizaHR */}
+        {/* Modal de edición (tu código original) */}
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
           <DialogContent className="bg-slate-900 border-slate-700">
             <DialogHeader>
