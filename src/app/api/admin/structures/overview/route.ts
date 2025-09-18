@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     // Obtener todas las cuentas con sus estructuras
     const accounts = await prisma.account.findMany({
-      where: { isActive: true },
+      where: { status: 'ACTIVE' },
       include: {
         departments: {
           where: { isActive: true }

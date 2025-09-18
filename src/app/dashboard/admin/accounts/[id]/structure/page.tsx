@@ -2,6 +2,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import { useEffect } from 'react';
 import { useStructureManager } from '@/hooks/useStructureManager';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,6 +65,14 @@ export default function StructurePage() {
     handleCreateGeneralManager,    // ← AGREGAR SI NO ESTÁ
     handleApplyStandardTemplate,    // ← AGREGAR SI NO ESTÁ
   } = useStructureManager(accountId);
+
+  // Debug: Verificar qué viene del hook
+  useEffect(() => {
+    console.log('🔍 Hook values check:');
+    console.log('  - structure:', structure);
+    console.log('  - handleCreateGeneralManager type:', typeof handleCreateGeneralManager);
+    console.log('  - handleApplyStandardTemplate type:', typeof handleApplyStandardTemplate);
+  }, [structure, handleCreateGeneralManager, handleApplyStandardTemplate]);
 
 
   // Estado de carga
@@ -162,8 +171,7 @@ export default function StructurePage() {
           <div className="grid md:grid-cols-2 gap-6">
             {/* Opción A: Estructura Plana */}
             <Card 
-              className="professional-card border-slate-700/50 bg-slate-800/50 hover:border-cyan-400/30 transition-all cursor-pointer"
-              onClick={handleCreateGeneralManager}
+              className="professional-card border-slate-700/50 bg-slate-800/50 hover:border-cyan-400/30 transition-all"
             >
               <CardContent className="p-8 text-center">
                 <div className="mb-6">
@@ -183,7 +191,19 @@ export default function StructurePage() {
                   <p>✓ Asigna todos los departamentos automáticamente</p>
                   <p>✓ Ideal para PyMEs y startups</p>
                 </div>
-                <Button className="btn-gradient w-full mt-6">
+                <Button 
+                  className="btn-gradient w-full mt-6"
+                  onClick={() => {
+                    console.log('🔵 Button clicked - Crear Gerencia General');
+                    console.log('🔵 handleCreateGeneralManager exists?', typeof handleCreateGeneralManager);
+                    console.log('🔵 accountId:', accountId);
+                    if (handleCreateGeneralManager) {
+                      handleCreateGeneralManager();
+                    } else {
+                      console.error('❌ handleCreateGeneralManager is undefined');
+                    }
+                  }}
+                >
                   Aplicar Estructura Plana
                 </Button>
               </CardContent>
@@ -191,8 +211,7 @@ export default function StructurePage() {
 
             {/* Opción B: Estructura Jerárquica */}
             <Card 
-              className="professional-card border-slate-700/50 bg-slate-800/50 hover:border-purple-400/30 transition-all cursor-pointer"
-              onClick={handleApplyStandardTemplate}
+              className="professional-card border-slate-700/50 bg-slate-800/50 hover:border-purple-400/30 transition-all"
             >
               <CardContent className="p-8 text-center">
                 <div className="mb-6">
@@ -218,7 +237,19 @@ export default function StructurePage() {
                     usar la terminología exacta del cliente
                   </p>
                 </div>
-                <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white w-full mt-6">
+                <Button 
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white w-full mt-6"
+                  onClick={() => {
+                    console.log('🟣 Button clicked - Aplicar Estructura Estándar');
+                    console.log('🟣 handleApplyStandardTemplate exists?', typeof handleApplyStandardTemplate);
+                    console.log('🟣 accountId:', accountId);
+                    if (handleApplyStandardTemplate) {
+                      handleApplyStandardTemplate();
+                    } else {
+                      console.error('❌ handleApplyStandardTemplate is undefined');
+                    }
+                  }}
+                >
                   Aplicar 8 Gerencias
                 </Button>
               </CardContent>

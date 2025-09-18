@@ -227,6 +227,72 @@ export function useStructureManager(accountId: string) {
     }));
   }, []);
 
+  // Función para crear Gerencia General
+  const handleCreateGeneralManager = useCallback(async () => {
+    if (!token) {
+      toast.error('Error de autenticación');
+      return;
+    }
+    
+    try {
+      console.log('🟢 Ejecutando handleCreateGeneralManager');
+      const response = await fetch(
+        `/api/admin/accounts/${accountId}/structure/apply-general-manager`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          }
+        }
+      );
+      
+      if (response.ok) {
+        const result = await response.json();
+        toast.success(result.message || 'Gerencia General creada exitosamente');
+        await loadStructure();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Error al crear Gerencia General');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Error al crear Gerencia General');
+    }
+  }, [accountId, token, loadStructure]);
+
+  // Función para aplicar estructura estándar
+  const handleApplyStandardTemplate = useCallback(async () => {
+    if (!token) {
+      toast.error('Error de autenticación');
+      return;
+    }
+    
+    try {
+      console.log('🟪 Ejecutando handleApplyStandardTemplate');
+      const response = await fetch(
+        `/api/admin/accounts/${accountId}/structure/apply-standard-template`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          }
+        }
+      );
+      
+      if (response.ok) {
+        const result = await response.json();
+        toast.success(result.message || 'Estructura estándar aplicada exitosamente');
+        await loadStructure();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Error al aplicar estructura estándar');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Error al aplicar estructura estándar');
+    }
+  }, [accountId, token, loadStructure]);
+
   // Cargar estructura al montar el componente
   useEffect(() => {
     if (accountId) {
@@ -250,6 +316,9 @@ export function useStructureManager(accountId: string) {
     handleOpenCreate,
     handleOpenEdit,
     updateFormField,
-    setIsModalOpen
+    setIsModalOpen,
+    handleCreateGeneralManager,      // ← AGREGAR ESTA LÍNEA
+    handleApplyStandardTemplate,     // ← AGREGAR ESTA LÍNEA
+    fetchStructure: loadStructure,    // ← AGREGAR ESTA LÍNEA
   };
 }
