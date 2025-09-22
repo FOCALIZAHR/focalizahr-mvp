@@ -72,7 +72,7 @@ export class DepartmentAdapter {
       'eventos', 'trade marketing', 'btl', 'atl'
     ],
     'tecnologia': [
-      'tecnologia', 'technology', 'tech', 'ti', 'it',
+      'tecnología','tecnologia', 'technology', 'tech', 'ti', 'it',
       'sistemas', 'informatica', 'digital',
       'gerencia de tecnologia','gerencia de tecnología', 'gerencia it', 'gerencia sistemas',
       'cto', 'chief technology officer', 'gerencia ti',
@@ -165,6 +165,26 @@ export class DepartmentAdapter {
   // ✅ MOTOR DE MAPEO INTELIGENTE - MÉTODO PRINCIPAL
   static getGerenciaCategory(term: string): string | null {
     if (!term) return null;
+    // ============ INICIO CÓDIGO NUEVO NIVEL 1 ============
+  // Excluir nivel 1 (CEO/Dirección) de categorización
+  const nivel1Keywords = [
+    'general', 'gerencia general', 'gerente general',
+    'ceo', 'presidente', 'presidencia', 'presidenta',
+    'director general', 'directora general', 
+    'dueño', 'dueña', 'propietario', 'propietaria',
+    'board', 'directorio', 'junta directiva'
+  ];
+  
+  const checkTerm = term.toLowerCase().trim();
+  
+  // Verificar si es un término de nivel 1
+  for (const keyword of nivel1Keywords) {
+    if (checkTerm === keyword || checkTerm.includes(keyword)) {
+      console.log(`🏢 Nivel 1 detectado: "${term}" - Sin categorización`);
+      return null; // El nivel 1 no necesita categoría
+    }
+  }
+  // ============ FIN CÓDIGO NUEVO NIVEL 1 ============
     
     const normalizedTerm = term.toLowerCase().trim();
     const categoryScores: { [key: string]: number } = {};

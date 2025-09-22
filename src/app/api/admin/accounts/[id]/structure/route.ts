@@ -60,7 +60,7 @@ export async function GET(
     });
 
     // Organizar en estructura jerárquica
-    const gerencias = structure.filter(d => d.level === 2 && !d.parentId);
+    const gerencias = structure.filter(d => d.level === 2); // Sin filtro de parentId
     const organized = gerencias.map(gerencia => ({
       ...gerencia,
       participantCount: gerencia._count.participants,

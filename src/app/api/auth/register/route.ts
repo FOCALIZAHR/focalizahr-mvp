@@ -88,6 +88,31 @@ export async function POST(request: NextRequest) {
     })
 
     console.log('✅ Account created successfully:', newAccount.adminEmail)
+    // ============ AGREGAR TODO ESTE BLOQUE NUEVO ============
+    // Crear automáticamente el CEO/Gerente General (Nivel 1)
+    try {
+      const ceo = await prisma.department.create({
+        data: {
+          accountId: newAccount.id,
+          displayName: 'Gerencia General',
+          unitType: 'direccion',
+          level: 1,
+          parentId: null,
+          isActive: true,
+          standardCategory: null, // CEO no tiene categoría
+          employeeCount: 0,
+          technicalComplexity: 'media',
+          emotionalComplexity: 'media',
+          marketScarcity: 'normal'
+        }
+      });
+      
+      console.log(`✅ CEO nivel 1 creado automáticamente para ${newAccount.companyName}`);
+    } catch (error) {
+      console.error('⚠️ Error creando CEO (no crítico):', error);
+      // No fallar el registro si hay error creando el CEO
+    }
+    // ============ FIN DEL BLOQUE NUEVO ============
 
     // Generar JWT para la nueva cuenta (opcional, pero útil)
     const token = generateJWT({

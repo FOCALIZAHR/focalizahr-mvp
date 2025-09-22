@@ -2,44 +2,46 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verify } from 'jsonwebtoken'
 // IMPORTANTE: Importar el DepartmentAdapter real que ya existe en tu proyecto
 import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter'
 
 /**
  * API ENDPOINT: Guardar Estructura Organizacional
+ * SOLO PARA ADMINISTRADORES FOCALIZAHR_ADMIN
  * 
  * PRINCIPIOS ARQUITECTÓNICOS:
  * 1. NUNCA asignar standard_category directamente
- * 2. Usar niveles correctos: Level 2 = Gerencias, Level 3 = Departamentos
+ * 2. Usar niveles correctos: Level 1 = CEO, Level 2 = Gerencias, Level 3 = Departamentos
  * 3. DepartmentAdapter es la ÚNICA fuente de verdad para categorías
  * 4. Proceso en 2 fases: crear estructura, luego asignar categorías
+ * 5. SOLO administradores pueden crear estructuras para clientes
  */
 
 export async function POST(request: NextRequest) {
   try {
     // ==========================================
-    // FASE 1: VERIFICACIÓN DE AUTENTICACIÓN
+    // FASE 1: VERIFICACIÓN DE AUTENTICACIÓN Y AUTORIZACIÓN ADMIN
     // ==========================================
     const authHeader = request.headers.get('Authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Token no proporcionado' }, 
-        { status: 401 }
-      )
-    }
-
-    const token = authHeader.split(' ')[1]
-    let decoded: any
+    const { validateAuthToken } = await import('@/lib/auth')
+    const validation = await validateAuthToken(authHeader, request)
     
-    try {
-      decoded = verify(token, process.env.JWT_SECRET || 'your-secret-key')
-    } catch (error) {
+    if (!validation.success || !validation.account) {
       return NextResponse.json(
-        { error: 'Token inválido o expirado' }, 
+        { error: validation.error || 'No autorizado' },
         { status: 401 }
       )
     }
+    
+    // VERIFICAR ROL ADMIN - SOLO FOCALIZAHR_ADMIN PUEDE CREAR ESTRUCTURAS
+    if (validation.account.role !== 'FOCALIZAHR_ADMIN') {
+      return NextResponse.json(
+        { error: 'Acceso denegado - Solo administradores de FocalizaHR pueden crear estructuras' },
+        { status: 403 }
+      )
+    }
+    
+    const decoded = validation.account
     
     // ==========================================
     // FASE 2: OBTENER Y VALIDAR DATOS
@@ -47,8 +49,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { structure } = body
     
-    // Usar accountId del token JWT (más seguro)
-    const accountId = decoded.accountId
+    // Usar accountId del body (admin especifica para qué cuenta es)
+    const accountId = body.accountId || decoded.id
     
     if (!accountId) {
       return NextResponse.json(
@@ -64,8 +66,8 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Verificar que la cuenta existe
-    const account = await prisma.accounts.findUnique({
+    // Verificar que la cuenta existe - CORRECCIÓN: usar prisma.account
+    const account = await prisma.account.findUnique({
       where: { id: accountId }
     })
     
@@ -82,14 +84,14 @@ export async function POST(request: NextRequest) {
     // Comentario: Decidir si queremos eliminar estructura anterior
     // o mantener histórico. Por ahora, eliminamos para evitar duplicados
     
-    const existingDepartments = await prisma.departments.count({
-      where: { account_id: accountId }
+    const existingDepartments = await prisma.department.count({
+      where: { accountId: accountId }  // CORRECCIÓN: accountId en camelCase
     })
     
     if (existingDepartments > 0) {
       console.log(`⚠️ Eliminando ${existingDepartments} departamentos existentes para cuenta ${accountId}`)
-      await prisma.departments.deleteMany({
-        where: { account_id: accountId }
+      await prisma.department.deleteMany({
+        where: { accountId: accountId }  // CORRECCIÓN: accountId en camelCase
       })
     }
     
@@ -97,6 +99,42 @@ export async function POST(request: NextRequest) {
     // FASE 4: CREAR ESTRUCTURA SIN CATEGORÍAS
     // ==========================================
     console.log('📦 Creando estructura organizacional...')
+    
+    // ============ PASO 4: BUSCAR O CREAR CEO ============
+    // Buscar el CEO/Nivel 1 de esta cuenta
+    const ceo = await prisma.department.findFirst({
+      where: {
+        accountId: accountId,
+        level: 1,
+        unitType: 'direccion'
+      }
+    });
+
+    // Si no existe CEO (empresas creadas antes del cambio), crearlo
+    let ceoId = ceo?.id;
+    if (!ceo) {
+      console.log('⚠️ No se encontró CEO, creando uno...');
+      const newCeo = await prisma.department.create({
+        data: {
+          accountId: accountId,
+          displayName: 'Gerencia General',
+          unitType: 'direccion',
+          level: 1,
+          isActive: true,
+          parentId: null,
+          standardCategory: null,
+          employeeCount: 0,
+          technicalComplexity: 'media',
+          emotionalComplexity: 'media',
+          marketScarcity: 'normal'
+        }
+      });
+      ceoId = newCeo.id;
+      console.log('✅ CEO nivel 1 creado retroactivamente');
+    } else {
+      console.log('✅ CEO existente encontrado');
+    }
+    // ============ FIN PASO 4 ============
     
     const createdGerencias = []
     const createdDepartments = []
@@ -108,25 +146,26 @@ export async function POST(request: NextRequest) {
         continue
       }
       
-      // CREAR GERENCIA - SIN standard_category
-      const ger = await prisma.departments.create({
+      // CREAR GERENCIA - SIN standard_category, CON parentId al CEO
+      const ger = await prisma.department.create({
         data: {
-          account_id: accountId,
-          display_name: gerencia.displayName.trim(),
-          unit_type: 'gerencia',
+          accountId: accountId,  // CORRECCIÓN: accountId en camelCase
+          displayName: gerencia.displayName.trim(),  // CORRECCIÓN: displayName en camelCase
+          unitType: 'gerencia',  // CORRECCIÓN: unitType en camelCase
           level: 2,  // ✅ CORRECTO: Level 2 para gerencias
-          is_active: true,
+          parentId: ceoId,  // ✅ AGREGADO: Las gerencias son hijas del CEO
+          isActive: true,  // CORRECCIÓN: isActive en camelCase
           // Campos opcionales con valores por defecto
-          employee_count: 0,
-          technical_complexity: 'media',
-          emotional_complexity: 'media',
-          market_scarcity: 'normal',
+          employeeCount: 0,  // CORRECCIÓN: employeeCount en camelCase
+          technicalComplexity: 'media',  // CORRECCIÓN: technicalComplexity en camelCase
+          emotionalComplexity: 'media',  // CORRECCIÓN: emotionalComplexity en camelCase
+          marketScarcity: 'normal',  // CORRECCIÓN: marketScarcity en camelCase
           // ❌ NO asignamos standard_category aquí
         }
       })
       
       createdGerencias.push(ger)
-      console.log(`✅ Gerencia creada: ${ger.display_name} (ID: ${ger.id})`)
+      console.log(`✅ Gerencia creada: ${ger.displayName} (ID: ${ger.id})`)
       
       // CREAR DEPARTAMENTOS HIJOS
       if (gerencia.departments && Array.isArray(gerencia.departments)) {
@@ -136,25 +175,25 @@ export async function POST(request: NextRequest) {
             continue
           }
           
-          const createdDept = await prisma.departments.create({
+          const createdDept = await prisma.department.create({  // CORRECCIÓN: department singular
             data: {
-              account_id: accountId,
-              display_name: dept.displayName.trim(),
-              parent_id: ger.id,  // Referencia a la gerencia padre
-              unit_type: 'departamento',
+              accountId: accountId,  // CORRECCIÓN: accountId en camelCase
+              displayName: dept.displayName.trim(),  // CORRECCIÓN: displayName en camelCase
+              parentId: ger.id,  // CORRECCIÓN: parentId en camelCase - Referencia a la gerencia padre
+              unitType: 'departamento',  // CORRECCIÓN: unitType en camelCase
               level: 3,  // ✅ CORRECTO: Level 3 para departamentos
-              is_active: true,
+              isActive: true,  // CORRECCIÓN: isActive en camelCase
               // Campos opcionales con valores por defecto
-              employee_count: 0,
-              technical_complexity: 'media',
-              emotional_complexity: 'media',
-              market_scarcity: 'normal',
+              employeeCount: 0,  // CORRECCIÓN: employeeCount en camelCase
+              technicalComplexity: 'media',  // CORRECCIÓN: technicalComplexity en camelCase
+              emotionalComplexity: 'media',  // CORRECCIÓN: emotionalComplexity en camelCase
+              marketScarcity: 'normal',  // CORRECCIÓN: marketScarcity en camelCase
               // ❌ NO asignamos standard_category aquí
             }
           })
           
           createdDepartments.push(createdDept)
-          console.log(`  ✅ Departamento creado: ${createdDept.display_name} (Padre: ${ger.display_name})`)
+          console.log(`  ✅ Departamento creado: ${createdDept.displayName} (Padre: ${ger.displayName})`)
         }
       }
     }
@@ -166,10 +205,10 @@ export async function POST(request: NextRequest) {
     // ==========================================
     console.log('🏷️ Asignando categorías estándar usando DepartmentAdapter...')
     
-    // Obtener TODOS los departamentos creados
-    const allDepts = await prisma.departments.findMany({
-      where: { account_id: accountId },
-      orderBy: { level: 'asc' }  // Procesar gerencias primero
+    // Obtener TODOS los departamentos creados (incluyendo CEO, gerencias y departamentos)
+    const allDepts = await prisma.department.findMany({  // CORRECCIÓN: department singular
+      where: { accountId: accountId },  // CORRECCIÓN: accountId en camelCase
+      orderBy: { level: 'asc' }  // Procesar por nivel: CEO primero, luego gerencias, luego departamentos
     })
     
     let categorizedCount = 0
@@ -177,32 +216,36 @@ export async function POST(request: NextRequest) {
     
     for (const dept of allDepts) {
       try {
+        // El CEO (nivel 1) no necesita categoría
+        if (dept.level === 1) {
+          console.log(`⏭️ CEO "${dept.displayName}" - Sin categorización necesaria`)
+          continue
+        }
+        
         // USAR EL DEPARTMENTADAPTER - Única fuente de verdad
         // El DepartmentAdapter tiene la lógica de mapeo centralizada
-        const category = DepartmentAdapter.getGerenciaCategory(dept.display_name)
+        const category = DepartmentAdapter.getGerenciaCategory(dept.displayName)  // CORRECCIÓN: displayName en camelCase
         
         if (category && category !== 'sin_asignar') {
-          await prisma.departments.update({
+          await prisma.department.update({  // CORRECCIÓN: department singular
             where: { id: dept.id },
-            data: { standard_category: category }
+            data: { standardCategory: category }  // CORRECCIÓN: standardCategory en camelCase
           })
           categorizedCount++
-          console.log(`  ✅ ${dept.display_name} → categoría: ${category}`)
+          console.log(`  ✅ ${dept.displayName} → categoría: ${category}`)
         } else {
           // Marcar para revisión manual posterior
-          await prisma.departments.update({
+          await prisma.department.update({  // CORRECCIÓN: department singular
             where: { id: dept.id },
             data: { 
-              standard_category: 'sin_asignar',
-              // Opcional: agregar flag para revisión
-              notes: 'Requiere mapeo manual de categoría'
+              standardCategory: 'sin_asignar'  // CORRECCIÓN: standardCategory en camelCase
             }
           })
           uncategorizedCount++
-          console.log(`  ⚠️ ${dept.display_name} → sin_asignar (requiere mapeo manual)`)
+          console.log(`  ⚠️ ${dept.displayName} → sin_asignar (requiere mapeo manual)`)
         }
       } catch (error) {
-        console.error(`❌ Error asignando categoría a ${dept.display_name}:`, error)
+        console.error(`❌ Error asignando categoría a ${dept.displayName}:`, error)
         // Continuar con el siguiente departamento
       }
     }
@@ -212,37 +255,22 @@ export async function POST(request: NextRequest) {
     // ==========================================
     // FASE 6: GENERAR ESTADÍSTICAS Y RESPUESTA
     // ==========================================
-    const stats = await prisma.departments.groupBy({
-      by: ['unit_type'],
-      where: { account_id: accountId },
+    const stats = await prisma.department.groupBy({  // CORRECCIÓN: department singular
+      by: ['unitType'],  // CORRECCIÓN: unitType en camelCase
+      where: { accountId: accountId },  // CORRECCIÓN: accountId en camelCase
       _count: true
     })
     
-    const categoryStats = await prisma.departments.groupBy({
-      by: ['standard_category'],
+    const categoryStats = await prisma.department.groupBy({  // CORRECCIÓN: department singular
+      by: ['standardCategory'],  // CORRECCIÓN: standardCategory en camelCase
       where: { 
-        account_id: accountId,
-        standard_category: { not: null }
+        accountId: accountId,  // CORRECCIÓN: accountId en camelCase
+        standardCategory: { not: null }  // CORRECCIÓN: standardCategory en camelCase
       },
       _count: true
     })
-    
-    // Actualizar metadata de la cuenta (opcional)
-    await prisma.accounts.update({
-      where: { id: accountId },
-      data: {
-        organizationStructure: JSON.stringify({
-          model: structure.model,
-          createdAt: new Date().toISOString(),
-          stats: {
-            gerencias: createdGerencias.length,
-            departamentos: createdDepartments.length,
-            categorized: categorizedCount,
-            uncategorized: uncategorizedCount
-          }
-        })
-      }
-    })
+    // ELIMINADO: El campo organizationStructure NO existe en el schema Account
+    // No hay necesidad de actualizar la cuenta aquí
     
     // ==========================================
     // FASE 7: RESPUESTA EXITOSA
@@ -251,15 +279,15 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Estructura organizacional creada exitosamente',
       stats: {
-        gerencias: stats.find(s => s.unit_type === 'gerencia')?._count || 0,
-        departamentos: stats.find(s => s.unit_type === 'departamento')?._count || 0,
+        gerencias: stats.find(s => s.unitType === 'gerencia')?._count || 0,  // CORRECCIÓN: unitType en camelCase
+        departamentos: stats.find(s => s.unitType === 'departamento')?._count || 0,  // CORRECCIÓN: unitType en camelCase
         total: allDepts.length
       },
       categorization: {
         categorized: categorizedCount,
         uncategorized: uncategorizedCount,
         byCategory: categoryStats.map(c => ({
-          category: c.standard_category,
+          category: c.standardCategory,  // CORRECCIÓN: standardCategory en camelCase
           count: c._count
         }))
       },
@@ -302,31 +330,42 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    // Verificar autenticación
+    // Verificar autenticación y rol admin
     const authHeader = request.headers.get('Authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
+    const { validateAuthToken } = await import('@/lib/auth')
+    const validation = await validateAuthToken(authHeader, request)
+    
+    if (!validation.success || !validation.account) {
       return NextResponse.json(
-        { error: 'Token no proporcionado' }, 
+        { error: validation.error || 'No autorizado' },
         { status: 401 }
       )
     }
-
-    const token = authHeader.split(' ')[1]
-    const decoded: any = verify(token, process.env.JWT_SECRET || 'your-secret-key')
-    const accountId = decoded.accountId
+    
+    // SOLO ADMIN PUEDE VER ESTRUCTURAS
+    if (validation.account.role !== 'FOCALIZAHR_ADMIN') {
+      return NextResponse.json(
+        { error: 'Acceso denegado - Solo administradores' },
+        { status: 403 }
+      )
+    }
+    
+    // Admin puede especificar qué cuenta ver
+    const searchParams = request.nextUrl.searchParams
+    const accountId = searchParams.get('accountId') || validation.account.id
     
     // Obtener estructura actual
-    const structure = await prisma.departments.findMany({
+    const structure = await prisma.department.findMany({  // CORRECCIÓN: department singular
       where: { 
-        account_id: accountId,
-        unit_type: 'gerencia'
+        accountId: accountId,  // CORRECCIÓN: accountId en camelCase
+        unitType: 'gerencia'  // CORRECCIÓN: unitType en camelCase
       },
       include: {
         children: {
-          where: { unit_type: 'departamento' }
+          where: { unitType: 'departamento' }  // CORRECCIÓN: unitType en camelCase
         }
       },
-      orderBy: { display_name: 'asc' }
+      orderBy: { displayName: 'asc' }  // CORRECCIÓN: displayName en camelCase
     })
     
     // Formatear respuesta
@@ -334,12 +373,12 @@ export async function GET(request: NextRequest) {
       model: structure.length > 1 ? 'hierarchical' : 'simple',
       gerencias: structure.map(ger => ({
         id: ger.id,
-        displayName: ger.display_name,
-        standardCategory: ger.standard_category,
+        displayName: ger.displayName,  // CORRECCIÓN: displayName en camelCase
+        standardCategory: ger.standardCategory,  // CORRECCIÓN: standardCategory en camelCase
         departments: ger.children.map(dept => ({
           id: dept.id,
-          displayName: dept.display_name,
-          standardCategory: dept.standard_category
+          displayName: dept.displayName,  // CORRECCIÓN: displayName en camelCase
+          standardCategory: dept.standardCategory  // CORRECCIÓN: standardCategory en camelCase
         }))
       }))
     }
