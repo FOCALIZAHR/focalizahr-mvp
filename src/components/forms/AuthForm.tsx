@@ -85,7 +85,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, onSuccess }) => {
     setLoading(true)
 
     try {
-      const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login'
+      const endpoint = isRegister ? '/api/auth/register' : '/api/auth/user/login'
       const payload = isRegister 
         ? {
             companyName: formData.companyName,

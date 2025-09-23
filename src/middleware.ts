@@ -1,8 +1,8 @@
-// src/middleware.ts
+// src/middleware.ts - ACTUALIZACIÓN DESDE TU CÓDIGO ACTUAL
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// Función simple para verificar JWT (sin dependencias externas)
+// TU FUNCIÓN ACTUAL - La mantenemos igual
 function verifyJWTSimple(token: string): any {
   try {
     // Decodificar el JWT sin verificar firma (solo para middleware)
@@ -24,8 +24,37 @@ function verifyJWTSimple(token: string): any {
   }
 }
 
+// NUEVA FUNCIÓN: Helper para determinar el rol efectivo
+function getEffectiveRole(payload: any): string {
+  // Si es un User nuevo (tiene userId)
+  if (payload.userId && payload.userRole) {
+    return payload.userRole;
+  }
+  
+  // Si es Account antiguo
+  if (payload.role) {
+    return payload.role; // Ya es FOCALIZAHR_ADMIN o CLIENT
+  }
+  
+  return 'CLIENT'; // Default
+}
+
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  
+  // NUEVO: Agregar /api/auth/user/login a rutas públicas
+  const publicPaths = [
+    '/login',
+    '/api/auth/login',
+    '/api/auth/user/login', // NUEVO
+    '/',
+    '/favicon.ico'
+  ];
+  
+  // Si es ruta pública, permitir acceso
+  if (publicPaths.some(path => pathname === path || pathname.startsWith('/public'))) {
+    return NextResponse.next();
+  }
   
   // Rutas que requieren rol FOCALIZAHR_ADMIN
   const isAdminRoute = 
@@ -33,7 +62,8 @@ export function middleware(request: NextRequest) {
     pathname === '/register';
   
   // Rutas que requieren autenticación (cualquier rol)
-  const isProtectedRoute = pathname.startsWith('/dashboard');
+  const isProtectedRoute = pathname.startsWith('/dashboard') || 
+                           pathname.startsWith('/api');
   
   // Si no es ruta protegida, permitir acceso
   if (!isProtectedRoute && !isAdminRoute) {
@@ -50,35 +80,68 @@ export function middleware(request: NextRequest) {
     }
   }
   
-  // Si no hay token, redirigir a login
+  // Si no hay token y es API, retornar 401
   if (!token) {
+    if (pathname.startsWith('/api')) {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      );
+    }
+    // Si es página web, redirigir a login
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('from', pathname);
     return NextResponse.redirect(url);
   }
   
-  // Verificar token
+  // Verificar token con tu función actual
   const payload = verifyJWTSimple(token);
   
   if (!payload) {
-    // Token inválido, redirigir a login
+    // Token inválido
+    if (pathname.startsWith('/api')) {
+      return NextResponse.json(
+        { error: 'Token inválido' },
+        { status: 401 }
+      );
+    }
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('from', pathname);
     return NextResponse.redirect(url);
   }
   
-  // Si es ruta admin, verificar rol
+  // NUEVO: Crear headers con contexto del usuario
+  const headers = new Headers(request.headers);
+  
+  // NUEVO: Si es un User (tiene userId), inyectar sus datos
+  if (payload.userId) {
+    headers.set('x-user-id', payload.userId);
+    headers.set('x-user-role', payload.userRole || '');
+    headers.set('x-department-id', payload.departmentId || '');
+    headers.set('x-user-email', payload.userEmail || '');
+    headers.set('x-user-name', payload.userName || '');
+  }
+  
+  // Siempre inyectar accountId (para compatibilidad)
+  headers.set('x-account-id', payload.accountId || payload.id || '');
+  headers.set('x-company-name', payload.companyName || '');
+  
+  // Obtener rol efectivo
+  const effectiveRole = getEffectiveRole(payload);
+  headers.set('x-effective-role', effectiveRole);
+  
+  // VERIFICACIÓN DE PERMISOS PARA RUTAS ADMIN
   if (isAdminRoute) {
-    const userRole = payload.role || 'CLIENT';
+    const adminRoles = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_MANAGER'];
     
-    if (userRole !== 'FOCALIZAHR_ADMIN') {
+    if (!adminRoles.includes(effectiveRole)) {
       // No es admin, mostrar error 403
       return new NextResponse(
         JSON.stringify({ 
           error: 'Acceso Denegado', 
-          message: 'No tienes permisos para acceder a esta sección. Solo administradores de FocalizaHR.' 
+          message: 'No tienes permisos para acceder a esta sección.' 
         }),
         { 
           status: 403, 
@@ -88,19 +151,34 @@ export function middleware(request: NextRequest) {
     }
   }
   
-  // Todo OK, permitir acceso
-  return NextResponse.next();
+  // NUEVO: EXCEPCIÓN para /api/admin/participants
+  // Permitir a roles que pueden gestionar participantes
+  if (pathname === '/api/admin/participants' && request.method === 'POST') {
+    const allowedRoles = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_MANAGER'];
+    
+    if (allowedRoles.includes(effectiveRole)) {
+      console.log(`✅ Permitiendo acceso a ${effectiveRole} para cargar participantes`);
+      return NextResponse.next({ headers });
+    }
+  }
+  
+  // Verificar permisos para otras rutas API admin
+  if (pathname.startsWith('/api/admin') && !isAdminRoute) {
+    const adminRoles = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_MANAGER'];
+    
+    if (!adminRoles.includes(effectiveRole)) {
+      return NextResponse.json(
+        { error: 'Acceso denegado a API admin' },
+        { status: 403 }
+      );
+    }
+  }
+  
+  // Todo OK, permitir acceso con headers inyectados
+  return NextResponse.next({ headers });
 }
 
-// Configuración del middleware
-//export const config = {
-  matcher: [
-    // Proteger todas las rutas del dashboard  (era la funcion antigua y queda comentada ya que funcionaba en caso de problemas)
-    '/dashboard/:path*',
-    // Proteger registro
-    '/register',
-  ]//
-  export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+// Tu configuración actual - la mantenemos
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)']
 };
-

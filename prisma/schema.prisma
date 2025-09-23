@@ -54,6 +54,7 @@ model Account {
   campaigns   Campaign[]
   auditLogs   AuditLog[]
   departments Department[]
+  users User[] // AGREGAR solo esta línea
 
   @@index([adminEmail], map: "idx_accounts_email")
   @@index([subscriptionTier], map: "idx_accounts_tier")
@@ -397,6 +398,7 @@ model Department {
   // Relaciones
   account      Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
   participants Participant[]
+  users User[] // AGREGAR solo esta línea
 
   @@unique([accountId, displayName])
   @@index([accountId], map: "idx_departments_account")
@@ -420,4 +422,30 @@ model SurveyConfiguration {
   campaignType CampaignType @relation(fields: [campaignTypeId], references: [id], onDelete: Cascade)
   
   @@map("survey_configurations")
+}
+// TABLA 14: USERS - Sistema Multi-usuario
+model User {
+  id           String   @id @default(cuid())
+  accountId    String   @map("account_id")
+  email        String   @unique
+  name         String
+  passwordHash String   @map("password_hash")
+  
+  // Sistema de roles
+  role         String   @default("VIEWER") // ACCOUNT_OWNER, HR_MANAGER, AREA_MANAGER, DIRECTOR, VIEWER
+  departmentId String?  @map("department_id") // NULL = acceso total
+  
+  // Control y auditoría
+  isActive     Boolean  @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  
+  // Relaciones
+  account      Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  department   Department? @relation(fields: [departmentId], references: [id])
+  
+  @@index([accountId])
+  @@index([email])
+  @@map("users")
 }
