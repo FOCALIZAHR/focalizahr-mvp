@@ -201,17 +201,19 @@ export async function PATCH(request: NextRequest) {
       await prisma.auditLog.create({
         data: {
           action: 'DEPARTMENT_CATEGORY_UPDATE',
-          accountId: department.accountId,  // La cuenta CLIENTE afectada
-          userId: null,  // Se deja nulo porque el actor no es un 'User' final
+          account: department.accountId ? {
+          connect: { id: department.accountId }
+          } : undefined,
+          //userId: null,  // Se deja nulo porque el actor no es un 'User' final
           entityType: 'department',
           entityId: departmentId,
           oldValues: { standardCategory: oldCategory },
           newValues: { standardCategory: newStandardCategory },
-          metadata: {
-            ...auditLog,
-            actingAccountId: validation.account.id,  // Guardamos el ID del admin aquí
-            actingAccountEmail: validation.account.adminEmail  // Y su email para trazabilidad
-          }
+          //metadata: {
+          //  ...auditLog,
+          //  actingAccountId: validation.account.id,  // Guardamos el ID del admin aquí
+           // actingAccountEmail: validation.account.adminEmail  // Y su email para trazabilidad
+          //}
         }
       });
     } catch (auditError) {

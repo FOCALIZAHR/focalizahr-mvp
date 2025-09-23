@@ -1,0 +1,39 @@
+
+> focalizahr-mvp@1.0.0 build
+> prisma generate && next build
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+
+Ô£ö Generated Prisma Client (v5.22.0) to .\node_modules\@prisma\client in 594ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Want to react to database changes in your app as they happen? Discover how with Pulse: https://pris.ly/tip-1-pulse
+
+  Ôû▓ Next.js 14.2.3
+  - Environments: .env
+
+   Creating an optimized production build ...
+
+warn - The class `ease-[cubic-bezier(0.16,1,0.3,1)]` is ambiguous and matches multiple utilities.
+warn - If this is content and not a class, replace it with `ease-&lsqb;cubic-bezier(0.16,1,0.3,1)&rsqb;` to silence this warning.
+ Ô£ô Compiled successfully
+   Linting and checking validity of types ...
+Failed to compile.
+
+./src/app/api/admin/participants/route.ts:454:9
+Type error: Type '{ campaignId: string; email: string; uniqueToken: string; name: string | null; department: string | null; departmentId: string; position: string | null; location: string | null; gender: string | null; dateOfBirth: Date | null; hireDate: Date | null; hasResponded: boolean; createdAt: Date; }[]' is not assignable to type 'ParticipantCreateManyInput | ParticipantCreateManyInput[]'.
+  Type '{ campaignId: string; email: string; uniqueToken: string; name: string | null; department: string | null; departmentId: string; position: string | null; location: string | null; gender: string | null; dateOfBirth: Date | null; hireDate: Date | null; hasResponded: boolean; createdAt: Date; }[]' is not assignable to type 'ParticipantCreateManyInput[]'.
+    Type '{ campaignId: string; email: string; uniqueToken: string; name: string | null; department: string | null; departmentId: string; position: string | null; location: string | null; gender: string | null; dateOfBirth: Date | null; hireDate: Date | null; hasResponded: boolean; createdAt: Date; }' is not assignable to type 'ParticipantCreateManyInput'.
+      Types of property 'gender' are incompatible.
+        Type 'string | null' is not assignable to type 'Gender | null | undefined'.
+          Type 'string' is not assignable to type 'Gender | null | undefined'.
+
+  452 |       // Insertar participantes
+  453 |       await tx.participant.createMany({
+> 454 |         data: participantsToInsert,
+      |         ^
+  455 |         skipDuplicates: true
+  456 |       });
+  457 |
