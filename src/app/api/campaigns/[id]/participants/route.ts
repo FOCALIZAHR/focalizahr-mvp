@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyJWT } from '@/lib/auth'
+import { buildParticipantAccessFilter, extractUserContext } from '@/lib/services/AuthorizationService'
 import { conciergeParticipantsSchema } from '@/lib/validations'
 import crypto from 'crypto'
 
@@ -90,11 +91,26 @@ export async function POST(
   try {
     console.log('👥 Participants upload request for campaign:', params.id)
     
-    const authResult = await verifyJWT(request)
-    if (!authResult.success || !authResult.user) {
+    // ✅ NUEVO: Usar extractUserContext en lugar de verifyJWT
+    const userContext = extractUserContext(request)
+    
+    if (!userContext.accountId) {
       return NextResponse.json(
         { success: false, error: 'No autorizado' },
         { status: 401 }
+      )
+    }
+    
+    // ✅ NUEVO: Verificar permisos para crear participantes
+    const allowedRoles = ['ACCOUNT_OWNER', 'HR_MANAGER', 'FOCALIZAHR_ADMIN', 'CEO']
+    if (!allowedRoles.includes(userContext.role || '')) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Sin permisos para crear participantes',
+          code: 'INSUFFICIENT_PERMISSIONS'
+        },
+        { status: 403 }
       )
     }
 
@@ -106,11 +122,11 @@ export async function POST(
       hasProcessingMetadata: !!body.processingMetadata
     })
 
-    // Verificar campaña existe y pertenece al usuario
+    // Verificar campaña existe y pertenece al usuario (doble verificación)
     const campaign = await prisma.campaign.findFirst({
       where: {
         id: campaignId,
-        accountId: authResult.user.id
+        accountId: userContext.accountId
       },
       include: {
         account: {
@@ -149,7 +165,7 @@ export async function POST(
       participants: body.participants,
       processingMetadata: {
         ...body.processingMetadata,
-        processedBy: authResult.user.adminName,
+        processedBy: userContext.userId || userContext.accountId,
         uploadedAt: new Date()
       },
       validationSettings: body.validationSettings || {
@@ -301,7 +317,7 @@ export async function POST(
     // Crear audit log
     await prisma.auditLog.create({
       data: {
-        accountId: authResult.user.id,
+        accountId: userContext.accountId,
         campaignId,
         action: 'participants_uploaded',
         entityType: 'participant',
@@ -393,8 +409,10 @@ export async function GET(
   try {
     console.log('📋 Participants list request for campaign:', params.id)
     
-    const authResult = await verifyJWT(request)
-    if (!authResult.success || !authResult.user) {
+    // ✅ NUEVO: Usar extractUserContext en lugar de verifyJWT
+    const userContext = extractUserContext(request)
+    
+    if (!userContext.accountId) {
       return NextResponse.json(
         { success: false, error: 'No autorizado' },
         { status: 401 }
@@ -405,11 +423,11 @@ export async function GET(
     const { searchParams } = new URL(request.url)
     const includeDetails = searchParams.get('include_details') === 'true'
 
-    // Verificar acceso a la campaña
+    // Verificar acceso a la campaña (doble verificación)
     const campaign = await prisma.campaign.findFirst({
       where: {
         id: campaignId,
-        accountId: authResult.user.id
+        accountId: userContext.accountId
       },
       select: {
         id: true,
@@ -428,10 +446,23 @@ export async function GET(
     }
 
     console.log('✅ Campaign found:', campaign.name)
+    
+    // ✅ NUEVO: Obtener filtros de seguridad
+    const accessFilter = await buildParticipantAccessFilter(userContext)
+    
+    // Log para debugging
+    console.log('🔐 Security filters applied to participants:', {
+      userRole: userContext.role,
+      departmentId: userContext.departmentId,
+      filterApplied: Object.keys(accessFilter).length > 0
+    })
 
-    // ✅ OBTENER PARTICIPANTES CON CAMPOS DEMOGRÁFICOS EXTENDIDOS
+    // ✅ OBTENER PARTICIPANTES CON FILTRADO JERÁRQUICO
     const participants = await prisma.participant.findMany({
-      where: { campaignId },
+      where: { 
+        campaignId,
+        ...accessFilter  // Aplica filtro de seguridad
+      },
       select: {
         id: true,
         email: includeDetails,
@@ -546,6 +577,8 @@ export async function GET(
         totalInvited: campaign.totalInvited,
         totalResponded: campaign.totalResponded
       },
+      // ✅ NUEVO: Campo filtered indica si se aplicó filtro jerárquico
+      filtered: userContext.role === 'AREA_MANAGER',
       performance: {
         queryTime: Date.now() - startTime,
         participantCount: participants.length

@@ -1,11 +1,11 @@
-// API ANALYTICS CAMPAÑA - FIX IMPORT DEPARTMENTADAPTER
+// API ANALYTICS CAMPAÑA - FIX IMPORT DEPARTMENTADAPTER + AUTHORIZATION V2
 // src/app/api/campaigns/[id]/analytics/route.ts
-// FIX CRÍTICO: Agregar import DepartmentAdapter faltante
+// FIX CRÍTICO: Seguridad multi-nivel con doble verificación
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyJWT } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter'; // ← FIX: IMPORT AGREGADO
+import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter';
+import { buildParticipantAccessFilter, extractUserContext } from '@/lib/services/AuthorizationService'; // ✅ NUEVO IMPORT
 
 // ✅ INTERFACES ANALYTICS + TREND BY DEPARTMENT
 interface CampaignAnalytics {
@@ -17,23 +17,27 @@ interface CampaignAnalytics {
   responseRate: number;
   segmentationData: any[];
   trendData: any[];
-  trendDataByDepartment?: Record<string, Array<{ date: string; responses: number }>>; // ✅ NUEVO
+  trendDataByDepartment?: Record<string, Array<{ date: string; responses: number }>>;
   lastUpdated: string;
   categoryScores?: Record<string, number>;
-  departmentScores?: Record<string, number>; // ✅ AGREGADO AL INTERFACE
+  departmentScores?: Record<string, number>;
   responsesByDay?: Record<string, number>;
   demographicBreakdown?: any[];
 }
 
-// ✅ GET /api/campaigns/[id]/analytics - RECONSTRUCCIÓN COMPLETA
+// ✅ GET /api/campaigns/[id]/analytics - RECONSTRUCCIÓN COMPLETA CON SEGURIDAD
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    // Verificar autenticación
-    const authResult = await verifyJWT(request);
-    if (!authResult.success || !authResult.user) {
+    const campaignId = params.id;
+    
+    // ✅ NUEVO: Extraer contexto del usuario usando helper centralizado
+    const userContext = extractUserContext(request);
+    
+    // Validación básica de autorización
+    if (!userContext.accountId) {
       return NextResponse.json(
         { 
           success: false,
@@ -43,19 +47,17 @@ export async function GET(
       );
     }
 
-    const campaignId = params.id;
-
-    // ✅ VERIFICAR CAMPAÑA - CONSULTA MÍNIMA + FECHAS
+    // ✅ DOBLE VERIFICACIÓN DE SEGURIDAD: Campaña pertenece al account
     const campaignMeta = await prisma.campaign.findFirst({
       where: {
         id: campaignId,
-        accountId: authResult.user.id
+        accountId: userContext.accountId  // Verificación explícita multi-tenant
       },
       select: {
         id: true,
         name: true,
-        startDate: true,  // ← AGREGAR PARA CÁLCULO DURACIÓN
-        createdAt: true,  // ← FALLBACK SI NO HAY startDate
+        startDate: true,
+        createdAt: true,
         campaignType: { select: { name: true } }
       }
     });
@@ -70,13 +72,33 @@ export async function GET(
       );
     }
 
-    // ✅ PASO 1: COMPLETITUD DE DATOS - SEGÚN DIRECTRIZ
+    // ✅ OBTENER FILTROS DE SEGURIDAD (multi-tenant + departamental)
+    const accessFilter = await buildParticipantAccessFilter(userContext);
+    
+    // ✅ DEFINIR BASE WHERE CLAUSE - PATRÓN CORRECTO PARA REUTILIZACIÓN
+    const baseWhereClause = {
+      campaignId,
+      ...accessFilter // Incluye campaign.accountId Y departmentId si aplica
+    };
+
+    // Log para debugging
+    console.log('🔐 Security filters applied:', {
+      userRole: userContext.role,
+      departmentId: userContext.departmentId,
+      accountId: userContext.accountId,
+      filterKeys: Object.keys(accessFilter)
+    });
+
+    // ✅ PASO 1: COMPLETITUD DE DATOS - SEGÚN DIRECTRIZ CON FILTRADO
     const totalInvited = await prisma.participant.count({ 
-      where: { campaignId } 
+      where: baseWhereClause 
     });
     
     const totalResponded = await prisma.participant.count({ 
-      where: { campaignId, hasResponded: true } 
+      where: { 
+        ...baseWhereClause,
+        hasResponded: true 
+      }
     });
 
     const participationRate = totalInvited > 0 ? (totalResponded / totalInvited) * 100 : 0;
@@ -101,7 +123,7 @@ export async function GET(
       // ✅ ENRIQUECER ANALYTICS VACÍO TAMBIÉN
       const enrichedEmptyMetrics = await DepartmentAdapter.enrichAnalytics(
         emptyMetrics,
-        authResult.user.id
+        userContext.accountId
       );
 
       return NextResponse.json(
@@ -115,6 +137,12 @@ export async function GET(
             totalResponses: 0,
             uniqueParticipants: 0,
             calculatedAt: new Date().toISOString()
+          },
+          metadata: {
+            filtered: userContext.role === 'AREA_MANAGER',
+            totalParticipants: totalInvited,
+            userRole: userContext.role,
+            departmentScope: userContext.departmentId || null
           }
         },
         { status: 200 }
@@ -123,21 +151,21 @@ export async function GET(
 
     // ✅ PASO 2: PERFORMANCE - ERRADICAR CONSULTA VORAZ
 
-    // Score promedio - DB AGGREGATION
+    // Score promedio - DB AGGREGATION con filtro
     const ratingAggregate = await prisma.response.aggregate({
       where: { 
-        participant: { campaignId }, 
+        participant: baseWhereClause,
         rating: { not: null } 
       },
       _avg: { rating: true }
     });
     const averageScore = ratingAggregate._avg.rating || 0;
 
-    // Scores por categoría - DB GROUPBY
+    // Scores por categoría - DB GROUPBY con filtro
     const categoryData = await prisma.response.groupBy({
       by: ['questionId'],
       where: { 
-        participant: { campaignId }, 
+        participant: baseWhereClause,
         rating: { not: null } 
       },
       _avg: { rating: true },
@@ -195,12 +223,12 @@ export async function GET(
       const startDate = new Date(`${day}T00:00:00.000Z`);
       const endDate = new Date(`${day}T23:59:59.999Z`);
       
-      // ✅ CONSULTA CORREGIDA - Usar participant.responseDate
+      // ✅ CONSULTA CORREGIDA CON FILTRO BASE
       const dailyResponses = await prisma.participant.findMany({
         where: {
-          campaignId,
+          ...baseWhereClause,
           hasResponded: true,
-          responseDate: {  // ← AHORA USA responseDate CORRECTAMENTE
+          responseDate: {
             gte: startDate,
             lte: endDate
           }
@@ -211,19 +239,19 @@ export async function GET(
       responsesByDay[day] = dailyResponses.length;
     }
 
-    // ✅ NUEVA CONSULTA - TREND DATA BY DEPARTMENT (ARQUITECTURA CORRECTA)
+    // ✅ NUEVA CONSULTA - TREND DATA BY DEPARTMENT CON FILTRO
     const responsesByDayByDept: Record<string, Record<string, number>> = {};
     
     for (const day of analysisRange) {
       const startDate = new Date(`${day}T00:00:00.000Z`);
       const endDate = new Date(`${day}T23:59:59.999Z`);
       
-      // Obtener respuestas del día con departamento
+      // Obtener respuestas del día con departamento Y FILTRO
       const dailyResponsesWithDept = await prisma.participant.findMany({
         where: {
-          campaignId,
+          ...baseWhereClause,
           hasResponded: true,
-          responseDate: {  // ← AHORA USA responseDate CORRECTAMENTE
+          responseDate: {
             gte: startDate,
             lte: endDate
           }
@@ -273,29 +301,29 @@ export async function GET(
       }));
     });
 
-    // ✅ SEGMENTACIÓN - DB GROUPBY DEPARTAMENTOS CENTRALIZADO
+    // ✅ SEGMENTACIÓN - DB GROUPBY DEPARTAMENTOS CON FILTRO
     const departmentStats = await prisma.participant.groupBy({
       by: ['department'],
-      where: { campaignId },
+      where: baseWhereClause,
       _count: { id: true }
     });
 
-    // ✅ DEPARTMENT SCORES - CÁLCULO CENTRALIZADO Y EFICIENTE (CORREGIDO)
+    // ✅ DEPARTMENT SCORES - CÁLCULO CENTRALIZADO CON FILTRO
     const departmentScores: Record<string, number> = {};
     
-    // Obtener scores promedio por participante - CORREGIDO: usar participantId
+    // Obtener scores promedio por participante CON FILTRO
     const participantAvgScores = await prisma.response.groupBy({
       by: ['participantId'],
       where: {
-        participant: { campaignId },
+        participant: baseWhereClause,
         rating: { not: null }
       },
       _avg: { rating: true }
     });
 
-    // Mapear participantId a department
+    // Mapear participantId a department CON FILTRO
     const participantDepartments = await prisma.participant.findMany({
-      where: { campaignId },
+      where: baseWhereClause,
       select: { id: true, department: true }
     });
 
@@ -385,19 +413,22 @@ export async function GET(
     console.log('📊 Raw analytics before enrichment:', {
       departmentScores: Object.keys(analytics.departmentScores || {}).length,
       totalInvited: analytics.totalInvited,
-      accountId: authResult.user.id
+      accountId: userContext.accountId,
+      filtered: userContext.role === 'AREA_MANAGER'
     });
 
     // ✅ ENRIQUECER ANALYTICS CON DEPARTMENT NOMENCLATURA CLIENTE
     const enrichedAnalytics = await DepartmentAdapter.enrichAnalytics(
       analytics,
-      authResult.user.id
+      userContext.accountId
     );
 
     console.log('✅ Analytics enriched successfully:', {
       originalDepartments: Object.keys(analytics.departmentScores || {}).length,
       enrichedDepartments: Object.keys(enrichedAnalytics.departmentScoresDisplay || {}).length,
-      departmentMapping: Object.keys(enrichedAnalytics.departmentMapping || {}).length
+      departmentMapping: Object.keys(enrichedAnalytics.departmentMapping || {}).length,
+      userRole: userContext.role,
+      filteredData: userContext.role === 'AREA_MANAGER'
     });
 
     return NextResponse.json(
@@ -411,6 +442,12 @@ export async function GET(
           totalResponses: categoryData.reduce((sum, item) => sum + item._count._all, 0),
           uniqueParticipants: totalResponded,
           calculatedAt: new Date().toISOString()
+        },
+        metadata: {
+          filtered: userContext.role === 'AREA_MANAGER',
+          totalParticipants: totalInvited,
+          userRole: userContext.role,
+          departmentScope: userContext.departmentId || null
         }
       },
       { status: 200 }
@@ -435,8 +472,11 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const authResult = await verifyJWT(request);
-    if (!authResult.success || !authResult.user) {
+    // ✅ NUEVO: Extraer contexto del usuario usando helper centralizado
+    const userContext = extractUserContext(request);
+    
+    // Validación básica
+    if (!userContext.accountId) {
       return NextResponse.json(
         { 
           success: false,
