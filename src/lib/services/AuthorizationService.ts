@@ -1,5 +1,5 @@
 // src/lib/services/AuthorizationService.ts
-// VERSIÓN FINAL VALIDADA - INCLUYE AMBOS NIVELES DE SEGURIDAD
+// VERSIÓN FINAL VALIDADA - INCLUYE AMBOS NIVELES DE SEGURIDAD + CONTEXTO
 
 import { prisma } from '@/lib/prisma';
 import { LRUCache } from 'lru-cache';
@@ -9,6 +9,14 @@ const hierarchyCache = new LRUCache<string, string[]>({
   max: 500,
   ttl: 1000 * 60 * 15 // 15 minutos
 });
+
+/**
+ * Interface para opciones de filtrado con contexto
+ */
+export interface FilterOptions {
+  dataType?: 'participation' | 'results' | 'administrative';
+  skipDepartmentFilter?: boolean;
+}
 
 /**
  * Obtiene todos los departamentos hijos de una gerencia
@@ -48,13 +56,23 @@ async function getChildDepartmentIds(parentId: string): Promise<string[]> {
 /**
  * FUNCIÓN CRÍTICA - Construye filtros de seguridad multi-nivel
  * NIVEL 1: Multi-tenant (accountId) - SIEMPRE
- * NIVEL 2: Departamental (departmentId) - Solo AREA_MANAGER
+ * NIVEL 2: Departamental (departmentId) - Solo AREA_MANAGER y según contexto
+ * 
+ * ACTUALIZADO: Ahora soporta contexto para comportamiento diferenciado
  */
-export async function buildParticipantAccessFilter(userContext: {
-  accountId: string;
-  role: string | null;
-  departmentId: string | null;
-}): Promise<any> {
+export async function buildParticipantAccessFilter(
+  userContext: {
+    accountId: string;
+    role: string | null;
+    departmentId: string | null;
+  },
+  options?: FilterOptions  // NUEVO: Parámetro opcional para contexto
+): Promise<any> {
+  
+  // Log del contexto si está presente
+  if (options?.dataType) {
+    debugLog(`📋 Contexto: ${options.dataType}`);
+  }
   
   debugLog(`🔐 Construyendo filtros para rol: ${userContext.role}, account: ${userContext.accountId}`);
   
@@ -70,8 +88,20 @@ export async function buildParticipantAccessFilter(userContext: {
     };
   }
   
-  // CASO 2: AREA_MANAGER - filtro por cuenta Y departamentos
+  // CASO 2: AREA_MANAGER - filtro por cuenta Y departamentos (CON CONTEXTO)
   if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
+    
+    // NUEVO: Si es contexto de participación o se pide skip explícito, NO filtrar por departamento
+    if (options?.dataType === 'participation' || options?.skipDepartmentFilter) {
+      debugLog(`📊 AREA_MANAGER en modo participación: Sin filtro departamental`);
+      return {
+        campaign: { 
+          accountId: userContext.accountId  // Solo multi-tenant
+        }
+      };
+    }
+    
+    // Comportamiento original: Para resultados o sin contexto, SÍ filtrar
     debugLog(`🏢 AREA_MANAGER: Aplicando filtros para depto ${userContext.departmentId}`);
     
     const childIds = await getChildDepartmentIds(userContext.departmentId);

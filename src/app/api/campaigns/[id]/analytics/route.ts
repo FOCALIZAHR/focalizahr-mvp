@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter';
 import { buildParticipantAccessFilter, extractUserContext } from '@/lib/services/AuthorizationService'; // ✅ NUEVO IMPORT
+import { AggregationService } from '@/lib/services/AggregationService';
 
 // ✅ INTERFACES ANALYTICS + TREND BY DEPARTMENT
 interface CampaignAnalytics {
@@ -23,6 +24,7 @@ interface CampaignAnalytics {
   departmentScores?: Record<string, number>;
   responsesByDay?: Record<string, number>;
   demographicBreakdown?: any[];
+  hierarchicalData?: any[] | null;
 }
 
 // ✅ GET /api/campaigns/[id]/analytics - RECONSTRUCCIÓN COMPLETA CON SEGURIDAD
@@ -73,7 +75,9 @@ export async function GET(
     }
 
     // ✅ OBTENER FILTROS DE SEGURIDAD (multi-tenant + departamental)
-    const accessFilter = await buildParticipantAccessFilter(userContext);
+    const accessFilter = await buildParticipantAccessFilter(userContext, {
+     dataType: 'participation'  // Torre Control = transparencia total
+    });
     
     // ✅ DEFINIR BASE WHERE CLAUSE - PATRÓN CORRECTO PARA REUTILIZACIÓN
     const baseWhereClause = {
@@ -423,6 +427,20 @@ export async function GET(
       userContext.accountId
     );
 
+    // ====================================================================
+    // INICIO DEL CÓDIGO NUEVO A INSERTAR
+    // ====================================================================
+    const hasHierarchy = await AggregationService.hasHierarchy(userContext.accountId);
+    let hierarchicalData = null;
+
+    if (hasHierarchy) {
+      console.log('🏗️ Jerarquía detectada. Invocando AggregationService...');
+      hierarchicalData = await AggregationService.getHierarchicalScores(campaignId, userContext.accountId);
+    }
+    // ====================================================================
+    // FIN DEL CÓDIGO NUEVO A INSERTAR
+    // ====================================================================
+
     console.log('✅ Analytics enriched successfully:', {
       originalDepartments: Object.keys(analytics.departmentScores || {}).length,
       enrichedDepartments: Object.keys(enrichedAnalytics.departmentScoresDisplay || {}).length,
@@ -434,7 +452,10 @@ export async function GET(
     return NextResponse.json(
       { 
         success: true,
-        metrics: enrichedAnalytics,                    // ✅ ANALYTICS ENRICHED
+        metrics: { 
+          ...enrichedAnalytics, 
+          hierarchicalData
+        },                    // ✅ ANALYTICS ENRICHED
         meta: {
           campaignId,
           campaignName: campaignMeta.name,

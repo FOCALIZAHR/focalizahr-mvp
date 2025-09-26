@@ -1,7 +1,7 @@
 // ====================================================================
 // FOCALIZAHR MONITOR PAGE - ARQUITECTURA ORIGINAL + IDs NAVEGACIÓN
 // src/app/dashboard/campaigns/[id]/monitor/page.tsx
-// VERSIÓN CORREGIDA: Props específicas y TopMoversPanel integrado
+// VERSIÓN INTEGRADA: GerenciaPulseBimodal agregado como Nivel 2
 // ====================================================================
 
 'use client';
@@ -11,6 +11,9 @@ import { useRouter, useParams } from 'next/navigation';
 
 // 🚀 CockpitHeader bimodal
 import { CockpitHeaderBimodal } from '@/components/monitor/CockpitHeaderBimodal';
+
+// ⭐ NUEVO - Componente Gerencias WOW
+import { GerenciaPulseBimodal } from '@/components/monitor/GerenciaPulseBimodal';
 
 // ✅ Componentes WOW existentes
 import { DepartmentPulsePanel } from '@/components/monitor/DepartmentPulsePanel';
@@ -76,7 +79,7 @@ export default function CampaignMonitorPage() {
     <div className="fhr-bg-main min-h-screen">
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
         
-        {/* 🚀 COCKPIT HEADER - Recibe TODOS los datos del hook incluyendo gráficos */}
+        {/* 🚀 NIVEL 1: COCKPIT HEADER - Recibe TODOS los datos del hook incluyendo gráficos */}
         <CockpitHeaderBimodal 
           {...monitorData}
           onScrollToSection={(sectionId) => {
@@ -87,12 +90,50 @@ export default function CampaignMonitorPage() {
           }}
         />
 
-        {/* 🎯 PROTAGONISTA - Historia Temporal */}
+        {/* ⭐ NIVEL 2: GERENCIA PULSE BIMODAL (NUEVO) - Vista Ejecutiva de Gerencias */}
+        {/* DEBUG: Verificar qué datos están llegando */}
+        {console.log('🔍 DEBUG monitorData:', {
+          hasHierarchy: monitorData.hasHierarchy,
+          gerenciaData: monitorData.gerenciaData,
+          hierarchicalData: (monitorData as any).hierarchicalData,
+          fullMonitorData: monitorData
+        })}
+        
+        {/* Temporalmente mostrar el componente siempre para debug */}
+        <div className="border-2 border-yellow-500 p-4 rounded-lg">
+          <p className="text-yellow-400 mb-2">DEBUG - Estado del Componente:</p>
+          <p className="text-white">hasHierarchy: {String(monitorData.hasHierarchy)}</p>
+          <p className="text-white">gerenciaData existe: {monitorData.gerenciaData ? 'SÍ' : 'NO'}</p>
+          <p className="text-white">gerenciaData length: {monitorData.gerenciaData?.length || 0}</p>
+          
+          {/* Intenta renderizar el componente con datos fallback */}
+          <GerenciaPulseBimodal 
+            gerenciaData={monitorData.gerenciaData || []}
+            hasHierarchy={monitorData.hasHierarchy || false}
+          />
+        </div>
+        
+        {/* SEPARADOR VISUAL - Mantenerlo visible para debug */}
+        <div className="my-10 relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t-2 border-gradient-to-r from-cyan-600/20 via-purple-600/20 to-cyan-600/20"></div>
+          </div>
+          <div className="relative flex justify-center">
+            <div className="bg-[#0a0e1a] px-8 py-4 rounded-full backdrop-blur-xl border border-white/10">
+              <h2 className="text-2xl font-bold text-center bg-gradient-to-r from-cyan-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent flex items-center gap-3">
+                <span className="text-3xl">📊</span>
+                ANÁLISIS INTELIGENTE DETALLADO - DEPARTAMENTOS
+              </h2>
+            </div>
+          </div>
+        </div>
+
+        {/* 🎯 NIVEL 3: PROTAGONISTA - Historia Temporal */}
         <div id="rhythm">
           <CampaignRhythmPanel {...monitorData} />
         </div>
 
-        {/* ⚡ GRID COMPONENTES WOW */}
+        {/* ⚡ NIVEL 4: GRID COMPONENTES WOW - Análisis Detallado Departamentos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           {/* Pulso Departamental */}

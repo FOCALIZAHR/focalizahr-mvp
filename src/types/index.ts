@@ -747,6 +747,26 @@ export interface Analytics {
   }>;
   demographicBreakdown?: any[];
   lastUpdated: string;
+  // Campo nuevo para datos jerárquicos
+  hierarchicalData?: Array<{
+    id: string;
+    displayName: string;
+    unitType: string;
+    level: number;
+    score: number;
+    participants: number;
+    employeeCount?: number;
+    children: Array<{
+      id: string;
+      displayName: string;
+      unitType: string;
+      level: number;
+      score: number;
+      participants: number;
+      responded: number;
+      rate: number;
+    }>;
+   }> | null;
 }
 
 // ✅ MONITOR DATA INTERFACES - TOWER CONTROL

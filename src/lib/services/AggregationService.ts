@@ -1,3 +1,6 @@
+// src/lib/services/AggregationService.ts
+// VERSIÓN CORRECTA - SQL Optimizado sin CTE recursivo problemático
+
 import { prisma } from '@/lib/prisma';
 
 export interface HierarchicalScore {
@@ -7,79 +10,89 @@ export interface HierarchicalScore {
   unitType: string;
   level: number;
   score: number;
-  participants: number;  // CORREGIDO: era participantCount
+  participants: number;
   children?: HierarchicalScore[];
 }
 
 export class AggregationService {
   /**
-   * Obtiene scores jerárquicos usando CTE recursivo (implementación Gemini optimizada)
-   * Performance optimizado con cálculo en BD
+   * Obtiene scores jerárquicos usando consulta SQL optimizada
+   * SOLUCIÓN: Evita agregaciones en CTE recursivo usando subconsultas
    */
   static async getHierarchicalScores(
     campaignId: string, 
     accountId: string
   ): Promise<HierarchicalScore[]> {
     try {
-      // ✅ CORRECCIÓN: Usando template literals con Prisma para seguridad SQL
+      console.log('📊 Starting hierarchical score calculation...');
+      
+      // ESTRATEGIA: Primero calculamos todos los scores base, 
+      // luego construimos la jerarquía con una segunda consulta
+      
       const results = await prisma.$queryRaw<HierarchicalScore[]>`
-        WITH RECURSIVE unit_scores AS (
-          -- ANCLA: Departamentos con participantes y scores directos
+        WITH base_scores AS (
+          -- Calculamos scores para TODOS los departamentos (nivel 3)
           SELECT 
             d.id,
             d.parent_id,
             d.display_name,
             d.unit_type,
             d.level,
-            d.employee_count,
-            COALESCE(AVG(r.rating), 0) AS weighted_score,
-            COUNT(DISTINCT p.id)::FLOAT AS participant_count
+            COALESCE(AVG(r.rating), 0) as score,
+            COUNT(DISTINCT p.id) as participant_count
           FROM departments d
-          LEFT JOIN participants p ON d.id = p.department_id AND p.campaign_id = ${campaignId}
+          LEFT JOIN participants p ON d.id = p.department_id 
+            AND p.campaign_id = ${campaignId}
           LEFT JOIN responses r ON p.id = r.participant_id
           WHERE d.account_id = ${accountId}
             AND d.is_active = true
-            AND d.level = 3  -- Solo departamentos (hojas)
-          GROUP BY d.id, d.parent_id, d.display_name, d.unit_type, d.level, d.employee_count
-          
-          UNION ALL
-          
-          -- RECURSIVO: Agregación ponderada hacia arriba (gerencias)
-          SELECT
-            parent.id,
-            parent.parent_id,
-            parent.display_name,
-            parent.unit_type,
-            parent.level,
-            parent.employee_count,
-            -- Promedio ponderado usando participant_count como peso
-            CASE 
-              WHEN SUM(child.participant_count) > 0 THEN
-                SUM(child.weighted_score * child.participant_count) / SUM(child.participant_count)
-              ELSE 0
-            END AS weighted_score,
-            SUM(child.participant_count) AS participant_count
-          FROM departments parent
-          INNER JOIN unit_scores child ON parent.id = child.parent_id
-          WHERE parent.account_id = ${accountId}
-            AND parent.is_active = true
-          GROUP BY parent.id, parent.parent_id, parent.display_name, parent.unit_type, parent.level, parent.employee_count
+            AND d.level = 3
+          GROUP BY d.id, d.parent_id, d.display_name, d.unit_type, d.level
+        ),
+        aggregated_scores AS (
+          -- Para las gerencias, agregamos los scores de sus departamentos hijos
+          SELECT 
+            g.id,
+            g.parent_id,
+            g.display_name,
+            g.unit_type,
+            g.level,
+            COALESCE(
+              SUM(bs.score * bs.participant_count) / NULLIF(SUM(bs.participant_count), 0),
+              0
+            ) as score,
+            COALESCE(SUM(bs.participant_count), 0) as participant_count
+          FROM departments g
+          LEFT JOIN base_scores bs ON g.id = bs.parent_id
+          WHERE g.account_id = ${accountId}
+            AND g.is_active = true
+            AND g.level = 2
+          GROUP BY g.id, g.parent_id, g.display_name, g.unit_type, g.level
         )
+        -- Combinamos gerencias y departamentos
         SELECT 
           id,
-          parent_id AS "parentId",           -- ✅ Alias para mapear correctamente
-          display_name AS "displayName",     -- ✅ Alias para mapear correctamente
-          unit_type AS "unitType",           -- ✅ Alias para mapear correctamente
+          parent_id as "parentId",
+          display_name as "displayName",
+          unit_type as "unitType",
           level,
-          ROUND(weighted_score::numeric, 2) as score,
+          ROUND(score::numeric, 2) as score,
           participant_count::INTEGER as participants
-        FROM unit_scores
-        ORDER BY level, display_name;
+        FROM (
+          SELECT * FROM aggregated_scores
+          UNION ALL
+          SELECT * FROM base_scores
+        ) combined
+        ORDER BY level, display_name
       `;
-      
+
+      console.log(`✅ Retrieved ${results.length} hierarchical units`);
+
+      // Construir árbol jerárquico
       return this.buildHierarchyTree(results);
+      
     } catch (error) {
-      console.error('Error in getHierarchicalScores:', error);
+      console.error('❌ Error in getHierarchicalScores:', error);
       throw error;
     }
   }
@@ -119,12 +132,90 @@ export class AggregationService {
    * Detecta si hay estructura jerárquica configurada
    */
   static async hasHierarchy(accountId: string): Promise<boolean> {
-    const count = await prisma.department.count({
-      where: {
-        accountId,
-        parentId: { not: null }
-      }
+    try {
+      const count = await prisma.department.count({
+        where: {
+          accountId,
+          parentId: { not: null },
+          isActive: true
+        }
+      });
+      return count > 0;
+    } catch (error) {
+      console.error('❌ Error checking hierarchy:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Agrupa scores por nivel jerárquico (helper para visualización)
+   */
+  static groupScoresByLevel(scores: HierarchicalScore[]): Record<number, HierarchicalScore[]> {
+    const grouped: Record<number, HierarchicalScore[]> = {};
+    
+    const flattenTree = (nodes: HierarchicalScore[]) => {
+      nodes.forEach(node => {
+        if (!grouped[node.level]) {
+          grouped[node.level] = [];
+        }
+        grouped[node.level].push(node);
+        if (node.children && node.children.length > 0) {
+          flattenTree(node.children);
+        }
+      });
+    };
+    
+    flattenTree(scores);
+    return grouped;
+  }
+
+  /**
+   * Calcula estadísticas generales de la jerarquía
+   */
+  static calculateHierarchyStats(scores: HierarchicalScore[]): {
+    avgScoreByLevel: Record<number, number>;
+    participationByLevel: Record<number, number>;
+    topPerformers: HierarchicalScore[];
+    bottomPerformers: HierarchicalScore[];
+  } {
+    const allNodes: HierarchicalScore[] = [];
+    
+    // Aplanar el árbol para análisis
+    const flattenTree = (nodes: HierarchicalScore[]) => {
+      nodes.forEach(node => {
+        allNodes.push(node);
+        if (node.children && node.children.length > 0) {
+          flattenTree(node.children);
+        }
+      });
+    };
+    
+    flattenTree(scores);
+    
+    const levels = [...new Set(allNodes.map(s => s.level))];
+    const avgScoreByLevel: Record<number, number> = {};
+    const participationByLevel: Record<number, number> = {};
+    
+    levels.forEach(level => {
+      const levelNodes = allNodes.filter(s => s.level === level);
+      const totalScore = levelNodes.reduce((sum, s) => sum + s.score, 0);
+      const totalParticipants = levelNodes.reduce((sum, s) => sum + s.participants, 0);
+      
+      avgScoreByLevel[level] = levelNodes.length > 0 
+        ? Math.round((totalScore / levelNodes.length) * 100) / 100 
+        : 0;
+      participationByLevel[level] = totalParticipants;
     });
-    return count > 0;
+
+    // Top y bottom performers (solo unidades con participación)
+    const nodesWithParticipation = allNodes.filter(s => s.participants > 0);
+    const sortedByScore = [...nodesWithParticipation].sort((a, b) => b.score - a.score);
+    
+    return {
+      avgScoreByLevel,
+      participationByLevel,
+      topPerformers: sortedByScore.slice(0, 5),
+      bottomPerformers: sortedByScore.slice(-5).reverse()
+    };
   }
 }

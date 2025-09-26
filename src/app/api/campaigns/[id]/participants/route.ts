@@ -448,7 +448,9 @@ export async function GET(
     console.log('✅ Campaign found:', campaign.name)
     
     // ✅ NUEVO: Obtener filtros de seguridad
-    const accessFilter = await buildParticipantAccessFilter(userContext)
+    const accessFilter = await buildParticipantAccessFilter(userContext, {
+      dataType: 'participation'  // Torre Control = transparencia total
+    });
     
     // Log para debugging
     console.log('🔐 Security filters applied to participants:', {
