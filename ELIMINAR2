@@ -357,49 +357,24 @@ async function loadParticipantsToDatabase(
       console.log('🆕 Departamento paraguas creado:', umbrellaDepId);
     }
     
-    // PASO 2: MAPEAR DEPARTAMENTOS Y GERENCIAS VÁLIDAS
+    // PASO 2: MAPEAR DEPARTAMENTOS VÁLIDOS
     const departmentNames = [...new Set(
       participants
         .map(p => p.department)
         .filter(Boolean) as string[]
     )];
     
-    console.log(`📊 Total de unidades organizacionales únicas en CSV: ${departmentNames.length}`);
+    console.log(`📊 Total de departamentos únicos en CSV: ${departmentNames.length}`);
     
-    // BUSCAR TODAS LAS ESTRUCTURAS (GERENCIAS Y DEPARTAMENTOS)
-    const existingStructures = await prisma.department.findMany({
-      where: {
-        accountId: campaign.accountId,
-        displayName: {
-          in: departmentNames,
-          mode: 'insensitive' // Comparación case-insensitive
-        }
-      },
-      select: {
-        id: true,
-        displayName: true,
-        unitType: true,
-        level: true
-      }
-    });
+    let departmentMapping: Record<string, string | null> = {};
     
-    console.log(`✅ Encontradas ${existingStructures.length} estructuras existentes`);
-    
-    // Crear mapeo manual (case-insensitive)
-    const departmentMapping: Record<string, string | null> = {};
-    const structureMap = new Map(
-      existingStructures.map(s => [s.displayName.toLowerCase(), s])
-    );
-    
-    for (const deptName of departmentNames) {
-      const structure = structureMap.get(deptName.toLowerCase());
-      if (structure) {
-        departmentMapping[deptName] = structure.id;
-        console.log(`✅ Mapeado: "${deptName}" → ${structure.unitType} (${structure.id})`);
-      } else {
-        departmentMapping[deptName] = null;
-        console.log(`⚠️ No encontrado: "${deptName}" → será asignado al paraguas`);
-      }
+    if (departmentNames.length > 0) {
+      // NO auto-crear - solo obtener mapeo de existentes
+      departmentMapping = await DepartmentAdapter.convertParticipantDepartments(
+        campaign.accountId,
+        departmentNames
+      );
+      console.log('🗺️ Mapeo obtenido:', departmentMapping);
     }
     
     // PASO 3: IDENTIFICAR Y REPORTAR DEPARTAMENTOS NO MAPEADOS
@@ -408,7 +383,7 @@ async function loadParticipantsToDatabase(
     );
     
     if (unmappedDepartments.length > 0) {
-      console.warn(`⚠️ ${unmappedDepartments.length} términos no mapeados (serán asignados al paraguas):`, unmappedDepartments);
+      console.warn(`⚠️ ${unmappedDepartments.length} departamentos no mapeados (serán asignados al paraguas):`, unmappedDepartments);
     }
     
     // ============= FIN FLUJO DE CARGA TOLERANTE =============

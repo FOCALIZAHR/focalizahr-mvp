@@ -3,37 +3,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import type { CampaignResultsData } from '@/types';
 
-// ✅ INTERFACE NORMALIZADA - DATOS LIMPIOS Y CONSISTENTES
-export interface CampaignResultsData {
-  campaign: any;
-  analytics: {
-    // Métricas principales normalizadas
-    totalInvited: number;
-    totalResponded: number;
-    totalResponses: number; // Alias para compatibilidad
-    participationRate: number;
-    averageScore: number;
-    completionTime: number;
-    responseRate: number;
-    
-    // Datos estructurados normalizados
-    categoryScores: Record<string, number>;
-    departmentScores: Record<string, number>;
-    departmentScoresDisplay?: Record<string, number>;
-    departmentMapping?: Record<string, string>;
-    trendData: Array<{
-      date: string;
-      responses: number;
-      score: number;
-    }>;
-    trendDataByDepartment?: Record<string, Array<{ date: string; responses: number }>>;
-    responsesByDay: Record<string, number>;
-    segmentationData: any[];
-    demographicBreakdown: any[];
-    lastUpdated: string;
-  };
-}
 
 const getAuthToken = () => {
   if (typeof window !== 'undefined') {
@@ -145,6 +116,10 @@ function normalizeAnalyticsData(rawAnalyticsData: any): CampaignResultsData {
       responsesByDay,
       segmentationData: Array.isArray(rawMetrics.segmentationData) ? rawMetrics.segmentationData : [],
       demographicBreakdown: Array.isArray(rawMetrics.demographicBreakdown) ? rawMetrics.demographicBreakdown : [],
+       // 🆕 CAMPOS JERÁRQUICOS CRÍTICOS:
+      hierarchicalData: rawMetrics.hierarchicalData || null,
+      hasHierarchy: rawMetrics.hasHierarchy || false,
+
       lastUpdated: rawMetrics.lastUpdated || new Date().toISOString()
     }
   };
@@ -196,6 +171,10 @@ export function useCampaignResults(campaignId: string) {
 
       const rawAnalyticsData = await analyticsRes.json();
       console.log('📊 Raw analytics data received:', rawAnalyticsData);
+      // 🆕 AGREGA ESTOS 3 LOGS:
+      console.log('🔍 Tiene hierarchicalData?', !!rawAnalyticsData?.metrics?.hierarchicalData);
+      console.log('🔍 hasHierarchy value:', rawAnalyticsData?.metrics?.hasHierarchy);
+      console.log('🔍 hierarchicalData length:', rawAnalyticsData?.metrics?.hierarchicalData?.length);
 
       // ✅ NORMALIZACIÓN CENTRAL - ÚNICA RESPONSABILIDAD DEL HOOK
       const normalizedData = normalizeAnalyticsData(rawAnalyticsData);

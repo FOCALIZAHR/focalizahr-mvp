@@ -70,6 +70,7 @@
     "react-circular-progressbar": "^2.2.0",
     "react-countup": "^6.5.3",
     "react-dom": "18.3.1",
+    "react-dropzone": "^14.3.8",
     "react-gauge-chart": "^0.5.1",
     "react-hook-form": "^7.51.5",
     "react-hot-toast": "^2.6.0",

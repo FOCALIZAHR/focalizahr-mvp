@@ -81,7 +81,7 @@ export default function ParticipantUploader(props: ParticipantUploaderProps) {
     };
     
     fetchDepartments();
-  }, [setDepartments]);
+  }, []);
 
   // RENDERIZADO CONDICIONAL SIMPLE POR PASO
   return (

@@ -1,7 +1,7 @@
 // ====================================================================
-// FOCALIZAHR MONITOR PAGE - ARQUITECTURA ORIGINAL + IDs NAVEGACIÓN
+// FOCALIZAHR MONITOR PAGE - ARQUITECTURA 3 NIVELES OPTIMIZADA
 // src/app/dashboard/campaigns/[id]/monitor/page.tsx
-// VERSIÓN INTEGRADA: GerenciaPulseBimodal agregado como Nivel 2
+// VERSIÓN FINAL: 3 Niveles limpios con DepartmentWowCarousel integrado
 // ====================================================================
 
 'use client';
@@ -9,26 +9,26 @@
 import { useCampaignMonitor } from '@/hooks/useCampaignMonitor';
 import { useRouter, useParams } from 'next/navigation';
 
-// 🚀 CockpitHeader bimodal
+// ====================================================================
+// ARQUITECTURA 3 NIVELES - IMPORTS LIMPIOS
+// ====================================================================
+
+// 🚀 NIVEL 1: Vista Empresa General
 import { CockpitHeaderBimodal } from '@/components/monitor/CockpitHeaderBimodal';
 
-// ⭐ NUEVO - Componente Gerencias WOW
-import { GerenciaPulseBimodal } from '@/components/monitor/GerenciaPulseBimodal';
+// 🏢 NIVEL 2: Vista Gerencias Competitivo
+import { GerenciaPulseBimodal } from '@/components/monitor/gerencia/GerenciaPulseBimodal';
 
-// ✅ Componentes WOW existentes
-import { DepartmentPulsePanel } from '@/components/monitor/DepartmentPulsePanel';
-import { TopMoversPanel } from '@/components/monitor/TopMoversPanel'; // ✅ AGREGADO
+// 📊 NIVEL 3: Vista Departamentos Profundización (Carrusel)
+import { DepartmentWowCarousel } from '@/components/monitor/DepartmentWowCarousel';
+
+// 🎛️ Componente de Acciones (no es WOW, se mantiene)
 import { ActionButtons } from '@/components/monitor/ActionButtons';
-import { AnomalyDetectorPanel } from '@/components/monitor/AnomalyDetectorPanel';
-import { EngagementHeatmapCard } from '@/components/monitor/EngagementHeatmapCard';
-import { CrossStudyComparatorCard } from '@/components/monitor/CrossStudyComparatorCard';
-import CampaignRhythmPanel from '@/components/monitor/CampaignRhythmPanel';
-import LeadershipFingerprintPanel from '@/components/monitor/LeadershipFingerprintPanel';
 
 // UI Components
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2, Sparkles, Building2, BarChart3 } from 'lucide-react';
 
 // ✅ CSS FocalizaHR
 import '@/styles/focalizahr-design-system.css';
@@ -75,119 +75,212 @@ export default function CampaignMonitorPage() {
     );
   }
 
+  // MAPEO DE DATOS PARA GERENCIAS
+  const hierarchicalData = (monitorData as any).hierarchicalData || [];
+  const hasHierarchy = monitorData.hasHierarchy || false;
+
   return (
     <div className="fhr-bg-main min-h-screen">
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
         
-        {/* 🚀 NIVEL 1: COCKPIT HEADER - Recibe TODOS los datos del hook incluyendo gráficos */}
-        <CockpitHeaderBimodal 
-          {...monitorData}
-          onScrollToSection={(sectionId) => {
-            const element = document.getElementById(sectionId);
-            if (element) {
-              element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-          }}
-        />
-
-        {/* ⭐ NIVEL 2: GERENCIA PULSE BIMODAL (NUEVO) - Vista Ejecutiva de Gerencias */}
-        {/* DEBUG: Verificar qué datos están llegando */}
-        {console.log('🔍 DEBUG monitorData:', {
-          hasHierarchy: monitorData.hasHierarchy,
-          gerenciaData: monitorData.gerenciaData,
-          hierarchicalData: (monitorData as any).hierarchicalData,
-          fullMonitorData: monitorData
-        })}
-        
-        {/* Temporalmente mostrar el componente siempre para debug */}
-        <div className="border-2 border-yellow-500 p-4 rounded-lg">
-          <p className="text-yellow-400 mb-2">DEBUG - Estado del Componente:</p>
-          <p className="text-white">hasHierarchy: {String(monitorData.hasHierarchy)}</p>
-          <p className="text-white">gerenciaData existe: {monitorData.gerenciaData ? 'SÍ' : 'NO'}</p>
-          <p className="text-white">gerenciaData length: {monitorData.gerenciaData?.length || 0}</p>
-          
-          {/* Intenta renderizar el componente con datos fallback */}
-          <GerenciaPulseBimodal 
-            gerenciaData={monitorData.gerenciaData || []}
-            hasHierarchy={monitorData.hasHierarchy || false}
+        {/* ====================================================================
+            NIVEL 1: VISTA EMPRESA GENERAL
+            CockpitHeaderBimodal - Visión ejecutiva completa
+        ==================================================================== */}
+        <div id="vista-empresa">
+          <CockpitHeaderBimodal 
+            {...monitorData}
+            onScrollToSection={(sectionId) => {
+              const element = document.getElementById(sectionId);
+              if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }}
           />
         </div>
-        
-        {/* SEPARADOR VISUAL - Mantenerlo visible para debug */}
-        <div className="my-10 relative">
+
+        {/* ====================================================================
+            SEPARADOR NIVEL 1 → 2 (Estilo coherente con design system)
+        ==================================================================== */}
+        <div className="relative py-4">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t-2 border-gradient-to-r from-cyan-600/20 via-purple-600/20 to-cyan-600/20"></div>
+            <div 
+              className="w-full h-px"
+              style={{
+                background: 'linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.3), rgba(167, 139, 250, 0.3), transparent)'
+              }}
+            />
           </div>
           <div className="relative flex justify-center">
-            <div className="bg-[#0a0e1a] px-8 py-4 rounded-full backdrop-blur-xl border border-white/10">
-              <h2 className="text-2xl font-bold text-center bg-gradient-to-r from-cyan-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent flex items-center gap-3">
-                <span className="text-3xl">📊</span>
-                ANÁLISIS INTELIGENTE DETALLADO - DEPARTAMENTOS
-              </h2>
+            <div 
+              className="px-6 py-2 rounded-full backdrop-blur-sm"
+              style={{
+                background: 'rgba(30, 41, 59, 0.8)',
+                border: '1px solid rgba(34, 211, 238, 0.2)'
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-cyan-400" />
+                <span className="text-sm font-medium uppercase tracking-wider text-slate-300">
+                  Nivel 2: Vista Gerencias
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* 🎯 NIVEL 3: PROTAGONISTA - Historia Temporal */}
-        <div id="rhythm">
-          <CampaignRhythmPanel {...monitorData} />
+        {/* ====================================================================
+            NIVEL 2: VISTA GERENCIAS COMPETITIVO
+            GerenciaPulseBimodal - Comparación y competencia entre gerencias
+        ==================================================================== */}
+        <div id="vista-gerencias">
+          <GerenciaPulseBimodal 
+            gerenciaData={hierarchicalData}
+            hasHierarchy={hasHierarchy}
+            isLoading={false}
+          />
         </div>
-
-        {/* ⚡ NIVEL 4: GRID COMPONENTES WOW - Análisis Detallado Departamentos */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          
-          {/* Pulso Departamental */}
-          <div id="pulse">
-            <DepartmentPulsePanel {...monitorData} />
-          </div>
-          
-          {/* ✅ TOP MOVERS - CORREGIDO: Era DepartmentPulsePanel duplicado */}
-          <div id="topmovers">
-            <TopMoversPanel 
-              topMovers={monitorData.topMovers}
-              lastRefresh={monitorData.lastRefresh}
-            />
-          </div>
-          
-          {/* ✅ ANOMALÍAS - CORREGIDO: Props específicas en lugar de spread */}
-          <div id="anomalies">
-            <AnomalyDetectorPanel 
-              departmentAnomalies={monitorData.departmentAnomalies || []}
-              positiveAnomalies={monitorData.positiveAnomalies || []}
-              negativeAnomalies={monitorData.negativeAnomalies || []}
-              meanRate={monitorData.meanRate || 0}
-              totalDepartments={monitorData.totalDepartments || 0}
-              lastRefresh={monitorData.lastRefresh}
-            />
-          </div>
-          
-          {/* Mapa de Calor Engagement */}
-          <div>
-            <EngagementHeatmapCard {...monitorData} />
-          </div>
-          
-          {/* ✅ CROSS STUDY - CORREGIDO: Prop 'comparison' correcta */}
-          <div className="lg:col-span-2" id="cross-study">
-            <CrossStudyComparatorCard 
-              comparison={monitorData.crossStudyComparison}
-              onApplyLearning={() => {
-                console.log('Apply learning from historical data');
-                // TODO: Implementar lógica de aplicar aprendizajes
+        
+        {/* ====================================================================
+            SEPARADOR NIVEL 2 → 3 (Estilo coherente con design system)
+        ==================================================================== */}
+        <div className="relative py-4">
+          <div className="absolute inset-0 flex items-center">
+            <div 
+              className="w-full h-px"
+              style={{
+                background: 'linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.3), rgba(167, 139, 250, 0.3), transparent)'
               }}
             />
           </div>
+          <div className="relative flex justify-center">
+            <div 
+              className="px-6 py-2 rounded-full backdrop-blur-sm"
+              style={{
+                background: 'rgba(30, 41, 59, 0.8)',
+                border: '1px solid rgba(167, 139, 250, 0.2)'
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-purple-400" />
+                <span className="text-sm font-medium uppercase tracking-wider text-slate-300">
+                  Nivel 3: Análisis Departamental
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* 🧠 LEADERSHIP FINGERPRINT - Análisis de Liderazgo Organizacional */}
-        <div id="leadership-analysis" className="lg:col-span-2">
-          <LeadershipFingerprintPanel 
-            leadershipAnalysis={monitorData.leadershipAnalysis} 
+        {/* ====================================================================
+            NIVEL 3: VISTA DEPARTAMENTOS PROFUNDIZACIÓN
+            DepartmentWowCarousel - Todos los componentes WOW en carrusel
+        ==================================================================== */}
+        <div id="vista-departamentos">
+          <DepartmentWowCarousel 
+            monitorData={monitorData}
           />
         </div>
 
-        {/* 🎛️ PANEL DE ACCIONES */}
-        <div id="actions">
+        {/* ====================================================================
+            PANEL DE ACCIONES - Se mantiene fuera de los 3 niveles
+        ==================================================================== */}
+        <div id="actions" className="mt-8">
           <ActionButtons {...monitorData} />
+        </div>
+
+        {/* ====================================================================
+            RESUMEN EJECUTIVO - Cards informativos finales
+        ==================================================================== */}
+        <div id="overview" className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+          <Card 
+            className="p-6"
+            style={{
+              background: 'rgba(30, 41, 59, 0.6)',
+              border: '1px solid rgba(71, 85, 105, 0.3)',
+              borderRadius: '12px'
+            }}
+          >
+            <h3 className="text-sm font-medium uppercase tracking-wider text-cyan-400 mb-4">
+              Resumen Ejecutivo
+            </h3>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Participación actual</span>
+                <span className="text-white font-medium">{monitorData.participationRate}%</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Días restantes</span>
+                <span className="text-white font-medium">{monitorData.daysRemaining}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Respuestas</span>
+                <span className="text-white font-medium">
+                  {monitorData.totalResponded} de {monitorData.totalInvited}
+                </span>
+              </div>
+              {hasHierarchy && (
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Gerencias activas</span>
+                  <span className="text-white font-medium">{hierarchicalData.length}</span>
+                </div>
+              )}
+            </div>
+          </Card>
+          
+          <Card 
+            className="p-6"
+            style={{
+              background: 'rgba(30, 41, 59, 0.6)',
+              border: '1px solid rgba(71, 85, 105, 0.3)',
+              borderRadius: '12px'
+            }}
+          >
+            <h3 className="text-sm font-medium uppercase tracking-wider text-purple-400 mb-4">
+              Próximos Pasos Recomendados
+            </h3>
+            <div className="space-y-2">
+              {monitorData.recommendations?.slice(0, 3).map((rec: string, index: number) => (
+                <div key={index} className="flex items-start gap-2">
+                  <Sparkles className="h-3 w-3 text-yellow-400 mt-1 flex-shrink-0" />
+                  <p className="text-sm text-slate-300">{rec}</p>
+                </div>
+              )) || (
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <Sparkles className="h-3 w-3 text-yellow-400 mt-1 flex-shrink-0" />
+                    <p className="text-sm text-slate-300">Revisar departamentos con baja participación</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Sparkles className="h-3 w-3 text-yellow-400 mt-1 flex-shrink-0" />
+                    <p className="text-sm text-slate-300">Enviar recordatorios focalizados</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Sparkles className="h-3 w-3 text-yellow-400 mt-1 flex-shrink-0" />
+                    <p className="text-sm text-slate-300">Analizar patrones de respuesta</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        {/* ====================================================================
+            FOOTER INFORMACIÓN
+        ==================================================================== */}
+        <div className="text-center text-xs text-slate-500 pt-8 mt-8 border-t border-slate-800">
+          <div className="flex items-center justify-center gap-4">
+            <span>Última actualización: {lastRefresh?.toLocaleString()}</span>
+            <span>•</span>
+            <span>Torre de Control v7.0</span>
+            <span>•</span>
+            <span>ID: {campaignId.slice(0, 8)}...</span>
+            {hasHierarchy && (
+              <>
+                <span>•</span>
+                <span>{hierarchicalData.length} Gerencias</span>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -59,6 +59,7 @@ export async function GET(
         id: true,
         name: true,
         startDate: true,
+        endDate: true,  // ← AGREGADO PARA INTELIGENCIA PREDICTIVA
         createdAt: true,
         campaignType: { select: { name: true } }
       }
@@ -73,6 +74,13 @@ export async function GET(
         { status: 404 }
       );
     }
+
+    // 🧠 CALCULAR DÍAS RESTANTES PARA INTELIGENCIA PREDICTIVA
+    const currentDate = new Date();
+    const endDate = campaignMeta.endDate ? new Date(campaignMeta.endDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Default: 7 días
+    const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+    console.log(`📅 Campaign timing - Days remaining: ${daysRemaining}`);
 
     // ✅ OBTENER FILTROS DE SEGURIDAD (multi-tenant + departamental)
     const accessFilter = await buildParticipantAccessFilter(userContext, {
@@ -428,14 +436,21 @@ export async function GET(
     );
 
     // ====================================================================
-    // INICIO DEL CÓDIGO NUEVO A INSERTAR
+    // INICIO DEL CÓDIGO NUEVO A INSERTAR - INTELIGENCIA PREDICTIVA
     // ====================================================================
     const hasHierarchy = await AggregationService.hasHierarchy(userContext.accountId);
     let hierarchicalData = null;
 
     if (hasHierarchy) {
-      console.log('🏗️ Jerarquía detectada. Invocando AggregationService...');
-      hierarchicalData = await AggregationService.getHierarchicalScores(campaignId, userContext.accountId);
+      console.log('🧠 Jerarquía detectada. Generando Inteligencia Predictiva...');
+      hierarchicalData = await AggregationService.getGerenciaIntelligence(
+        campaignId, 
+        userContext.accountId,
+        daysRemaining  // ← NUEVO PARÁMETRO PARA IA PREDICTIVA
+      );
+      console.log(`✅ Inteligencia generada para ${hierarchicalData.length} gerencias`);
+    } else {
+      console.log('📊 Estructura plana detectada. Manteniendo hierarchicalData = null');
     }
     // ====================================================================
     // FIN DEL CÓDIGO NUEVO A INSERTAR
@@ -446,7 +461,9 @@ export async function GET(
       enrichedDepartments: Object.keys(enrichedAnalytics.departmentScoresDisplay || {}).length,
       departmentMapping: Object.keys(enrichedAnalytics.departmentMapping || {}).length,
       userRole: userContext.role,
-      filteredData: userContext.role === 'AREA_MANAGER'
+      filteredData: userContext.role === 'AREA_MANAGER',
+      hierarchicalIntelligence: hierarchicalData ? `${hierarchicalData.length} gerencias con IA` : 'No aplicable',
+      daysRemaining: daysRemaining
     });
 
     return NextResponse.json(

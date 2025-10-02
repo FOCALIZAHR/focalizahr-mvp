@@ -1174,7 +1174,8 @@ export function useCampaignMonitor(campaignId: string) {
       viewLevel,
       setViewLevel,
       hasHierarchy,
-      gerenciaData: hierarchicalData  // Datos pre-calculados del backend
+      gerenciaData: hierarchicalData,  // Datos pre-calculados del backend
+      hierarchicalData: hierarchicalData  // Campo estándar del backend
     };
   
   }, [campaignData, participantsData, historicalData, campaignDetails, campaignId, viewLevel]);// ✅ DEPENDENCIAS SIMPLIFICADAS

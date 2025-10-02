@@ -1,7 +1,7 @@
 // src/components/admin/AdminNavigation.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getCurrentUser, logout, isAdmin } from '@/lib/auth';
 import { useSidebar } from '@/hooks/useSidebar';
@@ -47,7 +47,7 @@ interface PendingStructure {
   departmentsCount?: number;
 }
 
-// Hook para métricas y estructuras pendientes
+// Hook mejorado sin loops infinitos
 function useAdminMetrics() {
   const [metrics, setMetrics] = useState({
     totalAccounts: 0,
@@ -58,12 +58,30 @@ function useAdminMetrics() {
   
   const [pendingStructures, setPendingStructures] = useState<PendingStructure[]>([]);
   const [unmappedCount, setUnmappedCount] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Usar useRef para trackear si ya estamos fetching
+  const isFetchingRef = useRef(false);
+  const lastFetchRef = useRef<number>(0);
 
   useEffect(() => {
     const fetchMetrics = async () => {
+      // Evitar llamadas duplicadas
+      if (isFetchingRef.current) return;
+      
+      // Evitar llamadas muy frecuentes (mínimo 5 segundos entre llamadas)
+      const now = Date.now();
+      if (now - lastFetchRef.current < 5000) return;
+      
+      isFetchingRef.current = true;
+      lastFetchRef.current = now;
+      
       try {
         const token = localStorage.getItem('focalizahr_token');
-        if (!token) return;
+        if (!token) {
+          isFetchingRef.current = false;
+          return;
+        }
 
         // Fetch accounts metrics
         const response = await fetch('/api/admin/accounts?limit=1', {
@@ -114,16 +132,32 @@ function useAdminMetrics() {
         }
       } catch (error) {
         console.error('Error fetching metrics:', error);
+      } finally {
+        isFetchingRef.current = false;
+        setIsLoading(false);
       }
     };
 
+    // Fetch inicial
     fetchMetrics();
-    // Recargar cada 60 segundos
-    const interval = setInterval(fetchMetrics, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    
+    // NO USAR setInterval - En su lugar, usar un refresh manual o eventos específicos
+    // Si realmente necesitas auto-refresh, hazlo condicional:
+    const shouldAutoRefresh = false; // Cambiar a true solo si es necesario
+    
+    if (shouldAutoRefresh) {
+      const interval = setInterval(() => {
+        // Solo ejecutar si no estamos ya fetching
+        if (!isFetchingRef.current) {
+          fetchMetrics();
+        }
+      }, 120000); // 2 minutos en lugar de 1 minuto
+      
+      return () => clearInterval(interval);
+    }
+  }, []); // Array vacío - solo ejecutar una vez
 
-  return { metrics, pendingStructures, unmappedCount };
+  return { metrics, pendingStructures, unmappedCount, isLoading };
 }
 
 export default function AdminNavigation() {
@@ -134,7 +168,7 @@ export default function AdminNavigation() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   
   const { isCollapsed, toggleSidebar } = useSidebar();
-  const { metrics, pendingStructures, unmappedCount } = useAdminMetrics();
+  const { metrics, pendingStructures, unmappedCount, isLoading } = useAdminMetrics();
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -163,7 +197,7 @@ export default function AdminNavigation() {
       label: 'Cuentas',
       href: '/dashboard/admin/accounts',
       icon: Building2,
-      badge: metrics.totalAccounts,
+      badge: metrics.totalAccounts > 0 ? metrics.totalAccounts : undefined,
       description: 'Gestión de empresas cliente'
     },
     {
@@ -180,381 +214,151 @@ export default function AdminNavigation() {
       href: '/dashboard/admin/mapping-review',
       icon: GitBranch,
       badge: unmappedCount > 0 ? unmappedCount : undefined,
-      badgeVariant: 'danger',
-      description: 'Mapeo de departamentos'
+      badgeVariant: unmappedCount > 5 ? 'danger' : 'warning',
+      description: 'Categorización de departamentos'
     },
     {
-      id: 'campaigns',
-      label: 'Campañas',
-      href: '/dashboard/admin/campaigns',
-      icon: Activity,
-      badge: metrics.activeCampaigns,
-      badgeVariant: 'success'
+      id: 'participants',
+      label: 'Carga Participantes',
+      href: '/dashboard/admin/participants',
+      icon: FileText,
+      badge: metrics.pendingMappings > 0 ? 'Pendientes' : undefined,
+      badgeVariant: 'warning',
+      description: 'Servicio concierge'
     },
     {
-      id: 'templates',
-      label: 'Templates',
-      href: '/dashboard/admin/templates',
-      icon: FileText
-    },
-    {
-      id: 'benchmarks',
-      label: 'Benchmarks',
-      href: '/dashboard/admin/benchmarks',
+      id: 'analytics-admin',
+      label: 'Analytics Global',
+      href: '/dashboard/admin/analytics',
       icon: TrendingUp,
-      badge: 'NEW',
-      badgeVariant: 'new'
-    },
-    {
-      id: 'settings',
-      label: 'Configuración',
-      href: '/dashboard/admin/settings',
-      icon: Settings
+      description: 'Métricas cross-cliente'
     }
   ];
 
   const handleLogout = () => {
     logout();
-    router.push('/');
+    router.push('/login');
   };
 
-  const isActive = (href: string) => {
-    if (href === '/dashboard/admin') return pathname === href;
-    return pathname.startsWith(href);
-  };
-
-  if (!isAdminUser) return null;
+  if (!isAdminUser) {
+    return null;
+  }
 
   return (
     <>
-      {/* Mobile Toggle */}
-      <button
-        onClick={() => setIsMobileOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 professional-card"
+      {/* Mobile Menu Button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="fixed top-4 left-4 z-50 md:hidden"
+        onClick={() => setIsMobileOpen(!isMobileOpen)}
       >
-        <Menu className="h-5 w-5 text-white" />
-      </button>
+        {isMobileOpen ? <X /> : <Menu />}
+      </Button>
 
-      {/* Desktop Sidebar */}
-      <aside className={cn(
-        "hidden lg:flex flex-col",
-        "fixed inset-y-0 left-0 z-40",
-        "bg-slate-900 border-r border-slate-800/50",
-        "transition-all duration-300",
-        isCollapsed ? "w-20" : "w-72"
-      )}>
-        
-        {/* Header */}
-        <div className="h-20 flex items-center justify-between px-4 border-b border-slate-800/50">
-          <div className={cn(
-            "flex items-center gap-3",
-            isCollapsed && "w-full justify-center"
-          )}>
-            <img 
-              src="/images/focalizahr-logo.svg" 
-              alt="FocalizaHR"
-              className="w-12 h-12 flex-shrink-0"
-            />
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "fixed left-0 top-0 z-40 h-full bg-slate-900 border-r border-slate-800 transition-all duration-300",
+          isCollapsed ? "w-20" : "w-64",
+          isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        )}
+      >
+        <div className="flex h-full flex-col">
+          {/* Header */}
+          <div className="flex h-16 items-center justify-between px-4 border-b border-slate-800">
             {!isCollapsed && (
-              <div>
-                <div className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-                  Admin Panel
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
+                  <Sparkles className="h-5 w-5 text-white" />
                 </div>
-                <div className="text-xs text-gray-500">FocalizaHR Platform</div>
+                <span className="font-bold text-white">Admin Panel</span>
               </div>
             )}
-          </div>
-          
-          {!isCollapsed && (
             <Button
               variant="ghost"
               size="icon"
               onClick={toggleSidebar}
-              className="hover:bg-slate-800/50 text-slate-400 hover:text-white"
+              className="hidden md:flex text-gray-400 hover:text-white"
             >
-              <ChevronLeft className="h-4 w-4" />
+              {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
             </Button>
-          )}
-        </div>
-
-        {/* User Section */}
-        {!isCollapsed && user && (
-          <div className="px-4 py-3 border-b border-slate-800/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-semibold">
-                  {user.adminName?.charAt(0)?.toUpperCase() || 'A'}
-                </span>
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-white truncate">
-                  {user.adminName}
-                </div>
-                <div className="text-xs text-slate-400 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-yellow-500" />
-                  Super Admin
-                </div>
-              </div>
-            </div>
           </div>
-        )}
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto custom-scrollbar">
-          <div className="px-3 py-4 space-y-1">
+          {/* Navigation */}
+          <nav className="flex-1 space-y-1 px-3 py-4">
             {navigationItems.map((item) => {
               const Icon = item.icon;
-              const active = isActive(item.href);
+              const isActive = pathname === item.href;
               
               return (
-                <button
+                <Button
                   key={item.id}
-                  onClick={() => router.push(item.href)}
+                  variant={isActive ? "secondary" : "ghost"}
                   className={cn(
-                    "w-full flex items-center rounded-lg",
-                    "transition-all duration-200",
-                    "hover:bg-slate-800/50 group relative",
-                    active ? "bg-gradient-to-r from-slate-800/70 to-slate-700/50 text-white shadow-md" : "text-slate-400 hover:text-white",
-                    isCollapsed ? "justify-center p-3" : "justify-start px-3 py-2.5 gap-3"
+                    "w-full justify-start relative",
+                    isActive 
+                      ? "bg-slate-800 text-white" 
+                      : "text-gray-400 hover:text-white hover:bg-slate-800",
+                    isCollapsed && "px-2"
                   )}
+                  onClick={() => {
+                    router.push(item.href);
+                    setIsMobileOpen(false);
+                  }}
                 >
-                  <Icon className={cn(
-                    "flex-shrink-0",
-                    isCollapsed ? "h-5 w-5" : "h-4 w-4",
-                    active && "text-cyan-400"
-                  )} />
-                  
-                  <span className={cn(
-                    "font-medium transition-all duration-300",
-                    isCollapsed ? "w-0 opacity-0 overflow-hidden" : "opacity-100 flex-1 text-left text-sm"
-                  )}>
-                    {item.label}
-                  </span>
-                  
-                  {!isCollapsed && item.badge !== undefined && (
-                    <Badge 
-                      className={cn(
-                        "text-xs font-medium",
-                        item.badgeVariant === 'success' && "bg-green-500/20 text-green-300 border-green-500/30",
-                        item.badgeVariant === 'warning' && "bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse",
-                        item.badgeVariant === 'danger' && "bg-orange-500/20 text-orange-300 border-orange-500/30 animate-pulse",
-                        item.badgeVariant === 'new' && "bg-purple-500/20 text-purple-300 border-purple-500/30",
-                        !item.badgeVariant && "bg-slate-700/50 text-slate-300 border-slate-600/50"
+                  <Icon className={cn("h-5 w-5", !isCollapsed && "mr-3")} />
+                  {!isCollapsed && (
+                    <>
+                      <span className="flex-1 text-left">{item.label}</span>
+                      {item.badge && (
+                        <Badge
+                          variant={item.badgeVariant as any || "secondary"}
+                          className="ml-2"
+                        >
+                          {item.badge}
+                        </Badge>
                       )}
-                    >
-                      {item.badge}
-                    </Badge>
+                    </>
                   )}
-
-                  {/* Tooltip para modo colapsado */}
-                  {isCollapsed && (
-                    <div className="absolute left-full ml-2 px-3 py-1.5 bg-slate-800 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-xl border border-slate-700">
-                      <span className="font-medium">{item.label}</span>
-                      {item.badge !== undefined && (
-                        <Badge className="ml-2 text-xs">{item.badge}</Badge>
-                      )}
-                    </div>
+                  {isCollapsed && item.badge && (
+                    <div className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-cyan-500" />
                   )}
-                </button>
+                </Button>
               );
             })}
-          </div>
-        </nav>
+          </nav>
 
-        {/* Footer OPTIMIZADO */}
-        {!isCollapsed && (
-          <>
-            {/* ALERTA DE ESTRUCTURAS PENDIENTES */}
-            {pendingStructures.length > 0 && (
-              <div className="p-3 bg-gradient-to-r from-amber-950/30 to-orange-950/30 border-t border-slate-800/50">
-                <Card className="border-amber-500/60 bg-gradient-to-br from-amber-950/40 to-orange-950/30 animate-pulse hover:animate-none hover:border-amber-400/80 transition-all cursor-pointer"
-                      onClick={() => router.push('/dashboard/admin/structures')}>
-                  <CardContent className="p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="h-5 w-5 text-amber-400 animate-pulse" />
-                        <div>
-                          <span className="text-xs font-bold text-amber-300">
-                            {pendingStructures.length} Estructuras Pendientes
-                          </span>
-                          <span className="text-xs text-amber-200/70 block">
-                            {metrics.pendingMappings} deptos. sin asignar
-                          </span>
-                        </div>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-amber-400" />
-                    </div>
-                  </CardContent>
-                </Card>
+          {/* Footer */}
+          <div className="border-t border-slate-800 p-4">
+            {!isCollapsed && user && (
+              <div className="mb-4">
+                <p className="text-sm font-medium text-white">{user.name}</p>
+                <p className="text-xs text-gray-400">{user.email}</p>
+                <Badge className="mt-2 bg-cyan-500/20 text-cyan-400">
+                  Admin FocalizaHR
+                </Badge>
               </div>
             )}
-            
-            {/* Métricas minimalistas + Logout */}
-            <div className="px-3 py-2 border-t border-slate-800/50 flex items-center justify-between">
-              <div className="flex items-center gap-4 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-cyan-400"></div>
-                  <span className="text-slate-400">{metrics.activeAccounts} activas</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-purple-400"></div>
-                  <span className="text-slate-400">{metrics.activeCampaigns} campañas</span>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleLogout}
-                className="text-slate-500 hover:text-white text-xs px-2 py-1"
-              >
-                <LogOut className="h-3 w-3 mr-1" />
-                Salir
-              </Button>
-            </div>
-          </>
-        )}
-
-        {/* Botones cuando está colapsado */}
-        {isCollapsed && (
-          <>
             <Button
               variant="ghost"
-              size="icon"
-              onClick={toggleSidebar}
-              className="absolute top-6 right-2 hover:bg-slate-800/50 shadow-lg"
+              className="w-full justify-start text-gray-400 hover:text-white"
+              onClick={handleLogout}
             >
-              <ChevronRight className="h-4 w-4" />
+              <LogOut className={cn("h-5 w-5", !isCollapsed && "mr-3")} />
+              {!isCollapsed && <span>Cerrar sesión</span>}
             </Button>
-            
-            <div className="p-2 border-t border-slate-800/50">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleLogout}
-                className="w-full hover:bg-slate-800/50"
-              >
-                <LogOut className="h-4 w-4 text-slate-400" />
-              </Button>
-            </div>
-          </>
-        )}
+          </div>
+        </div>
       </aside>
 
-      {/* Mobile Menu */}
+      {/* Mobile Overlay */}
       {isMobileOpen && (
-        <div 
-          className="lg:hidden fixed inset-0 z-50 bg-black/50"
+        <div
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
           onClick={() => setIsMobileOpen(false)}
-        >
-          <aside 
-            className="fixed inset-y-0 left-0 w-72 bg-slate-900 overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Mobile Header */}
-            <div className="flex items-center justify-between p-4 border-b border-slate-800/50">
-              <div className="flex items-center gap-3">
-                <img 
-                  src="/images/focalizahr-logo.svg" 
-                  alt="FocalizaHR"
-                  className="w-10 h-10"
-                />
-                <div className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-                  Admin Panel
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsMobileOpen(false)}
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            {/* Mobile Navigation */}
-            <nav className="px-3 py-4 space-y-1">
-              {navigationItems.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.href);
-                
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      router.push(item.href);
-                      setIsMobileOpen(false);
-                    }}
-                    className={cn(
-                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg",
-                      "transition-all duration-200",
-                      "hover:bg-slate-800/50",
-                      active && "bg-slate-800/50 text-white"
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="flex-1 text-left text-sm">{item.label}</span>
-                    {item.badge !== undefined && (
-                      <Badge className={cn(
-                        "text-xs",
-                        item.badgeVariant === 'danger' && "bg-orange-500/20 text-orange-300"
-                      )}>
-                        {item.badge}
-                      </Badge>
-                    )}
-                  </button>
-                );
-              })}
-            </nav>
-
-            {/* Alerta móvil */}
-            {pendingStructures.length > 0 && (
-              <div className="px-3 pb-3 bg-gradient-to-r from-amber-950/30 to-orange-950/30">
-                <Card className="border-amber-500/60 bg-gradient-to-br from-amber-950/40 to-orange-950/30">
-                  <CardContent className="p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertCircle className="h-5 w-5 text-amber-400" />
-                      <span className="text-sm font-bold text-amber-300">
-                        {pendingStructures.length} Estructuras Pendientes
-                      </span>
-                    </div>
-                    <Button 
-                      size="sm"
-                      onClick={() => {
-                        router.push('/dashboard/admin/structures');
-                        setIsMobileOpen(false);
-                      }}
-                      className="w-full bg-gradient-to-r from-amber-600 to-orange-600 text-white"
-                    >
-                      Gestionar →
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-          </aside>
-        </div>
+        />
       )}
-
-      {/* Estilos CSS para scrollbar */}
-      <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: rgba(30, 41, 59, 0.5);
-          border-radius: 3px;
-        }
-        
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: linear-gradient(to bottom, #06b6d4, #a855f7);
-          border-radius: 3px;
-        }
-        
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: linear-gradient(to bottom, #22d3ee, #c084fc);
-        }
-      `}</style>
     </>
   );
 }

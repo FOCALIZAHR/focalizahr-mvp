@@ -18,6 +18,7 @@ enum Gender {
   NON_BINARY
   PREFER_NOT_TO_SAY
 }
+
 // ✅ ENUM ACCOUNT STATUS - AGREGADO PARA GESTIÓN DE CUENTAS
 enum AccountStatus {
   ACTIVE
@@ -25,22 +26,20 @@ enum AccountStatus {
   TRIAL
   INACTIVE
 }
+
 // TABLA 1: Cuentas empresa (multi-tenancy)
 model Account {
   id               String  @id @default(cuid())
   companyName      String  @map("company_name")
-  companyLogo      String? @map("company_logo") // ← ESTO ES CORRECTO
+  companyLogo      String? @map("company_logo")
   industry         String?
-  companySize      String? @map("company_size") // micro/pequeña/mediana
+  companySize      String? @map("company_size")
   adminEmail       String  @unique @map("admin_email")
   adminName        String  @map("admin_name")
   passwordHash     String  @map("password_hash")
   subscriptionTier String  @default("free") @map("subscription_tier")
-
-  // 👇 AGREGAR SOLO ESTA LÍNEA
-  role              String    @default("CLIENT")  // Valores: CLIENT, FOCALIZAHR_ADMIN
-  // 👇 NUEVA LÍNEA - Agregar aquí
-  status            AccountStatus @default(ACTIVE) @map("status")
+  role             String  @default("CLIENT")
+  status           AccountStatus @default(ACTIVE) @map("status")
 
   // Configuraciones parametrizables:
   maxActiveCampaigns         Int @default(1) @map("max_active_campaigns")
@@ -51,10 +50,11 @@ model Account {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relaciones
-  campaigns   Campaign[]
-  auditLogs   AuditLog[]
-  departments Department[]
-  users User[] // AGREGAR solo esta línea
+  campaigns         Campaign[]
+  auditLogs         AuditLog[]
+  departments       Department[]
+  users             User[]
+  departmentMetrics DepartmentMetric[] // ✅ NUEVA RELACIÓN CHAT 9
 
   @@index([adminEmail], map: "idx_accounts_email")
   @@index([subscriptionTier], map: "idx_accounts_tier")
@@ -65,19 +65,19 @@ model Account {
 model CampaignType {
   id                String   @id @default(cuid())
   name              String
-  slug              String   @unique // pulso-express, experiencia-full
+  slug              String   @unique
   description       String?
-  estimatedDuration Int?     @map("estimated_duration") // minutos
+  estimatedDuration Int?     @map("estimated_duration")
   questionCount     Int?     @map("question_count")
   methodology       String?
-  category          String? // clima, experiencia, beneficios
+  category          String?
   isActive          Boolean  @default(true) @map("is_active")
   sortOrder         Int      @default(0) @map("sort_order")
   createdAt         DateTime @default(now()) @map("created_at")
 
   // Relaciones
-  campaigns Campaign[]
-  questions Question[]
+  campaigns           Campaign[]
+  questions           Question[]
   surveyConfiguration SurveyConfiguration?
 
   @@index([isActive], map: "idx_campaign_types_active")
@@ -94,7 +94,7 @@ model Campaign {
   description    String?
   startDate      DateTime @map("start_date") @db.Date
   endDate        DateTime @map("end_date") @db.Date
-  status         String   @default("draft") // draft, active, completed, cancelled
+  status         String   @default("draft")
 
   // Configuración campaña:
   sendReminders    Boolean @default(true) @map("send_reminders")
@@ -132,13 +132,12 @@ model Participant {
   campaignId  String  @map("campaign_id")
   email       String
   uniqueToken String  @unique @map("unique_token")
-  // ✅ AGREGAR ESTA LÍNEA
   name        String?
 
   // Segmentación básica (carga manual):
   department     String?
   position       String?
-  seniorityLevel String? @map("seniority_level") // junior, mid, senior, executive
+  seniorityLevel String? @map("seniority_level")
   location       String?
 
   // Estados:
@@ -153,12 +152,11 @@ model Participant {
   userAgent String?  @map("user_agent")
   createdAt DateTime @default(now()) @map("created_at")
 
-  // ✅ CAMPOS DEMOGRÁFICOS - AGREGADOS PARA PARTICIPANTUPLOADER v2.0
-  dateOfBirth DateTime? @map("date_of_birth")
-  gender      Gender?
+  // Campos demográficos:
+  dateOfBirth  DateTime? @map("date_of_birth")
+  gender       Gender?
   hireDate     DateTime? @map("hire_date") @db.Date
-  // ✅ DEPARTMENT RELATION FIELD ADDED
-  departmentId String? @map("department_id")
+  departmentId String?   @map("department_id")
 
   // Relaciones
   campaign      Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
@@ -181,10 +179,10 @@ model Question {
   id               String  @id @default(cuid())
   campaignTypeId   String  @map("campaign_type_id")
   text             String
-  category         String // liderazgo, ambiente, desarrollo, bienestar
-  subcategory      String? // feedback, reconocimiento, autonomia, etc.
+  category         String
+  subcategory      String?
   questionOrder    Int     @map("question_order")
-  responseType     String  @default("rating") @map("response_type") // rating, text, choice
+  responseType     String  @default("rating") @map("response_type")
   choiceOptions    Json?   @map("choice_options")
   conditionalLogic Json?   @map("conditional_logic")
 
@@ -246,7 +244,7 @@ model CampaignResult {
   totalResponses    Int     @map("total_responses")
 
   // Análisis por categoría:
-  categoryScores         Json  @map("category_scores") // {liderazgo: 3.2, ambiente: 4.1, ...}
+  categoryScores         Json  @map("category_scores")
   categoryResponseCounts Json? @map("category_response_counts")
 
   // Análisis básico por segmentación:
@@ -265,7 +263,7 @@ model CampaignResult {
 
   // Metadatos:
   resultsData     Json?    @map("results_data")
-  confidenceLevel String?  @map("confidence_level") // high, medium, low
+  confidenceLevel String?  @map("confidence_level")
   generatedAt     DateTime @default(now()) @map("generated_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -280,12 +278,12 @@ model CampaignResult {
 // TABLA 8: Templates Kit Comunicación - ARQUITECTURA CONTEXTUAL
 model CommunicationTemplate {
   id                String  @id @default(cuid())
-  templateType      String  @map("template_type") // fortaleza, oportunidad, benchmark_superior, etc.
-  productContext    String  @default("general") @map("product_context") // NUEVO CAMPO
-  category          String? // liderazgo, ambiente, desarrollo, bienestar, general
-  conditionRule     String  @map("condition_rule") // "score >= 4.0", "participation < 50"
+  templateType      String  @map("template_type")
+  productContext    String  @default("general") @map("product_context")
+  category          String?
+  conditionRule     String  @map("condition_rule")
   templateText      String  @map("template_text")
-  variablesRequired Json?   @map("variables_required") // ["category", "score"]
+  variablesRequired Json?   @map("variables_required")
   priority          Int     @default(0)
   isActive          Boolean @default(true) @map("is_active")
 
@@ -293,7 +291,7 @@ model CommunicationTemplate {
   usageCount Int      @default(0) @map("usage_count")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  @@unique([templateType, productContext]) // REGLA DE UNICIDAD COMPUESTA
+  @@unique([templateType, productContext])
   @@index([category], map: "idx_templates_category")
   @@index([isActive], map: "idx_templates_active")
   @@index([priority], map: "idx_templates_priority")
@@ -306,12 +304,12 @@ model AuditLog {
   id         String   @id @default(cuid())
   accountId  String?  @map("account_id")
   campaignId String?  @map("campaign_id")
-  action     String // campaign_created, campaign_activated, participant_added, etc.
-  entityType String?  @map("entity_type") // campaign, participant, response
+  action     String
+  entityType String?  @map("entity_type")
   entityId   String?  @map("entity_id")
   oldValues  Json?    @map("old_values")
   newValues  Json?    @map("new_values")
-  userInfo   Json?    @map("user_info") // IP, user agent, etc.
+  userInfo   Json?    @map("user_info")
   createdAt  DateTime @default(now()) @map("created_at")
 
   // Relaciones
@@ -330,7 +328,7 @@ model EmailLog {
   id            String    @id @default(cuid())
   participantId String    @map("participant_id")
   campaignId    String    @map("campaign_id")
-  emailType     String    @map("email_type") // 'invitation', 'reminder_1', 'reminder_2'
+  emailType     String    @map("email_type")
   templateId    String    @map("template_id")
   sentAt        DateTime  @map("sent_at")
   deliveredAt   DateTime? @map("delivered_at")
@@ -340,7 +338,7 @@ model EmailLog {
   complainedAt  DateTime? @map("complained_at")
   openCount     Int       @default(0) @map("open_count")
   clickCount    Int       @default(0) @map("click_count")
-  status        String    @default("sent") // 'sent', 'delivered', 'bounced', 'complained'
+  status        String    @default("sent")
   bounceReason  String?   @map("bounce_reason")
 
   participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
@@ -358,7 +356,7 @@ model EmailLog {
 model EmailAutomation {
   id          String    @id @default(cuid())
   campaignId  String    @map("campaign_id")
-  triggerType String    @map("trigger_type") // 'reminder_1', 'reminder_2'
+  triggerType String    @map("trigger_type")
   triggerAt   DateTime  @map("trigger_at")
   processedAt DateTime? @map("processed_at")
   enabled     Boolean   @default(true)
@@ -378,39 +376,42 @@ model Department {
   id               String   @id @default(cuid())
   accountId        String   @map("account_id")
   displayName      String   @map("display_name")
-  standardCategory String?  @map("standard_category") // ventas, marketing, desarrollo, rrhh, operaciones, otros
+  standardCategory String?  @map("standard_category")
+  costCenterCode   String?  @unique @map("cost_center_code") // ✅ NUEVO CAMPO CHAT 9
   isActive         Boolean  @default(true) @map("is_active")
   createdAt        DateTime @default(now()) @map("created_at")
 
-  // NUEVOS CAMPOS - Jerarquía
-  parentId             String?  @map("parent_id")
-  parent               Department? @relation("DepartmentHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children             Department[] @relation("DepartmentHierarchy")
-  unitType             String   @default("departamento") @map("unit_type")
-  level                Int      @default(3)
-  employeeCount        Int      @default(0) @map("employee_count")
-  
-  // NUEVOS CAMPOS - Contexto organizacional
-  technicalComplexity   String   @default("media") @map("technical_complexity")
-  emotionalComplexity   String   @default("media") @map("emotional_complexity")
-  marketScarcity        String   @default("normal") @map("market_scarcity")
+  // Jerarquía
+  parentId String?      @map("parent_id")
+  parent   Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children Department[] @relation("DepartmentHierarchy")
+  unitType String       @default("departamento") @map("unit_type")
+  level    Int          @default(3)
+  employeeCount Int     @default(0) @map("employee_count")
+
+  // Contexto organizacional
+  technicalComplexity String @default("media") @map("technical_complexity")
+  emotionalComplexity String @default("media") @map("emotional_complexity")
+  marketScarcity      String @default("normal") @map("market_scarcity")
 
   // Relaciones
-  account      Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account      Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
   participants Participant[]
-  users User[] // AGREGAR solo esta línea
+  users        User[]
+  metrics      DepartmentMetric[] // ✅ NUEVA RELACIÓN CHAT 9
 
   @@unique([accountId, displayName])
   @@index([accountId], map: "idx_departments_account")
   @@index([standardCategory], map: "idx_departments_category")
   @@index([isActive], map: "idx_departments_active")
+  @@index([parentId], map: "idx_departments_parent")
+  @@index([costCenterCode], map: "idx_departments_cost_center") // ✅ NUEVO ÍNDICE CHAT 9
   @@map("departments")
 }
 
-// ========== NUEVA TABLA PARA CONFIGURACIÓN DE ENCUESTAS ==========
 // TABLA 13: Survey Configurations
 model SurveyConfiguration {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   campaignTypeId   String   @unique @map("campaign_type_id")
   categoryConfigs  Json     @default("{}") @map("category_configs")
   conditionalRules Json     @default("[]") @map("conditional_rules")
@@ -418,34 +419,91 @@ model SurveyConfiguration {
   validationRules  Json     @default("[]") @map("validation_rules")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
-  
+
   campaignType CampaignType @relation(fields: [campaignTypeId], references: [id], onDelete: Cascade)
-  
+
   @@map("survey_configurations")
 }
+
 // TABLA 14: USERS - Sistema Multi-usuario
 model User {
-  id           String   @id @default(cuid())
-  accountId    String   @map("account_id")
-  email        String   @unique
+  id           String    @id @default(cuid())
+  accountId    String    @map("account_id")
+  email        String    @unique
   name         String
-  passwordHash String   @map("password_hash")
-  
-  // Sistema de roles
-  role         String   @default("VIEWER") // ACCOUNT_OWNER, HR_MANAGER, AREA_MANAGER, DIRECTOR, VIEWER
-  departmentId String?  @map("department_id") // NULL = acceso total
-  
-  // Control y auditoría
-  isActive     Boolean  @default(true) @map("is_active")
+  passwordHash String    @map("password_hash")
+  role         String    @default("VIEWER")
+  departmentId String?   @map("department_id")
+  isActive     Boolean   @default(true) @map("is_active")
   lastLoginAt  DateTime? @map("last_login_at")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-  
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
   // Relaciones
-  account      Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  department   Department? @relation(fields: [departmentId], references: [id])
-  
+  account    Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id])
+
   @@index([accountId])
   @@index([email])
   @@map("users")
+}
+
+// ============================================
+// ✅ TABLA 15: DEPARTMENT METRICS - CHAT 9
+// ============================================
+model DepartmentMetric {
+  id           String   @id @default(cuid())
+  accountId    String   @map("account_id")
+  departmentId String   @map("department_id")
+
+  // PERÍODO (flexible)
+  period      String   // "2025-Q1", "2025-01", "2025"
+  periodStart DateTime @map("period_start")
+  periodEnd   DateTime @map("period_end")
+  periodType  String   @map("period_type") // "monthly", "quarterly", "semi-annual", "annual"
+
+  // KPIs FASE 1 (Core metrics)
+  turnoverRate       Float? @map("turnover_rate")
+  absenceRate        Float? @map("absence_rate")
+  issueCount         Int?   @map("issue_count")
+  overtimeHoursTotal Float? @map("overtime_hours_total")
+  overtimeHoursAvg   Float? @map("overtime_hours_avg")
+
+  // CONTEXTO CÁLCULO (opcionales)
+  headcountAvg          Float? @map("headcount_avg")
+  turnoverCount         Int?   @map("turnover_count")
+  absenceDaysTotal      Int?   @map("absence_days_total")
+  workingDaysTotal      Int?   @map("working_days_total")
+  overtimeEmployeeCount Int?   @map("overtime_employee_count")
+
+  // FASE 1.5 (opcional - rotación lamentada)
+  turnoverRegrettableRate  Float? @map("turnover_regrettable_rate")
+  turnoverRegrettableCount Int?   @map("turnover_regrettable_count")
+
+  // FASE 2 (preparado, nullables)
+  performanceScore   Float? @map("performance_score")
+  goalsAchievedRate  Float? @map("goals_achieved_rate")
+  trainingHoursAvg   Float? @map("training_hours_avg")
+  salaryIncreaseRate Float? @map("salary_increase_rate")
+  promotionRate      Float? @map("promotion_rate")
+
+  // METADATA
+  uploadedBy   String   @map("uploaded_by")
+  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+  uploadMethod String   @default("manual") @map("upload_method")
+  dataQuality  String   @default("validated") @map("data_quality")
+  notes        String?
+
+  // RELACIONES
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  account    Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // CONSTRAINTS E ÍNDICES
+  @@unique([departmentId, period], name: "departmentId_period")
+  @@index([accountId, periodStart, periodEnd], map: "idx_dept_metrics_account_period")
+  @@index([accountId, periodType], map: "idx_dept_metrics_period_type")
+  @@index([departmentId, periodStart], map: "idx_dept_metrics_department")
+  @@index([dataQuality], map: "idx_dept_metrics_quality")
+  @@index([uploadedAt], map: "idx_dept_metrics_uploaded")
+  @@map("department_metrics")
 }
