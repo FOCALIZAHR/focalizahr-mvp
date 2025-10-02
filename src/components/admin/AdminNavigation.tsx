@@ -16,6 +16,7 @@ import {
   Activity,
   FileText,
   TrendingUp,
+  BarChart2,
   Settings,
   LogOut,
   ChevronLeft,
@@ -222,9 +223,16 @@ export default function AdminNavigation() {
       label: 'Carga Participantes',
       href: '/dashboard/admin/participants',
       icon: FileText,
-      badge: metrics.pendingMappings > 0 ? 'Pendientes' : undefined,
+      badge: metrics.pendingMappings > 0 ? metrics.pendingMappings : undefined,
       badgeVariant: 'warning',
       description: 'Servicio concierge'
+    },
+    {
+      id: 'department-metrics',
+      label: 'Métricas Departamentales',
+      href: '/dashboard/admin/department-metrics',
+      icon: BarChart2,
+      description: 'Datos crudos RRHH por departamento'
     },
     {
       id: 'analytics-admin',
@@ -268,13 +276,33 @@ export default function AdminNavigation() {
           {/* Header */}
           <div className="flex h-16 items-center justify-between px-4 border-b border-slate-800">
             {!isCollapsed && (
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
-                  <Sparkles className="h-5 w-5 text-white" />
+              <div className="flex items-center gap-3">
+                {/* Logo FocalizaHR */}
+                <div className="h-10 w-10 flex items-center justify-center">
+                  <img 
+                    src="/images/focalizahr-logo.svg" 
+                    alt="FocalizaHR Logo" 
+                    className="h-full w-full object-contain"
+                  />
                 </div>
-                <span className="font-bold text-white">Admin Panel</span>
+                <div className="flex flex-col">
+                  <span className="font-bold text-white text-base">FocalizaHR</span>
+                  <span className="text-xs text-cyan-400">Admin Panel</span>
+                </div>
               </div>
             )}
+            
+            {/* Collapsed: Solo logo */}
+            {isCollapsed && (
+              <div className="flex items-center justify-center w-full">
+                <img 
+                  src="/images/focalizahr-logo.svg" 
+                  alt="FocalizaHR" 
+                  className="h-8 w-8 object-contain"
+                />
+              </div>
+            )}
+            
             <Button
               variant="ghost"
               size="icon"
