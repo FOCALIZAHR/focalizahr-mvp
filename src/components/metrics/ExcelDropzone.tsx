@@ -1,6 +1,6 @@
 // ============================================
-// COMPONENTE: ExcelDropzone
-// Drag & Drop upload con validación
+// COMPONENTE: ExcelDropzone v3.0
+// FIXED: Limpieza de símbolos % y #
 // ============================================
 
 'use client';
@@ -10,6 +10,7 @@ import { Upload, FileText, X, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast-system';
 import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 
 interface ExcelDropzoneProps {
   accountId: string;
@@ -58,51 +59,191 @@ export default function ExcelDropzone({
   }, [error]);
 
   // ============================================
-  // PROCESAR ARCHIVO
+  // NORMALIZAR HEADERS (Función compartida)
   // ============================================
 
-  const processFile = useCallback(async (file: File) => {
-    if (!validateFile(file)) return;
+  const normalizeHeader = useCallback((header: string): string => {
+    const normalized = header.trim().toLowerCase();
+    const mapping: Record<string, string> = {
+      'centro costos': 'costCenterCode',
+      'centro de costos': 'costCenterCode',
+      'código centro costos': 'costCenterCode',
+      'período': 'period',
+      'periodo': 'period',
+      'rotación (%)': 'turnoverRate',
+      'rotación %': 'turnoverRate',
+      'rotacion': 'turnoverRate',
+      'ausentismo (%)': 'absenceRate',
+      'ausentismo %': 'absenceRate',
+      'ausentismo': 'absenceRate',
+      'denuncias (#)': 'issueCount',
+      'denuncias #': 'issueCount',
+      'denuncias': 'issueCount',
+      'horas extras total': 'overtimeHoursTotal',
+      'horas extras promedio': 'overtimeHoursAvg',
+      'dotación promedio': 'headcountAvg',
+      'salidas (#)': 'turnoverCount',
+      'salidas #': 'turnoverCount',
+      'salidas': 'turnoverCount',
+      'días ausencia total': 'absenceDaysTotal',
+      'dias ausencia total': 'absenceDaysTotal',
+      'días laborales total': 'workingDaysTotal',
+      'dias laborales total': 'workingDaysTotal',
+      'empleados horas extras': 'overtimeEmployeeCount',
+      'rotación lamentable %': 'turnoverRegrettableRate',
+      'rotacion lamentable %': 'turnoverRegrettableRate',
+      'salidas lamentables #': 'turnoverRegrettableCount',
+      'salidas lamentables': 'turnoverRegrettableCount',
+      'notas': 'notes'
+    };
 
-    setIsProcessing(true);
-    setSelectedFile(file);
+    return mapping[normalized] || header;
+  }, []);
 
+  // ============================================
+  // LIMPIAR VALORES (NUEVO - CRÍTICO)
+  // ============================================
+
+  const cleanValue = useCallback((key: string, value: any): any => {
+    if (value === null || value === undefined || value === '') {
+      return undefined;
+    }
+
+    // Convertir a string para procesar
+    const strValue = String(value).trim();
+
+    // Campos de porcentaje: eliminar % y convertir a número
+    if (['turnoverRate', 'absenceRate', 'turnoverRegrettableRate'].includes(key)) {
+      const cleaned = strValue.replace(/%/g, '').trim();
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? undefined : num;
+    }
+
+    // Campos enteros: eliminar # y convertir a número
+    if (['issueCount', 'turnoverCount', 'absenceDaysTotal', 'workingDaysTotal', 
+         'overtimeEmployeeCount', 'turnoverRegrettableCount'].includes(key)) {
+      const cleaned = strValue.replace(/#/g, '').trim();
+      const num = parseInt(cleaned, 10);
+      return isNaN(num) ? undefined : num;
+    }
+
+    // Campos float: convertir a número
+    if (['overtimeHoursTotal', 'overtimeHoursAvg', 'headcountAvg'].includes(key)) {
+      // Remover unidades comunes (h, hrs, horas)
+      const cleaned = strValue.replace(/h(rs?|oras?)?$/i, '').trim();
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? undefined : num;
+    }
+
+    // Campos string: mantener como están
+    if (['costCenterCode', 'period', 'notes'].includes(key)) {
+      return strValue;
+    }
+
+    // Default: devolver valor original
+    return value;
+  }, []);
+
+  // ============================================
+  // VALIDAR Y PROCESAR DATOS (Función compartida)
+  // ============================================
+
+  const validateAndProcessData = useCallback((rawData: any[]) => {
+    if (rawData.length === 0) {
+      error('El archivo está vacío o no tiene datos válidos', 'Sin Datos');
+      setSelectedFile(null);
+      setIsProcessing(false);
+      return;
+    }
+
+    if (rawData.length > 100) {
+      error('Máximo 100 registros por carga. Divide el archivo.', 'Límite Excedido');
+      setSelectedFile(null);
+      setIsProcessing(false);
+      return;
+    }
+
+    // Filtrar filas vacías
+    const validData = rawData.filter((row: any) => {
+      return row.costCenterCode && row.period;
+    });
+
+    if (validData.length === 0) {
+      error('No se encontraron filas válidas con Centro Costos y Período', 'Sin Datos Válidos');
+      setSelectedFile(null);
+      setIsProcessing(false);
+      return;
+    }
+
+    info(
+      `Archivo procesado: ${validData.length} métricas detectadas`,
+      'Procesado'
+    );
+
+    onFileProcessed(validData);
+    setIsProcessing(false);
+  }, [error, info, onFileProcessed]);
+
+  // ============================================
+  // PROCESAR ARCHIVO EXCEL (.xlsx, .xls)
+  // ============================================
+
+  const processExcelFile = useCallback(async (file: File) => {
     try {
-      // Leer archivo
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      
+      // Buscar la hoja "Carga de Datos" o usar la primera hoja
+      let sheetName = workbook.SheetNames[0];
+      if (workbook.SheetNames.includes('Carga de Datos')) {
+        sheetName = 'Carga de Datos';
+      }
+      
+      const worksheet = workbook.Sheets[sheetName];
+      
+      // Convertir a JSON
+      const rawData: any[] = XLSX.utils.sheet_to_json(worksheet, {
+        raw: false, // Mantener valores como strings
+        defval: undefined // Valores vacíos como undefined
+      });
+
+      // Normalizar headers Y limpiar valores
+      const normalizedData = rawData.map(row => {
+        const normalizedRow: any = {};
+        Object.keys(row).forEach(key => {
+          const normalizedKey = normalizeHeader(key);
+          const cleanedValue = cleanValue(normalizedKey, row[key]);
+          if (cleanedValue !== undefined) {
+            normalizedRow[normalizedKey] = cleanedValue;
+          }
+        });
+        return normalizedRow;
+      });
+
+      // Validar y procesar
+      validateAndProcessData(normalizedData);
+
+    } catch (err) {
+      console.error('Excel processing error:', err);
+      error('Error al procesar archivo Excel. Verifica el formato.', 'Error Excel');
+      setSelectedFile(null);
+      setIsProcessing(false);
+    }
+  }, [normalizeHeader, cleanValue, validateAndProcessData, error]);
+
+  // ============================================
+  // PROCESAR ARCHIVO CSV
+  // ============================================
+
+  const processCSVFile = useCallback(async (file: File) => {
+    try {
       const text = await file.text();
 
-      // Parsear CSV con Papaparse
       Papa.parse(text, {
         header: true,
         skipEmptyLines: true,
-        dynamicTyping: true,
-        transformHeader: (header) => {
-          // Normalizar headers
-          const normalized = header.trim().toLowerCase();
-          const mapping: Record<string, string> = {
-            'centro costos': 'costCenterCode',
-            'centro de costos': 'costCenterCode',
-            'código centro costos': 'costCenterCode',
-            'período': 'period',
-            'periodo': 'period',
-            'rotación (%)': 'turnoverRate',
-            'rotacion': 'turnoverRate',
-            'ausentismo (%)': 'absenceRate',
-            'ausentismo': 'absenceRate',
-            'denuncias (#)': 'issueCount',
-            'denuncias': 'issueCount',
-            'horas extras total': 'overtimeHoursTotal',
-            'horas extras promedio': 'overtimeHoursAvg',
-            'dotación promedio': 'headcountAvg',
-            'salidas (#)': 'turnoverCount',
-            'días ausencia total': 'absenceDaysTotal',
-            'días laborales total': 'workingDaysTotal',
-            'empleados horas extras': 'overtimeEmployeeCount',
-            'notas': 'notes'
-          };
-
-          return mapping[normalized] || header;
-        },
+        dynamicTyping: false, // Mantener como strings para procesar
+        transformHeader: (header) => normalizeHeader(header),
         complete: (results) => {
           if (results.errors.length > 0) {
             warning(
@@ -111,51 +252,57 @@ export default function ExcelDropzone({
             );
           }
 
-          if (results.data.length === 0) {
-            error('El archivo está vacío o no tiene datos válidos', 'Sin Datos');
-            setSelectedFile(null);
-            return;
-          }
-
-          if (results.data.length > 100) {
-            error('Máximo 100 registros por carga. Divide el archivo.', 'Límite Excedido');
-            setSelectedFile(null);
-            return;
-          }
-
-          // Filtrar filas vacías
-          const validData = results.data.filter((row: any) => {
-            return row.costCenterCode && row.period;
+          // Limpiar valores de cada fila
+          const cleanedData = results.data.map((row: any) => {
+            const cleanedRow: any = {};
+            Object.keys(row).forEach(key => {
+              const cleanedValue = cleanValue(key, row[key]);
+              if (cleanedValue !== undefined) {
+                cleanedRow[key] = cleanedValue;
+              }
+            });
+            return cleanedRow;
           });
 
-          if (validData.length === 0) {
-            error('No se encontraron filas válidas con Centro Costos y Período', 'Sin Datos Válidos');
-            setSelectedFile(null);
-            return;
-          }
-
-          info(
-            `Archivo procesado: ${validData.length} métricas detectadas`,
-            'Procesado'
-          );
-
-          onFileProcessed(validData);
+          validateAndProcessData(cleanedData);
         },
         error: (err) => {
-          console.error('Parse error:', err);
-          error('Error al leer el archivo. Verifica el formato.', 'Error Parseo');
+          console.error('CSV parse error:', err);
+          error('Error al leer el archivo CSV. Verifica el formato.', 'Error CSV');
           setSelectedFile(null);
+          setIsProcessing(false);
         }
       });
 
     } catch (err) {
-      console.error('File processing error:', err);
-      error('Error al procesar archivo. Intenta nuevamente.', 'Error');
+      console.error('CSV processing error:', err);
+      error('Error al procesar archivo CSV. Intenta nuevamente.', 'Error');
       setSelectedFile(null);
-    } finally {
       setIsProcessing(false);
     }
-  }, [validateFile, onFileProcessed, error, warning, info]);
+  }, [normalizeHeader, cleanValue, validateAndProcessData, error, warning]);
+
+  // ============================================
+  // PROCESAR ARCHIVO (Router principal)
+  // ============================================
+
+  const processFile = useCallback(async (file: File) => {
+    if (!validateFile(file)) return;
+
+    setIsProcessing(true);
+    setSelectedFile(file);
+
+    // Detectar tipo de archivo por extensión
+    const isExcel = file.name.match(/\.(xlsx|xls)$/i);
+
+    if (isExcel) {
+      // Procesar archivo Excel
+      await processExcelFile(file);
+    } else {
+      // Procesar archivo CSV
+      await processCSVFile(file);
+    }
+  }, [validateFile, processExcelFile, processCSVFile]);
 
   // ============================================
   // HANDLERS DRAG & DROP

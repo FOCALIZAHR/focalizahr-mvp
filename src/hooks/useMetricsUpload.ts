@@ -1,6 +1,7 @@
 // ============================================
 // HOOK: useMetricsUpload
 // Gestión completa upload métricas departamentales
+// CON SOPORTE targetAccountId para admin
 // ============================================
 
 import { useState, useCallback } from 'react';
@@ -38,6 +39,7 @@ interface PreviewData extends MetricData {
 interface UploadResult {
   success: boolean;
   message?: string;
+  missingCostCenterCodes?: string[];
   results?: Array<{
     success: boolean;
     departmentId?: string;
@@ -71,7 +73,7 @@ interface UploadHistory {
 // HOOK PRINCIPAL
 // ============================================
 
-export function useMetricsUpload(accountId?: string) {
+export function useMetricsUpload(accountId?: string, userRole?: string) {
   const [isLoading, setIsLoading] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewData[]>([]);
   const [history, setHistory] = useState<UploadHistory[]>([]);
@@ -184,10 +186,16 @@ export function useMetricsUpload(accountId?: string) {
         return false;
       }
 
-      // Determinar si es batch o single
-      const payload = validMetrics.length === 1 
+      // ✅ CAMBIO CRÍTICO: Agregar targetAccountId al payload
+      // ✅ CONSTRUCCIÓN CONDICIONAL DEL PAYLOAD
+      const basePayload = validMetrics.length === 1 
         ? validMetrics[0]
         : { metrics: validMetrics };
+
+      // Solo agregar targetAccountId si es FOCALIZAHR_ADMIN
+      const payload = userRole === 'FOCALIZAHR_ADMIN' && accountId
+        ? { ...basePayload, targetAccountId: accountId }
+        : basePayload;
 
       const response = await fetch('/api/department-metrics/upload', {
         method: 'POST',
@@ -235,15 +243,99 @@ export function useMetricsUpload(accountId?: string) {
 
     } catch (err: any) {
       console.error('Upload error:', err);
+      
+      // ============================================
+      // MANEJO ESPECIAL: CENTROS DE COSTOS NO ENCONTRADOS
+      // ============================================
+      
+      // Intentar parsear la respuesta del servidor
+      let errorData: any = {};
+      try {
+        if (err.message && err.message.includes('{')) {
+          errorData = JSON.parse(err.message);
+        } else if (err.response) {
+          errorData = err.response;
+        }
+      } catch (parseErr) {
+        errorData = { message: err.message };
+      }
+
+      // ============================================
+      // MANEJO ESPECÍFICO DE ERRORES POR TIPO
+      // ============================================
+      
+      // ERROR 1: Centros de costos no encontrados
+      if (errorData.missingCostCenterCodes && Array.isArray(errorData.missingCostCenterCodes)) {
+        const missingCodes = errorData.missingCostCenterCodes;
+        
+        error(
+          `Los códigos "${missingCodes.join('", "')}" NO existen en la cuenta seleccionada. ` +
+          `Verifique los códigos en el sistema ERP/Contable y corrija el Excel.`,
+          'Centros de Costos No Encontrados'
+        );
+        
+        setTimeout(() => {
+          info(
+            'Los códigos de centros de costos deben coincidir exactamente con los de su sistema contable. ' +
+            'Contacte a soporte@focalizahr.com si necesita agregar nuevos departamentos.',
+            'Ayuda'
+          );
+        }, 1500);
+        
+        return false;
+      }
+      
+      // ERROR 2: Cliente intentando usar targetAccountId (seguridad)
+      if (errorData.attempted === 'targetAccountId override') {
+        error(
+          'No tiene permisos para cargar datos a otras cuentas. ' +
+          'Esta funcionalidad está reservada para administradores de FocalizaHR.',
+          'Acceso Denegado'
+        );
+        return false;
+      }
+      
+      // ERROR 3: Target account no encontrada (admin)
+      if (errorData.error && errorData.error.includes('Cuenta objetivo no encontrada')) {
+        error(
+          'La empresa seleccionada no existe en el sistema. ' +
+          'Por favor, verifique la selección en el selector de empresas.',
+          'Empresa No Encontrada'
+        );
+        return false;
+      }
+      
+      // ERROR 4: Target account inactiva (admin)
+      if (errorData.accountStatus && errorData.accountStatus !== 'ACTIVE') {
+        error(
+          `La cuenta "${errorData.companyName || 'seleccionada'}" no está activa (Estado: ${errorData.accountStatus}). ` +
+          'Solo se pueden cargar métricas a cuentas activas.',
+          'Cuenta Inactiva'
+        );
+        return false;
+      }
+      
+      // ERROR 5: No autorizado (rol incorrecto)
+      if (errorData.error && errorData.error.includes('No autorizado')) {
+        error(
+          'Su rol no tiene permisos para cargar métricas departamentales. ' +
+          'Contacte al administrador de su cuenta.',
+          'Sin Permisos'
+        );
+        return false;
+      }
+      
+      // ERROR GENÉRICO: Otros errores
       error(
-        err.message || 'Error al cargar métricas. Intenta nuevamente.',
+        errorData.message || errorData.error || err.message || 'Error al cargar métricas. Intenta nuevamente.',
         'Error Upload'
       );
       return false;
+      
     } finally {
       setIsLoading(false);
     }
-  }, [previewData, accountId, success, error, warning]);
+  }, [previewData, accountId, success, error, warning, info]);
 
   // ============================================
   // FETCH HISTÓRICO

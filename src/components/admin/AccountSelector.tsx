@@ -22,22 +22,31 @@ interface AccountSelectorProps {
   onChange: (accountId: string, accountName: string) => void;
   placeholder?: string;
   className?: string;
+  onOpenChange?: (isOpen: boolean) => void; // ✅ NUEVO: Callback para estado
 }
 
 export default function AccountSelector({
   value,
   onChange,
   placeholder = 'Buscar empresa por nombre o email...',
-  className = ''
+  className = '',
+  onOpenChange // ✅ NUEVO: Recibir callback
 }: AccountSelectorProps) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [filteredAccounts, setFilteredAccounts] = useState<Account[]>([]);
-  
-  const { error } = useToast();
 
+  // ✅ NUEVO: Notificar al padre cuando cambia isOpen
+  useEffect(() => {
+    if (onOpenChange) {
+      onOpenChange(isOpen);
+    }
+  }, [isOpen]); // ✅ FIX: Remover onOpenChange de dependencies
+
+  const { error } = useToast();
+  
   // ============================================
   // FETCH ACCOUNTS
   // ============================================
@@ -45,8 +54,21 @@ export default function AccountSelector({
   const fetchAccounts = useCallback(async () => {
     setIsLoading(true);
     try {
+      // ✅ FIX 1: Obtener token de localStorage (patrón del proyecto)
+      const token = localStorage.getItem('focalizahr_token');
+      
+      if (!token) {
+        console.warn('Token not available yet, skipping fetch');
+        setIsLoading(false);
+        return; // Salir silenciosamente si no hay token aún
+      }
+
+      // ✅ FIX 2: Usar Authorization header (patrón establecido)
       const response = await fetch('/api/admin/accounts?limit=100', {
-        credentials: 'include'
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
 
       if (!response.ok) {
@@ -56,26 +78,41 @@ export default function AccountSelector({
 
       const data = await response.json();
       
-      // Verificar que data.data sea un array
-      if (data.success && Array.isArray(data.data)) {
-        setAccounts(data.data);
-        setFilteredAccounts(data.data);
-      } else {
-        console.error('Invalid response format:', data);
-        throw new Error('Formato de respuesta inválido');
+      // ✅ FIX 3: Parsing flexible para estructura API real
+      // API retorna: { success: true, data: { accounts: [...], pagination, metrics } }
+      let accountsList: Account[] = [];
+      
+      if (data.success && data.data) {
+        if (Array.isArray(data.data.accounts)) {
+          accountsList = data.data.accounts;
+        } else if (Array.isArray(data.data)) {
+          accountsList = data.data;
+        }
       }
+
+      if (accountsList.length === 0) {
+        console.warn('No accounts found in response:', data);
+      }
+
+      setAccounts(accountsList);
+      setFilteredAccounts(accountsList);
 
     } catch (err) {
       console.error('Accounts fetch error:', err);
-      error('Error al cargar lista de empresas', 'Error');
+      // Toast se llama aquí dentro, no en dependency
+      const { error: showError } = useToast();
+      showError('Error al cargar lista de empresas', 'Error');
+      setAccounts([]);
+      setFilteredAccounts([]);
     } finally {
       setIsLoading(false);
     }
-  }, [error]);
+  }, []); // ✅ FIX 4: Array vacío - sin dependencies (evita loop infinito)
 
+  // ✅ FIX 5: useEffect solo ejecuta 1 vez en mount
   useEffect(() => {
     fetchAccounts();
-  }, [fetchAccounts]);
+  }, []); // Sin dependency de fetchAccounts
 
   // ============================================
   // FILTRAR ACCOUNTS

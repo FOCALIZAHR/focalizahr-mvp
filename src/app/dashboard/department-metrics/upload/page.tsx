@@ -26,7 +26,7 @@ export default function DepartmentMetricsUploadPage() {
     confirmUpload,
     cancelPreview,
     fetchHistory
-  } = useMetricsUpload(user?.id);
+  } = useMetricsUpload(user?.id, user?.role)
 
   // Cargar histórico al montar
   useEffect(() => {

@@ -1,6 +1,7 @@
 // ============================================
 // PÁGINA: Department Metrics Upload (Admin)
 // Ruta: /dashboard/admin/department-metrics
+// ✅ FIX: Empty state ahora es clickeable
 // ============================================
 
 'use client';
@@ -17,6 +18,7 @@ import UploadHistoryTable from '@/components/metrics/UploadHistoryTable';
 export default function AdminDepartmentMetricsPage() {
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [selectedAccountName, setSelectedAccountName] = useState<string>('');
+  const [isSelectorOpen, setIsSelectorOpen] = useState(false); // ✅ NUEVO
 
   const {
     isLoading,
@@ -27,7 +29,7 @@ export default function AdminDepartmentMetricsPage() {
     confirmUpload,
     cancelPreview,
     fetchHistory
-  } = useMetricsUpload(selectedAccountId);
+  } = useMetricsUpload(selectedAccountId, 'FOCALIZAHR_ADMIN');
 
   // Recargar histórico cuando cambia cuenta seleccionada
   useEffect(() => {
@@ -43,6 +45,16 @@ export default function AdminDepartmentMetricsPage() {
   const handleAccountChange = (accountId: string, accountName: string) => {
     setSelectedAccountId(accountId);
     setSelectedAccountName(accountName);
+  };
+
+  // ✅ NUEVO: Función para abrir el selector
+  const handleOpenSelector = () => {
+    // Buscar el input del AccountSelector y hacer focus
+    const input = document.querySelector<HTMLInputElement>('[placeholder*="Buscar empresa"]');
+    if (input) {
+      input.focus();
+      input.click();
+    }
   };
 
   return (
@@ -79,6 +91,7 @@ export default function AdminDepartmentMetricsPage() {
             value={selectedAccountId}
             onChange={handleAccountChange}
             placeholder="Buscar empresa por nombre o email..."
+            onOpenChange={setIsSelectorOpen} // ✅ NUEVO: Recibir estado
           />
           
           {selectedAccountId && (
@@ -122,15 +135,36 @@ export default function AdminDepartmentMetricsPage() {
             />
           </>
         ) : (
-          <div className="fhr-card text-center py-16">
-            <Database className="w-20 h-20 text-slate-600 mx-auto mb-4" />
-            <p className="text-slate-400 text-lg mb-2">
-              Selecciona una empresa cliente para comenzar
-            </p>
-            <p className="text-slate-500 text-sm">
-              Usa el selector de arriba para elegir la empresa a la que cargarás métricas
-            </p>
-          </div>
+          // ✅ EMPTY STATE - SOLO SE MUESTRA SI DROPDOWN CERRADO
+          !isSelectorOpen && (
+            <div 
+              className="fhr-card text-center py-16 cursor-pointer hover:border-cyan-500/50 hover:bg-cyan-500/5 transition-all duration-200"
+              onClick={handleOpenSelector}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  handleOpenSelector();
+                }
+              }}
+            >
+              <Database className="w-20 h-20 text-slate-600 mx-auto mb-4" />
+              <p className="text-slate-400 text-lg mb-2 font-semibold">
+                👆 Haz clic aquí para seleccionar una empresa
+              </p>
+              <p className="text-slate-500 text-sm">
+                O usa el buscador de arriba
+              </p>
+              
+              {/* Hint visual */}
+              <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
+                <Building2 className="w-4 h-4 text-cyan-400" />
+                <span className="text-cyan-300 text-sm">
+                  Servicio concierge: Carga datos para tus clientes
+                </span>
+              </div>
+            </div>
+          )
         )}
         
       </div>

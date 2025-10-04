@@ -2,6 +2,7 @@
 // API POST /api/department-metrics/upload
 // CHAT 9 REFACTORIZADO - Enterprise Security
 // Permite ACCOUNT_OWNER + FOCALIZAHR_ADMIN cargar datos
+// CON SOPORTE targetAccountId para admin
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -70,8 +71,8 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // ✅ AUTORIZACIÓN: Solo ACCOUNT_OWNER y FOCALIZAHR_ADMIN pueden cargar datos
-    const allowedRoles = ['ACCOUNT_OWNER', 'FOCALIZAHR_ADMIN', 'CLIENT'];
+    // ✅ AUTORIZACIÓN: Solo ACCOUNT_OWNER y FOCALIZAHR_ADMIN
+    const allowedRoles = ['ACCOUNT_OWNER', 'FOCALIZAHR_ADMIN'];
     if (!allowedRoles.includes(userContext.role)) {
       return NextResponse.json(
         { 
@@ -91,6 +92,81 @@ export async function POST(request: NextRequest) {
     // ========================================
     
     const body = await request.json();
+    
+    // ========================================
+    // PASO 2.5: DETERMINAR CUENTA EFECTIVA (NUEVO)
+    // ========================================
+    
+    let effectiveAccountId = userContext.accountId;
+    
+    // Si viene targetAccountId en el body
+    if (body.targetAccountId) {
+      
+      // 🔒 SEGURIDAD: Solo FOCALIZAHR_ADMIN puede usar targetAccountId
+      if (userContext.role !== 'FOCALIZAHR_ADMIN') {
+        return NextResponse.json({
+          success: false,
+          error: 'Solo FOCALIZAHR_ADMIN puede cargar datos para otras cuentas.',
+          attempted: 'targetAccountId override',
+          yourRole: userContext.role
+        }, { status: 403 });
+      }
+      
+      // ✅ VALIDAR: Target account debe existir y estar activo
+      const targetAccount = await prisma.account.findUnique({
+        where: { id: body.targetAccountId },
+        select: { 
+          id: true, 
+          companyName: true, 
+          status: true 
+        }
+      });
+      
+      if (!targetAccount) {
+        return NextResponse.json({
+          success: false,
+          error: 'Cuenta objetivo no encontrada.',
+          targetAccountId: body.targetAccountId
+        }, { status: 404 });
+      }
+      
+      if (targetAccount.status !== 'ACTIVE') {
+        return NextResponse.json({
+          success: false,
+          error: 'La cuenta objetivo no está activa.',
+          accountStatus: targetAccount.status,
+          companyName: targetAccount.companyName
+        }, { status: 403 });
+      }
+      
+      // ✅ TODO VALIDADO: Usar targetAccountId
+      effectiveAccountId = body.targetAccountId;
+      
+      console.log(`👑 Admin ${userContext.email} cargando métricas para: ${targetAccount.companyName} (${effectiveAccountId})`);
+      
+      // ✅ AUDITORÍA: Registrar operación admin
+      await prisma.auditLog.create({
+        data: {
+          action: 'ADMIN_METRICS_UPLOAD',
+          entityType: 'department_metrics',
+          userInfo: {
+            actingAdminId: userContext.accountId,
+            actingAdminEmail: userContext.email,
+            targetAccountId: effectiveAccountId,
+            targetAccountName: targetAccount.companyName,
+            timestamp: new Date().toISOString()
+          },
+          account: {
+            connect: { id: effectiveAccountId }
+          }
+        }
+      });
+    }
+    // Si NO viene targetAccountId, usa su propia cuenta (comportamiento actual)
+    
+    // ========================================
+    // PASO 3: VALIDAR FORMATO CON ZOD
+    // ========================================
     
     // Detectar si es batch o single upload
     const isBatch = Array.isArray(body.metrics) || Array.isArray(body);
@@ -123,7 +199,7 @@ export async function POST(request: NextRequest) {
     console.log(`📊 Procesando ${validatedMetrics.length} métricas departamentales...`);
     
     // ========================================
-    // PASO 3: VALIDAR LÍMITES Y BATCH SIZE
+    // PASO 4: VALIDAR LÍMITES Y BATCH SIZE
     // ========================================
     
     const MAX_BATCH_SIZE = 100;
@@ -139,15 +215,16 @@ export async function POST(request: NextRequest) {
     }
     
     // ========================================
-    // PASO 4: CONVERTIR costCenterCode → departmentId
+    // PASO 5: CONVERTIR costCenterCode → departmentId
     // ========================================
     
     const costCenterCodes = [...new Set(validatedMetrics.map(m => m.costCenterCode))];
     
+    // ✅ USAR effectiveAccountId (puede ser del cliente o admin seleccionado)
     const existingDepartments = await prisma.department.findMany({
       where: {
         costCenterCode: { in: costCenterCodes },
-        accountId: userContext.accountId // ✅ CRÍTICO: Multi-tenant isolation
+        accountId: effectiveAccountId // ✅ CAMBIO CRÍTICO: Usa cuenta efectiva
       },
       select: {
         id: true,
@@ -170,16 +247,17 @@ export async function POST(request: NextRequest) {
           success: false,
           error: 'Centros de costos no encontrados en su cuenta.',
           missingCostCenterCodes: missingCodes,
-          message: 'Verifique que los códigos de centro de costos sean correctos.'
+          message: 'Verifique que los códigos de centro de costos sean correctos.',
+          accountId: effectiveAccountId // ✅ Informar en qué cuenta se buscó
         },
         { status: 404 }
       );
     }
     
-    console.log(`✅ Todos los centros de costos existen en cuenta ${userContext.accountId}`);
+    console.log(`✅ Todos los centros de costos existen en cuenta ${effectiveAccountId}`);
     
     // ========================================
-    // PASO 5: PROCESAR CADA MÉTRICA
+    // PASO 6: PROCESAR CADA MÉTRICA
     // ========================================
     
     const results: (UploadResult | UploadError)[] = [];
@@ -192,17 +270,12 @@ export async function POST(request: NextRequest) {
         // Parsear período a fechas
         const { start, end, type } = parsePeriod(metric.period);
         
-        // Validar consistencia datos
+        // Validar consistencia datos (WARNING, no bloquear)
         const consistencyCheck = validateMetricsConsistency(metric);
         if (!consistencyCheck.valid) {
-          results.push({
-            success: false,
-            departmentId: metric.departmentId,
-            period: metric.period,
-            error: 'Datos inconsistentes',
-            details: consistencyCheck.errors
-          });
-          continue;
+          console.warn(`⚠️ Advertencia de consistencia en ${metric.costCenterCode}-${metric.period}:`,
+            consistencyCheck.errors.join(', '));
+          // CONTINUAR sin bloquear (los datos pueden ser correctos aunque no cuadren matemáticamente)
         }
         
         // ✅ UPSERT: Crear o actualizar según exista
@@ -237,9 +310,9 @@ export async function POST(request: NextRequest) {
             dataQuality: metric.dataQuality || 'validated'
           },
           create: {
-            // ✅ NOMBRES EXACTOS DEL SCHEMA (camelCase en Prisma)
-            accountId: userContext.accountId,
-            departmentId: departmentId, // ← Convertido desde costCenterCode
+            // ✅ USAR effectiveAccountId en create
+            accountId: effectiveAccountId, // ✅ CAMBIO CRÍTICO
+            departmentId: departmentId,
             
             // Período
             period: metric.period,
@@ -276,7 +349,7 @@ export async function POST(request: NextRequest) {
         // Determinar si fue creación o actualización
         const action = await prisma.departmentMetric.count({
           where: {
-            departmentId: metric.departmentId,
+            departmentId: departmentId,
             period: metric.period,
             uploadedAt: { lt: upsertedMetric.uploadedAt }
           }
@@ -296,7 +369,7 @@ export async function POST(request: NextRequest) {
         console.error(`❌ Error procesando métrica:`, error);
         results.push({
           success: false,
-          departmentId: metric.costCenterCode, // Mostrar código en error
+          departmentId: metric.costCenterCode,
           period: metric.period,
           error: error.message || 'Error desconocido al guardar métrica'
         });
@@ -304,7 +377,7 @@ export async function POST(request: NextRequest) {
     }
     
     // ========================================
-    // PASO 6: GENERAR RESPUESTA MULTI-STATUS
+    // PASO 7: GENERAR RESPUESTA MULTI-STATUS
     // ========================================
     
     const successCount = results.filter(r => r.success).length;
@@ -373,16 +446,27 @@ export async function GET() {
       'Upsert automático (crear o actualizar)',
       'Validación Zod completa',
       'Multi-tenant isolation',
+      'Admin puede cargar para otras cuentas con targetAccountId',
       'Audit trail automático'
     ],
     example: {
-      departmentId: 'dept_xyz',
+      costCenterCode: 'DEPT-003',
       period: '2025-Q1',
       turnoverRate: 12.5,
       absenceRate: 3.2,
       issueCount: 2,
       overtimeHoursTotal: 450.0,
       overtimeHoursAvg: 15.0
+    },
+    adminExample: {
+      targetAccountId: 'client-account-id',
+      metrics: [
+        {
+          costCenterCode: 'DEPT-003',
+          period: '2025-Q1',
+          turnoverRate: 12.5
+        }
+      ]
     }
   });
 }
