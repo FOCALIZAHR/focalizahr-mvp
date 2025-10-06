@@ -133,6 +133,9 @@ model Participant {
   email       String
   uniqueToken String  @unique @map("unique_token")
   name        String?
+// 🆕 NUEVOS CAMPOS - AGREGAR ESTAS 2 LÍNEAS
+  nationalId   String? @map("national_id")   // RUT chileno (12345678-9)
+  phoneNumber  String? @map("phone_number")  // Celular internacional (+56912345678)
 
   // Segmentación básica (carga manual):
   department     String?
@@ -171,6 +174,8 @@ model Participant {
   @@index([hasResponded], map: "idx_participants_responded")
   @@index([department], map: "idx_participants_department")
   @@index([departmentId], map: "idx_participants_department_id")
+  @@index([nationalId], map: "idx_participants_national_id")    // 🆕 NUEVO ÍNDICE
+  @@index([phoneNumber], map: "idx_participants_phone_number")  // 🆕 NUEVO ÍNDICE
   @@map("participants")
 }
 

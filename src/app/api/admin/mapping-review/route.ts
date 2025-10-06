@@ -2,11 +2,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateAuthToken } from '@/lib/auth';
+import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter';
 
-// GET: Obtener todos los departamentos sin categoría asignada
+// ================================================================
+// GET: Obtener términos CSV sin mapear (agrupados individualmente)
+// ================================================================
 export async function GET(request: NextRequest) {
   try {
-    // SEGURIDAD: Validar token y rol admin
+    // SEGURIDAD: Validar token y rol admin (NO TOCAR)
     const authHeader = request.headers.get('authorization');
     const validation = await validateAuthToken(authHeader, undefined);
 
@@ -28,80 +31,120 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const companyFilter = searchParams.get('company')?.toLowerCase();
 
-    // Consultar departamentos sin asignar con información de la empresa
-    const unmappedDepartments = await prisma.department.findMany({
-      where: {
-        standardCategory: 'sin_asignar',
-        isActive: true,
-        // Filtro opcional por empresa
-        ...(companyFilter && {
-          account: {
-            companyName: {
-              contains: companyFilter,
-              mode: 'insensitive'
-            }
-          }
-        })
-      },
-      include: {
+    // ✅ PASO 1: Obtener el/los departamento(s) paraguas
+    const umbrellaQuery: any = {
+      standardCategory: 'sin_asignar',
+      isActive: true
+    };
+
+    // Aplicar filtro de empresa si existe
+    if (companyFilter) {
+      umbrellaQuery.account = {
+        companyName: {
+          contains: companyFilter,
+          mode: 'insensitive'
+        }
+      };
+    }
+
+    const umbrellaDepartments = await prisma.department.findMany({
+      where: umbrellaQuery,
+      select: {
+        id: true,
+        accountId: true,
         account: {
           select: {
             id: true,
             companyName: true
           }
-        },
-        _count: {
-          select: {
-            participants: true
-          }
         }
-      },
-      orderBy: [
-        { account: { companyName: 'asc' } },
-        { displayName: 'asc' }
-      ]
+      }
     });
 
-    // Formatear respuesta con información adicional
-    const formattedDepartments = unmappedDepartments.map(dept => ({
-      id: dept.id,
-      displayName: dept.displayName,
-      companyId: dept.accountId,
-      companyName: dept.account.companyName,
-      participantCount: dept._count.participants,
-      level: dept.level,
-      unitType: dept.unitType,
-      createdAt: dept.createdAt
-    }));
+    if (umbrellaDepartments.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        stats: {
+          totalUnmappedTerms: 0,
+          companiesAffected: 0,
+          totalParticipants: 0
+        }
+      });
+    }
 
-    // Estadísticas generales
+    const umbrellaIds = umbrellaDepartments.map(d => d.id);
+    const accountIdMap = new Map(
+      umbrellaDepartments.map(d => [d.id, { accountId: d.accountId, companyName: d.account.companyName }])
+    );
+
+    // ✅ PASO 2: Agrupar por término CSV (participant.department)
+    const unmappedTerms = await prisma.participant.groupBy({
+      by: ['department', 'departmentId'],
+      where: {
+        departmentId: { in: umbrellaIds },
+        department: { not: null }
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    // ✅ PASO 3: Enriquecer con sugerencias de categoría
+    const enrichedTerms = unmappedTerms.map(term => {
+      const accountInfo = accountIdMap.get(term.departmentId!);
+      const suggestedCategory = DepartmentAdapter.getGerenciaCategory(term.department!);
+      
+      return {
+        id: term.departmentId, // ✅ FIX 3: Compatibilidad con frontend
+        csvTerm: term.department,
+        displayName: term.department,
+        companyId: accountInfo?.accountId || '',
+        companyName: accountInfo?.companyName || 'N/A',
+        participantCount: term._count.id,
+        suggestedCategory: suggestedCategory || null,
+        confidence: suggestedCategory ? 'high' : 'low',
+        departmentId: term.departmentId // Department paraguas actual
+      };
+    });
+
+    // Ordenar: primero por empresa, luego por término
+    enrichedTerms.sort((a, b) => {
+      const companyCompare = a.companyName.localeCompare(b.companyName);
+      if (companyCompare !== 0) return companyCompare;
+      return (a.csvTerm || '').localeCompare(b.csvTerm || '');
+    });
+
+    // Estadísticas agregadas
     const stats = {
-      totalUnmapped: formattedDepartments.length,
-      companiesAffected: new Set(formattedDepartments.map(d => d.companyId)).size,
-      totalParticipants: formattedDepartments.reduce((sum, d) => sum + d.participantCount, 0)
+      totalUnmappedTerms: enrichedTerms.length,
+      companiesAffected: new Set(enrichedTerms.map(d => d.companyId)).size,
+      totalParticipants: enrichedTerms.reduce((sum, d) => sum + d.participantCount, 0)
     };
 
-    console.log(`[Mapping Review] Consultados ${stats.totalUnmapped} departamentos sin asignar de ${stats.companiesAffected} empresas`);
+    console.log(`[Mapping Review] Consultados ${stats.totalUnmappedTerms} términos CSV únicos de ${stats.companiesAffected} empresas`);
 
     return NextResponse.json({
       success: true,
-      data: formattedDepartments,
+      data: enrichedTerms,
       stats
     });
 
   } catch (error) {
-    console.error('Error fetching unmapped departments:', error);
+    console.error('Error fetching unmapped CSV terms:', error);
     return NextResponse.json(
-      { error: 'Error al obtener departamentos sin asignar' },
+      { error: 'Error al obtener términos sin mapear' },
       { status: 500 }
     );
   }
 }
 
-// PATCH: Actualizar categoría de un departamento
+// ================================================================
+// PATCH: Crear departamento nuevo y reasignar participantes
+// ================================================================
 export async function PATCH(request: NextRequest) {
   try {
-    // SEGURIDAD: Validar token y rol admin
+    // SEGURIDAD: Validar token y rol admin (NO TOCAR)
     const authHeader = request.headers.get('authorization');
     const validation = await validateAuthToken(authHeader, undefined);
 
@@ -121,122 +164,148 @@ export async function PATCH(request: NextRequest) {
 
     // Obtener datos del body
     const body = await request.json();
-    const { departmentId, newStandardCategory } = body;
+    const { csvTerm, standardCategory, accountId, departmentId } = body;
 
-    // Validaciones
-    if (!departmentId || !newStandardCategory) {
+    // ✅ FIX 1: Validar que departmentId es obligatorio
+    if (!csvTerm || !standardCategory || !accountId || !departmentId) {
       return NextResponse.json(
-        { error: 'departmentId y newStandardCategory son requeridos' },
+        { error: 'csvTerm, standardCategory, accountId y departmentId son requeridos' },
         { status: 400 }
       );
     }
 
-    // Validar que la categoría sea válida (una de las 8 gerencias)
+    // Validar categoría (las 8 gerencias válidas)
     const validCategories = [
       'personas', 'comercial', 'marketing', 'tecnologia', 
       'operaciones', 'finanzas', 'servicio', 'legal'
     ];
 
-    if (!validCategories.includes(newStandardCategory)) {
+    if (!validCategories.includes(standardCategory)) {
       return NextResponse.json(
         { error: `Categoría inválida. Debe ser una de: ${validCategories.join(', ')}` },
         { status: 400 }
       );
     }
 
-    // Verificar que el departamento existe
-    const department = await prisma.department.findUnique({
+    // ✅ FIX 2: Validar que departmentId paraguas existe y pertenece al accountId
+    const paraguas = await prisma.department.findUnique({
       where: { id: departmentId },
-      include: {
-        account: {
-          select: { companyName: true }
-        }
+      select: { 
+        accountId: true,
+        standardCategory: true 
       }
     });
 
-    if (!department) {
+    if (!paraguas) {
       return NextResponse.json(
-        { error: 'Departamento no encontrado' },
+        { error: 'Departamento paraguas no encontrado' },
         { status: 404 }
       );
     }
 
-    // Actualizar la categoría
-    const oldCategory = department.standardCategory;
-    const updatedDepartment = await prisma.department.update({
-      where: { id: departmentId },
-      data: {
-        standardCategory: newStandardCategory
-      }
+    if (paraguas.accountId !== accountId) {
+      return NextResponse.json(
+        { error: 'Validación de seguridad fallida: departmentId no pertenece al accountId especificado' },
+        { status: 403 }
+      );
+    }
+
+    if (paraguas.standardCategory !== 'sin_asignar') {
+      return NextResponse.json(
+        { error: 'El departmentId especificado no es un paraguas válido (debe tener standardCategory = sin_asignar)' },
+        { status: 400 }
+      );
+    }
+
+    // ✅ TRANSACCIÓN: Crear department + reasignar participantes
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Crear el nuevo departamento con el término CSV
+      const newDepartment = await tx.department.create({
+        data: {
+          accountId,
+          displayName: csvTerm,
+          standardCategory,
+          unitType: 'departamento',
+          level: 3,
+          isActive: true
+        }
+      });
+
+      // 2. Reasignar participantes que tienen ese término CSV exacto
+      const updatedParticipants = await tx.participant.updateMany({
+        where: {
+          department: csvTerm,
+          departmentId: departmentId // Department paraguas actual
+        },
+        data: {
+          departmentId: newDepartment.id
+        }
+      });
+
+      return {
+        department: newDepartment,
+        participantsReassigned: updatedParticipants.count
+      };
     });
 
-    // Log de auditoría en el servidor
+    // ✅ AUDITORÍA: Log de la operación
     const auditLog = {
       timestamp: new Date().toISOString(),
-      action: 'MAPPING_REVIEW_UPDATE',
+      action: 'MAPPING_REVIEW_CREATE_AND_REASSIGN',
       performedBy: {
-        accountId: validation.account.id,  // ID de la cuenta FocalizaHR
+        accountId: validation.account.id,
         adminEmail: validation.account.adminEmail,
         adminName: validation.account.adminName,
         role: validation.account.role
       },
-      targetDepartment: {
-        departmentId,
-        departmentName: department.displayName,
-        account: department.accountId ? { connect: { id: department.accountId } } : undefined,  // ← CAMBIO CORRECTO
-        companyName: department.account.companyName
+      targetCompany: {
+        accountId,
       },
-      change: {
-        field: 'standardCategory',
-        oldValue: oldCategory,
-        newValue: newStandardCategory
+      operation: {
+        csvTerm,
+        newDepartmentId: result.department.id,
+        standardCategory,
+        participantsAffected: result.participantsReassigned
       }
     };
 
-    console.log('[AUDIT] Mapping Review Update:', JSON.stringify(auditLog, null, 2));
+    console.log('[AUDIT] Mapping Review - Create & Reassign:', JSON.stringify(auditLog, null, 2));
 
     // Guardar en tabla de auditoría
-    // ✅ CÓDIGO CORRECTO - userId se deja null porque el actor no es un 'User' final
     try {
       await prisma.auditLog.create({
         data: {
-          action: 'DEPARTMENT_CATEGORY_UPDATE',
-          account: department.accountId ? {
-          connect: { id: department.accountId }
-          } : undefined,
-          //userId: null,  // Se deja nulo porque el actor no es un 'User' final
+          action: 'DEPARTMENT_CREATE_FROM_CSV_TERM',
+          account: { connect: { id: accountId } },
           entityType: 'department',
-          entityId: departmentId,
-          oldValues: { standardCategory: oldCategory },
-          newValues: { standardCategory: newStandardCategory },
-          //metadata: {
-          //  ...auditLog,
-          //  actingAccountId: validation.account.id,  // Guardamos el ID del admin aquí
-           // actingAccountEmail: validation.account.adminEmail  // Y su email para trazabilidad
-          //}
+          entityId: result.department.id,
+          oldValues: { csvTerm, status: 'unmapped' },
+          newValues: { 
+            departmentId: result.department.id,
+            standardCategory,
+            participantsReassigned: result.participantsReassigned
+          }
         }
       });
     } catch (auditError) {
-      // Log pero no fallar si hay error con auditoría
-      console.error('[AUDIT] Error guardando en tabla auditoría:', auditError);
-      // La operación principal ya se completó, continuar
+      console.error('[AUDIT] Error guardando auditoría:', auditError);
     }
 
     return NextResponse.json({
       success: true,
-      message: `Categoría actualizada exitosamente de "${oldCategory}" a "${newStandardCategory}"`,
+      message: `Departamento "${csvTerm}" creado con categoría "${standardCategory}". ${result.participantsReassigned} participantes reasignados.`,
       data: {
-        departmentId,
-        displayName: department.displayName,
-        oldCategory,
-        newCategory: newStandardCategory
+        departmentId: result.department.id,
+        displayName: result.department.displayName,
+        standardCategory: result.department.standardCategory,
+        participantsReassigned: result.participantsReassigned
       }
     });
 
   } catch (error) {
-    console.error('Error updating department category:', error);
+    console.error('Error creating department and reassigning participants:', error);
     return NextResponse.json(
-      { error: 'Error al actualizar categoría del departamento' },
+      { error: 'Error al crear departamento y reasignar participantes' },
       { status: 500 }
     );
   }

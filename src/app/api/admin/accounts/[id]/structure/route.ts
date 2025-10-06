@@ -179,8 +179,41 @@ export async function POST(
       );
     }
 
-    // Obtener categorización automática usando DepartmentAdapter
-    const standardCategory = DepartmentAdapter.getGerenciaCategory(displayName) || 'sin_asignar';
+    // ========================================
+    // CASO B: HERENCIA DE CATEGORÍA DEL PADRE
+    // ========================================
+    let standardCategory: string | null = null;
+    let inheritedFromParent = false;
+
+    if (parentId) {
+      const parent = await prisma.department.findUnique({
+        where: { id: parentId },
+        select: { 
+          standardCategory: true,
+          displayName: true
+        }
+      });
+
+      if (parent?.standardCategory && parent.standardCategory !== 'sin_asignar') {
+        standardCategory = parent.standardCategory;
+        inheritedFromParent = true;
+        console.log(`✅ [CASO B] Heredando categoría del padre "${parent.displayName}": ${standardCategory}`);
+      }
+    }
+
+    // ========================================
+    // CASO A: AUTO-SUGERENCIA SI NO HEREDÓ
+    // ========================================
+    const suggestedCategory = !standardCategory 
+      ? DepartmentAdapter.getGerenciaCategory(displayName)
+      : null;
+
+    if (!standardCategory) {
+      standardCategory = suggestedCategory || 'sin_asignar';
+      if (suggestedCategory) {
+        console.log(`💡 [CASO A] Categoría sugerida para "${displayName}": ${suggestedCategory}`);
+      }
+    }
 
     // Crear la nueva unidad organizacional
     const newUnit = await prisma.department.create({
@@ -205,6 +238,20 @@ export async function POST(
       }
     });
 
+    // ========================================
+    // RESPUESTA CON METADATOS ENRIQUECIDOS
+    // ========================================
+    let message = '';
+    if (inheritedFromParent) {
+      message = `${unitType === 'gerencia' ? 'Gerencia' : 'Departamento'} creado. Categoría heredada del padre: ${standardCategory}`;
+    } else if (suggestedCategory && standardCategory === suggestedCategory) {
+      message = `${unitType === 'gerencia' ? 'Gerencia' : 'Departamento'} creado con categoría sugerida: ${standardCategory}`;
+    } else if (standardCategory === 'sin_asignar') {
+      message = `${unitType === 'gerencia' ? 'Gerencia' : 'Departamento'} creado. Requiere asignación manual en Mapping-Review`;
+    } else {
+      message = `${unitType === 'gerencia' ? 'Gerencia' : 'Departamento'} creado exitosamente`;
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -212,7 +259,12 @@ export async function POST(
         departmentCount: newUnit._count.children,
         participantCount: newUnit._count.participants
       },
-      message: `${unitType === 'gerencia' ? 'Gerencia' : 'Departamento'} creado exitosamente`
+      metadata: {
+        suggestedCategory: suggestedCategory,
+        inheritedFromParent: inheritedFromParent,
+        requiresManualMapping: standardCategory === 'sin_asignar'
+      },
+      message
     });
 
   } catch (error) {
