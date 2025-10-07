@@ -1,5 +1,6 @@
 // src/lib/validations.ts - FIX CRÍTICO WIZARD SCHEMA
 // PRESERVANDO 100% EL CONTENIDO EXISTENTE + CORRIGIENDO SCHEMA WIZARD
+// ✅ AGREGADO: Validaciones RUT + phoneNumber
 
 import { z } from 'zod'
 import type { CampaignStatus } from '@/types';
@@ -401,20 +402,51 @@ export const campaignActivationSchema = z.object({
 });
 
 // ========================================
-// VALIDACIONES PARTICIPANTES CONCIERGE
+// ✅ VALIDACIONES PARTICIPANTES CON RUT + PHONENUMBER
 // ========================================
 
-// Validación de participante individual (extendida)
+// Validación de participante individual (extendida CON RUT + PHONE)
 export const participantExtendedSchema = z.object({
+  // ✅ RUT OBLIGATORIO
+  nationalId: z.string()
+    .regex(/^\d{7,8}-[\dkK]$/, 'RUT inválido (formato: 12345678-9)'),
+  
+  // ✅ EMAIL OPCIONAL
   email: z.string()
     .email('Email inválido')
     .toLowerCase()
+    .optional()
     .refine((email) => {
-      // Validaciones adicionales de email
+      if (!email) return true; // Si es undefined/null, es válido (opcional)
+      // Validaciones adicionales solo si hay email
       const domain = email.split('@')[1];
       const blockedDomains = ['example.com', 'test.com', 'invalid.com'];
       return !blockedDomains.includes(domain);
     }, 'Dominio de email no válido'),
+  
+  // ✅ PHONE OPCIONAL (acepta múltiples formatos)
+  phoneNumber: z.string()
+    .optional()
+    .transform(val => {
+      if (!val) return undefined;
+      // Limpiar espacios, guiones, paréntesis
+      const cleaned = val.replace(/[\s\-\(\)]/g, '');
+      // Si no tiene +56, agregarlo
+      if (cleaned.startsWith('9') && cleaned.length === 9) {
+        return `+56${cleaned}`;
+      }
+      if (cleaned.startsWith('56') && cleaned.length === 11) {
+        return `+${cleaned}`;
+      }
+      if (cleaned.startsWith('+56') && cleaned.length === 12) {
+        return cleaned;
+      }
+      return val; // Devolver original si no coincide
+    })
+    .refine(
+      val => !val || /^\+56[0-9]{9}$/.test(val),
+      'Formato celular chileno inválido'
+    ),
   
   department: z.string()
     .max(100, 'Departamento muy largo')
@@ -438,25 +470,36 @@ export const participantExtendedSchema = z.object({
   status: z.enum(['pending', 'validated', 'error']).default('pending'),
   errorMessage: z.string().optional(),
   processedAt: z.date().optional(),
-  processedBy: z.string().optional()
-});
+  processedBy: z.string().optional(),
+  
+  // Campos demográficos opcionales
+  gender: z.string().optional(),
+  dateOfBirth: z.any().optional(),
+  hireDate: z.any().optional()
+}).refine(
+  (data) => data.email || data.phoneNumber,
+  { 
+    message: 'Debe proporcionar email O phoneNumber (al menos uno)',
+    path: ['email'] 
+  }
+);
 
-// Validación de carga masiva de participantes (enfoque concierge)
+// ✅ Validación de carga masiva CON DETECCIÓN DUPLICADOS POR RUT
 export const conciergeParticipantsSchema = z.object({
   campaignId: z.string().cuid(),
   participants: z.array(participantExtendedSchema)
     .min(5, 'Mínimo 5 participantes requeridos')
     .max(500, 'Máximo 500 participantes permitidos')
     .refine((participants) => {
-      // Validar emails únicos
-      const emails = participants.map(p => p.email);
-      return new Set(emails).size === emails.length;
-    }, 'Se encontraron emails duplicados')
+      // ✅ CAMBIO CRÍTICO: Validar RUTs únicos (no emails)
+      const ruts = participants.map(p => p.nationalId);
+      return new Set(ruts).size === ruts.length;
+    }, 'RUTs duplicados encontrados')
     .refine((participants) => {
       // Validar calidad mínima de datos
-      const validEmails = participants.filter(p => p.status !== 'error').length;
-      return validEmails >= 5;
-    }, 'Debe haber al menos 5 participantes con emails válidos'),
+      const validParticipants = participants.filter(p => p.status !== 'error').length;
+      return validParticipants >= 5;
+    }, 'Debe haber al menos 5 participantes válidos'),
   
   // Metadatos del procesamiento concierge
   processingMetadata: z.object({
@@ -634,6 +677,10 @@ export const VALIDATION_CONSTANTS = {
   EMAIL_REGEX: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
   DOMAIN_BLACKLIST: ['example.com', 'test.com', 'invalid.com'],
   
+  // ✅ NUEVAS VALIDACIONES RUT/PHONE
+  RUT_REGEX: /^\d{7,8}-[\dkK]$/,
+  PHONE_REGEX: /^\+56[0-9]{9}$/,
+  
   // Códigos de error
   ERROR_CODES: {
     INVALID_EMAIL: 'INVALID_EMAIL',
@@ -641,7 +688,10 @@ export const VALIDATION_CONSTANTS = {
     INVALID_DATE_RANGE: 'INVALID_DATE_RANGE',
     INSUFFICIENT_PARTICIPANTS: 'INSUFFICIENT_PARTICIPANTS',
     INVALID_TRANSITION: 'INVALID_TRANSITION',
-    MISSING_REQUIRED_FIELD: 'MISSING_REQUIRED_FIELD'
+    MISSING_REQUIRED_FIELD: 'MISSING_REQUIRED_FIELD',
+    INVALID_RUT: 'INVALID_RUT',
+    DUPLICATE_RUT: 'DUPLICATE_RUT',
+    INVALID_PHONE: 'INVALID_PHONE'
   }
 } as const;
 
@@ -708,15 +758,15 @@ export const validateParticipantQuality = (participants: ParticipantExtended[]) 
     issues: [] as string[]
   };
   
-  const emails = new Set<string>();
+  const ruts = new Set<string>();
   
   participants.forEach((participant, index) => {
-    // Verificar duplicados
-    if (emails.has(participant.email)) {
+    // ✅ Verificar duplicados por RUT
+    if (ruts.has(participant.nationalId)) {
       summary.duplicates++;
-      summary.issues.push(`Email duplicado en línea ${index + 1}: ${participant.email}`);
+      summary.issues.push(`RUT duplicado en línea ${index + 1}: ${participant.nationalId}`);
     } else {
-      emails.add(participant.email);
+      ruts.add(participant.nationalId);
     }
     
     // Verificar validez

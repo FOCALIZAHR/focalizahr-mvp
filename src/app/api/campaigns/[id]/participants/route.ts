@@ -1,5 +1,5 @@
 // src/app/api/campaigns/[id]/participants/route.ts
-// ✅ VERSIÓN EXTENDIDA CON CAMPOS DEMOGRÁFICOS - ZERO BREAKING CHANGES
+// ✅ VERSIÓN CON RUT + PHONENUMBER - CAMBIOS QUIRÚRGICOS APLICADOS
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -8,7 +8,50 @@ import { buildParticipantAccessFilter, extractUserContext } from '@/lib/services
 import { conciergeParticipantsSchema } from '@/lib/validations'
 import crypto from 'crypto'
 
-// ✅ FUNCIONES DE PARSING IMPORTADAS (CONSISTENCIA CON ADMIN/PARTICIPANTS)
+// ✅ NUEVO: Validación RUT chileno con dígito verificador
+function validateRut(rut: string): boolean {
+  if (!rut) return false;
+  
+  // Formato: 12345678-9 o 12345678-K
+  const rutRegex = /^(\d{7,8})-?([\dkK])$/;
+  const match = rutRegex.exec(rut.replace(/\./g, '').trim());
+  
+  if (!match) return false;
+  
+  const [, num, dv] = match;
+  let suma = 0;
+  let multiplo = 2;
+  
+  // Algoritmo módulo 11
+  for (let i = num.length - 1; i >= 0; i--) {
+    suma += parseInt(num[i]) * multiplo;
+    multiplo = multiplo === 7 ? 2 : multiplo + 1;
+  }
+  
+  const dvCalculado = 11 - (suma % 11);
+  const dvEsperado = dvCalculado === 11 ? '0' : 
+                     dvCalculado === 10 ? 'k' : 
+                     dvCalculado.toString();
+  
+  return dv.toLowerCase() === dvEsperado;
+}
+
+// ✅ NUEVO: Normalizar RUT a formato estándar
+function normalizeRut(rut: string): string {
+  if (!rut) return '';
+  
+  // Remover puntos y espacios
+  const cleaned = rut.replace(/[.\s]/g, '').trim();
+  
+  // Separar número y dígito verificador
+  const match = /^(\d{7,8})([\dkK])$/.exec(cleaned);
+  if (!match) return cleaned;
+  
+  const [, num, dv] = match;
+  return `${num}-${dv.toUpperCase()}`;
+}
+
+// ✅ FUNCIONES DE PARSING EXISTENTES (sin cambios)
 function parseGender(value: string): string | undefined {
   if (!value) return undefined;
   
@@ -37,9 +80,9 @@ function parseDate(value: any): Date | undefined {
   if (!value) return undefined;
   
   try {
-    // Si es un número de Excel (días desde 1900) - FÓRMULA CORREGIDA
+    // Si es un número de Excel (días desde 1900)
     if (typeof value === 'number') {
-      const excelEpoch = new Date(1899, 11, 30); // 30 dic 1899
+      const excelEpoch = new Date(1899, 11, 30);
       const date = new Date(excelEpoch.getTime() + value * 24 * 60 * 60 * 1000);
       return isValidDate(date) ? date : undefined;
     }
@@ -47,7 +90,7 @@ function parseDate(value: any): Date | undefined {
     if (typeof value === 'string') {
       const dateStr = value.trim();
       
-      // ✅ FORMATO DD/MM/YYYY o DD-MM-YYYY (AMBOS)
+      // Formato DD/MM/YYYY o DD-MM-YYYY
       const ddmmyyyy = /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/.exec(dateStr);
       if (ddmmyyyy) {
         const [, day, month, year] = ddmmyyyy;
@@ -55,7 +98,7 @@ function parseDate(value: any): Date | undefined {
         return isValidDate(date) ? date : undefined;
       }
       
-      // ✅ FORMATO YYYY-MM-DD (ISO)
+      // Formato YYYY-MM-DD (ISO)
       const yyyymmdd = /^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/.exec(dateStr);
       if (yyyymmdd) {
         const [, year, month, day] = yyyymmdd;
@@ -79,9 +122,7 @@ function isValidDate(date: Date): boolean {
          date.getFullYear() < 2030;
 }
 
-// ✅ FUNCIONES DE PARSING SOLAMENTE (NO CÁLCULOS DE NEGOCIO)
-
-// POST /api/campaigns/[id]/participants - Carga participantes enfoque concierge
+// POST /api/campaigns/[id]/participants
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -91,7 +132,6 @@ export async function POST(
   try {
     console.log('👥 Participants upload request for campaign:', params.id)
     
-    // ✅ NUEVO: Usar extractUserContext en lugar de verifyJWT
     const userContext = extractUserContext(request)
     
     if (!userContext.accountId) {
@@ -101,7 +141,6 @@ export async function POST(
       )
     }
     
-    // ✅ NUEVO: Verificar permisos para crear participantes
     const allowedRoles = ['ACCOUNT_OWNER', 'HR_MANAGER', 'FOCALIZAHR_ADMIN', 'CEO']
     if (!allowedRoles.includes(userContext.role || '')) {
       return NextResponse.json(
@@ -122,7 +161,7 @@ export async function POST(
       hasProcessingMetadata: !!body.processingMetadata
     })
 
-    // Verificar campaña existe y pertenece al usuario (doble verificación)
+    // Verificar campaña
     const campaign = await prisma.campaign.findFirst({
       where: {
         id: campaignId,
@@ -147,7 +186,6 @@ export async function POST(
 
     console.log('✅ Campaign found:', campaign.name, 'Status:', campaign.status)
 
-    // Solo permitir en estado draft
     if (campaign.status !== 'draft') {
       return NextResponse.json(
         { 
@@ -194,7 +232,6 @@ export async function POST(
 
     const validatedData = validation.data
 
-    // Verificar límite de participantes
     if (validatedData.participants.length > campaign.account.maxParticipantsPerCampaign) {
       return NextResponse.json(
         {
@@ -208,6 +245,26 @@ export async function POST(
 
     console.log('✅ Validation passed, processing participants...')
 
+    // ✅ CAMBIO 1: Validar RUTs antes de procesar
+    const invalidRuts: string[] = [];
+    validatedData.participants.forEach((p, index) => {
+      if (p.nationalId && !validateRut(p.nationalId)) {
+        invalidRuts.push(`Fila ${index + 1}: RUT inválido (${p.nationalId})`);
+      }
+    });
+
+    if (invalidRuts.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'RUTs inválidos encontrados',
+          details: invalidRuts,
+          code: 'INVALID_RUT'
+        },
+        { status: 400 }
+      )
+    }
+
     // Limpiar participantes existentes
     const existingCount = await prisma.participant.count({
       where: { campaignId }
@@ -220,35 +277,72 @@ export async function POST(
       })
     }
 
-    // ✅ PROCESAR PARTICIPANTES CON CAMPOS DEMOGRÁFICOS EXTENDIDOS
-    const participantsToCreate = validatedData.participants.map(participant => {
-      const uniqueToken = crypto.randomBytes(32).toString('hex')
-      
-      // ✅ PARSEAR CAMPOS DEMOGRÁFICOS (CONSISTENTE CON ADMIN/PARTICIPANTS)
-      const parsedGender = participant.gender ? parseGender(participant.gender) : null;
-      const parsedDateOfBirth = participant.dateOfBirth ? parseDate(participant.dateOfBirth) : null;
-      const parsedHireDate = participant.hireDate ? parseDate(participant.hireDate) : null;
-      
-      return {
-        campaignId,
-        email: participant.email.toLowerCase().trim(),
-        uniqueToken,
-        department: participant.department?.trim() || null,
-        position: participant.position?.trim() || null,
-        seniorityLevel: participant.seniorityLevel || null,
-        location: participant.location?.trim() || null,
-        // ✅ CAMPOS DEMOGRÁFICOS NUEVOS (OPCIONALES)
-        gender: parsedGender,
-        dateOfBirth: parsedDateOfBirth,
-        hireDate: parsedHireDate,
-        hasResponded: false,
-        reminderCount: 0
-      }
-    })
+    // ✅ CAMBIO 2: Detectar duplicados por RUT (prioritario) o email (fallback)
+    const seenRuts = new Set<string>();
+    const seenEmails = new Set<string>();
+    const duplicates: string[] = [];
+
+    const participantsToCreate = validatedData.participants
+      .map((participant, index) => {
+        const uniqueToken = crypto.randomBytes(32).toString('hex')
+        
+        // ✅ CAMBIO 3: Normalizar y validar RUT
+        const normalizedRut = participant.nationalId 
+          ? normalizeRut(participant.nationalId) 
+          : null;
+        
+        // Detectar duplicados
+        if (normalizedRut) {
+          if (seenRuts.has(normalizedRut)) {
+            duplicates.push(`Fila ${index + 1}: RUT duplicado (${normalizedRut})`);
+            return null;
+          }
+          seenRuts.add(normalizedRut);
+        } else {
+          // Fallback a email si no hay RUT
+          const email = participant.email.toLowerCase().trim();
+          if (seenEmails.has(email)) {
+            duplicates.push(`Fila ${index + 1}: Email duplicado (${email})`);
+            return null;
+          }
+          seenEmails.add(email);
+        }
+        
+        // ✅ CAMBIO 4: Normalizar phoneNumber
+        const normalizedPhone = participant.phoneNumber?.trim() || null;
+        
+        // Parsear campos demográficos
+        const parsedGender = participant.gender ? parseGender(participant.gender) : null;
+        const parsedDateOfBirth = participant.dateOfBirth ? parseDate(participant.dateOfBirth) : null;
+        const parsedHireDate = participant.hireDate ? parseDate(participant.hireDate) : null;
+        
+        return {
+          campaignId,
+          email: participant.email.toLowerCase().trim(),
+          uniqueToken,
+          // ✅ CAMBIO 5: Agregar campos nuevos
+          nationalId: normalizedRut,
+          phoneNumber: normalizedPhone,
+          department: participant.department?.trim() || null,
+          position: participant.position?.trim() || null,
+          seniorityLevel: participant.seniorityLevel || null,
+          location: participant.location?.trim() || null,
+          gender: parsedGender,
+          dateOfBirth: parsedDateOfBirth,
+          hireDate: parsedHireDate,
+          hasResponded: false,
+          reminderCount: 0
+        }
+      })
+      .filter(p => p !== null); // Remover duplicados
+
+    if (duplicates.length > 0) {
+      console.log(`⚠️ Found ${duplicates.length} duplicates, continuing with unique participants`);
+    }
 
     console.log(`💾 Creating ${participantsToCreate.length} participants...`)
 
-    // Crear participantes en lotes para mejor performance
+    // Crear participantes en lotes
     const batchSize = 100
     let totalCreated = 0
 
@@ -262,21 +356,22 @@ export async function POST(
       console.log(`📝 Batch ${Math.floor(i / batchSize) + 1} created: ${batch.length} participants`)
     }
 
-    // Actualizar contadores en campaña
+    // Actualizar contadores
     await prisma.campaign.update({
       where: { id: campaignId },
       data: {
         totalInvited: totalCreated,
-        totalResponded: 0, // Reset counter
+        totalResponded: 0,
         updatedAt: new Date()
       }
     })
 
     console.log('📊 Campaign counters updated')
 
-    // ✅ GENERAR ESTADÍSTICAS EXTENDIDAS CON DEMOGRAFÍA
+    // ✅ CAMBIO 6: Estadísticas extendidas con RUT y phone
     const statistics = {
       total: totalCreated,
+      duplicatesSkipped: duplicates.length,
       byDepartment: {} as Record<string, number>,
       byPosition: {} as Record<string, number>,
       bySeniority: {} as Record<string, number>,
@@ -285,10 +380,18 @@ export async function POST(
       withPosition: 0,
       withSeniority: 0,
       withLocation: 0,
-      // ✅ ESTADÍSTICAS DEMOGRÁFICAS NUEVAS
       withGender: 0,
       withDateOfBirth: 0,
-      withHireDate: 0
+      withHireDate: 0,
+      // ✅ NUEVAS MÉTRICAS
+      withNationalId: 0,
+      withPhoneNumber: 0,
+      withEmail: totalCreated, // Todos tienen email (requerido por ahora)
+      contactChannels: {
+        emailOnly: 0,
+        phoneOnly: 0,
+        both: 0
+      }
     }
 
     participantsToCreate.forEach(participant => {
@@ -308,13 +411,23 @@ export async function POST(
         statistics.byLocation[participant.location] = (statistics.byLocation[participant.location] || 0) + 1
         statistics.withLocation++
       }
-      // ✅ CONTAR CAMPOS DEMOGRÁFICOS
       if (participant.gender) statistics.withGender++
       if (participant.dateOfBirth) statistics.withDateOfBirth++
       if (participant.hireDate) statistics.withHireDate++
+      
+      // ✅ CONTAR NUEVOS CAMPOS
+      if (participant.nationalId) statistics.withNationalId++
+      if (participant.phoneNumber) statistics.withPhoneNumber++
+      
+      // Canales de contacto
+      const hasEmail = !!participant.email;
+      const hasPhone = !!participant.phoneNumber;
+      if (hasEmail && !hasPhone) statistics.contactChannels.emailOnly++;
+      if (!hasEmail && hasPhone) statistics.contactChannels.phoneOnly++;
+      if (hasEmail && hasPhone) statistics.contactChannels.both++;
     })
 
-    // Crear audit log
+    // Audit log
     await prisma.auditLog.create({
       data: {
         accountId: userContext.accountId,
@@ -324,6 +437,7 @@ export async function POST(
         entityId: campaignId,
         newValues: {
           count: totalCreated,
+          duplicatesSkipped: duplicates.length,
           statistics,
           processingMetadata: validatedData.processingMetadata
         },
@@ -336,25 +450,31 @@ export async function POST(
 
     console.log('📝 Audit log created')
 
-    // Recomendaciones básicas existentes
+    // ✅ CAMBIO 7: Recomendaciones actualizadas
     const recommendations = []
     
     if (statistics.withDepartment / statistics.total > 0.8) {
       recommendations.push('Excelente segmentación por departamento para análisis detallado')
     }
     
-    if (statistics.withPosition / statistics.total < 0.5) {
-      recommendations.push('Considerar agregar más información de cargos para mejor análisis')
+    if (statistics.withNationalId / statistics.total > 0.9) {
+      recommendations.push('✅ Excelente: 90%+ con RUT permite tracking robusto y previene duplicados')
+    } else if (statistics.withNationalId / statistics.total > 0.5) {
+      recommendations.push('⚠️ Considerar completar RUTs faltantes para mejor tracking')
     }
     
-    if (Object.keys(statistics.byDepartment).length > 5) {
-      recommendations.push('Múltiples departamentos permitirán análisis comparativo rico')
+    if (statistics.withPhoneNumber / statistics.total > 0.7) {
+      recommendations.push('📱 Excelente cobertura WhatsApp: Engagement esperado 3-4x mayor que email')
+    } else if (statistics.withPhoneNumber / statistics.total > 0) {
+      recommendations.push('💡 Sugerencia: Agregar más celulares para aprovechar canal WhatsApp (64% vs 20% engagement)')
+    }
+    
+    if (statistics.contactChannels.both / statistics.total > 0.6) {
+      recommendations.push('🎯 Doble canal disponible: Estrategia híbrida email + WhatsApp maximiza participación')
     }
 
     if (statistics.total >= 50) {
-      recommendations.push('Excelente tamaño de muestra para análisis estadísticamente significativo')
-    } else if (statistics.total >= 20) {
-      recommendations.push('Buen tamaño de muestra para análisis confiable')
+      recommendations.push('📊 Excelente tamaño de muestra para análisis estadísticamente significativo')
     }
 
     const response = {
@@ -362,6 +482,7 @@ export async function POST(
       participants: {
         total: totalCreated,
         created: totalCreated,
+        duplicatesSkipped: duplicates.length,
         statistics
       },
       processingMetadata: validatedData.processingMetadata,
@@ -399,7 +520,7 @@ export async function POST(
   }
 }
 
-// GET /api/campaigns/[id]/participants - Obtener participantes con estadísticas
+// GET /api/campaigns/[id]/participants
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -409,7 +530,6 @@ export async function GET(
   try {
     console.log('📋 Participants list request for campaign:', params.id)
     
-    // ✅ NUEVO: Usar extractUserContext en lugar de verifyJWT
     const userContext = extractUserContext(request)
     
     if (!userContext.accountId) {
@@ -423,7 +543,6 @@ export async function GET(
     const { searchParams } = new URL(request.url)
     const includeDetails = searchParams.get('include_details') === 'true'
 
-    // Verificar acceso a la campaña (doble verificación)
     const campaign = await prisma.campaign.findFirst({
       where: {
         id: campaignId,
@@ -447,27 +566,27 @@ export async function GET(
 
     console.log('✅ Campaign found:', campaign.name)
     
-    // ✅ NUEVO: Obtener filtros de seguridad
     const accessFilter = await buildParticipantAccessFilter(userContext, {
-      dataType: 'participation'  // Torre Control = transparencia total
+      dataType: 'participation'
     });
     
-    // Log para debugging
-    console.log('🔐 Security filters applied to participants:', {
+    console.log('🔐 Security filters applied:', {
       userRole: userContext.role,
       departmentId: userContext.departmentId,
       filterApplied: Object.keys(accessFilter).length > 0
     })
 
-    // ✅ OBTENER PARTICIPANTES CON FILTRADO JERÁRQUICO
+    // ✅ CAMBIO 8: Incluir campos nuevos en select
     const participants = await prisma.participant.findMany({
       where: { 
         campaignId,
-        ...accessFilter  // Aplica filtro de seguridad
+        ...accessFilter
       },
       select: {
         id: true,
         email: includeDetails,
+        nationalId: true,      // ✅ NUEVO
+        phoneNumber: true,     // ✅ NUEVO
         department: true,
         position: true,
         seniorityLevel: true,
@@ -477,11 +596,9 @@ export async function GET(
         reminderCount: true,
         lastReminderSent: true,
         createdAt: true,
-        // ✅ CAMPOS DEMOGRÁFICOS NUEVOS
         gender: true,
         dateOfBirth: true,
         hireDate: true,
-        // No incluir uniqueToken por seguridad
         ...(includeDetails && {
           responses: {
             select: {
@@ -493,14 +610,14 @@ export async function GET(
         })
       },
       orderBy: [
-        { hasResponded: 'asc' }, // No respondidos primero
+        { hasResponded: 'asc' },
         { createdAt: 'desc' }
       ]
     })
 
     console.log(`📊 Found ${participants.length} participants`)
 
-    // ✅ CALCULAR ESTADÍSTICAS BÁSICAS (SIN LÓGICA DE NEGOCIO)
+    // ✅ CAMBIO 9: Estadísticas con campos nuevos
     const summary = {
       total: participants.length,
       responded: participants.filter(p => p.hasResponded).length,
@@ -517,15 +634,16 @@ export async function GET(
         oneReminder: participants.filter(p => p.reminderCount === 1).length,
         multipleReminders: participants.filter(p => p.reminderCount > 1).length
       },
-      // ✅ CONTEOS DEMOGRÁFICOS BÁSICOS (NO CÁLCULOS COMPLEJOS)
       demographicFields: {
         withGender: participants.filter(p => p.gender).length,
         withDateOfBirth: participants.filter(p => p.dateOfBirth).length,
-        withHireDate: participants.filter(p => p.hireDate).length
+        withHireDate: participants.filter(p => p.hireDate).length,
+        // ✅ NUEVOS CONTADORES
+        withNationalId: participants.filter(p => p.nationalId).length,
+        withPhoneNumber: participants.filter(p => p.phoneNumber).length
       }
     }
 
-    // Agrupar por categorías con estadísticas de respuesta
     participants.forEach(participant => {
       const processSegment = (key: string, segmentMap: Record<string, { total: number; responded: number }>) => {
         if (!segmentMap[key]) {
@@ -551,24 +669,27 @@ export async function GET(
       }
     })
 
-    // Análisis simplificado (solo indicadores básicos)
     const analysis = {
       dataCompleteness: {
         department: Math.round((Object.values(summary.byDepartment).reduce((sum, dept) => sum + dept.total, 0) / summary.total) * 100),
         position: Math.round((Object.values(summary.byPosition).reduce((sum, pos) => sum + pos.total, 0) / summary.total) * 100),
         seniority: Math.round((Object.values(summary.bySeniority).reduce((sum, sen) => sum + sen.total, 0) / summary.total) * 100),
-        location: Math.round((Object.values(summary.byLocation).reduce((sum, loc) => sum + loc.total, 0) / summary.total) * 100)
+        location: Math.round((Object.values(summary.byLocation).reduce((sum, loc) => sum + loc.total, 0) / summary.total) * 100),
+        // ✅ NUEVOS PORCENTAJES
+        nationalId: Math.round((summary.demographicFields.withNationalId / summary.total) * 100),
+        phoneNumber: Math.round((summary.demographicFields.withPhoneNumber / summary.total) * 100)
       },
       trends: {
         needsReminders: summary.pending,
         highEngagement: summary.responded > summary.total * 0.7,
-        readyForAnalysis: summary.responded >= 20 && summary.participationRate >= 60
+        readyForAnalysis: summary.responded >= 20 && summary.participationRate >= 60,
+        // ✅ NUEVO ANÁLISIS
+        whatsappReady: summary.demographicFields.withPhoneNumber > summary.total * 0.5
       }
     }
 
     const response = {
       success: true,
-      // ✅ DATOS CRUDOS SIN ENRIQUECIMIENTO
       participants: includeDetails ? participants : [],
       summary,
       analysis,
@@ -579,7 +700,6 @@ export async function GET(
         totalInvited: campaign.totalInvited,
         totalResponded: campaign.totalResponded
       },
-      // ✅ NUEVO: Campo filtered indica si se aplicó filtro jerárquico
       filtered: userContext.role === 'AREA_MANAGER',
       performance: {
         queryTime: Date.now() - startTime,

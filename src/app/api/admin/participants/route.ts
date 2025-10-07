@@ -1,4 +1,5 @@
 // src/app/api/admin/participants/route.ts
+// ✅ ACTUALIZADO CON RUT + PHONENUMBER
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyJWTToken } from '@/lib/auth'
@@ -7,9 +8,11 @@ import { generateSecureToken } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter';
 
-// Esquema de validación para participantes
+// ✅ CAMBIO 1: Schema actualizado con RUT obligatorio + email/phone opcional
 const participantSchema = z.object({
-  email: z.string().email('Email inválido'),
+  nationalId: z.string().regex(/^\d{7,8}-[\dkK]$/, 'RUT inválido (formato: 12345678-9)'),
+  email: z.string().email('Email inválido').optional(),
+  phoneNumber: z.string().regex(/^\+56[0-9]{9}$/, 'Formato: +56912345678').optional(),
   name: z.string().optional(),
   department: z.string().min(1, 'El departamento es un campo requerido'),
   position: z.string().optional(),
@@ -17,9 +20,58 @@ const participantSchema = z.object({
   gender: z.string().optional(),
   dateOfBirth: z.date().optional(),
   hireDate: z.date().optional(),
-});
+}).refine(
+  (data) => data.email || data.phoneNumber,
+  { message: 'Debe proporcionar email O phoneNumber' }
+);
 
-// ============= FUNCIONES AUXILIARES DE PARSEO =============
+// ============= ✅ CAMBIO 2: FUNCIONES VALIDACIÓN RUT =============
+
+/**
+ * Valida RUT chileno con algoritmo módulo 11
+ */
+function validateRut(rut: string): boolean {
+  if (!rut) return false;
+  
+  const rutRegex = /^(\d{7,8})-?([\dkK])$/;
+  const match = rutRegex.exec(rut.replace(/\./g, '').trim());
+  
+  if (!match) return false;
+  
+  const [, num, dv] = match;
+  let suma = 0;
+  let multiplo = 2;
+  
+  for (let i = num.length - 1; i >= 0; i--) {
+    suma += parseInt(num[i]) * multiplo;
+    multiplo = multiplo === 7 ? 2 : multiplo + 1;
+  }
+  
+  const dvCalculado = 11 - (suma % 11);
+  const dvEsperado = dvCalculado === 11 ? '0' : 
+                     dvCalculado === 10 ? 'k' : 
+                     dvCalculado.toString();
+  
+  return dv.toLowerCase() === dvEsperado;
+}
+
+/**
+ * Normaliza RUT a formato estándar 12345678-9
+ */
+function normalizeRut(rut: string): string {
+  if (!rut) return '';
+  
+  const cleaned = rut.replace(/[.\s]/g, '').trim();
+  const match = /^(\d{7,8})([\dkK])$/.exec(cleaned);
+  if (!match) return cleaned;
+  
+  const [, num, dv] = match;
+  return `${num}-${dv.toUpperCase()}`;
+}
+
+// ============= FIN FUNCIONES VALIDACIÓN RUT =============
+
+// ============= FUNCIONES AUXILIARES DE PARSEO (SIN CAMBIOS) =============
 
 /**
  * Parsea género con variaciones comunes
@@ -63,17 +115,16 @@ function parseDate(value: any): Date | undefined {
   if (!value) return undefined;
   
   try {
-    // Si es un número de Excel (días desde 30/12/1899) - CORREGIDO
+    // Si es un número de Excel (días desde 30/12/1899)
     if (typeof value === 'number') {
-      const excelEpoch = new Date(1899, 11, 30); // 30 dic 1899 - CORRECCIÓN CRÍTICA
+      const excelEpoch = new Date(1899, 11, 30);
       const date = new Date(excelEpoch.getTime() + value * 24 * 60 * 60 * 1000);
       return isValidDate(date) ? date : undefined;
     }
     
-    // Convertir a string para procesar
     const dateStr = value.toString().trim();
     
-    // Formato DD/MM/YYYY o DD-MM-YYYY (acepta AMBOS con barras o guiones)
+    // Formato DD/MM/YYYY o DD-MM-YYYY
     const ddmmyyyy = /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/.exec(dateStr);
     if (ddmmyyyy) {
       const [, day, month, year] = ddmmyyyy;
@@ -89,7 +140,6 @@ function parseDate(value: any): Date | undefined {
       return isValidDate(date) ? date : undefined;
     }
     
-    // Fallback: usar constructor Date
     const date = new Date(value);
     return isValidDate(date) ? date : undefined;
     
@@ -110,7 +160,7 @@ function isValidDate(date: Date): boolean {
 
 // ============= FIN FUNCIONES AUXILIARES =============
 
-// Interfaz para resultados de procesamiento
+// ✅ CAMBIO 3: Interfaz actualizada con RUT + phone
 interface ProcessingResult {
   success: boolean;
   totalProcessed: number;
@@ -118,7 +168,9 @@ interface ProcessingResult {
   duplicates: number;
   errors: string[];
   participants: Array<{
-    email: string;
+    nationalId: string;      // ✅ NUEVO
+    email?: string;          // ✅ AHORA OPCIONAL
+    phoneNumber?: string;    // ✅ NUEVO
     name?: string;
     department?: string;
     position?: string;
@@ -173,9 +225,27 @@ async function processFile(file: File): Promise<ProcessingResult> {
 
     result.totalProcessed = dataRows.length;
 
-    // Mapear headers a campos conocidos
+    // ✅ CAMBIO 4: Agregar detección columna RUT
+    const rutIndex = headers.findIndex(h => 
+      h && (h.toLowerCase().includes('rut') || 
+            h.toLowerCase().includes('nacional') ||
+            h.toLowerCase().includes('cedula') ||
+            h.toLowerCase().includes('cédula'))
+    );
+    
+    // ✅ CAMBIO 5: Agregar detección columna Phone
+    const phoneIndex = headers.findIndex(h => 
+      h && (h.toLowerCase().includes('celular') || 
+            h.toLowerCase().includes('phone') || 
+            h.toLowerCase().includes('telefono') ||
+            h.toLowerCase().includes('teléfono') ||
+            h.toLowerCase().includes('whatsapp') ||
+            h.toLowerCase().includes('movil') ||
+            h.toLowerCase().includes('móvil'))
+    );
+    
     const emailIndex = headers.findIndex(h => 
-      h && h.toLowerCase().includes('email') || h.toLowerCase().includes('correo')
+      h && (h.toLowerCase().includes('email') || h.toLowerCase().includes('correo'))
     );
     const nameIndex = headers.findIndex(h => 
       h && (h.toLowerCase().includes('name') || h.toLowerCase().includes('nombre'))
@@ -187,10 +257,9 @@ async function processFile(file: File): Promise<ProcessingResult> {
       h && (h.toLowerCase().includes('position') || h.toLowerCase().includes('cargo') || h.toLowerCase().includes('puesto'))
     );
     const locationIndex = headers.findIndex(h => 
-      h && (h.toLowerCase().includes('location') || h.toLowerCase().includes('ubicacion'))
+      h && (h.toLowerCase().includes('location') || h.toLowerCase().includes('ubicacion') || h.toLowerCase().includes('ubicación'))
     );
     
-    // NUEVOS CAMPOS - Detección de columnas
     const genderIndex = headers.findIndex(h => 
       h && (h.toLowerCase().includes('gender') || h.toLowerCase().includes('genero') || h.toLowerCase().includes('género') || h.toLowerCase().includes('sexo'))
     );
@@ -205,44 +274,97 @@ async function processFile(file: File): Promise<ProcessingResult> {
       h.toLowerCase().includes('contrat')
     );
 
-    if (emailIndex === -1) {
-      result.errors.push('No se encontró columna de email/correo en el archivo');
+    // ✅ CAMBIO 6: Validar RUT obligatorio (antes era email)
+    if (rutIndex === -1) {
+      result.errors.push('No se encontró columna de RUT en el archivo');
       return result;
     }
 
-    // Procesar cada fila
-    const emailsSeen = new Set<string>();
+    // ✅ CAMBIO 7: Validar al menos email O phone
+    if (emailIndex === -1 && phoneIndex === -1) {
+      result.errors.push('Debe haber columna de Email o Celular');
+      return result;
+    }
+
+    // ✅ CAMBIO 8: Procesar cada fila con RUT
+    const rutsSeen = new Set<string>(); // ✅ CAMBIO: Set de RUTs en lugar de emails
     
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i] as any[];
-      const rowNumber = i + 2; // +2 porque empezamos en fila 2 (después de headers)
+      const rowNumber = i + 2;
       
       if (!row || row.length === 0) continue;
 
       try {
-        const email = row[emailIndex]?.toString().trim().toLowerCase();
+        // ✅ CAMBIO 9: Extraer RUT, email y phone
+        const nationalId = row[rutIndex]?.toString().trim();
+        const email = emailIndex >= 0 ? row[emailIndex]?.toString().trim().toLowerCase() : undefined;
+        const phoneNumber = phoneIndex >= 0 ? row[phoneIndex]?.toString().trim() : undefined;
         
-        if (!email) {
-          result.errors.push(`Fila ${rowNumber}: Email vacío`);
+        // ✅ CAMBIO 10: Validar RUT obligatorio
+        if (!nationalId) {
+          result.errors.push(`Fila ${rowNumber}: RUT vacío`);
           continue;
         }
 
-        // Verificar duplicados en el archivo
-        if (emailsSeen.has(email)) {
+        // ✅ CAMBIO 11: Validar formato RUT
+        if (!validateRut(nationalId)) {
+          result.errors.push(`Fila ${rowNumber}: RUT inválido (${nationalId})`);
+          continue;
+        }
+
+        // ✅ CAMBIO 12: Normalizar RUT
+        const normalizedRut = normalizeRut(nationalId);
+
+        // ✅ CAMBIO 13: Validar al menos un canal de contacto
+        if (!email && !phoneNumber) {
+          result.errors.push(`Fila ${rowNumber}: Debe tener email O celular`);
+          continue;
+        }
+
+        // ✅ CAMBIO 14: Normalizar phoneNumber (FLEXIBLE)
+        let normalizedPhone: string | undefined = undefined;
+        if (phoneNumber) {
+          // Limpiar espacios, guiones, paréntesis
+          const cleaned = phoneNumber.replace(/[\s\-\(\)]/g, '');
+
+          // Detectar y normalizar diferentes formatos
+          if (/^9\d{8}$/.test(cleaned)) {
+            // Formato: 912345678 → +56912345678
+            normalizedPhone = '+56' + cleaned;
+          } else if (/^56\d{9}$/.test(cleaned)) {
+            // Formato: 56912345678 → +56912345678
+            normalizedPhone = '+' + cleaned;
+          } else if (/^\+56\d{9}$/.test(cleaned)) {
+            // Formato: +56912345678 → OK
+            normalizedPhone = cleaned;
+          } else if (/^\d{9}$/.test(cleaned)) {
+            // Formato: 912345678 (sin 9 inicial) → +56912345678
+            normalizedPhone = '+56' + cleaned;
+          } else {
+            // Formato no reconocido
+            result.errors.push(`Fila ${rowNumber}: Formato celular inválido (${phoneNumber}). Formatos válidos: 912345678, 56912345678, +56912345678`);
+            continue;
+          }
+        }
+
+        // ✅ CAMBIO 15: Verificar duplicados por RUT (ADVERTIR, NO BLOQUEAR)
+        if (rutsSeen.has(normalizedRut)) {
           result.duplicates++;
-          result.errors.push(`Fila ${rowNumber}: Email duplicado en archivo: ${email}`);
-          continue;
+          result.errors.push(`Fila ${rowNumber}: RUT duplicado en archivo: ${normalizedRut} (se omitirá)`);
+          continue; // Saltar duplicado pero seguir procesando
         }
-        emailsSeen.add(email);
+        rutsSeen.add(normalizedRut);
 
-        // Crear objeto participante con TODOS los campos
+        // ✅ CAMBIO 16: Crear objeto participante con TODOS los campos
         const participant = {
+          nationalId: normalizedRut,
           email,
+          phoneNumber: normalizedPhone,
           name: nameIndex >= 0 ? row[nameIndex]?.toString().trim() : undefined,
           department: departmentIndex >= 0 ? row[departmentIndex]?.toString().trim() : undefined,
           position: positionIndex >= 0 ? row[positionIndex]?.toString().trim() : undefined,
           location: locationIndex >= 0 ? row[locationIndex]?.toString().trim() : undefined,
-          // NUEVOS CAMPOS - Parsear con funciones auxiliares
           gender: genderIndex >= 0 ? parseGender(row[genderIndex]?.toString().trim()) : undefined,
           dateOfBirth: dateOfBirthIndex >= 0 ? parseDate(row[dateOfBirthIndex]) : undefined,
           hireDate: hireDateIndex >= 0 ? parseDate(row[hireDateIndex]) : undefined,
@@ -274,11 +396,13 @@ async function processFile(file: File): Promise<ProcessingResult> {
   }
 }
 
-// Función para cargar participantes en la base de datos - FLUJO DE CARGA TOLERANTE
+// ✅ CAMBIO 17: Función actualizada con RUT + phone
 async function loadParticipantsToDatabase(
   campaignId: string, 
   participants: Array<{
-    email: string;
+    nationalId: string;      // ✅ NUEVO
+    email?: string;          // ✅ OPCIONAL
+    phoneNumber?: string;    // ✅ NUEVO
     name?: string;
     department?: string;
     position?: string;
@@ -291,7 +415,7 @@ async function loadParticipantsToDatabase(
   success: boolean; 
   totalLoaded: number; 
   duplicatesInDB: number; 
-  unmappedDepartments?: string[]; // NUEVO: reportar departamentos no mapeados
+  unmappedDepartments?: string[];
   error?: string 
 }> {
   
@@ -303,7 +427,7 @@ async function loadParticipantsToDatabase(
         id: true, 
         status: true, 
         totalInvited: true,
-        accountId: true  // NECESARIO para DepartmentAdapter
+        accountId: true
       }
     });
 
@@ -315,7 +439,6 @@ async function loadParticipantsToDatabase(
       return { success: false, totalLoaded: 0, duplicatesInDB: 0, error: 'Solo se pueden cargar participantes en campañas en estado draft' };
     }
 
-    // Verificar límite de participantes (máximo 500)
     if (participants.length > 500) {
       return { success: false, totalLoaded: 0, duplicatesInDB: 0, error: 'Máximo 500 participantes permitidos por campaña' };
     }
@@ -339,7 +462,6 @@ async function loadParticipantsToDatabase(
       umbrellaDepId = existingUmbrellaDep.id;
       console.log('✅ Departamento paraguas existente encontrado:', umbrellaDepId);
     } else {
-      // Crear el departamento paraguas si no existe
       const newUmbrellaDep = await prisma.department.create({
         data: {
           accountId: campaign.accountId,
@@ -366,13 +488,12 @@ async function loadParticipantsToDatabase(
     
     console.log(`📊 Total de unidades organizacionales únicas en CSV: ${departmentNames.length}`);
     
-    // BUSCAR TODAS LAS ESTRUCTURAS (GERENCIAS Y DEPARTAMENTOS)
     const existingStructures = await prisma.department.findMany({
       where: {
         accountId: campaign.accountId,
         displayName: {
           in: departmentNames,
-          mode: 'insensitive' // Comparación case-insensitive
+          mode: 'insensitive'
         }
       },
       select: {
@@ -385,7 +506,6 @@ async function loadParticipantsToDatabase(
     
     console.log(`✅ Encontradas ${existingStructures.length} estructuras existentes`);
     
-    // Crear mapeo manual (case-insensitive)
     const departmentMapping: Record<string, string | null> = {};
     const structureMap = new Map(
       existingStructures.map(s => [s.displayName.toLowerCase(), s])
@@ -413,17 +533,17 @@ async function loadParticipantsToDatabase(
     
     // ============= FIN FLUJO DE CARGA TOLERANTE =============
 
-    // Verificar duplicados existentes en BD
-    const existingEmails = await prisma.participant.findMany({
+    // ✅ CAMBIO 18: Verificar duplicados por RUT (no email)
+    const existingRuts = await prisma.participant.findMany({
       where: {
         campaignId,
-        email: { in: participants.map(p => p.email) }
+        nationalId: { in: participants.map(p => p.nationalId) }
       },
-      select: { email: true }
+      select: { nationalId: true }
     });
 
-    const existingEmailSet = new Set(existingEmails.map(p => p.email));
-    const newParticipants = participants.filter(p => !existingEmailSet.has(p.email));
+    const existingRutSet = new Set(existingRuts.map(p => p.nationalId));
+    const newParticipants = participants.filter(p => !existingRutSet.has(p.nationalId));
     const duplicatesInDB = participants.length - newParticipants.length;
 
     if (newParticipants.length === 0) {
@@ -436,32 +556,31 @@ async function loadParticipantsToDatabase(
       };
     }
 
-    // PASO 4: ASIGNAR departmentId A TODOS LOS PARTICIPANTES
+    // ✅ CAMBIO 19: ASIGNAR departmentId CON nationalId + phoneNumber
     const participantsToInsert = newParticipants.map(participant => {
       let assignedDepartmentId: string | null = null;
       
       if (participant.department) {
-        // Buscar en el mapeo
         assignedDepartmentId = departmentMapping[participant.department];
         
-        // Si no tiene mapeo válido, asignar al departamento paraguas
         if (!assignedDepartmentId) {
           assignedDepartmentId = umbrellaDepId;
-          console.log(`🔄 Participante ${participant.email} con departamento "${participant.department}" → asignado al paraguas`);
+          console.log(`🔄 Participante RUT ${participant.nationalId} con departamento "${participant.department}" → asignado al paraguas`);
         }
       } else {
-        // Si no tiene departamento, asignar al paraguas
         assignedDepartmentId = umbrellaDepId;
-        console.log(`🔄 Participante ${participant.email} sin departamento → asignado al paraguas`);
+        console.log(`🔄 Participante RUT ${participant.nationalId} sin departamento → asignado al paraguas`);
       }
       
       return {
         campaignId,
-        email: participant.email,
+        nationalId: participant.nationalId,   // ✅ NUEVO
+        email: participant.email || null,      // ✅ NULLABLE
+        phoneNumber: participant.phoneNumber || null, // ✅ NUEVO
         uniqueToken: generateSecureToken(),
         name: participant.name || null,
         department: participant.department || null,
-        departmentId: assignedDepartmentId, // GARANTIZADO: siempre tendrá un ID válido
+        departmentId: assignedDepartmentId,
         position: participant.position || null,
         location: participant.location || null,
         gender: participant.gender || null,
@@ -474,13 +593,11 @@ async function loadParticipantsToDatabase(
 
     // PASO 5: INSERTAR EL 100% DE LOS PARTICIPANTES
     const result = await prisma.$transaction(async (tx) => {
-      // Insertar participantes
       await tx.participant.createMany({
         data: participantsToInsert,
         skipDuplicates: true
       });
 
-      // Actualizar contador en campaña
       const totalInvited = campaign.totalInvited + newParticipants.length;
       await tx.campaign.update({
         where: { id: campaignId },
@@ -495,7 +612,6 @@ async function loadParticipantsToDatabase(
 
     console.log(`✅ Carga completada: ${result.totalLoaded} participantes cargados`);
     
-    // PASO 6: DEVOLVER EL REPORTE COMPLETO
     return { 
       success: true, 
       totalLoaded: result.totalLoaded, 
@@ -514,10 +630,9 @@ async function loadParticipantsToDatabase(
   }
 }
 
-// Handler principal POST
+// Handler principal POST (SIN CAMBIOS)
 export async function POST(request: NextRequest) {
   try {
-    // Verificar autenticación admin (simplificado para MVP)
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Token requerido' }, { status: 401 });
@@ -531,7 +646,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const campaignId = formData.get('campaignId') as string;
-    const action = formData.get('action') as string; // 'preview' | 'confirm'
+    const action = formData.get('action') as string;
 
     if (!file || !campaignId || !action) {
       return NextResponse.json(
@@ -540,7 +655,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validar que la campaña existe
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
       include: {
@@ -556,7 +670,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Procesar archivo
     const processingResult = await processFile(file);
 
     if (!processingResult.success) {
@@ -567,7 +680,6 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Si es preview, retornar solo resultados del procesamiento
     if (action === 'preview') {
       return NextResponse.json({
         success: true,
@@ -577,7 +689,6 @@ export async function POST(request: NextRequest) {
           name: campaign.name,
           company: campaign.account.companyName
         },
-        // Propiedades específicas del processingResult
         participants: processingResult.participants,
         validRecords: processingResult.validRecords,
         errors: processingResult.errors,
@@ -585,7 +696,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Si es confirm, cargar participantes a BD
     if (action === 'confirm') {
       const loadResult = await loadParticipantsToDatabase(
         campaignId, 
@@ -599,7 +709,6 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
 
-      // Construir respuesta con información de departamentos no mapeados
       const responseData: any = {
         success: true,
         message: `Participantes cargados exitosamente: ${loadResult.totalLoaded}`,
@@ -612,7 +721,6 @@ export async function POST(request: NextRequest) {
         }
       };
       
-      // Incluir información de departamentos no mapeados si existen
       if (loadResult.unmappedDepartments && loadResult.unmappedDepartments.length > 0) {
         responseData.unmappedDepartments = loadResult.unmappedDepartments;
         responseData.unmappedCount = loadResult.unmappedDepartments.length;
@@ -640,14 +748,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Handler GET para obtener campañas pendientes
+// Handler GET (SIN CAMBIOS)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const withoutParticipants = searchParams.get('withoutParticipants') === 'true';
 
-    // Construir filtros
     const where: any = {};
     if (status) {
       where.status = status;
@@ -675,7 +782,6 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' }
     });
 
-    // Transformar para la respuesta
     const formattedCampaigns = campaigns.map(campaign => ({
       id: campaign.id,
       name: campaign.name,
