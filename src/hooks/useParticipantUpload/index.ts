@@ -149,11 +149,11 @@ export function useParticipantUpload(
   // Generar template CSV con nuevos campos incluyendo FechaIngreso
   const handleDownloadTemplate = useCallback(() => {
     const csvContent = [
-      'Email,Nombre,Departamento,Cargo,Ubicacion,FechaNacimiento,Genero,FechaIngreso',
-      'juan.perez@empresa.com,Juan Pérez,Ventas,Ejecutivo Comercial,Santiago,15/03/1985,M,01/06/2015',
-      'maria.gonzalez@empresa.com,María González,RRHH,Analista,Valparaíso,22/08/1990,F,15/03/2018',
-      'carlos.lopez@empresa.com,Carlos López,TI,Desarrollador,Santiago,10/12/1988,M,01/06/2005',
-      'ana.silva@empresa.com,Ana Silva,Marketing,Coordinadora,Concepción,05/07/1992,F,20/01/2020'
+      'RUT,Email,Celular,Nombre,Departamento,Cargo,Ubicacion,FechaNacimiento,Genero,FechaIngreso',
+      '12345678-9,juan.perez@empresa.com,+56912345678,Juan Pérez,Ventas,Ejecutivo Comercial,Santiago,15/03/1985,M,01/06/2015',
+      '16608325-7,maria.gonzalez@empresa.com,912345679,María González,RRHH,Analista,Valparaíso,22/08/1990,F,15/03/2018',
+      '11843233-9,carlos.lopez@empresa.com,56923456789,Carlos López,TI,Desarrollador,Santiago,10/12/1988,M,01/06/2005',
+      '14111997-4,ana.silva@empresa.com,,Ana Silva,Marketing,Coordinadora,Concepción,05/07/1992,F,20/01/2020'
     ].join('\n');
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -245,13 +245,23 @@ export function useParticipantUpload(
       ? Math.round(seniorityYears.reduce((a, b) => a + b, 0) / seniorityYears.length * 10) / 10
       : null;
     
+    // ✅ CALCULAR ESTADÍSTICAS DE CONTACTO
+    const contactChannels = {
+      withEmail: participants.filter(p => p.email).length,
+      withPhone: participants.filter(p => p.phoneNumber).length,
+      withBoth: participants.filter(p => p.email && p.phoneNumber).length,
+      emailOnly: participants.filter(p => p.email && !p.phoneNumber).length,
+      phoneOnly: participants.filter(p => !p.email && p.phoneNumber).length,
+    };
+
     return {
       totalParticipants: participants.length,
       withDemographics: Math.max(totalWithGender, totalWithAge, totalWithSeniority),
       genderDistribution,
       ageDistribution,
       averageAge: ages.length > 0 ? Math.round(ages.reduce((a, b) => a + b, 0) / ages.length) : 0,
-      averageSeniority
+      averageSeniority,
+      contactChannels  // ✅ AGREGAR ESTA LÍNEA
     };
   }, []);
   

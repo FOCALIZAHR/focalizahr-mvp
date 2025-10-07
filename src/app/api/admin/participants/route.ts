@@ -14,7 +14,7 @@ const participantSchema = z.object({
   email: z.string().email('Email inválido').optional(),
   phoneNumber: z.string().regex(/^\+56[0-9]{9}$/, 'Formato: +56912345678').optional(),
   name: z.string().optional(),
-  department: z.string().min(1, 'El departamento es un campo requerido'),
+  department: z.string().optional(),// CAMBIO, AHORA OPCIONAL
   position: z.string().optional(),
   location: z.string().optional(),
   gender: z.string().optional(),

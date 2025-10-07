@@ -1,6 +1,10 @@
-﻿rut;email;celular;nombre;cargo;departamento
-12345678-1;juan@test.com;56912345678;Juan;Dev;TI
-16608325-1;maria@test.com;56923456789;María;Designer;Marketing
-11843233-1;pedro@test.com;56934567890;Pedro;Analyst;Ventas
-15373128-4;ana@test.com;56978901;Ana;Manager;RRHH
-18684053-4;luis@test.com;56989012;Luis;Engineer;TI
+﻿rut;email;nombre;cargo
+12345678-5;juan1@test.com;Juan Pérez 1;Dev
+12345678-5;juan2@test.com;Juan Pérez 2;Designer
+16608325-7;maria@test.com;María González;Analyst
+11843233-9;pedro@test.com;Pedro Silva;Manager
+12345678-5;juan3@test.com;Juan Pérez 3;Admin
+16608325-7;31@test.com;ALLEN ECCLEFIELD JOHN ANDREW;GERENTE DE OPERACIONES
+11843233-9;333@test.com;APABLAZA JOHN CLAUDIA ANDREA;SUBGERENTE DE HOTELERIA
+14111997-4;13@test.com;ARAYA PROESTAKIS DANIELA ALEJANDRA;JEFE SERVICIOS DE HOTELERIA
+15373128-4;11113@test.com;ARAYA SCHELENZ MAURO SEBASTIAN;INGENIERO EQUIPOS MEDICOS

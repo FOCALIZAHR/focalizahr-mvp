@@ -10,14 +10,25 @@ export enum Gender {
 
 // Datos de participante extendidos con campos demográficos
 export interface ParticipantData {
-  email: string;
+  // ✅ NUEVOS CAMPOS OBLIGATORIOS
+  nationalId: string;     // RUT chileno formato: 12345678-9
+  
+  // ✅ CANALES DE CONTACTO (al menos uno requerido)
+  email?: string;
+  phoneNumber?: string;   // Formato: +56912345678
+  
+  // Campos existentes
   name?: string;
   department?: string;
   position?: string;
   location?: string;
-  dateOfBirth?: string;  // ISO string o formato DD/MM/YYYY
+  
+  // Demográficos
+  dateOfBirth?: string;
   hireDate?: string;
   gender?: Gender | string;
+  age?: number;
+  seniority?: number;
 }
 
 // Departamento de la empresa
@@ -42,12 +53,14 @@ export interface UploadResult {
 export interface DemographicsStats {
   totalParticipants: number;
   withDemographics: number;
+  
   genderDistribution: {
     male: number;
     female: number;
     nonBinary: number;
     notSpecified: number;
   };
+  
   ageDistribution: {
     '18-25': number;
     '26-35': number;
@@ -55,7 +68,17 @@ export interface DemographicsStats {
     '46-55': number;
     '56+': number;
   };
+  
   averageAge: number;
+  
+  // ✅ NUEVAS ESTADÍSTICAS DE CONTACTO
+  contactChannels?: {
+    withEmail: number;
+    withPhone: number;
+    withBoth: number;
+    emailOnly: number;
+    phoneOnly: number;
+  };
 }
 
 // Estado del upload
