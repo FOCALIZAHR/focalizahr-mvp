@@ -135,6 +135,7 @@ export async function GET(
       // ✅ ENRIQUECER ANALYTICS VACÍO TAMBIÉN
       const enrichedEmptyMetrics = await DepartmentAdapter.enrichAnalytics(
         emptyMetrics,
+        campaignId,            // ← AGREGAR ESTE ARGUMENTO
         userContext.accountId
       );
 
@@ -432,6 +433,7 @@ export async function GET(
     // ✅ ENRIQUECER ANALYTICS CON DEPARTMENT NOMENCLATURA CLIENTE
     const enrichedAnalytics = await DepartmentAdapter.enrichAnalytics(
       analytics,
+      campaignId,  // ← AGREGAR SOLO ESTO
       userContext.accountId
     );
 

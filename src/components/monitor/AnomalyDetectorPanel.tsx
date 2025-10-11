@@ -231,7 +231,7 @@ export function AnomalyDetectorPanel({
               <AlertTriangle className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
               <div className="text-xs text-gray-300">
                 <span className="font-semibold">Análisis estadístico:</span> Se detectaron {departmentAnomalies.length} departamentos 
-                con variaciones significativas (|z| > 1.5). {positiveAnomalies.length > 0 && `${positiveAnomalies.length} superan expectativas.`} 
+                con variaciones significativas (|z| &gt; 1.5). {positiveAnomalies.length > 0 && `${positiveAnomalies.length} superan expectativas.`} 
                 {negativeAnomalies.length > 0 && ` ${negativeAnomalies.length} requieren seguimiento estratégico.`}
               </div>
             </div>

@@ -1,6 +1,6 @@
 // src/app/api/campaigns/[id]/activate/route.ts
-// SOLUCIÓN QUIRÚRGICA FINAL: Preserva TODAS las funcionalidades originales
-// Fix específico: Solo neutraliza la consulta problemática generateMissingTokens
+// VERSIÓN ACTUALIZADA: Soporte RUT + phoneNumber + email opcional
+// Fix: Return completo de queueCampaignEmails con skippedNoEmail y participantsWithoutEmail
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -24,10 +24,20 @@ async function generateMissingTokens(campaignId: string): Promise<number> {
   }
 }
 
-// ✅ PRESERVADA: Función completa emails original con templates HTML corporativos
-async function queueCampaignEmails(campaignId: string): Promise<{ queued: number; errors: string[] }> {
+// ✅ ACTUALIZADO: Función emails con soporte para email opcional + tracking participantes sin email
+async function queueCampaignEmails(campaignId: string): Promise<{ 
+  queued: number; 
+  errors: string[];
+  skippedNoEmail: number;
+  participantsWithoutEmail: Array<{
+    nationalId: string;
+    phoneNumber: string | null;
+    name: string | null;
+    uniqueToken: string | null;
+  }>;
+}> {
   try {
-    // Obtener datos de la campaña y participantes
+    // ✅ ACTUALIZADO: Select incluye nationalId y phoneNumber (nuevos campos obligatorios)
     const campaignData = await prisma.campaign.findUnique({
       where: { id: campaignId },
       include: {
@@ -35,7 +45,14 @@ async function queueCampaignEmails(campaignId: string): Promise<{ queued: number
         campaignType: { select: { name: true, slug: true, estimatedDuration: true } },
         participants: { 
           where: { hasResponded: false },
-          select: { id: true, email: true, uniqueToken: true, name: true }
+          select: { 
+            id: true, 
+            email: true,           // Ahora opcional (nullable)
+            nationalId: true,      // ✅ NUEVO: RUT (identificador primario)
+            phoneNumber: true,     // ✅ NUEVO: Teléfono (canal alternativo)
+            uniqueToken: true, 
+            name: true 
+          }
         }
       }
     });
@@ -49,8 +66,15 @@ async function queueCampaignEmails(campaignId: string): Promise<{ queued: number
     
     let queuedCount = 0;
     const errors: string[] = [];
+    let skippedNoEmailCount = 0; // ✅ NUEVO: Contador participantes sin email
+    const participantsWithoutEmail: Array<{
+      nationalId: string;
+      phoneNumber: string | null;
+      name: string | null;
+      uniqueToken: string | null;
+    }> = []; // ✅ NUEVO: Array tracking participantes sin email
 
-    // ✅ PRESERVADO: Template de email HTML corporativo completo
+    // ✅ PRESERVADO: Template de email HTML corporativo completo (sin cambios)
     const getEmailTemplate = (participant: any, token: string) => `
       <!DOCTYPE html>
       <html lang="es">
@@ -106,14 +130,30 @@ async function queueCampaignEmails(campaignId: string): Promise<{ queued: number
       </html>
     `;
 
-    // ✅ PRESERVADO: Envío emails en batches para rate limiting
+    // ✅ ACTUALIZADO: Loop con manejo de email opcional
     const batchSize = 10;
     for (let i = 0; i < participants.length; i += batchSize) {
       const batch = participants.slice(i, i + batchSize);
       
       const batchPromises = batch.map(async (participant) => {
+        // ✅ NUEVO: Identificador para logging (prioridad: nationalId > email > ID)
+        const participantId = participant.nationalId || participant.email || participant.id;
+        
+        // ✅ NUEVO: Skip participantes sin email (procesados por nacionalId pero no pueden recibir email)
+        if (!participant.email) {
+          console.log(`⚠️ Participante sin email - RUT: ${participant.nationalId}, Teléfono: ${participant.phoneNumber || 'N/A'}`);
+          skippedNoEmailCount++;
+          participantsWithoutEmail.push({
+            nationalId: participant.nationalId,
+            phoneNumber: participant.phoneNumber,
+            name: participant.name,
+            uniqueToken: participant.uniqueToken
+          });
+          return; // Skip envío email pero no es error
+        }
+
         if (!participant.uniqueToken) {
-          errors.push(`Participante ${participant.email}: Sin token único`);
+          errors.push(`Participante ${participantId}: Sin token único`);
           return;
         }
 
@@ -126,8 +166,9 @@ async function queueCampaignEmails(campaignId: string): Promise<{ queued: number
           });
           
           queuedCount++;
+          console.log(`✅ Email enviado a: ${participantId}`);
         } catch (emailError) {
-          errors.push(`Error enviando a ${participant.email}: ${emailError instanceof Error ? emailError.message : 'Error desconocido'}`);
+          errors.push(`Error enviando a ${participantId}: ${emailError instanceof Error ? emailError.message : 'Error desconocido'}`);
         }
       });
 
@@ -139,7 +180,13 @@ async function queueCampaignEmails(campaignId: string): Promise<{ queued: number
       }
     }
 
-    return { queued: queuedCount, errors };
+    // ✅ ACTUALIZADO: Return completo con todas las propiedades declaradas
+    return { 
+      queued: queuedCount, 
+      errors,
+      skippedNoEmail: skippedNoEmailCount,
+      participantsWithoutEmail
+    };
 
   } catch (error) {
     console.error('Error queueing campaign emails:', error);
@@ -292,20 +339,21 @@ export async function PUT(
           },
           campaignType: { 
             select: { 
-              
               name: true 
             } 
           }
         }
       });
-// Verificación seguridad para TypeScript
+
+      // Verificación seguridad para TypeScript
       if (!authResult.user) {
         throw new Error('Error crítico: Usuario no disponible en transacción');
       }
+
       // 3. ✅ PRESERVADO: Crear audit log completo
       await tx.auditLog.create({
         data: {
-         campaign: { connect: { id: campaignId } },
+          campaign: { connect: { id: campaignId } },
           action: 'campaign_activated',
           userInfo: JSON.stringify({
             userId: authResult.user.id,
@@ -313,7 +361,6 @@ export async function PUT(
             participantsCount: campaign.participants.length,
             activatedAt: new Date().toISOString()
           }),
-       
         }
       });
 
@@ -322,10 +369,19 @@ export async function PUT(
 
     console.log('📧 Queueing campaign emails...');
 
-    // ✅ PRESERVADO: Envío emails de invitación
+    // ✅ ACTUALIZADO: Envío emails con tracking de participantes sin email
     const emailResult = await queueCampaignEmails(campaignId);
     
-    console.log(`✅ Emails queued: ${emailResult.queued}, Errors: ${emailResult.errors.length}`);
+    console.log(`✅ Emails queued: ${emailResult.queued}`);
+    console.log(`⚠️ Skipped (no email): ${emailResult.skippedNoEmail}`);
+    console.log(`❌ Errors: ${emailResult.errors.length}`);
+
+    // ✅ NUEVO: Log detallado de participantes sin email
+    if (emailResult.participantsWithoutEmail.length > 0) {
+      console.log('📋 Participantes sin email:', emailResult.participantsWithoutEmail.map(p => 
+        `RUT: ${p.nationalId}, Teléfono: ${p.phoneNumber || 'N/A'}, Nombre: ${p.name || 'N/A'}`
+      ).join(' | '));
+    }
 
     // ✅ PRESERVADO: Notificación al cliente
     try {
@@ -344,7 +400,7 @@ export async function PUT(
       // No fallar si la notificación falla
     }
 
-    // ✅ PRESERVADO: Respuesta exitosa completa original
+    // ✅ ACTUALIZADO: Respuesta exitosa con información de participantes sin email
     return NextResponse.json({
       success: true,
       message: `Campaña "${activationResult.updatedCampaign.name}" activada exitosamente`,
@@ -357,13 +413,18 @@ export async function PUT(
       },
       participantsCount: campaign.participants.length,
       emailsQueued: emailResult.queued,
+      emailsSkipped: emailResult.skippedNoEmail, // ✅ NUEVO
       emailErrors: emailResult.errors.length,
+      participantsWithoutEmail: emailResult.participantsWithoutEmail.length, // ✅ NUEVO: Solo contador
       tokensGenerated: activationResult.tokensGenerated,
       nextSteps: [
-        'Los participantes recibirán emails de invitación',
+        'Los participantes con email recibirán invitaciones automáticas',
+        emailResult.skippedNoEmail > 0 
+          ? `⚠️ ${emailResult.skippedNoEmail} participantes sin email requerirán notificación manual (SMS/WhatsApp)`
+          : null,
         'Monitorea el progreso desde el dashboard',
         'Resultados disponibles al finalizar la campaña'
-      ]
+      ].filter(Boolean) // ✅ NUEVO: Filtrar nulls
     });
 
   } catch (error) {

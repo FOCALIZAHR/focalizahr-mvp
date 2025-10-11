@@ -130,11 +130,11 @@ model Campaign {
 model Participant {
   id          String  @id @default(cuid())
   campaignId  String  @map("campaign_id")
-  email       String
+  email       String?
   uniqueToken String  @unique @map("unique_token")
   name        String?
 // 🆕 NUEVOS CAMPOS - AGREGAR ESTAS 2 LÍNEAS
-  nationalId   String? @map("national_id")   // RUT chileno (12345678-9)
+  nationalId   String  @map("national_id")   // RUT chileno (12345678-9)
   phoneNumber  String? @map("phone_number")  // Celular internacional (+56912345678)
 
   // Segmentación básica (carga manual):
@@ -167,7 +167,8 @@ model Participant {
   emailLogs     EmailLog[]
   departmentRel Department? @relation(fields: [departmentId], references: [id])
 
-  @@unique([campaignId, email])
+ 
+  @@unique([campaignId, nationalId], map: "unique_campaign_rut")
   @@index([campaignId], map: "idx_participants_campaign")
   @@index([uniqueToken], map: "idx_participants_token")
   @@index([email], map: "idx_participants_email")

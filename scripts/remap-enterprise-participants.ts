@@ -1,226 +1,221 @@
 // scripts/remap-enterprise-participants.ts
-// Script para remapear participantes del paraguas a departments correctos
-// Corporación Enterprise - Corrección masiva
+// ✅ ACTUALIZADO: Compatible con RUT obligatorio + email opcional
+// Versión: 2.0 - Sincronizado con schema Prisma actualizado
 
-import { prisma } from '@/lib/prisma';
-import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter';
+import { prisma } from '../src/lib/prisma';
+import { DepartmentAdapter } from '../src/lib/services/DepartmentAdapter';
+
+/**
+ * Script de mantenimiento para remapear participantes desde el departamento "paraguas"
+ * hacia sus departamentos correctos usando el sistema de categorización inteligente.
+ * 
+ * CONTEXTO:
+ * - Problema: Participantes asignados incorrectamente al departamento "sin_asignar"
+ * - Causa: Código legacy buscaba por displayName exacto en lugar de standardCategory
+ * - Solución: Re-categorizar usando DepartmentAdapter como fuente única de verdad
+ * 
+ * CAMBIOS v2.0:
+ * - ✅ Maneja email nullable (ahora opcional en schema)
+ * - ✅ Usa nationalId como identificador primario
+ * - ✅ Incluye phoneNumber como canal alternativo
+ * - ✅ Type-safe para Prisma schema actualizado
+ */
 
 interface RemapResult {
   total: number;
   remapped: number;
-  unmapped: number;
-  details: Array<{
-    email: string;
-    originalDept: string;
-    category: string | null;
-    targetDept: string | null;
-    status: 'success' | 'no_category' | 'no_department';
-  }>;
+  skipped: number;
+  successRate: string;
 }
 
-async function remapEnterpriseParticipants(): Promise<RemapResult> {
-  const accountId = 'cmfgedx7b00012413i92048wl'; // Corporación Enterprise
+interface RemapError {
+  error: string;
+}
+
+async function remapEnterpriseParticipants(): Promise<RemapResult | RemapError> {
+  // ID de la cuenta a procesar (Corporación Enterprise)
+  const accountId = 'cmfgedx7b00012413i92048wl';
   
-  const result: RemapResult = {
-    total: 0,
-    remapped: 0,
-    unmapped: 0,
-    details: []
-  };
+  console.log('🔄 Iniciando remapeo de participantes...');
+  console.log(`📍 Account ID: ${accountId}\n`);
   
   try {
-    // PASO 1: Obtener el departamento paraguas
+    // ============================================
+    // PASO 1: Obtener departamento paraguas
+    // ============================================
     const umbrella = await prisma.department.findFirst({
-      where: {
-        accountId: accountId,
-        standardCategory: 'sin_asignar'
+      where: { 
+        accountId, 
+        standardCategory: 'sin_asignar' 
       }
     });
     
     if (!umbrella) {
-      throw new Error('No se encontró departamento paraguas');
+      console.error('❌ No se encontró departamento paraguas (sin_asignar)');
+      return { error: 'No umbrella department found' };
     }
     
+    console.log(`📂 Paraguas encontrado: "${umbrella.displayName}"`);
+    console.log(`   ID: ${umbrella.id}\n`);
+    
+    // ============================================
     // PASO 2: Obtener participantes en paraguas
-    const participantsInUmbrella = await prisma.participant.findMany({
-      where: {
-        departmentId: umbrella.id
-      },
-      select: {
+    // ============================================
+    // ✅ CAMBIO CRÍTICO: Incluye nationalId y phoneNumber
+    const participants = await prisma.participant.findMany({
+      where: { departmentId: umbrella.id },
+      select: { 
         id: true,
-        email: true,
-        department: true, // String original del CSV
-        name: true
+        email: true,           // ⚠️ Ahora puede ser null
+        nationalId: true,      // ✅ NUEVO - Identificador primario
+        phoneNumber: true,     // ✅ NUEVO - Canal alternativo
+        department: true       // Campo de texto del CSV (crítico para remapeo)
       }
     });
     
-    result.total = participantsInUmbrella.length;
+    console.log(`👥 Participantes en paraguas: ${participants.length}\n`);
     
-    // PASO 3: Obtener departments de destino disponibles
-    const availableDepartments = await prisma.department.findMany({
+    if (participants.length === 0) {
+      console.log('✅ No hay participantes para remapear');
+      return { 
+        total: 0, 
+        remapped: 0, 
+        skipped: 0,
+        successRate: 'N/A'
+      };
+    }
+    
+    // ============================================
+    // PASO 3: Obtener departments válidos
+    // ============================================
+    const availableDepts = await prisma.department.findMany({
       where: {
-        accountId: accountId,
+        accountId,
         isActive: true,
-        standardCategory: {
-          not: 'sin_asignar'
-        }
+        standardCategory: { not: 'sin_asignar' }
       },
-      orderBy: {
-        level: 'desc' // Preferir level 3 (departamentos) sobre level 2 (gerencias)
-      }
+      orderBy: { level: 'desc' } // Preferir departamentos (level 3) sobre gerencias (level 2)
     });
     
-    // PASO 4: Procesar cada participante
-    for (const participant of participantsInUmbrella) {
-      if (!participant.department) {
-        result.unmapped++;
-        result.details.push({
-          email: participant.email,
-          originalDept: 'NULL',
-          category: null,
-          targetDept: null,
-          status: 'no_category'
-        });
+    console.log(`🏢 Departamentos disponibles para mapeo: ${availableDepts.length}`);
+    console.log('   Categorías:', [...new Set(availableDepts.map(d => d.standardCategory))].join(', '));
+    console.log('');
+    
+    // ============================================
+    // PASO 4: Remapear cada participante
+    // ============================================
+    let remapped = 0;
+    let skipped = 0;
+    
+    console.log('🔄 Procesando participantes...\n');
+    
+    for (const p of participants) {
+      // ✅ CAMBIO CRÍTICO: Identificador robusto con prioridad
+      // Prioridad: nationalId > email > phoneNumber > id truncado
+      const identifier = 
+        p.nationalId || 
+        p.email || 
+        p.phoneNumber || 
+        `ID-${p.id.slice(0, 8)}`;
+      
+      // ✅ LÓGICA PRESERVADA: Sin department (texto) = no se puede mapear
+      if (!p.department) {
+        console.log(`⚠️  ${identifier}: Sin departamento (campo vacío en CSV) - SKIP`);
+        skipped++;
         continue;
       }
       
-      // Obtener categoría usando DepartmentAdapter
-      const category = DepartmentAdapter.getGerenciaCategory(participant.department);
+      // ============================================
+      // Categorización usando DepartmentAdapter
+      // ============================================
+      // ✅ FUENTE ÚNICA DE VERDAD para mapeo
+      const category = DepartmentAdapter.getGerenciaCategory(p.department);
       
       if (category && category !== 'sin_asignar') {
-        // Buscar department con esa categoría
-        const targetDept = availableDepartments.find(d => 
+        // Categoría válida encontrada, buscar department matching
+        const targetDept = availableDepts.find(d => 
           d.standardCategory === category
         );
         
         if (targetDept) {
-          // Actualizar participante
+          // ✅ ÉXITO: Remapear participante
           await prisma.participant.update({
-            where: { id: participant.id },
+            where: { id: p.id },
             data: { departmentId: targetDept.id }
           });
           
-          result.remapped++;
-          result.details.push({
-            email: participant.email,
-            originalDept: participant.department,
-            category: category,
-            targetDept: targetDept.displayName,
-            status: 'success'
-          });
+          console.log(`✅ ${identifier}: "${p.department}" → ${targetDept.displayName} (${category})`);
+          remapped++;
         } else {
-          result.unmapped++;
-          result.details.push({
-            email: participant.email,
-            originalDept: participant.department,
-            category: category,
-            targetDept: null,
-            status: 'no_department'
-          });
+          // ⚠️ Categoría válida pero no existe department en BD
+          console.log(`⚠️  ${identifier}: Categoría "${category}" encontrada pero sin department disponible`);
+          console.log(`    Término original: "${p.department}"`);
+          skipped++;
         }
       } else {
-        result.unmapped++;
-        result.details.push({
-          email: participant.email,
-          originalDept: participant.department,
-          category: null,
-          targetDept: null,
-          status: 'no_category'
-        });
+        // ⚠️ No se pudo categorizar (término muy específico o desconocido)
+        console.log(`⚠️  ${identifier}: "${p.department}" → sin categoría válida (permanece en paraguas)`);
+        skipped++;
       }
     }
     
-    // PASO 5: Generar resumen
+    // ============================================
+    // PASO 5: Reporte de resultados
+    // ============================================
     console.log('\n' + '='.repeat(60));
-    console.log('RESUMEN DE REMAPEO - CORPORACIÓN ENTERPRISE');
+    console.log('📊 RESUMEN DEL REMAPEO');
     console.log('='.repeat(60));
-    console.log(`Total participantes procesados: ${result.total}`);
-    console.log(`✅ Remapeados exitosamente: ${result.remapped}`);
-    console.log(`⚠️ Permanecen sin asignar: ${result.unmapped}`);
-    console.log(`📈 Tasa de éxito: ${((result.remapped / result.total) * 100).toFixed(1)}%`);
+    console.log(`   Total procesados: ${participants.length}`);
+    console.log(`   ✅ Remapeados exitosamente: ${remapped}`);
+    console.log(`   ⚠️  Omitidos (sin mapeo): ${skipped}`);
     
-    // PASO 6: Distribución por categoría
-    const categoryGroups = result.details
-      .filter(d => d.status === 'success')
-      .reduce((acc, item) => {
-        if (!acc[item.category!]) {
-          acc[item.category!] = new Set<string>();
-        }
-        acc[item.category!].add(item.targetDept!);
-        return acc;
-      }, {} as Record<string, Set<string>>);
+    const successRate = participants.length > 0 
+      ? ((remapped / participants.length) * 100).toFixed(1)
+      : '0.0';
     
-    console.log('\n📊 DISTRIBUCIÓN POR CATEGORÍA:');
-    console.log('-'.repeat(60));
-    Object.entries(categoryGroups).forEach(([category, depts]) => {
-      const count = result.details.filter(d => d.category === category && d.status === 'success').length;
-      console.log(`${category.padEnd(15)} : ${count} participantes → ${Array.from(depts).join(', ')}`);
-    });
+    console.log(`   📈 Tasa de éxito: ${successRate}%`);
+    console.log('='.repeat(60) + '\n');
     
-    // PASO 7: Casos sin mapear
-    const unmappedCases = result.details.filter(d => d.status !== 'success');
-    if (unmappedCases.length > 0) {
-      console.log('\n⚠️ CASOS SIN MAPEAR:');
-      console.log('-'.repeat(60));
-      const unmappedByReason = {
-        no_category: unmappedCases.filter(d => d.status === 'no_category').length,
-        no_department: unmappedCases.filter(d => d.status === 'no_department').length
-      };
-      console.log(`Sin categoría válida: ${unmappedByReason.no_category}`);
-      console.log(`Categoría válida pero sin department: ${unmappedByReason.no_department}`);
-      
-      // Mostrar primeros 10 ejemplos
-      console.log('\nEjemplos (primeros 10):');
-      unmappedCases.slice(0, 10).forEach(d => {
-        console.log(`  "${d.originalDept}" → ${d.status}`);
-      });
+    // Recomendaciones
+    if (skipped > 0) {
+      console.log('💡 RECOMENDACIONES:');
+      console.log('   - Revisa los términos sin mapeo arriba');
+      console.log('   - Considera agregar aliases a DepartmentAdapter.ts');
+      console.log('   - O usa la UI de Mapping-Review para mapeo manual\n');
     }
     
-    // PASO 8: Verificación final
-    console.log('\n🔍 VERIFICACIÓN POST-REMAPEO:');
-    console.log('-'.repeat(60));
-    
-    const finalDistribution = await prisma.department.findMany({
-      where: { accountId },
-      include: {
-        _count: {
-          select: { participants: true }
-        }
-      },
-      orderBy: {
-        _count: {
-          participants: 'desc'
-        }
-      }
-    });
-    
-    finalDistribution.forEach(dept => {
-      if (dept._count.participants > 0) {
-        const percentage = ((dept._count.participants / result.total) * 100).toFixed(1);
-        console.log(`${dept.displayName.padEnd(30)} : ${dept._count.participants.toString().padStart(3)} participantes (${percentage}%)`);
-      }
-    });
-    
-    console.log('\n' + '='.repeat(60));
-    
-    return result;
+    return { 
+      total: participants.length, 
+      remapped, 
+      skipped,
+      successRate: `${successRate}%`
+    };
     
   } catch (error) {
-    console.error('❌ Error durante el remapeo:', error);
+    console.error('\n💥 ERROR CRÍTICO:', error);
     throw error;
   }
 }
 
-// Ejecutar el script
+// ============================================
+// EJECUCIÓN DEL SCRIPT
+// ============================================
 remapEnterpriseParticipants()
   .then(result => {
-    console.log('\n✅ Remapeo completado exitosamente');
-    process.exit(0);
+    if ('error' in result) {
+      console.error(`\n❌ Error: ${result.error}`);
+      process.exit(1);
+    } else {
+      console.log('✅ Proceso completado exitosamente');
+      console.log(`   Resultados: ${result.remapped}/${result.total} remapeados (${result.successRate})\n`);
+      process.exit(0);
+    }
   })
   .catch(error => {
-    console.error('❌ Error fatal:', error);
+    console.error('\n💥 Error fatal durante ejecución:', error);
     process.exit(1);
   })
   .finally(() => {
+    // Desconectar Prisma Client
     prisma.$disconnect();
   });
