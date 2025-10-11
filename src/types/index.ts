@@ -1,157 +1,41 @@
 // src/types/index.ts
-// FOCALIZAHR UNIFIED TYPE DEFINITIONS - v2.0
-// Single Source of Truth - Aligned with Prisma Schema
+// FOCALIZAHR TYPE DEFINITIONS - RESTORED VERSION
+// Restauración quirúrgica preservando contratos de datos enriquecidos
 // Last Updated: 2025
 
-// ====================================================================
-// DOMAIN MODELS - Direct reflection of Prisma Schema
-// ====================================================================
+import type { 
+  Campaign as PrismaCampaign,
+  Participant as PrismaParticipant,
+  Account as PrismaAccount,
+  Question as PrismaQuestion,
+  Response as PrismaResponse,
+  CampaignResult as PrismaCampaignResult
+} from '@prisma/client';
 
-// Account Model - Core entity
-export interface Account {
-  id: string;
-  companyName: string;
-  companyLogo?: string | null;
-  adminEmail: string;
-  adminName: string;
-  passwordHash: string;
-  role: 'CLIENT' | 'FOCALIZAHR_ADMIN';
-  status: 'ACTIVE' | 'SUSPENDED' | 'TRIAL' | 'EXPIRED';
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  // Relations
-  campaigns?: Campaign[];
-}
+// ========================================
+// DOMAIN MODELS - Extendiendo tipos Prisma
+// ========================================
 
-// Campaign Model - Core campaign entity
-export interface Campaign {
-  id: string;
-  name: string;
-  status: 'draft' | 'active' | 'completed' | 'cancelled';
-  campaignTypeId: string;
-  startDate: Date | string;
-  endDate: Date | string;
-  accountId: string;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  // Relations
-  campaignType?: CampaignType;
-  account?: Account;
-  participants?: Participant[];
-  results?: CampaignResult[];
-}
+// Account - Modelo base extendido
+export type Account = PrismaAccount;
 
-// Participant Model - Core participant entity
-export interface Participant {
-  id: string;
-  campaignId: string;
-  fullName: string;
-  email: string;
-  position?: string | null;
-  department?: string | null;
-  departmentId?: string | null;
-  seniority?: string | null;
-  location?: string | null;
-  uniqueToken: string;
-  hasResponded: boolean;
-  responseDate?: Date | string | null;
-  reminderCount: number;
-  lastReminderSent?: Date | string | null;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  // Relations
-  campaign?: Campaign;
-  departmentRelation?: Department;  // Renamed to avoid conflict with department field
-  responses?: Response[];
-}
-
-// Department Model
-export interface Department {
-  id: string;
-  accountId: string;
-  displayName: string;
-  standardCategory: string;
-  parentId?: string | null;
-  unitType?: string | null;
-  level?: number | null;
-  isActive: boolean;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  // Relations
-  account?: Account;
-  participants?: Participant[];
-  parent?: Department;
-  children?: Department[];
-}
-
-// CampaignType Model
-export interface CampaignType {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string | null;
-  baseQuestions: number;
-  isActive: boolean;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  // Relations
-  campaigns?: Campaign[];
-}
-
-// Question Model
-export interface Question {
-  id: number;
-  text: string;
-  category: 'liderazgo' | 'ambiente' | 'desarrollo' | 'bienestar' | 'comunicacion' | 'reconocimiento';
-  questionOrder: number;
-  isActive: boolean;
-  responseType?: 'text_open' | 'multiple_choice' | 'rating_matrix_conditional' | 'rating_scale' | null;
-  choiceOptions?: any | null;
-  conditionalLogic?: any | null;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  // Relations
-  responses?: Response[];
-}
-
-// Response Model
-export interface Response {
-  id: string;
-  participantId: string;
-  questionId: number;
-  rating?: number | null;
-  textResponse?: string | null;
-  createdAt: Date | string;
-  // Relations
-  participant?: Participant;
-  question?: Question;
-}
-
-// CampaignResult Model
-export interface CampaignResult {
-  id: string;
-  campaignId: string;
-  participationRate?: number | null;
-  overallScore?: number | null;
-  highestCategory?: string | null;
-  highestScore?: number | null;
-  lowestCategory?: string | null;
-  lowestScore?: number | null;
-  resultsData?: any | null;
-  generatedAt: Date | string;
-  // Relations
-  campaign?: Campaign;
-}
-
-// ====================================================================
-// VIEW MODELS - UI Extensions of Domain Models
-// ====================================================================
-
-// Extended Campaign for UI/Dashboard views
-export interface CampaignViewModel extends Campaign {
+// Campaign - Fusión completa con todas las propiedades UI
+export type Campaign = PrismaCampaign & {
+  // Propiedades de relación
+  campaignType?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  company?: {
+    name: string;
+    adminEmail?: string;
+  };
+  // Propiedades calculadas/UI críticas
   totalInvited: number;
   totalResponded: number;
   participationRate: number;
+  // Propiedades de dashboard/UI
   canActivate?: boolean;
   canViewResults?: boolean;
   isOverdue?: boolean;
@@ -159,23 +43,61 @@ export interface CampaignViewModel extends Campaign {
   riskLevel?: 'low' | 'medium' | 'high';
   lastActivity?: string;
   completionTrend?: 'up' | 'down' | 'stable';
-  type?: string; // Alias for campaignType.name
-  company?: {
-    name: string;
-    adminEmail?: string;
-  };
-}
+  type?: string; // Alias para campaignType.name
+};
 
-// Extended Participant for UI views
-export interface ParticipantViewModel extends Participant {
-  seniorityLevel?: string; // UI alias for seniority
-  needsReminder?: boolean; // Calculated field
-  engagementLevel?: 'high' | 'medium' | 'low'; // Calculated field
-}
+// Participant - Fusión completa
+export type Participant = PrismaParticipant & {
+  // Campos adicionales del sistema
+  email?: string;
+  uniqueToken: string;
+  department?: string | null;
+  position?: string | null;
+  seniorityLevel?: string | null;
+  location?: string | null;
+  reminderCount: number;
+  lastReminderSent?: Date | string | null;
+  // Relaciones
+  campaign?: Campaign;
+  responses?: Array<{
+    id: string;
+    rating: number;
+    createdAt: Date | string;
+  }>;
+};
 
-// ====================================================================
+// Question - Modelo extendido
+export type Question = PrismaQuestion & {
+  category: QuestionCategory;
+  responseType?: 'text_open' | 'multiple_choice' | 'rating_matrix_conditional' | 'rating_scale';
+  choiceOptions?: string[] | null;
+  conditionalLogic?: any | null;
+};
+
+// Response - Modelo extendido
+export type Response = PrismaResponse & {
+  participant?: Participant;
+  question?: Question;
+};
+
+// CampaignResult - Modelo extendido
+export type CampaignResult = PrismaCampaignResult & {
+  campaign?: Campaign;
+};
+
+// ========================================
+// ENUMS Y TIPOS LITERALES
+// ========================================
+
+export type CampaignStatus = 'draft' | 'active' | 'completed' | 'cancelled';
+export type QuestionCategory = 'liderazgo' | 'ambiente' | 'desarrollo' | 'bienestar' | 'comunicacion' | 'reconocimiento';
+export type AccountStatus = 'ACTIVE' | 'SUSPENDED' | 'TRIAL' | 'EXPIRED';
+export type AccountRole = 'CLIENT' | 'FOCALIZAHR_ADMIN';
+export type ResponseType = 'text_open' | 'multiple_choice' | 'rating_matrix_conditional' | 'rating_scale';
+
+// ========================================
 // API RESPONSE TYPES
-// ====================================================================
+// ========================================
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -192,12 +114,93 @@ export interface AuthResponse {
     companyName: string;
     adminEmail: string;
     adminName: string;
-    createdAt: Date | string;
+    createdAt: Date;
   };
   error?: string;
 }
 
-// Participants aggregated data
+// ========================================
+// ANALYTICS & METRICS
+// ========================================
+
+export interface Analytics {
+  totalInvited: number;
+  totalResponded: number;
+  participationRate: number;
+  averageScore: number;
+  completionTime: number;
+  responseRate: number;
+  categoryScores: Record<string, number>;
+  departmentScores: Record<string, number>;
+  departmentScoresDisplay?: Record<string, number>;
+  departmentMapping?: Record<string, string>;
+  trendData: Array<{
+    date: string;
+    responses: number;
+    score?: number;
+    cumulativeParticipation?: number;
+  }>;
+  responsesByDay: Record<string, number>;
+  segmentationData: Array<{
+    segment: string;
+    count: number;
+    avgScore: number;
+    percentage: number;
+  }>;
+  demographicBreakdown?: any[];
+  lastUpdated: string;
+  // Campo para datos jerárquicos
+  hierarchicalData?: Array<{
+    id: string;
+    displayName: string;
+    unitType: string;
+    level: number;
+    score: number;
+    participants: number;
+    employeeCount?: number;
+    children: Array<{
+      id: string;
+      displayName: string;
+      unitType: string;
+      level: number;
+      score: number;
+      participants: number;
+      responded: number;
+      rate: number;
+    }>;
+  }> | null;
+  trendDataByDepartment?: Record<string, any>;
+}
+
+export interface CampaignStats {
+  totalParticipants: number;
+  totalResponses: number;
+  participationRate: number;
+  daysRemaining: number;
+  isActive: boolean;
+  isCompleted: boolean;
+}
+
+export interface DashboardMetrics {
+  totalCampaigns: number;
+  activeCampaigns: number;
+  completedCampaigns: number;
+  draftCampaigns: number;
+  cancelledCampaigns: number;
+  globalParticipationRate: number;
+  totalResponses: number;
+  totalParticipants: number;
+  recentResponses?: number;
+  weeklyGrowth?: number;
+  monthlyGrowth?: number;
+  averageCompletionTime?: number | null;
+  topPerformingCampaign?: string | null;
+}
+
+// ========================================
+// PARTICIPANTS DATA STRUCTURES
+// ========================================
+
 export interface ParticipantsData {
   participants: Participant[];
   summary: {
@@ -208,12 +211,12 @@ export interface ParticipantsData {
     byDepartment: Record<string, { 
       total: number; 
       responded: number;
-      rate: number;
+      rate?: number;
       displayName?: string;
     }>;
-    byPosition: Record<string, { total: number; responded: number; }>;
-    bySeniority: Record<string, { total: number; responded: number; }>;
-    byLocation: Record<string, { total: number; responded: number; }>;
+    byPosition: Record<string, { total: number; responded: number }>;
+    bySeniority: Record<string, { total: number; responded: number }>;
+    byLocation: Record<string, { total: number; responded: number }>;
     reminders: {
       noReminders: number;
       oneReminder: number;
@@ -235,45 +238,46 @@ export interface ParticipantsData {
   };
 }
 
-// Analytics data structure
-export interface Analytics {
-  totalInvited: number;
-  totalResponded: number;
-  participationRate: number;
-  averageScore: number;
-  completionTime: number;
-  responseRate: number;
-  categoryScores: Record<string, number>;
-  departmentScores: Record<string, number>;
-  departmentScoresDisplay?: Record<string, number>;
-  departmentMapping?: Record<string, string>;
-  trendData: Array<{
-    date: string;
-    responses: number;
-    score?: number;
-    cumulativeParticipation?: number;
-  }>;
-  trendDataByDepartment?: Record<string, any>;
-  responsesByDay: Record<string, number>;
-  segmentationData: Array<{
-    segment: string;
-    count: number;
-    avgScore: number;
-    percentage: number;
-  }>;
-  demographicBreakdown?: any[];
-  lastUpdated: string;
-}
+// ========================================
+// CAMPAIGN RESULTS & SURVEY
+// ========================================
 
-// Campaign results with analytics
 export interface CampaignResultsData {
   campaign: Campaign;
   analytics: Analytics;
+  stats?: any; // Para compatibilidad legacy
 }
 
-// ====================================================================
-// FORM & INPUT TYPES
-// ====================================================================
+export interface CategoryScore {
+  category: QuestionCategory | string;
+  score: number;
+  questionCount: number;
+  trend?: 'up' | 'down' | 'stable';
+}
+
+export interface SurveyResults {
+  campaignId: string;
+  campaignName: string;
+  participationRate: number;
+  overallScore: number;
+  categoryScores: CategoryScore[];
+  insights: SurveyInsight[];
+  benchmark: number;
+  totalParticipants: number;
+  totalResponses: number;
+  generatedAt: Date;
+}
+
+export interface SurveyInsight {
+  type: 'strength' | 'opportunity' | 'neutral';
+  category?: QuestionCategory | string;
+  message: string;
+  score?: number;
+}
+
+// ========================================
+// FORM DATA TYPES
+// ========================================
 
 export interface RegisterFormData {
   companyName: string;
@@ -292,7 +296,7 @@ export interface LoginFormData {
 export interface CreateCampaignFormData {
   name: string;
   description?: string;
-  campaignTypeId: string;
+  campaignTypeId?: string;
   startDate: string;
   endDate: string;
   emails: string[];
@@ -306,29 +310,38 @@ export interface SurveyFormData {
   }>;
 }
 
-// Wizard Types
+// ========================================
+// WIZARD TYPES (NUEVOS POST-26 SEP)
+// ========================================
+
 export interface WizardStep {
   id: number;
   title: string;
   subtitle?: string;
-  component: string;
-  icon?: string;
-  validation?: (data: any) => boolean;
+  description?: string;
+  completed?: boolean;
+  active?: boolean;
   isCompleted?: boolean;
   isActive?: boolean;
   isOptional?: boolean;
+  component?: string;
+  icon?: React.ComponentType<any> | string;
+  validation?: (data: any) => boolean;
+  estimatedTime?: number;
 }
 
 export interface WizardFormData {
   // Paso 1: Info Básica
   campaignName: string;
   campaignType: string;
+  name?: string; // Alias compatibilidad
+  description?: string;
+  campaignTypeId?: string;
   startDate: Date | string;
   endDate: Date | string;
-  description?: string;
   
   // Paso 2: Participantes
-  participants: Array<{
+  participants?: Array<{
     email: string;
     fullName: string;
     department?: string;
@@ -336,8 +349,16 @@ export interface WizardFormData {
     location?: string;
     seniority?: string;
   }>;
-  uploadMethod: 'manual' | 'csv' | 'integration';
+  estimatedParticipants?: number;
+  participantInstructions?: string;
+  uploadMethod?: 'manual' | 'csv' | 'integration';
   csvFile?: File;
+  dataQualityRequirements?: {
+    requireDepartment: boolean;
+    requirePosition: boolean;
+    requireSeniority: boolean;
+    requireLocation: boolean;
+  };
   departmentSettings?: {
     requireDepartment: boolean;
     requirePosition: boolean;
@@ -369,7 +390,7 @@ export interface WizardContextType {
   isLoading: boolean;
   error: string | null;
   
-  // Actions
+  // Acciones
   goToStep: (stepId: number) => void;
   nextStep: () => void;
   previousStep: () => void;
@@ -379,57 +400,19 @@ export interface WizardContextType {
   resetWizard: () => void;
 }
 
-// File Upload Types
-export interface FileUploadState {
-  file: File | null;
-  isUploading: boolean;
-  uploadProgress: number;
-  uploadError: string | null;
-  uploadSuccess: boolean;
-  previewData?: any[];
-  validationErrors?: string[];
-}
-
-export interface CsvParseResult {
-  data: any[];
-  errors: string[];
-  meta: {
-    totalRows: number;
-    validRows: number;
-    invalidRows: number;
-    duplicates: number;
-    fields: string[];
-  };
-}
-
-export interface ParticipantUpload {
-  email: string;
-  fullName: string;
-  firstName?: string;
-  lastName?: string;
-  department?: string;
-  position?: string;
-  location?: string;
-  seniority?: string;
-  customFields?: Record<string, any>;
-}
-
-export interface ParticipantBatch {
-  id: string;
-  campaignId: string;
-  totalCount: number;
-  validCount: number;
-  invalidCount: number;
-  processedCount: number;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  errors?: string[];
-  createdAt: Date | string;
-  completedAt?: Date | string;
-}
-
-// ====================================================================
+// ========================================
 // UI COMPONENT TYPES
-// ====================================================================
+// ========================================
+
+export interface Alert {
+  id: string;
+  type: 'warning' | 'info' | 'success' | 'error';
+  title: string;
+  message: string;
+  timestamp: Date | string;
+  campaignId?: string;
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+}
 
 export interface SelectOption {
   value: string;
@@ -457,7 +440,10 @@ export interface ActionButtonProps {
   icon?: React.ComponentType<any>;
 }
 
-// State Management Types
+// ========================================
+// STATE MANAGEMENT TYPES
+// ========================================
+
 export interface LoadingState {
   isLoading: boolean;
   loadingText?: string;
@@ -490,209 +476,61 @@ export interface NotificationState {
   actionCallback?: () => void;
 }
 
-export interface Alert {
+// ========================================
+// FILE UPLOAD TYPES
+// ========================================
+
+export interface FileUploadState {
+  file: File | null;
+  isUploading: boolean;
+  uploadProgress: number;
+  uploadError: string | null;
+  uploadSuccess: boolean;
+  previewData?: any[];
+  validationErrors?: string[];
+}
+
+export interface CsvParseResult {
+  data: any[];
+  errors: string[];
+  meta: {
+    totalRows: number;
+    validRows: number;
+    invalidRows: number;
+    duplicates: number;
+    fields: string[];
+  };
+}
+
+export interface ParticipantUpload {
+  email: string;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  department?: string;
+  position?: string;
+  location?: string;
+  seniority?: string;
+  customFields?: Record<string, any>;
+}
+
+export interface ParticipantBatch {
   id: string;
-  type: 'warning' | 'info' | 'success' | 'error';
-  title: string;
-  message: string;
-  timestamp: Date | string;
-  campaignId?: string;
-  priority?: 'low' | 'medium' | 'high' | 'critical';
-}
-
-// ====================================================================
-// ANALYTICS & INSIGHTS TYPES
-// ====================================================================
-
-export interface DashboardMetrics {
-  totalCampaigns: number;
-  activeCampaigns: number;
-  completedCampaigns: number;
-  draftCampaigns: number;
-  cancelledCampaigns: number;
-  globalParticipationRate: number;
-  totalResponses: number;
-  totalParticipants: number;
-  recentResponses?: number;
-  weeklyGrowth?: number;
-  monthlyGrowth?: number;
-  averageCompletionTime?: number | null;
-  topPerformingCampaign?: string | null;
-}
-
-export interface CampaignStats {
-  totalParticipants: number;
-  totalResponses: number;
-  participationRate: number;
-  daysRemaining: number;
-  isActive: boolean;
-  isCompleted: boolean;
-}
-
-export interface CategoryScore {
-  category: string;
-  score: number;
-  questionCount: number;
-  trend?: 'up' | 'down' | 'stable';
-}
-
-export interface SurveyResults {
   campaignId: string;
-  campaignName: string;
-  participationRate: number;
-  overallScore: number;
-  categoryScores: CategoryScore[];
-  insights: SurveyInsight[];
-  benchmark: number;
-  totalParticipants: number;
-  totalResponses: number;
-  generatedAt: Date | string;
+  totalCount: number;
+  validCount: number;
+  invalidCount: number;
+  processedCount: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  errors?: string[];
+  createdAt: Date | string;
+  completedAt?: Date | string;
 }
 
-export interface SurveyInsight {
-  type: 'strength' | 'opportunity' | 'neutral';
-  category?: string;
-  message: string;
-  score?: number;
-  confidence?: number;
-}
+// ========================================
+// MONITOR & COCKPIT TYPES (WOW Components)
+// ========================================
 
-// ====================================================================
-// INTELLIGENCE & MONITORING TYPES (WOW Components)
-// ====================================================================
-
-// Cockpit Intelligence System
-export interface CockpitIntelligence {
-  currentRate: number;
-  projectedFinal: number;
-  confidence: number;
-  velocityTrend: 'accelerating' | 'stable' | 'decelerating';
-  criticalDepartments: string[];
-  topPerformers: string[];
-  nextOptimalAction: string;
-  riskLevel: 'low' | 'medium' | 'high' | 'critical';
-  estimatedCompletion: Date | string;
-  recommendedActions: Array<{
-    action: string;
-    impact: 'low' | 'medium' | 'high';
-    urgency: 'low' | 'medium' | 'high' | 'immediate';
-  }>;
-  historicalComparison?: {
-    betterThanAverage: boolean;
-    percentile: number;
-    trend: 'improving' | 'stable' | 'declining';
-  };
-  tacticalAction: TacticalRecommendation;
-  departmentMomentum?: DepartmentMomentumData;
-}
-
-// Tactical Recommendations
-export interface TacticalRecommendation {
-  primary: string;
-  reasoning: string;
-  urgency: 'baja' | 'media' | 'alta' | 'crítica';
-  action: 'tactical';
-  urgencyColor: string;
-}
-
-// Department Momentum Analysis
-export interface DepartmentMomentumData {
-  departments: Array<{
-    name: string;
-    rate: number;
-    trend: string;
-    velocity: number;
-    status: 'positive' | 'warning' | 'critical';
-  }>;
-  summary: {
-    accelerating: number;
-    stable: number;
-    critical: number;
-    total: number;
-  };
-  insights: string[];
-  sparklineData: Array<{ 
-    name: string; 
-    value: number; 
-    velocity: number; 
-  }>;
-}
-
-// Cross Study Comparison
-export interface CrossStudyComparison {
-  currentCampaign: {
-    id: string;
-    name: string;
-    participationRate: number;
-    daysSinceStart: number;
-  };
-  historicalAverage: {
-    participationRate: number;
-    atSamePoint: number;
-    finalRate: number;
-  };
-  bestPerformer: {
-    name: string;
-    participationRate: number;
-    completedIn: number;
-  };
-  percentileRank: number;
-  performanceRating: 'excepcional' | 'sobre promedio' | 'promedio' | 'bajo promedio';
-  projection: {
-    expectedFinal: number;
-    confidence: number;
-    daysToGoal: number;
-  };
-}
-
-// Engagement Heatmap
-export interface EngagementHeatmapData {
-  hourlyData: Array<{ 
-    hour: number; 
-    count: number; 
-    intensity: number; 
-  }>;
-  recommendations: Array<{ 
-    message: string; 
-    confidence: number; 
-  }>;
-  nextOptimalWindow: { 
-    hour: number; 
-    day: string; 
-    confidence: number; 
-  };
-  totalEngagementScore: number;
-  maxHour: number;
-  maxActivity: number;
-  totalActivity: number;
-  hourBars: Array<{ 
-    hour: number; 
-    count: number; 
-    percentage: number; 
-    isPeak: boolean; 
-  }>;
-}
-
-// Participation Prediction
-export interface ParticipationPredictionData {
-  finalProjection: number;
-  confidence: number;
-  velocity: number;
-  riskLevel: 'low' | 'medium' | 'high';
-  recommendedActions: Array<{ 
-    action: string; 
-    impact: number; 
-  }>;
-  projectionPoints?: Array<{
-    dayLabel: string;
-    rate: number;
-  }>;
-  methodology?: string;
-  slope?: number;
-  intercept?: number;
-}
-
-// Monitor Data Types
 export interface DepartmentMonitorData {
   invited: number;
   responded: number;
@@ -727,113 +565,337 @@ export interface AlertItem {
   actionRequired?: boolean;
 }
 
-// ====================================================================
-// SYSTEM & CONFIGURATION TYPES
-// ====================================================================
+export interface EngagementHeatmapData {
+  hourlyData: Array<{ hour: number; count: number; intensity: number }>;
+  recommendations: Array<{ message: string; confidence: number }>;
+  nextOptimalWindow: { hour: number; day: string; confidence: number };
+  totalEngagementScore: number;
+  maxHour: number;
+  maxActivity: number;
+  totalActivity: number;
+  hourBars: Array<{ hour: number; count: number; percentage: number; isPeak: boolean }>;
+}
 
-export interface SystemConfig {
-  email: {
-    enabled: boolean;
-    provider: 'smtp' | 'sendgrid' | 'mailgun' | 'resend';
-    settings: Record<string, any>;
+export interface ParticipationPredictionData {
+  finalProjection: number;
+  confidence: number;
+  velocity: number;
+  riskLevel: 'low' | 'medium' | 'high';
+  recommendedActions: Array<{ action: string; impact: number }>;
+  projectionPoints?: Array<{
+    dayLabel: string;
+    rate: number;
+  }>;
+  methodology?: string;
+  slope?: number;
+  intercept?: number;
+}
+
+export interface DepartmentAnomalyData {
+  department: string;
+  rate: number;
+  zScore: number;
+  type: 'positive_outlier' | 'negative_outlier';
+  severity: 'high' | 'medium';
+}
+
+// Alias para compatibilidad
+export type CrossStudyComparisonData = CrossStudyComparison;
+
+export interface CrossStudyComparison {
+  currentCampaign?: {
+    id: string;
+    name: string;
+    participationRate: number;
+    daysSinceStart: number;
   };
-  storage: {
-    provider: 'local' | 'aws-s3' | 'gcp-storage' | 'azure-blob';
-    settings: Record<string, any>;
-  };
-  analytics: {
-    enabled: boolean;
-    provider?: 'google-analytics' | 'mixpanel' | 'amplitude' | 'segment';
-    trackingId?: string;
-  };
-  security: {
-    requireTwoFactor: boolean;
-    sessionTimeout: number;
-    maxLoginAttempts: number;
-    passwordPolicy: {
-      minLength: number;
-      requireNumbers: boolean;
-      requireSymbols: boolean;
-      requireUppercase: boolean;
+  lastCampaign?: {
+    name: string;
+    type: string;
+    participationRate: number;
+    velocityMetrics: {
+      averageResponsesPerDay: number;
+      completionVelocity: number;
     };
   };
-}
-
-// Permissions & Roles
-export interface Permission {
-  id: string;
-  name: string;
-  description: string;
-  resource: string;
-  action: 'create' | 'read' | 'update' | 'delete' | 'manage';
-}
-
-export interface Role {
-  id: string;
-  name: string;
-  description: string;
-  permissions: Permission[];
-  isDefault: boolean;
-}
-
-export interface UserPermissions {
-  userId: string;
-  accountId: string;
-  roles: Role[];
-  directPermissions: Permission[];
-  effectivePermissions: Permission[];
-}
-
-// Audit & Logging
-export interface AuditLog {
-  id: string;
-  userId: string;
-  action: string;
-  resource: string;
-  resourceId: string;
-  details: Record<string, any>;
-  ipAddress: string;
-  userAgent: string;
-  timestamp: Date | string;
-}
-
-export interface SystemLog {
-  id: string;
-  level: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
-  message: string;
-  context: Record<string, any>;
-  timestamp: Date | string;
-  source: string;
-}
-
-// Integrations
-export interface Integration {
-  id: string;
-  name: string;
-  type: 'webhook' | 'api' | 'sso' | 'storage' | 'analytics';
-  status: 'active' | 'inactive' | 'error';
-  config: Record<string, any>;
-  lastSync?: Date | string;
-  errorMessage?: string;
-}
-
-export interface WebhookEvent {
-  id: string;
-  event: string;
-  payload: Record<string, any>;
-  url: string;
-  status: 'pending' | 'sent' | 'failed' | 'retrying';
-  attempts: number;
-  lastAttempt?: Date | string;
-  nextAttempt?: Date | string;
-  response?: {
-    status: number;
-    body: string;
-    headers: Record<string, string>;
+  historicalAverage?: {
+    participationRate: number;
+    atSamePoint: number;
+    finalRate: number;
   };
+  bestPerformer?: {
+    name: string;
+    participationRate: number;
+    completedIn: number;
+  };
+  comparison?: {
+    velocityTrend: 'faster' | 'slower' | 'similar';
+    velocityDifference: number;
+    patternSimilarity: number;
+    projectedOutcome: {
+      finalRate: number;
+      confidence: number;
+      riskLevel: 'low' | 'medium' | 'high';
+    };
+  };
+  percentileRank?: number;
+  performanceRating?: 'excepcional' | 'sobre promedio' | 'promedio' | 'bajo promedio';
+  projection?: {
+    expectedFinal: number;
+    confidence: number;
+    daysToGoal: number;
+  };
+  insights?: string[];
+  recommendations?: string[];
 }
 
-// Advanced Form Configuration
+export interface DepartmentalIntelligence {
+  topPerformers: Array<{
+    name: string;
+    participationRate: number;
+    count: number;
+    total: number;
+    rank: number;
+    medal: string;
+    status: string;
+  }>;
+  
+  attentionNeeded: Array<{
+    name: string;
+    participationRate: number;
+    count: number;
+    total: number;
+    urgency: 'critical' | 'high' | 'medium';
+    action: 'llamar' | 'recordar' | 'seguimiento';
+    icon: '🚨' | '⚡' | '⚠️';
+  }>;
+  
+  totalDepartments: number;
+  averageRate: number;
+  excellentCount: number;
+  criticalCount: number;
+  allDepartments: Array<{
+    name: string;
+    participationRate: number;
+    count: number;
+    total: number;
+  }>;
+  hasRealData: boolean;
+  scenarioType: 'NO_DATA' | 'ALL_ZERO' | 'MIXED_DATA';
+  displayMessage: string;
+}
+
+// ========================================
+// COCKPIT INTELLIGENCE TYPES
+// ========================================
+
+export interface CockpitIntelligence {
+  currentRate: number;
+  projectedFinal: number;
+  confidence: number;
+  velocityTrend: 'accelerating' | 'stable' | 'decelerating';
+  criticalDepartments: string[];
+  topPerformers: string[];
+  nextOptimalAction: string;
+  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+  estimatedCompletion: Date | string;
+  recommendedActions: Array<{
+    action: string;
+    impact: 'low' | 'medium' | 'high';
+    urgency: 'low' | 'medium' | 'high' | 'immediate';
+  }>;
+  historicalComparison?: {
+    betterThanAverage: boolean;
+    percentile: number;
+    trend: 'improving' | 'stable' | 'declining';
+  };
+  tacticalAction?: TacticalRecommendation;
+  departmentMomentum?: DepartmentMomentumData;
+}
+
+export interface TacticalRecommendation {
+  primary: string;
+  reasoning: string;
+  urgency: 'baja' | 'media' | 'alta' | 'crítica';
+  action: 'tactical' | 'post-campaign' | 'emergency';
+  urgencyColor: string;
+}
+
+export interface DepartmentMomentumData {
+  departments: Array<{
+    name: string;
+    rate: number;
+    trend: string;
+    velocity: number;
+    status: 'positive' | 'warning' | 'critical';
+  }>;
+  summary: {
+    accelerating: number;
+    stable: number;
+    critical: number;
+    total: number;
+  };
+  insights: string[];
+  sparklineData: Array<{ name: string; value: number; velocity: number }>;
+}
+
+export interface CardState {
+  title: string;
+  department: string;
+  content: string;
+  severity: string;
+  action: string;
+  style: 'danger' | 'success' | 'healthy' | 'warning';
+  icon: 'alert' | 'trending' | 'check' | 'activity';
+}
+
+export interface CampaignMonitorData {
+  // Propiedades básicas
+  campaignId?: string;
+  isLoading?: boolean;
+  error?: string | null;
+  lastRefresh?: Date | string;
+  
+  // Datos principales
+  campaign?: Campaign;
+  analytics?: Analytics;
+  participants?: ParticipantsData;
+  
+  // Datos calculados Monitor
+  riskTrendData?: Array<{date: string, rate: number}>;
+  departmentSizes?: Record<string, number>;
+  momentumGaugeData?: Array<{value: number, fill: string}>;
+  
+  // Inteligencia
+  cockpitIntelligence?: CockpitIntelligence;
+  departmentalIntelligence?: DepartmentalIntelligence;
+  engagementHeatmap?: EngagementHeatmapData;
+  participationPrediction?: ParticipationPredictionData;
+  crossStudyComparison?: CrossStudyComparison;
+  anomalyDetection?: {
+    positiveAnomalies: DepartmentAnomalyData[];
+    negativeAnomalies: DepartmentAnomalyData[];
+  };
+  
+  // Datos adicionales
+  topMovers?: any;
+  departmentPulse?: any;
+  leadershipAnalysis?: any;
+  
+  // Métodos
+  handleRefresh?: () => void;
+}
+
+// ========================================
+// NUEVOS TIPOS POST-26 SEP (AGREGADOS)
+// ========================================
+
+export interface AggregatedGerencia {
+  id: string;
+  displayName: string;
+  unitType: string;
+  level: number;
+  score: number;
+  participants: number;
+  responded: number;
+  rate: number;
+  employeeCount?: number;
+  children: DepartmentChild[];
+  momentum?: number;
+  trend?: 'up' | 'down' | 'stable';
+  projection?: number;
+}
+
+export interface DepartmentChild {
+  id: string;
+  displayName: string;
+  unitType: string;
+  level: number;
+  score: number;
+  participants: number;
+  responded: number;
+  rate: number;
+  velocity?: number;
+  lastActivity?: string;
+  projection?: number;
+}
+
+export interface DemographicsStats {
+  genderDistribution?: Record<string, number>;
+  ageDistribution?: Record<string, number>;
+  averageAge?: number;
+  averageSeniority?: number;
+  totalWithDemographics?: number;
+}
+
+// ========================================
+// PATTERN DETECTOR TYPES
+// ========================================
+
+import type { 
+  DemographicPattern, 
+  ParticipationAnomaly, 
+  LeadershipFingerprint 
+} from '@/lib/services/PatternDetector';
+
+export type { 
+  DemographicPattern, 
+  ParticipationAnomaly, 
+  LeadershipFingerprint 
+};
+
+export interface LeadershipAnalysis {
+  pattern: DemographicPattern | null;
+  anomaly: ParticipationAnomaly | null;
+  insight: string;
+  fingerprint: LeadershipFingerprint | null;
+  hasData: boolean;
+}
+
+// ========================================
+// CONTEXT & HOOK TYPES
+// ========================================
+
+export interface AuthContextType {
+  account: Account | null;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => void;
+  register: (data: RegisterFormData) => Promise<boolean>;
+  loading: boolean;
+  isAuthenticated: boolean;
+}
+
+export interface UseApiOptions {
+  onSuccess?: (data: any) => void;
+  onError?: (error: string) => void;
+  autoFetch?: boolean;
+  cacheTime?: number;
+  retryCount?: number;
+}
+
+export interface UseApiReturn<T> {
+  data: T | null;
+  loading: boolean;
+  error: string | null;
+  fetch: () => Promise<void>;
+  refetch: () => Promise<void>;
+}
+
+// ========================================
+// FORM & VALIDATION TYPES
+// ========================================
+
+export interface ValidationError {
+  field: string;
+  message: string;
+}
+
+export interface FormState {
+  isValid: boolean;
+  errors: ValidationError[];
+  touched: Record<string, boolean>;
+}
+
 export interface FormFieldConfig {
   name: string;
   label: string;
@@ -868,13 +930,16 @@ export interface DynamicFormConfig {
   showProgress?: boolean;
 }
 
-// Advanced Metrics
+// ========================================
+// ADVANCED METRICS & REPORTS
+// ========================================
+
 export interface AdvancedMetrics {
   responseRate: {
     overall: number;
     byDepartment: Record<string, number>;
     byPosition: Record<string, number>;
-    trend: Array<{ date: string; rate: number; }>;
+    trend: Array<{ date: string; rate: number }>;
   };
   engagementScore: {
     average: number;
@@ -894,7 +959,6 @@ export interface AdvancedMetrics {
   }>;
 }
 
-// Comparison Reports
 export interface ComparisonReport {
   baseline: {
     campaignId: string;
@@ -920,51 +984,159 @@ export interface ComparisonReport {
   };
 }
 
-// ====================================================================
-// CONTEXT TYPES
-// ====================================================================
+// ========================================
+// SYSTEM CONFIGURATION TYPES
+// ========================================
 
-export interface AuthContextType {
-  account: Account | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
-  register: (data: RegisterFormData) => Promise<boolean>;
-  loading: boolean;
-  isAuthenticated: boolean;
+export interface SystemConfig {
+  email: {
+    enabled: boolean;
+    provider: 'smtp' | 'sendgrid' | 'mailgun' | 'resend';
+    settings: Record<string, any>;
+  };
+  storage: {
+    provider: 'local' | 'aws-s3' | 'gcp-storage' | 'azure-blob';
+    settings: Record<string, any>;
+  };
+  analytics: {
+    enabled: boolean;
+    provider?: 'google-analytics' | 'mixpanel' | 'amplitude' | 'segment';
+    trackingId?: string;
+  };
+  security: {
+    requireTwoFactor: boolean;
+    sessionTimeout: number;
+    maxLoginAttempts: number;
+    passwordPolicy: {
+      minLength: number;
+      requireNumbers: boolean;
+      requireSymbols: boolean;
+      requireUppercase: boolean;
+    };
+  };
 }
 
-// ====================================================================
-// HOOK TYPES
-// ====================================================================
-
-export interface UseApiOptions {
-  onSuccess?: (data: any) => void;
-  onError?: (error: string) => void;
-  autoFetch?: boolean;
-  cacheTime?: number;
-  retryCount?: number;
+export interface Permission {
+  id: string;
+  name: string;
+  description: string;
+  resource: string;
+  action: 'create' | 'read' | 'update' | 'delete' | 'manage';
 }
 
-// ====================================================================
-// ENUMS AND TYPE LITERALS
-// ====================================================================
+export interface Role {
+  id: string;
+  name: string;
+  description: string;
+  permissions: Permission[];
+  isDefault: boolean;
+}
 
-export type CampaignStatus = 'draft' | 'active' | 'completed' | 'cancelled';
-export type QuestionCategory = 'liderazgo' | 'ambiente' | 'desarrollo' | 'bienestar' | 'comunicacion' | 'reconocimiento';
-export type AccountStatus = 'ACTIVE' | 'SUSPENDED' | 'TRIAL' | 'EXPIRED';
-export type AccountRole = 'CLIENT' | 'FOCALIZAHR_ADMIN';
-export type ResponseType = 'text_open' | 'multiple_choice' | 'rating_matrix_conditional' | 'rating_scale';
+export interface UserPermissions {
+  userId: string;
+  accountId: string;
+  roles: Role[];
+  directPermissions: Permission[];
+  effectivePermissions: Permission[];
+}
 
-// ====================================================================
+export interface AuditLog {
+  id: string;
+  userId: string;
+  action: string;
+  resource: string;
+  resourceId: string;
+  details: Record<string, any>;
+  ipAddress: string;
+  userAgent: string;
+  timestamp: Date | string;
+}
+
+export interface SystemLog {
+  id: string;
+  level: 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+  message: string;
+  context: Record<string, any>;
+  timestamp: Date | string;
+  source: string;
+}
+
+export interface Integration {
+  id: string;
+  name: string;
+  type: 'webhook' | 'api' | 'sso' | 'storage' | 'analytics';
+  status: 'active' | 'inactive' | 'error';
+  config: Record<string, any>;
+  lastSync?: Date | string;
+  errorMessage?: string;
+}
+
+export interface WebhookEvent {
+  id: string;
+  event: string;
+  payload: Record<string, any>;
+  url: string;
+  status: 'pending' | 'sent' | 'failed' | 'retrying';
+  attempts: number;
+  lastAttempt?: Date | string;
+  nextAttempt?: Date | string;
+  response?: {
+    status: number;
+    body: string;
+    headers: Record<string, string>;
+  };
+}
+
+// ========================================
+// CONFIGURATION & CONSTANTS
+// ========================================
+
+export interface AppConfig {
+  maxParticipantsPerCampaign: number;
+  minCampaignDuration: number;
+  maxCampaignDuration: number;
+  minParticipants: number;
+  benchmarkScore: number;
+  supportEmail: string;
+}
+
+export const APP_CONFIG: AppConfig = {
+  maxParticipantsPerCampaign: 500,
+  minCampaignDuration: 3,
+  maxCampaignDuration: 30,
+  minParticipants: 5,
+  benchmarkScore: 3.2,
+  supportEmail: 'soporte@focalizahr.com'
+};
+
+export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
+  draft: 'Borrador',
+  active: 'Activa',
+  completed: 'Completada',
+  cancelled: 'Cancelada'
+};
+
+export const QUESTION_CATEGORY_LABELS: Record<string, string> = {
+  liderazgo: 'Liderazgo',
+  ambiente: 'Ambiente Laboral',
+  desarrollo: 'Desarrollo',
+  bienestar: 'Bienestar',
+  comunicacion: 'Comunicación',
+  reconocimiento: 'Reconocimiento'
+};
+
+// ========================================
 // UTILITY TYPES
-// ====================================================================
+// ========================================
 
+export type PartialBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+export type RequiredBy<T, K extends keyof T> = T & Required<Pick<T, K>>;
 export type Nullable<T> = T | null;
 export type Optional<T> = T | undefined;
 export type DateString = string;
 export type UUID = string;
 export type JSONValue = string | number | boolean | null | JSONObject | JSONArray;
-export interface JSONObject { [key: string]: JSONValue; }
+export interface JSONObject { [key: string]: JSONValue }
 export interface JSONArray extends Array<JSONValue> {}
 
 // END OF FILE

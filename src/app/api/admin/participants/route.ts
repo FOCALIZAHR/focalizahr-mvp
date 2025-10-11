@@ -6,6 +6,7 @@ import { verifyJWTToken } from '@/lib/auth'
 import { z } from 'zod';
 import { generateSecureToken } from '@/lib/utils';
 import * as XLSX from 'xlsx';
+import { Gender } from '@prisma/client';
 import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter';
 
 // ✅ CAMBIO 1: Schema actualizado con RUT obligatorio + email/phone opcional
@@ -81,28 +82,28 @@ function parseGender(value: string | undefined): string | undefined {
   
   const normalized = value.toLowerCase().trim();
   
-  const genderMap: Record<string, string> = {
-    'm': 'MALE',
-    'masculino': 'MALE',
-    'male': 'MALE',
-    'hombre': 'MALE',
-    'man': 'MALE',
-    'h': 'MALE',
-    'f': 'FEMALE',
-    'femenino': 'FEMALE',
-    'female': 'FEMALE',
-    'mujer': 'FEMALE',
-    'woman': 'FEMALE',
-    'nb': 'NON_BINARY',
-    'no binario': 'NON_BINARY',
-    'nobinario': 'NON_BINARY',
-    'non-binary': 'NON_BINARY',
-    'other': 'NON_BINARY',
-    'otro': 'NON_BINARY',
-    'ns': 'PREFER_NOT_TO_SAY',
-    'prefiero no decir': 'PREFER_NOT_TO_SAY',
-    'no especifica': 'PREFER_NOT_TO_SAY',
-    'n/a': 'PREFER_NOT_TO_SAY'
+  const genderMap: Record<string, Gender> = {  // ✅ CAMBIAR TIPO AQUÍ
+    'm': Gender.MALE,              // ✅ CAMBIAR 'MALE' → Gender.MALE
+    'masculino': Gender.MALE,
+    'male': Gender.MALE,
+    'hombre': Gender.MALE,
+    'man': Gender.MALE,
+    'h': Gender.MALE,
+    'f': Gender.FEMALE,            // ✅ CAMBIAR 'FEMALE' → Gender.FEMALE
+    'femenino': Gender.FEMALE,
+    'female': Gender.FEMALE,
+    'mujer': Gender.FEMALE,
+    'woman': Gender.FEMALE,
+    'nb': Gender.NON_BINARY,       // ✅ CAMBIAR a Gender.NON_BINARY
+    'no binario': Gender.NON_BINARY,
+    'nobinario': Gender.NON_BINARY,
+    'non-binary': Gender.NON_BINARY,
+    'other': Gender.NON_BINARY,
+    'otro': Gender.NON_BINARY,
+    'ns': Gender.PREFER_NOT_TO_SAY,  // ✅ CAMBIAR a Gender.PREFER_NOT_TO_SAY
+    'prefiero no decir': Gender.PREFER_NOT_TO_SAY,
+    'no especifica': Gender.PREFER_NOT_TO_SAY,
+    'n/a': Gender.PREFER_NOT_TO_SAY
   };
   
   return genderMap[normalized] || undefined;

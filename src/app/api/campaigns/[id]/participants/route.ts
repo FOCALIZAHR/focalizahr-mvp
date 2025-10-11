@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { verifyJWT } from '@/lib/auth'
 import { buildParticipantAccessFilter, extractUserContext } from '@/lib/services/AuthorizationService'
 import { conciergeParticipantsSchema } from '@/lib/validations'
+import { Gender } from '@prisma/client'
 import crypto from 'crypto'
 
 // ✅ NUEVO: Validación RUT chileno con dígito verificador
@@ -51,31 +52,31 @@ function normalizeRut(rut: string): string {
   return `${num}-${dv.toUpperCase()}`;
 }
 
-// ✅ FUNCIONES DE PARSING EXISTENTES (sin cambios)
-function parseGender(value: string): string | undefined {
-  if (!value) return undefined;
+// ✅ FUNCIÓN CORREGIDA (Gender enum + null)
+function parseGender(value: string | undefined): Gender | null {
+  if (!value) return null;  // ← Cambio 1: null en vez de undefined
   
   const normalized = value.toLowerCase().trim();
   
+  // ← Cambio 2: Devolver Gender.MALE en vez de 'MALE'
   if (['m', 'male', 'masculino', 'hombre', 'man'].includes(normalized)) {
-    return 'MALE';
+    return Gender.MALE;
   }
   
   if (['f', 'female', 'femenino', 'mujer', 'woman'].includes(normalized)) {
-    return 'FEMALE';
+    return Gender.FEMALE;
   }
   
   if (['nb', 'non-binary', 'no binario', 'nobinario', 'other', 'otro'].includes(normalized)) {
-    return 'NON_BINARY';
+    return Gender.NON_BINARY;
   }
   
   if (['prefer not to say', 'prefiero no decir', 'no especifica', 'n/a'].includes(normalized)) {
-    return 'PREFER_NOT_TO_SAY';
+    return Gender.PREFER_NOT_TO_SAY;
   }
   
-  return undefined;
+  return null;  // ← Cambio 3: null en vez de undefined
 }
-
 function parseDate(value: any): Date | undefined {
   if (!value) return undefined;
   
@@ -281,6 +282,22 @@ export async function POST(
     const seenRuts = new Set<string>();
     const seenEmails = new Set<string>();
     const duplicates: string[] = [];
+    // ✅ AGREGAR ESTAS LÍNEAS ANTES DEL .map():
+    const missingRuts: string[] = [];
+    validatedData.participants.forEach((p, index) => {
+      if (!p.nationalId || !validateRut(p.nationalId)) {
+        missingRuts.push(`Participante ${index + 1}: RUT ${p.nationalId || 'vacío'} inválido`);
+      }
+    });
+
+    if (missingRuts.length > 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'Participantes con RUT inválido o vacío',
+        details: missingRuts,
+        code: 'INVALID_NATIONAL_ID'
+      }, { status: 400 });
+    }
 
     const participantsToCreate = validatedData.participants
       .map((participant, index) => {
@@ -318,7 +335,7 @@ export async function POST(
         
         return {
           campaignId,
-          email: participant.email.toLowerCase().trim(),
+          email: participant.email ? participant.email.toLowerCase().trim() : null,  // ✅ CAMBIO
           uniqueToken,
           // ✅ CAMBIO 5: Agregar campos nuevos
           nationalId: normalizedRut,
