@@ -77,8 +77,8 @@ function normalizeRut(rut: string): string {
 /**
  * Parsea género con variaciones comunes
  */
-function parseGender(value: string | undefined): string | undefined {
-  if (!value) return undefined;
+function parseGender(value: string | undefined): Gender | null {
+ if (!value) return null;
   
   const normalized = value.toLowerCase().trim();
   
@@ -106,7 +106,7 @@ function parseGender(value: string | undefined): string | undefined {
     'n/a': Gender.PREFER_NOT_TO_SAY
   };
   
-  return genderMap[normalized] || undefined;
+  return genderMap[normalized] || null;
 }
 
 /**
@@ -584,7 +584,7 @@ async function loadParticipantsToDatabase(
         departmentId: assignedDepartmentId,
         position: participant.position || null,
         location: participant.location || null,
-        gender: participant.gender || null,
+        gender: participant.gender as Gender | null,
         dateOfBirth: participant.dateOfBirth || null,
         hireDate: participant.hireDate || null,
         hasResponded: false,

@@ -315,8 +315,12 @@ export async function POST(
             return null;
           }
           seenRuts.add(normalizedRut);
-        } else {
+       } else {
           // Fallback a email si no hay RUT
+          if (!participant.email) {
+            duplicates.push(`Fila ${index + 1}: Sin RUT ni email`);
+            return null;
+          }
           const email = participant.email.toLowerCase().trim();
           if (seenEmails.has(email)) {
             duplicates.push(`Fila ${index + 1}: Email duplicado (${email})`);
@@ -364,7 +368,10 @@ export async function POST(
     let totalCreated = 0
 
     for (let i = 0; i < participantsToCreate.length; i += batchSize) {
-      const batch = participantsToCreate.slice(i, i + batchSize)
+      const batch = participantsToCreate.slice(i, i + batchSize).map(p => ({
+        ...p,
+        nationalId: p.nationalId as string
+      }))
       await prisma.participant.createMany({
         data: batch,
         skipDuplicates: true
