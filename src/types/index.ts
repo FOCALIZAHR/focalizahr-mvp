@@ -3,24 +3,34 @@
 // Restauración quirúrgica preservando contratos de datos enriquecidos
 // Last Updated: 2025
 
-import type { 
-  Campaign as PrismaCampaign,
-  Participant as PrismaParticipant,
-  Account as PrismaAccount,
-  Question as PrismaQuestion,
-  Response as PrismaResponse,
-  CampaignResult as PrismaCampaignResult
-} from '@prisma/client';
-
 // ========================================
-// DOMAIN MODELS - Extendiendo tipos Prisma
+// DOMAIN MODELS - Definidos directamente sin herencia
 // ========================================
 
-// Account - Modelo base extendido
-export type Account = PrismaAccount;
+// Account - Modelo base
+export interface Account {
+  id: string;
+  companyName: string;
+  adminEmail: string;
+  adminName: string;
+  companyLogo?: string | null;
+  passwordHash?: string;
+  role?: 'CLIENT' | 'FOCALIZAHR_ADMIN';
+  status?: 'ACTIVE' | 'SUSPENDED' | 'TRIAL' | 'EXPIRED';
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
 
-// Campaign - Fusión completa con todas las propiedades UI
-export type Campaign = PrismaCampaign & {
+// Campaign - Con tipo literal correcto para status
+export interface Campaign {
+  id: string;
+  name: string;
+  status: 'draft' | 'active' | 'completed' | 'cancelled';  // TIPO LITERAL
+  startDate: Date | string;
+  endDate: Date | string;
+  totalInvited: number;
+  totalResponded: number;
+  participationRate: number;
   // Propiedades de relación
   campaignType?: {
     id: string;
@@ -31,11 +41,7 @@ export type Campaign = PrismaCampaign & {
     name: string;
     adminEmail?: string;
   };
-  // Propiedades calculadas/UI críticas
-  totalInvited: number;
-  totalResponded: number;
-  participationRate: number;
-  // Propiedades de dashboard/UI
+  // Propiedades UI
   canActivate?: boolean;
   canViewResults?: boolean;
   isOverdue?: boolean;
@@ -43,20 +49,27 @@ export type Campaign = PrismaCampaign & {
   riskLevel?: 'low' | 'medium' | 'high';
   lastActivity?: string;
   completionTrend?: 'up' | 'down' | 'stable';
-  type?: string; // Alias para campaignType.name
-};
+  type?: string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+}
 
-// Participant - Fusión completa
-export type Participant = PrismaParticipant & {
-  // Campos adicionales del sistema
+// Participant - Interface directa sin herencia
+export interface Participant {
+  id: string;
+  campaignId: string;
   email?: string;
   uniqueToken: string;
   department?: string | null;
   position?: string | null;
   seniorityLevel?: string | null;
   location?: string | null;
+  hasResponded: boolean;
+  responseDate?: Date | string | null;
   reminderCount: number;
   lastReminderSent?: Date | string | null;
+  createdAt: Date | string;
+  updatedAt?: Date | string;
   // Relaciones
   campaign?: Campaign;
   responses?: Array<{
@@ -64,26 +77,48 @@ export type Participant = PrismaParticipant & {
     rating: number;
     createdAt: Date | string;
   }>;
-};
+}
 
 // Question - Modelo extendido
-export type Question = PrismaQuestion & {
+export interface Question {
+  id: string | number;
+  text: string;
   category: QuestionCategory;
+  questionOrder: number;
+  isActive: boolean;
   responseType?: 'text_open' | 'multiple_choice' | 'rating_matrix_conditional' | 'rating_scale';
   choiceOptions?: string[] | null;
   conditionalLogic?: any | null;
-};
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+}
 
 // Response - Modelo extendido
-export type Response = PrismaResponse & {
+export interface Response {
+  id: string;
+  participantId: string;
+  questionId: string | number;
+  rating?: number | null;
+  textResponse?: string | null;
+  createdAt: Date | string;
   participant?: Participant;
   question?: Question;
-};
+}
 
 // CampaignResult - Modelo extendido
-export type CampaignResult = PrismaCampaignResult & {
+export interface CampaignResult {
+  id: string;
+  campaignId: string;
+  participationRate?: number | null;
+  overallScore?: number | null;
+  highestCategory?: string | null;
+  highestScore?: number | null;
+  lowestCategory?: string | null;
+  lowestScore?: number | null;
+  resultsData?: any | null;
+  generatedAt: Date | string;
   campaign?: Campaign;
-};
+}
 
 // ========================================
 // ENUMS Y TIPOS LITERALES
