@@ -86,7 +86,13 @@ export async function POST(
 
     // 4. PREPARAR DATA fuera de transacción (optimización crítica)
     const validQuestionIds = new Set(participant.campaign.campaignType.questions.map(q => q.id))
-    const responseData = []
+    const responseData: Array<{
+  participantId: string;
+  questionId: string;
+  rating?: number;
+  textResponse?: string;
+  choiceResponse?: string;
+}> = []
     
     for (const response of responses) {
       // Validar pregunta existe

@@ -3,6 +3,7 @@
 // CHAT 9 REFACTORIZADO - Enterprise Security
 // Permite ACCOUNT_OWNER + FOCALIZAHR_ADMIN cargar datos
 // CON SOPORTE targetAccountId para admin
+// ✅ FIX: Type narrowing para validatedMetrics
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -170,17 +171,33 @@ export async function POST(request: NextRequest) {
     
     // Detectar si es batch o single upload
     const isBatch = Array.isArray(body.metrics) || Array.isArray(body);
-    const metricsArray = isBatch 
-      ? (Array.isArray(body) ? body : body.metrics)
-      : [body];
     
-    // Validar formato con Zod
-    let validatedMetrics;
+    // Validar formato con Zod y extraer array de métricas
+    let validatedMetrics: any[];
     try {
       if (isBatch) {
-        validatedMetrics = departmentMetricsBatchSchema.parse(metricsArray);
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // BATCH: Soportar 2 formatos de entrada
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        if (Array.isArray(body)) {
+          // Formato 1: Array directo → [{ costCenterCode, period, ... }, ...]
+          // Envolver en objeto para validación Zod
+          const wrapped = { metrics: body };
+          const validated = departmentMetricsBatchSchema.parse(wrapped);
+          validatedMetrics = validated.metrics;
+        } else if (body.metrics && Array.isArray(body.metrics)) {
+          // Formato 2: Objeto con array → { metrics: [{ costCenterCode, ... }] }
+          const validated = departmentMetricsBatchSchema.parse(body);
+          validatedMetrics = validated.metrics;
+        } else {
+          throw new Error('Estructura de batch inválida');
+        }
       } else {
-        validatedMetrics = [departmentMetricsUploadSchema.parse(body)];
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // SINGLE: Un solo objeto → { costCenterCode, period, ... }
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        const validated = departmentMetricsUploadSchema.parse(body);
+        validatedMetrics = [validated];
       }
     } catch (error) {
       if (error instanceof ZodError) {
@@ -218,7 +235,7 @@ export async function POST(request: NextRequest) {
     // PASO 5: CONVERTIR costCenterCode → departmentId
     // ========================================
     
-    const costCenterCodes = [...new Set(validatedMetrics.map(m => m.costCenterCode))];
+    const costCenterCodes = [...new Set(validatedMetrics.map((m: any) => m.costCenterCode))];
     
     // ✅ USAR effectiveAccountId (puede ser del cliente o admin seleccionado)
     const existingDepartments = await prisma.department.findMany({
@@ -287,7 +304,11 @@ export async function POST(request: NextRequest) {
             }
           },
           update: {
-            // Actualizar solo campos provistos (nullables permitidos)
+            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            // UPDATE: Solo actualizar valores de negocio (KPIs + contexto)
+            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            
+            // KPIs Fase 1
             turnoverRate: metric.turnoverRate,
             absenceRate: metric.absenceRate,
             issueCount: metric.issueCount,
@@ -305,13 +326,20 @@ export async function POST(request: NextRequest) {
             turnoverRegrettableRate: metric.turnoverRegrettableRate,
             turnoverRegrettableCount: metric.turnoverRegrettableCount,
             
-            // Metadata
-            notes: metric.notes,
-            dataQuality: metric.dataQuality || 'validated'
+            // Notes (solo campo metadata actualizable)
+            notes: metric.notes
+            
+            // ✅ ARQUITECTURA: NO modificar dataQuality en updates
+            // Razón: Preservar metadata original de calidad
+            // Solo cambia por workflow de aprobación (endpoint futuro)
           },
           create: {
-            // ✅ USAR effectiveAccountId en create
-            accountId: effectiveAccountId, // ✅ CAMBIO CRÍTICO
+            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            // CREATE: Incluir metadata completa (backend-generated)
+            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            
+            // IDs y Relaciones
+            accountId: effectiveAccountId, // ✅ Multi-tenant
             departmentId: departmentId,
             
             // Período
@@ -338,10 +366,17 @@ export async function POST(request: NextRequest) {
             turnoverRegrettableRate: metric.turnoverRegrettableRate,
             turnoverRegrettableCount: metric.turnoverRegrettableCount,
             
-            // Metadata
+            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            // METADATA (Backend-Generated - NO viene del frontend)
+            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             uploadedBy: userContext.email,
             uploadMethod: 'manual',
-            dataQuality: metric.dataQuality || 'validated',
+            
+            // ✅ ARQUITECTURA CORRECTA: dataQuality basado en uploadMethod
+            // Regla de negocio: uploadMethod='manual' → dataQuality='validated'
+            // Razón: Upload manual significa que fue validado por el usuario
+            dataQuality: 'validated',
+            
             notes: metric.notes
           }
         });

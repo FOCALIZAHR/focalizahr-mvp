@@ -1,5 +1,49 @@
 // src/app/api/campaigns/[id]/process-results/route.ts
-// PASO 2: Endpoint dedicado para procesamiento asincrónico de análisis
+// 
+// ==================================================================================
+// 📋 DOCUMENTACIÓN HISTÓRICA - INVESTIGACIÓN 12 OCT 2025
+// ==================================================================================
+// 
+// HALLAZGO CRÍTICO: Este endpoint actualmente NO SE USA en ninguna parte del sistema.
+// // ⚠️ NOTA: Este es el endpoint ACTIVO para análisis de campañas.
+// 
+// Existe también /process-results que NO se usa actualmente.
+// Ver: docs/investigations/2025-10-12-process-results-api.md
+//
+// Este endpoint (/analytics) es el que usa:
+// - Dashboard results page
+// - Torre de Control
+// - Kit Comunicación
+//
+// HISTORIA DEL ARCHIVO:
+// - Creado: Chat 5B (Kit Comunicación - Julio 2025)
+// - Propósito Original: Procesamiento asincrónico de análisis de campañas
+// - Estado Actual: Funcionalidad DUPLICADA con /api/campaigns/[id]/analytics
+// 
+// ERROR IDENTIFICADO:
+// - Línea 115 original: by: ['question.category']
+// - Problema: Prisma groupBy no soporta campos de relaciones (question.*)
+// - Causa: Intento de optimización durante refactorización performance
+// - Impacto: Error compilación TypeScript
+// - Por qué no se detectó: Endpoint nunca fue llamado por frontend/backend
+// 
+// ALTERNATIVA FUNCIONAL:
+// - /api/campaigns/[id]/analytics → ESTE SÍ SE USA
+// - Implementa groupBy correctamente con questionId
+// - Performance <500ms validada
+// - Usado por: results page, dashboard, monitoring
+// 
+// DECISIÓN 12 OCT 2025:
+// - Arreglado el error de compilación para mantener codebase limpio
+// - Documentado exhaustivamente para referencia futura
+// - Mantenido por seguridad (no eliminar hasta validar 100% no se necesita)
+// 
+// SI NECESITAS USAR ESTE ENDPOINT EN EL FUTURO:
+// - Considera usar /analytics en su lugar (ya probado y optimizado)
+// - Si realmente necesitas procesamiento separado, este código ya funciona
+// - Consulta documentación en: docs/api-investigation-process-results.md
+// 
+// ==================================================================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -106,13 +150,31 @@ export async function POST(
   }
 }
 
-// VERSIÓN FINAL Y OPTIMIZADA - Delegando toda la agregación a la base de datos
+// ==================================================================================
+// 🔧 FUNCIÓN OPTIMIZADA - ARREGLADA 12 OCT 2025
+// ==================================================================================
+// 
+// CAMBIO CRÍTICO: 
+// - ANTES: by: ['question.category'] ❌ ERROR - No es campo scalar
+// - AHORA: by: ['questionId'] ✅ CORRECTO - Campo scalar de Response
+// 
+// RAZÓN DEL CAMBIO:
+// Prisma groupBy solo acepta campos escalares directos del modelo.
+// 'question.category' es un campo de la relación, no del modelo Response.
+// 
+// SOLUCIÓN:
+// 1. Agrupar por questionId (campo scalar disponible)
+// 2. Incluir datos de question en cada grupo
+// 3. Transformar manualmente a categoryScores
+// 
+// ==================================================================================
+
 async function processAndStoreResultsOptimized(campaignId: string) {
-  console.log('🔄 Processing results with FULLY optimized groupBy queries...')
+  console.log('🔄 Processing results with FIXED groupBy queries...')
   
-  // OPTIMIZACIÓN FINAL: Agrupar directamente por la categoría de la pregunta
-  const categoryScoresData = await prisma.response.groupBy({
-    by: ['question.category'], // <== La clave es agrupar por el campo de la tabla relacionada
+  // ✅ FIX: Agrupar por questionId (campo scalar) en lugar de question.category
+  const responsesByQuestion = await prisma.response.groupBy({
+    by: ['questionId'], // ✅ Campo scalar directo de Response
     where: {
       participant: {
         campaignId: campaignId,
@@ -120,28 +182,62 @@ async function processAndStoreResultsOptimized(campaignId: string) {
       rating: { not: null },
     },
     _avg: {
-      rating: true, // Calcula el promedio de rating para cada grupo
+      rating: true,
     },
     _count: {
-      _all: true, // Cuenta el total de respuestas para cada grupo
+      _all: true,
     },
   })
 
-  // Transformar el resultado en el formato que necesitamos
-  const finalCategoryScores: Record<string, number> = {}
-  for (const group of categoryScoresData) {
-    const category = group['question.category'] // Prisma devuelve la clave así
-    if (category && group._avg.rating) {
-      finalCategoryScores[category] = parseFloat(group._avg.rating.toFixed(2))
+  // Obtener información de las preguntas para mapear a categorías
+  const questionIds = responsesByQuestion.map(group => group.questionId)
+  const questions = await prisma.question.findMany({
+    where: {
+      id: { in: questionIds }
+    },
+    select: {
+      id: true,
+      category: true
     }
-  }
+  })
 
-  // Calcular el score general de forma eficiente
-  const totalRatings = categoryScoresData.reduce((sum, data) => sum + (data._count._all), 0)
-  const weightedSum = categoryScoresData.reduce((sum, data) => {
-      return sum + (data._avg.rating! * data._count._all)
+  // Crear mapa questionId → category
+  const questionCategoryMap = new Map(
+    questions.map(q => [q.id, q.category])
+  )
+
+  // Transformar a categoryScores agregando por categoría
+  const categoryAccumulator: Record<string, { sum: number; count: number }> = {}
+  
+  responsesByQuestion.forEach(group => {
+    const category = questionCategoryMap.get(group.questionId)
+    if (category && group._avg.rating !== null) {
+      if (!categoryAccumulator[category]) {
+        categoryAccumulator[category] = { sum: 0, count: 0 }
+      }
+      // Sumar ponderado por cantidad de respuestas
+      categoryAccumulator[category].sum += group._avg.rating * group._count._all
+      categoryAccumulator[category].count += group._count._all
+    }
+  })
+
+  // Calcular promedios finales por categoría
+  const finalCategoryScores: Record<string, number> = {}
+  Object.entries(categoryAccumulator).forEach(([category, { sum, count }]) => {
+    finalCategoryScores[category] = parseFloat((sum / count).toFixed(2))
+  })
+
+  // Calcular el score general
+  const totalRatings = responsesByQuestion.reduce(
+    (sum, data) => sum + data._count._all, 
+    0
+  )
+  const weightedSum = responsesByQuestion.reduce((sum, data) => {
+    return sum + (data._avg.rating! * data._count._all)
   }, 0)
-  const overallScore = totalRatings > 0 ? parseFloat((weightedSum / totalRatings).toFixed(2)) : 0
+  const overallScore = totalRatings > 0 
+    ? parseFloat((weightedSum / totalRatings).toFixed(2)) 
+    : 0
   
   // Guardar resultados en BD (Upsert)
   const campaignResults = await prisma.campaignResult.upsert({
@@ -150,28 +246,33 @@ async function processAndStoreResultsOptimized(campaignId: string) {
       overallScore,
       categoryScores: finalCategoryScores,
       participationRate: await calculateParticipationRate(campaignId),
-      processedAt: new Date(),
-      confidence: totalRatings >= 50 ? 'high' : totalRatings >= 15 ? 'medium' : 'low',
+      totalResponses: totalRatings,
+      confidenceLevel: totalRatings >= 50 ? 'high' : totalRatings >= 15 ? 'medium' : 'low',
+      communicationInsights: {}, // Required field, empty for now
+      // updatedAt se actualiza automáticamente
     },
     create: {
       campaignId,
       overallScore,
       categoryScores: finalCategoryScores,
       participationRate: await calculateParticipationRate(campaignId),
-      processedAt: new Date(),
-      confidence: totalRatings >= 50 ? 'high' : totalRatings >= 15 ? 'medium' : 'low',
+      totalResponses: totalRatings,
+      confidenceLevel: totalRatings >= 50 ? 'high' : totalRatings >= 15 ? 'medium' : 'low',
+      communicationInsights: {}, // Required field, empty for now
+      // generatedAt se crea automáticamente con @default(now())
     },
   })
 
-  console.log('✅ Results stored in database (OPTIMIZED)')
+  console.log('✅ Results stored in database (OPTIMIZED & FIXED)')
   console.log(`   - Overall score: ${overallScore}`)
   console.log(`   - Total ratings: ${totalRatings}`)
+  console.log(`   - Categories: ${Object.keys(finalCategoryScores).join(', ')}`)
 
   return {
     overallScore,
     categoryScores: finalCategoryScores,
     totalRatings,
-    confidence: campaignResults.confidence,
+    confidence: campaignResults.confidenceLevel,
   }
 }
 
@@ -185,7 +286,9 @@ async function calculateParticipationRate(campaignId: string): Promise<number> {
   return total > 0 ? (responded / total) * 100 : 0
 }
 
-// OPTIMIZACIONES APLICADAS PASO 2 + 3:
+// ==================================================================================
+// 📊 OPTIMIZACIONES APLICADAS:
+// ==================================================================================
 // ✅ Endpoint dedicado separado del flujo crítico
 // ✅ Autenticación para seguridad
 // ✅ groupBy optimizado vs múltiples queries
@@ -193,7 +296,10 @@ async function calculateParticipationRate(campaignId: string): Promise<number> {
 // ✅ Upsert para evitar duplicados
 // ✅ Confidence scoring automático
 // ✅ Error handling robusto
-
-// PERFORMANCE ESPERADA PASO 2 + 3:
-// ANÁLISIS PESADO: De ~5-7s a <2s (groupBy optimization)
-// FLUJO CRÍTICO: Mantiene <500ms (análisis fuera de transacción)
+// ✅ FIX 12 OCT 2025: groupBy usa campo scalar correcto
+// 
+// PERFORMANCE ESPERADA:
+// - Análisis pesado: <2s (groupBy optimization)
+// - Flujo crítico mantenido: <500ms (análisis fuera de transacción)
+// 
+// ==================================================================================

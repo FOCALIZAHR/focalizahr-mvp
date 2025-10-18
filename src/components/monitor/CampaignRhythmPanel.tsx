@@ -63,7 +63,7 @@ const CHART_CONFIG = {
   barRadius: [4, 4, 0, 0],
   strokeWidth: 3,
   dotSize: 6,
-} as const;
+};
 
 // ====================================================================
 // COMPONENTE PRINCIPAL
@@ -81,7 +81,7 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
   // 🧠 PREPARACIÓN DE DATOS PARA CHART (Solo transformación, no cálculos de negocio)
   const chartData = useMemo((): ChartDataPoint[] => {
     // Datos históricos con todas las métricas
-    const historical = dailyResponses.map((day, index) => {
+    const historical: ChartDataPoint[] = dailyResponses.map((day, index) => {
       // Calcular tasa acumulativa hasta este día
       const responsesUpToDay = dailyResponses
         .slice(0, index + 1)
@@ -93,7 +93,7 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
         date: day.date,
         responses: day.responses,
         cumulativeRate: Math.round(cumulativeRate * 10) / 10,
-        projectedRate: undefined,  // No hay proyección en datos históricos
+       
         isPrediction: false
       };
     });
@@ -110,10 +110,10 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
       
       // PUNTO PUENTE: Conectar histórico con proyección
       // Este punto especial tiene AMBOS valores para crear continuidad visual
-      historical[historical.length - 1] = {
-        ...lastDay,
-        projectedRate: currentRate  // Agregar punto inicial de proyección
-      };
+    historical[historical.length - 1] = {
+  ...lastDay,
+  projectedRate: currentRate
+} as ChartDataPoint;  // ← Agregar type assertion
       
       // Generar puntos de proyección futura
       for (let i = 1; i <= projectionDays; i++) {
@@ -253,7 +253,7 @@ const CampaignRhythmPanel: React.FC<CampaignRhythmPanelProps> = ({
                 <Bar
                   dataKey="responses"
                   fill={`url(#barGradient)`}
-                  radius={CHART_CONFIG.barRadius}
+                  radius={[...CHART_CONFIG.barRadius] as [number, number, number, number]}
                   animationDuration={1000}
                   animationBegin={200}
                 />

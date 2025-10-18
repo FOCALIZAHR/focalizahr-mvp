@@ -1,0 +1,250 @@
+src/app/dashboard/admin/AdminLayoutClient.tsx(32,9): error TS2322: Type '{ showMobileMenu: boolean; onMobileMenuToggle: () => void; }' is not assignable to type 'IntrinsicAttributes'.
+  Property 'showMobileMenu' does not exist on type 'IntrinsicAttributes'.
+src/app/dashboard/campaigns/[id]/monitor/page - paratest.tsx(13,27): error TS2307: Cannot find module '@/components/monitor/CockpitHeader' or its corresponding type declarations.
+src/app/dashboard/campaigns/[id]/monitor/page - paratest.tsx(119,14): error TS2322: Type '{ error: string | null; isLoading: boolean; handleRefresh: () => void; handleSendReminder: () => Promise<void>; handleExtendCampaign: () => Promise<void>; handleSendDepartmentReminder: (department: string) => Promise<...>; ... 33 more ...; gerenciaData: GerenciaData[] | null; }' is not assignable to type 'EngagementHeatmapCardProps'.
+  Types of property 'engagementHeatmap' are incompatible.
+    Type 'EngagementHeatmapData | undefined' is not assignable to type 'EngagementHeatmapData'.
+      Type 'undefined' is not assignable to type 'EngagementHeatmapData'.
+src/app/dashboard/campaigns/[id]/monitor/page - paratest.tsx(123,14): error TS2559: Type '{ error: string | null; isLoading: boolean; handleRefresh: () => void; handleSendReminder: () => Promise<void>; handleExtendCampaign: () => Promise<void>; handleSendDepartmentReminder: (department: string) => Promise<...>; ... 33 more ...; gerenciaData: GerenciaData[] | null; }' has no properties in common with type 'IntrinsicAttributes & CrossStudyComparatorCardProps'.
+src/app/dashboard/campaigns/[id]/monitor/page - paratest.tsx(149,30): error TS2339: Property 'recommendations' does not exist on type '{ error: string | null; isLoading: boolean; handleRefresh: () => void; handleSendReminder: () => Promise<void>; handleExtendCampaign: () => Promise<void>; handleSendDepartmentReminder: (department: string) => Promise<...>; ... 33 more ...; gerenciaData: GerenciaData[] | null; }'.
+src/app/dashboard/campaigns/[id]/monitor/page - paratest.tsx(149,64): error TS7006: Parameter 'rec' implicitly has an 'any' type.
+src/app/dashboard/campaigns/[id]/monitor/page - paratest.tsx(149,69): error TS7006: Parameter 'index' implicitly has an 'any' type.
+src/app/dashboard/campaigns/[id]/monitor/page.tsx(93,13): error TS2322: Type '{ onScrollToSection: (sectionId: any) => void; error: string | null; isLoading: boolean; handleRefresh: () => void; handleSendReminder: () => Promise<void>; handleExtendCampaign: () => Promise<...>; ... 34 more ...; gerenciaData: GerenciaData[] | null; }' is not assignable to type 'IntrinsicAttributes & CockpitHeaderBimodalProps'.
+  Property 'onScrollToSection' does not exist on type 'IntrinsicAttributes & CockpitHeaderBimodalProps'.
+src/app/dashboard/campaigns/[id]/monitor/page.tsx(93,33): error TS7006: Parameter 'sectionId' implicitly has an 'any' type.
+src/app/dashboard/campaigns/[id]/monitor/page.tsx(242,28): error TS2339: Property 'recommendations' does not exist on type '{ error: string | null; isLoading: boolean; handleRefresh: () => void; handleSendReminder: () => Promise<void>; handleExtendCampaign: () => Promise<void>; handleSendDepartmentReminder: (department: string) => Promise<...>; ... 33 more ...; gerenciaData: GerenciaData[] | null; }'.
+src/app/dashboard/campaigns/[id]/results/page - copia.tsx(110,9): error TS2322: Type 'Campaign' is not assignable to type '{ id: string; name: string; status: string; campaignType: { name: string; slug: string; }; startDate: string; endDate: string; totalInvited: number; totalResponded: number; }'.
+  Types of property 'campaignType' are incompatible.
+    Type '{ id: string; name: string; slug: string; } | undefined' is not assignable to type '{ name: string; slug: string; }'.
+      Type 'undefined' is not assignable to type '{ name: string; slug: string; }'.
+src/app/dashboard/campaigns/[id]/results/page - copia.tsx(120,11): error TS2322: Type 'Analytics' is not assignable to type '{ totalInvited: number; totalResponded: number; participationRate: number; averageScore: number; completionTime: number; responseRate: number; categoryScores: Record<string, number>; trendData: { ...; }[]; }'.
+  Types of property 'trendData' are incompatible.
+    Type '{ date: string; responses: number; score?: number | undefined; cumulativeParticipation?: number | undefined; }[]' is not assignable to type '{ date: string; responses: number; score: number; }[]'.
+      Type '{ date: string; responses: number; score?: number | undefined; cumulativeParticipation?: number | undefined; }' is not assignable to type '{ date: string; responses: number; score: number; }'.
+        Types of property 'score' are incompatible.
+          Type 'number | undefined' is not assignable to type 'number'.
+            Type 'undefined' is not assignable to type 'number'.
+src/app/dashboard/campaigns/[id]/results/page - copia.tsx(125,11): error TS2322: Type '{ participationRate: any; averageScore: any; totalInvited: number; totalResponded: number; completionTime: number; responseRate: number; categoryScores: Record<string, number>; departmentScores: Record<string, number>; ... 8 more ...; trendDataByDepartment?: Record<string, any>; }' is not assignable to type '{ categoryScores?: Record<string, number> | undefined; responsesByDay?: Record<string, number> | undefined; trendData?: { date: string; responses: number; score: number; }[] | undefined; ... 4 more ...; averageScore: number; }'.
+  Types of property 'trendData' are incompatible.
+    Type '{ date: string; responses: number; score?: number | undefined; cumulativeParticipation?: number | undefined; }[]' is not assignable to type '{ date: string; responses: number; score: number; }[]'.
+      Type '{ date: string; responses: number; score?: number | undefined; cumulativeParticipation?: number | undefined; }' is not assignable to type '{ date: string; responses: number; score: number; }'.
+        Types of property 'score' are incompatible.
+          Type 'number | undefined' is not assignable to type 'number'.
+            Type 'undefined' is not assignable to type 'number'.
+src/app/dashboard/campaigns/[id]/results/page - copia.tsx(143,15): error TS2739: Type 'Record<string, number>' is missing the following properties from type '{ liderazgo: number; ambiente: number; desarrollo: number; bienestar: number; }': liderazgo, ambiente, desarrollo, bienestar
+src/app/dashboard/campaigns/[id]/results/page.tsx(160,45): error TS2339: Property 'displayName' does not exist on type '{ id: string; name: string; slug: string; }'.
+src/app/dashboard/campaigns/[id]/results/page.tsx(234,12): error TS18048: 'retentionAnalysis.businessCases.length' is possibly 'undefined'.
+src/app/dashboard/campaigns/[id]/results/page.tsx(251,70): error TS18047: 'retentionAnalysis' is possibly 'null'.
+src/app/dashboard/campaigns/[id]/results/page.tsx(252,37): error TS18047: 'retentionAnalysis' is possibly 'null'.
+src/app/dashboard/campaigns/[id]/results/page.tsx(253,32): error TS18047: 'retentionAnalysis' is possibly 'null'.
+src/app/dashboard/campaigns/[id]/results/page.tsx(259,20): error TS18047: 'retentionAnalysis' is possibly 'null'.
+src/app/dashboard/campaigns/[id]/results/page.tsx(273,18): error TS18047: 'retentionAnalysis' is possibly 'null'.
+src/app/dashboard/campaigns/[id]/results/page.tsx(277,60): error TS18047: 'retentionAnalysis' is possibly 'null'.
+src/app/dashboard/campaigns/[id]/results/page.tsx(288,33): error TS2322: Type 'Analytics' is not assignable to type '{ totalInvited: number; totalResponded: number; participationRate: number; averageScore: number; completionTime: number; responseRate: number; categoryScores: Record<string, number>; trendData: { ...; }[]; }'.
+  Types of property 'trendData' are incompatible.
+    Type '{ date: string; responses: number; score?: number | undefined; cumulativeParticipation?: number | undefined; }[]' is not assignable to type '{ date: string; responses: number; score: number; }[]'.
+      Type '{ date: string; responses: number; score?: number | undefined; cumulativeParticipation?: number | undefined; }' is not assignable to type '{ date: string; responses: number; score: number; }'.
+        Types of property 'score' are incompatible.
+          Type 'number | undefined' is not assignable to type 'number'.
+            Type 'undefined' is not assignable to type 'number'.
+src/app/dashboard/campaigns/[id]/results/page.tsx(294,34): error TS2322: Type 'Analytics' is not assignable to type '{ categoryScores?: Record<string, number> | undefined; responsesByDay?: Record<string, number> | undefined; trendData?: { date: string; responses: number; score: number; }[] | undefined; ... 4 more ...; averageScore: number; }'.
+  Types of property 'trendData' are incompatible.
+    Type '{ date: string; responses: number; score?: number | undefined; cumulativeParticipation?: number | undefined; }[]' is not assignable to type '{ date: string; responses: number; score: number; }[]'.
+      Type '{ date: string; responses: number; score?: number | undefined; cumulativeParticipation?: number | undefined; }' is not assignable to type '{ date: string; responses: number; score: number; }'.
+        Types of property 'score' are incompatible.
+          Type 'number | undefined' is not assignable to type 'number'.
+            Type 'undefined' is not assignable to type 'number'.
+src/app/dashboard/campaigns/[id]/results/page.tsx(313,17): error TS2739: Type 'Record<string, number>' is missing the following properties from type '{ liderazgo: number; ambiente: number; desarrollo: number; bienestar: number; }': liderazgo, ambiente, desarrollo, bienestar
+src/app/dashboard/page.tsx(139,50): error TS2345: Argument of type 'import("C:/Users/PC/focalizahr-mvp/src/types/index").Campaign[]' is not assignable to parameter of type 'Campaign[]'.
+  Type 'import("C:/Users/PC/focalizahr-mvp/src/types/index").Campaign' is not assignable to type 'Campaign'.
+    Types of property 'campaignType' are incompatible.
+      Type '{ id: string; name: string; slug: string; } | undefined' is not assignable to type '{ name: string; slug: string; }'.
+        Type 'undefined' is not assignable to type '{ name: string; slug: string; }'.
+src/components/admin/AccountsTable.tsx(298,25): error TS2322: Type '"success" | "warning" | "secondary" | "outline" | "destructive"' is not assignable to type '"default" | "secondary" | "outline" | "destructive" | null | undefined'.
+  Type '"success"' is not assignable to type '"default" | "secondary" | "outline" | "destructive" | null | undefined'.
+src/components/admin/DemographicsStats.tsx(163,23): error TS2322: Type '{ value: number; className: string; indicatorClassName: string; }' is not assignable to type 'IntrinsicAttributes & ProgressProps & RefAttributes<HTMLDivElement>'.
+  Property 'indicatorClassName' does not exist on type 'IntrinsicAttributes & ProgressProps & RefAttributes<HTMLDivElement>'.
+src/components/admin/ParticipantUploader/DemographicsStats.tsx(123,23): error TS2322: Type '{ value: number; className: string; indicatorClassName: string; }' is not assignable to type 'IntrinsicAttributes & ProgressProps & RefAttributes<HTMLDivElement>'.
+  Property 'indicatorClassName' does not exist on type 'IntrinsicAttributes & ProgressProps & RefAttributes<HTMLDivElement>'.
+src/components/dashboard/AlertsPanel.tsx(47,34): error TS2551: Property 'toLocaleTimeString' does not exist on type 'string | Date'. Did you mean 'toLocaleString'?
+  Property 'toLocaleTimeString' does not exist on type 'string'.
+src/components/dashboard/CampaignsList.tsx(396,30): error TS18048: 'campaign.campaignType' is possibly 'undefined'.
+src/components/dashboard/CampaignsList.tsx(403,48): error TS2345: Argument of type 'import("C:/Users/PC/focalizahr-mvp/src/types/index").Campaign' is not assignable to parameter of type 'Campaign'.
+  Types of property 'campaignType' are incompatible.
+    Type '{ id: string; name: string; slug: string; } | undefined' is not assignable to type '{ name: string; slug: string; }'.
+      Type 'undefined' is not assignable to type '{ name: string; slug: string; }'.
+src/components/dashboard/CampaignsList.tsx(441,25): error TS2322: Type 'import("C:/Users/PC/focalizahr-mvp/src/types/index").Campaign' is not assignable to type 'Campaign'.
+  Types of property 'startDate' are incompatible.
+    Type 'string | Date' is not assignable to type 'string'.
+      Type 'Date' is not assignable to type 'string'.
+src/components/metrics/ExcelDropzone.tsx(269,17): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/components/monitor/CampaignRhythmPanel.tsx(115,9): error TS2322: Type 'number' is not assignable to type 'undefined'.
+src/components/monitor/CampaignRhythmPanel.tsx(256,19): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: Props): Bar', gave the following error.
+    Type 'readonly [4, 4, 0, 0]' is not assignable to type 'number | [number, number, number, number] | undefined'.
+      The type 'readonly [4, 4, 0, 0]' is 'readonly' and cannot be assigned to the mutable type '[number, number, number, number]'.
+  Overload 2 of 2, '(props: Props, context: any): Bar', gave the following error.
+    Type 'readonly [4, 4, 0, 0]' is not assignable to type 'number | [number, number, number, number] | undefined'.
+      The type 'readonly [4, 4, 0, 0]' is 'readonly' and cannot be assigned to the mutable type '[number, number, number, number]'.
+src/components/monitor/cockpit/PredictiveHeader.tsx(344,26): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ cr├¡tica: string; alta: string; media: string; baja: string; }'.
+src/components/monitor/cockpit/PredictiveView.tsx(328,26): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ cr├¡tica: string; alta: string; media: string; baja: string; }'.
+src/components/monitor/cockpit/Premium3DGauge.tsx(187,18): error TS2345: Argument of type 'Arc<any, DefaultArcObject>' is not assignable to parameter of type 'string | number | boolean | readonly (string | number)[] | ValueFn<SVGPathElement, unknown, string | number | boolean | readonly (string | number)[] | null> | null'.
+  Type 'Arc<any, DefaultArcObject>' is not assignable to type 'ValueFn<SVGPathElement, unknown, string | number | boolean | readonly (string | number)[] | null>'.
+    Types of parameters 'd' and 'datum' are incompatible.
+      Type 'unknown' is not assignable to type 'DefaultArcObject'.
+src/components/monitor/cockpit/Premium3DGauge.tsx(223,20): error TS2555: Expected at least 1 arguments, but got 0.
+src/components/monitor/cockpit/Premium3DGauge.tsx(227,30): error TS2345: Argument of type 'Arc<any, DefaultArcObject>' is not assignable to parameter of type 'string | number | boolean | readonly (string | number)[] | ValueFn<SVGPathElement, unknown, string | number | boolean | readonly (string | number)[] | null> | null'.
+  Type 'Arc<any, DefaultArcObject>' is not assignable to type 'ValueFn<SVGPathElement, unknown, string | number | boolean | readonly (string | number)[] | null>'.
+    Types of parameters 'd' and 'datum' are incompatible.
+      Type 'unknown' is not assignable to type 'DefaultArcObject'.
+src/components/monitor/cockpit/Premium3DGauge.tsx(240,20): error TS2345: Argument of type 'Arc<any, DefaultArcObject>' is not assignable to parameter of type 'string | number | boolean | readonly (string | number)[] | ValueFn<SVGPathElement, unknown, string | number | boolean | readonly (string | number)[] | null> | null'.
+  Type 'Arc<any, DefaultArcObject>' is not assignable to type 'ValueFn<SVGPathElement, unknown, string | number | boolean | readonly (string | number)[] | null>'.
+    Types of parameters 'd' and 'datum' are incompatible.
+      Type 'unknown' is not assignable to type 'DefaultArcObject'.
+src/components/monitor/cockpit/Premium3DGauge.tsx(296,29): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(data: Iterable<[number, number]> | [number, number][]): string | null', gave the following error.
+    Argument of type 'number[][]' is not assignable to parameter of type 'Iterable<[number, number]> | [number, number][]'.
+      Type 'number[][]' is not assignable to type '[number, number][]'.
+        Type 'number[]' is not assignable to type '[number, number]'.
+          Target requires 2 element(s) but source may have fewer.
+  Overload 2 of 2, '(data: Iterable<[number, number]> | [number, number][]): void', gave the following error.
+    Argument of type 'number[][]' is not assignable to parameter of type 'Iterable<[number, number]> | [number, number][]'.
+      Type 'number[][]' is not assignable to type '[number, number][]'.
+        Type 'number[]' is not assignable to type '[number, number]'.
+          Target requires 2 element(s) but source may have fewer.
+src/components/monitor/CockpitHeaderBimodal.tsx(332,12): error TS2322: Type '{ isActive: true; campaignName: string; participationRate: number; daysRemaining: number; totalInvited: number; totalResponded: number; dailyResponses?: { date: string; count: number; cumulative: number; }[] | undefined; ... 4 more ...; onNavigate?: ((section: string) => void) | undefined; }' is not assignable to type 'PredictiveHeaderProps'.
+  Types of property 'dailyResponses' are incompatible.
+    Type '{ date: string; count: number; cumulative: number; }[] | undefined' is not assignable to type '{ date: string; count: number; cumulative: number; }[]'.
+      Type 'undefined' is not assignable to type '{ date: string; count: number; cumulative: number; }[]'.
+src/components/monitor/CockpitHeaderBimodal.tsx(339,13): error TS2322: Type '{ isActive: boolean; campaignName: string; participationRate: number; daysRemaining: number; totalInvited: number; totalResponded: number; dailyResponses?: { date: string; count: number; cumulative: number; }[] | undefined; ... 4 more ...; onNavigate?: ((section: string) => void) | undefined; }' is not assignable to type 'IntrinsicAttributes & DynamicHeaderProps'.
+  Property 'isActive' does not exist on type 'IntrinsicAttributes & DynamicHeaderProps'.
+src/components/monitor/CrossStudyComparatorCard.tsx(202,12): error TS18048: 'recommendations' is possibly 'undefined'.
+src/components/monitor/CrossStudyComparatorCard.tsx(205,159): error TS18048: 'comp' is possibly 'undefined'.
+src/components/monitor/gerencia/GerenciaCompetitivoView.tsx(493,47): error TS2339: Property 'projection' does not exist on type 'DepartmentChild'.
+src/components/monitor/gerencia/GerenciaCompetitivoView.tsx(494,57): error TS2339: Property 'projection' does not exist on type 'DepartmentChild'.
+src/components/monitor/GerenciaPulseBimodal.tsx(12,41): error TS2307: Cannot find module './GerenciaCompetitivoView' or its corresponding type declarations.
+src/components/monitor/GerenciaPulseBimodal.tsx(13,40): error TS2307: Cannot find module './GerenciaFocalizadoView' or its corresponding type declarations.
+src/components/monitor/MomentumSparklines.tsx(3,47): error TS2304: Cannot find name 'DepartmentMomentumData'.
+src/components/monitor/MomentumSparklines.tsx(29,44): error TS7006: Parameter 'dept' implicitly has an 'any' type.
+src/components/monitor/MomentumSparklines.tsx(29,50): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/components/monitor/WOWStandards.tsx(117,71): error TS7053: Element implicitly has an 'any' type because expression of type '"info" | "success" | "warning" | "danger"' can't be used to index type '{ xl: string; lg: string; md: string; success: string; warning: string; danger: string; }'.
+  Property 'info' does not exist on type '{ xl: string; lg: string; md: string; success: string; warning: string; danger: string; }'.
+src/components/structure/StructureTreeView.tsx(305,97): error TS2339: Property 'backgroundColor' does not exist on type 'string'.
+src/components/survey/renderers/MultipleChoiceRenderer.tsx(34,7): error TS2322: Type '{ initial: { opacity: number; y: number; }; animate: { opacity: number; y: number; transition: { duration: number; ease: string; }; }; exit: { opacity: number; y: number; }; }' is not assignable to type 'Variants'.
+  Property 'animate' is incompatible with index signature.
+    Type '{ opacity: number; y: number; transition: { duration: number; ease: string; }; }' is not assignable to type 'Variant'.
+      Type '{ opacity: number; y: number; transition: { duration: number; ease: string; }; }' is not assignable to type 'TargetAndTransition'.
+        Type '{ opacity: number; y: number; transition: { duration: number; ease: string; }; }' is not assignable to type '{ transition?: Transition<any> | undefined; transitionEnd?: ResolvedValues | undefined; }'.
+          Types of property 'transition' are incompatible.
+            Type '{ duration: number; ease: string; }' is not assignable to type 'Transition<any> | undefined'.
+              Type '{ duration: number; ease: string; }' is not assignable to type 'TransitionWithValueOverrides<any>'.
+                Type '{ duration: number; ease: string; }' is not assignable to type 'ValueAnimationTransition<any>'.
+                  Types of property 'ease' are incompatible.
+                    Type 'string' is not assignable to type 'Easing | Easing[] | undefined'.
+src/components/survey/renderers/RatingMatrixRenderer.tsx(40,7): error TS2322: Type '{ initial: { opacity: number; y: number; }; animate: { opacity: number; y: number; transition: { duration: number; ease: string; }; }; exit: { opacity: number; y: number; }; }' is not assignable to type 'Variants'.
+  Property 'animate' is incompatible with index signature.
+    Type '{ opacity: number; y: number; transition: { duration: number; ease: string; }; }' is not assignable to type 'Variant'.
+      Type '{ opacity: number; y: number; transition: { duration: number; ease: string; }; }' is not assignable to type 'TargetAndTransition'.
+        Type '{ opacity: number; y: number; transition: { duration: number; ease: string; }; }' is not assignable to type '{ transition?: Transition<any> | undefined; transitionEnd?: ResolvedValues | undefined; }'.
+          Types of property 'transition' are incompatible.
+            Type '{ duration: number; ease: string; }' is not assignable to type 'Transition<any> | undefined'.
+              Type '{ duration: number; ease: string; }' is not assignable to type 'TransitionWithValueOverrides<any>'.
+                Type '{ duration: number; ease: string; }' is not assignable to type 'ValueAnimationTransition<any>'.
+                  Types of property 'ease' are incompatible.
+                    Type 'string' is not assignable to type 'Easing | Easing[] | undefined'.
+src/components/survey/renderers/RatingScaleRenderer.tsx(26,7): error TS2322: Type '{ initial: { scale: number; opacity: number; }; animate: { scale: number; opacity: number; transition: { duration: number; ease: string; }; }; exit: { scale: number; opacity: number; }; }' is not assignable to type 'Variants'.
+  Property 'animate' is incompatible with index signature.
+    Type '{ scale: number; opacity: number; transition: { duration: number; ease: string; }; }' is not assignable to type 'Variant'.
+      Type '{ scale: number; opacity: number; transition: { duration: number; ease: string; }; }' is not assignable to type 'TargetAndTransition'.
+        Type '{ scale: number; opacity: number; transition: { duration: number; ease: string; }; }' is not assignable to type '{ transition?: Transition<any> | undefined; transitionEnd?: ResolvedValues | undefined; }'.
+          Types of property 'transition' are incompatible.
+            Type '{ duration: number; ease: string; }' is not assignable to type 'Transition<any> | undefined'.
+              Type '{ duration: number; ease: string; }' is not assignable to type 'TransitionWithValueOverrides<any>'.
+                Type '{ duration: number; ease: string; }' is not assignable to type 'ValueAnimationTransition<any>'.
+                  Types of property 'ease' are incompatible.
+                    Type 'string' is not assignable to type 'Easing | Easing[] | undefined'.
+src/components/survey/renderers/SingleChoiceRenderer.tsx(22,7): error TS2322: Type '{ initial: { opacity: number; y: number; }; animate: { opacity: number; y: number; transition: { duration: number; ease: string; }; }; exit: { opacity: number; y: number; }; }' is not assignable to type 'Variants'.
+  Property 'animate' is incompatible with index signature.
+    Type '{ opacity: number; y: number; transition: { duration: number; ease: string; }; }' is not assignable to type 'Variant'.
+      Type '{ opacity: number; y: number; transition: { duration: number; ease: string; }; }' is not assignable to type 'TargetAndTransition'.
+        Type '{ opacity: number; y: number; transition: { duration: number; ease: string; }; }' is not assignable to type '{ transition?: Transition<any> | undefined; transitionEnd?: ResolvedValues | undefined; }'.
+          Types of property 'transition' are incompatible.
+            Type '{ duration: number; ease: string; }' is not assignable to type 'Transition<any> | undefined'.
+              Type '{ duration: number; ease: string; }' is not assignable to type 'TransitionWithValueOverrides<any>'.
+                Type '{ duration: number; ease: string; }' is not assignable to type 'ValueAnimationTransition<any>'.
+                  Types of property 'ease' are incompatible.
+                    Type 'string' is not assignable to type 'Easing | Easing[] | undefined'.
+src/components/survey/renderers/TextOpenRenderer.tsx(22,7): error TS2322: Type '{ initial: { opacity: number; y: number; }; animate: { opacity: number; y: number; transition: { duration: number; ease: string; }; }; exit: { opacity: number; y: number; }; }' is not assignable to type 'Variants'.
+  Property 'animate' is incompatible with index signature.
+    Type '{ opacity: number; y: number; transition: { duration: number; ease: string; }; }' is not assignable to type 'Variant'.
+      Type '{ opacity: number; y: number; transition: { duration: number; ease: string; }; }' is not assignable to type 'TargetAndTransition'.
+        Type '{ opacity: number; y: number; transition: { duration: number; ease: string; }; }' is not assignable to type '{ transition?: Transition<any> | undefined; transitionEnd?: ResolvedValues | undefined; }'.
+          Types of property 'transition' are incompatible.
+            Type '{ duration: number; ease: string; }' is not assignable to type 'Transition<any> | undefined'.
+              Type '{ duration: number; ease: string; }' is not assignable to type 'TransitionWithValueOverrides<any>'.
+                Type '{ duration: number; ease: string; }' is not assignable to type 'ValueAnimationTransition<any>'.
+                  Types of property 'ease' are incompatible.
+                    Type 'string' is not assignable to type 'Easing | Easing[] | undefined'.
+src/components/survey/sections/WelcomeScreen.tsx(142,19): error TS2367: This comparison appears to be unintentional because the types '0' and '1' have no overlap.
+src/components/survey/sections/WelcomeScreen.tsx(267,67): error TS2367: This comparison appears to be unintentional because the types '1' and '0' have no overlap.
+src/components/survey/UnifiedSurveyComponent.tsx(169,11): error TS2322: Type 'ValidationRule | null | undefined' is not assignable to type 'ValidationRule | undefined'.
+  Type 'null' is not assignable to type 'ValidationRule | undefined'.
+src/components/survey/UnifiedSurveyComponent.tsx(223,9): error TS2322: Type '{ companyName: string; campaignName: string; campaignTypeName: string; progress: { current: number; total: number; percentage: number; message: string; }; estimatedDuration: number; }' is not assignable to type 'IntrinsicAttributes & SurveyHeaderProps'.
+  Property 'campaignTypeName' does not exist on type 'IntrinsicAttributes & SurveyHeaderProps'. Did you mean 'campaignName'?
+src/components/survey/UnifiedSurveyComponent.tsx(236,17): error TS2353: Object literal may only specify known properties, and 'id' does not exist in type '{ name: string; displayName: string; description?: string | undefined; icon?: string | undefined; questionCount?: number | undefined; }'.
+src/components/survey/UnifiedSurveyComponent.tsx(249,15): error TS2322: Type '{ initial: { opacity: number; y: number; }; animate: { opacity: number; y: number; transition: { duration: number; ease: string; }; }; exit: { opacity: number; y: number; }; }' is not assignable to type 'Variants'.
+  Property 'animate' is incompatible with index signature.
+    Type '{ opacity: number; y: number; transition: { duration: number; ease: string; }; }' is not assignable to type 'Variant'.
+      Type '{ opacity: number; y: number; transition: { duration: number; ease: string; }; }' is not assignable to type 'TargetAndTransition'.
+        Type '{ opacity: number; y: number; transition: { duration: number; ease: string; }; }' is not assignable to type '{ transition?: Transition<any> | undefined; transitionEnd?: ResolvedValues | undefined; }'.
+          Types of property 'transition' are incompatible.
+            Type '{ duration: number; ease: string; }' is not assignable to type 'Transition<any> | undefined'.
+              Type '{ duration: number; ease: string; }' is not assignable to type 'TransitionWithValueOverrides<any>'.
+                Type '{ duration: number; ease: string; }' is not assignable to type 'ValueAnimationTransition<any>'.
+                  Types of property 'ease' are incompatible.
+                    Type 'string' is not assignable to type 'Easing | Easing[] | undefined'.
+src/engines/RetentionEngine.ts(12,33): error TS2307: Cannot find module '@/services/AnalyticsService' or its corresponding type declarations.
+src/engines/RetentionEngine.ts(63,15): error TS18046: 'score' is of type 'unknown'.
+src/hooks/useCampaignMonitor.ts(340,87): error TS2345: Argument of type 'CrossStudyComparison | undefined' is not assignable to parameter of type '{ patternSimilarity?: number | undefined; } | undefined'.
+  Type 'CrossStudyComparison' has no properties in common with type '{ patternSimilarity?: number | undefined; }'.
+src/hooks/useCampaignMonitor.ts(870,11): error TS2322: Type '{ topPerformers: never[]; attentionNeeded: never[]; totalDepartments: number; averageRate: number; excellentCount: number; criticalCount: number; allDepartments: never[]; hasRealData: false; scenarioType: "NO_DATA"; displayMessage: string; } | { ...; }' is not assignable to type 'DepartmentalIntelligence'.
+  Type '{ topPerformers: { rank: number; medal: string; status: string; name: string; participationRate: number; count: number; total: number; }[]; attentionNeeded: { urgency: string; action: string; icon: string; name: string; participationRate: number; count: number; total: number; }[]; ... 7 more ...; displayMessage: str...' is not assignable to type 'DepartmentalIntelligence'.
+    Types of property 'attentionNeeded' are incompatible.
+      Type '{ urgency: string; action: string; icon: string; name: string; participationRate: number; count: number; total: number; }[]' is not assignable to type '{ name: string; participationRate: number; count: number; total: number; urgency: "medium" | "high" | "critical"; action: "llamar" | "recordar" | "seguimiento"; icon: "­ƒÜ¿" | "ÔÜí" | "ÔÜá´©Å"; }[]'.
+        Type '{ urgency: string; action: string; icon: string; name: string; participationRate: number; count: number; total: number; }' is not assignable to type '{ name: string; participationRate: number; count: number; total: number; urgency: "medium" | "high" | "critical"; action: "llamar" | "recordar" | "seguimiento"; icon: "­ƒÜ¿" | "ÔÜí" | "ÔÜá´©Å"; }'.
+          Types of property 'urgency' are incompatible.
+            Type 'string' is not assignable to type '"medium" | "high" | "critical"'.
+src/hooks/useCampaignMonitor.ts(1063,71): error TS2345: Argument of type 'import("C:/Users/PC/focalizahr-mvp/src/types/index").Participant[]' is not assignable to parameter of type 'import("C:/Users/PC/focalizahr-mvp/src/lib/services/PatternDetector").Participant[]'.
+  Type 'Participant' is missing the following properties from type 'Participant': gender, dateOfBirth, hireDate
+src/hooks/useCampaignMonitor.ts(1064,72): error TS2345: Argument of type 'import("C:/Users/PC/focalizahr-mvp/src/types/index").Participant[]' is not assignable to parameter of type 'import("C:/Users/PC/focalizahr-mvp/src/lib/services/PatternDetector").Participant[]'.
+  Type 'Participant' is missing the following properties from type 'Participant': gender, dateOfBirth, hireDate
+src/hooks/useCampaignMonitor.ts(1068,9): error TS2345: Argument of type 'import("C:/Users/PC/focalizahr-mvp/src/types/index").Participant[]' is not assignable to parameter of type 'import("C:/Users/PC/focalizahr-mvp/src/lib/services/PatternDetector").Participant[]'.
+  Type 'Participant' is missing the following properties from type 'Participant': gender, dateOfBirth, hireDate
+src/hooks/useCampaignMonitor.ts(1113,7): error TS2345: Argument of type '{ department: string; rate: number; type: "negative_outlier"; severity: string; zScore: number; }[]' is not assignable to parameter of type '{ department: string; rate: number; severity: "medium" | "high"; zScore: number; }[]'.
+  Type '{ department: string; rate: number; type: "negative_outlier"; severity: string; zScore: number; }' is not assignable to type '{ department: string; rate: number; severity: "medium" | "high"; zScore: number; }'.
+    Types of property 'severity' are incompatible.
+      Type 'string' is not assignable to type '"medium" | "high"'.
+src/hooks/useCampaignMonitor.ts(1148,7): error TS2322: Type '{ department: string; rate: number; type: "negative_outlier"; severity: string; zScore: number; }[]' is not assignable to type 'DepartmentAnomalyData[]'.
+  Type '{ department: string; rate: number; type: "negative_outlier"; severity: string; zScore: number; }' is not assignable to type 'DepartmentAnomalyData'.
+    Types of property 'severity' are incompatible.
+      Type 'string' is not assignable to type '"medium" | "high"'.
+src/hooks/useCampaignMonitor.ts(1177,7): error TS2322: Type '{ id: string; displayName: string; unitType: string; level: number; score: number; participants: number; employeeCount?: number | undefined; children: { id: string; displayName: string; unitType: string; ... 4 more ...; rate: number; }[]; }[] | null' is not assignable to type 'GerenciaData[] | null'.
+  Type '{ id: string; displayName: string; unitType: string; level: number; score: number; participants: number; employeeCount?: number | undefined; children: { id: string; displayName: string; unitType: string; ... 4 more ...; rate: number; }[]; }[]' is not assignable to type 'GerenciaData[]'.
+    Type '{ id: string; displayName: string; unitType: string; level: number; score: number; participants: number; employeeCount?: number | undefined; children: { id: string; displayName: string; unitType: string; ... 4 more ...; rate: number; }[]; }' is missing the following properties from type 'GerenciaData': name, departments, totalInvited, totalResponded, percentage
+src/hooks/useParticipantUpload/index.ts(263,7): error TS2322: Type 'number | null' is not assignable to type 'number | undefined'.
+  Type 'null' is not assignable to type 'number | undefined'.
+src/hooks/useRetentionAnalysis.ts(7,10): error TS2724: '"@/hooks/useCampaignResults"' has no exported member named 'CampaignResultsData'. Did you mean 'useCampaignResults'?
+src/hooks/useTemplateSelection.ts(3,75): error TS2307: Cannot find module '@/services/TemplateService' or its corresponding type declarations.
+src/hooks/useTemplateSelection.ts(4,34): error TS2307: Cannot find module '@/services/AnalyticsService' or its corresponding type declarations.
+src/hooks/useTemplateSelection.ts(5,10): error TS2724: '"./useCampaignResults"' has no exported member named 'CampaignResultsData'. Did you mean 'useCampaignResults'?
+src/hooks/useTemplateSelection.ts(102,56): error TS7006: Parameter 'template' implicitly has an 'any' type.
+src/hooks/useTemplateSelection.ts(121,41): error TS2552: Cannot find name 'campaignResults'. Did you mean 'CampaignResultsData'?
+src/hooks/useTemplateSelection.ts(190,7): error TS2571: Object is of type 'unknown'.
+src/hooks/useTemplateSelection.ts(190,17): error TS2571: Object is of type 'unknown'.
+src/hooks/useTemplateSelection.ts(193,7): error TS2571: Object is of type 'unknown'.
+src/hooks/useTemplateSelection.ts(193,17): error TS2571: Object is of type 'unknown'.
+src/hooks/useTemplateSelection.ts(196,9): error TS2571: Object is of type 'unknown'.
+src/hooks/useTemplateSelection.ts(201,69): error TS2571: Object is of type 'unknown'.
+src/hooks/useTemplateSelection.ts(206,9): error TS2571: Object is of type 'unknown'.
+src/hooks/useTemplateSelection.ts(211,81): error TS2571: Object is of type 'unknown'.
+src/test-header/page.tsx(2,38): error TS2307: Cannot find module './HeaderExecutiveDashboard' or its corresponding type declarations.

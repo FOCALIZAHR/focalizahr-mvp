@@ -31,14 +31,14 @@ export async function POST(request: NextRequest) {
   try {
     // ✅ VERIFICAR AUTENTICACIÓN
     const authResult = await verifyJWT(request);
-    if (!authResult.valid || !authResult.decoded?.accountId) {
+    if (!authResult.success || !authResult.user?.accountId) {
       return NextResponse.json(
         { success: false, error: 'No autorizado' },
         { status: 401 }
       );
     }
 
-    const accountId = authResult.decoded.accountId;
+    const accountId = authResult.user.accountId || authResult.user.id;
 
     // ✅ PARSEAR BODY REQUEST
     const body: TemplateUsageRequest = await request.json();
@@ -69,7 +69,8 @@ export async function POST(request: NextRequest) {
         accountId: accountId
       },
       include: {
-        company: true
+        account: true,
+        campaignType: true  // ✅ AGREGAR ESTA LÍNEA
       }
     });
 
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest) {
       newValues: {
         templateId,
         finalText,
-        companyName: companyName || campaign.company?.name,
+        companyName: companyName || campaign.account?.companyName,
         industry: industry || 'General',
         originalText: template.templateText,
         wasModified: finalText !== template.templateText,
@@ -151,8 +152,8 @@ export async function POST(request: NextRequest) {
       totalUsage: template.usageCount + 1,
       isCustomized: finalText !== template.templateText,
       textLength: finalText.length,
-      company: campaign.company?.name,
-      campaignType: campaign.type
+      company: campaign.account?.companyName,
+      campaignType: campaign.campaignType?.name
     };
 
     // ✅ RESPUESTA EXITOSA
@@ -178,7 +179,9 @@ export async function POST(request: NextRequest) {
       { 
         success: false, 
         error: 'Error interno del servidor',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        details: process.env.NODE_ENV === 'development'
+          ? (error instanceof Error ? error.message : 'Unknown error')
+          : undefined
       },
       { status: 500 }
     );
@@ -190,14 +193,14 @@ export async function GET(request: NextRequest) {
   try {
     // ✅ VERIFICAR AUTENTICACIÓN
     const authResult = await verifyJWT(request);
-    if (!authResult.valid || !authResult.decoded?.accountId) {
+    if (!authResult.success || !authResult.user?.accountId) {
       return NextResponse.json(
         { success: false, error: 'No autorizado' },
         { status: 401 }
       );
     }
 
-    const accountId = authResult.decoded.accountId;
+    const accountId = authResult.user.accountId || authResult.user.id;
     const { searchParams } = new URL(request.url);
     const campaignId = searchParams.get('campaignId');
 
@@ -274,7 +277,9 @@ export async function GET(request: NextRequest) {
       { 
         success: false, 
         error: 'Error interno del servidor',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        details: process.env.NODE_ENV === 'development'
+          ? (error instanceof Error ? error.message : 'Unknown error')
+          : undefined
       },
       { status: 500 }
     );

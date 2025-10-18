@@ -165,8 +165,14 @@ export async function GET(request: NextRequest) {
 
     // ✅ PASO 6: CALCULAR COMPARACIÓN ACTUAL SI SE PROPORCIONA
     let currentComparison = null;
+    console.log('🔍 [API] currentCampaignId:', currentCampaignId);
+    console.log('🔍 [API] processedData.length:', processedData.length);
+    console.log('🔍 [API] ¿Entra al if?', !!(currentCampaignId && processedData.length > 0));
+
     if (currentCampaignId && processedData.length > 0) {
       try {
+        console.log('🔍 [API] Iniciando cálculo de comparación...');
+        
         // Obtener datos de la campaña actual
         const currentCampaign = await prisma.campaign.findUnique({
           where: { id: currentCampaignId },
@@ -176,6 +182,8 @@ export async function GET(request: NextRequest) {
             }
           }
         });
+
+        console.log('🔍 [API] currentCampaign encontrada:', !!currentCampaign);
 
         if (currentCampaign) {
           // Obtener datos de participación actual
@@ -188,15 +196,38 @@ export async function GET(request: NextRequest) {
             }
           });
 
+          // 🔍 LOGS AGREGADOS PARA DEBUG
+          console.log('🔍 [API] Participantes actuales:', currentParticipants.length);
+          console.log('🔍 [API] campaignType actual:', JSON.stringify(currentCampaign.campaignType));
+          console.log('🔍 [API] Campañas históricas disponibles:', processedData.map(h => ({
+            name: h.name,
+            slug: h.campaignType.slug,
+            typeName: h.campaignType.name
+          })));
+
           const currentTotal = currentParticipants.length;
           const currentResponded = currentParticipants.filter(p => p.hasResponded).length;
           const currentRate = currentTotal > 0 ? (currentResponded / currentTotal) * 100 : 0;
 
-          // Buscar campaña histórica del mismo tipo
-          const matchingHistorical = processedData.find(h => 
+          console.log('🔍 [API] Buscando match con slug:', currentCampaign.campaignType?.slug);
+          console.log('🔍 [API] Buscando match con name:', currentCampaign.campaignType?.name);
+
+          // Buscar campaña histórica del mismo tipo (preferencia)
+          let matchingHistorical = processedData.find(h => 
             h.campaignType.slug === currentCampaign.campaignType?.slug ||
             h.campaignType.name === currentCampaign.campaignType?.name
           );
+
+          // FALLBACK: Si no hay del mismo tipo, usar la más reciente (primera en array)
+          if (!matchingHistorical && processedData.length > 0) {
+            matchingHistorical = processedData[0];
+            console.log('🔍 [API] ⚠️ No hay match exacto, usando campaña más reciente como referencia');
+          }
+
+          console.log('🔍 [API] matchingHistorical encontrada:', !!matchingHistorical);
+          if (matchingHistorical) {
+            console.log('🔍 [API] ✅ Usando como referencia:', matchingHistorical.name, `(${matchingHistorical.campaignType.name})`);
+          }
 
           if (matchingHistorical) {
             // Calcular velocidad actual
@@ -264,6 +295,8 @@ export async function GET(request: NextRequest) {
               insights,
               recommendations
             };
+
+            console.log('🔍 [API] ✅ Comparación calculada exitosamente');
           }
         }
       } catch (error) {
@@ -272,11 +305,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    console.log('🔍 [API] currentComparison antes del return:', currentComparison ? 'EXISTE' : 'NULL');
+
     return NextResponse.json({
       campaigns: processedData,
       total: processedData.length,
       lastUpdated: new Date().toISOString(),
-      ...(currentComparison && { currentComparison })
+      ...(currentComparison && { crossStudyComparison: currentComparison })
     });
 
   } catch (error) {

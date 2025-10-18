@@ -156,7 +156,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     // ✅ ¡AQUÍ ESTÁ LA CORRECCIÓN CLAVE!
     // Si companyLogo es un string vacío, lo convertimos a null antes de enviar.
     if (updateData.companyLogo === '') {
-      updateData.companyLogo = null;
+      updateData.companyLogo = undefined;
     }
 
     const response = await fetch(`/api/admin/accounts/${accountId}`, {

@@ -9,6 +9,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key-focalizahr-202
 
 export interface JWTPayload {
   id: string
+  accountId?: string  // ← AGREGAR ESTA LÍNEA
   adminEmail: string
   adminName: string
   companyName: string

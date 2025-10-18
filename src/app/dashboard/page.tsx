@@ -34,30 +34,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import DashboardNavigation from '@/components/dashboard/DashboardNavigation';
 import MetricsCards from '@/components/dashboard/MetricsCards';
 import CampaignsList from '@/components/dashboard/CampaignsList';
+import type { Campaign } from '@/types';
 import { useCampaignsContext } from '@/context/CampaignsContext';
 
-// Tipos de datos (consistentes con plataforma)
-interface Campaign {
-  id: string;
-  name: string;
-  status: 'draft' | 'active' | 'completed' | 'cancelled';
-  campaignType: {
-    name: string;
-    slug: string;
-  };
-  totalInvited: number;
-  totalResponded: number;
-  participationRate: number;
-  startDate: string;
-  endDate: string;
-  canActivate?: boolean;
-  canViewResults?: boolean;
-  isOverdue?: boolean;
-  daysRemaining?: number;
-  riskLevel?: 'low' | 'medium' | 'high';
-  lastActivity?: string;
-  completionTrend?: 'up' | 'down' | 'stable';
-}
+
 
 interface Metrics {
   totalCampaigns: number;

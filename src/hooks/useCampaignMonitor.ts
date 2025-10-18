@@ -50,25 +50,28 @@ interface HistoricalDataResponse {
 // ====================================================================
 // 🏢 CAMBIO 1: AGREGAR INTERFACE PARA DATOS DE GERENCIA
 // ====================================================================
+// ✅ REEMPLAZAR POR ESTO (interface correcta):
 interface GerenciaData {
   id: string;
-  name: string;
-  departments: Array<{
+  displayName: string;
+  participants: number;
+  responded: number;
+  scoreNum: number;      // CAMBIAR de: score: string
+  rateNum: number;       // CAMBIAR de: rate: string
+  children: Array<{
     id: string;
-    name: string;
-    percentage: number;
+    displayName: string;
+    scoreNum: number;    // CAMBIO: era 'score: string'
+    rateNum: number;     // CAMBIO: era 'rate: string'
     responded: number;
-    invited: number;
-    status: 'excellent' | 'good' | 'warning' | 'critical';
+    participants: number;
   }>;
-  totalInvited: number;
-  totalResponded: number;
-  percentage: number;
-  momentum?: number;
+  // Campos opcionales de IA
+  trend?: 'acelerando' | 'desacelerando' | 'estable' | 'crítico' | null;
   velocity?: number;
   projection?: number;
+  position?: number;
 }
-
 // ====================================================================
 // 🧠 COCKPIT INTELLIGENCE - TRASPLANTE DE CEREBRO DIRECTO
 // TODAS LAS FUNCIONES ORIGINALES PRESERVADAS
@@ -337,7 +340,12 @@ function processCockpitIntelligence(
 ): CockpitIntelligence {
   return {
     vectorMomentum: getVectorMomentum(participationRate, daysRemaining, topMovers, participationPrediction),
-    projection: getProjectionIntelligence(participationRate, participationPrediction, crossStudyComparison),
+    // ✅ FIX: Extraer solo patternSimilarity si existe
+projection: getProjectionIntelligence(
+  participationRate, 
+  participationPrediction, 
+  crossStudyComparison ? { patternSimilarity: crossStudyComparison.comparison?.patternSimilarity } : undefined
+),
     action: getActionRecommendation(participationRate, daysRemaining, topMovers, negativeAnomalies),
     pattern: getPatternAnalysis(topMovers, negativeAnomalies),
     // ✅ AGREGAR ESTA LÍNEA:
@@ -911,12 +919,17 @@ export function useCampaignMonitor(campaignId: string) {
         .slice(0, 3)
         .map(dept => ({
           ...dept,
-          urgency: dept.participationRate < 50 ? 'critical' : 
-                   dept.participationRate < 70 ? 'high' : 'medium',
-          action: dept.participationRate < 50 ? 'llamar' : 
-                  dept.participationRate < 70 ? 'recordar' : 'seguimiento',
-          icon: dept.participationRate < 50 ? '🚨' : 
-                dept.participationRate < 70 ? '⚡' : '⚠️'
+          urgency: (dept.participationRate < 50 ? 'critical' :
+            dept.participationRate < 70 ? 'high' :
+              'medium') as 'critical' | 'high' | 'medium',
+
+          action: (dept.participationRate < 50 ? 'llamar' :
+            dept.participationRate < 70 ? 'recordar' :
+              'seguimiento') as 'llamar' | 'recordar' | 'seguimiento',
+
+          icon: (dept.participationRate < 50 ? '🚨' :
+            dept.participationRate < 70 ? '⚡' :
+              '⚠️') as '🚨' | '⚡' | '⚠️'
         }));
 
       // MÉTRICAS AGREGADAS - PRESERVADAS
@@ -960,7 +973,7 @@ export function useCampaignMonitor(campaignId: string) {
           department: data.displayName || name,
           rate: data.rate,
           type: 'negative_outlier' as const,
-          severity: data.rate < 30 ? 'high' : 'medium' as const,
+          severity: (data.rate < 30 ? 'high' : 'medium') as 'high' | 'medium',
           zScore: realZScore  // Z-Score calculado, no hardcodeado
         };
       });
@@ -1059,14 +1072,23 @@ export function useCampaignMonitor(campaignId: string) {
         };
       });
 
+      // ✅ REEMPLAZAR líneas 1082-1091 por:
       // Análisis global de la organización
-      const globalPattern = PatternDetector.detectDemographicPatterns(participants);
-      const globalAnomaly = PatternDetector.findParticipationAnomalies(participants);
-      const globalInsight = PatternDetector.generateLeadershipInsight(
-        globalPattern,
-        globalAnomaly,
-        participants
-      );
+      const globalPattern = participants.length >= 5
+        ? PatternDetector.detectDemographicPatterns(participants as any)
+        : null;
+
+      const globalAnomaly = participants.length >= 5
+        ? PatternDetector.findParticipationAnomalies(participants as any)
+        : null;
+
+      const globalInsight = participants.length >= 5
+        ? PatternDetector.generateLeadershipInsight(
+          globalPattern,
+          globalAnomaly,
+          participants as any
+        )
+        : 'Datos insuficientes para análisis demográfico';
 
       return {
         byDepartment: departmentAnalyses,
@@ -1149,7 +1171,7 @@ export function useCampaignMonitor(campaignId: string) {
       
       meanRate: anomalyData.meanRate,
       totalDepartments: anomalyData.totalDepartments,
-      crossStudyComparison: historicalData?.currentComparison,
+      crossStudyComparison: historicalData?.crossStudyComparison || undefined,
       
       // ✅ MOMENTUM DEPARTAMENTAL VISUAL - PRESERVADO
       departmentMomentum: departmentMomentumCalculated,

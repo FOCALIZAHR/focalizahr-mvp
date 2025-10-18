@@ -275,21 +275,6 @@ export interface RetentionEngineFinancialOutput {
 /**
  * EXPORT TYPES PRINCIPALES
  */
-export type {
-  FinancialSource,
-  CalculationStep,
-  FinancialAssumption,
-  TransparencyAuditTrail,
-  FinancialImpactScenario,
-  BusinessCaseFinancials,
-  ChileanMarketAdjustments,
-  FinancialTransparencyReport,
-  FinancialDisplayProps,
-  ROIDisplayProps,
-  SourceCredibilityBadgeProps,
-  RetentionEngineFinancialInput,
-  RetentionEngineFinancialOutput
-};
 
 // Constantes para validación
 export const FINANCIAL_CONSTANTS = {

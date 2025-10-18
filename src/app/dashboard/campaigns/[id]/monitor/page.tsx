@@ -88,15 +88,38 @@ export default function CampaignMonitorPage() {
             CockpitHeaderBimodal - Visión ejecutiva completa
         ==================================================================== */}
         <div id="vista-empresa">
-          <CockpitHeaderBimodal 
-            {...monitorData}
-            onScrollToSection={(sectionId) => {
-              const element = document.getElementById(sectionId);
-              if (element) {
-                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }
-            }}
-          />
+          <div id="vista-empresa">
+  {(() => {
+              // Transformar datos para CockpitHeaderBimodal
+              // Transformar datos para CockpitHeaderBimodal
+              const cockpitHeaderProps = {
+                campaignName: monitorData.name || 'Campaña',
+                participationRate: monitorData.participationRate,
+                daysRemaining: monitorData.daysRemaining,
+                totalInvited: monitorData.totalInvited,
+                totalResponded: monitorData.totalResponded,
+                dailyResponses: monitorData.dailyResponses?.map(dr => ({
+                  date: dr.date,
+                  count: dr.responses,
+                  cumulative: dr.cumulative || 0
+                })),
+                topMovers: monitorData.topMovers,
+                negativeAnomalies: monitorData.negativeAnomalies,
+                participationPrediction: monitorData.participationPrediction,
+                // FIX para cockpitIntelligence
+                cockpitIntelligence: monitorData.cockpitIntelligence ? {
+                  ...monitorData.cockpitIntelligence,
+                  action: {
+                    ...monitorData.cockpitIntelligence.action,
+                    timeline: (monitorData.cockpitIntelligence.action as any).timeline ||
+                      `${monitorData.daysRemaining} días restantes`
+                  }
+                } : undefined
+              };
+
+              return <CockpitHeaderBimodal {...cockpitHeaderProps} />;
+            })()}
+          </div>
         </div>
 
         {/* ====================================================================
@@ -239,27 +262,7 @@ export default function CampaignMonitorPage() {
               Próximos Pasos Recomendados
             </h3>
             <div className="space-y-2">
-              {monitorData.recommendations?.slice(0, 3).map((rec: string, index: number) => (
-                <div key={index} className="flex items-start gap-2">
-                  <Sparkles className="h-3 w-3 text-yellow-400 mt-1 flex-shrink-0" />
-                  <p className="text-sm text-slate-300">{rec}</p>
-                </div>
-              )) || (
-                <div className="space-y-2">
-                  <div className="flex items-start gap-2">
-                    <Sparkles className="h-3 w-3 text-yellow-400 mt-1 flex-shrink-0" />
-                    <p className="text-sm text-slate-300">Revisar departamentos con baja participación</p>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Sparkles className="h-3 w-3 text-yellow-400 mt-1 flex-shrink-0" />
-                    <p className="text-sm text-slate-300">Enviar recordatorios focalizados</p>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Sparkles className="h-3 w-3 text-yellow-400 mt-1 flex-shrink-0" />
-                    <p className="text-sm text-slate-300">Analizar patrones de respuesta</p>
-                  </div>
-                </div>
-              )}
+        
             </div>
           </Card>
         </div>

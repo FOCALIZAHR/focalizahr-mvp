@@ -100,7 +100,8 @@ export function useCampaignHistory(options: UseCampaignHistoryOptions = {}) {
       
       // EXPONER DATOS YA PROCESADOS - SIN TRANSFORMACIONES
       setData(result);
-      
+      console.log('🔍 [HOOK] result tiene crossStudyComparison:', !!result.crossStudyComparison);
+      console.log('🔍 [HOOK] keys de result:', Object.keys(result));
     } catch (err) {
       console.error('[useCampaignHistory] Error:', err);
       setError(err instanceof Error ? err.message : 'Error desconocido');
@@ -125,7 +126,7 @@ export function useCampaignHistory(options: UseCampaignHistoryOptions = {}) {
     hasHistoricalData: data && data.campaigns.length > 0,
     totalCampaigns: data?.total || 0,
     // ✅ NUEVO: Comparación cross-study pre-calculada
-    crossStudyComparison: data?.currentComparison || null
+    crossStudyComparison: data?.crossStudyComparison || null
   }), [data, isLoading, error, fetchHistoricalData]);
 
   return stableReturn;

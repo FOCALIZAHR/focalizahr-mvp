@@ -10,8 +10,9 @@ interface Department {
   level: number;
   standardCategory: string;
   isActive: boolean;
-  participantCount?: number;
+  participantCount: number;
   departments?: Department[];
+  children: Department[];  // ✅ EL API LO DEVUELVE
 }
 
 interface StructureData {
@@ -19,6 +20,7 @@ interface StructureData {
   orphanDepartments: Department[];
   totalGerencias: number;
   totalDepartments: number;
+  companyName?: string;  // ✅ LO EXTRAEREMOS DE account.name
 }
 
 interface FormData {
@@ -66,7 +68,10 @@ export function useStructureManager(accountId: string) {
 
       const result = await response.json();
       if (result.success) {
-        setStructure(result.data);
+        setStructure({
+          ...result.data,
+          companyName: result.data.account?.name || 'Cliente'
+        });
       } else {
         throw new Error(result.error || 'Error desconocido');
       }

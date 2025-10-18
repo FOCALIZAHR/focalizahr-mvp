@@ -32,7 +32,7 @@ export interface Campaign {
   totalResponded: number;
   participationRate: number;
   // Propiedades de relación
-  campaignType?: {
+  campaignType: {
     id: string;
     name: string;
     slug: string;

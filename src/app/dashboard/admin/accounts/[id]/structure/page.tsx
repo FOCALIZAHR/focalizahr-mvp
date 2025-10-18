@@ -89,6 +89,24 @@ export default function StructurePage() {
     );
   }
 
+  // ✅ AGREGAR TODO ESTE BLOQUE AQUÍ:
+  if (!structure) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
+        <div className="max-w-4xl mx-auto">
+          <Card className="border-red-500/20 bg-red-950/20">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3 text-red-400">
+                <AlertCircle className="h-5 w-5" />
+                <p>No se pudo cargar la estructura organizacional. Por favor, intenta recargar la página.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   // NUEVO: Detectar si necesita configuración inicial
   const needsInitialSetup = !loading && 
     structure.gerencias.length === 0 && 

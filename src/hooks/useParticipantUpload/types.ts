@@ -70,6 +70,16 @@ export interface DemographicsStats {
   };
   
   averageAge: number;
+
+  // ✅ AGREGAR ESTAS LÍNEAS:
+  averageSeniority?: number;
+  seniorityDistribution?: {
+    '0-1': number;
+    '1-3': number;
+    '3-5': number;
+    '5+': number;
+  };
+
   
   // ✅ NUEVAS ESTADÍSTICAS DE CONTACTO
   contactChannels?: {
