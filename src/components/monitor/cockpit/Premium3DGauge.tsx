@@ -184,7 +184,7 @@ export default function PremiumD3Gauge({
       .endAngle(endAngle);
     
     g.append('path')
-      .attr('d', arc)
+      .attr('d', arc as any)
       .attr('transform', `translate(${centerX}, ${centerY})`)
       .attr('fill', colors.background)
       .attr('stroke', colors.primary)
@@ -220,11 +220,11 @@ export default function PremiumD3Gauge({
               .outerRadius(outerRadius)
               .startAngle(startAngle)
               .endAngle(currentAngle);
-            return currentArc();
+            return currentArc(null as any) || '';
           };
         });
     } else {
-      valueArcPath.attr('d', valueArc);
+      valueArcPath.attr('d', valueArc as any);
     }
     
     // Confidence ring
@@ -237,7 +237,7 @@ export default function PremiumD3Gauge({
         .endAngle(startAngle + (confidence / 100) * (endAngle - startAngle));
       
       g.append('path')
-        .attr('d', confidenceArc)
+        .attr('d', confidenceArc as any)
         .attr('transform', `translate(${centerX}, ${centerY})`)
         .attr('fill', colors.accent)
         .attr('opacity', 0.7);
@@ -281,19 +281,19 @@ export default function PremiumD3Gauge({
     const needleLength = outerRadius - 10;
     const needleBase = 8;
     
-    const needleData = [
-      [0, -needleBase/2],
+    const needleData: [number, number][] = [
+      [0, -needleBase / 2],
       [needleLength - 15, -3],
       [needleLength, 0],
       [needleLength - 15, 3],
-      [0, needleBase/2],
-      [0, -needleBase/2]
+      [0, needleBase / 2],
+      [0, -needleBase / 2]
     ];
     
     const needlePath = d3.line().curve(d3.curveCardinal);
     
     const needle = g.append('path')
-      .attr('d', needlePath(needleData))
+      .attr('d', needlePath(needleData) || '')
       .attr('transform', `translate(${centerX}, ${centerY})`)
       .attr('fill', 'url(#metallicGradient)')
       .attr('stroke', needleColor)

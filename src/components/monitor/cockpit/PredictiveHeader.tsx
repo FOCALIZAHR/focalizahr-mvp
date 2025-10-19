@@ -55,7 +55,7 @@ interface PredictiveHeaderProps {
   daysRemaining: number;
   totalInvited: number;
   totalResponded: number;
-  dailyResponses: Array<{ date: string; count: number; cumulative: number }>;
+  dailyResponses?: Array<{ date: string; count: number; cumulative: number }>;
   participationPrediction?: {
     finalProjection: number;
     confidence: number;
@@ -85,7 +85,7 @@ export function PredictiveHeader({
   daysRemaining,
   totalInvited,
   totalResponded,
-  dailyResponses,
+  dailyResponses = [], // ← AGREGAR DEFAULT VALUE
   participationPrediction,
   cockpitIntelligence,
   isActive,
@@ -346,7 +346,7 @@ const HudCard = ({ icon: Icon, title, isActionable = false, urgency = 'baja', on
         'alta': 'var(--focalizahr-warning)',
         'media': 'var(--focalizahr-info)',
         'baja': 'var(--focalizahr-cyan)'
-    }[urgency];
+    }[urgency as 'crítica' | 'alta' | 'media' | 'baja'];  // ← AGREGAR "as 'crítica' | 'alta' | 'media' | 'baja'"
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}

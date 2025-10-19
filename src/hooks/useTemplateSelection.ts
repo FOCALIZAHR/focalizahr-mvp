@@ -1,7 +1,7 @@
 // src/hooks/useTemplateSelection.ts
 import { useState, useEffect } from 'react';
-import { TemplateService, CommunicationTemplate, CampaignAnalytics } from '@/services/TemplateService';
-import { AnalyticsService } from '@/services/AnalyticsService';
+import { TemplateService, CommunicationTemplate, CampaignAnalytics } from '@/lib/services/TemplateService';
+import { AnalyticsService } from '@/lib/services/AnalyticsService';
 import type { CampaignResultsData } from '@/types'; // ← IMPORTACIÓN FUENTE DE VERDAD ÚNICA
 
 export interface UseTemplateSelectionResult {
@@ -40,14 +40,13 @@ export const useTemplateSelection = (campaignData: CampaignResultsData | null): 
       const campaignResults = {
         overall_score: campaignData.analytics.averageScore,
         participation_rate: campaignData.analytics.participationRate,
-        total_responses: campaignData.analytics.totalResponses,
+        total_responses: campaignData.analytics.totalResponded,
         total_invited: campaignData.analytics.totalInvited,
         company_name: campaignData.campaign?.company?.name || 'Empresa',
         industry_benchmark: 3.5, // Default benchmark
         category_scores: campaignData.analytics.categoryScores,
         department_scores: campaignData.analytics.departmentScores,
         campaign_type: campaignData.campaign?.campaignType?.slug,
-        industry: campaignData.campaign?.industry,
         created_date: campaignData.analytics.lastUpdated,
         completion_time: campaignData.analytics.completionTime
       };
@@ -63,7 +62,8 @@ export const useTemplateSelection = (campaignData: CampaignResultsData | null): 
       setAnalytics(campaignAnalytics);
 
       // ⚡ PASO 1.5: INTELIGENCIA AVANZADA CON DATOS REALES
-      // ✅ FIXED: Usar datos reales en lugar de mock data
+      // ⚠️ TODO v3.0: Descomentar cuando AnalyticsService.calculateAdvancedIntelligence esté implementado
+      /*
       let advancedIntelligence = null;
       
       // La API ya provee trendData y segmentationData reales
@@ -82,6 +82,7 @@ export const useTemplateSelection = (campaignData: CampaignResultsData | null): 
           confidence_level: advancedIntelligence?.confidenceAnalysis?.level || 'medium'
         };
       }
+      */
 
       // 🗄️ PASO 2: CONSULTAR TEMPLATES BD ESPECÍFICOS
       const dbTemplates = await TemplateService.getTemplatesForCampaignType(campaignResults.campaign_type);
@@ -92,10 +93,10 @@ export const useTemplateSelection = (campaignData: CampaignResultsData | null): 
         return;
       }
 
-      // 🎯 PASO 3: SELECCIÓN BASADA REGLAS BD
+      // 🎯 PASO 3: SELECCIÓN BASADA REGLAS BD (sin advancedVariables por ahora)
       const selectedTemplates = TemplateService.selectTemplatesByRules(
         dbTemplates, 
-        { ...campaignAnalytics, ...campaignAnalytics.advancedVariables }
+        campaignAnalytics
       );
 
       // 🔄 PASO 4: PROCESAR VARIABLES
@@ -117,8 +118,19 @@ export const useTemplateSelection = (campaignData: CampaignResultsData | null): 
     } catch (err) {
       console.error('Error in template selection:', err);
       setError(err instanceof Error ? err.message : 'Error desconocido');
+      
       // Fallback en caso de error
-      setTemplates(getFallbackTemplates(campaignResults));
+      if (campaignData) {
+        const fallbackResults = {
+          overall_score: campaignData.analytics.averageScore,
+          participation_rate: campaignData.analytics.participationRate,
+          category_scores: campaignData.analytics.categoryScores,
+          department_scores: campaignData.analytics.departmentScores,
+          company_name: campaignData.campaign?.company?.name || 'Empresa',
+          industry_benchmark: 3.5
+        };
+        setTemplates(getFallbackTemplates(fallbackResults));
+      }
     } finally {
       setIsLoading(false);
     }

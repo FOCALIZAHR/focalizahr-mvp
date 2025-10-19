@@ -25,13 +25,13 @@ interface CockpitHeaderBimodalProps {
   topMovers?: Array<{
     name: string;
     momentum: number;
-    trend: string;
+    trend: 'completado' | 'acelerando' | 'estable' | 'desacelerando';
   }>;
   negativeAnomalies?: Array<{
     department: string;
     rate: number;
-    severity: string;
-    zScore?: number;
+    severity: 'high' | 'medium';  // ← ESPECÍFICO
+    zScore: number;               // ← REQUERIDO
   }>;
   participationPrediction?: {
     finalProjection: number;

@@ -9,7 +9,7 @@ import {
   BusinessCaseType,
   RetentionAnalysisResult 
 } from '@/types/BusinessCase';
-import type { CampaignResultsData } from '@/types';
+import { CampaignResults } from '@/lib/services/AnalyticsService';
 import { 
   FinancialCalculationsService, 
   calculateFinancialImpactForBusinessCase 
@@ -59,7 +59,7 @@ export class RetentionEngine {
       
       // Identificar departamentos afectados
       if (campaignResults.department_scores) {
-        Object.entries(campaignResults.department_scores).forEach(([dept, score]) => {
+        Object.entries(campaignResults.department_scores).forEach(([dept, score]: [string, number]) => {
           if (score < 2.5) {
             criticalDepartments.push(dept);
           }

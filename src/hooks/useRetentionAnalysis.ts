@@ -21,19 +21,20 @@ export function useRetentionAnalysis(data: CampaignResultsData | null): Retentio
       return null;
     }
 
-    // ✅ VERIFICACIÓN DE TIPO DE CAMPAÑA ROBUSTA (Maneja string y objeto)
+    // ✅ VERIFICACIÓN DE TIPO DE CAMPAÑA ROBUSTA
     let campaignTypeIdentifier = '';
     const campaignType = data.campaign.campaignType;
 
-    if (typeof campaignType === 'string') {
-        campaignTypeIdentifier = campaignType.toLowerCase();
-    } else if (typeof campaignType === 'object' && campaignType !== null) {
-        // Busca en .name o .slug para máxima compatibilidad futura
-        campaignTypeIdentifier = (campaignType.name || campaignType.slug || '').toLowerCase();
+    // campaignType SIEMPRE es un objeto CampaignType (relación Prisma), nunca string
+    if (campaignType && typeof campaignType === 'object' &&
+      ('name' in campaignType || 'slug' in campaignType)) {
+      const typeObj = campaignType as { name?: string; slug?: string };
+      campaignTypeIdentifier = (typeObj.name || typeObj.slug || '').toLowerCase();
     }
 
     const isRetentionCampaign = campaignTypeIdentifier.includes('retencion') || campaignTypeIdentifier.includes('retención');
 
+  
     console.log('🔍 useRetentionAnalysis: Verificación tipo campaña:', {
       campaignType,
       campaignTypeIdentifier,

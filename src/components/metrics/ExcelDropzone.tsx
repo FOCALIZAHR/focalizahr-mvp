@@ -266,7 +266,9 @@ export default function ExcelDropzone({
 
           validateAndProcessData(cleanedData);
         },
-        error: (err) => {
+     
+        // ✅ CORRECTO (renombrar parámetro):
+        error: (err: Error) => {
           console.error('CSV parse error:', err);
           error('Error al leer el archivo CSV. Verifica el formato.', 'Error CSV');
           setSelectedFile(null);

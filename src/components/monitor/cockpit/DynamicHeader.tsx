@@ -22,13 +22,13 @@ interface DynamicHeaderProps {
   daysRemaining: number;
   totalInvited: number;
   totalResponded: number;
-  lastActivity: string;
-  topMovers: Array<{
+  lastActivity?: string;
+  topMovers?: Array<{
     name: string;
     momentum: number;
     trend: 'completado' | 'acelerando' | 'estable' | 'desacelerando';
   }>;
-  negativeAnomalies: Array<{
+  negativeAnomalies?: Array<{
     department: string;
     rate: number;
     severity: 'high' | 'medium';
@@ -68,6 +68,7 @@ interface DynamicHeaderProps {
       timeline?: string;
     };
   };
+  isActive?: boolean; // ✅ AGREGAR ESTA LÍNEA
   onNavigate?: (section: string) => void;
 }
 
@@ -77,14 +78,17 @@ export function DynamicHeader({
   daysRemaining,
   totalInvited,
   totalResponded,
-  lastActivity,
+  lastActivity = "Sin actividad reciente", // ✅ RESTAURAR con default
   topMovers,
   negativeAnomalies,
   byDepartment,
   cockpitIntelligence,
+  isActive = true, // ✅ AGREGAR ESTA LÍNEA
   onNavigate
 }: DynamicHeaderProps) {
-
+  
+  // ✅✅ AGREGAR ESTAS 2 LÍNEAS AQUÍ ✅✅
+  if (!isActive) return null;
   // ✅ DATOS REALES DEL HOOK
   const campeón = topMovers && topMovers.length > 0 ? {
     name: topMovers[0].name,

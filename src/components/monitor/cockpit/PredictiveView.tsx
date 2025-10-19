@@ -330,7 +330,7 @@ const HudCard = ({ icon: Icon, title, isActionable = false, urgency = 'baja', on
         'alta': 'var(--focalizahr-warning)',
         'media': 'var(--focalizahr-info)',
         'baja': 'var(--focalizahr-cyan)'
-    }[urgency];
+    }[urgency as 'crítica' | 'alta' | 'media' | 'baja'];
 
     return (
         <motion.div

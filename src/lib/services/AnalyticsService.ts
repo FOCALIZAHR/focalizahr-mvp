@@ -64,6 +64,8 @@ export interface CampaignResults {
   industry?: string;               // Industria empresa
   created_date?: string;           // Fecha creación campaña
   completion_time?: number;        // Tiempo promedio completar encuesta (minutos)
+  industry_sector?: string;        // Sector específico de la industria
+  industry_benchmark?: number;     // Benchmark de la industria (default 3.5)
 }
 
 /**
