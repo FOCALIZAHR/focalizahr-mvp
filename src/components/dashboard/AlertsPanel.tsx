@@ -11,7 +11,20 @@ interface AlertsPanelProps {
   alerts: AlertType[];
 }
 
-// Componente AlertsPanel extraído exacto del original
+// ✅ ENTERPRISE FIX: Normalizar timestamp a Date object
+function getAlertTime(timestamp: Date | string): string {
+  try {
+    const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    return date.toLocaleTimeString('es-CL', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  } catch (error) {
+    console.error('Error parsing alert timestamp:', timestamp, error);
+    return 'Hora no disponible';
+  }
+}
+
 export default function AlertsPanel({ alerts }: AlertsPanelProps) {
   if (alerts.length === 0) return null;
 
@@ -44,7 +57,7 @@ export default function AlertsPanel({ alerts }: AlertsPanelProps) {
                 <AlertDescription className="text-sm">{alert.message}</AlertDescription>
               </div>
               <span className="text-xs text-muted-foreground">
-                {alert.timestamp.toLocaleTimeString()}
+                {getAlertTime(alert.timestamp)}
               </span>
             </div>
           </Alert>

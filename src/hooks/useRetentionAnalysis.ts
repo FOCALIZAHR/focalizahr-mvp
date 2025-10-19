@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { RetentionEngine } from '@/engines/RetentionEngine';
-import { CampaignResultsData } from '@/hooks/useCampaignResults';
+import type { CampaignResultsData } from '@/types';
 import { RetentionAnalysisResult } from '@/types/BusinessCase';
 
 /**

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { TemplateService, CommunicationTemplate, CampaignAnalytics } from '@/services/TemplateService';
 import { AnalyticsService } from '@/services/AnalyticsService';
-import { CampaignResultsData } from './useCampaignResults'; // ← IMPORTACIÓN FUENTE DE VERDAD ÚNICA
+import type { CampaignResultsData } from '@/types'; // ← IMPORTACIÓN FUENTE DE VERDAD ÚNICA
 
 export interface UseTemplateSelectionResult {
   templates: CommunicationTemplate[];

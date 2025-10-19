@@ -9,7 +9,7 @@ import {
   BusinessCaseType,
   RetentionAnalysisResult 
 } from '@/types/BusinessCase';
-import { CampaignResults } from '@/services/AnalyticsService';
+import type { CampaignResultsData } from '@/types';
 import { 
   FinancialCalculationsService, 
   calculateFinancialImpactForBusinessCase 

@@ -137,11 +137,11 @@ export default function AccountsTable({
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'active':
-        return 'success';
+        return 'default';
       case 'suspended':
         return 'destructive';
       case 'inactive':
-        return 'warning';
+        return 'secondary';
       case 'trial':
         return 'secondary';
       default:

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import type { Campaign } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { 
   Plus, 
@@ -26,27 +27,6 @@ import { useToast, useParticipantsNotifications } from '@/components/ui/toast-sy
 import { useConfirmationDialog, confirmationActions } from '@/components/ui/confirmation-dialog';
 import CampaignStatusGuide from '@/components/ui/campaign-status-guide';
 
-interface Campaign {
-  id: string;
-  name: string;
-  status: 'draft' | 'active' | 'completed' | 'cancelled';
-  campaignType: {
-    name: string;
-    slug: string;
-  };
-  totalInvited: number;
-  totalResponded: number;
-  participationRate: number;
-  startDate: string;
-  endDate: string;
-  canActivate?: boolean;
-  canViewResults?: boolean;
-  isOverdue?: boolean;
-  daysRemaining?: number;
-  riskLevel?: 'low' | 'medium' | 'high';
-  lastActivity?: string;
-  completionTrend?: 'up' | 'down' | 'stable';
-}
 
 export default function EnhancedCampaignsList() {
   const [filter, setFilter] = useState<'all' | 'active' | 'draft' | 'completed' | 'cancelled'>('all');

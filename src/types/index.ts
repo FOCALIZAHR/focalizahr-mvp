@@ -26,8 +26,8 @@ export interface Campaign {
   id: string;
   name: string;
   status: 'draft' | 'active' | 'completed' | 'cancelled';  // TIPO LITERAL
-  startDate: Date | string;
-  endDate: Date | string;
+  startDate: string;
+  endDate: string;
   totalInvited: number;
   totalResponded: number;
   participationRate: number;
