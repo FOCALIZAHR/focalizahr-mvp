@@ -8,6 +8,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import type { CockpitIntelligence } from '@/types';
 import PredictiveHeader from './cockpit/PredictiveHeader';
 import { DynamicHeader } from './cockpit/DynamicHeader';
 
@@ -38,19 +39,7 @@ interface CockpitHeaderBimodalProps {
     confidence: number;
     velocity: number;
   };
-  cockpitIntelligence?: {
-    vectorMomentum: string;
-    projection: {
-      finalProjection: number;
-      confidence: number;
-    };
-    action: {
-      primary: string;
-      reasoning: string;
-      timeline: string;
-      urgency: 'baja' | 'media' | 'alta' | 'crítica';
-    };
-  };
+  cockpitIntelligence?: CockpitIntelligence;
   
   // Handler opcional
   onNavigate?: (section: string) => void;

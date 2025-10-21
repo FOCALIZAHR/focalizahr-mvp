@@ -28,7 +28,9 @@ export const WOW_STYLES = {
     // Variantes de color
     success: "text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent",
     warning: "text-xl font-bold bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent",
-    danger: "text-xl font-bold bg-gradient-to-r from-red-400 to-pink-400 bg-clip-text text-transparent"
+    danger: "text-xl font-bold bg-gradient-to-r from-red-400 to-pink-400 bg-clip-text text-transparent",
+    info: "text-xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent"  // ← AGREGAR
+    
   },
 
   // CONTENEDORES DE ICONOS

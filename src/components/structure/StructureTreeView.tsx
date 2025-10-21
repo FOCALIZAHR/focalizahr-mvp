@@ -299,10 +299,10 @@ const StructureTreeView: React.FC<TreeViewProps> = ({
           <div className="grid grid-cols-4 gap-2 text-xs">
             {Object.keys(categoryStats).filter(cat => cat !== 'sin_asignar').map(category => (
               <div key={category} className="flex items-center gap-1">
-                <div 
+                <div
                   className="w-3 h-3 rounded-full"
                   style={{
-                    backgroundColor: CATEGORY_COLORS[category as keyof typeof CATEGORY_COLORS]?.backgroundColor || '#374151'
+                    backgroundColor: `var(--fhr-categoria-${category}, #374151)`
                   }}
                 />
                 <span className="capitalize text-gray-400">{category}</span>

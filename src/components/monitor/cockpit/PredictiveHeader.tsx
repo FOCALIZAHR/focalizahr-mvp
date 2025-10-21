@@ -9,6 +9,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Target, TrendingUp, ArrowRight, Activity } from 'lucide-react';
+import type { CockpitIntelligence } from '@/types';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 // CSS esencial para efectos vivos
@@ -61,19 +62,7 @@ interface PredictiveHeaderProps {
     confidence: number;
     velocity: number;
   };
-  cockpitIntelligence?: {
-    vectorMomentum: string;
-    projection: {
-      finalProjection: number;
-      confidence: number;
-    };
-    action: {
-      primary: string;
-      reasoning: string;
-      timeline: string;
-      urgency: 'baja' | 'media' | 'alta' | 'crítica';
-    };
-  };
+  cockpitIntelligence?: CockpitIntelligence;
   isActive: boolean;
   onNavigate?: (sectionId: string) => void;
 }
@@ -161,8 +150,9 @@ export function PredictiveHeader({
   const actionToDisplay = cockpitIntelligence?.action ?? {
     primary: 'Mantener Monitoreo',
     reasoning: 'El sistema no ha detectado anomalías que requieran una acción inmediata.',
-    timeline: 'Revisión continua',
-    urgency: 'baja'
+    urgency: 'baja',
+    nextSteps: ['Continuar monitoreando'],
+    urgencyColor: 'text-green-400'
   };
 
   // Clasificación inteligente de cards según contexto

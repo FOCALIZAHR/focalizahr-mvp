@@ -23,6 +23,7 @@ interface DepartmentChild {
   rateNum: number;
   responded: number;
   participants: number;
+  projection?: number;  // ← AGREGAR ESTA LÍNEA
 }
 
 interface GerenciaData {

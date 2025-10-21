@@ -724,30 +724,32 @@ export interface DepartmentalIntelligence {
 // COCKPIT INTELLIGENCE TYPES
 // ========================================
 
+// src/types/index.ts línea 727
 export interface CockpitIntelligence {
-  currentRate: number;
-  projectedFinal: number;
-  confidence: number;
-  velocityTrend: 'accelerating' | 'stable' | 'decelerating';
-  criticalDepartments: string[];
-  topPerformers: string[];
-  nextOptimalAction: string;
-  riskLevel: 'low' | 'medium' | 'high' | 'critical';
-  estimatedCompletion: Date | string;
-  recommendedActions: Array<{
-    action: string;
-    impact: 'low' | 'medium' | 'high';
-    urgency: 'low' | 'medium' | 'high' | 'immediate';
-  }>;
-  historicalComparison?: {
-    betterThanAverage: boolean;
-    percentile: number;
-    trend: 'improving' | 'stable' | 'declining';
+  vectorMomentum: string;
+  projection: {
+    finalProjection: number;
+    confidence: number;
+    methodology: string;
+    confidenceText: string;
+  };
+  action: {
+    primary: string;
+    reasoning: string;
+    urgency: 'baja' | 'media' | 'alta' | 'crítica';
+    nextSteps: string[];
+    urgencyColor: string;
+    // ❌ ELIMINAR timeline: string; (no existe)
+  };
+  pattern: {
+    dominantPattern: string;
+    description: string;
+    insights: string[];
+    patternColor: string;
   };
   tacticalAction?: TacticalRecommendation;
   departmentMomentum?: DepartmentMomentumData;
 }
-
 export interface TacticalRecommendation {
   primary: string;
   reasoning: string;
@@ -830,10 +832,10 @@ export interface AggregatedGerencia {
   displayName: string;
   unitType: string;
   level: number;
-  score: number;
+  scoreNum: number;
   participants: number;
   responded: number;
-  rate: number;
+  rateNum: number;
   employeeCount?: number;
   children: DepartmentChild[];
   momentum?: number;
@@ -846,13 +848,14 @@ export interface DepartmentChild {
   displayName: string;
   unitType: string;
   level: number;
-  score: number;
+  scoreNum: number;
   participants: number;
   responded: number;
-  rate: number;
+  rateNum: number;
   velocity?: number;
   lastActivity?: string;
   projection?: number;
+  
 }
 
 export interface DemographicsStats {

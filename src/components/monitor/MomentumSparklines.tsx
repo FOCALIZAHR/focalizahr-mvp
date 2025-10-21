@@ -1,5 +1,5 @@
 import { LineChart, Line, ResponsiveContainer, Cell, BarChart, Bar } from 'recharts';
-
+import type { DepartmentMomentumData } from '@/types';
 function MomentumSparklines({ data }: { data: DepartmentMomentumData }) {
   return (
     <div className="w-full h-16 relative">

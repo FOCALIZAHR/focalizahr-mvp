@@ -31,6 +31,7 @@ interface DepartmentChild {
   scoreNum: number;
   rateNum: number;
   responded: number;
+  projection?: number;  // ← AGREGAR ESTA LÍNEA
   participants: number;
 }
 
@@ -490,11 +491,11 @@ export function GerenciaCompetitivoView({
                                         {dept.rateNum.toFixed(0)}%
                                       </span>
                                       <div className="text-xs text-slate-500 w-20 text-right">
-                                        {dept.projection > 0 ? (
+                                        {dept.projection && dept.projection > 0 ? (
                                           <>Proy: {dept.projection.toFixed(0)}%</>
                                         ) : (
                                           <></>
-                                        )}
+)}
                                       </div>
                                     </div>
                                   </div>

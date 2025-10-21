@@ -22,6 +22,7 @@ export const TextOpenRenderer: React.FC<TextOpenRendererProps> = ({
       variants={fadeIn} 
       initial="initial" 
       animate="animate"
+      transition={{ duration: 0.3, ease: "easeOut" }}  // ← AGREGAR
       className="space-y-4"
     >
       <textarea

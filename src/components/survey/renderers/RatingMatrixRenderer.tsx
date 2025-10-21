@@ -40,6 +40,7 @@ export const RatingMatrixRenderer: React.FC<RatingMatrixRendererProps> = ({
       variants={fadeIn} 
       initial="initial" 
       animate="animate"
+      transition={{ duration: 0.3, ease: "easeOut" }}  // ← AGREGAR ESTO
       className="space-y-4"
     >
       {selectedAspects.map((aspect, index) => (

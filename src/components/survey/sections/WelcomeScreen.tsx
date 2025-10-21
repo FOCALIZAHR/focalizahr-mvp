@@ -27,14 +27,14 @@ interface WelcomeScreenProps {
 export default function WelcomeScreen({
   campaignName,
   companyName,
-  companyLogo,  // ← AGREGAR ESTA LÍNEA
+  companyLogo,
   estimatedTime,
   questionCount,
   campaignTypeName = "Evaluación Estratégica",
   campaignDescription = "Tu perspectiva honesta es la clave para construir un mejor equipo y transformar la cultura organizacional.",
   onStart
 }: WelcomeScreenProps) {
-  const [currentPanel, setCurrentPanel] = useState(0);
+  const [currentPanel, setCurrentPanel] = useState<number>(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [hoveredGuarantee, setHoveredGuarantee] = useState<number | null>(null);
 
@@ -130,159 +130,150 @@ export default function WelcomeScreen({
                   <ChevronRight className="w-4 h-4" />
                 </SurveyButton>
               </div>
-
-              {/* Indicador de carrusel - 2 puntos */}
-              <div className="flex gap-2 mt-8">
-                <div className={cn(
-                  "w-2 h-2 rounded-full transition-all duration-300",
-                  currentPanel === 0 ? "bg-[#22D3EE] w-8" : "bg-slate-600"
-                )} />
-                <div className={cn(
-                  "w-2 h-2 rounded-full transition-all duration-300",
-                  currentPanel === 1 ? "bg-[#22D3EE] w-8" : "bg-slate-600"
-                )} />
-              </div>
             </div>
           </div>
         )}
 
-        {/* Panel 2: Portal de Confianza - JERARQUÍA VISUAL CORREGIDA */}
-{currentPanel === 1 && (
-  <div className="w-full flex flex-col justify-center min-h-screen animate-in fade-in duration-700 px-8">
-    
-    {/* Contenido centrado */}
-    <div className="max-w-4xl mx-auto w-full text-center">
-      
-      {/* CAMBIO 1: AGREGAR LOGO DEL CLIENTE */}
-      {companyLogo ? (
-        <div className="flex justify-center mb-6">
-          <img 
-            src={companyLogo} 
-            alt={companyName}
-            className="h-12 w-auto opacity-80"
-          />
-        </div>
-      ) : companyName ? (
-        <div className="mb-6">
-          <p className="text-sm text-slate-400 uppercase tracking-wider">
-            {companyName}
-          </p>
-        </div>
-      ) : null}
-      
-      {/* 1. MÁXIMA JERARQUÍA: Nombre de la campaña del cliente */}
-      <h1 className="text-5xl md:text-6xl font-extralight text-white mb-6 tracking-tight">
-        {campaignName}
-      </h1>
-      
-      {/* Línea decorativa minimalista */}
-      <div className="flex items-center justify-center gap-3 mb-8">
-        <div className="h-px w-16 bg-white/20" />
-        <div className="w-1.5 h-1.5 rounded-full bg-[#22D3EE]" />
-        <div className="h-px w-16 bg-white/20" />
-      </div>
-      
-      {/* CAMBIO 2: ELIMINAR METODOLOGÍA DE AQUÍ - se movió al footer */}
-      
-      {/* 3. FOCO CENTRAL: Propósito de la evaluación */}
-      <p className="text-xl md:text-2xl text-slate-200 max-w-3xl mx-auto mb-20 font-light leading-relaxed">
-        {campaignDescription || "Tu perspectiva honesta es la clave para construir un mejor equipo y transformar la cultura organizacional."}
-      </p>
-      
-      {/* 4. JERARQUÍA DE APOYO: Triple garantía con íconos sutiles */}
-<div className="mb-1">
-  <div className="flex justify-center items-start mb-8 w-full">
-    <div className="flex justify-between items-start w-full max-w-2xl">
-      {[
-        { icon: Shield, label: "Tu identidad está protegida", text: "Sistema anónimo garantizado. Solo resultados grupales (mín. 5 personas)." },
-        { icon: Lock, label: "Respetamos tu tiempo", text: "Diseño eficiente. Solo preguntas esenciales para insights valiosos." },
-        { icon: Check, label: "Análisis profesional", text: "Metodología científica validada. Insights accionables garantizados." }
-      ].map((item, index) => (
-        <div
-          key={index}
-          className="group cursor-pointer flex-1 text-center"
-          onMouseEnter={() => setHoveredGuarantee(index)}
-          onMouseLeave={() => setHoveredGuarantee(null)}
-        >
-          <div className={cn(
-            "flex flex-col items-center gap-3 transition-all duration-300",
-            hoveredGuarantee !== null && hoveredGuarantee !== index ? "opacity-50" : "opacity-100"
-          )}>
-            {/* Íconos REDUCIDOS - ahora son sutiles elementos de apoyo */}
-            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-[#22D3EE]/10 transition-colors">
-              <item.icon className="w-5 h-5 text-white/40 group-hover:text-[#22D3EE] transition-colors" />
+        {/* Panel 2: Portal de Confianza */}
+        {currentPanel === 1 && (
+          <div className="w-full flex flex-col justify-center min-h-screen animate-in fade-in duration-700 px-8">
+            
+            {/* Contenido centrado */}
+            <div className="max-w-4xl mx-auto w-full text-center">
+              
+              {/* Logo del cliente */}
+              {companyLogo ? (
+                <div className="flex justify-center mb-6">
+                  <img 
+                    src={companyLogo} 
+                    alt={companyName}
+                    className="h-12 w-auto opacity-80"
+                  />
+                </div>
+              ) : companyName ? (
+                <div className="mb-6">
+                  <p className="text-sm text-slate-400 uppercase tracking-wider">
+                    {companyName}
+                  </p>
+                </div>
+              ) : null}
+              
+              {/* Nombre de la campaña */}
+              <h1 className="text-5xl md:text-6xl font-extralight text-white mb-6 tracking-tight">
+                {campaignName}
+              </h1>
+              
+              {/* Línea decorativa */}
+              <div className="flex items-center justify-center gap-3 mb-8">
+                <div className="h-px w-16 bg-white/20" />
+                <div className="w-1.5 h-1.5 rounded-full bg-[#22D3EE]" />
+                <div className="h-px w-16 bg-white/20" />
+              </div>
+              
+              {/* Propósito */}
+              <p className="text-xl md:text-2xl text-slate-200 max-w-3xl mx-auto mb-20 font-light leading-relaxed">
+                {campaignDescription || "Tu perspectiva honesta es la clave para construir un mejor equipo y transformar la cultura organizacional."}
+              </p>
+              
+              {/* Triple garantía */}
+              <div className="mb-1">
+                <div className="flex justify-center items-start mb-8 w-full">
+                  <div className="flex justify-between items-start w-full max-w-2xl">
+                    {[
+                      { icon: Shield, label: "Tu identidad está protegida", text: "Sistema anónimo garantizado. Solo resultados grupales (mín. 5 personas)." },
+                      { icon: Lock, label: "Respetamos tu tiempo", text: "Diseño eficiente. Solo preguntas esenciales para insights valiosos." },
+                      { icon: Check, label: "Análisis profesional", text: "Metodología científica validada. Insights accionables garantizados." }
+                    ].map((item, index) => (
+                      <div
+                        key={index}
+                        className="group cursor-pointer flex-1 text-center"
+                        onMouseEnter={() => setHoveredGuarantee(index)}
+                        onMouseLeave={() => setHoveredGuarantee(null)}
+                      >
+                        <div className={cn(
+                          "flex flex-col items-center gap-3 transition-all duration-300",
+                          hoveredGuarantee !== null && hoveredGuarantee !== index ? "opacity-50" : "opacity-100"
+                        )}>
+                          <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-[#22D3EE]/10 transition-colors">
+                            <item.icon className="w-5 h-5 text-white/40 group-hover:text-[#22D3EE] transition-colors" />
+                          </div>
+                          <span className="text-sm text-white/80 group-hover:text-white transition-colors font-medium">
+                            {item.label}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Texto hover */}
+                <div className="h-10 flex items-center justify-center">
+                  {hoveredGuarantee !== null && (
+                    <p className="text-xs text-slate-500 max-w-md animate-in fade-in duration-300">
+                      {[
+                        `${companyName} solo recibe resultados grupales. Mínimo 5 personas por grupo.`,
+                        `${questionCount} preguntas diseñadas para completar en ${estimatedTime} minutos.`,
+                        "Metodología científica validada. Insights accionables garantizados."
+                      ][hoveredGuarantee]}
+                    </p>
+                  )}
+                </div>
+              </div>
+              
+              {/* CTA Principal */}
+              <div className="flex flex-col items-center space-y-6">
+                <button
+                  onClick={handleStartSurvey}
+                  className={cn(
+                    "px-12 py-3 rounded-full",
+                    "bg-[#22D3EE] text-white font-medium",
+                    "transition-all duration-300",
+                    "hover:bg-[#A78BFA] hover:shadow-lg hover:shadow-[#A78BFA]/25",
+                    "hover:scale-[1.02] active:scale-100"
+                  )}
+                >
+                  Comenzar Evaluación
+                </button>
+                
+                {/* Volver */}
+                <button
+                  onClick={() => setCurrentPanel(0)}
+                  className="text-slate-500 hover:text-slate-300 text-sm transition-colors"
+                >
+                  ← Volver
+                </button>
+              </div>
             </div>
-            {/* El TEXTO es ahora el protagonista */}
-            <span className="text-sm text-white/80 group-hover:text-white transition-colors font-medium">
-              {item.label}
-            </span>
+            
+            {/* Footer */}
+            <div className="mt-1">
+              <p className="text-center text-[10px] text-slate-700 uppercase tracking-wider mb-2">
+                Metodología FocalizaHR: {campaignTypeName || "Evaluación Estratégica"}
+              </p>
+              
+              <p className="text-center text-xs text-slate-600">
+                Proceso confidencial garantizado por FocalizaHR
+              </p>
+            </div>
           </div>
+        )}
+
+        {/* ✅ CAMBIO QUIRÚRGICO: Indicadores FUERA de bloques condicionales */}
+        <div className="flex justify-center gap-2 my-8">
+          <div className={cn(
+            "w-2 h-2 rounded-full transition-all duration-300",
+            currentPanel === 0 ? "bg-[#22D3EE] w-8" : "bg-slate-600"
+          )} />
+          <div className={cn(
+            "w-2 h-2 rounded-full transition-all duration-300",
+            currentPanel === 1 ? "bg-[#22D3EE] w-8" : "bg-slate-600"
+          )} />
         </div>
-      ))}
-    </div>
-  </div>
-        
-        {/* CAMBIO 3: HACER DINÁMICO EL TEXTO DEL HOVER */}
-        <div className="h-10 flex items-center justify-center">
-          {hoveredGuarantee !== null && (
-            <p className="text-xs text-slate-500 max-w-md animate-in fade-in duration-300">
-              {[
-                `${companyName} solo recibe resultados grupales. Mínimo 5 personas por grupo.`,
-                `${questionCount} preguntas diseñadas para completar en ${estimatedTime} minutos.`,
-                "Metodología científica validada. Insights accionables garantizados."
-              ][hoveredGuarantee]}
-            </p>
-          )}
-        </div>
-      </div>
-      
-      {/* CTA Principal - Botón que cambia a púrpura al hover */}
-      <div className="flex flex-col items-center space-y-6">
-        <button
-          onClick={handleStartSurvey}
-          className={cn(
-            "px-12 py-3 rounded-full",
-            "bg-[#22D3EE] text-white font-medium",
-            "transition-all duration-300",
-            "hover:bg-[#A78BFA] hover:shadow-lg hover:shadow-[#A78BFA]/25",
-            "hover:scale-[1.02] active:scale-100"
-          )}
-        >
-          Comenzar Evaluación
-        </button>
-        
-        {/* Volver - minimalista */}
-        <button
-          onClick={() => setCurrentPanel(0)}
-          className="text-slate-500 hover:text-slate-300 text-sm transition-colors"
-        >
-          ← Volver
-        </button>
-      </div>
-    </div>
-    
-    {/* Indicadores y footer mínimo */}
-    <div className="mt-1">
-      <div className="flex justify-center gap-2 mb-4">
-        <div className={cn("w-2 h-2 rounded-full transition-all", currentPanel === 0 ? "bg-[#22D3EE] w-6" : "bg-white/20")} />
-        <div className={cn("w-2 h-2 rounded-full transition-all", currentPanel === 1 ? "bg-[#22D3EE] w-6" : "bg-white/20")} />
-      </div>
-      
-      {/* CAMBIO 4: AGREGAR METODOLOGÍA AQUÍ */}
-      <p className="text-center text-[10px] text-slate-700 uppercase tracking-wider mb-2">
-        Metodología FocalizaHR: {campaignTypeName || "Evaluación Estratégica"}
-      </p>
-      
-      <p className="text-center text-xs text-slate-600">
-        Proceso confidencial garantizado por FocalizaHR
-      </p>
-    </div>
-  </div>
-)}
+
       </div>
     </div>
   );
 }
 
-// Exportación compatible con UnifiedSurveyComponent
+// Exportación compatible
 export { WelcomeScreen };

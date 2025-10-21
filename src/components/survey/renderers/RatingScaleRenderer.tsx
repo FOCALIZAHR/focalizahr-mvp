@@ -26,6 +26,7 @@ export const RatingScaleRenderer: React.FC<RatingScaleRendererProps> = ({
       variants={scaleIn} 
       initial="initial" 
       animate="animate" 
+      transition={{ duration: 0.2, ease: "easeOut" }}  // Para scaleIn
       className="space-y-6"
     >
       {/* Botones de escala */}

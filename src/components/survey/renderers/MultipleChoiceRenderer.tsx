@@ -34,6 +34,7 @@ export const MultipleChoiceRenderer: React.FC<MultipleChoiceRendererProps> = ({
       variants={fadeIn} 
       initial="initial" 
       animate="animate"
+      transition={{ duration: 0.3, ease: "easeOut" }}  // ← AGREGAR ESTO
       className="space-y-4"
     >
       {exactCount && (
