@@ -2,7 +2,14 @@
 // FOCALIZAHR TYPE DEFINITIONS - RESTORED VERSION
 // Restauración quirúrgica preservando contratos de datos enriquecidos
 // Last Updated: 2025
+// ========================================
+// TYPE IMPORTS - Tipos auxiliares externos
+// ========================================
 
+import type { TopMoverTrend } from '@/lib/utils/monitor-utils';
+
+// Re-exportar para que otros archivos también puedan importarlo desde aquí
+export type { TopMoverTrend };
 // ========================================
 // DOMAIN MODELS - Definidos directamente sin herencia
 // ========================================
@@ -185,25 +192,7 @@ export interface Analytics {
   demographicBreakdown?: any[];
   lastUpdated: string;
   // Campo para datos jerárquicos
-  hierarchicalData?: Array<{
-    id: string;
-    displayName: string;
-    unitType: string;
-    level: number;
-    score: number;
-    participants: number;
-    employeeCount?: number;
-    children: Array<{
-      id: string;
-      displayName: string;
-      unitType: string;
-      level: number;
-      score: number;
-      participants: number;
-      responded: number;
-      rate: number;
-    }>;
-  }> | null;
+  hierarchicalData?: AggregatedGerencia[] | null;
   trendDataByDepartment?: Record<string, any>;
 }
 
@@ -786,40 +775,98 @@ export interface CardState {
   icon: 'alert' | 'trending' | 'check' | 'activity';
 }
 
+// ====================================================================
+// 🎯 INTERFACE CAMPAIGNMONITORDATA COMPLETA Y DEFINITIVA
+// Para reemplazar en src/types/index.ts
+// ====================================================================
+
 export interface CampaignMonitorData {
-  // Propiedades básicas
-  campaignId?: string;
-  isLoading?: boolean;
-  error?: string | null;
-  lastRefresh?: Date | string;
+  // ====================================================================
+  // PROPIEDADES BÁSICAS
+  // ====================================================================
+  isLoading: boolean;
+  id: string;
+  name: string;
+  type: string;
+  status: string;
   
-  // Datos principales
+  // ====================================================================
+  // MÉTRICAS PRINCIPALES
+  // ====================================================================
+  participationRate: number;
+  totalInvited: number;
+  totalResponded: number;
+  daysRemaining: number;
+  
+  // ====================================================================
+  // FECHAS
+  // ====================================================================
+  startDate: string;
+  endDate: string;
+  lastRefresh: Date;
+  
+  // ====================================================================
+  // DATOS DEPARTAMENTALES
+  // ====================================================================
+  byDepartment: Record<string, DepartmentMonitorData & { displayName?: string }>;
+  dailyResponses: DailyResponse[];
+  recentActivity: ActivityItem[];
+  
+  // ====================================================================
+  // COMPONENTES WOW - DATOS CALCULADOS COMPLETOS
+  // ====================================================================
+  engagementHeatmap?: EngagementHeatmapData;
+  participationPrediction?: ParticipationPredictionData;
+  departmentAnomalies: DepartmentAnomalyData[];
+  positiveAnomalies: DepartmentAnomalyData[];
+  negativeAnomalies: DepartmentAnomalyData[];
+  meanRate: number;
+  totalDepartments: number;
+  crossStudyComparison?: CrossStudyComparisonData;
+  
+  // ====================================================================
+  // INTELIGENCIA AVANZADA
+  // ====================================================================
+  departmentalIntelligence: DepartmentalIntelligence;
+  topMovers: Array<{ 
+    name: string; 
+    momentum: number; 
+    trend: TopMoverTrend; 
+    isFallback?: boolean 
+  }>;
+  cockpitIntelligence?: CockpitIntelligence;
+  departmentMomentum?: DepartmentMomentumData;
+  leadershipAnalysis?: LeadershipAnalysis;  // ✅ LA PROPIEDAD CRÍTICA
+  
+  // ====================================================================
+  // DATOS VISUALIZACIÓN
+  // ====================================================================
+  riskTrendData: Array<{date: string, rate: number}>;
+  departmentSizes: Record<string, number>;
+  momentumGaugeData: Array<{value: number, fill: string}>;
+  
+  // ====================================================================
+  // VISTA JERÁRQUICA
+  // ====================================================================
+  viewLevel: 'department' | 'gerencia';
+  setViewLevel: (level: 'department' | 'gerencia') => void;
+  hasHierarchy: boolean;
+  gerenciaData: GerenciaData[] | null;
+  hierarchicalData?: AggregatedGerencia[] | null;  // ← AGREGAR ESTA LÍNEA
+  
+  // ====================================================================
+  // DATOS OPCIONALES LEGACY (para compatibilidad)
+  // ====================================================================
+  campaignId?: string;
   campaign?: Campaign;
   analytics?: Analytics;
   participants?: ParticipantsData;
-  
-  // Datos calculados Monitor
-  riskTrendData?: Array<{date: string, rate: number}>;
-  departmentSizes?: Record<string, number>;
-  momentumGaugeData?: Array<{value: number, fill: string}>;
-  
-  // Inteligencia
-  cockpitIntelligence?: CockpitIntelligence;
-  departmentalIntelligence?: DepartmentalIntelligence;
-  engagementHeatmap?: EngagementHeatmapData;
-  participationPrediction?: ParticipationPredictionData;
-  crossStudyComparison?: CrossStudyComparison;
-  anomalyDetection?: {
-    positiveAnomalies: DepartmentAnomalyData[];
-    negativeAnomalies: DepartmentAnomalyData[];
-  };
-  
-  // Datos adicionales
-  topMovers?: any;
+  error?: string | null;
   departmentPulse?: any;
-  leadershipAnalysis?: any;
   
-  // Métodos
+  // ====================================================================
+  // MÉTODOS
+  // ====================================================================
   handleRefresh?: () => void;
 }
 
@@ -839,9 +886,13 @@ export interface AggregatedGerencia {
   employeeCount?: number;
   children: DepartmentChild[];
   momentum?: number;
-  trend?: 'up' | 'down' | 'stable';
+  trend?: 'acelerando' | 'desacelerando' | 'estable' | 'crítico' | null;  // ✅ CORRECTO
+  velocity?: number;  // ✅ AGREGAR (faltaba)
   projection?: number;
+  position?: number;  // ✅ AGREGAR (faltaba)
 }
+// Alias para compatibilidad con hook
+export type GerenciaData = AggregatedGerencia;  // ← AGREGAR ESTA LÍNEA
 
 export interface DepartmentChild {
   id: string;
@@ -873,23 +924,44 @@ export interface DemographicsStats {
 import type { 
   DemographicPattern, 
   ParticipationAnomaly, 
-  LeadershipFingerprint 
+  LeadershipFingerprint,
+
 } from '@/lib/services/PatternDetector';
 
 export type { 
   DemographicPattern, 
   ParticipationAnomaly, 
-  LeadershipFingerprint 
+  LeadershipFingerprint,
 };
 
-export interface LeadershipAnalysis {
-  pattern: DemographicPattern | null;
-  anomaly: ParticipationAnomaly | null;
-  insight: string;
-  fingerprint: LeadershipFingerprint | null;
-  hasData: boolean;
-}
 
+export interface LeadershipAnalysis {
+  byDepartment: Record<string, {
+    pattern: DemographicPattern | null;
+    anomaly: ParticipationAnomaly | null;
+    insight: string;
+    fingerprint: LeadershipFingerprint | null;
+    hasData: boolean;
+  }>;
+  global: {
+    pattern: DemographicPattern | null;
+    anomaly: ParticipationAnomaly | null;
+    insight: string;
+    fingerprint: LeadershipFingerprint | null;
+    hasData: boolean;
+  };
+  criticalDepartments: Array<{
+    department: string;
+    issue: string;
+    severity: string;
+    insight: string;
+  }>;
+  exemplaryDepartments: Array<{
+    department: string;
+    impactScore: number;
+    insight: string;
+  }>;
+}
 // ========================================
 // CONTEXT & HOOK TYPES
 // ========================================

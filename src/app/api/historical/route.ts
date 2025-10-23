@@ -3,7 +3,8 @@
 // src/app/api/historical/route.ts
 // Chat 4B: Cross-Study Comparator - BACKEND CEREBRO IMPLEMENTATION
 // ====================================================================
-
+// ⭐ AGREGAR ESTA LÍNEA AL INICIO
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyJWT } from '@/lib/auth';

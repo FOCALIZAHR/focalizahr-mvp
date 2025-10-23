@@ -1,4 +1,6 @@
 // src/app/api/admin/structures/overview/route.ts
+// ⭐ AGREGAR ESTA LÍNEA AL INICIO
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateAuthToken } from '@/lib/auth';

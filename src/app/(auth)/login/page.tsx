@@ -1,12 +1,20 @@
-import React from 'react'
+import React, { Suspense } from 'react'
 import AuthForm from '@/components/forms/AuthForm'
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Iniciar Sesión - FocalizaHR MVP',
+  title: 'Iniciar Sesión - FocalizaHR',
   description: 'Accede a tu cuenta de FocalizaHR y gestiona tus campañas de clima laboral'
 }
 
 export default function LoginPage() {
-  return <AuthForm mode="login" />
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <AuthForm mode="login" />
+    </Suspense>
+  )
 }

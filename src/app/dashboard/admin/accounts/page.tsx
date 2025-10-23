@@ -1,3 +1,6 @@
+// ⚡ FIX: Agregar directiva dynamic para resolver error de searchParams
+export const dynamic = 'force-dynamic';
+
 // /app/dashboard/admin/accounts/page.tsx
 import { Suspense } from 'react';
 import Link from 'next/link';

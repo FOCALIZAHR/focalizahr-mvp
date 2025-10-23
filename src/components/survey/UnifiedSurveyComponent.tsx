@@ -91,10 +91,12 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
     getCurrentValidationRule,
     handleSubmit,
     handleSave,
-    getProgress
+    getProgress,
+    getCurrentCategory  // ← LÍNEA NUEVA
   } = useSurveyEngine(questions, configuration, onSubmit, onSave);
 
   const progress = getProgress();
+  const currentCategory = getCurrentCategory();  // ← LÍNEA NUEVA
   
   // Estado local para categorías vistas
   const [viewedCategories, setViewedCategories] = useState<Set<string>>(new Set());
@@ -226,20 +228,17 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
       />
 
       {/* Contenido principal con padding para header */}
-      <div className="survey-content">   
+      <div className="survey-content">
         <AnimatePresence mode="wait">
           {/* Portada de categoría */}
-          {shouldShowCategoryIntro && currentQuestion && (
+
+          {shouldShowCategoryIntro && currentCategory && (
             <CategoryIntroCard
-              category={{
-                ...config.categoryConfigs[currentQuestion.category],
-                id: currentQuestion.category
-              }}
+              category={currentCategory}
               onContinue={handleCategoryIntroContinue}
-              questionCount={questions.filter(q => q.category === currentQuestion.category).length}
               currentSection={currentCategoryIndex + 1}
               totalSections={uniqueCategories.length}
-            />
+/>
           )}
           
           {/* Pregunta actual */}

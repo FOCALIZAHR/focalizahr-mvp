@@ -8,6 +8,8 @@ interface SurveyHeaderProps {
   companyName?: string;
   companyLogo?: string;
   campaignName?: string;
+  campaignTypeName?: string;      // ← AGREGAR
+  estimatedDuration?: number;     // ← AGREGAR
   progress: {
     current: number;
     total: number;

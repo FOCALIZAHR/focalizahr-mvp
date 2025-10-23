@@ -197,7 +197,7 @@ const getFallbackTemplates = (results: any): CommunicationTemplate[] => {
 
   // Templates departamentales (si disponibles)
   if (results.department_scores && Object.keys(results.department_scores).length > 0) {
-    const deptEntries = Object.entries(results.department_scores);
+    const deptEntries = Object.entries(results.department_scores) as [string, number][];
     const strongest = deptEntries.reduce((prev, current) => 
       prev[1] > current[1] ? prev : current
     );

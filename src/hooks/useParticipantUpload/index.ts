@@ -243,7 +243,7 @@ export function useParticipantUpload(
     
     const averageSeniority = seniorityYears.length > 0 
       ? Math.round(seniorityYears.reduce((a, b) => a + b, 0) / seniorityYears.length * 10) / 10
-      : null;
+      : undefined;
     
     // ✅ CALCULAR ESTADÍSTICAS DE CONTACTO
     const contactChannels = {

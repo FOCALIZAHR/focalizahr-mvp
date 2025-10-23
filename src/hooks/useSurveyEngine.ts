@@ -198,14 +198,26 @@ export function useSurveyEngine(
   const getCurrentCategory = useCallback(() => {
     if (!currentQuestion) return null;
     const category = currentQuestion.category;
+
     if (config.categoryConfigs && config.categoryConfigs[category]) {
+      const categoryQuestionCount = questions.filter(
+        q => q.category === category
+      ).length;
+
       return {
-        ...config.categoryConfigs[category],
-        id: category
+        name: category,
+        displayName: config.categoryConfigs[category].displayName,
+        description: config.categoryConfigs[category].description,
+        icon: config.categoryConfigs[category].icon,
+        color: config.categoryConfigs[category].color,
+        questionCount: categoryQuestionCount,
+        motivationalText: config.categoryConfigs[category].motivationalText,
+        order: config.categoryConfigs[category].order
       };
     }
+
     return null;
-  }, [currentQuestion, config.categoryConfigs]);
+  }, [currentQuestion, config.categoryConfigs, questions]);
 
   // Obtener respuesta actual (memoizado)
   const getCurrentResponse = useCallback(() => {
@@ -324,7 +336,7 @@ export function useSurveyEngine(
 
   // Obtener validación para pregunta actual (memoizado)
   const getCurrentValidationRule = useCallback(() => {
-    if (!currentQuestion) return null;
+     if (!currentQuestion) return undefined;  // ← SOLO ESTE CAMBIO
     return config.validationRules.find(
       r => r.questionOrder === currentQuestion.questionOrder
     );

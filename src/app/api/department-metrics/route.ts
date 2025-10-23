@@ -3,7 +3,8 @@
 // CHAT 9 REFACTORIZADO - Enterprise Security
 // Lista métricas departamentales con filtros
 // ============================================
-
+// ⭐ AGREGAR ESTA LÍNEA AL INICIO
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { departmentMetricsQuerySchema } from '@/lib/validations/departmentMetrics'

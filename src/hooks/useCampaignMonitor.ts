@@ -23,7 +23,6 @@ import {
   calculateParticipationPrediction,
   calculateDepartmentAnomalies,
   calculateDepartmentMomentum,
-  TopMoverTrend // ✅ AGREGAR ESTO
 } from '@/lib/utils/monitor-utils';
 import { PatternDetector } from '@/lib/services/PatternDetector';
 import type { 
@@ -37,6 +36,10 @@ import type {
   DepartmentalIntelligence,
   TacticalRecommendation,  // ← AGREGAR ESTA LÍNEA
   DepartmentMomentumData,  // ← AGREGAR ESTA LÍNEA
+  LeadershipAnalysis,        // ← DEBE ESTAR
+  CampaignMonitorData,       // ← DEBE ESTAR
+  TopMoverTrend, // ✅ AGREGAR ESTO
+  GerenciaData               // ← AGREGAR ESTA
 } from '@/types'
 
 // ✅ INTERFACE EXTENDIDA PARA CORREGIR ERROR TYPESCRIPT
@@ -50,28 +53,8 @@ interface HistoricalDataResponse {
 // ====================================================================
 // 🏢 CAMBIO 1: AGREGAR INTERFACE PARA DATOS DE GERENCIA
 // ====================================================================
-// ✅ REEMPLAZAR POR ESTO (interface correcta):
-interface GerenciaData {
-  id: string;
-  displayName: string;
-  participants: number;
-  responded: number;
-  scoreNum: number;      // CAMBIAR de: score: string
-  rateNum: number;       // CAMBIAR de: rate: string
-  children: Array<{
-    id: string;
-    displayName: string;
-    scoreNum: number;    // CAMBIO: era 'score: string'
-    rateNum: number;     // CAMBIO: era 'rate: string'
-    responded: number;
-    participants: number;
-  }>;
-  // Campos opcionales de IA
-  trend?: 'acelerando' | 'desacelerando' | 'estable' | 'crítico' | null;
-  velocity?: number;
-  projection?: number;
-  position?: number;
-}
+// ✅ REEMPLAZAR POR ESTO (interface correcta-SE MIGRO TODA LA INTERFACE AL INDEX.TS):
+
 // ====================================================================
 // 🧠 COCKPIT INTELLIGENCE - TRASPLANTE DE CEREBRO DIRECTO
 // TODAS LAS FUNCIONES ORIGINALES PRESERVADAS
@@ -605,52 +588,6 @@ function getPatternAnalysis(
   };
 }
 
-// ✅ INTERFACE PRINCIPAL DEL MONITOR - EXTENDIDA CON COCKPIT INTELLIGENCE
-export interface CampaignMonitorData {
-  isLoading: boolean;
-  id: string;
-  name: string;
-  type: string;
-  status: string;
-  participationRate: number;
-  totalInvited: number;
-  totalResponded: number;
-  daysRemaining: number;
-  startDate: string;
-  endDate: string;
-  byDepartment: Record<string, DepartmentMonitorData & { displayName?: string }>;
-  dailyResponses: DailyResponse[];
-  recentActivity: ActivityItem[];
-  lastRefresh: Date;
-  // 🔥 COMPONENTES WOW - DATOS CALCULADOS COMPLETOS
-  engagementHeatmap?: EngagementHeatmapData;
-  participationPrediction?: ParticipationPredictionData;
-  departmentAnomalies: DepartmentAnomalyData[];
-  positiveAnomalies: DepartmentAnomalyData[];
-  negativeAnomalies: DepartmentAnomalyData[];
-  meanRate: number;
-  totalDepartments: number;
-  crossStudyComparison?: CrossStudyComparisonData;
-  // 🧠 DEPARTMENTAL INTELLIGENCE - Datos procesados para componente híbrido
-  departmentalIntelligence: DepartmentalIntelligence;
-  // 🎯 TOP MOVERS - Nueva inteligencia momentum departamental
-  topMovers: Array<{ name: string; momentum: number; trend: TopMoverTrend; isFallback?: boolean }>;
-  // 🧠 COCKPIT INTELLIGENCE - CEREBRO TRASPLANTADO
-  cockpitIntelligence?: CockpitIntelligence;
-  // ✅ AGREGAR NUEVO CAMPO - MOMENTUM DEPARTAMENTAL
-  departmentMomentum?: DepartmentMomentumData;
-  // ✅ EXTENSIÓN TARJETAS VIVAS - NUEVAS PROPIEDADES
-  riskTrendData: Array<{date: string, rate: number}>;
-  departmentSizes: Record<string, number>;
-  momentumGaugeData: Array<{value: number, fill: string}>;
-  // ====================================================================
-  // 🏢 CAMBIO 2: AGREGAR CAMPOS PARA VISTA JERÁRQUICA
-  // ====================================================================
-  viewLevel: 'department' | 'gerencia';
-  setViewLevel: (level: 'department' | 'gerencia') => void;
-  hasHierarchy: boolean;
-  gerenciaData: GerenciaData[] | null;
-}
 
 // ====================================================================
 // 🎯 HOOK PRINCIPAL - REORGANIZADO EN SINGLE useMemo (SIN ELIMINAR CÓDIGO)
