@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { Toaster } from 'sonner';
 import { ToastProvider } from '@/components/ui/toast-system';
@@ -25,8 +25,12 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'FocalizaHR MVP - Pulso de Bienestar',
     description: 'Plataforma de clima laboral para PyMEs chilenas'
-  },
-  viewport: 'width=device-width, initial-scale=1',
+  }
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
   themeColor: '#22D3EE'
 }
 

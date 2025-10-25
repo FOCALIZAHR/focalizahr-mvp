@@ -7,6 +7,14 @@ export const metadata: Metadata = {
   description: 'Accede a tu cuenta de FocalizaHR y gestiona tus campañas de clima laboral'
 }
 
+export function generateViewport() {
+  return {
+    width: 'device-width',
+    initialScale: 1,
+    themeColor: '#22D3EE'
+  }
+}
+
 export default function LoginPage() {
   return (
     <Suspense fallback={

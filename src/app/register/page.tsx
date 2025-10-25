@@ -1,4 +1,3 @@
-
 import React, { Suspense } from 'react'
 import AuthForm from '@/components/forms/AuthForm'
 import { Metadata } from 'next'
@@ -6,6 +5,14 @@ import { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'Registro - FocalizaHR',
   description: 'Registra tu empresa y comienza a medir el clima laboral con FocalizaHR'
+}
+
+export function generateViewport() {
+  return {
+    width: 'device-width',
+    initialScale: 1,
+    themeColor: '#22D3EE'
+  }
 }
 
 export default function RegisterPage() {
