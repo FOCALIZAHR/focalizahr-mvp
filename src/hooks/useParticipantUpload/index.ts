@@ -113,6 +113,9 @@ export function useParticipantUpload(
   const [state, dispatch] = useReducer(participantUploadReducer, initialState);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // ✅ PASO 2.1: Crear constante API_URL con arquitectura RESTful
+  const API_URL = `/api/campaigns/${campaignId}/participants/upload`;
+  
   // Validar archivo
   const validateFile = useCallback((file: File): string | null => {
     const fileExtension = `.${file.name.split('.').pop()?.toLowerCase()}`;
@@ -286,8 +289,8 @@ export function useParticipantUpload(
       
       const formData = new FormData();
       formData.append('file', state.uploadFile);
-      formData.append('campaignId', campaignId);
-      formData.append('action', 'preview');
+      // ❌ REMOVIDO: formData.append('campaignId', campaignId); - Ya está en URL
+      // ❌ REMOVIDO: formData.append('action', 'preview'); - Ahora en query params
       
       if (state.selectedDepartmentId && state.selectedDepartmentId !== 'none') {
         formData.append('defaultDepartmentId', state.selectedDepartmentId);
@@ -295,7 +298,8 @@ export function useParticipantUpload(
       
       const token = localStorage.getItem('focalizahr_token');
       
-      const response = await fetch('/api/admin/participants', {
+      // ✅ PASO 2.2: Actualizar URL y mover action a query params
+      const response = await fetch(`${API_URL}?action=preview`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -332,7 +336,7 @@ export function useParticipantUpload(
     } finally {
       dispatch({ type: 'SET_UPLOADING', payload: false });
     }
-  }, [state.uploadFile, state.selectedDepartmentId, campaignId, calculateDemographics, onError]);
+  }, [state.uploadFile, state.selectedDepartmentId, campaignId, calculateDemographics, onError, API_URL]);
   
   // Confirmar carga
   const handleConfirmUpload = useCallback(async () => {
@@ -347,8 +351,8 @@ export function useParticipantUpload(
       
       const formData = new FormData();
       formData.append('file', state.uploadFile);
-      formData.append('campaignId', campaignId);
-      formData.append('action', 'confirm');
+      // ❌ REMOVIDO: formData.append('campaignId', campaignId); - Ya está en URL
+      // ❌ REMOVIDO: formData.append('action', 'confirm'); - Ahora en query params
       
       if (state.selectedDepartmentId && state.selectedDepartmentId !== 'none') {
         formData.append('defaultDepartmentId', state.selectedDepartmentId);
@@ -356,7 +360,8 @@ export function useParticipantUpload(
       
       const token = localStorage.getItem('focalizahr_token');
       
-      const response = await fetch('/api/admin/participants', {
+      // ✅ PASO 2.2: Actualizar URL y mover action a query params
+      const response = await fetch(`${API_URL}?action=confirm`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -386,7 +391,7 @@ export function useParticipantUpload(
     } finally {
       dispatch({ type: 'SET_PROCESSING', payload: false });
     }
-  }, [state.uploadFile, state.uploadResult, state.selectedDepartmentId, state.previewData, campaignId, onUploadComplete, onError]);
+  }, [state.uploadFile, state.uploadResult, state.selectedDepartmentId, state.previewData, campaignId, onUploadComplete, onError, API_URL]);
   
   // Limpiar formulario
   const handleClearForm = useCallback(() => {

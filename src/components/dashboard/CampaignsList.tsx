@@ -126,6 +126,9 @@ export default function EnhancedCampaignsList() {
       case 'edit':
         router.push(`/dashboard/campaigns/${campaignId}/edit`);
         break;
+      case 'manage-participants':
+        router.push(`/dashboard/campaigns/${campaignId}/participants`);
+        break;
       default:
         console.log(`Acción: ${action} para campaña ${campaignName}`);
     }
@@ -190,7 +193,9 @@ export default function EnhancedCampaignsList() {
     // Acciones basadas en estado
     switch (campaign.status) {
       case 'draft':
+        // ✅ LÓGICA EXCLUSIVA: Solo UNO de los dos
         if (campaign.totalInvited > 0 && campaign.canActivate) {
+          // Si tiene participantes → Mostrar ACTIVAR
           actions.push({
             id: 'activate',
             label: 'Activar',
@@ -198,7 +203,18 @@ export default function EnhancedCampaignsList() {
             variant: 'default' as const,
             onClick: () => handleStateChange(campaign.id, 'active', 'activate')
           });
+        } else {
+          // Si NO tiene participantes → Mostrar GESTIONAR PARTICIPANTES
+          actions.push({
+            id: 'manage-participants',
+            label: 'Gestionar',
+            icon: Users,
+            variant: 'default' as const,
+            onClick: () => handleCampaignAction('manage-participants', campaign.id, campaign.name)
+          });
         }
+        
+        // Botón editar siempre visible
         actions.push({
           id: 'edit',
           label: 'Editar',
@@ -218,7 +234,7 @@ export default function EnhancedCampaignsList() {
         });
         actions.push({
           id: 'complete',
-          label: 'Completar',
+          label: 'Finalizar',
           icon: CheckCircle,
           variant: 'secondary' as const,
           onClick: () => handleStateChange(campaign.id, 'completed', 'complete')
@@ -236,7 +252,7 @@ export default function EnhancedCampaignsList() {
         if (campaign.canViewResults) {
           actions.push({
             id: 'results',
-            label: 'Ver Resultados',
+            label: 'Resultados',
             icon: BarChart3,
             variant: 'default' as const,
             onClick: () => handleCampaignAction('results', campaign.id, campaign.name)
@@ -273,7 +289,7 @@ export default function EnhancedCampaignsList() {
               <Button 
                 size="sm" 
                 onClick={() => router.push('/dashboard/campaigns/new')}
-                className="focus-ring"
+                className="bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-700 hover:to-purple-700 text-white shadow-lg"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Nueva Campaña
@@ -366,10 +382,10 @@ export default function EnhancedCampaignsList() {
                   <CardContent className="p-6">
                     <div className="space-y-4">
                       {/* Header de campaña */}
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-3">
-                            <h3 className="font-semibold text-lg">{campaign.name}</h3>
+                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                        <div className="space-y-1 flex-1 min-w-0">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <h3 className="font-semibold text-lg truncate">{campaign.name}</h3>
                             {getStatusBadge(campaign.status, campaign.riskLevel)}
                           </div>
                           <p className="text-sm text-muted-foreground">
@@ -377,40 +393,30 @@ export default function EnhancedCampaignsList() {
                           </p>
                         </div>
                         
-                        {/* SECCIÓN BOTONES OPTIMIZADA - TAMAÑOS UNIFORMES */}
-                        {/* SECCIÓN BOTONES OPTIMIZADA - ESTILO SITIO OFICIAL FOCALIZAHR */}
-                        <div className="flex items-center gap-3 flex-wrap">
+                        {/* ✅ BOTONES CON ANCHO FIJO Y GRID RESPONSIVO */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 lg:w-auto">
                           {getAvailableActions(campaign).map((action) => {
                             const IconComponent = action.icon;
                             
-                            // Determinar si es botón primario según estado campaña
+                            // Determinar si es botón primario
                             const isPrimary = (campaign.status === 'active' && action.id === 'monitor') || 
-                                            (campaign.status === 'draft' && action.id === 'activate') ||
+                                            (campaign.status === 'draft' && (action.id === 'activate' || action.id === 'manage-participants')) ||
                                             (campaign.status === 'completed' && action.id === 'results');
                             
                             return (
-                              <button
+                              <Button
                                 key={action.id}
                                 onClick={action.onClick}
+                                size="sm"
+                                variant={isPrimary ? 'default' : action.variant}
                                 className={`
-                                  inline-flex items-center justify-center
-                                  font-semibold text-sm whitespace-nowrap
-                                  border-radius-12 transition-all duration-300
-                                  min-w-[130px] h-[40px]
-                                  ${isPrimary 
-                                    ? 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white border-0 shadow-lg hover:shadow-xl hover:scale-105 hover:-translate-y-0.5' 
-                                    : action.variant === 'destructive'
-                                      ? 'bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 hover:scale-105'
-                                      : action.variant === 'secondary' 
-                                        ? 'bg-purple-500/10 text-purple-400 border border-purple-500/30 hover:bg-purple-500/20 hover:scale-105'
-                                        : 'bg-white/5 text-gray-300 border border-white/20 hover:bg-white/10 hover:border-cyan-400 hover:scale-105'
-                                  }
+                                  w-full sm:w-[130px]
+                                  ${isPrimary ? 'bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-700 hover:to-purple-700' : ''}
                                 `}
-                                style={{ borderRadius: '12px' }}
                               >
-                                <IconComponent className="h-4 w-4 mr-2" />
-                                {action.label === 'Completar' ? 'Finalizar' : action.label}
-                              </button>
+                                <IconComponent className="h-4 w-4 mr-2 flex-shrink-0" />
+                                <span className="truncate">{action.label}</span>
+                              </Button>
                             );
                           })}
                         </div>
@@ -425,26 +431,26 @@ export default function EnhancedCampaignsList() {
                       {/* Métricas de campaña */}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t">
                         <div className="flex items-center gap-2 text-sm">
-                          <div className="w-5 h-5 rounded bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center">
+                          <div className="w-5 h-5 rounded bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center flex-shrink-0">
                             <Users className="h-3 w-3 text-cyan-600" />
                           </div>
-                          <span>
+                          <span className="truncate">
                             <strong className="text-foreground">{campaign.totalInvited}</strong> participantes
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <div className="w-5 h-5 rounded bg-gradient-to-br from-green-500/20 to-blue-500/20 flex items-center justify-center">
+                          <div className="w-5 h-5 rounded bg-gradient-to-br from-green-500/20 to-blue-500/20 flex items-center justify-center flex-shrink-0">
                             <BarChart3 className="h-3 w-3 text-green-600" />
                           </div>
-                          <span>
+                          <span className="truncate">
                             <strong className="text-foreground">{campaign.participationRate}%</strong> participación
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <div className="w-5 h-5 rounded bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
+                          <div className="w-5 h-5 rounded bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center flex-shrink-0">
                             <Calendar className="h-3 w-3 text-purple-600" />
                           </div>
-                          <span>
+                          <span className="truncate">
                             {new Date(campaign.startDate).toLocaleDateString('es-ES')}
                           </span>
                         </div>

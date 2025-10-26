@@ -1,16 +1,14 @@
 // src/components/admin/ParticipantUploader.tsx
-// COMPONENTE ORQUESTADOR FINAL - REFACTORIZACIÓN COMPLETA
+// VERSIÓN FINAL - Sin header redundante
 'use client';
 
 import React, { useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload } from 'lucide-react';
 
 // Importar el hook con TODA la lógica
 import { useParticipantUpload } from '@/hooks/useParticipantUpload';
 import { ParticipantUploaderProps } from '@/hooks/useParticipantUpload/types';
 
-// Importar componentes UI especializados (MISMA CARPETA)
+// Importar componentes UI especializados
 import PreviewTable from '@/components/admin/PreviewTable';
 import DemographicsStats from '@/components/admin/DemographicsStats';
 import UploadStep from '@/components/admin/UploadStep';
@@ -83,75 +81,61 @@ export default function ParticipantUploader(props: ParticipantUploaderProps) {
     fetchDepartments();
   }, []);
 
-  // RENDERIZADO CONDICIONAL SIMPLE POR PASO
+  // RENDERIZADO DIRECTO - Sin header redundante
   return (
-    <Card className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Upload className="h-5 w-5 text-cyan-400" />
-          <span className="focalizahr-gradient-text">Cargar Participantes</span>
-        </CardTitle>
-        <CardDescription className="text-gray-300">
-          Campaña: <strong className="text-white">{campaignName}</strong> • 
-          Máximo {maxParticipants} participantes • 
-          <span className="text-cyan-400">Incluye datos demográficos</span>
-        </CardDescription>
-      </CardHeader>
+    <>
+      {/* ORQUESTACIÓN DIRECTA DE COMPONENTES */}
+      {(currentStep === 'idle' || currentStep === 'uploading') && (
+        <UploadStep
+          uploadFile={uploadFile}
+          uploading={uploading}
+          uploadProgress={uploadProgress}
+          uploadError={uploadError}
+          departments={departments}
+          selectedDepartmentId={selectedDepartmentId}
+          fileInputRef={fileInputRef}
+          allowedFormats={props.allowedFormats || ['.csv', '.xlsx', '.xls']}
+          onFileSelect={handleFileSelect}
+          onDownloadTemplate={handleDownloadTemplate}
+          onFilePreview={handleFilePreview}
+          onDepartmentChange={setSelectedDepartment}
+        />
+      )}
       
-      <CardContent>
-        {/* ORQUESTACIÓN SIMPLE DE COMPONENTES */}
-        {(currentStep === 'idle' || currentStep === 'uploading') && (
-          <UploadStep
-            uploadFile={uploadFile}
-            uploading={uploading}
-            uploadProgress={uploadProgress}
-            uploadError={uploadError}
-            departments={departments}
-            selectedDepartmentId={selectedDepartmentId}
-            fileInputRef={fileInputRef}
-            allowedFormats={props.allowedFormats || ['.csv', '.xlsx', '.xls']}
-            onFileSelect={handleFileSelect}
-            onDownloadTemplate={handleDownloadTemplate}
-            onFilePreview={handleFilePreview}
-            onDepartmentChange={setSelectedDepartment}
-          />
-        )}
-        
-        {currentStep === 'preview' && uploadResult && (
-          <PreviewStep
-            uploadResult={uploadResult}
-            previewData={previewData}
-            demographicsStats={demographicsStats}
-            uploadFile={uploadFile}
-            maxParticipants={maxParticipants}
-            processing={processing}
-            mode={props.mode}
-            onClearForm={handleClearForm}
-            onFilePreview={handleFilePreview}
-            onConfirmUpload={handleConfirmUpload}
-          />
-        )}
-        
-        {currentStep === 'confirming' && (
-          <LoadingStep message="Cargando participantes..." />
-        )}
-        
-        {currentStep === 'complete' && (
-          <LoadingStep 
-            message="¡Participantes cargados exitosamente!" 
-            isSuccess={true}
-            uploadResult={uploadResult}
-            demographicsStats={demographicsStats}
-          />
-        )}
-        
-        {currentStep === 'error' && uploadError && (
-          <LoadingStep 
-            message={uploadError} 
-            isError={true}
-          />
-        )}
-      </CardContent>
-    </Card>
+      {currentStep === 'preview' && uploadResult && (
+        <PreviewStep
+          uploadResult={uploadResult}
+          previewData={previewData}
+          demographicsStats={demographicsStats}
+          uploadFile={uploadFile}
+          maxParticipants={maxParticipants}
+          processing={processing}
+          mode={props.mode}
+          onClearForm={handleClearForm}
+          onFilePreview={handleFilePreview}
+          onConfirmUpload={handleConfirmUpload}
+        />
+      )}
+      
+      {currentStep === 'confirming' && (
+        <LoadingStep message="Cargando participantes..." />
+      )}
+      
+      {currentStep === 'complete' && (
+        <LoadingStep 
+          message="¡Participantes cargados exitosamente!" 
+          isSuccess={true}
+          uploadResult={uploadResult}
+          demographicsStats={demographicsStats}
+        />
+      )}
+      
+      {currentStep === 'error' && uploadError && (
+        <LoadingStep 
+          message={uploadError} 
+          isError={true}
+        />
+      )}
+    </>
   );
 }

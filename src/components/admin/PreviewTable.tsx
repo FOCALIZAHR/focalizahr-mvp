@@ -1,10 +1,9 @@
 // src/components/admin/PreviewTable.tsx
+// VERSIÓN FINAL - Con scrollbars visibles y fuente optimizada
 'use client';
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Users, Calendar, User, MapPin, Briefcase, Building2, Phone, FileText } from 'lucide-react';
 import { ParticipantData, Gender, DemographicsStats } from '@/hooks/useParticipantUpload/types';
 
@@ -26,13 +25,11 @@ export default function PreviewTable({
   const formatDate = (date: string | undefined): string => {
     if (!date) return '-';
     
-    // Si viene en formato ISO
     if (date.includes('-')) {
       const d = new Date(date);
       return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
     }
     
-    // Si ya está en formato DD/MM/YYYY
     return date;
   };
   
@@ -88,280 +85,211 @@ export default function PreviewTable({
   };
   
   return (
-    <Card className="professional-card">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-cyan-400" />
-            <span className="text-cyan-400">Vista Previa de Participantes</span>
-          </div>
-          <Badge variant={participants.length > maxParticipants ? 'destructive' : 'secondary'}>
-            {participants.length} / {maxParticipants}
-          </Badge>
-        </CardTitle>
-      </CardHeader>
+    <div className="bg-white/5 border border-gray-800 rounded-lg p-6 space-y-6">
       
-      <CardContent>
-        <ScrollArea className="h-[400px] w-full rounded-md border border-white/10">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px]">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-cyan-400 uppercase tracking-wider">
-                    #
-                  </th>
-                  {/* ✅ CAMBIO 1: RUT - NUEVA COLUMNA OBLIGATORIA */}
-                  <th className="px-4 py-3 text-left text-xs font-medium text-cyan-400 uppercase tracking-wider">
-                    <FileText className="h-4 w-4 inline mr-1" />
-                    RUT <span className="text-red-400 ml-1">*</span>
-                  </th>
-                  {/* ✅ CAMBIO 2: EMAIL - AHORA OPCIONAL */}
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                    Email
-                  </th>
-                  {/* ✅ CAMBIO 3: CELULAR - NUEVA COLUMNA OPCIONAL */}
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                    <Phone className="h-4 w-4 inline mr-1" />
-                    Celular
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-cyan-400 uppercase tracking-wider">
-                    Nombre
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-cyan-400 uppercase tracking-wider">
-                    <Building2 className="h-4 w-4 inline mr-1" />
-                    Departamento
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-cyan-400 uppercase tracking-wider">
-                    <Briefcase className="h-4 w-4 inline mr-1" />
-                    Cargo
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-cyan-400 uppercase tracking-wider">
-                    <MapPin className="h-4 w-4 inline mr-1" />
-                    Ubicación
-                  </th>
-                  {showDemographics && (
-                    <>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-cyan-400 uppercase tracking-wider">
-                        <Calendar className="h-4 w-4 inline mr-1" />
-                        F. Nacimiento
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-cyan-400 uppercase tracking-wider">
-                        Edad
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-cyan-400 uppercase tracking-wider">
-                        <User className="h-4 w-4 inline mr-1" />
-                        Género
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-cyan-400 uppercase tracking-wider">
-                        <Briefcase className="h-4 w-4 inline mr-1" />
-                        F. Ingreso
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-cyan-400 uppercase tracking-wider">
-                        Antigüedad
-                      </th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              
-              <tbody className="divide-y divide-white/5">
-                {participants.map((participant, index) => {
-                  const age = calculateAge(participant.dateOfBirth);
-                  const seniority = calculateSeniority(participant.hireDate);
-                  
-                  return (
-                    <tr key={index} className="hover:bg-white/5 transition-colors">
-                      <td className="px-4 py-3 text-sm text-white/60">
-                        {index + 1}
-                      </td>
-                      
-                      {/* ✅ CAMBIO 4: MOSTRAR RUT DESTACADO */}
-                      <td className="px-4 py-3 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-semibold text-cyan-400">
-                            {participant.nationalId}
-                          </span>
-                          {!participant.email && !participant.phoneNumber && (
-                            <span className="text-xs text-red-400" title="Sin canales de contacto">
-                              ⚠️
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      
-                      {/* ✅ CAMBIO 5: EMAIL OPCIONAL CON INDICADOR */}
-                      <td className="px-4 py-3 text-sm">
-                        {participant.email ? (
-                          <span className="font-mono text-xs text-white">
-                            {participant.email}
-                          </span>
-                        ) : (
-                          <span className="text-gray-500 text-xs italic">sin email</span>
-                        )}
-                      </td>
-                      
-                      {/* ✅ CAMBIO 6: CELULAR NUEVO CON WHATSAPP INDICATOR */}
-                      <td className="px-4 py-3 text-sm">
-                        {participant.phoneNumber ? (
-                          <div className="flex items-center gap-1">
-                            <span className="font-mono text-xs text-green-400 font-medium">
-                              {participant.phoneNumber}
-                            </span>
-                            <span className="text-xs" title="WhatsApp disponible">
-                              📱
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-500 text-xs italic">sin celular</span>
-                        )}
-                      </td>
-                      
-                      <td className="px-4 py-3 text-sm text-white/80">
-                        {participant.name || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-white/80">
-                        {participant.department || <span className="text-gray-500 italic">sin departamento</span>}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-white/80">
-                        {participant.position || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-white/80">
-                        {participant.location || '-'}
-                      </td>
-                      {showDemographics && (
-                        <>
-                          <td className="px-4 py-3 text-sm text-white/80">
-                            {formatDate(participant.dateOfBirth)}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-white/80">
-                            {age !== null ? `${age} años` : '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-white/80">
-                            <Badge variant="outline" className="text-xs">
-                              {formatGender(participant.gender)}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-white/80">
-                            {formatDate(participant.hireDate)}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-white/80">
-                            <Badge variant="secondary" className="text-xs">
-                              {seniority}
-                            </Badge>
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </ScrollArea>
-        
-        {/* ✅ CAMBIO 7: RESUMEN ACTUALIZADO CON CANALES DE CONTACTO */}
-        <div className="mt-4 pt-4 border-t border-white/10">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white/5 rounded-lg border border-white/10 p-3">
-              <p className="text-xs text-cyan-400 mb-1">Total</p>
-              <p className="text-lg font-bold text-white">{participants.length}</p>
-            </div>
+      {/* Header limpio */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Users className="h-5 w-5 text-cyan-400" />
+          <h2 className="text-lg font-light text-white">Vista Previa de Participantes</h2>
+        </div>
+        <Badge className={participants.length > maxParticipants ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-purple-500/20 text-purple-300 border-purple-500/30'}>
+          {participants.length} / {maxParticipants}
+        </Badge>
+      </div>
+      
+      {/* Tabla con scroll VISIBLE */}
+      <div className="border border-gray-800 rounded-lg overflow-hidden">
+        <div 
+          className="h-[450px] w-full overflow-auto"
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#334155 #1e293b'
+          }}
+        >
+          <style jsx>{`
+            div::-webkit-scrollbar {
+              width: 12px;
+              height: 12px;
+            }
+            div::-webkit-scrollbar-track {
+              background: #1e293b;
+              border-radius: 6px;
+            }
+            div::-webkit-scrollbar-thumb {
+              background: #334155;
+              border-radius: 6px;
+            }
+            div::-webkit-scrollbar-thumb:hover {
+              background: #475569;
+            }
+          `}</style>
+          
+          <table className="w-full min-w-[1200px]">
+            <thead className="bg-gray-900 sticky top-0 z-10">
+              <tr className="border-b border-gray-800">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-cyan-400 uppercase">
+                  <FileText className="h-3 w-3 inline mr-1" />
+                  RUT *
+                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase">Email</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase">
+                  <Phone className="h-3 w-3 inline mr-1" />
+                  Celular
+                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-white uppercase">Nombre</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-white uppercase">
+                  <Building2 className="h-3 w-3 inline mr-1" />
+                  Departamento
+                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase">Cargo</th>
+                {showDemographics && (
+                  <>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase">Edad</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase">Género</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase">Antigüedad</th>
+                  </>
+                )}
+              </tr>
+            </thead>
             
-            <div className="bg-white/5 rounded-lg border border-white/10 p-3">
-              <p className="text-xs text-cyan-400 mb-1">Con Info Completa</p>
-              <p className="text-lg font-bold text-white">
-                {participants.filter(p => p.name && p.department && p.position).length}
+            <tbody className="divide-y divide-gray-800/50 bg-slate-900/30">
+              {participants.map((participant, index) => {
+                const age = calculateAge(participant.dateOfBirth);
+                const seniority = calculateSeniority(participant.hireDate);
+                
+                return (
+                  <tr key={index} className="hover:bg-white/5 transition-colors">
+                    <td className="px-3 py-2 text-xs text-gray-500">{index + 1}</td>
+                    
+                    {/* RUT */}
+                    <td className="px-3 py-2">
+                      <span className="font-mono text-xs text-cyan-400 font-medium">
+                        {participant.nationalId || '-'}
+                      </span>
+                    </td>
+                    
+                    {/* Email */}
+                    <td className="px-3 py-2">
+                      {participant.email ? (
+                        <span className="text-gray-300 text-xs">
+                          {participant.email}
+                        </span>
+                      ) : (
+                        <span className="text-gray-600 text-xs italic">sin email</span>
+                      )}
+                    </td>
+                    
+                    {/* Celular */}
+                    <td className="px-3 py-2">
+                      {participant.phoneNumber ? (
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono text-xs text-green-400">
+                            {participant.phoneNumber}
+                          </span>
+                          <span className="text-xs">📱</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-600 text-xs italic">sin celular</span>
+                      )}
+                    </td>
+                    
+                    <td className="px-3 py-2 text-xs text-white font-medium">
+                      {participant.name || '-'}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-white">
+                      {participant.department || <span className="text-gray-600 italic">sin departamento</span>}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-300">
+                      {participant.position || '-'}
+                    </td>
+                    
+                    {showDemographics && (
+                      <>
+                        <td className="px-3 py-2 text-xs text-gray-300">
+                          {age !== null ? `${age} años` : '-'}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Badge variant="outline" className="text-xs">
+                            {formatGender(participant.gender)}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {seniority}
+                          </Badge>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      {/* Métricas pequeñas */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-4">
+          <p className="text-xs text-cyan-400 mb-1">Total</p>
+          <p className="text-2xl font-light text-white">{participants.length}</p>
+        </div>
+        
+        <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-4">
+          <p className="text-xs text-cyan-400 mb-1">Con Info Completa</p>
+          <p className="text-2xl font-light text-white">
+            {participants.filter(p => p.name && p.department && p.position).length}
+          </p>
+        </div>
+        
+        {showDemographics && (
+          <>
+            <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-4">
+              <p className="text-xs text-cyan-400 mb-1">Con Demografía</p>
+              <p className="text-2xl font-light text-white">
+                {participants.filter(p => p.dateOfBirth || p.gender || p.hireDate).length}
               </p>
             </div>
             
-            {showDemographics && (
-              <>
-                <div className="bg-white/5 rounded-lg border border-white/10 p-3">
-                  <p className="text-xs text-cyan-400 mb-1">Con Demografía</p>
-                  <p className="text-lg font-bold text-white">
-                    {participants.filter(p => p.dateOfBirth || p.gender || p.hireDate).length}
-                  </p>
+            <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-4">
+              <p className="text-xs text-cyan-400 mb-1">Con Email</p>
+              <p className="text-2xl font-light text-white">
+                {participants.filter(p => p.email).length}
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+      
+      {/* Info canales - Más sutil */}
+      {demographicsStats?.contactChannels && (
+        <div className="bg-cyan-400/5 border border-cyan-400/20 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-cyan-400">ℹ️</span>
+            <div className="flex-1 space-y-3">
+              <div>
+                <p className="text-sm text-cyan-400 font-medium mb-1.5">Campos requeridos:</p>
+                <div className="text-xs text-gray-400 space-y-1">
+                  <p>• <span className="text-cyan-400">RUT</span> obligatorio para todos</p>
+                  <p>• <span className="text-white">Email O Celular</span> al menos uno requerido</p>
                 </div>
-                
-                <div className="bg-white/5 rounded-lg border border-white/10 p-3">
-                  <p className="text-xs text-cyan-400 mb-1">Con Email</p>
-                  <p className="text-lg font-bold text-white">
-                    {participants.filter(p => p.email).length}
-                  </p>
+              </div>
+              
+              <div className="pt-3 border-t border-cyan-400/10">
+                <p className="text-xs text-cyan-400 font-medium mb-2">Canales detectados:</p>
+                <div className="flex items-center gap-4 text-xs text-gray-400">
+                  <div>Email: <span className="text-white">{demographicsStats.contactChannels.withEmail}</span></div>
+                  <div>Celular: <span className="text-green-400">{demographicsStats.contactChannels.withPhone}</span></div>
+                  <div>Ambos: <span className="text-cyan-400">{demographicsStats.contactChannels.withBoth}</span></div>
                 </div>
-              </>
-            )}
-          </div>
-          
-          {/* ✅ CAMBIO 8: NOTA INFORMATIVA SOBRE CAMPOS REQUERIDOS */}
-          <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-            <div className="flex items-start gap-3">
-              <div className="text-blue-400 text-xl">ℹ️</div>
-              <div className="flex-1 text-sm text-gray-300">
-                <p className="font-semibold text-blue-300 mb-1">Campos requeridos:</p>
-                <ul className="list-disc list-inside space-y-1 text-xs">
-                  <li>
-                    <span className="font-semibold text-cyan-400">RUT</span> - Obligatorio para todos los participantes
-                  </li>
-                  <li>
-                    <span className="font-semibold">Email O Celular</span> - Al menos uno es requerido
-                  </li>
-                  <li>
-                    <span className="text-gray-400">Departamento</span> - Opcional (se asignará automáticamente si falta)
-                  </li>
-                </ul>
-                
-                {/* ✅ CAMBIO 9: ESTADÍSTICAS DE CANALES DE CONTACTO */}
-                {demographicsStats?.contactChannels && (
-                  <div className="mt-3 pt-3 border-t border-blue-500/20">
-                    <p className="font-semibold text-blue-300 mb-2">Canales de contacto detectados:</p>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
-                      <div className="bg-gray-800/50 rounded px-2 py-1">
-                        <span className="text-gray-400">Con Email:</span>
-                        <span className="ml-1 font-semibold text-white">
-                          {demographicsStats.contactChannels.withEmail}
-                        </span>
-                      </div>
-                      <div className="bg-gray-800/50 rounded px-2 py-1">
-                        <span className="text-gray-400">Con Celular:</span>
-                        <span className="ml-1 font-semibold text-green-400">
-                          {demographicsStats.contactChannels.withPhone}
-                        </span>
-                      </div>
-                      <div className="bg-gray-800/50 rounded px-2 py-1">
-                        <span className="text-gray-400">Ambos:</span>
-                        <span className="ml-1 font-semibold text-cyan-400">
-                          {demographicsStats.contactChannels.withBoth}
-                        </span>
-                      </div>
-                      <div className="bg-gray-800/50 rounded px-2 py-1">
-                        <span className="text-gray-400">Solo Email:</span>
-                        <span className="ml-1 font-semibold">
-                          {demographicsStats.contactChannels.emailOnly}
-                        </span>
-                      </div>
-                      <div className="bg-gray-800/50 rounded px-2 py-1">
-                        <span className="text-gray-400">Solo Celular:</span>
-                        <span className="ml-1 font-semibold">
-                          {demographicsStats.contactChannels.phoneOnly}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </div>
-          
-          {showDemographics && participants.some(p => p.dateOfBirth || p.gender || p.hireDate) && (
-            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <p className="text-xs text-blue-600 dark:text-blue-400">
-                💡 Datos demográficos detectados. Esto permitirá análisis más detallados de diversidad e inclusión.
-              </p>
-            </div>
-          )}
         </div>
-      </CardContent>
-    </Card>
+      )}
+      
+    </div>
   );
 }
