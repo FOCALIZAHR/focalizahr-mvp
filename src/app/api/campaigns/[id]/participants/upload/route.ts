@@ -475,8 +475,11 @@ async function loadParticipantsToDatabase(
           accountId: campaign.accountId,
           displayName: 'Departamentos sin Asignar',
           standardCategory: 'sin_asignar',
-          unitType: 'cuarentena',
-          isActive: true
+          unitType: 'departamento',  // ✅ CAMBIAR A 'departamento'
+          isActive: true,
+          technicalComplexity: 'baja',      // ✅ AGREGAR estos campos
+          emotionalComplexity: 'baja',      // ✅ también
+          marketScarcity: 'normal'          // ✅ también
         }
       });
     }

@@ -1,39 +1,27 @@
 // src/app/dashboard/admin/participants/page.tsx
+// VERSIÓN MINIMALISTA - Consistente con el resto del sistema
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import '@/app/dashboard/dashboard.css';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { 
-  Upload, 
-  FileText, 
   Users, 
-  CheckCircle, 
   AlertTriangle, 
-  Eye, 
-  Download,
-  Trash2,
-  Send,
   Clock,
   Activity,
   ArrowLeft,
   RefreshCw
 } from 'lucide-react';
 
-// Importar el componente ParticipantUploader reutilizable
 import ParticipantUploader from '@/components/admin/ParticipantUploader';
 import { useCampaignsContext } from '@/context/CampaignsContext';
 
-// Tipos para el admin panel
-// ESTA ES LA INTERFACE CORRECTA QUE SOLUCIONA EL PROBLEMA
 interface Campaign {
   id: string;
   name: string;
@@ -42,9 +30,9 @@ interface Campaign {
     name: string;
     slug: string;
   };
-  company: { // <--- Correcto
-    name: string; // <--- Correcto
-    admin_email: string; // <--- Correcto
+  company: {
+    name: string;
+    admin_email: string;
   };
   totalInvited: number;
   startDate: string;
@@ -52,7 +40,6 @@ interface Campaign {
   created_at: string;
 }
 
-// Hook para gestionar campañas pendientes
 function usePendingCampaigns() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,8 +56,7 @@ function usePendingCampaigns() {
         throw new Error('Token de autenticación no encontrado');
       }
 
-      const response = await fetch('/api/admin/participants?status=draft&withoutParticipants=true', {
-
+      const response = await fetch('/api/admin/campaigns/pending?status=draft&withoutParticipants=true', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -86,7 +72,6 @@ function usePendingCampaigns() {
 
       const data = await response.json();
       
-      // Filtrar campañas draft sin participantes
       const pendingCampaigns = (data.campaigns || []).filter((campaign: any) => 
         campaign.status === 'draft' && campaign.totalInvited === 0
       );
@@ -108,52 +93,39 @@ function usePendingCampaigns() {
   return { campaigns, loading, error, lastUpdated, refetch: fetchCampaigns };
 }
 
-// Componente principal del admin panel
 export default function AdminParticipantsPage() {
   const router = useRouter();
   const { campaigns, loading, error, lastUpdated, refetch } = usePendingCampaigns();
-  // DESPUÉS:
-const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const { fetchCampaigns: syncGlobal } = useCampaignsContext();
 
-// ✅ INTEGRACIÓN CONTEXT PARA SINCRONIZACIÓN GLOBAL
-const { fetchCampaigns: syncGlobal } = useCampaignsContext();
-  
-
-  // Manejar éxito de upload
   const handleUploadComplete = useCallback((result: { totalLoaded: number; participants: any[] }) => {
-  // Mostrar toast de éxito (profesional y visible)
-  toast.success(`✅ ${result.totalLoaded} participantes cargados exitosamente`, {
-    description: "Redirigiendo al dashboard principal...",
-    duration: 3000,
-  });
-  
-  // Remover campaña de la lista ya que ya tiene participantes
-  // ✅ SINCRONIZACIÓN DUAL: Local + Global
-if (selectedCampaign) {
-  refetch(); // Refrescar lista local admin
-  syncGlobal(); // Sincronizar dashboard principal  
-  setSelectedCampaign(null); // Limpiar selección
-}
+    toast.success(`✅ ${result.totalLoaded} participantes cargados exitosamente`, {
+      description: "Redirigiendo al dashboard principal...",
+      duration: 3000,
+    });
+    
+    if (selectedCampaign) {
+      refetch();
+      syncGlobal();
+      setSelectedCampaign(null);
+    }
 
-  // Redirección automática al dashboard después de 2.5 segundos
-  setTimeout(() => {
-    router.push('/dashboard');
-  }, 5000);
-}, [selectedCampaign, refetch, router]);
+    setTimeout(() => {
+      router.push('/dashboard');
+    }, 5000);
+  }, [selectedCampaign, refetch, syncGlobal, router]);
 
-  // Manejar errores de upload
   const handleUploadError = useCallback((error: string) => {
     console.error('Upload error:', error);
-    // El error ya se maneja en el componente ParticipantUploader
   }, []);
 
-  // Renderizar estado de carga
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center neural-dashboard">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-lg font-medium">Cargando admin panel...</span>
+          <div className="w-8 h-8 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-lg font-medium text-white">Cargando admin panel...</span>
         </div>
       </div>
     );
@@ -161,227 +133,214 @@ if (selectedCampaign) {
 
   return (
     <div className="min-h-screen neural-dashboard">
-      {/* Header del admin panel - como Card */}
-      <div className="max-w-6xl mx-auto px-6">
-        <Card className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Button
-                  onClick={() => router.push('/dashboard')}
-                  className="btn-gradient flex items-center gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4 text-cyan-400" />
-                  Volver al Dashboard
-                </Button>
-                
-                <div>
-                  <h1 className="text-3xl font-bold focalizahr-gradient-text">
-                    Admin Panel - Carga Participantes
-                  </h1>
-                  <p className="text-gray-300 mt-1">
-                    Gestión de participantes para campañas FocalizaHR (Enfoque Concierge)
-                  </p>
-                </div>
-              </div>
+      {/* Header con jerarquía visual */}
+      <div className="max-w-6xl mx-auto px-6 py-6">
+        <div className="bg-white/5 border border-gray-800 rounded-lg p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <Button
+                onClick={() => router.push('/dashboard')}
+                variant="ghost"
+                size="sm"
+                className="text-gray-500 hover:text-gray-300"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Volver
+              </Button>
               
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={refetch}
-                  className="flex items-center gap-2 border-cyan-500/30 text-cyan-400 hover:border-cyan-400 hover:bg-cyan-500/10 transition-all"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Actualizar
-                </Button>
-                
-                <div className="flex items-center gap-2 text-sm text-gray-400">
-                  <Activity className="h-4 w-4" />
-                  <span>Admin: team@focalizahr.com</span>
+              <Separator orientation="vertical" className="h-8 bg-gray-800" />
+              
+              <div>
+                <div className="flex items-center gap-3 mb-1">
+                  <h1 className="text-3xl font-light bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+                    Carga de Participantes
+                  </h1>
+                  {campaigns.length > 0 && (
+                    <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30 px-3 py-1">
+                      {campaigns.length} {campaigns.length === 1 ? 'campaña pendiente' : 'campañas pendientes'}
+                    </Badge>
+                  )}
                 </div>
+                <p className="text-sm text-gray-500">
+                  Enfoque Concierge • Admin Panel
+                </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+            
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={refetch}
+                className="text-cyan-400 hover:text-cyan-300"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Actualizar
+              </Button>
+              
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <Activity className="h-3 w-3" />
+                <span>team@focalizahr.com</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
+      <div className="max-w-6xl mx-auto px-6 pb-6 space-y-6">
         
-        {/* Mostrar mensaje de éxito global */}
-      
-
-        {/* Mostrar error global */}
+        {/* Error */}
         {error && (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="border-red-500/30 bg-red-500/10">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        {/* Lista de campañas disponibles */}
-        <Card className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        {/* Lista de campañas pendientes */}
+        <div className="bg-white/5 border border-gray-800 rounded-lg p-6 space-y-6">
+          
+          {/* Header */}
+          <div className="flex items-center justify-between pb-4 border-b border-gray-800">
+            <div className="flex items-center gap-3">
               <Clock className="h-5 w-5 text-cyan-400" />
-              Campañas Pendientes de Participantes
-              {campaigns.length > 0 && (
-                <Badge variant="secondary">{campaigns.length}</Badge>
-              )}
-            </CardTitle>
-            <CardDescription>
-              Campañas en estado 'draft' que necesitan carga de participantes
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {campaigns.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                <Users className="h-16 w-16 mx-auto mb-4 text-cyan-400/50" />
-                <p className="text-lg font-medium">No hay campañas pendientes</p>
-                <p className="text-sm mt-2">
-                  Todas las campañas activas ya tienen participantes cargados
-                </p>
-                <Button
-                  onClick={refetch}
-                  className="mt-4 btn-gradient flex items-center gap-2"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Actualizar Lista
-                </Button>
+              <div>
+                <h2 className="text-lg font-light text-white">Campañas Pendientes</h2>
+                <p className="text-xs text-gray-500">Estado 'draft' sin participantes</p>
               </div>
-            ) : (
-              <div className="grid gap-4">
-                {campaigns.map((campaign) => (
-                  <div
-                    key={campaign.id}
-                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${
-                      selectedCampaign?.id === campaign.id
-                        ? 'border-primary bg-primary/5 shadow-md'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => setSelectedCampaign(campaign)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg text-gray-900">
-                          {campaign.name}
-                        </h3>
-                        <p className="text-gray-600 font-medium">
-                         {campaign.company.name}
-                        </p>
-                        <div className="flex items-center gap-6 mt-3 text-sm text-gray-500">
-                          <div className="flex items-center gap-1">
-                            <span className="font-medium">Tipo:</span>
-                            <span>{campaign.campaignType.name}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="font-medium">Creada:</span>
-                            <span>{new Date(campaign.created_at).toLocaleDateString('es-CL')}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="font-medium">Período:</span>
-                            <span>
-                              {new Date(campaign.startDate).toLocaleDateString('es-CL')} - 
-                              {new Date(campaign.endDate).toLocaleDateString('es-CL')}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="mt-2 text-sm text-gray-600">
-                        <span className="font-medium">Email cliente:</span> {campaign.company.admin_email}
-                        </div>
-                      </div>
-                      
-                      <div className="text-right">
-                        <Badge variant="outline" className="mb-2">
-                          {campaign.status}
-                        </Badge>
-                        <p className="text-sm text-gray-500">
-                          {campaign.totalInvited} participantes
-                        </p>
-                        {selectedCampaign?.id === campaign.id && (
-                          <div className="mt-2">
-                            <Badge variant="default" className="text-xs">
-                              ✓ Seleccionada
-                            </Badge>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            </div>
+            {campaigns.length > 0 && (
+              <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+                {campaigns.length}
+              </Badge>
             )}
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Panel de carga de participantes */}
-        {selectedCampaign && (
-          <div className="space-y-6">
-            <Separator />
-            
-            <div>
-              <h2 className="text-xl font-semibold mb-2">
-                Cargar Participantes para: {selectedCampaign.name}
-              </h2>
-              <p className="text-gray-600">
-                Cliente: {selectedCampaign.company.name} ({selectedCampaign.company.admin_email})
+          {/* Lista */}
+          {campaigns.length === 0 ? (
+            <div className="text-center py-12">
+              <Users className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+              <p className="text-base text-gray-400">No hay campañas pendientes</p>
+              <p className="text-xs text-gray-600 mt-2">
+                Todas las campañas ya tienen participantes cargados
               </p>
             </div>
+          ) : (
+            <div className="space-y-3">
+              {campaigns.map((campaign) => (
+                <div
+                  key={campaign.id}
+                  className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                    selectedCampaign?.id === campaign.id
+                      ? 'border-cyan-400 bg-cyan-400/5'
+                      : 'border-gray-800 hover:border-gray-700 hover:bg-white/5'
+                  }`}
+                  onClick={() => setSelectedCampaign(campaign)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-medium text-white">
+                        {campaign.name}
+                      </h3>
+                      <p className="text-sm text-gray-400 mt-1">
+                        {campaign.company.name}
+                      </p>
+                      <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                        <span>{campaign.campaignType.name}</span>
+                        <span>•</span>
+                        <span>{new Date(campaign.created_at).toLocaleDateString('es-CL')}</span>
+                        <span>•</span>
+                        <span>{campaign.company.admin_email}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="text-right">
+                      <Badge variant="outline" className="text-xs mb-2">
+                        {campaign.status}
+                      </Badge>
+                      {selectedCampaign?.id === campaign.id && (
+                        <div className="mt-2">
+                          <Badge className="bg-cyan-400/20 text-cyan-400 border-cyan-400/30 text-xs">
+                            Seleccionada
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-            <ParticipantUploader
-              campaignId={selectedCampaign.id}
-              campaignName={selectedCampaign.name}
-              onUploadComplete={handleUploadComplete}
-              onError={handleUploadError}
-              maxParticipants={500}
-              allowedFormats={['.csv', '.xlsx', '.xls']}
-              showPreview={true}
-              mode="admin"
-            />
+        {/* Uploader */}
+        {selectedCampaign && (
+          <div className="space-y-6">
+            <Separator className="bg-gray-800" />
+            
+            <div className="bg-white/5 border border-gray-800 rounded-lg p-6">
+              <div className="mb-6">
+                <h2 className="text-base font-medium text-white">
+                  Cargar Participantes
+                </h2>
+                <p className="text-sm text-gray-400 mt-1">
+                  {selectedCampaign.name} • {selectedCampaign.company.name}
+                </p>
+              </div>
+
+              <ParticipantUploader
+                campaignId={selectedCampaign.id}
+                campaignName={selectedCampaign.name}
+                onUploadComplete={handleUploadComplete}
+                onError={handleUploadError}
+                maxParticipants={500}
+                allowedFormats={['.csv', '.xlsx', '.xls']}
+                showPreview={true}
+                mode="admin"
+              />
+            </div>
           </div>
         )}
 
-        {/* Información del workflow concierge */}
-        <Card className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50">
-          <CardContent className="p-6">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <Activity className="h-5 w-5 text-cyan-400" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-white mb-2">
-                  Workflow Concierge FocalizaHR
-                </h3>
-                <div className="space-y-2 text-gray-300 text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-r from-cyan-500 to-purple-500 text-white flex items-center justify-center text-xs font-semibold shadow-lg">1</div>
-                    <span>Cliente crea campaña via wizard → queda en estado 'draft'</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-blue-500/20 text-white flex items-center justify-center text-xs font-semibold">2</div>
-                    <span>Cliente envía CSV participantes por email</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-semibold">3</div>
-                    <span><strong>FocalizaHR procesa y carga participantes (este panel)</strong></span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-cyan-500/20 text-white flex items-center justify-center text-xs font-semibold">4</div>
-                    <span>Sistema notifica cliente automáticamente</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-blue-500/20 text-white flex items-center justify-center text-xs font-semibold">5</div>
-                    <span>Cliente activa campaña → emails automáticos</span>
-                  </div>
+        {/* Workflow info - Minimalista */}
+        <div className="bg-white/5 border border-gray-800 rounded-lg p-6">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Activity className="h-5 w-5 text-white/80" />
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-white mb-4">
+                Workflow Concierge
+              </h3>
+              <div className="space-y-2 text-xs text-gray-400">
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded-full bg-cyan-400/20 text-cyan-400 flex items-center justify-center text-xs font-medium">1</div>
+                  <span>Cliente crea campaña → estado 'draft'</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded-full bg-white/5 text-gray-400 flex items-center justify-center text-xs font-medium">2</div>
+                  <span>Cliente envía CSV por email</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded-full bg-white/5 text-gray-400 flex items-center justify-center text-xs font-medium">3</div>
+                  <span>Admin procesa y carga (este panel)</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded-full bg-white/5 text-gray-400 flex items-center justify-center text-xs font-medium">4</div>
+                  <span>Sistema notifica automáticamente</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded-full bg-white/5 text-gray-400 flex items-center justify-center text-xs font-medium">5</div>
+                  <span>Cliente activa → emails automáticos</span>
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Información de actualización */}
+        {/* Timestamp */}
         {lastUpdated && (
-          <div className="text-center text-sm text-gray-500">
+          <div className="text-center text-xs text-gray-600">
             Última actualización: {lastUpdated.toLocaleTimeString('es-CL')}
           </div>
         )}
