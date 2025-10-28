@@ -159,7 +159,7 @@ async function queueCampaignEmails(campaignId: string): Promise<{
 
         try {
           await resend.emails.send({
-            from: 'FocalizaHR <noreply@focalizahr.com>',
+            from: 'FocalizaHR <onboarding@resend.dev>',
             to: participant.email,
             subject: `Tu opinión importa - ${account.companyName}`,
             html: getEmailTemplate(participant, participant.uniqueToken),

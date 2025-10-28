@@ -245,7 +245,7 @@ export class EmailAutomationService {
 
       // Envío real con Resend
       await this.resend.emails.send({
-        from: 'FocalizaHR <noreply@focalizahr.com>',
+        from: 'FocalizaHR <onboarding@resend.dev>',
         to: data.participantEmail,
         subject: template.subject,
         html: htmlContent
