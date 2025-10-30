@@ -83,7 +83,11 @@ export const useCampaignState = ({ onSuccess }: UseCampaignStateProps = {}) => {
 
     try {
       // ✅ URL CORREGIDA: /status en lugar de /transition
-      const response = await fetch(`/api/campaigns/${campaignId}/status`, {
+      const endpoint = transition.action === 'activate'
+        ? `/api/campaigns/${campaignId}/activate`
+        : `/api/campaigns/${campaignId}/status`;
+
+      const response = await fetch(endpoint, {
         method: 'PUT', // ✅ MÉTODO CORREGIDO según el endpoint existente
         headers: {
           'Content-Type': 'application/json',

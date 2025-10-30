@@ -75,7 +75,11 @@ export default function EnhancedCampaignsList() {
         console.log(`🔄 Cambiando estado: ${action} → ${newStatus}`);
         
         const token = localStorage.getItem('focalizahr_token');
-        const response = await fetch(`/api/campaigns/${campaignId}/status`, {
+        const endpoint = action === 'activate'
+          ? `/api/campaigns/${campaignId}/activate`
+          : `/api/campaigns/${campaignId}/status`;
+
+        const response = await fetch(endpoint, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
