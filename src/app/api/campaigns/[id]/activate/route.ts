@@ -1,5 +1,6 @@
 // 📧 ACTIVATE CAMPAIGN ROUTE - VERSIÓN UNIFICADA CON TEMPLATES PREMIUM
 // Actualizado: Usa templates premium centralizados + tracking EmailLog
+// 🔧 FIX QUIRÚRGICO: Envío secuencial para respetar rate limit Resend (2 req/s)
 // Cambios críticos:
 // 1. Importa renderEmailTemplate desde módulo centralizado
 // 2. Elimina getEmailTemplate hardcodeado local
@@ -7,6 +8,7 @@
 // 4. Guarda EmailLog en BD para tracking
 // 5. Headers UTF-8 para caracteres especiales (ñ, tildes)
 // 6. URL correcta: /encuesta/[token] (no /survey/)
+// 7. ✅ NUEVO: Envío secuencial con delay para rate limiting
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -29,7 +31,7 @@ async function generateMissingTokens(campaignId: string): Promise<number> {
   }
 }
 
-// ✅ ACTUALIZADO: Función queueCampaignEmails con templates premium + EmailLog
+// ✅ ACTUALIZADO: Función queueCampaignEmails con templates premium + EmailLog + ENVÍO SECUENCIAL
 async function queueCampaignEmails(campaignId: string): Promise<{ 
   queued: number; 
   errors: string[];
@@ -79,12 +81,17 @@ async function queueCampaignEmails(campaignId: string): Promise<{
       uniqueToken: string | null;
     }> = [];
 
-    // ✅ PRESERVADO: Batching para rate limits
+    // ✅ PRESERVADO: Batching para organización de logs
     const batchSize = 10;
     for (let i = 0; i < participants.length; i += batchSize) {
       const batch = participants.slice(i, i + batchSize);
       
-      const batchPromises = batch.map(async (participant) => {
+      // 🔧 FIX QUIRÚRGICO: Cambio de Promise.all (paralelo) a for...of (secuencial)
+      // ANTES: const batchPromises = batch.map(async (participant) => { ... });
+      //        await Promise.all(batchPromises);
+      // DESPUÉS: for...of con delay después de cada email
+      
+      for (const participant of batch) {
         const participantId = participant.nationalId || participant.email || participant.id;
         
         // ✅ PRESERVADO: Skip si no tiene email
@@ -97,7 +104,7 @@ async function queueCampaignEmails(campaignId: string): Promise<{
             uniqueToken: participant.uniqueToken
           });
           console.log(`⚠️  Participante sin email: ${participantId} (RUT: ${participant.nationalId})`);
-          return;
+          continue; // Salta al siguiente participante
         }
 
         try {
@@ -105,10 +112,10 @@ async function queueCampaignEmails(campaignId: string): Promise<{
           const surveyUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
           const fullSurveyUrl = `${surveyUrl}/encuesta/${participant.uniqueToken}`;
 
-
           console.log(`🔍 Tipo de campaña: ${campaignType.slug}`);
           console.log(`🔍 Participante: ${participant.email}`);
           console.log(`🔍 URL encuesta: ${fullSurveyUrl}`);
+          
           // ✅ NUEVO: Obtener template premium dinámico por tipo de campaña
           const { subject, html } = renderEmailTemplate(
             campaignType.slug, // 'retencion-predictiva', 'pulso-express', 'experiencia-full'
@@ -116,17 +123,19 @@ async function queueCampaignEmails(campaignId: string): Promise<{
               participant_name: participant.name || 'Estimado/a colaborador/a',
               company_name: account.companyName,
               survey_url: fullSurveyUrl
-              
             }
           );
+          
           console.log(`✅ Email preparado - Subject: ${subject}`);
           console.log(`✅ HTML generado: ${html.length} caracteres`);
           console.log('📨 HTML preview:', html.substring(0, 200));
           console.log('📨 HTML length:', html.length);
           console.log('📨 Calling resend.emails.send()...');
+          
           // ✅ ACTUALIZADO: Envío con headers UTF-8
-          await resend.emails.send({
-            from: 'FocalizaHR <onboarding@resend.dev>',
+          // 🎯 FIX GEMINI: Capturar respuesta completa de Resend
+          const { data, error: resendError } = await resend.emails.send({
+            from: 'FocalizaHR <noreply@focalizahr.cl>',
             to: participant.email,
             subject,
             html,
@@ -134,6 +143,15 @@ async function queueCampaignEmails(campaignId: string): Promise<{
               'Content-Type': 'text/html; charset=UTF-8'
             }
           });
+
+          // 🔍 VALIDACIÓN EXPLÍCITA: Forzar error si Resend reporta problema
+          if (resendError) {
+            throw new Error(`Resend API Error: ${resendError.message || JSON.stringify(resendError)}`);
+          }
+
+          // ✅ Solo loggear si REALMENTE fue exitoso
+          console.log(`✅ Email CONFIRMADO enviado a: ${participant.email}`);
+          console.log(`📬 Resend Email ID: ${data?.id || 'N/A'}`);
 
           // ✅ NUEVO: Guardar EmailLog en BD para tracking
           try {
@@ -161,9 +179,13 @@ async function queueCampaignEmails(campaignId: string): Promise<{
           errors.push(`Error enviando a ${participantId}: ${errorMessage}`);
           console.error(`❌ Error enviando email a ${participantId}:`, emailError);
         }
-      });
-
-      await Promise.all(batchPromises);
+        
+        // 🔧 FIX QUIRÚRGICO CRÍTICO: Delay después de CADA email
+        // Rate limit Resend: 2 requests/second
+        // Delay 600ms = 1.67 emails/segundo (bajo el límite con margen 16.5%)
+        await new Promise(resolve => setTimeout(resolve, 600));
+        
+      } // Fin del for...of secuencial
       
       // ✅ PRESERVADO: Pausa entre batches
       if (i + batchSize < participants.length) {
