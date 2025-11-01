@@ -243,6 +243,7 @@ export default function ExcelDropzone({
         header: true,
         skipEmptyLines: true,
         dynamicTyping: false, // Mantener como strings para procesar
+        encoding: 'UTF-8',  // ✅ AGREGAR ESTA LÍNEA
         transformHeader: (header) => normalizeHeader(header),
         complete: (results) => {
           if (results.errors.length > 0) {

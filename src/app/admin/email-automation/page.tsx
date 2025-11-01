@@ -9,7 +9,16 @@ import { Mail, Send, Clock, CheckCircle, Sparkles, FileText, Eye } from 'lucide-
 import { useToast } from '@/components/ui/toast-system';
 import { PREMIUM_EMAIL_TEMPLATES, EmailTemplate } from '@/lib/templates/email-templates';
 import '@/styles/focalizahr-design-system.css';
-
+// Función helper para nombres display
+function getCampaignDisplayName(slug: string): string {
+  const displayNames: Record<string, string> = {
+    'retencion-predictiva': 'Retención Predictiva',
+    'pulso-express': 'Pulso Express',
+    'experiencia-full': 'Experiencia Full',
+    'pulso-ambientes-sanos': 'Ambiente Sano (Ley Karin)'
+  };
+  return displayNames[slug] || 'General';
+}
 export default function EmailAutomationPage() {
   const { success, error, info } = useToast();
   
@@ -134,10 +143,8 @@ export default function EmailAutomationPage() {
                       `}
                     >
                       <div className="flex items-start justify-between mb-2">
-                        <div className="font-semibold text-white text-sm">
-                          {template.campaignTypeSlug === 'retencion-predictiva' ? 'Retención Predictiva' :
-                           template.campaignTypeSlug === 'pulso-express' ? 'Pulso Express' :
-                           template.campaignTypeSlug === 'experiencia-full' ? 'Experiencia Full' : 'General'}
+                        <div className="font-medium text-white mb-1">
+                          {getCampaignDisplayName(template.campaignTypeSlug)}
                         </div>
                         {isSelected && (
                           <CheckCircle className="h-4 w-4 text-cyan-400 flex-shrink-0" />

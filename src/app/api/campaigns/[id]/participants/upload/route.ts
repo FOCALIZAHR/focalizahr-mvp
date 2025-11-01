@@ -200,8 +200,11 @@ async function processFile(file: File): Promise<ProcessingResult> {
 
     // Determinar tipo de archivo y procesar
     if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
-      const csvData = new TextDecoder().decode(buffer);
-      workbook = XLSX.read(csvData, { type: 'string' });
+      const csvData = new TextDecoder('utf-8').decode(buffer);  // ← AGREGAR 'utf-8'
+      workbook = XLSX.read(csvData, {
+        type: 'string',
+        codepage: 65001  // ← AGREGAR ESTA LÍNEA (es el código de UTF-8)
+      });
     } else {
       workbook = XLSX.read(buffer, { type: 'array' });
     }
@@ -214,7 +217,11 @@ async function processFile(file: File): Promise<ProcessingResult> {
     }
 
     const worksheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+      header: 1,
+      raw: false,  // ← AGREGAR: Mantener como strings (no procesar encoding)
+      defval: ''   // ← AGREGAR: Valores vacíos como string vacío
+});
 
     if (jsonData.length === 0) {
       result.errors.push('Archivo vacío');
