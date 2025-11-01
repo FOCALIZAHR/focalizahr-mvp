@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 // 🤖 MOTOR DE AUTOMATIZACIÓN EMAIL - CRON JOB
 // Funcionalidad: Envío automático de recordatorios de campaña
 // Escalabilidad: Base para futuro Onboarding Journey Intelligence (día 1, 7, 30, 90)
