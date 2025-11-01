@@ -44,7 +44,8 @@ async function processReminders(): Promise<{
     // 1️⃣ Buscar campañas activas
     const activeCampaigns = await prisma.campaign.findMany({
       where: {
-        status: 'active'
+        status: 'active',
+        sendReminders: true  // ✅ CAMBIO 1: Respetar configuración de campaña
       },
       include: {
         account: { select: { companyName: true } },
@@ -56,7 +57,8 @@ async function processReminders(): Promise<{
             email: true,
             name: true,
             uniqueToken: true,
-            nationalId: true
+            nationalId: true,
+            reminderCount: true  // ✅ CAMBIO 2: Incluir contador en select
           }
         }
       }
@@ -78,7 +80,13 @@ async function processReminders(): Promise<{
         // ✅ VALIDACIÓN TEMPRANA: Saltar si no tiene email
         if (!participant.email || participant.email.trim() === '') {
           console.log(`⚠️  Participante ${participantId} sin email, saltando`);
-          continue;  // Sale del loop antes de procesar
+          continue;
+        }
+
+        // ✅ CAMBIO 3: Validar límite de recordatorios (máximo 2)
+        if (participant.reminderCount >= 2) {
+          console.log(`⏭️  Participante ${participantId} alcanzó límite de recordatorios (${participant.reminderCount}/2)`);
+          continue;
         }
 
         try {
@@ -114,11 +122,10 @@ async function processReminders(): Promise<{
 
             if (!reminder1Exists) {
               // 📧 Enviar Recordatorio 1
-              // ✅ TypeScript sabe que email NO es null por el if arriba
               await sendReminder(
                 {
                   id: participant.id,
-                  email: participant.email,  // ✅ TS sabe que es string
+                  email: participant.email,
                   name: participant.name,
                   uniqueToken: participant.uniqueToken
                 },
@@ -144,11 +151,10 @@ async function processReminders(): Promise<{
 
             if (!reminder2Exists) {
               // 📧 Enviar Recordatorio 2 (último aviso)
-              // ✅ TypeScript sabe que email NO es null por el if arriba
               await sendReminder(
                 {
                   id: participant.id,
-                  email: participant.email,  // ✅ TS sabe que es string
+                  email: participant.email,
                   name: participant.name,
                   uniqueToken: participant.uniqueToken
                 },
@@ -188,7 +194,7 @@ async function processReminders(): Promise<{
 async function sendReminder(
   participant: {
     id: string;
-    email: string;  // ✅ Ya está garantizado como string (filtrado previo)
+    email: string;
     name: string | null;
     uniqueToken: string | null;
   },
@@ -200,7 +206,6 @@ async function sendReminder(
   reminderType: 'reminder1' | 'reminder2',
   customSubject: string
 ): Promise<void> {
-  // ✅ No necesita validación - email ya está garantizado por filtro previo
   const surveyUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   const fullSurveyUrl = `${surveyUrl}/encuesta/${participant.uniqueToken}`;
 
@@ -234,6 +239,15 @@ async function sendReminder(
       templateId: campaign.campaignType.slug,
       sentAt: new Date(),
       status: 'sent'
+    }
+  });
+
+  // ✅ CAMBIO 4: Incrementar contador de recordatorios
+  await prisma.participant.update({
+    where: { id: participant.id },
+    data: { 
+      reminderCount: { increment: 1 },
+      lastReminderSent: new Date()
     }
   });
 }
