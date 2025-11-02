@@ -47,6 +47,7 @@ export function middleware(request: NextRequest) {
     '/login',
     '/api/auth/login',
     '/api/auth/user/login', // NUEVO
+    '/api/cron',  // ← NUEVA LÍNEA
     '/',
     '/favicon.ico'
   ];
