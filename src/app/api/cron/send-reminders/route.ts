@@ -237,7 +237,7 @@ async function sendReminder(
 
   // 🔧 CAMBIO CRÍTICO 1: Capturar respuesta de Resend
   const { data, error } = await resend.emails.send({
-    from: 'FocalizaHR <noreply@focalizahr.com>',
+    from: 'FocalizaHR <noreply@focalizahr.cl>',
     to: participant.email,
     subject: `${customSubject} - ${campaign.account.companyName}`,
     html,
