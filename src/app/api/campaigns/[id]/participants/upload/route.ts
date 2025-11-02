@@ -200,14 +200,13 @@ async function processFile(file: File): Promise<ProcessingResult> {
 
     // Determinar tipo de archivo y procesar
     if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
-      const csvData = new TextDecoder('utf-8').decode(buffer);  // ← AGREGAR 'utf-8'
-      workbook = XLSX.read(csvData, {
-        type: 'string',
-        codepage: 65001  // ← AGREGAR ESTA LÍNEA (es el código de UTF-8)
+      workbook = XLSX.read(buffer, {
+        type: 'buffer',
+        codepage: 65001
       });
     } else {
-      workbook = XLSX.read(buffer, { type: 'array' });
-    }
+  workbook = XLSX.read(buffer, { type: 'array' });
+}
 
     // Obtener primera hoja
     const sheetName = workbook.SheetNames[0];
