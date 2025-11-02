@@ -51,9 +51,17 @@ export function middleware(request: NextRequest) {
     '/',
     '/favicon.ico'
   ];
-  
+
   // Si es ruta pública, permitir acceso
-  if (publicPaths.some(path => pathname === path || pathname.startsWith('/public'))) {
+  // Si es ruta pública, permitir acceso
+  const isPublicPath = publicPaths.some(path => {
+    if (path === '/') {
+      return pathname === '/';
+    }
+    return pathname.startsWith(path);
+  });
+
+  if (isPublicPath) {
     return NextResponse.next();
   }
   
