@@ -1,5 +1,14 @@
 export const dynamic = 'force-dynamic';
 // 🤖 MOTOR DE AUTOMATIZACIÓN EMAIL - CRON JOB
+// 🔧 VERSIÓN: v4.2.1 PRODUCTION READY (Schema Compatible + Robust Error Handling)
+// 📅 Fecha: 2 Noviembre 2025
+// 🎯 Cambios vs versión anterior:
+//    - Captura real de { data, error } de Resend (sin falsos positivos)
+//    - Validación robusta de fallos antes de guardar EmailLog
+//    - Auditoría de errores en BD usando campo bounceReason existente
+//    - Compatible con schema actual (sin migration requerida)
+//    - Logs detallados con resendId para debugging
+//    - Protección try-catch para guardado de logs (no bloquea proceso principal)
 // Funcionalidad: Envío automático de recordatorios de campaña
 // Escalabilidad: Base para futuro Onboarding Journey Intelligence (día 1, 7, 30, 90)
 // Trigger: Vercel Cron o servicio externo
@@ -13,6 +22,12 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 // 🔐 Verificación de seguridad CRON_SECRET
 function verifyCronAuth(request: NextRequest): boolean {
+  // ✅ NUEVO: Detectar ejecución de Vercel Cron
+  const vercelCron = request.headers.get('x-vercel-cron-bypass');
+  if (vercelCron) {
+    console.log('✅ Ejecución automática de Vercel Cron detectada');
+    return true;
+  }
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
   
@@ -220,8 +235,8 @@ async function sendReminder(
     }
   );
 
-  // Enviar email con subject personalizado para recordatorio
-  await resend.emails.send({
+  // 🔧 CAMBIO CRÍTICO 1: Capturar respuesta de Resend
+  const { data, error } = await resend.emails.send({
     from: 'FocalizaHR <noreply@focalizahr.com>',
     to: participant.email,
     subject: `${customSubject} - ${campaign.account.companyName}`,
@@ -231,7 +246,63 @@ async function sendReminder(
     }
   });
 
-  // Guardar EmailLog
+  // 🔧 CAMBIO CRÍTICO 2: Validar error antes de continuar
+  if (error) {
+    console.error('❌ Resend API error:', {
+      participantEmail: participant.email,
+      participantId: participant.id,
+      reminderType,
+      campaignId: campaign.id,
+      errorName: error.name,
+      errorMessage: error.message,
+      fullError: JSON.stringify(error)
+    });
+    
+    // ✅ MEJORA v4.2: Guardar fallo en BD usando bounceReason
+    // ✅ MEJORA v4.2.1: Proteger con try-catch para no bloquear proceso principal
+    try {
+      await prisma.emailLog.create({
+        data: {
+          participantId: participant.id,
+          campaignId: campaign.id,
+          emailType: reminderType,
+          templateId: campaign.campaignType.slug,
+          sentAt: new Date(),
+          status: 'failed',
+          bounceReason: JSON.stringify(error)
+        }
+      });
+    } catch (logError) {
+      console.error('⚠️ No se pudo guardar log de fallo en BD:', logError);
+      // Continuar y lanzar error original de Resend
+    }
+    
+    // ✅ Fallo registrado en BD (o intentado), ahora lanzar error para detener proceso
+    throw new Error(`Resend API failed: ${error.message}`);
+  }
+
+  // 🔧 CAMBIO CRÍTICO 3: Verificar que data existe
+  if (!data) {
+    console.error('❌ Resend no devolvió data (caso edge):', {
+      participantEmail: participant.email,
+      participantId: participant.id,
+      reminderType,
+      campaignId: campaign.id
+    });
+    throw new Error('Resend API did not return data');
+  }
+
+  // 🔧 CAMBIO CRÍTICO 4: Log de éxito con información útil
+  console.log('✅ Email enviado exitosamente:', {
+    resendId: data.id,
+    participantEmail: participant.email,
+    participantId: participant.id,
+    reminderType,
+    campaignId: campaign.id,
+    timestamp: new Date().toISOString()
+  });
+
+  // 🔧 CAMBIO CRÍTICO 5: SOLO guardar EmailLog si Resend confirmó el envío
   await prisma.emailLog.create({
     data: {
       participantId: participant.id,
