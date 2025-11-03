@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 // 🤖 MOTOR DE AUTOMATIZACIÓN EMAIL - CRON JOB
-// 🔧 VERSIÓN: v4.2.1 PRODUCTION READY (Schema Compatible + Robust Error Handling)
-// 📅 Fecha: 2 Noviembre 2025
+// 🔧 VERSIÓN: v4.2.2 PRODUCTION READY (Schema Compatible + Rate Limiting)
+// 📅 Fecha: 3 Noviembre 2025
 // 🎯 Cambios vs versión anterior:
 //    - Captura real de { data, error } de Resend (sin falsos positivos)
 //    - Validación robusta de fallos antes de guardar EmailLog
@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 //    - Compatible con schema actual (sin migration requerida)
 //    - Logs detallados con resendId para debugging
 //    - Protección try-catch para guardado de logs (no bloquea proceso principal)
+//    - Rate limiting: 600ms delay entre emails (1.66/seg < 2/seg límite Resend)
 // Funcionalidad: Envío automático de recordatorios de campaña
 // Escalabilidad: Base para futuro Onboarding Journey Intelligence (día 1, 7, 30, 90)
 // Trigger: Vercel Cron o servicio externo
@@ -19,6 +20,9 @@ import { Resend } from 'resend';
 import { renderEmailTemplate } from '@/lib/templates/email-templates';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+// ⏱️ Helper para respetar rate limit de Resend (2 requests/segundo)
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // 🔐 Verificación de seguridad CRON_SECRET
 function verifyCronAuth(request: NextRequest): boolean {
@@ -151,6 +155,9 @@ async function processReminders(): Promise<{
               );
               reminder1Sent++;
               console.log(`✅ Reminder1 enviado a ${participantId}`);
+              
+              // ⏱️ Delay para respetar rate limit (600ms = 1.66 emails/seg < 2/seg)
+              await delay(600);
             }
           }
 
@@ -180,6 +187,9 @@ async function processReminders(): Promise<{
               );
               reminder2Sent++;
               console.log(`✅ Reminder2 enviado a ${participantId}`);
+              
+              // ⏱️ Delay para respetar rate limit (600ms = 1.66 emails/seg < 2/seg)
+              await delay(600);
             }
           }
 
