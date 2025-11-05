@@ -55,11 +55,6 @@ model Account {
   departments       Department[]
   users             User[]
   departmentMetrics DepartmentMetric[] // ✅ NUEVA RELACIÓN CHAT 9
-  
-  // ✅ v3.2.2: NUEVAS RELACIONES ONBOARDING
-  journeys            JourneyOrchestration[]
-  journeyAlerts       JourneyAlert[]
-  departmentInsights  DepartmentOnboardingInsight[]
 
   @@index([adminEmail], map: "idx_accounts_email")
   @@index([subscriptionTier], map: "idx_accounts_tier")
@@ -78,10 +73,6 @@ model CampaignType {
   category          String?
   isActive          Boolean  @default(true) @map("is_active")
   sortOrder         Int      @default(0) @map("sort_order")
-  
-  // ✅ v3.2.2: PILAR 1 - isPermanent en CampaignType
-  isPermanent       Boolean  @default(false) @map("is_permanent")
-  
   createdAt         DateTime @default(now()) @map("created_at")
 
   // Relaciones
@@ -91,7 +82,6 @@ model CampaignType {
 
   @@index([isActive], map: "idx_campaign_types_active")
   @@index([category], map: "idx_campaign_types_category")
-  @@index([isPermanent], map: "idx_campaign_types_ispermanent")
   @@map("campaign_types")
 }
 
@@ -177,11 +167,6 @@ model Participant {
   emailLogs     EmailLog[]
   departmentRel Department? @relation(fields: [departmentId], references: [id])
 
-  // ✅ v3.2.2: NUEVAS RELACIONES INVERSAS ONBOARDING (CRÍTICO compilación)
-  journeyStage1 JourneyOrchestration? @relation("Stage1")
-  journeyStage2 JourneyOrchestration? @relation("Stage2")
-  journeyStage3 JourneyOrchestration? @relation("Stage3")
-  journeyStage4 JourneyOrchestration? @relation("Stage4")
  
   @@unique([campaignId, nationalId], map: "unique_campaign_rut")
   @@index([campaignId], map: "idx_participants_campaign")
@@ -420,10 +405,6 @@ model Department {
   participants Participant[]
   users        User[]
   metrics      DepartmentMetric[] // ✅ NUEVA RELACIÓN CHAT 9
-  
-  // ✅ v3.2.2: NUEVAS RELACIONES ONBOARDING
-  onboardingInsights  DepartmentOnboardingInsight[]
-  journeys            JourneyOrchestration[]
 
   @@unique([accountId, displayName])
   @@index([accountId], map: "idx_departments_account")
@@ -531,165 +512,4 @@ model DepartmentMetric {
   @@index([dataQuality], map: "idx_dept_metrics_quality")
   @@index([uploadedAt], map: "idx_dept_metrics_uploaded")
   @@map("department_metrics")
-}
-
-// ============================================
-// ✅ ONBOARDING JOURNEY INTELLIGENCE v3.2.2
-// ============================================
-
-// MODELO NUEVO 1: JourneyOrchestration
-model JourneyOrchestration {
-  id                    String    @id @default(cuid())
-  accountId             String    @map("account_id")
-  nationalId            String    @map("national_id")
-  fullName              String    @map("full_name")
-  participantEmail      String?   @map("participant_email")
-  phoneNumber           String?   @map("phone_number")
-  departmentId          String    @map("department_id")
-  position              String?
-  hireDate              DateTime  @map("hire_date") @db.Date
-  
-  // IDs Participants (4 stages) - ✅ @unique para relaciones 1:1
-  stage1ParticipantId   String?   @unique @map("stage1_participant_id")
-  stage2ParticipantId   String?   @unique @map("stage2_participant_id")
-  stage3ParticipantId   String?   @unique @map("stage3_participant_id")
-  stage4ParticipantId   String?   @unique @map("stage4_participant_id")
-  
-  // Scores 4C
-  complianceScore       Float?    @map("compliance_score")
-  clarificationScore    Float?    @map("clarification_score")
-  cultureScore          Float?    @map("culture_score")
-  connectionScore       Float?    @map("connection_score")
-  
-  // EXO Score
-  exoScore              Float?    @map("exo_score")
-  
-  // Fechas completitud
-  stage1CompletedAt     DateTime? @map("stage1_completed_at")
-  stage2CompletedAt     DateTime? @map("stage2_completed_at")
-  stage3CompletedAt     DateTime? @map("stage3_completed_at")
-  stage4CompletedAt     DateTime? @map("stage4_completed_at")
-  
-  // Estado
-  currentStage          Int       @default(0) @map("current_stage")
-  status                String    @default("active")
-  retentionRisk         String?   @map("retention_risk")  // ✅ CORREGIDO v3.2.2
-  
-  // Metadata
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
-  
-  // Relaciones
-  account               Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  department            Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-  stage1Participant     Participant? @relation("Stage1", fields: [stage1ParticipantId], references: [id], onDelete: SetNull)
-  stage2Participant     Participant? @relation("Stage2", fields: [stage2ParticipantId], references: [id], onDelete: SetNull)
-  stage3Participant     Participant? @relation("Stage3", fields: [stage3ParticipantId], references: [id], onDelete: SetNull)
-  stage4Participant     Participant? @relation("Stage4", fields: [stage4ParticipantId], references: [id], onDelete: SetNull)
-  alerts                JourneyAlert[]
-  
-  @@unique([accountId, nationalId])
-  @@index([accountId])
-  @@index([nationalId])
-  @@index([departmentId])
-  @@index([status])
-  @@index([currentStage])
-  @@index([retentionRisk])
-  @@index([hireDate])
-  @@map("journey_orchestrations")
-}
-
-// MODELO NUEVO 2: JourneyAlert
-model JourneyAlert {
-  id                String    @id @default(cuid())
-  journeyId         String    @map("journey_id")
-  accountId         String    @map("account_id")
-  
-  // Tipo alerta
-  alertType         String    @map("alert_type")
-  severity          String
-  title             String
-  description       String
-  
-  // Contexto
-  stage             Int
-  questionId        String?   @map("question_id")
-  responseValue     Float?    @map("response_value")
-  threshold         Float?
-  
-  // Gestión
-  status            String    @default("pending")
-  resolvedAt        DateTime? @map("resolved_at")
-  resolvedBy        String?   @map("resolved_by")
-  resolutionNotes   String?   @map("resolution_notes")
-  
-  // SLA (SISTEMA CORRECTO v3.2.2)
-  slaHours          Int       @map("sla_hours")          // ✅ CORREGIDO
-  dueDate           DateTime  @map("due_date")           // ✅ CORREGIDO
-  slaStatus         String    @map("sla_status")         // ✅ CORREGIDO (obligatorio)
-  
-  // Metadata
-  metadata          Json?
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-  
-  // Relaciones
-  journey           JourneyOrchestration @relation(fields: [journeyId], references: [id], onDelete: Cascade)
-  account           Account              @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  
-  @@index([journeyId])
-  @@index([accountId])
-  @@index([status])
-  @@index([severity])
-  @@index([alertType])
-  @@index([slaStatus, dueDate])
-  @@map("journey_alerts")
-}
-
-// MODELO NUEVO 3: DepartmentOnboardingInsight
-model DepartmentOnboardingInsight {
-  id                      String    @id @default(cuid())
-  accountId               String    @map("account_id")
-  departmentId            String    @map("department_id")
-  periodStart             DateTime  @map("period_start") @db.Date
-  periodEnd               DateTime  @map("period_end") @db.Date
-  
-  // Métricas
-  totalJourneys           Int       @default(0) @map("total_journeys")
-  activeJourneys          Int       @default(0) @map("active_journeys")
-  completedJourneys       Int       @default(0) @map("completed_journeys")
-  atRiskJourneys          Int       @default(0) @map("at_risk_journeys")
-  abandonedJourneys       Int       @default(0) @map("abandoned_journeys")
-  
-  // Scores 4C
-  avgComplianceScore      Float?    @map("avg_compliance_score")
-  avgClarificationScore   Float?    @map("avg_clarification_score")
-  avgCultureScore         Float?    @map("avg_culture_score")
-  avgConnectionScore      Float?    @map("avg_connection_score")
-  
-  // EXO Score
-  avgEXOScore             Float?    @map("avg_exo_score")
-  
-  // Alertas
-  criticalAlerts          Int       @default(0) @map("critical_alerts")
-  highAlerts              Int       @default(0) @map("high_alerts")
-  mediumAlerts            Int       @default(0) @map("medium_alerts")
-  
-  // Patterns
-  topIssues               Json?     @map("top_issues")
-  recommendations         Json?
-  
-  // Metadata
-  createdAt               DateTime  @default(now()) @map("created_at")
-  updatedAt               DateTime  @updatedAt @map("updated_at")
-  
-  // Relaciones
-  account                 Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  department              Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  
-  @@unique([departmentId, periodStart, periodEnd], map: "unique_department_period")
-  @@index([accountId])
-  @@index([departmentId])
-  @@index([periodStart, periodEnd])
-  @@map("department_onboarding_insights")
 }

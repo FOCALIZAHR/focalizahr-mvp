@@ -378,6 +378,103 @@ const TEMPLATE_REMINDER_1_HTML = createEmailHTML(`
 `);
 
 // ========================================
+// 📧 TEMPLATES ONBOARDING FALTANTES
+// Para agregar a: src/lib/templates/email-templates.ts
+// ========================================
+
+// Copiar estas constantes ANTES de la línea "// ========================================// 7. REMINDER 1"
+
+// ========================================
+// 3. ONBOARDING DAY 30 - Primer Mes (Culture)
+// ========================================
+
+const TEMPLATE_ONBOARDING_D30_HTML = createEmailHTML(`
+  ${EmailHeader({ companyName: '{company_name}' })}
+  
+  ${EmailHero({
+    title: 'Primer Mes Cumplido',
+    subtitle: 'Hola {participant_name}, ¿cómo te sientes con la cultura de equipo?',
+    badge: 'Día 30'
+  })}
+  
+  ${EmailContentSection({
+    greeting: '¡Felicitaciones por completar tu primer mes en {company_name}!',
+    paragraphs: [
+      'Después de 30 días trabajando con nosotros, queremos conocer tu percepción sobre la cultura organizacional, los valores que vivimos día a día, y qué tan alineado te sientes con el equipo.',
+      'Evaluaremos tu experiencia en:'
+    ],
+    highlight: {
+      icon: 'heart',
+      title: 'Alineación Cultural',
+      text: 'Tu feedback nos ayuda a fortalecer nuestra cultura y asegurar que todos nos sentimos parte del mismo propósito.',
+      variant: 'info'
+    }
+  })}
+  
+  ${EmailFeatureList({
+    features: [
+      { icon: 'heart', title: 'Valores compartidos', description: 'Alineación con principios y cultura organizacional' },
+      { icon: 'users', title: 'Sentido de pertenencia', description: 'Conexión emocional con el equipo y la empresa' },
+      { icon: 'star', title: 'Ambiente de trabajo', description: 'Clima laboral y relaciones interpersonales' },
+      { icon: 'target', title: 'Propósito y misión', description: 'Comprensión del impacto de tu trabajo' }
+    ]
+  })}
+  
+  ${EmailCTASection({
+    buttonText: 'Evaluar Experiencia Cultural',
+    buttonUrl: '{survey_url}',
+    metadata: { time: '6 minutos', confidential: true }
+  })}
+  
+  ${EmailFooter()}
+`);
+
+// ========================================
+// 4. ONBOARDING DAY 90 - Tercer Mes (Connection)
+// ========================================
+
+const TEMPLATE_ONBOARDING_D90_HTML = createEmailHTML(`
+  ${EmailHeader({ companyName: '{company_name}' })}
+  
+  ${EmailHero({
+    title: '90 Días de Crecimiento',
+    subtitle: 'Hola {participant_name}, completaste tu onboarding - ¿te proyectas con nosotros?',
+    badge: 'Día 90'
+  })}
+  
+  ${EmailContentSection({
+    greeting: '¡Hemos llegado a un hito importante! Ya completaste 90 días en {company_name}.',
+    paragraphs: [
+      'Este es el momento perfecto para reflexionar sobre tu experiencia completa, tu visión de futuro en la organización, y el nivel de compromiso que sientes con tu desarrollo profesional aquí.',
+      'En esta última evaluación exploraremos:'
+    ],
+    highlight: {
+      icon: 'trending',
+      title: 'Proyección de Futuro',
+      text: 'Tu visión a largo plazo nos permite diseñar planes de carrera alineados con tus expectativas y nuestras oportunidades.',
+      variant: 'success'
+    }
+  })}
+  
+  ${EmailFeatureList({
+    features: [
+      { icon: 'trending', title: 'Proyección de carrera', description: 'Visión de tu desarrollo profesional a largo plazo' },
+      { icon: 'target', title: 'Compromiso organizacional', description: 'Nivel de engagement con la empresa y tu rol' },
+      { icon: 'star', title: 'Satisfacción general', description: 'Evaluación integral de tu experiencia onboarding' },
+      { icon: 'heart', title: 'Sentido de permanencia', description: 'Te visualizas construyendo tu carrera aquí' }
+    ]
+  })}
+  
+  ${EmailCTASection({
+    buttonText: 'Completar Evaluación Final',
+    buttonUrl: '{survey_url}',
+    metadata: { time: '7 minutos', confidential: true }
+  })}
+  
+  ${EmailFooter()}
+`);
+
+// ========================================
 // 8. REMINDER 2 - Último Recordatorio (7 días)
 // ========================================
 
@@ -520,6 +617,30 @@ export const PREMIUM_EMAIL_TEMPLATES: Record<string, EmailTemplate> = {
     estimatedTime: '5 minutos'
   },
   
+  
+  
+'onboarding-day-30': {
+    id: 'onboarding_d30',
+    campaignTypeSlug: 'onboarding-day-30',
+    subject: 'Primer mes cumplido - {company_name}',
+    previewText: '¿Cómo te sientes con la cultura de equipo?',
+    htmlContent: TEMPLATE_ONBOARDING_D30_HTML,
+    variables: ['participant_name', 'company_name', 'survey_url'],
+    tone: 'Reflexivo, cultural, alineación de valores',
+    estimatedTime: '6 minutos'
+  },
+  
+  'onboarding-day-90': {
+    id: 'onboarding_d90',
+    campaignTypeSlug: 'onboarding-day-90',
+    subject: '90 días de crecimiento - {company_name}',
+    previewText: '¿Te proyectas construyendo tu carrera con nosotros?',
+    htmlContent: TEMPLATE_ONBOARDING_D90_HTML,
+    variables: ['participant_name', 'company_name', 'survey_url'],
+    tone: 'Evaluativo, proyección futura, compromiso',
+    estimatedTime: '7 minutos'
+  },
+
   'reminder-1': {
     id: 'reminder_1',
     campaignTypeSlug: 'reminder-1',

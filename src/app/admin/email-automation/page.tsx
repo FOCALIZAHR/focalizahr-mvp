@@ -15,7 +15,12 @@ function getCampaignDisplayName(slug: string): string {
     'retencion-predictiva': 'Retención Predictiva',
     'pulso-express': 'Pulso Express',
     'experiencia-full': 'Experiencia Full',
-    'pulso-ambientes-sanos': 'Ambiente Sano (Ley Karin)'
+    'pulso-ambientes-sanos': 'Ambiente Sano (Ley Karin)',
+        // ✅ AGREGAR ESTOS 4:
+    'onboarding-day-1': 'Onboarding Día 1',
+    'onboarding-day-7': 'Onboarding Día 7',
+    'onboarding-day-30': 'Onboarding Día 30',
+    'onboarding-day-90': 'Onboarding Día 90'
   };
   return displayNames[slug] || 'General';
 }
