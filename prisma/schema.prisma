@@ -377,6 +377,7 @@ model EmailLog {
 model EmailAutomation {
   id          String    @id @default(cuid())
   campaignId  String    @map("campaign_id")
+  participantId String  @map("participant_id") // ✅ AÑADIR ESTA LÍNEA
   triggerType String    @map("trigger_type")
   triggerAt   DateTime  @map("trigger_at")
   processedAt DateTime? @map("processed_at")
@@ -386,6 +387,7 @@ model EmailAutomation {
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@index([campaignId], map: "idx_email_automation_campaign")
+  @@index([participantId], map: "idx_email_automation_participant") // ✅ AÑADIR ESTE ÍNDICE
   @@index([triggerType], map: "idx_email_automation_type")
   @@index([triggerAt], map: "idx_email_automation_trigger")
   @@index([enabled], map: "idx_email_automation_enabled")
@@ -612,13 +614,15 @@ model JourneyAlert {
   description       String
   
   // Contexto
-  stage             Int
+  stage             Int?
   questionId        String?   @map("question_id")
   responseValue     Float?    @map("response_value")
   threshold         Float?
   
   // Gestión
   status            String    @default("pending")
+  acknowledgedAt    DateTime?  @map("acknowledged_at")  // ← NUEVO
+  acknowledgedBy    String?    @map("acknowledged_by")  // ← NUEVO
   resolvedAt        DateTime? @map("resolved_at")
   resolvedBy        String?   @map("resolved_by")
   resolutionNotes   String?   @map("resolution_notes")
