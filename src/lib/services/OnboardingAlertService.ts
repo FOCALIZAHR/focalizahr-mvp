@@ -1,42 +1,24 @@
-/**
- * ONBOARDING ALERT SERVICE
- * 
- * RESPONSABILIDADES:
- * - Detectar situaciones de riesgo automáticamente
- * - Crear alertas con SLA (Service Level Agreement)
- * - Actualizar estado SLA (on_time/at_risk/breached)
- * - Gestionar ciclo de vida alertas (open/acknowledged/resolved)
- * 
- * TIPOS DE ALERTAS:
- * 1. low_score: Score bajo en alguna dimensión 4C
- * 2. stage_incomplete: Stage no completado después de 7+ días
- * 3. risk_escalation: Riesgo aumentó entre journeys
- * 
- * SLA CONFIG:
- * - critical: 4 horas
- * - high: 24 horas
- * - medium: 72 horas (3 días)
- * - low: 168 horas (7 días)
- */
+// src/lib/services/OnboardingAlertService.ts
 
 import { prisma } from '@/lib/prisma';
 import { addHours } from 'date-fns';
+import { JourneyAlert } from '@prisma/client';
 
 export class OnboardingAlertService {
   
-  // Configuración SLA por severidad
   private static SLA_CONFIG: Record<string, number> = {
-    critical: 4,   // 4 horas
-    high: 24,      // 24 horas
-    medium: 72,    // 3 días
-    low: 168       // 7 días
+    critical: 4,
+    high: 24,
+    medium: 72,
+    low: 168
   };
   
   /**
    * ✅ DETECTAR Y CREAR ALERTAS AUTOMÁTICAS
-   * Método principal que orquesta todas las detecciones
    */
-  static async detectAndCreateAlerts(journeyId: string) {
+  static async detectAndCreateAlerts(journeyId: string): Promise<JourneyAlert[]> {
+    const createdAlerts: JourneyAlert[] = [];
+    
     const journey = await prisma.journeyOrchestration.findUnique({
       where: { id: journeyId },
       include: {
@@ -46,23 +28,26 @@ export class OnboardingAlertService {
       }
     });
     
-    if (!journey) return;
+    if (!journey) return createdAlerts;
     
-    // 1. Alertas por score bajo
-    await this.checkLowScores(journey);
+    const lowScoreAlerts = await this.checkLowScores(journey);
+    createdAlerts.push(...lowScoreAlerts);
     
-    // 2. Alertas por stage incompleto
-    await this.checkIncompleteStages(journey);
+    const incompleteAlerts = await this.checkIncompleteStages(journey);
+    createdAlerts.push(...incompleteAlerts);
     
-    // 3. Alertas por escalación de riesgo
-    await this.checkRiskEscalation(journey);
+    const escalationAlerts = await this.checkRiskEscalation(journey);
+    createdAlerts.push(...escalationAlerts);
+    
+    return createdAlerts;
   }
   
   /**
    * ✅ ALERTAS POR SCORES BAJOS
-   * Detecta cuando un score 4C está por debajo del umbral crítico
    */
-  private static async checkLowScores(journey: any) {
+  private static async checkLowScores(journey: any): Promise<JourneyAlert[]> {
+    const createdAlerts: JourneyAlert[] = [];
+    
     const scores = [
       { name: 'compliance', score: journey.complianceScore, stage: 1, threshold: 3.0 },
       { name: 'clarification', score: journey.clarificationScore, stage: 2, threshold: 3.5 },
@@ -72,7 +57,6 @@ export class OnboardingAlertService {
     
     for (const { name, score, stage, threshold } of scores) {
       if (score !== null && score < threshold) {
-        // Verificar si ya existe alerta similar abierta
         const existingAlert = journey.alerts.find((a: any) =>
           a.alertType === 'low_score' &&
           a.dimension === name &&
@@ -82,7 +66,7 @@ export class OnboardingAlertService {
         if (!existingAlert) {
           const severity = score < 2.0 ? 'critical' : score < 3.0 ? 'high' : 'medium';
           
-          await this.createAlert({
+          const alert = await this.createAlert({
             journeyId: journey.id,
             accountId: journey.accountId,
             alertType: 'low_score',
@@ -94,17 +78,22 @@ export class OnboardingAlertService {
             score,
             slaHours: this.SLA_CONFIG[severity]
           });
+          
+          createdAlerts.push(alert);
         }
       }
     }
+    
+    return createdAlerts;
   }
   
   /**
    * ✅ ALERTAS POR STAGES INCOMPLETOS
-   * Detecta cuando han pasado más de 7 días desde la fecha del stage sin responder
    */
-  private static async checkIncompleteStages(journey: any) {
+  private static async checkIncompleteStages(journey: any): Promise<JourneyAlert[]> {
+    const createdAlerts: JourneyAlert[] = [];
     const now = new Date();
+    
     const stages = [
       { num: 1, date: journey.stage1Date, participantId: journey.stage1ParticipantId },
       { num: 2, date: journey.stage2Date, participantId: journey.stage2ParticipantId },
@@ -117,7 +106,6 @@ export class OnboardingAlertService {
       
       const daysSince = Math.floor((now.getTime() - new Date(date).getTime()) / (1000 * 60 * 60 * 24));
       
-      // Si pasaron más de 7 días desde la fecha del stage y no ha respondido
       if (daysSince > 7 && num > journey.currentStage) {
         const participant = await prisma.participant.findUnique({
           where: { id: participantId },
@@ -125,7 +113,6 @@ export class OnboardingAlertService {
         });
         
         if (participant && !participant.hasResponded) {
-          // Verificar si ya existe alerta
           const existingAlert = journey.alerts.find((a: any) =>
             a.alertType === 'stage_incomplete' &&
             a.stage === num &&
@@ -135,7 +122,7 @@ export class OnboardingAlertService {
           if (!existingAlert) {
             const severity = daysSince > 14 ? 'high' : 'medium';
             
-            await this.createAlert({
+            const alert = await this.createAlert({
               journeyId: journey.id,
               accountId: journey.accountId,
               alertType: 'stage_incomplete',
@@ -145,20 +132,24 @@ export class OnboardingAlertService {
               stage: num,
               slaHours: this.SLA_CONFIG[severity]
             });
+            
+            createdAlerts.push(alert);
           }
         }
       }
     }
+    
+    return createdAlerts;
   }
   
   /**
    * ✅ ALERTAS POR ESCALACIÓN DE RIESGO
-   * Detecta cuando el riesgo aumentó comparado con journeys previos
    */
-  private static async checkRiskEscalation(journey: any) {
-    if (!journey.exoScore || !journey.retentionRisk) return;
+  private static async checkRiskEscalation(journey: any): Promise<JourneyAlert[]> {
+    const createdAlerts: JourneyAlert[] = [];
     
-    // Buscar journey histórico para comparar
+    if (!journey.exoScore || !journey.retentionRisk) return createdAlerts;
+    
     const previousJourneys = await prisma.journeyOrchestration.findMany({
       where: {
         accountId: journey.accountId,
@@ -172,13 +163,12 @@ export class OnboardingAlertService {
     if (previousJourneys.length > 0) {
       const previous = previousJourneys[0];
       
-      // Si riesgo escaló
       const riskLevels = ['low', 'medium', 'high', 'critical'];
       const currentLevel = riskLevels.indexOf(journey.retentionRisk);
       const previousLevel = riskLevels.indexOf(previous.retentionRisk || 'low');
       
       if (currentLevel > previousLevel) {
-        await this.createAlert({
+        const alert = await this.createAlert({
           journeyId: journey.id,
           accountId: journey.accountId,
           alertType: 'risk_escalation',
@@ -188,13 +178,16 @@ export class OnboardingAlertService {
           score: journey.exoScore,
           slaHours: this.SLA_CONFIG.high
         });
+        
+        createdAlerts.push(alert);
       }
     }
+    
+    return createdAlerts;
   }
   
   /**
    * ✅ CREAR ALERTA
-   * Método privado para crear alertas con SLA calculado
    */
   private static async createAlert(data: {
     journeyId: string;
@@ -207,10 +200,10 @@ export class OnboardingAlertService {
     stage?: number;
     score?: number;
     slaHours: number;
-  }) {
+  }): Promise<JourneyAlert> {
     const dueDate = addHours(new Date(), data.slaHours);
     
-    await prisma.journeyAlert.create({
+    const alert = await prisma.journeyAlert.create({
       data: {
         ...data,
         status: 'open',
@@ -220,11 +213,12 @@ export class OnboardingAlertService {
     });
     
     console.log(`[Alert Created] ${data.title} - Journey: ${data.journeyId}`);
+    
+    return alert;
   }
   
   /**
    * ✅ ACTUALIZAR ESTADO SLA (ejecutar en cron)
-   * Recalcula slaStatus basado en tiempo restante
    */
   static async updateSLAStatus() {
     const now = new Date();
@@ -257,7 +251,6 @@ export class OnboardingAlertService {
   
   /**
    * ✅ ACKNOWLEDGE ALERTA
-   * Marca alerta como reconocida por usuario
    */
   static async acknowledgeAlert(alertId: string, userId: string) {
     await prisma.journeyAlert.update({
@@ -272,7 +265,6 @@ export class OnboardingAlertService {
   
   /**
    * ✅ RESOLVER ALERTA
-   * Marca alerta como resuelta con resolución
    */
   static async resolveAlert(alertId: string, userId: string, resolutionNotes: string) {
     await prisma.journeyAlert.update({
@@ -288,7 +280,6 @@ export class OnboardingAlertService {
   
   /**
    * ✅ DESCARTAR ALERTA
-   * Marca alerta como descartada sin acción
    */
   static async dismissAlert(alertId: string, userId: string, reason?: string) {
     await prisma.journeyAlert.update({
@@ -304,7 +295,6 @@ export class OnboardingAlertService {
   
   /**
    * ✅ OBTENER ALERTAS POR CUENTA
-   * Lista alertas con filtros opcionales
    */
   static async getAlertsByAccount(accountId: string, filters?: {
     status?: string;
@@ -320,7 +310,7 @@ export class OnboardingAlertService {
         journey: {
           select: {
             fullName: true,
-            department: true,
+            departmentId: true,
             currentStage: true,
             exoScore: true,
             retentionRisk: true
@@ -336,7 +326,6 @@ export class OnboardingAlertService {
   
   /**
    * ✅ OBTENER ALERTAS POR JOURNEY
-   * Lista alertas de un journey específico
    */
   static async getAlertsByJourney(journeyId: string) {
     return await prisma.journeyAlert.findMany({
@@ -350,7 +339,6 @@ export class OnboardingAlertService {
   
   /**
    * ✅ OBTENER ESTADÍSTICAS DE ALERTAS
-   * Métricas agregadas por cuenta
    */
   static async getAlertStatistics(accountId: string) {
     const alerts = await prisma.journeyAlert.findMany({
