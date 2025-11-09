@@ -1,3 +1,5 @@
+
+export const dynamic = 'force-dynamic'; // ✅ AGREGAR ESTA LÍNEA
 // ============================================
 // API GET /api/onboarding/journeys
 // FASE 3 - Onboarding Journey Intelligence v3.2.2

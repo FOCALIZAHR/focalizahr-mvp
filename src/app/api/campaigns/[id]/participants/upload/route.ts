@@ -618,21 +618,29 @@ export async function POST(
     // Obtener rol del payload (compatible con Account y User)
     const payload = verification.payload as any; // Type assertion para acceder a campos extendidos
     const userRole = payload?.userRole || payload?.role || 'CLIENT';
-    
-    const allowedRoles = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_ADMIN', 'HR_OPERATOR'];
-    
-    if (!allowedRoles.includes(userRole)) {
-      return NextResponse.json(
-        { 
-          error: 'No autorizado. Solo administradores y personal de RRHH pueden cargar participantes.',
-          requiredRoles: allowedRoles,
-          currentRole: userRole
-        },
-        { status: 403 }
-      );
-    }
-    
-    console.log(`✅ Upload autorizado para rol: ${userRole}`);
+
+    // ✅ RECONOCER SERVICE TOKENS (para OnboardingEnrollmentService)
+    if (payload.type === 'service') {
+      console.log(`✅ [Upload API] Service token detected - scope: ${payload.scope}, accountId: ${payload.accountId}`);
+      // Service tokens están pre-autorizados por el middleware
+      // Continuar sin validación de rol humano
+    } else {
+      // ✅ AUTORIZACIÓN NORMAL: Solo roles permitidos pueden cargar participantes
+      const allowedRoles = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_ADMIN', 'HR_OPERATOR'];
+
+      if (!allowedRoles.includes(userRole)) {
+        return NextResponse.json(
+          {
+            error: 'No autorizado. Solo administradores y personal de RRHH pueden cargar participantes.',
+            requiredRoles: allowedRoles,
+            currentRole: userRole
+          },
+          { status: 403 }
+        );
+      }
+
+  console.log(`✅ [Upload API] Usuario autorizado - Role: ${userRole}`);
+}
     
     // ✅ OBTENER formData
     const formData = await request.formData();

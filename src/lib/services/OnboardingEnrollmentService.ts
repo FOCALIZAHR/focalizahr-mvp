@@ -35,15 +35,22 @@ interface EnrollmentData {
   location?: string;
   hireDate: Date;              // OBLIGATORIO para calcular etapas
   startDate?: Date;            // Fecha inicio journey (default = hireDate)
+  dateOfBirth?: Date;    // ← Nuevo
+  gender?: 'MALE' | 'FEMALE' | 'NON_BINARY' | 'PREFER_NOT_TO_SAY';  // ← Nuevo
 }
 
-interface EnrollmentResult {
-  success: boolean;
-  journeyId?: string;
-  participantIds?: string[];
-  message: string;
-  error?: string;
-}
+type EnrollmentResult = 
+  | {
+      success: true;
+      journeyId: string;
+      participantIds: string[];
+      message: string;
+    }
+  | {
+      success: false;
+      message: string;
+      error: string;
+    };
 
 interface JourneyDates {
   stage1Date: Date;  // Día 1
@@ -61,6 +68,8 @@ interface ParticipantCSVData {
   position?: string;
   location?: string;
   hireDate: Date;
+  dateOfBirth?: Date;    // ← Nuevo
+  gender?: string;       // ← Nuevo
 }
 
 // ============================================================================
@@ -68,6 +77,9 @@ interface ParticipantCSVData {
 // ============================================================================
 
 export class OnboardingEnrollmentService {
+  
+  // Variable temporal para pasar accountId a getAuthToken()
+  private static currentAccountId: string | null = null;
   
   /**
    * ✅ MÉTODO PRINCIPAL: Inscribir empleado en journey completo
@@ -90,6 +102,9 @@ export class OnboardingEnrollmentService {
         nationalId: data.nationalId,
         fullName: data.fullName
       });
+      
+      // ✅ NUEVO: Guardar accountId para usarlo en getAuthToken()
+      this.currentAccountId = data.accountId;
       
       // PASO 1: Validaciones básicas
       this.validateEnrollmentData(data);
@@ -130,12 +145,19 @@ export class OnboardingEnrollmentService {
             department: await this.getDepartmentName(data.departmentId),
             position: data.position,
             location: data.location,
-            hireDate: stageDate
+            hireDate: data.hireDate,
+            // ✅ AGREGAR ESTAS 2 LÍNEAS
+            dateOfBirth: data.dateOfBirth,   // ← Nuevo
+            gender: data.gender               // ← Nuevo
           });
-          
+          // ✅ AGREGAR ESTE LOG TEMPORAL
+          console.log('📄 [CSV DEBUG] Content generated:');
+          console.log(csvContent);
+          console.log('📄 [CSV DEBUG] dateOfBirth:', data.dateOfBirth);
+          console.log('📄 [CSV DEBUG] gender:', data.gender);
           // 📦 CREAR FormData
           const formData = new FormData();
-          const blob = new Blob([csvContent], { type: 'text/csv; charset=utf-8' });
+          const blob = new Blob([csvContent], { type: 'text/csv' });
           formData.append('file', blob, `onboarding_${data.nationalId}_stage${stage + 1}.csv`);
           
           // 🔑 OBTENER TOKEN AUTH
@@ -155,7 +177,8 @@ export class OnboardingEnrollmentService {
           
           if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(`Stage ${stage + 1} failed: ${errorData.error || errorData.message || 'Unknown error'}`);
+            const errorDetails = errorData.details ? JSON.stringify(errorData.details) : '';
+            throw new Error(`Stage ${stage + 1} failed: ${errorData.error || errorData.message || 'Unknown error'}. Details: ${errorDetails}`);
           }
           
           const result = await response.json();
@@ -210,24 +233,24 @@ export class OnboardingEnrollmentService {
       console.log('[OnboardingEnrollment] Creating JourneyOrchestration master record...');
       
       const journey = await prisma.journeyOrchestration.create({
-  data: {
-    accountId: data.accountId,
-    nationalId: data.nationalId,
-    fullName: data.fullName,
-    participantEmail: data.participantEmail,
-    phoneNumber: data.phoneNumber,
-    departmentId: data.departmentId,
-    position: data.position,
-    hireDate: data.hireDate,
-    stage1ParticipantId: participantIds[0],
-    stage2ParticipantId: participantIds[1],
-    stage3ParticipantId: participantIds[2],
-    stage4ParticipantId: participantIds[3],
-    currentStage: 1,
-    status: 'active',
-    retentionRisk: 'pending'
-  }
-});
+        data: {
+          accountId: data.accountId,
+          nationalId: data.nationalId,
+          fullName: data.fullName,
+          participantEmail: data.participantEmail,
+          phoneNumber: data.phoneNumber,
+          departmentId: data.departmentId,
+          position: data.position,
+          hireDate: data.hireDate,
+          stage1ParticipantId: participantIds[0],
+          stage2ParticipantId: participantIds[1],
+          stage3ParticipantId: participantIds[2],
+          stage4ParticipantId: participantIds[3],
+          currentStage: 1,
+          status: 'active',
+          retentionRisk: 'pending'
+        }
+      });
       
       console.log(`[OnboardingEnrollment] ✅ Journey created. ID: ${journey.id}`);
       
@@ -251,9 +274,12 @@ export class OnboardingEnrollmentService {
       
       return {
         success: false,
-  message: error instanceof Error ? error.message : 'Error desconocido en enrollment',
-  error: error instanceof Error ? error.message : 'Error desconocido en enrollment'
-};
+        message: error instanceof Error ? error.message : 'Error desconocido en enrollment',
+        error: error instanceof Error ? error.message : 'Error desconocido en enrollment'
+      };
+    } finally {
+      // ✅ NUEVO: Limpiar accountId al terminar
+      this.currentAccountId = null;
     }
   }
   
@@ -390,28 +416,57 @@ export class OnboardingEnrollmentService {
   // ==========================================================================
   // CSV GENERATION METHODS
   // ==========================================================================
-  
   /**
+ * Normaliza género a formato esperado por API
+ */
+private static normalizeGender(gender?: string): string {
+  if (!gender) return '';
+  
+  const upperGender = gender.toUpperCase();
+  
+  if (upperGender === 'MALE' || upperGender === 'M') return 'M';
+  if (upperGender === 'FEMALE' || upperGender === 'F') return 'F';
+  if (upperGender === 'NON_BINARY' || upperGender === 'NB') return 'NB';
+  
+  return ''; // Si no reconoce el género, envía vacío
+}
+/**
    * Generar CSV de 1 participante para carga en API
    * 
    * Formato exacto esperado por API:
    * RUT,Email,Celular,Nombre,Departamento,Cargo,Ubicacion,FechaIngreso
    */
   private static generateSingleParticipantCSV(data: ParticipantCSVData): string {
-    const headers = 'RUT,Email,Celular,Nombre,Departamento,Cargo,Ubicacion,FechaIngreso\n';
-    
-    const row = [
-      data.nationalId,                              // RUT obligatorio (12345678-9)
-      data.participantEmail || '',                  // Email opcional
-      data.phoneNumber || '',                       // Phone opcional
-      `"${data.fullName}"`,                         // Nombre (con comillas por si tiene comas)
-      `"${data.department}"`,                       // Departamento
-      data.position ? `"${data.position}"` : '',    // Cargo opcional
-      data.location ? `"${data.location}"` : '',    // Ubicación opcional
-      format(data.hireDate, 'yyyy-MM-dd')          // Fecha ISO
-    ].join(',');
-    
-    return headers + row;
+    const headers = 'RUT,Email,Celular,Nombre,Departamento,Cargo,Ubicacion,Fecha Nacimiento,Genero,FechaIngreso\n';
+
+    // ✅ Fecha en formato DD/MM/YYYY
+    const formattedDate = format(data.hireDate, 'dd/MM/yyyy');
+
+    // ✅ Row con datos limpios (SIN comillas hard-coded)
+    const rowValues = [
+      data.nationalId,
+      data.participantEmail || '',
+      data.phoneNumber || '',
+      data.fullName,
+      data.department,
+      data.position || '',
+      data.location || '',
+      data.dateOfBirth ? format(data.dateOfBirth, 'dd/MM/yyyy') : '', // ✅ CORREGIDO: format() en lugar de formatDate()
+      this.normalizeGender(data.gender),
+      formattedDate
+    ];
+
+    // ✅ Lógica de escape CSV correcta
+    const row = rowValues.map(value => {
+      const stringValue = String(value);
+      if (stringValue.includes(',') || stringValue.includes('"')) {
+        // Duplicar comillas internas (escape CSV estándar)
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }
+      return stringValue;
+    }).join(',');
+
+    return '\uFEFF' + headers + row;
   }
   
   // ==========================================================================
@@ -425,28 +480,29 @@ export class OnboardingEnrollmentService {
    */
   private static async scheduleOnboardingEmails(
     journeyId: string,
-    campaignIds: string[],  // ✅ AGREGAR
+    campaignIds: string[],
     participantIds: string[],
     journeyDates: JourneyDates
   ): Promise<void> {
     const emailSchedule = [
-  { participantId: participantIds[0], campaignId: campaignIds[0], slug: 'onboarding-day-1', triggerAt: journeyDates.stage1Date },
-  { participantId: participantIds[1], campaignId: campaignIds[1], slug: 'onboarding-day-7', triggerAt: journeyDates.stage2Date },
-  { participantId: participantIds[2], campaignId: campaignIds[2], slug: 'onboarding-day-30', triggerAt: journeyDates.stage3Date },
-  { participantId: participantIds[3], campaignId: campaignIds[3], slug: 'onboarding-day-90', triggerAt: journeyDates.stage4Date }
-];
+      { participantId: participantIds[0], campaignId: campaignIds[0], slug: 'onboarding-day-1', triggerAt: journeyDates.stage1Date },
+      { participantId: participantIds[1], campaignId: campaignIds[1], slug: 'onboarding-day-7', triggerAt: journeyDates.stage2Date },
+      { participantId: participantIds[2], campaignId: campaignIds[2], slug: 'onboarding-day-30', triggerAt: journeyDates.stage3Date },
+      { participantId: participantIds[3], campaignId: campaignIds[3], slug: 'onboarding-day-90', triggerAt: journeyDates.stage4Date }
+    ];
 
-await prisma.emailAutomation.createMany({
-  data: emailSchedule.map(email => ({
-    participantId: email.participantId,
-    campaignId: email.campaignId,
-    templateId: email.slug,
-    triggerType: email.slug,
-    triggerAt: email.triggerAt,
-    enabled: true
-  }))
-});
-  }  // ← FALTA ESTE CIERRE DEL MÉTODO scheduleOnboardingEmails
+    await prisma.emailAutomation.createMany({
+      data: emailSchedule.map(email => ({
+        participantId: email.participantId,
+        campaignId: email.campaignId,
+        templateId: email.slug,
+        triggerType: email.slug,
+        triggerAt: email.triggerAt,
+        enabled: true
+      }))
+    });
+  }
+  
   // ==========================================================================
   // ROLLBACK METHODS
   // ==========================================================================
@@ -461,7 +517,6 @@ await prisma.emailAutomation.createMany({
       console.log('[OnboardingEnrollment] No participants to rollback');
       return;
     }
-    
     
     console.log(`[OnboardingEnrollment] Rolling back ${participantIds.length} participants...`);
     
@@ -500,28 +555,29 @@ await prisma.emailAutomation.createMany({
   }
   
   /**
-   * Obtener token de autenticación del contexto actual
-   * 
-   * En backend, obtenemos el token de las cookies de la sesión activa
+   * Obtener token de autenticación para llamadas internas
+   * Genera JWT de servicio válido por 5 minutos
    */
   private static async getAuthToken(): Promise<string> {
-    // TODO: Implementar según tu sistema de auth
-    // Ejemplo básico:
-    
-    // Opción 1: Si estás en context de API route
-    // const token = cookies().get('focalizahr_token')?.value;
-    
-    // Opción 2: Si usas headers
-    // const token = headers().get('authorization')?.replace('Bearer ', '');
-    
-    // Opción 3: Generar token de servicio interno
-    const token = process.env.INTERNAL_SERVICE_TOKEN;
-    
-    if (!token) {
+    try {
+      const accountId = this.currentAccountId;
+      
+      if (!accountId) {
+        throw new Error('[ONBOARDING] No accountId available in context');
+      }
+      
+      // Importar función de auth
+      const { generateServiceToken } = await import('@/lib/auth');
+      const token = generateServiceToken(accountId);
+      
+      console.log(`✅ [OnboardingEnrollment] Service token generated for account ${accountId}`);
+      
+      return token;
+      
+    } catch (error) {
+      console.error('[ONBOARDING] Error generating service token:', error);
       throw new Error('[ONBOARDING] No auth token available for API call');
     }
-    
-    return token;
   }
 }
 

@@ -121,6 +121,16 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
   
+  // ✅✅✅ CÓDIGO NUEVO: Reconocer service tokens ✅✅✅
+  if (payload.type === 'service') {
+    console.log(`🔧 [Middleware] Service token detected - scope: ${payload.scope}`);
+    const headers = new Headers(request.headers);
+    headers.set('x-account-id', payload.accountId);
+    headers.set('x-is-service-token', 'true');
+    return NextResponse.next({ headers });
+  }
+  // ✅✅✅ FIN CÓDIGO NUEVO ✅✅✅
+  
   // NUEVO: Crear headers con contexto del usuario
   const headers = new Headers(request.headers);
   

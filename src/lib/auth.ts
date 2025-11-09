@@ -476,3 +476,24 @@ export function getUserFromHeaders(request: Request): JWTPayload | null {
     return null;
   }
 }
+/**
+ * Genera JWT de servicio interno para llamadas server-to-server
+ * Vida útil: 5 minutos (suficiente para enrollment completo)
+ */
+export function generateServiceToken(accountId: string): string {
+  const payload = {
+    type: 'service',
+    accountId,
+    scope: 'onboarding-enrollment',
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + (5 * 60) // 5 minutos
+  };
+  
+  const token = jwt.sign(payload, JWT_SECRET, {
+    issuer: 'focalizahr-internal-service'
+  });
+  
+  console.log(`🔑 [ServiceToken] Generated for account: ${accountId}`);
+  
+  return token;
+}
