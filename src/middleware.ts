@@ -1,11 +1,16 @@
-// src/middleware.ts - ACTUALIZACIÓN DESDE TU CÓDIGO ACTUAL
+// src/middleware.ts
+// ✅ SOLUCIÓN ARQUITECTÓNICA OPTIMIZADA (Patrón Gemini + FocalizaHR)
+// Separa rutas públicas estáticas vs. dinámicas con autenticación alternativa
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// TU FUNCIÓN ACTUAL - La mantenemos igual
+/**
+ * Verifica JWT simple (sin verificar firma, solo estructura y expiración)
+ * Usado SOLO en middleware para validación rápida
+ */
 function verifyJWTSimple(token: string): any {
   try {
-    // Decodificar el JWT sin verificar firma (solo para middleware)
     const parts = token.split('.');
     if (parts.length !== 3) return null;
     
@@ -24,16 +29,19 @@ function verifyJWTSimple(token: string): any {
   }
 }
 
-// NUEVA FUNCIÓN: Helper para determinar el rol efectivo
+/**
+ * Determina el rol efectivo del usuario
+ * Soporta tanto Account legacy como nuevo sistema User
+ */
 function getEffectiveRole(payload: any): string {
   // Si es un User nuevo (tiene userId)
   if (payload.userId && payload.userRole) {
     return payload.userRole;
   }
   
-  // Si es Account antiguo
+  // Si es Account legacy
   if (payload.role) {
-    return payload.role; // Ya es FOCALIZAHR_ADMIN o CLIENT
+    return payload.role;
   }
   
   return 'CLIENT'; // Default
@@ -42,18 +50,44 @@ function getEffectiveRole(payload: any): string {
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   
-  // NUEVO: Agregar /api/auth/user/login a rutas públicas
+  // ============================================================================
+  // 🎯 CAPA 1: RUTAS PÚBLICAS DINÁMICAS (Autenticación por uniqueToken)
+  // ============================================================================
+  // Estas rutas NO requieren JWT de sesión, pero SÍ validan uniqueToken en la API
+  // Son "públicas" para el middleware, pero "protegidas" en la capa de aplicación
+  
+  const dynamicPublicPatterns = [
+    '/encuesta/',                 // Frontend: Encuestas normales (Pulso, Experiencia, Retención, Karin)
+    '/api/survey/',               // API: GET/POST encuestas normales
+    '/onboarding/encuesta/',      // Frontend: Onboarding Journey Intelligence
+    '/api/onboarding/survey/'     // API: GET/POST onboarding stages (4C Bauer)
+  ];
+
+  // Verificar si pathname coincide con patrón dinámico
+  if (dynamicPublicPatterns.some(pattern => pathname.startsWith(pattern))) {
+    console.log(`[Middleware] ✅ Dynamic public pattern (uniqueToken auth): ${pathname}`);
+    return NextResponse.next();
+  }
+  
+  // ============================================================================
+  // 🔓 CAPA 2: RUTAS PÚBLICAS ESTÁTICAS (Sin autenticación)
+  // ============================================================================
+  // Estas rutas NO requieren autenticación de ningún tipo
+  
   const publicPaths = [
+    // Auth routes
     '/login',
     '/api/auth/login',
-    '/api/auth/user/login', // NUEVO
-    '/api/cron',  // ← NUEVA LÍNEA
+    '/api/auth/user/login',
+    
+    // Cron jobs (autenticación por Vercel Cron Secret)
+    '/api/cron',
+    
+    // Static assets
     '/',
     '/favicon.ico'
   ];
 
-  // Si es ruta pública, permitir acceso
-  // Si es ruta pública, permitir acceso
   const isPublicPath = publicPaths.some(path => {
     if (path === '/') {
       return pathname === '/';
@@ -62,8 +96,13 @@ export function middleware(request: NextRequest) {
   });
 
   if (isPublicPath) {
+    console.log(`[Middleware] ✅ Static public path: ${pathname}`);
     return NextResponse.next();
   }
+  
+  // ============================================================================
+  // 🔐 CAPA 3: RUTAS PROTEGIDAS (Requieren JWT de sesión)
+  // ============================================================================
   
   // Rutas que requieren rol FOCALIZAHR_ADMIN
   const isAdminRoute = 
@@ -71,13 +110,18 @@ export function middleware(request: NextRequest) {
     pathname === '/register';
   
   // Rutas que requieren autenticación (cualquier rol)
-  const isProtectedRoute = pathname.startsWith('/dashboard') || 
-                           pathname.startsWith('/api');
+  const isProtectedRoute = 
+    pathname.startsWith('/dashboard') || 
+    pathname.startsWith('/api');
   
-  // Si no es ruta protegida, permitir acceso
+  // Si no es ruta protegida ni admin, permitir acceso
   if (!isProtectedRoute && !isAdminRoute) {
     return NextResponse.next();
   }
+  
+  // ============================================================================
+  // 🎫 VERIFICAR TOKEN JWT DE SESIÓN
+  // ============================================================================
   
   // Obtener token de cookies o header
   let token = request.cookies.get('focalizahr_token')?.value;
@@ -89,14 +133,17 @@ export function middleware(request: NextRequest) {
     }
   }
   
-  // Si no hay token y es API, retornar 401
+  // Si no hay token
   if (!token) {
+    console.log(`[Middleware] ❌ No token found for protected route: ${pathname}`);
+    
     if (pathname.startsWith('/api')) {
       return NextResponse.json(
-        { error: 'No autorizado' },
+        { error: 'No autorizado - Token requerido' },
         { status: 401 }
       );
     }
+    
     // Si es página web, redirigir a login
     const url = request.nextUrl.clone();
     url.pathname = '/login';
@@ -104,37 +151,42 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
   
-  // Verificar token con tu función actual
+  // Verificar token
   const payload = verifyJWTSimple(token);
   
   if (!payload) {
-    // Token inválido
+    console.log(`[Middleware] ❌ Invalid token for: ${pathname}`);
+    
     if (pathname.startsWith('/api')) {
       return NextResponse.json(
-        { error: 'Token inválido' },
+        { error: 'Token inválido o expirado' },
         { status: 401 }
       );
     }
+    
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('from', pathname);
     return NextResponse.redirect(url);
   }
   
-  // ✅✅✅ CÓDIGO NUEVO: Reconocer service tokens ✅✅✅
+  // ============================================================================
+  // 🔧 SERVICE TOKENS (Para servicios internos como OnboardingEnrollmentService)
+  // ============================================================================
   if (payload.type === 'service') {
-    console.log(`🔧 [Middleware] Service token detected - scope: ${payload.scope}`);
+    console.log(`[Middleware] 🔧 Service token - scope: ${payload.scope}`);
     const headers = new Headers(request.headers);
     headers.set('x-account-id', payload.accountId);
     headers.set('x-is-service-token', 'true');
     return NextResponse.next({ headers });
   }
-  // ✅✅✅ FIN CÓDIGO NUEVO ✅✅✅
   
-  // NUEVO: Crear headers con contexto del usuario
+  // ============================================================================
+  // 👤 INYECTAR CONTEXTO DE USUARIO EN HEADERS
+  // ============================================================================
   const headers = new Headers(request.headers);
   
-  // NUEVO: Si es un User (tiene userId), inyectar sus datos
+  // Si es un User nuevo (tiene userId)
   if (payload.userId) {
     headers.set('x-user-id', payload.userId);
     headers.set('x-user-role', payload.userRole || '');
@@ -143,7 +195,7 @@ export function middleware(request: NextRequest) {
     headers.set('x-user-name', payload.userName || '');
   }
   
-  // Siempre inyectar accountId (para compatibilidad)
+  // Siempre inyectar accountId (para multi-tenant isolation)
   headers.set('x-account-id', payload.accountId || payload.id || '');
   headers.set('x-company-name', payload.companyName || '');
   
@@ -151,53 +203,53 @@ export function middleware(request: NextRequest) {
   const effectiveRole = getEffectiveRole(payload);
   headers.set('x-effective-role', effectiveRole);
   
-  // VERIFICACIÓN DE PERMISOS PARA RUTAS ADMIN
+  console.log(`[Middleware] ✅ Auth OK - Role: ${effectiveRole}`);
+  
+  // ============================================================================
+  // 🛡️ VERIFICACIÓN DE PERMISOS PARA RUTAS ADMIN
+  // ============================================================================
   if (isAdminRoute) {
     const adminRoles = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_MANAGER'];
     
     if (!adminRoles.includes(effectiveRole)) {
-      // No es admin, mostrar error 403
-      return new NextResponse(
-        JSON.stringify({ 
-          error: 'Acceso Denegado', 
-          message: 'No tienes permisos para acceder a esta sección.' 
-        }),
-        { 
-          status: 403, 
-          headers: { 'Content-Type': 'application/json' } 
-        }
-      );
+      console.log(`[Middleware] ❌ Access denied for role: ${effectiveRole}`);
+      
+      if (pathname.startsWith('/api')) {
+        return NextResponse.json(
+          {
+            error: 'Acceso Denegado',
+            message: 'No tienes permisos para acceder a esta sección.'
+          },
+          { status: 403 }
+        );
+      }
+      
+      // Redirigir a dashboard con mensaje
+      const url = request.nextUrl.clone();
+      url.pathname = '/dashboard';
+      url.searchParams.set('error', 'access_denied');
+      return NextResponse.redirect(url);
     }
   }
   
-  // NUEVO: EXCEPCIÓN para /api/admin/participants
-  // Permitir a roles que pueden gestionar participantes
-  if (pathname === '/api/admin/participants' && request.method === 'POST') {
-    const allowedRoles = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_MANAGER'];
-    
-    if (allowedRoles.includes(effectiveRole)) {
-      console.log(`✅ Permitiendo acceso a ${effectiveRole} para cargar participantes`);
-      return NextResponse.next({ headers });
-    }
-  }
-  
-  // Verificar permisos para otras rutas API admin
-  if (pathname.startsWith('/api/admin') && !isAdminRoute) {
-    const adminRoles = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_MANAGER'];
-    
-    if (!adminRoles.includes(effectiveRole)) {
-      return NextResponse.json(
-        { error: 'Acceso denegado a API admin' },
-        { status: 403 }
-      );
-    }
-  }
-  
-  // Todo OK, permitir acceso con headers inyectados
+  // ============================================================================
+  // ✅ PERMITIR ACCESO CON HEADERS INYECTADOS
+  // ============================================================================
   return NextResponse.next({ headers });
 }
 
-// Tu configuración actual - la mantenemos
+// ============================================================================
+// 📍 CONFIGURACIÓN DE MATCHER
+// ============================================================================
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)']
+  matcher: [
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
 };
