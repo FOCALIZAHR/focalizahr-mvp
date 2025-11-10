@@ -1,17 +1,20 @@
 export const dynamic = 'force-dynamic';
 // 🤖 MOTOR DE AUTOMATIZACIÓN EMAIL - CRON JOB
-// 🔧 VERSIÓN: v4.2.2 PRODUCTION READY (Schema Compatible + Rate Limiting)
-// 📅 Fecha: 3 Noviembre 2025
-// 🎯 Cambios vs versión anterior:
+// 🔧 VERSIÓN: v5.0 PRODUCTION READY + ONBOARDING JOURNEY INTELLIGENCE
+// 📅 Fecha: 10 Noviembre 2025
+// 🎯 Cambios v5.0 (FASE 5 ONBOARDING):
+//    - AGREGADA función processAutomationQueue() para procesar EmailAutomation
+//    - MODIFICADO handler GET para ejecutar ambas lógicas en paralelo
+//    - Sistema legacy (processReminders) preservado 100% intacto
+//    - Rate limiting: 600ms delay entre emails (1.66/seg < 2/seg límite Resend)
+// 🎯 Cambios v4.2.2 (previos):
 //    - Captura real de { data, error } de Resend (sin falsos positivos)
 //    - Validación robusta de fallos antes de guardar EmailLog
 //    - Auditoría de errores en BD usando campo bounceReason existente
 //    - Compatible con schema actual (sin migration requerida)
 //    - Logs detallados con resendId para debugging
 //    - Protección try-catch para guardado de logs (no bloquea proceso principal)
-//    - Rate limiting: 600ms delay entre emails (1.66/seg < 2/seg límite Resend)
-// Funcionalidad: Envío automático de recordatorios de campaña
-// Escalabilidad: Base para futuro Onboarding Journey Intelligence (día 1, 7, 30, 90)
+// Funcionalidad: Envío automático de recordatorios + Onboarding Journey Intelligence
 // Trigger: Vercel Cron o servicio externo
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -48,6 +51,10 @@ function verifyCronAuth(request: NextRequest): boolean {
   const token = authHeader.substring(7); // Remover 'Bearer '
   return token === cronSecret;
 }
+
+// ============================================================================
+// SISTEMA LEGACY: REMINDERS (PRESERVADO 100% INTACTO)
+// ============================================================================
 
 // 🎯 Función principal: Procesar recordatorios de campaña
 async function processReminders(): Promise<{
@@ -334,83 +341,283 @@ async function sendReminder(
   });
 }
 
-// 🎯 HTTP GET Handler - Endpoint principal del Cron
+// ============================================================================
+// 🚀 NUEVO SISTEMA: ONBOARDING JOURNEY INTELLIGENCE (FASE 5)
+// ============================================================================
+
+/**
+ * 🚀 NUEVO (FASE 5): Procesar cola de EmailAutomation
+ * 
+ * Busca registros pendientes en EmailAutomation (onboarding, futuras campañas automatizadas)
+ * y los envía usando la infraestructura existente de emails.
+ * 
+ * Ejecuta en paralelo con processReminders() sin interferir.
+ */
+async function processAutomationQueue(): Promise<{
+  totalProcessed: number;
+  emailsSent: number;
+  errors: string[];
+}> {
+  const errors: string[] = [];
+  let emailsSent = 0;
+  const now = new Date();
+
+  try {
+    console.log('📧 [AutomationQueue] Iniciando procesamiento...');
+
+    // 1️⃣ QUERY: Buscar emails programados que ya deben enviarse
+    const pendingEmails = await prisma.emailAutomation.findMany({
+      where: {
+        enabled: true,                // Solo activos
+        triggerAt: { lte: now }       // Ya pasó la hora de envío
+      },
+      include: {
+        participant: {
+          select: { 
+            id: true, 
+            email: true, 
+            name: true, 
+            uniqueToken: true 
+          }
+        },
+        campaign: {
+          include: {
+            account: { 
+              select: { companyName: true } 
+            }
+          }
+        }
+      },
+      take: 50  // 🔒 RATE LIMITING: Máximo 50 por ejecución (50 * 0.6s = 30s)
+    });
+
+    if (pendingEmails.length === 0) {
+      console.log('✅ [AutomationQueue] Sin emails pendientes.');
+      return { totalProcessed: 0, emailsSent: 0, errors };
+    }
+
+    console.log(`📊 [AutomationQueue] Procesando ${pendingEmails.length} emails...`);
+
+    // 2️⃣ LOOP: Procesar cada email secuencialmente
+    for (const emailJob of pendingEmails) {
+      const { participant, campaign, templateId } = emailJob;
+
+      // ⚠️ VALIDACIÓN: Datos completos
+      if (!participant || !campaign || !participant.email || !participant.uniqueToken) {
+        const errorMsg = `Datos incompletos Job ID: ${emailJob.id}`;
+        console.error(`⚠️ [AutomationQueue] ${errorMsg}`);
+        errors.push(errorMsg);
+        
+        // Deshabilitar para no reintentar
+        await prisma.emailAutomation.update({
+          where: { id: emailJob.id },
+          data: { 
+            enabled: false, 
+            processedAt: now 
+          }
+        });
+        continue;
+      }
+
+      try {
+        // 3️⃣ RENDERIZAR: Usar sistema centralizado
+        const surveyUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/encuesta/${participant.uniqueToken}`;
+        
+        const { subject, html } = renderEmailTemplate(
+          templateId,  // 'onboarding-day-1', 'onboarding-day-7', etc.
+          {
+            participant_name: participant.name || 'Estimado/a colaborador/a',
+            company_name: campaign.account.companyName,
+            survey_url: surveyUrl
+          }
+        );
+
+        // 4️⃣ ENVIAR: Resend API
+        const { data, error } = await resend.emails.send({
+          from: process.env.RESEND_FROM_EMAIL || 'FocalizaHR <noreply@focalizahr.cl>',
+          to: participant.email,
+          subject,
+          html,
+          headers: { 'Content-Type': 'text/html; charset=UTF-8' }
+        });
+
+        // ⚠️ PROTOCOLO 1: Capturar {data, error}
+        if (error) throw new Error(JSON.stringify(error));
+        if (!data) throw new Error('Resend no devolvió data');
+
+        // 5️⃣ LOGGING: EmailLog (auditoría)
+        await prisma.emailLog.create({
+          data: {
+            participantId: participant.id,
+            campaignId: campaign.id,
+            emailType: templateId,
+            templateId: templateId,
+            sentAt: now,
+            status: 'sent'
+          }
+        });
+
+        // 6️⃣ MARCAR PROCESADO: EmailAutomation
+        await prisma.emailAutomation.update({
+          where: { id: emailJob.id },
+          data: { 
+            enabled: false,      // Ya no debe procesarse
+            processedAt: now 
+          }
+        });
+
+        emailsSent++;
+        console.log(`✅ [AutomationQueue] Email ${templateId} → ${participant.email}`);
+
+        // 7️⃣ RATE LIMITING: OBLIGATORIO
+        await new Promise(r => setTimeout(r, 600));  // 600ms delay
+
+      } catch (sendError) {
+        // ❌ ERROR HANDLING
+        const errorMsg = `Error Job ${emailJob.id}: ${sendError instanceof Error ? sendError.message : 'Desconocido'}`;
+        console.error(`❌ [AutomationQueue] ${errorMsg}`);
+        errors.push(errorMsg);
+        
+        // Loggear fallo
+        await prisma.emailLog.create({
+          data: {
+            participantId: participant.id,
+            campaignId: campaign.id,
+            emailType: templateId,
+            templateId: templateId,
+            sentAt: now,
+            status: 'failed',
+            bounceReason: errorMsg
+          }
+        });
+
+        // Deshabilitar (evitar loop infinito)
+        await prisma.emailAutomation.update({
+          where: { id: emailJob.id },
+          data: { 
+            enabled: false, 
+            processedAt: now 
+          }
+        });
+      }
+    }
+
+    const summary = {
+      totalProcessed: pendingEmails.length,
+      emailsSent,
+      errors
+    };
+
+    console.log('✅ [AutomationQueue] Completado:', summary);
+    return summary;
+
+  } catch (error) {
+    console.error('❌ [AutomationQueue] Error fatal:', error);
+    throw error;
+  }
+}
+
+// ============================================================================
+// 🎯 HTTP GET HANDLER - ENDPOINT PRINCIPAL (MODIFICADO FASE 5)
+// ============================================================================
+
+/**
+ * 🎯 HTTP GET Handler - Endpoint principal del Cron
+ * 
+ * ✅ MODIFICADO (FASE 5): Ejecuta AMBAS lógicas en paralelo:
+ * 1. processReminders() - Sistema legacy (reminder1, reminder2)
+ * 2. processAutomationQueue() - Sistema nuevo (onboarding, futuras automatizaciones)
+ * 
+ * Vercel ejecuta este endpoint según schedule en vercel.json
+ */
+// ============================================================================
+// 🎯 HTTP GET HANDLER CORREGIDO - COPIAR ESTA FUNCIÓN COMPLETA
+// ============================================================================
+// 
+// REEMPLAZAR la función export async function GET() COMPLETA
+// en src/app/api/cron/send-reminders/route.ts
+//
+// Este código RESUELVE el error de TypeScript con Promise.allSettled
+
 export async function GET(request: NextRequest) {
   try {
-    console.log('🤖 Cron job iniciado:', new Date().toISOString());
+    console.log('🤖 [Cron] Iniciado:', new Date().toISOString());
 
-    // 🔐 Verificar autenticación
+    // 🔐 AUTENTICACIÓN: CRON_SECRET obligatorio
     if (!verifyCronAuth(request)) {
-      console.error('❌ Autenticación fallida');
+      console.error('❌ [Cron] Autenticación fallida');
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    console.log('✅ Autenticación exitosa');
+    console.log('✅ [Cron] Autenticación exitosa');
 
-    // 🚀 Ejecutar lógica de recordatorios
-    const results = await processReminders();
+    // 🚀 EJECUTAR AMBAS LÓGICAS EN PARALELO
+    const [legacyResult, automationResult] = await Promise.allSettled([
+      processReminders(),       // 📨 Legacy: reminder1, reminder2
+      processAutomationQueue()  // 🆕 Nuevo: onboarding, etc.
+    ]);
 
-    console.log('✅ Cron job completado:', {
+    // 📊 CONSOLIDAR RESULTADOS CON TYPE GUARDS EXPLÍCITOS
+    // ✅ FIX: Definir estructura completa para ambos casos (fulfilled/rejected)
+    const legacyReminders = legacyResult.status === 'fulfilled' 
+      ? legacyResult.value 
+      : {
+          totalProcessed: 0,
+          reminder1Sent: 0,
+          reminder2Sent: 0,
+          errors: [legacyResult.reason?.message || 'Error desconocido']
+        };
+    
+    const automationQueue = automationResult.status === 'fulfilled'
+      ? automationResult.value
+      : {
+          totalProcessed: 0,
+          emailsSent: 0,
+          errors: [automationResult.reason?.message || 'Error desconocido']
+        };
+
+    // Estructura consolidada
+    const results = {
       timestamp: new Date().toISOString(),
-      ...results
+      legacyReminders,
+      automationQueue
+    };
+
+    // ✅ LOG FINAL - Ahora TypeScript conoce la estructura exacta
+    console.log('✅ [Cron] Completado:', {
+      legacy: {
+        reminder1: legacyReminders.reminder1Sent,
+        reminder2: legacyReminders.reminder2Sent,
+        errors: legacyReminders.errors.length
+      },
+      automation: {
+        processed: automationQueue.totalProcessed,
+        sent: automationQueue.emailsSent,
+        errors: automationQueue.errors.length
+      }
     });
 
+    // 📤 RESPONSE
     return NextResponse.json({
       success: true,
-      message: 'Recordatorios procesados exitosamente',
+      message: 'Procesamiento de emails completado',
       data: results
     });
 
   } catch (error) {
-    console.error('❌ Error en cron job:', error);
+    // ❌ ERROR FATAL (no capturado por Promise.allSettled)
+    console.error('❌ [Cron] Error fatal:', error);
+    
     return NextResponse.json(
       {
         success: false,
-        error: 'Error procesando recordatorios',
+        error: 'Error crítico procesando cron',
         details: error instanceof Error ? error.message : 'Error desconocido'
       },
       { status: 500 }
     );
   }
 }
-
-// 📝 NOTAS PARA ESCALABILIDAD FUTURA (ONBOARDING JOURNEY)
-/*
-EXPANSIÓN PARA ONBOARDING:
-
-1. Agregar lógica adicional en processReminders():
-   - Buscar participants con hireDate definido
-   - Calcular días desde hireDate (Día 1, 7, 30, 90)
-   - Llamar a sendOnboardingEmail() en lugar de sendReminder()
-
-2. Nueva función sendOnboardingEmail():
-   async function sendOnboardingEmail(
-     participant: { ... },
-     onboardingDay: 1 | 7 | 30 | 90
-   ) {
-     const { html } = renderEmailTemplate(
-       `onboarding-day-${onboardingDay}`, // 'onboarding-day-1', etc.
-       variables
-     );
-     // ... enviar y loggear
-   }
-
-3. Agregar templates de onboarding en email-templates.ts:
-   'onboarding-day-1': { ... },
-   'onboarding-day-7': { ... },
-   'onboarding-day-30': { ... },
-   'onboarding-day-90': { ... }
-
-4. Modificar EmailLog para soportar:
-   emailType: 'invitation' | 'reminder1' | 'reminder2' | 'onboarding-d1' | 'onboarding-d7' | ...
-
-ARQUITECTURA YA PREPARADA PARA:
-✅ Múltiples tipos de email automation
-✅ Cron job robusto y escalable
-✅ Sistema de templates extensible
-✅ Tracking completo en EmailLog
-✅ Lógica de reglas parametrizable
-*/

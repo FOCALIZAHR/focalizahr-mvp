@@ -176,6 +176,7 @@ model Participant {
   responses     Response[]
   emailLogs     EmailLog[]
   departmentRel Department? @relation(fields: [departmentId], references: [id])
+  emailAutomations  EmailAutomation[] // ✅ AGREGAR ESTA LÍNEA
 
   // ✅ v3.2.2: NUEVAS RELACIONES INVERSAS ONBOARDING (CRÍTICO compilación)
   journeyStage1 JourneyOrchestration? @relation("Stage1")
@@ -385,6 +386,7 @@ model EmailAutomation {
   templateId  String    @map("template_id")
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)  // ✅ AGREGAR ESTA LÍNEA
 
   @@index([campaignId], map: "idx_email_automation_campaign")
   @@index([participantId], map: "idx_email_automation_participant") // ✅ AÑADIR ESTE ÍNDICE
