@@ -682,6 +682,10 @@ model DepartmentOnboardingInsight {
   // Patterns
   topIssues               Json?     @map("top_issues")
   recommendations         Json?
+    // 🆕 DEMOGRAFÍA (Agregar estos 3 campos)
+  avgAge                  Float?    @map("avg_age")
+  avgSeniority            Float?    @map("avg_seniority")
+  genderDistribution      Json?     @map("gender_distribution")
   
   // Metadata
   createdAt               DateTime  @default(now()) @map("created_at")

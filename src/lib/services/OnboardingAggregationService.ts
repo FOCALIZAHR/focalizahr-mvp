@@ -1,328 +1,469 @@
 /**
- * ONBOARDING AGGREGATION SERVICE
+ * ONBOARDING AGGREGATION SERVICE - PERIOD-CENTRIC
  * 
- * ARQUITECTURA "PERIOD-CENTRIC":
- * - Agrega por período temporal (periodStart/periodEnd)
- * - Compara períodos (no campañas individuales)
- * - Reutiliza lógica jerárquica de AggregationService
+ * ARQUITECTURA:
+ * - Agrega por PERÍODO TEMPORAL (no por campaignId individual)
+ * - Calcula métricas departamentales consolidadas
+ * - Compara períodos (no campañas)
+ * - Incluye métricas demográficas completas (edad, antigüedad, género)
  * 
- * RESPONSABILIDADES:
- * - Calcular métricas departamentales por período
- * - Identificar patrones y top issues
- * - Generar recomendaciones automáticas
- * - Guardar insights en DepartmentOnboardingInsight
+ * PILAR 3: Sistema separado de AggregationService legado
+ * PILAR 4: NO duplica lógica, usa utilities compartidas
+ * 
+ * @version 3.2.4
+ * @date November 2025
  */
 
 import { prisma } from '@/lib/prisma';
-import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { startOfMonth, endOfMonth, format } from 'date-fns';
+
+// ============================================================================
+// TYPES
+// ============================================================================
 
 interface PeriodMetrics {
-  period: string;          // YYYY-MM (display)
-  periodStart: Date;       // ✅ AGREGADO
-  periodEnd: Date;         // ✅ AGREGADO
+  // Período
+  period: string;          // Formato: 'yyyy-MM' (ej: '2025-11')
+  periodStart: Date;
+  periodEnd: Date;
+  
+  // Contadores (5)
   totalJourneys: number;
-  completedJourneys: number;
   activeJourneys: number;
+  completedJourneys: number;
   atRiskJourneys: number;
+  abandonedJourneys: number;
+  
+  // Scores 4C (5)
+  avgComplianceScore: number | null;
+  avgClarificationScore: number | null;
+  avgCultureScore: number | null;
+  avgConnectionScore: number | null;
   avgEXOScore: number | null;
-  avgScores: {
-    compliance: number | null;
-    clarification: number | null;
-    culture: number | null;
-    connection: number | null;
-  };
-  alerts: {
-    critical: number;
-    high: number;
-    medium: number;
-  };
-  topIssues: Array<{
-    issue: string;
-    count: number;
-  }>;
+  
+  // Alertas (3)
+  criticalAlerts: number;
+  highAlerts: number;
+  mediumAlerts: number;
+  
+  // Demografía (3 - v3.2.4)
+  avgAge: number | null;
+  avgSeniority: number | null;
+  genderDistribution: Record<string, number> | null;
+  
+  // Análisis (2)
+  topIssues: Array<{ issue: string; count: number }> | null;
+  recommendations: string[] | null;
 }
 
-interface ComparisonResult {
-  current: PeriodMetrics;
-  previous: PeriodMetrics;
-  delta: {
-    totalJourneys: number;
-    avgEXOScore: number | null;
-    atRiskJourneys: number;
-  };
-}
+// ============================================================================
+// SERVICE
+// ============================================================================
 
 export class OnboardingAggregationService {
   
   /**
-   * ✅ CALCULAR MÉTRICAS POR DEPARTAMENTO Y PERÍODO
+   * MÉTODO PRINCIPAL: Calcular métricas por departamento y período
+   * 
+   * @param accountId - ID de la cuenta
+   * @param departmentId - ID del departamento
+   * @param periodStart - Inicio del período
+   * @param periodEnd - Fin del período
    */
   static async calculateDepartmentMetrics(
     accountId: string,
     departmentId: string,
-    date: Date = new Date()
+    periodStart: Date,
+    periodEnd: Date
   ): Promise<PeriodMetrics> {
-    const period = format(date, 'yyyy-MM');
-    const periodStart = startOfMonth(date);
-    const periodEnd = endOfMonth(date);
     
-    // Obtener journeys del período
+    // ========================================================================
+    // 1. OBTENER JOURNEYS DEL PERÍODO (con filtro isPermanent)
+    // ========================================================================
     const journeys = await prisma.journeyOrchestration.findMany({
       where: {
         accountId,
-        departmentId,  // ✅ CORREGIDO (era: department)
+        departmentId,
         createdAt: {
           gte: periodStart,
           lte: periodEnd
+        },
+        // ✅ CORRECCIÓN PILAR 3 (v3.2.4): Filtrar en BD, NO en memoria
+        stage1Participant: {
+          campaign: {
+            campaignType: {
+              isPermanent: true
+            }
+          }
         }
       },
       include: {
-        alerts: {  // ✅ AGREGADO (faltaba include)
+        // Alertas activas
+        alerts: {
           where: {
-            status: { in: ['open', 'acknowledged'] }
+            status: { in: ['pending', 'acknowledged'] }
+          }
+        },
+        // Participant para demografía (stage1 es el principal)
+        stage1Participant: {
+          select: {
+            gender: true,
+            dateOfBirth: true,
+            hireDate: true
+            // ✅ CORRECCIÓN: include limpio, campaign ya filtrado en WHERE
           }
         }
       }
     });
     
-    // Calcular métricas básicas
+    // ========================================================================
+    // 2. CALCULAR CONTADORES (5 métricas)
+    // ========================================================================
     const totalJourneys = journeys.length;
-    const completedJourneys = journeys.filter(j => j.status === 'completed').length;
     const activeJourneys = journeys.filter(j => j.status === 'active').length;
+    const completedJourneys = journeys.filter(j => j.status === 'completed').length;
     const atRiskJourneys = journeys.filter(j => 
       j.retentionRisk === 'high' || j.retentionRisk === 'critical'
     ).length;
+    const abandonedJourneys = journeys.filter(j => j.status === 'abandoned').length;
     
-    // Calcular promedios de scores
-    const journeysWithScores = journeys.filter(j => j.exoScore !== null);
-    const avgEXOScore = journeysWithScores.length > 0
-      ? journeysWithScores.reduce((sum, j) => sum + j.exoScore!, 0) / journeysWithScores.length
-      : null;
+    // ========================================================================
+    // 3. CALCULAR SCORES PROMEDIO (5 métricas)
+    // ========================================================================
+    const avgComplianceScore = this.calculateAverage(
+      journeys.map(j => j.complianceScore)
+    );
+    const avgClarificationScore = this.calculateAverage(
+      journeys.map(j => j.clarificationScore)
+    );
+    const avgCultureScore = this.calculateAverage(
+      journeys.map(j => j.cultureScore)
+    );
+    const avgConnectionScore = this.calculateAverage(
+      journeys.map(j => j.connectionScore)
+    );
+    const avgEXOScore = this.calculateAverage(
+      journeys.map(j => j.exoScore)
+    );
     
-    const avgScores = {
-      compliance: this.calculateAverage(journeys.map(j => j.complianceScore)),
-      clarification: this.calculateAverage(journeys.map(j => j.clarificationScore)),
-      culture: this.calculateAverage(journeys.map(j => j.cultureScore)),
-      connection: this.calculateAverage(journeys.map(j => j.connectionScore))
-    };
+    // ========================================================================
+    // 4. CALCULAR ALERTAS POR SEVERIDAD (3 métricas)
+    // ========================================================================
+    const allAlerts = journeys.flatMap(j => j.alerts);
+    const criticalAlerts = allAlerts.filter(a => a.severity === 'critical').length;
+    const highAlerts = allAlerts.filter(a => a.severity === 'high').length;
+    const mediumAlerts = allAlerts.filter(a => a.severity === 'medium').length;
     
-    // Contar alertas por severidad
-    const allAlerts = journeys.flatMap(j => j.alerts);  // ✅ AHORA FUNCIONA (alerts incluido)
-    const alerts = {
-      critical: allAlerts.filter(a => a.severity === 'critical').length,
-      high: allAlerts.filter(a => a.severity === 'high').length,
-      medium: allAlerts.filter(a => a.severity === 'medium').length
-    };
+    // ========================================================================
+    // 5. CALCULAR DEMOGRAFÍA (3 métricas - v3.2.4)
+    // ========================================================================
+    const participants = journeys
+      .map(j => j.stage1Participant)
+      .filter((p): p is NonNullable<typeof p> => p !== null);
     
-    // Identificar top issues
+    const avgAge = this.calculateAverageAge(
+      participants
+        .map(p => p.dateOfBirth)
+        .filter((d): d is Date => d !== null)
+    );
+    
+    const avgSeniority = this.calculateAverageSeniority(
+      participants
+        .map(p => p.hireDate)
+        .filter((d): d is Date => d !== null)
+    );
+    
+    const genderDistribution = this.calculateGenderDistribution(
+      participants.map(p => p.gender)
+    );
+    
+    // ========================================================================
+    // 6. IDENTIFICAR TOP ISSUES (análisis)
+    // ========================================================================
     const topIssues = this.identifyTopIssues(allAlerts);
+    
+    // ========================================================================
+    // 7. GENERAR RECOMENDACIONES (análisis)
+    // ========================================================================
+    const recommendations = this.generateRecommendations({
+      totalJourneys,
+      atRiskJourneys,
+      avgEXOScore,
+      criticalAlerts
+    });
+    
+    // ========================================================================
+    // 8. RETORNAR MÉTRICAS CONSOLIDADAS
+    // ========================================================================
+    const period = format(periodStart, 'yyyy-MM');
     
     return {
       period,
-      periodStart,  // ✅ AGREGADO
-      periodEnd,    // ✅ AGREGADO
+      periodStart,
+      periodEnd,
       totalJourneys,
-      completedJourneys,
       activeJourneys,
+      completedJourneys,
       atRiskJourneys,
+      abandonedJourneys,
+      avgComplianceScore,
+      avgClarificationScore,
+      avgCultureScore,
+      avgConnectionScore,
       avgEXOScore,
-      avgScores,
-      alerts,
-      topIssues
+      criticalAlerts,
+      highAlerts,
+      mediumAlerts,
+      avgAge,
+      avgSeniority,
+      genderDistribution,
+      topIssues,
+      recommendations
     };
   }
   
   /**
-   * ✅ GUARDAR INSIGHTS EN BD
+   * GUARDAR INSIGHTS EN BD (upsert)
    */
   static async saveDepartmentInsights(
     accountId: string,
     departmentId: string,
     metrics: PeriodMetrics
-  ) {
-    // Generar recomendaciones
-    const recommendations = this.generateRecommendations(metrics);
-    
+  ): Promise<void> {
     await prisma.departmentOnboardingInsight.upsert({
       where: {
-        departmentId_periodStart_periodEnd: {  // ✅ CORREGIDO (era: departmentId_period)
+        // ✅ CORRECCIÓN v3.2.4: Constraint auto-generado por Prisma
+        // @@unique([departmentId, periodStart, periodEnd]) genera este nombre
+        departmentId_periodStart_periodEnd: {
           departmentId,
           periodStart: metrics.periodStart,
           periodEnd: metrics.periodEnd
         }
       },
       update: {
+        // Actualizar métricas si período ya existe
         totalJourneys: metrics.totalJourneys,
-        completedJourneys: metrics.completedJourneys,
         activeJourneys: metrics.activeJourneys,
+        completedJourneys: metrics.completedJourneys,
         atRiskJourneys: metrics.atRiskJourneys,
+        abandonedJourneys: metrics.abandonedJourneys,
+        avgComplianceScore: metrics.avgComplianceScore,
+        avgClarificationScore: metrics.avgClarificationScore,
+        avgCultureScore: metrics.avgCultureScore,
+        avgConnectionScore: metrics.avgConnectionScore,
         avgEXOScore: metrics.avgEXOScore,
-        avgComplianceScore: metrics.avgScores.compliance,
-        avgClarificationScore: metrics.avgScores.clarification,
-        avgCultureScore: metrics.avgScores.culture,
-        avgConnectionScore: metrics.avgScores.connection,
-        criticalAlerts: metrics.alerts.critical,
-        highAlerts: metrics.alerts.high,
-        mediumAlerts: metrics.alerts.medium,
+        criticalAlerts: metrics.criticalAlerts,
+        highAlerts: metrics.highAlerts,
+        mediumAlerts: metrics.mediumAlerts,
+        avgAge: metrics.avgAge,
+        avgSeniority: metrics.avgSeniority,
+        genderDistribution: metrics.genderDistribution as any,
         topIssues: metrics.topIssues as any,
-        recommendations: recommendations as any,
+        recommendations: metrics.recommendations as any,
         updatedAt: new Date()
       },
       create: {
+        // Crear nuevo registro
         accountId,
         departmentId,
-        periodStart: metrics.periodStart,  // ✅ CORREGIDO (era: period)
-        periodEnd: metrics.periodEnd,      // ✅ AGREGADO
+        periodStart: metrics.periodStart,
+        periodEnd: metrics.periodEnd,
         totalJourneys: metrics.totalJourneys,
-        completedJourneys: metrics.completedJourneys,
         activeJourneys: metrics.activeJourneys,
+        completedJourneys: metrics.completedJourneys,
         atRiskJourneys: metrics.atRiskJourneys,
+        abandonedJourneys: metrics.abandonedJourneys,
+        avgComplianceScore: metrics.avgComplianceScore,
+        avgClarificationScore: metrics.avgClarificationScore,
+        avgCultureScore: metrics.avgCultureScore,
+        avgConnectionScore: metrics.avgConnectionScore,
         avgEXOScore: metrics.avgEXOScore,
-        avgComplianceScore: metrics.avgScores.compliance,
-        avgClarificationScore: metrics.avgScores.clarification,
-        avgCultureScore: metrics.avgScores.culture,
-        avgConnectionScore: metrics.avgScores.connection,
-        criticalAlerts: metrics.alerts.critical,
-        highAlerts: metrics.alerts.high,
-        mediumAlerts: metrics.alerts.medium,
+        criticalAlerts: metrics.criticalAlerts,
+        highAlerts: metrics.highAlerts,
+        mediumAlerts: metrics.mediumAlerts,
+        avgAge: metrics.avgAge,
+        avgSeniority: metrics.avgSeniority,
+        genderDistribution: metrics.genderDistribution as any,
         topIssues: metrics.topIssues as any,
-        recommendations: recommendations as any
+        recommendations: metrics.recommendations as any
       }
     });
   }
   
   /**
-   * ✅ COMPARAR DOS PERÍODOS
+   * AGREGAR TODOS LOS DEPARTAMENTOS DE UNA CUENTA
+   * (método para ejecutar en cron)
    */
-  static async comparePeriods(
+  static async aggregateAllDepartments(
     accountId: string,
-    departmentId: string,
-    currentDate: Date,
-    previousDate: Date
-  ): Promise<ComparisonResult> {
-    const [current, previous] = await Promise.all([
-      this.calculateDepartmentMetrics(accountId, departmentId, currentDate),
-      this.calculateDepartmentMetrics(accountId, departmentId, previousDate)
-    ]);
-    
-    return {
-      current,
-      previous,
-      delta: {
-        totalJourneys: current.totalJourneys - previous.totalJourneys,
-        avgEXOScore: current.avgEXOScore && previous.avgEXOScore
-          ? current.avgEXOScore - previous.avgEXOScore
-          : null,
-        atRiskJourneys: current.atRiskJourneys - previous.atRiskJourneys
-      }
-    };
-  }
-  
-  /**
-   * ✅ AGREGAR TODAS LAS DEPARTAMENTOS DE UNA CUENTA
-   */
-  static async aggregateAllDepartments(accountId: string, date: Date = new Date()) {
-    // Obtener todos los departamentos con journeys
-    const departments = await prisma.department.findMany({
-      where: {
-        accountId,
-        journeys: {
-          some: {}
-        }
-      },
-      select: {
-        id: true,
-        displayName: true
-      }
-    });
-    
-    const results = [];
-    
-    for (const dept of departments) {
-      const metrics = await this.calculateDepartmentMetrics(accountId, dept.id, date);
-      await this.saveDepartmentInsights(accountId, dept.id, metrics);
-      
-      results.push({
-        departmentId: dept.id,
-        departmentName: dept.displayName,
-        metrics
-      });
-    }
-    
-    return results;
-  }
-  
-  /**
-   * ✅ OBTENER INSIGHTS GUARDADOS
-   */
-  static async getDepartmentInsights(
-    departmentId: string,
     periodStart?: Date,
     periodEnd?: Date
-  ) {
-    const where: any = { departmentId };
+  ): Promise<{ success: boolean; departmentsProcessed: number; errors: string[] }> {
     
-    if (periodStart && periodEnd) {
-      where.periodStart = periodStart;
-      where.periodEnd = periodEnd;
-    }
+    // Si no se especifica período, usar mes actual
+    const start = periodStart || startOfMonth(new Date());
+    const end = periodEnd || endOfMonth(new Date());
     
-    return await prisma.departmentOnboardingInsight.findMany({
-      where,
-      orderBy: { periodStart: 'desc' },  // ✅ CORREGIDO (era: period)
-      take: (periodStart && periodEnd) ? 1 : 12  // Último año si no se especifica período
-    });
-  }
-  
-  /**
-   * ✅ OBTENER TENDENCIAS (últimos 6 meses)
-   */
-  static async getTrends(accountId: string, departmentId: string) {
-    const currentDate = new Date();
-    const trends = [];
+    const errors: string[] = [];
+    let processed = 0;
     
-    for (let i = 0; i < 6; i++) {
-      const date = subMonths(currentDate, i);
-      const periodStart = startOfMonth(date);
-      const periodEnd = endOfMonth(date);
-      
-      const insight = await prisma.departmentOnboardingInsight.findUnique({
+    try {
+      // Obtener departamentos con journeys onboarding
+      const departments = await prisma.department.findMany({
         where: {
-          departmentId_periodStart_periodEnd: {  // ✅ CORREGIDO (era: departmentId_period)
-            departmentId,
-            periodStart,
-            periodEnd
+          accountId,
+          journeys: {
+            some: {
+              createdAt: {
+                gte: start,
+                lte: end
+              },
+              // ✅ CORRECCIÓN PILAR 3 (v3.2.4): Filtrar en BD
+              stage1Participant: {
+                campaign: {
+                  campaignType: {
+                    isPermanent: true
+                  }
+                }
+              }
+            }
           }
+        },
+        select: {
+          id: true,
+          displayName: true
         }
       });
       
-      if (insight) {
-        trends.unshift({
-          period: format(date, 'yyyy-MM'),
-          avgEXOScore: insight.avgEXOScore,
-          atRiskJourneys: insight.atRiskJourneys,
-          totalJourneys: insight.totalJourneys
-        });
+      console.log(`[OnboardingAggregation] Processing ${departments.length} departments...`);
+      
+      // Procesar cada departamento
+      for (const dept of departments) {
+        try {
+          const metrics = await this.calculateDepartmentMetrics(
+            accountId,
+            dept.id,
+            start,
+            end
+          );
+          
+          await this.saveDepartmentInsights(accountId, dept.id, metrics);
+          
+          console.log(`[OnboardingAggregation] ✅ ${dept.displayName}: ${metrics.totalJourneys} journeys`);
+          processed++;
+          
+        } catch (error) {
+          const errorMsg = `Error processing ${dept.displayName}: ${error}`;
+          console.error(`[OnboardingAggregation] ❌ ${errorMsg}`);
+          errors.push(errorMsg);
+        }
       }
+      
+      return {
+        success: errors.length === 0,
+        departmentsProcessed: processed,
+        errors
+      };
+      
+    } catch (error) {
+      console.error('[OnboardingAggregation] Fatal error:', error);
+      return {
+        success: false,
+        departmentsProcessed: processed,
+        errors: [`Fatal error: ${error}`]
+      };
     }
-    
-    return trends;
+  }
+  
+  // ==========================================================================
+  // HELPERS PRIVADOS
+  // ==========================================================================
+  
+  /**
+   * Calcular promedio de array (ignorando nulls)
+   */
+  private static calculateAverage(values: (number | null)[]): number | null {
+    const validValues = values.filter((v): v is number => v !== null);
+    if (validValues.length === 0) return null;
+    return validValues.reduce((sum, val) => sum + val, 0) / validValues.length;
   }
   
   /**
-   * HELPERS PRIVADOS
+   * Calcular edad promedio desde fechas de nacimiento
    */
-  private static calculateAverage(values: (number | null)[]): number | null {
-    const validValues = values.filter(v => v !== null) as number[];
-    if (validValues.length === 0) return null;
-    return validValues.reduce((a, b) => a + b, 0) / validValues.length;
+  private static calculateAverageAge(dates: Date[]): number | null {
+    if (dates.length === 0) return null;
+    
+    const today = new Date();
+    const ages = dates.map(birthDate => {
+      const age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        return age - 1;
+      }
+      return age;
+    });
+    
+    return ages.reduce((sum, age) => sum + age, 0) / ages.length;
   }
   
-  private static identifyTopIssues(alerts: any[]): Array<{ issue: string; count: number }> {
+  /**
+   * Calcular antigüedad promedio desde fechas de contratación
+   */
+  private static calculateAverageSeniority(dates: Date[]): number | null {
+    if (dates.length === 0) return null;
+    
+    const today = new Date();
+    const seniorities = dates.map(hireDate => {
+      const years = today.getFullYear() - hireDate.getFullYear();
+      const monthDiff = today.getMonth() - hireDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < hireDate.getDate())) {
+        return years - 1;
+      }
+      return years;
+    });
+    
+    return seniorities.reduce((sum, years) => sum + years, 0) / seniorities.length;
+  }
+  
+  /**
+   * Calcular distribución de género (v3.2.4)
+   */
+  private static calculateGenderDistribution(
+    genders: (string | null)[]
+  ): Record<string, number> | null {
+    if (genders.length === 0) return null;
+    
+    const distribution: Record<string, number> = {
+      MALE: 0,
+      FEMALE: 0,
+      NON_BINARY: 0,
+      PREFER_NOT_TO_SAY: 0,
+      UNKNOWN: 0
+    };
+    
+    for (const gender of genders) {
+      const key = gender || 'UNKNOWN';
+      if (key in distribution) {
+        distribution[key]++;
+      } else {
+        distribution['UNKNOWN']++;
+      }
+    }
+    
+    return distribution;
+  }
+  
+  /**
+   * Identificar top 5 issues más frecuentes
+   */
+  private static identifyTopIssues(alerts: any[]): Array<{ issue: string; count: number }> | null {
+    if (alerts.length === 0) return null;
+    
     const issueCount: Record<string, number> = {};
     
     alerts.forEach(alert => {
-      const key = alert.dimension || alert.alertType;
+      const key = alert.alertType || 'unknown';
       issueCount[key] = (issueCount[key] || 0) + 1;
     });
     
@@ -332,60 +473,35 @@ export class OnboardingAggregationService {
       .slice(0, 5);
   }
   
-  private static generateRecommendations(metrics: PeriodMetrics): string[] {
-    const recommendations: string[] = [];
+  /**
+   * Generar recomendaciones automáticas
+   */
+  private static generateRecommendations(data: {
+    totalJourneys: number;
+    atRiskJourneys: number;
+    avgEXOScore: number | null;
+    criticalAlerts: number;
+  }): string[] | null {
+    const recs: string[] = [];
     
     // Recomendación por proporción de riesgo
-    if (metrics.totalJourneys > 0 && metrics.atRiskJourneys > metrics.totalJourneys * 0.3) {
-      recommendations.push('🚨 Alta proporción de journeys en riesgo (>30%). Revisar proceso de onboarding');
-    }
-    
-    // Recomendación por EXO Score bajo
-    if (metrics.avgEXOScore && metrics.avgEXOScore < 70) {
-      recommendations.push('⚠️ EXO Score departamental bajo (<70). Evaluar causas estructurales');
-    }
-    
-    // Recomendación por top issue
-    if (metrics.topIssues.length > 0) {
-      const topIssue = metrics.topIssues[0];
-      recommendations.push(`📊 Issue más frecuente: ${topIssue.issue} (${topIssue.count} casos)`);
-    }
-    
-    // Recomendación por alertas críticas
-    if (metrics.alerts.critical > 0) {
-      recommendations.push(`🔥 ${metrics.alerts.critical} alertas críticas requieren atención inmediata`);
-    }
-    
-    // Recomendación por tasa de completación
-    if (metrics.totalJourneys > 0) {
-      const completionRate = (metrics.completedJourneys / metrics.totalJourneys) * 100;
-      
-      if (completionRate < 50) {
-        recommendations.push('📉 Baja tasa de completación (<50%). Revisar engagement y comunicación');
+    if (data.totalJourneys > 0) {
+      const riskRate = data.atRiskJourneys / data.totalJourneys;
+      if (riskRate > 0.3) {
+        recs.push('🚨 Alta proporción de journeys en riesgo (>30%). Revisar proceso de onboarding.');
       }
     }
     
-    // Recomendación por dimensión más débil
-    const weakestDimension = this.identifyWeakestDimension(metrics.avgScores);
-    if (weakestDimension) {
-      recommendations.push(`🎯 Dimensión más débil: ${weakestDimension.name} (score: ${weakestDimension.score.toFixed(1)})`);
+    // Recomendación por EXO Score bajo
+    if (data.avgEXOScore && data.avgEXOScore < 70) {
+      recs.push('⚠️ EXO Score departamental bajo (<70). Reforzar seguimiento y soporte.');
     }
     
-    return recommendations;
-  }
-  
-  private static identifyWeakestDimension(avgScores: PeriodMetrics['avgScores']): { name: string; score: number } | null {
-    const dimensions = [
-      { name: 'compliance', score: avgScores.compliance },
-      { name: 'clarification', score: avgScores.clarification },
-      { name: 'culture', score: avgScores.culture },
-      { name: 'connection', score: avgScores.connection }
-    ].filter(d => d.score !== null) as { name: string; score: number }[];
+    // Recomendación por alertas críticas
+    if (data.criticalAlerts > 0) {
+      recs.push(`🔴 ${data.criticalAlerts} alerta(s) crítica(s) pendiente(s). Atención inmediata requerida.`);
+    }
     
-    if (dimensions.length === 0) return null;
-    
-    return dimensions.reduce((min, d) => 
-      d.score < min.score ? d : min
-    );
+    return recs.length > 0 ? recs : null;
   }
 }
