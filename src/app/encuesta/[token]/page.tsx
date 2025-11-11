@@ -71,6 +71,8 @@ export default function SurveyPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCompleted, setIsCompleted] = useState(false)
+  // AGREGAR DESPUÉS:
+  const [isPermanentSurvey, setIsPermanentSurvey] = useState<boolean>(false)
 
   // Hook para obtener la configuración de la encuesta
   const { configuration } = useSurveyConfiguration(
@@ -94,7 +96,15 @@ export default function SurveyPage() {
         }
 
         console.log('✅ Datos survey cargados:', data)
-
+        // AGREGAR INMEDIATAMENTE DESPUÉS:
+        // ✅ Detectar tipo de encuesta
+        if (data.participant?.campaign?.campaignType?.isPermanent) {
+          setIsPermanentSurvey(true)
+          console.log('🎯 Encuesta PERMANENTE detectada (Onboarding/Exit)')
+        } else {
+          setIsPermanentSurvey(false)
+          console.log('📊 Encuesta TEMPORAL detectada (Pulso/Experiencia)')
+}
         // Verificar si ya está completada
         if (data.participant.status === 'completed') {
           setIsCompleted(true)
@@ -120,9 +130,17 @@ export default function SurveyPage() {
     try {
       setIsSubmitting(true)
 
+      // REEMPLAZAR POR:
       console.log('📤 Enviando respuestas:', responses)
 
-      const response = await fetch(`/api/survey/${token}/submit`, {
+      // ✅ Enrutador inteligente basado en isPermanent
+      const submitUrl = isPermanentSurvey
+        ? `/api/onboarding/survey/${token}/submit`  // Onboarding (motor inteligencia)
+        : `/api/survey/${token}/submit`             // Legacy (temporal)
+
+      console.log(`🎯 Enrutando submit a: ${submitUrl}`)
+
+const response = await fetch(submitUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

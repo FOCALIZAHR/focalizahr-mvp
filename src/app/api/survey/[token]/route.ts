@@ -51,7 +51,9 @@ export async function GET(
                 questionCount: true,
                 estimatedDuration: true,
                 methodology: true,
-                category: true
+                category: true,
+                // ✅ AGREGAR DESPUÉS DE "category: true":
+                isPermanent: true
               }
             }
           }
