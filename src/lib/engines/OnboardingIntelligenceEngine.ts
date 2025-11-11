@@ -243,9 +243,6 @@ export class OnboardingIntelligenceEngine {
       where: {
         participantId,
         rating: { not: null },
-        question: {
-          responseType: { in: ['likert', 'nps'] }
-        }
       },
       include: {
         question: {
