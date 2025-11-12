@@ -26,10 +26,10 @@
  * 
  * RESPONSE DATA:
  * - Si departmentId: data es objeto único (OnboardingMetrics)
- * - Si global: data es array (OnboardingMetrics[])
+ * - Si global: data es OnboardingDashboardData (agregaciones globales)
  * - Si sin datos: data es null
  * 
- * @version 3.2.4
+ * @version 3.2.5
  * @date November 2025
  */
 
@@ -70,7 +70,7 @@ export interface OnboardingMetrics {
   avgCultureScore: number | null         // Día 30 - Culture
   avgConnectionScore: number | null      // Día 90 - Connection
   avgEXOScore: number | null             // Score global experiencia
-  exoScoreTrend: number | null           // Tendencia vs período anterior  ⬅️ AGREGAR ESTA LÍNEA
+  exoScoreTrend: number | null           // Tendencia vs período anterior
   
   // ========================================
   // ALERTAS (3)
@@ -112,10 +112,58 @@ export interface OnboardingMetrics {
 }
 
 /**
+ * Interface para respuesta agregada del dashboard
+ * v3.2.5 - Nueva estructura con agregaciones globales
+ */
+export interface OnboardingDashboardData {
+  global: {
+    avgEXOScore: number | null;
+    totalActiveJourneys: number;
+    criticalAlerts: number;
+    period: string;
+    exoScoreTrend: number | null;
+  };
+  topDepartments: Array<{
+    name: string;
+    avgEXOScore: number;
+    activeJourneys: number;
+  }>;
+  bottomDepartments: Array<{
+    name: string;
+    avgEXOScore: number;
+    atRiskCount: number;
+  }>;
+  insights: {
+    topIssues: Array<{ issue: string; count: number }>;
+    recommendations: string[];
+  };
+  demographics: {
+    byGeneration: Array<{ 
+      generation: string; 
+      count: number; 
+      avgEXOScore: number; 
+      atRiskRate: number 
+    }>;
+    byGender: Array<{ 
+      gender: string; 
+      count: number; 
+      avgEXOScore: number 
+    }>;
+    bySeniority: Array<{ 
+      range: string; 
+      count: number; 
+      avgEXOScore: number 
+    }>;
+  };
+  departments: OnboardingMetrics[]; // Array original para drill-down
+}
+
+/**
  * Return type del hook
+ * v3.2.5 - Actualizado para soportar OnboardingDashboardData
  */
 interface UseOnboardingMetricsReturn {
-  data: OnboardingMetrics | OnboardingMetrics[] | null
+  data: OnboardingMetrics | OnboardingDashboardData | null
   loading: boolean
   error: string | null
   refetch: () => void
@@ -133,11 +181,13 @@ interface UseOnboardingMetricsReturn {
  * 
  * @example
  * ```tsx
- * // Todas las métricas
+ * // Todas las métricas (agregadas)
  * const { data, loading } = useOnboardingMetrics()
+ * // data es OnboardingDashboardData
  * 
  * // Departamento específico
  * const { data } = useOnboardingMetrics('dept_123')
+ * // data es OnboardingMetrics
  * ```
  */
 export function useOnboardingMetrics(
@@ -147,7 +197,7 @@ export function useOnboardingMetrics(
   // ========================================================================
   // ESTADOS
   // ========================================================================
-  const [data, setData] = useState<OnboardingMetrics | OnboardingMetrics[] | null>(null)
+  const [data, setData] = useState<OnboardingMetrics | OnboardingDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -205,6 +255,7 @@ export function useOnboardingMetrics(
       console.log('[useOnboardingMetrics] ✅ Data received:', {
         hasData: !!result.data,
         isArray: Array.isArray(result.data),
+        isDashboard: result.data?.global !== undefined,
         count: Array.isArray(result.data) ? result.data.length : 1
       })
       
@@ -253,3 +304,7 @@ export function useOnboardingMetrics(
     refetch
   }
 }
+
+// ============================================================================
+// EXPORTS
+// ============================================================================

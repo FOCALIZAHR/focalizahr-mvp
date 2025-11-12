@@ -16,16 +16,17 @@ export const dynamic = 'force-dynamic';
  * 
  * QUERY PARAMS:
  * - departmentId (opcional): Filtrar por departamento específico
+ * - period (opcional): Período YYYY-MM (default: mes actual)
  * 
  * RESPONSE:
  * {
- *   data: DepartmentOnboardingInsight | DepartmentOnboardingInsight[],
+ *   data: DepartmentOnboardingInsight | OnboardingDashboardData,
  *   success: boolean,
  *   message?: string
  * }
  * 
  * CASOS DE USO:
- * 1. Dashboard Torre Control: GET /metrics (todos los departamentos)
+ * 1. Dashboard Torre Control: GET /metrics (agregaciones globales)
  * 2. Vista Departamental: GET /metrics?departmentId=xxx (específico)
  * 
  * ARQUITECTURA:
@@ -34,12 +35,13 @@ export const dynamic = 'force-dynamic';
  * - Incluye relación department (displayName, standardCategory)
  * - Multi-tenant isolation por accountId
  * 
- * @version 3.2.4
+ * @version 3.2.5
  * @date November 2025
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { OnboardingAggregationService } from '@/lib/services/OnboardingAggregationService';
 
 /**
  * GET /api/onboarding/metrics
@@ -75,59 +77,105 @@ export async function GET(request: NextRequest) {
     // ========================================================================
     const { searchParams } = new URL(request.url);
     const departmentId = searchParams.get('departmentId');
+    const period = searchParams.get('period');
     
     console.log('[API GET /onboarding/metrics] Params:', {
-      departmentId: departmentId || 'ALL'
+      departmentId: departmentId || 'ALL',
+      period: period || 'CURRENT'
     });
     
     // ========================================================================
-    // 3. CONSTRUIR WHERE CLAUSE (Multi-tenant + Filtro opcional)
+    // 3. SI ES DEPARTAMENTO ESPECÍFICO: FLUJO ORIGINAL (SIN CAMBIOS)
     // ========================================================================
-    const whereClause: any = {
-      accountId  // CRÍTICO: Multi-tenant isolation
-    };
-    
     if (departmentId) {
-      whereClause.departmentId = departmentId;
+      const whereClause: any = {
+        accountId,
+        departmentId
+      };
+      
+      const metrics = await prisma.departmentOnboardingInsight.findMany({
+        where: whereClause,
+        orderBy: {
+          updatedAt: 'desc'
+        },
+        include: {
+          department: {
+            select: {
+              id: true,
+              displayName: true,
+              standardCategory: true
+            }
+          }
+        },
+        take: 1
+      });
+      
+      if (metrics.length === 0) {
+        return NextResponse.json(
+          {
+            data: null,
+            message: 'No hay métricas disponibles para este departamento',
+            success: true
+          },
+          { status: 200 }
+        );
+      }
+      
+      const duration = Date.now() - startTime;
+      console.log(`[API GET /onboarding/metrics] ✅ Success - ${duration}ms (departamento específico)`);
+      
+      return NextResponse.json({
+        data: metrics[0],
+        success: true
+      });
     }
     
     // ========================================================================
-    // 4. CONSULTAR MÉTRICAS EN BD
+    // 4. CONSULTA GLOBAL: USAR AGREGACIONES DEL SERVICE
     // ========================================================================
-    // Obtener las métricas más recientes por departamento
-    // Si departmentId específico: 1 resultado
-    // Si general: Top 10 departamentos más recientes
-    const metrics = await prisma.departmentOnboardingInsight.findMany({
-      where: whereClause,
-      orderBy: {
-        updatedAt: 'desc'  // Más recientes primero
-      },
-      include: {
-        department: {
-          select: {
-            id: true,
-            displayName: true,
-            standardCategory: true
-          }
-        }
-      },
-      take: departmentId ? 1 : 20  // 1 si específico, 20 si general
-    });
+    console.log('[API GET /onboarding/metrics] Generando agregaciones globales...');
     
-    console.log(`[API GET /onboarding/metrics] Encontrados ${metrics.length} registros`);
+    // Llamar a los 5 métodos del service en paralelo
+    const [
+      globalMetrics,
+      topDepartments,
+      bottomDepartments,
+      insights,
+      demographics,
+      departments
+    ] = await Promise.all([
+      OnboardingAggregationService.getGlobalMetrics(accountId, period || undefined),
+      OnboardingAggregationService.getTopDepartments(accountId, period || undefined),
+      OnboardingAggregationService.getBottomDepartments(accountId, period || undefined),
+      OnboardingAggregationService.getGlobalInsights(accountId, period || undefined),
+      OnboardingAggregationService.getGlobalDemographics(accountId, period || undefined),
+      // Mantener array original para backward compatibility
+      prisma.departmentOnboardingInsight.findMany({
+        where: { accountId },
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          department: {
+            select: {
+              id: true,
+              displayName: true,
+              standardCategory: true
+            }
+          }
+        },
+        take: 20
+      })
+    ]);
     
     // ========================================================================
     // 5. VALIDAR DATOS ENCONTRADOS
     // ========================================================================
-    if (metrics.length === 0) {
+    if (departments.length === 0) {
       console.log('[API GET /onboarding/metrics] Sin métricas disponibles');
       
       return NextResponse.json(
         {
           data: null,
-          message: departmentId 
-            ? 'No hay métricas disponibles para este departamento'
-            : 'No hay métricas de onboarding calculadas aún',
+          message: 'No hay métricas de onboarding calculadas aún',
           success: true
         },
         { status: 200 }
@@ -135,17 +183,30 @@ export async function GET(request: NextRequest) {
     }
     
     // ========================================================================
-    // 6. FORMATEAR RESPUESTA
+    // 6. FORMATEAR RESPUESTA AGREGADA
     // ========================================================================
-    // Si es departamento específico, retornar objeto único
-    // Si es consulta general, retornar array
-    const data = departmentId ? metrics[0] : metrics;
+    const data = {
+      global: globalMetrics,
+      topDepartments,
+      bottomDepartments,
+      insights,
+      demographics,
+      departments // Array original para drill-down futuro
+    };
     
     const duration = Date.now() - startTime;
     
     console.log(`[API GET /onboarding/metrics] ✅ Success - ${duration}ms`, {
-      recordsReturned: metrics.length,
-      isSingleDepartment: !!departmentId
+      globalMetrics: !!globalMetrics.avgEXOScore,
+      topDepartments: topDepartments.length,
+      bottomDepartments: bottomDepartments.length,
+      insights: insights.topIssues.length,
+      demographics: {
+        generations: demographics.byGeneration.length,
+        genders: demographics.byGender.length,
+        seniority: demographics.bySeniority.length
+      },
+      departmentsArray: departments.length
     });
     
     return NextResponse.json({

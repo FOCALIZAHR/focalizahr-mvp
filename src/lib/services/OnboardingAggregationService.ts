@@ -10,7 +10,7 @@
  * PILAR 3: Sistema separado de AggregationService legado
  * PILAR 4: NO duplica lógica, usa utilities compartidas
  * 
- * @version 3.2.4
+ * @version 3.2.5
  * @date November 2025
  */
 
@@ -411,6 +411,429 @@ export class OnboardingAggregationService {
     }
   }
   
+  // ============================================================================
+  // NUEVOS MÉTODOS: AGREGACIONES GLOBALES PARA DASHBOARD v3.2.5
+  // ============================================================================
+  
+  /**
+   * Obtener métricas globales agregadas con jerarquía
+   * 
+   * @param accountId - ID de la cuenta
+   * @param period - Período YYYY-MM (opcional, default: mes actual)
+   * @returns Métricas globales con respeto a jerarquía
+   */
+  static async getGlobalMetrics(
+    accountId: string,
+    period?: string
+  ): Promise<{
+    avgEXOScore: number | null;
+    totalActiveJourneys: number;
+    criticalAlerts: number;
+    period: string;
+    exoScoreTrend: number | null;
+  }> {
+    
+    const targetPeriod = period || format(new Date(), 'yyyy-MM');
+    const [year, month] = targetPeriod.split('-').map(Number);
+    const periodStart = new Date(year, month - 1, 1);
+    const periodEnd = endOfMonth(periodStart);
+    
+    // Verificar si hay jerarquía
+    const hasHierarchy = await prisma.department.count({
+      where: {
+        accountId,
+        parentId: { not: null },
+        isActive: true
+      }
+    }) > 0;
+    
+    let avgEXOScore: number | null = null;
+    let totalActiveJourneys = 0;
+    let criticalAlerts = 0;
+    
+    if (hasHierarchy) {
+      // CON JERARQUÍA: Usar CTE recursivo para agregación ponderada
+      const results = await prisma.$queryRaw<Array<{
+        avgEXOScore: number | null;
+        totalActiveJourneys: number;
+        criticalAlerts: number;
+      }>>`
+        WITH base_scores AS (
+          SELECT 
+            oi.avg_exo_score,
+            oi.active_journeys,
+            oi.critical_alerts
+          FROM department_onboarding_insight oi
+          INNER JOIN departments d ON oi.department_id = d.id
+          WHERE d.account_id = ${accountId}
+            AND d.is_active = true
+            AND d.level = 3
+            AND oi.period_start >= ${periodStart}
+            AND oi.period_end <= ${periodEnd}
+        ),
+        aggregated_scores AS (
+          SELECT 
+            COALESCE(
+              SUM(bs.avg_exo_score * bs.active_journeys) / NULLIF(SUM(bs.active_journeys), 0),
+              NULL
+            ) as weighted_avg_exo_score,
+            COALESCE(SUM(bs.active_journeys), 0) as total_active,
+            COALESCE(SUM(bs.critical_alerts), 0) as total_critical
+          FROM base_scores bs
+        )
+        SELECT 
+          weighted_avg_exo_score as "avgEXOScore",
+          total_active as "totalActiveJourneys",
+          total_critical as "criticalAlerts"
+        FROM aggregated_scores
+      `;
+      
+      if (results.length > 0) {
+        avgEXOScore = results[0].avgEXOScore;
+        totalActiveJourneys = results[0].totalActiveJourneys;
+        criticalAlerts = results[0].criticalAlerts;
+      }
+      
+    } else {
+      // SIN JERARQUÍA: Agregación simple
+      const insights = await prisma.departmentOnboardingInsight.findMany({
+        where: {
+          accountId,
+          periodStart: { gte: periodStart },
+          periodEnd: { lte: periodEnd }
+        }
+      });
+      
+      if (insights.length > 0) {
+        avgEXOScore = this.calculateAverage(insights.map(i => i.avgEXOScore));
+        totalActiveJourneys = insights.reduce((sum, i) => sum + i.activeJourneys, 0);
+        criticalAlerts = insights.reduce((sum, i) => sum + i.criticalAlerts, 0);
+      }
+    }
+    
+    // Calcular tendencia vs período anterior
+    const previousPeriod = this.getPreviousPeriod(targetPeriod);
+    const previousInsights = await prisma.departmentOnboardingInsight.findMany({
+      where: {
+        accountId,
+        periodStart: { gte: new Date(previousPeriod + '-01') }
+      }
+    });
+    
+    const previousAvgEXOScore = previousInsights.length > 0
+      ? this.calculateAverage(previousInsights.map(i => i.avgEXOScore))
+      : null;
+    
+    const exoScoreTrend = avgEXOScore && previousAvgEXOScore
+      ? Number((avgEXOScore - previousAvgEXOScore).toFixed(1))
+      : null;
+    
+    return {
+      avgEXOScore: avgEXOScore ? Number(avgEXOScore.toFixed(1)) : null,
+      totalActiveJourneys,
+      criticalAlerts,
+      period: targetPeriod,
+      exoScoreTrend
+    };
+  }
+  
+  /**
+   * Obtener Top 3 departamentos por EXO Score
+   */
+  static async getTopDepartments(
+    accountId: string,
+    period?: string
+  ): Promise<Array<{
+    name: string;
+    avgEXOScore: number;
+    activeJourneys: number;
+  }>> {
+    
+    const targetPeriod = period || format(new Date(), 'yyyy-MM');
+    const [year, month] = targetPeriod.split('-').map(Number);
+    const periodStart = new Date(year, month - 1, 1);
+    const periodEnd = endOfMonth(periodStart);
+    
+    const insights = await prisma.departmentOnboardingInsight.findMany({
+      where: {
+        accountId,
+        periodStart: { gte: periodStart },
+        periodEnd: { lte: periodEnd },
+        avgEXOScore: { not: null }
+      },
+      include: {
+        department: {
+          select: { displayName: true }
+        }
+      },
+      orderBy: { avgEXOScore: 'desc' },
+      take: 3
+    });
+    
+    return insights.map(i => ({
+      name: i.department.displayName,
+      avgEXOScore: Number(i.avgEXOScore!.toFixed(1)),
+      activeJourneys: i.activeJourneys
+    }));
+  }
+  
+  /**
+   * Obtener Bottom 3 departamentos por EXO Score
+   */
+  static async getBottomDepartments(
+    accountId: string,
+    period?: string
+  ): Promise<Array<{
+    name: string;
+    avgEXOScore: number;
+    atRiskCount: number;
+  }>> {
+    
+    const targetPeriod = period || format(new Date(), 'yyyy-MM');
+    const [year, month] = targetPeriod.split('-').map(Number);
+    const periodStart = new Date(year, month - 1, 1);
+    const periodEnd = endOfMonth(periodStart);
+    
+    const insights = await prisma.departmentOnboardingInsight.findMany({
+      where: {
+        accountId,
+        periodStart: { gte: periodStart },
+        periodEnd: { lte: periodEnd },
+        avgEXOScore: { not: null }
+      },
+      include: {
+        department: {
+          select: { displayName: true }
+        }
+      },
+      orderBy: { avgEXOScore: 'asc' },
+      take: 3
+    });
+    
+    return insights.map(i => ({
+      name: i.department.displayName,
+      avgEXOScore: Number(i.avgEXOScore!.toFixed(1)),
+      atRiskCount: i.atRiskJourneys
+    }));
+  }
+  
+  /**
+   * Obtener insights globales agregados
+   */
+  static async getGlobalInsights(
+    accountId: string,
+    period?: string
+  ): Promise<{
+    topIssues: Array<{ issue: string; count: number }>;
+    recommendations: string[];
+  }> {
+    
+    const targetPeriod = period || format(new Date(), 'yyyy-MM');
+    const [year, month] = targetPeriod.split('-').map(Number);
+    const periodStart = new Date(year, month - 1, 1);
+    const periodEnd = endOfMonth(periodStart);
+    
+    const insights = await prisma.departmentOnboardingInsight.findMany({
+      where: {
+        accountId,
+        periodStart: { gte: periodStart },
+        periodEnd: { lte: periodEnd }
+      },
+      include: {
+        department: {
+          select: { displayName: true }
+        }
+      }
+    });
+    
+    // Agregar topIssues
+    const issuesMap = new Map<string, number>();
+    
+    insights.forEach(insight => {
+      if (insight.topIssues) {
+        const issues = insight.topIssues as Array<{ issue: string; count: number }>;
+        issues.forEach(({ issue, count }) => {
+          const currentCount = issuesMap.get(issue) || 0;
+          issuesMap.set(issue, currentCount + count);
+        });
+      }
+    });
+    
+    const topIssues = Array.from(issuesMap.entries())
+      .map(([issue, count]) => ({ issue, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+    
+    // Generar recomendaciones
+    const recommendations: string[] = [];
+    
+    const lowScoreDepts = insights
+      .filter(i => i.avgEXOScore !== null && i.avgEXOScore < 60)
+      .map(i => i.department.displayName);
+    
+    if (lowScoreDepts.length > 0) {
+      recommendations.push(
+        `Prioridad Alta: Revisar proceso onboarding en ${lowScoreDepts.slice(0, 2).join(', ')}`
+      );
+    }
+    
+    const highAlertDepts = insights
+      .filter(i => i.criticalAlerts > 2)
+      .map(i => i.department.displayName);
+    
+    if (highAlertDepts.length > 0) {
+      recommendations.push(
+        `Prioridad Media: Atender alertas críticas en ${highAlertDepts.slice(0, 2).join(', ')}`
+      );
+    }
+    
+    const highAbandonDepts = insights
+      .filter(i => i.abandonedJourneys > 0)
+      .map(i => i.department.displayName);
+    
+    if (highAbandonDepts.length > 0) {
+      recommendations.push(
+        `Revisar causas de abandono en ${highAbandonDepts.slice(0, 2).join(', ')}`
+      );
+    }
+    
+    return {
+      topIssues,
+      recommendations
+    };
+  }
+  
+  /**
+   * Obtener segmentación demográfica global
+   */
+  static async getGlobalDemographics(
+    accountId: string,
+    period?: string
+  ): Promise<{
+    byGeneration: Array<{ generation: string; count: number; avgEXOScore: number; atRiskRate: number }>;
+    byGender: Array<{ gender: string; count: number; avgEXOScore: number }>;
+    bySeniority: Array<{ range: string; count: number; avgEXOScore: number }>;
+  }> {
+    
+    const targetPeriod = period || format(new Date(), 'yyyy-MM');
+    const [year, month] = targetPeriod.split('-').map(Number);
+    const periodStart = new Date(year, month - 1, 1);
+    const periodEnd = endOfMonth(periodStart);
+    
+    // Obtener todos los journeys del período con demographics
+    const journeys = await prisma.journeyOrchestration.findMany({
+      where: {
+        accountId,
+        createdAt: {
+          gte: periodStart,
+          lte: periodEnd
+        }
+      },
+      select: {
+        exoScore: true,
+        retentionRisk: true,
+        hireDate: true,
+        // ✅ FIX: Traer demographics desde stage1Participant
+        stage1Participant: {
+          select: {
+            dateOfBirth: true,
+            gender: true
+          }
+        }
+      }
+    });
+    
+    if (journeys.length === 0) {
+      return {
+        byGeneration: [],
+        byGender: [],
+        bySeniority: []
+      };
+    }
+    
+    // ✅ FIX: Acceder a demographics correctamente
+    const genZ = journeys.filter(j => 
+      j.stage1Participant?.dateOfBirth && 
+      this.calculateAge(j.stage1Participant.dateOfBirth) < 27
+    );
+    const millennial = journeys.filter(j => 
+      j.stage1Participant?.dateOfBirth && 
+      this.calculateAge(j.stage1Participant.dateOfBirth) >= 27 && 
+      this.calculateAge(j.stage1Participant.dateOfBirth) <= 42
+    );
+    const genX = journeys.filter(j => 
+      j.stage1Participant?.dateOfBirth && 
+      this.calculateAge(j.stage1Participant.dateOfBirth) > 42 && 
+      this.calculateAge(j.stage1Participant.dateOfBirth) <= 58
+    );
+    
+    const byGeneration = [
+      {
+        generation: 'Gen Z (<27)',
+        count: genZ.length,
+        avgEXOScore: Number(this.calculateAverage(genZ.map(j => j.exoScore))?.toFixed(1) || 0),
+        atRiskRate: genZ.filter(j => j.retentionRisk === 'high' || j.retentionRisk === 'critical').length / (genZ.length || 1)
+      },
+      {
+        generation: 'Millennial (27-42)',
+        count: millennial.length,
+        avgEXOScore: Number(this.calculateAverage(millennial.map(j => j.exoScore))?.toFixed(1) || 0),
+        atRiskRate: millennial.filter(j => j.retentionRisk === 'high' || j.retentionRisk === 'critical').length / (millennial.length || 1)
+      },
+      {
+        generation: 'Gen X (43-58)',
+        count: genX.length,
+        avgEXOScore: Number(this.calculateAverage(genX.map(j => j.exoScore))?.toFixed(1) || 0),
+        atRiskRate: genX.filter(j => j.retentionRisk === 'high' || j.retentionRisk === 'critical').length / (genX.length || 1)
+      }
+    ].filter(g => g.count > 0);
+    
+    // ✅ FIX: Segmentación por género desde stage1Participant
+    const genderGroups = new Map<string, typeof journeys>();
+    journeys.forEach(j => {
+      if (j.stage1Participant?.gender) {
+        const group = genderGroups.get(j.stage1Participant.gender) || [];
+        group.push(j);
+        genderGroups.set(j.stage1Participant.gender, group);
+      }
+    });
+    
+    const byGender = Array.from(genderGroups.entries()).map(([gender, group]) => ({
+      gender,
+      count: group.length,
+      avgEXOScore: Number(this.calculateAverage(group.map(j => j.exoScore))?.toFixed(1) || 0)
+    }));
+    
+    // Segmentación por antigüedad
+    const nuevo = journeys.filter(j => j.hireDate && this.calculateSeniority(j.hireDate) < 0.5);
+    const junior = journeys.filter(j => j.hireDate && this.calculateSeniority(j.hireDate) >= 0.5 && this.calculateSeniority(j.hireDate) < 2);
+    const senior = journeys.filter(j => j.hireDate && this.calculateSeniority(j.hireDate) >= 2);
+    
+    const bySeniority = [
+      {
+        range: 'Nuevo (0-6 meses)',
+        count: nuevo.length,
+        avgEXOScore: Number(this.calculateAverage(nuevo.map(j => j.exoScore))?.toFixed(1) || 0)
+      },
+      {
+        range: 'Junior (6-24 meses)',
+        count: junior.length,
+        avgEXOScore: Number(this.calculateAverage(junior.map(j => j.exoScore))?.toFixed(1) || 0)
+      },
+      {
+        range: 'Senior (24+ meses)',
+        count: senior.length,
+        avgEXOScore: Number(this.calculateAverage(senior.map(j => j.exoScore))?.toFixed(1) || 0)
+      }
+    ].filter(s => s.count > 0);
+    
+    return {
+      byGeneration,
+      byGender,
+      bySeniority
+    };
+  }
+  
   // ==========================================================================
   // HELPERS PRIVADOS
   // ==========================================================================
@@ -460,6 +883,32 @@ export class OnboardingAggregationService {
     });
     
     return seniorities.reduce((sum, years) => sum + years, 0) / seniorities.length;
+  }
+  
+  /**
+   * Calcular edad desde fecha de nacimiento (helper para demographics)
+   */
+  private static calculateAge(birthdate: Date): number {
+    const today = new Date();
+    let age = today.getFullYear() - birthdate.getFullYear();
+    const monthDiff = today.getMonth() - birthdate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthdate.getDate())) {
+      age--;
+    }
+    return age;
+  }
+  
+  /**
+   * Calcular antigüedad en años desde fecha de contratación (helper para demographics)
+   */
+  private static calculateSeniority(hireDate: Date): number {
+    const today = new Date();
+    let years = today.getFullYear() - hireDate.getFullYear();
+    const monthDiff = today.getMonth() - hireDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < hireDate.getDate())) {
+      years--;
+    }
+    return years + (monthDiff / 12);
   }
   
   /**
