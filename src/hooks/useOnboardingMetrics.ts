@@ -70,6 +70,7 @@ export interface OnboardingMetrics {
   avgCultureScore: number | null         // Día 30 - Culture
   avgConnectionScore: number | null      // Día 90 - Connection
   avgEXOScore: number | null             // Score global experiencia
+  exoScoreTrend: number | null           // Tendencia vs período anterior  ⬅️ AGREGAR ESTA LÍNEA
   
   // ========================================
   // ALERTAS (3)

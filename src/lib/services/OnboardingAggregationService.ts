@@ -40,6 +40,7 @@ interface PeriodMetrics {
   avgCultureScore: number | null;
   avgConnectionScore: number | null;
   avgEXOScore: number | null;
+  exoScoreTrend: number | null;  // Tendencia vs período anterior
   
   // Alertas (3)
   criticalAlerts: number;
@@ -211,6 +212,7 @@ export class OnboardingAggregationService {
       avgCultureScore,
       avgConnectionScore,
       avgEXOScore,
+      exoScoreTrend: null,  // Se calcula en saveDepartmentInsights
       criticalAlerts,
       highAlerts,
       mediumAlerts,
@@ -230,6 +232,38 @@ export class OnboardingAggregationService {
     departmentId: string,
     metrics: PeriodMetrics
   ): Promise<void> {
+    
+    // ========================================================================
+    // CALCULAR TENDENCIA VS PERÍODO ANTERIOR
+    // ========================================================================
+    const period = format(metrics.periodStart, 'yyyy-MM');
+    const previousPeriod = this.getPreviousPeriod(period);
+    
+    // Calcular fechas del período anterior
+    const previousPeriodStart = new Date(`${previousPeriod}-01`);
+    const previousPeriodEnd = endOfMonth(previousPeriodStart);
+    
+    // Buscar insight del período anterior
+    const previousInsight = await prisma.departmentOnboardingInsight.findFirst({
+      where: { 
+        accountId,
+        departmentId,
+        periodStart: previousPeriodStart,
+        periodEnd: previousPeriodEnd
+      },
+      select: { avgEXOScore: true }
+    });
+    
+    // Calcular tendencia (diferencia vs período anterior)
+    const exoScoreTrend = previousInsight && 
+                          metrics.avgEXOScore !== null && 
+                          previousInsight.avgEXOScore !== null
+      ? parseFloat((metrics.avgEXOScore - previousInsight.avgEXOScore).toFixed(1))
+      : null;
+    
+    // ========================================================================
+    // GUARDAR EN BD
+    // ========================================================================
     await prisma.departmentOnboardingInsight.upsert({
       where: {
         // ✅ CORRECCIÓN v3.2.4: Constraint auto-generado por Prisma
@@ -252,6 +286,7 @@ export class OnboardingAggregationService {
         avgCultureScore: metrics.avgCultureScore,
         avgConnectionScore: metrics.avgConnectionScore,
         avgEXOScore: metrics.avgEXOScore,
+        exoScoreTrend: exoScoreTrend,
         criticalAlerts: metrics.criticalAlerts,
         highAlerts: metrics.highAlerts,
         mediumAlerts: metrics.mediumAlerts,
@@ -278,6 +313,7 @@ export class OnboardingAggregationService {
         avgCultureScore: metrics.avgCultureScore,
         avgConnectionScore: metrics.avgConnectionScore,
         avgEXOScore: metrics.avgEXOScore,
+        exoScoreTrend: exoScoreTrend,
         criticalAlerts: metrics.criticalAlerts,
         highAlerts: metrics.highAlerts,
         mediumAlerts: metrics.mediumAlerts,
@@ -424,6 +460,20 @@ export class OnboardingAggregationService {
     });
     
     return seniorities.reduce((sum, years) => sum + years, 0) / seniorities.length;
+  }
+  
+  /**
+   * Calcular período anterior (formato YYYY-MM)
+   * Ejemplo: "2025-11" → "2025-10" | "2025-01" → "2024-12"
+   */
+  private static getPreviousPeriod(period: string): string {
+    const [year, month] = period.split('-').map(Number);
+    
+    if (month === 1) {
+      return `${year - 1}-12`;
+    }
+    
+    return `${year}-${String(month - 1).padStart(2, '0')}`;
   }
   
   /**

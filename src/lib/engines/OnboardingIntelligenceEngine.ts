@@ -273,77 +273,78 @@ export class OnboardingIntelligenceEngine {
   /**
    * ✅ ACTUALIZAR SCORES EN JOURNEY DESPUÉS DE RESPONDER STAGE
    */
-  static async updateJourneyScores(journeyId: string, stage: number) {
-    const journey = await prisma.journeyOrchestration.findUnique({
-      where: { id: journeyId }
-    });
-    
-    if (!journey) return;
-    
-    // Obtener participantId del stage
-    const participantIds = [
-      journey.stage1ParticipantId,
-      journey.stage2ParticipantId,
-      journey.stage3ParticipantId,
-      journey.stage4ParticipantId
-    ];
-    
-    const participantId = participantIds[stage - 1];
-    if (!participantId) return;
-    
-    // Calcular score del stage
-    const stageScore = await this.calculateStageScore(participantId);
-    
-    if (stageScore === null) return;
-    
-    // Actualizar score correspondiente
-    const updateData: any = {
-      currentStage: stage
-    };
-    
-    switch (stage) {
-      case 1:
-        updateData.complianceScore = stageScore;
-        break;
-      case 2:
-        updateData.clarificationScore = stageScore;
-        break;
-      case 3:
-        updateData.cultureScore = stageScore;
-        break;
-      case 4:
-        updateData.connectionScore = stageScore;
-        updateData.status = 'completed';  // Journey completo
-        break;
-    }
-    
-    // Recalcular EXO Score
-    const updatedJourney = await prisma.journeyOrchestration.findUnique({
-      where: { id: journeyId }
-    });
-    
-    if (updatedJourney) {
-      const scores: StageScores = {
-        compliance: updateData.complianceScore ?? updatedJourney.complianceScore,
-        clarification: updateData.clarificationScore ?? updatedJourney.clarificationScore,
-        culture: updateData.cultureScore ?? updatedJourney.cultureScore,
-        connection: updateData.connectionScore ?? updatedJourney.connectionScore
-      };
-      
-      const exoScore = this.calculateEXOScore(scores);
-      
-      if (exoScore !== null) {
-        updateData.exoScore = exoScore;
-        updateData.retentionRisk = this.calculateRetentionRisk(exoScore);
-      }
-    }
-    
-    // Aplicar update
-    await prisma.journeyOrchestration.update({
-      where: { id: journeyId },
-      data: updateData
-    });
-    
-    console.log(`[OnboardingEngine] Journey ${journeyId} Stage ${stage} actualizado: score=${stageScore}`);
+  /**
+ * ✅ ACTUALIZAR SCORES EN JOURNEY DESPUÉS DE RESPONDER STAGE (CORREGIDO)
+ */
+static async updateJourneyScores(journeyId: string, stage: number) {
+  const journey = await prisma.journeyOrchestration.findUnique({
+    where: { id: journeyId }
+  });
+  
+  if (!journey) return;
+  
+  // Obtener participantId del stage
+  const participantIds = [
+    journey.stage1ParticipantId,
+    journey.stage2ParticipantId,
+    journey.stage3ParticipantId,
+    journey.stage4ParticipantId
+  ];
+  
+  const participantId = participantIds[stage - 1];
+  if (!participantId) return;
+  
+  // Calcular score del stage
+  const stageScore = await this.calculateStageScore(participantId);
+  
+  if (stageScore === null) {
+    console.warn(`[updateJourneyScores] No se pudo calcular score para stage ${stage}`);
+    return;
   }
+  
+  // Actualizar score correspondiente
+  const updateData: any = {
+    currentStage: stage
+  };
+  
+  switch (stage) {
+    case 1:
+      updateData.complianceScore = stageScore;
+      break;
+    case 2:
+      updateData.clarificationScore = stageScore;
+      break;
+    case 3:
+      updateData.cultureScore = stageScore;
+      break;
+    case 4:
+      updateData.connectionScore = stageScore;
+      updateData.status = 'completed';
+      break;
+  }
+  
+  // ✅ FIX: Construir scores usando journey ACTUAL + nuevo score
+  const scores: StageScores = {
+    compliance: updateData.complianceScore ?? journey.complianceScore,
+    clarification: updateData.clarificationScore ?? journey.clarificationScore,
+    culture: updateData.cultureScore ?? journey.cultureScore,
+    connection: updateData.connectionScore ?? journey.connectionScore
+  };
+  
+  // Calcular EXO Score con los scores actualizados
+  const exoScore = this.calculateEXOScore(scores);
+  
+  if (exoScore !== null) {
+    updateData.exoScore = exoScore;
+    updateData.retentionRisk = this.calculateRetentionRisk(exoScore);
+  }
+  
+  // Aplicar update
+  await prisma.journeyOrchestration.update({
+    where: { id: journeyId },
+    data: updateData
+  });
+  
+  console.log(`[OnboardingEngine] Journey ${journeyId} Stage ${stage} actualizado: score=${stageScore}, exo=${exoScore}`);
+}
 }
