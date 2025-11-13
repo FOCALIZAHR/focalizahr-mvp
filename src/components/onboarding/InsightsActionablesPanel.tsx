@@ -12,71 +12,21 @@ import {
 } from 'lucide-react';
 
 // ============================================
-// TYPES
+// TYPES - Según backend docs
 // ============================================
 interface TopIssue {
-  dimension: string;
-  severity: 'high' | 'medium' | 'low';
-  affectedCount: number;
-  message: string;
+  issue: string;
+  count: number;
 }
 
-interface Recommendation {
-  priority: 'Alta' | 'Media' | 'Baja';
-  action: string;
-  expectedImpact: string;
-}
-
-interface InsightsData {
+interface Insights {
   topIssues: TopIssue[];
-  recommendations: Recommendation[];
+  recommendations: string[];
 }
 
 interface InsightsActionablesPanelProps {
-  insights: InsightsData;
+  insights: Insights;
 }
-
-// ============================================
-// CONSTANTS
-// ============================================
-const SEVERITY_CONFIG = {
-  high: {
-    color: '#EF4444',
-    bgColor: 'from-red-500/10 to-transparent',
-    borderColor: 'border-red-500/20',
-    icon: AlertCircle
-  },
-  medium: {
-    color: '#F59E0B',
-    bgColor: 'from-amber-500/10 to-transparent',
-    borderColor: 'border-amber-500/20',
-    icon: TrendingDown
-  },
-  low: {
-    color: '#3B82F6',
-    bgColor: 'from-blue-500/10 to-transparent',
-    borderColor: 'border-blue-500/20',
-    icon: Users
-  }
-};
-
-const PRIORITY_CONFIG = {
-  'Alta': {
-    color: '#EF4444',
-    bgColor: 'bg-red-500/10',
-    borderColor: 'border-red-500/30'
-  },
-  'Media': {
-    color: '#F59E0B',
-    bgColor: 'bg-amber-500/10',
-    borderColor: 'border-amber-500/30'
-  },
-  'Baja': {
-    color: '#3B82F6',
-    bgColor: 'bg-blue-500/10',
-    borderColor: 'border-blue-500/30'
-  }
-};
 
 // ============================================
 // COMPONENT
@@ -86,6 +36,67 @@ export const InsightsActionablesPanel = memo(function InsightsActionablesPanel({
 }: InsightsActionablesPanelProps) {
   
   const { topIssues = [], recommendations = [] } = insights;
+
+  // Mapeo de issues a configuración visual
+  const getIssueConfig = (issue: string) => {
+    // Detección de severidad basada en el nombre del issue
+    const isLowScore = issue.includes('low_') || issue.includes('bajo');
+    const isCritical = issue.includes('critical') || issue.includes('critico');
+    
+    if (isCritical) {
+      return {
+        color: '#EF4444',
+        bgColor: 'from-red-500/10 to-transparent',
+        borderColor: 'border-red-500/20',
+        icon: AlertCircle,
+        severity: 'CRÍTICO'
+      };
+    } else if (isLowScore) {
+      return {
+        color: '#F59E0B',
+        bgColor: 'from-amber-500/10 to-transparent',
+        borderColor: 'border-amber-500/20',
+        icon: TrendingDown,
+        severity: 'MEDIO'
+      };
+    } else {
+      return {
+        color: '#3B82F6',
+        bgColor: 'from-blue-500/10 to-transparent',
+        borderColor: 'border-blue-500/20',
+        icon: Users,
+        severity: 'BAJO'
+      };
+    }
+  };
+
+  // Parsear prioridad de recommendation
+  const getRecommendationPriority = (rec: string): 'Alta' | 'Media' | 'Baja' => {
+    if (rec.toLowerCase().includes('prioridad alta') || rec.toLowerCase().includes('crítico')) {
+      return 'Alta';
+    } else if (rec.toLowerCase().includes('prioridad media')) {
+      return 'Media';
+    }
+    return 'Baja';
+  };
+
+  const PRIORITY_CONFIG = {
+    'Alta': {
+      color: '#EF4444',
+      bgColor: 'bg-red-500/10',
+      borderColor: 'border-red-500/30'
+    },
+    'Media': {
+      color: '#F59E0B',
+      bgColor: 'bg-amber-500/10',
+      borderColor: 'border-amber-500/30'
+    },
+    'Baja': {
+      color: '#3B82F6',
+      bgColor: 'bg-blue-500/10',
+      borderColor: 'border-blue-500/30'
+    }
+  };
 
   // ========================================
   // RENDER
@@ -97,9 +108,7 @@ export const InsightsActionablesPanel = memo(function InsightsActionablesPanel({
       transition={{ duration: 0.5, delay: 0.5 }}
       className="grid grid-cols-1 lg:grid-cols-2 gap-6"
     >
-      {/* ========================================
-          COLUMNA IZQUIERDA: PROBLEMAS DETECTADOS
-          ======================================== */}
+      {/* COLUMNA IZQUIERDA: PROBLEMAS DETECTADOS */}
       <div className="fhr-card">
         <div className="flex items-center gap-2 mb-6">
           <AlertCircle className="h-5 w-5 text-red-400" />
@@ -125,7 +134,7 @@ export const InsightsActionablesPanel = memo(function InsightsActionablesPanel({
         ) : (
           <div className="space-y-3">
             {topIssues.map((issue, index) => {
-              const config = SEVERITY_CONFIG[issue.severity];
+              const config = getIssueConfig(issue.issue);
               const Icon = config.icon;
 
               return (
@@ -150,10 +159,10 @@ export const InsightsActionablesPanel = memo(function InsightsActionablesPanel({
 
                     {/* CONTENT */}
                     <div className="flex-1 min-w-0">
-                      {/* DIMENSION + SEVERITY */}
+                      {/* ISSUE + SEVERITY */}
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-sm font-medium text-white">
-                          {issue.dimension}
+                          {issue.issue.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                         </span>
                         <span 
                           className="text-xs px-2 py-0.5 rounded-full font-medium uppercase tracking-wide"
@@ -162,21 +171,16 @@ export const InsightsActionablesPanel = memo(function InsightsActionablesPanel({
                             backgroundColor: `${config.color}20`
                           }}
                         >
-                          {issue.severity}
+                          {config.severity}
                         </span>
                       </div>
 
-                      {/* MESSAGE */}
-                      <p className="text-sm text-slate-300 mb-2 leading-relaxed">
-                        {issue.message}
-                      </p>
-
-                      {/* AFFECTED COUNT */}
-                      {issue.affectedCount > 0 && (
+                      {/* COUNT */}
+                      {issue.count > 0 && (
                         <div className="flex items-center gap-1.5 text-xs text-slate-500">
                           <Users className="h-3 w-3" />
                           <span>
-                            {issue.affectedCount} colaborador{issue.affectedCount !== 1 ? 'es' : ''} afectado{issue.affectedCount !== 1 ? 's' : ''}
+                            {issue.count} caso{issue.count !== 1 ? 's' : ''} detectado{issue.count !== 1 ? 's' : ''}
                           </span>
                         </div>
                       )}
@@ -189,9 +193,7 @@ export const InsightsActionablesPanel = memo(function InsightsActionablesPanel({
         )}
       </div>
 
-      {/* ========================================
-          COLUMNA DERECHA: RECOMENDACIONES
-          ======================================== */}
+      {/* COLUMNA DERECHA: RECOMENDACIONES */}
       <div className="fhr-card">
         <div className="flex items-center gap-2 mb-6">
           <Lightbulb className="h-5 w-5 text-cyan-400" />
@@ -217,7 +219,8 @@ export const InsightsActionablesPanel = memo(function InsightsActionablesPanel({
         ) : (
           <div className="space-y-3">
             {recommendations.map((rec, index) => {
-              const config = PRIORITY_CONFIG[rec.priority];
+              const priority = getRecommendationPriority(rec);
+              const config = PRIORITY_CONFIG[priority];
 
               return (
                 <motion.div
@@ -237,21 +240,20 @@ export const InsightsActionablesPanel = memo(function InsightsActionablesPanel({
                         borderLeft: `2px solid ${config.color}`
                       }}
                     >
-                      {rec.priority}
+                      {priority}
                     </div>
 
                     {/* CONTENT */}
                     <div className="flex-1 min-w-0">
-                      {/* ACTION */}
                       <p className="text-sm font-medium text-white mb-2 leading-relaxed">
-                        {rec.action}
+                        {rec}
                       </p>
 
-                      {/* EXPECTED IMPACT */}
+                      {/* IMPACT INDICATOR */}
                       <div className="flex items-start gap-2">
                         <ArrowRight className="h-3 w-3 text-cyan-400 flex-shrink-0 mt-0.5" />
                         <p className="text-xs text-slate-400 leading-relaxed">
-                          {rec.expectedImpact}
+                          Impacto esperado en experiencia onboarding
                         </p>
                       </div>
                     </div>

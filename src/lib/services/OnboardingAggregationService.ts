@@ -463,7 +463,7 @@ export class OnboardingAggregationService {
             oi.avg_exo_score,
             oi.active_journeys,
             oi.critical_alerts
-          FROM department_onboarding_insight oi
+          FROM department_onboarding_insights oi
           INNER JOIN departments d ON oi.department_id = d.id
           WHERE d.account_id = ${accountId}
             AND d.is_active = true

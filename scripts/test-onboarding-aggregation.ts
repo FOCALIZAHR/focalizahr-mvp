@@ -13,7 +13,7 @@ async function testOnboardingAggregation() {
   console.log('🧪 TESTING OnboardingAggregationService');
   console.log('==========================================\n');
   
-  const accountId = 'cmfivd2040000fbu2sk4wkoz5';
+  const accountId = 'cmfgedx7b00012413i92048wl';
   
   try {
     console.log(`📊 Account ID: ${accountId}`);

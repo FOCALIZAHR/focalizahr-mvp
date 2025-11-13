@@ -6,15 +6,22 @@ import {
   Users, 
   TrendingUp, 
   AlertTriangle, 
-  CheckCircle2 
+  Activity 
 } from 'lucide-react';
-import type { OnboardingMetrics } from '@/hooks/useOnboardingMetrics';
 
 // ============================================
-// TYPES
+// TYPES - Según backend docs
 // ============================================
+interface GlobalMetrics {
+  avgEXOScore: number | null;
+  totalActiveJourneys: number;
+  criticalAlerts: number;
+  period: string;
+  exoScoreTrend: number | null;
+}
+
 interface OnboardingKPIsGridProps {
-  metrics: OnboardingMetrics;
+  globalMetrics: GlobalMetrics;
 }
 
 interface KPICard {
@@ -32,22 +39,18 @@ interface KPICard {
 // COMPONENT
 // ============================================
 export const OnboardingKPIsGrid = memo(function OnboardingKPIsGrid({ 
-  metrics 
+  globalMetrics 
 }: OnboardingKPIsGridProps) {
   
   // ========================================
-  // CÁLCULOS DERIVADOS
+  // KPI CARDS
   // ========================================
   const kpiCards: KPICard[] = useMemo(() => {
-    const completionRate = metrics.totalJourneys > 0
-      ? Math.round((metrics.completedJourneys / metrics.totalJourneys) * 100)
-      : 0;
-
     return [
       {
         id: 'active',
         label: 'Journeys Activos',
-        value: metrics.activeJourneys || 0,
+        value: globalMetrics.totalActiveJourneys || 0,
         icon: Users,
         color: '#22D3EE', // cyan
         bgGradient: 'from-cyan-500/20 to-cyan-600/10',
@@ -57,35 +60,35 @@ export const OnboardingKPIsGrid = memo(function OnboardingKPIsGrid({
       {
         id: 'exo',
         label: 'EXO Score Promedio',
-        value: metrics.avgEXOScore || 0,
+        value: Math.round(globalMetrics.avgEXOScore || 0),
         icon: TrendingUp,
         color: '#A78BFA', // purple
         bgGradient: 'from-purple-500/20 to-purple-600/10',
-        trend: metrics.exoScoreTrend || null,
+        trend: globalMetrics.exoScoreTrend || null,
         suffix: ' pts'
       },
       {
-        id: 'completion',
-        label: 'Tasa Completitud',
-        value: completionRate,
-        icon: CheckCircle2,
-        color: '#10B981', // green
-        bgGradient: 'from-green-500/20 to-green-600/10',
+        id: 'alerts',
+        label: 'Alertas Críticas',
+        value: globalMetrics.criticalAlerts || 0,
+        icon: AlertTriangle,
+        color: '#EF4444', // red
+        bgGradient: 'from-red-500/20 to-red-600/10',
         trend: null,
-        suffix: '%'
+        suffix: ''
       },
       {
-        id: 'risk',
-        label: 'En Riesgo',
-        value: metrics.atRiskJourneys || 0,
-        icon: AlertTriangle,
-        color: '#F59E0B', // warning
-        bgGradient: 'from-amber-500/20 to-amber-600/10',
+        id: 'period',
+        label: 'Período Actual',
+        value: 0, // Mostraremos el período como texto
+        icon: Activity,
+        color: '#10B981', // green
+        bgGradient: 'from-green-500/20 to-green-600/10',
         trend: null,
         suffix: ''
       }
     ];
-  }, [metrics]);
+  }, [globalMetrics]);
 
   // ========================================
   // RENDER
@@ -117,7 +120,7 @@ export const OnboardingKPIsGrid = memo(function OnboardingKPIsGrid({
               />
             </div>
             
-            {/* TREND INDICATOR (si existe) */}
+            {/* TREND INDICATOR */}
             {card.trend !== null && card.trend !== undefined && (
               <div className="flex items-center gap-1">
                 <TrendingUp 
@@ -151,26 +154,43 @@ export const OnboardingKPIsGrid = memo(function OnboardingKPIsGrid({
 
           {/* VALUE */}
           <div className="flex items-baseline gap-1">
-            <motion.span
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ 
-                delay: index * 0.1 + 0.2,
-                type: "spring",
-                stiffness: 200
-              }}
-              className="text-3xl font-bold text-white"
-            >
-              {card.value}
-            </motion.span>
-            {card.suffix && (
-              <span className="text-lg text-slate-400 font-light">
-                {card.suffix}
-              </span>
+            {card.id === 'period' ? (
+              <motion.span
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ 
+                  delay: index * 0.1 + 0.2,
+                  type: "spring",
+                  stiffness: 200
+                }}
+                className="text-2xl font-bold text-white"
+              >
+                {globalMetrics.period}
+              </motion.span>
+            ) : (
+              <>
+                <motion.span
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ 
+                    delay: index * 0.1 + 0.2,
+                    type: "spring",
+                    stiffness: 200
+                  }}
+                  className="text-3xl font-bold text-white"
+                >
+                  {card.value}
+                </motion.span>
+                {card.suffix && (
+                  <span className="text-lg text-slate-400 font-light">
+                    {card.suffix}
+                  </span>
+                )}
+              </>
             )}
           </div>
 
-          {/* HOVER EFFECT INDICATOR */}
+          {/* HOVER EFFECT */}
           <div 
             className="absolute bottom-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
             style={{

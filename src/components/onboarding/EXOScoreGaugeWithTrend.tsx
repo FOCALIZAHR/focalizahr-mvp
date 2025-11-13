@@ -162,7 +162,7 @@ export const EXOScoreGaugeWithTrend = memo(function EXOScoreGaugeWithTrend({
             className="absolute inset-0 flex flex-col items-center justify-center"
           >
             <div className="text-6xl font-bold text-white mb-1">
-              {currentScore}
+              {Math.round(currentScore)}
             </div>
             <div 
               className="text-sm font-medium uppercase tracking-wide"
@@ -193,7 +193,7 @@ export const EXOScoreGaugeWithTrend = memo(function EXOScoreGaugeWithTrend({
               className="text-sm font-medium"
               style={{ color: trendColor }}
             >
-              {trend > 0 ? '+' : ''}{trend} pts vs período anterior
+              {trend > 0 ? '+' : ''}{trend.toFixed(1)} pts vs período anterior
             </span>
           </motion.div>
         )}

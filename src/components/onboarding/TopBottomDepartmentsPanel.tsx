@@ -5,18 +5,18 @@ import { motion } from 'framer-motion';
 import { Trophy, AlertTriangle, TrendingUp, Users } from 'lucide-react';
 
 // ============================================
-// TYPES
+// TYPES - Según backend docs
 // ============================================
-interface Department {
+interface DepartmentRanking {
   name: string;
-  avgEXOScore?: number;
+  avgEXOScore: number;
   activeJourneys?: number;
   atRiskCount?: number;
 }
 
 interface TopBottomDepartmentsPanelProps {
-  topDepartments: Department[];
-  bottomDepartments: Department[];
+  topDepartments: DepartmentRanking[];
+  bottomDepartments: DepartmentRanking[];
 }
 
 // ============================================
@@ -27,9 +27,6 @@ export const TopBottomDepartmentsPanel = memo(function TopBottomDepartmentsPanel
   bottomDepartments = []
 }: TopBottomDepartmentsPanelProps) {
   
-  // ========================================
-  // RENDER
-  // ========================================
   return (
     <motion.div
       initial={{ opacity: 0, x: -20 }}
@@ -66,7 +63,7 @@ export const TopBottomDepartmentsPanel = memo(function TopBottomDepartmentsPanel
           <div className="space-y-2">
             {topDepartments.slice(0, 3).map((dept, index) => (
               <motion.div
-                key={dept.name}
+                key={dept.name + index}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.4 + index * 0.1 }}
@@ -86,15 +83,13 @@ export const TopBottomDepartmentsPanel = memo(function TopBottomDepartmentsPanel
                   {/* MÉTRICAS */}
                   <div className="flex items-center gap-4">
                     {/* EXO Score */}
-                    {dept.avgEXOScore !== undefined && (
-                      <div className="flex items-center gap-1.5">
-                        <TrendingUp className="h-3 w-3 text-green-400" />
-                        <span className="text-sm font-bold text-green-400">
-                          {dept.avgEXOScore}
-                        </span>
-                        <span className="text-xs text-slate-500">pts</span>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      <TrendingUp className="h-3 w-3 text-green-400" />
+                      <span className="text-sm font-bold text-green-400">
+                        {Math.round(dept.avgEXOScore)}
+                      </span>
+                      <span className="text-xs text-slate-500">pts</span>
+                    </div>
 
                     {/* Active Journeys */}
                     {dept.activeJourneys !== undefined && (
@@ -142,7 +137,7 @@ export const TopBottomDepartmentsPanel = memo(function TopBottomDepartmentsPanel
           <div className="space-y-2">
             {bottomDepartments.slice(0, 3).map((dept, index) => (
               <motion.div
-                key={dept.name}
+                key={dept.name + index}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.6 + index * 0.1 }}
@@ -162,14 +157,12 @@ export const TopBottomDepartmentsPanel = memo(function TopBottomDepartmentsPanel
                   {/* MÉTRICAS */}
                   <div className="flex items-center gap-4">
                     {/* EXO Score */}
-                    {dept.avgEXOScore !== undefined && (
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-bold text-amber-400">
-                          {dept.avgEXOScore}
-                        </span>
-                        <span className="text-xs text-slate-500">pts</span>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-bold text-amber-400">
+                        {Math.round(dept.avgEXOScore)}
+                      </span>
+                      <span className="text-xs text-slate-500">pts</span>
+                    </div>
 
                     {/* At Risk Count */}
                     {dept.atRiskCount !== undefined && dept.atRiskCount > 0 && (
