@@ -1,37 +1,123 @@
+// ====================================================================
+// EXO SCORE GAUGE - DISEÑO CIRCULAR COMPLETO CON CONTADOR ANIMADO
+// src/components/onboarding/EXOScoreGauge.tsx
+// 🎯 Basado en gauge de Torre de Control (PredictiveView.tsx)
+// ====================================================================
+
 'use client';
 
-import { memo, useMemo } from 'react';
-import { 
-  RadialBarChart, 
-  RadialBar, 
-  ResponsiveContainer,
-  PolarAngleAxis 
-} from 'recharts';
+import { memo, useState, useEffect, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
+// ============================================
+// TYPES
+// ============================================
 interface EXOScoreGaugeProps {
   score: number | null;
   label: string;
   trend?: number | null;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
+// ============================================
+// CONSTANTS
+// ============================================
 const COLORS = {
-  excellent: '#10B981',
-  good: '#22D3EE',
-  warning: '#F59E0B',
-  critical: '#EF4444'
+  excellent: '#10B981',  // Verde - 80-100
+  good: '#22D3EE',       // Cyan - 60-79
+  warning: '#F59E0B',    // Amarillo - 40-59
+  critical: '#EF4444'    // Rojo - 0-39
 };
 
+const SIZE_CONFIG = {
+  sm: { 
+    container: 180, 
+    fontSize: 'text-3xl',
+    labelSize: 'text-sm',
+    trendSize: 'text-xs'
+  },
+  md: { 
+    container: 240, 
+    fontSize: 'text-4xl',
+    labelSize: 'text-base',
+    trendSize: 'text-sm'
+  },
+  lg: { 
+    container: 300, 
+    fontSize: 'text-5xl',
+    labelSize: 'text-lg',
+    trendSize: 'text-sm'
+  },
+  xl: { 
+    container: 360, 
+    fontSize: 'text-6xl',
+    labelSize: 'text-xl',
+    trendSize: 'text-base'
+  }
+};
+
+// ============================================
+// COMPONENT
+// ============================================
 const EXOScoreGauge = memo(function EXOScoreGauge({ 
   score,
   label,
   trend,
-  size = 'lg'
+  size = 'xl'
 }: EXOScoreGaugeProps) {
   
   const currentScore = score ?? 0;
+  const config = SIZE_CONFIG[size];
 
+  // ========================================
+  // CONTADOR ANIMADO (Estilo Torre Control)
+  // ========================================
+  const [displayValue, setDisplayValue] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    const startCounting = () => {
+      setIsAnimating(true);
+      setDisplayValue(0);
+      
+      const duration = 2500; // 2.5 segundos
+      const startTime = Date.now();
+      const targetValue = currentScore;
+      
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Curva suave easeOut
+        const easeOut = 1 - Math.pow(1 - progress, 2);
+        const currentValue = Math.round(targetValue * easeOut);
+        
+        setDisplayValue(currentValue);
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          setIsAnimating(false);
+        }
+      };
+      
+      animate();
+    };
+
+    // Iniciar inmediatamente
+    startCounting();
+    
+    // Repetir cada 12 segundos
+    const interval = setInterval(startCounting, 12000);
+    
+    return () => clearInterval(interval);
+  }, [currentScore]);
+
+  // ========================================
+  // LÓGICA COLOR Y LABEL
+  // ========================================
   const { color, statusLabel } = useMemo(() => {
     let scoreColor: string;
     let status: string;
@@ -53,14 +139,25 @@ const EXOScoreGauge = memo(function EXOScoreGauge({
     return { color: scoreColor, statusLabel: status };
   }, [currentScore]);
 
-  const chartData = useMemo(() => {
-    return [{
-      name: 'EXO Score',
-      value: currentScore,
-      fill: color
-    }];
-  }, [currentScore, color]);
+  // ========================================
+  // DATOS GAUGE (1 solo segmento) - SINCRONIZADO CON CONTADOR
+  // ========================================
+  const gaugeData = useMemo(() => [
+    { 
+      name: 'Score', 
+      value: displayValue,  // ← Usar displayValue animado
+      color: color
+    },
+    { 
+      name: 'Restante', 
+      value: 100 - displayValue,  // ← Usar displayValue animado
+      color: 'rgba(255, 255, 255, 0.05)' // Gris muy sutil
+    }
+  ], [displayValue, color]);  // ← Dependencia en displayValue
 
+  // ========================================
+  // TREND LOGIC
+  // ========================================
   const TrendIcon = useMemo(() => {
     if (trend === null || trend === undefined) return Minus;
     if (trend > 0) return TrendingUp;
@@ -75,107 +172,120 @@ const EXOScoreGauge = memo(function EXOScoreGauge({
     return '#94a3b8';
   }, [trend]);
 
+  // ========================================
+  // RENDER
+  // ========================================
   return (
-    <div className="bg-slate-900/30 border border-slate-800/50 rounded-lg p-6">
-      
-      <div className="mb-6">
-        <h3 className="text-base font-medium text-slate-200">{label}</h3>
-      </div>
-
-      <div className="flex flex-col items-center">
-        <div className="relative w-full h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <RadialBarChart
-              cx="50%"
-              cy="50%"
-              innerRadius="70%"
-              outerRadius="100%"
-              barSize={12}
-              data={chartData}
-              startAngle={180}
-              endAngle={0}
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5 }}
+      className="flex flex-col items-center"
+    >
+      {/* GAUGE CIRCULAR */}
+      <div 
+        className="relative"
+        style={{ 
+          width: config.container, 
+          height: config.container 
+        }}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie 
+              data={gaugeData} 
+              cx="50%" 
+              cy="50%" 
+              startAngle={-90}   // ← Empieza arriba (12 en punto)
+              endAngle={270}     // ← Completa 360° horario
+              innerRadius="80%"  // Dona gruesa
+              outerRadius="88%" 
+              dataKey="value" 
+              stroke="none"
+              isAnimationActive={false}  // ← Desactivar animación de Recharts
             >
-              <PolarAngleAxis
-                type="number"
-                domain={[0, 100]}
-                angleAxisId={0}
-                tick={false}
-              />
-              <RadialBar
-                background={{ fill: 'rgba(255,255,255,0.03)' }}
-                dataKey="value"
-                cornerRadius={10}
-                fill={color}
-                animationDuration={1200}
-              />
-            </RadialBarChart>
-          </ResponsiveContainer>
+              {gaugeData.map((entry, index) => (
+                <Cell 
+                  key={`cell-${index}`} 
+                  fill={entry.color}
+                />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
 
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <div className="text-5xl font-extralight text-white tabular-nums">
-              {Math.round(currentScore)}
-            </div>
-            <div 
-              className="text-xs font-light uppercase tracking-wide mt-1"
-              style={{ color }}
-            >
-              {statusLabel}
-            </div>
+        {/* OVERLAY SUTIL (Efecto sheen) */}
+        <div 
+          className="absolute inset-0 rounded-full overflow-hidden pointer-events-none"
+          style={{
+            background: 'linear-gradient(to right, transparent 0%, rgba(255, 255, 255, 0.03) 50%, transparent 100%)'
+          }}
+        />
+
+        {/* NÚMERO CENTRAL ANIMADO */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <motion.div
+            className={`${config.fontSize} font-extralight text-white tabular-nums leading-none`}
+            animate={isAnimating ? { scale: [1, 1.05, 1] } : {}}
+            transition={{ duration: 0.5 }}
+          >
+            {displayValue}
+          </motion.div>
+          
+          <div 
+            className={`${config.labelSize} font-light uppercase tracking-wide mt-2`}
+            style={{ color }}
+          >
+            {isAnimating ? 'Procesando...' : statusLabel}
           </div>
-        </div>
 
-        {/* ✅ CAMBIO 5: TREND CON FLECHITA */}
-        {trend !== null && trend !== undefined && (
-          <div className="mt-6 flex items-center gap-2">
-            {trend !== 0 && (
-              <div 
-                className={`w-0 h-0 ${
-                  trend > 0 
-                    ? 'border-l-[4px] border-r-[4px] border-b-[6px] border-l-transparent border-r-transparent'
-                    : 'border-l-[4px] border-r-[4px] border-t-[6px] border-l-transparent border-r-transparent'
-                }`} 
-                style={{ 
-                  borderBottomColor: trend > 0 ? trendColor : 'transparent',
-                  borderTopColor: trend < 0 ? trendColor : 'transparent'
-                }}
-              />
-            )}
-            
-            <TrendIcon 
-              className="h-3 w-3" 
-              style={{ color: trendColor }}
-            />
-            <span 
-              className="text-xs font-light"
-              style={{ color: trendColor }}
-            >
-              {trend > 0 ? '+' : ''}{trend.toFixed(1)} pts vs período anterior
-            </span>
-          </div>
-        )}
-
-        <div className="w-full mt-6 pt-6 border-t border-slate-800/50">
-          <div className="grid grid-cols-4 gap-2 text-center">
-            <div className="space-y-1">
-              <div className="h-1 rounded-full bg-red-400/30"></div>
-              <p className="text-xs text-slate-600">0-39</p>
-            </div>
-            <div className="space-y-1">
-              <div className="h-1 rounded-full bg-amber-400/30"></div>
-              <p className="text-xs text-slate-600">40-59</p>
-            </div>
-            <div className="space-y-1">
-              <div className="h-1 rounded-full bg-cyan-400/30"></div>
-              <p className="text-xs text-slate-600">60-79</p>
-            </div>
-            <div className="space-y-1">
-              <div className="h-1 rounded-full bg-green-400/30"></div>
-              <p className="text-xs text-slate-600">80-100</p>
-            </div>
+          {/* BADGE RANGO MINI DENTRO DEL GAUGE */}
+          <div 
+            className="mt-2 px-2 py-0.5 rounded-full text-[10px] font-light"
+            style={{ 
+              backgroundColor: `${color}15`,
+              color: color,
+              border: `1px solid ${color}40`
+            }}
+          >
+            {
+              currentScore >= 80 ? '80-100' :
+              currentScore >= 60 ? '60-79' :
+              currentScore >= 40 ? '40-59' :
+              '0-39'
+            }
           </div>
         </div>
       </div>
-    </div>
+
+      {/* LABEL */}
+      <div className="text-center mt-4">
+        <p className="text-lg text-slate-300 font-light">
+          {label}
+        </p>
+      </div>
+
+      {/* TREND MINI - SIEMPRE VISIBLE SI EXISTE (FIX 3) */}
+      {trend !== null && trend !== undefined && (
+        <motion.div
+          initial={{ opacity: 0, y: 5 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="flex items-center justify-center gap-1.5 mt-3"
+        >
+          <TrendIcon 
+            className="h-3 w-3"
+            style={{ color: trendColor }}
+          />
+          <span 
+            className="text-xs font-light"
+            style={{ color: trendColor }}
+          >
+            {trend > 0 ? '+' : ''}{trend.toFixed(1)} pts
+          </span>
+        </motion.div>
+      )}
+    </motion.div>
   );
 });
 

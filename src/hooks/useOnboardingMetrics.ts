@@ -1,3 +1,4 @@
+// src/hooks/useOnboardingMetrics.ts - v3.2.7 CENTRALIZADO
 /**
  * ============================================
  * CUSTOM HOOK: useOnboardingMetrics
@@ -29,145 +30,23 @@
  * - Si global: data es OnboardingDashboardData (agregaciones globales)
  * - Si sin datos: data es null
  * 
- * @version 3.2.5
+ * @version 3.2.7 - Types centralizados en @/types/onboarding
  * @date November 2025
  */
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 
 // ============================================================================
-// TYPES - Copia exacta de DepartmentOnboardingInsight
+// IMPORTS - Types centralizados (Fuente Única de Verdad)
 // ============================================================================
-
-/**
- * Interfaz completa de métricas de onboarding
- * Refleja modelo Prisma DepartmentOnboardingInsight
- */
-export interface OnboardingMetrics {
-  // IDs y período
-  id: string
-  accountId: string
-  departmentId: string
-  periodStart: string  // ISO date string
-  periodEnd: string    // ISO date string
-  
-  // ========================================
-  // MÉTRICAS BASE (5)
-  // ========================================
-  totalJourneys: number
-  activeJourneys: number
-  completedJourneys: number
-  atRiskJourneys: number
-  abandonedJourneys: number
-  
-  // ========================================
-  // SCORES 4C (5)
-  // ========================================
-  avgComplianceScore: number | null      // Día 1 - Compliance
-  avgClarificationScore: number | null   // Día 7 - Clarification
-  avgCultureScore: number | null         // Día 30 - Culture
-  avgConnectionScore: number | null      // Día 90 - Connection
-  avgEXOScore: number | null             // Score global experiencia
-  exoScoreTrend: number | null           // Tendencia vs período anterior
-  
-  // ========================================
-  // ALERTAS (3)
-  // ========================================
-  criticalAlerts: number
-  highAlerts: number
-  mediumAlerts: number
-  
-  // ========================================
-  // DEMOGRAFÍA (3)
-  // ========================================
-  avgAge: number | null
-  avgSeniority: number | null
-  genderDistribution: Record<string, number> | null
-  
-  // ========================================
-  // INSIGHTS (2)
-  // ========================================
-  topIssues: Array<{
-    issue: string
-    count: number
-  }> | null
-  recommendations: string[] | null
-  
-  // ========================================
-  // TIMESTAMPS (2)
-  // ========================================
-  createdAt: string  // ISO timestamp
-  updatedAt: string  // ISO timestamp
-  
-  // ========================================
-  // RELACIÓN DEPARTMENT (Incluida por API)
-  // ========================================
-  department?: {
-    id: string
-    displayName: string
-    standardCategory: string
-  }
-}
-
-/**
- * Interface para respuesta agregada del dashboard
- * v3.2.5 - Nueva estructura con agregaciones globales
- */
-export interface OnboardingDashboardData {
-  global: {
-    avgEXOScore: number | null;
-    totalActiveJourneys: number;
-    criticalAlerts: number;
-    period: string;
-    exoScoreTrend: number | null;
-  };
-  topDepartments: Array<{
-    name: string;
-    avgEXOScore: number;
-    activeJourneys: number;
-  }>;
-  bottomDepartments: Array<{
-    name: string;
-    avgEXOScore: number;
-    atRiskCount: number;
-  }>;
-  insights: {
-    topIssues: Array<{ issue: string; count: number }>;
-    recommendations: string[];
-  };
-  demographics: {
-    byGeneration: Array<{ 
-      generation: string; 
-      count: number; 
-      avgEXOScore: number; 
-      atRiskRate: number 
-    }>;
-    byGender: Array<{ 
-      gender: string; 
-      count: number; 
-      avgEXOScore: number 
-    }>;
-    bySeniority: Array<{ 
-      range: string; 
-      count: number; 
-      avgEXOScore: number 
-    }>;
-  };
-  departments: OnboardingMetrics[]; // Array original para drill-down
-}
-
-/**
- * Return type del hook
- * v3.2.5 - Actualizado para soportar OnboardingDashboardData
- */
-interface UseOnboardingMetricsReturn {
-  data: OnboardingMetrics | OnboardingDashboardData | null
-  loading: boolean
-  error: string | null
-  refetch: () => void
-}
+import { 
+  OnboardingMetrics, 
+  OnboardingDashboardData,
+  UseOnboardingMetricsReturn,
+  TimelineStage
+} from '@/types/onboarding'
 
 // ============================================================================
 // CUSTOM HOOK
@@ -177,12 +56,12 @@ interface UseOnboardingMetricsReturn {
  * Hook para obtener métricas de onboarding
  * 
  * @param departmentId - Opcional. Si se proporciona, filtra por departamento específico
- * @returns { data, loading, error, refetch }
+ * @returns { data, loading, error, refetch, timelineStages }
  * 
  * @example
  * ```tsx
  * // Todas las métricas (agregadas)
- * const { data, loading } = useOnboardingMetrics()
+ * const { data, loading, timelineStages } = useOnboardingMetrics()
  * // data es OnboardingDashboardData
  * 
  * // Departamento específico
@@ -295,16 +174,104 @@ export function useOnboardingMetrics(
   }, [fetchMetrics])
   
   // ========================================================================
+  // CALCULATE TIMELINE STAGES (4C Bauer)
+  // ========================================================================
+  const timelineStages = useMemo((): TimelineStage[] => {
+    // Si no hay data, retornar stages vacíos
+    if (!data) {
+      return [
+        { day: 1, label: 'Compliance', score: null, alerts: 0, color: '#475569' },
+        { day: 7, label: 'Clarificación', score: null, alerts: 0, color: '#475569' },
+        { day: 30, label: 'Cultura', score: null, alerts: 0, color: '#475569' },
+        { day: 90, label: 'Conexión', score: null, alerts: 0, color: '#475569' }
+      ];
+    }
+
+    // Verificar si es OnboardingDashboardData (tiene global e insights)
+    const dashboardData = data as OnboardingDashboardData;
+    if (!dashboardData.global || !dashboardData.insights) {
+      return [
+        { day: 1, label: 'Compliance', score: null, alerts: 0, color: '#475569' },
+        { day: 7, label: 'Clarificación', score: null, alerts: 0, color: '#475569' },
+        { day: 30, label: 'Cultura', score: null, alerts: 0, color: '#475569' },
+        { day: 90, label: 'Conexión', score: null, alerts: 0, color: '#475569' }
+      ];
+    }
+
+    // Helper: Color según score
+    const getStageColor = (score: number | null): string => {
+      if (!score) return '#475569'; // slate-600
+      if (score >= 80) return '#22D3EE'; // cyan-400
+      if (score >= 60) return '#F59E0B'; // amber-400
+      return '#EF4444'; // red-400
+    };
+
+    // Helper: Conteo alertas por tipo
+    const getAlertCount = (issueType: string): number => {
+      const issue = dashboardData.insights.topIssues.find(i => i.issue === issueType);
+      return issue?.count || 0;
+    };
+
+    // Tomar primer departamento para scores individuales
+    const dept = dashboardData.departments?.[0];
+    
+    // Convertir scores de 0-5 a 0-100
+    const complianceScore = dept?.avgComplianceScore 
+      ? Math.round((dept.avgComplianceScore / 5) * 100) 
+      : null;
+    
+    const clarificationScore = dept?.avgClarificationScore 
+      ? Math.round((dept.avgClarificationScore / 5) * 100) 
+      : null;
+    
+    const cultureScore = dept?.avgCultureScore 
+      ? Math.round((dept.avgCultureScore / 5) * 100) 
+      : null;
+    
+    const connectionScore = dept?.avgConnectionScore 
+      ? Math.round((dept.avgConnectionScore / 5) * 100) 
+      : null;
+
+    return [
+      { 
+        day: 1, 
+        label: 'Compliance',
+        score: complianceScore,
+        alerts: getAlertCount('low_compliance_score'),
+        color: getStageColor(complianceScore)
+      },
+      { 
+        day: 7, 
+        label: 'Clarificación',
+        score: clarificationScore,
+        alerts: getAlertCount('low_clarification_score'),
+        color: getStageColor(clarificationScore)
+      },
+      { 
+        day: 30, 
+        label: 'Cultura',
+        score: cultureScore,
+        alerts: getAlertCount('missed_culture_survey'),
+        color: getStageColor(cultureScore)
+      },
+      { 
+        day: 90, 
+        label: 'Conexión',
+        score: connectionScore,
+        alerts: getAlertCount('connection_score_declining'),
+        color: getStageColor(connectionScore)
+      }
+    ];
+  }, [data]);
+  
+  // ========================================================================
   // RETURN
   // ========================================================================
   return {
     data,
     loading,
     error,
-    refetch
+    refetch,
+    timelineStages
   }
 }
-
-// ============================================================================
-// EXPORTS
-// ============================================================================
