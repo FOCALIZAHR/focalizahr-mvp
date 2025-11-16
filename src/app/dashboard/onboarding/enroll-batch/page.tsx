@@ -18,6 +18,7 @@ import {
   Phone
 } from 'lucide-react';
 import { useOnboardingBatchUpload } from '@/hooks/useOnboardingBatchUpload';
+import { CyanButton, NeutralButton, SuccessButton, PurpleButton } from '@/components/ui/MinimalistButton';
 import Papa from 'papaparse';
 import '@/styles/focalizahr-design-system.css';
 
@@ -142,13 +143,14 @@ export default function OnboardingBatchUploadPage() {
         
         {/* Header */}
         <div className="mb-12">
-          <button
+          <NeutralButton
+            icon={ArrowLeft}
+            iconPosition="left"
+            size="sm"
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors mb-6"
           >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Volver</span>
-          </button>
+            Volver
+          </NeutralButton>
           
           <div className="flex items-center gap-4 mb-4">
             <div className="p-3 bg-gradient-to-br from-cyan-500/20 to-purple-500/20 rounded-xl">
@@ -298,13 +300,14 @@ function UploadDropzone({
       
       {/* Botón Template */}
       <div className="flex justify-center">
-        <button
+        <PurpleButton
+          icon={Download}
+          iconPosition="left"
+          size="md"
           onClick={onDownloadTemplate}
-          className="fhr-btn-secondary gap-2"
         >
-          <Download className="h-4 w-4" />
           Descargar Template CSV
-        </button>
+        </PurpleButton>
       </div>
       
       {/* Info Columnas */}
@@ -459,18 +462,24 @@ function PreviewStep({
       
       {/* Actions */}
       <div className="flex items-center justify-between gap-4">
-        <button onClick={onCancel} className="fhr-btn-secondary">
+        <NeutralButton
+          icon={XCircle}
+          iconPosition="left"
+          size="md"
+          onClick={onCancel}
+        >
           Cancelar
-        </button>
+        </NeutralButton>
         
-        <button
+        <CyanButton
+          icon={Upload}
+          iconPosition="left"
+          size="md"
           onClick={onConfirm}
           disabled={!canUpload}
-          className="fhr-btn-primary gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Upload className="h-4 w-4" />
           Confirmar Carga ({validCount} empleados)
-        </button>
+        </CyanButton>
       </div>
     </div>
   );
@@ -535,12 +544,23 @@ function CompleteStep({ result, onReset, onContinue }: any) {
       </div>
       
       <div className="flex items-center justify-center gap-4">
-        <button onClick={onReset} className="fhr-btn-secondary">
+        <PurpleButton
+          icon={Upload}
+          iconPosition="left"
+          size="md"
+          onClick={onReset}
+        >
           Cargar Más
-        </button>
-        <button onClick={onContinue} className="fhr-btn-primary">
+        </PurpleButton>
+        
+        <CyanButton
+          icon={CheckCircle}
+          iconPosition="left"
+          size="md"
+          onClick={onContinue}
+        >
           Ver Pipeline
-        </button>
+        </CyanButton>
       </div>
     </div>
   );
@@ -566,12 +586,23 @@ function ErrorStep({ error, onReset, onCancel }: any) {
       </p>
       
       <div className="flex items-center justify-center gap-4">
-        <button onClick={onCancel} className="fhr-btn-secondary">
+        <NeutralButton
+          icon={ArrowLeft}
+          iconPosition="left"
+          size="md"
+          onClick={onCancel}
+        >
           Volver
-        </button>
-        <button onClick={onReset} className="fhr-btn-primary">
+        </NeutralButton>
+        
+        <CyanButton
+          icon={Upload}
+          iconPosition="left"
+          size="md"
+          onClick={onReset}
+        >
           Intentar Nuevamente
-        </button>
+        </CyanButton>
       </div>
     </div>
   );

@@ -114,9 +114,9 @@ export const OnboardingKPIsGrid = memo(function OnboardingKPIsGrid({
             <div 
               className={`p-2 rounded-lg bg-gradient-to-br ${card.bgGradient}`}
             >
-                      <card.icon
-                          className="h-4 w-4"
-                      />
+              <card.icon 
+                className="h-4 w-4 text-white"  // ✅ Usar className en lugar de style
+              />
             </div>
             
             {/* TREND INDICATOR */}

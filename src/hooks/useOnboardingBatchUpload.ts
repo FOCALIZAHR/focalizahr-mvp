@@ -157,6 +157,35 @@ export function useOnboardingBatchUpload({
   }, []);
   
   /**
+   * Mapear género a enum válido
+   */
+  const mapGender = useCallback((gender?: string): 'MALE' | 'FEMALE' | 'NON_BINARY' | 'PREFER_NOT_TO_SAY' | undefined => {
+    if (!gender) return undefined;
+    
+    const normalized = gender.trim().toUpperCase();
+    
+    // Mapeo de valores comunes
+    const genderMap: Record<string, 'MALE' | 'FEMALE' | 'NON_BINARY' | 'PREFER_NOT_TO_SAY'> = {
+      'M': 'MALE',
+      'MALE': 'MALE',
+      'MASCULINO': 'MALE',
+      'HOMBRE': 'MALE',
+      'F': 'FEMALE',
+      'FEMALE': 'FEMALE',
+      'FEMENINO': 'FEMALE',
+      'MUJER': 'FEMALE',
+      'NB': 'NON_BINARY',
+      'NON_BINARY': 'NON_BINARY',
+      'NO BINARIO': 'NON_BINARY',
+      'NS': 'PREFER_NOT_TO_SAY',
+      'PREFER_NOT_TO_SAY': 'PREFER_NOT_TO_SAY',
+      'PREFIERO NO DECIR': 'PREFER_NOT_TO_SAY'
+    };
+    
+    return genderMap[normalized];
+  }, []);
+  
+  /**
    * Validar empleado individual
    */
   const validateEmployee = useCallback((employee: Partial<OnboardingEmployee>, departments: Map<string, string>): OnboardingEmployee => {
@@ -232,6 +261,12 @@ export function useOnboardingBatchUpload({
       }
     }
     
+    // Mapear género
+    const mappedGender = employee.gender ? mapGender(employee.gender) : undefined;
+    if (employee.gender && !mappedGender) {
+      warnings.push(`Género "${employee.gender}" no reconocido (se omitirá)`);
+    }
+    
     return {
       nationalId: employee.nationalId || '',
       fullName: employee.fullName || '',
@@ -242,13 +277,13 @@ export function useOnboardingBatchUpload({
       hireDate: parsedHireDate || '',
       position: employee.position,
       location: employee.location,
-      gender: employee.gender,
+      gender: mappedGender,
       dateOfBirth: parsedDateOfBirth,
       isValid: errors.length === 0,
       errors,
       warnings
     };
-  }, [validateRUT, normalizePhone, parseDate]);
+  }, [validateRUT, normalizePhone, parseDate, mapGender]);
   
   // ============================================================================
   // PARSE CSV
