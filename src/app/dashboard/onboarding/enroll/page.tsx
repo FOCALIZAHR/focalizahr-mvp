@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
 import { UserPlus, Loader2, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { useToast } from '@/components/ui/toast-system';
 import { z } from 'zod';
 
 /**
@@ -140,9 +141,9 @@ type EnrollmentFormData = z.infer<typeof enrollmentSchema>;
 
 interface Department {
   id: string;
-  displayName: string;
-  unitType: string;
-  level: number;
+    displayName: string;
+    unitType: string;
+    level: number;
 }
 
 // ============================================
@@ -150,65 +151,63 @@ interface Department {
 // ============================================
 
 export default function EnrollmentPage() {
-  const router = useRouter();
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+    const router = useRouter();
+    const [departments, setDepartments] = useState<Department[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const { success, error: showError } = useToast();
+    const {
+        register,
+        handleSubmit,
+        formState: { errors },
+        watch
+    } = useForm<EnrollmentFormData>({
+        resolver: zodResolver(enrollmentSchema)
+    });
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    watch
-  } = useForm<EnrollmentFormData>({
-    resolver: zodResolver(enrollmentSchema)
-  });
+    // Watch para validación en vivo
+    const emailValue = watch('participantEmail');
+    const phoneValue = watch('phoneNumber');
+    const hasContactMethod = !!emailValue || !!phoneValue;
 
-  // Watch para validación en vivo
-  const emailValue = watch('participantEmail');
-  const phoneValue = watch('phoneNumber');
-  const hasContactMethod = !!emailValue || !!phoneValue;
+    // ============================================
+    // CARGAR DEPARTAMENTOS (con filtrado RBAC)
+    // ============================================
+    useEffect(() => {
+        const fetchDepartments = async () => {
+            try {
+                setLoading(true);
+                setError(null);
 
-  // ============================================
-  // CARGAR DEPARTAMENTOS (con filtrado RBAC)
-  // ============================================
+                const response = await fetch('/api/departments', {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-  useEffect(() => {
-    const fetchDepartments = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // La API debe aplicar AuthorizationService automáticamente
-        const response = await fetch('/api/departments', {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error('Error cargando departamentos');
-        }
-        
-        const data = await response.json();
-        
-        if (data.success && Array.isArray(data.data)) {
-          setDepartments(data.data);
-        } else {
-          throw new Error('Formato de respuesta inválido');
-        }
-      } catch (err: any) {
-        console.error('Error cargando departamentos:', err);
-        setError(err.message || 'Error al cargar departamentos');
-      } finally {
-        setLoading(false);
-      }
-    };
+                if (!response.ok) {
+                    throw new Error('Error cargando departamentos');
+                }
 
-    fetchDepartments();
-  }, []);
+                const data = await response.json();
 
+                // ✅ FIX: Cambiar data.data → data.departments
+                if (data.success && Array.isArray(data.departments)) {
+                    setDepartments(data.departments);
+                } else {
+                    throw new Error('Formato de respuesta inválido');
+                }
+            } catch (err: any) {
+                console.error('Error cargando departamentos:', err);
+                setError(err.message || 'Error al cargar departamentos');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchDepartments();
+    }, []);
   // ============================================
   // SUBMIT FORM
   // ============================================
@@ -228,22 +227,44 @@ export default function EnrollmentPage() {
 
       const result = await response.json();
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Error al inscribir colaborador');
-      }
+        if (!response.ok) {
+            // Si hay detalles de validación, mostrarlos
+            if (result.details && result.details.length > 0) {
+                const errores = result.details
+                    .map((d: any) => `• ${d.message}`)  // ← Eliminé ${d.field}:
+                    .join('\n');
+                throw new Error(`Errores de validación:\n${errores}`);
+            }
+            throw new Error(result.error || 'Error al inscribir colaborador');
+        }
 
-      // Success: mostrar mensaje y redirect
-      alert(`✅ Colaborador inscrito exitosamente.\n\nJourney ID: ${result.data?.journey?.id || 'N/A'}\n\nSe han programado 4 encuestas automáticas (Día 1, 7, 30, 90).`);
-      
-      // Redirect a pipeline
-      router.push('/dashboard/onboarding/pipeline');
-      
-    } catch (err: any) {
-      console.error('Error al inscribir:', err);
-      setError(err.message || 'Error al inscribir colaborador');
-    } finally {
-      setSubmitting(false);
-    }
+        // Success: mostrar mensaje y redirect
+        // ✅ REEMPLÁZALO CON ESTO:
+        // Success: mostrar toast corporativo con Journey ID real
+        // Success: mostrar toast corporativo
+        success(
+            `Colaborador "${data.fullName}" inscrito exitosamente. Se han programado 4 encuestas automáticas (Día 1, 7, 30, 90).`,
+            '¡Éxito!'
+        );
+
+        setTimeout(() => {
+            router.push('/dashboard/onboarding/pipeline');
+        }, 1500);
+
+      } catch (err: any) {
+          console.error('Error al inscribir:', err);
+
+          const errorMessage = err.message || 'Error al inscribir colaborador';
+          setError(errorMessage);
+
+          // Scroll automático hacia arriba para mostrar el error
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+
+          // Mostrar Toast de error
+          showError(errorMessage, 'Error de Validación');
+      } finally {
+          setSubmitting(false);
+      }
   };
 
   // ============================================

@@ -92,20 +92,47 @@ export class OnboardingEnrollmentService {
    * 5. Crear JourneyOrchestration
    * 6. Programar 4 emails automáticos
    * 7. Retornar resultado
-   * 
+   *
    * @param data - Datos del nuevo empleado
    * @returns Promise<EnrollmentResult>
    */
+
   static async enrollParticipant(data: EnrollmentData): Promise<EnrollmentResult> {
     try {
       console.log('[OnboardingEnrollment] Starting enrollment process...', {
         nationalId: data.nationalId,
         fullName: data.fullName
       });
-      
+
       // ✅ NUEVO: Guardar accountId para usarlo en getAuthToken()
       this.currentAccountId = data.accountId;
-      
+      // ✅ VALIDACIÓN DE DUPLICADOS - Verificar si ya existe journey activo
+      const existingJourney = await prisma.journeyOrchestration.findFirst({
+        where: {
+          accountId: data.accountId,
+          nationalId: data.nationalId,
+          status: { in: ['active', 'in_progress'] }
+        },
+        select: {
+          id: true,
+          status: true,
+          fullName: true,
+          createdAt: true
+        }
+      });
+
+      if (existingJourney) {
+        const statusText = {
+          'active': 'activo',
+          'in_progress': 'en progreso'
+        }[existingJourney.status] || existingJourney.status;
+
+        console.log(`[OnboardingEnrollment] ⚠️ Journey duplicado detectado para RUT ${data.nationalId}`);
+
+        throw new Error(
+          `El colaborador "${existingJourney.fullName}" (RUT: ${data.nationalId}) ya tiene un journey ${statusText}. Para reiniciarlo, primero dele de baja desde el Dashboard Onboarding.`
+        );
+      }
       // PASO 1: Validaciones básicas
       this.validateEnrollmentData(data);
       

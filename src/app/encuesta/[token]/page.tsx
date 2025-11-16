@@ -129,7 +129,7 @@ export default function OnboardingDashboard() {
         </div>
 
         {/* GRID KPIs - 4 CARDS MÉTRICAS */}
-        <OnboardingKPIsGrid metrics={metrics} />
+        <OnboardingKPIsGrid globalMetrics={metrics} />
 
         {/* GRID 2 COLUMNAS: TOP/BOTTOM + GAUGE */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
