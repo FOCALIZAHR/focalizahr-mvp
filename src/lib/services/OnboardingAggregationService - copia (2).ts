@@ -17,7 +17,6 @@
 import { prisma } from '@/lib/prisma';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
 
-
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -473,17 +472,18 @@ export class OnboardingAggregationService {
       AND oi.period_end = ${periodEnd}::date
   ),
   aggregated_scores AS (
-  SELECT 
-    COALESCE(
-      SUM(CASE WHEN bs.avg_exo_score IS NOT NULL THEN bs.avg_exo_score * bs.total_journeys END) 
-      / NULLIF(SUM(CASE WHEN bs.avg_exo_score IS NOT NULL THEN bs.total_journeys END), 0),
-      NULL
-    ) as weighted_avg_exo_score,
-    COALESCE(SUM(bs.active_journeys), 0) as total_active,
-    COALESCE(SUM(bs.critical_alerts), 0) as total_critical
-  FROM base_scores bs
-  -- ✅ SIN WHERE: permite contar todos los active_journeys
-)
+    SELECT 
+      COALESCE(
+        SUM(bs.avg_exo_score * bs.total_journeys) / NULLIF(SUM(bs.total_journeys), 0),
+        -- ✅ CAMBIO 2: Usar total_journeys en lugar de active_journeys para la ponderación
+        NULL
+      ) as weighted_avg_exo_score,
+      COALESCE(SUM(bs.active_journeys), 0) as total_active,
+      COALESCE(SUM(bs.critical_alerts), 0) as total_critical
+    FROM base_scores bs
+    WHERE bs.avg_exo_score IS NOT NULL    -- ✅ CAMBIO 3: Filtrar nulls antes de agregar
+      AND bs.total_journeys > 0            -- ✅ CAMBIO 4: Solo departamentos con journeys
+  )
   SELECT 
     weighted_avg_exo_score as "avgEXOScore",
     total_active as "totalActiveJourneys",
@@ -1006,91 +1006,4 @@ export class OnboardingAggregationService {
     
     return recs.length > 0 ? recs : null;
   }
-  /**
- * ✅ FUNCIÓN CONSOLIDADA - Mejor de Claude + Gemini + Tu idea
- */
-static async updateAccumulatedExoScores(accountId: string): Promise<void> {
-  try {
-    console.log(`[Onboarding] 🔄 Calculating accumulated EXO Scores for account: ${accountId}`);
-    
-    const departments = await prisma.department.findMany({
-      where: { accountId, isActive: true },
-      select: { id: true, displayName: true }
-    });
-    
-    console.log(`[Onboarding] Found ${departments.length} active departments`);
-    
-    for (const dept of departments) {
-      // 1. Obtener últimos 12 meses de insights
-      const insights = await prisma.departmentOnboardingInsight.findMany({
-        where: {
-          departmentId: dept.id,
-          avgEXOScore: { not: null }
-        },
-        select: {
-          avgEXOScore: true,
-          totalJourneys: true,
-          periodStart: true  // 🌟 PARA METADATOS
-        },
-        orderBy: { periodStart: 'desc' },
-        take: 12
-      });
-      
-      // 2. Si no hay datos
-      if (insights.length === 0) {
-        await prisma.department.update({
-          where: { id: dept.id },
-          data: { 
-            accumulatedExoScore: null,
-            accumulatedExoJourneys: null,
-            accumulatedPeriodCount: null,      // 🌟 TU IDEA
-            accumulatedLastUpdated: null       // 🌟 TU IDEA
-          }
-        });
-        console.log(`[Onboarding]   - ${dept.displayName}: No data`);
-        continue;
-      }
-      
-      // 3. Calcular promedio ponderado (CLAUDE + GEMINI)
-      let totalWeightedScore = 0;
-      let totalJourneys = 0;
-      
-      for (const insight of insights) {
-        if (insight.avgEXOScore !== null && insight.totalJourneys > 0) {
-          totalWeightedScore += insight.avgEXOScore * insight.totalJourneys;
-          totalJourneys += insight.totalJourneys;
-        }
-      }
-      
-      const accumulatedScore = totalJourneys > 0
-        ? parseFloat((totalWeightedScore / totalJourneys).toFixed(1))
-        : null;
-      
-      // 4. Guardar con metadatos (🌟 TU MEJORA)
-      await prisma.department.update({
-        where: { id: dept.id },
-        data: { 
-          accumulatedExoScore: accumulatedScore,
-          accumulatedExoJourneys: totalJourneys,
-          accumulatedPeriodCount: insights.length,        // 🌟 NUEVO
-          accumulatedLastUpdated: new Date()              // 🌟 NUEVO
-        }
-      });
-      
-      console.log(
-        `[Onboarding]   ✅ ${dept.displayName}: ${accumulatedScore} ` +
-        `(${insights.length} periods, ${totalJourneys} journeys)`  // 🌟 MEJORADO
-      );
-    }
-    
-    console.log(`[Onboarding] ✅ Accumulated scores updated successfully`);
-    
-  } catch (error) {
-    console.error('[Onboarding] ❌ Error updating accumulated scores:', error);
-    throw error;
-  }
 }
-}
-
-
-

@@ -6,6 +6,7 @@
 
 import { useState, useCallback } from 'react';
 import Papa from 'papaparse';
+import { useToast } from '@/components/ui/toast-system';
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -62,7 +63,7 @@ export function useOnboardingBatchUpload({
   onSuccess,
   onError
 }: UseOnboardingBatchUploadProps = {}) {
-  
+  const { success: showSuccess, error: showError } = useToast();
   const [state, setState] = useState<UploadState>('idle');
   const [employees, setEmployees] = useState<OnboardingEmployee[]>([]);
   const [file, setFile] = useState<File | null>(null);
@@ -413,13 +414,30 @@ export function useOnboardingBatchUpload({
       clearInterval(progressInterval);
       setUploadProgress(100);
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Error HTTP ${response.status}`);
-      }
+     if (!response.ok) {
+  const errorData = await response.json();
+  
+  // Mostrar error detallado si hay
+         if (errorData.details && errorData.details.length > 0) {
+             const errores = errorData.details
+                 .map((d: any) => `• ${d.message}`)
+                 .join('\n');
+             const errorMessage = `Errores de validación:\n${errores}`;
+             showError(errorMessage, 'Error de Validación');
+             throw new Error(errorMessage);
+         }
+
+         const errorMessage = errorData.error || `Error HTTP ${response.status}`;
+         showError(errorMessage, 'Error en Carga');
+         throw new Error(errorMessage);
+     }
       
       const result: BatchUploadResponse = await response.json();
-      
+        // Mostrar Toast de éxito
+        showSuccess(
+            `${result.successCount} colaborador(es) inscrito(s) exitosamente de ${result.totalProcessed}`,
+            '¡Carga Completa!'
+        );
       setUploadResult(result);
       setState('complete');
       onSuccess?.(result);

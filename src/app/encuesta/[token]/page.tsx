@@ -1,201 +1,259 @@
-'use client';
+// src/app/encuesta/[token]/page.tsx
+'use client'
 
-import { motion } from 'framer-motion';
-import { useRouter } from 'next/navigation';
-import { useOnboardingMetrics } from '@/hooks/useOnboardingMetrics';
-import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
+import Image from 'next/image'
+import { ArrowLeft, CheckCircle, AlertCircle, Clock } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import SurveyForm from '@/components/forms/SurveyForm'
+import ConditionalSurveyComponent from '@/components/forms/ConditionalSurveyComponent'
+import UnifiedSurveyComponent from '@/components/survey/UnifiedSurveyComponent'
+import { useSurveyConfiguration } from '@/hooks/useSurveyConfiguration'
 
-// Componentes hijos
-import { OnboardingKPIsGrid } from '@/components/onboarding/OnboardingKPIsGrid';
-import { TopBottomDepartmentsPanel } from '@/components/onboarding/TopBottomDepartmentsPanel';
-import { EXOScoreGaugeWithTrend } from '@/components/onboarding/EXOScoreGaugeWithTrend';
-import { InsightsActionablesPanel } from '@/components/onboarding/InsightsActionablesPanel';
+interface Campaign {
+  id: string
+  name: string
+  description?: string
+  status: string
+  startDate: string
+  endDate: string
+  account?: {
+    id: string
+    companyName: string
+    companyLogo?: string  // ← AGREGAR ESTA LÍNEA
+    adminEmail: string
+  }
+  campaignType: {
+    id: string
+    name: string
+    slug: string
+    description: string
+    questionCount: number
+    estimatedDuration: number
+    methodology: string
+    category: string
+    isPermanent?: boolean  // ← AGREGAR AQUÍ
+  }
+}
 
-export default function OnboardingDashboard() {
-  const router = useRouter();
-  
-  // ✅ CONSUMO CORRECTO DEL HOOK EXISTENTE
-  // Hook retorna: { data, loading, error, refetch }
-  // data puede ser array o objeto único según si hay departmentId
-  const { data, loading, error, refetch } = useOnboardingMetrics();
+interface Participant {
+  id: string
+  email: string
+  invitedAt: string
+  reminderSentAt?: string
+  respondedAt?: string
+  status: 'pending' | 'in_progress' | 'completed'
+  campaign: Campaign
+}
 
-  // ========================================
-  // LOADING STATE MINIMALISTA
-  // ========================================
-  if (loading) {
+interface SurveyData {
+  participant: Participant
+  questions: Array<{
+    id: string
+    text: string
+    category: string
+    questionOrder: number
+    responseType: 'text_open' | 'multiple_choice' | 'rating_matrix_conditional' | 'rating_scale'
+    choiceOptions?: string[] | null
+    conditionalLogic?: any | null
+  }>
+}
+
+export default function SurveyPage() {
+  const params = useParams()
+  const token = params.token as string
+
+  const [surveyData, setSurveyData] = useState<SurveyData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isCompleted, setIsCompleted] = useState(false)
+
+  // Hook para obtener la configuración de la encuesta
+  const { configuration } = useSurveyConfiguration(
+    surveyData?.participant.campaign.campaignType.slug || null
+  )
+
+  // Cargar datos de la encuesta
+  useEffect(() => {
+    async function loadSurveyData() {
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        console.log('🔍 Cargando datos survey para token:', token)
+
+        const response = await fetch(`/api/survey/${token}`)
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Error cargando encuesta')
+        }
+
+        console.log('✅ Datos survey cargados:', data)
+
+        // Verificar si ya está completada
+        if (data.participant.status === 'completed') {
+          setIsCompleted(true)
+        }
+
+        setSurveyData(data)
+
+      } catch (err) {
+        console.error('❌ Error cargando survey:', err)
+        setError(err instanceof Error ? err.message : 'Error desconocido')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    if (token) {
+      loadSurveyData()
+    }
+  }, [token])
+
+  // Manejar envío del formulario
+  // Manejar envío del formulario
+const handleSubmit = async (responses: Array<{questionId: string, rating?: number, textResponse?: string}>) => {
+  try {
+    setIsSubmitting(true)
+
+    console.log('📤 Enviando respuestas:', responses)
+
+    // ✅ ENRUTADOR INTELIGENTE: Detectar API correcta basado en isPermanent
+    const campaignType = surveyData?.participant.campaign.campaignType
+    const isPermanent = campaignType?.isPermanent || false
+    
+    const submitUrl = isPermanent
+      ? `/api/onboarding/survey/${token}/submit`  // Onboarding con inteligencia
+      : `/api/survey/${token}/submit`             // Productos temporales legacy
+
+    console.log(`🎯 Tipo campaña: ${campaignType?.slug}`)
+    console.log(`🎯 isPermanent: ${isPermanent}`)
+    console.log(`🎯 Enrutando submit a: ${submitUrl}`)
+
+    const response = await fetch(submitUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ responses }),
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Error enviando respuestas')
+    }
+
+    console.log('✅ Respuestas enviadas exitosamente')
+    setIsCompleted(true)
+
+  } catch (err) {
+    console.error('❌ Error enviando respuestas:', err)
+    setError(err instanceof Error ? err.message : 'Error enviando respuestas')
+  } finally {
+    setIsSubmitting(false)
+  }
+}
+
+  // Estados de carga y error
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
-          className="text-center space-y-4"
-        >
-          <Loader2 className="h-10 w-10 animate-spin mx-auto text-cyan-400" />
-          <p className="text-slate-400 text-sm font-light">
-            Cargando inteligencia de onboarding...
-          </p>
-        </motion.div>
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <Clock className="h-8 w-8 text-cyan-500 animate-spin mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-white mb-2">Cargando encuesta...</h2>
+          <p className="text-slate-300">Por favor espera un momento</p>
+        </div>
       </div>
-    );
+    )
   }
 
-  // ========================================
-  // ERROR STATE
-  // ========================================
-  if (error || !data) {
+  if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="text-center space-y-6 max-w-md"
-        >
-          <div className="fhr-card border-red-500/30">
-            <p className="text-red-400 mb-4 text-sm">
-              {error || 'Error cargando métricas de onboarding'}
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md bg-slate-800 border-slate-700">
+          <CardHeader className="text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <CardTitle className="text-red-400">Error al cargar encuesta</CardTitle>
+            <CardDescription className="text-slate-300">{error}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Alert className="bg-red-950 border-red-800">
+              <AlertCircle className="h-4 w-4 text-red-400" />
+              <AlertDescription className="text-red-300">
+                Si este problema persiste, contacta con tu departamento de RRHH.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!surveyData) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-white mb-2">Encuesta no encontrada</h2>
+          <p className="text-slate-300">El enlace puede haber expirado o ser inválido</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Estado completado
+  if (isCompleted) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md bg-slate-800 border-slate-700">
+          <CardHeader className="text-center">
+            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+            <CardTitle className="text-green-400">¡Encuesta completada!</CardTitle>
+            <CardDescription className="text-slate-300">
+              Gracias por tu participación en "{surveyData.participant.campaign.name}"
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-slate-300 mb-4">
+              Tus respuestas han sido registradas exitosamente. Los resultados ayudarán a mejorar el ambiente laboral.
             </p>
-            <Button 
-              onClick={() => refetch()}
-              className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white border-0"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Reintentar
-            </Button>
-          </div>
-        </motion.div>
+            <Alert className="mb-4 bg-green-950 border-green-800">
+              <CheckCircle className="h-4 w-4 text-green-400" />
+              <AlertDescription className="text-green-300">
+                Tu participación es completamente anónima y confidencial.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
       </div>
-    );
+    )
   }
 
-  // ========================================
-  // PROCESAR DATA
-  // ========================================
-  const metrics = Array.isArray(data) ? data[0] : data;
+  const { participant, questions } = surveyData
+  const { campaign } = participant
 
-  if (!metrics) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center space-y-4"
-        >
-          <p className="text-slate-400 text-sm">
-            No hay datos de onboarding disponibles aún.
-          </p>
-          <Button 
-            onClick={() => router.push('/dashboard/hub-de-carga')}
-            className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white border-0"
-          >
-            Inscribir Primer Colaborador
-          </Button>
-        </motion.div>
-      </div>
-    );
-  }
-
-  // ========================================
-  // RENDER PRINCIPAL
-  // ========================================
+  // LA PÁGINA SOLO PASA EL COMPONENTE, SIN CONTENIDO ADICIONAL
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="max-w-7xl mx-auto space-y-8"
-      >
-        {/* HEADER MINIMALISTA APPLE/TESLA STYLE */}
-        <div className="text-center mb-12">
-          <motion.h1 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="text-4xl md:text-5xl font-extralight text-white mb-2 tracking-tight"
-          >
-            Onboarding Journey Intelligence
-          </motion.h1>
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="text-slate-400 text-sm font-light"
-          >
-            Sistema predictivo de retención · Monitoreo continuo 4C Bauer
-          </motion.p>
-        </div>
-
-        {/* GRID KPIs - 4 CARDS MÉTRICAS */}
-        <OnboardingKPIsGrid globalMetrics={metrics} />
-
-        {/* GRID 2 COLUMNAS: TOP/BOTTOM + GAUGE */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <TopBottomDepartmentsPanel 
-            topDepartments={metrics.topDepartments || []}
-            bottomDepartments={metrics.bottomDepartments || []}
-          />
-          
-          <EXOScoreGaugeWithTrend 
-            currentScore={metrics.avgEXOScore || 0}
-            trend={metrics.exoScoreTrend || null} 
-            period={metrics.period || ''}
-          />
-        </div>
-
-        {/* INSIGHTS ACCIONABLES */}
-        <InsightsActionablesPanel 
-          insights={metrics.insights || { topIssues: [], recommendations: [] }} 
-        />
-
-        {/* CTAS NAVEGACIÓN */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-4"
-        >
-          <Button 
-            variant="default"
-            className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white border-0 h-12"
-            onClick={() => router.push('/dashboard/onboarding/pipeline')}
-          >
-            Ver Pipeline Completo
-          </Button>
-          <Button 
-            variant="outline"
-            className="border-slate-700 text-slate-300 hover:bg-slate-800 h-12"
-            onClick={() => router.push('/dashboard/onboarding/alerts')}
-          >
-            Centro de Alertas
-          </Button>
-          <Button 
-            variant="outline"
-            className="border-slate-700 text-slate-300 hover:bg-slate-800 h-12"
-            onClick={() => router.push('/dashboard/hub-de-carga')}
-          >
-            Inscribir Colaborador
-          </Button>
-        </motion.div>
-
-        {/* FOOTER SUTIL CON REFRESH */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-          className="text-center pt-8"
-        >
-          <button
-            onClick={() => refetch()}
-            className="text-slate-500 hover:text-cyan-400 transition-colors text-xs font-light inline-flex items-center gap-2"
-          >
-            <RefreshCw className="h-3 w-3" />
-            Actualizar datos
-          </button>
-        </motion.div>
-      </motion.div>
-    </div>
-  );
+    <UnifiedSurveyComponent
+      campaignId={campaign.id}
+      participantToken={token}
+      questions={questions}
+      companyLogo={campaign.account?.companyLogo} // CORRECTO// AGREGAR ESTA LÍNEA
+      configuration={configuration || undefined}
+      campaignName={campaign.name}
+      campaignTypeName={campaign.campaignType.name}
+      companyName={campaign.account?.companyName || 'La empresa'}
+      estimatedDuration={campaign.campaignType.estimatedDuration}
+      questionCount={campaign.campaignType.questionCount}
+      onSubmit={handleSubmit}
+      isSubmitting={isSubmitting}
+    />
+  )
 }

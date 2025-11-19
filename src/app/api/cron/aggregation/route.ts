@@ -90,7 +90,9 @@ export async function GET(request: NextRequest) {
         );
         
         totalDepartmentsProcessed += result.departmentsProcessed;
-        
+        // ✅ AGREGAR ESTAS 2 LÍNEAS AQUÍ
+        await OnboardingAggregationService.updateAccumulatedExoScores(account.id);
+        console.log(`[Cron] ✅ Accumulated scores updated for: ${account.companyName}`);
         if (result.success) {
           console.log(
             `[Cron Aggregation] ✅ ${account.companyName}: ` +

@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
 import { UserPlus, Loader2, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/components/ui/toast-system';
+import { CyanButton, NeutralButton } from '@/components/ui/MinimalistButton';
 import { z } from 'zod';
 
 /**
@@ -567,32 +568,26 @@ export default function EnrollmentPage() {
 
             {/* BOTONES */}
             <div className="flex items-center justify-end gap-4 pt-4 border-t border-slate-700">
-              <button
-                type="button"
+              <NeutralButton
                 onClick={() => router.back()}
                 disabled={submitting}
-                className="px-6 py-2 border border-slate-700 text-slate-300 rounded-lg hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                icon={ArrowLeft}
+                iconPosition="left"
+                size="md"
               >
                 Cancelar
-              </button>
-              
-              <button
+              </NeutralButton>
+
+              <CyanButton
                 type="submit"
                 disabled={submitting || departments.length === 0}
-                className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-lg hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
+                icon={submitting ? Loader2 : CheckCircle}
+                iconPosition="left"
+                size="md"
+                isLoading={submitting}
               >
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Inscribiendo...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="h-4 w-4" />
-                    Inscribir Colaborador
-                  </>
-                )}
-              </button>
+                {submitting ? 'Inscribiendo...' : 'Inscribir Colaborador'}
+              </CyanButton>
             </div>
           </form>
         </motion.div>

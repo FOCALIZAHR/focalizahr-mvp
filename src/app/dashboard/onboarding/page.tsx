@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, ArrowRight, TrendingUp, TrendingDown, Target, BarChart3 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { CyanButton, PurpleButton, NeutralButton, ButtonGroup } from '@/components/ui/MinimalistButton';
 
 // Componentes específicos de onboarding
 import EXOScoreGauge from '@/components/onboarding/EXOScoreGauge';
@@ -299,26 +300,29 @@ export default function OnboardingDashboard() {
         )}
 
         {/* CTAs NAVEGACIÓN */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* CTAs NAVEGACIÓN - ESTILO TABS DISCRETOS */}
+        <div className="flex items-center justify-center gap-3 pt-12">
           <button
             onClick={() => router.push('/dashboard/onboarding/pipeline')}
-            className="h-12 px-6 bg-gradient-to-r from-cyan-500 to-purple-500 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+            className="group flex items-center gap-2 px-6 py-3 bg-slate-900/30 border border-slate-800/50 rounded-2xl text-slate-300 text-sm font-light hover:bg-cyan-500/10 hover:border-cyan-500/50 hover:text-cyan-400 transition-all"
           >
+            <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
             Ver Pipeline Completo
-            <ArrowRight className="h-4 w-4" />
           </button>
 
           <button
             onClick={() => router.push('/dashboard/onboarding/alerts')}
-            className="h-12 px-6 border border-slate-800 text-slate-300 text-sm font-medium rounded-lg hover:bg-slate-900/50 hover:border-cyan-500/50 transition-colors"
+            className="group flex items-center gap-2 px-6 py-3 bg-slate-900/30 border border-slate-800/50 rounded-2xl text-slate-300 text-sm font-light hover:bg-purple-500/10 hover:border-purple-500/50 hover:text-purple-400 transition-all"
           >
+            <Target className="h-4 w-4" />
             Centro de Alertas
           </button>
 
           <button
             onClick={() => router.push('/dashboard/hub-de-carga')}
-            className="h-12 px-6 border border-slate-800 text-slate-300 text-sm font-medium rounded-lg hover:bg-slate-900/50 hover:border-cyan-500/50 transition-colors"
+            className="group flex items-center gap-2 px-6 py-3 bg-slate-900/30 border border-slate-800/50 rounded-2xl text-slate-300 text-sm font-light hover:bg-slate-800/50 hover:border-slate-700/50 transition-all"
           >
+            <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
             Inscribir Colaborador
           </button>
         </div>

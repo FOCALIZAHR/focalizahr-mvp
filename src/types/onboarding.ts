@@ -144,6 +144,22 @@ export interface OnboardingDashboardData {
     }>
   }
   departments: OnboardingMetrics[] // Array original para drill-down
+  // 🌟 AGREGAR ESTO AQUÍ:
+  accumulated: {
+    globalExoScore: number | null
+    totalJourneys: number
+    periodCount: number
+    lastUpdated: Date | null
+    departments: Array<{
+      id: string
+      displayName: string
+      standardCategory: string | null
+      accumulatedExoScore: number
+      accumulatedExoJourneys: number
+      accumulatedPeriodCount: number
+      accumulatedLastUpdated: Date | null
+    }>
+  }
 }
 
 // ============================================================================
@@ -210,3 +226,5 @@ export function isDepartmentMetrics(
     !('global' in data)
   )
 }
+
+

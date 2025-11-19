@@ -35,13 +35,14 @@ export const dynamic = 'force-dynamic';
  * - Incluye relación department (displayName, standardCategory)
  * - Multi-tenant isolation por accountId
  * 
- * @version 3.2.5
+ * @version 3.2.6 - AGREGADO: Nodo accumulated (12 meses)
  * @date November 2025
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { OnboardingAggregationService } from '@/lib/services/OnboardingAggregationService';
+import { serializeBigInt } from '@/lib/utils/bigint-serializer';
 
 /**
  * GET /api/onboarding/metrics
@@ -124,10 +125,12 @@ export async function GET(request: NextRequest) {
       const duration = Date.now() - startTime;
       console.log(`[API GET /onboarding/metrics] ✅ Success - ${duration}ms (departamento específico)`);
       
-      return NextResponse.json({
-        data: metrics[0],
-        success: true
-      });
+      return NextResponse.json(
+        serializeBigInt({
+          data: metrics[0],
+          success: true
+        })
+      );
     }
     
     // ========================================================================
@@ -167,6 +170,56 @@ export async function GET(request: NextRequest) {
     ]);
     
     // ========================================================================
+    // 🌟 NUEVO: 4B. CONSULTA ACUMULADO 12 MESES (AGREGADO)
+    // ========================================================================
+    console.log('[API GET /onboarding/metrics] Consultando datos acumulados 12 meses...');
+    
+    const accumulatedDepartments = await prisma.department.findMany({
+      where: { 
+        accountId,
+        accumulatedExoScore: { not: null }
+      },
+      select: {
+        id: true,
+        displayName: true,
+        standardCategory: true,
+        accumulatedExoScore: true,
+        accumulatedExoJourneys: true,
+        accumulatedPeriodCount: true,
+        accumulatedLastUpdated: true
+      },
+      orderBy: {
+        accumulatedExoScore: 'desc'
+      }
+    });
+    
+    // Calcular EXO global ponderado
+    const totalWeightedScore = accumulatedDepartments.reduce(
+      (sum, dept) => sum + (dept.accumulatedExoScore! * dept.accumulatedExoJourneys!),
+      0
+    );
+    const totalJourneys = accumulatedDepartments.reduce(
+      (sum, dept) => sum + dept.accumulatedExoJourneys!,
+      0
+    );
+    const globalAccumulatedExoScore = totalJourneys > 0
+      ? parseFloat((totalWeightedScore / totalJourneys).toFixed(1))
+      : null;
+    
+    // Máximo de períodos disponibles
+    const maxPeriodCount = accumulatedDepartments.reduce(
+      (max, d) => Math.max(max, d.accumulatedPeriodCount || 0),
+      0
+    );
+    
+    console.log('[API GET /onboarding/metrics] Acumulado calculado:', {
+      globalScore: globalAccumulatedExoScore,
+      totalJourneys,
+      maxPeriods: maxPeriodCount,
+      departmentsWithData: accumulatedDepartments.length
+    });
+    
+    // ========================================================================
     // 5. VALIDAR DATOS ENCONTRADOS
     // ========================================================================
     if (departments.length === 0) {
@@ -183,15 +236,25 @@ export async function GET(request: NextRequest) {
     }
     
     // ========================================================================
-    // 6. FORMATEAR RESPUESTA AGREGADA
+    // 🌟 6. FORMATEAR RESPUESTA CON AMBOS LENTES (MODIFICADO)
     // ========================================================================
     const data = {
+      // LENTE 1: PULSO MENSUAL (existente, sin cambios)
       global: globalMetrics,
       topDepartments,
       bottomDepartments,
       insights,
       demographics,
-      departments // Array original para drill-down futuro
+      departments, // Array original para drill-down futuro
+      
+      // 🌟 LENTE 2: ACUMULADO ESTRATÉGICO 12 MESES (NUEVO)
+      accumulated: {
+        globalExoScore: globalAccumulatedExoScore,
+        totalJourneys: totalJourneys,
+        periodCount: maxPeriodCount,
+        lastUpdated: accumulatedDepartments[0]?.accumulatedLastUpdated || null,
+        departments: accumulatedDepartments
+      }
     };
     
     const duration = Date.now() - startTime;
@@ -206,25 +269,32 @@ export async function GET(request: NextRequest) {
         genders: demographics.byGender.length,
         seniority: demographics.bySeniority.length
       },
-      departmentsArray: departments.length
+      departmentsArray: departments.length,
+      // 🌟 NUEVO LOG
+      accumulated: {
+        globalScore: globalAccumulatedExoScore,
+        departmentsWithData: accumulatedDepartments.length
+      }
     });
     
-    return NextResponse.json({
-      data,
-      success: true
-    });
+    return NextResponse.json(
+      serializeBigInt({
+        data,
+        success: true
+      })
+    );
     
   } catch (error) {
     const duration = Date.now() - startTime;
     
     console.error('[API GET /onboarding/metrics] ❌ Error:', error);
-    
+
     return NextResponse.json(
-      {
+      serializeBigInt({
         error: 'Error al obtener métricas de onboarding',
         details: error instanceof Error ? error.message : 'Error desconocido',
         success: false
-      },
+      }),
       { status: 500 }
     );
   }

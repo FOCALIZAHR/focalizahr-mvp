@@ -17,7 +17,6 @@
 import { prisma } from '@/lib/prisma';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
 
-
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -202,7 +201,7 @@ export class OnboardingAggregationService {
     return {
       period,
       periodStart,
-      periodEnd: periodStart,  // ← Normalizado: mismo valor que periodStart
+      periodEnd,
       totalJourneys,
       activeJourneys,
       completedJourneys,
@@ -250,7 +249,7 @@ export class OnboardingAggregationService {
         accountId,
         departmentId,
         periodStart: previousPeriodStart,
-        periodEnd: previousPeriodStart  // ← Normalizado
+        periodEnd: previousPeriodEnd
       },
       select: { avgEXOScore: true }
     });
@@ -437,7 +436,7 @@ export class OnboardingAggregationService {
     const targetPeriod = period || format(new Date(), 'yyyy-MM');
     const [year, month] = targetPeriod.split('-').map(Number);
     const periodStart = new Date(year, month - 1, 1);
-    const periodEnd = periodStart;  // ← Normalizado: mismo valor
+    const periodEnd = endOfMonth(periodStart);
     
     // Verificar si hay jerarquía
     const hasHierarchy = await prisma.department.count({
@@ -459,37 +458,35 @@ export class OnboardingAggregationService {
         totalActiveJourneys: number;
         criticalAlerts: number;
       }>>`
-  WITH base_scores AS (
-    SELECT 
-      oi.avg_exo_score,
-      oi.total_journeys,        -- ✅ CAMBIO 1: Cambiar de active_journeys a total_journeys
-      oi.active_journeys,       -- ✅ Mantener para el contador total_active
-      oi.critical_alerts
-    FROM department_onboarding_insights oi
-    INNER JOIN departments d ON oi.department_id = d.id
-    WHERE d.account_id = ${accountId}
-      AND d.is_active = true
-      AND oi.period_start = ${periodStart}::date
-      AND oi.period_end = ${periodEnd}::date
-  ),
-  aggregated_scores AS (
-  SELECT 
-    COALESCE(
-      SUM(CASE WHEN bs.avg_exo_score IS NOT NULL THEN bs.avg_exo_score * bs.total_journeys END) 
-      / NULLIF(SUM(CASE WHEN bs.avg_exo_score IS NOT NULL THEN bs.total_journeys END), 0),
-      NULL
-    ) as weighted_avg_exo_score,
-    COALESCE(SUM(bs.active_journeys), 0) as total_active,
-    COALESCE(SUM(bs.critical_alerts), 0) as total_critical
-  FROM base_scores bs
-  -- ✅ SIN WHERE: permite contar todos los active_journeys
-)
-  SELECT 
-    weighted_avg_exo_score as "avgEXOScore",
-    total_active as "totalActiveJourneys",
-    total_critical as "criticalAlerts"
-  FROM aggregated_scores
-`;
+        WITH base_scores AS (
+          SELECT 
+            oi.avg_exo_score,
+            oi.active_journeys,
+            oi.critical_alerts
+          FROM department_onboarding_insights oi
+          INNER JOIN departments d ON oi.department_id = d.id
+          WHERE d.account_id = ${accountId}
+            AND d.is_active = true
+            
+            AND oi.period_start >= ${periodStart}
+            AND oi.period_end <= ${periodEnd}
+        ),
+        aggregated_scores AS (
+          SELECT 
+            COALESCE(
+              SUM(bs.avg_exo_score * bs.active_journeys) / NULLIF(SUM(bs.active_journeys), 0),
+              NULL
+            ) as weighted_avg_exo_score,
+            COALESCE(SUM(bs.active_journeys), 0) as total_active,
+            COALESCE(SUM(bs.critical_alerts), 0) as total_critical
+          FROM base_scores bs
+        )
+        SELECT 
+          weighted_avg_exo_score as "avgEXOScore",
+          total_active as "totalActiveJourneys",
+          total_critical as "criticalAlerts"
+        FROM aggregated_scores
+      `;
       
       if (results.length > 0) {
         avgEXOScore = results[0].avgEXOScore;
@@ -502,8 +499,8 @@ export class OnboardingAggregationService {
       const insights = await prisma.departmentOnboardingInsight.findMany({
         where: {
           accountId,
-          periodStart: periodStart,  // ← Búsqueda exacta
-          periodEnd: periodEnd        // ← Búsqueda exacta
+          periodStart: { gte: periodStart },
+          periodEnd: { lte: periodEnd }
         }
       });
       
@@ -555,13 +552,13 @@ export class OnboardingAggregationService {
     const targetPeriod = period || format(new Date(), 'yyyy-MM');
     const [year, month] = targetPeriod.split('-').map(Number);
     const periodStart = new Date(year, month - 1, 1);
-    const periodEnd = periodStart;  // ← Normalizado: mismo valor
+    const periodEnd = endOfMonth(periodStart);
     
     const insights = await prisma.departmentOnboardingInsight.findMany({
       where: {
         accountId,
-        periodStart: periodStart,
-        periodEnd: periodEnd,
+        periodStart: { gte: periodStart },
+        periodEnd: { lte: periodEnd },
         avgEXOScore: { not: null }
       },
       include: {
@@ -595,13 +592,13 @@ export class OnboardingAggregationService {
     const targetPeriod = period || format(new Date(), 'yyyy-MM');
     const [year, month] = targetPeriod.split('-').map(Number);
     const periodStart = new Date(year, month - 1, 1);
-    const periodEnd = periodStart;  // ← Normalizado: mismo valor
+    const periodEnd = endOfMonth(periodStart);
     
     const insights = await prisma.departmentOnboardingInsight.findMany({
       where: {
         accountId,
-        periodStart: periodStart,
-        periodEnd: periodEnd,
+        periodStart: { gte: periodStart },
+        periodEnd: { lte: periodEnd },
         avgEXOScore: { not: null }
       },
       include: {
@@ -634,13 +631,13 @@ export class OnboardingAggregationService {
     const targetPeriod = period || format(new Date(), 'yyyy-MM');
     const [year, month] = targetPeriod.split('-').map(Number);
     const periodStart = new Date(year, month - 1, 1);
-    const periodEnd = periodStart;  // ← Normalizado: mismo valor
+    const periodEnd = endOfMonth(periodStart);
     
     const insights = await prisma.departmentOnboardingInsight.findMany({
       where: {
         accountId,
-        periodStart: periodStart,
-        periodEnd: periodEnd,
+        periodStart: { gte: periodStart },
+        periodEnd: { lte: periodEnd }
       },
       include: {
         department: {
@@ -721,7 +718,7 @@ export class OnboardingAggregationService {
     const targetPeriod = period || format(new Date(), 'yyyy-MM');
     const [year, month] = targetPeriod.split('-').map(Number);
     const periodStart = new Date(year, month - 1, 1);
-    const periodEnd = periodStart;  // ← Normalizado: mismo valor
+    const periodEnd = endOfMonth(periodStart);
     
     // Obtener todos los journeys del período con demographics
     const journeys = await prisma.journeyOrchestration.findMany({
@@ -1006,91 +1003,4 @@ export class OnboardingAggregationService {
     
     return recs.length > 0 ? recs : null;
   }
-  /**
- * ✅ FUNCIÓN CONSOLIDADA - Mejor de Claude + Gemini + Tu idea
- */
-static async updateAccumulatedExoScores(accountId: string): Promise<void> {
-  try {
-    console.log(`[Onboarding] 🔄 Calculating accumulated EXO Scores for account: ${accountId}`);
-    
-    const departments = await prisma.department.findMany({
-      where: { accountId, isActive: true },
-      select: { id: true, displayName: true }
-    });
-    
-    console.log(`[Onboarding] Found ${departments.length} active departments`);
-    
-    for (const dept of departments) {
-      // 1. Obtener últimos 12 meses de insights
-      const insights = await prisma.departmentOnboardingInsight.findMany({
-        where: {
-          departmentId: dept.id,
-          avgEXOScore: { not: null }
-        },
-        select: {
-          avgEXOScore: true,
-          totalJourneys: true,
-          periodStart: true  // 🌟 PARA METADATOS
-        },
-        orderBy: { periodStart: 'desc' },
-        take: 12
-      });
-      
-      // 2. Si no hay datos
-      if (insights.length === 0) {
-        await prisma.department.update({
-          where: { id: dept.id },
-          data: { 
-            accumulatedExoScore: null,
-            accumulatedExoJourneys: null,
-            accumulatedPeriodCount: null,      // 🌟 TU IDEA
-            accumulatedLastUpdated: null       // 🌟 TU IDEA
-          }
-        });
-        console.log(`[Onboarding]   - ${dept.displayName}: No data`);
-        continue;
-      }
-      
-      // 3. Calcular promedio ponderado (CLAUDE + GEMINI)
-      let totalWeightedScore = 0;
-      let totalJourneys = 0;
-      
-      for (const insight of insights) {
-        if (insight.avgEXOScore !== null && insight.totalJourneys > 0) {
-          totalWeightedScore += insight.avgEXOScore * insight.totalJourneys;
-          totalJourneys += insight.totalJourneys;
-        }
-      }
-      
-      const accumulatedScore = totalJourneys > 0
-        ? parseFloat((totalWeightedScore / totalJourneys).toFixed(1))
-        : null;
-      
-      // 4. Guardar con metadatos (🌟 TU MEJORA)
-      await prisma.department.update({
-        where: { id: dept.id },
-        data: { 
-          accumulatedExoScore: accumulatedScore,
-          accumulatedExoJourneys: totalJourneys,
-          accumulatedPeriodCount: insights.length,        // 🌟 NUEVO
-          accumulatedLastUpdated: new Date()              // 🌟 NUEVO
-        }
-      });
-      
-      console.log(
-        `[Onboarding]   ✅ ${dept.displayName}: ${accumulatedScore} ` +
-        `(${insights.length} periods, ${totalJourneys} journeys)`  // 🌟 MEJORADO
-      );
-    }
-    
-    console.log(`[Onboarding] ✅ Accumulated scores updated successfully`);
-    
-  } catch (error) {
-    console.error('[Onboarding] ❌ Error updating accumulated scores:', error);
-    throw error;
-  }
 }
-}
-
-
-

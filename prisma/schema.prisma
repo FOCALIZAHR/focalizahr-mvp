@@ -405,6 +405,13 @@ model Department {
   costCenterCode   String?  @unique @map("cost_center_code") // ✅ NUEVO CAMPO CHAT 9
   isActive         Boolean  @default(true) @map("is_active")
   createdAt        DateTime @default(now()) @map("created_at")
+  // ✅ CLAUDE + GEMINI: Score y peso para ponderación
+  accumulatedExoScore       Float?    @map("accumulated_exo_score")
+  accumulatedExoJourneys    Int?      @map("accumulated_exo_journeys")
+  
+  // 🌟 TU IDEA: Metadatos de contexto para UI
+  accumulatedPeriodCount    Int?      @map("accumulated_period_count")
+  accumulatedLastUpdated    DateTime? @map("accumulated_last_updated")
 
   // Jerarquía
   parentId      String?      @map("parent_id")
