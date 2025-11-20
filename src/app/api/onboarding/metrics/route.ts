@@ -213,15 +213,72 @@ export async function GET(request: NextRequest) {
     );
     
     console.log('[API GET /onboarding/metrics] Acumulado calculado:', {
-      globalScore: globalAccumulatedExoScore,
-      totalJourneys,
-      maxPeriods: maxPeriodCount,
-      departmentsWithData: accumulatedDepartments.length
-    });
+  globalScore: globalAccumulatedExoScore,
+  totalJourneys,
+  maxPeriods: maxPeriodCount,
+  departmentsWithData: accumulatedDepartments.length
+});
+
+// ========================================================================
+// 🌟 4B. CALCULAR BALANCE DEPARTAMENTAL (Quién impulsa / Quién frena)
+// ========================================================================
+let departmentImpact = null;
+
+if (accumulatedDepartments.length > 0 && globalAccumulatedExoScore !== null && totalJourneys > 0) {
+  // Calcular contribución de cada departamento al promedio global
+  const departmentsWithContribution = accumulatedDepartments.map(dept => {
+    const deptScore = dept.accumulatedExoScore || 0;
+    const deptJourneys = dept.accumulatedExoJourneys || 0;
     
-    // ========================================================================
-    // 5. VALIDAR DATOS ENCONTRADOS
-    // ========================================================================
+    // Fórmula: (score_dept - score_global) × (journeys_dept / total_journeys)
+    const contribution = (deptScore - globalAccumulatedExoScore) * (deptJourneys / totalJourneys);
+    
+    return {
+      departmentId: dept.id,
+      departmentName: dept.displayName,
+      score: deptScore,
+      journeys: deptJourneys,
+      contribution: parseFloat(contribution.toFixed(2))
+    };
+  });
+  
+  // Ordenar por contribución (mayor a menor)
+  departmentsWithContribution.sort((a, b) => b.contribution - a.contribution);
+  
+  // Top influencer (mayor impulso positivo)
+  const topInfluencer = departmentsWithContribution[0];
+  
+  // Bottom impact (mayor arrastre negativo)
+  const bottomImpact = departmentsWithContribution[departmentsWithContribution.length - 1];
+  
+  departmentImpact = {
+    topInfluencer: {
+      departmentId: topInfluencer.departmentId,
+      departmentName: topInfluencer.departmentName,
+      score: topInfluencer.score,
+      journeys: topInfluencer.journeys,
+      contribution: topInfluencer.contribution
+    },
+    bottomImpact: {
+      departmentId: bottomImpact.departmentId,
+      departmentName: bottomImpact.departmentName,
+      score: bottomImpact.score,
+      journeys: bottomImpact.journeys,
+      contribution: bottomImpact.contribution
+    }
+  };
+  
+  console.log('[API GET /onboarding/metrics] Balance departamental calculado:', {
+    topInfluencer: topInfluencer.departmentName,
+    topContribution: topInfluencer.contribution,
+    bottomImpact: bottomImpact.departmentName,
+    bottomContribution: bottomImpact.contribution
+  });
+}
+
+// ========================================================================
+// 5. VALIDAR DATOS ENCONTRADOS
+// ========================================================================
     if (departments.length === 0) {
       console.log('[API GET /onboarding/metrics] Sin métricas disponibles');
       
@@ -253,7 +310,10 @@ export async function GET(request: NextRequest) {
         totalJourneys: totalJourneys,
         periodCount: maxPeriodCount,
         lastUpdated: accumulatedDepartments[0]?.accumulatedLastUpdated || null,
-        departments: accumulatedDepartments
+        departments: accumulatedDepartments,
+
+        // 🌟 NUEVO: Balance Departamental
+        departmentImpact: departmentImpact
       }
     };
     
@@ -273,7 +333,8 @@ export async function GET(request: NextRequest) {
       // 🌟 NUEVO LOG
       accumulated: {
         globalScore: globalAccumulatedExoScore,
-        departmentsWithData: accumulatedDepartments.length
+        departmentsWithData: accumulatedDepartments.length,
+        hasImpactData: !!departmentImpact
       }
     });
     

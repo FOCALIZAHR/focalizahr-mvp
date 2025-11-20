@@ -145,7 +145,7 @@ export interface OnboardingDashboardData {
   }
   departments: OnboardingMetrics[] // Array original para drill-down
   // 🌟 AGREGAR ESTO AQUÍ:
-  accumulated: {
+ accumulated: {
     globalExoScore: number | null
     totalJourneys: number
     periodCount: number
@@ -159,6 +159,24 @@ export interface OnboardingDashboardData {
       accumulatedPeriodCount: number
       accumulatedLastUpdated: Date | null
     }>
+    
+    // 🌟 NUEVO: Balance Departamental
+    departmentImpact: {
+      topInfluencer: {
+        departmentId: string
+        departmentName: string
+        score: number
+        journeys: number
+        contribution: number
+      }
+      bottomImpact: {
+        departmentId: string
+        departmentName: string
+        score: number
+        journeys: number
+        contribution: number
+      }
+    } | null
   }
 }
 

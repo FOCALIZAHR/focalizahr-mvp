@@ -139,7 +139,7 @@ export function useOnboardingMetrics(
       })
       
       // 6. Actualizar estado
-      setData(result.data)
+      setData(result.data || result)
       setError(null)
       
     } catch (err) {

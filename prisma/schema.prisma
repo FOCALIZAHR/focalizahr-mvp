@@ -41,6 +41,12 @@ model Account {
   role             String        @default("CLIENT")
   status           AccountStatus @default(ACTIVE) @map("status")
 
+ // 🌍 INTERNACIONALIZACIÓN (Enterprise Multi-País)
+  country  String  @default("CL") @map("country")      // ISO 3166-1 alpha-2: "CL", "AR", "MX", "BR", "CO", "PE"
+  region   String? @map("region")                       // "LATAM", "EU", "ASIA", "NA" (opcional, para agrupación)
+  timezone String  @default("America/Santiago") @map("timezone") // IANA timezone database
+  locale   String  @default("es-CL") @map("locale")    // BCP 47 language tag: "es-CL", "es-AR", "pt-BR", "en-US"
+
   // Configuraciones parametrizables:
   maxActiveCampaigns         Int @default(1) @map("max_active_campaigns")
   maxParticipantsPerCampaign Int @default(500) @map("max_participants_per_campaign")
@@ -63,6 +69,10 @@ model Account {
 
   @@index([adminEmail], map: "idx_accounts_email")
   @@index([subscriptionTier], map: "idx_accounts_tier")
+  // 🌍 AGREGAR ESTOS 3 ÍNDICES:
+  @@index([country], map: "idx_accounts_country")
+  @@index([region], map: "idx_accounts_region")
+  @@index([country, industry], map: "idx_accounts_country_industry")
   @@map("accounts")
 }
 
