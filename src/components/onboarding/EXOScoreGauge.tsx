@@ -10,6 +10,7 @@ import { memo, useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { useBenchmark } from '@/hooks/useBenchmark'; // 🆕 IMPORT HOOK
 
 // ============================================
 // TYPES
@@ -19,6 +20,8 @@ interface EXOScoreGaugeProps {
   label: string;
   trend?: number | null;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  standardCategory?: string;  // 🆕 Para benchmark
+  country?: string;            // 🆕 Para benchmark
 }
 
 // ============================================
@@ -65,11 +68,23 @@ const EXOScoreGauge = memo(function EXOScoreGauge({
   score,
   label,
   trend,
-  size = 'xl'
+  size = 'xl',
+  standardCategory,  // 🆕
+  country            // 🆕
 }: EXOScoreGaugeProps) {
   
   const currentScore = score ?? 0;
   const config = SIZE_CONFIG[size];
+
+  // ========================================
+  // 🆕 BENCHMARK DATA
+  // ========================================
+  const { data: benchmarkData } = useBenchmark(
+    'onboarding_exo',
+    standardCategory || 'ALL',
+    undefined,
+    country || 'CL'
+  );
 
   // ========================================
   // CONTADOR ANIMADO (Estilo Torre Control)
@@ -265,7 +280,7 @@ const EXOScoreGauge = memo(function EXOScoreGauge({
         </p>
       </div>
 
-      {/* TREND MINI - SIEMPRE VISIBLE SI EXISTE (FIX 3) */}
+      {/* TREND MINI - SIEMPRE VISIBLE SI EXISTE */}
       {trend !== null && trend !== undefined && (
         <motion.div
           initial={{ opacity: 0, y: 5 }}
@@ -283,6 +298,25 @@ const EXOScoreGauge = memo(function EXOScoreGauge({
           >
             {trend > 0 ? '+' : ''}{trend.toFixed(1)} pts
           </span>
+        </motion.div>
+      )}
+
+      {/* 🆕 BENCHMARK LINE - QUIRÚRGICAMENTE AGREGADA */}
+      {benchmarkData?.benchmark && (
+        <motion.div
+          initial={{ opacity: 0, y: 5 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="mt-2 text-center"
+        >
+          <p className="text-xs text-slate-400">
+            benchmark{' '}
+            <span className="text-slate-300">{country || 'CL'}</span>
+            {' '}{benchmarkData.benchmark.category}:{' '}
+            <span className="font-semibold text-cyan-400">
+              {benchmarkData.benchmark.avgScore}
+            </span>
+          </p>
         </motion.div>
       )}
     </motion.div>

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { RefreshCw, ArrowRight, TrendingUp, TrendingDown, Target, BarChart3 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { CyanButton, PurpleButton, NeutralButton, ButtonGroup } from '@/components/ui/MinimalistButton';
+import CriticalFocusCard from '@/components/onboarding/CriticalFocusCard';
 
 // Componentes específicos de onboarding
 import EXOScoreGauge from '@/components/onboarding/EXOScoreGauge';
@@ -14,6 +15,11 @@ import { TopBottomDepartmentsSimple } from '@/components/onboarding/TopBottomDep
 import { InsightsSimplePanel } from '@/components/onboarding/InsightsSimplePanel';
 import { DemographicIntelligencePanel } from '@/components/onboarding/DemographicIntelligencePanel';
 import OnboardingTabsToggle from '@/components/onboarding/OnboardingTabsToggle';
+
+// 🌟 NUEVOS COMPONENTES CORRECTOS
+import OnboardingScoreClassificationCard from '@/components/onboarding/OnboardingScoreClassificationCard';
+import BalanceDepartmentalCard from '@/components/onboarding/BalanceDepartmentalCard';
+import EvolutionTrendCard from '@/components/onboarding/EvolutionTrendCard';
 
 // Hook actualizado
 import { useOnboardingMetrics } from '@/hooks/useOnboardingMetrics';
@@ -111,7 +117,24 @@ export default function OnboardingDashboard() {
   // ========================================
   // PREPARAR DATOS
   // ========================================
-  const { global, topDepartments, bottomDepartments, insights, demographics } = data;
+  const { global, topDepartments, bottomDepartments, insights, demographics, accumulated } = data;
+
+  // 🌟 EXTRAER DATOS PARA LAS 3 CARDS
+  const accumulatedData = accumulated || null;
+  const departmentImpact = accumulatedData?.departmentImpact || null;
+  
+  // CARD 1: Classification data
+  const scoreForClassification = accumulatedData?.globalExoScore || global.avgEXOScore || 0;
+  const periodCountForCard = accumulatedData?.periodCount || 0;
+  const totalJourneysForCard = accumulatedData?.totalJourneys || global.totalActiveJourneys || 0;
+  
+  // CARD 2: Balance data
+  const topInfluencer = departmentImpact?.topInfluencer || null;
+  const bottomImpact = departmentImpact?.bottomImpact || null;
+  
+  // CARD 3: Evolution data
+  const currentScore = accumulatedData?.globalExoScore || global.avgEXOScore || 0;
+  const trendValue = global.exoScoreTrend;
 
   // ========================================
   // RENDER PRINCIPAL
@@ -183,86 +206,38 @@ export default function OnboardingDashboard() {
                   label="EXO Score Global"
                   trend={global.exoScoreTrend || null}
                   size="xl"
+                  standardCategory="ALL"  // 🆕 AGREGAR
+                  country="CL"            // 🆕 AGREGAR
                 />
               </div>
 
-              {/* DERECHA: 3 CARDS APILADAS - COMPACTAS */}
+              {/* ════════════════════════════════════════════════════ */}
+              {/* DERECHA: 3 CARDS APILADAS - VERSIÓN CORRECTA ✅     */}
+              {/* ════════════════════════════════════════════════════ */}
               <div className="space-y-3">
                 
-                {/* CARD 1: Ritmo y Momentum */}
-                <div className="bg-slate-900/30 border border-slate-800/50 rounded-lg p-4 space-y-2">
-                  <div className="flex items-center gap-1.5 text-cyan-400">
-                    <TrendingUp className="h-3.5 w-3.5" />
-                    <p className="text-[10px] uppercase tracking-wider font-medium">
-                      Ritmo y Momentum
-                    </p>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <p className="text-4xl font-extralight text-white tabular-nums">
-                      {global.totalActiveJourneys}
-                    </p>
-                    <span className="text-xs text-slate-500">journeys · {global.period}</span>
-                  </div>
-                  {global.exoScoreTrend !== null && global.exoScoreTrend !== undefined && (
-                    <div className="flex items-center gap-1.5">
-                      {global.exoScoreTrend > 0 ? (
-                        <TrendingUp className="h-3 w-3 text-green-400" />
-                      ) : global.exoScoreTrend < 0 ? (
-                        <TrendingDown className="h-3 w-3 text-red-400" />
-                      ) : null}
-                      <span className={`text-xs font-medium ${
-                        global.exoScoreTrend > 0 ? 'text-green-400' : 
-                        global.exoScoreTrend < 0 ? 'text-red-400' : 'text-slate-400'
-                      }`}>
-                        {global.exoScoreTrend > 0 ? '+' : ''}{global.exoScoreTrend} pts
-                      </span>
-                    </div>
-                  )}
-                </div>
+                {/* 🌟 CARD 1: CLASIFICACIÓN + BENCHMARK INLINE */}
+                <OnboardingScoreClassificationCard 
+                  score={scoreForClassification}
+                  periodCount={periodCountForCard}
+                  totalJourneys={totalJourneysForCard}
+                  companyName="tu empresa"
+                />
 
-                {/* CARD 2: Acción Prioritaria */}
-                <div className={`bg-slate-900/30 border rounded-lg p-4 space-y-2 ${
-                  global.criticalAlerts > 0 
-                    ? 'border-red-500/50 border-l-4 border-l-red-500' 
-                    : 'border-slate-800/50'
-                }`}>
-                  <div className="flex items-center gap-1.5 text-amber-400">
-                    <Target className="h-3.5 w-3.5" />
-                    <p className="text-[10px] uppercase tracking-wider font-medium">
-                      Acción Prioritaria
-                    </p>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <p className={`text-4xl font-extralight tabular-nums ${
-                      global.criticalAlerts > 0 ? 'text-red-400' : 'text-green-400'
-                    }`}>
-                      {global.criticalAlerts}
-                    </p>
-                    <span className="text-xs text-slate-500">alertas críticas</span>
-                  </div>
-                  <Badge 
-                    variant={global.criticalAlerts > 0 ? "destructive" : "secondary"}
-                    className="text-[10px] font-normal px-2 py-0.5"
-                  >
-                    {global.criticalAlerts === 0 ? 'Sin alertas' : 'Requiere intervención'}
-                  </Badge>
-                </div>
+                {/* 🌟 CARD 2: BALANCE DEPARTAMENTAL */}
+                <BalanceDepartmentalCard 
+                  topInfluencer={topInfluencer}
+                  bottomImpact={bottomImpact}
+                />
 
-                {/* CARD 3: Panorama y Proyección */}
-                <div className="bg-slate-900/30 border border-slate-800/50 rounded-lg p-4 space-y-2">
-                  <div className="flex items-center gap-1.5 text-purple-400">
-                    <BarChart3 className="h-3.5 w-3.5" />
-                    <p className="text-[10px] uppercase tracking-wider font-medium">
-                      Panorama y Proyección
-                    </p>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <p className="text-4xl font-extralight text-white tabular-nums">
-                      {Math.round(global.avgEXOScore || 0)}
-                    </p>
-                    <span className="text-xs text-slate-500">pts promedio</span>
-                  </div>
-                </div>
+                {/* 🌟 CARD 3: EVOLUCIÓN CON MINI GRÁFICO */}
+                <CriticalFocusCard
+                  avgComplianceScore={data.departments?.[0]?.avgComplianceScore ?? null}
+                  avgClarificationScore={data.departments?.[0]?.avgClarificationScore ?? null}
+                  avgCultureScore={data.departments?.[0]?.avgCultureScore ?? null}
+                  avgConnectionScore={data.departments?.[0]?.avgConnectionScore ?? null}
+                  onTabChange={(tab) => setActiveTab(tab)}
+                />
 
               </div>
             </div>
@@ -300,7 +275,6 @@ export default function OnboardingDashboard() {
         )}
 
         {/* CTAs NAVEGACIÓN */}
-        {/* CTAs NAVEGACIÓN - ESTILO TABS DISCRETOS */}
         <div className="flex items-center justify-center gap-3 pt-12">
           <button
             onClick={() => router.push('/dashboard/onboarding/pipeline')}

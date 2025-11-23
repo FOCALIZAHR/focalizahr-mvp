@@ -161,8 +161,6 @@ model Participant {
   department     String?
   position       String?
   seniorityLevel String? @map("seniority_level")
-  // 🔮 NUEVO CAMPO DE ALTO VALOR (Plan Benchmark)
-  standardSeniority String? @map("standard_seniority")
   location       String?
 
   // Estados:
@@ -205,7 +203,6 @@ model Participant {
   @@index([departmentId], map: "idx_participants_department_id")
   @@index([nationalId], map: "idx_participants_national_id") // 🆕 NUEVO ÍNDICE
   @@index([phoneNumber], map: "idx_participants_phone_number") // 🆕 NUEVO ÍNDICE
-  @@index([standardSeniority])  // ✅ AGREGAR ESTE ÍNDICE AL FINAL
   @@map("participants")
 }
 
@@ -725,62 +722,4 @@ model DepartmentOnboardingInsight {
   @@index([departmentId])
   @@index([periodStart, periodEnd])
   @@map("department_onboarding_insights")
-}
-
-// ==========================================
-// 🏛️ ARQUITECTURA BENCHMARK ENTERPRISE
-// ==========================================
-
-model MarketBenchmark {
-  id String @id @default(cuid())
-
-  // 🌍 SEGMENTACIÓN ESTRUCTURAL
-  country          String  @map("country")
-  industry         String  @map("industry")
-  companySizeRange String  @map("company_size_range")
-  standardCategory String  @map("standard_category")
-
-  // 👥 SEGMENTACIÓN DEMOGRÁFICA
-  dimension        String  @default("GLOBAL") @map("dimension")
-  segment          String  @default("ALL")    @map("segment")
-
-  // 📦 CONTEXTO
-  metricType       String  @map("metric_type")
-  metricSource     String  @map("metric_source")
-  
-  // 📅 TIEMPO
-  periodType       String  @default("monthly") @map("period_type")
-  periodStart      DateTime @db.Date @map("period_start")
-  periodEnd        DateTime @db.Date @map("period_end")
-  period           String  @map("period")
-
-  // 📊 ESTADÍSTICAS
-  avgScore         Float   @map("avg_score")
-  medianScore      Float   @map("median_score")
-  percentile25     Float   @map("percentile_25")
-  percentile75     Float   @map("percentile_75")
-  percentile90     Float   @map("percentile_90")
-  
-  stdDeviation     Float   @map("std_deviation")
-  sampleSize       Int     @map("sample_size")
-  companyCount     Int     @map("company_count")
-
-  // 🔒 CONTROL
-  isPublic         Boolean @default(false) @map("is_public")
-  isActive         Boolean @default(true)  @map("is_active")
-  version          String  @default("v1.0") @map("calculation_version")
-  
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
-
-  // ✅ CONSTRAINT CORREGIDO (Todo en una línea)
-  @@unique([country, industry, companySizeRange, standardCategory, dimension, segment, metricType, period], name: "unique_market_benchmark")
-  
-  // ÍNDICES
-  @@index([metricType, country, industry], map: "idx_benchmark_lookup")
-  @@index([isPublic, metricType], map: "idx_benchmark_public")
-  @@index([dimension, segment], map: "idx_benchmark_demographic")
-  @@index([period], map: "idx_benchmark_period")
-  
-  @@map("market_benchmarks")
 }

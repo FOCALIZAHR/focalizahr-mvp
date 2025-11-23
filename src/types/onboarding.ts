@@ -245,4 +245,69 @@ export function isDepartmentMetrics(
   )
 }
 
+// ============================================================================
+// BENCHMARK SYSTEM (v1.0)
+// ============================================================================
 
+/**
+ * Percentiles de benchmark
+ */
+export interface BenchmarkPercentiles {
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+}
+
+/**
+ * Datos de benchmark de mercado
+ * Retornado por /api/benchmarks
+ */
+export interface BenchmarkData {
+  metricType: string;            // 'onboarding_exo'
+  country: string;               // 'CL', 'AR', 'ALL'
+  industry: string;              // 'tecnologia', 'retail', 'ALL'
+  companySizeRange: string;      // '51-200', '201-1000', 'ALL'
+  category: string;              // 'personas', 'tecnologia', etc.
+  dimension: string;             // 'GLOBAL'
+  segment: string;               // 'ALL'
+  avgScore: number;              // Promedio mercado
+  medianScore: number;           // Mediana
+  percentiles: BenchmarkPercentiles;
+  stdDeviation: number;
+  sampleSize: number;            // # departamentos
+  companyCount: number;          // # empresas
+  period: string;                // 'YYYY-MM'
+  lastUpdated: string;           // ISO timestamp
+}
+
+/**
+ * Comparación departamento vs benchmark
+ */
+export interface BenchmarkComparison {
+  departmentScore: number;
+  difference: number;
+  percentageGap: number;
+  percentileRank: number;
+  status: 'above' | 'at' | 'below';
+  message: string;
+}
+
+/**
+ * Response completo de benchmark
+ * Usado por useBenchmark hook
+ */
+export interface BenchmarkResponse {
+  benchmark: BenchmarkData | null;
+  comparison: BenchmarkComparison | null;
+}
+
+/**
+ * Return type del hook useBenchmark
+ */
+export interface UseBenchmarkReturn {
+  data: BenchmarkResponse | null;
+  loading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+}
