@@ -1090,6 +1090,216 @@ static async updateAccumulatedExoScores(accountId: string): Promise<void> {
     throw error;
   }
 }
+// ============================================================================
+// MÉTODO: getComplianceEfficiency (AUDITORÍA COMPLETA)
+// Ubicación: src/lib/services/OnboardingAggregationService.ts
+// ============================================================================
+
+/**
+ * ✅ COMPLIANCE EFFICIENCY - AUDITORÍA COMPLETA
+ * 
+ * Retorna compliance % por departamento CON lista completa de empleados
+ * y su estado individual (Completado/Vencido/Pendiente)
+ * 
+ * FÓRMULA COMPLIANCE: (Respondidas) / (Respondidas + Vencidas) * 100
+ * 
+ * @param accountId - ID cuenta
+ * @param departmentId - ID departamento específico (opcional)
+ * @returns Array de departamentos con compliance y lista completa empleados
+ */
+static async getComplianceEfficiency(
+  accountId: string,
+  departmentId?: string
+): Promise<Array<{
+  departmentId: string;
+  departmentName: string;
+  compliance: number;
+  status: 'excellent' | 'good' | 'warning' | 'critical' | 'neutral';
+  responded: number;
+  overdue: number;
+  pending: number;
+  employeeDetail: Array<{  // ✅ CAMBIO: De stuckEmployees a employeeDetail
+    id: string;
+    fullName: string;
+    currentStage: number;
+    daysSinceHire: number;
+    complianceStatus: 'completed' | 'overdue' | 'pending';  // ✅ NUEVO
+    daysOverdue?: number;  // ✅ NUEVO: Solo si está vencido
+  }>;
+}>> {
+  const today = new Date();
+  
+  // Query base
+  const whereClause: any = {
+    accountId,
+    status: 'active'
+  };
+  
+  if (departmentId) {
+    whereClause.departmentId = departmentId;
+  }
+  
+  // Obtener todos los journeys activos con sus participants
+  const journeys = await prisma.journeyOrchestration.findMany({
+    where: whereClause,
+    include: {
+      stage1Participant: {
+        select: {
+          hasResponded: true,
+          campaign: { select: { endDate: true } }
+        }
+      },
+      stage2Participant: {
+        select: {
+          hasResponded: true,
+          campaign: { select: { endDate: true } }
+        }
+      },
+      stage3Participant: {
+        select: {
+          hasResponded: true,
+          campaign: { select: { endDate: true } }
+        }
+      },
+      stage4Participant: {
+        select: {
+          hasResponded: true,
+          campaign: { select: { endDate: true } }
+        }
+      },
+      department: {
+        select: { displayName: true }
+      }
+    }
+  });
+  
+  // Agrupar por departamento
+  const deptMap = new Map<string, {
+    departmentId: string;
+    departmentName: string;
+    responded: number;
+    overdue: number;
+    pending: number;
+    journeys: typeof journeys;
+  }>();
+  
+  for (const journey of journeys) {
+    const deptId = journey.departmentId;
+    
+    if (!deptMap.has(deptId)) {
+      deptMap.set(deptId, {
+        departmentId: deptId,
+        departmentName: journey.department.displayName,
+        responded: 0,
+        overdue: 0,
+        pending: 0,
+        journeys: []
+      });
+    }
+    
+    const dept = deptMap.get(deptId)!;
+    dept.journeys.push(journey);
+    
+    // Contar estado de cada stage participant
+    const participants = [
+      journey.stage1Participant,
+      journey.stage2Participant,
+      journey.stage3Participant,
+      journey.stage4Participant
+    ];
+    
+    for (const p of participants) {
+      if (!p) continue;
+      
+      if (p.hasResponded) {
+        dept.responded++;
+      } else if (p.campaign.endDate < today) {
+        dept.overdue++;
+      } else {
+        dept.pending++;
+      }
+    }
+  }
+  
+  // Calcular compliance y generar employeeDetail COMPLETO
+  const results = Array.from(deptMap.values()).map(dept => {
+    const total = dept.responded + dept.overdue;
+    const compliance = total > 0 
+      ? Math.round((dept.responded / total) * 100) 
+      : 0;
+    
+    // Determinar status
+    let status: 'excellent' | 'good' | 'warning' | 'critical' | 'neutral';
+    if (total === 0) status = 'neutral';
+    else if (compliance >= 90) status = 'excellent';
+    else if (compliance >= 75) status = 'good';
+    else if (compliance >= 60) status = 'warning';
+    else status = 'critical';
+    
+    // ✅ NUEVO: Generar employeeDetail COMPLETO (TODOS los empleados)
+    const employeeDetail = dept.journeys.map(j => {
+      const participants = [
+        j.stage1Participant,
+        j.stage2Participant,
+        j.stage3Participant,
+        j.stage4Participant
+      ];
+      
+      // Determinar estado global del empleado
+      const allResponded = participants.filter(p => p).every(p => p!.hasResponded);
+      const hasOverdue = participants.some(p => p && !p.hasResponded && p.campaign.endDate < today);
+      
+      let complianceStatus: 'completed' | 'overdue' | 'pending';
+      let daysOverdue: number | undefined;
+      
+      if (allResponded) {
+        complianceStatus = 'completed';
+      } else if (hasOverdue) {
+        complianceStatus = 'overdue';
+        // Calcular días de atraso del stage más vencido
+        const overdueStages = participants.filter(p => 
+          p && !p.hasResponded && p.campaign.endDate < today
+        );
+        if (overdueStages.length > 0) {
+          const mostOverdue = overdueStages.reduce((max, p) => {
+            const days = Math.floor(
+              (today.getTime() - p!.campaign.endDate.getTime()) / (1000 * 60 * 60 * 24)
+            );
+            return days > max ? days : max;
+          }, 0);
+          daysOverdue = mostOverdue;
+        }
+      } else {
+        complianceStatus = 'pending';
+      }
+      
+      return {
+        id: j.id,
+        fullName: j.fullName,
+        currentStage: j.currentStage,
+        daysSinceHire: Math.floor(
+          (today.getTime() - j.hireDate.getTime()) / (1000 * 60 * 60 * 24)
+        ),
+        complianceStatus,
+        daysOverdue
+      };
+    });
+    
+    return {
+      departmentId: dept.departmentId,
+      departmentName: dept.departmentName,
+      compliance,
+      status,
+      responded: dept.responded,
+      overdue: dept.overdue,
+      pending: dept.pending,
+      employeeDetail  // ✅ Lista completa con estados
+    };
+  });
+  
+  // Ordenar por compliance ascendente (críticos primero)
+  return results.sort((a, b) => a.compliance - b.compliance);
+}
 }
 
 

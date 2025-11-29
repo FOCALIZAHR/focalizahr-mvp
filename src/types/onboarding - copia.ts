@@ -1,4 +1,4 @@
-// src/types/onboarding.ts - v3.2.8 MEJORADO
+// src/types/onboarding.ts - v3.2.7
 /**
  * ============================================
  * TYPES ONBOARDING - FUENTE ÚNICA DE VERDAD
@@ -14,7 +14,7 @@
  * - src/app/dashboard/onboarding/page.tsx
  * - src/components/onboarding/*
  * 
- * @version 3.2.8 - REFACTOR: Interfaces extraídas para mejor legibilidad
+ * @version 3.2.7
  * @date November 2025
  */
 
@@ -93,50 +93,18 @@ export interface OnboardingMetrics {
 }
 
 // ============================================================================
-// COMPLIANCE EFFICIENCY SYSTEM (Interfaces Extraídas)
-// ============================================================================
-
-/**
- * Detalle individual de empleado en auditoría compliance
- * Usado en ComplianceEfficiencyMatrix component
- */
-export interface ComplianceEmployeeDetail {
-  id: string
-  fullName: string
-  currentStage: number
-  daysSinceHire: number
-  complianceStatus: 'completed' | 'overdue' | 'pending'
-  daysOverdue?: number
-}
-
-/**
- * Métricas de compliance por departamento
- * Retornado por OnboardingAggregationService.getComplianceEfficiency()
- */
-export interface ComplianceEfficiencyData {
-  departmentId: string
-  departmentName: string
-  compliance: number
-  status: 'excellent' | 'good' | 'warning' | 'critical' | 'neutral'
-  responded: number
-  overdue: number
-  pending: number
-  employeeDetail: ComplianceEmployeeDetail[]
-}
-
-// ============================================================================
 // DASHBOARD AGREGADO (Vista global)
 // ============================================================================
 
 /**
  * Interface para respuesta agregada del dashboard
- * v3.2.8 - Refactorizada con interfaces extraídas
+ * v3.2.5 - Nueva estructura con agregaciones globales
  * 
  * ⚠️ CRÍTICO: La propiedad se llama `global`, NO `globalMetrics`
  * (según documentación backend BACKEND_ONBOARDING_API_DOCS.md)
  */
 export interface OnboardingDashboardData {
-  global: {
+  global: {  // ⚠️ IMPORTANTE: Es "global", no "globalMetrics"
     avgEXOScore: number | null
     totalActiveJourneys: number
     criticalAlerts: number
@@ -175,8 +143,9 @@ export interface OnboardingDashboardData {
       avgEXOScore: number 
     }>
   }
-  departments: OnboardingMetrics[]
-  accumulated: {
+  departments: OnboardingMetrics[] // Array original para drill-down
+  // 🌟 AGREGAR ESTO AQUÍ:
+ accumulated: {
     globalExoScore: number | null
     totalJourneys: number
     periodCount: number
@@ -191,6 +160,7 @@ export interface OnboardingDashboardData {
       accumulatedLastUpdated: Date | null
     }>
     
+    // 🌟 NUEVO: Balance Departamental
     departmentImpact: {
       topInfluencer: {
         departmentId: string
@@ -207,11 +177,33 @@ export interface OnboardingDashboardData {
         contribution: number
       }
     } | null
-  }
-  
-  // ✅ REFACTORIZADO: Una línea limpia en lugar de 25 líneas anidadas
-  complianceEfficiency: ComplianceEfficiencyData[]
-}
+  } 
+  // ============================================================================
+// ACTUALIZACIÓN TIPO TYPESCRIPT
+// Archivo: src/types/onboarding.ts
+// Ubicación en archivo: Dentro de OnboardingDashboardData interface
+// ============================================================================
+
+// ✅ REEMPLAZAR ESTE BLOQUE (líneas ~190-205):
+
+complianceEfficiency: Array<{
+  departmentId: string
+  departmentName: string
+  compliance: number
+  status: 'excellent' | 'good' | 'warning' | 'critical' | 'neutral'
+  responded: number
+  overdue: number
+  pending: number
+  employeeDetail: Array<{  // ✅ CAMBIO: De stuckEmployees a employeeDetail
+    id: string
+    fullName: string
+    currentStage: number
+    daysSinceHire: number
+    complianceStatus: 'completed' | 'overdue' | 'pending'  // ✅ NUEVO
+    daysOverdue?: number  // ✅ NUEVO
+  }>
+}>
+}    // ← Cierre de OnboardingDashboardData
 
 // ============================================================================
 // TIMELINE 4C BAUER
@@ -235,7 +227,7 @@ export interface TimelineStage {
 
 /**
  * Return type del hook useOnboardingMetrics
- * v3.2.8 - Agregado timelineStages
+ * v3.2.7 - Agregado timelineStages
  */
 export interface UseOnboardingMetricsReturn {
   data: OnboardingMetrics | OnboardingDashboardData | null
@@ -344,9 +336,8 @@ export interface UseBenchmarkReturn {
   error: string | null;
   refetch: () => Promise<void>;
 }
-
 // ============================================================================
-// PIPELINE KANBAN - TYPES
+// PIPELINE KANBAN - TYPES (Pegar al final de src/types/onboarding.ts)
 // ============================================================================
 
 export interface JourneyDepartment {

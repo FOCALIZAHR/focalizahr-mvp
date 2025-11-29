@@ -1,0 +1,134 @@
+// src/app/api/onboarding/alerts/[id]/route.ts
+
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { extractUserContext } from '@/lib/services/AuthorizationService';
+
+/**
+ * PATCH /api/onboarding/alerts/[id]
+ * 
+ * Actualizar estado de alerta:
+ * - action: 'acknowledge' | 'resolve'
+ * - notes: string (opcional, requerido para resolve)
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+    
+    // ========================================
+    // 1. AUTENTICACIÓN
+    // ========================================
+    const userContext = extractUserContext(request);
+    
+    if (!userContext.accountId || !userContext.userId) {
+      return NextResponse.json(
+        { error: 'No autorizado', success: false },
+        { status: 401 }
+      );
+    }
+    
+    // ========================================
+    // 2. PARSEAR BODY
+    // ========================================
+    const body = await request.json();
+    const { action, notes } = body;
+    
+    if (!action || !['acknowledge', 'resolve'].includes(action)) {
+      return NextResponse.json(
+        { 
+          error: 'Acción inválida. Debe ser "acknowledge" o "resolve"', 
+          success: false 
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Validar que alerta existe y pertenece a la cuenta
+    const existingAlert = await prisma.journeyAlert.findFirst({
+      where: {
+        id,
+        accountId: userContext.accountId
+      }
+    });
+    
+    if (!existingAlert) {
+      return NextResponse.json(
+        { error: 'Alerta no encontrada', success: false },
+        { status: 404 }
+      );
+    }
+    
+    // ========================================
+    // 3. CONSTRUIR UPDATE DATA
+    // ========================================
+    const updateData: any = {};
+    
+    if (action === 'acknowledge') {
+      updateData.status = 'acknowledged';
+      updateData.acknowledgedAt = new Date();
+      updateData.acknowledgedBy = userContext.userId;
+      
+      console.log(`[API] Acknowledge alert ${id} by user ${userContext.userId}`);
+      
+    } else if (action === 'resolve') {
+      // Para resolve, notes es recomendado
+      updateData.status = 'resolved';
+      updateData.resolvedAt = new Date();
+      updateData.resolvedBy = userContext.userId;
+      
+      if (notes) {
+        updateData.resolutionNotes = notes;
+      }
+      
+      console.log(`[API] Resolve alert ${id} by user ${userContext.userId}`);
+    }
+    
+    // ========================================
+    // 4. ACTUALIZAR ALERTA
+    // ========================================
+    const updatedAlert = await prisma.journeyAlert.update({
+      where: {
+        id
+      },
+      data: updateData,
+      include: {
+        journey: {
+          include: {
+            department: {
+              select: {
+                id: true,
+                displayName: true
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    console.log(`[API] Alerta ${id} actualizada exitosamente a estado: ${updateData.status}`);
+    
+    // ========================================
+    // 5. RESPONSE
+    // ========================================
+    return NextResponse.json({
+      data: updatedAlert,
+      success: true,
+      message: action === 'acknowledge' 
+        ? 'Alerta marcada como accionada' 
+        : 'Alerta marcada como resuelta'
+    });
+    
+  } catch (error: any) {
+    console.error('[API PATCH /alerts/[id]] Error:', error);
+    return NextResponse.json(
+      { 
+        error: error.message || 'Error actualizando alerta', 
+        success: false 
+      },
+      { status: 500 }
+    );
+  }
+}

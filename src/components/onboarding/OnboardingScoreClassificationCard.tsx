@@ -1,171 +1,161 @@
 // src/components/onboarding/OnboardingScoreClassificationCard.tsx
 /**
- * 💼 ONBOARDING SCORE CLASSIFICATION CARD
- * 
- * Card conceptual "Cómo nos evalúan los talentos en su ingreso"
- * Muestra clasificación textual + benchmark inline + fortaleza/oportunidad
- * 
- * Props:
- * - score: EXO Score actual (0-100)
- * - periodCount: Meses con datos
- * - totalJourneys: Total de journeys acumulados
- * - companyName: Nombre de la empresa (opcional)
- * 
- * Diseño: Estilo FocalizaHR premium inline
+ * DISEÑO: Mantener glassmorphism premium original
+ * CONTENIDO: Explicar significado sin repetir "BUENO"
  */
 
 'use client';
 
 import { memo, useMemo } from 'react';
-import { Briefcase, TrendingUp, Award } from 'lucide-react';
+import { Briefcase, TrendingUp, TrendingDown, Info } from 'lucide-react';
 
 interface OnboardingScoreClassificationCardProps {
   score: number;
   periodCount: number;
   totalJourneys: number;
   companyName?: string;
+  benchmarkScore?: number | null;
 }
 
 export default memo(function OnboardingScoreClassificationCard({
   score,
   periodCount,
   totalJourneys,
-  companyName = 'tu empresa'
+  companyName = 'tu empresa',
+  benchmarkScore = null
 }: OnboardingScoreClassificationCardProps) {
   
-  // ========================================
-  // HELPER: Obtener clasificación según score
-  // ========================================
   const classification = useMemo(() => {
     if (score >= 80) {
       return {
-        label: 'Excelente',
-        description: 'Proceso de integración sobresaliente que supera ampliamente las expectativas del mercado.',
+        meaning: 'Proceso de integración excepcional que supera ampliamente estándares del mercado. Los nuevos talentos tienen experiencias sobresalientes desde día 1.',
         color: 'text-green-400',
-        bgColor: 'bg-green-500/10'
+        bgColor: 'bg-green-500/10',
+        borderColor: 'border-green-500/20'
       };
     }
-    if (score >= 65) {
+    if (score >= 60) {
       return {
-        label: 'Bueno',
-        description: 'Proceso de integración funcionando correctamente con oportunidades de mejora.',
+        meaning: 'Proceso de integración sólido y funcional con áreas de oportunidad identificadas. La experiencia del talento es positiva pero mejorable.',
         color: 'text-cyan-400',
-        bgColor: 'bg-cyan-500/10'
+        bgColor: 'bg-cyan-500/10',
+        borderColor: 'border-cyan-500/20'
       };
     }
-    if (score >= 50) {
+    if (score >= 40) {
       return {
-        label: 'Regular',
-        description: 'Proceso de integración con desafíos importantes que requieren atención.',
+        meaning: 'Proceso de integración con desafíos importantes que requieren atención. Los nuevos talentos experimentan fricciones que afectan su compromiso inicial.',
         color: 'text-amber-400',
-        bgColor: 'bg-amber-500/10'
+        bgColor: 'bg-amber-500/10',
+        borderColor: 'border-amber-500/20'
       };
     }
     return {
-      label: 'Crítico',
-      description: 'Proceso de integración con problemas serios que demandan intervención inmediata.',
+      meaning: 'Proceso de integración con problemas críticos que demandan intervención urgente. La experiencia del talento nuevo está comprometida seriamente.',
       color: 'text-red-400',
-      bgColor: 'bg-red-500/10'
+      bgColor: 'bg-red-500/10',
+      borderColor: 'border-red-500/20'
     };
   }, [score]);
 
-  // ========================================
-  // HELPER: Calcular benchmark vs industria
-  // ========================================
   const benchmark = useMemo(() => {
-    const industryAvg = 52.5; // Promedio industria Chile (hardcoded por ahora)
+    const industryAvg = benchmarkScore ?? 52.5;
     const diff = score - industryAvg;
-    const diffPercent = ((diff / industryAvg) * 100).toFixed(0);
+    const diffPercent = Math.abs((diff / industryAvg) * 100);
     
-    const isAbove = diff > 5;
-    const isBelow = diff < -5;
-    const isNeutral = !isAbove && !isBelow;
+    const isAbove = diff > 2;
+    const isBelow = diff < -2;
+
+    let positionText = '';
+    if (isAbove) {
+      positionText = `${companyName} está ${Math.round(diffPercent)}% sobre el promedio nacional`;
+    } else if (isBelow) {
+      positionText = `${companyName} está ${Math.round(diffPercent)}% bajo el promedio nacional`;
+    } else {
+      positionText = `${companyName} está alineado con la mediana nacional`;
+    }
 
     return {
-      diff: Math.abs(diff).toFixed(0),
-      diffPercent: Math.abs(parseFloat(diffPercent)),
+      industryAvg: Math.round(industryAvg),
       isAbove,
       isBelow,
-      isNeutral,
-      status: isAbove ? 'fortaleza' : isBelow ? 'oportunidad' : 'neutral',
-      statusEmoji: isAbove ? '✨' : isBelow ? '⚠️' : '➖',
-      statusText: isAbove 
-        ? `Esto es una fortaleza de ${companyName}`
-        : isBelow 
-        ? `Esto es una oportunidad de mejora para ${companyName}`
-        : `${companyName} está en línea con el mercado`
+      positionText,
+      icon: isAbove ? TrendingUp : isBelow ? TrendingDown : Info,
+      iconColor: isAbove ? 'text-green-400' : isBelow ? 'text-amber-400' : 'text-slate-400'
     };
-  }, [score, companyName]);
+  }, [score, companyName, benchmarkScore]);
 
-  // ========================================
-  // RENDER PRINCIPAL
-  // ========================================
   return (
-    <div className="bg-slate-900/30 border border-slate-800/50 rounded-lg p-4 space-y-3">
+    <div 
+      className="
+        relative overflow-hidden
+        bg-slate-900/40 
+        backdrop-blur-xl
+        border border-slate-700/50 
+        rounded-xl 
+        p-4 
+        space-y-3
+        transition-all duration-300 ease-out
+        hover:bg-slate-900/50
+        hover:border-slate-600/50
+        hover:shadow-lg hover:shadow-cyan-500/5
+      "
+    >
+      <div className="absolute -top-12 -right-12 w-24 h-24 bg-gradient-to-br from-cyan-500/10 to-purple-500/10 rounded-full blur-2xl pointer-events-none" />
       
-      {/* HEADER CON TÍTULO CONCEPTUAL */}
-      <div className="space-y-1">
-        <div className="flex items-center gap-1.5 text-cyan-400">
-          <Briefcase className="h-3.5 w-3.5" />
-          <p className="text-[10px] uppercase tracking-wider font-medium">
+      <div className="relative space-y-0.5">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-gradient-to-br from-cyan-500/20 to-cyan-600/10 rounded-lg">
+            <Briefcase className="h-3.5 w-3.5 text-cyan-400" />
+          </div>
+          <p className="text-[11px] uppercase tracking-wider font-medium bg-gradient-to-r from-cyan-400 to-cyan-300 bg-clip-text text-transparent">
             Cómo nos evalúan los talentos
           </p>
         </div>
-        <p className="text-[9px] text-slate-500 pl-5">
+        <p className="text-[9px] text-slate-500 pl-8">
           en su ingreso
         </p>
       </div>
 
-      {/* CLASIFICACIÓN + DESCRIPCIÓN */}
-      <div className={`${classification.bgColor} rounded-lg px-3 py-2.5 space-y-1.5`}>
-        <div className="flex items-baseline gap-2">
-          <p className={`text-sm font-semibold ${classification.color}`}>
-            EXO Score: {classification.label}
+      <div className={`${classification.bgColor} ${classification.borderColor} border rounded-lg px-3 py-2.5 space-y-1.5`}>
+        <div className="flex items-start gap-2">
+          <Info className={`h-3.5 w-3.5 mt-0.5 flex-shrink-0 ${classification.color}`} />
+          <div className="space-y-1">
+            <p className={`text-[10px] font-medium ${classification.color}`}>
+              ¿Qué significa este score?
+            </p>
+            <p className="text-[10px] text-slate-300 leading-relaxed">
+              {classification.meaning}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-slate-800/40 border border-slate-700/40 rounded-lg px-3 py-2.5 space-y-1.5">
+        <div className="flex items-center gap-2">
+          <benchmark.icon className={`h-3.5 w-3.5 ${benchmark.iconColor}`} />
+          <p className="text-xs text-slate-300">
+            {benchmark.positionText}
           </p>
         </div>
-        <p className="text-[10px] text-slate-300 leading-relaxed">
-          {classification.description}
+        <p className="text-[9px] text-slate-500 pl-5">
+          Benchmark Chile: {benchmark.industryAvg} pts
         </p>
       </div>
 
-      {/* BENCHMARK INLINE */}
-      <div className="space-y-1.5 pt-1">
-        <div className="flex items-center gap-2">
-          <TrendingUp className={`h-3.5 w-3.5 ${
-            benchmark.isAbove ? 'text-green-400' : 
-            benchmark.isBelow ? 'text-amber-400' : 
-            'text-slate-400'
-          }`} />
-          <p className="text-xs text-slate-300">
-            <span className={`font-bold ${
-              benchmark.isAbove ? 'text-green-400' : 
-              benchmark.isBelow ? 'text-amber-400' : 
-              'text-slate-400'
-            }`}>
-              {benchmark.isAbove ? '+' : benchmark.isBelow ? '-' : ''}{benchmark.diffPercent}%
-            </span>
-            {' '}
-            {benchmark.isAbove ? 'sobre' : benchmark.isBelow ? 'bajo' : 'en línea con'} promedio industria
-          </p>
-        </div>
-        
-        <div className="flex items-start gap-1.5 pl-5">
-          <span className="text-xs">{benchmark.statusEmoji}</span>
-          <p className="text-[10px] text-slate-400 leading-relaxed">
-            {benchmark.statusText}
-          </p>
+      <div className="pt-2 border-t border-slate-700/50">
+        <div className="flex items-center justify-center gap-3 text-[10px] text-slate-500">
+          <span className="flex items-center gap-1">
+            <span className="w-1 h-1 bg-cyan-500/50 rounded-full"></span>
+            {periodCount} {periodCount === 1 ? 'mes' : 'meses'}
+          </span>
+          <span className="text-slate-700">·</span>
+          <span className="flex items-center gap-1">
+            <span className="w-1 h-1 bg-purple-500/50 rounded-full"></span>
+            {totalJourneys} journeys
+          </span>
         </div>
       </div>
-
-      {/* METADATOS */}
-      <div className="pt-2 border-t border-slate-800/50">
-        <div className="flex items-center justify-center gap-2 text-[10px] text-slate-500">
-          <span>{periodCount} {periodCount === 1 ? 'mes' : 'meses'}</span>
-          <span>·</span>
-          <span>{totalJourneys} journeys</span>
-        </div>
-      </div>
-
     </div>
   );
 });

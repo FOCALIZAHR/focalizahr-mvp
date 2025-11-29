@@ -145,7 +145,8 @@ export async function GET(request: NextRequest) {
       bottomDepartments,
       insights,
       demographics,
-      departments
+      departments,
+      complianceEfficiency  // ← AGREGAR
     ] = await Promise.all([
       OnboardingAggregationService.getGlobalMetrics(accountId, period || undefined),
       OnboardingAggregationService.getTopDepartments(accountId, period || undefined),
@@ -154,6 +155,7 @@ export async function GET(request: NextRequest) {
       OnboardingAggregationService.getGlobalDemographics(accountId, period || undefined),
       // Mantener array original para backward compatibility
       prisma.departmentOnboardingInsight.findMany({
+        
         where: { accountId },
         orderBy: { updatedAt: 'desc' },
         include: {
@@ -166,7 +168,8 @@ export async function GET(request: NextRequest) {
           }
         },
         take: 20
-      })
+      }),
+      OnboardingAggregationService.getComplianceEfficiency(accountId)  // ← AGREGAR
     ]);
     
     // ========================================================================
@@ -314,7 +317,8 @@ if (accumulatedDepartments.length > 0 && globalAccumulatedExoScore !== null && t
 
         // 🌟 NUEVO: Balance Departamental
         departmentImpact: departmentImpact
-      }
+      },
+       complianceEfficiency  // ← AGREGAR
     };
     
     const duration = Date.now() - startTime;
