@@ -2,6 +2,7 @@
 
 import { BusinessCase, BusinessCaseFinancials } from '@/types/BusinessCase';
 import { JourneyAlert, JourneyOrchestration } from '@prisma/client';
+import { calculateOnboardingFinancialImpact, formatCurrencyCLP } from '@/lib/financialCalculations';
 
 /**
  * ONBOARDING ALERT ENGINE
@@ -9,7 +10,7 @@ import { JourneyAlert, JourneyOrchestration } from '@prisma/client';
  * Transforma alertas técnicas → Casos de negocio ejecutivos
  * 
  * Pattern: Reutiliza Kit Comunicación 2.5/3.0
- * - FinancialCalculator para costos
+ * - FinancialCalculator centralizado para costos (SHRM 2024, 6 salarios, $0 inversión)
  * - BusinessCase para estructura
  * - InsightAccionable para UI
  * 
@@ -19,6 +20,7 @@ import { JourneyAlert, JourneyOrchestration } from '@prisma/client';
  * ✅ BusinessCaseType: Usar 'onboarding_crisis' y 'onboarding_warning' (tras extender enum)
  * ✅ evidenceData: Adaptado a estructura real {score, benchmark, departmentAffected, participantsAffected}
  * ✅ confidenceLevel: Solo 'alta' | 'media' | 'baja'
+ * ✅ Finanzas centralizadas: calculateOnboardingFinancialImpact desde @/lib/financialCalculations
  */
 
 // ========================================
@@ -52,25 +54,6 @@ interface ActionStep {
 }
 
 // ========================================
-// CONFIGURACIÓN FINANCIERA
-// ========================================
-
-const FINANCIAL_CONFIG = {
-  // Costo reemplazo Chile (SHRM 2024)
-  avgSalaryChile: 45000 * 12, // $540K CLP anual
-  turnoverCostMultiplier: 1.5, // 150% salario = $810K
-  
-  // Costos intervención (promedio mercado)
-  interventionCosts: {
-    session1on1: 5000,        // Sesión HRBP 2h
-    careerPlan: 8000,         // Workshop plan carrera
-    onboardingRefresh: 12000, // Rediseño proceso
-    mentorship: 15000,        // Programa mentor 3 meses
-    trainingModule: 20000     // Capacitación especializada
-  }
-};
-
-// ========================================
 // ENGINE PRINCIPAL
 // ========================================
 
@@ -85,18 +68,22 @@ export class OnboardingAlertEngine {
   ): BusinessCase {
     
     // Mapeo tipo alerta → generador específico
+    // ✅ VALORES CORRECTOS: Coinciden con validación Zod y backend
     const generators = {
-      'riesgo_fuga': this.generateRiesgoFugaCase,
-      'abandono_dia_1': this.generateAbandonoDia1Case,
-      'bienvenida_fallida': this.generateBienvenidaFallidaCase,
-      'confusion_rol': this.generateConfusionRolCase,
-      'desajuste_rol': this.generateDesajusteRolCase,
-      'detractor_cultural': this.generateDetractorCase
+      'RIESGO_FUGA': this.generateRiesgoFugaCase,
+      'ABANDONO_DIA_1': this.generateAbandonoDia1Case,
+      'BIENVENIDA_FALLIDA': this.generateBienvenidaFallidaCase,
+      'CONFUSION_ROL': this.generateConfusionRolCase,
+      'DESAJUSTE_ROL': this.generateDesajusteRolCase,
+      'DESAJUSTE_CULTURAL': this.generateDesajusteRolCase, // Alias
+      'DETRACTOR_CULTURAL': this.generateDetractorCase,
+      'low_score': this.generateLowScoreCase  // Alertas genéricas backend
     };
     
     const generator = generators[alert.alertType as keyof typeof generators];
     
     if (!generator) {
+      console.warn(`[OnboardingAlertEngine] Tipo alerta no reconocido: ${alert.alertType}`);
       return this.generateGenericCase(alert, journey);
     }
     
@@ -112,10 +99,12 @@ export class OnboardingAlertEngine {
     journey: AlertJourney
   ): BusinessCase {
     
-    const turnoverCost = FINANCIAL_CONFIG.turnoverCostMultiplier * FINANCIAL_CONFIG.avgSalaryChile;
-    const interventionCost = FINANCIAL_CONFIG.interventionCosts.session1on1 + 
-                             FINANCIAL_CONFIG.interventionCosts.careerPlan;
-    const roi = Math.round(((turnoverCost * 0.9) - interventionCost) / interventionCost * 100);
+    // ✅ CAMBIO QUIRÚRGICO: Usar función centralizada
+    const financials = calculateOnboardingFinancialImpact({
+      employeeName: journey.fullName,
+      role: journey.department?.displayName || 'Sin Depto',
+      alertType: 'riesgo_fuga'
+    });
     
     const actionPlan: ActionStep[] = [
       {
@@ -141,37 +130,16 @@ export class OnboardingAlertEngine {
       }
     ];
     
-    const financials: BusinessCaseFinancials = {
-      currentAnnualCost: 0,
-      potentialAnnualLoss: turnoverCost,
-      recommendedInvestment: interventionCost,
-      estimatedROI: roi,
-      paybackPeriod: 0.5,
-      methodologySources: [
-        "Bauer 4C Model (2010-2024): Predictor #1 rotación temprana = intención permanencia Día 30",
-        "SHRM 2024: Costo reemplazo promedio 150% salario anual en LATAM",
-        "Gallup Q12 Meta-Analysis: Intervención dentro 30 días = 90% efectividad retención"
-      ],
-      keyAssumptions: [
-        `Empleado ${journey.fullName} expresó no verse en empresa en 1 año (Día ${alert.stage})`,
-        `Probabilidad fuga sin intervención: 90% en próximos 3-6 meses (metodología Bauer)`,
-        `Costo reemplazo: ${this.formatCurrency(turnoverCost)} (150% salario anual promedio Chile)`,
-        `Inversión intervención: ${this.formatCurrency(interventionCost)} (sesión + plan carrera)`,
-        `Tasa éxito intervención día 30-45: 85-90% (estudios longitudinales Gallup)`
-      ]
-    };
-    
     return {
       id: `onboarding_riesgo_fuga_${alert.id}`,
-      type: 'onboarding_crisis', // ✅ CORREGIDO: Ahora válido tras extender BusinessCaseType
+      type: 'onboarding_crisis',
       severity: 'crítica',
       title: `🚨 RIESGO FUGA CRÍTICO - ${journey.fullName} (${journey.department?.displayName || 'Sin Depto'})`,
       problemDescription: 
         `${journey.fullName} expresó no verse en la empresa en 1 año durante evaluación Día ${alert.stage}. ` +
         `Según metodología 4C Bauer (predictor #1 validado de rotación temprana), esto indica 90% probabilidad ` +
-        `de renuncia en próximos 3-6 meses sin intervención. Costo proyectado: ${this.formatCurrency(turnoverCost)}.`,
+        `de renuncia en próximos 3-6 meses sin intervención. Costo proyectado: ${formatCurrencyCLP(financials.potentialAnnualLoss)}.`,
       
-      // ✅ CORREGIDO: Estructura evidenceData adaptada a BusinessCase.ts real
       evidenceData: {
         score: journey.exoScore || 0,
         benchmark: this.getBenchmarkForStage(alert.stage || 1),
@@ -196,7 +164,7 @@ export class OnboardingAlertEngine {
       ],
       
       createdAt: new Date(),
-      confidenceLevel: 'alta' // ✅ CORREGIDO: Valor válido
+      confidenceLevel: 'alta'
     };
   }
   
@@ -209,9 +177,12 @@ export class OnboardingAlertEngine {
     journey: AlertJourney
   ): BusinessCase {
     
-    const turnoverCost = FINANCIAL_CONFIG.turnoverCostMultiplier * FINANCIAL_CONFIG.avgSalaryChile;
-    const interventionCost = FINANCIAL_CONFIG.interventionCosts.onboardingRefresh;
-    const roi = Math.round(((turnoverCost * 0.85) - interventionCost) / interventionCost * 100);
+    // ✅ CAMBIO QUIRÚRGICO: Usar función centralizada
+    const financials = calculateOnboardingFinancialImpact({
+      employeeName: journey.fullName,
+      role: journey.department?.displayName || 'Sin Depto',
+      alertType: 'abandono_dia_1'
+    });
     
     const actionPlan: ActionStep[] = [
       {
@@ -237,37 +208,16 @@ export class OnboardingAlertEngine {
       }
     ];
     
-    const financials: BusinessCaseFinancials = {
-      currentAnnualCost: 0,
-      potentialAnnualLoss: turnoverCost,
-      recommendedInvestment: interventionCost,
-      estimatedROI: roi,
-      paybackPeriod: 1,
-      methodologySources: [
-        "Aberdeen Group Research: 86% rotación Día 1-7 es prevenible con preparación adecuada",
-        "SHRM 2024: Costo reemplazo 150% salario (incluye reclutamiento duplicado)",
-        "Brandon Hall Group: Onboarding estructurado reduce abandono temprano 50%"
-      ],
-      keyAssumptions: [
-        `Empleado ${journey.fullName} no se presentó Día 1 sin aviso previo`,
-        `85% de estos casos son recuperables con contacto inmediato (Aberdeen Group)`,
-        `Causa típica: Logística (40%), segunda opinión (30%), expectativa errónea (30%)`,
-        `Inversión: Rediseño proceso onboarding = ${this.formatCurrency(interventionCost)}`,
-        `Prevención: Evita 2-3 casos similares/año = ROI ${roi}%`
-      ]
-    };
-    
     return {
       id: `onboarding_abandono_dia1_${alert.id}`,
-      type: 'onboarding_crisis', // ✅ CORREGIDO
+      type: 'onboarding_crisis',
       severity: 'crítica',
       title: `🚨 ABANDONO DÍA 1 - ${journey.fullName} (${journey.department?.displayName || 'Sin Depto'})`,
       problemDescription:
         `${journey.fullName} no se presentó en su primer día de trabajo. 86% de estos casos son prevenibles ` +
         `con preparación adecuada (Aberdeen Group). Contacto inmediato puede recuperar 85% de casos. ` +
-        `Costo si se pierde: ${this.formatCurrency(turnoverCost)} (reclutamiento duplicado).`,
+        `Costo si se pierde: ${formatCurrencyCLP(financials.potentialAnnualLoss)} (reclutamiento duplicado).`,
       
-      // ✅ CORREGIDO: evidenceData estructura real
       evidenceData: {
         score: 0,
         benchmark: this.getBenchmarkForStage(1),
@@ -291,7 +241,7 @@ export class OnboardingAlertEngine {
       ],
       
       createdAt: new Date(),
-      confidenceLevel: 'alta' // ✅ CORREGIDO
+      confidenceLevel: 'alta'
     };
   }
   
@@ -304,10 +254,12 @@ export class OnboardingAlertEngine {
     journey: AlertJourney
   ): BusinessCase {
     
-    const turnoverCost = FINANCIAL_CONFIG.turnoverCostMultiplier * FINANCIAL_CONFIG.avgSalaryChile;
-    const interventionCost = FINANCIAL_CONFIG.interventionCosts.onboardingRefresh + 
-                             FINANCIAL_CONFIG.interventionCosts.session1on1;
-    const roi = Math.round(((turnoverCost * 0.75) - interventionCost) / interventionCost * 100);
+    // ✅ CAMBIO QUIRÚRGICO: Usar función centralizada
+    const financials = calculateOnboardingFinancialImpact({
+      employeeName: journey.fullName,
+      role: journey.department?.displayName || 'Sin Depto',
+      alertType: 'bienvenida_fallida'
+    });
     
     const actionPlan: ActionStep[] = [
       {
@@ -326,28 +278,9 @@ export class OnboardingAlertEngine {
       }
     ];
     
-    const financials: BusinessCaseFinancials = {
-      currentAnnualCost: 0,
-      potentialAnnualLoss: turnoverCost * 0.75,
-      recommendedInvestment: interventionCost,
-      estimatedROI: roi,
-      paybackPeriod: 1,
-      methodologySources: [
-        "Glassdoor Research: 88% decisión de quedarse/irse se forma en primeras 4 semanas",
-        "BambooHR: Bienvenida deficiente duplica probabilidad renuncia en 6 meses",
-        "SHRM 2024: 69% empleados quedan >3 años con excelente onboarding"
-      ],
-      keyAssumptions: [
-        `${journey.fullName} reportó experiencia negativa Día 1 (score Compliance <50)`,
-        `75% probabilidad abandono en 3-6 meses si no se corrige (BambooHR data)`,
-        `Intervención rápida (<48h) recupera 80% de casos`,
-        `Costo proyectado: ${this.formatCurrency(turnoverCost * 0.75)}`
-      ]
-    };
-    
     return {
       id: `onboarding_bienvenida_fallida_${alert.id}`,
-      type: 'onboarding_warning', // ✅ CORREGIDO
+      type: 'onboarding_warning',
       severity: 'alta',
       title: `⚠️ BIENVENIDA FALLIDA - ${journey.fullName} (${journey.department?.displayName || 'Sin Depto'})`,
       problemDescription:
@@ -355,7 +288,6 @@ export class OnboardingAlertEngine {
         `Glassdoor Research indica que 88% de decisión quedarse/irse se forma en primeras 4 semanas. ` +
         `Intervención rápida puede recuperar 80% de estos casos.`,
       
-      // ✅ CORREGIDO: evidenceData estructura real
       evidenceData: {
         score: journey.exoScore || alert.score || 0,
         benchmark: this.getBenchmarkForStage(alert.stage || 1),
@@ -379,7 +311,7 @@ export class OnboardingAlertEngine {
       ],
       
       createdAt: new Date(),
-      confidenceLevel: 'alta' // ✅ CORREGIDO
+      confidenceLevel: 'alta'
     };
   }
   
@@ -392,9 +324,12 @@ export class OnboardingAlertEngine {
     journey: AlertJourney
   ): BusinessCase {
     
-    const turnoverCost = FINANCIAL_CONFIG.turnoverCostMultiplier * FINANCIAL_CONFIG.avgSalaryChile;
-    const interventionCost = FINANCIAL_CONFIG.interventionCosts.session1on1;
-    const roi = Math.round(((turnoverCost * 0.6) - interventionCost) / interventionCost * 100);
+    // ✅ CAMBIO QUIRÚRGICO: Usar función centralizada
+    const financials = calculateOnboardingFinancialImpact({
+      employeeName: journey.fullName,
+      role: journey.department?.displayName || 'Sin Depto',
+      alertType: 'confusion_rol'
+    });
     
     const actionPlan: ActionStep[] = [
       {
@@ -413,28 +348,9 @@ export class OnboardingAlertEngine {
       }
     ];
     
-    const financials: BusinessCaseFinancials = {
-      currentAnnualCost: 0,
-      potentialAnnualLoss: turnoverCost * 0.6,
-      recommendedInvestment: interventionCost,
-      estimatedROI: roi,
-      paybackPeriod: 0.5,
-      methodologySources: [
-        "LinkedIn Talent Solutions: Falta claridad rol es causa #2 rotación <6 meses",
-        "Bauer 4C Model: Dimensión Clarification es predictor directo compromiso temprano",
-        "Gallup: Empleados con expectativas claras tienen 3.2x más engagement"
-      ],
-      keyAssumptions: [
-        `${journey.fullName} reportó confusión sobre responsabilidades y expectativas (score Clarification <60)`,
-        `60% probabilidad abandono si no se aclara en primeros 60 días (LinkedIn data)`,
-        `Intervención sesión clarificación = ${this.formatCurrency(interventionCost)}`,
-        `ROI: ${roi}% evitando rotación prematura`
-      ]
-    };
-    
     return {
       id: `onboarding_confusion_rol_${alert.id}`,
-      type: 'onboarding_warning', // ✅ CORREGIDO
+      type: 'onboarding_warning',
       severity: 'media',
       title: `⚠️ CONFUSIÓN ROL - ${journey.fullName} (${journey.department?.displayName || 'Sin Depto'})`,
       problemDescription:
@@ -442,7 +358,6 @@ export class OnboardingAlertEngine {
         `LinkedIn identifica esto como causa #2 de rotación en primeros 6 meses. ` +
         `Sesión clarificación inmediata puede prevenir desalineación crónica.`,
       
-      // ✅ CORREGIDO: evidenceData estructura real
       evidenceData: {
         score: journey.exoScore || alert.score || 0,
         benchmark: this.getBenchmarkForStage(alert.stage || 1),
@@ -466,7 +381,7 @@ export class OnboardingAlertEngine {
       ],
       
       createdAt: new Date(),
-      confidenceLevel: 'alta' // ✅ CORREGIDO
+      confidenceLevel: 'alta'
     };
   }
   
@@ -479,9 +394,12 @@ export class OnboardingAlertEngine {
     journey: AlertJourney
   ): BusinessCase {
     
-    const turnoverCost = FINANCIAL_CONFIG.turnoverCostMultiplier * FINANCIAL_CONFIG.avgSalaryChile;
-    const interventionCost = FINANCIAL_CONFIG.interventionCosts.careerPlan;
-    const roi = Math.round(((turnoverCost * 0.7) - interventionCost) / interventionCost * 100);
+    // ✅ CAMBIO QUIRÚRGICO: Usar función centralizada
+    const financials = calculateOnboardingFinancialImpact({
+      employeeName: journey.fullName,
+      role: journey.department?.displayName || 'Sin Depto',
+      alertType: 'desajuste_rol'
+    });
     
     const actionPlan: ActionStep[] = [
       {
@@ -507,28 +425,9 @@ export class OnboardingAlertEngine {
       }
     ];
     
-    const financials: BusinessCaseFinancials = {
-      currentAnnualCost: 0,
-      potentialAnnualLoss: turnoverCost * 0.7,
-      recommendedInvestment: interventionCost,
-      estimatedROI: roi,
-      paybackPeriod: 1,
-      methodologySources: [
-        "Deloitte Human Capital: 72% rotación temprana por mismatch skills-rol",
-        "Harvard Business Review: Ajuste rol temprano retiene 85% empleados vs 40% sin ajuste",
-        "SHRM 2024: Costo reemplazo + pérdida productividad = 150-200% salario"
-      ],
-      keyAssumptions: [
-        `${journey.fullName} muestra desajuste entre skills y demandas del rol`,
-        `70% probabilidad renuncia si no se ajusta en primeros 90 días (Deloitte)`,
-        `Opciones: Ajustar tareas (0 costo), Capacitación (${this.formatCurrency(interventionCost)}), o Reasignación (0 costo si hay vacante)`,
-        `Tasa éxito ajuste temprano: 85% (HBR study)`
-      ]
-    };
-    
     return {
       id: `onboarding_desajuste_rol_${alert.id}`,
-      type: 'onboarding_warning', // ✅ CORREGIDO
+      type: 'onboarding_warning',
       severity: 'media',
       title: `⚠️ DESAJUSTE ROL - ${journey.fullName} (${journey.department?.displayName || 'Sin Depto'})`,
       problemDescription:
@@ -536,7 +435,6 @@ export class OnboardingAlertEngine {
         `Deloitte identifica esto como causa del 72% de rotación temprana. ` +
         `Ajuste proactivo (tareas, capacitación, o reasignación) retiene 85% de casos.`,
       
-      // ✅ CORREGIDO: evidenceData estructura real
       evidenceData: {
         score: journey.exoScore || alert.score || 0,
         benchmark: this.getBenchmarkForStage(alert.stage || 1),
@@ -561,7 +459,7 @@ export class OnboardingAlertEngine {
       ],
       
       createdAt: new Date(),
-      confidenceLevel: 'alta' // ✅ CORREGIDO
+      confidenceLevel: 'alta'
     };
   }
   
@@ -574,10 +472,12 @@ export class OnboardingAlertEngine {
     journey: AlertJourney
   ): BusinessCase {
     
-    const turnoverCost = FINANCIAL_CONFIG.turnoverCostMultiplier * FINANCIAL_CONFIG.avgSalaryChile;
-    const interventionCost = FINANCIAL_CONFIG.interventionCosts.session1on1 + 
-                             FINANCIAL_CONFIG.interventionCosts.mentorship;
-    const roi = Math.round(((turnoverCost * 0.8) - interventionCost) / interventionCost * 100);
+    // ✅ CAMBIO QUIRÚRGICO: Usar función centralizada
+    const financials = calculateOnboardingFinancialImpact({
+      employeeName: journey.fullName,
+      role: journey.department?.displayName || 'Sin Depto',
+      alertType: 'detractor_cultural'
+    });
     
     const actionPlan: ActionStep[] = [
       {
@@ -603,28 +503,9 @@ export class OnboardingAlertEngine {
       }
     ];
     
-    const financials: BusinessCaseFinancials = {
-      currentAnnualCost: 0,
-      potentialAnnualLoss: turnoverCost * 0.8,
-      recommendedInvestment: interventionCost,
-      estimatedROI: roi,
-      paybackPeriod: 1,
-      methodologySources: [
-        "Deloitte Culture 500: Desajuste cultural es predictor #1 rotación <1 año (89% casos)",
-        "Gallup: Cultural fit es 3x más importante que skills para retención long-term",
-        "SHRM 2024: Salida ética temprana cuesta 30% vs rotación conflictiva tardía"
-      ],
-      keyAssumptions: [
-        `${journey.fullName} muestra desajuste significativo con valores/cultura organizacional (score Culture <50)`,
-        `80% de estos casos terminan en renuncia dentro 12 meses (Deloitte)`,
-        `Opciones: Salvable con mentor (${this.formatCurrency(interventionCost)}) o salida ética ($0 extra costo)`,
-        `Detección temprana evita toxicidad en equipo + reduce costo salida 70%`
-      ]
-    };
-    
     return {
       id: `onboarding_detractor_cultural_${alert.id}`,
-      type: 'onboarding_warning', // ✅ CORREGIDO
+      type: 'onboarding_warning',
       severity: 'alta',
       title: `⚠️ DETRACTOR CULTURAL - ${journey.fullName} (${journey.department?.displayName || 'Sin Depto'})`,
       problemDescription:
@@ -632,7 +513,6 @@ export class OnboardingAlertEngine {
         `Deloitte identifica esto como predictor #1 de rotación en primer año (89% casos). ` +
         `Decisión temprana (salvar o salida ética) previene toxicidad y reduce costos 70%.`,
       
-      // ✅ CORREGIDO: evidenceData estructura real
       evidenceData: {
         score: journey.exoScore || alert.score || 0,
         benchmark: this.getBenchmarkForStage(alert.stage || 1),
@@ -657,7 +537,198 @@ export class OnboardingAlertEngine {
       ],
       
       createdAt: new Date(),
-      confidenceLevel: 'alta' // ✅ CORREGIDO
+      confidenceLevel: 'alta'
+    };
+  }
+  
+  // ========================================
+  // CASO 7: LOW SCORE (GENÉRICO POR DIMENSIÓN)
+  // ========================================
+  
+  private static generateLowScoreCase(
+    alert: JourneyAlert,
+    journey: AlertJourney
+  ): BusinessCase {
+    
+    // ✅ Usar función centralizada
+    const financials = calculateOnboardingFinancialImpact({
+      employeeName: journey.fullName,
+      role: journey.department?.displayName || 'Sin Depto',
+      alertType: 'low_score'
+    });
+    
+    // Determinar dimensión (si no viene en alert, inferir del título)
+    const dimension = (alert as any).dimension || 
+                     alert.title?.toLowerCase().includes('compliance') ? 'compliance' :
+                     alert.title?.toLowerCase().includes('clarification') ? 'clarification' :
+                     alert.title?.toLowerCase().includes('culture') ? 'culture' :
+                     alert.title?.toLowerCase().includes('connection') ? 'connection' : 'general';
+    
+    const score = (alert as any).score || journey.exoScore || 0;
+    
+    // Plan de acción específico por dimensión
+    const dimensionPlans: Record<string, ActionStep[]> = {
+      compliance: [
+        {
+          step: 1,
+          action: "Auditar preparación logística Día 1: equipamiento, accesos, desk setup completados 100%",
+          responsible: "IT + Facilities + HRBP",
+          deadline: "24 horas",
+          validationMetric: "Checklist pre-arrival completado + empleado confirma herramientas funcionando"
+        },
+        {
+          step: 2,
+          action: "Sesión bienvenida de recuperación con gerente + tour oficina completo",
+          responsible: "Gerente Directo",
+          deadline: "48 horas",
+          validationMetric: "Empleado confirma sentirse bienvenido + orientación espacios completada"
+        },
+        {
+          step: 3,
+          action: "Rediseñar checklist pre-arrival con responsables y deadlines claros",
+          responsible: "HRBP",
+          deadline: "7 días",
+          validationMetric: "Proceso documentado + aplicado en próximos 3 onboardings sin fallas"
+        }
+      ],
+      
+      clarification: [
+        {
+          step: 1,
+          action: "Sesión clarificación expectativas: Job description detallado + objetivos 30-60-90 días específicos",
+          responsible: "Gerente Directo",
+          deadline: "48 horas",
+          validationMetric: "Documento firmado por ambas partes + empleado confirma claridad 100%"
+        },
+        {
+          step: 2,
+          action: "Implementar check-ins semanales estructurados primeras 4 semanas (30 min, agenda fija)",
+          responsible: "Gerente Directo",
+          deadline: "Desde hoy",
+          validationMetric: "4 sesiones completadas + score Clarification Día 30 >70"
+        },
+        {
+          step: 3,
+          action: "Asignar mentor/buddy para consultas diarias operativas",
+          responsible: "HRBP",
+          deadline: "5 días",
+          validationMetric: "Buddy activo + empleado reporta consultas resueltas <24h"
+        }
+      ],
+      
+      culture: [
+        {
+          step: 1,
+          action: "Sesión profunda valores/cultura: identificar 3 desajustes culturales específicos",
+          responsible: "HRBP + Gerente",
+          deadline: "48 horas",
+          validationMetric: "3 desajustes documentados con ejemplos concretos"
+        },
+        {
+          step: 2,
+          action: "Decidir: A) Salvable (asignar mentor cultural + integración gradual), o B) Salida ética",
+          responsible: "HR Leadership",
+          deadline: "7 días",
+          validationMetric: "Decisión documentada + plan implementación aprobado"
+        },
+        {
+          step: 3,
+          action: "Ejecutar plan: Si A) Mentor + check-ins cultura. Si B) Off-boarding digno con referencia",
+          responsible: "HRBP + Gerente",
+          deadline: "14 días",
+          validationMetric: "Score Culture Día 60 >70 (A) o Salida ejecutada profesionalmente (B)"
+        }
+      ],
+      
+      connection: [
+        {
+          step: 1,
+          action: "Diagnóstico profundo intención permanencia: causas específicas de desconexión",
+          responsible: "HRBP + Gerente",
+          deadline: "24 horas",
+          validationMetric: "Empleado identifica 3 factores que afectan compromiso"
+        },
+        {
+          step: 2,
+          action: "Plan carrera individualizado con hitos 3-6-12 meses + sponsor ejecutivo asignado",
+          responsible: "Gerente + HR",
+          deadline: "7 días",
+          validationMetric: "Plan documentado + firmado + sponsor comprometido"
+        },
+        {
+          step: 3,
+          action: "Check-ins mensuales validación progreso + ajustes según feedback",
+          responsible: "Gerente + Sponsor",
+          deadline: "Ciclo permanente",
+          validationMetric: "Score Connection Día 90 >75 + empleado confirma intención permanencia"
+        }
+      ]
+    };
+    
+    const actionPlan = dimensionPlans[dimension] || dimensionPlans.clarification;
+    
+    const dimensionTitles: Record<string, string> = {
+      compliance: 'PREPARACIÓN LOGÍSTICA DEFICIENTE',
+      clarification: 'FALTA CLARIDAD EXPECTATIVAS',
+      culture: 'DESAJUSTE CULTURAL',
+      connection: 'DESCONEXIÓN / BAJO COMPROMISO'
+    };
+    
+    const dimensionDescriptions: Record<string, string> = {
+      compliance: 
+        `${journey.fullName} reportó experiencia negativa en preparación logística (score: ${score.toFixed(1)}/5.0). ` +
+        `Glassdoor Research: 88% de decisión quedarse/irse se forma en primeras 4 semanas. ` +
+        `Falta equipamiento Día 1 genera percepción "no me esperaban" → abandono emocional.`,
+      
+      clarification:
+        `${journey.fullName} evidencia falta de claridad sobre expectativas y rol (score: ${score.toFixed(1)}/5.0). ` +
+        `LinkedIn identifica esto como causa #2 de rotación en primeros 6 meses. ` +
+        `Sesión clarificación inmediata puede prevenir desalineación crónica.`,
+      
+      culture:
+        `${journey.fullName} evidencia desajuste cultural significativo (score: ${score.toFixed(1)}/5.0). ` +
+        `Deloitte: desajuste cultural es predictor #1 de rotación primer año (89% casos). ` +
+        `Decisión temprana (salvar o salida ética) previene toxicidad y reduce costos 70%.`,
+      
+      connection:
+        `${journey.fullName} muestra bajo compromiso y desconexión con la organización (score: ${score.toFixed(1)}/5.0). ` +
+        `Metodología 4C Bauer: Connection es predictor final de retención a largo plazo. ` +
+        `Intervención ahora puede recuperar 75% de casos vs 15% si se espera a renuncia.`
+    };
+    
+    return {
+      id: `onboarding_low_score_${alert.id}`,
+      type: 'onboarding_warning',
+      severity: score < 2.0 ? 'crítica' : score < 3.0 ? 'alta' : 'media',
+      title: `⚠️ ${dimensionTitles[dimension] || 'SCORE BAJO'} - ${journey.fullName} (${journey.department?.displayName || 'Sin Depto'})`,
+      problemDescription: dimensionDescriptions[dimension] || alert.description,
+      
+      evidenceData: {
+        score,
+        benchmark: this.getBenchmarkForStage(alert.stage || 1),
+        departmentAffected: journey.department?.displayName,
+        participantsAffected: 1
+      },
+      
+      financials,
+      
+      recommendedActions: actionPlan.map(step =>
+        `${step.step}. ${step.action}\n   ⏱️ Plazo: ${step.deadline}\n   👤 Responsable: ${step.responsible}\n   ✓ Validación: ${step.validationMetric}`
+      ),
+      
+      suggestedTimeline: score < 2.0 
+        ? `URGENCIA ALTA - Próximas 48 horas para intervención` 
+        : `ACCIÓN REQUERIDA - Próximos 7 días`,
+      
+      successMetrics: [
+        `Causa raíz específica identificada`,
+        `Plan corrección implementado en <7 días`,
+        `Score ${dimension} mejora >+20 puntos en próxima evaluación`,
+        `Empleado confirma mejora tangible en sesión validación`
+      ],
+      
+      createdAt: new Date(),
+      confidenceLevel: 'alta'
     };
   }
   
@@ -670,17 +741,20 @@ export class OnboardingAlertEngine {
     journey: AlertJourney
   ): BusinessCase {
     
-    const turnoverCost = FINANCIAL_CONFIG.turnoverCostMultiplier * FINANCIAL_CONFIG.avgSalaryChile;
-    const interventionCost = FINANCIAL_CONFIG.interventionCosts.session1on1;
+    // ✅ CAMBIO QUIRÚRGICO: Usar función centralizada
+    const financials = calculateOnboardingFinancialImpact({
+      employeeName: journey.fullName,
+      role: journey.department?.displayName || 'Sin Depto',
+      alertType: 'generic'
+    });
     
     return {
       id: `onboarding_generic_${alert.id}`,
-      type: 'onboarding_warning', // ✅ CORREGIDO
+      type: 'onboarding_warning',
       severity: this.mapSeverityToSpanish(alert.severity),
       title: `⚠️ ${alert.title}`,
       problemDescription: alert.description,
       
-      // ✅ CORREGIDO: evidenceData estructura real
       evidenceData: {
         score: journey.exoScore || alert.score || 0,
         benchmark: this.getBenchmarkForStage(alert.stage || 1),
@@ -688,15 +762,7 @@ export class OnboardingAlertEngine {
         participantsAffected: 1
       },
       
-      financials: {
-        currentAnnualCost: 0,
-        potentialAnnualLoss: turnoverCost * 0.5,
-        recommendedInvestment: interventionCost,
-        estimatedROI: 500,
-        paybackPeriod: 1,
-        methodologySources: [],
-        keyAssumptions: []
-      },
+      financials,
       
       recommendedActions: [
         '1. Sesión diagnóstico con HRBP para entender causa raíz',
@@ -713,22 +779,13 @@ export class OnboardingAlertEngine {
       ],
       
       createdAt: new Date(),
-      confidenceLevel: 'media' // ✅ CORREGIDO
+      confidenceLevel: 'media'
     };
   }
   
   // ========================================
   // HELPERS
   // ========================================
-  
-  private static formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  }
   
   private static calculateDaysInCompany(createdAt: Date): number {
     const now = new Date();
@@ -737,7 +794,7 @@ export class OnboardingAlertEngine {
   }
   
   /**
-   * ✅ NUEVO: Helper para obtener benchmark esperado por etapa
+   * Helper para obtener benchmark esperado por etapa
    * Basado en metodología 4C Bauer
    */
   private static getBenchmarkForStage(stage: number): number {
@@ -749,6 +806,7 @@ export class OnboardingAlertEngine {
     };
     return benchmarks[stage as keyof typeof benchmarks] || 70;
   }
+  
   /**
    * Mapea severity de JourneyAlert (inglés) a BusinessCase (español)
    */

@@ -61,6 +61,7 @@ model Account {
   departments       Department[]
   users             User[]
   departmentMetrics DepartmentMetric[] // ✅ NUEVA RELACIÓN CHAT 9
+  onboardingEffectivenessInsights OnboardingEffectivenessInsight[]  // ⬅️ AGREGAR ESTA ES LA NUEVA
 
   // ✅ v3.2.2: NUEVAS RELACIONES ONBOARDING
   journeys           JourneyOrchestration[]
@@ -783,4 +784,69 @@ model MarketBenchmark {
   @@index([period], map: "idx_benchmark_period")
   
   @@map("market_benchmarks")
+}
+// ============================================================================
+// MODELO NUEVO: OnboardingEffectivenessInsight
+
+
+// Tabla para guardar insights agregados mensuales por account
+// Correlación: Alertas gestionadas vs ignoradas → Retención
+// 
+// PROPÓSITO:
+// - Demostrar ROI sistema de alertas onboarding
+// - Análisis efectividad gestión alertas
+// - Insights para mejora continua
+// 
+// FASE ACTUAL (Análisis Simple):
+// - Métricas agregadas por mes
+// - Retención gestionadas vs ignoradas
+// - Score improvement promedio
+// - ROI estimado en CLP
+
+model OnboardingEffectivenessInsight {
+  id        String   @id @default(cuid())
+  accountId String   @map("account_id")
+  period    String   // Formato: "2025-11" (YYYY-MM)
+  
+  // ============================================================================
+  // ALERTAS GESTIONADAS
+  // ============================================================================
+  totalAlerts            Int   @default(0) @map("total_alerts")
+  managedCount           Int   @default(0) @map("managed_count")
+  managedRetained        Int   @default(0) @map("managed_retained")
+  managedRetentionRate   Float @default(0) @map("managed_retention_rate")   // 0.75 = 75%
+  managedAvgScoreChange  Float @default(0) @map("managed_avg_score_change") // +15.5 puntos
+  
+  // ============================================================================
+  // ALERTAS IGNORADAS
+  // ============================================================================
+  ignoredCount           Int   @default(0) @map("ignored_count")
+  ignoredRetained        Int   @default(0) @map("ignored_retained")
+  ignoredRetentionRate   Float @default(0) @map("ignored_retention_rate")   // 0.20 = 20%
+  ignoredAvgScoreChange  Float @default(0) @map("ignored_avg_score_change") // -5.2 puntos
+  
+  // ============================================================================
+  // INSIGHTS CALCULADOS
+  // ============================================================================
+  retentionDelta         Float @default(0) @map("retention_delta")  // +55 puntos porcentuales
+  estimatedROI           Float @default(0) @map("estimated_roi")     // $86,400,000 CLP ahorro
+  
+  // ============================================================================
+  // METADATA
+  // ============================================================================
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  // ============================================================================
+  // RELACIONES
+  // ============================================================================
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  // ============================================================================
+  // ÍNDICES
+  // ============================================================================
+  @@unique([accountId, period])
+  @@index([accountId])
+  @@index([period])
+  @@map("onboarding_effectiveness_insights")
 }

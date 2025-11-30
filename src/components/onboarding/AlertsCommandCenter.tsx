@@ -4,10 +4,11 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Loader2, DollarSign } from 'lucide-react';
 import { useOnboardingAlerts } from '@/hooks/useOnboardingAlerts';
 import { OnboardingAlertEngine } from '@/engines/OnboardingAlertEngine';
 import { InsightAccionable } from '@/components/insights/InsightAccionable';
+import { ResolutionModal } from './ResolutionModal';
 import { AlertMetricsPanel } from './AlertMetricsPanel';
 import { TopAlertsPanel } from './TopAlertsPanel';
 import { AlertFilters } from './AlertFilters';
@@ -38,6 +39,8 @@ export const AlertsCommandCenter: React.FC = () => {
   );
   
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState<any>(null);
+  const [showResolutionModal, setShowResolutionModal] = useState(false);
   
   // ========================================
   // HANDLERS
@@ -54,6 +57,28 @@ export const AlertsCommandCenter: React.FC = () => {
     } catch (error) {
       console.error('Error acknowledging alert:', error);
       alert('Error al marcar alerta como accionada');
+    }
+  };
+
+  const handleResolve = async (alertId: string, notes: string) => {
+    try {
+      const response = await fetch(`/api/onboarding/alerts/${alertId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'resolve',
+          notes 
+        })
+      });
+      
+      if (!response.ok) throw new Error('Error al resolver alerta');
+      
+      await refetch();
+      setShowResolutionModal(false);
+      setSelectedAlert(null);
+    } catch (error) {
+      console.error('Error resolving alert:', error);
+      alert('Error al resolver alerta');
     }
   };
   

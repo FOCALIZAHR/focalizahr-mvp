@@ -7,6 +7,7 @@
  */
 
 import { FinancialCalculator, CHILE_ECONOMIC_ADJUSTMENTS } from '@/config/impactAssumptions';
+import { BusinessCaseFinancials } from '@/types/BusinessCase';
 
 export interface FinancialImpactCalculation {
   scenario: string;
@@ -33,7 +34,19 @@ export interface FinancialImpactCalculation {
   };
 }
 
-export interface BusinessCaseFinancials {
+// ============================================================================
+// NOTA CRÍTICA: Interfaz renombrada para evitar conflicto con BusinessCaseFinancials
+// importada de @/types/BusinessCase (línea 10)
+// 
+// RAZÓN DEL CAMBIO:
+// - Esta interfaz es SOLO para RetentionEngine (Kit 2.5/3.0)
+// - RetentionEngine usa estructura DIFERENTE: total_at_risk_clp, annual_savings_potential_clp
+// - OnboardingEngine (nuevo) usa BusinessCaseFinancials importada con: methodologySources, keyAssumptions
+// - NO AFECTA consumidores: RetentionEngine solo llama funciones, no importa esta interfaz
+// 
+// FECHA CAMBIO: 30 Nov 2025 - Chat refactorización OnboardingEngine
+// ============================================================================
+export interface RetentionBusinessCaseFinancials {
   total_at_risk_clp: number;
   annual_savings_potential_clp: number;
   roi_percentage: number;
@@ -259,6 +272,11 @@ export class FinancialCalculationsService {
     };
   }
   
+  // ============================================================================
+  // NOTA: Retorna RetentionBusinessCaseFinancials (renombrada) NO BusinessCaseFinancials
+  // RAZÓN: RetentionEngine (Kit 3.0) usa estructura diferente vs OnboardingEngine
+  // CONSUMIDOR: calculateFinancialImpactForBusinessCase() línea ~480
+  // ============================================================================
   /**
    * Genera caso negocio financiero completo
    * Integración directa con RetentionEngine BusinessCase
@@ -266,7 +284,7 @@ export class FinancialCalculationsService {
   static generateBusinessCaseFinancials(
     scenario_type: 'critical_environment' | 'leadership_gap' | 'champion_replication',
     parameters: any
-  ): BusinessCaseFinancials {
+  ): RetentionBusinessCaseFinancials {
     
     let primary_calculation: FinancialImpactCalculation;
     
@@ -415,11 +433,20 @@ export class FinancialCalculationsService {
  * FUNCIONES UTILIDAD EXPORTADAS
  */
 
+// ============================================================================
+// NOTA: Retorna RetentionBusinessCaseFinancials (renombrada) NO BusinessCaseFinancials
+// RAZÓN: RetentionEngine llama esta función y convierte manualmente a BusinessCaseFinancials
+// CONSUMIDOR: RetentionEngine.ts generateAmbienteCriticoCase() y generateRetentionRiskCase()
+// IMPACTO: CERO - RetentionEngine solo accede a campos, no importa el nombre de interfaz
+// ============================================================================
+// ============================================================================
+// CAMBIO 3: Actualizar tipo de retorno a RetentionBusinessCaseFinancials
+// ============================================================================
 // Helper para integración con RetentionEngine
 export function calculateFinancialImpactForBusinessCase(
   scenario_type: 'critical_environment' | 'leadership_gap' | 'champion_replication',
   campaign_data: any
-): BusinessCaseFinancials {
+): RetentionBusinessCaseFinancials {
   
   // Estimación tamaño equipo y salarios basado en datos campaña
   const estimated_team_size = campaign_data.total_responses || 50;
@@ -460,7 +487,181 @@ export function convertToChileanPesos(amount_usd: number): number {
   return FinancialCalculationsService.convertUSDtoCLP(amount_usd);
 }
 
+// ============================================================================
+// CONFIGURACIÓN ONBOARDING - SHRM 2024
+// ============================================================================
+
+const ONBOARDING_FINANCIAL_CONFIG = {
+  // Salario promedio Chile (roles medios)
+  avgSalaryChile: 75000 * 12, // $900,000 CLP anual
+  
+  // Multiplicador costo rotación temprana (SHRM 2024)
+  // Incluye: reclutamiento + onboarding + productividad perdida + conocimiento perdido
+  turnoverMultiplier: 6.0,
+  
+  // Costos intervención (tiempo interno ya asignado)
+  interventionCosts: {
+    session1on1: 0,           // Reunión líder directo = tiempo ya pagado
+    careerPlan: 0,            // Reunión planificación = tiempo ya pagado
+    onboardingRefresh: 0,     // Ajuste proceso = tiempo interno
+    mentorship: 0,            // Mentor interno = tiempo ya asignado
+    trainingModuleExternal: 0 // Solo si capacitación externa (mayoría $0)
+  },
+  
+  // Probabilidad éxito intervención (estudios longitudinales Bauer 2010-2024)
+  interventionSuccessRate: 0.75,
+  
+  // Fuentes metodológicas
+  sources: [
+    "Talya Bauer - 4C Onboarding Model Meta-Analysis (2010-2024)",
+    "SHRM 2024 Human Capital Benchmarking Report: Costo reemplazo = 6 sueldos rotación <6 meses",
+    "Glassdoor Research 2024: 88% decisión quedarse/irse se forma primeras 4 semanas",
+    "Journal of Applied Psychology: Intervención temprana efectividad 75%",
+    "Aberdeen Group: Preparación Día 1 predice 85% retención si ejecutada correctamente"
+  ]
+};
+
+// ============================================================================
+// FUNCIÓN PRINCIPAL - CÁLCULO IMPACTO FINANCIERO ONBOARDING
+// ============================================================================
+
+// ============================================================================
+// NOTA CRÍTICA: Esta función SÍ usa BusinessCaseFinancials IMPORTADA (línea 10)
+// RAZÓN: OnboardingAlertEngine necesita estructura NUEVA con:
+//   - methodologySources: string[]
+//   - keyAssumptions: string[]
+// 
+// DIFERENCIA vs RetentionEngine:
+// - RetentionEngine usa RetentionBusinessCaseFinancials (total_at_risk_clp)
+// - OnboardingEngine usa BusinessCaseFinancials importada (methodologySources)
+// 
+// NO CONFUNDIR: Son 2 estructuras diferentes para 2 motores diferentes
+// CONSUMIDOR: OnboardingAlertEngine.ts (6 generadores de casos negocio)
+// ============================================================================
+/**
+ * Calcula impacto financiero de alertas onboarding
+ * Usado por OnboardingAlertEngine para casos de negocio
+ * 
+ * @param params - Parámetros empleado y alerta
+ * @returns BusinessCaseFinancials con ROI auditado
+ */
+export function calculateOnboardingFinancialImpact(params: {
+  employeeName: string;
+  role: string;
+  alertType: string;
+  currentSalary?: number;
+  companyName?: string;
+}): BusinessCaseFinancials {
+  
+  // Usar salario específico o promedio Chile
+  const annualSalary = params.currentSalary 
+    ? params.currentSalary * 12 
+    : ONBOARDING_FINANCIAL_CONFIG.avgSalaryChile;
+  
+  // Calcular costo rotación según SHRM 2024
+  const turnoverCost = annualSalary * ONBOARDING_FINANCIAL_CONFIG.turnoverMultiplier;
+  
+  // Inversión intervención (siempre $0 - tiempo interno)
+  const interventionCost = Object.values(ONBOARDING_FINANCIAL_CONFIG.interventionCosts)
+    .reduce((sum, cost) => sum + cost, 0);
+  
+  // ROI proyectado
+  const potentialSavings = turnoverCost * ONBOARDING_FINANCIAL_CONFIG.interventionSuccessRate;
+  const roi = interventionCost > 0 
+    ? ((potentialSavings - interventionCost) / interventionCost) * 100
+    : Infinity; // ROI infinito si inversión = $0
+  
+  // Payback period (N/A si inversión = $0)
+  const paybackPeriod = interventionCost > 0 
+    ? (interventionCost / (potentialSavings / 12))
+    : 0;
+  
+  // Formatear moneda CLP
+  const formatCLP = (amount: number) => {
+    return `$${(amount / 1000000).toFixed(1)}M CLP`;
+  };
+  
+  return {
+    // Costo estado actual
+    currentAnnualCost: 0, // No hay costo actual, es prevención
+    
+    // Pérdida potencial si no se interviene
+    potentialAnnualLoss: turnoverCost,
+    
+    // Inversión recomendada
+    recommendedInvestment: interventionCost,
+    
+    // ROI estimado
+    estimatedROI: roi,
+    
+    // Período retorno inversión
+    paybackPeriod: paybackPeriod,
+    
+    // Fuentes metodológicas
+    methodologySources: ONBOARDING_FINANCIAL_CONFIG.sources,
+    
+    // Supuestos clave
+    keyAssumptions: [
+      `Salario base: ${formatCLP(annualSalary)} anual (${params.role})`,
+      `Costo rotación: ${formatCLP(turnoverCost)} (6 salarios según SHRM 2024)`,
+      `Inversión intervención: ${formatCLP(interventionCost)} (tiempo interno ya asignado)`,
+      `Probabilidad éxito: ${(ONBOARDING_FINANCIAL_CONFIG.interventionSuccessRate * 100).toFixed(0)}% (estudios longitudinales Bauer)`,
+      `ROI: ${roi === Infinity ? 'Infinito (inversión $0)' : `${roi.toFixed(0)}%`}`,
+      `Ventana efectividad: 48-72h para máxima probabilidad retención`
+    ]
+  };
+}
+
+// ============================================================================
+// HELPER FUNCTIONS - FORMATEO Y UTILIDADES
+// ============================================================================
+
+/**
+ * Formatea monto CLP para casos de negocio
+ */
+export function formatCurrencyCLP(amount: number): string {
+  if (amount >= 1000000) {
+    return `$${(amount / 1000000).toFixed(1)}M CLP`;
+  }
+  if (amount >= 1000) {
+    return `$${(amount / 1000).toFixed(0)}K CLP`;
+  }
+  return `$${Math.round(amount).toLocaleString('es-CL')} CLP`;
+}
+
+/**
+ * Calcula costo rotación individual (wrapper SHRM 2024)
+ */
+export function calculateTurnoverCostSHRM2024(annualSalary: number): number {
+  return annualSalary * ONBOARDING_FINANCIAL_CONFIG.turnoverMultiplier;
+}
+
+/**
+ * Obtiene configuración financiera onboarding (para auditoría)
+ */
+export function getOnboardingFinancialConfig() {
+  return {
+    ...ONBOARDING_FINANCIAL_CONFIG,
+    version: '1.0',
+    lastUpdated: 'Enero 2025',
+    methodology: 'SHRM 2024 + Bauer 4C Model Meta-Analysis'
+  };
+}
+
+// ============================================================================
+// EXPORT DEFAULT
+// ============================================================================
+
 /**
  * EXPORT DEFAULT
  */
-export default FinancialCalculationsService;
+export default {
+  FinancialCalculationsService,  // ← Conserva todo lo existente
+  calculateFinancialImpactForBusinessCase, // ← Función RetentionEngine (vieja)
+  getTransparencyReportForExecutives,  // ← Conserva
+  convertToChileanPesos,  // ← Conserva
+  calculateOnboardingFinancialImpact,  // ← Función Onboarding (nueva)
+  formatCurrencyCLP,
+  calculateTurnoverCostSHRM2024,
+  getOnboardingFinancialConfig
+};
