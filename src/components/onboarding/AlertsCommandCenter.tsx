@@ -6,7 +6,8 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
 import { useOnboardingAlerts } from '@/hooks/useOnboardingAlerts';
-import { AlertCard } from './AlertCard';
+import { OnboardingAlertEngine } from '@/engines/OnboardingAlertEngine';
+import { InsightAccionable } from '@/components/insights/InsightAccionable';
 import { AlertMetricsPanel } from './AlertMetricsPanel';
 import { TopAlertsPanel } from './TopAlertsPanel';
 import { AlertFilters } from './AlertFilters';
@@ -96,10 +97,10 @@ export const AlertsCommandCenter: React.FC = () => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="fhr-title-gradient text-3xl font-bold mb-2">
-            Centro de Alertas
+            🎯 Radar Predictivo de Retención
           </h1>
           <p className="text-slate-400">
-            Gestión proactiva de intervenciones onboarding
+            Casos de Negocio Inteligentes • Intervención Temprana • ROI Cuantificado
           </p>
         </div>
         
@@ -131,7 +132,7 @@ export const AlertsCommandCenter: React.FC = () => {
         onSlaStatusChange={setSlaStatus}
       />
       
-      {/* LISTA DE ALERTAS */}
+      {/* LISTA DE ALERTAS → CASOS DE NEGOCIO */}
       <div className="space-y-6">
         {alerts.length === 0 ? (
           <motion.div
@@ -146,24 +147,70 @@ export const AlertsCommandCenter: React.FC = () => {
             <p className="text-sm text-slate-500">
               {severity || status || slaStatus 
                 ? 'Intenta cambiar los filtros para ver más alertas'
-                : 'Todo está funcionando correctamente'}
+                : '¡Excelente! Todos los colaboradores en proceso saludable'}
             </p>
           </motion.div>
         ) : (
           <>
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm text-slate-400">
-                Mostrando <span className="font-semibold text-cyan-400">{alerts.length}</span> alerta(s)
+                Mostrando <span className="font-semibold text-cyan-400">{alerts.length}</span> caso(s) de negocio
               </p>
             </div>
             
-            {alerts.map((alert) => (
-              <AlertCard
-                key={alert.id}
-                alert={alert}
-                onAcknowledge={handleAcknowledge}
-              />
-            ))}
+            {/* TRANSFORMACIÓN: Alerta → BusinessCase → InsightAccionable */}
+            {alerts.map((alert) => {
+              // ✅ CORRECCIÓN 1: Cast seguro para type compatibility
+              // JourneyAlert de Prisma incluye campos opcionales que OnboardingAlertEngine necesita
+              const businessCase = OnboardingAlertEngine.generateBusinessCaseFromAlert(
+                alert as any, // Cast necesario: alert incluye questionId?, responseValue?, threshold?, metadata?
+                 alert.journey 
+              );
+              
+              return (
+                <motion.div
+                  key={alert.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {/* ✅ CORRECCIÓN 2: onActionClick (NO onDismiss) */}
+                  <InsightAccionable
+                    businessCase={businessCase}
+                    companyName="FocalizaHR"
+                    onActionClick={(action) => {
+                      // Manejar acciones del componente InsightAccionable
+                      // Acciones posibles: 'schedule_meeting', 'generate_report'
+                      console.log(`[AlertsCommandCenter] Acción ejecutada: ${action} para alerta ${alert.id}`);
+                      
+                      // Si la alerta está pendiente, marcarla como accionada cuando el usuario hace algo
+                      if (alert.status === 'pending') {
+                        handleAcknowledge(alert.id);
+                      }
+                    }}
+                  />
+                  
+                  {/* METADATA ADICIONAL (SLA, Estado) */}
+                  <div className="mt-2 flex items-center gap-4 text-xs text-slate-500">
+                    <span>
+                      SLA: {alert.slaStatus === 'on_time' ? '🟢 A Tiempo' : 
+                            alert.slaStatus === 'at_risk' ? '🟡 En Riesgo' : 
+                            '🔴 Violado'}
+                    </span>
+                    <span>•</span>
+                    <span>
+                      Estado: {alert.status === 'pending' ? '⏳ Pendiente' :
+                               alert.status === 'acknowledged' ? '✓ Accionada' :
+                               '✅ Resuelta'}
+                    </span>
+                    <span>•</span>
+                    <span>
+                      Creada: {new Date(alert.createdAt).toLocaleDateString('es-CL')}
+                    </span>
+                  </div>
+                </motion.div>
+              );
+            })}
           </>
         )}
       </div>

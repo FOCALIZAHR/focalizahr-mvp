@@ -17,7 +17,9 @@ export type BusinessCaseType =
   | 'productividad_baja'
   | 'liderazgo_débil'
   | 'bienestar_deteriorado'
-  | 'desarrollo_estancado';
+  | 'desarrollo_estancado'
+  | 'onboarding_crisis'      // ← AGREGAR
+  | 'onboarding_warning';    // ← AGREGAR
 
 /**
  * Detalle financiero del caso negocio con transparencia total
