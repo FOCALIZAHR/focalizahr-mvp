@@ -62,7 +62,7 @@ export default function CompetitiveContextCard({
   }
 
   // No benchmark disponible
-  if (!benchmark?.comparison) {
+  if (!benchmark?.comparison || !benchmark?.benchmark) {
     return (
       <div className="fhr-card border-l-4 border-l-slate-600">
         <div className="flex items-center gap-2 mb-3">

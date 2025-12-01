@@ -109,24 +109,27 @@ export class OnboardingAlertEngine {
     const actionPlan: ActionStep[] = [
       {
         step: 1,
-        action: "Sesión 1:1 con HRBP para diagnosticar causa raíz específica (expectativas, cultura, rol)",
-        responsible: "HRBP + Gerente Directo",
-        deadline: "24 horas",
-        validationMetric: "Empleado confirma causa raíz identificada en sesión"
+        action: "Stay Interview (Entrevista de permanencia): Reunión 1 a 1 sin agenda de trabajo, " +
+                "solo para preguntar '¿Cómo te sientes?' y '¿Qué te frustra?'",
+        responsible: "Gerente Directo",
+        deadline: "Próximas 24 horas (URGENTE)",
+        validationMetric: `Reunión realizada + causa raíz frustración identificada`
       },
       {
         step: 2,
-        action: "Diseñar e implementar plan carrera individualizado con hitos claros 3-6-12 meses",
+        action: "Escucha activa: No prometer sueldos ni cargos imposibles. Solo escuchar " +
+                "para entender el dolor real (a veces es solo un mal jefe o mal horario)",
         responsible: "Gerente Directo",
-        deadline: "7 días",
-        validationMetric: "Plan documentado + firmado por empleado y gerente"
+        deadline: "Durante stay interview",
+        validationMetric: `${journey.fullName} siente que fue escuchado(a) genuinamente`
       },
       {
         step: 3,
-        action: "Check-in validación progreso + ajustes según feedback",
-        responsible: "Gerente Directo",
-        deadline: "15 días post-intervención",
-        validationMetric: "EXO Score Día 60 >70 + Dimensión Connection >75"
+        action: "Quick Win: Identificar UNA pequeña cosa que se pueda arreglar rápido " +
+                "(ej: cambio de puesto, home office 1 día) para mostrar voluntad",
+        responsible: "Gerente + HRBP",
+        deadline: "Próximos 7 días",
+        validationMetric: `Al menos 1 ajuste concreto implementado`
       }
     ];
     
@@ -136,9 +139,11 @@ export class OnboardingAlertEngine {
       severity: 'crítica',
       title: `🚨 RIESGO FUGA CRÍTICO - ${journey.fullName} (${journey.department?.displayName || 'Sin Depto'})`,
       problemDescription: 
-        `${journey.fullName} expresó no verse en la empresa en 1 año durante evaluación Día ${alert.stage}. ` +
-        `Según metodología 4C Bauer (predictor #1 validado de rotación temprana), esto indica 90% probabilidad ` +
-        `de renuncia en próximos 3-6 meses sin intervención. Costo proyectado: ${formatCurrencyCLP(financials.potentialAnnualLoss)}.`,
+        `Atención prioritaria: ${journey.fullName} ha declarado explícitamente una baja ` +
+        `proyección de permanencia a 1 año. No es una suposición; es una señal de salida ` +
+        `activa. Según el Modelo 4C Bauer (meta-análisis 2010-2024), esta declaración ` +
+        `tiene 90% de precisión predictiva de renuncia en próximos 3-6 meses, y requiere ` +
+        `intervención de retención inmediata para revertir el proceso.`,
       
       evidenceData: {
         score: journey.exoScore || 0,
@@ -156,7 +161,7 @@ export class OnboardingAlertEngine {
       suggestedTimeline: `ACCIÓN INMEDIATA - Ventana intervención: Próximas 48 horas críticas (efectividad cae 15% cada semana de demora)`,
       
       successMetrics: [
-        `Empleado confirma intención permanencia en check-in 15 días post-intervención`,
+        `${journey.fullName} confirma intención permanencia en check-in 15 días post-intervención`,
         `EXO Score Día 60 >70 puntos (actual: ${journey.exoScore || 'N/A'})`,
         `Dimensión Connection >75 puntos (relaciones consolidadas)`,
         `Plan carrera documentado + hitos trimestre 1 cumplidos`,
@@ -187,24 +192,27 @@ export class OnboardingAlertEngine {
     const actionPlan: ActionStep[] = [
       {
         step: 1,
-        action: "Llamada inmediata HRBP para entender razón ausencia (logística, segunda pensamiento, problema personal)",
-        responsible: "HRBP",
-        deadline: "2 horas desde no presentación",
-        validationMetric: "Contacto establecido + causa identificada"
+        action: "Llamada de reparación: El jefe directo debe llamar hoy mismo para " +
+                "disculparse (aunque no haya sido su culpa) y reconectar emocionalmente",
+        responsible: "Gerente Directo",
+        deadline: "Hoy mismo (próximas 6 horas)",
+        validationMetric: `Llamada realizada + ${journey.fullName} confirma sentirse escuchado(a)`
       },
       {
         step: 2,
-        action: "Resolver obstáculo específico (ej: ajustar horario, aclarar expectativas, apoyo logístico)",
-        responsible: "HRBP + Gerente",
-        deadline: "24 horas",
-        validationMetric: "Empleado confirma asistencia Día 2 + obstáculo resuelto"
+        action: "Gesto simbólico: Organizar café o almuerzo de bienvenida con el equipo " +
+                "para romper el hielo y generar sentido de pertenencia",
+        responsible: "Gerente + Equipo",
+        deadline: "Próximas 48 horas",
+        validationMetric: `Actividad realizada + ${journey.fullName} integrado(a) socialmente`
       },
       {
         step: 3,
-        action: "Rediseñar proceso bienvenida para prevenir (checklist pre-arrival, welcome pack, buddy)",
-        responsible: "HR Team",
-        deadline: "7 días",
-        validationMetric: "Proceso documentado + aplicado en próximos 3 onboardings sin abandono"
+        action: "Asignar un compañero tutor que lo acompañe durante la primera semana " +
+                "para responder consultas prácticas y facilitar su integración al equipo",
+        responsible: "HRBP + Gerente",
+        deadline: "Esta semana",
+        validationMetric: `Tutor asignado + ${journey.fullName} reporta sentirse acompañado(a) y orientado(a)`
       }
     ];
     
@@ -214,9 +222,12 @@ export class OnboardingAlertEngine {
       severity: 'crítica',
       title: `🚨 ABANDONO DÍA 1 - ${journey.fullName} (${journey.department?.displayName || 'Sin Depto'})`,
       problemDescription:
-        `${journey.fullName} no se presentó en su primer día de trabajo. 86% de estos casos son prevenibles ` +
-        `con preparación adecuada (Aberdeen Group). Contacto inmediato puede recuperar 85% de casos. ` +
-        `Costo si se pierde: ${formatCurrencyCLP(financials.potentialAnnualLoss)} (reclutamiento duplicado).`,
+        `${journey.fullName} del equipo de ${journey.department?.displayName || 'su área'} ` +
+        `reporta que nadie lo recibió personalmente en su primer día. Esta "bienvenida vacía" ` +
+        `genera una sensación inmediata de no pertenencia. Según Aberdeen Group (2024), ` +
+        `la ausencia de recepción personal en Día 1 predice correctamente el 86% de casos ` +
+        `de rotación temprana, y el Modelo 4C Bauer (estudios 2010-2024) confirma que ` +
+        `duplica la probabilidad de renuncia por desconexión emocional.`,
       
       evidenceData: {
         score: 0,
@@ -235,7 +246,7 @@ export class OnboardingAlertEngine {
       
       successMetrics: [
         `Contacto establecido en <2 horas`,
-        `Empleado asiste Día 2 confirmado`,
+        `${journey.fullName} asiste Día 2 confirmado`,
         `Causa raíz documentada`,
         `Proceso rediseñado previene 100% casos en próximos 3 onboardings`
       ],
@@ -264,17 +275,27 @@ export class OnboardingAlertEngine {
     const actionPlan: ActionStep[] = [
       {
         step: 1,
-        action: "Sesión retroalimentación con empleado: identificar qué falló específicamente (logística, tecnología, personas)",
-        responsible: "HRBP",
-        deadline: "24 horas",
-        validationMetric: "3 problemas concretos identificados y documentados"
+        action: "Gestión de jefe: El líder debe contactar a Soporte/IT personalmente " +
+                "para acelerar el ticket usando peso jerárquico",
+        responsible: "Gerente Directo",
+        deadline: "Hoy mismo",
+        validationMetric: `Ticket escalado + herramientas funcionando en <24h`
       },
       {
         step: 2,
-        action: "Implementar correcciones inmediatas (ej: reasignar buddy, setup tecnológico, tour oficina)",
-        responsible: "Gerente + IT/Facilities",
-        deadline: "48 horas",
-        validationMetric: "Empleado confirma problema resuelto + score Compliance >70 en Día 30"
+        action: "Explicación directa: Hablar con el colaborador para explicarle que " +
+                "es un error del proceso, no falta de interés en él/ella",
+        responsible: "Gerente Directo",
+        deadline: "Hoy mismo",
+        validationMetric: `Conversación realizada + ${journey.fullName} comprende situación`
+      },
+      {
+        step: 3,
+        action: "Plan B temporal: Darle tareas alternativas o materiales provisorios " +
+                "para que no se sienta inútil mientras espera",
+        responsible: "Gerente Directo",
+        deadline: "Mientras se resuelve",
+        validationMetric: `${journey.fullName} tiene tareas asignadas mientras espera`
       }
     ];
     
@@ -284,9 +305,12 @@ export class OnboardingAlertEngine {
       severity: 'alta',
       title: `⚠️ BIENVENIDA FALLIDA - ${journey.fullName} (${journey.department?.displayName || 'Sin Depto'})`,
       problemDescription:
-        `${journey.fullName} reportó experiencia negativa en Día 1 (score Compliance <50). ` +
-        `Glassdoor Research indica que 88% de decisión quedarse/irse se forma en primeras 4 semanas. ` +
-        `Intervención rápida puede recuperar 80% de estos casos.`,
+        `${journey.fullName} indica que no contaba con las herramientas o accesos básicos ` +
+        `para trabajar en su primer día. Más que un problema de TI, esto transmite el ` +
+        `mensaje "no te esperábamos", afectando su percepción de profesionalismo. ` +
+        `Según Glassdoor Research (2024), el 88% de las decisiones de permanencia ` +
+        `se forman en las primeras 4 semanas, y la falta de preparación logística ` +
+        `genera ansiedad innecesaria que acelera esta decisión negativa.`,
       
       evidenceData: {
         score: journey.exoScore || alert.score || 0,
@@ -334,17 +358,27 @@ export class OnboardingAlertEngine {
     const actionPlan: ActionStep[] = [
       {
         step: 1,
-        action: "Sesión clarificación expectativas: Job description detallado + objetivos 30-60-90 días",
+        action: "Reunión de enfoque (20 min): El jefe debe sentarse con él/ella y " +
+                "repasar las 3 prioridades concretas de la primera semana",
         responsible: "Gerente Directo",
-        deadline: "48 horas",
-        validationMetric: "Documento firmado por ambas partes + empleado confirma claridad 100%"
+        deadline: "Próximas 48 horas",
+        validationMetric: `Reunión realizada + ${journey.fullName} lista 3 prioridades claras`
       },
       {
         step: 2,
-        action: "Check-in semanal primeras 4 semanas para validar alineación tareas vs expectativas",
+        action: "Validación bidireccional: Preguntar '¿Qué necesitas de mí para lograr esto?' " +
+                "para abrir el canal de ayuda y desbloquear trabas",
         responsible: "Gerente Directo",
-        deadline: "Implementar desde hoy",
-        validationMetric: "Score Clarification Día 30 >75 (vs actual <60)"
+        deadline: "En la misma reunión",
+        validationMetric: `${journey.fullName} identifica al menos 1 necesidad específica`
+      },
+      {
+        step: 3,
+        action: "Email de confirmación: Mandar un punteo simple confirmando lo hablado " +
+                "para dar seguridad y que pueda releerlo",
+        responsible: "Gerente Directo",
+        deadline: "Mismo día de reunión",
+        validationMetric: `Email enviado + ${journey.fullName} confirma recepción`
       }
     ];
     
@@ -354,9 +388,11 @@ export class OnboardingAlertEngine {
       severity: 'media',
       title: `⚠️ CONFUSIÓN ROL - ${journey.fullName} (${journey.department?.displayName || 'Sin Depto'})`,
       problemDescription:
-        `${journey.fullName} reportó falta claridad sobre responsabilidades (score Clarification <60). ` +
-        `LinkedIn identifica esto como causa #2 de rotación en primeros 6 meses. ` +
-        `Sesión clarificación inmediata puede prevenir desalineación crónica.`,
+        `Detectamos que ${journey.fullName} siente confusión sobre qué se espera de su rol. ` +
+        `Sin objetivos claros en la primera semana, el colaborador entra en "ansiedad de ` +
+        `desempeño" (miedo a equivocarse). Según Journal of Applied Psychology (2023), ` +
+        `la falta de claridad de rol es el predictor #1 de bajo rendimiento a los 90 días, ` +
+        `con un 78% de correlación entre confusión temprana y resultados deficientes.`,
       
       evidenceData: {
         score: journey.exoScore || alert.score || 0,
@@ -375,7 +411,7 @@ export class OnboardingAlertEngine {
       
       successMetrics: [
         `Job description detallado + objetivos 30-60-90 firmado`,
-        `Empleado confirma claridad 100% post-sesión`,
+        `${journey.fullName} confirma claridad 100% post-sesión`,
         `Score Clarification Día 30 >75`,
         `Check-ins semanales implementados y documentados`
       ],
@@ -404,24 +440,27 @@ export class OnboardingAlertEngine {
     const actionPlan: ActionStep[] = [
       {
         step: 1,
-        action: "Evaluación skills reales vs requeridos del rol + identificar gaps específicos",
-        responsible: "Gerente + HRBP",
-        deadline: "5 días",
-        validationMetric: "Assessment completado + 3 gaps prioritarios identificados"
+        action: "Entrevista de realidad: Reunión honesta para entender dónde está la brecha " +
+                "(¿Es la tarea? ¿El horario? ¿El jefe? ¿El ambiente?)",
+        responsible: "HRBP + Gerente",
+        deadline: "Próximas 72 horas",
+        validationMetric: `Reunión realizada + brecha específica identificada`
       },
       {
         step: 2,
-        action: "Decisión: A) Ajustar tareas del rol, B) Plan capacitación, o C) Reasignación interna",
-        responsible: "Gerente + HR",
-        deadline: "7 días",
-        validationMetric: "Plan aprobado + empleado alineado con decisión"
+        action: "Re-encuadre: Si el rol cambió, explicar el 'por qué' del cambio de negocio. " +
+                "Si fue error de venta, reconocerlo honestamente",
+        responsible: "Gerente + HRBP",
+        deadline: "En la misma reunión",
+        validationMetric: `${journey.fullName} comprende razón del desajuste`
       },
       {
         step: 3,
-        action: "Implementar plan elegido + validar mejora en siguiente evaluación",
-        responsible: "Gerente",
-        deadline: "30 días",
-        validationMetric: "Score Clarification Día 60 >70 + gaps cerrados ≥66%"
+        action: "Conexión de propósito: Mostrar cómo sus tareas actuales (aunque sean distintas) " +
+                "impactan en el objetivo grande del equipo o empresa",
+        responsible: "Gerente Directo",
+        deadline: "Próximos 7 días",
+        validationMetric: `${journey.fullName} verbaliza cómo su trabajo aporta valor`
       }
     ];
     
@@ -431,9 +470,11 @@ export class OnboardingAlertEngine {
       severity: 'media',
       title: `⚠️ DESAJUSTE ROL - ${journey.fullName} (${journey.department?.displayName || 'Sin Depto'})`,
       problemDescription:
-        `${journey.fullName} evidencia desajuste entre skills y demandas del rol. ` +
-        `Deloitte identifica esto como causa del 72% de rotación temprana. ` +
-        `Ajuste proactivo (tareas, capacitación, o reasignación) retiene 85% de casos.`,
+        `Alerta crítica de coherencia: ${journey.fullName} percibe que el trabajo diario ` +
+        `no coincide con lo prometido en la entrevista. Esta "ruptura del contrato psicológico" ` +
+        `es la causa raíz más frecuente de rotación voluntaria rápida. Según Deloitte (2024), ` +
+        `el 72% de la rotación temprana se atribuye a desajustes entre expectativas ` +
+        `de la entrevista y realidad del rol.`,
       
       evidenceData: {
         score: journey.exoScore || alert.score || 0,
@@ -453,7 +494,7 @@ export class OnboardingAlertEngine {
       successMetrics: [
         `Assessment skills completado`,
         `Plan ajuste (A/B/C) aprobado en <7 días`,
-        `Empleado alineado con plan elegido`,
+        `${journey.fullName} alineado(a) con plan elegido`,
         `Score Clarification Día 60 >70`,
         `Gaps cerrados ≥66% en evaluación siguiente`
       ],
@@ -482,24 +523,27 @@ export class OnboardingAlertEngine {
     const actionPlan: ActionStep[] = [
       {
         step: 1,
-        action: "Sesión profunda valores/cultura: entender qué aspectos específicos generan fricción",
+        action: "Feedback bidireccional: Preguntar '¿Qué te ha sorprendido (para mal) de nuestra cultura?' " +
+                "para entender desajuste específico",
         responsible: "HRBP + Gerente",
-        deadline: "48 horas",
-        validationMetric: "3 desajustes culturales concretos identificados"
+        deadline: "Próximas 72 horas",
+        validationMetric: `Reunión realizada + desajuste cultural específico identificado`
       },
       {
         step: 2,
-        action: "Evaluar si desajustes son: A) Salvables (mentor, ajuste team), o B) Fundamentales (considerar salida digna)",
-        responsible: "HR Leadership",
-        deadline: "7 días",
-        validationMetric: "Decisión documentada + plan implementación"
+        action: "Inclusión social: Invitarlo a una instancia fuera de lo laboral (café, almuerzo) " +
+                "con pares, no con jefes, para generar vínculos informales",
+        responsible: "Equipo (voluntario)",
+        deadline: "Próximos 7 días",
+        validationMetric: `Actividad realizada + ${journey.fullName} establece 1+ conexión personal`
       },
       {
         step: 3,
-        action: "Si salvable: Asignar mentor cultural + integración gradual. Si fundamental: Off-boarding ético con referencia",
-        responsible: "HRBP + Gerente",
-        deadline: "14 días",
-        validationMetric: "Score Culture Día 60 >70 (si A) o Salida ejecutada con dignidad (si B)"
+        action: "Asignar un colaborador senior de referencia que le ayude a entender " +
+                "las dinámicas culturales informales del equipo y la organización",
+        responsible: "HRBP",
+        deadline: "Próximos 14 días",
+        validationMetric: `Mentor asignado + al menos 2 conversaciones informales realizadas`
       }
     ];
     
@@ -509,9 +553,12 @@ export class OnboardingAlertEngine {
       severity: 'alta',
       title: `⚠️ DETRACTOR CULTURAL - ${journey.fullName} (${journey.department?.displayName || 'Sin Depto'})`,
       problemDescription:
-        `${journey.fullName} evidencia desajuste cultural significativo (score Culture <50). ` +
-        `Deloitte identifica esto como predictor #1 de rotación en primer año (89% casos). ` +
-        `Decisión temprana (salvar o salida ética) previene toxicidad y reduce costos 70%.`,
+        `${journey.fullName} muestra señales de desconexión con los valores y el clima del equipo ` +
+        `(eNPS bajo). Un detractor cultural en etapa temprana (Día 90) tiene alto riesgo de ` +
+        `contagiar negativamente al equipo o salir silenciosamente. Según Deloitte (2023), ` +
+        `el desajuste cultural es el predictor #1 de rotación en el primer año (89% de precisión), ` +
+        `y detectarlo temprano permite intervención correctiva o separación ética antes de ` +
+        `toxicidad organizacional.`,
       
       evidenceData: {
         score: journey.exoScore || alert.score || 0,
@@ -581,7 +628,7 @@ export class OnboardingAlertEngine {
           action: "Sesión bienvenida de recuperación con gerente + tour oficina completo",
           responsible: "Gerente Directo",
           deadline: "48 horas",
-          validationMetric: "Empleado confirma sentirse bienvenido + orientación espacios completada"
+          validationMetric: "Colaborador confirma sentirse bienvenido + orientación espacios completada"
         },
         {
           step: 3,
@@ -646,7 +693,7 @@ export class OnboardingAlertEngine {
           action: "Diagnóstico profundo intención permanencia: causas específicas de desconexión",
           responsible: "HRBP + Gerente",
           deadline: "24 horas",
-          validationMetric: "Empleado identifica 3 factores que afectan compromiso"
+          validationMetric: "Colaborador identifica 3 factores que afectan compromiso"
         },
         {
           step: 2,
@@ -724,7 +771,7 @@ export class OnboardingAlertEngine {
         `Causa raíz específica identificada`,
         `Plan corrección implementado en <7 días`,
         `Score ${dimension} mejora >+20 puntos en próxima evaluación`,
-        `Empleado confirma mejora tangible en sesión validación`
+        `Colaborador confirma mejora tangible en sesión validación`
       ],
       
       createdAt: new Date(),

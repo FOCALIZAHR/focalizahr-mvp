@@ -65,14 +65,6 @@ const surveyConfigurations = [
         "description": "¿Tu jefe te ha explicado claramente tus responsabilidades?",
         "motivationalText": "El diálogo abierto construye confianza",
         "order": 2
-      },
-      "autonomia": {
-        "displayName": "Recursos y Capacitación",
-        "icon": "Briefcase",
-        "color": "gradient",
-        "description": "¿Tienes las herramientas y formación para ejecutar tu rol?",
-        "motivationalText": "Empoderamos tu éxito",
-        "order": 3
       }
     },
     uiSettings: {
