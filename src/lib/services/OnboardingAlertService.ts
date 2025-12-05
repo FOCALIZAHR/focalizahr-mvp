@@ -1,5 +1,6 @@
 // src/lib/services/OnboardingAlertService.ts
 // ✅ COMPLETO Y FINAL: 6 alertas específicas + todos los métodos públicos restaurados
+// 🔧 CAMBIOS APLICADOS: Eliminados checkLowScores() y checkRiskEscalation()
 
 import { prisma } from '@/lib/prisma';
 import { addHours } from 'date-fns';
@@ -179,28 +180,12 @@ export class OnboardingAlertService {
     console.log(`[OnboardingAlertService] Specific alerts created: ${specificAlerts.length}`);
     
     // ============================================================================
-    // PRIORIDAD 2: ALERTAS POR SCORES BAJOS (Métricas agregadas)
-    // ============================================================================
-    console.log('[OnboardingAlertService] Checking low scores...');
-    const lowScoreAlerts = await this.checkLowScores(journey);
-    createdAlerts.push(...lowScoreAlerts);
-    console.log(`[OnboardingAlertService] Low score alerts created: ${lowScoreAlerts.length}`);
-    
-    // ============================================================================
-    // PRIORIDAD 3: ALERTAS POR STAGES INCOMPLETOS
+    // PRIORIDAD 2: ALERTAS POR STAGES INCOMPLETOS
     // ============================================================================
     console.log('[OnboardingAlertService] Checking incomplete stages...');
     const incompleteAlerts = await this.checkIncompleteStages(journey);
     createdAlerts.push(...incompleteAlerts);
     console.log(`[OnboardingAlertService] Incomplete stage alerts created: ${incompleteAlerts.length}`);
-    
-    // ============================================================================
-    // PRIORIDAD 4: ALERTAS POR ESCALACIÓN DE RIESGO
-    // ============================================================================
-    console.log('[OnboardingAlertService] Checking risk escalation...');
-    const escalationAlerts = await this.checkRiskEscalation(journey);
-    createdAlerts.push(...escalationAlerts);
-    console.log(`[OnboardingAlertService] Risk escalation alerts created: ${escalationAlerts.length}`);
     
     console.log(`[OnboardingAlertService] Total alerts created: ${createdAlerts.length}`);
     return createdAlerts;
@@ -336,53 +321,8 @@ export class OnboardingAlertService {
   }
   
   // ============================================================================
-  // MÉTODOS EXISTENTES (SIN CAMBIOS)
+  // MÉTODO EXISTENTE: CHECK INCOMPLETE STAGES
   // ============================================================================
-  
-  /**
-   * ✅ ALERTAS POR SCORES BAJOS (Métricas agregadas departamentales)
-   */
-  private static async checkLowScores(journey: any): Promise<JourneyAlert[]> {
-    const createdAlerts: JourneyAlert[] = [];
-    
-    const scores = [
-      { name: 'compliance', score: journey.complianceScore, stage: 1, threshold: 3.0 },
-      { name: 'clarification', score: journey.clarificationScore, stage: 2, threshold: 3.5 },
-      { name: 'culture', score: journey.cultureScore, stage: 3, threshold: 3.5 },
-      { name: 'connection', score: journey.connectionScore, stage: 4, threshold: 4.0 }
-    ];
-    
-    for (const { name, score, stage, threshold } of scores) {
-      if (score !== null && score < threshold) {
-        const existingAlert = journey.alerts.find((a: any) =>
-          a.alertType === 'low_score' &&
-          a.dimension === name &&
-          a.status === 'pending'
-        );
-        
-        if (!existingAlert) {
-          const severity = score < 2.0 ? 'critical' : score < 3.0 ? 'high' : 'medium';
-          
-          const alert = await this.createAlert({
-            journeyId: journey.id,
-            accountId: journey.accountId,
-            alertType: 'low_score',
-            severity,
-            title: `Score ${name.toUpperCase()} Bajo: ${score.toFixed(1)}/5.0`,
-            description: `El colaborador ${journey.fullName} obtuvo un score de ${score.toFixed(1)} en la dimensión ${name} (Stage ${stage}), por debajo del umbral crítico de ${threshold}.`,
-            dimension: name,
-            stage,
-            score,
-            slaHours: this.SLA_CONFIG[severity]
-          });
-          
-          createdAlerts.push(alert);
-        }
-      }
-    }
-    
-    return createdAlerts;
-  }
   
   /**
    * ✅ ALERTAS POR STAGES INCOMPLETOS
@@ -439,49 +379,9 @@ export class OnboardingAlertService {
     return createdAlerts;
   }
   
-  /**
-   * ✅ ALERTAS POR ESCALACIÓN DE RIESGO
-   */
-  private static async checkRiskEscalation(journey: any): Promise<JourneyAlert[]> {
-    const createdAlerts: JourneyAlert[] = [];
-    
-    if (!journey.exoScore || !journey.retentionRisk) return createdAlerts;
-    
-    const previousJourneys = await prisma.journeyOrchestration.findMany({
-      where: {
-        accountId: journey.accountId,
-        nationalId: journey.nationalId,
-        id: { not: journey.id }
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 1
-    });
-    
-    if (previousJourneys.length > 0) {
-      const previous = previousJourneys[0];
-      
-      const riskLevels = ['low', 'medium', 'high', 'critical'];
-      const currentLevel = riskLevels.indexOf(journey.retentionRisk);
-      const previousLevel = riskLevels.indexOf(previous.retentionRisk || 'low');
-      
-      if (currentLevel > previousLevel) {
-        const alert = await this.createAlert({
-          journeyId: journey.id,
-          accountId: journey.accountId,
-          alertType: 'risk_escalation',
-          severity: 'high',
-          title: `Escalación de Riesgo: ${previous.retentionRisk} → ${journey.retentionRisk}`,
-          description: `El nivel de riesgo de retención para ${journey.fullName} escaló de ${previous.retentionRisk} a ${journey.retentionRisk}. EXO Score: ${journey.exoScore}.`,
-          score: journey.exoScore,
-          slaHours: this.SLA_CONFIG.high
-        });
-        
-        createdAlerts.push(alert);
-      }
-    }
-    
-    return createdAlerts;
-  }
+  // ============================================================================
+  // HELPER: CREATE ALERT
+  // ============================================================================
   
   /**
    * ✅ CREAR ALERTA EN BASE DE DATOS
@@ -592,13 +492,14 @@ export class OnboardingAlertService {
   /**
    * ✅ Acknowledge (reconocer) una alerta
    */
-  static async acknowledgeAlert(alertId: string, userId: string) {
+  static async acknowledgeAlert(alertId: string, userId: string, notes?: string) {
     return await prisma.journeyAlert.update({
       where: { id: alertId },
       data: {
         status: 'acknowledged',
         acknowledgedAt: new Date(),
-        acknowledgedBy: userId
+        acknowledgedBy: userId,
+        ...(notes && { resolutionNotes: notes })
       }
     });
   }

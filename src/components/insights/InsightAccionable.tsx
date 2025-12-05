@@ -1,28 +1,31 @@
 // src/components/insights/InsightAccionable.tsx
-// 🎯 FOCALIZAHR - CHAT 6B: INSIGHT ACCIONABLE UI COMPONENT
-// Interfaz executive-grade para casos negocio automáticos
+// REDISEÑO PREMIUM - Adaptado a estructura REAL OnboardingAlertEngine
+// Filosofía: Componentes WOW + Guía Diseño FocalizaHR + Collapsibles
+// CORRECCIONES APLICADAS: Sin scores (Punto 2), Botón ejecutivo (Punto 3)
 
 'use client';
 
-import React from 'react';
-import { Card, CardHeader, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  TrendingUp, 
   AlertTriangle, 
+  TrendingDown, 
   DollarSign, 
-  Clock, 
   Target,
-  FileText,
-  CheckCircle,
-  XCircle,
   Calendar,
+  ChevronDown,
+  ChevronUp,
   Users,
-  BarChart3
+  Sparkles,
+  Clock,
+  Play
 } from 'lucide-react';
-import { BusinessCase, BusinessCaseSeverity } from '@/types/BusinessCase';
+
+// ========================================
+// TYPES - Importar desde el proyecto REAL
+// ========================================
+
+import { BusinessCase } from '@/types/BusinessCase';
 
 interface InsightAccionableProps {
   businessCase: BusinessCase;
@@ -31,262 +34,407 @@ interface InsightAccionableProps {
   className?: string;
 }
 
-/**
- * InsightAccionable - Componente UI enterprise para casos negocio ejecutivos
- * Diferenciación competitiva: casos negocio vs templates básicos
- * Arquitectura V3.0: Capa 3 inteligencia + display financiero transparente
- */
+// ========================================
+// CONFIG VISUAL POR SEVERIDAD
+// ========================================
+
+// COPIADO DE CampaignRhythmPanel - Sutileza real FocalizaHR
+const SEVERITY_CONFIG = {
+  crítica: {
+    color: 'red',
+    icon: AlertTriangle,
+    bgGradient: 'from-red-500/5 to-transparent',
+    borderColor: 'border-red-500/30',
+    glowColor: 'shadow-lg',
+    badgeClass: 'bg-red-500/10 text-red-400 border-red-400/30',
+    textColor: 'text-red-400'
+  },
+  alta: {
+    color: 'orange',
+    icon: TrendingDown,
+    bgGradient: 'from-orange-500/5 to-transparent',
+    borderColor: 'border-orange-500/30',
+    glowColor: 'shadow-lg',
+    badgeClass: 'bg-orange-500/10 text-orange-400 border-orange-400/30',
+    textColor: 'text-orange-400'
+  },
+  media: {
+    color: 'yellow',
+    icon: Clock,
+    bgGradient: 'from-yellow-500/5 to-transparent',
+    borderColor: 'border-yellow-500/30',
+    glowColor: 'shadow-lg',
+    badgeClass: 'bg-yellow-500/10 text-yellow-400 border-yellow-400/30',
+    textColor: 'text-yellow-400'
+  },
+  baja: {
+    color: 'blue',
+    icon: Target,
+    bgGradient: 'from-blue-500/5 to-transparent',
+    borderColor: 'border-blue-500/30',
+    glowColor: 'shadow-md',
+    badgeClass: 'bg-blue-500/10 text-blue-400 border-blue-400/30',
+    textColor: 'text-blue-400'
+  }
+};
+
+// ========================================
+// COMPONENT
+// ========================================
+
 export const InsightAccionable: React.FC<InsightAccionableProps> = ({
   businessCase,
-  companyName = '',
+  companyName,
   onActionClick,
   className = ''
 }) => {
-  // 🎨 THEME MAPPING CORPORATIVO
-  const severityConfig = {
-    crítica: {
-      bgClass: 'bg-gradient-to-br from-red-900/40 to-red-800/40',
-      borderClass: 'border-red-500/50',
-      badgeClass: 'bg-red-500 hover:bg-red-600',
-      iconColor: 'text-red-400',
-      icon: XCircle
-    },
-    alta: {
-      bgClass: 'bg-gradient-to-br from-orange-900/40 to-orange-800/40', 
-      borderClass: 'border-orange-500/50',
-      badgeClass: 'bg-orange-500 hover:bg-orange-600',
-      iconColor: 'text-orange-400',
-      icon: AlertTriangle
-    },
-    media: {
-      bgClass: 'bg-gradient-to-br from-yellow-900/40 to-yellow-800/40',
-      borderClass: 'border-yellow-500/50',
-      badgeClass: 'bg-yellow-500 hover:bg-yellow-600',
-      iconColor: 'text-yellow-400',
-      icon: Clock
-    },
-    baja: {
-      bgClass: 'bg-gradient-to-br from-blue-900/40 to-blue-800/40',
-      borderClass: 'border-blue-500/50',
-      badgeClass: 'bg-blue-500 hover:bg-blue-600',
-      iconColor: 'text-blue-400',
-      icon: CheckCircle
-    }
-  };
+  const [expandedSections, setExpandedSections] = useState({
+    problema: false,
+    impacto: false,
+    plan: false
+  });
 
-  const config = severityConfig[businessCase.severity];
+  const config = SEVERITY_CONFIG[businessCase.severity];
   const SeverityIcon = config.icon;
 
-  // 🎯 URGENCY DISPLAY MAPPING
-  const getUrgencyDisplay = (timeline: string) => {
-    if (timeline.toLowerCase().includes('inmediata') || timeline.toLowerCase().includes('72')) {
-      return { text: 'ACCIÓN INMEDIATA', color: 'text-red-400', pulse: true };
-    }
-    if (timeline.toLowerCase().includes('semana')) {
-      return { text: 'ESTA SEMANA', color: 'text-orange-400', pulse: true };
-    }
-    if (timeline.toLowerCase().includes('30')) {
-      return { text: '30 DÍAS', color: 'text-yellow-400', pulse: false };
-    }
-    return { text: 'PROGRAMAR', color: 'text-blue-400', pulse: false };
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
   };
 
-  const urgencyDisplay = getUrgencyDisplay(businessCase.suggestedTimeline);
+  // ========================================
+  // FORMATTERS
+  // ========================================
 
-  // 💰 FINANCIAL FORMATTING
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
+  const formatCurrency = (value: number) => {
+    if (value >= 1_000_000) {
+      return `$${(value / 1_000_000).toFixed(1)}M`;
+    }
+    return `$${(value / 1_000).toFixed(0)}K`;
   };
 
-  const formatROI = (roi: number) => {
-    return `${roi > 0 ? '+' : ''}${roi}%`;
+  const formatROI = (roi: number | undefined) => {
+    if (!roi || roi === 0) return '0%';
+    if (roi === Infinity) return '+∞%';
+    if (roi > 1000) return '+1000%';
+    return `+${roi.toFixed(0)}%`;
+  };
+
+  // Parsear recommendedActions que vienen como string con formato especial
+  const parseAction = (actionString: string) => {
+    // Formato: "1. Acción\n   ⏱️ Plazo: X\n   👤 Responsable: Y\n   ✓ Validación: Z"
+    const lines = actionString.split('\n').map(l => l.trim());
+    const mainAction = lines[0];
+    
+    let timeline = 'Por definir';
+    let responsible = 'RRHH';
+    
+    lines.forEach(line => {
+      if (line.includes('Plazo:')) {
+        timeline = line.split('Plazo:')[1]?.trim() || timeline;
+      }
+      if (line.includes('Responsable:')) {
+        responsible = line.split('Responsable:')[1]?.trim() || responsible;
+      }
+    });
+    
+    return { mainAction, timeline, responsible };
   };
 
   return (
-    <Card className={`relative overflow-hidden ${config.bgClass} ${config.borderClass} border-2 ${className}`}>
-      {/* 🚨 HEADER EXECUTIVO */}
-      <CardHeader className="pb-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-3">
-            <div className={`p-2 rounded-lg bg-black/30 ${config.iconColor}`}>
-              <SeverityIcon className="h-6 w-6" />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <Badge className={`${config.badgeClass} text-white font-semibold px-3 py-1`}>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className={`
+        relative overflow-hidden
+        bg-slate-900/60
+        backdrop-blur-sm
+        border ${config.borderColor}
+        ${config.glowColor}
+        rounded-xl
+        ${className}
+      `}
+    >
+      {/* Gradiente de fondo muy sutil */}
+      <div className={`absolute inset-0 bg-gradient-to-br ${config.bgGradient} opacity-50 pointer-events-none`} />
+
+      {/* Contenido principal */}
+      <div className="relative z-10">
+        {/* Header - Similar a CampaignRhythmPanel */}
+        <div className="p-6 border-b border-slate-700/30">
+          <div className="flex items-start justify-between gap-4">
+            {/* Left: Título + Metadata */}
+            <div className="flex-1 space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`px-3 py-1 rounded-full text-xs font-medium border ${config.badgeClass}`}>
                   {businessCase.severity.toUpperCase()}
-                </Badge>
-                <div className={`text-sm font-semibold ${urgencyDisplay.color} ${urgencyDisplay.pulse ? 'animate-pulse' : ''}`}>
-                  ⏱️ {urgencyDisplay.text}
-                </div>
+                </span>
+                <span className="px-3 py-1 rounded-full text-xs font-medium bg-cyan-500/10 text-cyan-400 border border-cyan-400/30">
+                  Confianza: {businessCase.confidenceLevel}
+                </span>
               </div>
-              <h3 className="text-lg font-bold text-white leading-tight">
+
+              <h2 className="text-2xl md:text-3xl font-semibold text-white">
                 {businessCase.title}
-              </h3>
-              <div className="flex items-center text-sm text-white/70 mt-1">
-                <Calendar className="h-4 w-4 mr-1" />
-                {new Date(businessCase.createdAt).toLocaleDateString('es-CL')}
-                <span className="mx-2">•</span>
-                <BarChart3 className="h-4 w-4 mr-1" />
-                Confianza: {businessCase.confidenceLevel}
-              </div>
-            </div>
-          </div>
-        </div>
-      </CardHeader>
+              </h2>
 
-      <CardContent className="space-y-6">
-        {/* 📊 PROBLEMA Y EVIDENCIA */}
-        <Alert className="border-white/20 bg-black/20">
-          <Users className="h-4 w-4" />
-          <AlertDescription className="text-white/90">
-            <strong className="text-white">Problema Detectado:</strong> {businessCase.problemDescription}
-          </AlertDescription>
-        </Alert>
-
-        {/* 💰 IMPACTO FINANCIERO TRANSPARENTE */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-3">
-            <h4 className="text-white font-semibold flex items-center">
-              <DollarSign className="h-4 w-4 mr-2 text-red-400" />
-              Impacto Financiero
-            </h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-white/70">Costo Actual Anual:</span>
-                <span className="text-white font-medium">
-                  {formatCurrency(businessCase.financials.currentAnnualCost)}
+              <div className="flex items-center gap-3 text-xs text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5" />
+                  {new Date(businessCase.createdAt).toLocaleDateString('es-CL', { 
+                    day: '2-digit', 
+                    month: 'short',
+                    year: 'numeric'
+                  })}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-white/70">Pérdida Potencial:</span>
-                <span className="text-red-400 font-bold">
+            </div>
+
+            {/* Right: KPI Principal */}
+            <div className="flex-shrink-0 text-right">
+              <div className="p-4 bg-slate-800/50 backdrop-blur-sm rounded-lg border border-slate-700/50">
+                <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Pérdida Potencial</p>
+                <p className={`text-3xl md:text-4xl font-bold ${config.textColor}`}>
                   {formatCurrency(businessCase.financials.potentialAnnualLoss)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-white/70">Inversión Requerida:</span>
-                <span className="text-cyan-400 font-medium">
-                  {formatCurrency(businessCase.financials.recommendedInvestment)}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h4 className="text-white font-semibold flex items-center">
-              <TrendingUp className="h-4 w-4 mr-2 text-green-400" />
-              Retorno Esperado
-            </h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-white/70">ROI Estimado:</span>
-                <span className="text-green-400 font-bold text-lg">
-                  {formatROI(businessCase.financials.estimatedROI)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-white/70">Período Retorno:</span>
-                <span className="text-white font-medium">
-                  {businessCase.financials.paybackPeriod} meses
-                </span>
-              </div>
-              <div className="text-xs text-white/60">
-                <Target className="h-3 w-3 inline mr-1" />
-                {businessCase.evidenceData.participantsAffected} colaboradores afectados
+                </p>
+                <p className="text-xs text-slate-500 mt-1">CLP/año</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* 🎯 ACCIONES RECOMENDADAS */}
-        <div className="space-y-3">
-          <h4 className="text-white font-semibold flex items-center">
-            <CheckCircle className="h-4 w-4 mr-2 text-cyan-400" />
-            Plan de Acción Recomendado
-          </h4>
-          <div className="space-y-2">
-            {businessCase.recommendedActions.map((action, index) => (
-              <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-black/20 border border-white/10">
-                <div className="flex-shrink-0 w-6 h-6 bg-cyan-500 text-white text-xs font-bold rounded-full flex items-center justify-center mt-0.5">
-                  {index + 1}
+      {/* Secciones Collapsibles */}
+      <div className="p-6 space-y-4">
+        
+        {/* SECCIÓN: Problema Detectado */}
+        <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-lg overflow-hidden">
+          <button
+            onClick={() => toggleSection('problema')}
+            className="w-full flex items-center justify-between p-4 hover:bg-slate-700/20 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-cyan-500/10 rounded-lg">
+                <Users className="h-5 w-5 text-cyan-400" />
+              </div>
+              <div className="text-left">
+                <h4 className="text-base font-semibold text-white">Problema Detectado</h4>
+                <p className="text-xs text-slate-400">Análisis del caso</p>
+              </div>
+            </div>
+            {expandedSections.problema ? (
+              <ChevronUp className="h-5 w-5 text-slate-400" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-slate-400" />
+            )}
+          </button>
+
+          <AnimatePresence>
+            {expandedSections.problema && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <div className="px-4 pb-4 border-t border-slate-700/30">
+                  <p className="text-sm text-slate-300 leading-relaxed mt-4">
+                    {businessCase.problemDescription}
+                  </p>
+                  
+                  {/* CORRECCIÓN 2: Sección scores ELIMINADA - distrae en alertas críticas */}
                 </div>
-                <p className="text-white/90 text-sm flex-1">{action}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* SECCIÓN: Impacto Financiero */}
+        <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-lg overflow-hidden">
+          <button
+            onClick={() => toggleSection('impacto')}
+            className="w-full flex items-center justify-between p-4 hover:bg-slate-700/20 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-500/10 rounded-lg">
+                <DollarSign className="h-5 w-5 text-purple-400" />
               </div>
-            ))}
-          </div>
+              <div className="text-left">
+                <h4 className="text-base font-semibold text-white">Impacto Financiero</h4>
+                <p className="text-xs text-slate-400">Valorización ROI</p>
+              </div>
+            </div>
+            {expandedSections.impacto ? (
+              <ChevronUp className="h-5 w-5 text-slate-400" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-slate-400" />
+            )}
+          </button>
+
+          <AnimatePresence>
+            {expandedSections.impacto && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <div className="px-4 pb-4 border-t border-slate-700/30">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 mb-4">
+                    <div className="p-3 bg-slate-900/50 rounded-lg border border-slate-700/50 text-center">
+                      <p className="text-xs text-slate-500 mb-1">Costo Actual</p>
+                      <p className="text-lg font-semibold text-white">
+                        {formatCurrency(businessCase.financials.currentAnnualCost)}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-slate-900/50 rounded-lg border border-red-500/20 text-center">
+                      <p className="text-xs text-slate-500 mb-1">Pérdida Potencial</p>
+                      <p className="text-lg font-semibold text-red-400">
+                        {formatCurrency(businessCase.financials.potentialAnnualLoss)}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-slate-900/50 rounded-lg border border-cyan-500/20 text-center">
+                      <p className="text-xs text-slate-500 mb-1">Inversión</p>
+                      <p className="text-lg font-semibold text-cyan-400">
+                        {formatCurrency(businessCase.financials.recommendedInvestment)}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-slate-900/50 rounded-lg border border-green-500/20 text-center">
+                      <p className="text-xs text-slate-500 mb-1">ROI</p>
+                      <p className="text-lg font-semibold text-green-400">
+                        {formatROI(businessCase.financials.estimatedROI)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Fuentes */}
+                  {businessCase.financials.methodologySources && businessCase.financials.methodologySources.length > 0 && (
+                    <div className="p-3 bg-blue-500/10 border border-blue-400/30 rounded-lg">
+                      <p className="text-xs text-blue-400 font-medium mb-1">📚 Fuentes Metodológicas</p>
+                      <p className="text-xs text-slate-300">
+                        {businessCase.financials.methodologySources.join(' • ')}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* ⏱️ TIMELINE Y MÉTRICAS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <h5 className="text-white/80 font-medium text-sm">Timeline Sugerido</h5>
-            <p className="text-cyan-400 font-semibold">{businessCase.suggestedTimeline}</p>
-          </div>
-          <div className="space-y-2">
-            <h5 className="text-white/80 font-medium text-sm">Métricas de Éxito</h5>
-            <div className="space-y-1">
-              {businessCase.successMetrics.slice(0, 2).map((metric, index) => (
-                <p key={index} className="text-white/70 text-xs">• {metric}</p>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* 🔬 TRANSPARENCIA METODOLÓGICA */}
-        <details className="group">
-          <summary className="cursor-pointer text-white/80 text-sm font-medium hover:text-white transition-colors">
-            <FileText className="h-4 w-4 inline mr-2" />
-            Ver Metodología y Fuentes
-            <span className="group-open:rotate-180 inline-block transition-transform ml-2">▼</span>
-          </summary>
-          <div className="mt-3 space-y-2 text-xs text-white/60">
-            <div>
-              <strong className="text-white/80">Fuentes Metodológicas:</strong>
-              <ul className="mt-1 space-y-1 ml-4">
-                {businessCase.financials.methodologySources.map((source, index) => (
-                  <li key={index}>• {source}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <strong className="text-white/80">Supuestos Clave:</strong>
-              <ul className="mt-1 space-y-1 ml-4">
-                {businessCase.financials.keyAssumptions.map((assumption, index) => (
-                  <li key={index}>• {assumption}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </details>
-
-        {/* 🚀 BOTONES ACCIÓN EXECUTIVO */}
-        <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-white/10">
-          <Button 
-            onClick={() => onActionClick?.('schedule_meeting')}
-            className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold"
+        {/* SECCIÓN: Plan de Acción */}
+        <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-lg overflow-hidden">
+          <button
+            onClick={() => toggleSection('plan')}
+            className="w-full flex items-center justify-between p-4 hover:bg-slate-700/20 transition-colors"
           >
-            <Calendar className="h-4 w-4 mr-2" />
-            Programar Reunión Ejecutiva
-          </Button>
-          <Button 
-            onClick={() => onActionClick?.('generate_report')}
-            variant="outline"
-            className="flex-1 border-white/20 text-white hover:bg-white/10"
-          >
-            <FileText className="h-4 w-4 mr-2" />
-            Generar Reporte Detallado
-          </Button>
-        </div>
-      </CardContent>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-500/10 rounded-lg">
+                <Target className="h-5 w-5 text-orange-400" />
+              </div>
+              <div className="text-left">
+                <h4 className="text-base font-semibold text-white">Plan de Acción</h4>
+                <p className="text-xs text-slate-400">Intervención recomendada</p>
+              </div>
+            </div>
+            {expandedSections.plan ? (
+              <ChevronUp className="h-5 w-5 text-slate-400" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-slate-400" />
+            )}
+          </button>
 
-      {/* 🌟 ACCENT BORDER GLOW */}
-      <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-cyan-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity -z-10" />
-    </Card>
+          <AnimatePresence>
+            {expandedSections.plan && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <div className="px-4 pb-4 border-t border-slate-700/30 space-y-3 mt-4">
+                  {businessCase.recommendedActions.map((actionString, idx) => {
+                    const { mainAction, timeline, responsible } = parseAction(actionString);
+                    
+                    return (
+                      <div
+                        key={idx}
+                        className="flex gap-3 p-3 bg-slate-900/30 rounded-lg border border-slate-700/50"
+                      >
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-cyan-500/10 border border-cyan-400/30 flex items-center justify-center">
+                          <span className="text-sm font-semibold text-cyan-400">{idx + 1}</span>
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <p className="text-sm text-white font-medium leading-relaxed">
+                            {mainAction}
+                          </p>
+                          <div className="flex items-center gap-3 text-xs text-slate-400">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-800/50 rounded">
+                              <Calendar className="h-3 w-3" />
+                              {timeline}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-800/50 rounded">
+                              <Users className="h-3 w-3" />
+                              {responsible}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Timeline */}
+                  <div className="p-3 bg-amber-500/10 border border-amber-400/30 rounded-lg">
+                    <p className="text-xs text-amber-400 font-medium mb-1 flex items-center gap-1.5">
+                      <Clock className="h-4 w-4" />
+                      Timeline Sugerido
+                    </p>
+                    <p className="text-sm text-slate-300">{businessCase.suggestedTimeline}</p>
+                  </div>
+
+                  {/* Métricas */}
+                  {businessCase.successMetrics && businessCase.successMetrics.length > 0 && (
+                    <div className="p-3 bg-green-500/10 border border-green-400/30 rounded-lg">
+                      <p className="text-xs text-green-400 font-medium mb-2 flex items-center gap-1.5">
+                        <Target className="h-4 w-4" />
+                        Métricas de Éxito
+                      </p>
+                      <ul className="space-y-1.5">
+                        {businessCase.successMetrics.map((metric, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-xs text-slate-300">
+                            <span className="text-green-400 mt-0.5">✓</span>
+                            <span>{metric}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+
+      {/* Footer CTA - CORRECCIÓN 3: Botón ejecutivo con icono Play */}
+      <div className="p-6 bg-slate-900/30 border-t border-slate-700/30">
+        <button
+          onClick={() => onActionClick?.('schedule_meeting')}
+          className="w-full py-3 px-6 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-lg transition-all duration-300 text-base font-semibold flex items-center justify-center gap-2"
+        >
+          <Play className="h-5 w-5" />
+          INICIAR PROTOCOLO DE SOLUCIÓN
+        </button>
+        <p className="text-center text-xs text-slate-500 mt-3">
+          Acción temprana = Mayor probabilidad de éxito
+        </p>
+      </div>
+      </div>
+    </motion.div>
   );
 };

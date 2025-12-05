@@ -14,17 +14,9 @@ interface TopAlertsPanelProps {
  * ALERT TYPE LABELS MAPPING
  */
 const ALERT_TYPE_LABELS: Record<string, { label: string; color: string }> = {
-  low_score: { 
-    label: 'Score Bajo', 
-    color: 'text-red-400' 
-  },
   stage_incomplete: { 
     label: 'Etapa Incompleta', 
     color: 'text-orange-400' 
-  },
-  risk_escalation: { 
-    label: 'Escalación de Riesgo', 
-    color: 'text-yellow-400' 
   },
   abandono_dia_1: { 
     label: 'Abandono Día 1', 

@@ -88,9 +88,7 @@ const SLA_STYLES = {
  * ALERT TYPE LABELS
  */
 const ALERT_TYPE_LABELS: Record<string, string> = {
-  low_score: 'Score Bajo',
   stage_incomplete: 'Etapa Incompleta',
-  risk_escalation: 'Escalación de Riesgo',
   abandono_dia_1: 'Abandono Día 1',
   bienvenida_fallida: 'Bienvenida Fallida',
   confusion_rol: 'Confusión de Rol',
@@ -181,64 +179,56 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert, onAcknowledge }) =>
           <AlertCircle className="h-4 w-4 text-slate-500" />
           <div>
             <p className="text-xs text-slate-500">Departamento</p>
-            <p className="text-sm text-slate-300">
+            <p className="text-sm text-slate-300 font-medium">
               {alert.journey.department?.displayName || 'Sin asignar'}
             </p>
           </div>
         </div>
         
-        {/* Etapa */}
-        {alert.stage && (
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-slate-500" />
-            <div>
-              <p className="text-xs text-slate-500">Etapa</p>
-              <p className="text-sm text-slate-300">Día {alert.stage}</p>
-            </div>
+        {/* Due Date */}
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4 text-slate-500" />
+          <div>
+            <p className="text-xs text-slate-500">Vence</p>
+            <p className="text-sm text-slate-300 font-medium">
+              {formatDistanceToNow(new Date(alert.dueDate), { 
+                addSuffix: true, 
+                locale: es 
+              })}
+            </p>
           </div>
-        )}
-        
-        {/* Score */}
-        {alert.score !== null && (
-          <div className="flex items-center gap-2">
-            <div className="h-4 w-4 rounded-full bg-slate-700 flex items-center justify-center">
-              <span className="text-xs text-slate-400">S</span>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500">Score</p>
-              <p className="text-sm text-slate-300">{alert.score.toFixed(1)}</p>
-            </div>
-          </div>
-        )}
-      </div>
-      
-      {/* FOOTER - Due Date + Action */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <Clock className="h-3 w-3" />
-          <span>
-            Vence {formatDistanceToNow(new Date(alert.dueDate), { 
-              addSuffix: true,
-              locale: es 
-            })}
-          </span>
         </div>
         
+        {/* Created At */}
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-slate-500" />
+          <div>
+            <p className="text-xs text-slate-500">Creada</p>
+            <p className="text-sm text-slate-300 font-medium">
+              {formatDistanceToNow(new Date(alert.createdAt), { 
+                addSuffix: true, 
+                locale: es 
+              })}
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      {/* ACTIONS */}
+      <div className="flex justify-end gap-3">
         {alert.status === 'pending' && (
           <SuccessButton
-            size="sm"
-            isLoading={isAcknowledging}
             onClick={handleAcknowledge}
+            disabled={isAcknowledging}
+            size="sm"
           >
             {isAcknowledging ? 'Marcando...' : 'Marcar como Accionada'}
           </SuccessButton>
         )}
         
-        {alert.status === 'acknowledged' && (
-          <NeutralButton size="sm" disabled>
-            Accionada ✓
-          </NeutralButton>
-        )}
+        <NeutralButton size="sm">
+          Ver Detalle Journey
+        </NeutralButton>
       </div>
     </motion.div>
   );

@@ -202,7 +202,7 @@ export default function OnboardingDashboard() {
               {/* IZQUIERDA: GAUGE PROTAGONISTA */}
               <div className="flex items-center justify-center lg:justify-end">
                 <EXOScoreGauge 
-                  score={global.avgEXOScore || 0}
+                  score={accumulated?.globalExoScore || global.avgEXOScore || 0}
                   label="EXO Score Global"
                   trend={global.exoScoreTrend || null}
                   size="xl"

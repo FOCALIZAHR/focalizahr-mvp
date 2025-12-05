@@ -71,7 +71,7 @@ interface UseOnboardingAlertsReturn {
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
-  acknowledgeAlert: (id: string) => Promise<void>;
+  acknowledgeAlert: (id: string, notes?: string) => Promise<void>;
   resolveAlert: (id: string, notes?: string) => Promise<void>;
 }
 
@@ -141,14 +141,17 @@ export function useOnboardingAlerts(
   /**
    * ACKNOWLEDGE ALERT
    */
-  const acknowledgeAlert = useCallback(async (id: string) => {
+  const acknowledgeAlert = useCallback(async (id: string, notes?: string) => {
     try {
-      console.log('[useOnboardingAlerts] Acknowledging alert:', id);
-      
+      console.log('[useOnboardingAlerts] Acknowledging alert:', id, notes ? `with notes: ${notes.substring(0, 50)}...` : '(no notes)');
+
       const response = await fetch(`/api/onboarding/alerts/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'acknowledge' })
+        body: JSON.stringify({
+          action: 'acknowledge',
+          ...(notes && { notes })
+        })
       });
       
       if (!response.ok) {

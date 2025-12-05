@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { extractUserContext } from '@/lib/services/AuthorizationService';
+import { OnboardingAlertService } from '@/lib/services/OnboardingAlertService';
 
 /**
  * PATCH /api/onboarding/alerts/[id]
@@ -62,38 +63,34 @@ export async function PATCH(
     }
     
     // ========================================
-    // 3. CONSTRUIR UPDATE DATA
+    // 3. DELEGACIÓN A SERVICIO (Arquitectura Correcta)
     // ========================================
-    const updateData: any = {};
+    let updatedAlert;
     
     if (action === 'acknowledge') {
-      updateData.status = 'acknowledged';
-      updateData.acknowledgedAt = new Date();
-      updateData.acknowledgedBy = userContext.userId;
-      
       console.log(`[API] Acknowledge alert ${id} by user ${userContext.userId}`);
       
+      updatedAlert = await OnboardingAlertService.acknowledgeAlert(
+        id, 
+        userContext.userId, 
+        notes
+      );
+      
     } else if (action === 'resolve') {
-      // Para resolve, notes es recomendado
-      updateData.status = 'resolved';
-      updateData.resolvedAt = new Date();
-      updateData.resolvedBy = userContext.userId;
-      
-      if (notes) {
-        updateData.resolutionNotes = notes;
-      }
-      
       console.log(`[API] Resolve alert ${id} by user ${userContext.userId}`);
+      
+      updatedAlert = await OnboardingAlertService.resolveAlert(
+        id, 
+        userContext.userId, 
+        notes
+      );
     }
     
     // ========================================
-    // 4. ACTUALIZAR ALERTA
+    // 4. OBTENER ALERTA CON RELACIONES PARA RESPONSE
     // ========================================
-    const updatedAlert = await prisma.journeyAlert.update({
-      where: {
-        id
-      },
-      data: updateData,
+    const alertWithRelations = await prisma.journeyAlert.findUnique({
+      where: { id: updatedAlert!.id },
       include: {
         journey: {
           include: {
@@ -108,13 +105,13 @@ export async function PATCH(
       }
     });
     
-    console.log(`[API] Alerta ${id} actualizada exitosamente a estado: ${updateData.status}`);
+    console.log(`[API] Alerta ${id} actualizada exitosamente a estado: ${updatedAlert!.status}`);
     
     // ========================================
     // 5. RESPONSE
     // ========================================
     return NextResponse.json({
-      data: updatedAlert,
+      data: alertWithRelations,
       success: true,
       message: action === 'acknowledge' 
         ? 'Alerta marcada como accionada' 
