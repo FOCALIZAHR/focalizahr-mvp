@@ -1,6 +1,7 @@
 // src/hooks/useOnboardingAlerts.ts
 
 import { useState, useEffect, useCallback } from 'react';
+import { AlertTrend, AlertHistoryPoint } from '@/types/onboarding';
 
 /**
  * INTERFACES
@@ -63,6 +64,9 @@ interface AlertMetrics {
     at_risk: number;
     violated: number;
   };
+  // 🆕 V2.0: Trend mensual + Historia 12 meses (tipos compartidos enterprise)
+  trend: AlertTrend | null;
+  history: AlertHistoryPoint[];
 }
 
 interface UseOnboardingAlertsReturn {

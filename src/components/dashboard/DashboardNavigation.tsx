@@ -1,19 +1,23 @@
+// ============================================================================
+// FOCALIZAHR DASHBOARD NAVIGATION - v2.1 MINIMAL
+// Basado en el ORIGINAL que funciona - Solo ajustes de header solicitados
+// NO CSS externos - Solo Tailwind inline
+// ============================================================================
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { getCurrentUser, logout } from '@/lib/auth';
 import { useSidebar } from '@/hooks/useSidebar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import {
   BarChart3,
   Users,
   Settings,
   LogOut,
-  Plus,
   Bell,
   Home,
   Activity,
@@ -22,20 +26,38 @@ import {
   ChevronDown,
   Menu,
   X,
-  Zap,
-  Shield,
   Mail,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Heart,
+  Rocket,
+  DoorOpen,
+  MessageSquare,
+  FileSpreadsheet,
+  Plus,
+  Building2,
 } from 'lucide-react';
+
+// ============================================================================
+// TYPES
+// ============================================================================
 
 interface NavigationItem {
   id: string;
   label: string;
-  href: string;
+  href?: string;
   icon: React.ComponentType<any>;
   badge?: number;
   active?: boolean;
+  comingSoon?: boolean;
+  isDropdown?: boolean;
+  subItems?: {
+    id: string;
+    label: string;
+    href: string;
+    icon: React.ComponentType<any>;
+    comingSoon?: boolean;
+  }[];
 }
 
 interface DashboardNavigationProps {
@@ -43,6 +65,10 @@ interface DashboardNavigationProps {
   showMobileMenu?: boolean;
   onMobileMenuToggle?: () => void;
 }
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 export default function DashboardNavigation({ 
   currentCampaignId, 
@@ -52,10 +78,9 @@ export default function DashboardNavigation({
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
-  const [showUserMenu, setShowUserMenu] = useState(false);
   const [notifications] = useState(3);
+  const [openDropdowns, setOpenDropdowns] = useState<string[]>(['signos-vitales']);
   
-  // Usar hook global
   const { isCollapsed, toggleSidebar } = useSidebar();
 
   useEffect(() => {
@@ -63,51 +88,90 @@ export default function DashboardNavigation({
     setUser(currentUser);
   }, []);
 
+  // ══════════════════════════════════════════════════════════════
+  // RBAC: Roles que pueden ver sección "Operaciones"
+  // Según AuthorizationService.ts - Roles con acceso administrativo
+  // ══════════════════════════════════════════════════════════════
+  const operationsAllowedRoles = [
+    // Sistema nuevo (tabla users)
+    'FOCALIZAHR_ADMIN',  // Admin sistema FocalizaHR
+    'ACCOUNT_OWNER',     // Dueño de la cuenta/empresa
+    'HR_MANAGER',        // RRHH (rol correcto según AuthorizationService)
+    // Sistema antiguo (tabla accounts) - compatibilidad transitoria
+    'CLIENT',            // Equivale a ACCOUNT_OWNER en sistema antiguo
+    // CEO NO incluido - solo lectura ejecutiva
+    // AREA_MANAGER NO incluido - solo ve su área
+  ];
+  
+  const canSeeOperations = user?.role && operationsAllowedRoles.includes(user.role);
+
+  // Navigation Config con Dropdowns
   const navigationItems: NavigationItem[] = [
     {
-      id: 'dashboard',
-      label: 'Dashboard',
-      href: '/dashboard',
-      icon: Home,
-      active: pathname === '/dashboard'
+      id: 'signos-vitales',
+      label: 'Signos Vitales',
+      icon: Heart,
+      isDropdown: true,
+      subItems: [
+        { id: 'salud', label: 'Salud Departamental', href: '/dashboard/salud-departamental', icon: Activity, comingSoon: true },
+        { id: 'onboarding', label: 'Onboarding Intelligence', href: '/dashboard/onboarding', icon: Rocket },
+        { id: 'exit', label: 'Exit Intelligence', href: '/dashboard/exit', icon: DoorOpen, comingSoon: true },
+      ],
     },
     {
-      id: 'campaigns',
-      label: 'Campañas',
+      id: 'estudios',
+      label: 'Estudios',
       href: '/dashboard/campaigns',
       icon: BarChart3,
       active: pathname.startsWith('/dashboard/campaigns'),
-      badge: 2
-    },
-    {
-      id: 'email-automation',
-      label: 'Email Automation',
-      href: '/admin/email-automation',
-      icon: Mail,
-      active: pathname.startsWith('/admin/email-automation')
     },
     {
       id: 'analytics',
       label: 'Analytics',
       href: '/dashboard/analytics',
       icon: TrendingUp,
-      active: pathname.startsWith('/dashboard/analytics')
+      active: pathname.startsWith('/dashboard/analytics'),
+      comingSoon: true,
+    },
+    // ══════════════════════════════════════════════════════════════
+    // SECCIÓN OPERACIONES - Solo visible para HR y Admin
+    // Incluye: Inscribir Colaboradores, Métricas, Nueva Campaña
+    // ══════════════════════════════════════════════════════════════
+    ...(canSeeOperations ? [{
+      id: 'operaciones',
+      label: 'Operaciones',
+      icon: Settings,
+      isDropdown: true,
+      subItems: [
+        { id: 'inscribir', label: 'Inscribir Colaboradores', href: '/dashboard/hub-inscripcion-permanentes', icon: Users },
+        { id: 'metricas', label: 'Métricas Empresa', href: '/dashboard/department-metrics/upload', icon: FileSpreadsheet },
+        { id: 'nueva-campana', label: 'Nueva Campaña', href: '/dashboard/campaigns/new', icon: Plus },
+      ],
+    }] : []),
+    {
+      id: 'comunicaciones',
+      label: 'Comunicaciones',
+      icon: Mail,
+      isDropdown: true,
+      subItems: [
+        { id: 'email', label: 'Email Templates', href: '/admin/email-automation', icon: Mail },
+        { id: 'whatsapp', label: 'WhatsApp', href: '/dashboard/whatsapp', icon: MessageSquare, comingSoon: true },
+      ],
     },
     {
-      id: 'participants',
-      label: 'Participantes',
-      href: '/dashboard/admin/participants',
-      icon: Users,
-      active: pathname.startsWith('/dashboard/admin/participants')
-    },
-    {
-      id: 'settings',
+      id: 'configuracion',
       label: 'Configuración',
       href: '/dashboard/settings',
-      icon: Settings,
-      active: pathname.startsWith('/dashboard/settings')
-    }
+      icon: Building2,
+      active: pathname.startsWith('/dashboard/settings'),
+    },
   ];
+
+  const toggleDropdown = (id: string) => {
+    setOpenDropdowns(prev => 
+      prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
+    );
+  };
 
   const handleLogout = () => {
     logout();
@@ -121,9 +185,13 @@ export default function DashboardNavigation({
     }
   };
 
+  const isHomeActive = pathname === '/dashboard';
+
   return (
     <>
-      {/* Desktop Navigation - Premium Collapsible */}
+      {/* ════════════════════════════════════════════════════════════════════
+          DESKTOP NAVIGATION
+          ════════════════════════════════════════════════════════════════════ */}
       <div className={`hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:z-50 transition-all duration-300 ease-in-out ${
         isCollapsed ? 'lg:w-20' : 'lg:w-64'
       }`}>
@@ -135,7 +203,7 @@ export default function DashboardNavigation({
             backdropFilter: 'blur(20px)'
           }}
         >
-          {/* Overlay pattern IA sutil */}
+          {/* Overlay pattern */}
           <div 
             className="absolute inset-0 pointer-events-none opacity-60"
             style={{
@@ -146,190 +214,224 @@ export default function DashboardNavigation({
             }}
           />
 
-          {/* Header Premium */}
-          <div className="relative z-10 p-6 border-b border-white/10">
-            <div className="flex items-center justify-between">
-              {!isCollapsed && (
-                <div className="flex items-center">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-cyan-500 to-purple-500 flex items-center justify-center mr-3">
-                    <Activity className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-lg bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-                      FocalizaHR
-                    </h3>
-                    <p className="text-xs text-white/60">Centro Inteligencia</p>
-                  </div>
-                </div>
-              )}
+          {/* ══════════════════════════════════════════════════════════════
+              HEADER: Logo (Fila 1) + Home/Collapse (Fila 2)
+              ══════════════════════════════════════════════════════════════ */}
+          <div className="relative z-10 p-4 border-b border-white/10">
+            {/* Fila 1: Logo centrado */}
+            <Link href="/dashboard" className="flex justify-center mb-4">
+              <img 
+                src="/images/focalizahr-logo_palabra.svg" 
+                alt="FocalizaHR" 
+                className={`transition-all duration-300 hover:opacity-80 ${isCollapsed ? 'h-8' : 'h-10'}`}
+              />
+            </Link>
+            
+            {/* Fila 2: Botones Home + Collapse */}
+            <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} gap-2`}>
+              {/* Botón Home - Purple hover */}
+              <Link href="/dashboard">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`
+                    transition-all duration-300 rounded-lg
+                    ${isHomeActive 
+                      ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30' 
+                      : 'text-slate-400 hover:bg-purple-500/10 hover:text-purple-400 hover:border-purple-500/30 border border-transparent'
+                    }
+                  `}
+                >
+                  <Home className="h-4 w-4" />
+                  {!isCollapsed && <span className="ml-2">Inicio</span>}
+                </Button>
+              </Link>
               
-              {/* Toggle Button Premium */}
+              {/* Botón Collapse - Cyan hover */}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={toggleSidebar}
-                className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  backdropFilter: 'blur(10px)'
-                }}
+                className="text-slate-400 hover:bg-cyan-500/10 hover:text-cyan-400 hover:border-cyan-500/30 border border-transparent transition-all duration-300 rounded-lg"
               >
-                {isCollapsed ? (
-                  <ChevronRight className="h-4 w-4" />
-                ) : (
-                  <ChevronLeft className="h-4 w-4" />
-                )}
+                {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
               </Button>
             </div>
           </div>
 
-          {/* Navigation Items Premium */}
-          <nav className="flex-1 px-4 py-6 space-y-2 relative z-10">
+          {/* ══════════════════════════════════════════════════════════════
+              NAVIGATION ITEMS
+              ══════════════════════════════════════════════════════════════ */}
+          <nav className="flex-1 px-3 py-4 space-y-1 relative z-10 overflow-y-auto">
             {navigationItems.map((item) => {
               const Icon = item.icon;
-              return (
-                <div key={item.id} className="relative group">
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleNavigation(item.href)}
-                    className={`
-                      w-full transition-all duration-200 ease-in-out relative overflow-hidden
-                      ${isCollapsed ? 'justify-center px-3' : 'justify-start px-4'}
-                      ${item.active 
-                        ? 'text-white bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border-l-4 border-l-cyan-500' 
-                        : 'text-white/70 hover:text-white hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-purple-500/10'
-                      }
-                    `}
-                    style={{
-                      borderRadius: '12px',
-                      padding: isCollapsed ? '12px' : '12px 16px',
-                      height: 'auto',
-                      backdropFilter: item.active ? 'blur(10px)' : 'none'
-                    }}
-                  >
-                    <div className="flex items-center w-full">
-                      <Icon className={`h-5 w-5 ${isCollapsed ? '' : 'mr-3'} transition-transform duration-200 group-hover:scale-110`} />
+              const isDropdown = item.isDropdown && item.subItems;
+              const isOpen = openDropdowns.includes(item.id);
+              const hasActiveChild = item.subItems?.some(sub => pathname.startsWith(sub.href));
+              const isActive = item.active || hasActiveChild;
+
+              // Dropdown Item
+              if (isDropdown) {
+                return (
+                  <div key={item.id}>
+                    {/* Dropdown Trigger */}
+                    <button
+                      onClick={() => toggleDropdown(item.id)}
+                      className={`
+                        w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200
+                        ${isCollapsed ? 'justify-center' : 'justify-start'}
+                        ${isOpen || hasActiveChild
+                          ? 'bg-gradient-to-r from-cyan-500/15 to-purple-500/10 text-white'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        }
+                      `}
+                    >
+                      <Icon className="h-5 w-5 flex-shrink-0" />
                       {!isCollapsed && (
                         <>
-                          <span className="flex-1 text-left font-medium">{item.label}</span>
-                          {item.badge && (
-                            <div 
-                              className="px-2 py-1 rounded-full text-xs font-semibold ml-2"
-                              style={{
-                                background: 'linear-gradient(135deg, #22D3EE, #A78BFA)',
-                                color: 'white',
-                                boxShadow: '0 2px 8px rgba(34, 211, 238, 0.3)'
-                              }}
-                            >
-                              {item.badge}
-                            </div>
-                          )}
+                          <span className="flex-1 text-left text-sm font-medium">{item.label}</span>
+                          <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
                         </>
                       )}
-                    </div>
-                  </Button>
-                  
-                  {/* Tooltip Premium para modo colapsado */}
-                  {isCollapsed && (
-                    <div 
-                      className="absolute left-full ml-3 top-1/2 transform -translate-y-1/2 px-3 py-2 bg-slate-900 text-white text-sm rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap"
-                      style={{
-                        background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(51, 65, 85, 0.95))',
-                        backdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(34, 211, 238, 0.2)',
-                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
-                      }}
-                    >
-                      {item.label}
-                      {item.badge && (
-                        <span className="ml-2 px-1.5 py-0.5 bg-gradient-to-r from-cyan-500 to-purple-500 rounded text-xs">
-                          {item.badge}
+                    </button>
+
+                    {/* Dropdown Content */}
+                    {!isCollapsed && (
+                      <div className={`overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'}`}>
+                        <div className="pl-4 pt-1 space-y-1">
+                          {item.subItems?.map((subItem) => {
+                            const SubIcon = subItem.icon;
+                            const isSubActive = pathname.startsWith(subItem.href);
+                            
+                            if (subItem.comingSoon) {
+                              return (
+                                <div
+                                  key={subItem.id}
+                                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 cursor-not-allowed opacity-60"
+                                >
+                                  <SubIcon className="h-4 w-4" />
+                                  <span className="text-sm">{subItem.label}</span>
+                                  <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                                    Pronto
+                                  </span>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <button
+                                key={subItem.id}
+                                onClick={() => handleNavigation(subItem.href)}
+                                className={`
+                                  w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200
+                                  ${isSubActive
+                                    ? 'bg-cyan-500/15 text-cyan-400 border-l-2 border-cyan-400'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                                  }
+                                `}
+                              >
+                                <SubIcon className="h-4 w-4" />
+                                <span className="text-sm">{subItem.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              // Simple Item
+              if (item.comingSoon) {
+                return (
+                  <div
+                    key={item.id}
+                    className={`
+                      flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 cursor-not-allowed opacity-60
+                      ${isCollapsed ? 'justify-center' : ''}
+                    `}
+                  >
+                    <Icon className="h-5 w-5" />
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1 text-sm font-medium">{item.label}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                          Pronto
                         </span>
-                      )}
-                    </div>
-                  )}
-                </div>
+                      </>
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleNavigation(item.href!)}
+                  className={`
+                    w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200
+                    ${isCollapsed ? 'justify-center' : ''}
+                    ${isActive
+                      ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/15 text-white border-l-4 border-cyan-500'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }
+                  `}
+                >
+                  <Icon className="h-5 w-5" />
+                  {!isCollapsed && <span className="text-sm font-medium">{item.label}</span>}
+                </button>
               );
             })}
           </nav>
 
-          {/* Footer Premium con Sistema Status */}
-          {!isCollapsed && (
-            <div className="relative z-10 p-6 border-t border-white/10">
-              <div 
-                className="p-4 rounded-xl relative overflow-hidden"
-                style={{
-                  background: 'rgba(30, 41, 59, 0.6)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(71, 85, 105, 0.3)'
-                }}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold" style={{ color: '#7D8590' }}>Sistema</span>
-                  <div className="flex items-center space-x-2">
-                    <div 
-                      className="w-2 h-2 rounded-full animate-pulse"
-                      style={{
-                        background: '#10B981',
-                        boxShadow: '0 0 8px rgba(16, 185, 129, 0.6)'
-                      }}
-                    />
-                    <span className="text-xs text-green-400 font-medium">Activo</span>
+          {/* ══════════════════════════════════════════════════════════════
+              FOOTER: User + Logout
+              ══════════════════════════════════════════════════════════════ */}
+          <div className="relative z-10 p-4 border-t border-white/10">
+            {/* User Info */}
+            {user && !isCollapsed && (
+              <div className="mb-3 p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center border border-cyan-500/30">
+                    <span className="text-sm font-semibold text-cyan-400">
+                      {(user.adminName || user.companyName || 'U').slice(0, 2).toUpperCase()}
+                    </span>
                   </div>
-                </div>
-                
-                <div className="space-y-1">
-                  <p className="text-xs text-white/60">Funcionando correctamente</p>
-                  <p className="text-xs text-white/50">
-                    Última actualización: {new Date().toLocaleTimeString()}
-                  </p>
-                </div>
-
-                {notifications > 0 && (
-                  <div className="mt-3 pt-3 border-t border-white/10">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Bell className="h-3 w-3 text-cyan-400" />
-                        <span className="text-xs text-white/70">Notificaciones</span>
-                      </div>
-                      <div 
-                        className="px-2 py-1 rounded-full text-xs font-semibold"
-                        style={{
-                          background: 'linear-gradient(135deg, #F59E0B, #EF4444)',
-                          color: 'white'
-                        }}
-                      >
-                        {notifications}
-                      </div>
-                    </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">
+                      {user.adminName || 'Admin'}
+                    </p>
+                    <p className="text-xs text-slate-500 truncate">
+                      {user.companyName || 'Empresa'}
+                    </p>
                   </div>
-                )}
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Logout Button Premium */}
-          <div className="relative z-10 px-4 pb-6">
+            {/* Logout Button */}
             <Button
               variant="ghost"
               onClick={handleLogout}
-              className="w-full justify-start text-white/70 hover:text-white hover:bg-red-500/20 transition-all duration-200"
-              style={{
-                borderRadius: '12px',
-                padding: isCollapsed ? '12px' : '12px 16px',
-                height: 'auto'
-              }}
+              className={`
+                w-full text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200 rounded-xl
+                ${isCollapsed ? 'justify-center px-3' : 'justify-start'}
+              `}
             >
-              <LogOut className={`h-5 w-5 ${isCollapsed ? '' : 'mr-3'}`} />
-              {!isCollapsed && <span>Cerrar Sesión</span>}
+              <LogOut className="h-5 w-5" />
+              {!isCollapsed && <span className="ml-3">Cerrar Sesión</span>}
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Mobile Navigation - Preservado intacto */}
+      {/* ════════════════════════════════════════════════════════════════════
+          MOBILE NAVIGATION (Preservado del original)
+          ════════════════════════════════════════════════════════════════════ */}
       <div className="lg:hidden">
-        {/* Mobile Header Premium */}
+        {/* Mobile Header */}
         <div 
           className="px-4 py-3 flex items-center justify-between relative"
           style={{
@@ -345,31 +447,20 @@ export default function DashboardNavigation({
               onClick={onMobileMenuToggle}
               className="p-2 text-white/80 hover:text-white hover:bg-white/10"
             >
-              {showMobileMenu ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
+              {showMobileMenu ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
             
-            <div className="ml-3 flex items-center">
-              <div className="w-6 h-6 rounded bg-gradient-to-r from-cyan-500 to-purple-500 flex items-center justify-center mr-2">
-                <Activity className="h-4 w-4 text-white" />
-              </div>
-              <span className="font-bold text-lg bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-                FocalizaHR
-              </span>
-            </div>
+            <img 
+              src="/images/focalizahr-logo_palabra.svg" 
+              alt="FocalizaHR" 
+              className="h-7 ml-3"
+            />
           </div>
 
-          {/* Mobile Status Indicator */}
           <div className="flex items-center space-x-2">
             <div 
               className="w-2 h-2 rounded-full animate-pulse"
-              style={{
-                background: '#10B981',
-                boxShadow: '0 0 8px rgba(16, 185, 129, 0.6)'
-              }}
+              style={{ background: '#10B981', boxShadow: '0 0 8px rgba(16, 185, 129, 0.6)' }}
             />
             <span className="text-xs text-green-400 font-medium">Activo</span>
           </div>
@@ -386,37 +477,15 @@ export default function DashboardNavigation({
                 backdropFilter: 'blur(20px)'
               }}
             >
-              {/* Overlay pattern IA móvil */}
-              <div 
-                className="absolute inset-0 pointer-events-none opacity-60"
-                style={{
-                  background: `
-                    radial-gradient(circle at 25% 25%, rgba(34, 211, 238, 0.03) 0%, transparent 50%),
-                    radial-gradient(circle at 75% 75%, rgba(167, 139, 250, 0.03) 0%, transparent 50%)
-                  `
-                }}
-              />
-
               {/* Mobile Header */}
-              <div className="relative z-10 p-6 border-b border-white/10">
+              <div className="relative z-10 px-6 py-4 border-b border-white/10">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-cyan-500 to-purple-500 flex items-center justify-center mr-3">
-                      <Activity className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-lg bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-                        FocalizaHR
-                      </h3>
-                      <p className="text-xs text-white/60">Centro Inteligencia</p>
-                    </div>
-                  </div>
-                  
+                  <img src="/images/focalizahr-logo_palabra.svg" alt="FocalizaHR" className="h-8" />
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={onMobileMenuToggle}
-                    className="p-2 text-white/70 hover:text-white hover:bg-white/10"
+                    className="text-white/70 hover:text-white"
                   >
                     <X className="h-5 w-5" />
                   </Button>
@@ -429,78 +498,125 @@ export default function DashboardNavigation({
                   <div className="flex items-center">
                     <div 
                       className="w-12 h-12 rounded-full flex items-center justify-center"
-                      style={{
-                        background: 'rgba(34, 211, 238, 0.2)',
-                        border: '2px solid rgba(34, 211, 238, 0.3)'
-                      }}
+                      style={{ background: 'rgba(34, 211, 238, 0.2)', border: '2px solid rgba(34, 211, 238, 0.3)' }}
                     >
                       <User className="h-6 w-6 text-cyan-400" />
                     </div>
                     <div className="ml-3">
                       <p className="font-semibold text-white">{user.companyName || 'Empresa Demo'}</p>
                       <p className="text-sm text-white/60">{user.adminName || 'Admin Demo'}</p>
-                      <Badge 
-                        variant="outline" 
-                        className="mt-1 text-xs text-cyan-400 border-cyan-400/30"
-                      >
-                        FocalizaHR
-                      </Badge>
                     </div>
                   </div>
                 </div>
               )}
 
               {/* Mobile Navigation */}
-              <nav className="relative z-10 px-4 py-4 space-y-2 flex-1">
+              <nav className="relative z-10 px-4 py-4 space-y-2 flex-1 overflow-y-auto">
+                {/* Home Button */}
+                <Button
+                  variant="ghost"
+                  onClick={() => handleNavigation('/dashboard')}
+                  className={`
+                    w-full justify-start rounded-xl transition-all duration-200
+                    ${isHomeActive 
+                      ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30' 
+                      : 'text-white/70 hover:text-white hover:bg-white/10'
+                    }
+                  `}
+                >
+                  <Home className="h-5 w-5 mr-3" />
+                  Inicio
+                </Button>
+
+                {/* Nav Items */}
                 {navigationItems.map((item) => {
                   const Icon = item.icon;
+                  
+                  if (item.isDropdown && item.subItems) {
+                    const isOpen = openDropdowns.includes(item.id);
+                    
+                    return (
+                      <div key={item.id}>
+                        <button
+                          onClick={() => toggleDropdown(item.id)}
+                          className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-all"
+                        >
+                          <div className="flex items-center">
+                            <Icon className="h-5 w-5 mr-3" />
+                            {item.label}
+                          </div>
+                          <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                        
+                        {isOpen && (
+                          <div className="pl-8 pt-1 space-y-1">
+                            {item.subItems.map((subItem) => {
+                              const SubIcon = subItem.icon;
+                              
+                              if (subItem.comingSoon) {
+                                return (
+                                  <div key={subItem.id} className="flex items-center px-4 py-2 text-slate-500 opacity-60">
+                                    <SubIcon className="h-4 w-4 mr-3" />
+                                    {subItem.label}
+                                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">Pronto</span>
+                                  </div>
+                                );
+                              }
+                              
+                              return (
+                                <Button
+                                  key={subItem.id}
+                                  variant="ghost"
+                                  onClick={() => handleNavigation(subItem.href)}
+                                  className="w-full justify-start text-white/60 hover:text-white hover:bg-white/10"
+                                >
+                                  <SubIcon className="h-4 w-4 mr-3" />
+                                  {subItem.label}
+                                </Button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  if (item.comingSoon) {
+                    return (
+                      <div key={item.id} className="flex items-center px-4 py-3 text-slate-500 opacity-60">
+                        <Icon className="h-5 w-5 mr-3" />
+                        {item.label}
+                        <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">Pronto</span>
+                      </div>
+                    );
+                  }
+
                   return (
                     <Button
                       key={item.id}
                       variant="ghost"
-                      onClick={() => handleNavigation(item.href)}
+                      onClick={() => handleNavigation(item.href!)}
                       className={`
-                        w-full justify-start relative overflow-hidden transition-all duration-200
+                        w-full justify-start rounded-xl transition-all duration-200
                         ${item.active 
-                          ? 'text-white bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border-l-4 border-l-cyan-500' 
-                          : 'text-white/70 hover:text-white hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-purple-500/10'
+                          ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/15 text-white border-l-4 border-cyan-500' 
+                          : 'text-white/70 hover:text-white hover:bg-white/10'
                         }
                       `}
-                      style={{
-                        borderRadius: '12px',
-                        padding: '12px 16px',
-                        height: 'auto'
-                      }}
                     >
                       <Icon className="h-5 w-5 mr-3" />
                       {item.label}
-                      {item.badge && (
-                        <div 
-                          className="ml-auto px-2 py-1 rounded-full text-xs font-semibold"
-                          style={{
-                            background: 'linear-gradient(135deg, #22D3EE, #A78BFA)',
-                            color: 'white'
-                          }}
-                        >
-                          {item.badge}
-                        </div>
-                      )}
                     </Button>
                   );
                 })}
               </nav>
 
               {/* Mobile Logout */}
-              <div className="relative z-10 p-4 border-t border-white/10">
+              <div className="relative z-10 px-4 pb-6">
                 <Button
                   variant="ghost"
                   onClick={handleLogout}
-                  className="w-full justify-start text-white/70 hover:text-white hover:bg-red-500/20"
-                  style={{
-                    borderRadius: '12px',
-                    padding: '12px 16px',
-                    height: 'auto'
-                  }}
+                  className="w-full justify-start text-white/70 hover:text-red-400 hover:bg-red-500/10 rounded-xl"
                 >
                   <LogOut className="h-5 w-5 mr-3" />
                   Cerrar Sesión

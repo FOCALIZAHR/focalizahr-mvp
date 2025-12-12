@@ -7,6 +7,14 @@
     {
       "path": "/api/cron/aggregation",
       "schedule": "0 2 1 * *"
+    },
+    {
+      "path": "/api/cron/benchmark-aggregation",
+      "schedule": "10 2 1 * *"
+    },
+    {
+      "path": "/api/cron/onboarding-effectiveness",
+      "schedule": "15 2 1 * *"
     }
   ]
 }

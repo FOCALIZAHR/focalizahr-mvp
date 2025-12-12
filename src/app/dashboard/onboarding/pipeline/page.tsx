@@ -370,7 +370,7 @@ export default function PipelineOnboardingPage() {
               )}
             </div>
             
-            <h1 className="text-4xl font-extralight text-white mb-2">
+            <h1 className="text-6xl font-light text-white mb-2">
               Pipeline{' '}
               <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
                 Onboarding

@@ -3,6 +3,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { extractUserContext, buildParticipantAccessFilter } from '@/lib/services/AuthorizationService';
+import { OnboardingAlertService } from '@/lib/services/OnboardingAlertService';
+import { AlertTrend, AlertHistoryPoint } from '@/types/onboarding';
 
 /**
  * GET /api/onboarding/alerts
@@ -141,6 +143,24 @@ export async function GET(request: NextRequest) {
     };
     
     // ========================================
+    // 6.1 OBTENER TREND + HISTORY (V2.0 - ARQUITECTURA ENTERPRISE)
+    // ========================================
+    let trendData: AlertTrend | null = null;
+    let historyData: AlertHistoryPoint[] = [];
+    
+    try {
+      const statistics = await OnboardingAlertService.getAlertStatistics(
+        userContext.accountId
+      );
+      
+      // ✅ NO type assertion needed - servicio retorna tipos correctos
+      trendData = statistics.trend;
+      historyData = statistics.history;
+    } catch (error) {
+      console.error('[API] Error obteniendo trend/history (non-critical):', error);
+    }
+    
+    // ========================================
     // 7. RESPONSE CON INTELIGENCIA
     // ========================================
     return NextResponse.json({
@@ -153,7 +173,9 @@ export async function GET(request: NextRequest) {
           topDepartments,
           topAlertTypes,
           severityDistribution: severityCounts,
-          slaDistribution: slaCounts
+          slaDistribution: slaCounts,
+          trend: trendData,
+          history: historyData
         }
       },
       success: true

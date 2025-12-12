@@ -459,3 +459,63 @@ export interface UseOnboardingJourneysReturn {
   refetch: () => Promise<void>;
   lastUpdated: Date | null;
 }
+// ============================================================================
+// ALERT STATISTICS (V2.0 - Trend + History)
+// ============================================================================
+
+/**
+ * Dirección de tendencia de alertas
+ */
+export type TrendDirection = 'up' | 'down' | 'stable';
+
+/**
+ * Tendencia mensual de alertas (actual vs anterior)
+ */
+export interface AlertTrend {
+  value: number;                    // Porcentaje de cambio: +12, -8, 0
+  direction: TrendDirection;        // "up" | "down" | "stable"
+  absolute: number;                 // Cambio absoluto: +5, -3
+  current: number;                  // Total mes actual: 45
+  previous: number;                 // Total mes anterior: 40
+  comparison: string;               // "12% más que 2025-10"
+}
+
+/**
+ * Punto histórico en serie temporal (1 mes)
+ */
+export interface AlertHistoryPoint {
+  period: string;                   // "2025-11"
+  totalAlerts: number;              // 45
+  managedCount: number;             // 30
+  ignoredCount: number;             // 15
+  managedRetentionRate: number;     // 0.75
+  retentionDelta: number;           // 55
+}
+
+/**
+ * Respuesta completa de getAlertStatistics()
+ * Incluye contadores actuales + trend + historia 12 meses
+ */
+export interface AlertStatistics {
+  // Contadores por estado
+  total: number;
+  pending: number;
+  acknowledged: number;
+  resolved: number;
+  dismissed: number;
+  
+  // Contadores por severidad
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  
+  // Contadores por SLA
+  breached: number;
+  atRisk: number;
+  onTime: number;
+  
+  // 🆕 V2.0: Tendencia + Historia
+  trend: AlertTrend | null;         // null si < 2 meses de data
+  history: AlertHistoryPoint[];     // Array ordenado: [más antiguo → más reciente]
+}

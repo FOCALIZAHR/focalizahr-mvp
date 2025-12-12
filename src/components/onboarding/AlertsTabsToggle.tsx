@@ -25,11 +25,11 @@ type TabConfig = {
   value: 'active' | 'managed' | 'all';
   label: string;
   icon: React.ElementType;
-  color: 'red' | 'green' | 'cyan';
+  color: 'purple' | 'green' | 'cyan';  // ✅ CAMBIO: red → purple
 };
 
 const TABS: TabConfig[] = [
-  { value: 'active', label: 'Activas', icon: AlertTriangle, color: 'red' },
+  { value: 'active', label: 'Activas', icon: AlertTriangle, color: 'purple' },  // ✅ CAMBIO
   { value: 'managed', label: 'Gestionadas', icon: CheckCircle, color: 'green' },
   { value: 'all', label: 'Todas', icon: LayoutGrid, color: 'cyan' }
 ];
@@ -52,8 +52,8 @@ export default function AlertsTabsToggle({
   // Determinar color del slider según tab activo
   const getSliderGradient = () => {
     const activeConfig = TABS.find(tab => tab.value === activeTab);
-    if (activeConfig?.color === 'red') {
-      return 'linear-gradient(135deg, #EF4444, #DC2626)';
+    if (activeConfig?.color === 'purple') {  // ✅ CAMBIO: red → purple
+      return 'linear-gradient(135deg, #A78BFA, #8B5CF6)';
     } else if (activeConfig?.color === 'green') {
       return 'linear-gradient(135deg, #10B981, #059669)';
     } else {
@@ -63,8 +63,8 @@ export default function AlertsTabsToggle({
 
   const getSliderShadow = () => {
     const activeConfig = TABS.find(tab => tab.value === activeTab);
-    if (activeConfig?.color === 'red') {
-      return '0 2px 8px rgba(239, 68, 68, 0.3)';
+    if (activeConfig?.color === 'purple') {  // ✅ CAMBIO: red → purple
+      return '0 2px 8px rgba(167, 139, 250, 0.3)';
     } else if (activeConfig?.color === 'green') {
       return '0 2px 8px rgba(16, 185, 129, 0.3)';
     } else {
@@ -75,8 +75,8 @@ export default function AlertsTabsToggle({
   // Obtener color de la línea superior
   const getTopLineGradient = () => {
     const activeConfig = TABS.find(tab => tab.value === activeTab);
-    if (activeConfig?.color === 'red') {
-      return 'linear-gradient(90deg, transparent, #EF4444, #DC2626, transparent)';
+    if (activeConfig?.color === 'purple') {  // ✅ CAMBIO: red → purple
+      return 'linear-gradient(90deg, transparent, #A78BFA, #8B5CF6, transparent)';
     } else if (activeConfig?.color === 'green') {
       return 'linear-gradient(90deg, transparent, #10B981, #059669, transparent)';
     } else {
@@ -187,7 +187,7 @@ export default function AlertsTabsToggle({
         <div 
           className="absolute left-0 top-0 bottom-0 w-20 pointer-events-none"
           style={{
-            background: 'linear-gradient(90deg, rgba(239, 68, 68, 0.05), transparent)'
+            background: 'linear-gradient(90deg, rgba(167, 139, 250, 0.05), transparent)'  // ✅ CAMBIO: purple
           }}
         />
         <div 

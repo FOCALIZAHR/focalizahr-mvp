@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, ClipboardList, Check } from 'lucide-react';
+import { CheckCircle, ClipboardList, Check, Sparkles } from 'lucide-react';
 import { InsightAccionable } from '@/components/insights/InsightAccionable';
 
 // ============================================================================
@@ -196,11 +196,28 @@ export function ResolutionModal({
                   <ClipboardList className="h-6 w-6 text-cyan-400" />
                 </div>
                 <div>
-                  <h2 className="text-2xl fhr-title-gradient font-bold">
+                  <h2 className="text-2xl fhr-title-gradient font-semibold">
                     Reporte de Intervención
                   </h2>
                   <p className="text-slate-400 mt-1 text-sm">
-                    <span className="text-cyan-400 font-bold">{employeeName}</span> • Validación para Algoritmo de Efectividad
+                    <span className="text-cyan-400 font-semibold">{employeeName}</span> • Validación para Algoritmo de Efectividad
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* ✅ NUEVO: HINT MEDICIÓN AUTOMÁTICA */}
+            <div className="p-4 bg-cyan-500/10 border border-cyan-400/30 rounded-lg">
+              <div className="flex items-start gap-3">
+                <Sparkles className="h-5 w-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-cyan-400 mb-1">
+                    Enfócate en ejecutar el plan
+                  </p>
+                  <p className="text-sm text-slate-300 leading-relaxed">
+                    El sistema medirá automáticamente la efectividad de tu intervención 
+                    en 60 días (retención del empleado + mejora de score). 
+                    No necesitas volver a reportar resultados.
                   </p>
                 </div>
               </div>
@@ -211,7 +228,7 @@ export function ResolutionModal({
               
               {/* Texto contexto natural */}
               <p className="text-sm text-slate-300 leading-relaxed">
-                ¿Qué hiciste para ayudar a <span className="text-cyan-400 font-bold">{employeeName}</span>?
+                ¿Qué hiciste para ayudar a <span className="text-cyan-400 font-semibold">{employeeName}</span>?
                 Selecciona la acción que tomaste o describe qué hiciste:
               </p>
               
@@ -301,7 +318,7 @@ export function ResolutionModal({
               >
                 {isSubmitting 
                   ? 'Guardando...'
-                  : 'Registrar Intervención y Cerrar Alerta'
+                  : 'Registrar Plan y Cerrar Alerta'
                 }
               </PrimaryButton>
             </DialogFooter>

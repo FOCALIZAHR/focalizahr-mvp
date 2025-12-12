@@ -43,6 +43,7 @@ export interface Campaign {
     id: string;
     name: string;
     slug: string;
+    isPermanent?: boolean;  // ✅ AGREGAR ESTA LÍNEA
   };
   company?: {
     name: string;

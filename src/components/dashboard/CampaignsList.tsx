@@ -153,6 +153,11 @@ export default function EnhancedCampaignsList() {
 
   // Filtrado de campañas
   const filteredCampaigns = campaigns.filter(campaign => {
+    // ✅ CRÍTICO: Filtrar productos permanentes (Hub Dual - solo mostrar temporales)
+    const isPermanent = campaign.campaignType?.isPermanent === true;
+    if (isPermanent) return false;
+
+    // Filtros existentes
     const matchesSearch = campaign.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filter === 'all' || campaign.status === filter;
     return matchesSearch && matchesFilter;

@@ -26,6 +26,7 @@ import {
 // ========================================
 
 import { BusinessCase } from '@/types/BusinessCase';
+import { PrimaryButton } from '@/components/ui/PremiumButton';
 
 interface InsightAccionableProps {
   businessCase: BusinessCase;
@@ -333,8 +334,9 @@ export const InsightAccionable: React.FC<InsightAccionableProps> = ({
             className="w-full flex items-center justify-between p-4 hover:bg-slate-700/20 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-500/10 rounded-lg">
-                <Target className="h-5 w-5 text-orange-400" />
+              {/* CAMBIO 2: orange → cyan */}
+              <div className="p-2 bg-cyan-500/10 rounded-lg">
+                <Target className="h-5 w-5 text-cyan-400" />
               </div>
               <div className="text-left">
                 <h4 className="text-base font-semibold text-white">Plan de Acción</h4>
@@ -388,9 +390,9 @@ export const InsightAccionable: React.FC<InsightAccionableProps> = ({
                     );
                   })}
 
-                  {/* Timeline */}
-                  <div className="p-3 bg-amber-500/10 border border-amber-400/30 rounded-lg">
-                    <p className="text-xs text-amber-400 font-medium mb-1 flex items-center gap-1.5">
+                  {/* CAMBIO 3: Timeline amber → slate */}
+                  <div className="p-3 bg-slate-700/30 border border-slate-600/50 rounded-lg">
+                    <p className="text-xs text-slate-300 font-medium mb-1 flex items-center gap-1.5">
                       <Clock className="h-4 w-4" />
                       Timeline Sugerido
                     </p>
@@ -421,15 +423,16 @@ export const InsightAccionable: React.FC<InsightAccionableProps> = ({
         </div>
       </div>
 
-      {/* Footer CTA - CORRECCIÓN 3: Botón ejecutivo con icono Play */}
+      {/* Footer CTA - CAMBIO 4: Usar PrimaryButton del sistema FocalizaHR */}
       <div className="p-6 bg-slate-900/30 border-t border-slate-700/30">
-        <button
+        <PrimaryButton
           onClick={() => onActionClick?.('schedule_meeting')}
-          className="w-full py-3 px-6 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-lg transition-all duration-300 text-base font-semibold flex items-center justify-center gap-2"
+          icon={Play}
+          fullWidth
+          size="lg"
         >
-          <Play className="h-5 w-5" />
           INICIAR PROTOCOLO DE SOLUCIÓN
-        </button>
+        </PrimaryButton>
         <p className="text-center text-xs text-slate-500 mt-3">
           Acción temprana = Mayor probabilidad de éxito
         </p>

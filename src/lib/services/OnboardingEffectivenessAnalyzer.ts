@@ -116,8 +116,10 @@ export class OnboardingEffectivenessAnalyzer {
     }
     
     // 2. Clasificar alertas por gestión
-    const managed = alerts.filter(a => a.status === 'resolved');
-    const ignored = alerts.filter(a => a.status === 'pending');
+    const managed = alerts.filter(a =>
+      a.status === 'acknowledged' || a.status === 'resolved'
+    );
+    const ignored = alerts.filter(a => a.status === 'pending')
     
     console.log(`  Gestionadas: ${managed.length}`);
     console.log(`  Ignoradas: ${ignored.length}`);

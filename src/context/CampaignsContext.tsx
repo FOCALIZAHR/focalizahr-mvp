@@ -20,7 +20,7 @@ export const CampaignsProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(true);
         try {
             const token = localStorage.getItem('focalizahr_token');
-            const response = await fetch('/api/campaigns', {
+            const response = await fetch('/api/campaigns?limit=100', {  // ✅ FIX: Agregar ?limit=100
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Cache-Control': 'no-cache, no-store, must-revalidate',

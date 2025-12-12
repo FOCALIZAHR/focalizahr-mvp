@@ -1,10 +1,13 @@
 // src/lib/services/OnboardingAlertService.ts
 // ✅ COMPLETO Y FINAL: 6 alertas específicas + todos los métodos públicos restaurados
 // 🔧 CAMBIOS APLICADOS: Eliminados checkLowScores() y checkRiskEscalation()
+// 🆕 V2.0: Agregado trend + history 12 meses en getAlertStatistics
+// 🏗️ V2.1: Tipos explícitos enterprise (AlertStatistics interface)
 
 import { prisma } from '@/lib/prisma';
 import { addHours } from 'date-fns';
 import { JourneyAlert } from '@prisma/client';
+import { AlertStatistics, TrendDirection } from '@/types/onboarding';
 
 export class OnboardingAlertService {
   
@@ -539,9 +542,15 @@ export class OnboardingAlertService {
   }
 
   /**
-   * ✅ Obtener estadísticas de alertas
+   * ✅ Obtener estadísticas de alertas + TREND + HISTORY 12 MESES
+   * 
+   * 🆕 V2.0: Ahora incluye:
+   * - trend: Comparación mes actual vs anterior (%, dirección, contexto)
+   * - history: Serie temporal últimos 12 meses (para sparklines)
+   * 
+   * @returns Promise<AlertStatistics> - Tipos explícitos enterprise
    */
-  static async getAlertStatistics(accountId: string) {
+  static async getAlertStatistics(accountId: string): Promise<AlertStatistics> {
     const alerts = await prisma.journeyAlert.findMany({
       where: { accountId },
       select: {
@@ -550,6 +559,51 @@ export class OnboardingAlertService {
         slaStatus: true
       }
     });
+    
+    // ============================================================================
+    // 🆕 HISTORIA 12 MESES + TREND CALCULATION
+    // ============================================================================
+    
+    // Buscar últimos 12 registros históricos de OnboardingEffectivenessInsight
+    const history = await prisma.onboardingEffectivenessInsight.findMany({
+      where: { accountId },
+      orderBy: { period: 'desc' },  // Más reciente primero
+      take: 12,
+      select: {
+        period: true,              // "2025-11"
+        totalAlerts: true,         // 45
+        managedCount: true,        // 30 (gestionadas)
+        ignoredCount: true,        // 15 (ignoradas)
+        managedRetentionRate: true,// 0.75 (efectividad gestión)
+        retentionDelta: true       // +55 puntos (impacto)
+      }
+    });
+    
+    // Calcular trend (mes actual vs anterior)
+    let trend = null;
+    if (history.length >= 2) {
+      const current = history[0];   // Mes más reciente
+      const previous = history[1];  // Mes anterior
+      
+      if (previous.totalAlerts > 0) {
+        const change = current.totalAlerts - previous.totalAlerts;
+        const percentageChange = Math.round((change / previous.totalAlerts) * 100);
+        
+        // ✅ TIPO EXPLÍCITO: TrendDirection (enterprise pattern)
+        const direction: TrendDirection = percentageChange > 0 ? 'up' : 
+                                          percentageChange < 0 ? 'down' : 
+                                          'stable';
+        
+        trend = {
+          value: percentageChange,                    // +12 o -8
+          direction,                                  // "up" | "down" | "stable" ✅ Tipo seguro
+          absolute: change,                           // +5 alertas
+          current: current.totalAlerts,               // 45
+          previous: previous.totalAlerts,             // 40
+          comparison: `${Math.abs(percentageChange)}% ${percentageChange > 0 ? 'más' : 'menos'} que ${previous.period}` // "12% más que 2025-10"
+        };
+      }
+    }
     
     return {
       total: alerts.length,
@@ -563,7 +617,10 @@ export class OnboardingAlertService {
       low: alerts.filter(a => a.severity === 'low').length,
       breached: alerts.filter(a => a.slaStatus === 'breached').length,
       atRisk: alerts.filter(a => a.slaStatus === 'at_risk').length,
-      onTime: alerts.filter(a => a.slaStatus === 'on_time').length
+      onTime: alerts.filter(a => a.slaStatus === 'on_time').length,
+      // 🆕 NUEVOS CAMPOS V2.0
+      trend,                       // Tendencia mes actual vs anterior
+      history: history.reverse()   // Serie temporal [más antiguo → más reciente]
     };
   }
 

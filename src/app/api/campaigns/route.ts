@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     }
 
     const params = queryValidation.data
-    const limit = params.limit || 10
+    const limit = params.limit || 100  // ✅ FIX: Era 10, ahora 100 (ver TODAS las campañas)
     const offset = params.offset || 0
 
     // Construir filtros dinámicos
@@ -155,7 +155,8 @@ export async function GET(request: NextRequest) {
               slug: true,
               estimatedDuration: true,
               questionCount: true,
-              methodology: true
+              methodology: true,
+              isPermanent: true  // ✅ AGREGAR ESTA LÍNEA
             }
           },
           _count: {
