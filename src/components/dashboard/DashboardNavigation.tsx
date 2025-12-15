@@ -217,13 +217,13 @@ export default function DashboardNavigation({
           {/* ══════════════════════════════════════════════════════════════
               HEADER: Logo (Fila 1) + Home/Collapse (Fila 2)
               ══════════════════════════════════════════════════════════════ */}
-          <div className="relative z-10 p-4 border-b border-white/10">
-            {/* Fila 1: Logo centrado */}
-            <Link href="/dashboard" className="flex justify-center mb-4">
+          <div className="relative z-10 px-4 pt-8 pb-5 border-b border-white/10">
+            {/* Fila 1: Logo centrado con espacio de respiración premium */}
+            <Link href="/dashboard" className="flex justify-center mb-7">
               <img 
                 src="/images/focalizahr-logo_palabra.svg" 
                 alt="FocalizaHR" 
-                className={`transition-all duration-300 hover:opacity-80 ${isCollapsed ? 'h-8' : 'h-10'}`}
+                className={`transition-all duration-300 hover:opacity-80 ${isCollapsed ? 'h-7' : 'h-9'}`}
               />
             </Link>
             
@@ -260,9 +260,9 @@ export default function DashboardNavigation({
           </div>
 
           {/* ══════════════════════════════════════════════════════════════
-              NAVIGATION ITEMS
+              NAVIGATION ITEMS - Estilo Linear Premium
               ══════════════════════════════════════════════════════════════ */}
-          <nav className="flex-1 px-3 py-4 space-y-1 relative z-10 overflow-y-auto">
+          <nav className="flex-1 px-3 py-5 space-y-1.5 relative z-10 overflow-y-auto">
             {navigationItems.map((item) => {
               const Icon = item.icon;
               const isDropdown = item.isDropdown && item.subItems;
@@ -273,16 +273,17 @@ export default function DashboardNavigation({
               // Dropdown Item
               if (isDropdown) {
                 return (
-                  <div key={item.id}>
+                  <div key={item.id} className="mb-1">
                     {/* Dropdown Trigger */}
                     <button
                       onClick={() => toggleDropdown(item.id)}
                       className={`
-                        w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200
+                        w-full flex items-center gap-3 px-3 py-3 rounded-xl 
+                        transition-all duration-250 ease-out
                         ${isCollapsed ? 'justify-center' : 'justify-start'}
                         ${isOpen || hasActiveChild
-                          ? 'bg-gradient-to-r from-cyan-500/15 to-purple-500/10 text-white'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                          ? 'bg-gradient-to-r from-cyan-500/10 to-purple-500/5 text-white'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
                         }
                       `}
                     >
@@ -295,23 +296,29 @@ export default function DashboardNavigation({
                       )}
                     </button>
 
-                    {/* Dropdown Content */}
+                    {/* Dropdown Content - Estilo Linear Premium */}
                     {!isCollapsed && (
-                      <div className={`overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'}`}>
-                        <div className="pl-4 pt-1 space-y-1">
-                          {item.subItems?.map((subItem) => {
+                      <div className={`overflow-hidden transition-all duration-300 ease-out ${isOpen ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'}`}>
+                        <div className="relative ml-6 mt-1 space-y-0.5">
+                          {/* Línea conectora vertical estilo Linear */}
+                          <div className="absolute left-0 top-0 bottom-2 w-px bg-gradient-to-b from-slate-600/50 via-slate-700/30 to-transparent" />
+                          
+                          {item.subItems?.map((subItem, index) => {
                             const SubIcon = subItem.icon;
                             const isSubActive = pathname.startsWith(subItem.href);
+                            const isLast = index === (item.subItems?.length || 0) - 1;
                             
                             if (subItem.comingSoon) {
                               return (
                                 <div
                                   key={subItem.id}
-                                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 cursor-not-allowed opacity-60"
+                                  className="relative flex items-center gap-3 pl-4 pr-3 py-2.5 text-slate-500 cursor-not-allowed"
                                 >
-                                  <SubIcon className="h-4 w-4" />
-                                  <span className="text-sm">{subItem.label}</span>
-                                  <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                                  {/* Línea horizontal conectora */}
+                                  <div className={`absolute left-0 top-1/2 w-3 h-px ${isLast ? 'bg-slate-700/30' : 'bg-slate-700/40'}`} />
+                                  <SubIcon className="h-4 w-4 flex-shrink-0" />
+                                  <span className="text-sm flex-1">{subItem.label}</span>
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-400 border border-purple-500/20 font-medium">
                                     Pronto
                                   </span>
                                 </div>
@@ -323,15 +330,24 @@ export default function DashboardNavigation({
                                 key={subItem.id}
                                 onClick={() => handleNavigation(subItem.href)}
                                 className={`
-                                  w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200
+                                  relative w-full flex items-center gap-3 pl-4 pr-3 py-2.5 rounded-lg
+                                  transition-all duration-200 ease-out group/sub
                                   ${isSubActive
-                                    ? 'bg-cyan-500/15 text-cyan-400 border-l-2 border-cyan-400'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                                    ? 'bg-cyan-500/10 text-cyan-400'
+                                    : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
                                   }
                                 `}
                               >
-                                <SubIcon className="h-4 w-4" />
-                                <span className="text-sm">{subItem.label}</span>
+                                {/* Línea horizontal conectora */}
+                                <div className={`absolute left-0 top-1/2 w-3 h-px transition-colors duration-200 ${
+                                  isSubActive ? 'bg-cyan-500/50' : 'bg-slate-700/40 group-hover/sub:bg-slate-600/50'
+                                }`} />
+                                {/* Punto de conexión activo */}
+                                {isSubActive && (
+                                  <div className="absolute left-[-2px] top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.5)]" />
+                                )}
+                                <SubIcon className={`h-4 w-4 flex-shrink-0 transition-transform duration-200 ${isSubActive ? '' : 'group-hover/sub:scale-110'}`} />
+                                <span className="text-sm font-medium">{subItem.label}</span>
                               </button>
                             );
                           })}
@@ -348,15 +364,15 @@ export default function DashboardNavigation({
                   <div
                     key={item.id}
                     className={`
-                      flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 cursor-not-allowed opacity-60
+                      flex items-center gap-3 px-3 py-3 rounded-xl text-slate-500 cursor-not-allowed
                       ${isCollapsed ? 'justify-center' : ''}
                     `}
                   >
-                    <Icon className="h-5 w-5" />
+                    <Icon className="h-5 w-5 opacity-50" />
                     {!isCollapsed && (
                       <>
-                        <span className="flex-1 text-sm font-medium">{item.label}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                        <span className="flex-1 text-sm font-medium opacity-50">{item.label}</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-400 border border-purple-500/20 font-medium">
                           Pronto
                         </span>
                       </>
@@ -370,15 +386,16 @@ export default function DashboardNavigation({
                   key={item.id}
                   onClick={() => handleNavigation(item.href!)}
                   className={`
-                    w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200
+                    w-full flex items-center gap-3 px-3 py-3 rounded-xl 
+                    transition-all duration-250 ease-out
                     ${isCollapsed ? 'justify-center' : ''}
                     ${isActive
-                      ? 'bg-gradient-to-r from-cyan-500/20 to-purple-500/15 text-white border-l-4 border-cyan-500'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                      ? 'bg-gradient-to-r from-cyan-500/12 to-purple-500/8 text-white border-l-2 border-cyan-400 ml-0.5'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
                     }
                   `}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className={`h-5 w-5 transition-transform duration-200 ${isActive ? 'text-cyan-400' : ''}`} />
                   {!isCollapsed && <span className="text-sm font-medium">{item.label}</span>}
                 </button>
               );

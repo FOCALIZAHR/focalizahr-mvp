@@ -22,7 +22,7 @@ export interface FilterOptions {
  * Obtiene todos los departamentos hijos de una gerencia
  * Utiliza CTE recursivo con cache para optimización
  */
-async function getChildDepartmentIds(parentId: string): Promise<string[]> {
+export async function getChildDepartmentIds(parentId: string): Promise<string[]> {
   if (hierarchyCache.has(parentId)) {
     debugLog(`📦 Cache hit para departamento ${parentId}`);
     return hierarchyCache.get(parentId)!;

@@ -8,19 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, ClipboardList, Check, Sparkles } from 'lucide-react';
 import { InsightAccionable } from '@/components/insights/InsightAccionable';
+import { ResolutionModalProps } from '@/types/onboarding';
 
-// ============================================================================
-// INTERFACES
-// ============================================================================
-
-interface ResolutionModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onResolve: (notes: string) => Promise<void>;
-  alertType: string;
-  employeeName: string;
-  businessCase: any; // BusinessCase type del OnboardingAlertEngine
-}
 
 // ============================================================================
 // QUICK PICKS ALINEADOS A NARRATIVAS (PRODUCCIÓN)

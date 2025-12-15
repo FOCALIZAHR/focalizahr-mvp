@@ -519,3 +519,15 @@ export interface AlertStatistics {
   trend: AlertTrend | null;         // null si < 2 meses de data
   history: AlertHistoryPoint[];     // Array ordenado: [más antiguo → más reciente]
 }
+
+// ============================================================================
+// RESOLUTIONMODAL
+// ============================================================================
+export interface ResolutionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onResolve: (notes: string) => Promise<void>;
+  alertType: string;
+  employeeName: string;
+  businessCase: any;
+}

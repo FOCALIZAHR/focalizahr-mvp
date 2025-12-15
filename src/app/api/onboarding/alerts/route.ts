@@ -1,4 +1,5 @@
 // src/app/api/onboarding/alerts/route.ts
+// 🔧 FIX: Incluir parent (gerencia) para agrupación jerárquica correcta
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -64,7 +65,8 @@ export async function GET(request: NextRequest) {
     if (slaStatus) whereClause.slaStatus = slaStatus;
     
     // ========================================
-    // 5. QUERY ALERTS CON RELACIONES
+    // 3. QUERY ALERTS CON RELACIONES
+    // ✅ FIX: Incluir parent (gerencia) para resolver agrupación
     // ========================================
     const alerts = await prisma.journeyAlert.findMany({
       where: whereClause,
@@ -72,10 +74,13 @@ export async function GET(request: NextRequest) {
         journey: {
           include: {
             department: {
-              select: {
-                id: true,
-                displayName: true,
-                standardCategory: true
+              include: {
+                parent: {  // ✅ CRÍTICO: Traer info de la gerencia padre
+                  select: {
+                    id: true,
+                    displayName: true
+                  }
+                }
               }
             }
           }
@@ -90,7 +95,7 @@ export async function GET(request: NextRequest) {
     console.log(`[API] Encontradas ${alerts.length} alertas accesibles`);
     
     // ========================================
-    // 6. CALCULAR MÉTRICAS INTELIGENCIA
+    // 4. CALCULAR MÉTRICAS INTELIGENCIA
     // ========================================
     
     const journeyFilter: any = {
@@ -143,7 +148,7 @@ export async function GET(request: NextRequest) {
     };
     
     // ========================================
-    // 6.1 OBTENER TREND + HISTORY (V2.0 - ARQUITECTURA ENTERPRISE)
+    // 5. OBTENER TREND + HISTORY (V2.0 - ARQUITECTURA ENTERPRISE)
     // ========================================
     let trendData: AlertTrend | null = null;
     let historyData: AlertHistoryPoint[] = [];
@@ -161,7 +166,7 @@ export async function GET(request: NextRequest) {
     }
     
     // ========================================
-    // 7. RESPONSE CON INTELIGENCIA
+    // 6. RESPONSE CON INTELIGENCIA
     // ========================================
     return NextResponse.json({
       data: {

@@ -9,7 +9,13 @@ export interface Question {
   text: string;
   category: string;
   questionOrder: number;
-  responseType: 'text_open' | 'multiple_choice' | 'rating_matrix_conditional' | 'rating_scale' | 'single_choice';
+  responseType:
+  | 'text_open'
+  | 'multiple_choice'
+  | 'rating_matrix_conditional'
+  | 'rating_scale'
+  | 'single_choice'
+  | 'nps_scale'; // ← AGREGAR ESTE TIPO
   choiceOptions?: string[] | null;
   conditionalLogic?: any;
 }
@@ -268,6 +274,11 @@ export function useSurveyEngine(
         return completedAspects === requiredAspects && requiredAspects > 0;
       case 'rating_scale':
         return response.rating && response.rating >= 1 && response.rating <= 5;
+      // ← AGREGAR ESTA VALIDACIÓN
+      case 'nps_scale':
+        return response.rating !== undefined &&
+          response.rating >= 0 &&
+          response.rating <= 10;
       case 'single_choice':
         return response.choiceResponse && response.choiceResponse.length === 1;
       default:

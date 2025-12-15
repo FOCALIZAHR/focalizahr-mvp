@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { extractUserContext } from '@/lib/services/AuthorizationService';
+import { extractUserContext, getChildDepartmentIds } from '@/lib/services/AuthorizationService';
 import { OnboardingAlertService } from '@/lib/services/OnboardingAlertService';
 
 /**
@@ -52,6 +52,13 @@ export async function PATCH(
       where: {
         id,
         accountId: userContext.accountId
+      },
+      include: {
+        journey: {
+          select: {
+            departmentId: true
+          }
+        }
       }
     });
     
@@ -60,6 +67,26 @@ export async function PATCH(
         { error: 'Alerta no encontrada', success: false },
         { status: 404 }
       );
+    }
+    
+    // ========================================
+    // 2.5 VALIDAR ACCESO JERÁRQUICO PARA AREA_MANAGER
+    // ========================================
+    if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
+      const childIds = await getChildDepartmentIds(userContext.departmentId);
+      const accessibleDeptIds = [userContext.departmentId, ...childIds];
+      
+      if (!accessibleDeptIds.includes(existingAlert.journey.departmentId)) {
+        console.warn('[RBAC DENIED] AREA_MANAGER sin acceso a alerta', {
+          userDepartmentId: userContext.departmentId,
+          alertDepartmentId: existingAlert.journey.departmentId
+        });
+        
+        return NextResponse.json(
+          { error: 'Sin permisos para gestionar esta alerta', success: false },
+          { status: 403 }
+        );
+      }
     }
     
     // ========================================

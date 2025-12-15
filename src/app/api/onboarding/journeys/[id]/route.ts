@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { OnboardingIntelligenceEngine } from '@/lib/engines/OnboardingIntelligenceEngine';
+import { getChildDepartmentIds } from '@/lib/services/AuthorizationService';
 
 // ============================================================================
 // TYPES
@@ -37,13 +38,13 @@ interface JourneyDetailResponse {
 // ============================================================================
 
 /**
- * Valida RBAC para acceso a journey
+ * Valida RBAC para acceso a journey CON SOPORTE JERÁRQUICO
  */
-function validateRBAC(
+async function validateRBAC(
   userRole: string,
   userDepartmentId: string | null,
   journeyDepartmentId: string
-): { allowed: boolean; reason?: string } {
+): Promise<{ allowed: boolean; reason?: string }> {
   // Roles con acceso completo
   const fullAccessRoles = [
     'FOCALIZAHR_ADMIN',
@@ -56,14 +57,26 @@ function validateRBAC(
     return { allowed: true };
   }
 
-  // AREA_MANAGER: solo su departamento
+  // AREA_MANAGER: su departamento + hijos (JERÁRQUICO)
   if (userRole === 'AREA_MANAGER') {
-    if (userDepartmentId === journeyDepartmentId) {
+    if (!userDepartmentId) {
+      return {
+        allowed: false,
+        reason: 'AREA_MANAGER sin departamento asignado'
+      };
+    }
+    
+    // Obtener departamentos hijos usando CTE recursivo
+    const childIds = await getChildDepartmentIds(userDepartmentId);
+    const accessibleDeptIds = [userDepartmentId, ...childIds];
+    
+    if (accessibleDeptIds.includes(journeyDepartmentId)) {
       return { allowed: true };
     }
+    
     return {
       allowed: false,
-      reason: 'AREA_MANAGER solo puede ver journeys de su departamento'
+      reason: 'AREA_MANAGER solo puede ver journeys de su gerencia y departamentos hijos'
     };
   }
 
@@ -73,7 +86,6 @@ function validateRBAC(
     reason: `Rol ${userRole} no tiene permisos para ver journeys`
   };
 }
-
 // ============================================================================
 // MAIN HANDLER
 // ============================================================================
@@ -249,7 +261,7 @@ export async function GET(
     // ========================================================================
     // 4. VALIDAR RBAC
     // ========================================================================
-    const rbacCheck = validateRBAC(
+    const rbacCheck = await validateRBAC(
       userRole,
       userDepartmentId,
       journey.departmentId

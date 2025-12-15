@@ -5,3 +5,4 @@ export { TextOpenRenderer } from './TextOpenRenderer';
 export { SingleChoiceRenderer } from './SingleChoiceRenderer';
 export { MultipleChoiceRenderer } from './MultipleChoiceRenderer';
 export { RatingMatrixRenderer } from './RatingMatrixRenderer'
+export { NPSScaleRenderer } from './NPSScaleRenderer'; // ← AGREGAR ESTA LÍNEA

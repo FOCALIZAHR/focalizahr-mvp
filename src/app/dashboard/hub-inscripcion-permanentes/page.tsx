@@ -18,7 +18,7 @@
  * - NO bold (700), máximo font-semibold (600)
  */
 
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { 
   Rocket, 
@@ -56,7 +56,7 @@ export default function HubInscripcionPermanentesPage() {
       y: 0,
       transition: { 
         duration: 0.6, 
-        ease: [0.22, 1, 0.36, 1] // Custom easing premium
+        ease: [0.22, 1, 0.36, 1] as const // Custom easing premium
       }
     }
   };
@@ -66,7 +66,7 @@ export default function HubInscripcionPermanentesPage() {
     hover: { 
       scale: 1.02, 
       y: -4,
-      transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] }
+      transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] as const }
     },
     tap: { scale: 0.98 }
   };

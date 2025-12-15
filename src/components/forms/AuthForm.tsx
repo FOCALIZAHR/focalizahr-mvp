@@ -1,14 +1,14 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import Logo from '@/components/common/Logo'
 import { registerSchema, loginSchema } from '@/lib/validations'
 import { cn } from '@/lib/utils'
+import { LogIn } from 'lucide-react'
 
 interface AuthFormProps {
   mode: 'login' | 'register'
@@ -33,7 +33,6 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, onSuccess }) => {
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
-    // Limpiar error del campo cuando el usuario empieza a escribir
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }))
     }
@@ -56,7 +55,6 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, onSuccess }) => {
         })
       }
 
-      // Validar confirmación de contraseña
       if (formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = 'Las contraseñas no coinciden'
       }
@@ -104,26 +102,19 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, onSuccess }) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload),
-        credentials: 'same-origin' // Importante: permite que el servidor establezca cookies
+        credentials: 'same-origin'
       })
 
       const data = await response.json()
 
       if (data.success) {
-        // Guardar token en localStorage (para compatibilidad con código existente)
-        // El token viene del body de la respuesta como siempre
         localStorage.setItem('focalizahr_token', data.token)
         localStorage.setItem('focalizahr_account', JSON.stringify(data.user || data.account))
         
-        // NO creamos cookie aquí - el servidor ya la estableció como HttpOnly
-        
-        // Callback de éxito si fue proporcionado
         onSuccess?.()
         
-        // Obtener URL de redirección del parámetro 'from' o usar dashboard por defecto
         const redirectTo = searchParams?.get('from') || '/dashboard'
         
-        // Pequeño delay para asegurar que el navegador procese la cookie del servidor
         setTimeout(() => {
           router.push(redirectTo)
         }, 100)
@@ -143,14 +134,21 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, onSuccess }) => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-4">
-          <div className="flex justify-center">
-            <Logo size="lg" theme="gradient" />
+          {/* Logo como IMG SVG */}
+          <div className="flex justify-center mb-2">
+            <img 
+              src="/images/focalizahr-logo_palabra.svg" 
+              alt="FocalizaHR" 
+              className="h-10 w-auto"
+            />
           </div>
+          
+          {/* Títulos contextuales */}
           <div className="text-center">
-            <CardTitle className="text-2xl">
+            <CardTitle className="text-2xl font-normal">
               {isRegister ? 'Crear cuenta' : 'Iniciar sesión'}
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-base">
               {isRegister 
                 ? 'Registra tu empresa para comenzar con Pulso de Bienestar'
                 : 'Accede a tu cuenta de FocalizaHR'
@@ -161,6 +159,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, onSuccess }) => {
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            
             {/* Error general */}
             {errors.general && (
               <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
@@ -276,30 +275,47 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, onSuccess }) => {
               </div>
             )}
 
-            {/* Botón submit */}
-            <Button 
-              type="submit" 
-              variant="gradient" 
-              size="lg" 
-              className="w-full"
+            {/* Botón submit - Outline cyan con icono LogIn (estilo original) */}
+            <Button
+              type="submit"
+              variant="outline"
+              size="lg"
+              className="w-full border-cyan-500 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300 transition-colors group"
               disabled={loading}
             >
-              {loading ? 'Procesando...' : (isRegister ? 'Crear cuenta' : 'Iniciar sesión')}
+              <span className="flex-1 text-center">
+                {loading ? 'Procesando...' : (isRegister ? 'Crear cuenta' : 'Iniciar sesión')}
+              </span>
+              <LogIn className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
             </Button>
 
             {/* Link para cambiar modo */}
             <div className="text-center text-sm">
-              <span className="text-muted-foreground">
-                {isRegister ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?'}
-              </span>{' '}
-              <button
-                type="button"
-                onClick={() => router.push(isRegister ? '/login' : '/register')}
-                className="text-primary hover:underline font-medium"
-                disabled={loading}
-              >
-                {isRegister ? 'Iniciar sesión' : 'Crear cuenta'}
-              </button>
+              {isRegister ? (
+                <>
+                  <span className="text-muted-foreground">
+                    ¿Ya tienes cuenta?
+                  </span>{' '}
+                  <button
+                    type="button"
+                    onClick={() => router.push('/login')}
+                    className="text-cyan-400 hover:text-cyan-300 underline font-medium"
+                    disabled={loading}
+                  >
+                    Iniciar sesión
+                  </button>
+                </>
+              ) : (
+                <p className="text-muted-foreground text-xs">
+                  ¿Necesitas una cuenta? Contacta a{' '}
+                  <a 
+                    href="mailto:soporte@focalizahr.com" 
+                    className="text-cyan-400 hover:text-cyan-300 underline"
+                  >
+                    soporte@focalizahr.com
+                  </a>
+                </p>
+              )}
             </div>
           </form>
         </CardContent>

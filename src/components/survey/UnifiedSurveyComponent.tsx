@@ -24,7 +24,8 @@ import {
   TextOpenRenderer,
   MultipleChoiceRenderer,
   SingleChoiceRenderer,
-  RatingMatrixRenderer
+  RatingMatrixRenderer,
+  NPSScaleRenderer  // ← AGREGAR ESTA LÍNEA
 } from './renderers';
 
 // Import hook and types
@@ -152,9 +153,12 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
     switch (currentQuestion.responseType) {
       case 'text_open':
         return <TextOpenRenderer response={response} updateResponse={updateResponse} />;
-      
+
       case 'rating_scale':
         return <RatingScaleRenderer response={response} updateResponse={updateResponse} />;
+      // ← AGREGAR ESTE CASE COMPLETO
+      case 'nps_scale':
+        return <NPSScaleRenderer response={response} updateResponse={updateResponse} />;
       
       case 'single_choice':
         return <SingleChoiceRenderer 
