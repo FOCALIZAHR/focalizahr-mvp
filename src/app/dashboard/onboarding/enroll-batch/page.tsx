@@ -1,5 +1,5 @@
 // src/app/dashboard/onboarding/enroll-batch/page.tsx
-// Carga Masiva Onboarding - Reutilizando componentes existentes
+// Carga Masiva Onboarding - Con validación de ventana de fechas
 
 'use client';
 
@@ -15,10 +15,16 @@ import {
   ArrowLeft,
   Loader2,
   Mail,
-  Phone
+  Phone,
+  Clock,
+  Calendar,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { useOnboardingBatchUpload } from '@/hooks/useOnboardingBatchUpload';
 import { CyanButton, NeutralButton, SuccessButton, PurpleButton } from '@/components/ui/MinimalistButton';
+import { parseEnrollmentError, validateHireDateWindow, type ParsedEnrollmentError } from '@/lib/utils/enrollment-error-parser';
 import Papa from 'papaparse';
 import '@/styles/focalizahr-design-system.css';
 
@@ -29,6 +35,14 @@ import '@/styles/focalizahr-design-system.css';
 interface Department {
   id: string;
   displayName: string;
+}
+
+interface FailureDetail {
+  index: number;
+  nationalId: string;
+  fullName: string;
+  error: string;
+  parsedError: ParsedEnrollmentError;
 }
 
 // ============================================================================
@@ -108,10 +122,19 @@ export default function OnboardingBatchUploadPage() {
   };
   
   const downloadTemplate = () => {
+    // Calcular fechas de ejemplo dentro de la ventana válida
+    const today = new Date();
+    const validPastDate = new Date(today);
+    validPastDate.setDate(validPastDate.getDate() - 3); // 3 días atrás (válido)
+    const validFutureDate = new Date(today);
+    validFutureDate.setDate(validFutureDate.getDate() + 5); // 5 días adelante (válido)
+    
+    const formatDate = (d: Date) => d.toISOString().split('T')[0];
+    
     const csvContent = [
       'RUT,Nombre,Email,Celular,Departamento,FechaIngreso,Cargo,Ubicacion,Genero,FechaNacimiento',
-      '12345678-9,Juan Pérez,juan@empresa.cl,+56912345678,Ventas,2025-01-15,Ejecutivo,Santiago,M,1990-05-20',
-      '98765432-1,María García,maria@empresa.cl,+56987654321,TI,2025-02-01,Developer,Valparaíso,F,1992-03-10'
+      `12345678-9,Juan Pérez,juan@empresa.cl,+56912345678,Ventas,${formatDate(validPastDate)},Ejecutivo,Santiago,M,1990-05-20`,
+      `98765432-1,María García,maria@empresa.cl,+56987654321,TI,${formatDate(validFutureDate)},Developer,Valparaíso,F,1992-03-10`
     ].join('\n');
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -152,44 +175,64 @@ export default function OnboardingBatchUploadPage() {
             Volver
           </NeutralButton>
           
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-4 mb-4 mt-6">
             <div className="p-3 bg-gradient-to-br from-cyan-500/20 to-purple-500/20 rounded-xl">
               <Upload className="h-7 w-7 text-cyan-400" />
             </div>
-            <h1 className="fhr-title-gradient text-4xl font-bold">
-              Carga Masiva Onboarding
+            <h1 className="text-4xl font-light text-white">
+              Carga{' '}
+              <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+                Masiva Onboarding
+              </span>
             </h1>
           </div>
           
-          <p className="text-lg text-slate-400 leading-relaxed max-w-3xl">
+          <p className="text-lg text-slate-400 font-light leading-relaxed max-w-3xl">
             Inscribe múltiples colaboradores al{' '}
-            <span className="text-cyan-400 font-medium">Sistema Predictivo de Retención</span>.
+            <span className="text-cyan-400 font-normal">Sistema Predictivo de Retención</span>.
             Cada uno recibirá 4 encuestas automáticas en días clave (1, 7, 30, 90).
           </p>
         </div>
         
-        {/* Info Card Metodología */}
-        <div className="fhr-card border-l-4 border-l-cyan-400 mb-8">
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-cyan-400/10 rounded-xl flex-shrink-0">
-              <AlertCircle className="h-6 w-6 text-cyan-400" />
+        {/* Info Card Metodología + Ventana */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Card Metodología */}
+          <div className="fhr-card border-l-4 border-l-cyan-400">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-cyan-400/10 rounded-xl flex-shrink-0">
+                <AlertCircle className="h-6 w-6 text-cyan-400" />
+              </div>
+              
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-white mb-2">Metodología 4C Bauer</h3>
+                <div className="text-sm text-slate-400 space-y-1">
+                  <p><span className="text-cyan-400 font-medium">Día 1:</span> Compliance</p>
+                  <p><span className="text-cyan-400 font-medium">Día 7:</span> Clarification</p>
+                  <p><span className="text-cyan-400 font-medium">Día 30:</span> Culture</p>
+                  <p><span className="text-cyan-400 font-medium">Día 90:</span> Connection</p>
+                </div>
+              </div>
             </div>
-            
-            <div className="flex-1">
-              <h3 className="fhr-subtitle text-lg mb-2">Metodología 4C Bauer</h3>
-              <div className="text-sm text-slate-400 space-y-2">
-                <p>
-                  <span className="text-cyan-300 font-medium">Día 1:</span> Compliance (primera impresión)
-                </p>
-                <p>
-                  <span className="text-cyan-300 font-medium">Día 7:</span> Clarification (claridad del rol)
-                </p>
-                <p>
-                  <span className="text-cyan-300 font-medium">Día 30:</span> Culture (integración cultural)
-                </p>
-                <p>
-                  <span className="text-cyan-300 font-medium">Día 90:</span> Connection (consolidación)
-                </p>
+          </div>
+          
+          {/* Card Ventana de Inscripción */}
+          <div className="fhr-card border-l-4 border-l-amber-400">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-amber-400/10 rounded-xl flex-shrink-0">
+                <Clock className="h-6 w-6 text-amber-400" />
+              </div>
+              
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-white mb-2">Ventana de Inscripción</h3>
+                <div className="text-sm text-slate-300 space-y-2">
+                  <p>
+                    La fecha de ingreso debe estar dentro de{' '}
+                    <span className="text-cyan-400 font-medium">±7 días</span> desde hoy.
+                  </p>
+                  <p className="text-slate-400 text-xs">
+                    Esto asegura que la percepción del onboarding se capture en el momento óptimo.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -241,7 +284,7 @@ export default function OnboardingBatchUploadPage() {
 }
 
 // ============================================================================
-// COMPONENTE: UPLOAD DROPZONE (Adaptado de ExcelDropzone)
+// COMPONENTE: UPLOAD DROPZONE
 // ============================================================================
 
 function UploadDropzone({ 
@@ -311,8 +354,8 @@ function UploadDropzone({
       </div>
       
       {/* Info Columnas */}
-      <div className="fhr-card-simple">
-        <h4 className="text-sm font-medium text-slate-300 mb-3">
+      <div className="fhr-card">
+        <h4 className="text-sm font-semibold text-slate-300 mb-3">
           Columnas obligatorias:
         </h4>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
@@ -344,7 +387,7 @@ function ParsingStep() {
 }
 
 // ============================================================================
-// COMPONENTE: PREVIEW (Adaptado de DataPreviewTable)
+// COMPONENTE: PREVIEW (Con validación de fechas)
 // ============================================================================
 
 function PreviewStep({
@@ -355,38 +398,91 @@ function PreviewStep({
   onConfirm,
   onCancel
 }: any) {
+  // Calcular estadísticas de fechas
+  const dateStats = React.useMemo(() => {
+    let windowExpired = 0;
+    let tooEarly = 0;
+    let validDates = 0;
+    
+    employees.forEach((emp: any) => {
+      if (emp.hireDate) {
+        const dateError = validateHireDateWindow(emp.hireDate);
+        if (!dateError) {
+          validDates++;
+        } else if (dateError.type === 'window_expired') {
+          windowExpired++;
+        } else if (dateError.type === 'too_early') {
+          tooEarly++;
+        }
+      }
+    });
+    
+    return { windowExpired, tooEarly, validDates };
+  }, [employees]);
+  
+  const hasDateWarnings = dateStats.windowExpired > 0 || dateStats.tooEarly > 0;
+  
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="fhr-card-metric">
+        <div className="fhr-card p-4">
           <div className="flex items-center gap-3 mb-2">
             <Users className="h-5 w-5 text-slate-400" />
             <span className="text-sm text-slate-400">Total</span>
           </div>
-          <p className="text-3xl font-bold text-white">{employees.length}</p>
+          <p className="text-3xl font-semibold text-white">{employees.length}</p>
         </div>
         
-        <div className="fhr-card-metric border-l-green-400">
+        <div className="fhr-card p-4 border-l-4 border-l-green-400">
           <div className="flex items-center gap-3 mb-2">
             <CheckCircle className="h-5 w-5 text-green-400" />
             <span className="text-sm text-slate-400">Válidos</span>
           </div>
-          <p className="text-3xl font-bold text-green-400">{validCount}</p>
+          <p className="text-3xl font-semibold text-green-400">{validCount}</p>
         </div>
         
-        <div className="fhr-card-metric border-l-red-400">
+        <div className="fhr-card p-4 border-l-4 border-l-red-400">
           <div className="flex items-center gap-3 mb-2">
             <XCircle className="h-5 w-5 text-red-400" />
             <span className="text-sm text-slate-400">Inválidos</span>
           </div>
-          <p className="text-3xl font-bold text-red-400">{invalidCount}</p>
+          <p className="text-3xl font-semibold text-red-400">{invalidCount}</p>
         </div>
       </div>
       
+      {/* Warning de fechas fuera de ventana */}
+      {hasDateWarnings && (
+        <div className="fhr-card border-l-4 border-l-amber-400 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-sm font-semibold text-amber-200 mb-1">
+                Fechas fuera de ventana detectadas
+              </h4>
+              <p className="text-sm text-slate-300">
+                {dateStats.windowExpired > 0 && (
+                  <span className="block">
+                    <span className="text-amber-400 font-medium">{dateStats.windowExpired}</span> con fecha de ingreso expirada (&gt;7 días pasado)
+                  </span>
+                )}
+                {dateStats.tooEarly > 0 && (
+                  <span className="block">
+                    <span className="text-cyan-400 font-medium">{dateStats.tooEarly}</span> con fecha muy lejana (&gt;7 días futuro)
+                  </span>
+                )}
+              </p>
+              <p className="text-xs text-slate-400 mt-2">
+                Estos registros serán rechazados por el sistema. Revisa la columna "Fecha" en la tabla.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Tabla Preview */}
       <div className="fhr-card">
-        <h3 className="fhr-subtitle text-lg mb-4">
+        <h3 className="text-lg font-semibold text-white mb-4">
           Vista Previa ({employees.length} empleados)
         </h3>
         
@@ -399,56 +495,88 @@ function PreviewStep({
                 <th className="text-left py-3 px-4 text-slate-400 font-medium">Nombre</th>
                 <th className="text-left py-3 px-4 text-slate-400 font-medium">Contacto</th>
                 <th className="text-left py-3 px-4 text-slate-400 font-medium">Departamento</th>
-                <th className="text-left py-3 px-4 text-slate-400 font-medium">Errores</th>
+                <th className="text-left py-3 px-4 text-slate-400 font-medium">Fecha Ingreso</th>
+                <th className="text-left py-3 px-4 text-slate-400 font-medium">Observaciones</th>
               </tr>
             </thead>
             <tbody>
-              {employees.slice(0, 50).map((emp: any, idx: number) => (
-                <tr 
-                  key={idx}
-                  className={`border-b border-slate-800 ${!emp.isValid ? 'bg-red-900/10' : ''}`}
-                >
-                  <td className="py-3 px-4">
-                    {emp.isValid ? (
-                      <CheckCircle className="h-4 w-4 text-green-400" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-red-400" />
-                    )}
-                  </td>
-                  <td className="py-3 px-4 font-mono text-xs text-slate-300">
-                    {emp.nationalId}
-                  </td>
-                  <td className="py-3 px-4 text-slate-300">
-                    {emp.fullName}
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex flex-col gap-1 text-xs">
-                      {emp.participantEmail && (
-                        <div className="flex items-center gap-1 text-slate-400">
-                          <Mail className="h-3 w-3" />
-                          <span className="truncate max-w-[150px]">{emp.participantEmail}</span>
-                        </div>
+              {employees.slice(0, 50).map((emp: any, idx: number) => {
+                const dateError = emp.hireDate ? validateHireDateWindow(emp.hireDate) : null;
+                const hasDateError = dateError !== null;
+                const rowHasError = !emp.isValid || hasDateError;
+                
+                return (
+                  <tr 
+                    key={idx}
+                    className={`border-b border-slate-800 ${
+                      rowHasError ? 'bg-red-900/10' : ''
+                    } ${hasDateError && emp.isValid ? 'bg-amber-900/10' : ''}`}
+                  >
+                    <td className="py-3 px-4">
+                      {emp.isValid && !hasDateError ? (
+                        <CheckCircle className="h-4 w-4 text-green-400" />
+                      ) : hasDateError && emp.isValid ? (
+                        <AlertTriangle className="h-4 w-4 text-amber-400" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-400" />
                       )}
-                      {emp.phoneNumber && (
-                        <div className="flex items-center gap-1 text-slate-400">
-                          <Phone className="h-3 w-3" />
-                          <span>{emp.phoneNumber}</span>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-slate-400 text-xs">
-                    {emp.departmentName || '-'}
-                  </td>
-                  <td className="py-3 px-4">
-                    {emp.errors.length > 0 && (
-                      <div className="text-xs text-red-400">
-                        {emp.errors.join(', ')}
+                    </td>
+                    <td className="py-3 px-4 font-mono text-xs text-slate-300">
+                      {emp.nationalId}
+                    </td>
+                    <td className="py-3 px-4 text-slate-300">
+                      {emp.fullName}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex flex-col gap-1 text-xs">
+                        {emp.participantEmail && (
+                          <div className="flex items-center gap-1 text-slate-400">
+                            <Mail className="h-3 w-3" />
+                            <span className="truncate max-w-[150px]">{emp.participantEmail}</span>
+                          </div>
+                        )}
+                        {emp.phoneNumber && (
+                          <div className="flex items-center gap-1 text-slate-400">
+                            <Phone className="h-3 w-3" />
+                            <span>{emp.phoneNumber}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-3 px-4 text-slate-400 text-xs">
+                      {emp.departmentName || '-'}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs ${hasDateError ? (dateError.color === 'amber' ? 'text-amber-400' : 'text-cyan-400') : 'text-slate-400'}`}>
+                          {emp.hireDate || '-'}
+                        </span>
+                        {hasDateError && (
+                          dateError.type === 'window_expired' ? (
+                            <Clock className="h-3 w-3 text-amber-400" />
+                          ) : (
+                            <Calendar className="h-3 w-3 text-cyan-400" />
+                          )
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="text-xs space-y-1">
+                        {emp.errors.length > 0 && (
+                          <div className="text-red-400">
+                            {emp.errors.join(', ')}
+                          </div>
+                        )}
+                        {hasDateError && (
+                          <div className={dateError.color === 'amber' ? 'text-amber-400' : 'text-cyan-400'}>
+                            {dateError.message}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           
@@ -471,15 +599,22 @@ function PreviewStep({
           Cancelar
         </NeutralButton>
         
-        <CyanButton
-          icon={Upload}
-          iconPosition="left"
-          size="md"
-          onClick={onConfirm}
-          disabled={!canUpload}
-        >
-          Confirmar Carga ({validCount} empleados)
-        </CyanButton>
+        <div className="flex items-center gap-3">
+          {hasDateWarnings && (
+            <span className="text-xs text-amber-400">
+              {dateStats.windowExpired + dateStats.tooEarly} serán rechazados
+            </span>
+          )}
+          <CyanButton
+            icon={Upload}
+            iconPosition="left"
+            size="md"
+            onClick={onConfirm}
+            disabled={!canUpload}
+          >
+            Confirmar Carga ({validCount} empleados)
+          </CyanButton>
+        </div>
       </div>
     </div>
   );
@@ -510,58 +645,210 @@ function UploadingStep({ progress }: { progress: number }) {
 }
 
 // ============================================================================
-// COMPONENTE: COMPLETE
+// COMPONENTE: COMPLETE (Con tabla de fallos detallada)
 // ============================================================================
 
 function CompleteStep({ result, onReset, onContinue }: any) {
+  const [showFailures, setShowFailures] = useState(true);
+  
+  // Parsear errores de los fallos
+  const failures: FailureDetail[] = React.useMemo(() => {
+    if (!result.results) return [];
+    
+    return result.results
+      .filter((r: any) => !r.success)
+      .map((r: any) => ({
+        index: r.index,
+        nationalId: r.nationalId,
+        fullName: r.fullName,
+        error: r.error,
+        parsedError: parseEnrollmentError(r.error || 'Error desconocido')
+      }));
+  }, [result.results]);
+  
+  const hasFailures = failures.length > 0;
+  
+  // Agrupar fallos por tipo
+  const failuresByType = React.useMemo(() => {
+    const groups = {
+      window_expired: [] as FailureDetail[],
+      too_early: [] as FailureDetail[],
+      validation: [] as FailureDetail[],
+      generic: [] as FailureDetail[]
+    };
+    
+    failures.forEach(f => {
+      groups[f.parsedError.type].push(f);
+    });
+    
+    return groups;
+  }, [failures]);
+  
   return (
-    <div className="fhr-card border-green-400/30 text-center py-16">
-      <div className="w-20 h-20 rounded-full bg-green-400/20 flex items-center justify-center mx-auto mb-6">
-        <CheckCircle className="w-10 h-10 text-green-400" />
-      </div>
-      
-      <h3 className="text-2xl font-bold text-white mb-2">
-        ¡Carga Exitosa!
-      </h3>
-      
-      <p className="text-slate-400 mb-8">
-        Los colaboradores han sido inscritos en el sistema de onboarding
-      </p>
-      
-      <div className="max-w-md mx-auto bg-slate-800/50 rounded-lg p-6 mb-8">
-        <div className="space-y-3 text-sm">
-          <div className="flex justify-between">
-            <span className="text-slate-400">Journeys creados:</span>
-            <span className="font-semibold text-green-400">{result.successCount}</span>
+    <div className="space-y-6">
+      {/* Card Principal de Éxito */}
+      <div className={`fhr-card text-center py-12 ${hasFailures ? 'border-amber-400/30' : 'border-green-400/30'}`}>
+        <div className={`w-20 h-20 rounded-full ${hasFailures ? 'bg-amber-400/20' : 'bg-green-400/20'} flex items-center justify-center mx-auto mb-6`}>
+          {hasFailures ? (
+            <AlertTriangle className="w-10 h-10 text-amber-400" />
+          ) : (
+            <CheckCircle className="w-10 h-10 text-green-400" />
+          )}
+        </div>
+        
+        <h3 className="text-2xl font-semibold text-white mb-2">
+          {hasFailures ? 'Carga Parcialmente Exitosa' : '¡Carga Exitosa!'}
+        </h3>
+        
+        <p className="text-slate-400 mb-8">
+          {hasFailures 
+            ? 'Algunos colaboradores no pudieron ser inscritos'
+            : 'Todos los colaboradores han sido inscritos en el sistema de onboarding'
+          }
+        </p>
+        
+        {/* Stats Grid */}
+        <div className="max-w-lg mx-auto grid grid-cols-2 gap-4 mb-8">
+          <div className="bg-slate-800/50 rounded-lg p-4">
+            <p className="text-sm text-slate-400 mb-1">Journeys creados</p>
+            <p className="text-3xl font-semibold text-green-400">{result.successCount}</p>
           </div>
-          {result.failureCount > 0 && (
-            <div className="flex justify-between">
-              <span className="text-slate-400">Fallos:</span>
-              <span className="font-semibold text-red-400">{result.failureCount}</span>
+          {hasFailures && (
+            <div className="bg-slate-800/50 rounded-lg p-4">
+              <p className="text-sm text-slate-400 mb-1">No procesados</p>
+              <p className="text-3xl font-semibold text-amber-400">{result.failureCount}</p>
             </div>
           )}
         </div>
+        
+        {/* Botones principales */}
+        <div className="flex items-center justify-center gap-4">
+          <PurpleButton
+            icon={Upload}
+            iconPosition="left"
+            size="md"
+            onClick={onReset}
+          >
+            Cargar Más
+          </PurpleButton>
+          
+          <CyanButton
+            icon={CheckCircle}
+            iconPosition="left"
+            size="md"
+            onClick={onContinue}
+          >
+            Ver Pipeline
+          </CyanButton>
+        </div>
       </div>
       
-      <div className="flex items-center justify-center gap-4">
-        <PurpleButton
-          icon={Upload}
-          iconPosition="left"
-          size="md"
-          onClick={onReset}
-        >
-          Cargar Más
-        </PurpleButton>
-        
-        <CyanButton
-          icon={CheckCircle}
-          iconPosition="left"
-          size="md"
-          onClick={onContinue}
-        >
-          Ver Pipeline
-        </CyanButton>
-      </div>
+      {/* Tabla de Fallos Detallada */}
+      {hasFailures && (
+        <div className="fhr-card">
+          <button
+            onClick={() => setShowFailures(!showFailures)}
+            className="w-full flex items-center justify-between text-left"
+          >
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-400" />
+              <h3 className="text-lg font-semibold text-white">
+                Detalle de Errores ({failures.length})
+              </h3>
+            </div>
+            {showFailures ? (
+              <ChevronUp className="h-5 w-5 text-slate-400" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-slate-400" />
+            )}
+          </button>
+          
+          {showFailures && (
+            <div className="mt-6 space-y-4">
+              {/* Resumen por tipo */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {failuresByType.window_expired.length > 0 && (
+                  <div className="flex items-center gap-2 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                    <Clock className="h-4 w-4 text-amber-400" />
+                    <span className="text-sm text-amber-300">
+                      {failuresByType.window_expired.length} ventana expirada
+                    </span>
+                  </div>
+                )}
+                {failuresByType.too_early.length > 0 && (
+                  <div className="flex items-center gap-2 p-3 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+                    <Calendar className="h-4 w-4 text-cyan-400" />
+                    <span className="text-sm text-cyan-300">
+                      {failuresByType.too_early.length} fecha muy lejana
+                    </span>
+                  </div>
+                )}
+                {(failuresByType.validation.length + failuresByType.generic.length) > 0 && (
+                  <div className="flex items-center gap-2 p-3 bg-red-500/10 rounded-lg border border-red-500/20">
+                    <XCircle className="h-4 w-4 text-red-400" />
+                    <span className="text-sm text-red-300">
+                      {failuresByType.validation.length + failuresByType.generic.length} otros errores
+                    </span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Tabla detallada */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-700">
+                      <th className="text-left py-3 px-4 text-slate-400 font-medium">RUT</th>
+                      <th className="text-left py-3 px-4 text-slate-400 font-medium">Nombre</th>
+                      <th className="text-left py-3 px-4 text-slate-400 font-medium">Motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {failures.map((failure, idx) => (
+                      <tr key={idx} className="border-b border-slate-800">
+                        <td className="py-3 px-4 font-mono text-xs text-slate-300">
+                          {failure.nationalId}
+                        </td>
+                        <td className="py-3 px-4 text-slate-300">
+                          {failure.fullName}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            {failure.parsedError.icon === 'clock' && <Clock className="h-4 w-4 text-amber-400" />}
+                            {failure.parsedError.icon === 'calendar' && <Calendar className="h-4 w-4 text-cyan-400" />}
+                            {failure.parsedError.icon === 'alert' && <AlertCircle className="h-4 w-4 text-red-400" />}
+                            {failure.parsedError.icon === 'x' && <XCircle className="h-4 w-4 text-red-400" />}
+                            <span className={`text-sm ${
+                              failure.parsedError.color === 'amber' ? 'text-amber-300' :
+                              failure.parsedError.color === 'cyan' ? 'text-cyan-300' :
+                              'text-red-300'
+                            }`}>
+                              {failure.parsedError.message}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Tip para errores de ventana */}
+              {(failuresByType.window_expired.length > 0 || failuresByType.too_early.length > 0) && (
+                <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                  <p className="text-sm text-slate-300">
+                    <strong className="text-white">¿Por qué importa la ventana de inscripción?</strong>
+                  </p>
+                  <ul className="text-sm text-slate-400 mt-2 space-y-1">
+                    <li>• La percepción del onboarding se forma en los <span className="text-cyan-400">primeros días</span></li>
+                    <li>• Inscribir a tiempo permite <span className="text-cyan-400">detectar alertas</span> y corregir oportunamente</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -577,7 +864,7 @@ function ErrorStep({ error, onReset, onCancel }: any) {
         <XCircle className="w-10 h-10 text-red-400" />
       </div>
       
-      <h3 className="text-2xl font-bold text-white mb-2">
+      <h3 className="text-2xl font-semibold text-white mb-2">
         Error en la Carga
       </h3>
       

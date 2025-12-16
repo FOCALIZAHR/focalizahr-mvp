@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
-import { UserPlus, Loader2, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { UserPlus, Loader2, CheckCircle, AlertCircle, ArrowLeft, AlertTriangle, Clock, X } from 'lucide-react';
 import { useToast } from '@/components/ui/toast-system';
 import { CyanButton, NeutralButton } from '@/components/ui/MinimalistButton';
 import { z } from 'zod';
@@ -108,14 +108,7 @@ const enrollmentSchema = z.object({
   
   hireDate: z.string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato: YYYY-MM-DD')
-    .min(1, 'Fecha de contratación es obligatoria')
-    .refine((date) => {
-      if (!date) return true;
-      const hireDate = new Date(date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return hireDate <= today;
-    }, 'Fecha de contratación no puede ser futura'),
+    .min(1, 'Fecha de contratación es obligatoria'),
   
   location: z.string()
     .max(100, 'Ubicación demasiado larga')
@@ -157,6 +150,10 @@ export default function EnrollmentPage() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [windowModal, setWindowModal] = useState<{
+      type: 'expired' | 'too_early';
+      days: number;
+    } | null>(null);
     const { success, error: showError } = useToast();
     const {
         register,
@@ -229,10 +226,28 @@ export default function EnrollmentPage() {
       const result = await response.json();
 
         if (!response.ok) {
+            const errorMsg = result.error || result.message || '';
+            
+            // ✅ Detectar error de ventana expirada (>7 días pasado)
+            if (errorMsg.includes('ENROLLMENT_WINDOW_EXPIRED')) {
+                const days = parseInt(errorMsg.split(':')[1]) || 0;
+                setWindowModal({ type: 'expired', days });
+                setSubmitting(false);
+                return;
+            }
+            
+            // ✅ Detectar error de inscripción muy temprana (>7 días futuro)
+            if (errorMsg.includes('ENROLLMENT_TOO_EARLY')) {
+                const days = parseInt(errorMsg.split(':')[1]) || 0;
+                setWindowModal({ type: 'too_early', days });
+                setSubmitting(false);
+                return;
+            }
+            
             // Si hay detalles de validación, mostrarlos
             if (result.details && result.details.length > 0) {
                 const errores = result.details
-                    .map((d: any) => `• ${d.message}`)  // ← Eliminé ${d.field}:
+                    .map((d: any) => `• ${d.message}`)
                     .join('\n');
                 throw new Error(`Errores de validación:\n${errores}`);
             }
@@ -532,7 +547,6 @@ export default function EnrollmentPage() {
                 <input
                   {...register('hireDate')}
                   type="date"
-                  max={new Date().toISOString().split('T')[0]}
                   className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition"
                 />
                 {errors.hireDate && (
@@ -612,6 +626,109 @@ export default function EnrollmentPage() {
             </div>
           </div>
         </motion.div>
+
+        {/* MODAL VENTANA DE ENROLLMENT */}
+        {windowModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setWindowModal(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2 }}
+              className="bg-slate-900/95 backdrop-blur-xl border border-slate-700/50 rounded-2xl max-w-lg w-full p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header con icono */}
+              <div className="flex items-start gap-4">
+                <div className={`p-3 rounded-xl ${
+                  windowModal.type === 'expired' 
+                    ? 'bg-amber-500/20' 
+                    : 'bg-cyan-500/20'
+                }`}>
+                  {windowModal.type === 'expired' 
+                    ? <AlertTriangle className="w-6 h-6 text-amber-400" />
+                    : <Clock className="w-6 h-6 text-cyan-400" />
+                  }
+                </div>
+                
+                <div className="flex-1">
+                  <h3 className={`text-xl font-semibold ${
+                    windowModal.type === 'expired' 
+                      ? 'text-amber-200' 
+                      : 'text-cyan-200'
+                  }`}>
+                    {windowModal.type === 'expired' 
+                      ? 'Ventana de Onboarding Expirada'
+                      : 'Fecha de Ingreso Muy Lejana'
+                    }
+                  </h3>
+                  
+                  <p className="text-slate-300 mt-3">
+                    {windowModal.type === 'expired' ? (
+                      <>
+                        Han pasado <span className="text-cyan-400 font-semibold">{windowModal.days} días</span> desde 
+                        la fecha de ingreso. La ventana válida para inscripción es de <span className="text-cyan-400 font-semibold">7 días</span>.
+                      </>
+                    ) : (
+                      <>
+                        La fecha de ingreso es en <span className="text-cyan-400 font-semibold">{windowModal.days} días</span>. 
+                        Solo se permite pre-inscribir hasta <span className="text-cyan-400 font-semibold">7 días</span> antes del ingreso.
+                      </>
+                    )}
+                  </p>
+
+                  {/* Dato estadístico - solo para expirado */}
+                  {windowModal.type === 'expired' && (
+                    <div className="mt-4 p-4 bg-slate-800/50 rounded-lg border border-cyan-500/20 space-y-3">
+                      <p className="text-sm text-white font-medium">
+                        ¿Por qué es importante inscribir a tiempo?
+                      </p>
+                      <ul className="text-sm text-slate-300 space-y-2">
+                        <li>• La percepción del onboarding se forma en los <span className="text-cyan-400 font-medium">primeros días</span></li>
+                        <li>• El <span className="text-cyan-400 font-medium">22%</span> de las renuncias del primer año se deciden antes del <span className="text-cyan-400 font-medium">día 45</span></li>
+                        <li>• Inscribir a tiempo permite <span className="text-cyan-400 font-medium">detectar alertas</span> y corregir oportunamente</li>
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Dato estadístico - solo para too_early */}
+                  {windowModal.type === 'too_early' && (
+                    <div className="mt-4 p-4 bg-slate-800/50 rounded-lg border border-cyan-500/20 space-y-3">
+                      <p className="text-sm text-white font-medium">
+                        ¿Por qué limitamos la pre-inscripción?
+                      </p>
+                      <ul className="text-sm text-slate-300 space-y-2">
+                        <li>• Tasa de <span className="text-cyan-400 font-medium">caída de candidatos</span> antes del ingreso efectivo</li>
+                        <li>• Cambios de última hora en <span className="text-cyan-400 font-medium">fechas o condiciones</span></li>
+                        <li>• Optimizar recursos del sistema para <span className="text-cyan-400 font-medium">ingresos confirmados</span></li>
+                      </ul>
+                    </div>
+                  )}
+
+                  <p className="text-slate-300 mt-4 text-sm">
+                    {windowModal.type === 'expired' 
+                      ? 'Recomendamos coordinar con jefatura directa para evaluar el estado actual del colaborador.'
+                      : 'Vuelve más cerca de la fecha de ingreso para inscribir a este colaborador.'
+                    }
+                  </p>
+
+                  {/* Botones */}
+                  <div className="flex justify-end mt-6">
+                    <NeutralButton onClick={() => setWindowModal(null)} icon={X} iconPosition="left" size="md">
+                      Cerrar
+                    </NeutralButton>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </div>
     </div>
   );

@@ -339,21 +339,28 @@ export class OnboardingEnrollmentService {
       throw new Error('[ONBOARDING] hireDate es obligatorio para calcular etapas del journey');
     }
     
-    // Validación lógica de negocio
+    // ✅ Validación ventana de enrollment (7 días en ambas direcciones)
+    const MAX_DAYS_PAST = 7;
+    const MAX_DAYS_FUTURE = 7;
+
     const today = new Date();
-    if (data.hireDate > today) {
-      throw new Error('[ONBOARDING] hireDate no puede ser fecha futura');
+    today.setHours(0, 0, 0, 0);
+
+    const hireDateNorm = new Date(data.hireDate);
+    hireDateNorm.setHours(0, 0, 0, 0);
+
+    const daysDiff = Math.floor(
+      (today.getTime() - hireDateNorm.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    // Pasado > 7 días: ERROR
+    if (daysDiff > MAX_DAYS_PAST) {
+      throw new Error(`ENROLLMENT_WINDOW_EXPIRED:${daysDiff}`);
     }
-    
-    // Validación de edad del dato (warning, no error)
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-    
-    if (data.hireDate < oneYearAgo) {
-      console.warn(
-        `[ONBOARDING] hireDate es muy antigua (${data.hireDate.toISOString()}). ` +
-        `Journey puede no ser representativo de proceso actual.`
-      );
+
+    // Futuro > 7 días: ERROR
+    if (daysDiff < -MAX_DAYS_FUTURE) {
+      throw new Error(`ENROLLMENT_TOO_EARLY:${Math.abs(daysDiff)}`);
     }
   }
   
@@ -432,11 +439,20 @@ export class OnboardingEnrollmentService {
    * @returns JourneyDates con las 4 fechas calculadas
    */
   private static calculateJourneyDates(startDate: Date): JourneyDates {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const startNormalized = new Date(startDate);
+    startNormalized.setHours(0, 0, 0, 0);
+
+    // Si hire_date pasó, usar HOY como base (Day 1 = mañana)
+    const baseDate = startNormalized < today ? today : startNormalized;
+
     return {
-      stage1Date: addDays(startDate, 1),   // Día 1
-      stage2Date: addDays(startDate, 7),   // Día 7
-      stage3Date: addDays(startDate, 30),  // Día 30
-      stage4Date: addDays(startDate, 90)   // Día 90
+      stage1Date: addDays(baseDate, 1),   // Día 1
+      stage2Date: addDays(baseDate, 7),   // Día 7
+      stage3Date: addDays(baseDate, 30),  // Día 30
+      stage4Date: addDays(baseDate, 90)   // Día 90
     };
   }
   
