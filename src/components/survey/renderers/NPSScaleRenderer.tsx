@@ -1,6 +1,11 @@
 // src/components/survey/renderers/NPSScaleRenderer.tsx
+'use client';
+
 import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import Slider from 'rc-slider';
+import 'rc-slider/assets/index.css';
 import { scaleIn } from '../constants/animations';
 import type { SurveyResponse } from '@/hooks/useSurveyEngine';
 
@@ -10,32 +15,25 @@ interface NPSScaleRendererProps {
 }
 
 /**
- * NPSScaleRenderer - Net Promoter Score (0-10)
+ * NPSScaleRenderer v3.0 - Net Promoter Score Premium
  * 
- * Implementa la metodología oficial NPS/eNPS:
- * - Detractores: 0-6 (Rojo)
- * - Pasivos: 7-8 (Amarillo)
- * - Promotores: 9-10 (Verde)
+ * FILOSOFÍA ALINEADA AL SURVEY:
+ * - Minimalismo extremo
+ * - Slate (gris) para neutral/pasivo
+ * - Cyan-Purple SOLO para promotor (colores corporativos)
+ * - Font-light, espacios generosos
+ * - Sin saturación de colores
  * 
- * Uso típico: eNPS, Customer NPS, Product NPS
+ * Clasificación NPS:
+ * - Detractores: 0-6 (Rojo desaturado)
+ * - Pasivos: 7-8 (Slate - neutral)
+ * - Promotores: 9-10 (Cyan-Purple gradient)
  */
 export const NPSScaleRenderer: React.FC<NPSScaleRendererProps> = ({ 
   response, 
   updateResponse 
 }) => {
-  // Escala NPS: 0 a 10 (11 valores)
-  const npsValues = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-
-  // Labels contextuales para valores clave (eNPS específico)
-  const contextualLabels: { [key: number]: string } = {
-    0: 'Definitivamente no',
-    5: 'Probablemente no',
-    7: 'Neutral',
-    9: 'Probablemente sí',
-    10: 'Definitivamente sí'
-  };
-
-  // Clasificación NPS según metodología oficial
+  // Clasificación NPS - ALINEADA A FILOSOFÍA SURVEY
   const getNPSClassification = useMemo(() => {
     if (response?.rating === undefined || response?.rating === null) {
       return null;
@@ -44,31 +42,40 @@ export const NPSScaleRenderer: React.FC<NPSScaleRendererProps> = ({
     const rating = response.rating;
 
     if (rating <= 6) {
+      // Detractor - Rojo muy desaturado (minimalista)
       return {
-        label: 'Detractor',
-        color: 'text-red-400',
-        bgColor: 'bg-red-500/10',
-        borderColor: 'border-red-500/30',
-        description: 'Poco probable que recomiende',
-        emoji: '😟'
+        label: 'Poco Probable',
+        range: '0-6',
+        trackColor: '#EF4444',
+        trackGradient: 'linear-gradient(90deg, rgba(239, 68, 68, 0.4), rgba(220, 38, 38, 0.3))',
+        glowColor: 'rgba(239, 68, 68, 0.15)',
+        gradient: 'from-red-400 to-red-500',
+        icon: TrendingDown,
+        description: 'Necesitamos mejorar tu experiencia'
       };
     } else if (rating <= 8) {
+      // Pasivo - SLATE (neutral, sin color) ← FILOSOFÍA SURVEY
       return {
-        label: 'Pasivo',
-        color: 'text-yellow-400',
-        bgColor: 'bg-yellow-500/10',
-        borderColor: 'border-yellow-500/30',
-        description: 'Neutral, podría recomendar',
-        emoji: '😐'
+        label: 'Neutral',
+        range: '7-8',
+        trackColor: '#64748B',
+        trackGradient: 'linear-gradient(90deg, rgba(100, 116, 139, 0.4), rgba(71, 85, 105, 0.3))',
+        glowColor: 'rgba(100, 116, 139, 0.15)',
+        gradient: 'from-slate-400 to-slate-500',
+        icon: Minus,
+        description: 'Tu opinión nos ayuda a seguir mejorando'
       };
     } else {
+      // Promotor - CYAN → PURPLE (colores corporativos) ← FILOSOFÍA SURVEY
       return {
-        label: 'Promotor',
-        color: 'text-green-400',
-        bgColor: 'bg-green-500/10',
-        borderColor: 'border-green-500/30',
-        description: 'Muy probable que recomiende',
-        emoji: '😊'
+        label: 'Muy Probable',
+        range: '9-10',
+        trackColor: '#22D3EE',
+        trackGradient: 'linear-gradient(90deg, #22D3EE, #A78BFA)',
+        glowColor: 'rgba(34, 211, 238, 0.2)',
+        gradient: 'from-cyan-400 to-purple-400',
+        icon: TrendingUp,
+        description: '¡Gracias! Tu recomendación nos motiva'
       };
     }
   }, [response?.rating]);
@@ -78,119 +85,139 @@ export const NPSScaleRenderer: React.FC<NPSScaleRendererProps> = ({
       variants={scaleIn} 
       initial="initial" 
       animate="animate" 
-      transition={{ duration: 0.2, ease: "easeOut" }}
       className="space-y-6"
     >
-      {/* Escala NPS 0-10 */}
-      <div className="space-y-4">
-        {/* Grid responsive para 11 botones */}
-        <div className="grid grid-cols-11 gap-1.5 md:gap-2 max-w-5xl mx-auto">
-          {npsValues.map((value) => {
-            const isSelected = response?.rating === value;
-            
-            // Determinar color según rango NPS
-            let selectedColorClass = '';
-            if (isSelected) {
-              if (value <= 6) {
-                selectedColorClass = 'bg-red-500 border-red-500 text-white shadow-[0_4px_16px_rgba(239,68,68,0.4)]';
-              } else if (value <= 8) {
-                selectedColorClass = 'bg-yellow-500 border-yellow-500 text-slate-900 shadow-[0_4px_16px_rgba(245,158,11,0.4)]';
-              } else {
-                selectedColorClass = 'bg-green-500 border-green-500 text-white shadow-[0_4px_16px_rgba(16,185,129,0.4)]';
-              }
-            }
-
-            return (
-              <button
-                key={value}
-                onClick={() => updateResponse({ rating: value })}
-                className={`survey-scale-button ${
-                  isSelected 
-                    ? `selected ${selectedColorClass} scale-110` 
-                    : ''
-                }`}
-                style={{
-                  aspectRatio: '1 / 1',
-                  minWidth: '32px',
-                  minHeight: '32px'
-                }}
-                aria-label={`NPS Score ${value}${contextualLabels[value] ? ` - ${contextualLabels[value]}` : ''}`}
-                aria-pressed={isSelected}
+      {/* Feedback inline ARRIBA - Sutil pero visible */}
+      <AnimatePresence>
+        {getNPSClassification && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="text-center"
+          >
+            <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full backdrop-blur-sm border"
+              style={{
+                background: `${getNPSClassification.trackColor}08`,
+                borderColor: `${getNPSClassification.trackColor}20`
+              }}
+            >
+              <getNPSClassification.icon 
+                className="w-4 h-4"
+                style={{ color: getNPSClassification.trackColor }}
+              />
+              <span 
+                className="text-sm font-light"
+                style={{ color: getNPSClassification.trackColor }}
               >
-                <span className="survey-scale-button-number text-sm md:text-base">
-                  {value}
-                </span>
-                
-                {/* Ripple effect cuando está seleccionado */}
-                {isSelected && (
-                  <span className="survey-scale-ripple" />
-                )}
-              </button>
-            );
-          })}
-        </div>
+                {getNPSClassification.label}
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        {/* Labels contextuales en posiciones clave */}
-        <div className="relative max-w-5xl mx-auto px-1">
-          <div className="flex justify-between text-[10px] md:text-xs text-slate-500 font-medium">
-            <span className="flex-1 text-left">Definitivamente no</span>
-            <span className="flex-1 text-center -ml-8">Probablemente no</span>
-            <span className="flex-1 text-center -ml-4">Neutral</span>
-            <span className="flex-1 text-center ml-2">Probablemente sí</span>
-            <span className="flex-1 text-right">Definitivamente sí</span>
-          </div>
+      {/* Slider NPS - Compacto y funcional */}
+      <div className="space-y-3">
+        <div className="relative max-w-3xl mx-auto px-6">
           
-          {/* Indicadores de posición (opcional - visual guide) */}
-          <div className="flex justify-between mt-1 opacity-30">
-            <span className="text-[9px] text-slate-600">0</span>
-            <span className="text-[9px] text-slate-600">5</span>
-            <span className="text-[9px] text-slate-600">7</span>
-            <span className="text-[9px] text-slate-600">9</span>
-            <span className="text-[9px] text-slate-600">10</span>
+          {/* Números - TODOS visibles con jerarquía clara */}
+          <div className="flex justify-between mb-4 px-2">
+            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
+              const isSelected = response?.rating === num;
+              
+              return (
+                <span 
+                  key={num}
+                  className={`
+                    transition-all duration-300 tabular-nums
+                    ${isSelected 
+                      ? 'text-2xl font-medium text-[#A78BFA]' 
+                      : 'text-sm font-light text-slate-500'
+                    }
+                  `}
+                >
+                  {num}
+                </span>
+              );
+            })}
+          </div>
+
+          {/* Container barra con glassmorphism sutil */}
+          <div className="relative rounded-xl bg-slate-900/20 backdrop-blur-sm border border-white/5 p-4">
+            
+            {/* Slider refinado */}
+            <Slider
+              min={0}
+              max={10}
+              step={1}
+              value={response?.rating ?? 0}
+              onChange={(value) => updateResponse({ rating: value as number })}
+              railStyle={{
+                height: 6,
+                borderRadius: 3,
+                background: 'rgba(51, 65, 85, 0.4)',
+                border: '1px solid rgba(255, 255, 255, 0.05)'
+              }}
+              trackStyle={{
+                height: 6,
+                borderRadius: 3,
+                background: getNPSClassification 
+                  ? getNPSClassification.trackGradient
+                  : 'linear-gradient(90deg, #22D3EE, #A78BFA)',
+                boxShadow: getNPSClassification
+                  ? `0 0 12px ${getNPSClassification.glowColor}`
+                  : '0 0 12px rgba(34, 211, 238, 0.2)',
+                transition: 'all 0.4s ease'
+              }}
+              handleStyle={{
+                width: 20,
+                height: 20,
+                marginTop: -7,
+                background: '#ffffff',
+                border: '2px solid rgba(255, 255, 255, 0.8)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2), 0 0 0 3px rgba(167, 139, 250, 0.15)',
+                opacity: 1,
+                cursor: 'pointer'
+              }}
+              dotStyle={{
+                display: 'none'
+              }}
+            />
+          </div>
+
+          {/* Labels PEGADOS a la barra */}
+          <div className="flex justify-between text-[10px] text-slate-600 font-light mt-2 px-2 uppercase tracking-wider">
+            <span>Definitivamente no</span>
+            <span className="opacity-60">Neutral</span>
+            <span>Definitivamente sí</span>
           </div>
         </div>
       </div>
 
-      {/* Label del valor seleccionado (dinámico) */}
-      {response?.rating !== undefined && response?.rating !== null && (
-        <div className="text-center">
-          <span className="text-sm text-cyan-400 font-medium">
-            {contextualLabels[response.rating] || `Valor: ${response.rating}`}
-          </span>
-        </div>
-      )}
-
-      {/* Clasificación NPS con feedback visual */}
-      {getNPSClassification && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-          className={`
-            p-4 rounded-xl border text-center
-            ${getNPSClassification.bgColor}
-            ${getNPSClassification.borderColor}
-          `}
-        >
-          <div className="flex items-center justify-center gap-3 mb-2">
-            <span className="text-2xl" role="img" aria-label={getNPSClassification.label}>
-              {getNPSClassification.emoji}
-            </span>
-            <span className={`text-lg md:text-xl font-bold ${getNPSClassification.color}`}>
-              {getNPSClassification.label}
+      {/* Hint inicial - Diseño minimalista */}
+      {!getNPSClassification && (
+        <div className="text-center space-y-4 max-w-2xl mx-auto">
+          <div className="inline-flex items-center gap-3 px-5 py-3 rounded-full backdrop-blur-sm bg-white/[0.02] border border-white/5">
+            <div className="relative">
+              <div className="absolute inset-0 w-2 h-2 bg-[#22D3EE] rounded-full blur-sm animate-pulse" />
+              <div className="relative w-2 h-2 bg-[#22D3EE] rounded-full" />
+            </div>
+            <span className="text-xs text-slate-400 font-light">
+              Desliza o toca para seleccionar un valor de 0 a 10
             </span>
           </div>
-          <p className="text-xs md:text-sm text-slate-400">
-            {getNPSClassification.description}
-          </p>
-        </motion.div>
-      )}
-
-      {/* Hint cuando no hay selección */}
-      {!getNPSClassification && (
-        <div className="text-center">
-          <p className="text-xs text-slate-500">
-            Selecciona un valor de <strong>0 (Definitivamente no)</strong> a <strong>10 (Definitivamente sí)</strong>
+          
+          {/* Línea decorativa */}
+          <div className="flex items-center justify-center gap-2 opacity-30">
+            <div className="h-px w-12 bg-gradient-to-r from-transparent to-white/10" />
+            <div className="w-0.5 h-0.5 rounded-full bg-white/20" />
+            <div className="h-px w-12 bg-gradient-to-l from-transparent to-white/10" />
+          </div>
+          
+          <p className="text-[10px] text-slate-600 font-light uppercase tracking-wider">
+            Tu respuesta es completamente confidencial
           </p>
         </div>
       )}

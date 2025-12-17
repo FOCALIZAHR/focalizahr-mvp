@@ -238,38 +238,27 @@ export class OnboardingIntelligenceEngine {
    * Promedio de responses del participant en ese stage
    * Normaliza cualquier escala (1-5, 0-10) a 0-5
    */
+  // ✅ DESPUÉS (SIMPLIFICADO):
   static async calculateStageScore(participantId: string): Promise<number | null> {
     const responses = await prisma.response.findMany({
       where: {
         participantId,
-        rating: { not: null },
+        normalizedScore: { not: null },  // ✅ Filtra por normalizedScore
       },
-      include: {
-        question: {
-          select: {
-            responseType: true,
-            minValue: true,
-            maxValue: true
-          }
-        }
+      select: {
+        id: true,
+        normalizedScore: true  // ✅ Solo necesitamos esto
       }
     });
-    
+
     if (responses.length === 0) return null;
-    
-    // Normalizar cualquier escala (1-5, 0-10) a 0-5
-    const scores = responses.map(r => {
-      const rating = r.rating!;
-      const min = r.question.minValue;
-      const max = r.question.maxValue;
-      
-      return ((rating - min) / (max - min)) * 5;
-    });
-    
+
+    // Ya está normalizado 0-5
+    const scores = responses.map(r => r.normalizedScore!);  // ✅ Directo
+
     const average = scores.reduce((a, b) => a + b, 0) / scores.length;
     return Math.round(average * 10) / 10;
   }
-  
   /**
    * ✅ ACTUALIZAR SCORES EN JOURNEY DESPUÉS DE RESPONDER STAGE
    */

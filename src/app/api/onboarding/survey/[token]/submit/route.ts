@@ -1,3 +1,4 @@
+// src/app/api/onboarding/survey/[token]/submit/route.ts
 /**
  * POST /api/onboarding/survey/[token]/submit
  * 
@@ -22,6 +23,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { OnboardingIntelligenceEngine } from '@/lib/engines/OnboardingIntelligenceEngine';
 import { OnboardingAlertService } from '@/lib/services/OnboardingAlertService';
+import { calculateNormalizedScore } from '@/lib/utils/responseNormalizer';
 
 // ============================================================================
 // TYPES
@@ -311,7 +313,28 @@ export async function POST(
     }
 
     // ========================================================================
-    // 10. PREPARAR RESPONSES DATA
+    // 9.5 OBTENER PREGUNTAS CON METADATA (para normalización)
+    // ========================================================================
+    const questionIds = body.responses.map(r => r.questionId);
+    const questions = await prisma.question.findMany({
+      where: {
+        id: { in: questionIds }
+      },
+      select: {
+        id: true,
+        responseType: true,
+        minValue: true,
+        maxValue: true,
+        choiceOptions: true,
+        responseValueMapping: true
+      }
+    });
+
+    // Crear mapa para lookup rápido
+    const questionMap = new Map(questions.map(q => [q.id, q]));
+
+    // ========================================================================
+    // 10. PREPARAR RESPONSES DATA (CON normalizedScore)
     // ========================================================================
     const responsesData: Array<{
       participantId: string;
@@ -319,6 +342,7 @@ export async function POST(
       rating?: number;
       textResponse?: string;
       choiceResponse?: string;
+      normalizedScore?: number;
     }> = [];
 
     for (const response of body.responses) {
@@ -332,6 +356,13 @@ export async function POST(
           },
           { status: 400 }
         );
+      }
+
+      // Obtener pregunta del mapa
+      const question = questionMap.get(response.questionId);
+      if (!question) {
+        console.warn(`[Question not found]: ${response.questionId}`);
+        continue;
       }
 
       // Preparar data limpia
@@ -358,10 +389,34 @@ export async function POST(
         data.choiceResponse = JSON.stringify(response.matrixResponses);
       }
 
+      // ═══════════════════════════════════════════════════════════════
+      // ✅ NUEVO: Calcular normalizedScore
+      // ═══════════════════════════════════════════════════════════════
+      const normalizedScore = calculateNormalizedScore(
+        {
+          rating: data.rating,
+          choiceResponse: data.choiceResponse,
+          textResponse: data.textResponse
+        },
+        question
+      );
+
+      if (normalizedScore !== null) {
+        data.normalizedScore = normalizedScore;
+        console.log(`[normalizedScore calculated]`, {
+          questionId: response.questionId,
+          type: question.responseType,
+          value: normalizedScore
+        });
+      }
+
       responsesData.push(data);
     }
 
-    console.log('[Responses prepared]', { count: responsesData.length });
+    console.log('[Responses prepared with normalizedScore]', { 
+      count: responsesData.length,
+      withNormalized: responsesData.filter(r => r.normalizedScore !== undefined).length
+    });
 
     // ========================================================================
     // 11. TRANSACCIÓN: GUARDAR RESPONSES + MARCAR PARTICIPANT

@@ -3,11 +3,13 @@
 // 🔧 CAMBIOS APLICADOS: Eliminados checkLowScores() y checkRiskEscalation()
 // 🆕 V2.0: Agregado trend + history 12 meses en getAlertStatistics
 // 🏗️ V2.1: Tipos explícitos enterprise (AlertStatistics interface)
+// 🔧 V2.2: normalizedScore con fallback robusto (backward compatibility)
 
 import { prisma } from '@/lib/prisma';
 import { addHours } from 'date-fns';
 import { JourneyAlert } from '@prisma/client';
 import { AlertStatistics, TrendDirection } from '@/types/onboarding';
+import { calculateNormalizedScore } from '@/lib/utils/responseNormalizer';
 
 export class OnboardingAlertService {
   
@@ -18,136 +20,115 @@ export class OnboardingAlertService {
     low: 168
   };
 
-  // ============================================================================
-  // 🆕 DEFINICIONES DE LAS 6 ALERTAS ESPECÍFICAS
-  // ============================================================================
-  private static ALERT_DEFINITIONS = [
-    // ✅ 1/6 - ABANDONO_DIA_1
-    {
-      type: 'ABANDONO_DIA_1',
-      stage: 1,
-      questionOrder: 2,
-      campaignTypeSlug: 'onboarding-day-1',
-      condition: (response: any) => {
-        const choice = response.choiceResponse;
-        if (!choice) return false;
-        
-        // Parsear JSON si es string
-        let choices: string[] = [];
-        try {
-          choices = typeof choice === 'string' ? JSON.parse(choice) : [choice];
-        } catch {
-          choices = [choice];
-        }
-        
-        return choices.includes('No, nadie me recibió');
-      },
-      severity: 'critical' as const,
-      slaHours: 24,
-      titleTemplate: (name: string) => `🚨 ABANDONO DÍA 1: ${name}`,
-      descriptionTemplate: (name: string) => 
-        `${name} reporta que nadie le recibió personalmente en su primer día. Requiere intervención inmediata del manager y HRBP.`
+  // ════════════════════════════════════════════════════════════
+// TODAS LAS 6 ALERTAS - VERSIÓN FINAL CORRECTA
+// ════════════════════════════════════════════════════════════
+
+private static ALERT_DEFINITIONS = [
+  // 1. ABANDONO_DIA_1
+  {
+    type: 'ABANDONO_DIA_1',
+    stage: 1,
+    questionOrder: 2,
+    campaignTypeSlug: 'onboarding-day-1',
+    condition: (response: any) => {
+      // ✅ USA normalizedScore (no texto)
+      return response.normalizedScore !== null && response.normalizedScore <= 1.0;
     },
-    
-    // ✅ 2/6 - BIENVENIDA_FALLIDA
-    {
-      type: 'BIENVENIDA_FALLIDA',
-      stage: 1,
-      questionOrder: 1,
-      campaignTypeSlug: 'onboarding-day-1',
-      condition: (response: any) => response.rating !== null && response.rating <= 2,
-      severity: 'critical' as const,
-      slaHours: 48,
-      titleTemplate: (name: string) => `🚨 BIENVENIDA FALLIDA: ${name}`,
-      descriptionTemplate: (name: string, score?: number) => 
-        `${name} calificó la preparación logística con ${score}/5. Herramientas o accesos no disponibles el día 1.`
-    },
-    
-    // ✅ 3/6 - CONFUSION_ROL
-    {
-      type: 'CONFUSION_ROL',
-      stage: 2,
-      questionOrder: 1,
-      campaignTypeSlug: 'onboarding-day-7',
-      condition: (response: any) => response.rating !== null && response.rating <= 2,
-      severity: 'high' as const,
-      slaHours: 72,
-      titleTemplate: (name: string) => `⚠️ CONFUSIÓN DE ROL: ${name}`,
-      descriptionTemplate: (name: string, score?: number) => 
-        `${name} reporta baja claridad sobre expectativas del rol (${score}/5). Requiere reunión de alineamiento urgente.`
-    },
-    
-    // ✅ 4/6 - DESAJUSTE_ROL
-    {
-      type: 'DESAJUSTE_ROL',
-      stage: 2,
-      questionOrder: 4,
-      campaignTypeSlug: 'onboarding-day-7',
-      condition: (response: any) => {
-        const choice = response.choiceResponse;
-        if (!choice) return false;
-        
-        // Parsear JSON si es string
-        let choices: string[] = [];
-        try {
-          choices = typeof choice === 'string' ? JSON.parse(choice) : [choice];
-        } catch {
-          choices = [choice];
-        }
-        
-        const negative = ['Mayormente no', 'No coinciden en absoluto'];
-        return choices.some(c => negative.includes(c));
-      },
-      severity: 'critical' as const,
-      slaHours: 48,
-      titleTemplate: (name: string) => `🚨 DESAJUSTE DE ROL: ${name}`,
-      descriptionTemplate: (name: string) => 
-        `${name} indica que las tareas asignadas no coinciden con la descripción del puesto. Investigar discrepancia urgente.`
-    },
-    
-    // ✅ 5/6 - RIESGO_FUGA
-    {
-      type: 'RIESGO_FUGA',
-      stage: 3,
-      questionOrder: 1,
-      campaignTypeSlug: 'onboarding-day-30',
-      condition: (response: any) => {
-        const choice = response.choiceResponse;
-        if (!choice) return false;
-        
-        // Parsear JSON si es string
-        let choices: string[] = [];
-        try {
-          choices = typeof choice === 'string' ? JSON.parse(choice) : [choice];
-        } catch {
-          choices = [choice];
-        }
-        
-        const negative = ['Probablemente no', 'Definitivamente no'];
-        return choices.some(c => negative.includes(c));
-      },
-      severity: 'critical' as const,
-      slaHours: 24,
-      titleTemplate: (name: string) => `🔴 RIESGO DE FUGA: ${name}`,
-      descriptionTemplate: (name: string) => 
-        `${name} declaró que no se ve trabajando en la empresa en un año. Máxima prioridad - entrevista de permanencia HOY.`
-    },
-    
-    // ✅ 6/6 - DETRACTOR_CULTURAL
-    {
-      type: 'DETRACTOR_CULTURAL',
-      stage: 4,
-      questionOrder: 1,
-      campaignTypeSlug: 'onboarding-day-90',
-      condition: (response: any) => response.rating !== null && response.rating <= 6,
-      severity: 'high' as const,
-      slaHours: 72,
-      titleTemplate: (name: string) => `⚠️ DETRACTOR CULTURAL: ${name}`,
-      descriptionTemplate: (name: string, score?: number) => 
-        `${name} es detractor (eNPS: ${score}/10). No recomendaría la empresa. Analizar causas y plan de retención.`
-    }
-  ];
+    severity: 'critical' as const,
+    slaHours: 24,
+    titleTemplate: (name: string) => `🚨 ABANDONO DÍA 1: ${name}`,
+    descriptionTemplate: (name: string) => 
+      `${name} reporta que nadie le recibió personalmente en su primer día.`
+  },
   
+  // 2. BIENVENIDA_FALLIDA
+  {
+    type: 'BIENVENIDA_FALLIDA',
+    stage: 1,
+    questionOrder: 1,
+    campaignTypeSlug: 'onboarding-day-1',
+    condition: (response: any) => {
+      // ✅ USA normalizedScore (no rating)
+      return response.normalizedScore !== null && response.normalizedScore <= 2.0;
+    },
+    severity: 'critical' as const,
+    slaHours: 48,
+    titleTemplate: (name: string) => `🚨 BIENVENIDA FALLIDA: ${name}`,
+    descriptionTemplate: (name: string, score?: number) => 
+      `${name} calificó la preparación logística con ${score}/5.`
+  },
+  
+  // 3. CONFUSION_ROL
+  {
+    type: 'CONFUSION_ROL',
+    stage: 2,
+    questionOrder: 1,
+    campaignTypeSlug: 'onboarding-day-7',
+    condition: (response: any) => {
+      // ✅ USA normalizedScore (no rating)
+      return response.normalizedScore !== null && response.normalizedScore <= 2.0;
+    },
+    severity: 'high' as const,
+    slaHours: 72,
+    titleTemplate: (name: string) => `⚠️ CONFUSIÓN DE ROL: ${name}`,
+    descriptionTemplate: (name: string, score?: number) => 
+      `${name} reporta baja claridad sobre expectativas del rol (${score}/5).`
+  },
+  
+  // 4. DESAJUSTE_ROL
+  {
+    type: 'DESAJUSTE_ROL',
+    stage: 2,
+    questionOrder: 4,
+    campaignTypeSlug: 'onboarding-day-7',
+    condition: (response: any) => {
+      // ✅ USA normalizedScore (no texto)
+      return response.normalizedScore !== null && response.normalizedScore <= 2.0;
+    },
+    severity: 'critical' as const,
+    slaHours: 48,
+    titleTemplate: (name: string) => `🚨 DESAJUSTE DE ROL: ${name}`,
+    descriptionTemplate: (name: string) => 
+      `${name} indica que las tareas no coinciden con la descripción del puesto.`
+  },
+  
+  // 5. RIESGO_FUGA
+  {
+    type: 'RIESGO_FUGA',
+    stage: 3,
+    questionOrder: 1,
+    campaignTypeSlug: 'onboarding-day-30',
+    condition: (response: any) => {
+      // ✅ USA normalizedScore (no texto)
+      return response.normalizedScore !== null && response.normalizedScore <= 2.0;
+    },
+    severity: 'critical' as const,
+    slaHours: 24,
+    titleTemplate: (name: string) => `🔴 RIESGO DE FUGA: ${name}`,
+    descriptionTemplate: (name: string) => 
+      `${name} declaró que no se ve trabajando en la empresa en un año.`
+  },
+  
+  // 6. DETRACTOR_CULTURAL
+  {
+    type: 'DETRACTOR_CULTURAL',
+    stage: 4,
+    questionOrder: 1,
+    campaignTypeSlug: 'onboarding-day-90',
+    condition: (response: any) => {
+      // ✅ USA normalizedScore (no rating)
+      // NPS 0-10 → normalizedScore 0-5 (dividido por 2)
+      // Detractor: rating <= 6 → normalizedScore <= 3.0
+      return response.normalizedScore !== null && response.normalizedScore <= 3.0;
+    },
+    severity: 'high' as const,
+    slaHours: 72,
+    titleTemplate: (name: string) => `⚠️ DETRACTOR CULTURAL: ${name}`,
+    descriptionTemplate: (name: string, score?: number) => 
+      `${name} es detractor (eNPS: ${score ? Math.round(score * 2) : 0}/10).`
+  }
+]
   // ============================================================================
   // MÉTODO PRINCIPAL: DETECTAR Y CREAR ALERTAS
   // ============================================================================
@@ -248,7 +229,12 @@ export class OnboardingAlertService {
           },
           select: {
             id: true,
-            text: true
+            text: true,
+            responseType: true,
+            responseValueMapping: true,
+            choiceOptions: true,
+            minValue: true,
+            maxValue: true
           }
         });
 
@@ -259,7 +245,7 @@ export class OnboardingAlertService {
 
         console.log(`[checkSpecificAlerts] Found question: ${question.text.substring(0, 50)}...`);
 
-        // Buscar la respuesta del participante a esta pregunta específica
+        // 🔧 CAMBIO 2: Buscar la respuesta CON normalizedScore + question metadata
         const response = await prisma.response.findFirst({
           where: {
             participantId: participantId,
@@ -269,7 +255,8 @@ export class OnboardingAlertService {
             id: true,
             rating: true,
             textResponse: true,
-            choiceResponse: true
+            choiceResponse: true,
+            normalizedScore: true
           }
         });
 
@@ -281,13 +268,43 @@ export class OnboardingAlertService {
         console.log(`[checkSpecificAlerts] Response found:`, {
           rating: response.rating,
           choiceResponse: response.choiceResponse,
+          normalizedScore: response.normalizedScore,
           hasText: !!response.textResponse
         });
 
-        // Evaluar la condición
-        const shouldTrigger = definition.condition(response);
+        // 🔧 CAMBIO 3: Calcular normalizedScore si es null (backward compatibility)
+        let normalizedScore = response.normalizedScore;
         
-        console.log(`[checkSpecificAlerts] Condition result for ${definition.type}: ${shouldTrigger}`);
+        if (normalizedScore === null || normalizedScore === undefined) {
+          // Fallback: calcular on-the-fly usando la función importada
+          normalizedScore = calculateNormalizedScore(
+            {
+              rating: response.rating,
+              choiceResponse: response.choiceResponse,
+              textResponse: response.textResponse
+            },
+            {
+              responseType: question.responseType,
+              responseValueMapping: question.responseValueMapping,
+              choiceOptions: question.choiceOptions,
+              minValue: question.minValue,
+              maxValue: question.maxValue
+            }
+          );
+          
+          console.warn(`[checkSpecificAlerts] normalizedScore NULL - calculado on-the-fly: ${normalizedScore}`);
+        }
+
+        // Crear objeto con normalizedScore garantizado para la condición
+        const responseWithScore = {
+          ...response,
+          normalizedScore
+        };
+
+        // Evaluar la condición
+        const shouldTrigger = definition.condition(responseWithScore);
+        
+        console.log(`[checkSpecificAlerts] Condition result for ${definition.type}: ${shouldTrigger} (normalizedScore: ${normalizedScore})`);
 
         if (shouldTrigger) {
           // 🚨 ALERTA DISPARADA - Crear en base de datos
@@ -301,11 +318,11 @@ export class OnboardingAlertService {
             title: definition.titleTemplate(journey.fullName),
             description: definition.descriptionTemplate(
               journey.fullName, 
-              response.rating || undefined
+              normalizedScore || undefined
             ),
             stage: definition.stage,
             questionId: question.id,
-            responseValue: response.rating,
+            responseValue: normalizedScore,
             slaHours: definition.slaHours
           });
           

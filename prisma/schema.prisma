@@ -220,6 +220,9 @@ model Question {
   questionOrder    Int     @map("question_order")
   responseType     String  @default("rating") @map("response_type")
   choiceOptions    Json?   @map("choice_options")
+  // ✅ NUEVO - Metadata para normalización
+  responseValueMapping Json? @map("response_value_mapping")
+  // Ejemplo: {"Sí, muy bien": 5.0, "Solo brevemente": 2.5, "No, nadie": 1.0}
   conditionalLogic Json?   @map("conditional_logic")
 
   // Configuración pregunta:
@@ -254,6 +257,9 @@ model Response {
   textResponse   String? @map("text_response")
   choiceResponse String? @map("choice_response")
 
+  // ✅ NUEVO - Valor normalizado para inteligencia
+  normalizedScore Float? @map("normalized_score")
+
   // Metadatos:
   responseTimeSeconds Int?     @map("response_time_seconds")
   createdAt           DateTime @default(now()) @map("created_at")
@@ -265,6 +271,7 @@ model Response {
   @@index([participantId], map: "idx_responses_participant")
   @@index([questionId], map: "idx_responses_question")
   @@index([rating], map: "idx_responses_rating")
+  @@index([normalizedScore], map: "idx_responses_normalized_score")  // ✅ NUEVO
   @@index([createdAt], map: "idx_responses_created")
   @@map("responses")
 }
