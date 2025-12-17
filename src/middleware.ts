@@ -1,6 +1,10 @@
 // src/middleware.ts
 // ✅ SOLUCIÓN ARQUITECTÓNICA OPTIMIZADA (Patrón Gemini + FocalizaHR)
 // Separa rutas públicas estáticas vs. dinámicas con autenticación alternativa
+// 
+// 🔧 FIX 17-Dic-2025: Compatibilidad Vercel Edge Runtime
+//    - Buffer.from() → atob() (Edge-compatible)
+//    - encodeURIComponent() en headers con caracteres no-ASCII
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
@@ -8,14 +12,18 @@ import type { NextRequest } from 'next/server';
 /**
  * Verifica JWT simple (sin verificar firma, solo estructura y expiración)
  * Usado SOLO en middleware para validación rápida
+ * 
+ * 🔧 FIX: Usar atob() en lugar de Buffer.from() para compatibilidad Edge Runtime
  */
 function verifyJWTSimple(token: string): any {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
     
+    // ✅ FIX: atob() es Edge-compatible, Buffer.from() no lo es
+    // También manejamos base64url (reemplazar - por + y _ por /)
     const payload = JSON.parse(
-      Buffer.from(parts[1], 'base64').toString()
+      atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
     );
     
     // Verificar expiración
@@ -192,12 +200,14 @@ export function middleware(request: NextRequest) {
     headers.set('x-user-role', payload.userRole || '');
     headers.set('x-department-id', payload.departmentId || '');
     headers.set('x-user-email', payload.userEmail || '');
-    headers.set('x-user-name', payload.userName || '');
+    // ✅ FIX: encodeURIComponent para caracteres no-ASCII (ñ, tildes, etc.)
+    headers.set('x-user-name', encodeURIComponent(payload.userName || ''));
   }
   
   // Siempre inyectar accountId (para multi-tenant isolation)
   headers.set('x-account-id', payload.accountId || payload.id || '');
-  headers.set('x-company-name', payload.companyName || '');
+  // ✅ FIX: encodeURIComponent para caracteres no-ASCII (ej: "Corporación" → "Corporaci%C3%B3n")
+  headers.set('x-company-name', encodeURIComponent(payload.companyName || ''));
   
   // Obtener rol efectivo
   const effectiveRole = getEffectiveRole(payload);

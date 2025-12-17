@@ -1,6 +1,6 @@
 // src/components/onboarding/AlertsGroupedFeed.tsx
 // COMPONENTE SEPARADO: Feed de Alertas con Jerarquía Completa
-// v4.0: Gerencia → [Personas Directas] + [Departamentos → Personas]
+// v4.1 DISEÑO FOCALIZAHR: Iconografía profesional + Glassmorphism + Gradientes marca
 // ✅ Maneja: personas directas (level=2), departamentos (level=3), huérfanos
 
 'use client';
@@ -10,14 +10,26 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShieldCheck,
   ChevronDown,
-  Building2,
-  AlertTriangle
+  ChevronUp,
+  Building,        // ✅ Más profesional que Building2
+  AlertCircle,     // ✅ Más sutil que AlertTriangle
+  AlertTriangle    // Mantener para huérfanos
 } from 'lucide-react';
 import { OnboardingAlertEngine } from '@/engines/OnboardingAlertEngine';
 import { useToast } from '@/components/ui/toast-system';
 import AlertsTabsToggle from './AlertsTabsToggle';
 import DepartmentCard from './DepartmentCard';
 import DirectReportsSection from './DirectReportsSection';
+
+// ============================================================================
+// ESTILOS FOCALIZAHR - Gradiente Marca
+// ============================================================================
+const gradientTextStyle = {
+  background: 'linear-gradient(135deg, #22D3EE, #3B82F6, #A78BFA)',
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  backgroundClip: 'text'
+} as const;
 
 interface AlertsGroupedFeedProps {
   alerts: any[];
@@ -434,69 +446,84 @@ export default function AlertsGroupedFeed({
                       group relative overflow-hidden
                       ${gerenciaGroup.isOrphanGroup
                         ? 'bg-gradient-to-br from-amber-950/30 to-orange-950/20 hover:from-amber-950/40 hover:to-orange-950/30 border-amber-500/20 hover:border-amber-400/30'
-                        : 'bg-slate-900/50 hover:bg-slate-900/70 border-slate-700/50 hover:border-slate-600/50'
+                        : 'bg-slate-900/40 hover:bg-slate-900/60 border-slate-700/30 hover:border-cyan-500/30'
                       }
+                      backdrop-blur-sm
                       border
                       rounded-xl transition-all duration-300 cursor-pointer
-                      p-5
+                      hover:shadow-lg hover:shadow-cyan-500/10
+                      p-6
                     `}
                   >
                     <div className="flex items-center justify-between">
                       {/* Izquierda: Nombre + Totales */}
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-5">
                         {/* Icono Gerencia */}
                         <div className={`
-                          w-12 h-12 rounded-xl flex items-center justify-center
+                          w-14 h-14 rounded-xl flex items-center justify-center
+                          transition-all duration-300
                           ${gerenciaGroup.isOrphanGroup
                             ? 'bg-amber-950/50 border border-amber-500/30'
-                            : 'bg-slate-800/50 border border-slate-700/50'
+                            : 'bg-gradient-to-br from-cyan-500/10 to-purple-500/10 border border-cyan-500/30 group-hover:border-cyan-400/50'
                           }
                         `}>
                           {gerenciaGroup.isOrphanGroup ? (
-                            <AlertTriangle className="h-6 w-6 text-amber-400" />
+                            <AlertTriangle className="h-7 w-7 text-amber-400" strokeWidth={1.5} />
                           ) : (
-                            <Building2 className="h-6 w-6 text-cyan-400" />
+                            <Building className="h-7 w-7 text-cyan-400 group-hover:text-cyan-300 transition-colors" strokeWidth={1.5} />
                           )}
                         </div>
                         
                         {/* Nombre y stats */}
                         <div>
-                          <div className="flex items-center gap-3 mb-1">
-                            <h4 className={`text-lg font-semibold transition-colors ${
+                          <div className="flex items-center gap-3 mb-1.5">
+                            <h4 className={`text-2xl font-light transition-colors ${
                               gerenciaGroup.isOrphanGroup
                                 ? 'text-amber-100 group-hover:text-amber-300'
-                                : 'text-white group-hover:text-cyan-400'
+                                : 'text-white'
                             }`}>
-                              {gerenciaGroup.gerenciaName}
+                              {gerenciaGroup.isOrphanGroup ? (
+                                gerenciaGroup.gerenciaName
+                              ) : (
+                                <>
+                                  {gerenciaGroup.gerenciaName.split(' ')[0]}{' '}
+                                  <span style={gradientTextStyle}>
+                                    {gerenciaGroup.gerenciaName.split(' ').slice(1).join(' ')}
+                                  </span>
+                                </>
+                              )}
                             </h4>
-                            <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                            <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${
                               gerenciaGroup.isOrphanGroup
                                 ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
-                                : 'bg-slate-800/50 border border-slate-700/30 text-slate-400'
+                                : 'bg-slate-800/50 border border-slate-600/30 text-slate-300'
                             }`}>
                               {gerenciaGroup.totalPeople} {gerenciaGroup.totalPeople === 1 ? 'persona' : 'personas'}
                             </span>
                             {gerenciaGroup.directReports.length > 0 && (
-                              <span className="px-2 py-0.5 text-xs font-medium bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded">
+                              <span className="inline-flex items-center px-2.5 py-1 text-xs font-medium bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded-full">
                                 {gerenciaGroup.directReports.length} directa{gerenciaGroup.directReports.length !== 1 ? 's' : ''}
                               </span>
                             )}
                             {gerenciaGroup.departments.length > 0 && (
-                              <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                              <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${
                                 gerenciaGroup.isOrphanGroup
                                   ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
-                                  : 'bg-slate-800/50 border border-slate-700/30 text-slate-400'
+                                  : 'bg-purple-500/10 border border-purple-500/30 text-purple-400'
                               }`}>
                                 {gerenciaGroup.departments.length} {gerenciaGroup.departments.length === 1 ? 'depto' : 'deptos'}
                               </span>
                             )}
                           </div>
                           
-                          <div className="flex items-center gap-4 text-sm">
+                          <div className="flex items-center gap-5 text-sm mt-1">
                             <span className={gerenciaGroup.isOrphanGroup ? 'text-amber-200/60' : 'text-slate-400'}>
-                              Riesgo Total: <span className="font-semibold text-white">{formatCurrency(gerenciaGroup.totalRisk)}</span>
+                              Riesgo Total:{' '}
+                              <span className="font-medium text-lg" style={gradientTextStyle}>
+                                {formatCurrency(gerenciaGroup.totalRisk)}
+                              </span>
                             </span>
-                            <span className={gerenciaGroup.isOrphanGroup ? 'text-amber-600/40' : 'text-slate-600'}>•</span>
+                            <span className={gerenciaGroup.isOrphanGroup ? 'text-amber-600/40' : 'text-slate-700'}>•</span>
                             <span className={`font-semibold ${
                               pendingPercentage >= 70 ? 'text-red-400' : 
                               pendingPercentage >= 40 ? 'text-amber-400' : 
@@ -509,27 +536,27 @@ export default function AlertsGroupedFeed({
                       </div>
 
                       {/* Derecha: Stats + Toggle */}
-                      <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-8">
                         {/* Mini stats */}
-                        <div className="hidden md:flex items-center gap-6">
-                          <div className="text-right">
-                            <div className={`text-xs uppercase tracking-wider mb-0.5 ${
+                        <div className="hidden md:flex items-center gap-8">
+                          <div className="text-center">
+                            <div className={`text-[10px] uppercase tracking-wider font-semibold mb-1 ${
                               gerenciaGroup.isOrphanGroup ? 'text-amber-400/60' : 'text-slate-500'
                             }`}>
-                              Activas
+                              ACTIVAS
                             </div>
-                            <div className="text-lg font-semibold text-amber-400">
+                            <div className="text-2xl font-light text-amber-400">
                               {gerenciaGroup.activeCount}
                             </div>
                           </div>
                           
-                          <div className="text-right">
-                            <div className={`text-xs uppercase tracking-wider mb-0.5 ${
+                          <div className="text-center">
+                            <div className={`text-[10px] uppercase tracking-wider font-semibold mb-1 ${
                               gerenciaGroup.isOrphanGroup ? 'text-amber-400/60' : 'text-slate-500'
                             }`}>
-                              Gestionadas
+                              GESTIONADAS
                             </div>
-                            <div className="text-lg font-semibold text-cyan-400">
+                            <div className="text-2xl font-light text-emerald-400">
                               {gerenciaGroup.managedCount}
                             </div>
                           </div>
@@ -538,17 +565,17 @@ export default function AlertsGroupedFeed({
                         {/* Botón expand/collapse */}
                         <motion.div
                           animate={{ rotate: isExpanded ? 180 : 0 }}
-                          transition={{ duration: 0.3 }}
+                          transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
                           className={`
-                            w-10 h-10 rounded-full flex items-center justify-center
+                            w-11 h-11 rounded-xl flex items-center justify-center
                             transition-all duration-300
                             ${gerenciaGroup.isOrphanGroup
-                              ? 'bg-amber-950/50 text-amber-400 border border-amber-500/30 group-hover:bg-amber-500/20'
-                              : 'bg-slate-800/50 text-slate-400 border border-slate-700/50 group-hover:bg-cyan-500/20 group-hover:text-cyan-400 group-hover:border-cyan-500/30'
+                              ? 'bg-amber-950/50 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-400/40'
+                              : 'bg-slate-800/30 text-slate-400 border border-slate-600/30 hover:bg-cyan-500/10 hover:text-cyan-400 hover:border-cyan-500/40'
                             }
                           `}
                         >
-                          <ChevronDown className="h-5 w-5" />
+                          <ChevronDown className="h-5 w-5" strokeWidth={2} />
                         </motion.div>
                       </div>
                     </div>
@@ -561,8 +588,8 @@ export default function AlertsGroupedFeed({
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="space-y-3 pl-4"
+                        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                        className="space-y-4 pl-4 pt-2"
                       >
                         {/* SECCIÓN 1: PERSONAS DIRECTAS */}
                         {gerenciaGroup.directReports.length > 0 && (
