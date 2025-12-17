@@ -2,13 +2,11 @@
   "crons": [
     {
       "path": "/api/cron/send-reminders",
-      "schedule": "0 23 * * *",
-      "comment": "CRÍTICO - Envía emails diarios de encuestas"
+      "schedule": "0 23 * * *"
     },
     {
       "path": "/api/cron/aggregation",
-      "schedule": "0 2 1 * *",
-      "comment": "Actualiza métricas mensuales del dashboard"
+      "schedule": "0 2 1 * *"
     }
   ]
 }
