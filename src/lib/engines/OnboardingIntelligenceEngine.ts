@@ -11,6 +11,9 @@
  * FÓRMULA EXO SCORE:
  * EXO = [(Compliance × 0.20) + (Clarification × 0.30) + 
  *        (Culture × 0.25) + (Connection × 0.25)] / 5.0 × 100
+ * 
+ * @version 2.0.0 - Fix current_stage calculation
+ * @date December 2025
  */
 
 import { prisma } from '@/lib/prisma';
@@ -238,102 +241,213 @@ export class OnboardingIntelligenceEngine {
    * Promedio de responses del participant en ese stage
    * Normaliza cualquier escala (1-5, 0-10) a 0-5
    */
-  // ✅ DESPUÉS (SIMPLIFICADO):
   static async calculateStageScore(participantId: string): Promise<number | null> {
     const responses = await prisma.response.findMany({
       where: {
         participantId,
-        normalizedScore: { not: null },  // ✅ Filtra por normalizedScore
+        normalizedScore: { not: null },
       },
       select: {
         id: true,
-        normalizedScore: true  // ✅ Solo necesitamos esto
+        normalizedScore: true
       }
     });
 
     if (responses.length === 0) return null;
 
     // Ya está normalizado 0-5
-    const scores = responses.map(r => r.normalizedScore!);  // ✅ Directo
+    const scores = responses.map(r => r.normalizedScore!);
 
     const average = scores.reduce((a, b) => a + b, 0) / scores.length;
     return Math.round(average * 10) / 10;
   }
+
+  /**
+   * ✅ CALCULAR PRÓXIMO STAGE PENDIENTE EN SECUENCIA
+   * Retorna el primer stage que NO ha sido respondido
+   * 
+   * @version 2.0.0 - NUEVO MÉTODO
+   */
+  private static async calculateNextPendingStage(journeyId: string): Promise<number> {
+    const journey = await prisma.journeyOrchestration.findUnique({
+      where: { id: journeyId },
+      select: {
+        stage1ParticipantId: true,
+        stage2ParticipantId: true,
+        stage3ParticipantId: true,
+        stage4ParticipantId: true,
+      }
+    });
+
+    if (!journey) return 1;
+
+    // Obtener estado de respuesta de cada participant
+    const [p1, p2, p3, p4] = await Promise.all([
+      journey.stage1ParticipantId 
+        ? prisma.participant.findUnique({ 
+            where: { id: journey.stage1ParticipantId }, 
+            select: { hasResponded: true } 
+          })
+        : null,
+      journey.stage2ParticipantId
+        ? prisma.participant.findUnique({ 
+            where: { id: journey.stage2ParticipantId }, 
+            select: { hasResponded: true } 
+          })
+        : null,
+      journey.stage3ParticipantId
+        ? prisma.participant.findUnique({ 
+            where: { id: journey.stage3ParticipantId }, 
+            select: { hasResponded: true } 
+          })
+        : null,
+      journey.stage4ParticipantId
+        ? prisma.participant.findUnique({ 
+            where: { id: journey.stage4ParticipantId }, 
+            select: { hasResponded: true } 
+          })
+        : null,
+    ]);
+
+    // Retornar el primer stage NO respondido (en secuencia)
+    if (!p1?.hasResponded) return 1;
+    if (!p2?.hasResponded) return 2;
+    if (!p3?.hasResponded) return 3;
+    if (!p4?.hasResponded) return 4;
+    
+    // Si todas respondidas, retornar 4 (se marcará completed)
+    return 4;
+  }
+
+  /**
+   * ✅ VERIFICAR SI TODAS LAS ETAPAS ESTÁN COMPLETAS
+   * 
+   * @version 2.0.0 - NUEVO MÉTODO
+   */
+  private static async areAllStagesCompleted(journeyId: string): Promise<boolean> {
+    const journey = await prisma.journeyOrchestration.findUnique({
+      where: { id: journeyId },
+      select: {
+        stage1ParticipantId: true,
+        stage2ParticipantId: true,
+        stage3ParticipantId: true,
+        stage4ParticipantId: true,
+      }
+    });
+
+    if (!journey) return false;
+
+    const participantIds = [
+      journey.stage1ParticipantId,
+      journey.stage2ParticipantId,
+      journey.stage3ParticipantId,
+      journey.stage4ParticipantId,
+    ].filter(Boolean) as string[];
+
+    // Si no tiene los 4 participants, no está completo
+    if (participantIds.length !== 4) return false;
+
+    const participants = await prisma.participant.findMany({
+      where: { id: { in: participantIds } },
+      select: { hasResponded: true }
+    });
+
+    // Todas completas si hay 4 y todos respondieron
+    return participants.length === 4 && participants.every(p => p.hasResponded);
+  }
+
   /**
    * ✅ ACTUALIZAR SCORES EN JOURNEY DESPUÉS DE RESPONDER STAGE
+   * 
+   * @version 2.0.0 - FIX: current_stage ahora calcula próximo pendiente en secuencia
+   * 
+   * CAMBIOS v2.0.0:
+   * - currentStage usa calculateNextPendingStage() en lugar del stage respondido
+   * - status='completed' solo cuando areAllStagesCompleted() es true
+   * - Agregado stageXCompletedAt para tracking de fechas
    */
-  /**
- * ✅ ACTUALIZAR SCORES EN JOURNEY DESPUÉS DE RESPONDER STAGE (CORREGIDO)
- */
-static async updateJourneyScores(journeyId: string, stage: number) {
-  const journey = await prisma.journeyOrchestration.findUnique({
-    where: { id: journeyId }
-  });
-  
-  if (!journey) return;
-  
-  // Obtener participantId del stage
-  const participantIds = [
-    journey.stage1ParticipantId,
-    journey.stage2ParticipantId,
-    journey.stage3ParticipantId,
-    journey.stage4ParticipantId
-  ];
-  
-  const participantId = participantIds[stage - 1];
-  if (!participantId) return;
-  
-  // Calcular score del stage
-  const stageScore = await this.calculateStageScore(participantId);
-  
-  if (stageScore === null) {
-    console.warn(`[updateJourneyScores] No se pudo calcular score para stage ${stage}`);
-    return;
-  }
-  
-  // Actualizar score correspondiente
-  const updateData: any = {
-    currentStage: stage
-  };
-  
-  switch (stage) {
-    case 1:
-      updateData.complianceScore = stageScore;
-      break;
-    case 2:
-      updateData.clarificationScore = stageScore;
-      break;
-    case 3:
-      updateData.cultureScore = stageScore;
-      break;
-    case 4:
-      updateData.connectionScore = stageScore;
+  static async updateJourneyScores(journeyId: string, stage: number) {
+    const journey = await prisma.journeyOrchestration.findUnique({
+      where: { id: journeyId }
+    });
+    
+    if (!journey) return;
+    
+    // Obtener participantId del stage
+    const participantIds = [
+      journey.stage1ParticipantId,
+      journey.stage2ParticipantId,
+      journey.stage3ParticipantId,
+      journey.stage4ParticipantId
+    ];
+    
+    const participantId = participantIds[stage - 1];
+    if (!participantId) return;
+    
+    // Calcular score del stage
+    const stageScore = await this.calculateStageScore(participantId);
+    
+    if (stageScore === null) {
+      console.warn(`[updateJourneyScores] No se pudo calcular score para stage ${stage}`);
+      return;
+    }
+    
+    // ✅ FIX v2.0.0: Calcular el próximo stage pendiente EN SECUENCIA
+    const nextPendingStage = await this.calculateNextPendingStage(journeyId);
+    
+    // Actualizar score correspondiente
+    const updateData: any = {
+      currentStage: nextPendingStage  // ✅ FIX: Usar próximo pendiente, no stage respondido
+    };
+    
+    switch (stage) {
+      case 1:
+        updateData.complianceScore = stageScore;
+        updateData.stage1CompletedAt = new Date();
+        break;
+      case 2:
+        updateData.clarificationScore = stageScore;
+        updateData.stage2CompletedAt = new Date();
+        break;
+      case 3:
+        updateData.cultureScore = stageScore;
+        updateData.stage3CompletedAt = new Date();
+        break;
+      case 4:
+        updateData.connectionScore = stageScore;
+        updateData.stage4CompletedAt = new Date();
+        // ✅ FIX v2.0.0: NO marcar completed aquí, se verifica abajo
+        break;
+    }
+    
+    // ✅ FIX v2.0.0: Verificar si TODAS las etapas están completas
+    const allCompleted = await this.areAllStagesCompleted(journeyId);
+    if (allCompleted) {
       updateData.status = 'completed';
-      break;
+    }
+    
+    // Construir scores usando journey ACTUAL + nuevo score
+    const scores: StageScores = {
+      compliance: updateData.complianceScore ?? journey.complianceScore,
+      clarification: updateData.clarificationScore ?? journey.clarificationScore,
+      culture: updateData.cultureScore ?? journey.cultureScore,
+      connection: updateData.connectionScore ?? journey.connectionScore
+    };
+    
+    // Calcular EXO Score con los scores actualizados
+    const exoScore = this.calculateEXOScore(scores);
+    
+    if (exoScore !== null) {
+      updateData.exoScore = exoScore;
+      updateData.retentionRisk = this.calculateRetentionRisk(exoScore);
+    }
+    
+    // Aplicar update
+    await prisma.journeyOrchestration.update({
+      where: { id: journeyId },
+      data: updateData
+    });
+    
+    console.log(`[OnboardingEngine] Journey ${journeyId} Stage ${stage} actualizado: score=${stageScore}, nextStage=${nextPendingStage}, exo=${exoScore}, completed=${allCompleted}`);
   }
-  
-  // ✅ FIX: Construir scores usando journey ACTUAL + nuevo score
-  const scores: StageScores = {
-    compliance: updateData.complianceScore ?? journey.complianceScore,
-    clarification: updateData.clarificationScore ?? journey.clarificationScore,
-    culture: updateData.cultureScore ?? journey.cultureScore,
-    connection: updateData.connectionScore ?? journey.connectionScore
-  };
-  
-  // Calcular EXO Score con los scores actualizados
-  const exoScore = this.calculateEXOScore(scores);
-  
-  if (exoScore !== null) {
-    updateData.exoScore = exoScore;
-    updateData.retentionRisk = this.calculateRetentionRisk(exoScore);
-  }
-  
-  // Aplicar update
-  await prisma.journeyOrchestration.update({
-    where: { id: journeyId },
-    data: updateData
-  });
-  
-  console.log(`[OnboardingEngine] Journey ${journeyId} Stage ${stage} actualizado: score=${stageScore}, exo=${exoScore}`);
-}
 }

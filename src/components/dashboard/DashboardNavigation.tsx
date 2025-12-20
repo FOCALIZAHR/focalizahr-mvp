@@ -1,7 +1,6 @@
 // ============================================================================
-// FOCALIZAHR DASHBOARD NAVIGATION - v2.1 MINIMAL
-// Basado en el ORIGINAL que funciona - Solo ajustes de header solicitados
-// NO CSS externos - Solo Tailwind inline
+// FOCALIZAHR DASHBOARD NAVIGATION - v2.2 OPTIMIZED
+// Cambios quirúrgicos: Logo reducido + Botón móvil visible + Navegación actualizada
 // ============================================================================
 
 'use client';
@@ -114,9 +113,17 @@ export default function DashboardNavigation({
       isDropdown: true,
       subItems: [
         { id: 'salud', label: 'Salud Departamental', href: '/dashboard/salud-departamental', icon: Activity, comingSoon: true },
-        { id: 'onboarding', label: 'Onboarding Intelligence', href: '/dashboard/onboarding', icon: Rocket },
+        { id: 'onboarding', label: 'Onboarding Intelligence', href: '/dashboard/onboarding/inicio', icon: Rocket }, // ✅ CAMBIO 7: href actualizado
         { id: 'exit', label: 'Exit Intelligence', href: '/dashboard/exit', icon: DoorOpen, comingSoon: true },
       ],
+    },
+    // ✅ CAMBIO 6: NUEVO ITEM "SEGUIMIENTO"
+    {
+      id: 'seguimiento',
+      label: 'Seguimiento',
+      href: '/dashboard/seguimiento',
+      icon: Activity,
+      active: pathname.startsWith('/dashboard/seguimiento'),
     },
     {
       id: 'estudios',
@@ -220,10 +227,11 @@ export default function DashboardNavigation({
           <div className="relative z-10 px-4 pt-8 pb-5 border-b border-white/10">
             {/* Fila 1: Logo centrado con espacio de respiración premium */}
             <Link href="/dashboard" className="flex justify-center mb-7">
+              {/* ✅ CAMBIO 1: Logo desktop reducido (h-9→h-7, h-7→h-5) */}
               <img 
                 src="/images/focalizahr-logo_palabra.svg" 
                 alt="FocalizaHR" 
-                className={`transition-all duration-300 hover:opacity-80 ${isCollapsed ? 'h-7' : 'h-9'}`}
+                className={`transition-all duration-300 hover:opacity-80 ${isCollapsed ? 'h-5' : 'h-7'}`}
               />
             </Link>
             
@@ -458,19 +466,22 @@ export default function DashboardNavigation({
           }}
         >
           <div className="flex items-center">
+            {/* ✅ CAMBIO 3: Botón hamburguesa con fondo visible */}
             <Button
               variant="ghost"
               size="sm"
               onClick={onMobileMenuToggle}
-              className="p-2 text-white/80 hover:text-white hover:bg-white/10"
+              className="p-3 text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-700 rounded-lg"
             >
-              {showMobileMenu ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              {/* ✅ CAMBIO 4: Icono más grande (h-5→h-6) */}
+              {showMobileMenu ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </Button>
             
+            {/* ✅ CAMBIO 2: Logo móvil header reducido (h-7→h-6) */}
             <img 
               src="/images/focalizahr-logo_palabra.svg" 
               alt="FocalizaHR" 
-              className="h-7 ml-3"
+              className="h-6 ml-3"
             />
           </div>
 
@@ -497,7 +508,12 @@ export default function DashboardNavigation({
               {/* Mobile Header */}
               <div className="relative z-10 px-6 py-4 border-b border-white/10">
                 <div className="flex items-center justify-between">
-                  <img src="/images/focalizahr-logo_palabra.svg" alt="FocalizaHR" className="h-8" />
+                  {/* ✅ CAMBIO 5: Logo móvil overlay reducido (h-8→h-6) */}
+                  <img 
+                    src="/images/focalizahr-logo_palabra.svg" 
+                    alt="FocalizaHR" 
+                    className="h-6"
+                  />
                   <Button
                     variant="ghost"
                     size="sm"

@@ -1,6 +1,6 @@
 // src/components/onboarding/AlertsGroupedFeed.tsx
 // COMPONENTE SEPARADO: Feed de Alertas con Jerarquía Completa
-// v4.1 DISEÑO FOCALIZAHR: Iconografía profesional + Glassmorphism + Gradientes marca
+// ✅ v4.2 FILOSOFÍA FOCALIZAHR: NEUTRO, Mobile-first, Apple/Tesla
 // ✅ Maneja: personas directas (level=2), departamentos (level=3), huérfanos
 
 'use client';
@@ -10,26 +10,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShieldCheck,
   ChevronDown,
-  ChevronUp,
-  Building,        // ✅ Más profesional que Building2
-  AlertCircle,     // ✅ Más sutil que AlertTriangle
-  AlertTriangle    // Mantener para huérfanos
+  Building,
+  AlertTriangle
 } from 'lucide-react';
 import { OnboardingAlertEngine } from '@/engines/OnboardingAlertEngine';
 import { useToast } from '@/components/ui/toast-system';
 import AlertsTabsToggle from './AlertsTabsToggle';
 import DepartmentCard from './DepartmentCard';
 import DirectReportsSection from './DirectReportsSection';
-
-// ============================================================================
-// ESTILOS FOCALIZAHR - Gradiente Marca
-// ============================================================================
-const gradientTextStyle = {
-  background: 'linear-gradient(135deg, #22D3EE, #3B82F6, #A78BFA)',
-  WebkitBackgroundClip: 'text',
-  WebkitTextFillColor: 'transparent',
-  backgroundClip: 'text'
-} as const;
 
 interface AlertsGroupedFeedProps {
   alerts: any[];
@@ -63,7 +51,7 @@ interface DepartmentData {
 interface GerenciaData {
   gerenciaId: string;
   gerenciaName: string;
-  directReports: PersonData[];  // ✅ NUEVO: personas directas
+  directReports: PersonData[];
   departments: DepartmentData[];
   totalRisk: number;
   pendingRisk: number;
@@ -71,7 +59,9 @@ interface GerenciaData {
   activeCount: number;
   managedCount: number;
   totalPeople: number;
-  isOrphanGroup: boolean;  // ✅ NUEVO: flag para huérfanos
+  atRiskPersons: number;
+  protectedPersons: number;
+  isOrphanGroup: boolean;
 }
 
 export default function AlertsGroupedFeed({
@@ -120,10 +110,8 @@ export default function AlertsGroupedFeed({
 
   // ========================================
   // AGRUPACIÓN JERÁRQUICA CON PERSONAS DIRECTAS
-  // v4.0: Separa personas directas (level=2) de departamentos (level=3)
   // ========================================
   
-  // Paso 1: Construir mapa de departamentos Y gerencias
   const deptMap = useMemo(() => {
     const map = new Map<string, any>();
     alerts.forEach(alert => {
@@ -139,7 +127,6 @@ export default function AlertsGroupedFeed({
     return map;
   }, [alerts]);
   
-  // Paso 2: Agrupar alertas por Gerencia con separación personas directas/departamentos
   const alertsByGerencia = useMemo(() => {
     const gerenciaMap = new Map<string, {
       directReportsMap: Map<string, PersonData>;
@@ -154,9 +141,6 @@ export default function AlertsGroupedFeed({
       const dept = alert.journey?.department;
       if (!dept) return;
       
-      // ========================================
-      // CLASIFICACIÓN: ¿Gerencia directa, Departamento normal, o Huérfano?
-      // ========================================
       const isDirectReport = dept.level === 2 || (!dept.parentId && dept.unitType === 'gerencia');
       const isOrphan = dept.level === 3 && !dept.parentId;
       
@@ -165,21 +149,17 @@ export default function AlertsGroupedFeed({
       let isInDirectReports = false;
       
       if (isDirectReport) {
-        // CASO A: Persona directa en gerencia (Gerente, Secretaria, etc.)
         gerenciaId = dept.id;
         gerenciaName = dept.displayName;
         isInDirectReports = true;
       } else if (isOrphan) {
-        // CASO B: Departamento huérfano (sin gerencia)
         gerenciaId = 'sin-gerencia';
         gerenciaName = '⚠️ SIN GERENCIA ASIGNADA';
       } else {
-        // CASO C: Departamento normal con gerencia
         gerenciaId = dept.parentId!;
         gerenciaName = deptMap.get(dept.parentId!)?.displayName || 'Gerencia Sin Nombre';
       }
       
-      // Inicializar gerencia si no existe
       if (!gerenciaMap.has(gerenciaId)) {
         gerenciaMap.set(gerenciaId, {
           directReportsMap: new Map(),
@@ -192,7 +172,6 @@ export default function AlertsGroupedFeed({
       if (!journeyId) return;
       
       if (isInDirectReports) {
-        // ✅ PERSONA DIRECTA: Agregar a directReportsMap
         if (!gerencia.directReportsMap.has(journeyId)) {
           gerencia.directReportsMap.set(journeyId, {
             journeyId,
@@ -213,7 +192,6 @@ export default function AlertsGroupedFeed({
           person.managedCount++;
         }
       } else {
-        // ✅ PERSONA EN DEPARTAMENTO: Agregar a departmentsMap
         const departmentId = dept.id;
         const departmentName = dept.displayName;
         
@@ -249,15 +227,11 @@ export default function AlertsGroupedFeed({
       }
     });
     
-    // ========================================
-    // CALCULAR RIESGOS POR PERSONA ÚNICA
-    // ========================================
     const gerenciasArray: GerenciaData[] = Array.from(gerenciaMap.entries()).map(([gerenciaId, data]) => {
       const gerenciaName = gerenciaId === 'sin-gerencia' 
         ? '⚠️ SIN GERENCIA ASIGNADA'
         : deptMap.get(gerenciaId)?.displayName || 'Gerencia Sin Nombre';
       
-      // Calcular riesgo personas directas
       const directReports = Array.from(data.directReportsMap.values()).map((person) => {
         const firstAlert = person.alerts[0];
         const businessCase = OnboardingAlertEngine.generateBusinessCaseFromAlert(firstAlert as any, firstAlert.journey);
@@ -269,7 +243,6 @@ export default function AlertsGroupedFeed({
         };
       });
       
-      // Calcular riesgo departamentos
       const departments = Array.from(data.departmentsMap.values()).map(dept => {
         const people = Array.from(dept.peopleMap.values()).map((person) => {
           const firstAlert = person.alerts[0];
@@ -305,7 +278,6 @@ export default function AlertsGroupedFeed({
         };
       });
       
-      // Riesgo total gerencia = personas directas + departamentos
       const directReportsRisk = directReports.reduce((sum, p) => sum + p.risk, 0);
       const departmentsRisk = departments.reduce((sum, d) => sum + d.totalRisk, 0);
       const totalRisk = directReportsRisk + departmentsRisk;
@@ -332,6 +304,11 @@ export default function AlertsGroupedFeed({
       
       const totalPeople = directReports.length + departments.reduce((sum, d) => sum + d.people.length, 0);
       
+      const atRiskPersons = directReports.filter(p => p.activeCount > 0).length + 
+        departments.reduce((sum, d) => sum + d.people.filter(p => p.activeCount > 0).length, 0);
+      const protectedPersons = directReports.filter(p => p.activeCount === 0 && p.managedCount > 0).length +
+        departments.reduce((sum, d) => sum + d.people.filter(p => p.activeCount === 0 && p.managedCount > 0).length, 0);
+      
       return {
         gerenciaId,
         gerenciaName,
@@ -343,11 +320,12 @@ export default function AlertsGroupedFeed({
         activeCount,
         managedCount,
         totalPeople,
+        atRiskPersons,
+        protectedPersons,
         isOrphanGroup: gerenciaId === 'sin-gerencia'
       };
     });
     
-    // Ordenar: huérfanos al final, resto por riesgo pendiente
     return gerenciasArray.sort((a, b) => {
       if (a.isOrphanGroup) return 1;
       if (b.isOrphanGroup) return -1;
@@ -355,7 +333,6 @@ export default function AlertsGroupedFeed({
     });
   }, [filteredAlerts, deptMap]);
   
-  // Toggle expansión de gerencia
   const toggleGerencia = (gerenciaId: string) => {
     setExpandedGerencias(prev => {
       const next = new Set(prev);
@@ -369,22 +346,22 @@ export default function AlertsGroupedFeed({
   };
 
   // ========================================
-  // RENDER
+  // RENDER - NEUTRO + MOBILE FIRST
   // ========================================
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       
       {/* Header + Tabs */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-4 border-b border-slate-800">
+      <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-end pb-4 border-b border-slate-800">
         <div>
-          <h3 className="text-2xl font-light text-white">
+          <h3 className="text-xl md:text-2xl font-light text-white">
             Alertas{' '}
             <span className="text-slate-500">
               Prioritarias
             </span>
           </h3>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-xs md:text-sm text-slate-500 mt-1">
             Intervenciones recomendadas para retener talento clave
           </p>
         </div>
@@ -405,17 +382,17 @@ export default function AlertsGroupedFeed({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="py-20 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/20"
+            className="py-12 md:py-20 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/20"
           >
-            <div className="inline-flex p-4 rounded-full bg-slate-800/50 mb-4">
-              <ShieldCheck className="h-10 w-10 text-slate-600" />
+            <div className="inline-flex p-3 md:p-4 rounded-full bg-slate-800/50 mb-4">
+              <ShieldCheck className="h-8 w-8 md:h-10 md:w-10 text-slate-600" />
             </div>
-            <p className="text-lg text-slate-400 font-light">
+            <p className="text-base md:text-lg text-slate-400 font-light">
               {activeTab === 'active' && 'Ecosistema saludable'}
               {activeTab === 'managed' && 'Sin alertas gestionadas aún'}
               {activeTab === 'all' && 'No hay alertas en el sistema'}
             </p>
-            <p className="text-sm text-slate-600 mt-1">
+            <p className="text-xs md:text-sm text-slate-600 mt-1">
               {activeTab === 'active' 
                 ? 'No hay riesgos de fuga detectados en este momento'
                 : 'Las alertas gestionadas aparecerán aquí'
@@ -424,7 +401,7 @@ export default function AlertsGroupedFeed({
           </motion.div>
         ) : (
           /* Feed Agrupado por Gerencia */
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             {alertsByGerencia.map((gerenciaGroup, groupIndex) => {
               const isExpanded = expandedGerencias.has(gerenciaGroup.gerenciaId);
               const pendingPercentage = gerenciaGroup.totalRisk > 0 
@@ -439,95 +416,89 @@ export default function AlertsGroupedFeed({
                   transition={{ delay: groupIndex * 0.05 }}
                   className="space-y-2"
                 >
-                  {/* Header Gerencia */}
+                  {/* Header Gerencia - NEUTRO */}
                   <div
                     onClick={() => toggleGerencia(gerenciaGroup.gerenciaId)}
                     className={`
                       group relative overflow-hidden
                       ${gerenciaGroup.isOrphanGroup
                         ? 'bg-gradient-to-br from-amber-950/30 to-orange-950/20 hover:from-amber-950/40 hover:to-orange-950/30 border-amber-500/20 hover:border-amber-400/30'
-                        : 'bg-slate-900/40 hover:bg-slate-900/60 border-slate-700/30 hover:border-cyan-500/30'
+                        : 'bg-slate-900/40 hover:bg-slate-900/60 border-slate-700/20 hover:border-slate-600/40'
                       }
-                      backdrop-blur-sm
                       border
                       rounded-xl transition-all duration-300 cursor-pointer
-                      hover:shadow-lg hover:shadow-cyan-500/10
-                      p-6
+                      p-4 md:p-6
                     `}
                   >
-                    <div className="flex items-center justify-between">
-                      {/* Izquierda: Nombre + Totales */}
-                      <div className="flex items-center gap-5">
-                        {/* Icono Gerencia */}
+                    {/* Layout principal */}
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      
+                      {/* Izquierda: Icono + Info */}
+                      <div className="flex items-start gap-3 md:gap-4">
+                        {/* Icono Gerencia - NEUTRO */}
                         <div className={`
-                          w-14 h-14 rounded-xl flex items-center justify-center
-                          transition-all duration-300
+                          w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0
                           ${gerenciaGroup.isOrphanGroup
                             ? 'bg-amber-950/50 border border-amber-500/30'
-                            : 'bg-gradient-to-br from-cyan-500/10 to-purple-500/10 border border-cyan-500/30 group-hover:border-cyan-400/50'
+                            : 'bg-slate-800/50 border border-slate-700/30'
                           }
                         `}>
                           {gerenciaGroup.isOrphanGroup ? (
-                            <AlertTriangle className="h-7 w-7 text-amber-400" strokeWidth={1.5} />
+                            <AlertTriangle className="h-5 w-5 md:h-6 md:w-6 text-amber-400" strokeWidth={1.5} />
                           ) : (
-                            <Building className="h-7 w-7 text-cyan-400 group-hover:text-cyan-300 transition-colors" strokeWidth={1.5} />
+                            <Building className="h-5 w-5 md:h-6 md:w-6 text-slate-400" strokeWidth={1.5} />
                           )}
                         </div>
                         
                         {/* Nombre y stats */}
-                        <div>
-                          <div className="flex items-center gap-3 mb-1.5">
-                            <h4 className={`text-2xl font-light transition-colors ${
+                        <div className="flex-1 min-w-0">
+                          {/* Título - SIN GRADIENTE */}
+                          <h4 className={`text-base md:text-xl font-medium transition-colors mb-1 ${
+                            gerenciaGroup.isOrphanGroup
+                              ? 'text-amber-100'
+                              : 'text-white'
+                          }`}>
+                            {gerenciaGroup.gerenciaName}
+                          </h4>
+                          
+                          {/* Badges - NEUTROS */}
+                          <div className="flex flex-wrap gap-1.5 md:gap-2 mb-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 text-[10px] md:text-xs font-medium rounded ${
                               gerenciaGroup.isOrphanGroup
-                                ? 'text-amber-100 group-hover:text-amber-300'
-                                : 'text-white'
-                            }`}>
-                              {gerenciaGroup.isOrphanGroup ? (
-                                gerenciaGroup.gerenciaName
-                              ) : (
-                                <>
-                                  {gerenciaGroup.gerenciaName.split(' ')[0]}{' '}
-                                  <span style={gradientTextStyle}>
-                                    {gerenciaGroup.gerenciaName.split(' ').slice(1).join(' ')}
-                                  </span>
-                                </>
-                              )}
-                            </h4>
-                            <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${
-                              gerenciaGroup.isOrphanGroup
-                                ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
-                                : 'bg-slate-800/50 border border-slate-600/30 text-slate-300'
+                                ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400/80'
+                                : 'bg-slate-800/60 border border-slate-700/30 text-slate-400'
                             }`}>
                               {gerenciaGroup.totalPeople} {gerenciaGroup.totalPeople === 1 ? 'persona' : 'personas'}
                             </span>
                             {gerenciaGroup.directReports.length > 0 && (
-                              <span className="inline-flex items-center px-2.5 py-1 text-xs font-medium bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded-full">
+                              <span className="inline-flex items-center px-2 py-0.5 text-[10px] md:text-xs font-medium bg-slate-800/60 border border-slate-700/30 text-slate-400 rounded">
                                 {gerenciaGroup.directReports.length} directa{gerenciaGroup.directReports.length !== 1 ? 's' : ''}
                               </span>
                             )}
                             {gerenciaGroup.departments.length > 0 && (
-                              <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${
+                              <span className={`inline-flex items-center px-2 py-0.5 text-[10px] md:text-xs font-medium rounded ${
                                 gerenciaGroup.isOrphanGroup
-                                  ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
-                                  : 'bg-purple-500/10 border border-purple-500/30 text-purple-400'
+                                  ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400/80'
+                                  : 'bg-slate-800/60 border border-slate-700/30 text-slate-400'
                               }`}>
                                 {gerenciaGroup.departments.length} {gerenciaGroup.departments.length === 1 ? 'depto' : 'deptos'}
                               </span>
                             )}
                           </div>
                           
-                          <div className="flex items-center gap-5 text-sm mt-1">
-                            <span className={gerenciaGroup.isOrphanGroup ? 'text-amber-200/60' : 'text-slate-400'}>
-                              Riesgo Total:{' '}
-                              <span className="font-medium text-lg" style={gradientTextStyle}>
+                          {/* Riesgo Total - SIN GRADIENTE */}
+                          <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs md:text-sm">
+                            <span className={gerenciaGroup.isOrphanGroup ? 'text-amber-200/60' : 'text-slate-500'}>
+                              Riesgo:{' '}
+                              <span className="font-medium text-sm md:text-base text-white">
                                 {formatCurrency(gerenciaGroup.totalRisk)}
                               </span>
                             </span>
                             <span className={gerenciaGroup.isOrphanGroup ? 'text-amber-600/40' : 'text-slate-700'}>•</span>
-                            <span className={`font-semibold ${
-                              pendingPercentage >= 70 ? 'text-red-400' : 
-                              pendingPercentage >= 40 ? 'text-amber-400' : 
-                              'text-green-400'
+                            <span className={`font-medium ${
+                              pendingPercentage >= 70 ? 'text-red-400/80' : 
+                              pendingPercentage >= 40 ? 'text-amber-400/80' : 
+                              'text-green-400/80'
                             }`}>
                               {pendingPercentage}% pendiente
                             </span>
@@ -536,46 +507,46 @@ export default function AlertsGroupedFeed({
                       </div>
 
                       {/* Derecha: Stats + Toggle */}
-                      <div className="flex items-center gap-8">
+                      <div className="flex items-center justify-between md:justify-end gap-4 md:gap-6 pt-2 md:pt-0 border-t border-slate-700/20 md:border-0">
                         {/* Mini stats */}
-                        <div className="hidden md:flex items-center gap-8">
+                        <div className="flex items-center gap-4 md:gap-6">
                           <div className="text-center">
-                            <div className={`text-[10px] uppercase tracking-wider font-semibold mb-1 ${
-                              gerenciaGroup.isOrphanGroup ? 'text-amber-400/60' : 'text-slate-500'
+                            <div className={`text-[9px] md:text-[10px] uppercase tracking-wider font-medium mb-0.5 ${
+                              gerenciaGroup.isOrphanGroup ? 'text-amber-400/60' : 'text-slate-600'
                             }`}>
-                              ACTIVAS
+                              EN RIESGO
                             </div>
-                            <div className="text-2xl font-light text-amber-400">
-                              {gerenciaGroup.activeCount}
+                            <div className="text-lg md:text-xl font-light text-amber-400/90">
+                              {gerenciaGroup.atRiskPersons}
                             </div>
                           </div>
                           
                           <div className="text-center">
-                            <div className={`text-[10px] uppercase tracking-wider font-semibold mb-1 ${
-                              gerenciaGroup.isOrphanGroup ? 'text-amber-400/60' : 'text-slate-500'
+                            <div className={`text-[9px] md:text-[10px] uppercase tracking-wider font-medium mb-0.5 ${
+                              gerenciaGroup.isOrphanGroup ? 'text-amber-400/60' : 'text-slate-600'
                             }`}>
-                              GESTIONADAS
+                              PROTEGIDAS
                             </div>
-                            <div className="text-2xl font-light text-emerald-400">
-                              {gerenciaGroup.managedCount}
+                            <div className="text-lg md:text-xl font-light text-emerald-400/90">
+                              {gerenciaGroup.protectedPersons}
                             </div>
                           </div>
                         </div>
 
-                        {/* Botón expand/collapse */}
+                        {/* Toggle - NEUTRO */}
                         <motion.div
                           animate={{ rotate: isExpanded ? 180 : 0 }}
                           transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
                           className={`
-                            w-11 h-11 rounded-xl flex items-center justify-center
+                            w-9 h-9 md:w-10 md:h-10 rounded-lg flex items-center justify-center
                             transition-all duration-300
                             ${gerenciaGroup.isOrphanGroup
-                              ? 'bg-amber-950/50 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-400/40'
-                              : 'bg-slate-800/30 text-slate-400 border border-slate-600/30 hover:bg-cyan-500/10 hover:text-cyan-400 hover:border-cyan-500/40'
+                              ? 'bg-amber-950/50 text-amber-400 border border-amber-500/30'
+                              : 'bg-slate-800/40 text-slate-500 border border-slate-700/30 hover:bg-slate-700/50 hover:text-white'
                             }
                           `}
                         >
-                          <ChevronDown className="h-5 w-5" strokeWidth={2} />
+                          <ChevronDown className="h-4 w-4 md:h-5 md:w-5" strokeWidth={2} />
                         </motion.div>
                       </div>
                     </div>
@@ -589,7 +560,7 @@ export default function AlertsGroupedFeed({
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
                         transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-                        className="space-y-4 pl-4 pt-2"
+                        className="space-y-3 md:space-y-4 pl-2 md:pl-4 pt-2"
                       >
                         {/* SECCIÓN 1: PERSONAS DIRECTAS */}
                         {gerenciaGroup.directReports.length > 0 && (
@@ -604,12 +575,12 @@ export default function AlertsGroupedFeed({
                         {gerenciaGroup.departments.length > 0 && (
                           <div className="space-y-2">
                             {gerenciaGroup.directReports.length > 0 && (
-                              <div className="flex items-center gap-3 mb-2">
-                                <div className="flex-1 border-t border-slate-700/30" />
-                                <span className="text-xs uppercase tracking-wider text-slate-600 font-semibold">
+                              <div className="flex items-center gap-2 md:gap-3 mb-2">
+                                <div className="flex-1 border-t border-slate-700/20" />
+                                <span className="text-[10px] md:text-xs uppercase tracking-wider text-slate-600 font-medium">
                                   Departamentos
                                 </span>
-                                <div className="flex-1 border-t border-slate-700/30" />
+                                <div className="flex-1 border-t border-slate-700/20" />
                               </div>
                             )}
                             {gerenciaGroup.departments.map((department, deptIndex) => (

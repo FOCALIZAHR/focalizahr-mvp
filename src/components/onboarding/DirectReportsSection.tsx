@@ -1,9 +1,11 @@
 // src/components/onboarding/DirectReportsSection.tsx
+// ✅ v4.1 FILOSOFÍA FOCALIZAHR: Neutro, Mobile-first, Apple/Tesla
+
 'use client';
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UserCog, ChevronDown, ChevronUp } from 'lucide-react';
+import { UserCog, ChevronDown } from 'lucide-react';
 import PersonCard from './PersonCard';
 
 interface DirectReportsSectionProps {
@@ -42,49 +44,57 @@ export default function DirectReportsSection({
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="mb-4"
+      className="mb-3 md:mb-4"
     >
+      {/* Header - NEUTRO, MOBILE FIRST */}
       <div
         onClick={() => setIsExpanded(!isExpanded)}
-        className="group relative overflow-hidden bg-gradient-to-br from-cyan-500/10 via-purple-500/5 to-cyan-500/10 hover:from-cyan-500/15 hover:via-purple-500/10 hover:to-cyan-500/15 border border-cyan-500/20 hover:border-cyan-400/30 rounded-xl transition-all duration-300 cursor-pointer backdrop-blur-sm p-4"
-        style={{
-          boxShadow: '0 4px 20px rgba(34, 211, 238, 0.1), inset 0 1px 1px rgba(255, 255, 255, 0.1)'
-        }}
+        className="
+          group relative overflow-hidden
+          bg-slate-800/25 hover:bg-slate-800/40
+          border border-slate-700/20 hover:border-slate-600/30
+          rounded-xl transition-all duration-300 cursor-pointer
+          p-3 md:p-4
+        "
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-        
-        <div className="relative flex items-center justify-between">
+        {/* Layout: stack en mobile, row en desktop */}
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          
+          {/* Izquierda: Icono + Info */}
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-400/30 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-              <UserCog className="h-5 w-5 text-cyan-400 group-hover:text-cyan-300 transition-colors" />
+            {/* Icono - NEUTRO */}
+            <div className="w-9 h-9 md:w-11 md:h-11 rounded-lg md:rounded-xl bg-slate-700/30 border border-slate-600/20 flex items-center justify-center flex-shrink-0">
+              <UserCog className="h-4 w-4 md:h-5 md:w-5 text-slate-400" strokeWidth={1.5} />
             </div>
             
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h5 className="text-base font-semibold text-white group-hover:text-cyan-400 transition-colors">
+            <div className="min-w-0 flex-1">
+              {/* Título + Badge */}
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <h5 className="text-sm md:text-base font-medium text-white group-hover:text-slate-200 transition-colors">
                   Personas Directas
                 </h5>
-                <span className="px-2 py-0.5 text-xs font-medium bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded">
+                <span className="px-2 py-0.5 text-[10px] md:text-xs font-medium bg-slate-700/40 border border-slate-600/20 text-slate-300 rounded">
                   {people.length} {people.length === 1 ? 'persona' : 'personas'}
                 </span>
               </div>
               
-              <div className="flex items-center gap-3 text-xs text-slate-400">
+              {/* Stats */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] md:text-xs text-slate-500">
                 <span>
                   {totalAlerts} {totalAlerts === 1 ? 'alerta' : 'alertas'}
                 </span>
                 {activeCount > 0 && (
                   <>
-                    <span>•</span>
-                    <span className="text-amber-400">
+                    <span className="text-slate-700">•</span>
+                    <span className="text-amber-400/80">
                       {activeCount} {activeCount === 1 ? 'activa' : 'activas'}
                     </span>
                   </>
                 )}
                 {managedCount > 0 && (
                   <>
-                    <span>•</span>
-                    <span className="text-green-400">
+                    <span className="text-slate-700">•</span>
+                    <span className="text-green-400/80">
                       {managedCount} {managedCount === 1 ? 'gestionada' : 'gestionadas'}
                     </span>
                   </>
@@ -93,27 +103,38 @@ export default function DirectReportsSection({
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <div className="text-lg font-semibold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+          {/* Derecha: Riesgo + Toggle */}
+          <div className="flex items-center justify-between md:justify-end gap-3 md:gap-4 pt-2 md:pt-0 border-t border-slate-700/20 md:border-0">
+            {/* Riesgo - SIN GRADIENTE */}
+            <div className="text-left md:text-right">
+              <div className="text-base md:text-lg font-medium text-white">
                 {formatCurrency(totalRisk)}
               </div>
-              <div className="text-[10px] text-slate-600 uppercase tracking-wide">
+              <div className="text-[9px] md:text-[10px] text-slate-600 uppercase tracking-wide">
                 Riesgo
               </div>
             </div>
             
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ${isExpanded ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'bg-slate-700/20 text-slate-500 border border-slate-600/20'}`}>
-              {isExpanded ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-            </div>
+            {/* Toggle - NEUTRO */}
+            <motion.div 
+              animate={{ rotate: isExpanded ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+              className={`
+                w-8 h-8 md:w-9 md:h-9 rounded-lg flex items-center justify-center
+                transition-all duration-300
+                ${isExpanded 
+                  ? 'bg-slate-700/50 text-white border border-slate-600/30' 
+                  : 'bg-slate-800/30 text-slate-500 border border-slate-700/20'
+                }
+              `}
+            >
+              <ChevronDown className="h-4 w-4" strokeWidth={2} />
+            </motion.div>
           </div>
         </div>
       </div>
       
+      {/* Lista de Personas */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div
@@ -121,7 +142,7 @@ export default function DirectReportsSection({
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3 }}
-            className="space-y-2 mt-2 pl-3"
+            className="space-y-2 mt-2 pl-2 md:pl-3"
           >
             {people.map((person, index) => (
               <PersonCard
@@ -135,9 +156,10 @@ export default function DirectReportsSection({
         )}
       </AnimatePresence>
       
+      {/* Separador */}
       {isExpanded && (
-        <div className="mt-4 border-t border-slate-700/30" />
+        <div className="mt-3 md:mt-4 border-t border-slate-700/20" />
       )}
     </motion.div>
   );
-} 
+}

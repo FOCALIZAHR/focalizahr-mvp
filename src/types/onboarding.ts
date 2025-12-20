@@ -88,7 +88,16 @@ export interface OnboardingMetrics {
   department?: {
     id: string
     displayName: string
-    standardCategory: string
+    standardCategory: string              // ← SIN CAMBIO
+    // Campos jerárquicos (opcionales, incluidos por backend)
+    level?: number                        // 2 = gerencia, 3 = departamento
+    parentId?: string | null              // ID de gerencia padre
+    unitType?: string                     // 'gerencia' | 'departamento'
+    parent?: {                            // Relación al padre (si se incluye)
+      id: string
+      displayName: string
+      level?: number
+    } | null
   }
 }
 

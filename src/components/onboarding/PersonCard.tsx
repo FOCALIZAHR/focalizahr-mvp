@@ -1,12 +1,12 @@
 // src/components/onboarding/PersonCard.tsx
 // COMPONENTE: Card de Persona (Nivel 3)
-// Agrupa alertas de una persona con expand/collapse
+// ✅ v4.3 FILOSOFÍA FOCALIZAHR: Sobrio, sin saturación, Apple/Tesla
 
 'use client';
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, ArrowRight, Clock, AlertTriangle } from 'lucide-react';
+import { ChevronDown, ArrowRight, Clock } from 'lucide-react';
 import { OnboardingAlertEngine } from '@/engines/OnboardingAlertEngine';
 import { useToast } from '@/components/ui/toast-system';
 import ResolutionModal from './ResolutionModal';
@@ -61,12 +61,29 @@ export default function PersonCard({
     return stages[stage] || `Etapa ${stage}`;
   };
   
+  // Severidad - MÁS SUTIL, solo dot indica nivel
   const getSeverityConfig = (severity: string) => {
     const configs = {
-      critical: { border: 'bg-red-500', label: 'CRÍTICA', labelBg: 'bg-red-500/10 border-red-500/30 text-red-400' },
-      high: { border: 'bg-orange-500', label: 'ALTA', labelBg: 'bg-orange-500/10 border-orange-500/30 text-orange-400' },
-      medium: { border: 'bg-yellow-500', label: 'MEDIA', labelBg: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' },
-      low: { border: 'bg-blue-500', label: 'BAJA', labelBg: 'bg-blue-500/10 border-blue-500/30 text-blue-400' }
+      critical: { 
+        border: 'bg-red-500/60', 
+        label: 'Crítica', 
+        dot: 'bg-red-400'
+      },
+      high: { 
+        border: 'bg-orange-500/60', 
+        label: 'Alta', 
+        dot: 'bg-orange-400'
+      },
+      medium: { 
+        border: 'bg-yellow-500/60', 
+        label: 'Media', 
+        dot: 'bg-yellow-400'
+      },
+      low: { 
+        border: 'bg-slate-500/60', 
+        label: 'Baja', 
+        dot: 'bg-slate-400'
+      }
     };
     return configs[severity as keyof typeof configs] || configs.low;
   };
@@ -82,6 +99,11 @@ export default function PersonCard({
   const severityConfig = getSeverityConfig(maxSeverity);
   const totalAlerts = person.alerts.length;
   
+  // Limpiar título de emojis
+  const cleanTitle = (title: string) => {
+    return title.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]/gu, '').trim();
+  };
+  
   return (
     <>
       <motion.div
@@ -90,93 +112,91 @@ export default function PersonCard({
         transition={{ delay: index * 0.03 }}
         className="space-y-2"
       >
-        {/* Header Persona */}
+        {/* Header Persona - SOBRIO */}
         <div
           onClick={() => setIsExpanded(!isExpanded)}
           className="
             group relative overflow-hidden
-            bg-slate-900/40 hover:bg-slate-900/60
-            border border-slate-700/20 hover:border-slate-600/40
+            bg-slate-900/25 hover:bg-slate-900/40
+            border border-slate-700/15 hover:border-slate-600/25
             rounded-lg transition-all duration-300 cursor-pointer
-            p-3
+            p-2.5 md:p-3
           "
         >
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
+            
             {/* Izquierda: Avatar + Info */}
-            <div className="flex items-center gap-3">
-              {/* Avatar */}
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-slate-600/30 flex items-center justify-center">
-                <span className="text-sm font-semibold text-white">
+            <div className="flex items-center gap-2.5 md:gap-3 min-w-0 flex-1">
+              {/* Avatar - NEUTRO */}
+              <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-slate-800/50 border border-slate-700/30 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs md:text-sm font-medium text-slate-400">
                   {getInitials(person.journey.fullName)}
                 </span>
               </div>
               
               {/* Info */}
-              <div>
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-sm font-semibold text-white group-hover:text-cyan-400 transition-colors">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-1.5 md:gap-2 mb-0.5">
+                  <span className="text-sm font-medium text-white truncate">
                     {person.journey.fullName}
                   </span>
                   {totalAlerts > 1 && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/30 rounded-full text-xs text-cyan-400">
-                      <AlertTriangle className="h-3 w-3" />
+                    <span className="inline-flex items-center px-1.5 py-0.5 bg-slate-800/50 border border-slate-700/30 rounded text-[10px] text-slate-400">
                       {totalAlerts} alertas
                     </span>
                   )}
                 </div>
                 
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <span>{person.journey.department?.displayName || 'Sin departamento'}</span>
-                  <span>•</span>
+                {/* Meta info - Solo dot de color */}
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] md:text-xs text-slate-500">
+                  <span className="truncate max-w-[120px] md:max-w-none">{person.journey.department?.displayName || 'Sin departamento'}</span>
+                  <span className="text-slate-700">•</span>
                   <span>{getStageLabel(person.journey.currentStage)}</span>
-                  <span>•</span>
-                  <span className={severityConfig.labelBg.includes('red') ? 'text-red-400' : 
-                                   severityConfig.labelBg.includes('orange') ? 'text-orange-400' :
-                                   severityConfig.labelBg.includes('yellow') ? 'text-yellow-400' : 'text-blue-400'}>
-                    Riesgo {severityConfig.label.toLowerCase()}
+                  <span className="text-slate-700">•</span>
+                  <span className="inline-flex items-center gap-1 text-slate-400">
+                    <span className={`w-1.5 h-1.5 rounded-full ${severityConfig.dot}`}></span>
+                    {severityConfig.label}
                   </span>
                 </div>
                 
                 {person.activeCount > 0 && person.managedCount > 0 && (
-                  <div className="mt-1 text-[10px] text-slate-600">
-                    {person.activeCount} {person.activeCount === 1 ? 'activa' : 'activas'} • {person.managedCount} {person.managedCount === 1 ? 'gestionada' : 'gestionadas'}
+                  <div className="mt-1 text-[9px] md:text-[10px] text-slate-600">
+                    {person.activeCount} activa{person.activeCount !== 1 ? 's' : ''} • {person.managedCount} gestionada{person.managedCount !== 1 ? 's' : ''}
                   </div>
                 )}
               </div>
             </div>
             
             {/* Derecha: Riesgo + Toggle */}
-            <div className="flex items-center gap-3">
-              {/* Riesgo */}
+            <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
               <div className="text-right">
-                <div className="text-base font-semibold text-white">
+                <div className="text-sm md:text-base font-medium text-white">
                   {formatCurrency(person.risk)}
                 </div>
-                <div className="text-[9px] text-slate-600 uppercase tracking-wide">
+                <div className="text-[8px] md:text-[9px] text-slate-600 uppercase tracking-wide">
                   Riesgo
                 </div>
               </div>
               
-              {/* Toggle Icon */}
-              <div className={`
-                w-7 h-7 rounded-full flex items-center justify-center
-                transition-all duration-300
-                ${isExpanded 
-                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
-                  : 'bg-slate-700/20 text-slate-500 border border-slate-600/20'
-                }
-              `}>
-                {isExpanded ? (
-                  <ChevronUp className="h-3.5 w-3.5" />
-                ) : (
-                  <ChevronDown className="h-3.5 w-3.5" />
-                )}
-              </div>
+              <motion.div 
+                animate={{ rotate: isExpanded ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+                className={`
+                  w-7 h-7 rounded-lg flex items-center justify-center
+                  transition-all duration-300
+                  ${isExpanded 
+                    ? 'bg-slate-700/50 text-white border border-slate-600/30' 
+                    : 'bg-slate-800/30 text-slate-500 border border-slate-700/20'
+                  }
+                `}
+              >
+                <ChevronDown className="h-3.5 w-3.5" strokeWidth={2} />
+              </motion.div>
             </div>
           </div>
         </div>
         
-        {/* Lista de Alertas (colapsable) */}
+        {/* Lista de Alertas */}
         <AnimatePresence>
           {isExpanded && (
             <motion.div
@@ -184,13 +204,13 @@ export default function PersonCard({
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.3 }}
-              className="space-y-1.5 pl-8"
+              className="space-y-1.5 pl-4 md:pl-8"
             >
-              {/* Sección: Alertas Activas */}
+              {/* Alertas Activas */}
               {person.activeCount > 0 && (
-                <div className="space-y-1.5">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-600 font-semibold px-2 py-1">
-                    Alertas Activas ({person.activeCount})
+                <div className="space-y-1">
+                  <div className="text-[9px] md:text-[10px] uppercase tracking-wider text-slate-600 font-medium py-1">
+                    Activas ({person.activeCount})
                   </div>
                   {person.alerts
                     .filter((alert: any) => alert.status === 'pending')
@@ -207,35 +227,38 @@ export default function PersonCard({
                           onClick={() => setSelectedAlert({ alert, businessCase })}
                           className="
                             group relative overflow-hidden
-                            bg-slate-900/20 hover:bg-slate-900/40
-                            border border-transparent hover:border-slate-700/30
+                            bg-slate-900/20 hover:bg-slate-900/35
+                            border border-slate-700/10 hover:border-slate-600/20
                             rounded-lg transition-all duration-200 cursor-pointer
-                            p-2.5
+                            p-2 md:p-2.5
                           "
                         >
-                          {/* Borde lateral severidad */}
+                          {/* Borde lateral sutil */}
                           <div className={`absolute left-0 top-0 bottom-0 w-0.5 ${config.border} rounded-l-lg`} />
                           
-                          <div className="flex items-center justify-between pl-2">
+                          <div className="flex items-center justify-between pl-2 gap-2">
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-0.5">
-                                <span className={`text-[9px] uppercase font-semibold tracking-wider px-1.5 py-0.5 rounded border ${config.labelBg}`}>
+                              <div className="flex flex-wrap items-center gap-1.5 md:gap-2 mb-0.5">
+                                {/* Dot + label en lugar de badge colorido */}
+                                <span className="inline-flex items-center gap-1 text-[8px] md:text-[9px] uppercase font-medium text-slate-400">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`}></span>
                                   {config.label}
                                 </span>
-                                <span className="text-[9px] text-slate-600 flex items-center gap-1">
+                                <span className="text-[8px] md:text-[9px] text-slate-600 flex items-center gap-1">
                                   <Clock className="h-2.5 w-2.5" />
                                   {new Date(alert.createdAt).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })}
                                 </span>
                               </div>
-                              <p className="text-xs text-slate-400 font-light truncate">
-                                {businessCase?.title || alert.alertType.replace(/_/g, ' ')}
+                              {/* Título limpio SIN EMOJIS */}
+                              <p className="text-[11px] md:text-xs text-slate-400 font-light truncate">
+                                {cleanTitle(businessCase?.title || alert.alertType.replace(/_/g, ' '))}
                               </p>
                             </div>
                             
                             <div className="
-                              w-7 h-7 rounded-full flex items-center justify-center
-                              bg-slate-800/30 text-slate-500 border border-slate-700/30
-                              group-hover:bg-cyan-500/20 group-hover:text-cyan-400 group-hover:border-cyan-500/30
+                              w-6 h-6 md:w-7 md:h-7 rounded-lg flex items-center justify-center flex-shrink-0
+                              bg-slate-800/30 text-slate-500 border border-slate-700/20
+                              group-hover:bg-slate-700/40 group-hover:text-white
                               transition-all duration-300
                             ">
                               <ArrowRight className="h-3 w-3" />
@@ -247,11 +270,11 @@ export default function PersonCard({
                 </div>
               )}
               
-              {/* Sección: Alertas Gestionadas */}
+              {/* Alertas Gestionadas */}
               {person.managedCount > 0 && (
-                <div className="space-y-1.5 pt-2">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-600 font-semibold px-2 py-1">
-                    Alertas Gestionadas ({person.managedCount})
+                <div className="space-y-1 pt-2">
+                  <div className="text-[9px] md:text-[10px] uppercase tracking-wider text-slate-600 font-medium py-1">
+                    Gestionadas ({person.managedCount})
                   </div>
                   {person.alerts
                     .filter((alert: any) => alert.status !== 'pending')
@@ -266,60 +289,60 @@ export default function PersonCard({
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: alertIndex * 0.02 }}
-                          className="space-y-2"
+                          className="space-y-1"
                         >
                           <div
                             onClick={() => setExpandedManagedAlert(isExpandedManaged ? null : alert.id)}
                             className="
                               group relative overflow-hidden
-                              bg-green-500/5 hover:bg-green-500/10
-                              border border-green-500/10 hover:border-green-500/20
+                              bg-emerald-500/5 hover:bg-emerald-500/10
+                              border border-emerald-500/10 hover:border-emerald-500/15
                               rounded-lg transition-all duration-200 cursor-pointer
-                              p-2.5
+                              p-2 md:p-2.5
                             "
                           >
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between gap-2">
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-0.5">
-                                  <span className="px-1.5 py-0.5 text-[9px] font-medium uppercase bg-green-500/10 border border-green-500/30 text-green-400 rounded">
+                                <div className="flex flex-wrap items-center gap-1.5 md:gap-2 mb-0.5">
+                                  <span className="text-[8px] md:text-[9px] font-medium text-emerald-400/70">
                                     ✓ Gestionada
                                   </span>
-                                  <span className={`text-[9px] uppercase font-semibold tracking-wider px-1.5 py-0.5 rounded border ${config.labelBg}`}>
+                                  <span className="inline-flex items-center gap-1 text-[8px] md:text-[9px] text-slate-500">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${config.dot} opacity-50`}></span>
                                     {config.label}
                                   </span>
                                 </div>
-                                <p className="text-xs text-slate-400 font-light truncate">
-                                  {businessCase?.title || alert.alertType.replace(/_/g, ' ')}
+                                <p className="text-[11px] md:text-xs text-slate-500 font-light truncate">
+                                  {cleanTitle(businessCase?.title || alert.alertType.replace(/_/g, ' '))}
                                 </p>
                               </div>
                               
-                              <div className={`
-                                w-7 h-7 rounded-full flex items-center justify-center
-                                transition-all duration-300
-                                ${isExpandedManaged 
-                                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
-                                  : 'bg-green-500/10 text-green-400 border border-green-500/30'
-                                }
-                              `}>
-                                {isExpandedManaged ? (
-                                  <ChevronUp className="h-3 w-3" />
-                                ) : (
-                                  <ChevronDown className="h-3 w-3" />
-                                )}
-                              </div>
+                              <motion.div 
+                                animate={{ rotate: isExpandedManaged ? 180 : 0 }}
+                                transition={{ duration: 0.2 }}
+                                className={`
+                                  w-6 h-6 md:w-7 md:h-7 rounded-lg flex items-center justify-center flex-shrink-0
+                                  transition-all duration-300
+                                  ${isExpandedManaged 
+                                    ? 'bg-slate-700/50 text-white border border-slate-600/30' 
+                                    : 'bg-emerald-500/10 text-emerald-400/60 border border-emerald-500/15'
+                                  }
+                                `}
+                              >
+                                <ChevronDown className="h-3 w-3" />
+                              </motion.div>
                             </div>
                           </div>
                           
-                          {/* Detalle expandido */}
                           <AnimatePresence>
                             {isExpandedManaged && (
                               <motion.div
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: 'auto' }}
                                 exit={{ opacity: 0, height: 0 }}
-                                className="bg-slate-900/20 border border-slate-700/20 rounded-lg p-3 ml-2"
+                                className="bg-slate-900/15 border border-slate-700/15 rounded-lg p-2.5 ml-2"
                               >
-                                <div className="space-y-2 text-xs">
+                                <div className="space-y-1 text-[10px] md:text-xs">
                                   {alert.resolvedAt && (
                                     <div>
                                       <span className="text-slate-600">Resuelta:</span>{' '}
@@ -348,7 +371,7 @@ export default function PersonCard({
         </AnimatePresence>
       </motion.div>
       
-      {/* Modal Resolución */}
+      {/* Modal */}
       {selectedAlert && (
         <ResolutionModal
           isOpen={!!selectedAlert}

@@ -258,7 +258,17 @@ export async function GET(request: NextRequest) {
             select: {
               id: true,
               displayName: true,
-              standardCategory: true
+              standardCategory: true,
+              level: true,
+              parentId: true,
+              unitType: true,
+              parent: {
+                select: {
+                  id: true,
+                  displayName: true,
+                  level: true
+                }
+              }
             }
           }
         },
@@ -317,7 +327,17 @@ export async function GET(request: NextRequest) {
             select: {
               id: true,
               displayName: true,
-              standardCategory: true
+              standardCategory: true,
+              level: true,
+              parentId: true,
+              unitType: true,
+              parent: {
+                select: {
+                  id: true,
+                  displayName: true,
+                  level: true
+                }
+              }
             }
           }
         },

@@ -1,0 +1,1826 @@
+/* ============================================================================
+   FOCALIZAHR UNIFIED DESIGN SYSTEM v1.0
+   ============================================================================
+   
+   🎯 FILOSOFÍA CORE:
+   "El espacio vacío es contenido, no ausencia."
+   "Menos es más. El espacio respira. La claridad comunica."
+   
+   FocalizaHR NO es una empresa de encuestas. Es un GARANTE DE CONFIANZA
+   que crea espacios donde la verdad puede emerger sin miedo.
+   
+   📐 ADN VISUAL:
+   - 70% Apple: Minimalismo extremo, espaciado generoso, tipografía light
+   - 20% Tesla: Datos elegantes, tecnología accesible, inteligencia sutil
+   - 10% Institucional: Confianza profesional, credibilidad Big 4
+   
+   📱 MOBILE-FIRST (Regla Inquebrantable):
+   - Base = Mobile (375px)
+   - Si no funciona en móvil, NO está listo para producción
+   - Touch targets mínimo 44px
+   - Textos legibles sin zoom
+   
+   🎨 PALETA EMOCIONAL:
+   - Cyan (#22D3EE): Innovación, confianza, interacción
+   - Purple (#A78BFA): Premium, inteligencia, sofisticación
+   - Amber (#F59E0B): Alerta, atención (usar con moderación)
+   - Emerald (#10B981): Éxito, positivo, completado
+   
+   ⚡ PREGUNTA PARA CADA ELEMENTO:
+   1. ¿Reduce fricción cognitiva?
+   2. ¿Aporta valor inmediato?
+   3. ¿Respeta la jerarquía visual?
+   → Si alguna es NO → eliminar o refinar
+   
+   ============================================================================ */
+
+/* ============================================================================
+   1. VARIABLES CSS - Mobile First
+   ============================================================================ */
+:root {
+  /* ========== COLORES MARCA ========== */
+  --fhr-cyan: #22D3EE;
+  --fhr-cyan-light: #67E8F9;
+  --fhr-cyan-dark: #0891B2;
+  --fhr-cyan-muted: rgba(34, 211, 238, 0.1);
+  --fhr-cyan-glow: rgba(34, 211, 238, 0.25);
+  
+  --fhr-purple: #A78BFA;
+  --fhr-purple-light: #C4B5FD;
+  --fhr-purple-dark: #7C3AED;
+  --fhr-purple-muted: rgba(167, 139, 250, 0.1);
+  --fhr-purple-glow: rgba(167, 139, 250, 0.25);
+  
+  --fhr-blue: #3B82F6;
+  
+  /* ========== COLORES SEMÁNTICOS ========== */
+  --fhr-success: #10B981;
+  --fhr-success-muted: rgba(16, 185, 129, 0.15);
+  --fhr-warning: #F59E0B;
+  --fhr-warning-muted: rgba(245, 158, 11, 0.15);
+  --fhr-error: #EF4444;
+  --fhr-error-muted: rgba(239, 68, 68, 0.15);
+  --fhr-info: #06B6D4;
+  
+  /* ========== FONDOS ========== */
+  --fhr-bg-primary: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  --fhr-bg-primary-solid: #0F172A;
+  --fhr-bg-secondary: #1E293B;
+  --fhr-bg-elevated: rgba(30, 41, 59, 0.9);
+  --fhr-bg-subtle: rgba(30, 41, 59, 0.5);
+  --fhr-bg-overlay: rgba(15, 23, 42, 0.8);
+  
+  /* ========== TEXTO ========== */
+  --fhr-text-primary: #FFFFFF;
+  --fhr-text-secondary: #CBD5E1;
+  --fhr-text-tertiary: #94A3B8;
+  --fhr-text-muted: #64748B;
+  --fhr-text-disabled: #475569;
+  
+  /* ========== BORDES ========== */
+  --fhr-border-default: rgba(71, 85, 105, 0.3);
+  --fhr-border-hover: rgba(34, 211, 238, 0.5);
+  --fhr-border-active: #22D3EE;
+  --fhr-border-subtle: rgba(255, 255, 255, 0.1);
+  
+  /* ========== GRADIENTES ========== */
+  --fhr-gradient-text: linear-gradient(135deg, #22D3EE 0%, #3B82F6 50%, #A78BFA 100%);
+  --fhr-gradient-primary: linear-gradient(135deg, #22D3EE, #A78BFA);
+  --fhr-gradient-bg-subtle: radial-gradient(circle at 25% 25%, rgba(34, 211, 238, 0.03) 0%, transparent 50%);
+  --fhr-gradient-bg-purple: radial-gradient(circle at 75% 75%, rgba(167, 139, 250, 0.03) 0%, transparent 50%);
+  
+  /* ========== ESPACIADO (8px grid) ========== */
+  --fhr-space-xs: 0.5rem;    /* 8px */
+  --fhr-space-sm: 1rem;      /* 16px */
+  --fhr-space-md: 1.5rem;    /* 24px */
+  --fhr-space-lg: 2rem;      /* 32px */
+  --fhr-space-xl: 3rem;      /* 48px */
+  --fhr-space-2xl: 4rem;     /* 64px */
+  
+  /* ========== BORDES REDONDEADOS ========== */
+  --fhr-radius-sm: 8px;
+  --fhr-radius-md: 12px;
+  --fhr-radius-lg: 16px;
+  --fhr-radius-xl: 24px;
+  --fhr-radius-full: 9999px;
+  
+  /* ========== TRANSICIONES ========== */
+  --fhr-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --fhr-transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --fhr-transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* ========== SOMBRAS ========== */
+  --fhr-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --fhr-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.2);
+  --fhr-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.3);
+  --fhr-shadow-glow-cyan: 0 0 30px rgba(34, 211, 238, 0.25);
+  --fhr-shadow-glow-purple: 0 0 30px rgba(167, 139, 250, 0.25);
+  
+  /* ========== Z-INDEX ========== */
+  --fhr-z-base: 1;
+  --fhr-z-dropdown: 10;
+  --fhr-z-sticky: 20;
+  --fhr-z-fixed: 30;
+  --fhr-z-modal-backdrop: 40;
+  --fhr-z-modal: 50;
+  --fhr-z-toast: 60;
+  --fhr-z-tooltip: 70;
+  
+  /* ========== TOUCH TARGET (Accesibilidad) ========== */
+  --fhr-touch-target: 44px;
+}
+
+/* ============================================================================
+   2. RESET Y BASE
+   ============================================================================ */
+.fhr-container {
+  min-height: 100vh;
+  background: var(--fhr-bg-primary);
+  color: var(--fhr-text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================================
+   3. FONDOS Y LAYOUTS
+   ============================================================================ */
+
+/* Fondo principal con patrón sutil */
+.fhr-bg-main {
+  background: var(--fhr-bg-primary);
+  position: relative;
+  min-height: 100vh;
+}
+
+.fhr-bg-main::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    var(--fhr-gradient-bg-subtle),
+    var(--fhr-gradient-bg-purple);
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* Fondo elevado para cards */
+.fhr-bg-elevated {
+  background: var(--fhr-bg-secondary);
+}
+
+/* Fondo para surveys (sólido, más inmersivo) */
+.fhr-bg-survey {
+  background: #0A0E1A;
+  position: relative;
+  min-height: 100vh;
+}
+
+/* Contenedor centrado responsive */
+.fhr-content {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--fhr-space-sm);
+  position: relative;
+  z-index: var(--fhr-z-base);
+}
+
+@media (min-width: 768px) {
+  .fhr-content {
+    padding: var(--fhr-space-md);
+  }
+}
+
+@media (min-width: 1024px) {
+  .fhr-content {
+    padding: var(--fhr-space-lg);
+  }
+}
+
+/* ============================================================================
+   4. TIPOGRAFÍA
+   ============================================================================ */
+
+/* Título Hero con gradiente (font-light obligatorio) */
+.fhr-title-hero {
+  font-size: 2.25rem;
+  font-weight: 300;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  color: var(--fhr-text-primary);
+}
+
+@media (min-width: 768px) {
+  .fhr-title-hero {
+    font-size: 3rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .fhr-title-hero {
+    font-size: 3.75rem;
+  }
+}
+
+/* Texto con gradiente (solo parte del título) */
+.fhr-title-gradient {
+  background: var(--fhr-gradient-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Título de sección */
+.fhr-title-section {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--fhr-text-primary);
+}
+
+@media (min-width: 768px) {
+  .fhr-title-section {
+    font-size: 1.875rem;
+  }
+}
+
+/* Título de card */
+.fhr-title-card {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--fhr-text-primary);
+}
+
+@media (min-width: 768px) {
+  .fhr-title-card {
+    font-size: 1.25rem;
+  }
+}
+
+/* Subtítulo */
+.fhr-subtitle {
+  font-size: 1rem;
+  font-weight: 300;
+  line-height: 1.6;
+  color: var(--fhr-text-tertiary);
+}
+
+@media (min-width: 768px) {
+  .fhr-subtitle {
+    font-size: 1.125rem;
+  }
+}
+
+/* Texto body */
+.fhr-text {
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--fhr-text-secondary);
+}
+
+@media (min-width: 768px) {
+  .fhr-text {
+    font-size: 1rem;
+  }
+}
+
+/* Texto pequeño/caption */
+.fhr-text-sm {
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--fhr-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Texto con acento cyan */
+.fhr-text-accent {
+  color: var(--fhr-cyan);
+}
+
+/* Texto muted */
+.fhr-text-muted {
+  color: var(--fhr-text-muted);
+}
+
+/* Texto secondary */
+.fhr-text-secondary {
+  color: var(--fhr-text-secondary);
+}
+
+/* Texto extra pequeño */
+.fhr-text-xs {
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ============================================================================
+   5. PORTADAS DE PÁGINA (Hero Sections)
+   ============================================================================ */
+
+/* Contenedor de portada */
+.fhr-hero {
+  text-align: center;
+  padding: var(--fhr-space-lg) var(--fhr-space-sm);
+  margin-bottom: var(--fhr-space-lg);
+}
+
+@media (min-width: 768px) {
+  .fhr-hero {
+    padding: var(--fhr-space-xl) var(--fhr-space-md);
+    margin-bottom: var(--fhr-space-xl);
+  }
+}
+
+/* Badge superior de contexto */
+.fhr-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(30, 41, 59, 0.3);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--fhr-border-subtle);
+  border-radius: var(--fhr-radius-full);
+  margin-bottom: var(--fhr-space-sm);
+}
+
+.fhr-hero-badge-icon {
+  width: 1rem;
+  height: 1rem;
+  color: var(--fhr-cyan);
+}
+
+.fhr-hero-badge-text {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--fhr-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Título hero */
+.fhr-hero-title {
+  font-size: 2.25rem;
+  font-weight: 300;
+  line-height: 1.1;
+  color: var(--fhr-text-primary);
+  margin-bottom: var(--fhr-space-xs);
+}
+
+@media (min-width: 768px) {
+  .fhr-hero-title {
+    font-size: 3rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .fhr-hero-title {
+    font-size: 3.75rem;
+  }
+}
+
+/* Subtítulo hero */
+.fhr-hero-subtitle {
+  font-size: 1rem;
+  font-weight: 300;
+  line-height: 1.6;
+  color: var(--fhr-text-tertiary);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+  .fhr-hero-subtitle {
+    font-size: 1.25rem;
+  }
+}
+
+/* Línea decorativa FocalizaHR ── • ── */
+.fhr-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin: var(--fhr-space-md) 0;
+}
+
+.fhr-divider-line {
+  width: 4rem;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.fhr-divider-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fhr-cyan);
+}
+
+/* Divider con texto */
+.fhr-divider-text {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fhr-text-muted);
+  padding: 0 0.5rem;
+}
+
+/* Divider con líneas a los lados (para secciones) */
+.fhr-divider::before,
+.fhr-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(71, 85, 105, 0.3);
+}
+
+/* ============================================================================
+   6. CARDS
+   ============================================================================ */
+
+/* Card base con glassmorphism */
+.fhr-card {
+  background: var(--fhr-bg-elevated);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--fhr-border-default);
+  border-radius: var(--fhr-radius-lg);
+  padding: var(--fhr-space-sm);
+  transition: all var(--fhr-transition-base);
+}
+
+@media (min-width: 768px) {
+  .fhr-card {
+    padding: var(--fhr-space-md);
+  }
+}
+
+.fhr-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--fhr-shadow-lg);
+  border-color: var(--fhr-border-hover);
+}
+
+/* Card sin hover (para contenedores estáticos) */
+.fhr-card-static {
+  background: var(--fhr-bg-elevated);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--fhr-border-default);
+  border-radius: var(--fhr-radius-lg);
+  padding: var(--fhr-space-sm);
+}
+
+@media (min-width: 768px) {
+  .fhr-card-static {
+    padding: var(--fhr-space-md);
+  }
+}
+
+/* Card métrica con borde lateral */
+.fhr-card-metric {
+  background: var(--fhr-bg-elevated);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--fhr-border-default);
+  border-left: 4px solid var(--fhr-cyan);
+  border-radius: var(--fhr-radius-lg);
+  padding: var(--fhr-space-sm);
+  transition: all var(--fhr-transition-base);
+}
+
+@media (min-width: 768px) {
+  .fhr-card-metric {
+    padding: var(--fhr-space-md);
+  }
+}
+
+.fhr-card-metric:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--fhr-shadow-md);
+  border-color: var(--fhr-border-hover);
+}
+
+/* Variantes de borde para cards métrica */
+.fhr-card-metric-purple {
+  border-left-color: var(--fhr-purple);
+}
+
+.fhr-card-metric-success {
+  border-left-color: var(--fhr-success);
+}
+
+.fhr-card-metric-warning {
+  border-left-color: var(--fhr-warning);
+}
+
+.fhr-card-metric-error {
+  border-left-color: var(--fhr-error);
+}
+
+/* Card warning (para huérfanos, alertas) */
+.fhr-card-warning {
+  background: linear-gradient(135deg, rgba(120, 53, 15, 0.3) 0%, rgba(154, 52, 18, 0.2) 100%);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.fhr-card-warning:hover {
+  background: linear-gradient(135deg, rgba(120, 53, 15, 0.4) 0%, rgba(154, 52, 18, 0.3) 100%);
+  border-color: rgba(245, 158, 11, 0.3);
+  transform: translateY(-2px);
+}
+
+/* ============================================================================
+   ICON BOX - Contenedor de iconos
+   ============================================================================ */
+
+.fhr-icon-box {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--fhr-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--fhr-transition-base);
+}
+
+@media (min-width: 768px) {
+  .fhr-icon-box {
+    width: 3rem;
+    height: 3rem;
+  }
+}
+
+.fhr-icon-box-cyan {
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.1) 0%, rgba(167, 139, 250, 0.1) 100%);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  color: var(--fhr-cyan);
+}
+
+.fhr-icon-box-cyan:hover,
+.group:hover .fhr-icon-box-cyan {
+  border-color: rgba(34, 211, 238, 0.5);
+  color: var(--fhr-cyan-light);
+}
+
+.fhr-icon-box-warning {
+  background: rgba(120, 53, 15, 0.5);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: var(--fhr-warning);
+}
+
+.fhr-icon-box-purple {
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.1) 0%, rgba(34, 211, 238, 0.1) 100%);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  color: var(--fhr-purple);
+}
+
+/* ============================================================================
+   BTN ICON - Botón solo icono (expand/collapse, actions)
+   ============================================================================ */
+
+.fhr-btn-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--fhr-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(51, 65, 85, 0.3);
+  border: 1px solid var(--fhr-border-default);
+  color: var(--fhr-text-tertiary);
+  cursor: pointer;
+  transition: all var(--fhr-transition-base);
+}
+
+@media (min-width: 768px) {
+  .fhr-btn-icon {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}
+
+.fhr-btn-icon:hover,
+.group:hover .fhr-btn-icon {
+  background: rgba(34, 211, 238, 0.1);
+  border-color: rgba(34, 211, 238, 0.4);
+  color: var(--fhr-cyan);
+}
+
+.fhr-btn-icon-warning {
+  background: rgba(120, 53, 15, 0.5);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--fhr-warning);
+}
+
+.fhr-btn-icon-warning:hover,
+.group:hover .fhr-btn-icon-warning {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+/* Card glassmorphism intenso */
+.fhr-card-glass {
+  background: rgba(30, 41, 59, 0.5);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--fhr-border-subtle);
+  border-radius: var(--fhr-radius-lg);
+  padding: var(--fhr-space-sm);
+}
+
+@media (min-width: 768px) {
+  .fhr-card-glass {
+    padding: var(--fhr-space-md);
+  }
+}
+
+/* Card para preguntas (survey) */
+.fhr-card-question {
+  background: rgba(30, 41, 59, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--fhr-border-default);
+  border-radius: var(--fhr-radius-xl);
+  padding: var(--fhr-space-md);
+  transition: all var(--fhr-transition-base);
+}
+
+@media (min-width: 768px) {
+  .fhr-card-question {
+    padding: var(--fhr-space-lg);
+  }
+}
+
+.fhr-card-question:hover {
+  border-color: rgba(71, 85, 105, 0.5);
+  background: rgba(30, 41, 59, 0.6);
+}
+
+/* ============================================================================
+   7. BADGES
+   ============================================================================ */
+
+/* Badge base */
+.fhr-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: var(--fhr-radius-full);
+  transition: all var(--fhr-transition-fast);
+}
+
+/* Badge success (verde) */
+.fhr-badge-success {
+  background: var(--fhr-success-muted);
+  color: var(--fhr-success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Badge default (gris neutro) */
+.fhr-badge-default {
+  background: rgba(51, 65, 85, 0.5);
+  color: var(--fhr-text-secondary);
+  border: 1px solid rgba(71, 85, 105, 0.3);
+}
+
+/* Badge active (cyan) */
+.fhr-badge-active {
+  background: var(--fhr-cyan-muted);
+  color: var(--fhr-cyan);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+}
+
+/* Badge cyan (alias de active) */
+.fhr-badge-cyan {
+  background: var(--fhr-cyan-muted);
+  color: var(--fhr-cyan);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+}
+
+/* Badge warning (amarillo) */
+.fhr-badge-warning {
+  background: var(--fhr-warning-muted);
+  color: var(--fhr-warning);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* Badge error (rojo) */
+.fhr-badge-error {
+  background: var(--fhr-error-muted);
+  color: var(--fhr-error);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Badge draft (gris) */
+.fhr-badge-draft {
+  background: rgba(100, 116, 139, 0.15);
+  color: var(--fhr-text-tertiary);
+  border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+/* Badge purple */
+.fhr-badge-purple {
+  background: var(--fhr-purple-muted);
+  color: var(--fhr-purple);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+}
+
+/* Badge premium (purple alias) */
+.fhr-badge-premium {
+  background: var(--fhr-purple-muted);
+  color: var(--fhr-purple);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+}
+
+/* Badge confidencial con pulso */
+.fhr-badge-confidential {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(30, 41, 59, 0.5);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--fhr-border-subtle);
+  border-radius: var(--fhr-radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--fhr-text-tertiary);
+}
+
+.fhr-badge-confidential-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fhr-cyan);
+  animation: fhr-pulse 2s ease-in-out infinite;
+}
+
+/* ============================================================================
+   8. BOTONES
+   ============================================================================ */
+
+/* Botón base */
+.fhr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: var(--fhr-touch-target);
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: var(--fhr-radius-md);
+  cursor: pointer;
+  transition: all var(--fhr-transition-base);
+  border: none;
+  outline: none;
+}
+
+.fhr-btn:focus-visible {
+  outline: 2px solid var(--fhr-cyan);
+  outline-offset: 2px;
+}
+
+.fhr-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Botón primario (cyan gradient) */
+.fhr-btn-primary {
+  background: var(--fhr-gradient-primary);
+  color: var(--fhr-bg-primary);
+  font-weight: 600;
+}
+
+.fhr-btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--fhr-shadow-glow-cyan);
+}
+
+.fhr-btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Botón secundario (outline cyan) */
+.fhr-btn-secondary {
+  background: transparent;
+  color: var(--fhr-cyan);
+  border: 2px solid var(--fhr-cyan);
+}
+
+.fhr-btn-secondary:hover:not(:disabled) {
+  background: var(--fhr-cyan-muted);
+  transform: translateY(-2px);
+}
+
+/* Botón ghost (transparente) */
+.fhr-btn-ghost {
+  background: transparent;
+  color: var(--fhr-text-secondary);
+  border: 1px solid var(--fhr-border-default);
+}
+
+.fhr-btn-ghost:hover:not(:disabled) {
+  background: var(--fhr-bg-subtle);
+  border-color: var(--fhr-border-hover);
+  color: var(--fhr-text-primary);
+}
+
+/* Botón danger (rojo) */
+.fhr-btn-danger {
+  background: var(--fhr-error);
+  color: white;
+}
+
+.fhr-btn-danger:hover:not(:disabled) {
+  background: #DC2626;
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+}
+
+/* Botón success (verde) */
+.fhr-btn-success {
+  background: var(--fhr-success);
+  color: white;
+}
+
+.fhr-btn-success:hover:not(:disabled) {
+  background: #059669;
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+}
+
+/* Botón small */
+.fhr-btn-sm {
+  min-height: 36px;
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+}
+
+/* Botón large */
+.fhr-btn-lg {
+  min-height: 52px;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+}
+
+/* Botón full width */
+.fhr-btn-full {
+  width: 100%;
+}
+
+/* ============================================================================
+   9. FORMULARIOS
+   ============================================================================ */
+
+/* Input base */
+.fhr-input {
+  width: 100%;
+  min-height: var(--fhr-touch-target);
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  color: var(--fhr-text-primary);
+  background: var(--fhr-bg-secondary);
+  border: 1px solid var(--fhr-border-default);
+  border-radius: var(--fhr-radius-md);
+  transition: all var(--fhr-transition-fast);
+}
+
+.fhr-input::placeholder {
+  color: var(--fhr-text-muted);
+}
+
+.fhr-input:focus {
+  outline: none;
+  border-color: var(--fhr-cyan);
+  box-shadow: 0 0 0 3px var(--fhr-cyan-muted);
+}
+
+.fhr-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Input error */
+.fhr-input-error {
+  border-color: var(--fhr-error);
+}
+
+.fhr-input-error:focus {
+  border-color: var(--fhr-error);
+  box-shadow: 0 0 0 3px var(--fhr-error-muted);
+}
+
+/* Select */
+.fhr-select {
+  width: 100%;
+  min-height: var(--fhr-touch-target);
+  padding: 0.75rem 2.5rem 0.75rem 1rem;
+  font-size: 1rem;
+  color: var(--fhr-text-primary);
+  background: var(--fhr-bg-secondary);
+  border: 1px solid var(--fhr-border-default);
+  border-radius: var(--fhr-radius-md);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+  transition: all var(--fhr-transition-fast);
+}
+
+.fhr-select:focus {
+  outline: none;
+  border-color: var(--fhr-cyan);
+  box-shadow: 0 0 0 3px var(--fhr-cyan-muted);
+}
+
+/* Textarea */
+.fhr-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  color: var(--fhr-text-primary);
+  background: var(--fhr-bg-secondary);
+  border: 1px solid var(--fhr-border-default);
+  border-radius: var(--fhr-radius-md);
+  resize: vertical;
+  transition: all var(--fhr-transition-fast);
+}
+
+.fhr-textarea:focus {
+  outline: none;
+  border-color: var(--fhr-cyan);
+  box-shadow: 0 0 0 3px var(--fhr-cyan-muted);
+}
+
+/* Label */
+.fhr-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--fhr-text-primary);
+}
+
+/* Helper text */
+.fhr-helper {
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--fhr-text-muted);
+}
+
+.fhr-helper-error {
+  color: var(--fhr-error);
+}
+
+/* ============================================================================
+   10. ESCALA DE RATING (Survey)
+   ============================================================================ */
+
+/* Contenedor de botones de escala */
+.fhr-scale-buttons {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.5rem;
+}
+
+@media (min-width: 768px) {
+  .fhr-scale-buttons {
+    gap: 0.75rem;
+  }
+}
+
+/* Botón de escala individual */
+.fhr-scale-button {
+  aspect-ratio: 1;
+  min-width: 48px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 41, 59, 0.3);
+  border: 2px solid var(--fhr-border-default);
+  border-radius: var(--fhr-radius-full);
+  cursor: pointer;
+  transition: all var(--fhr-transition-base);
+  position: relative;
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .fhr-scale-button {
+    min-width: 64px;
+    min-height: 64px;
+  }
+}
+
+.fhr-scale-button:hover {
+  transform: translateY(-4px) scale(1.05);
+  border-color: var(--fhr-border-hover);
+  background: rgba(30, 41, 59, 0.5);
+}
+
+.fhr-scale-button.selected {
+  background: var(--fhr-cyan-muted);
+  border-color: var(--fhr-cyan);
+  transform: scale(1.1);
+  box-shadow: var(--fhr-shadow-glow-cyan);
+}
+
+/* Número dentro del botón */
+.fhr-scale-number {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--fhr-text-muted);
+  transition: all var(--fhr-transition-base);
+}
+
+@media (min-width: 768px) {
+  .fhr-scale-number {
+    font-size: 1.5rem;
+  }
+}
+
+.fhr-scale-button:hover .fhr-scale-number {
+  color: var(--fhr-text-secondary);
+}
+
+.fhr-scale-button.selected .fhr-scale-number {
+  color: var(--fhr-cyan);
+  font-size: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .fhr-scale-button.selected .fhr-scale-number {
+    font-size: 1.75rem;
+  }
+}
+
+/* Labels de escala */
+.fhr-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 0.25rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--fhr-text-muted);
+}
+
+/* ============================================================================
+   11. OPCIONES MÚLTIPLES (Survey)
+   ============================================================================ */
+
+.fhr-option-button {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 1rem;
+  background: rgba(30, 41, 59, 0.3);
+  border: 2px solid var(--fhr-border-default);
+  border-radius: var(--fhr-radius-md);
+  cursor: pointer;
+  transition: all var(--fhr-transition-base);
+  text-align: left;
+}
+
+.fhr-option-button:hover {
+  background: rgba(30, 41, 59, 0.5);
+  border-color: var(--fhr-border-hover);
+  transform: translateX(4px);
+}
+
+.fhr-option-button.selected {
+  background: var(--fhr-cyan-muted);
+  border-color: var(--fhr-cyan);
+}
+
+.fhr-option-checkbox {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--fhr-border-default);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--fhr-transition-fast);
+}
+
+.fhr-option-button.selected .fhr-option-checkbox {
+  background: var(--fhr-cyan);
+  border-color: var(--fhr-cyan);
+}
+
+.fhr-option-text {
+  font-size: 0.9375rem;
+  color: var(--fhr-text-primary);
+}
+
+/* ============================================================================
+   12. NAVEGACIÓN (Survey)
+   ============================================================================ */
+
+/* Botón navegación anterior */
+.fhr-nav-prev {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--fhr-touch-target);
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--fhr-text-tertiary);
+  background: rgba(30, 41, 59, 0.3);
+  border: 1px solid var(--fhr-border-default);
+  border-radius: var(--fhr-radius-md);
+  cursor: pointer;
+  transition: all var(--fhr-transition-base);
+}
+
+.fhr-nav-prev:hover:not(:disabled) {
+  color: var(--fhr-text-primary);
+  border-color: var(--fhr-border-hover);
+  background: rgba(30, 41, 59, 0.5);
+  transform: translateX(-4px);
+}
+
+.fhr-nav-prev:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Botón navegación siguiente */
+.fhr-nav-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--fhr-touch-target);
+  padding: 0.625rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--fhr-bg-primary);
+  background: var(--fhr-cyan);
+  border: none;
+  border-radius: var(--fhr-radius-md);
+  cursor: pointer;
+  transition: all var(--fhr-transition-base);
+  position: relative;
+  overflow: hidden;
+}
+
+.fhr-nav-next:hover:not(:disabled) {
+  background: var(--fhr-cyan-dark);
+  transform: translateX(4px);
+  box-shadow: var(--fhr-shadow-glow-cyan);
+}
+
+.fhr-nav-next:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Efecto shimmer en botón next */
+.fhr-nav-next::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.5s ease;
+}
+
+.fhr-nav-next:hover::before {
+  transform: translateX(100%);
+}
+
+/* ============================================================================
+   13. PROGRESS BAR
+   ============================================================================ */
+
+.fhr-progress {
+  width: 100%;
+  height: 4px;
+  background: rgba(30, 41, 59, 0.5);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.fhr-progress-bar {
+  height: 100%;
+  background: var(--fhr-gradient-primary);
+  border-radius: 2px;
+  transition: width var(--fhr-transition-slow);
+  position: relative;
+}
+
+.fhr-progress-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: fhr-shimmer 2s ease-in-out infinite;
+}
+
+/* Progress header fijo */
+.fhr-progress-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(30, 41, 59, 0.5);
+  z-index: var(--fhr-z-sticky);
+}
+
+/* ============================================================================
+   14. TABLAS
+   ============================================================================ */
+
+.fhr-table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.fhr-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.fhr-table th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--fhr-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--fhr-bg-secondary);
+  border-bottom: 1px solid var(--fhr-border-default);
+}
+
+.fhr-table td {
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: var(--fhr-text-secondary);
+  border-bottom: 1px solid var(--fhr-border-default);
+}
+
+.fhr-table tbody tr {
+  transition: background var(--fhr-transition-fast);
+}
+
+.fhr-table tbody tr:hover {
+  background: rgba(30, 41, 59, 0.5);
+}
+
+/* ============================================================================
+   15. ESTADOS (Loading, Empty, Error)
+   ============================================================================ */
+
+/* Loading skeleton */
+.fhr-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--fhr-bg-secondary) 0%,
+    rgba(51, 65, 85, 0.5) 50%,
+    var(--fhr-bg-secondary) 100%
+  );
+  background-size: 200% 100%;
+  animation: fhr-skeleton 1.5s ease-in-out infinite;
+  border-radius: var(--fhr-radius-sm);
+}
+
+/* Loading spinner */
+.fhr-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--fhr-border-default);
+  border-top-color: var(--fhr-cyan);
+  border-radius: 50%;
+  animation: fhr-spin 0.8s linear infinite;
+}
+
+.fhr-spinner-lg {
+  width: 40px;
+  height: 40px;
+  border-width: 3px;
+}
+
+/* Estado vacío */
+.fhr-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--fhr-space-xl);
+  text-align: center;
+}
+
+.fhr-empty-state-icon {
+  width: 64px;
+  height: 64px;
+  color: var(--fhr-text-muted);
+  margin-bottom: var(--fhr-space-md);
+}
+
+.fhr-empty-state-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--fhr-text-primary);
+  margin-bottom: var(--fhr-space-xs);
+}
+
+.fhr-empty-state-text {
+  font-size: 0.875rem;
+  color: var(--fhr-text-muted);
+  max-width: 400px;
+}
+
+/* Estado error */
+.fhr-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--fhr-space-xl);
+  text-align: center;
+  background: var(--fhr-error-muted);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--fhr-radius-lg);
+}
+
+.fhr-error-state-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--fhr-error);
+  margin-bottom: var(--fhr-space-sm);
+}
+
+.fhr-error-state-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--fhr-error);
+  margin-bottom: var(--fhr-space-xs);
+}
+
+.fhr-error-state-text {
+  font-size: 0.875rem;
+  color: var(--fhr-text-secondary);
+}
+
+/* ============================================================================
+   16. COMPONENTES INTERACTIVOS (Para usar con shadcn/ui)
+   ============================================================================ */
+
+/* Modal overlay */
+.fhr-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--fhr-bg-overlay);
+  backdrop-filter: blur(4px);
+  z-index: var(--fhr-z-modal-backdrop);
+}
+
+/* Modal content */
+.fhr-modal-content {
+  background: var(--fhr-bg-elevated);
+  border: 1px solid var(--fhr-border-default);
+  border-radius: var(--fhr-radius-xl);
+  padding: var(--fhr-space-md);
+  max-width: 500px;
+  width: calc(100% - 2rem);
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
+}
+
+@media (min-width: 768px) {
+  .fhr-modal-content {
+    padding: var(--fhr-space-lg);
+  }
+}
+
+/* Modal header */
+.fhr-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--fhr-space-md);
+}
+
+/* Toast base */
+.fhr-toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: var(--fhr-bg-elevated);
+  border: 1px solid var(--fhr-border-default);
+  border-radius: var(--fhr-radius-md);
+  box-shadow: var(--fhr-shadow-lg);
+  min-width: 300px;
+  max-width: 420px;
+}
+
+.fhr-toast-success {
+  border-left: 4px solid var(--fhr-success);
+}
+
+.fhr-toast-error {
+  border-left: 4px solid var(--fhr-error);
+}
+
+.fhr-toast-warning {
+  border-left: 4px solid var(--fhr-warning);
+}
+
+.fhr-toast-info {
+  border-left: 4px solid var(--fhr-cyan);
+}
+
+/* Tooltip */
+.fhr-tooltip {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--fhr-text-primary);
+  background: var(--fhr-bg-secondary);
+  border: 1px solid var(--fhr-border-default);
+  border-radius: var(--fhr-radius-sm);
+  box-shadow: var(--fhr-shadow-md);
+  z-index: var(--fhr-z-tooltip);
+}
+
+/* Tabs */
+.fhr-tabs-list {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--fhr-bg-secondary);
+  padding: 0.25rem;
+  border-radius: var(--fhr-radius-md);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.fhr-tab {
+  min-height: var(--fhr-touch-target);
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--fhr-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--fhr-radius-sm);
+  cursor: pointer;
+  transition: all var(--fhr-transition-fast);
+  white-space: nowrap;
+}
+
+.fhr-tab:hover {
+  color: var(--fhr-text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.fhr-tab.active {
+  color: var(--fhr-text-primary);
+  background: var(--fhr-bg-elevated);
+  box-shadow: var(--fhr-shadow-sm);
+}
+
+/* Dropdown */
+.fhr-dropdown {
+  background: var(--fhr-bg-elevated);
+  border: 1px solid var(--fhr-border-default);
+  border-radius: var(--fhr-radius-md);
+  padding: 0.5rem;
+  min-width: 180px;
+  box-shadow: var(--fhr-shadow-lg);
+  z-index: var(--fhr-z-dropdown);
+}
+
+.fhr-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--fhr-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--fhr-radius-sm);
+  cursor: pointer;
+  transition: all var(--fhr-transition-fast);
+  text-align: left;
+}
+
+.fhr-dropdown-item:hover {
+  color: var(--fhr-text-primary);
+  background: var(--fhr-bg-subtle);
+}
+
+.fhr-dropdown-item-danger {
+  color: var(--fhr-error);
+}
+
+.fhr-dropdown-item-danger:hover {
+  background: var(--fhr-error-muted);
+}
+
+/* ============================================================================
+   17. CATEGORY INTRO (Survey)
+   ============================================================================ */
+
+.fhr-category-intro {
+  text-align: center;
+  padding: var(--fhr-space-xl) var(--fhr-space-md);
+  animation: fhr-fade-in 0.5s ease-out;
+}
+
+.fhr-category-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto var(--fhr-space-md);
+  background: linear-gradient(135deg, var(--fhr-cyan-muted), var(--fhr-purple-muted));
+  border-radius: var(--fhr-radius-xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(3deg);
+  transition: all var(--fhr-transition-base);
+}
+
+.fhr-category-icon:hover {
+  transform: rotate(0deg) scale(1.1);
+}
+
+.fhr-category-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  background: var(--fhr-gradient-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: var(--fhr-space-xs);
+}
+
+@media (min-width: 768px) {
+  .fhr-category-title {
+    font-size: 2.25rem;
+  }
+}
+
+.fhr-category-description {
+  font-size: 1rem;
+  color: var(--fhr-text-tertiary);
+  max-width: 480px;
+  margin: 0 auto var(--fhr-space-md);
+}
+
+/* ============================================================================
+   18. HEADER FIJO (Survey)
+   ============================================================================ */
+
+.fhr-header-fixed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--fhr-border-subtle);
+  z-index: var(--fhr-z-fixed);
+}
+
+.fhr-header-content {
+  height: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 var(--fhr-space-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@media (min-width: 768px) {
+  .fhr-header-content {
+    padding: 0 var(--fhr-space-md);
+  }
+}
+
+/* ============================================================================
+   19. EFECTOS Y UTILIDADES
+   ============================================================================ */
+
+/* Glassmorphism */
+.fhr-glass {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--fhr-border-subtle);
+}
+
+.fhr-glass-subtle {
+  background: rgba(30, 41, 59, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Glow effects */
+.fhr-glow-cyan {
+  box-shadow: var(--fhr-shadow-glow-cyan);
+}
+
+.fhr-glow-purple {
+  box-shadow: var(--fhr-shadow-glow-purple);
+}
+
+/* Hover lift */
+.fhr-hover-lift {
+  transition: transform var(--fhr-transition-base);
+}
+
+.fhr-hover-lift:hover {
+  transform: translateY(-4px);
+}
+
+/* Focus ring */
+.fhr-focus-ring:focus-visible {
+  outline: 2px solid var(--fhr-cyan);
+  outline-offset: 2px;
+}
+
+/* Text gradient */
+.fhr-text-gradient {
+  background: var(--fhr-gradient-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Dots indicadores (carrusel/pasos) */
+.fhr-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.fhr-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fhr-text-muted);
+  transition: all var(--fhr-transition-base);
+}
+
+.fhr-dot.active {
+  width: 24px;
+  border-radius: 4px;
+  background: var(--fhr-cyan);
+}
+
+/* ============================================================================
+   20. ANIMACIONES
+   ============================================================================ */
+
+@keyframes fhr-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes fhr-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes fhr-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fhr-skeleton {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes fhr-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fhr-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* Clase para animación fade-in */
+.fhr-animate-in {
+  animation: fhr-fade-in 0.5s ease-out;
+}
+
+/* ============================================================================
+   21. RESPONSIVE UTILITIES
+   ============================================================================ */
+
+/* Ocultar en mobile */
+.fhr-hide-mobile {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .fhr-hide-mobile {
+    display: block;
+  }
+}
+
+/* Ocultar en desktop */
+@media (min-width: 768px) {
+  .fhr-hide-desktop {
+    display: none;
+  }
+}
+
+/* Stack en mobile */
+.fhr-stack-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fhr-space-sm);
+}
+
+@media (min-width: 768px) {
+  .fhr-stack-mobile {
+    flex-direction: row;
+  }
+}
+
+/* Full width en mobile */
+.fhr-full-mobile {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .fhr-full-mobile {
+    width: auto;
+  }
+}
+
+/* ============================================================================
+   FIN DEL SISTEMA DE DISEÑO UNIFICADO FOCALIZAHR
+   
+   Versión: 1.0
+   Fecha: Diciembre 2025
+   
+   "Las mejores interfaces son invisibles. Lo distintivo de FocalizaHR 
+   no está en decorar más, sino en la experiencia completa cohesiva 
+   donde cada elemento tiene un propósito."
+   ============================================================================ */

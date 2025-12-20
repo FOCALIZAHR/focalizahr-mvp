@@ -5,8 +5,14 @@
 // MODAL DETALLE JOURNEY - DISEÑO PREMIUM FOCALIZAHR
 // Glassmorphism + Animaciones + Componentes reales del proyecto
 // ============================================================================
+// 
+// FIXES APLICADOS v2.0:
+// ✅ FIX 1 (Línea 139): Scores con 1 decimal → score.toFixed(1)
+// ✅ FIX 2: Alertas clickeables que abren ResolutionModal
+// ✅ FIX 3: Botón "Ver Historial" eliminado (redundante)
+// ============================================================================
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';  // ✅ FIX 2: Agregado useState
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X,
@@ -37,6 +43,10 @@ import EXOScoreGauge from '@/components/onboarding/EXOScoreGauge';
 import OnboardingTimeline from '@/components/onboarding/OnboardingTimeline';
 import type { TimelineStage } from '@/types/onboarding';
 
+// ✅ FIX 2: Nuevos imports para ResolutionModal
+import ResolutionModal from '@/components/onboarding/ResolutionModal';
+import { OnboardingAlertEngine } from '@/engines/OnboardingAlertEngine';
+
 // ============================================================================
 // TIPOS
 // ============================================================================
@@ -44,6 +54,7 @@ import type { TimelineStage } from '@/types/onboarding';
 interface PipelineJourneyDetailModalProps {
   journey: Journey | null;
   onClose: () => void;
+  onAlertResolved?: (alertId: string, notes: string) => Promise<void>;  // ✅ FIX 2: Callback opcional
 }
 
 // ============================================================================
@@ -136,7 +147,8 @@ const ScoreCard = memo(function ScoreCard({ label, score, icon, description }: S
           {icon}
         </div>
         <span className={`text-2xl font-light ${colors.text}`}>
-          {score !== null ? Math.round(score) : '—'}
+          {/* ✅ FIX 1: Mostrar 1 decimal en lugar de Math.round */}
+          {score !== null ? score.toFixed(1) : '—'}
         </span>
       </div>
       <h4 className="text-white text-sm font-medium">{label}</h4>
@@ -168,14 +180,15 @@ const InfoRow = memo(function InfoRow({ icon, label, value }: InfoRowProps) {
 });
 
 // ============================================================================
-// COMPONENTE: ALERT ITEM
+// COMPONENTE: ALERT ITEM (✅ FIX 2: Ahora clickeable)
 // ============================================================================
 
 interface AlertItemProps {
   alert: Journey['alerts'][number];
+  onClick?: () => void;  // ✅ FIX 2: Agregado onClick
 }
 
-const AlertItem = memo(function AlertItem({ alert }: AlertItemProps) {
+const AlertItem = memo(function AlertItem({ alert, onClick }: AlertItemProps) {
   const severityColors: Record<string, string> = {
     critical: 'border-red-500/50 bg-red-500/10',
     high: 'border-orange-500/50 bg-orange-500/10',
@@ -184,10 +197,14 @@ const AlertItem = memo(function AlertItem({ alert }: AlertItemProps) {
   };
 
   return (
-    <div className={`
-      p-3 rounded-lg border
-      ${severityColors[alert.severity] || 'border-slate-700 bg-slate-800/30'}
-    `}>
+    <div 
+      onClick={onClick}
+      className={`
+        p-3 rounded-lg border
+        ${onClick ? 'cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:shadow-lg' : ''}
+        ${severityColors[alert.severity] || 'border-slate-700 bg-slate-800/30'}
+      `}
+    >
       <div className="flex items-start gap-2">
         <AlertTriangle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
         <div className="flex-1 min-w-0">
@@ -207,8 +224,15 @@ const AlertItem = memo(function AlertItem({ alert }: AlertItemProps) {
 
 const PipelineJourneyDetailModal = memo(function PipelineJourneyDetailModal({
   journey,
-  onClose
+  onClose,
+  onAlertResolved  // ✅ FIX 2: Nuevo prop
 }: PipelineJourneyDetailModalProps) {
+  
+  // ✅ FIX 2: Estado para alerta seleccionada
+  const [selectedAlert, setSelectedAlert] = useState<{ 
+    alert: Journey['alerts'][number]; 
+    businessCase: any 
+  } | null>(null);
   
   if (!journey) return null;
 
@@ -247,6 +271,37 @@ const PipelineJourneyDetailModal = memo(function PipelineJourneyDetailModal({
       color: getScoreColor(journey.connectionScore).hex
     }
   ], [journey]);
+
+  // ✅ FIX 2: Handler para click en alerta
+  const handleAlertClick = (alert: Journey['alerts'][number]) => {
+    const businessCase = OnboardingAlertEngine.generateBusinessCaseFromAlert(
+      alert as any, 
+      journey
+    );
+    setSelectedAlert({ alert, businessCase });
+  };
+
+  // ✅ FIX 2: Handler para resolver alerta
+  const handleResolveAlert = async (notes: string) => {
+    if (!selectedAlert) return;
+    
+    if (onAlertResolved) {
+      await onAlertResolved(selectedAlert.alert.id, notes);
+    } else {
+      // Fallback: llamar API directamente
+      try {
+        await fetch(`/api/onboarding/alerts/${selectedAlert.alert.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'resolve', notes })
+        });
+      } catch (error) {
+        console.error('Error resolviendo alerta:', error);
+      }
+    }
+    
+    setSelectedAlert(null);
+  };
 
   return (
     <AnimatePresence>
@@ -440,7 +495,7 @@ const PipelineJourneyDetailModal = memo(function PipelineJourneyDetailModal({
                   />
                 </div>
 
-                {/* Alertas */}
+                {/* Alertas - ✅ FIX 2: Ahora clickeables */}
                 {journey.alerts && journey.alerts.length > 0 && (
                   <div className="
                     bg-slate-800/30 backdrop-blur-sm
@@ -450,10 +505,17 @@ const PipelineJourneyDetailModal = memo(function PipelineJourneyDetailModal({
                     <h3 className="text-white font-light text-lg mb-4 flex items-center gap-2">
                       <AlertTriangle className="w-5 h-5 text-yellow-500" />
                       Alertas Activas ({journey.alerts.length})
+                      <span className="text-xs text-slate-500 ml-2">
+                        Click para gestionar
+                      </span>
                     </h3>
                     <div className="space-y-3">
                       {journey.alerts.map((alert) => (
-                        <AlertItem key={alert.id} alert={alert} />
+                        <AlertItem 
+                          key={alert.id} 
+                          alert={alert}
+                          onClick={() => handleAlertClick(alert)}
+                        />
                       ))}
                     </div>
                   </div>
@@ -462,7 +524,7 @@ const PipelineJourneyDetailModal = memo(function PipelineJourneyDetailModal({
             </div>
           </div>
 
-          {/* Footer */}
+          {/* Footer - ✅ FIX 3: Botón "Ver Historial" eliminado (redundante) */}
           <div className="
             px-6 py-4
             border-t border-slate-800/50
@@ -472,13 +534,21 @@ const PipelineJourneyDetailModal = memo(function PipelineJourneyDetailModal({
             <NeutralButton onClick={onClose}>
               Cerrar
             </NeutralButton>
-            <CyanButton onClick={() => console.log('Ver historial completo')}>
-              <TrendingUp className="w-4 h-4" />
-              Ver Historial
-            </CyanButton>
           </div>
         </motion.div>
       </motion.div>
+
+      {/* ✅ FIX 2: Modal de Resolución de Alertas */}
+      {selectedAlert && (
+        <ResolutionModal
+          isOpen={!!selectedAlert}
+          onClose={() => setSelectedAlert(null)}
+          onResolve={handleResolveAlert}
+          alertType={selectedAlert.alert.alertType}
+          employeeName={journey.fullName}
+          businessCase={selectedAlert.businessCase}
+        />
+      )}
     </AnimatePresence>
   );
 });

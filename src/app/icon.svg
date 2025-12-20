@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  FocalizaHR Favicon - FINAL
+  F blanca + Punto cyan + Bordes redondeados
+-->
+<svg 
+  viewBox="0 0 32 32" 
+  fill="none" 
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <!-- Fondo oscuro con bordes redondeados -->
+  <rect width="32" height="32" rx="6" fill="#0F172A"/>
+  
+  <!-- F blanca vectorizada -->
+  <rect x="4" y="3" width="6" height="26" fill="#FFFFFF"/>
+  <rect x="4" y="3" width="17" height="5" fill="#FFFFFF"/>
+  <rect x="4" y="13" width="13" height="4" fill="#FFFFFF"/>
+  
+  <!-- Punto CYAN -->
+  <circle cx="26" cy="26" r="4.5" fill="#22D3EE"/>
+</svg>
