@@ -36,7 +36,7 @@ export const dynamic = 'force-dynamic';
  * - Incluye relación department (displayName, standardCategory)
  * - Multi-tenant isolation por accountId
  * 
- * @version 3.2.7 - AGREGADO: Lente 3 "LIVE" + Filtrado Jerárquico
+ * @version 3.2.8 - OPTIMIZADO: accumulatedDepartments en Promise.all
  * @date December 2025
  */
 
@@ -298,11 +298,11 @@ export async function GET(request: NextRequest) {
     }
     
     // ========================================================================
-    // 4. CONSULTA GLOBAL: USAR AGREGACIONES DEL SERVICE
+    // 4. 🚀 CONSULTA GLOBAL OPTIMIZADA: TODAS LAS QUERIES EN PARALELO
     // ========================================================================
     console.log('[API GET /onboarding/metrics] Generando agregaciones globales...');
     
-    // Llamar a los métodos del service en paralelo (AGREGADO: liveMetrics)
+    // 🚀 OPTIMIZACIÓN: Todas las queries en un solo Promise.all
     const [
       globalMetrics,
       topDepartments,
@@ -311,7 +311,8 @@ export async function GET(request: NextRequest) {
       demographics,
       departments,
       complianceEfficiency,
-      liveMetrics  // 🆕 NUEVO: Métricas en tiempo real
+      liveMetrics,
+      accumulatedDepartments  // 🚀 MOVIDO AQUÍ (antes era secuencial)
     ] = await Promise.all([
       OnboardingAggregationService.getGlobalMetrics(accountId, period || undefined),
       OnboardingAggregationService.getTopDepartments(accountId, period || undefined),
@@ -344,32 +345,31 @@ export async function GET(request: NextRequest) {
         take: 20
       }),
       OnboardingAggregationService.getComplianceEfficiency(accountId),
-      calculateLiveMetrics(userContext)  // 🆕 NUEVO: Calcular métricas en vivo
+      calculateLiveMetrics(userContext),
+      // 🚀 OPTIMIZACIÓN: Query acumulado ahora en paralelo
+      prisma.department.findMany({
+        where: { 
+          accountId,
+          accumulatedExoScore: { not: null }
+        },
+        select: {
+          id: true,
+          displayName: true,
+          standardCategory: true,
+          accumulatedExoScore: true,
+          accumulatedExoJourneys: true,
+          accumulatedPeriodCount: true,
+          accumulatedLastUpdated: true
+        },
+        orderBy: {
+          accumulatedExoScore: 'desc'
+        }
+      })
     ]);
     
     // ========================================================================
-    // 🌟 NUEVO: 4B. CONSULTA ACUMULADO 12 MESES (AGREGADO)
+    // 4B. CALCULAR MÉTRICAS ACUMULADAS (en memoria - rápido)
     // ========================================================================
-    console.log('[API GET /onboarding/metrics] Consultando datos acumulados 12 meses...');
-    
-    const accumulatedDepartments = await prisma.department.findMany({
-      where: { 
-        accountId,
-        accumulatedExoScore: { not: null }
-      },
-      select: {
-        id: true,
-        displayName: true,
-        standardCategory: true,
-        accumulatedExoScore: true,
-        accumulatedExoJourneys: true,
-        accumulatedPeriodCount: true,
-        accumulatedLastUpdated: true
-      },
-      orderBy: {
-        accumulatedExoScore: 'desc'
-      }
-    });
     
     // Calcular EXO global ponderado
     const totalWeightedScore = accumulatedDepartments.reduce(
@@ -398,7 +398,7 @@ export async function GET(request: NextRequest) {
     });
 
     // ========================================================================
-    // 🌟 4B. CALCULAR BALANCE DEPARTAMENTAL (Quién impulsa / Quién frena)
+    // 4C. CALCULAR BALANCE DEPARTAMENTAL (Quién impulsa / Quién frena)
     // ========================================================================
     let departmentImpact = null;
 
@@ -471,7 +471,7 @@ export async function GET(request: NextRequest) {
     }
     
     // ========================================================================
-    // 🌟 6. FORMATEAR RESPUESTA CON 3 LENTES (MODIFICADO)
+    // 6. FORMATEAR RESPUESTA CON 3 LENTES
     // ========================================================================
     const data = {
       // LENTE 1: PULSO MENSUAL (existente, sin cambios)
@@ -482,7 +482,7 @@ export async function GET(request: NextRequest) {
       demographics,
       departments, // Array original para drill-down futuro
       
-      // 🌟 LENTE 2: ACUMULADO ESTRATÉGICO 12 MESES (existente, sin cambios)
+      // LENTE 2: ACUMULADO ESTRATÉGICO 12 MESES (existente, sin cambios)
       accumulated: {
         globalExoScore: globalAccumulatedExoScore,
         totalJourneys: totalJourneys,
@@ -490,11 +490,11 @@ export async function GET(request: NextRequest) {
         lastUpdated: accumulatedDepartments[0]?.accumulatedLastUpdated || null,
         departments: accumulatedDepartments,
 
-        // 🌟 Balance Departamental
+        // Balance Departamental
         departmentImpact: departmentImpact
       },
       
-      // 🆕 LENTE 3: EN VIVO (NUEVO)
+      // LENTE 3: EN VIVO
       live: liveMetrics,
       
       complianceEfficiency
@@ -513,13 +513,13 @@ export async function GET(request: NextRequest) {
         seniority: demographics.bySeniority.length
       },
       departmentsArray: departments.length,
-      // 🌟 LENTE 2 LOG
+      // LENTE 2 LOG
       accumulated: {
         globalScore: globalAccumulatedExoScore,
         departmentsWithData: accumulatedDepartments.length,
         hasImpactData: !!departmentImpact
       },
-      // 🆕 LENTE 3 LOG (NUEVO)
+      // LENTE 3 LOG
       live: {
         period: liveMetrics.period,
         avgEXOScore: liveMetrics.avgEXOScore,

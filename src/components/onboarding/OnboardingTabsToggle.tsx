@@ -11,13 +11,13 @@ import { motion } from 'framer-motion';
 import { FileText, Trophy, BarChart3, AlertCircle } from 'lucide-react';
 
 interface OnboardingTabsToggleProps {
-  activeTab: 'resumen' | 'ranking' | 'alertas' | 'diagnostic';
-  onTabChange: (tab: 'resumen' | 'ranking' | 'alertas' | 'diagnostic') => void;
+  activeTab: 'resumen' | 'ranking' | 'alertas' | 'enps';
+  onTabChange: (tab: 'resumen' | 'ranking' | 'alertas' | 'enps') => void;
    isTransitioning?: boolean;  // ← AGREGAR ESTA LÍNEA SI FALTA
 }
 
 type TabConfig = {
-  value: 'resumen' | 'ranking' | 'alertas' | 'diagnostic';
+  value: 'resumen' | 'ranking' | 'alertas' | 'enps';
   label: string;
   icon: React.ElementType;
   color: 'cyan' | 'purple';
@@ -29,7 +29,7 @@ const TABS: TabConfig[] = [
   { value: 'resumen', label: 'Resumen', icon: FileText, color: 'cyan' },
   { value: 'ranking', label: 'Ranking Gerencias', icon: Trophy, color: 'cyan' },
   { value: 'alertas', label: 'Alertas Críticas', icon: AlertCircle, color: 'purple' },
-  { value: 'diagnostic', label: 'Diagnóstico 4C', icon: BarChart3, color: 'purple' }
+  { value: 'enps', label: 'eNPS', icon: BarChart3, color: 'purple' }
 ];
 
 export default function OnboardingTabsToggle({ 

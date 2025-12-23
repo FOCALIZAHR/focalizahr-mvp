@@ -358,11 +358,21 @@ export interface UseBenchmarkReturn {
 // PIPELINE KANBAN - TYPES
 // ============================================================================
 
+// REEMPLAZAR CON:
 export interface JourneyDepartment {
   id: string;
   displayName: string;
   standardCategory: string | null;
   accumulatedExoScore: number | null;
+  // Campos jerárquicos
+  level?: number;
+  parentId?: string | null;
+  unitType?: string;
+  parent?: {
+    id: string;
+    displayName: string;
+    level?: number;
+  } | null;
 }
 
 export interface JourneyAlert {

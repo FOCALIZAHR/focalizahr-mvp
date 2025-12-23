@@ -67,6 +67,9 @@ model Account {
   journeys           JourneyOrchestration[]
   journeyAlerts      JourneyAlert[]
   departmentInsights DepartmentOnboardingInsight[]
+   
+   // ✅ AGREGAR ESTA LÍNEA AQUÍ ↓
+  npsInsights        NPSInsight[]
 
   @@index([adminEmail], map: "idx_accounts_email")
   @@index([subscriptionTier], map: "idx_accounts_tier")
@@ -456,6 +459,8 @@ model Department {
   // ✅ v3.2.2: NUEVAS RELACIONES ONBOARDING
   onboardingInsights DepartmentOnboardingInsight[]
   journeys           JourneyOrchestration[]
+  // ✅ AGREGAR ESTA LÍNEA AQUÍ ↓
+  npsInsights        NPSInsight[]
 
   @@unique([accountId, displayName])
   @@index([accountId], map: "idx_departments_account")
@@ -856,4 +861,84 @@ model OnboardingEffectivenessInsight {
   @@index([accountId])
   @@index([period])
   @@map("onboarding_effectiveness_insights")
+}
+
+// ============================================
+// NPSInsight - Sistema NPS Transversal FocalizaHR
+// ============================================
+// Patrón: DepartmentOnboardingInsight
+// Propósito: Centralizar NPS de todos los productos
+// Versión: 1.0 - Diciembre 2025
+// ============================================
+// 
+// INSTRUCCIONES DE INTEGRACIÓN:
+// 1. Copiar este modelo al final de prisma/schema.prisma
+// 2. Agregar la relación al modelo Account:
+//    npsInsights NPSInsight[]
+// 3. Agregar la relación al modelo Department:
+//    npsInsights NPSInsight[]
+// 4. Ejecutar: npx prisma migrate dev --name add_nps_insight_model
+// ============================================
+
+model NPSInsight {
+  id              String    @id @default(cuid())
+  accountId       String    @map("account_id")
+  departmentId    String?   @map("department_id")  // NULL = empresa completa
+  
+  // ========================================
+  // DIMENSIÓN: Producto
+  // ========================================
+  productType     String    @map("product_type")   // onboarding | exit | pulso | experiencia
+  
+  // ========================================
+  // DIMENSIÓN: Período (patrón FocalizaHR)
+  // ========================================
+  period          String                            // "2025-12" | "2025-Q4" | "2025"
+  periodType      String    @map("period_type")    // monthly | quarterly | yearly
+  periodStart     DateTime  @map("period_start")
+  periodEnd       DateTime  @map("period_end")
+  
+  // ========================================
+  // MÉTRICAS NPS
+  // ========================================
+  npsScore        Int       @map("nps_score")      // -100 a +100
+  promoters       Int                               // Cantidad (rating 9-10)
+  passives        Int                               // Cantidad (rating 7-8)
+  detractors      Int                               // Cantidad (rating 0-6)
+  totalResponses  Int       @map("total_responses")
+  
+  // Porcentajes pre-calculados (performance)
+  promotersPct    Float     @map("promoters_pct")  // 0-100
+  passivesPct     Float     @map("passives_pct")   // 0-100
+  detractorsPct   Float     @map("detractors_pct") // 0-100
+  
+  // ========================================
+  // TREND (vs período anterior)
+  // ========================================
+  previousScore   Int?      @map("previous_score")
+  scoreDelta      Int?      @map("score_delta")    // +5, -10, 0
+  
+  // ========================================
+  // METADATA
+  // ========================================
+  calculatedAt    DateTime  @default(now()) @map("calculated_at")
+  
+  // ========================================
+  // RELACIONES
+  // ========================================
+  account         Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  department      Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  
+  // ========================================
+  // ÍNDICES Y CONSTRAINTS
+  // ========================================
+  // Clave única compuesta (nombre auto-generado: accountId_departmentId_productType_period_periodType)
+  @@unique([accountId, departmentId, productType, period, periodType])
+  
+  // Índices para queries frecuentes
+  @@index([accountId, periodType, period])
+  @@index([accountId, productType])
+  @@index([departmentId])
+  
+  @@map("nps_insights")
 }

@@ -8,13 +8,15 @@ export const dynamic = 'force-dynamic';
  * Schedule: 1er día de cada mes a las 02:00 AM
  * Authentication: CRON_SECRET (Vercel)
  * 
- * @version 3.2.4
- * @date November 2025
+ * @version 3.2.5
+ * @date December 2025
+ * @changelog v3.2.5: Agregado NPSAggregationService para cálculo NPS Onboarding
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { OnboardingAggregationService } from '@/lib/services/OnboardingAggregationService';
+import { NPSAggregationService } from '@/lib/services/NPSAggregationService'; // ✅ NUEVO
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
@@ -93,6 +95,29 @@ export async function GET(request: NextRequest) {
         // ✅ AGREGAR ESTAS 2 LÍNEAS AQUÍ
         await OnboardingAggregationService.updateAccumulatedExoScores(account.id);
         console.log(`[Cron] ✅ Accumulated scores updated for: ${account.companyName}`);
+        
+        // =====================================================================
+        // ✅ NUEVO: AGREGACIÓN NPS ONBOARDING
+        // =====================================================================
+        const now = new Date();
+        const periodDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const period = `${periodDate.getFullYear()}-${String(periodDate.getMonth() + 1).padStart(2, '0')}`;
+        const periodStart = new Date(periodDate.getFullYear(), periodDate.getMonth(), 1);
+        const periodEnd = new Date(periodDate.getFullYear(), periodDate.getMonth() + 1, 0, 23, 59, 59);
+        
+        try {
+          await NPSAggregationService.aggregateOnboardingNPS(
+            account.id,
+            period,
+            periodStart,
+            periodEnd
+          );
+          console.log(`[Cron] ✅ NPS Onboarding aggregated for: ${account.companyName}`);
+        } catch (npsError) {
+          console.error(`[Cron] ⚠️ Error aggregating NPS for ${account.companyName}:`, npsError);
+        }
+        // =====================================================================
+        
         if (result.success) {
           console.log(
             `[Cron Aggregation] ✅ ${account.companyName}: ` +

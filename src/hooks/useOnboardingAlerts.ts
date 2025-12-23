@@ -1,16 +1,13 @@
 // src/hooks/useOnboardingAlerts.ts
 
 import { useState, useEffect, useCallback } from 'react';
-import { AlertTrend, AlertHistoryPoint } from '@/types/onboarding';
+import { AlertTrend, AlertHistoryPoint, JourneyDepartment } from '@/types/onboarding';
+
 
 /**
  * INTERFACES
  */
-interface Department {
-  id: string;
-  displayName: string;
-  standardCategory: string | null;
-}
+
 
 interface Journey {
   id: string;
@@ -19,7 +16,7 @@ interface Journey {
   currentStage: number;
   exoScore: number | null;
   retentionRisk: string | null;
-  department: Department | null;
+  department: JourneyDepartment | null;  // ← SOLO ESTE CAMBIO
 }
 
 interface JourneyAlert {

@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { RefreshCw, ArrowRight, TrendingUp, TrendingDown, Target, BarChart3 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { CyanButton, PurpleButton, NeutralButton, ButtonGroup } from '@/components/ui/MinimalistButton';
-import CriticalFocusCard from '@/components/onboarding/CriticalFocusCard';
+
+
 
 // ═══════════════════════════════════════════════════════════════
 // 🆕 NAVEGACIÓN - AGREGAR ESTOS 2 IMPORTS
@@ -24,6 +25,7 @@ import OnboardingTabsToggle from '@/components/onboarding/OnboardingTabsToggle';
 // 🆕 NUEVOS COMPONENTES PARA TABS REORGANIZADOS
 import GerenciaOnboardingBimodal from '@/components/onboarding/GerenciaOnboardingBimodal';
 import AlertasGerenciaRanking from '@/components/onboarding/AlertasGerenciaRanking';
+import NPSOnboardingCard from '@/components/onboarding/NPSOnboardingCard';
 
 // 🌟 NUEVOS COMPONENTES CORRECTOS
 import OnboardingScoreClassificationCard from '@/components/onboarding/OnboardingScoreClassificationCard';
@@ -43,7 +45,7 @@ export default function OnboardingDashboard() {
   const { isCollapsed } = useSidebar();
   
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'resumen' | 'ranking' | 'alertas' | 'diagnostic'>('resumen');
+  const [activeTab, setActiveTab] = useState<'resumen' | 'ranking' | 'alertas' | 'enps'>('resumen');
   
   const { data, loading, error, refetch, timelineStages } = useOnboardingMetrics(
     selectedDepartment === 'all' ? undefined : selectedDepartment
@@ -258,16 +260,6 @@ export default function OnboardingDashboard() {
                     topInfluencer={topInfluencer}
                     bottomImpact={bottomImpact}
                   />
-
-                  {/* 🌟 CARD 3: EVOLUCIÓN CON MINI GRÁFICO */}
-                  <CriticalFocusCard
-                    avgComplianceScore={data.departments?.[0]?.avgComplianceScore ?? null}
-                    avgClarificationScore={data.departments?.[0]?.avgClarificationScore ?? null}
-                    avgCultureScore={data.departments?.[0]?.avgCultureScore ?? null}
-                    avgConnectionScore={data.departments?.[0]?.avgConnectionScore ?? null}
-                    onTabChange={(tab) => setActiveTab(tab)}
-                  />
-
                 </div>
               </div>
             </div>
@@ -281,14 +273,10 @@ export default function OnboardingDashboard() {
             />
           )}
 
-          {/* TAB CONTENT: DIAGNÓSTICO 4C */}
-          {activeTab === 'diagnostic' && (
-            <OnboardingTimeline 
-              stages={timelineStages}
-              avgScore={global.avgEXOScore || 0}
-              totalJourneys={global.totalActiveJourneys}
-            />
-          )}
+          {/* TAB CONTENT: eNPS ONBOARDING */}
+          {activeTab === 'enps' && (
+            <NPSOnboardingCard />
+)}
 
            {/* TAB CONTENT: ALERTAS POR GERENCIA */}
           {/* TAB CONTENT: ALERTAS POR GERENCIA */}
