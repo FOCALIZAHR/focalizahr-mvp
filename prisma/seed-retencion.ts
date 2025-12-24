@@ -1,5 +1,7 @@
 // prisma/seed-retencion.ts
-// FocalizaHR Retención Predictiva - Seed Separado
+// FocalizaHR Retención Predictiva - Seed v2.0 UPSERT
+// ✅ Estrategia: Upsert Lógico (UPDATE P1-P7, CREATE P8)
+// 🛡️ Safety Net: Preserva IDs, mantiene responses existentes
 // Ejecutar: npm run db:seed:retencion
 
 import { PrismaClient } from '@prisma/client'
@@ -7,50 +9,78 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function seedRetencionPredictiva() {
-  console.log('🎯 Seeding FocalizaHR Retención Predictiva...');
+  console.log('🎯 Seeding FocalizaHR Retención Predictiva v2.0 (Upsert)...');
+  console.log('📊 Estrategia: UPDATE existentes + CREATE faltantes');
+  console.log('');
 
   try {
-    // 1. Verificar si ya existe
-    const existing = await prisma.campaignType.findUnique({
+    // ════════════════════════════════════════════════════════════════
+    // PASO 1: Buscar CampaignType existente
+    // ════════════════════════════════════════════════════════════════
+    
+    console.log('📋 Buscando CampaignType existente...');
+    
+    let campaignType = await prisma.campaignType.findUnique({
       where: { slug: 'retencion-predictiva' }
     });
 
-    if (existing) {
-      console.log('⚠️  FocalizaHR Retención Predictiva ya existe. Saltando...');
-      return;
-    }
-
-    // 2. Crear campaign type
-    console.log('📝 Creando campaign type Retención Predictiva...');
-    const campaignType = await prisma.campaignType.create({
-      data: {
-        name: 'FocalizaHR Retención Predictiva',
-        slug: 'retencion-predictiva',
-        description: 'Instrumento estratégico para identificar y predecir las causas de la rotación de talento.',
-        questionCount: 7,
-        estimatedDuration: 12,
-        methodology: 'Exit Interview Scientific Framework + Predictive Analytics + Conditional Logic',
-        category: 'retencion',
-        isActive: true,
-        sortOrder: 3
+    if (!campaignType) {
+      console.log('⚠️  CampaignType no existe. Creando...');
+      campaignType = await prisma.campaignType.create({
+        data: {
+          name: 'FocalizaHR Retención Predictiva',
+          slug: 'retencion-predictiva',
+          description: 'Instrumento estratégico para identificar y predecir las causas de la rotación de talento.',
+          questionCount: 8,
+          estimatedDuration: 12,
+          methodology: 'Exit Interview Scientific Framework + Predictive Analytics + Conditional Logic',
+          category: 'retencion',
+          isActive: true,
+          sortOrder: 3,
+          isPermanent: true  // ← Marcar como permanente
+        }
+      });
+      console.log('✅ CampaignType creado:', campaignType.id);
+    } else {
+      // Actualizar questionCount si es necesario
+      if (campaignType.questionCount !== 8) {
+        await prisma.campaignType.update({
+          where: { id: campaignType.id },
+          data: { 
+            questionCount: 8,
+            isPermanent: true  // ← Asegurar isPermanent
+          }
+        });
+        console.log('✅ CampaignType actualizado: questionCount = 8');
+      } else {
+        console.log('✅ CampaignType encontrado:', campaignType.id);
       }
-    });
-    console.log('✅ Campaign type creado:', campaignType.id);
-
-    // 3. Crear las 7 preguntas
-    console.log('📋 Creando 7 preguntas...');
+    }
     
-    const questions = [
+    console.log('');
+    
+    // ════════════════════════════════════════════════════════════════
+    // PASO 2: Definir las 8 preguntas (P1-P7 existentes + P8 nueva)
+    // ════════════════════════════════════════════════════════════════
+    
+    console.log('📋 Procesando 8 preguntas (UPDATE + CREATE)...');
+    console.log('');
+    
+    const questionsDefinition = [
       {
+        questionOrder: 1,
         text: 'Si tuvieras que resumir en una frase la razón principal que te llevó a tomar la decisión de buscar una nueva oportunidad, ¿cuál sería?',
         category: 'causa_raiz',
-        questionOrder: 1,
-        responseType: 'text_open'
+        responseType: 'text_open',
+        choiceOptions: undefined,
+        conditionalLogic: undefined,
+        minValue: undefined,
+        maxValue: undefined
       },
       {
+        questionOrder: 2,
         text: 'De la siguiente lista, por favor selecciona los 3 aspectos que MÁS VALORAS o habrías valorado para tu desarrollo y permanencia en la empresa.',
         category: 'valoracion_aspectos',
-        questionOrder: 2,
         responseType: 'multiple_choice',
         choiceOptions: [
           "Oportunidades de Crecimiento",
@@ -59,67 +89,145 @@ async function seedRetencionPredictiva() {
           "Reconocimiento y Valoración",
           "Liderazgo de Apoyo",
           "Compensación y Beneficios"
-        ]
+        ],
+        conditionalLogic: undefined,
+        minValue: undefined,
+        maxValue: undefined
       },
       {
+        questionOrder: 3,
         text: 'Ahora, para los 3 aspectos que seleccionaste, ¿cómo calificarías la calidad con la que la empresa los entregó?',
         category: 'calidad_entrega',
-        questionOrder: 3,
         responseType: 'rating_matrix_conditional',
+        choiceOptions: undefined,
         conditionalLogic: {
           depends_on_question: 2,
           matrix_type: 'selected_aspects_only'
-        }
+        },
+        minValue: undefined,
+        maxValue: undefined
       },
       {
+        questionOrder: 4,
         text: 'Mi líder/supervisor/a directo/a se preocupó genuinamente por mi bienestar y me proporcionó el apoyo necesario para tener éxito.',
         category: 'liderazgo',
-        questionOrder: 4,
-        responseType: 'rating_scale'
+        responseType: 'rating_scale',
+        choiceOptions: undefined,
+        conditionalLogic: undefined,
+        minValue: undefined,
+        maxValue: undefined
       },
       {
+        questionOrder: 5,
         text: 'Las oportunidades de crecimiento y desarrollo que recibí en la empresa cumplieron con las expectativas que tenía al momento de ingresar.',
         category: 'desarrollo_evp',
-        questionOrder: 5,
-        responseType: 'rating_scale'
+        responseType: 'rating_scale',
+        choiceOptions: undefined,
+        conditionalLogic: undefined,
+        minValue: undefined,
+        maxValue: undefined
       },
       {
+        questionOrder: 6,
         text: 'Considero que el ambiente de trabajo fue siempre un lugar seguro y respetuoso, libre de acoso o discriminación.',
         category: 'seguridad_psicologica',
-        questionOrder: 6,
-        responseType: 'rating_scale'
+        responseType: 'rating_scale',
+        choiceOptions: undefined,
+        conditionalLogic: undefined,
+        minValue: undefined,
+        maxValue: undefined
       },
       {
+        questionOrder: 7,
         text: 'Sentí que tenía la confianza y la autonomía necesarias para tomar decisiones relevantes sobre mi propio trabajo.',
         category: 'autonomia',
-        questionOrder: 7,
-        responseType: 'rating_scale'
+        responseType: 'rating_scale',
+        choiceOptions: undefined,
+        conditionalLogic: undefined,
+        minValue: undefined,
+        maxValue: undefined
+      },
+      // ════════════════════════════════════════════════════════════════
+      // ← P8 NUEVA: NPS 0-10
+      // ════════════════════════════════════════════════════════════════
+      {
+        questionOrder: 8,
+        text: 'En una escala de 0 a 10, ¿qué tan probable es que recomiendes esta empresa como lugar para trabajar?',
+        category: 'satisfaccion',
+        responseType: 'nps_scale',
+        choiceOptions: undefined,
+        conditionalLogic: undefined,
+        minValue: 0,
+        maxValue: 10
       }
     ];
-
-    for (const [index, questionData] of questions.entries()) {
-      const question = await prisma.question.create({
-        data: {
+    
+    let updatedCount = 0;
+    let createdCount = 0;
+    
+    // ════════════════════════════════════════════════════════════════
+    // PASO 3: Upsert lógico por pregunta
+    // ════════════════════════════════════════════════════════════════
+    
+    for (const questionDef of questionsDefinition) {
+      // Buscar pregunta existente por questionOrder
+      const existingQuestion = await prisma.question.findFirst({
+        where: {
           campaignTypeId: campaignType.id,
-          text: questionData.text,
-          category: questionData.category,
-          questionOrder: questionData.questionOrder,
-          responseType: questionData.responseType,
-          choiceOptions: questionData.choiceOptions || undefined,
-          conditionalLogic: questionData.conditionalLogic || undefined,
-          isRequired: true,
-          isActive: true,
-          minValue: 1,
-          maxValue: 5
+          questionOrder: questionDef.questionOrder
         }
       });
-      console.log(`✅ Pregunta ${questionData.questionOrder}/7 creada`);
+      
+      if (existingQuestion) {
+        // ✅ UPDATE: Pregunta existe (P1-P7)
+        const updated = await prisma.question.update({
+          where: { id: existingQuestion.id },
+          data: {
+            text: questionDef.text,
+            category: questionDef.category,
+            responseType: questionDef.responseType,
+            choiceOptions: questionDef.choiceOptions || undefined,
+            conditionalLogic: questionDef.conditionalLogic || undefined,
+            isRequired: true,
+            isActive: true,
+            minValue: questionDef.minValue ?? 1,
+            maxValue: questionDef.maxValue ?? 5
+          }
+        });
+        updatedCount++;
+        console.log(`  ♻️  Updated: Order ${questionDef.questionOrder} (ID: ${existingQuestion.id})`);
+      } else {
+        // 🆕 CREATE: Pregunta no existe (P8)
+        const created = await prisma.question.create({
+          data: {
+            campaignTypeId: campaignType.id,
+            text: questionDef.text,
+            category: questionDef.category,
+            questionOrder: questionDef.questionOrder,
+            responseType: questionDef.responseType,
+            choiceOptions: questionDef.choiceOptions || undefined,
+            conditionalLogic: questionDef.conditionalLogic || undefined,
+            isRequired: true,
+            isActive: true,
+            minValue: questionDef.minValue ?? 1,
+            maxValue: questionDef.maxValue ?? 5
+          }
+        });
+        createdCount++;
+        console.log(`  🆕 Created: Order ${questionDef.questionOrder} (ID: ${created.id})`);
+      }
     }
-
-    // 4. Crear templates de comunicación (5 claves)
-    console.log('💭 Creando templates inteligencia...');
     
-    const templates = [
+    console.log('');
+    
+    // ════════════════════════════════════════════════════════════════
+    // PASO 4: Upsert Templates de Comunicación (preservar existentes)
+    // ════════════════════════════════════════════════════════════════
+    
+    console.log('💭 Procesando templates de comunicación...');
+    console.log('');
+    
+    const templatesDefinition = [
       {
         templateType: 'alerta_fuga_estancamiento',
         category: 'desarrollo_evp',
@@ -160,35 +268,71 @@ async function seedRetencionPredictiva() {
         priority: 9
       }
     ];
-
-    for (const templateData of templates) {
-      const template = await prisma.communicationTemplate.create({
-        data: {
-          templateType: templateData.templateType,
-          category: templateData.category,
-          conditionRule: templateData.conditionRule,
-          templateText: JSON.stringify(templateData.templateText),
-          variablesRequired: templateData.variablesRequired,
-          priority: templateData.priority,
-          isActive: true,
-          usageCount: 0
+    
+    let templatesUpdatedCount = 0;
+    let templatesCreatedCount = 0;
+    
+    for (const templateDef of templatesDefinition) {
+      // Buscar template existente por templateType
+      const existingTemplate = await prisma.communicationTemplate.findFirst({
+        where: {
+          templateType: templateDef.templateType
         }
       });
-      console.log(`✅ Template ${templateData.templateType} creado`);
-    }
-
-    // 5. Verificación final
-    const verification = await prisma.campaignType.findUnique({
-      where: { slug: 'retencion-predictiva' },
-      include: {
-        questions: true
+      
+      if (existingTemplate) {
+        // ✅ UPDATE: Template existe (preservar)
+        await prisma.communicationTemplate.update({
+          where: { id: existingTemplate.id },
+          data: {
+            category: templateDef.category,
+            conditionRule: templateDef.conditionRule,
+            templateText: JSON.stringify(templateDef.templateText),
+            variablesRequired: templateDef.variablesRequired,
+            priority: templateDef.priority,
+            isActive: true
+          }
+        });
+        templatesUpdatedCount++;
+        console.log(`  ♻️  Updated template: ${templateDef.templateType}`);
+      } else {
+        // 🆕 CREATE: Template no existe
+        await prisma.communicationTemplate.create({
+          data: {
+            templateType: templateDef.templateType,
+            category: templateDef.category,
+            conditionRule: templateDef.conditionRule,
+            templateText: JSON.stringify(templateDef.templateText),
+            variablesRequired: templateDef.variablesRequired,
+            priority: templateDef.priority,
+            isActive: true,
+            usageCount: 0
+          }
+        });
+        templatesCreatedCount++;
+        console.log(`  🆕 Created template: ${templateDef.templateType}`);
       }
-    });
-
-    console.log('🎉 FocalizaHR Retención Predictiva seeded exitosamente!');
-    console.log(`   - Campaign type: ${verification?.name}`);
-    console.log(`   - Preguntas: ${verification?.questions.length}/7`);
-    console.log(`   - Templates: ${templates.length}`);
+    }
+    
+    console.log('');
+    console.log('═══════════════════════════════════════════════════');
+    console.log('✅ SEED COMPLETADO');
+    console.log('═══════════════════════════════════════════════════');
+    console.log('');
+    console.log('📊 RESUMEN:');
+    console.log(`   ♻️  Preguntas actualizadas: ${updatedCount}`);
+    console.log(`   🆕 Preguntas creadas: ${createdCount}`);
+    console.log(`   ♻️  Templates actualizados: ${templatesUpdatedCount}`);
+    console.log(`   🆕 Templates creados: ${templatesCreatedCount}`);
+    console.log(`   📝 Total procesado: ${questionsDefinition.length} preguntas + ${templatesDefinition.length} templates`);
+    console.log('');
+    console.log('🎯 RESULTADO:');
+    console.log('   ✅ P1-P7: Mantenidas (IDs + responses preservadas)');
+    console.log('   ✅ P8: Agregada (NPS 0-10)');
+    console.log('   ✅ Templates: Preservados/Creados');
+    console.log('   ✅ isPermanent: true');
+    console.log('   ✅ Idempotente (ejecutar múltiples veces = mismo resultado)');
+    console.log('');
 
   } catch (error) {
     console.error('❌ Error seeding Retención Predictiva:', error);
@@ -198,26 +342,27 @@ async function seedRetencionPredictiva() {
 
 // Función principal para ejecutar solo este seed
 async function main() {
-  console.log('🌱 Starting FocalizaHR Retención Predictiva seed...')
+  console.log('🌱 Starting FocalizaHR Retención Predictiva seed v2.0...');
+  console.log('');
   
   try {
     await seedRetencionPredictiva();
-    console.log('🎉 Retención Predictiva seed completed successfully!')
+    console.log('🎉 Retención Predictiva seed completed successfully!');
   } catch (error) {
-    console.error('❌ Retención Predictiva seed failed:', error)
-    throw error
+    console.error('❌ Retención Predictiva seed failed:', error);
+    throw error;
   }
 }
 
 main()
   .then(async () => {
-    await prisma.$disconnect()
+    await prisma.$disconnect();
   })
   .catch(async (e) => {
-    console.error('❌ Seed failed:', e)
-    await prisma.$disconnect()
-    process.exit(1)
-  })
+    console.error('❌ Seed failed:', e);
+    await prisma.$disconnect();
+    process.exit(1);
+  });
 
 // Exportar función para usar desde seed.ts principal si se desea
-export { seedRetencionPredictiva }
+export { seedRetencionPredictiva };

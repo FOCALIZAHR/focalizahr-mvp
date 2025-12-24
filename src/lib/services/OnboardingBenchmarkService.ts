@@ -1,16 +1,22 @@
 /**
- * ONBOARDING BENCHMARK SERVICE
+ * @deprecated SERVICIO OBSOLETO - Usar /api/benchmarks en su lugar
  * 
- * Calcula benchmarks comparativos de onboarding por:
- * - standardCategory (gerencia)
- * - country (país)
+ * RAZÓN DE DEPRECACIÓN:
+ * - Duplica funcionalidad de BenchmarkAggregationService + /api/benchmarks
+ * - Calcula benchmarks en TIEMPO REAL (ineficiente) vs usar MarketBenchmark pre-calculado
+ * - La métrica "Completion Rate" que calcula NO está guardada en BD (volátil)
+ * - El componente BenchmarkComparisonCard.tsx que lo consume NO está en producción
  * 
- * Métricas calculadas:
- * - EXO Score (usa cache Department.accumulatedExoScore)
- * - Tasa Completitud (% journeys completados)
- * - Percentiles (P25, P50, P75, P90)
+ * MIGRACIÓN:
+ * - Hook: usar useBenchmark() de @/hooks/useBenchmark
+ * - API: GET /api/benchmarks?metricType=onboarding_exo&standardCategory=X&departmentId=Y
+ * - Tipos: importar desde @/types/benchmark
  * 
- * NOTA: 4C individuales se agregarán en Fase 2
+ * FECHA DEPRECACIÓN: Diciembre 2025
+ * ELIMINACIÓN PLANIFICADA: Marzo 2026
+ * 
+ * @see /api/benchmarks - API correcta con InsightEngine
+ * @see BenchmarkAggregationService - CRON mensual que alimenta MarketBenchmark
  */
 
 import { prisma } from '@/lib/prisma';

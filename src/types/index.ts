@@ -1250,4 +1250,9 @@ export type JSONValue = string | number | boolean | null | JSONObject | JSONArra
 export interface JSONObject { [key: string]: JSONValue }
 export interface JSONArray extends Array<JSONValue> {}
 
+// ============================================================================
+// BENCHMARK TYPES (Cross-producto)
+// ============================================================================
+export * from './benchmark';
+
 // END OF FILE

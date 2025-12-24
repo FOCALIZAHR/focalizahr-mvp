@@ -95,6 +95,8 @@ model CampaignType {
 
   // ✅ v3.2.2: PILAR 1 - isPermanent en CampaignType
   isPermanent Boolean @default(false) @map("is_permanent")
+  // Agregar DEBAJO:
+  flowType    String  @default("standard") @map("flow_type")
 
   createdAt DateTime @default(now()) @map("created_at")
 
