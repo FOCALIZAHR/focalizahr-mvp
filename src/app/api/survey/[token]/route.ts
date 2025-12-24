@@ -53,7 +53,8 @@ export async function GET(
                 methodology: true,
                 category: true,
                 // ✅ AGREGAR DESPUÉS DE "category: true":
-                isPermanent: true
+                isPermanent: true,
+                flowType: true  // ← AGREGAR ESTA LÍNEA
               }
             }
           }

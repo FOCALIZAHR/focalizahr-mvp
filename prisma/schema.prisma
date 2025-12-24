@@ -68,8 +68,14 @@ model Account {
   journeyAlerts      JourneyAlert[]
   departmentInsights DepartmentOnboardingInsight[]
    
-   // ✅ AGREGAR ESTA LÍNEA AQUÍ ↓
+  // ✅ AGREGAR ESTA LÍNEA AQUÍ ↓
   npsInsights        NPSInsight[]
+  // ═══════════════════════════════════════════════════
+  // RELACIONES EXIT INTELLIGENCE
+  // ═══════════════════════════════════════════════════
+  exitRecords       ExitRecord[]
+  exitAlerts        ExitAlert[]
+  exitInsights      DepartmentExitInsight[]
 
   @@index([adminEmail], map: "idx_accounts_email")
   @@index([subscriptionTier], map: "idx_accounts_tier")
@@ -201,6 +207,8 @@ model Participant {
   journeyStage2 JourneyOrchestration? @relation("Stage2")
   journeyStage3 JourneyOrchestration? @relation("Stage3")
   journeyStage4 JourneyOrchestration? @relation("Stage4")
+  // Relación con ExitRecord (1:1 opcional)
+  exitRecord  ExitRecord?
 
   @@unique([campaignId, nationalId], map: "unique_campaign_rut")
   @@index([campaignId], map: "idx_participants_campaign")
@@ -438,6 +446,14 @@ model Department {
   // 🌟 TU IDEA: Metadatos de contexto para UI
   accumulatedPeriodCount    Int?      @map("accumulated_period_count")
   accumulatedLastUpdated    DateTime? @map("accumulated_last_updated")
+  // ═══════════════════════════════════════════════════
+  // EXIT - Gold Cache 12 meses (LENTE 2)
+  // ═══════════════════════════════════════════════════
+  accumulatedEISScore          Float?    @map("accumulated_eis_score")
+  accumulatedExitCount         Int?      @map("accumulated_exit_count")
+  accumulatedExitPeriodCount   Int?      @map("accumulated_exit_period_count")
+  accumulatedExitLastUpdated   DateTime? @map("accumulated_exit_last_updated")
+  accumulatedConservationIndex Float?    @map("accumulated_conservation_index")
 
   // Jerarquía
   parentId      String?      @map("parent_id")
@@ -463,6 +479,12 @@ model Department {
   journeys           JourneyOrchestration[]
   // ✅ AGREGAR ESTA LÍNEA AQUÍ ↓
   npsInsights        NPSInsight[]
+  // ═══════════════════════════════════════════════════
+  // RELACIONES EXIT (agregar a relaciones existentes)
+  // ═══════════════════════════════════════════════════
+  exitRecords       ExitRecord[]
+  exitInsights      DepartmentExitInsight[]
+  exitAlerts        ExitAlert[]
 
   @@unique([accountId, displayName])
   @@index([accountId], map: "idx_departments_account")
@@ -943,4 +965,257 @@ model NPSInsight {
   @@index([departmentId])
   
   @@map("nps_insights")
+}
+// ═══════════════════════════════════════════════════════════════════════════
+// EXIT INTELLIGENCE - CAMBIOS AL SCHEMA PRISMA
+// ═══════════════════════════════════════════════════════════════════════════
+// Fecha: Diciembre 2025
+// Versión: 1.0
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SECCIÓN 1: MODELOS NUEVOS (agregar al final de schema.prisma)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ============================================
+// ✅ EXIT INTELLIGENCE v1.0
+// ============================================
+
+// MODELO EXIT 1: ExitRecord
+model ExitRecord {
+  id            String   @id @default(cuid())
+  accountId     String   @map("account_id")
+  departmentId  String   @map("department_id")
+
+  // ═══════════════════════════════════════════════════
+  // VÍNCULO AL SISTEMA EXISTENTE (1:1 con Participant)
+  // ═══════════════════════════════════════════════════
+  participantId String   @unique @map("participant_id")
+  nationalId    String   @map("national_id")
+
+  // ═══════════════════════════════════════════════════
+  // DATOS EXCLUSIVOS DE EXIT
+  // ═══════════════════════════════════════════════════
+  exitDate      DateTime @map("exit_date") @db.Date
+  exitReason    String?  @map("exit_reason") // voluntary|termination|contract_end|retirement|other
+
+  // ═══════════════════════════════════════════════════
+  // EIS - EXIT INTELLIGENCE SCORE (calculado)
+  // Fórmula: 20%P1 + 25%P4 + 20%P5 + 25%P6 + 10%P7
+  // ═══════════════════════════════════════════════════
+  eis               Float?   @map("eis")
+  eisClassification String?  @map("eis_classification") // healthy|neutral|problematic|toxic
+
+  // ═══════════════════════════════════════════════════
+  // P2 + P3: CAUSAS RAÍZ (factores cualitativos)
+  // ═══════════════════════════════════════════════════
+  exitFactors       String[] @map("exit_factors")        // Multi-select P2
+  exitFactorsDetail Json?    @map("exit_factors_detail") // Matrix P3 {factor: score}
+  exitFactorsAvg    Float?   @map("exit_factors_avg")    // Promedio severidad
+
+  // ═══════════════════════════════════════════════════
+  // CORRELACIÓN ONBOARDING (detectada por nationalId)
+  // ═══════════════════════════════════════════════════
+  hadOnboarding           Boolean  @default(false) @map("had_onboarding")
+  onboardingJourneyId     String?  @map("onboarding_journey_id")
+  onboardingEXOScore      Float?   @map("onboarding_exo_score")
+  onboardingAlertsCount   Int      @default(0) @map("onboarding_alerts_count")
+  onboardingIgnoredAlerts Int      @default(0) @map("onboarding_ignored_alerts")
+  onboardingManagedAlerts Int      @default(0) @map("onboarding_managed_alerts")
+  tenureMonths            Int?     @map("tenure_months")
+
+  // ═══════════════════════════════════════════════════
+  // RED FLAGS (detección automática)
+  // ═══════════════════════════════════════════════════
+  hasLeyKarinAlert        Boolean  @default(false) @map("has_ley_karin_alert")
+
+  // ═══════════════════════════════════════════════════
+  // TIMESTAMPS
+  // ═══════════════════════════════════════════════════
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  // ═══════════════════════════════════════════════════
+  // RELACIONES
+  // ═══════════════════════════════════════════════════
+  participant   Participant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  account       Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  department    Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  alerts        ExitAlert[]
+
+  // ═══════════════════════════════════════════════════
+  // ÍNDICES OPTIMIZADOS
+  // ═══════════════════════════════════════════════════
+  @@index([accountId, exitDate], map: "idx_exit_records_account_date")
+  @@index([departmentId, exitDate], map: "idx_exit_records_department_date")
+  @@index([nationalId], map: "idx_exit_records_national_id")
+  @@index([eis], map: "idx_exit_records_eis")
+  @@index([eisClassification], map: "idx_exit_records_classification")
+  @@index([hasLeyKarinAlert], map: "idx_exit_records_ley_karin")
+  @@map("exit_records")
+}
+
+// MODELO EXIT 2: ExitAlert (alertas departamentales, no individuales)
+model ExitAlert {
+  id            String    @id @default(cuid())
+  exitRecordId  String?   @map("exit_record_id") // Opcional: puede ser alerta de patrón
+  accountId     String    @map("account_id")
+  departmentId  String    @map("department_id")
+
+  // ═══════════════════════════════════════════════════
+  // TIPO DE ALERTA
+  // ═══════════════════════════════════════════════════
+  alertType     String    @map("alert_type")
+  // Tipos válidos:
+  // - ley_karin: P6 < 2.5 (ambiente no seguro)
+  // - liderazgo_concentracion: 3+ exits mismo factor liderazgo
+  // - nps_critico: eNPS < -30 en departamento
+  // - toxic_exit_detected: EIS < 40 individual
+  // - department_exit_pattern: Patrón normalizado departamental
+  // - onboarding_exit_correlation: Correlación alertas ignoradas
+
+  severity      String    // critical|high|medium|low
+  title         String
+  description   String
+
+  // ═══════════════════════════════════════════════════
+  // CONTEXTO POR TIPO (campos dinámicos)
+  // ═══════════════════════════════════════════════════
+  triggerScore    Float?    @map("trigger_score")   // Score que disparó alerta
+  exitCount       Int?      @map("exit_count")      // Exits involucrados en patrón
+  triggerFactor   String?   @map("trigger_factor")  // Factor P2/P3 predominante
+  avgScore        Float?    @map("avg_score")       // Score promedio del patrón
+  enpsValue       Float?    @map("enps_value")      // eNPS del departamento
+  periodStart     DateTime? @map("period_start")    // Inicio período análisis
+  periodEnd       DateTime? @map("period_end")      // Fin período análisis
+
+  // ═══════════════════════════════════════════════════
+  // GESTIÓN (patrón idéntico a JourneyAlert)
+  // ═══════════════════════════════════════════════════
+  status          String    @default("pending") // pending|acknowledged|resolved|dismissed
+  acknowledgedAt  DateTime? @map("acknowledged_at")
+  acknowledgedBy  String?   @map("acknowledged_by")
+  resolvedAt      DateTime? @map("resolved_at")
+  resolvedBy      String?   @map("resolved_by")
+  resolutionNotes String?   @map("resolution_notes") @db.Text
+
+  // ═══════════════════════════════════════════════════
+  // SLA (trackeable pero sin presión urgente como Onboarding)
+  // ═══════════════════════════════════════════════════
+  slaHours        Int?      @map("sla_hours")   // Sugerido, no obligatorio
+  dueDate         DateTime? @map("due_date")
+  slaStatus       String?   @map("sla_status")  // on_track|at_risk|breached|null
+
+  // ═══════════════════════════════════════════════════
+  // TIMESTAMPS
+  // ═══════════════════════════════════════════════════
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  // ═══════════════════════════════════════════════════
+  // RELACIONES
+  // ═══════════════════════════════════════════════════
+  exitRecord      ExitRecord? @relation(fields: [exitRecordId], references: [id], onDelete: Cascade)
+  department      Department  @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  account         Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // ═══════════════════════════════════════════════════
+  // ÍNDICES OPTIMIZADOS
+  // ═══════════════════════════════════════════════════
+  @@index([accountId, status], map: "idx_exit_alerts_account_status")
+  @@index([departmentId, status], map: "idx_exit_alerts_department_status")
+  @@index([alertType, status], map: "idx_exit_alerts_type_status")
+  @@index([severity, status], map: "idx_exit_alerts_severity_status")
+  @@index([createdAt], map: "idx_exit_alerts_created")
+  @@map("exit_alerts")
+}
+
+// MODELO EXIT 3: DepartmentExitInsight (agregación mensual LENTE 1)
+model DepartmentExitInsight {
+  id            String   @id @default(cuid())
+  accountId     String   @map("account_id")
+  departmentId  String   @map("department_id")
+
+  // ═══════════════════════════════════════════════════
+  // PERÍODO (patrón FocalizaHR)
+  // ═══════════════════════════════════════════════════
+  period        String   // "2025-12", "2025-Q4", "2025"
+  periodType    String   @default("monthly") @map("period_type") // monthly|quarterly|yearly
+  periodStart   DateTime @map("period_start") @db.Date
+  periodEnd     DateTime @map("period_end") @db.Date
+
+  // ═══════════════════════════════════════════════════
+  // MÉTRICAS BÁSICAS
+  // ═══════════════════════════════════════════════════
+  totalExits        Int @default(0) @map("total_exits")
+  voluntaryExits    Int @default(0) @map("voluntary_exits")
+  involuntaryExits  Int @default(0) @map("involuntary_exits")
+  surveysCompleted  Int @default(0) @map("surveys_completed")
+
+  // ═══════════════════════════════════════════════════
+  // SCORES PROMEDIO (de ExitRecord)
+  // ═══════════════════════════════════════════════════
+  avgSatisfaction   Float? @map("avg_satisfaction")   // P1
+  avgFactorsScore   Float? @map("avg_factors_score")  // P3 promedio
+  avgLeadership     Float? @map("avg_leadership")     // P4
+  avgDevelopment    Float? @map("avg_development")    // P5
+  avgSafety         Float? @map("avg_safety")         // P6 (Ley Karin)
+  avgAutonomy       Float? @map("avg_autonomy")       // P7
+  avgNPS            Float? @map("avg_nps")            // P8 (0-10)
+
+  // ═══════════════════════════════════════════════════
+  // EIS AGREGADO
+  // ═══════════════════════════════════════════════════
+  avgEIS            Float? @map("avg_eis")
+  eisTrend          Float? @map("eis_trend") // vs período anterior
+
+  // ═══════════════════════════════════════════════════
+  // eNPS DEPARTAMENTAL
+  // ═══════════════════════════════════════════════════
+  enps              Float? @map("enps") // -100 a +100
+  promoters         Int    @default(0)  // 9-10
+  passives          Int    @default(0)  // 7-8
+  detractors        Int    @default(0)  // 0-6
+
+  // ═══════════════════════════════════════════════════
+  // TOP FACTORES P2+P3 (causas raíz agregadas)
+  // ═══════════════════════════════════════════════════
+  topExitFactors    Json?  @map("top_exit_factors")
+  // Estructura: [{ factor: string, mentions: number, mentionRate: number, avgSeverity: number }]
+
+  // ═══════════════════════════════════════════════════
+  // CORRELACIÓN ONBOARDING (ÚNICO DIFERENCIADOR)
+  // ═══════════════════════════════════════════════════
+  exitsWithOnboarding       Int    @default(0) @map("exits_with_onboarding")
+  exitsWithOnboardingAlerts Int    @default(0) @map("exits_with_onboarding_alerts")
+  exitsWithIgnoredAlerts    Int    @default(0) @map("exits_with_ignored_alerts")
+  avgOnboardingEXOOfExits   Float? @map("avg_onboarding_exo_of_exits")
+  conservationIndex         Float? @map("conservation_index")      // % que recibió alerta y NO se fue
+  alertPredictionRate       Float? @map("alert_prediction_rate")   // % exits que tuvieron alerta previa
+
+  // ═══════════════════════════════════════════════════
+  // ALERTAS GENERADAS
+  // ═══════════════════════════════════════════════════
+  alertsGenerated           Int @default(0) @map("alerts_generated")
+
+  // ═══════════════════════════════════════════════════
+  // TIMESTAMPS
+  // ═══════════════════════════════════════════════════
+  calculatedAt              DateTime @default(now()) @map("calculated_at")
+
+  // ═══════════════════════════════════════════════════
+  // RELACIONES
+  // ═══════════════════════════════════════════════════
+  account     Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  department  Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  // ═══════════════════════════════════════════════════
+  // CONSTRAINTS E ÍNDICES
+  // ═══════════════════════════════════════════════════
+  @@unique([departmentId, period, periodType])
+  @@index([accountId], map: "idx_dept_exit_insights_account")
+  @@index([departmentId], map: "idx_dept_exit_insights_department")
+  @@index([periodStart, periodEnd], map: "idx_dept_exit_insights_period")
+  @@index([avgEIS], map: "idx_dept_exit_insights_eis")
+  @@index([avgSafety], map: "idx_dept_exit_insights_safety")
+  @@map("department_exit_insights")
 }

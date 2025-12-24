@@ -37,6 +37,7 @@ interface Campaign {
     methodology: string
     category: string
     isPermanent?: boolean  // ← AGREGAR AQUÍ
+    flowType?: string  // ← AGREGAR
   }
 }
 
@@ -124,17 +125,17 @@ const handleSubmit = async (responses: Array<{questionId: string, rating?: numbe
 
     console.log('📤 Enviando respuestas:', responses)
 
-    // ✅ ENRUTADOR INTELIGENTE: Detectar API correcta basado en isPermanent
+    // ✅ ENRUTADOR V3 (Arquitectura flowType)
     const campaignType = surveyData?.participant.campaign.campaignType
-    const isPermanent = campaignType?.isPermanent || false
-    
-    const submitUrl = isPermanent
-      ? `/api/onboarding/survey/${token}/submit`  // Onboarding con inteligencia
-      : `/api/survey/${token}/submit`             // Productos temporales legacy
+    const flowType = campaignType?.flowType || 'standard'
 
-    console.log(`🎯 Tipo campaña: ${campaignType?.slug}`)
-    console.log(`🎯 isPermanent: ${isPermanent}`)
-    console.log(`🎯 Enrutando submit a: ${submitUrl}`)
+    const submitUrl = flowType === 'onboarding'
+      ? `/api/onboarding/survey/${token}/submit`  // Motor Onboarding (requiere Journey)
+      : `/api/survey/${token}/submit`              // Motor Estándar (Exit, Pulso, etc.)
+
+    console.log(`🚀 [Router] Tipo: ${campaignType?.slug}`)
+    console.log(`🚀 [Router] flowType: ${flowType}`)
+    console.log(`🚀 [Router] Submit URL: ${submitUrl}`)
 
     const response = await fetch(submitUrl, {
       method: 'POST',
