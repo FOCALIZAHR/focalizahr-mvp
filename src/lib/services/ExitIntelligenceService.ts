@@ -1,23 +1,18 @@
 /**
- * EXIT REGISTRATION SERVICE
+ * EXIT INTELLIGENCE SERVICE
  * 
  * PROPÓSITO:
- * - Registrar salidas (crear ExitRecord + Participant)
- * - Buscar correlación con Onboarding existente
- * - Programar email de invitación a encuesta
+ * - Calcular EIS (Exit Intelligence Score) desde Response.normalizedScore
+ * - Extraer P2+P3 (causas raíz) sin duplicar datos
+ * - Detectar alertas Ley Karin (P6 < 2.5)
+ * - Post-proceso automático al completar encuesta exit-survey
  * 
- * ARQUITECTURA:
- * Análogo a OnboardingEnrollmentService pero SIMPLE:
- * - 1 campaign permanente (exit-survey)
- * - 1 participant por salida
- * - 1 email de invitación
+ * PRINCIPIO ARQUITECTÓNICO:
+ * Las respuestas YA se guardan en Response con normalizedScore calculado.
+ * Este servicio LEE desde Response, NO duplica datos.
  * 
- * IMPORTANTE:
- * Este servicio usa los campos correctos de EmailAutomation:
- * - triggerType (NO emailType)
- * - triggerAt (NO scheduledFor)
- * - enabled: true (NO status: 'pending')
- * - templateId
+ * FÓRMULA EIS (validada en /types/exit.ts):
+ * EIS = P1(20%) + P4(25%) + P5(20%) + P6(25%) + P7(10%)
  * 
  * @version 1.0
  * @date December 2025
@@ -25,521 +20,558 @@
  */
 
 import { prisma } from '@/lib/prisma';
-import { generateUniqueToken } from '@/lib/auth';
 import { 
-  ExitRegistrationData, 
-  ExitRegistrationResult,
-  OnboardingCorrelation,
-  BatchExitRegistrationResult
+  ExitScores, 
+  EISCalculationResult,
+  ExitFactorsResult,
+  EIS_CLASSIFICATIONS,
+  EIS_WEIGHTS,
+  EIS_THRESHOLDS,
+  getEISClassification
 } from '@/types/exit';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONSTANTES LOCALES
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Mapeo de questionOrder a dimensión EIS
+ * Basado en la estructura de la encuesta exit-survey
+ */
+const QUESTION_ORDER_MAP = {
+  SATISFACTION: 1,    // P1: Satisfacción general
+  FACTORS_SELECT: 2,  // P2: Factores seleccionados (multi-select)
+  FACTORS_RATING: 3,  // P3: Rating por factor (matrix)
+  LEADERSHIP: 4,      // P4: Liderazgo
+  DEVELOPMENT: 5,     // P5: Desarrollo
+  SAFETY: 6,          // P6: Ambiente seguro (Ley Karin)
+  AUTONOMY: 7,        // P7: Autonomía
+  NPS: 8              // P8: eNPS (0-10)
+} as const;
+
+/**
+ * Threshold para alerta Ley Karin
+ * Si P6 (safety) < 2.5 en escala 1-5, se genera alerta crítica
+ */
+const LEY_KARIN_THRESHOLD = 2.5;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SERVICIO PRINCIPAL
 // ═══════════════════════════════════════════════════════════════════════════
 
-export class ExitRegistrationService {
+export class ExitIntelligenceService {
   
   /**
    * ════════════════════════════════════════════════════════════════════════
-   * MÉTODO PRINCIPAL: Registrar una salida
+   * MÉTODO PRINCIPAL: Calcular EIS completo para un participante
    * ════════════════════════════════════════════════════════════════════════
    * 
-   * Flujo:
-   * 1. Validar datos de entrada
-   * 2. Verificar que no exista registro pendiente para este RUT
-   * 3. Obtener/crear campaign permanente exit-survey
-   * 4. Buscar correlación con Onboarding (por nationalId)
-   * 5. Crear Participant + ExitRecord en transacción
-   * 6. Programar email de invitación
+   * @param participantId - ID del participante que completó la encuesta
+   * @returns Objeto con score EIS, clasificación, y métricas relacionadas
    */
-  static async registerExit(data: ExitRegistrationData): Promise<ExitRegistrationResult> {
+  static async calculateEIS(participantId: string): Promise<EISCalculationResult> {
     try {
-      console.log('[ExitRegistration] Starting registration...', { 
-        nationalId: data.nationalId,
-        accountId: data.accountId 
+      console.log('[ExitIntelligence] Calculating EIS for participant:', participantId);
+      
+      // 1. Obtener scores desde Response.normalizedScore
+      const scores = await this.getExitScores(participantId);
+      
+      console.log('[ExitIntelligence] Raw scores:', {
+        satisfaction: scores.satisfaction,
+        leadership: scores.leadership,
+        development: scores.development,
+        safety: scores.safety,
+        autonomy: scores.autonomy,
+        nps: scores.nps
       });
       
-      // 1. Validar datos
-      this.validateData(data);
+      // 2. Extraer factores P2+P3
+      const factors = await this.extractExitFactors(participantId);
       
-      // 2. Verificar si ya existe un ExitRecord activo para este RUT
-      const existing = await prisma.exitRecord.findFirst({
-        where: {
-          accountId: data.accountId,
-          nationalId: data.nationalId,
-          eis: null // Solo pendientes (sin encuesta completada)
+      // 3. Validar que tenemos suficientes datos para calcular
+      const requiredScores = [
+        scores.satisfaction,
+        scores.leadership,
+        scores.development,
+        scores.safety,
+        scores.autonomy
+      ];
+      
+      const validScores = requiredScores.filter(s => s !== null && s !== undefined);
+      
+      // Necesitamos al menos 3 de 5 dimensiones para un cálculo válido
+      if (validScores.length < 3) {
+        console.warn('[ExitIntelligence] Insufficient scores for EIS calculation:', {
+          validCount: validScores.length,
+          required: 3
+        });
+        
+        return {
+          score: null,
+          classification: null,
+          factorsAvg: factors.exitFactorsAvg,
+          safetyScore: scores.safety,
+          npsScore: scores.nps,
+          breakdown: this.createEmptyBreakdown(scores)
+        };
+      }
+      
+      // 4. Calcular EIS con pesos oficiales de /types/exit.ts
+      // Normalizar scores 1-5 a 0-100 antes de aplicar pesos
+      const normSatisfaction = this.normalizeToHundred(scores.satisfaction);
+      const normLeadership = this.normalizeToHundred(scores.leadership);
+      const normDevelopment = this.normalizeToHundred(scores.development);
+      const normSafety = this.normalizeToHundred(scores.safety);
+      const normAutonomy = this.normalizeToHundred(scores.autonomy);
+      
+      // Calcular weighted score
+      const weightedSatisfaction = (normSatisfaction ?? 0) * EIS_WEIGHTS.SATISFACTION;
+      const weightedLeadership = (normLeadership ?? 0) * EIS_WEIGHTS.LEADERSHIP;
+      const weightedDevelopment = (normDevelopment ?? 0) * EIS_WEIGHTS.DEVELOPMENT;
+      const weightedSafety = (normSafety ?? 0) * EIS_WEIGHTS.SAFETY;
+      const weightedAutonomy = (normAutonomy ?? 0) * EIS_WEIGHTS.AUTONOMY;
+      
+      const eis = weightedSatisfaction + weightedLeadership + weightedDevelopment + 
+                  weightedSafety + weightedAutonomy;
+      
+      // 5. Clasificar según umbrales
+      const classification = getEISClassification(eis);
+      
+      console.log('[ExitIntelligence] EIS calculated:', {
+        eis: Math.round(eis * 10) / 10,
+        classification,
+        breakdown: {
+          satisfaction: weightedSatisfaction,
+          leadership: weightedLeadership,
+          development: weightedDevelopment,
+          safety: weightedSafety,
+          autonomy: weightedAutonomy
         }
       });
       
-      if (existing) {
-        console.log('[ExitRegistration] Existing pending record found:', existing.id);
-        return {
-          success: false,
-          error: `Ya existe un registro de salida pendiente para RUT ${data.nationalId}`
-        };
-      }
+      return {
+        score: Math.round(eis * 10) / 10, // 1 decimal
+        classification,
+        factorsAvg: factors.exitFactorsAvg,
+        safetyScore: scores.safety,
+        npsScore: scores.nps,
+        breakdown: {
+          satisfaction: { raw: scores.satisfaction, weighted: weightedSatisfaction },
+          leadership: { raw: scores.leadership, weighted: weightedLeadership },
+          development: { raw: scores.development, weighted: weightedDevelopment },
+          safety: { raw: scores.safety, weighted: weightedSafety },
+          autonomy: { raw: scores.autonomy, weighted: weightedAutonomy }
+        }
+      };
       
-      // 3. Obtener campaign permanente exit-survey
-      const campaign = await this.getOrCreateExitCampaign(data.accountId);
-      if (!campaign) {
-        return {
-          success: false,
-          error: 'Campaign exit-survey no encontrada. Verifique que el CampaignType existe con isPermanent=true'
-        };
-      }
-      
-      console.log('[ExitRegistration] Using campaign:', campaign.id);
-      
-      // 4. Buscar correlación onboarding
-      const correlation = await this.findOnboardingCorrelation(
-        data.accountId,
-        data.nationalId
-      );
-      
-      // 5. Crear Participant + ExitRecord en transacción
-      const result = await prisma.$transaction(async (tx) => {
-        // Crear Participant
-        const participant = await tx.participant.create({
-          data: {
-            campaignId: campaign.id,
-            nationalId: data.nationalId,
-            name: data.fullName,
-            email: data.email || null,
-            phoneNumber: data.phoneNumber || null,
-            department: data.departmentId, // Campo string legacy
-            departmentId: data.departmentId, // FK real
-            position: data.position || null,
-            uniqueToken: generateUniqueToken(), // ← Función del proyecto (64 chars hex)
-            hasResponded: false
+    } catch (error) {
+      console.error('[ExitIntelligence] Error calculating EIS:', error);
+      return {
+        score: null,
+        classification: null,
+        factorsAvg: null,
+        safetyScore: null,
+        npsScore: null,
+        breakdown: this.createEmptyBreakdown({
+          satisfaction: null,
+          leadership: null,
+          development: null,
+          safety: null,
+          autonomy: null,
+          factorsDetail: null,
+          nps: null
+        })
+      };
+    }
+  }
+  
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * Obtener scores desde Response.normalizedScore
+   * ════════════════════════════════════════════════════════════════════════
+   * 
+   * LEE directamente desde la tabla Response, aprovechando que
+   * normalizedScore ya fue calculado al momento del submit.
+   */
+  static async getExitScores(participantId: string): Promise<ExitScores> {
+    const responses = await prisma.response.findMany({
+      where: { participantId },
+      include: {
+        question: {
+          select: {
+            questionOrder: true,
+            responseType: true,
+            category: true
           }
-        });
-        
-        console.log('[ExitRegistration] Participant created:', participant.id);
-        
-        // Calcular tenure si hay correlación onboarding
-        const tenureMonths = correlation.found && correlation.hireDate
-          ? this.calculateTenureMonths(correlation.hireDate, data.exitDate)
-          : null;
-        
-        // Crear ExitRecord
-        const exitRecord = await tx.exitRecord.create({
-          data: {
-            accountId: data.accountId,
-            departmentId: data.departmentId,
-            participantId: participant.id,
-            nationalId: data.nationalId,
-            exitDate: data.exitDate,
-            exitReason: data.exitReason || null,
-            exitFactors: [], // Se llenará al completar encuesta
-            // Correlación onboarding
-            hadOnboarding: correlation.found,
-            onboardingJourneyId: correlation.journeyId || null,
-            onboardingEXOScore: correlation.exoScore || null,
-            onboardingAlertsCount: correlation.alertsCount || 0,
-            onboardingIgnoredAlerts: correlation.ignoredAlerts || 0,
-            onboardingManagedAlerts: correlation.managedAlerts || 0,
-            tenureMonths
-          }
-        });
-        
-        console.log('[ExitRegistration] ExitRecord created:', exitRecord.id);
-        
-        return { participant, exitRecord };
+        }
+      }
+    });
+    
+    // Mapear por orden de pregunta para acceso O(1)
+    const byOrder = new Map(
+      responses.map(r => [r.question.questionOrder, r])
+    );
+    
+    // Extraer scores usando normalizedScore (ya calculado)
+    // Para rating_scale (1-5), normalizedScore ya está en escala 1-5
+    const satisfaction = byOrder.get(QUESTION_ORDER_MAP.SATISFACTION)?.normalizedScore ?? null;
+    const leadership = byOrder.get(QUESTION_ORDER_MAP.LEADERSHIP)?.normalizedScore ?? null;
+    const development = byOrder.get(QUESTION_ORDER_MAP.DEVELOPMENT)?.normalizedScore ?? null;
+    const safety = byOrder.get(QUESTION_ORDER_MAP.SAFETY)?.normalizedScore ?? null;
+    const autonomy = byOrder.get(QUESTION_ORDER_MAP.AUTONOMY)?.normalizedScore ?? null;
+    
+    // NPS usa rating directo (escala 0-10)
+    const nps = byOrder.get(QUESTION_ORDER_MAP.NPS)?.rating ?? null;
+    
+    // P3: Factores detail (matrix de ratings)
+    // Normalizar undefined → null para compatibilidad de tipos
+    const factorsDetail = this.parseFactorsDetail(
+      byOrder.get(QUESTION_ORDER_MAP.FACTORS_RATING)?.choiceResponse ?? null
+    );
+    
+    return {
+      satisfaction,
+      factorsDetail,
+      leadership,
+      development,
+      safety,
+      autonomy,
+      nps
+    };
+  }
+  
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * Extraer P2+P3 (Causas Raíz)
+   * ════════════════════════════════════════════════════════════════════════
+   * 
+   * P2: Multi-select de factores (array de strings)
+   * P3: Matrix de ratings por factor seleccionado (object {factor: score})
+   */
+  static async extractExitFactors(participantId: string): Promise<ExitFactorsResult> {
+    const responses = await prisma.response.findMany({
+      where: { participantId },
+      include: {
+        question: {
+          select: { questionOrder: true }
+        }
+      }
+    });
+    
+    const byOrder = new Map(
+      responses.map(r => [r.question.questionOrder, r])
+    );
+    
+    // P2: Factores seleccionados (array)
+    // Normalizar undefined → null para compatibilidad de tipos
+    const p2Response = byOrder.get(QUESTION_ORDER_MAP.FACTORS_SELECT);
+    const exitFactors = this.parseP2Response(p2Response?.choiceResponse ?? null);
+    
+    // P3: Ratings por factor (matrix)
+    // Normalizar undefined → null para compatibilidad de tipos
+    const p3Response = byOrder.get(QUESTION_ORDER_MAP.FACTORS_RATING);
+    const exitFactorsDetail = this.parseFactorsDetail(p3Response?.choiceResponse ?? null) || {};
+    
+    // Calcular promedio de severidad
+    const ratings = Object.values(exitFactorsDetail);
+    const exitFactorsAvg = ratings.length > 0
+      ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10
+      : null;
+    
+    console.log('[ExitIntelligence] Extracted factors:', {
+      factorsCount: exitFactors.length,
+      detailKeys: Object.keys(exitFactorsDetail),
+      avgSeverity: exitFactorsAvg
+    });
+    
+    return {
+      exitFactors,
+      exitFactorsDetail,
+      exitFactorsAvg
+    };
+  }
+  
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * Verificar y crear alerta Ley Karin
+   * ════════════════════════════════════════════════════════════════════════
+   * 
+   * Condición: P6 (safety) < 2.5 en escala 1-5
+   * Acción: Crear ExitAlert tipo 'ley_karin' con severidad 'critical'
+   * SLA: 24 horas (requiere investigación inmediata)
+   */
+  static async checkAndCreateLeyKarinAlert(
+    exitRecord: {
+      id: string;
+      accountId: string;
+      departmentId: string;
+    },
+    safetyScore: number | null
+  ): Promise<boolean> {
+    // No crear alerta si no hay score o está por encima del threshold
+    if (safetyScore === null || safetyScore >= LEY_KARIN_THRESHOLD) {
+      console.log('[ExitIntelligence] No Ley Karin alert needed:', {
+        safetyScore,
+        threshold: LEY_KARIN_THRESHOLD
+      });
+      return false;
+    }
+    
+    // Verificar si ya existe alerta Ley Karin para este ExitRecord
+    const existingAlert = await prisma.exitAlert.findFirst({
+      where: {
+        exitRecordId: exitRecord.id,
+        alertType: 'ley_karin',
+        status: { in: ['pending', 'acknowledged'] }
+      }
+    });
+    
+    if (existingAlert) {
+      console.log('[ExitIntelligence] Ley Karin alert already exists:', existingAlert.id);
+      return false;
+    }
+    
+    // Obtener nombre departamento para el título
+    const department = await prisma.department.findUnique({
+      where: { id: exitRecord.departmentId },
+      select: { displayName: true }
+    });
+    
+    // Calcular fecha límite SLA (24 horas)
+    const dueDate = new Date();
+    dueDate.setHours(dueDate.getHours() + 24);
+    
+    // Crear alerta
+    const alert = await prisma.exitAlert.create({
+      data: {
+        exitRecordId: exitRecord.id,
+        accountId: exitRecord.accountId,
+        departmentId: exitRecord.departmentId,
+        alertType: 'ley_karin',
+        severity: 'critical',
+        title: `⚠️ Alerta Ley Karin en ${department?.displayName || 'Departamento'}`,
+        description: `Se ha detectado una respuesta crítica en la dimensión de ambiente seguro y respetuoso (${safetyScore?.toFixed(1)}/5.0). Requiere investigación inmediata del clima laboral del departamento según normativa Ley Karin.`,
+        triggerScore: safetyScore,
+        slaHours: 24,
+        dueDate,
+        slaStatus: 'on_track',
+        status: 'pending'
+      }
+    });
+    
+    console.log('[ExitIntelligence] Ley Karin alert created:', {
+      alertId: alert.id,
+      departmentId: exitRecord.departmentId,
+      safetyScore,
+      dueDate: dueDate.toISOString()
+    });
+    
+    return true;
+  }
+  
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * MÉTODO CRÍTICO: Procesar encuesta completada (post-proceso)
+   * ════════════════════════════════════════════════════════════════════════
+   * 
+   * Este método se llama desde /api/survey/[token]/submit después de guardar
+   * las respuestas cuando se detecta que es una encuesta exit-survey.
+   * 
+   * Flujo:
+   * 1. Buscar ExitRecord vinculado al participantId
+   * 2. Calcular EIS
+   * 3. Extraer factores P2+P3
+   * 4. Actualizar ExitRecord con resultados
+   * 5. Crear alerta Ley Karin si aplica
+   */
+  static async processCompletedSurvey(participantId: string): Promise<{
+    success: boolean;
+    exitRecordId?: string;
+    eis?: number | null;
+    classification?: string | null;
+    alertCreated?: boolean;
+    error?: string;
+  }> {
+    try {
+      console.log('[ExitIntelligence] Processing completed survey for participant:', participantId);
+      
+      // 1. Buscar ExitRecord vinculado
+      const exitRecord = await prisma.exitRecord.findUnique({
+        where: { participantId },
+        select: {
+          id: true,
+          accountId: true,
+          departmentId: true,
+          eis: true // Verificar si ya fue procesado
+        }
       });
       
-      // 6. Programar email de invitación
-      await this.scheduleInvitationEmail(result.participant, data, campaign.id);
+      if (!exitRecord) {
+        console.log('[ExitIntelligence] No ExitRecord found for participant:', participantId);
+        return {
+          success: false,
+          error: 'No se encontró registro de salida vinculado'
+        };
+      }
       
-      console.log('[ExitRegistration] ✅ Registration completed successfully:', {
-        exitRecordId: result.exitRecord.id,
-        participantId: result.participant.id,
-        surveyToken: result.participant.uniqueToken
+      // Verificar si ya fue procesado
+      if (exitRecord.eis !== null) {
+        console.log('[ExitIntelligence] ExitRecord already processed:', exitRecord.id);
+        return {
+          success: true,
+          exitRecordId: exitRecord.id,
+          eis: exitRecord.eis,
+          alertCreated: false
+        };
+      }
+      
+      // 2. Calcular EIS
+      const eisResult = await this.calculateEIS(participantId);
+      
+      // 3. Extraer factores
+      const factors = await this.extractExitFactors(participantId);
+      
+      // 4. Actualizar ExitRecord
+      await prisma.exitRecord.update({
+        where: { id: exitRecord.id },
+        data: {
+          eis: eisResult.score,
+          eisClassification: eisResult.classification,
+          exitFactors: factors.exitFactors,
+          exitFactorsDetail: factors.exitFactorsDetail,
+          exitFactorsAvg: factors.exitFactorsAvg,
+          hasLeyKarinAlert: eisResult.safetyScore !== null && 
+                           eisResult.safetyScore < LEY_KARIN_THRESHOLD
+        }
+      });
+      
+      // 5. Crear alerta Ley Karin si aplica
+      let alertCreated = false;
+      if (eisResult.safetyScore !== null && eisResult.safetyScore < LEY_KARIN_THRESHOLD) {
+        alertCreated = await this.checkAndCreateLeyKarinAlert(
+          exitRecord, 
+          eisResult.safetyScore
+        );
+      }
+      
+      // 6. Actualizar Participant como respondido
+      await prisma.participant.update({
+        where: { id: participantId },
+        data: {
+          hasResponded: true,
+          responseDate: new Date()
+        }
+      });
+      
+      console.log('[ExitIntelligence] Survey processed successfully:', {
+        exitRecordId: exitRecord.id,
+        eis: eisResult.score,
+        classification: eisResult.classification,
+        alertCreated
       });
       
       return {
         success: true,
-        exitRecordId: result.exitRecord.id,
-        participantId: result.participant.id,
-        surveyToken: result.participant.uniqueToken,
-        message: 'Salida registrada exitosamente. Email de invitación programado.'
+        exitRecordId: exitRecord.id,
+        eis: eisResult.score,
+        classification: eisResult.classification,
+        alertCreated
       };
       
     } catch (error: any) {
-      console.error('[ExitRegistration] ❌ Error:', error);
+      console.error('[ExitIntelligence] Error processing survey:', error);
       return {
         success: false,
-        error: error.message || 'Error registrando salida'
+        error: error.message || 'Error procesando encuesta'
       };
     }
-  }
-  
-  /**
-   * ════════════════════════════════════════════════════════════════════════
-   * Registro masivo (hasta 100 registros)
-   * ════════════════════════════════════════════════════════════════════════
-   */
-  static async registerBatch(
-    items: ExitRegistrationData[]
-  ): Promise<BatchExitRegistrationResult> {
-    console.log('[ExitRegistration] Starting batch registration:', items.length);
-    
-    // Validación de límite
-    if (items.length > 100) {
-      return {
-        success: false,
-        total: items.length,
-        processed: 0,
-        failed: items.length,
-        results: [{
-          nationalId: '',
-          success: false,
-          error: 'Máximo 100 registros por batch'
-        }]
-      };
-    }
-    
-    if (items.length === 0) {
-      return {
-        success: false,
-        total: 0,
-        processed: 0,
-        failed: 0,
-        results: []
-      };
-    }
-    
-    const results: Array<{
-      nationalId: string;
-      success: boolean;
-      exitRecordId?: string;
-      error?: string;
-    }> = [];
-    
-    let successCount = 0;
-    let failureCount = 0;
-    
-    // Procesar secuencialmente para evitar race conditions
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      
-      try {
-        const result = await this.registerExit(item);
-        
-        if (result.success) {
-          successCount++;
-          results.push({
-            nationalId: item.nationalId,
-            success: true,
-            exitRecordId: result.exitRecordId
-          });
-        } else {
-          failureCount++;
-          results.push({
-            nationalId: item.nationalId,
-            success: false,
-            error: result.error
-          });
-        }
-      } catch (error: any) {
-        failureCount++;
-        results.push({
-          nationalId: item.nationalId,
-          success: false,
-          error: error.message || 'Error desconocido'
-        });
-      }
-      
-      // Pequeño delay para evitar sobrecarga
-      if (i < items.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-    }
-    
-    console.log('[ExitRegistration] Batch completed:', {
-      total: items.length,
-      success: successCount,
-      failed: failureCount
-    });
-    
-    return {
-      success: successCount > 0,
-      total: items.length,
-      processed: successCount,
-      failed: failureCount,
-      results
-    };
-  }
-  
-  /**
-   * ════════════════════════════════════════════════════════════════════════
-   * Obtener estadísticas de registros Exit para un account
-   * ════════════════════════════════════════════════════════════════════════
-   */
-  static async getExitStats(accountId: string): Promise<{
-    total: number;
-    pending: number;
-    completed: number;
-    withOnboarding: number;
-    avgTenure: number | null;
-    avgEIS: number | null;
-    byClassification: Record<string, number>;
-  }> {
-    const [total, pending, completed, withOnboarding, tenureData, eisData, classificationCounts] = 
-      await Promise.all([
-        prisma.exitRecord.count({ where: { accountId } }),
-        prisma.exitRecord.count({ where: { accountId, eis: null } }),
-        prisma.exitRecord.count({ where: { accountId, eis: { not: null } } }),
-        prisma.exitRecord.count({ where: { accountId, hadOnboarding: true } }),
-        prisma.exitRecord.aggregate({
-          where: { accountId, tenureMonths: { not: null } },
-          _avg: { tenureMonths: true }
-        }),
-        prisma.exitRecord.aggregate({
-          where: { accountId, eis: { not: null } },
-          _avg: { eis: true }
-        }),
-        prisma.exitRecord.groupBy({
-          by: ['eisClassification'],
-          where: { accountId, eisClassification: { not: null } },
-          _count: true
-        })
-      ]);
-    
-    // Convertir agrupación a objeto
-    const byClassification: Record<string, number> = {};
-    for (const item of classificationCounts) {
-      if (item.eisClassification) {
-        byClassification[item.eisClassification] = item._count;
-      }
-    }
-    
-    return {
-      total,
-      pending,
-      completed,
-      withOnboarding,
-      avgTenure: tenureData._avg.tenureMonths,
-      avgEIS: eisData._avg.eis ? Math.round(eisData._avg.eis * 10) / 10 : null,
-      byClassification
-    };
   }
   
   // ═══════════════════════════════════════════════════════════════════════════
-  // MÉTODOS PRIVADOS
+  // MÉTODOS AUXILIARES PRIVADOS
   // ═══════════════════════════════════════════════════════════════════════════
   
   /**
-   * Validar datos de entrada
+   * Normalizar rating 1-5 a escala 0-100
    */
-  private static validateData(data: ExitRegistrationData): void {
-    if (!data.accountId) {
-      throw new Error('accountId es requerido');
-    }
-    if (!data.departmentId) {
-      throw new Error('departmentId es requerido');
-    }
-    if (!data.nationalId) {
-      throw new Error('nationalId (RUT) es requerido');
-    }
-    if (!data.fullName) {
-      throw new Error('fullName es requerido');
-    }
-    if (!data.exitDate) {
-      throw new Error('exitDate es requerido');
-    }
+  private static normalizeToHundred(rating: number | null): number | null {
+    if (rating === null) return null;
+    // Escala 1-5 → 0-100
+    // 1 → 0, 2 → 25, 3 → 50, 4 → 75, 5 → 100
+    return ((rating - 1) / 4) * 100;
+  }
+  
+  /**
+   * Parsear respuesta P2 (array de factores seleccionados)
+   */
+  private static parseP2Response(choiceResponse: string | null): string[] {
+    if (!choiceResponse) return [];
     
-    // Validar que fecha de salida no sea muy futura (máximo 30 días)
-    const maxFutureDate = new Date();
-    maxFutureDate.setDate(maxFutureDate.getDate() + 30);
-    
-    const exitDate = new Date(data.exitDate);
-    if (exitDate > maxFutureDate) {
-      throw new Error('La fecha de salida no puede ser mayor a 30 días en el futuro');
-    }
-    
-    // Validar formato RUT básico (opcional, se puede expandir)
-    const rutPattern = /^\d{1,2}\.\d{3}\.\d{3}-[\dkK]$|^\d{7,8}-[\dkK]$/;
-    if (!rutPattern.test(data.nationalId)) {
-      // Solo warning, no bloquear
-      console.warn('[ExitRegistration] Formato RUT no estándar:', data.nationalId);
+    try {
+      const parsed = JSON.parse(choiceResponse);
+      
+      // Puede venir como array directo o como string JSON de array
+      if (Array.isArray(parsed)) {
+        return parsed.filter(item => typeof item === 'string');
+      }
+      
+      // Si es string, podría ser un solo factor
+      if (typeof parsed === 'string') {
+        return [parsed];
+      }
+      
+      return [];
+    } catch {
+      // Si falla el parse, intentar split por coma
+      return choiceResponse.split(',').map(s => s.trim()).filter(Boolean);
     }
   }
   
   /**
-   * Obtener o crear campaign permanente exit-survey
+   * Parsear respuesta P3 (matriz de ratings por factor)
    */
-  private static async getOrCreateExitCampaign(accountId: string) {
-    // Buscar campaign existente activa
-    let campaign = await prisma.campaign.findFirst({
-      where: {
-        accountId,
-        campaignType: {
-          slug: 'exit-survey',
-          isPermanent: true
-        },
-        status: 'active'
-      }
-    });
+  private static parseFactorsDetail(
+    choiceResponse: string | null
+  ): Record<string, number> | null {
+    if (!choiceResponse) return null;
     
-    if (campaign) {
-      return campaign;
-    }
-    
-    // Si no existe, intentar crear
-    const campaignType = await prisma.campaignType.findFirst({
-      where: {
-        slug: 'exit-survey',
-        isPermanent: true
-      }
-    });
-    
-    if (!campaignType) {
-      console.error('[ExitRegistration] CampaignType exit-survey not found or not permanent');
-      return null;
-    }
-    
-    // Crear campaign permanente
-    campaign = await prisma.campaign.create({
-      data: {
-        accountId,
-        campaignTypeId: campaignType.id,
-        name: 'Exit Survey - Permanente',
-        description: 'Encuesta de salida para colaboradores que dejan la organización',
-        startDate: new Date(),
-        endDate: new Date('2099-12-31'), // Fecha simbólica
-        status: 'active',
-        sendReminders: true,
-        anonymousResults: true
-      }
-    });
-    
-    console.log('[ExitRegistration] Created permanent campaign:', campaign.id);
-    
-    return campaign;
-  }
-  
-  /**
-   * Buscar correlación con Onboarding por RUT
-   */
-  private static async findOnboardingCorrelation(
-    accountId: string,
-    nationalId: string
-  ): Promise<OnboardingCorrelation> {
-    const journey = await prisma.journeyOrchestration.findFirst({
-      where: {
-        accountId,
-        nationalId
-      },
-      include: {
-        alerts: {
-          select: {
-            id: true,
-            status: true,
-            resolvedAt: true,
-            acknowledgedAt: true
+    try {
+      const parsed = JSON.parse(choiceResponse);
+      
+      // Debe ser un objeto plano {factor: score}
+      if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+        // Validar que los valores son números
+        const result: Record<string, number> = {};
+        for (const [key, value] of Object.entries(parsed)) {
+          if (typeof value === 'number') {
+            result[key] = value;
+          } else if (typeof value === 'string') {
+            const numValue = parseFloat(value);
+            if (!isNaN(numValue)) {
+              result[key] = numValue;
+            }
           }
         }
+        return Object.keys(result).length > 0 ? result : null;
       }
-    });
-    
-    if (!journey) {
-      console.log('[ExitRegistration] No onboarding journey found for:', nationalId);
-      return { found: false };
+      
+      return null;
+    } catch {
+      return null;
     }
-    
-    // Clasificar alertas
-    const ignoredAlerts = journey.alerts.filter(a => 
-      a.status === 'pending' || 
-      (a.status === 'dismissed' && !a.resolvedAt)
-    ).length;
-    
-    const managedAlerts = journey.alerts.filter(a =>
-      a.status === 'resolved' || 
-      (a.status === 'acknowledged' && a.acknowledgedAt)
-    ).length;
-    
-    console.log('[ExitRegistration] Onboarding correlation found:', {
-      journeyId: journey.id,
-      exoScore: journey.exoScore,
-      totalAlerts: journey.alerts.length,
-      ignoredAlerts,
-      managedAlerts
-    });
-    
+  }
+  
+  /**
+   * Crear breakdown vacío para casos de error
+   */
+  private static createEmptyBreakdown(scores: Partial<ExitScores>) {
     return {
-      found: true,
-      journeyId: journey.id,
-      exoScore: journey.exoScore,
-      alertsCount: journey.alerts.length,
-      ignoredAlerts,
-      managedAlerts,
-      hireDate: journey.hireDate
+      satisfaction: { raw: scores.satisfaction ?? null, weighted: 0 },
+      leadership: { raw: scores.leadership ?? null, weighted: 0 },
+      development: { raw: scores.development ?? null, weighted: 0 },
+      safety: { raw: scores.safety ?? null, weighted: 0 },
+      autonomy: { raw: scores.autonomy ?? null, weighted: 0 }
     };
-  }
-  
-  /**
-   * Calcular meses de tenure
-   */
-  private static calculateTenureMonths(hireDate: Date, exitDate: Date): number {
-    const hire = new Date(hireDate);
-    const exit = new Date(exitDate);
-    
-    const months = (exit.getFullYear() - hire.getFullYear()) * 12 
-      + (exit.getMonth() - hire.getMonth());
-    
-    return Math.max(0, months);
-  }
-  
-  /**
-   * Programar email de invitación
-   * 
-   * IMPORTANTE: Usa los campos correctos de EmailAutomation:
-   * - triggerType (NO emailType)
-   * - triggerAt (NO scheduledFor)
-   * - enabled: true (NO status: 'pending')
-   * - templateId
-   */
-  private static async scheduleInvitationEmail(
-    participant: { id: string; email: string | null; name: string | null },
-    data: ExitRegistrationData,
-    campaignId: string
-  ): Promise<void> {
-    if (!participant.email) {
-      console.log('[ExitRegistration] No email provided, skipping invitation');
-      return;
-    }
-    
-    // Programar para 1 día después de la fecha de salida
-    const scheduledDate = new Date(data.exitDate);
-    scheduledDate.setDate(scheduledDate.getDate() + 1);
-    scheduledDate.setHours(9, 0, 0, 0); // 9:00 AM
-    
-    // Verificar que la fecha no sea en el pasado
-    const now = new Date();
-    if (scheduledDate < now) {
-      // Si ya pasó, programar para mañana a las 9 AM
-      scheduledDate.setTime(now.getTime());
-      scheduledDate.setDate(scheduledDate.getDate() + 1);
-      scheduledDate.setHours(9, 0, 0, 0);
-    }
-    
-    // Crear registro en EmailAutomation con campos CORRECTOS
-    await prisma.emailAutomation.create({
-      data: {
-        campaignId,
-        participantId: participant.id,
-        triggerType: 'exit_invitation',  // ← Campo correcto
-        triggerAt: scheduledDate,         // ← Campo correcto
-        enabled: true,                    // ← Campo correcto
-        templateId: 'exit-survey'         // ← Template de email
-      }
-    });
-    
-    console.log('[ExitRegistration] Email scheduled:', {
-      participantId: participant.id,
-      email: participant.email,
-      scheduledFor: scheduledDate.toISOString()
-    });
   }
 }
 
@@ -547,4 +579,4 @@ export class ExitRegistrationService {
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type { ExitRegistrationData, ExitRegistrationResult };
+export { QUESTION_ORDER_MAP, LEY_KARIN_THRESHOLD };

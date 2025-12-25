@@ -1,8 +1,11 @@
 // src/app/api/survey/[token]/submit/route.ts
 // REFACTORIZACIÓN PASO 1: Solo validación y guardado de respuestas
+// + EXIT INTELLIGENCE POST-PROCESO
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { ExitIntelligenceService } from '@/lib/services/ExitIntelligenceService';
+import { calculateNormalizedScore } from '@/lib/utils/responseNormalizer';  // ← CAMBIO 1
 
 interface SurveyResponse {
   questionId: string
@@ -50,9 +53,16 @@ export async function POST(
             campaignType: {
               select: {
                 slug: true,
+                isPermanent: true,
                 questions: {
                   select: {
-                    id: true
+                    id: true,
+                    questionOrder: true,           // ← CAMBIO 2
+                    responseType: true,            // ← CAMBIO 2
+                    minValue: true,                // ← CAMBIO 2
+                    maxValue: true,                // ← CAMBIO 2
+                    choiceOptions: true,           // ← CAMBIO 2
+                    responseValueMapping: true     // ← CAMBIO 2
                   }
                 }
               }
@@ -86,13 +96,20 @@ export async function POST(
 
     // 4. PREPARAR DATA fuera de transacción (optimización crítica)
     const validQuestionIds = new Set(participant.campaign.campaignType.questions.map(q => q.id))
+    
+    // ← CAMBIO 3: Mapa para lookup de metadata de preguntas
+    const questionMap = new Map(
+      participant.campaign.campaignType.questions.map(q => [q.id, q])
+    );
+    
     const responseData: Array<{
-  participantId: string;
-  questionId: string;
-  rating?: number;
-  textResponse?: string;
-  choiceResponse?: string;
-}> = []
+      participantId: string;
+      questionId: string;
+      rating?: number;
+      textResponse?: string;
+      choiceResponse?: string;
+      normalizedScore?: number;  // ← CAMBIO 4
+    }> = []
     
     for (const response of responses) {
       // Validar pregunta existe
@@ -130,6 +147,25 @@ export async function POST(
         data.choiceResponse = JSON.stringify(response.matrixResponses);
         console.log(`🎯 [MATRIX] Q${response.questionId}: ${Object.keys(response.matrixResponses).length} aspects`);
       }
+
+      // ← CAMBIO 5: Calcular normalizedScore para Exit Intelligence
+      const question = questionMap.get(response.questionId);
+      if (question) {
+        const normalizedScore = calculateNormalizedScore(
+          {
+            rating: data.rating,
+            choiceResponse: data.choiceResponse,
+            textResponse: data.textResponse
+          },
+          question
+        );
+        
+        if (normalizedScore !== null) {
+          data.normalizedScore = normalizedScore;
+          console.log(`📈 [NORMALIZED] Q${response.questionId}: ${normalizedScore}`);
+        }
+      }
+      // ← FIN CAMBIO 5
 
       responseData.push(data)
     }
@@ -173,8 +209,44 @@ export async function POST(
     console.log(`   - Responses saved: ${result.responsesCount}`)
     console.log(`   - Processing time: ${processingTime}ms`)
 
-    // 6. ELIMINAR COMPLETAMENTE: processAndStoreResults del flujo síncrono
-    // La lógica de análisis pesado se movió a endpoint separado
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 🆕 POST-PROCESO EXIT INTELLIGENCE
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Detectar si es encuesta de salida y procesar automáticamente:
+    // - Calcular EIS (Exit Intelligence Score)
+    // - Extraer factores P2+P3 (causas raíz)
+    // - Crear alerta Ley Karin si P6 < 2.5
+    // - Actualizar ExitRecord con resultados
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    const exitSurveySlugs = ['retencion-predictiva', 'exit-survey'];
+    const campaignSlug = participant.campaign.campaignType.slug;
+    
+    if (exitSurveySlugs.includes(campaignSlug)) {
+      console.log('[Survey Submit] Exit survey detected, processing intelligence...');
+      
+      try {
+        const exitResult = await ExitIntelligenceService.processCompletedSurvey(participant.id);
+        
+        if (exitResult.success) {
+          console.log('[Survey Submit] Exit intelligence processed successfully:', {
+            exitRecordId: exitResult.exitRecordId,
+            eis: exitResult.eis,
+            classification: exitResult.classification,
+            alertCreated: exitResult.alertCreated
+          });
+        } else {
+          // No fallar el submit si falla el post-proceso
+          // Solo loguear el error para investigación
+          console.warn('[Survey Submit] Exit intelligence processing failed:', exitResult.error);
+        }
+      } catch (exitError) {
+        // No fallar el submit si falla el post-proceso
+        console.error('[Survey Submit] Error processing exit intelligence:', exitError);
+      }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
 
     return NextResponse.json({
       success: true,
@@ -218,7 +290,10 @@ export async function POST(
 // ✅ ELIMINADO: processAndStoreResults síncrono
 // ✅ Performance timing logging
 // ✅ Validación con Set() O(1) vs find() O(n)
+// ✅ EXIT INTELLIGENCE: Post-proceso automático para encuestas de salida
+// ✅ NORMALIZED SCORE: Cálculo para inteligencia de respuestas
 
 // PERFORMANCE ESPERADA PASO 1:
 // ANTES: 7.5s (validaciones + escritura + análisis pesado en transacción)
 // DESPUÉS: <500ms (solo validaciones optimizadas + escritura batch)
+// + ~100-200ms adicionales para Exit Intelligence (si aplica)
