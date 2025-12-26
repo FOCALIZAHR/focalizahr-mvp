@@ -510,6 +510,7 @@ export interface ExitAlertWithRelations {
   description: string;
   status: string;
   slaStatus: string | null;
+  slaHours: number | null;      // ← AGREGAR ESTE CAMPO
   dueDate: Date | null;
   triggerScore: number | null;
   exitCount: number | null;
