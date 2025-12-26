@@ -114,7 +114,7 @@ export default function DashboardNavigation({
       subItems: [
         { id: 'salud', label: 'Salud Departamental', href: '/dashboard/salud-departamental', icon: Activity, comingSoon: true },
         { id: 'onboarding', label: 'Onboarding Intelligence', href: '/dashboard/onboarding/inicio', icon: Rocket }, // ✅ CAMBIO 7: href actualizado
-        { id: 'exit', label: 'Exit Intelligence', href: '/dashboard/exit', icon: DoorOpen, comingSoon: true },
+        { id: 'exit', label: 'Exit Intelligence', href: '/dashboard/exit', icon: DoorOpen },
       ],
     },
     // ✅ CAMBIO 6: NUEVO ITEM "SEGUIMIENTO"
