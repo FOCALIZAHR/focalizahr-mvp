@@ -229,3 +229,95 @@ export async function PATCH(
     );
   }
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// HANDLER GET - OBTENER DETALLE DE ALERTA
+// ═══════════════════════════════════════════════════════════════════════════
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const startTime = Date.now();
+  
+  try {
+    const alertId = params.id;
+    console.log('🔍 [Exit Alert GET] Request iniciada:', alertId);
+    
+    const userContext = extractUserContext(request);
+    
+    if (!userContext.accountId) {
+      return NextResponse.json(
+        { success: false, error: 'No autorizado' },
+        { status: 401 }
+      );
+    }
+    
+    if (!userContext.role || !ALLOWED_ROLES.includes(userContext.role)) {
+      return NextResponse.json(
+        { success: false, error: 'Rol no autorizado para esta acción' },
+        { status: 403 }
+      );
+    }
+    
+    const alert = await prisma.exitAlert.findFirst({
+      where: {
+        id: alertId,
+        accountId: userContext.accountId
+      },
+      include: {
+        department: {
+          select: {
+            id: true,
+            displayName: true,
+            standardCategory: true
+          }
+        },
+        exitRecord: {
+          select: {
+            id: true,
+            nationalId: true,
+            exitDate: true,
+            exitReason: true,
+            eis: true,
+            eisClassification: true
+          }
+        }
+      }
+    });
+    
+    if (!alert) {
+      return NextResponse.json(
+        { success: false, error: 'Alerta no encontrada' },
+        { status: 404 }
+      );
+    }
+    
+    // Validar acceso jerárquico AREA_MANAGER
+    if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
+      const childIds = await getChildDepartmentIds(userContext.departmentId);
+      const accessibleDepartmentIds = [userContext.departmentId, ...childIds];
+      
+      if (!accessibleDepartmentIds.includes(alert.departmentId)) {
+        return NextResponse.json(
+          { success: false, error: 'Acceso denegado: alerta fuera de su ámbito' },
+          { status: 403 }
+        );
+      }
+    }
+    
+    console.log('[Exit Alert GET] ✅ Alerta encontrada:', alertId);
+    
+    return NextResponse.json({
+      success: true,
+      data: alert,
+      responseTime: Date.now() - startTime
+    });
+    
+  } catch (error: any) {
+    console.error('[Exit Alert GET] ❌ Error:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || 'Error interno' },
+      { status: 500 }
+    );
+  }
+}

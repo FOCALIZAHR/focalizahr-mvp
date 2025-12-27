@@ -1,47 +1,36 @@
 // src/components/exit/ExitAlertsGroupedFeed.tsx
 // ============================================================================
-// GROUPED FEED - EXIT INTELLIGENCE ALERTS
+// FEED DE ALERTAS EXIT - AGRUPADO POR TIPO
 // ============================================================================
-// COPIADO DE: src/components/onboarding/AlertsGroupedFeed.tsx
-// ADAPTADO PARA: Exit Intelligence con agrupación por alertType
-// 
-// CAMBIOS VS ONBOARDING:
-// - Agrupa por alertType en vez de gerencia
-// - Orden: ley_karin primero, toxic_exit_detected segundo, resto después
-// - ley_karin usa LeyKarinAlertCard especial
-// - Otras alertas usan card estándar con SeverityBadge + StatusBadge
+// DISEÑO: FocalizaHR Philosophy v2.0
+// - Reutiliza AlertsTabsToggle (Tesla/Apple slider)
+// - Opción C: Solo CRÍTICO destacado (un solo color de acento)
+// - SLA mejorado: "Vencido 3d" en lugar de solo "Vencido"
+// - Ordenamiento comunica urgencia (crítico → alto → medio → bajo)
+// - Sin iconos infantiles, sin arcoíris de colores
+// - Mobile-first, touch targets 44px
 // ============================================================================
 
 'use client';
 
-import { memo, useMemo, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useMemo, useState, useCallback, memo } from 'react';
+import { motion } from 'framer-motion';
 import { 
-  ChevronDown, 
-  ChevronRight,
-  AlertTriangle,
-  Siren,
-  TrendingDown,
-  Users,
-  Target,
-  Link2,
   Clock,
+  CheckCircle2,
+  ArrowRight,
+  AlertTriangle,
+  Scale,
+  TrendingDown,
+  BarChart3,
   Building2,
-  User,
-  Calendar,
-  CheckCircle,
-    Loader2,
-    FileText
+  Link2
 } from 'lucide-react';
-import { ExitAlertWithRelations, ExitAlertType } from '@/types/exit';
-import { SeverityBadge } from '@/components/shared/intelligence/SeverityBadge';
-import { StatusBadge } from '@/components/shared/intelligence/StatusBadge';
-import {
-    calculateSLARemaining,
-    AlertStatus,
-    AlertSeverity
-} from '@/components/shared/intelligence/types';
-import LeyKarinAlertCard from './LeyKarinAlertCard';
+
+// Reutilizamos el TabsToggle de Onboarding (diseño Tesla/Apple)
+import AlertsTabsToggle from '@/components/onboarding/AlertsTabsToggle';
+import FocalizaIntelligenceAlertModal from './FocalizaIntelligenceAlertModal';
+import type { ExitAlertWithRelations } from '@/types/exit';
 
 // ============================================================================
 // INTERFACES
@@ -53,369 +42,110 @@ interface ExitAlertsGroupedFeedProps {
   onTabChange: (tab: 'active' | 'managed' | 'all') => void;
   onAcknowledgeAlert: (id: string, notes?: string) => Promise<void>;
   onResolveAlert: (id: string, notes: string) => Promise<void>;
-  loading?: boolean;
-}
-
-interface AlertGroup {
-  type: ExitAlertType;
-  label: string;
-  icon: React.ElementType;
-  alerts: ExitAlertWithRelations[];
-  color: string;
+  loading: boolean;
 }
 
 // ============================================================================
-// CONSTANTES
+// CONFIGURACIÓN - TIPOS DE ALERTA
 // ============================================================================
 
-// Configuración visual por tipo de alerta
-// IMPORTANTE: Las keys deben coincidir EXACTAMENTE con ExitAlertType de src/types/exit.ts
-const ALERT_TYPE_CONFIG: Record<ExitAlertType, {
+// Iconos por tipo (outline, monocromáticos - sin color)
+const ALERT_TYPE_CONFIG: Record<string, {
+  icon: React.ComponentType<any>;
   label: string;
-  icon: React.ElementType;
-  color: string;
   priority: number;
 }> = {
   ley_karin: {
-    label: 'Ley Karin - Compliance',
-    icon: Siren,
-    color: 'red',
+    icon: Scale,
+    label: 'Ley Karin',
     priority: 1
   },
   toxic_exit_detected: {
-    label: 'Salida Tóxica Detectada',
     icon: TrendingDown,
-    color: 'orange',
+    label: 'Salida Tóxica',
     priority: 2
   },
   nps_critico: {
+    icon: BarChart3,
     label: 'NPS Crítico',
-    icon: Target,
-    color: 'amber',
     priority: 3
   },
   liderazgo_concentracion: {
+    icon: BarChart3,
     label: 'Concentración Liderazgo',
-    icon: Users,
-    color: 'purple',
     priority: 4
   },
   department_exit_pattern: {
-    label: 'Patrón Departamental',
     icon: Building2,
-    color: 'blue',
+    label: 'Patrón Departamental',
     priority: 5
   },
   onboarding_exit_correlation: {
-    label: 'Correlación Onboarding',
     icon: Link2,
-    color: 'cyan',
+    label: 'Correlación Onboarding',
     priority: 6
   }
 };
 
-const TAB_CONFIG = {
-  active: { label: 'Activas', filter: (a: ExitAlertWithRelations) => a.status === 'pending' },
-  managed: { label: 'En Gestión', filter: (a: ExitAlertWithRelations) => a.status === 'acknowledged' },
-  all: { label: 'Todas', filter: () => true }
+const DEFAULT_CONFIG = {
+  icon: AlertTriangle,
+  label: 'Alerta',
+  priority: 99
+};
+
+// Orden de severidad para sorting
+const SEVERITY_ORDER: Record<string, number> = {
+  critical: 1,
+  high: 2,
+  medium: 3,
+  low: 4
 };
 
 // ============================================================================
-// SUBCOMPONENTES
+// HELPERS
 // ============================================================================
 
-// Tabs Toggle
-const AlertsTabsToggle = memo(function AlertsTabsToggle({
-  activeTab,
-  onTabChange,
-  counts
-}: {
-  activeTab: 'active' | 'managed' | 'all';
-  onTabChange: (tab: 'active' | 'managed' | 'all') => void;
-  counts: { active: number; managed: number; all: number };
-}) {
-  return (
-    <div className="flex gap-1 p-1 bg-slate-800/50 rounded-lg border border-slate-700/50">
-      {(Object.keys(TAB_CONFIG) as Array<'active' | 'managed' | 'all'>).map((tab) => (
-        <button
-          key={tab}
-          onClick={() => onTabChange(tab)}
-          className={`
-            flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all
-            ${activeTab === tab 
-              ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
-              : 'text-slate-400 hover:text-slate-300 hover:bg-slate-700/50'
-            }
-          `}
-        >
-          {TAB_CONFIG[tab].label}
-          <span className={`
-            px-1.5 py-0.5 rounded-full text-xs
-            ${activeTab === tab ? 'bg-cyan-500/30' : 'bg-slate-700'}
-          `}>
-            {counts[tab]}
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-});
-
-// Standard Alert Card (para alertas que no son Ley Karin)
-const StandardAlertCard = memo(function StandardAlertCard({
-  alert,
-  onAcknowledge,
-  onResolve
-}: {
-  alert: ExitAlertWithRelations;
-  onAcknowledge: (id: string, notes?: string) => Promise<void>;
-  onResolve: (id: string, notes: string) => Promise<void>;
-}) {
-  const [notes, setNotes] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showActions, setShowActions] = useState(false);
+/**
+ * Calcula estado del SLA con días vencidos
+ * MEJORA: "Vencido 3d" en lugar de solo "Vencido"
+ */
+const getSLAStatus = (alert: ExitAlertWithRelations): { 
+  label: string; 
+  isOverdue: boolean;
+  color: string;
+} => {
+  if (!alert.dueDate) {
+    return { label: 'Sin SLA', isOverdue: false, color: 'text-slate-500' };
+  }
   
-  // Convertir dueDate a string para calculateSLARemaining
-  const slaInfo = useMemo(() => {
-    if (!alert.dueDate) {
-      return { hours: 0, isOverdue: false, label: 'Sin SLA' };
+  const now = new Date();
+  const due = new Date(alert.dueDate);
+  const hoursRemaining = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
+  
+  // VENCIDO - mostrar cuántos días
+  if (hoursRemaining < 0) {
+    const hoursOverdue = Math.abs(hoursRemaining);
+    if (hoursOverdue < 24) {
+      return { label: `Vencido ${Math.ceil(hoursOverdue)}h`, isOverdue: true, color: 'text-red-400' };
     }
-    const dueDateStr = alert.dueDate instanceof Date 
-      ? alert.dueDate.toISOString() 
-      : String(alert.dueDate);
-    return calculateSLARemaining(dueDateStr);
-  }, [alert.dueDate]);
+    const daysOverdue = Math.ceil(hoursOverdue / 24);
+    return { label: `Vencido ${daysOverdue}d`, isOverdue: true, color: 'text-red-400' };
+  }
   
-  // SLA hours: usar del alert o fallback
-  const slaHours = alert.slaHours ?? 48; // Default 48h para alertas no-LeyKarin
+  // Menos de 8 horas - urgente
+  if (hoursRemaining < 8) {
+    return { label: `${Math.ceil(hoursRemaining)}h`, isOverdue: false, color: 'text-amber-400' };
+  }
   
-  // Cast status a AlertStatus
-  const alertStatus = alert.status as AlertStatus;
-  const isResolved = alertStatus === 'resolved';
-  const isAcknowledged = alertStatus === 'acknowledged';
-  const isPending = alertStatus === 'pending';
+  // Menos de 24 horas
+  if (hoursRemaining < 24) {
+    return { label: `${Math.ceil(hoursRemaining)}h`, isOverdue: false, color: 'text-slate-400' };
+  }
   
-  const handleAcknowledge = useCallback(async () => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      await onAcknowledge(alert.id, notes || undefined);
-      setNotes('');
-      setShowActions(false);
-    } catch (error) {
-      console.error('[StandardAlertCard] Error:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [alert.id, notes, onAcknowledge, isSubmitting]);
-  
-  const handleResolve = useCallback(async () => {
-    if (isSubmitting || !notes.trim()) return;
-    setIsSubmitting(true);
-    try {
-      await onResolve(alert.id, notes.trim());
-      setNotes('');
-      setShowActions(false);
-    } catch (error) {
-      console.error('[StandardAlertCard] Error:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [alert.id, notes, onResolve, isSubmitting]);
-  
-  const config = ALERT_TYPE_CONFIG[alert.alertType as ExitAlertType] || ALERT_TYPE_CONFIG.toxic_exit_detected;
-  const Icon = config.icon;
-  
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="p-4 bg-slate-800/30 border border-slate-700/30 rounded-xl hover:border-slate-600/50 transition-colors"
-    >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg bg-${config.color}-500/10`}>
-            <Icon className={`h-4 w-4 text-${config.color}-400`} />
-          </div>
-          <div>
-            <h4 className="text-sm font-medium text-white">{alert.title}</h4>
-            <p className="text-xs text-slate-500">{alert.department?.displayName}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <SeverityBadge severity={alert.severity as AlertSeverity} size="sm" />
-          <StatusBadge status={alertStatus} size="sm" />
-        </div>
-      </div>
-      
-      {/* Descripción */}
-      <p className="text-sm text-slate-400 mb-3">{alert.description}</p>
-      
-      {/* SLA */}
-      <div className={`
-        inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs
-        ${slaInfo.isOverdue 
-          ? 'bg-red-500/10 text-red-400' 
-          : 'bg-slate-700/50 text-slate-400'
-        }
-      `}>
-        <Clock className="h-3 w-3" />
-        {slaInfo.label}
-      </div>
-      
-      {/* Notas de resolución si ya está resuelta */}
-      {isResolved && alert.resolutionNotes && (
-        <div className="mt-3 p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-          <div className="flex items-center gap-1.5 mb-1">
-            <CheckCircle className="h-3 w-3 text-emerald-400" />
-            <span className="text-xs text-emerald-400 font-medium">Resuelta</span>
-          </div>
-          <p className="text-xs text-slate-400">{alert.resolutionNotes}</p>
-        </div>
-      )}
-      
-      {/* Acciones (si no está resuelta) */}
-      {!isResolved && (
-        <div className="mt-3 pt-3 border-t border-slate-700/30">
-          {!showActions && isPending && (
-            <button
-              onClick={() => setShowActions(true)}
-              className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-400 transition-colors"
-            >
-              <FileText className="h-3 w-3" />
-              Gestionar alerta
-            </button>
-          )}
-          
-          {(showActions || isAcknowledged) && (
-            <div className="space-y-2">
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder={isAcknowledged ? "Notas de resolución (obligatorias)..." : "Notas..."}
-                className="w-full h-16 px-2 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded text-xs text-slate-300 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50 resize-none"
-              />
-              <div className="flex gap-2">
-                {isPending && (
-                  <>
-                    <button
-                      onClick={() => setShowActions(false)}
-                      className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-400"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      onClick={handleAcknowledge}
-                      disabled={isSubmitting}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-amber-500/20 border border-amber-500/30 rounded text-xs font-medium text-amber-400 hover:bg-amber-500/30 disabled:opacity-50"
-                    >
-                      {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin" /> : 'En Gestión'}
-                    </button>
-                  </>
-                )}
-                {isAcknowledged && (
-                  <button
-                    onClick={handleResolve}
-                    disabled={isSubmitting || !notes.trim()}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 rounded text-xs font-medium text-emerald-400 hover:bg-emerald-500/30 disabled:opacity-50"
-                  >
-                    {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Resolver'}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </motion.div>
-  );
-});
-
-// Accordion Group
-const AlertGroupAccordion = memo(function AlertGroupAccordion({
-  group,
-  onAcknowledge,
-  onResolve,
-  defaultOpen = false
-}: {
-  group: AlertGroup;
-  onAcknowledge: (id: string, notes?: string) => Promise<void>;
-  onResolve: (id: string, notes: string) => Promise<void>;
-  defaultOpen?: boolean;
-}) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-  const Icon = group.icon;
-  
-  const criticalCount = group.alerts.filter(a => a.severity === 'critical').length;
-  
-  return (
-    <div className="border border-slate-700/30 rounded-xl overflow-hidden">
-      {/* Header clickeable */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-4 bg-slate-800/30 hover:bg-slate-800/50 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg bg-${group.color}-500/10`}>
-            <Icon className={`h-5 w-5 text-${group.color}-400`} />
-          </div>
-          <div className="text-left">
-            <h3 className="text-sm font-medium text-white">{group.label}</h3>
-            <p className="text-xs text-slate-500">
-              {group.alerts.length} alerta{group.alerts.length !== 1 ? 's' : ''}
-              {criticalCount > 0 && (
-                <span className="text-red-400 ml-2">
-                  • {criticalCount} crítica{criticalCount !== 1 ? 's' : ''}
-                </span>
-              )}
-            </p>
-          </div>
-        </div>
-        
-        <motion.div
-          animate={{ rotate: isOpen ? 180 : 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <ChevronDown className="h-5 w-5 text-slate-400" />
-        </motion.div>
-      </button>
-      
-      {/* Contenido expandible */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <div className="p-4 space-y-3 bg-slate-900/50">
-              {group.alerts.map((alert) => (
-                group.type === 'ley_karin' ? (
-                  <LeyKarinAlertCard
-                    key={alert.id}
-                    alert={alert}
-                    onAcknowledge={onAcknowledge}
-                    onResolve={onResolve}
-                  />
-                ) : (
-                  <StandardAlertCard
-                    key={alert.id}
-                    alert={alert}
-                    onAcknowledge={onAcknowledge}
-                    onResolve={onResolve}
-                  />
-                )
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-});
+  // Días restantes
+  const daysRemaining = Math.ceil(hoursRemaining / 24);
+  return { label: `${daysRemaining}d`, isOverdue: false, color: 'text-slate-500' };
+};
 
 // ============================================================================
 // MAIN COMPONENT
@@ -427,131 +157,284 @@ const ExitAlertsGroupedFeed = memo(function ExitAlertsGroupedFeed({
   onTabChange,
   onAcknowledgeAlert,
   onResolveAlert,
-  loading = false
+  loading
 }: ExitAlertsGroupedFeedProps) {
   
+  const [processingAlert, setProcessingAlert] = useState<string | null>(null);
+  const [alertForModal, setAlertForModal] = useState<ExitAlertWithRelations | null>(null);
+  
   // ========================================
-  // FILTRAR Y AGRUPAR
+  // CONTADORES PARA TABS
   // ========================================
   
-  const { filteredAlerts, groups, counts } = useMemo(() => {
-    // Filtrar por tab
-    const filtered = alerts.filter(TAB_CONFIG[activeTab].filter);
+  const counts = useMemo(() => ({
+    active: alerts.filter(a => a.status === 'pending').length,
+    managed: alerts.filter(a => a.status !== 'pending').length,
+    all: alerts.length
+  }), [alerts]);
+  
+  // ========================================
+  // FILTRADO Y AGRUPACIÓN
+  // ========================================
+  
+  const groupedAlerts = useMemo(() => {
+    // 1. Filtrar por tab activo
+    let filtered: ExitAlertWithRelations[];
+    switch(activeTab) {
+      case 'active': 
+        filtered = alerts.filter(a => a.status === 'pending');
+        break;
+      case 'managed': 
+        filtered = alerts.filter(a => a.status !== 'pending');
+        break;
+      default: 
+        filtered = [...alerts];
+    }
     
-    // Agrupar por alertType
-    const groupMap = new Map<ExitAlertType, ExitAlertWithRelations[]>();
+    // 2. Agrupar por tipo de alerta
+    const groups: Record<string, ExitAlertWithRelations[]> = {};
     
-    filtered.forEach((alert) => {
-      const type = alert.alertType as ExitAlertType;
-      if (!groupMap.has(type)) {
-        groupMap.set(type, []);
+    filtered.forEach(alert => {
+      const type = alert.alertType || 'other';
+      if (!groups[type]) {
+        groups[type] = [];
       }
-      groupMap.get(type)!.push(alert);
+      groups[type].push(alert);
     });
     
-    // Convertir a array y ordenar por prioridad
-    const groupsArray: AlertGroup[] = Array.from(groupMap.entries())
-      .map(([type, typeAlerts]) => {
-        const config = ALERT_TYPE_CONFIG[type] || ALERT_TYPE_CONFIG.toxic_exit_detected;
-        return {
-          type,
-          label: config.label,
-          icon: config.icon,
-          color: config.color,
-          alerts: typeAlerts.sort((a, b) => {
-            // Ordenar por severidad dentro del grupo
-            const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
-            return (severityOrder[a.severity] ?? 99) - (severityOrder[b.severity] ?? 99);
-          })
-        };
-      })
-      .sort((a, b) => {
-        // Ordenar grupos por prioridad (ley_karin primero)
-        const configA = ALERT_TYPE_CONFIG[a.type] || { priority: 99 };
-        const configB = ALERT_TYPE_CONFIG[b.type] || { priority: 99 };
-        return configA.priority - configB.priority;
+    // 3. Ordenar alertas dentro de cada grupo por severidad
+    Object.keys(groups).forEach(type => {
+      groups[type].sort((a, b) => {
+        const orderA = SEVERITY_ORDER[a.severity] || 99;
+        const orderB = SEVERITY_ORDER[b.severity] || 99;
+        return orderA - orderB;
       });
+    });
     
-    return {
-      filteredAlerts: filtered,
-      groups: groupsArray,
-      counts: {
-        active: alerts.filter(a => a.status === 'pending').length,
-        managed: alerts.filter(a => a.status === 'acknowledged').length,
-        all: alerts.length
-      }
-    };
+    // 4. Convertir a array y ordenar grupos por prioridad
+    return Object.entries(groups)
+      .map(([type, typeAlerts]) => ({
+        type,
+        config: ALERT_TYPE_CONFIG[type] || DEFAULT_CONFIG,
+        alerts: typeAlerts
+      }))
+      .sort((a, b) => a.config.priority - b.config.priority);
   }, [alerts, activeTab]);
   
   // ========================================
-  // LOADING STATE
+  // HANDLERS
   // ========================================
   
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="h-12 bg-slate-800/50 rounded-lg animate-pulse" />
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="h-24 bg-slate-800/30 rounded-xl animate-pulse" />
-        ))}
-      </div>
-    );
-  }
-  
+  const handleAlertClick = useCallback((alert: ExitAlertWithRelations) => {
+    if (alert.status === 'pending') {
+      setAlertForModal(alert);
+    }
+  }, []);
+
   // ========================================
   // RENDER
   // ========================================
-  
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       
-      {/* Tabs */}
-      <div className="flex items-center justify-between">
-        <AlertsTabsToggle
-          activeTab={activeTab}
-          onTabChange={onTabChange}
-          counts={counts}
-        />
+      {/* ════════════════════════════════════════════════════════════════════
+          HEADER DE SECCIÓN
+          ════════════════════════════════════════════════════════════════════ */}
+      <div className="space-y-1">
+        <h3 className="text-xl md:text-2xl font-light text-white">
+          Alertas{' '}
+          <span className="text-slate-500">Prioritarias</span>
+        </h3>
+        <p className="text-sm text-slate-500">
+          Detección automática · Compliance Ley Karin
+        </p>
       </div>
       
-      {/* Grupos de alertas */}
-      {groups.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <CheckCircle className="h-12 w-12 text-emerald-400/50 mb-4" />
-          <h3 className="text-lg font-medium text-white mb-1">
-            Sin alertas {activeTab === 'active' ? 'activas' : activeTab === 'managed' ? 'en gestión' : ''}
-          </h3>
-          <p className="text-sm text-slate-500">
-            {activeTab === 'active' 
-              ? 'No hay alertas pendientes de atención'
-              : activeTab === 'managed'
-              ? 'No hay alertas en proceso de gestión'
-              : 'No se han generado alertas aún'
-            }
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {groups.map((group, index) => (
-            <AlertGroupAccordion
-              key={group.type}
-              group={group}
-              onAcknowledge={onAcknowledgeAlert}
-              onResolve={onResolveAlert}
-              defaultOpen={index === 0} // Primer grupo abierto por defecto
-            />
-          ))}
+      {/* ════════════════════════════════════════════════════════════════════
+          TABS - Reutilizando AlertsTabsToggle de Onboarding
+          ════════════════════════════════════════════════════════════════════ */}
+      <AlertsTabsToggle 
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        counts={counts}
+        isTransitioning={loading}
+      />
+      
+      {/* ════════════════════════════════════════════════════════════════════
+          LISTA AGRUPADA POR TIPO
+          ════════════════════════════════════════════════════════════════════ */}
+      <div className="space-y-6">
+        
+        {/* Estado vacío */}
+        {groupedAlerts.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="py-16 md:py-20 text-center"
+          >
+            <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="h-7 w-7 md:h-8 md:w-8 text-green-400" strokeWidth={1.5} />
+            </div>
+            <p className="text-base md:text-lg text-slate-300 font-light mb-1">
+              {activeTab === 'active' && 'Sin alertas pendientes'}
+              {activeTab === 'managed' && 'Sin alertas gestionadas'}
+              {activeTab === 'all' && 'No hay alertas en el sistema'}
+            </p>
+            <p className="text-sm text-slate-500">
+              {activeTab === 'active' && 'El ecosistema está funcionando bien'}
+              {activeTab === 'managed' && 'Las alertas gestionadas aparecerán aquí'}
+              {activeTab === 'all' && 'Las alertas se generan automáticamente'}
+            </p>
+          </motion.div>
+        ) : (
+          groupedAlerts.map(({ type, config, alerts: typeAlerts }) => {
+            const Icon = config.icon;
+            
+            return (
+              <motion.div
+                key={type}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden"
+              >
+                {/* ════════════════════════════════════════════════════════
+                    Header del grupo - Minimalista
+                    ════════════════════════════════════════════════════════ */}
+                <div className="px-5 md:px-6 py-4 border-b border-slate-700/30">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Icon className="h-4 w-4 text-slate-400" strokeWidth={1.5} />
+                      <span className="font-medium text-white">
+                        {config.label}
+                      </span>
+                    </div>
+                    <span className="text-sm text-slate-500">
+                      {typeAlerts.length} alerta{typeAlerts.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* ════════════════════════════════════════════════════════
+                    Lista de alertas
+                    ════════════════════════════════════════════════════════ */}
+                <div className="divide-y divide-slate-700/20">
+                  {typeAlerts.map(alert => {
+                    const isProcessing = processingAlert === alert.id;
+                    const slaStatus = getSLAStatus(alert);
+                    const isManaged = alert.status !== 'pending';
+                    const isCritical = alert.severity === 'critical';
+                    
+                    return (
+                      <div 
+                        key={alert.id} 
+                        className={`
+                          group
+                          ${isManaged ? 'opacity-50' : ''}
+                        `}
+                      >
+                        <div 
+                          className={`
+                            px-5 md:px-6 py-4 md:py-5
+                            flex items-center gap-3 md:gap-4 
+                            min-h-[72px]
+                            transition-all duration-200
+                            ${!isManaged && 'cursor-pointer hover:bg-slate-700/20'}
+                            ${isProcessing ? 'pointer-events-none opacity-50' : ''}
+                          `}
+                          onClick={() => !isProcessing && handleAlertClick(alert)}
+                        >
+                          {/* Contenido principal */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm md:text-base font-medium text-white mb-0.5 md:mb-1">
+                              {alert.department?.displayName || 'Sin departamento'}
+                            </p>
+                            <p className="text-xs md:text-sm text-slate-400 truncate">
+                              {alert.title || alert.description}
+                            </p>
+                          </div>
+                          
+                          {/* ══════════════════════════════════════════════
+                              OPCIÓN C: Solo CRÍTICO tiene badge destacado
+                              ══════════════════════════════════════════════ */}
+                          {isCritical && !isManaged && (
+                            <span className="
+                              flex items-center gap-1.5
+                              px-2.5 py-1 
+                              rounded-full 
+                              text-xs font-medium
+                              bg-red-500/10 
+                              text-red-400
+                              border border-red-500/20
+                            ">
+                              <AlertTriangle className="h-3 w-3" strokeWidth={2} />
+                              <span className="hidden sm:inline">Crítico</span>
+                            </span>
+                          )}
+                          
+                          {/* SLA - Mejorado con días vencidos */}
+                          <div className={`
+                            flex items-center gap-1.5 
+                            min-w-[70px] md:min-w-[90px]
+                            text-xs md:text-sm
+                            ${slaStatus.color}
+                          `}>
+                            <Clock className="h-3.5 w-3.5" strokeWidth={1.5} />
+                            <span>{slaStatus.label}</span>
+                          </div>
+                          
+                          {/* Indicador de estado / Acción */}
+                          {isManaged ? (
+                            <div className="w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center bg-green-500/10">
+                              <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 text-green-400" strokeWidth={1.5} />
+                            </div>
+                          ) : (
+                            <div className="
+                              w-9 h-9 md:w-10 md:h-10 
+                              rounded-full 
+                              flex items-center justify-center 
+                              bg-slate-700/50 
+                              border border-slate-600/50
+                              group-hover:bg-cyan-500/20 
+                              group-hover:border-cyan-500/30 
+                              transition-all duration-200
+                            ">
+                              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-cyan-400 transition-colors" strokeWidth={1.5} />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            );
+          })
+        )}
+      </div>
+      
+      {/* ════════════════════════════════════════════════════════════════════
+          FOOTER INFO - Solo si hay alertas
+          ════════════════════════════════════════════════════════════════════ */}
+      {groupedAlerts.length > 0 && (
+        <div className="flex items-center justify-center gap-3 pt-2 text-xs text-slate-600">
+          <span>{counts.active} pendiente{counts.active !== 1 ? 's' : ''}</span>
+          <span>·</span>
+          <span>{groupedAlerts.length} tipo{groupedAlerts.length > 1 ? 's' : ''}</span>
         </div>
       )}
       
-      {/* Resumen */}
-      {groups.length > 0 && (
-        <div className="flex items-center justify-center gap-4 pt-4 border-t border-slate-700/30 text-xs text-slate-600">
-          <span>{filteredAlerts.length} alertas en vista</span>
-          <span>•</span>
-          <span>{groups.length} grupos</span>
-        </div>
-      )}
+      {/* ════════════════════════════════════════════════════════════════════
+          Modal Intermedio - FocalizaHR Intelligence
+          ════════════════════════════════════════════════════════════════════ */}
+      <FocalizaIntelligenceAlertModal
+        isOpen={!!alertForModal}
+        onClose={() => setAlertForModal(null)}
+        alertId={alertForModal?.id || ''}
+        alertType={(alertForModal?.alertType as any) || 'toxic_exit_detected'}
+        departmentName={alertForModal?.department?.displayName || 'Departamento'}
+        severity={(alertForModal?.severity as any) || 'medium'}
+      />
     </div>
   );
 });
