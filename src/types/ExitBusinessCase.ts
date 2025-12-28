@@ -267,8 +267,17 @@ export interface ExitBusinessCase {
   // ═══════════════════════════════════════════════════════════════════════════
   
   detection: {
+    /** Texto de la pregunta que disparó la alerta */
+    questionText?: string;
+    
+    /** ID de la pregunta (ej: "P6", "EIS") */
+    questionId?: string;
+    
     /** Resumen de lo detectado */
     summary: string;
+    
+    /** Interpretación humana del resultado */
+    interpretation?: string;
     
     /** Etiqueta del score (ej: "Seguridad Psicológica") */
     scoreLabel: string;
@@ -391,6 +400,7 @@ export interface DepartmentContext {
   name: string;
   employeeCount: number;
   avgSalary: number;
+  companyName?: string;
 }
 
 /**

@@ -258,7 +258,7 @@ export async function GET(
         { status: 403 }
       );
     }
-    
+
     const alert = await prisma.exitAlert.findFirst({
       where: {
         id: alertId,
@@ -270,6 +270,11 @@ export async function GET(
             id: true,
             displayName: true,
             standardCategory: true
+          }
+        },
+        account: {
+          select: {
+            companyName: true
           }
         },
         exitRecord: {

@@ -436,7 +436,7 @@ export class ExitAlertEngine {
         questionId: EXIT_SURVEY_QUESTIONS.p6_safety.questionId,
         
         // Narrativa específica (NO genérica)
-        summary: `Un colaborador que dejó ${departmentName} respondió a la pregunta sobre ambiente seguro con una calificación de ${securityScore.toFixed(1)}/5.0 — muy por debajo del umbral de alerta (2.5).`,
+        summary: `Un colaborador de ${departmentName}, que dejó ${context?.companyName || 'la empresa'} indicó que NO percibió un ambiente seguro y respetuoso, libre de acoso o discriminación.`,
         
         // Interpretación humana clara
         interpretation: `Esta calificación indica que el colaborador NO percibió un ambiente seguro y respetuoso durante su tiempo en la empresa. Según la Ley 21.643 (Ley Karin), esto constituye un INDICIO —no una denuncia— que debe investigarse preventivamente para proteger a los colaboradores actuales del área.`,
@@ -637,7 +637,7 @@ export class ExitAlertEngine {
         questionId: EXIT_SURVEY_QUESTIONS.eis_composite.questionId,
         
         // Narrativa específica
-        summary: `${employeeName || 'Un colaborador'} que dejó ${departmentName} obtuvo un Exit Intelligence Score de ${eis}/100 — clasificado como TÓXICO (umbral: <25). Esta persona ya se fue, pero los problemas que reportó siguen afectando al equipo.`,
+        summary: `Un colaborador de ${departmentName}, que dejó ${context?.companyName || 'la empresa'} tuvo una experiencia tan negativa (EIS: ${eis}/100 - TÓXICO) que representa riesgo de contagio al equipo actual.`,
         
         // Interpretación humana clara
         interpretation: `Un EIS de ${eis} indica una experiencia laboral extremadamente negativa. Según Gallup 2024, cuando un empleado se va por ambiente tóxico, hay 61% de probabilidad de que otros estén considerando irse también. Los problemas que causaron esta salida probablemente están afectando a más personas.`,
@@ -822,7 +822,7 @@ export class ExitAlertEngine {
         questionText: 'Denuncia formal registrada bajo protocolo Ley 21.643 (Ley Karin).',
         questionId: 'DENUNCIA',
         
-        summary: `Se ha registrado ${complaintCount} denuncia(s) formal(es) en ${departmentName}. Esto activa obligaciones legales con plazos estrictos según la Ley 21.643.`,
+        summary: `Se ha registrado ${complaintCount} denuncia(s) formal(es) en ${departmentName} de ${context?.companyName || 'la empresa'}. Esto activa obligaciones legales con plazos estrictos según la Ley 21.643.`,
         
         interpretation: 'Una vez existe denuncia formal, la empresa tiene obligaciones legales inmediatas: activar protocolo de investigación, implementar medidas de resguardo, y completar la investigación en máximo 30 días. El incumplimiento de plazos agrava las sanciones. La forma en que manejen esta denuncia definirá si el problema se contiene o se convierte en un escándalo mayor.',
         
@@ -987,7 +987,7 @@ export class ExitAlertEngine {
         questionId: EXIT_SURVEY_QUESTIONS.p7_nps.questionId,
         
         // Narrativa específica
-        summary: `El departamento ${departmentName} muestra un eNPS de ${enps}, muy por debajo del umbral saludable (>20). Esto significa que la mayoría de los colaboradores del área NO recomendarían trabajar aquí.`,
+        summary: `Un colaborador de ${departmentName}, que dejó ${context?.companyName || 'la empresa'} NO recomendaría la empresa como lugar de trabajo (eNPS: ${enps}). Esto significa que la mayoría de los colaboradores del área NO recomendarían trabajar aquí.`,
         
         // Interpretación humana clara
         interpretation: `Un eNPS negativo indica más detractores que promotores activos. Estos ${detractorCount} empleados no solo NO refieren talento — están hablando MAL de la empresa en sus círculos, LinkedIn y potencialmente en Glassdoor. El costo de reclutamiento puede aumentar 20-30% cuando la marca empleadora está dañada.`,
@@ -1166,7 +1166,7 @@ export class ExitAlertEngine {
         questionId: isLeadershipFactor ? 'P4' : 'P2/P3',
         
         // Narrativa específica
-        summary: `En los últimos 90 días, ${exitCount} personas de ${departmentName} mencionaron "${factor}" como factor principal de salida, con un score promedio de ${avgScore.toFixed(1)}/5.0. Esto NO es coincidencia — es un PATRÓN CONFIRMADO.`,
+        summary: `${exitCount} colaboradores de ${departmentName}, que dejaron ${context?.companyName || 'la empresa'} mencionaron "${factor}" como factor principal de salida (score promedio: ${avgScore.toFixed(1)}/5.0). Esto NO es coincidencia — es un PATRÓN CONFIRMADO.`,
         
         // Interpretación humana clara
         interpretation: isLeadershipFactor
@@ -1375,7 +1375,7 @@ export class ExitAlertEngine {
         questionText: 'Análisis de correlación entre alertas de Onboarding ignoradas y salidas posteriores.',
         questionId: 'CORRELACIÓN',
         
-        summary: `De las últimas ${exitCount} salidas de ${departmentName}, el ${Math.round(correlationRate * 100)}% tuvieron alertas de onboarding que NO fueron gestionadas. El sistema ADVIRTIÓ que había problemas. Y nadie actuó.`,
+        summary: `De las últimas ${exitCount} salidas de ${departmentName} en ${context?.companyName || 'la empresa'}, el ${Math.round(correlationRate * 100)}% tuvieron alertas de onboarding que NO fueron gestionadas. El sistema ADVIRTIÓ que había problemas. Y nadie actuó.`,
         
         interpretation: `${Math.ceil(exitCount * correlationRate)} personas se fueron después de que FocalizaHR generó alertas tempranas sobre ellas. Según Aberdeen Group, 75% de quienes renuncian en los primeros 18 meses DECIDIERON irse en los primeros 90 días. Las alertas de onboarding son PREDICTORES — si nadie actúa sobre ellas, ¿qué esperábamos?`,
         
@@ -1537,7 +1537,7 @@ export class ExitAlertEngine {
         questionText: 'Alerta generada por el sistema de inteligencia Exit basada en umbrales configurados.',
         questionId: alert.alertType || 'N/A',
         
-        summary: alert.description || `Se detectó una señal de alerta en ${departmentName} que requiere análisis. El sistema identificó un indicador fuera de los parámetros esperados.`,
+        summary: alert.description || `Se detectó una señal de alerta en ${departmentName} de ${context?.companyName || 'la empresa'} que requiere análisis. El sistema identificó un indicador fuera de los parámetros esperados.`,
         
         interpretation: 'Esta alerta fue generada automáticamente. Recomendamos investigar la causa raíz antes de tomar acciones. Un diagnóstico con Pulso Express puede ayudar a entender el estado actual del área.',
         
