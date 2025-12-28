@@ -1,76 +1,340 @@
 // src/components/exit/EISScoreGauge.tsx
-// 🎯 Gauge Exit Intelligence Score - Contexto cuantitativo
+// 🎯 GAUGE ADAPTATIVO - Exit Alert Detail Page
+// Filosofía: "El trigger es protagonista. El número habla por sí solo."
+// v2.1: Usa /src/config/exitAlertConfig.ts centralizado
 
 'use client';
 
 import { memo, useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { BarChart3 } from 'lucide-react';
 
-// Colores por clasificación EIS
-const EIS_COLORS = {
-  toxic: '#EF4444',       // 0-25: Rojo
-  problematic: '#F59E0B', // 26-50: Amber
-  neutral: '#22D3EE',     // 51-70: Cyan
-  healthy: '#10B981'      // 71-100: Verde
-};
+// ═══════════════════════════════════════════════════════════════════════════════
+// IMPORTAR DESDE CONFIG CENTRALIZADA
+// ═══════════════════════════════════════════════════════════════════════════════
+import {
+  getExitAlertConfig,
+  getEISClassification,
+  getNPSClassification,
+  getScale5Classification,
+  GAUGE_DIMENSIONS,
+  GAUGE_TRACK_COLOR,
+  type GaugeConfig,
+  type ClassificationStyle
+} from '@/config/exitAlertConfig';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TIPOS
+// ═══════════════════════════════════════════════════════════════════════════════
 
 interface EISScoreGaugeProps {
-  /** Score EIS 0-100 */
-  score: number;
-  /** Score del trigger (P6, etc.) */
-  triggerScore?: number;
-  /** Máximo del trigger */
+  alertType: string;
+  triggerScore: number;
   triggerMax?: number;
-  /** Label del trigger */
-  triggerLabel?: string;
-  /** Umbral de alerta */
-  threshold?: number;
+  eisScore?: number;
+  eisClassification?: string;
+  daysElapsed?: number;
+  daysTotal?: number;
 }
 
-export default memo(function EISScoreGauge({
-  score,
-  triggerScore,
-  triggerMax = 5,
-  triggerLabel = 'P6 Seguridad',
-  threshold = 2.5
-}: EISScoreGaugeProps) {
-  
-  const [displayValue, setDisplayValue] = useState(0);
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENTE: Gauge Principal
+// ═══════════════════════════════════════════════════════════════════════════════
 
-  // Animación contador
+function GaugeCircle({
+  value,
+  max,
+  scoreType,
+  classification,
+  gaugeConfig
+}: {
+  value: number;
+  max: number;
+  scoreType: string;
+  classification: ClassificationStyle;
+  gaugeConfig: GaugeConfig;
+}) {
+  const [displayValue, setDisplayValue] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+
   useEffect(() => {
-    const duration = 1500;
-    const steps = 60;
-    const increment = score / steps;
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    const duration = 1200;
+    const steps = 40;
+    const increment = value / steps;
     let current = 0;
     
     const timer = setInterval(() => {
       current += increment;
-      if (current >= score) {
-        setDisplayValue(Math.round(score * 10) / 10);
+      if (current >= value) {
+        setDisplayValue(value);
         clearInterval(timer);
       } else {
-        setDisplayValue(Math.round(current * 10) / 10);
+        setDisplayValue(current);
       }
     }, duration / steps);
     
     return () => clearInterval(timer);
-  }, [score]);
+  }, [value]);
 
-  // Clasificación y color
-  const { color, classification } = useMemo(() => {
-    if (score <= 25) return { color: EIS_COLORS.toxic, classification: 'TÓXICO' };
-    if (score <= 50) return { color: EIS_COLORS.problematic, classification: 'PROBLEMÁTICO' };
-    if (score <= 70) return { color: EIS_COLORS.neutral, classification: 'NEUTRAL' };
-    return { color: EIS_COLORS.healthy, classification: 'SALUDABLE' };
-  }, [score]);
+  const getPercent = () => {
+    if (scoreType === 'nps') {
+      return ((value + 100) / 200) * 100;
+    }
+    return (value / max) * 100;
+  };
 
-  // Data para Recharts
+  const percent = Math.max(0, Math.min(100, getPercent()));
+  const dimensions = isMobile ? GAUGE_DIMENSIONS.mobile : GAUGE_DIMENSIONS.desktop;
+
   const gaugeData = [
-    { value: score, color },
-    { value: 100 - score, color: 'rgba(51, 65, 85, 0.3)' }
+    { value: percent, color: classification.color },
+    { value: 100 - percent, color: GAUGE_TRACK_COLOR }
   ];
+
+  const formatDisplayValue = () => {
+    if (scoreType === 'nps') {
+      const v = Math.round(displayValue);
+      return v >= 0 ? `+${v}` : `${v}`;
+    }
+    if (scoreType === 'scale_5') {
+      return displayValue.toFixed(1);
+    }
+    return Math.round(displayValue).toString();
+  };
+
+  const formatMax = () => {
+    if (scoreType === 'nps') return '+100';
+    return max.toString();
+  };
+
+  return (
+    <div className="flex flex-col items-center">
+      <h3 className="text-xs font-medium text-slate-500 uppercase tracking-[0.15em] mb-4">
+        {gaugeConfig.title}
+      </h3>
+
+      <div 
+        className="relative"
+        style={{ 
+          width: dimensions.container, 
+          height: dimensions.container 
+        }}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={gaugeData}
+              cx="50%"
+              cy="50%"
+              startAngle={90}
+              endAngle={-270}
+              innerRadius={dimensions.innerRadius}
+              outerRadius={dimensions.outerRadius}
+              dataKey="value"
+              stroke="none"
+              isAnimationActive={false}
+            >
+              {gaugeData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <motion.span
+            className={`${dimensions.fontSize} font-extralight tabular-nums leading-none`}
+            style={{ color: classification.color }}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            {formatDisplayValue()}
+          </motion.span>
+          
+          <span className="text-sm font-light text-slate-500 mt-1">
+            / {formatMax()}
+          </span>
+          
+          <motion.div
+            className={`
+              mt-3 px-3 py-1 rounded-full
+              ${dimensions.badgeSize} font-medium uppercase tracking-wider
+              ${classification.bgClass} ${classification.textClass} ${classification.borderClass}
+              border
+            `}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.6 }}
+          >
+            {classification.label}
+          </motion.div>
+        </div>
+      </div>
+
+      <p className="text-xs text-slate-600 mt-4">
+        {gaugeConfig.thresholdLabel}: {gaugeConfig.thresholdDirection === 'below' ? '<' : '>'} {gaugeConfig.thresholdValue}
+      </p>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENTE: Countdown para denuncia_formal
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function CountdownDisplay({
+  daysElapsed,
+  daysTotal,
+  gaugeConfig
+}: {
+  daysElapsed: number;
+  daysTotal: number;
+  gaugeConfig: GaugeConfig;
+}) {
+  const daysRemaining = Math.max(0, daysTotal - daysElapsed);
+  const percent = (daysElapsed / daysTotal) * 100;
+  const isOverdue = daysElapsed > daysTotal;
+
+  return (
+    <div className="flex flex-col items-center">
+      <h3 className="text-xs font-medium text-slate-500 uppercase tracking-[0.15em] mb-4">
+        {gaugeConfig.title}
+      </h3>
+
+      <div className={`
+        w-full max-w-[280px] p-6 rounded-xl border
+        ${isOverdue 
+          ? 'bg-red-500/5 border-red-500/20' 
+          : 'bg-slate-800/30 border-slate-700/30'
+        }
+      `}>
+        <div className="text-center mb-4">
+          <span className={`
+            text-5xl font-extralight tabular-nums
+            ${isOverdue ? 'text-red-400' : 'text-slate-200'}
+          `}>
+            {isOverdue ? `+${daysElapsed - daysTotal}` : daysRemaining}
+          </span>
+          <span className="text-lg text-slate-500 ml-2">
+            / {daysTotal} días
+          </span>
+        </div>
+
+        <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden mb-3">
+          <motion.div
+            className={`h-full rounded-full ${isOverdue ? 'bg-red-500' : 'bg-amber-500'}`}
+            initial={{ width: 0 }}
+            animate={{ width: `${Math.min(100, percent)}%` }}
+            transition={{ duration: 1, ease: 'easeOut' }}
+          />
+        </div>
+
+        <p className={`text-xs text-center ${isOverdue ? 'text-red-400' : 'text-slate-500'}`}>
+          {isOverdue 
+            ? 'Plazo legal VENCIDO' 
+            : `${daysRemaining} días restantes para concluir investigación`
+          }
+        </p>
+      </div>
+
+      <p className="text-xs text-amber-400/80 mt-4 text-center max-w-[280px]">
+        ⚠️ Obligación: Concluir investigación en {daysTotal} días según Ley 21.643
+      </p>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENTE: Sección secundaria EIS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function SecondaryEISContext({
+  eisScore,
+  eisClassification
+}: {
+  eisScore: number;
+  eisClassification?: string;
+}) {
+  const classification = getEISClassification(eisScore);
+
+  return (
+    <div className="mt-6 pt-4 border-t border-slate-700/50">
+      <div className="p-4 bg-slate-800/30 rounded-xl">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-slate-700/30 rounded-lg">
+            <BarChart3 className="h-4 w-4 text-slate-400" />
+          </div>
+          <div>
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider">
+              Exit Intelligence Score
+            </p>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <span className={`text-lg font-light ${classification.textClass}`}>
+                {eisScore.toFixed(1)}
+              </span>
+              <span className="text-xs text-slate-500">/ 100</span>
+              <span className={`text-xs ${classification.textClass}`}>
+                • {eisClassification || classification.label}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export default memo(function EISScoreGauge({
+  alertType,
+  triggerScore,
+  triggerMax = 100,
+  eisScore,
+  eisClassification,
+  daysElapsed = 0,
+  daysTotal = 30
+}: EISScoreGaugeProps) {
+  
+  // Obtener config desde fuente centralizada
+  const config = useMemo(() => getExitAlertConfig(alertType), [alertType]);
+  const gaugeConfig = config.gauge;
+
+  const classification = useMemo(() => {
+    switch (gaugeConfig.scoreType) {
+      case 'scale_5':
+        return getScale5Classification(triggerScore, gaugeConfig.thresholdValue);
+      case 'nps':
+        return getNPSClassification(triggerScore);
+      case 'scale_100':
+      default:
+        return getEISClassification(triggerScore);
+    }
+  }, [gaugeConfig.scoreType, gaugeConfig.thresholdValue, triggerScore]);
+
+  const effectiveMax = useMemo(() => {
+    switch (gaugeConfig.scoreType) {
+      case 'scale_5': return 5;
+      case 'nps': return 100;
+      case 'scale_100': return 100;
+      default: return triggerMax;
+    }
+  }, [gaugeConfig.scoreType, triggerMax]);
+
+  if (gaugeConfig.displayMode === 'hidden') {
+    return null;
+  }
 
   return (
     <motion.div
@@ -79,98 +343,40 @@ export default memo(function EISScoreGauge({
       transition={{ duration: 0.5 }}
       className="
         relative overflow-hidden rounded-2xl 
-        border border-white/10 
+        border border-slate-700/50 
         bg-gradient-to-b from-slate-800/40 to-slate-900/40 
-        p-6 md:p-8 backdrop-blur-xl 
-        shadow-[0_0_30px_rgba(34,211,238,0.1)]
+        p-6 md:p-8 backdrop-blur-xl
       "
     >
-      {/* Efecto decorativo */}
       <div 
-        className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-30"
-        style={{ backgroundColor: color }}
+        className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-20"
+        style={{ backgroundColor: classification.color }}
       />
-      
-      <div className="text-center relative z-10">
-        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-[0.2em] mb-4">
-          Exit Intelligence Score
-        </h3>
-        
-        {/* GAUGE PRINCIPAL - 240px */}
-        <div className="relative w-[240px] h-[240px] mx-auto">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={gaugeData}
-                cx="50%"
-                cy="50%"
-                startAngle={-90}
-                endAngle={270}
-                innerRadius="76%"
-                outerRadius="92%"
-                dataKey="value"
-                stroke="none"
-              >
-                {gaugeData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-            </PieChart>
-          </ResponsiveContainer>
 
-          {/* Número central */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <motion.span
-              className="text-5xl font-extralight tabular-nums"
-              style={{ color }}
-              animate={{ scale: [1, 1.02, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              {displayValue}
-            </motion.span>
-            <span className="text-base font-light text-slate-500 mt-1">/100</span>
-            
-            {/* Badge clasificación */}
-            <span 
-              className="text-xs font-semibold uppercase tracking-wider mt-3 px-3 py-1.5 rounded-full"
-              style={{ 
-                color, 
-                backgroundColor: `${color}15`,
-                border: `1px solid ${color}40`
-              }}
-            >
-              {classification}
-            </span>
-          </div>
-        </div>
+      <div className="relative z-10">
+        {gaugeConfig.displayMode === 'countdown' ? (
+          <CountdownDisplay
+            daysElapsed={daysElapsed}
+            daysTotal={daysTotal}
+            gaugeConfig={gaugeConfig}
+          />
+        ) : (
+          <>
+            <GaugeCircle
+              value={triggerScore}
+              max={effectiveMax}
+              scoreType={gaugeConfig.scoreType}
+              classification={classification}
+              gaugeConfig={gaugeConfig}
+            />
 
-        {/* TRIGGER SCORE (P6 Seguridad) */}
-        {triggerScore !== undefined && (
-          <div className="mt-6 pt-6 border-t border-slate-700/30">
-            <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">
-              {triggerLabel}
-            </p>
-            <div className="flex items-center justify-center gap-3">
-              <span className="text-2xl font-light text-red-400">
-                {triggerScore.toFixed(1)}
-              </span>
-              <span className="text-slate-500">/ {triggerMax}</span>
-            </div>
-            
-            {/* Barra trigger */}
-            <div className="w-36 h-2 bg-slate-700/50 rounded-full mx-auto mt-3 overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-red-500 to-orange-500 rounded-full"
-                initial={{ width: 0 }}
-                animate={{ width: `${(triggerScore / triggerMax) * 100}%` }}
-                transition={{ duration: 1, delay: 0.5 }}
+            {gaugeConfig.showSecondaryEIS && eisScore !== undefined && (
+              <SecondaryEISContext
+                eisScore={eisScore}
+                eisClassification={eisClassification}
               />
-            </div>
-            
-            <p className="text-xs text-slate-600 mt-2">
-              Umbral crítico: &lt; {threshold}
-            </p>
-          </div>
+            )}
+          </>
         )}
       </div>
     </motion.div>

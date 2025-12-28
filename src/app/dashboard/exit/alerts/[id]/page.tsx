@@ -207,6 +207,7 @@ export default function ExitAlertDetailPage() {
             ═══════════════════════════════════════════════════════════════════ */}
         <div className="mb-8">
           <RevelationCard
+            alertType={alert.alertType}                              // ← AGREGAR
             summary={businessCase.detection.summary}
             questionText={businessCase.detection.questionText || ''}
             questionId={businessCase.detection.questionId || 'P6'}
@@ -214,6 +215,8 @@ export default function ExitAlertDetailPage() {
             scoreMax={businessCase.detection.scoreMax}
             interpretation={businessCase.detection.interpretation || ''}
             disclaimer={businessCase.detection.disclaimer}
+            departmentName={businessCase.header.departmentName}      // ← AGREGAR
+            companyName={alert.account?.companyName}  
           />
         </div>
 
@@ -223,11 +226,11 @@ export default function ExitAlertDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Gauge */}
           <EISScoreGauge
-            score={eis}
+            alertType={alert.alertType}
             triggerScore={businessCase.detection.scoreValue}
             triggerMax={businessCase.detection.scoreMax}
-            triggerLabel={businessCase.detection.scoreLabel}
-            threshold={businessCase.detection.threshold}
+            eisScore={alert.exitRecord?.eis}
+            eisClassification={alert.exitRecord?.eisClassification}
           />
           
           {/* Métricas: Benchmark + Urgencia */}

@@ -1,49 +1,414 @@
 // src/components/exit/RevelationCard.tsx
-// 🎯 PROTAGONISTA - La pregunta es el corazón emocional de la asesoría
+// 🎯 PROTAGONISTA - ACTO 2: La Revelación
+// Filosofía: "El diamante merece una presentación premium"
+// v3.1: Usa /src/config/exitAlertConfig.ts centralizado
 
 'use client';
 
-import { memo } from 'react';
-import { motion } from 'framer-motion';
-import { Lightbulb, AlertTriangle, Quote } from 'lucide-react';
+import { memo, useMemo, useState, Fragment } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Lightbulb, Scale, ChevronDown, BookOpen, Target } from 'lucide-react';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// IMPORTAR DESDE CONFIG CENTRALIZADA
+// ═══════════════════════════════════════════════════════════════════════════════
+import {
+  getExitAlertConfig,
+  ALERT_COLOR_CLASSES,
+  type ExitAlertTypeConfig,
+  type AlertColor
+} from '@/config/exitAlertConfig';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TIPOS
+// ═══════════════════════════════════════════════════════════════════════════════
 
 interface RevelationCardProps {
-  /** Summary personalizado: "Un colaborador de X, que dejó Y..." */
+  alertType: string;
   summary: string;
-  /** La pregunta exacta del survey */
   questionText: string;
-  /** ID de la pregunta (P6, EIS, etc.) */
   questionId: string;
-  /** Score obtenido */
   scoreValue: number;
-  /** Máximo posible */
   scoreMax: number;
-  /** Interpretación: "Esta calificación indica que..." */
   interpretation: string;
-  /** Disclaimer legal opcional */
   disclaimer?: string;
+  departmentName?: string;
+  companyName?: string;
+  eisFactors?: string[];
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// HELPER: Highlights de texto
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function escapeRegex(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+interface HighlightRule {
+  text: string;
+  className: string;
+}
+
+function highlightText(text: string, rules: HighlightRule[]): JSX.Element {
+  if (!text || rules.length === 0) return <>{text}</>;
+
+  const validRules = rules.filter(r => r.text && r.text.trim().length > 0);
+  if (validRules.length === 0) return <>{text}</>;
+
+  const pattern = validRules.map(r => `(${escapeRegex(r.text)})`).join('|');
+  const regex = new RegExp(pattern, 'gi');
+  const parts = text.split(regex);
+
+  return (
+    <>
+      {parts.map((part, index) => {
+        if (!part) return null;
+        const matchedRule = validRules.find(r => r.text.toLowerCase() === part.toLowerCase());
+        if (matchedRule) {
+          return <span key={index} className={matchedRule.className}>{part}</span>;
+        }
+        return <Fragment key={index}>{part}</Fragment>;
+      })}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENTE: Score Display (Compacto, sin drama)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function ScoreDisplay({ 
+  value, 
+  max, 
+  label,
+  sublabel 
+}: { 
+  value: number; 
+  max: number; 
+  label: string;
+  sublabel: string;
+}) {
+  const percent = (value / max) * 100;
+
+  return (
+    <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-700/30">
+      <p className="text-[10px] text-slate-500 uppercase tracking-[0.15em] font-medium mb-3">
+        {label}
+      </p>
+      
+      <div className="flex items-baseline gap-2 mb-3">
+        <span className="text-3xl font-light tracking-tight text-slate-200">
+          {value.toFixed(1)}
+        </span>
+        <span className="text-slate-500 text-sm">
+          / {max}
+        </span>
+      </div>
+      
+      <div className="h-1.5 bg-slate-700/50 rounded-full overflow-hidden mb-2">
+        <motion.div
+          className="h-full bg-gradient-to-r from-slate-500 to-slate-400 rounded-full"
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.max(0, Math.min(100, percent))}%` }}
+          transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
+        />
+      </div>
+      
+      <p className="text-[9px] text-slate-600">{sublabel}</p>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENTE: Marco Legal (Compacto)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function LegalNote({ 
+  title, 
+  text, 
+  prominent 
+}: { 
+  title: string; 
+  text: string; 
+  prominent: boolean;
+}) {
+  return (
+    <div className={`
+      p-4 rounded-xl border
+      ${prominent 
+        ? 'bg-amber-500/5 border-amber-500/20' 
+        : 'bg-slate-800/30 border-slate-700/30'
+      }
+    `}>
+      <div className="flex items-start gap-3">
+        <div className={`p-1.5 rounded-lg ${prominent ? 'bg-amber-500/10' : 'bg-slate-700/30'}`}>
+          <Scale className={`h-3.5 w-3.5 ${prominent ? 'text-amber-400' : 'text-slate-400'}`} />
+        </div>
+        <div>
+          <p className={`
+            text-[10px] uppercase tracking-wider mb-1.5 font-medium
+            ${prominent ? 'text-amber-400' : 'text-slate-500'}
+          `}>
+            {title}
+          </p>
+          <p className={`
+            text-xs leading-relaxed
+            ${prominent ? 'text-amber-400/80' : 'text-slate-400'}
+          `}>
+            {text}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENTE: Evidencia Metodológica Colapsable
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function EvidenceCollapsible({
+  config,
+  questionText,
+  questionId,
+  eisFactors
+}: {
+  config: ExitAlertTypeConfig;
+  questionText?: string;
+  questionId?: string;
+  eisFactors?: string[];
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const { evidence } = config;
+
+  const renderTriggerContent = () => {
+    switch (evidence.triggerType) {
+      case 'question':
+        return (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Target className="h-4 w-4 text-cyan-400" />
+              <p className="text-xs text-cyan-400 uppercase tracking-wider font-medium">
+                {evidence.triggerLabel}
+              </p>
+            </div>
+            <blockquote className="pl-4 py-3 border-l-2 border-slate-600/50 bg-slate-800/20 rounded-r-lg">
+              <p className="text-sm text-slate-300 italic leading-relaxed">
+                "{questionText}"
+              </p>
+              <cite className="block mt-2 text-[10px] text-slate-500 not-italic">
+                — {questionId}
+              </cite>
+            </blockquote>
+          </div>
+        );
+      
+      case 'factors':
+        return (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Target className="h-4 w-4 text-cyan-400" />
+              <p className="text-xs text-cyan-400 uppercase tracking-wider font-medium">
+                {evidence.triggerLabel}
+              </p>
+            </div>
+            <div className="p-3 bg-slate-800/20 rounded-lg border border-slate-700/30">
+              <p className="text-sm text-slate-300 mb-3">
+                El Exit Intelligence Score integra:
+              </p>
+              <ul className="space-y-1.5">
+                {(eisFactors || [
+                  'Factores críticos de decisión de salida (mayor peso)',
+                  'Calidad de liderazgo percibido',
+                  'Oportunidades de desarrollo profesional',
+                  'Employee Net Promoter Score'
+                ]).map((factor, index) => (
+                  <li key={index} className="flex items-center gap-2 text-xs text-slate-400">
+                    <span className="w-1 h-1 rounded-full bg-slate-500" />
+                    {factor}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-[10px] text-slate-500 italic">
+                Algoritmo propietario FocalizaHR v2.0
+              </p>
+            </div>
+          </div>
+        );
+      
+      case 'pattern':
+        return (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Target className="h-4 w-4 text-purple-400" />
+              <p className="text-xs text-purple-400 uppercase tracking-wider font-medium">
+                {evidence.triggerLabel}
+              </p>
+            </div>
+            <div className="p-3 bg-slate-800/20 rounded-lg border border-slate-700/30">
+              <p className="text-sm text-slate-300">
+                Se detectaron <span className="text-purple-400 font-medium">3 o más salidas</span> con 
+                el mismo factor crítico en los últimos <span className="text-purple-400 font-medium">90 días</span>.
+              </p>
+              <p className="mt-2 text-xs text-slate-400">
+                Esto indica un problema sistémico que requiere intervención estructural.
+              </p>
+            </div>
+          </div>
+        );
+      
+      case 'correlation':
+        return (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Target className="h-4 w-4 text-cyan-400" />
+              <p className="text-xs text-cyan-400 uppercase tracking-wider font-medium">
+                {evidence.triggerLabel}
+              </p>
+            </div>
+            <div className="p-3 bg-slate-800/20 rounded-lg border border-slate-700/30">
+              <p className="text-sm text-slate-300">
+                El sistema detectó que este colaborador tuvo 
+                <span className="text-cyan-400 font-medium"> alertas de onboarding </span>
+                que no fueron gestionadas.
+              </p>
+              <p className="mt-2 text-xs text-slate-400">
+                El sistema ADVIRTIÓ sobre riesgos durante la integración que ahora se confirman en la salida.
+              </p>
+            </div>
+          </div>
+        );
+      
+      case 'protocol':
+        return (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Target className="h-4 w-4 text-red-400" />
+              <p className="text-xs text-red-400 uppercase tracking-wider font-medium">
+                {evidence.triggerLabel}
+              </p>
+            </div>
+            <div className="p-3 bg-red-500/5 rounded-lg border border-red-500/20">
+              <p className="text-sm text-slate-300 mb-2">
+                Se activó el protocolo de investigación según Ley 21.643:
+              </p>
+              <ul className="space-y-1.5">
+                {[
+                  'Plazo máximo de investigación: 30 días',
+                  'Obligación de implementar medidas de resguardo',
+                  'Documentación obligatoria de todas las acciones',
+                  'Comunicación formal a las partes involucradas'
+                ].map((item, index) => (
+                  <li key={index} className="flex items-center gap-2 text-xs text-red-400/80">
+                    <span className="w-1 h-1 rounded-full bg-red-400" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        );
+      
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="mt-6 border-t border-slate-700/30 pt-4">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-3 rounded-lg bg-slate-800/20 hover:bg-slate-800/40 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <BookOpen className="h-4 w-4 text-slate-400" />
+          <span className="text-sm text-slate-300">Evidencia Metodológica</span>
+        </div>
+        <motion.div
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <ChevronDown className="h-4 w-4 text-slate-400" />
+        </motion.div>
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="overflow-hidden"
+          >
+            <div className="pt-4 pb-2 px-1">
+              {renderTriggerContent()}
+              
+              <div className="flex items-center gap-3 my-4">
+                <div className="flex-1 h-px bg-slate-700/50" />
+                <span className="text-[10px] text-slate-600">•</span>
+                <div className="flex-1 h-px bg-slate-700/50" />
+              </div>
+              
+              <div>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-3 font-medium">
+                  📖 Fuentes
+                </p>
+                <ul className="space-y-2">
+                  {evidence.sources.map((source, index) => (
+                    <li key={index} className="flex items-start gap-2 text-xs text-slate-400">
+                      <span className="text-slate-600 mt-0.5">•</span>
+                      <span>{source}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export default memo(function RevelationCard({
+  alertType,
   summary,
   questionText,
   questionId,
   scoreValue,
   scoreMax,
   interpretation,
-  disclaimer
+  disclaimer,
+  departmentName,
+  companyName,
+  eisFactors
 }: RevelationCardProps) {
   
-  const percent = (scoreValue / scoreMax) * 100;
+  // Obtener config desde fuente centralizada
+  const config = useMemo(() => getExitAlertConfig(alertType), [alertType]);
   
-  // Color según score (invertido: bajo = malo en este contexto)
-  const getScoreColor = () => {
-    if (percent <= 40) return { bar: 'from-red-500 to-orange-500', text: 'text-red-400' };
-    if (percent <= 60) return { bar: 'from-amber-500 to-yellow-500', text: 'text-amber-400' };
-    return { bar: 'from-cyan-500 to-emerald-500', text: 'text-cyan-400' };
-  };
+  const highlightRules = useMemo((): HighlightRule[] => {
+    const rules: HighlightRule[] = [];
+    if (departmentName) {
+      rules.push({ text: departmentName, className: 'text-cyan-400 font-medium' });
+    }
+    if (companyName) {
+      rules.push({ text: companyName, className: 'text-cyan-400 font-medium' });
+    }
+    config.revelation.emphasisWords.forEach(word => {
+      rules.push({ text: word, className: 'text-red-400 font-semibold' });
+    });
+    return rules;
+  }, [departmentName, companyName, config.revelation.emphasisWords]);
   
-  const colors = getScoreColor();
+  const HeaderIcon = config.header.icon;
+  const iconColorClasses = ALERT_COLOR_CLASSES[config.header.iconColor];
 
   return (
     <motion.div
@@ -57,84 +422,74 @@ export default memo(function RevelationCard({
         p-6 md:p-8
       "
     >
-      {/* Efecto decorativo superior */}
-      <div className="absolute -top-24 -right-24 w-48 h-48 bg-gradient-to-br from-cyan-500/10 to-purple-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-gradient-to-br from-red-500/5 to-orange-500/5 rounded-full blur-3xl pointer-events-none" />
+      {/* Efectos decorativos */}
+      <div className="absolute -top-32 -right-32 w-64 h-64 bg-cyan-500/5 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-purple-500/5 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="relative z-10">
         
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-gradient-to-br from-cyan-500/20 to-cyan-600/10 rounded-xl">
-            <Lightbulb className="h-5 w-5 text-cyan-400" />
+        {/* HEADER */}
+        <div className="flex items-start gap-4 mb-6">
+          <div className={`p-3 rounded-xl border ${iconColorClasses.bg} ${iconColorClasses.border}`}>
+            <HeaderIcon className={`h-6 w-6 ${iconColorClasses.icon}`} />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-white uppercase tracking-wider">
-              La Pregunta que Activó Esta Alerta
+            <h2 className="text-lg md:text-xl font-semibold text-white uppercase tracking-wide">
+              {config.header.title}
             </h2>
-            <p className="text-xs text-slate-500">{questionId}</p>
+            <p className="text-sm text-purple-400 font-light">
+              {config.header.subtitle}
+            </p>
+            <p className="text-[10px] text-slate-500 mt-1.5 tracking-wider uppercase">
+              {config.header.contextLabel}
+            </p>
           </div>
         </div>
 
         {/* Línea decorativa */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-700 to-transparent" />
+        <div className="flex items-center gap-4 mb-8">
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600 to-transparent" />
+          <div className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600 to-transparent" />
         </div>
 
-        {/* Summary - La historia humana */}
-        <p className="text-slate-300 text-base md:text-lg leading-relaxed mb-6">
-          {summary}
-        </p>
-
-        {/* Blockquote Premium - La pregunta exacta */}
-        <blockquote className="
-          relative pl-5 py-4 mb-6
-          border-l-2 border-cyan-500/60
-          bg-gradient-to-r from-cyan-500/5 via-cyan-500/3 to-transparent
+        {/* SUMMARY - PROTAGONISTA */}
+        <div className="
+          relative pl-5 py-5 mb-6
+          border-l-[3px] border-cyan-500/70
+          bg-gradient-to-r from-cyan-500/8 via-transparent to-transparent
           rounded-r-xl
         ">
-          <Quote className="absolute top-3 left-2 w-3 h-3 text-cyan-500/40" />
-          <p className="text-sm md:text-base text-slate-200 italic leading-relaxed pl-2">
-            "{questionText}"
+          <p className="text-lg md:text-xl text-slate-100 leading-relaxed font-light">
+            {highlightText(summary, highlightRules)}
           </p>
-        </blockquote>
-
-        {/* Score Visual */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6 p-4 bg-slate-800/30 rounded-xl">
-          <div className="flex items-baseline gap-2">
-            <span className="text-xs text-slate-500 uppercase tracking-wider">Calificación:</span>
-            <span className={`text-2xl font-light ${colors.text}`}>
-              {scoreValue.toFixed(1)}
-            </span>
-            <span className="text-slate-500">/ {scoreMax}</span>
-          </div>
-          
-          <div className="flex-1">
-            <div className="h-2.5 bg-slate-700/50 rounded-full overflow-hidden">
-              <motion.div
-                className={`h-full bg-gradient-to-r ${colors.bar} rounded-full`}
-                initial={{ width: 0 }}
-                animate={{ width: `${percent}%` }}
-                transition={{ duration: 1, delay: 0.3, ease: 'easeOut' }}
-              />
-            </div>
-            <div className="flex justify-between mt-1.5">
-              <span className="text-[10px] text-slate-600">0</span>
-              <span className="text-xs text-slate-500">{Math.round(percent)}%</span>
-              <span className="text-[10px] text-slate-600">{scoreMax}</span>
-            </div>
-          </div>
         </div>
 
-        {/* Interpretación */}
-        <div className="p-4 bg-slate-800/40 rounded-xl border border-slate-700/30 mb-4">
+        {/* GRID: MÉTRICA | MARCO LEGAL */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <ScoreDisplay
+            value={scoreValue}
+            max={scoreMax}
+            label={config.revelation.scoreLabel}
+            sublabel={config.revelation.sourceLabel}
+          />
+          
+          <LegalNote
+            title={config.revelation.legalNoteTitle}
+            text={config.revelation.legalNoteText}
+            prominent={config.revelation.showLegalNote}
+          />
+        </div>
+
+        {/* CONCLUSIÓN - FULL WIDTH */}
+        <div className="p-5 bg-slate-800/30 rounded-xl border border-slate-700/20">
           <div className="flex items-start gap-3">
-            <div className="p-1.5 bg-cyan-500/10 rounded-lg mt-0.5">
+            <div className="p-2 bg-cyan-500/10 rounded-lg mt-0.5">
               <Lightbulb className="h-4 w-4 text-cyan-400" />
             </div>
             <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
-                Qué significa
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-medium">
+                Conclusión
               </p>
               <p className="text-sm text-slate-300 leading-relaxed">
                 {interpretation}
@@ -143,15 +498,13 @@ export default memo(function RevelationCard({
           </div>
         </div>
 
-        {/* Disclaimer (si existe) */}
-        {disclaimer && (
-          <div className="flex items-start gap-3 p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl">
-            <AlertTriangle className="h-4 w-4 text-yellow-400 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-yellow-400/80 leading-relaxed">
-              {disclaimer}
-            </p>
-          </div>
-        )}
+        {/* EVIDENCIA METODOLÓGICA - COLAPSABLE */}
+        <EvidenceCollapsible
+          config={config}
+          questionText={questionText}
+          questionId={questionId}
+          eisFactors={eisFactors}
+        />
       </div>
     </motion.div>
   );
