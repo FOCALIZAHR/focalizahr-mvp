@@ -8,7 +8,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Scale, Skull, TrendingDown, AlertTriangle, Lightbulb, BookOpen, Loader2, BrainCircuit } from 'lucide-react';
+import { ArrowLeft, Scale, Skull, TrendingDown, AlertTriangle, Lightbulb, Loader2, BrainCircuit } from 'lucide-react';
 
 // Componentes modulares
 import RevelationCard from '@/components/exit/RevelationCard';
@@ -18,7 +18,7 @@ import UrgencyCard from '@/components/exit/UrgencyCard';
 import DepartmentContextCard from '@/components/exit/DepartmentContextCard';
 import CollapsibleSection from '@/components/exit/CollapsibleSection';
 import OpportunityTimeline from '@/components/exit/OpportunityTimeline';
-import EmblamaticCasesPanel from '@/components/exit/EmblamaticCasesPanel';
+
 import ResolutionPanel from '@/components/exit/ResolutionPanel';
 
 // Engine y tipos
@@ -236,10 +236,12 @@ export default function ExitAlertDetailPage() {
           {/* Métricas: Benchmark + Urgencia */}
           <div className="space-y-4">
             <BenchmarkCard
+              alertType={alert.alertType}
               score={eis}
               departmentCategory={alert.department?.standardCategory}
             />
             <UrgencyCard
+              alertType={alert.alertType}  // ← AGREGAR
               dueDate={alert.dueDate}
               riskFormatted={businessCase.header.riskFormatted}
               severity={businessCase.header.severity}
@@ -267,25 +269,16 @@ export default function ExitAlertDetailPage() {
             defaultOpen
           >
             <OpportunityTimeline
+              companyName={businessCase.header.departmentName || 'Tu Empresa'}
               currentStage={businessCase.goldenOpportunity.diagram.currentStage}
               stages={businessCase.goldenOpportunity.diagram.stages}
               message={businessCase.goldenOpportunity.message}
               callToAction={businessCase.goldenOpportunity.callToAction}
+              autopsiaCase={businessCase.emblamaticCases?.cases?.[0]}
             />
           </CollapsibleSection>
 
-          {/* Casos Emblemáticos */}
-          {businessCase.emblamaticCases?.cases?.length > 0 && (
-            <CollapsibleSection 
-              title="Casos Emblemáticos" 
-              icon={<BookOpen className="w-5 h-5" />}
-            >
-              <EmblamaticCasesPanel
-                cases={businessCase.emblamaticCases.cases}
-                statistic={businessCase.emblamaticCases.statistic}
-              />
-            </CollapsibleSection>
-          )}
+         
         </div>
 
         {/* Resolución */}

@@ -1,7 +1,7 @@
 // src/components/exit/EISScoreGauge.tsx
 // 🎯 GAUGE ADAPTATIVO - Exit Alert Detail Page
-// Filosofía: "El trigger es protagonista. El número habla por sí solo."
-// v2.1: Usa /src/config/exitAlertConfig.ts centralizado
+// Filosofía v3.2: "El número habla. El resto susurra."
+// FIX: Usar eisClassification de BD directamente, solo traducir para display
 
 'use client';
 
@@ -10,19 +10,53 @@ import { motion } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { BarChart3 } from 'lucide-react';
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// IMPORTAR DESDE CONFIG CENTRALIZADA
-// ═══════════════════════════════════════════════════════════════════════════════
 import {
   getExitAlertConfig,
   getEISClassification,
   getNPSClassification,
   getScale5Classification,
-  GAUGE_DIMENSIONS,
-  GAUGE_TRACK_COLOR,
   type GaugeConfig,
   type ClassificationStyle
 } from '@/config/exitAlertConfig';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSTANTES DE DISEÑO v3.2
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const GAUGE_TRACK_COLOR = 'rgba(167, 139, 250, 0.35)';
+
+const GAUGE_DIMENSIONS = {
+  mobile: {
+    container: 160,
+    innerRadius: '68%',
+    outerRadius: '85%',
+    fontSize: 'text-4xl',
+  },
+  desktop: {
+    container: 180,
+    innerRadius: '70%',
+    outerRadius: '87%',
+    fontSize: 'text-5xl',
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TRADUCCIÓN BD → DISPLAY (solo presentación, NO lógica)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const CLASSIFICATION_DISPLAY: Record<string, string> = {
+  'toxic': 'tóxico',
+  'problematic': 'problemático',
+  'neutral': 'neutral',
+  'healthy': 'saludable',
+  'detractor': 'detractor',
+  'passive': 'pasivo',
+  'promoter': 'promotor'
+};
+
+function translateToSpanish(value: string): string {
+  return CLASSIFICATION_DISPLAY[value.toLowerCase()] || value;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -36,6 +70,18 @@ interface EISScoreGaugeProps {
   eisClassification?: string;
   daysElapsed?: number;
   daysTotal?: number;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HELPER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function capitalizeTitle(text: string): string {
+  return text
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -117,16 +163,13 @@ function GaugeCircle({
 
   return (
     <div className="flex flex-col items-center">
-      <h3 className="text-xs font-medium text-slate-500 uppercase tracking-[0.15em] mb-4">
-        {gaugeConfig.title}
+      <h3 className="text-sm font-light text-slate-400 tracking-wide mb-4">
+        {capitalizeTitle(gaugeConfig.title)}
       </h3>
 
       <div 
         className="relative"
-        style={{ 
-          width: dimensions.container, 
-          height: dimensions.container 
-        }}
+        style={{ width: dimensions.container, height: dimensions.container }}
       >
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -160,35 +203,21 @@ function GaugeCircle({
             {formatDisplayValue()}
           </motion.span>
           
-          <span className="text-sm font-light text-slate-500 mt-1">
+          <span className="text-base font-light text-slate-500 mt-1">
             / {formatMax()}
           </span>
-          
-          <motion.div
-            className={`
-              mt-3 px-3 py-1 rounded-full
-              ${dimensions.badgeSize} font-medium uppercase tracking-wider
-              ${classification.bgClass} ${classification.textClass} ${classification.borderClass}
-              border
-            `}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.6 }}
-          >
-            {classification.label}
-          </motion.div>
         </div>
       </div>
 
-      <p className="text-xs text-slate-600 mt-4">
-        {gaugeConfig.thresholdLabel}: {gaugeConfig.thresholdDirection === 'below' ? '<' : '>'} {gaugeConfig.thresholdValue}
+      <p className="text-xs font-light text-slate-600 mt-4">
+        Umbral crítico: {gaugeConfig.thresholdValue}
       </p>
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// COMPONENTE: Countdown para denuncia_formal
+// COMPONENTE: Countdown
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function CountdownDisplay({
@@ -206,55 +235,46 @@ function CountdownDisplay({
 
   return (
     <div className="flex flex-col items-center">
-      <h3 className="text-xs font-medium text-slate-500 uppercase tracking-[0.15em] mb-4">
-        {gaugeConfig.title}
+      <h3 className="text-sm font-light text-slate-400 tracking-wide mb-4">
+        {capitalizeTitle(gaugeConfig.title)}
       </h3>
 
       <div className={`
-        w-full max-w-[280px] p-6 rounded-xl border
-        ${isOverdue 
-          ? 'bg-red-500/5 border-red-500/20' 
-          : 'bg-slate-800/30 border-slate-700/30'
-        }
+        w-full max-w-[260px] p-6 rounded-2xl border
+        ${isOverdue ? 'bg-red-500/5 border-red-500/20' : 'bg-slate-800/20 border-slate-700/30'}
       `}>
         <div className="text-center mb-4">
-          <span className={`
-            text-5xl font-extralight tabular-nums
-            ${isOverdue ? 'text-red-400' : 'text-slate-200'}
-          `}>
+          <span className={`text-5xl font-extralight tabular-nums ${isOverdue ? 'text-red-400' : 'text-slate-200'}`}>
             {isOverdue ? `+${daysElapsed - daysTotal}` : daysRemaining}
           </span>
-          <span className="text-lg text-slate-500 ml-2">
+          <span className="text-base font-light text-slate-500 ml-2">
             / {daysTotal} días
           </span>
         </div>
 
-        <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden mb-3">
+        <div className="h-1.5 bg-slate-700/30 rounded-full overflow-hidden mb-3">
           <motion.div
-            className={`h-full rounded-full ${isOverdue ? 'bg-red-500' : 'bg-amber-500'}`}
+            className={`h-full rounded-full ${isOverdue ? 'bg-red-500/60' : 'bg-amber-500/60'}`}
             initial={{ width: 0 }}
             animate={{ width: `${Math.min(100, percent)}%` }}
             transition={{ duration: 1, ease: 'easeOut' }}
           />
         </div>
 
-        <p className={`text-xs text-center ${isOverdue ? 'text-red-400' : 'text-slate-500'}`}>
-          {isOverdue 
-            ? 'Plazo legal VENCIDO' 
-            : `${daysRemaining} días restantes para concluir investigación`
-          }
+        <p className={`text-xs font-light text-center ${isOverdue ? 'text-red-400/80' : 'text-slate-500'}`}>
+          {isOverdue ? 'Plazo legal vencido' : `${daysRemaining} días restantes`}
         </p>
       </div>
 
-      <p className="text-xs text-amber-400/80 mt-4 text-center max-w-[280px]">
-        ⚠️ Obligación: Concluir investigación en {daysTotal} días según Ley 21.643
+      <p className="text-xs font-light text-slate-600 mt-4 text-center max-w-[260px]">
+        Obligación: Concluir en {daysTotal} días (Ley 21.643)
       </p>
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// COMPONENTE: Sección secundaria EIS
+// COMPONENTE: EIS Secundario
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function SecondaryEISContext({
@@ -264,26 +284,35 @@ function SecondaryEISContext({
   eisScore: number;
   eisClassification?: string;
 }) {
-  const classification = getEISClassification(eisScore);
+  // Estilos visuales (color) desde el score
+  const style = getEISClassification(eisScore);
+  
+  // Label para display: usar BD si existe, si no usar fallback
+  // CRÍTICO: translateToSpanish('toxic') → 'tóxico'
+  const displayLabel = eisClassification 
+    ? translateToSpanish(eisClassification)
+    : translateToSpanish(style.label);
 
   return (
-    <div className="mt-6 pt-4 border-t border-slate-700/50">
-      <div className="p-4 bg-slate-800/30 rounded-xl">
+    <div className="mt-5 pt-4 border-t border-slate-700/30">
+      <div className="p-4 bg-slate-800/20 rounded-xl">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-slate-700/30 rounded-lg">
-            <BarChart3 className="h-4 w-4 text-slate-400" />
+          <div className="p-2 bg-slate-700/20 rounded-lg">
+            <BarChart3 className="h-4 w-4 text-slate-500" />
           </div>
+          
           <div>
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider">
+            <p className="text-[11px] font-light text-slate-500 tracking-wide">
               Exit Intelligence Score
             </p>
+            
             <div className="flex items-baseline gap-2 mt-0.5">
-              <span className={`text-lg font-light ${classification.textClass}`}>
+              <span className={`text-lg font-light ${style.textClass}`}>
                 {eisScore.toFixed(1)}
               </span>
-              <span className="text-xs text-slate-500">/ 100</span>
-              <span className={`text-xs ${classification.textClass}`}>
-                • {eisClassification || classification.label}
+              <span className="text-xs font-light text-slate-500">/ 100</span>
+              <span className={`text-xs font-light ${style.textClass}`}>
+                · {displayLabel}
               </span>
             </div>
           </div>
@@ -307,7 +336,6 @@ export default memo(function EISScoreGauge({
   daysTotal = 30
 }: EISScoreGaugeProps) {
   
-  // Obtener config desde fuente centralizada
   const config = useMemo(() => getExitAlertConfig(alertType), [alertType]);
   const gaugeConfig = config.gauge;
 
@@ -343,13 +371,13 @@ export default memo(function EISScoreGauge({
       transition={{ duration: 0.5 }}
       className="
         relative overflow-hidden rounded-2xl 
-        border border-slate-700/50 
-        bg-gradient-to-b from-slate-800/40 to-slate-900/40 
+        border border-slate-700/40 
+        bg-gradient-to-b from-slate-800/30 to-slate-900/30 
         p-6 md:p-8 backdrop-blur-xl
       "
     >
       <div 
-        className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-20"
+        className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-[0.05]"
         style={{ backgroundColor: classification.color }}
       />
 
@@ -371,8 +399,8 @@ export default memo(function EISScoreGauge({
             />
 
             {gaugeConfig.showSecondaryEIS && eisScore !== undefined && (
-              <SecondaryEISContext
-                eisScore={eisScore}
+              <SecondaryEISContext 
+                eisScore={eisScore} 
                 eisClassification={eisClassification}
               />
             )}

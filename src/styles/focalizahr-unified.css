@@ -1824,3 +1824,52 @@
    no está en decorar más, sino en la experiencia completa cohesiva 
    donde cada elemento tiene un propósito."
    ============================================================================ */
+  /* ============================================================================
+   LÍNEA TESLA (Top Line) - FocalizaHR Design System
+   ============================================================================ */
+.fhr-top-line,
+.fhr-top-line-purple {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.fhr-top-line {
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    var(--fhr-cyan) 30%, 
+    var(--fhr-cyan) 70%, 
+    transparent 100%
+  );
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.5);
+}
+
+.fhr-top-line-purple {
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    var(--fhr-purple) 30%, 
+    var(--fhr-purple) 70%, 
+    transparent 100%
+  );
+  box-shadow: 0 0 8px rgba(167, 139, 250, 0.5);
+}
+
+/* ============================================================================
+   UTILIDADES ICONOS LUCIDE
+   ============================================================================ */
+.fhr-icon-xs { width: 12px; height: 12px; }
+.fhr-icon-sm { width: 16px; height: 16px; }
+.fhr-icon-md { width: 20px; height: 20px; }
+.fhr-icon-lg { width: 24px; height: 24px; }
+.fhr-icon-xl { width: 32px; height: 32px; }
+
+.fhr-icon-primary { color: var(--fhr-cyan); }
+.fhr-icon-secondary { color: var(--fhr-purple); }
+.fhr-icon-success { color: var(--fhr-success); }
+.fhr-icon-warning { color: var(--fhr-warning); }
+.fhr-icon-danger { color: var(--fhr-error); }
+.fhr-icon-muted { color: var(--fhr-text-muted); }

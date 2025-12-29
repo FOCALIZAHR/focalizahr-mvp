@@ -1,7 +1,11 @@
 // src/components/exit/RevelationCard.tsx
 // 🎯 PROTAGONISTA - ACTO 2: La Revelación
 // Filosofía: "El diamante merece una presentación premium"
-// v3.1: Usa /src/config/exitAlertConfig.ts centralizado
+// v3.5: Botón Evidencia con borde cyan sólido + animación suave
+// ⚡ CAMBIOS v3.5:
+//    - Botón con borde cyan sólido (visible pero elegante)
+//    - Animación más suave (0.5s con easing natural)
+//    - 0 cambios en lógica/props/config
 
 'use client';
 
@@ -75,7 +79,7 @@ function highlightText(text: string, rules: HighlightRule[]): JSX.Element {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// COMPONENTE: Score Display (Compacto, sin drama)
+// COMPONENTE: Score Display
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function ScoreDisplay({ 
@@ -92,7 +96,9 @@ function ScoreDisplay({
   const percent = (value / max) * 100;
 
   return (
-    <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-700/30">
+    <div className="relative p-4 rounded-xl bg-slate-800/30 border border-slate-700/30">
+      <div className="fhr-top-line" />
+      
       <p className="text-[10px] text-slate-500 uppercase tracking-[0.15em] font-medium mb-3">
         {label}
       </p>
@@ -121,7 +127,7 @@ function ScoreDisplay({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// COMPONENTE: Marco Legal (Compacto)
+// COMPONENTE: Marco Legal
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function LegalNote({ 
@@ -135,12 +141,14 @@ function LegalNote({
 }) {
   return (
     <div className={`
-      p-4 rounded-xl border
+      relative p-4 rounded-xl border
       ${prominent 
         ? 'bg-amber-500/5 border-amber-500/20' 
         : 'bg-slate-800/30 border-slate-700/30'
       }
     `}>
+      <div className="fhr-top-line-purple" />
+      
       <div className="flex items-start gap-3">
         <div className={`p-1.5 rounded-lg ${prominent ? 'bg-amber-500/10' : 'bg-slate-700/30'}`}>
           <Scale className={`h-3.5 w-3.5 ${prominent ? 'text-amber-400' : 'text-slate-400'}`} />
@@ -166,6 +174,7 @@ function LegalNote({
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPONENTE: Evidencia Metodológica Colapsable
+// ⚡ v3.5: Botón con borde cyan sólido + animación suave
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function EvidenceCollapsible({
@@ -182,6 +191,7 @@ function EvidenceCollapsible({
   const [isOpen, setIsOpen] = useState(false);
   const { evidence } = config;
 
+  // Contenido dinámico según triggerType - NO TOCAR
   const renderTriggerContent = () => {
     switch (evidence.triggerType) {
       case 'question':
@@ -317,29 +327,42 @@ function EvidenceCollapsible({
 
   return (
     <div className="mt-6 border-t border-slate-700/30 pt-4">
+      {/* ⚡ v3.5: Botón con BORDE CYAN SÓLIDO - visible pero elegante */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-3 rounded-lg bg-slate-800/20 hover:bg-slate-800/40 transition-colors"
+        className="
+          w-full flex items-center justify-between 
+          p-4 rounded-xl
+          bg-slate-800/40
+          border border-cyan-500/50
+          hover:bg-slate-800/60 hover:border-cyan-500/70
+          transition-all duration-300
+          group
+        "
       >
         <div className="flex items-center gap-3">
-          <BookOpen className="h-4 w-4 text-slate-400" />
-          <span className="text-sm text-slate-300">Evidencia Metodológica</span>
+          <BookOpen className="h-4 w-4 text-cyan-400" />
+          <span className="text-sm text-white font-medium">Ver Evidencia Metodológica</span>
         </div>
         <motion.div
           animate={{ rotate: isOpen ? 180 : 0 }}
-          transition={{ duration: 0.2 }}
+          transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
         >
-          <ChevronDown className="h-4 w-4 text-slate-400" />
+          <ChevronDown className="h-4 w-4 text-cyan-400 group-hover:text-cyan-300" />
         </motion.div>
       </button>
 
+      {/* Contenido expandible - animación suave */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ 
+              duration: 0.5,  // ⚡ v3.5: Más lento
+              ease: [0.4, 0, 0.2, 1]  // ⚡ v3.5: Easing natural
+            }}
             className="overflow-hidden"
           >
             <div className="pt-4 pb-2 px-1">
@@ -390,7 +413,6 @@ export default memo(function RevelationCard({
   eisFactors
 }: RevelationCardProps) {
   
-  // Obtener config desde fuente centralizada
   const config = useMemo(() => getExitAlertConfig(alertType), [alertType]);
   
   const highlightRules = useMemo((): HighlightRule[] => {
@@ -481,8 +503,9 @@ export default memo(function RevelationCard({
           />
         </div>
 
-        {/* CONCLUSIÓN - FULL WIDTH */}
-        <div className="p-5 bg-slate-800/30 rounded-xl border border-slate-700/20">
+        {/* CONCLUSIÓN */}
+        <div className="relative p-5 bg-slate-800/30 rounded-xl border border-slate-700/20">
+          <div className="fhr-top-line" />
           <div className="flex items-start gap-3">
             <div className="p-2 bg-cyan-500/10 rounded-lg mt-0.5">
               <Lightbulb className="h-4 w-4 text-cyan-400" />
@@ -498,7 +521,7 @@ export default memo(function RevelationCard({
           </div>
         </div>
 
-        {/* EVIDENCIA METODOLÓGICA - COLAPSABLE */}
+        {/* EVIDENCIA METODOLÓGICA */}
         <EvidenceCollapsible
           config={config}
           questionText={questionText}

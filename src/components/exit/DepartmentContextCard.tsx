@@ -1,81 +1,93 @@
 // src/components/exit/DepartmentContextCard.tsx
-// 🎯 Contexto Departamental - Datos históricos que enriquecen la alerta
-// STATUS: MOCK - Requiere implementación de APIs
+// 🎯 Ciclo de Vida del Empleado - Vista rápida departamento vs empresa
+// Filosofía: "Un vistazo para hacerse una idea"
+// Pregunta que responde: "¿Debo preocuparme por este departamento?"
+// STATUS: MOCK - Datos hardcodeados
 
 'use client';
 
-import { memo } from 'react';
-import { 
-  BarChart3, 
-  AlertTriangle, 
-  TrendingUp, 
-  TrendingDown,
-  Users,
-  Skull,
-  History
-} from 'lucide-react';
+import { memo, useMemo } from 'react';
+import { motion } from 'framer-motion';
+import { BrainCircuit } from 'lucide-react';
 
-/**
- * TODO: APIS REQUERIDAS PARA DATOS REALES
- * ═══════════════════════════════════════════════════════════════════════════
- * 
- * 1. GET /api/exit/alerts?departmentId={id}&status=pending
- *    → Obtener alertas previas del departamento
- *    → Campos: count, pendingCount
- * 
- * 2. GET /api/exit/department-insights/{departmentId}
- *    → Obtener DepartmentExitInsight
- *    → Campos: avgEIS, totalExits, toxicExits
- * 
- * 3. GET /api/department-metrics/{departmentId}?period=latest
- *    → Obtener DepartmentMetric más reciente
- *    → Campos: turnoverRate, headcountAvg
- * 
- * 4. GET /api/department-metrics/company-avg?accountId={id}
- *    → Obtener promedio empresa para comparación
- *    → Campos: avgTurnoverRate
- * 
- * 5. Opcional: GET /api/benchmarks?type=eis&category={standardCategory}
- *    → Benchmark EIS del mercado para comparar
- * 
- * ═══════════════════════════════════════════════════════════════════════════
- */
+// ═══════════════════════════════════════════════════════════════════════════════
+// TIPOS (mismas props que versión anterior para compatibilidad)
+// ═══════════════════════════════════════════════════════════════════════════════
 
 interface DepartmentContextCardProps {
   departmentId: string;
   departmentName: string;
-  /** EIS de la alerta actual para comparar */
   currentEIS: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 // MOCK DATA - Reemplazar con datos reales de APIs
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const MOCK_DATA = {
-  alertasPrevias: {
-    total: 3,
-    pendientes: 2,
-    // TODO: Obtener de GET /api/exit/alerts?departmentId={id}
+  ingreso: {
+    value: 72,
+    label: 'EXO',
+    empresa: 78,
   },
-  eisDepartamento: {
-    promedio: 42,
-    totalSalidas: 12,
-    salidasToxicas: 4,
-    // TODO: Obtener de GET /api/exit/department-insights/{departmentId}
-  },
-  rotacion: {
-    departamento: 15,
+  estadia: {
+    value: 15,
+    label: 'Rotación',
     empresa: 8,
-    // TODO: Obtener de GET /api/department-metrics
+    isPercentage: true,
+    invertDelta: true, // Mayor rotación = peor
   },
-  // Insight generado basado en datos
-  patron: {
-    detectado: true,
-    mensaje: 'Este departamento acumula señales de alerta recurrentes.',
-    // TODO: Generar dinámicamente basado en thresholds
+  salida: {
+    value: 42,
+    label: 'EIS',
+    empresa: 58,
   }
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface DeltaInfo {
+  value: number;
+  isPositive: boolean;
+  color: string;
+}
+
+function calculateDelta(
+  value: number, 
+  empresa: number, 
+  invertDelta: boolean = false
+): DeltaInfo {
+  const delta = value - empresa;
+  // Para rotación, mayor = peor, así que invertimos la lógica
+  const isPositive = invertDelta ? delta < 0 : delta > 0;
+  
+  return {
+    value: Math.abs(delta),
+    isPositive,
+    color: isPositive ? 'text-emerald-400' : 'text-amber-400'
+  };
+}
+
+function generateInsight(data: typeof MOCK_DATA): string {
+  const deltas = [
+    calculateDelta(data.ingreso.value, data.ingreso.empresa),
+    calculateDelta(data.estadia.value, data.estadia.empresa, data.estadia.invertDelta),
+    calculateDelta(data.salida.value, data.salida.empresa)
+  ];
+  
+  const bajosCount = deltas.filter(d => !d.isPositive).length;
+  
+  if (bajosCount === 0) return 'Departamento saludable. Esta alerta parece un caso aislado.';
+  if (bajosCount === 1) return 'Mayormente saludable. Foco específico requerido.';
+  if (bajosCount === 2) return 'Bajo en 2/3 etapas. Revisar experiencia durante estadía.';
+  return 'Problema estructural en todo el ciclo.';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export default memo(function DepartmentContextCard({
   departmentId,
@@ -83,123 +95,151 @@ export default memo(function DepartmentContextCard({
   currentEIS
 }: DepartmentContextCardProps) {
   
-  // TODO: Reemplazar con hooks reales
-  // const { data: alerts } = useExitAlerts({ departmentId, status: 'pending' });
-  // const { data: insights } = useDepartmentExitInsights(departmentId);
-  // const { data: metrics } = useDepartmentMetrics(departmentId);
-  
+  // TODO: Usar departmentId y currentEIS para obtener datos reales
+  // Por ahora usamos MOCK_DATA
   const data = MOCK_DATA;
-  const eisDiff = currentEIS - data.eisDepartamento.promedio;
-  const rotacionDiff = data.rotacion.departamento - data.rotacion.empresa;
-  const toxicRate = Math.round((data.eisDepartamento.salidasToxicas / data.eisDepartamento.totalSalidas) * 100);
+  
+  const deltas = useMemo(() => ({
+    ingreso: calculateDelta(data.ingreso.value, data.ingreso.empresa),
+    estadia: calculateDelta(data.estadia.value, data.estadia.empresa, data.estadia.invertDelta),
+    salida: calculateDelta(data.salida.value, data.salida.empresa)
+  }), [data]);
+  
+  const insight = useMemo(() => generateInsight(data), [data]);
 
   return (
-    <div className="fhr-card-static">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+      className="
+        relative overflow-hidden
+        bg-slate-900/40 backdrop-blur-xl
+        border border-slate-700/50 rounded-xl
+        p-6
+      "
+    >
+      {/* Línea Tesla cyan sutil */}
+      <div className="fhr-top-line opacity-40" />
       
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="fhr-icon-box fhr-icon-box-purple">
-          <BarChart3 className="w-4 h-4" />
-        </div>
-        <div>
-          <h3 className="fhr-title-card">Contexto Departamental</h3>
-          <p className="fhr-text-muted text-xs">{departmentName}</p>
-        </div>
+      {/* ═══════════════════════════════════════════════════════════════════
+          HEADER
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div className="flex items-center justify-between mb-6 pt-1">
+        <p className="text-sm font-light text-slate-400">
+          Ciclo de Vida
+        </p>
+        <p className="text-xs font-light text-slate-500">
+          {departmentName}
+        </p>
       </div>
 
-      {/* Divider */}
-      <div className="fhr-divider">
-        <div className="fhr-divider-line"></div>
-        <div className="fhr-divider-dot"></div>
-        <div className="fhr-divider-line"></div>
-      </div>
-
-      {/* Grid de Métricas - Mobile: 2 cols, Desktop: 4 cols */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+      {/* ═══════════════════════════════════════════════════════════════════
+          JOURNEY - 3 Etapas con línea conectora
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div className="relative">
         
-        {/* Métrica 1: Alertas Previas */}
-        <div className="fhr-card-metric">
-          <div className="flex items-center gap-2 mb-2">
-            <History className="w-3.5 h-3.5 fhr-text-accent" />
-            <span className="fhr-text-sm">Alertas</span>
-          </div>
-          <p className="fhr-title-section">{data.alertasPrevias.total}</p>
-          <span className="fhr-badge fhr-badge-warning">
-            {data.alertasPrevias.pendientes} pendientes
-          </span>
-        </div>
-
-        {/* Métrica 2: EIS Promedio Depto */}
-        <div className="fhr-card-metric fhr-card-metric-purple">
-          <div className="flex items-center gap-2 mb-2">
-            <Users className="w-3.5 h-3.5" style={{ color: 'var(--fhr-purple)' }} />
-            <span className="fhr-text-sm">EIS Depto</span>
-          </div>
-          <p className="fhr-title-section">{data.eisDepartamento.promedio}</p>
-          <div className="flex items-center gap-1">
-            {eisDiff < 0 ? (
-              <TrendingDown className="w-3 h-3" style={{ color: 'var(--fhr-error)' }} />
-            ) : (
-              <TrendingUp className="w-3 h-3" style={{ color: 'var(--fhr-success)' }} />
-            )}
-            <span className={`text-xs ${eisDiff < 0 ? 'fhr-text-accent' : 'fhr-text-muted'}`}>
-              Esta: {currentEIS} ({eisDiff > 0 ? '+' : ''}{eisDiff})
-            </span>
-          </div>
-        </div>
-
-        {/* Métrica 3: Rotación vs Empresa */}
-        <div className={`fhr-card-metric ${rotacionDiff > 5 ? 'fhr-card-metric-warning' : 'fhr-card-metric-success'}`}>
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-3.5 h-3.5" style={{ color: rotacionDiff > 5 ? 'var(--fhr-warning)' : 'var(--fhr-success)' }} />
-            <span className="fhr-text-sm">Rotación</span>
-          </div>
-          <p className="fhr-title-section">{data.rotacion.departamento}%</p>
-          <span className={`fhr-badge ${rotacionDiff > 5 ? 'fhr-badge-warning' : 'fhr-badge-success'}`}>
-            {rotacionDiff > 0 ? '+' : ''}{rotacionDiff}% vs empresa
-          </span>
-        </div>
-
-        {/* Métrica 4: Salidas Tóxicas */}
-        <div className="fhr-card-metric fhr-card-metric-error">
-          <div className="flex items-center gap-2 mb-2">
-            <Skull className="w-3.5 h-3.5" style={{ color: 'var(--fhr-error)' }} />
-            <span className="fhr-text-sm">Tóxicas</span>
-          </div>
-          <p className="fhr-title-section">{data.eisDepartamento.salidasToxicas}/{data.eisDepartamento.totalSalidas}</p>
-          <span className="fhr-badge fhr-badge-error">
-            {toxicRate}% del total
-          </span>
-        </div>
-      </div>
-
-      {/* Insight/Patrón Detectado */}
-      {data.patron.detectado && (
-        <div className="mt-4 p-3 rounded-lg" style={{ 
-          background: 'rgba(34, 211, 238, 0.05)',
-          border: '1px solid rgba(34, 211, 238, 0.2)'
-        }}>
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 fhr-text-accent flex-shrink-0 mt-0.5" />
-            <p className="fhr-text text-sm">
-              <span className="fhr-text-accent font-medium">Patrón detectado:</span>{' '}
-              {data.patron.mensaje}
+        {/* Línea conectora horizontal */}
+        <div className="absolute top-8 left-[15%] right-[15%] h-px bg-gradient-to-r from-cyan-500/30 via-slate-600/50 to-purple-500/30" />
+        
+        {/* Grid de 3 etapas */}
+        <div className="grid grid-cols-3 gap-4 relative">
+          
+          {/* INGRESO */}
+          <div className="text-center">
+            <p className="text-[10px] font-light text-slate-500 uppercase tracking-wider mb-3">
+              Ingreso
+            </p>
+            <div className="relative inline-block">
+              <p className="text-3xl font-light text-slate-200">
+                {data.ingreso.value}
+              </p>
+              <p className="text-xs font-light text-slate-500 mt-1">
+                {data.ingreso.label}
+              </p>
+            </div>
+            <p className={`text-sm font-light mt-2 ${deltas.ingreso.color}`}>
+              {deltas.ingreso.isPositive ? '↑' : '↓'}{deltas.ingreso.value}
             </p>
           </div>
+
+          {/* ESTADÍA */}
+          <div className="text-center">
+            <p className="text-[10px] font-light text-slate-500 uppercase tracking-wider mb-3">
+              Estadía
+            </p>
+            <div className="relative inline-block">
+              <p className="text-3xl font-light text-slate-200">
+                {data.estadia.value}
+                <span className="text-lg text-slate-500">%</span>
+              </p>
+              <p className="text-xs font-light text-slate-500 mt-1">
+                {data.estadia.label}
+              </p>
+            </div>
+            <p className={`text-sm font-light mt-2 ${deltas.estadia.color}`}>
+              {deltas.estadia.isPositive ? '↓' : '↑'}{deltas.estadia.value}
+            </p>
+          </div>
+
+          {/* SALIDA */}
+          <div className="text-center">
+            <p className="text-[10px] font-light text-slate-500 uppercase tracking-wider mb-3">
+              Salida
+            </p>
+            <div className="relative inline-block">
+              <p className="text-3xl font-light text-slate-200">
+                {data.salida.value}
+              </p>
+              <p className="text-xs font-light text-slate-500 mt-1">
+                {data.salida.label}
+              </p>
+            </div>
+            <p className={`text-sm font-light mt-2 ${deltas.salida.color}`}>
+              {deltas.salida.isPositive ? '↑' : '↓'}{deltas.salida.value}
+            </p>
+          </div>
+
         </div>
-      )}
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          REFERENCIA EMPRESA (muy sutil)
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div className="mt-4 pt-3 border-t border-slate-700/30">
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <p className="text-xs font-light text-slate-600">
+            emp: {data.ingreso.empresa}
+          </p>
+          <p className="text-xs font-light text-slate-600">
+            emp: {data.estadia.empresa}%
+          </p>
+          <p className="text-xs font-light text-slate-600">
+            emp: {data.salida.empresa}
+          </p>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          INSIGHT (susurra)
+          ═══════════════════════════════════════════════════════════════════ */}
+      <div className="mt-4 pt-3 border-t border-slate-700/30">
+        <div className="flex items-center gap-2">
+          <BrainCircuit className="h-4 w-4 text-cyan-400 flex-shrink-0" />
+          <p className="text-sm font-light text-slate-400">
+            {insight}
+          </p>
+        </div>
+      </div>
 
       {/* TODO Banner - Solo en desarrollo */}
       {process.env.NODE_ENV === 'development' && (
-        <div className="mt-4 p-2 rounded border border-dashed" style={{ 
-          borderColor: 'rgba(167, 139, 250, 0.3)',
-          background: 'rgba(167, 139, 250, 0.05)'
-        }}>
-          <p className="text-xs" style={{ color: 'var(--fhr-purple)' }}>
-            🚧 MOCK: Ver TODOs en código para implementar APIs reales
+        <div className="mt-4 p-2 rounded border border-dashed border-purple-500/30 bg-purple-500/5">
+          <p className="text-[10px] font-light text-purple-400 text-center">
+            🚧 MOCK: Conectar con APIs reales de Onboarding + Exit
           </p>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 });

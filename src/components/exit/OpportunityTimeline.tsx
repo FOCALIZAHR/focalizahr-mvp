@@ -1,104 +1,162 @@
 // src/components/exit/OpportunityTimeline.tsx
-// 🎯 Timeline de Oportunidad - INDICIOS → Denuncia → Tutela → ESCÁNDALO
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🎯 OPPORTUNITY TIMELINE - ORQUESTADOR
+// ═══════════════════════════════════════════════════════════════════════════════
+// 
+// Arquitectura limpia:
+// - OpportunityToggle: Cambia entre modos
+// - OpportunityAlertPanel: Modo "Tu Alerta" (datos del motor)
+// - OpportunityAutopsia: Modo "Autopsia Real" (emblamaticCases.ts)
+//
+// ═══════════════════════════════════════════════════════════════════════════════
 
 'use client';
 
-import { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
+import type { EmblamaticCase } from '@/types/ExitBusinessCase';
+
+// Componentes separados
+import OpportunityToggle, { type OpportunityMode } from './OpportunityToggle';
+import OpportunityAlertPanel from './OpportunityAlertPanel';
+import OpportunityAutopsia from './OpportunityAutopsia';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TIPOS
+// ═══════════════════════════════════════════════════════════════════════════════
 
 interface OpportunityTimelineProps {
-  /** Índice del stage actual (0-based) */
+  companyName: string;
   currentStage: number;
-  /** Array de nombres de stages */
   stages: string[];
-  /** Mensaje principal de oportunidad */
   message: string;
-  /** Call to action */
   callToAction?: string;
+  autopsiaCase?: EmblamaticCase;
+  statistic?: {
+    value: string;
+    description: string;
+    source: string;
+  };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENTE: ESTADÍSTICA
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const Statistic = memo(function Statistic({
+  statistic,
+  mode
+}: {
+  statistic: { value: string; description: string; source: string };
+  mode: OpportunityMode;
+}) {
+  const accentColor = mode === 'alerta' ? '#22D3EE' : '#A78BFA';
+  
+  return (
+    <div className="mt-6 text-center">
+      {/* Divider */}
+      <div 
+        className="h-px w-24 mx-auto mb-4"
+        style={{ 
+          background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)` 
+        }}
+      />
+      
+      {/* Número */}
+      <motion.p 
+        className="text-5xl font-light mb-2"
+        style={{ color: accentColor }}
+        animate={{ scale: [1, 1.02, 1] }}
+        transition={{ duration: 3, repeat: Infinity }}
+      >
+        {statistic.value}
+      </motion.p>
+      
+      {/* Descripción */}
+      <p className="text-sm text-slate-300 mb-1">
+        {statistic.description}
+      </p>
+      
+      {/* Fuente */}
+      <p className="text-xs text-slate-500">
+        — {statistic.source}
+      </p>
+    </div>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export default memo(function OpportunityTimeline({
+  companyName,
   currentStage,
   stages,
   message,
-  callToAction
+  callToAction,
+  autopsiaCase,
+  statistic
 }: OpportunityTimelineProps) {
   
+  const [mode, setMode] = useState<OpportunityMode>('alerta');
+  
+  // Estadística por defecto si no viene del motor
+  const displayStatistic = statistic || {
+    value: '60%',
+    description: 'de empresas en crisis de reputación NUNCA se recuperan',
+    source: 'Deloitte 2023'
+  };
+  
+  // Si no hay caso de autopsia, deshabilitar el toggle
+  const hasAutopsia = !!autopsiaCase?.autopsia;
+  
   return (
-    <div className="space-y-6">
+    <div className="space-y-2">
+      {/* Toggle */}
+      <OpportunityToggle
+        mode={mode}
+        onModeChange={setMode}
+        disabled={!hasAutopsia && mode === 'alerta'}
+      />
       
-      {/* Mensaje principal */}
-      <p className="text-slate-300 text-center leading-relaxed">
-        {message}
-      </p>
-
-      {/* Timeline visual */}
-      <div className="relative">
-        {/* Línea de fondo */}
-        <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-slate-700/50 -translate-y-1/2" />
-        
-        {/* Stages */}
-        <div className="relative flex items-center justify-between gap-2 overflow-x-auto py-4 px-2">
-          {stages.map((stage, index) => {
-            const isCurrent = index === currentStage;
-            const isPast = index < currentStage;
-            const isFuture = index > currentStage;
-            
-            return (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.1 }}
-                className={`
-                  relative flex-shrink-0 px-4 py-2.5 rounded-xl text-xs md:text-sm text-center 
-                  transition-all duration-300 min-w-[90px]
-                  ${isCurrent 
-                    ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50 shadow-[0_0_15px_rgba(34,211,238,0.2)]' 
-                    : isPast
-                      ? 'bg-emerald-500/10 text-emerald-400/70 border border-emerald-500/20'
-                      : 'bg-slate-800/50 text-slate-500 border border-slate-700/30'
-                  }
-                `}
-              >
-                {/* Indicador de posición actual */}
-                {isCurrent && (
-                  <motion.div
-                    className="absolute -top-1 -right-1 w-3 h-3 bg-cyan-500 rounded-full"
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  />
-                )}
-                
-                {/* Icono de peligro para el último stage */}
-                {index === stages.length - 1 && (
-                  <span className="mr-1">⚠️</span>
-                )}
-                
-                {stage}
-              </motion.div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Indicador "Ustedes están AQUÍ" */}
-      <motion.p 
-        className="text-center text-cyan-400 text-sm font-medium"
-        animate={{ opacity: [0.5, 1, 0.5] }}
-        transition={{ duration: 2, repeat: Infinity }}
-      >
-        ↑ Ustedes están AQUÍ
-      </motion.p>
-
-      {/* Call to Action */}
-      {callToAction && (
-        <div className="pt-4 border-t border-slate-700/30">
-          <p className="text-slate-400 text-sm text-center italic">
-            {callToAction}
-          </p>
-        </div>
-      )}
+      {/* Contenido según modo */}
+      <AnimatePresence mode="wait">
+        {mode === 'alerta' ? (
+          <motion.div
+            key="alerta"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.2 }}
+          >
+            <OpportunityAlertPanel
+              currentStage={currentStage}
+              message={message}
+              callToAction={callToAction}
+            />
+          </motion.div>
+        ) : autopsiaCase ? (
+          <motion.div
+            key="autopsia"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+          >
+            <OpportunityAutopsia
+              autopsiaCase={autopsiaCase}
+            />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+      
+      {/* Estadística */}
+      <Statistic 
+        statistic={displayStatistic} 
+        mode={mode} 
+      />
     </div>
   );
 });

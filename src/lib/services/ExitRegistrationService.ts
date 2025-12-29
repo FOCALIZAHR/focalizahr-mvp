@@ -8,7 +8,7 @@
  * 
  * ARQUITECTURA:
  * Análogo a OnboardingEnrollmentService pero SIMPLE:
- * - 1 campaign permanente (exit-survey)
+ * - 1 campaign permanente (retencion-predictiva)
  * - 1 participant por salida
  * - 1 email de invitación
  * 
@@ -47,7 +47,7 @@ export class ExitRegistrationService {
    * Flujo:
    * 1. Validar datos de entrada
    * 2. Verificar que no exista registro pendiente para este RUT
-   * 3. Obtener/crear campaign permanente exit-survey
+   * 3. Obtener/crear campaign permanente retencion-predictiva
    * 4. Buscar correlación con Onboarding (por nationalId)
    * 5. Crear Participant + ExitRecord en transacción
    * 6. Programar email de invitación
@@ -79,12 +79,12 @@ export class ExitRegistrationService {
         };
       }
       
-      // 3. Obtener campaign permanente exit-survey
+      // 3. Obtener campaign permanente retencion-predictiva
       const campaign = await this.getOrCreateExitCampaign(data.accountId);
       if (!campaign) {
         return {
           success: false,
-          error: 'Campaign exit-survey no encontrada. Verifique que el CampaignType existe con isPermanent=true'
+          error: 'Campaign retencion-predictiva no encontrada. Verifique que el CampaignType existe con isPermanent=true'
         };
       }
       
@@ -366,7 +366,7 @@ export class ExitRegistrationService {
   }
   
   /**
-   * Obtener o crear campaign permanente exit-survey
+   * Obtener o crear campaign permanente retencion-predictiva
    */
   private static async getOrCreateExitCampaign(accountId: string) {
     // Buscar campaign existente activa
@@ -374,7 +374,7 @@ export class ExitRegistrationService {
       where: {
         accountId,
         campaignType: {
-          slug: 'exit-survey',
+          slug: 'retencion-predictiva',
           isPermanent: true
         },
         status: 'active'
@@ -388,13 +388,13 @@ export class ExitRegistrationService {
     // Si no existe, intentar crear
     const campaignType = await prisma.campaignType.findFirst({
       where: {
-        slug: 'exit-survey',
+        slug: 'retencion-predictiva',
         isPermanent: true
       }
     });
     
     if (!campaignType) {
-      console.error('[ExitRegistration] CampaignType exit-survey not found or not permanent');
+      console.error('[ExitRegistration] CampaignType retencion-predictiva not found or not permanent');
       return null;
     }
     
@@ -531,7 +531,7 @@ export class ExitRegistrationService {
         triggerType: 'exit_invitation',  // ← Campo correcto
         triggerAt: scheduledDate,         // ← Campo correcto
         enabled: true,                    // ← Campo correcto
-        templateId: 'exit-survey'         // ← Template de email
+        templateId: 'retencion-predictiva'         // ← Template de email
       }
     });
     

@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import { Toaster } from 'sonner';
 import { ToastProvider } from '@/components/ui/toast-system';
 import './globals.css'
+import '@/styles/focalizahr-unified.css'
 
 const inter = Inter({ subsets: ['latin'] })
 

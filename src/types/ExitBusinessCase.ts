@@ -37,6 +37,29 @@ export type ExitAlertType =
  * Caso emblemático para sección de ejemplos
  * Propósito: Mostrar consecuencias reales de ignorar señales
  */
+/**
+ * Timeline de Autopsia Real
+ */
+export interface AutopsiaTimeline {
+  indicios: {
+    periodo: string;
+    descripcion: string;
+    ignorado: string;
+  };
+  denuncia: {
+    fecha: string;
+    trigger: string;
+    titulo?: string;
+  };
+  investigacion: {
+    accion: string;
+    consecuencias: string;
+  };
+  escandalo: {
+    resultado: string;
+    costoFinal: string;
+  };
+}
 export interface EmblamaticCase {
   /** Nombre de la empresa */
   company: string;
@@ -61,6 +84,12 @@ export interface EmblamaticCase {
   
   /** Año del incidente */
   year: number;
+
+  
+  // Campos nuevos para Autopsia Real
+  autopsia?: AutopsiaTimeline;
+  categoria?: 'cultura_toxica' | 'acoso' | 'fraude' | 'reputacion' | 'ley_karin';
+  pais?: 'USA' | 'Chile' | 'Global';
 }
 
 /**
