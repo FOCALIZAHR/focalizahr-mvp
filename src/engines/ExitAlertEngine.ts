@@ -369,54 +369,52 @@ export class ExitAlertEngine {
       // SECCIÓN 6: PLAN DE ACCIÓN
       // ─────────────────────────────────────────────────────────────────────────
       actionPlan: {
-        philosophy: 'No estamos apagando un incendio. Estamos PREVINIENDO uno.',
+        philosophy: 'No estamos juzgando. Estamos verificando para proteger.',
         steps: [
           {
             step: 1,
-            title: 'VALIDAR INDICIOS CON DATA FRESCA',
-            description: 'Antes de actuar, confirmar los indicios con una medición rápida y confidencial al área. Ambiente Sano permite validar o descartar el riesgo detectado.',
-            responsible: 'HRBP',
-            deadline: '48-72 horas',
-            validationMetric: 'Diagnóstico completado con >70% participación del área',
-            suggestedProduct: FOCALIZA_PRODUCTS.ambiente_sano
+            title: 'REVISAR DATOS DEL SISTEMA',
+            description: 'Antes de salir a terreno, revisa en FocalizaHR: ¿Hay otros Exit con P6 bajo en este departamento? ¿El EXO del área está bajo? ¿Hay alertas onboarding sin gestionar?',
+            responsible: 'Tú (Gerente)',
+            deadline: 'Mismo día',
+            validationMetric: 'Tengo claridad si es señal aislada o patrón'
           },
           {
             step: 2,
-            title: 'DIAGNÓSTICO DE CAUSA RAÍZ',
-            description: 'Si Ambiente Sano confirma indicios: Investigación discreta (NO punitiva). Entrevistas 1:1 con personas clave. Identificar SI es liderazgo, carga, o conductas específicas.',
-            responsible: 'HRBP Senior o Consultor Externo',
-            deadline: '1 semana',
-            validationMetric: 'Causa raíz identificada con evidencia'
+            title: 'OBSERVACIÓN DISCRETA',
+            description: 'Si hay más señales, pasa tiempo con el equipo. Observa sin alarmar: ¿Hay tensión? ¿Silencios? ¿Alguien evita a alguien?',
+            responsible: 'Tú (Gerente)',
+            deadline: '1-2 días',
+            validationMetric: 'Observé el ambiente sin generar ruido'
           },
           {
             step: 3,
-            title: 'INTERVENCIÓN SEGÚN DIAGNÓSTICO',
-            description: 'Si es liderazgo → Coaching o cambio. Si es carga → Revisar dotación. Si hay conductas → Activar protocolo Ley Karin formal. Actuar RÁPIDO pero CON EVIDENCIA.',
-            responsible: 'Según causa raíz identificada',
-            deadline: '2-3 semanas',
-            validationMetric: 'Plan de mejora implementado'
+            title: 'CONVERSACIÓN DE CONFIANZA',
+            description: 'Habla informalmente con 1-2 personas de confianza del equipo. Pregunta abierto: "¿Cómo sientes el ambiente últimamente?"',
+            responsible: 'Tú (Gerente)',
+            deadline: '2-3 días',
+            validationMetric: 'Tengo perspectiva adicional del clima',
+            suggestedProduct: FOCALIZA_PRODUCTS.pulso_express
           },
           {
             step: 4,
-            title: 'MONITOREO POST-INTERVENCIÓN',
-            description: 'Pulso Express a 30 días para validar que la intervención funcionó. Si no mejora → Escalar.',
-            responsible: 'RRHH',
-            deadline: '30 días post-intervención',
-            validationMetric: 'Score seguridad >3.5, cero denuncias',
-            suggestedProduct: FOCALIZA_PRODUCTS.pulso_express
+            title: 'ESCALAR SI HAY PATRÓN',
+            description: 'Si confirmas que hay algo, solicita a Gerencia de Personas desplegar Ambiente Sano o ISD Departamental. Si no hay nada más, registra y monitorea.',
+            responsible: 'Gerencia de Personas',
+            deadline: 'Antes del SLA (24h)',
+            validationMetric: 'Decisión tomada: escalar o monitorear',
+            suggestedProduct: FOCALIZA_PRODUCTS.ambiente_sano
           }
         ],
         escalationCriteria: [
           'Ambiente Sano confirma scores críticos (<2.0 en seguridad)',
           'Surge denuncia formal durante la investigación',
-          'Rotación del área aumenta >20% en el período',
           'Nuevas salidas mencionan mismos factores'
         ],
         successMetrics: [
           `Score seguridad psicológica sube de ${securityScore.toFixed(1)} a >3.5`,
           'Cero denuncias formales en 6 meses',
-          'Rotación del área controlada (<15%)',
-          'Y lo más importante: CERO ESCÁNDALOS'
+          'Rotación del área controlada (<15%)'
         ]
       },
       
@@ -436,18 +434,16 @@ export class ExitAlertEngine {
       // ─────────────────────────────────────────────────────────────────────────
       resolutionOptions: {
         quickPicks: [
-          'Decidí junto a RRHH aplicar Ambiente Sano al área para validar indicios',
-          'Inicié protocolo de diagnóstico confidencial con HRBP',
-          'Realicé entrevistas 1:1 discretas para entender situación',
-          'Convoqué reunión HR + Legal (sin alertar al área)',
-          'Identifiqué conductas específicas y responsables',
-          'Escalé a Gerencia General por gravedad del caso',
-          'Activé protocolo formal Ley Karin (hay denuncia)'
+          'Revisé datos en FocalizaHR → No hay más señales, registro y monitoreo',
+          'Revisé datos → SÍ hay patrón, observé el ambiente en terreno',
+          'Tuve conversaciones informales para validar el clima',
+          'Solicité a Personas desplegar Ambiente Sano al área',
+          'Solicité ISD Departamental para diagnóstico profundo'
         ],
         customPrompt: 'O describe la acción específica que tomaste:',
         minCharacters: 10,
         successMessage: '✅ Acción registrada. El sistema medirá automáticamente la efectividad en 60 días mediante seguimiento de indicadores del área.',
-        followUpDays: 60
+        followUpDays: 10
       }
     };
   }
@@ -563,49 +559,47 @@ export class ExitAlertEngine {
         steps: [
           {
             step: 1,
-            title: 'MEDIR ESTADO ACTUAL DEL EQUIPO',
-            description: 'Antes de asumir, medir. Pulso Express anónimo al equipo restante: ¿Cuántos sienten lo mismo que quien se fue?',
-            responsible: 'HRBP',
-            deadline: '1 semana',
-            validationMetric: 'Pulso completado con >70% participación',
-            suggestedProduct: FOCALIZA_PRODUCTS.pulso_express
+            title: 'ANALIZAR LOS FACTORES',
+            description: 'Revisa en FocalizaHR qué factores mencionaron (Liderazgo, Desarrollo, Compensación, etc.). ¿Hay un factor repetido?',
+            responsible: 'Tú (Gerente)',
+            deadline: '1-2 días',
+            validationMetric: 'Identifico qué factores son recurrentes'
           },
           {
             step: 2,
-            title: 'STAY INTERVIEWS FOCALIZADAS',
-            description: 'Si Pulso confirma riesgo: Identificar top performers del área. Conversación directa: "¿Qué necesitas para quedarte?" No esperar a que renuncien.',
-            responsible: 'Líder directo + HRBP',
-            deadline: '2 semanas',
-            validationMetric: 'Entrevistas completadas + compromisos documentados'
+            title: 'CHEQUEAR AL EQUIPO ACTUAL',
+            description: 'Conversa con 2-3 personas clave del equipo. No menciones los exits, pregunta: "¿Cómo están? ¿Qué les preocupa?"',
+            responsible: 'Tú (Gerente)',
+            deadline: '3-5 días',
+            validationMetric: 'Tengo pulso informal del equipo actual',
+            suggestedProduct: FOCALIZA_PRODUCTS.pulso_express
           },
           {
             step: 3,
-            title: 'ABORDAR CAUSA RAÍZ',
-            description: 'Basado en encuesta de salida + Pulso: ¿Es el líder? ¿Es la carga? ¿Es desarrollo? Actuar según diagnóstico, NO suposiciones.',
-            responsible: 'Según causa identificada',
-            deadline: '30-60 días',
-            validationMetric: 'Causa raíz intervenida + mejora medible'
+            title: 'PROTEGER TALENTO CLAVE',
+            description: 'Identifica a tus top performers. Asegúrate de que estén bien. Una salida tóxica puede contagiar a los buenos.',
+            responsible: 'Tú (Gerente)',
+            deadline: '1 semana',
+            validationMetric: 'Talento clave está contenido'
           },
           {
             step: 4,
-            title: 'VALIDAR MEJORA',
-            description: 'Pulso de seguimiento a 60 días. ¿Mejoró el clima? ¿Los indicadores subieron?',
-            responsible: 'RRHH',
-            deadline: '60 días post-intervención',
-            validationMetric: 'Score clima >3.5, rotación controlada',
+            title: 'SOLICITAR DIAGNÓSTICO SI HAY DUDA',
+            description: 'Si el equipo muestra señales de desgaste, solicita a Personas un Pulso Express para tener mapa claro.',
+            responsible: 'Gerencia de Personas',
+            deadline: 'Antes del SLA (48h)',
+            validationMetric: 'Diagnóstico solicitado o situación estable',
             suggestedProduct: FOCALIZA_PRODUCTS.pulso_express
           }
         ],
         escalationCriteria: [
           'Más de 1 renuncia adicional en 30 días',
-          'Aparecen reviews negativos públicos',
-          'Top performers piden referencias',
-          'Engagement del área cae >15 puntos'
+          'Aparecen reviews negativos públicos (Glassdoor/LinkedIn)',
+          'Top performers piden referencias'
         ],
         successMetrics: [
           'Cero salidas adicionales en 90 días',
           'Engagement del área mejora >10 puntos',
-          'Rating Glassdoor se mantiene o mejora',
           'Top performers comprometidos y retenidos'
         ]
       },
@@ -621,17 +615,16 @@ export class ExitAlertEngine {
       
       resolutionOptions: {
         quickPicks: [
-          'Decidí junto a RRHH aplicar Pulso Express al equipo',
-          'Realicé stay interviews con top performers del área',
-          'Identifiqué y abordé causa raíz con el líder directo',
-          'Implementé plan de retención para empleados en riesgo',
-          'Inicié assessment de liderazgo del área',
-          'Monitoreo activo de reviews en Glassdoor/LinkedIn'
+          'Analicé factores de salida → No hay patrón, solo casos aislados',
+          'Analicé factores → Hay patrón en [factor específico]',
+          'Conversé con el equipo y están bien → Monitoreo',
+          'Conversé con el equipo y hay desgaste → Solicité Pulso Express',
+          'Blindé a talento clave con conversaciones individuales'
         ],
         customPrompt: 'O describe la acción específica que tomaste:',
         minCharacters: 10,
         successMessage: '✅ Acción registrada. Monitorearemos rotación y engagement del área en los próximos 90 días.',
-        followUpDays: 90
+        followUpDays: 14
       }
     };
   }
@@ -903,43 +896,49 @@ export class ExitAlertEngine {
       },
       
       actionPlan: {
-        philosophy: 'Convertir detractores en promotores es más barato que reemplazarlos.',
+        philosophy: 'Convertir detractores en pasivos es más barato que reemplazarlos.',
         steps: [
           {
             step: 1,
-            title: 'FOCUS GROUP URGENTE',
-            description: 'Convocar a 5-8 personas del área (mix de perfiles). Pregunta directa: "¿Qué necesita cambiar para que recomienden trabajar aquí?"',
-            responsible: 'HRBP + Facilitador externo',
-            deadline: '1 semana',
-            validationMetric: 'Top 3 causas de insatisfacción identificadas'
+            title: 'ENTENDER LA BRECHA',
+            description: 'Revisa en FocalizaHR qué dijeron. ¿La decepción es por sueldo? ¿Por promesas incumplidas? ¿Por el jefe?',
+            responsible: 'Tú (Gerente)',
+            deadline: '1-2 días',
+            validationMetric: 'Identifico la causa raíz de la decepción'
           },
           {
             step: 2,
-            title: 'PLAN DE ACCIÓN VISIBLE',
-            description: 'Basado en feedback, implementar 2-3 cambios concretos Y comunicarlos al equipo. La gente necesita ver que escucharon.',
-            responsible: 'Gerente de Área + RRHH',
-            deadline: '2 semanas',
-            validationMetric: 'Acciones implementadas + comunicadas'
+            title: 'VALIDAR CON EQUIPO ACTUAL',
+            description: 'Pregunta a tu equipo actual: "¿Lo que les prometimos cuando entraron se cumplió?". Busca la misma brecha.',
+            responsible: 'Tú (Gerente)',
+            deadline: '1 semana',
+            validationMetric: 'Sé si la brecha también afecta a los actuales'
           },
           {
             step: 3,
-            title: 'MEDICIÓN DE IMPACTO',
-            description: 'Pulso Express a 60 días. ¿Mejoró el clima? ¿Los detractores están menos vocales?',
-            responsible: 'RRHH',
-            deadline: '60 días',
-            validationMetric: 'eNPS sube >10 puntos',
+            title: 'SINCERAR O CORREGIR',
+            description: 'Si hay brecha real: corrige lo que puedas (carga, expectativas, desarrollo). Si es percepción: trabaja comunicación.',
+            responsible: 'Tú (Gerente) + RRHH si aplica',
+            deadline: '2 semanas',
+            validationMetric: 'Acción correctiva definida',
             suggestedProduct: FOCALIZA_PRODUCTS.pulso_express
+          },
+          {
+            step: 4,
+            title: 'FEEDBACK A ATRACCIÓN',
+            description: 'Si el problema viene desde la selección, habla con Personas: "Estamos sobrevendiendo el cargo".',
+            responsible: 'Gerencia de Personas',
+            deadline: 'Antes del SLA (48h)',
+            validationMetric: 'Personas tiene el feedback para ajustar'
           }
         ],
         escalationCriteria: [
           'NPS no mejora después de acciones',
           'Aparecen reviews negativos públicos',
-          'Rotación del área supera 20%',
-          'Top performers piden referencias'
+          'Rotación del área supera 20%'
         ],
         successMetrics: [
           `eNPS sube de ${enps} a >0 en 90 días`,
-          'Al menos 3 detractores se convierten en pasivos/promotores',
           'Cero reviews negativos nuevos',
           'Rotación controlada (<15%)'
         ]
@@ -956,17 +955,16 @@ export class ExitAlertEngine {
       
       resolutionOptions: {
         quickPicks: [
-          'Decidí junto a RRHH aplicar Pulso Express al área',
-          'Convoqué focus group para entender causas del NPS',
-          'Implementé plan de mejora basado en feedback',
-          'Comuniqué acciones concretas al equipo',
-          'Establecí check-ins mensuales con el área',
-          'Revisé y ajusté políticas del departamento'
+          'Identifiqué la brecha → Es tema de compensación, escalé a Personas',
+          'Identifiqué la brecha → Es tema de expectativas, las sinceré con el equipo',
+          'Validé con equipo actual → No hay brecha, son casos aislados',
+          'Di feedback a Personas sobre el perfil de búsqueda',
+          'Realicé actividad de reconocimiento para reforzar pertenencia'
         ],
         customPrompt: 'O describe la acción específica que tomaste:',
         minCharacters: 10,
         successMessage: '✅ Acción registrada. Mediremos evolución del NPS en 90 días.',
-        followUpDays: 90
+        followUpDays: 30
       }
     };
   }
@@ -1098,67 +1096,81 @@ export class ExitAlertEngine {
         steps: isLeadershipFactor ? [
           {
             step: 1,
-            title: 'ASSESSMENT 360° DEL LÍDER',
-            description: 'Feedback confidencial de: reportes, pares, jefatura. Usar instrumento validado, no opiniones sueltas.',
-            responsible: 'RRHH + Consultor Externo',
-            deadline: '2 semanas',
-            validationMetric: 'Informe 360° completado con hallazgos claros'
+            title: 'VALIDAR EL PATRÓN',
+            description: 'Revisa los 3+ casos en FocalizaHR. ¿Es el mismo líder? ¿El mismo tipo de queja? Confirma que no es coincidencia.',
+            responsible: 'Tú (Gerente de área o BP)',
+            deadline: '1-2 días',
+            validationMetric: 'Patrón confirmado con evidencia'
           },
           {
             step: 2,
-            title: 'CONVERSACIÓN DE REALIDAD',
-            description: `Presentar datos al líder: "${exitCount} personas se fueron mencionándote como factor." Evaluar: ¿Reconoce? ¿Tiene voluntad? ¿Es capaz de cambiar?`,
-            responsible: 'Gerente General + RRHH',
-            deadline: 'Después del 360°',
-            validationMetric: 'Evaluación de salvabilidad documentada'
+            title: 'FEEDBACK DIRECTO AL LÍDER',
+            description: `Siéntate con el líder. Muéstrale los datos sin juzgar: "Tenemos ${exitCount} salidas que mencionan tu gestión. Quiero entender qué está pasando."`,
+            responsible: 'Tú (Gerente o BP)',
+            deadline: '1 semana',
+            validationMetric: 'Líder tiene claridad del problema'
           },
           {
             step: 3,
-            title: 'INTERVENCIÓN O DECISIÓN',
-            description: 'SI hay voluntad y capacidad → Coaching ejecutivo (6 sesiones mín). SI NO → Reasignación o desvinculación. El costo de mantenerlo supera el de cambiarlo.',
-            responsible: 'Gerencia General',
-            deadline: '90 días máximo',
-            validationMetric: 'Decisión tomada y ejecutada'
+            title: 'PLAN DE CAMBIO CONCRETO',
+            description: 'Acuerda 2 cambios de conducta específicos y medibles. Ejemplo: "No interrumpir", "Dar feedback en privado". Monitorea.',
+            responsible: 'Líder + Tú',
+            deadline: '2 semanas',
+            validationMetric: 'Compromisos acordados y en seguimiento'
+          },
+          {
+            step: 4,
+            title: 'APOYO PROFESIONAL SI NO MEJORA',
+            description: 'Si en 30 días no hay cambio, solicita a Personas apoyo de Coach o evaluación 360° (ISD Departamental).',
+            responsible: 'Gerencia de Personas',
+            deadline: '30 días',
+            validationMetric: 'Intervención profesional activada'
           }
         ] : [
           {
             step: 1,
-            title: 'DIAGNÓSTICO FOCALIZADO',
-            description: 'Ambiente Sano al área para entender por qué este factor está fallando. Data concreta antes de actuar.',
-            responsible: 'RRHH + Área afectada',
-            deadline: '2 semanas',
-            validationMetric: 'Causas raíz identificadas',
-            suggestedProduct: FOCALIZA_PRODUCTS.ambiente_sano
+            title: 'DIAGNOSTICAR CON DATOS',
+            description: 'Revisa en FocalizaHR: EIS del área, factores mencionados, EXO si hay, alertas históricas. Busca el patrón.',
+            responsible: 'Tú (Gerente)',
+            deadline: '1-2 días',
+            validationMetric: 'Tengo hipótesis de causa raíz'
           },
           {
             step: 2,
-            title: 'PLAN DE MEJORA ESTRUCTURAL',
-            description: 'Basado en diagnóstico, implementar cambios en procesos, políticas o estructura.',
-            responsible: 'Gerente de Área + RRHH',
-            deadline: '30 días',
-            validationMetric: 'Plan implementado y comunicado'
+            title: 'ESCUCHA DIRECTA',
+            description: 'Junta al equipo (sin mandos medios si es necesario). Pregunta: "¿Qué es lo más difícil de trabajar aquí hoy?"',
+            responsible: 'Tú (Gerente)',
+            deadline: '1 semana',
+            validationMetric: 'Escuché sin filtro del equipo'
           },
           {
             step: 3,
-            title: 'MONITOREO Y AJUSTE',
-            description: 'Pulso Express mensual. Si el patrón persiste, escalar intervención.',
-            responsible: 'RRHH',
-            deadline: '90 días',
-            validationMetric: 'Patrón roto (0 exits por este factor)',
+            title: 'QUICK WINS',
+            description: 'Identifica 1-2 cosas que puedas resolver rápido (recursos, condiciones, burocracia). Hazlas esta semana.',
+            responsible: 'Tú (Gerente)',
+            deadline: '1 semana',
+            validationMetric: 'Quick win ejecutado y comunicado',
             suggestedProduct: FOCALIZA_PRODUCTS.pulso_express
+          },
+          {
+            step: 4,
+            title: 'DIAGNÓSTICO PROFUNDO SI PERSISTE',
+            description: 'Si el problema es estructural, solicita a Personas aplicar ISD (Inteligencia Departamental) para análisis completo.',
+            responsible: 'Gerencia de Personas',
+            deadline: '2-3 semanas',
+            validationMetric: 'ISD solicitado o problema resuelto',
+            suggestedProduct: FOCALIZA_PRODUCTS.ambiente_sano
           }
         ],
         escalationCriteria: [
           'Líder no reconoce problema después de ver datos',
           'No implementa cambios después de coaching',
-          'Rotación continúa o acelera',
-          'Surge denuncia formal relacionada'
+          'Rotación continúa o acelera'
         ],
         successMetrics: [
           'Cero salidas por este factor en próximos 6 meses',
           `Score de ${factor} sube de ${avgScore.toFixed(1)} a >3.5`,
-          'Engagement del área mejora >15 puntos',
-          'Top performers retenidos'
+          'Equipo reporta mejora en clima'
         ]
       },
       
@@ -1171,18 +1183,23 @@ export class ExitAlertEngine {
       },
       
       resolutionOptions: {
-        quickPicks: [
-          'Decidí junto a RRHH aplicar Ambiente Sano al área afectada',
-          'Realicé assessment 360° del líder mencionado',
-          'Inicié coaching ejecutivo para el gerente',
-          'Presenté evidencia a Gerencia General para decisión',
-          'Reasigné o desvinculé al líder problemático',
-          'Implementé plan de recuperación del equipo'
+        quickPicks: isLeadershipFactor ? [
+          'Validé el patrón → Es real, involucra al mismo líder',
+          'Di feedback directo al líder con los datos',
+          'Acordamos cambios de conducta específicos',
+          'Solicité a Personas apoyo de Coaching/360°',
+          'El líder no tiene herramientas → Solicité ISD Departamental'
+        ] : [
+          'Diagnostiqué con datos → Problema es de recursos/condiciones',
+          'Diagnostiqué con datos → Problema es de liderazgo/clima',
+          'Realicé sesión de escucha con el equipo',
+          'Ejecuté quick wins (mejoras inmediatas)',
+          'Solicité a Personas aplicar ISD Departamental'
         ],
         customPrompt: 'O describe la acción específica que tomaste:',
         minCharacters: 10,
         successMessage: '✅ Acción registrada. Monitorearemos si el patrón se rompe en los próximos 120 días.',
-        followUpDays: 120
+        followUpDays: 45
       }
     };
   }
@@ -1300,27 +1317,35 @@ export class ExitAlertEngine {
         steps: [
           {
             step: 1,
-            title: 'AUDITORÍA DEL PROCESO',
-            description: '¿Por qué no se gestionaron las alertas? ¿Los gerentes las reciben? ¿Las entienden? ¿Tienen tiempo? ¿Hay consecuencias por ignorarlas?',
-            responsible: 'RRHH + Ops',
-            deadline: '1 semana',
-            validationMetric: 'Gaps del proceso identificados'
+            title: 'ENTENDER QUÉ FALLÓ',
+            description: '¿Por qué no se gestionaron las alertas? ¿Falta de tiempo? ¿No se vieron? Revisa las alertas que se ignoraron.',
+            responsible: 'Tú + Buddy/Jefe del colaborador',
+            deadline: '1-2 días',
+            validationMetric: 'Identifico el gap de proceso'
           },
           {
             step: 2,
-            title: 'HACER IMPOSIBLE IGNORAR',
-            description: 'Escalación automática si no hay acción en SLA. Notificación a nivel superior. Dashboard visible de alertas pendientes.',
-            responsible: 'RRHH + TI',
-            deadline: '2 semanas',
-            validationMetric: 'Automatización implementada'
+            title: 'RESCATAR A LOS NUEVOS ACTUALES',
+            description: 'Revisa HOY quiénes entraron hace poco al área. ¿Tienen alertas activas? Gestiónalas AHORA.',
+            responsible: 'Tú (Gerente)',
+            deadline: 'Mismo día',
+            validationMetric: 'Nuevos ingresos revisados y alertas gestionadas'
           },
           {
             step: 3,
-            title: 'KPI PARA GERENTES',
-            description: 'Incluir en evaluación de desempeño: "% alertas onboarding gestionadas en tiempo". Si ignoran consistentemente → Consecuencias reales.',
-            responsible: 'Gerencia General + RRHH',
-            deadline: 'Próximo ciclo evaluación',
-            validationMetric: 'KPI agregado a evaluaciones'
+            title: 'AJUSTAR PROCESO',
+            description: 'Si el buddy/jefe no está gestionando alertas, habla con ellos. Aclara que es su responsabilidad.',
+            responsible: 'Tú (Gerente)',
+            deadline: '1 semana',
+            validationMetric: 'Responsabilidades clarificadas'
+          },
+          {
+            step: 4,
+            title: 'SOLICITAR APOYO SI HAY MUCHOS JOURNEYS',
+            description: 'Si tienes muchos ingresos y no das abasto, pide a Personas apoyo para monitorear Journeys críticos.',
+            responsible: 'Gerencia de Personas',
+            deadline: '2 semanas',
+            validationMetric: 'Apoyo solicitado o situación manejable'
           }
         ],
         escalationCriteria: [
@@ -1331,8 +1356,7 @@ export class ExitAlertEngine {
         successMetrics: [
           '% alertas gestionadas en SLA: >90%',
           'Correlación alertas ignoradas → exits: <30%',
-          'Rotación primeros 90 días: -30%',
-          'Gerentes reconocen alertas como herramienta útil'
+          'Rotación primeros 90 días: -30%'
         ]
       },
       
@@ -1346,17 +1370,16 @@ export class ExitAlertEngine {
       
       resolutionOptions: {
         quickPicks: [
-          'Audité proceso de gestión de alertas onboarding',
-          'Capacité a gerentes en respuesta a alertas',
-          'Implementé SLA obligatorio para alertas',
-          'Agregué KPI de alertas gestionadas a evaluación',
-          'Rediseñé flujo de escalamiento automático',
-          'Creé dashboard de accountability por gerente'
+          'Identifiqué por qué no se gestionaron las alertas',
+          'Revisé y gestioné alertas de los nuevos ingresos actuales',
+          'Tuve conversación de accountability con el responsable',
+          'Corregí el proceso de seguimiento de onboarding',
+          'Solicité a Personas apoyo en Journeys críticos'
         ],
         customPrompt: 'O describe la acción específica que tomaste:',
         minCharacters: 10,
         successMessage: '✅ Acción registrada. Monitorearemos la tasa de gestión de alertas en 90 días.',
-        followUpDays: 90
+        followUpDays: 45
       }
     };
   }
@@ -1457,19 +1480,19 @@ export class ExitAlertEngine {
           {
             step: 1,
             title: 'DIAGNÓSTICO INICIAL',
-            description: 'Pulso Express al área para entender el estado actual antes de intervenir.',
-            responsible: 'RRHH',
-            deadline: '1 semana',
-            validationMetric: 'Causa raíz identificada',
-            suggestedProduct: FOCALIZA_PRODUCTS.pulso_express
+            description: 'Revisa en FocalizaHR los datos disponibles. ¿Qué dice el EIS? ¿Hay otros indicadores?',
+            responsible: 'Tú (Gerente)',
+            deadline: '1-2 días',
+            validationMetric: 'Contexto claro de la situación'
           },
           {
             step: 2,
             title: 'PLAN DE ACCIÓN',
-            description: 'Basado en diagnóstico, definir acciones correctivas.',
+            description: 'Basado en diagnóstico, define acciones correctivas si son necesarias.',
             responsible: 'Según diagnóstico',
-            deadline: '2 semanas',
-            validationMetric: 'Plan documentado'
+            deadline: '1 semana',
+            validationMetric: 'Plan documentado o caso cerrado',
+            suggestedProduct: FOCALIZA_PRODUCTS.pulso_express
           }
         ],
         escalationCriteria: [
@@ -1490,10 +1513,10 @@ export class ExitAlertEngine {
       
       resolutionOptions: {
         quickPicks: [
-          'Decidí junto a RRHH aplicar Pulso Express para diagnóstico',
+          'Revisé los datos y no requiere acción → Cierro alerta',
           'Inicié investigación de la causa raíz',
           'Convoqué reunión con stakeholders relevantes',
-          'Documenté hallazgos y próximos pasos',
+          'Solicité Pulso Express para diagnóstico',
           'Escalé a nivel superior por complejidad'
         ],
         customPrompt: 'O describe la acción específica que tomaste:',

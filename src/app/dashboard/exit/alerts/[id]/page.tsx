@@ -1,14 +1,26 @@
 // src/app/dashboard/exit/alerts/[id]/page.tsx
+// ═══════════════════════════════════════════════════════════════════════════════
 // 🎯 ORQUESTADOR - Exit Alert Detail Page
 // Filosofía: "El WOW viene de contar la historia correcta"
 // Flujo: EMOCIÓN → Contexto → Dato → Acción
+// ⚡ v2.1: ActionPlanCard premium + Flujo 3 estados
+// ═══════════════════════════════════════════════════════════════════════════════
 
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Scale, Skull, TrendingDown, AlertTriangle, Lightbulb, Loader2, BrainCircuit } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  Scale, 
+  Skull, 
+  TrendingDown, 
+  AlertTriangle, 
+  Lightbulb, 
+  Loader2, 
+  BrainCircuit
+} from 'lucide-react';
 
 // Componentes modulares
 import RevelationCard from '@/components/exit/RevelationCard';
@@ -18,8 +30,8 @@ import UrgencyCard from '@/components/exit/UrgencyCard';
 import DepartmentContextCard from '@/components/exit/DepartmentContextCard';
 import CollapsibleSection from '@/components/exit/CollapsibleSection';
 import OpportunityTimeline from '@/components/exit/OpportunityTimeline';
-
 import ResolutionPanel from '@/components/exit/ResolutionPanel';
+import ActionPlanCard from '@/components/exit/ActionPlanCard';  // ⚡ v2.1: Nuevo
 
 // Engine y tipos
 import { ExitAlertEngine } from '@/engines/ExitAlertEngine';
@@ -53,6 +65,9 @@ export default function ExitAlertDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isResolving, setIsResolving] = useState(false);
+  
+  // ⚡ v2.1: Estado para flujo 3 estados
+  const [showResolutionPanel, setShowResolutionPanel] = useState(false);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // FETCH DATA
@@ -215,7 +230,7 @@ export default function ExitAlertDetailPage() {
             ═══════════════════════════════════════════════════════════════════ */}
         <div className="mb-8">
           <RevelationCard
-            alertType={alert.alertType}                              // ← AGREGAR
+            alertType={alert.alertType}
             summary={businessCase.detection.summary}
             questionText={businessCase.detection.questionText || ''}
             questionId={businessCase.detection.questionId || 'P6'}
@@ -223,7 +238,7 @@ export default function ExitAlertDetailPage() {
             scoreMax={businessCase.detection.scoreMax}
             interpretation={businessCase.detection.interpretation || ''}
             disclaimer={businessCase.detection.disclaimer}
-            departmentName={businessCase.header.departmentName}      // ← AGREGAR
+            departmentName={businessCase.header.departmentName}
             companyName={alert.account?.companyName}  
           />
         </div>
@@ -249,7 +264,7 @@ export default function ExitAlertDetailPage() {
               departmentCategory={alert.department?.standardCategory}
             />
             <UrgencyCard
-              alertType={alert.alertType}  // ← AGREGAR
+              alertType={alert.alertType}
               dueDate={alert.dueDate}
               riskFormatted={businessCase.header.riskFormatted}
               severity={businessCase.header.severity}
@@ -267,10 +282,9 @@ export default function ExitAlertDetailPage() {
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════════
-            ACTO 4: OPORTUNIDAD + CASOS + RESOLUCIÓN
+            ACTO 4: OPORTUNIDAD
             ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-4 mb-8">
-          {/* La Oportunidad */}
           <CollapsibleSection 
             title="La Oportunidad" 
             icon={<Lightbulb className="w-5 h-5" />}
@@ -285,18 +299,41 @@ export default function ExitAlertDetailPage() {
               autopsiaCase={businessCase.emblamaticCases?.cases?.[0]}
             />
           </CollapsibleSection>
-
-         
         </div>
 
-        {/* Resolución */}
-        <ResolutionPanel
-          quickPicks={businessCase.resolutionOptions.quickPicks}
-          followUpDays={businessCase.resolutionOptions.followUpDays}
-          isResolved={isResolved}
-          onResolve={handleResolve}
-          isLoading={isResolving}
-        />
+        {/* ═══════════════════════════════════════════════════════════════════
+            ACTO 5: PLAN DE ACCIÓN + RESOLUCIÓN
+            ⚡ v2.1: ActionPlanCard premium con flujo 3 estados
+            ═══════════════════════════════════════════════════════════════════ */}
+        
+        {/* Componente premium de Plan de Acción */}
+        <div className="mb-6">
+          <ActionPlanCard
+            philosophy={businessCase.actionPlan?.philosophy}
+            steps={businessCase.actionPlan?.steps || []}
+            escalationCriteria={businessCase.actionPlan?.escalationCriteria || []}
+            isResolved={isResolved}
+            onRegisterAction={() => setShowResolutionPanel(true)}
+            followUpDays={businessCase.resolutionOptions?.followUpDays || 30}
+          />
+        </div>
+
+        {/* Panel de Resolución (aparece al hacer clic en CTA del ActionPlanCard) */}
+        {showResolutionPanel && !isResolved && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+          >
+            <ResolutionPanel
+              quickPicks={businessCase.resolutionOptions.quickPicks}
+              followUpDays={businessCase.resolutionOptions.followUpDays}
+              isResolved={isResolved}
+              onResolve={handleResolve}
+              isLoading={isResolving}
+            />
+          </motion.div>
+        )}
 
       </div>
     </div>
