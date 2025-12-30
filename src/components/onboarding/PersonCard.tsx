@@ -22,12 +22,14 @@ interface PersonCardProps {
   };
   index: number;
   onAcknowledgeAlert: (id: string, notes: string) => Promise<void>;
+  onManagedAlertClick?: (alert: any) => void;
 }
 
-export default function PersonCard({ 
-  person, 
+export default function PersonCard({
+  person,
   index,
-  onAcknowledgeAlert 
+  onAcknowledgeAlert,
+  onManagedAlertClick
 }: PersonCardProps) {
   
   const [isExpanded, setIsExpanded] = useState(false);
@@ -292,7 +294,7 @@ export default function PersonCard({
                           className="space-y-1"
                         >
                           <div
-                            onClick={() => setExpandedManagedAlert(isExpandedManaged ? null : alert.id)}
+                            onClick={() => onManagedAlertClick ? onManagedAlertClick(alert) : setExpandedManagedAlert(isExpandedManaged ? null : alert.id)}
                             className="
                               group relative overflow-hidden
                               bg-emerald-500/5 hover:bg-emerald-500/10

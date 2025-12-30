@@ -90,20 +90,28 @@ export default function ExitAlertDetailPage() {
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLER: RESOLVER ALERTA
   // ═══════════════════════════════════════════════════════════════════════════
-  
+
   const handleResolve = async (selectedAction: string, notes: string) => {
     setIsResolving(true);
     try {
-      await fetch(`/api/exit/alerts/${alertId}`, {
+      const response = await fetch(`/api/exit/alerts/${alertId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'resolve',
-          resolutionNotes: `${selectedAction}${notes ? ` | Notas: ${notes}` : ''}`
+          notes: `${selectedAction}${notes ? ` | ${notes}` : ''}`
         })
       });
-      router.push('/dashboard/exit?tab=alertas');
-    } catch {
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('[AlertDetailPage] Error:', error);
+        throw new Error(error.error || 'Error resolviendo alerta');
+      }
+
+      router.push('/dashboard/exit/alerts');
+    } catch (err) {
+      console.error('[AlertDetailPage] Error resolving:', err);
       setIsResolving(false);
     }
   };
@@ -131,7 +139,7 @@ export default function ExitAlertDetailPage() {
           <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <p className="text-white mb-4">{error || 'Alerta no encontrada'}</p>
           <button 
-            onClick={() => router.push('/dashboard/exit?tab=alertas')}
+            onClick={() => router.push('/dashboard/exit/alerts')}
             className="px-6 py-2.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors"
           >
             Volver a Alertas
@@ -168,7 +176,7 @@ export default function ExitAlertDetailPage() {
         >
           {/* Back */}
           <button 
-            onClick={() => router.push('/dashboard/exit?tab=alertas')}
+            onClick={() => router.push('/dashboard/exit/alerts')}
             className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-8"
           >
             <ArrowLeft className="w-4 h-4" />

@@ -9,15 +9,17 @@ import { UserCog, ChevronDown } from 'lucide-react';
 import PersonCard from './PersonCard';
 
 interface DirectReportsSectionProps {
-  people: any[];
+ people: any[];
   gerenciaName: string;
   onAcknowledgeAlert: (id: string, notes: string) => Promise<void>;
+  onManagedAlertClick?: (alert: any) => void;
 }
 
 export default function DirectReportsSection({ 
-  people, 
+  people,
   gerenciaName,
-  onAcknowledgeAlert 
+  onAcknowledgeAlert,
+  onManagedAlertClick
 }: DirectReportsSectionProps) {
   
   const [isExpanded, setIsExpanded] = useState(true);
@@ -150,6 +152,7 @@ export default function DirectReportsSection({
                 person={person}
                 index={index}
                 onAcknowledgeAlert={onAcknowledgeAlert}
+                onManagedAlertClick={onManagedAlertClick}
               />
             ))}
           </motion.div>

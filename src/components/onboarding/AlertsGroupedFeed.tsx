@@ -18,6 +18,7 @@ import { useToast } from '@/components/ui/toast-system';
 import AlertsTabsToggle from './AlertsTabsToggle';
 import DepartmentCard from './DepartmentCard';
 import DirectReportsSection from './DirectReportsSection';
+import OnboardingResolvedAlertModal from './OnboardingResolvedAlertModal';
 
 interface AlertsGroupedFeedProps {
   alerts: any[];
@@ -74,6 +75,7 @@ export default function AlertsGroupedFeed({
   
   const { success, error: showError } = useToast();
   const [expandedGerencias, setExpandedGerencias] = useState<Set<string>>(new Set());
+  const [resolvedAlertForModal, setResolvedAlertForModal] = useState<any>(null);
   
   // ========================================
   // CÁLCULOS
@@ -568,6 +570,7 @@ export default function AlertsGroupedFeed({
                             people={gerenciaGroup.directReports}
                             gerenciaName={gerenciaGroup.gerenciaName}
                             onAcknowledgeAlert={onAcknowledgeAlert}
+                            onManagedAlertClick={(alert: any) => setResolvedAlertForModal(alert)}
                           />
                         )}
                         
@@ -589,6 +592,7 @@ export default function AlertsGroupedFeed({
                                 department={department}
                                 index={deptIndex}
                                 onAcknowledgeAlert={onAcknowledgeAlert}
+                                onManagedAlertClick={(alert: any) => setResolvedAlertForModal(alert)}
                               />
                             ))}
                           </div>
@@ -602,6 +606,13 @@ export default function AlertsGroupedFeed({
           </div>
         )}
       </div>
+      
+      {/* Modal de Alerta Gestionada */}
+      <OnboardingResolvedAlertModal
+        isOpen={!!resolvedAlertForModal}
+        onClose={() => setResolvedAlertForModal(null)}
+        alert={resolvedAlertForModal}
+      />
     </div>
   );
 }

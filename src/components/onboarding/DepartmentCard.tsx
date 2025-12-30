@@ -23,12 +23,14 @@ interface DepartmentCardProps {
   };
   index: number;
   onAcknowledgeAlert: (id: string, notes: string) => Promise<void>;
+  onManagedAlertClick?: (alert: any) => void;
 }
 
 export default function DepartmentCard({ 
   department, 
   index,
-  onAcknowledgeAlert 
+  onAcknowledgeAlert,
+  onManagedAlertClick
 }: DepartmentCardProps) {
   
   const [isExpanded, setIsExpanded] = useState(false);
@@ -161,6 +163,7 @@ export default function DepartmentCard({
                 person={person}
                 index={personIndex}
                 onAcknowledgeAlert={onAcknowledgeAlert}
+                onManagedAlertClick={onManagedAlertClick}
               />
             ))}
           </motion.div>

@@ -9,6 +9,7 @@
 // - Ordenamiento comunica urgencia (crítico → alto → medio → bajo)
 // - Sin iconos infantiles, sin arcoíris de colores
 // - Mobile-first, touch targets 44px
+// - NUEVO: Modal para alertas gestionadas
 // ============================================================================
 
 'use client';
@@ -24,12 +25,14 @@ import {
   TrendingDown,
   BarChart3,
   Building2,
-  Link2
+  Link2,
+  Eye
 } from 'lucide-react';
 
 // Reutilizamos el TabsToggle de Onboarding (diseño Tesla/Apple)
 import AlertsTabsToggle from '@/components/onboarding/AlertsTabsToggle';
 import FocalizaIntelligenceAlertModal from './FocalizaIntelligenceAlertModal';
+import ResolvedAlertDetailModal from './ResolvedAlertDetailModal';
 import type { ExitAlertWithRelations } from '@/types/exit';
 
 // ============================================================================
@@ -162,6 +165,7 @@ const ExitAlertsGroupedFeed = memo(function ExitAlertsGroupedFeed({
   
   const [processingAlert, setProcessingAlert] = useState<string | null>(null);
   const [alertForModal, setAlertForModal] = useState<ExitAlertWithRelations | null>(null);
+  const [resolvedAlertForModal, setResolvedAlertForModal] = useState<ExitAlertWithRelations | null>(null);
   
   // ========================================
   // CONTADORES PARA TABS
@@ -227,7 +231,11 @@ const ExitAlertsGroupedFeed = memo(function ExitAlertsGroupedFeed({
   
   const handleAlertClick = useCallback((alert: ExitAlertWithRelations) => {
     if (alert.status === 'pending') {
+      // Alerta pendiente → modal de acción
       setAlertForModal(alert);
+    } else {
+      // Alerta gestionada → modal de detalle de resolución
+      setResolvedAlertForModal(alert);
     }
   }, []);
 
@@ -296,15 +304,18 @@ const ExitAlertsGroupedFeed = memo(function ExitAlertsGroupedFeed({
                 key={type}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden"
+                className="relative bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden"
               >
+                {/* Línea Tesla sutil */}
+                <div className="fhr-top-line" />
+                
                 {/* ════════════════════════════════════════════════════════
                     Header del grupo - Minimalista
                     ════════════════════════════════════════════════════════ */}
                 <div className="px-5 md:px-6 py-4 border-b border-slate-700/30">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Icon className="h-4 w-4 text-slate-400" strokeWidth={1.5} />
+                      <Icon className="fhr-icon-sm fhr-icon-muted" strokeWidth={1.5} />
                       <span className="font-medium text-white">
                         {config.label}
                       </span>
@@ -330,7 +341,7 @@ const ExitAlertsGroupedFeed = memo(function ExitAlertsGroupedFeed({
                         key={alert.id} 
                         className={`
                           group
-                          ${isManaged ? 'opacity-50' : ''}
+                          ${isManaged ? 'opacity-60' : ''}
                         `}
                       >
                         <div 
@@ -339,7 +350,7 @@ const ExitAlertsGroupedFeed = memo(function ExitAlertsGroupedFeed({
                             flex items-center gap-3 md:gap-4 
                             min-h-[72px]
                             transition-all duration-200
-                            ${!isManaged && 'cursor-pointer hover:bg-slate-700/20'}
+                            cursor-pointer hover:bg-slate-700/20
                             ${isProcessing ? 'pointer-events-none opacity-50' : ''}
                           `}
                           onClick={() => !isProcessing && handleAlertClick(alert)}
@@ -359,15 +370,10 @@ const ExitAlertsGroupedFeed = memo(function ExitAlertsGroupedFeed({
                               ══════════════════════════════════════════════ */}
                           {isCritical && !isManaged && (
                             <span className="
+                              fhr-badge fhr-badge-danger
                               flex items-center gap-1.5
-                              px-2.5 py-1 
-                              rounded-full 
-                              text-xs font-medium
-                              bg-red-500/10 
-                              text-red-400
-                              border border-red-500/20
                             ">
-                              <AlertTriangle className="h-3 w-3" strokeWidth={2} />
+                              <AlertTriangle className="fhr-icon-xs" strokeWidth={2} />
                               <span className="hidden sm:inline">Crítico</span>
                             </span>
                           )}
@@ -379,14 +385,24 @@ const ExitAlertsGroupedFeed = memo(function ExitAlertsGroupedFeed({
                             text-xs md:text-sm
                             ${slaStatus.color}
                           `}>
-                            <Clock className="h-3.5 w-3.5" strokeWidth={1.5} />
+                            <Clock className="fhr-icon-xs" strokeWidth={1.5} />
                             <span>{slaStatus.label}</span>
                           </div>
                           
                           {/* Indicador de estado / Acción */}
                           {isManaged ? (
-                            <div className="w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center bg-green-500/10">
-                              <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 text-green-400" strokeWidth={1.5} />
+                            <div className="
+                              w-9 h-9 md:w-10 md:h-10 
+                              rounded-full 
+                              flex items-center justify-center 
+                              bg-green-500/10
+                              border border-transparent
+                              group-hover:bg-slate-700/30
+                              group-hover:border-slate-600/30
+                              transition-all duration-200
+                            ">
+                              <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 text-green-400 group-hover:hidden" strokeWidth={1.5} />
+                              <Eye className="h-4 w-4 md:h-5 md:w-5 text-slate-400 hidden group-hover:block" strokeWidth={1.5} />
                             </div>
                           ) : (
                             <div className="
@@ -425,7 +441,7 @@ const ExitAlertsGroupedFeed = memo(function ExitAlertsGroupedFeed({
       )}
       
       {/* ════════════════════════════════════════════════════════════════════
-          Modal Intermedio - FocalizaHR Intelligence
+          Modal Intermedio - FocalizaHR Intelligence (para alertas pendientes)
           ════════════════════════════════════════════════════════════════════ */}
       <FocalizaIntelligenceAlertModal
         isOpen={!!alertForModal}
@@ -434,6 +450,15 @@ const ExitAlertsGroupedFeed = memo(function ExitAlertsGroupedFeed({
         alertType={(alertForModal?.alertType as any) || 'toxic_exit_detected'}
         departmentName={alertForModal?.department?.displayName || 'Departamento'}
         severity={(alertForModal?.severity as any) || 'medium'}
+      />
+      
+      {/* ════════════════════════════════════════════════════════════════════
+          Modal de Alerta Resuelta (para alertas gestionadas)
+          ════════════════════════════════════════════════════════════════════ */}
+      <ResolvedAlertDetailModal
+        isOpen={!!resolvedAlertForModal}
+        onClose={() => setResolvedAlertForModal(null)}
+        alert={resolvedAlertForModal}
       />
     </div>
   );
