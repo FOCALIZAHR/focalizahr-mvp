@@ -198,6 +198,10 @@ export interface OnboardingDashboardData {
       accumulatedExoJourneys: number
       accumulatedPeriodCount: number
       accumulatedLastUpdated: Date | null
+      // ✅ AGREGAR ESTOS 3:
+      level?: number
+      parentId?: string | null
+      unitType?: string
     }>
     
     departmentImpact: {

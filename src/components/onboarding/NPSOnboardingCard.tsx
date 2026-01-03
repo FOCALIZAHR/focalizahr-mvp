@@ -1,7 +1,19 @@
 // ====================================================================
-// NPS ONBOARDING CARD - DISEÑO FOCALIZAHR PREMIUM v3
+// NPS ONBOARDING CARD - DISEÑO FOCALIZAHR PREMIUM v4.1
 // src/components/onboarding/NPSOnboardingCard.tsx
-// 🎯 FILOSOFÍA: BimodalToggle interno (sin modal) + Colores NPS universales
+// ====================================================================
+// 🎯 FILOSOFÍA: BimodalToggle interno + Colores NPS universales
+// ✅ viewMode: 'gerencias' | 'departamentos' → cambia groupBy en API
+// ✅ COLOR TENDENCIA CONTEXTUAL: Cyan si mejoró pero aún negativo
+// ✅ fhr-top-line: Línea Tesla superior
+// ✅ RBAC: Backend filtra automáticamente según rol del usuario
+// ====================================================================
+// CHANGELOG v4.1:
+// - ELIMINADO: parentDepartmentId (innecesario, backend filtra por RBAC)
+// - SIMPLIFICADO: RankingView sin filtrado manual
+// - AGREGADO: groupBy dinámico según viewMode ('gerencia' | 'department')
+// - AGREGADO: fhr-top-line (línea Tesla)
+// - ELIMINADO: n=X duplicado de NPSScoreBar (solo en DistributionPanel)
 // ====================================================================
 
 'use client';
@@ -27,10 +39,24 @@ interface NPSInsight {
     id: string;
     displayName: string;
     level: number;
+    parentId?: string | null;
   } | null;
 }
 
 type ViewMode = 'resumen' | 'ranking';
+
+// ============================================
+// 🆕 PROPS BIMODAL
+// ============================================
+interface NPSOnboardingCardProps {
+  /** 
+   * Modo de agrupación:
+   * - 'gerencias': groupBy='gerencia' (para /dashboard/onboarding/)
+   * - 'departamentos': groupBy='department' (para /dashboard/onboarding/executive)
+   * El filtrado RBAC lo hace el backend automáticamente
+   */
+  viewMode?: 'gerencias' | 'departamentos';
+}
 
 // ============================================
 // CONSTANTS - COLORES NPS UNIVERSALES
@@ -68,14 +94,33 @@ const getScoreLabel = (score: number): string => {
 };
 
 // ============================================
+// 🆕 HELPER: COLOR TENDENCIA CONTEXTUAL
+// ============================================
+const getTrendColor = (delta: number | null, currentScore: number): string => {
+  if (delta === null || delta === 0) return '#64748B'; // Slate: sin cambio
+  
+  if (delta > 0) {
+    // Mejoró
+    if (currentScore < 0) {
+      return '#22D3EE';  // Cyan: mejoró PERO aún negativo
+    }
+    return '#10B981';    // Verde: mejoró Y está bien
+  }
+  
+  return '#F59E0B';      // Amber: empeoró
+};
+
+// ============================================
 // SUB-COMPONENTE: BIMODAL TOGGLE MINI
 // ============================================
 const BimodalToggleMini = memo(function BimodalToggleMini({
   activeMode,
-  onModeChange
+  onModeChange,
+  secondLabel = 'Por Gerencia'  // 🆕 PROP DINÁMICO
 }: {
   activeMode: ViewMode;
   onModeChange: (mode: ViewMode) => void;
+  secondLabel?: string;
 }) {
   return (
     <div 
@@ -110,7 +155,7 @@ const BimodalToggleMini = memo(function BimodalToggleMini({
         `}
       >
         <Trophy className="h-3.5 w-3.5" />
-        <span>Por Gerencia</span>
+        <span>{secondLabel}</span>  {/* 🆕 LABEL DINÁMICO */}
       </button>
     </div>
   );
@@ -121,12 +166,10 @@ const BimodalToggleMini = memo(function BimodalToggleMini({
 // ============================================
 const NPSScoreBar = memo(function NPSScoreBar({ 
   score, 
-  delta,
-  totalResponses 
+  delta
 }: { 
   score: number; 
   delta: number | null;
-  totalResponses: number;
 }) {
   const color = getScoreColor(score);
   const label = getScoreLabel(score);
@@ -136,7 +179,9 @@ const NPSScoreBar = memo(function NPSScoreBar({
   const barWidth = Math.abs(score) / 2; // 100 = 50% del ancho total (mitad de la barra)
   
   const TrendIcon = delta === null ? Minus : delta > 0 ? TrendingUp : delta < 0 ? TrendingDown : Minus;
-  const trendColor = delta === null ? '#64748B' : delta > 0 ? '#10B981' : delta < 0 ? '#EF4444' : '#64748B';
+  
+  // 🆕 COLOR TENDENCIA CONTEXTUAL
+  const trendColor = getTrendColor(delta, score);
 
   return (
     <div className="flex flex-col items-center w-full">
@@ -206,10 +251,7 @@ const NPSScoreBar = memo(function NPSScoreBar({
         </div>
       </div>
 
-      {/* Meta info */}
-      <div className="text-xs text-slate-500 mt-3">
-        n={totalResponses} respuestas
-      </div>
+      {/* n=X eliminado - ya está en DistributionPanel */}
     </div>
   );
 });
@@ -302,27 +344,31 @@ const DistributionPanel = memo(function DistributionPanel({
 });
 
 // ============================================
-// SUB-COMPONENTE: VISTA RANKING GERENCIAS
+// SUB-COMPONENTE: VISTA RANKING
+// Backend ya filtra por RBAC, solo renderizamos
 // ============================================
 const RankingView = memo(function RankingView({
-  data
+  data,
+  emptyLabel = 'gerencias'
 }: {
   data: NPSInsight[];
+  /** Label para empty state */
+  emptyLabel?: string;
 }) {
-  const sortedGerencias = useMemo(() => 
-    [...data]
-      .filter(d => d.department?.level === 2)
-      .sort((a, b) => b.npsScore - a.npsScore),
-    [data]
-  );
+  // Backend ya devuelve datos filtrados y agrupados correctamente
+  const sortedItems = useMemo(() => {
+    return [...data]
+      .filter(d => d.department !== null) // Excluir el global
+      .sort((a, b) => b.npsScore - a.npsScore);
+  }, [data]);
 
-  const top3 = sortedGerencias.slice(0, 3);
-  const rest = sortedGerencias.slice(3);
+  const top3 = sortedItems.slice(0, 3);
+  const rest = sortedItems.slice(3);
 
-  if (sortedGerencias.length === 0) {
+  if (sortedItems.length === 0) {
     return (
       <div className="text-center py-8 text-slate-500 text-sm">
-        Sin datos de gerencias disponibles
+        Sin datos de {emptyLabel} disponibles
       </div>
     );
   }
@@ -389,8 +435,8 @@ const RankingView = memo(function RankingView({
               </span>
               <span className="text-[10px] text-slate-500">NPS</span>
             </div>
-            <span className="text-cyan-400 text-xs font-medium mt-1.5">1°</span>
-            <span className="text-slate-300 text-[11px] font-light truncate max-w-[112px] text-center">
+            <span className="text-cyan-400 text-xs mt-1.5">1°</span>
+            <span className="text-slate-400 text-[11px] font-light truncate max-w-[112px] text-center">
               {top3[0].department?.displayName}
             </span>
           </motion.div>
@@ -427,20 +473,22 @@ const RankingView = memo(function RankingView({
         )}
       </div>
 
-      {/* Lista resto */}
+      {/* Lista del resto */}
       {rest.length > 0 && (
-        <div className="space-y-1 pt-3 border-t border-slate-800/50">
+        <div className="space-y-1.5 pt-2 border-t border-slate-800/50">
           {rest.map((item, index) => (
             <motion.div
               key={item.id}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.25 + index * 0.05 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 + index * 0.05 }}
               className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-slate-800/30 transition-colors"
             >
               <div className="flex items-center gap-2">
                 <span className="text-slate-600 text-xs w-5">{String(index + 4).padStart(2, '0')}</span>
-                <span className="text-slate-400 text-sm font-light">{item.department?.displayName}</span>
+                <span className="text-slate-400 text-sm font-light truncate max-w-[200px]">
+                  {item.department?.displayName}
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <span 
@@ -450,7 +498,10 @@ const RankingView = memo(function RankingView({
                   {item.npsScore > 0 ? '+' : ''}{item.npsScore}
                 </span>
                 {item.scoreDelta !== null && item.scoreDelta !== 0 && (
-                  <span className={`text-[10px] ${item.scoreDelta > 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  <span 
+                    className="text-[10px]"
+                    style={{ color: getTrendColor(item.scoreDelta, item.npsScore) }}
+                  >
                     {item.scoreDelta > 0 ? '↑' : '↓'}{Math.abs(item.scoreDelta)}
                   </span>
                 )}
@@ -529,8 +580,16 @@ const NPSOnboardingSkeleton = () => (
 // ============================================
 // COMPONENTE PRINCIPAL
 // ============================================
-export default memo(function NPSOnboardingCard() {
-  const [viewMode, setViewMode] = useState<ViewMode>('resumen');
+export default memo(function NPSOnboardingCard({
+  viewMode = 'gerencias'
+}: NPSOnboardingCardProps) {
+  const [internalViewMode, setInternalViewMode] = useState<ViewMode>('resumen');
+  
+  // Label dinámico según viewMode
+  const rankingLabel = viewMode === 'gerencias' ? 'Por Gerencia' : 'Por Departamento';
+  
+  // 🎯 groupBy dinámico: gerencia o department según viewMode
+  const groupByParam = viewMode === 'gerencias' ? 'gerencia' : 'department';
   
   // Fetch datos
   const { data: globalData, loading: loadingGlobal } = useNPSData({ 
@@ -538,9 +597,10 @@ export default memo(function NPSOnboardingCard() {
     period: 'latest' 
   });
   
+  // 🎯 Aquí se aplica el groupBy dinámico
   const { data: rankingData, loading: loadingRanking } = useNPSData({ 
     product: 'onboarding', 
-    groupBy: 'gerencia' 
+    groupBy: groupByParam 
   });
   
   const loading = loadingGlobal || loadingRanking;
@@ -599,13 +659,15 @@ export default memo(function NPSOnboardingCard() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="rounded-2xl overflow-hidden"
+        className="rounded-2xl overflow-hidden relative"
         style={{
           background: 'rgba(15, 23, 42, 0.5)',
           border: '1px solid rgba(51, 65, 85, 0.5)',
           backdropFilter: 'blur(40px)'
         }}
       >
+        {/* Línea Tesla superior */}
+        <div className="fhr-top-line" />
         {/* Header con BimodalToggle */}
         <div className="flex items-center justify-between p-5 border-b border-slate-800/50">
           <div>
@@ -614,15 +676,16 @@ export default memo(function NPSOnboardingCard() {
           </div>
           
           <BimodalToggleMini 
-            activeMode={viewMode}
-            onModeChange={setViewMode}
+            activeMode={internalViewMode}
+            onModeChange={setInternalViewMode}
+            secondLabel={rankingLabel}  // 🆕 LABEL DINÁMICO
           />
         </div>
 
         {/* Content */}
         <div className="p-5">
           <AnimatePresence mode="wait">
-            {viewMode === 'resumen' ? (
+            {internalViewMode === 'resumen' ? (
               <motion.div
                 key="resumen"
                 initial={{ opacity: 0, x: -20 }}
@@ -636,7 +699,6 @@ export default memo(function NPSOnboardingCard() {
                     <NPSScoreBar 
                       score={globalInsight.npsScore}
                       delta={globalInsight.scoreDelta}
-                      totalResponses={globalInsight.totalResponses}
                     />
                   </div>
 
@@ -666,7 +728,11 @@ export default memo(function NPSOnboardingCard() {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
               >
-                <RankingView data={rankingData?.data || []} />
+                {/* RankingView - datos ya vienen filtrados del backend */}
+                <RankingView 
+                  data={rankingData?.data || []} 
+                  emptyLabel={viewMode === 'gerencias' ? 'gerencias' : 'departamentos'}
+                />
               </motion.div>
             )}
           </AnimatePresence>

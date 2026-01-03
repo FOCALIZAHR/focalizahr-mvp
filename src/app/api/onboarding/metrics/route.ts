@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
  * AUTENTICACIÓN:
  * Headers inyectados por middleware:
  * - x-account-id (obligatorio) - Multi-tenant isolation
- * - x-user-role (opcional) - Para RBAC futuro
+ * - x-user-role (opcional) - Para RBAC
  * - x-department-id (opcional) - Para filtrado jerárquico
  * 
  * QUERY PARAMS:
@@ -35,8 +35,9 @@ export const dynamic = 'force-dynamic';
  * - Ordenadas por updatedAt DESC (más recientes primero)
  * - Incluye relación department (displayName, standardCategory)
  * - Multi-tenant isolation por accountId
+ * - 🔐 RBAC: Filtrado jerárquico en ORIGEN (servicio)
  * 
- * @version 3.2.8 - OPTIMIZADO: accumulatedDepartments en Promise.all
+ * @version 3.3.0 - RBAC LIMPIO: Filtrado en OnboardingAggregationService
  * @date December 2025
  */
 
@@ -45,7 +46,8 @@ import { prisma } from '@/lib/prisma';
 import { OnboardingAggregationService } from '@/lib/services/OnboardingAggregationService';
 import { serializeBigInt } from '@/lib/utils/bigint-serializer';
 import { 
-  extractUserContext
+  extractUserContext,
+  getChildDepartmentIds
 } from '@/lib/services/AuthorizationService';
 
 /**
@@ -62,6 +64,7 @@ import {
  * - LENTE 3: Estado actual en tiempo real de journeys en curso
  * 
  * @param userContext - Contexto del usuario autenticado
+ * @param allowedDepartmentIds - IDs permitidos para AREA_MANAGER (null = todos)
  * @returns Métricas actuales con flag isPartial: true
  */
 async function calculateLiveMetrics(
@@ -69,7 +72,8 @@ async function calculateLiveMetrics(
     accountId: string;
     role: string | null;
     departmentId: string | null;
-  }
+  },
+  allowedDepartmentIds: string[] | null
 ): Promise<{
   period: string;
   avgEXOScore: number | null;
@@ -100,18 +104,13 @@ async function calculateLiveMetrics(
   // Roles globales (ven toda la empresa)
   const globalRoles = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_ADMIN', 'HR_OPERATOR', 'CEO'];
   
-  // Si es AREA_MANAGER, filtrar por jerarquía departamental
-  if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
-    const { getChildDepartmentIds } = await import('@/lib/services/AuthorizationService');
-    const childIds = await getChildDepartmentIds(userContext.departmentId);
-    const allowedDepartments = [userContext.departmentId, ...childIds];
-    
-    whereClause.departmentId = { in: allowedDepartments };
+  // 🔐 RBAC: Usar allowedDepartmentIds pre-calculado
+  if (allowedDepartmentIds) {
+    whereClause.departmentId = { in: allowedDepartmentIds };
     
     console.log('[calculateLiveMetrics] Filtrado jerárquico aplicado:', {
-      role: 'AREA_MANAGER',
-      baseDepartment: userContext.departmentId,
-      totalDepartments: allowedDepartments.length
+      role: userContext.role,
+      totalDepartments: allowedDepartmentIds.length
     });
   } else {
     console.log('[calculateLiveMetrics] Acceso global:', {
@@ -142,13 +141,9 @@ async function calculateLiveMetrics(
     severity: 'critical'
   };
   
-  // Si es AREA_MANAGER, aplicar filtro departamental también en alertas
-  if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
-    const { getChildDepartmentIds } = await import('@/lib/services/AuthorizationService');
-    const childIds = await getChildDepartmentIds(userContext.departmentId);
-    const allowedDepartments = [userContext.departmentId, ...childIds];
-    
-    alertsWhereClause.journey.departmentId = { in: allowedDepartments };
+  // 🔐 RBAC: Filtro jerárquico en alertas
+  if (allowedDepartmentIds) {
+    alertsWhereClause.journey.departmentId = { in: allowedDepartmentIds };
   }
   
   const alerts = await prisma.journeyAlert.findMany({
@@ -228,6 +223,42 @@ export async function GET(request: NextRequest) {
     });
     
     // ========================================================================
+    // 🔐 1C. CALCULAR DEPARTAMENTOS PERMITIDOS (UNA VEZ)
+    // Según GUÍA MAESTRA RBAC Sección 3.2 - Matriz de Acceso por Rol
+    // ========================================================================
+    let allowedDepartmentIds: string[] | null = null;
+    
+    // Roles con acceso global (ven toda la empresa)
+    const globalRoles = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_ADMIN', 'HR_MANAGER', 'HR_OPERATOR', 'CEO'];
+    
+    if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
+      // AREA_MANAGER: Solo ve su departamento + hijos (CTE recursivo)
+      const childIds = await getChildDepartmentIds(userContext.departmentId);
+      allowedDepartmentIds = [userContext.departmentId, ...childIds];
+      
+      console.log('[API GET /onboarding/metrics] 🔐 Filtrado jerárquico calculado:', {
+        role: 'AREA_MANAGER',
+        baseDepartment: userContext.departmentId,
+        childDepartments: childIds.length,
+        totalAllowed: allowedDepartmentIds.length
+      });
+    } else if (globalRoles.includes(userContext.role || '')) {
+      // Roles globales: null significa "todos los departamentos"
+      console.log('[API GET /onboarding/metrics] ✅ Acceso global:', {
+        role: userContext.role
+      });
+    } else {
+      // Rol desconocido: log warning pero continuar (backward compatible)
+      console.warn('[API GET /onboarding/metrics] ⚠️ Rol sin definición explícita:', {
+        role: userContext.role,
+        departmentId: userContext.departmentId
+      });
+    }
+    
+    // 🔐 Preparar options para el servicio (LIMPIO - sin workaround)
+    const filterOptions = { allowedDepartmentIds };
+    
+    // ========================================================================
     // 2. EXTRAER QUERY PARAMS
     // ========================================================================
     const { searchParams } = new URL(request.url);
@@ -240,9 +271,25 @@ export async function GET(request: NextRequest) {
     });
     
     // ========================================================================
-    // 3. SI ES DEPARTAMENTO ESPECÍFICO: FLUJO ORIGINAL (SIN CAMBIOS)
+    // 3. SI ES DEPARTAMENTO ESPECÍFICO: FLUJO ORIGINAL (CON VALIDACIÓN RBAC)
     // ========================================================================
     if (departmentId) {
+      // 🔐 Validar que AREA_MANAGER puede ver este departamento
+      if (allowedDepartmentIds && !allowedDepartmentIds.includes(departmentId)) {
+        console.warn('[API GET /onboarding/metrics] 🚫 Acceso denegado:', {
+          role: userContext.role,
+          requestedDepartment: departmentId,
+          allowedCount: allowedDepartmentIds.length
+        });
+        return NextResponse.json(
+          { 
+            error: 'Acceso denegado - No tiene permisos para este departamento', 
+            success: false 
+          },
+          { status: 403 }
+        );
+      }
+      
       const whereClause: any = {
         accountId,
         departmentId
@@ -303,6 +350,7 @@ export async function GET(request: NextRequest) {
     console.log('[API GET /onboarding/metrics] Generando agregaciones globales...');
     
     // 🚀 OPTIMIZACIÓN: Todas las queries en un solo Promise.all
+    // 🔐 LIMPIO: Servicio filtra directamente con filterOptions
     const [
       globalMetrics,
       topDepartments,
@@ -312,16 +360,20 @@ export async function GET(request: NextRequest) {
       departments,
       complianceEfficiency,
       liveMetrics,
-      accumulatedDepartments  // 🚀 MOVIDO AQUÍ (antes era secuencial)
+      accumulatedDepartments
     ] = await Promise.all([
-      OnboardingAggregationService.getGlobalMetrics(accountId, period || undefined),
-      OnboardingAggregationService.getTopDepartments(accountId, period || undefined),
-      OnboardingAggregationService.getBottomDepartments(accountId, period || undefined),
-      OnboardingAggregationService.getGlobalInsights(accountId, period || undefined),
-      OnboardingAggregationService.getGlobalDemographics(accountId, period || undefined),
-      // Mantener array original para backward compatibility
+      // 🔐 LIMPIO: Pasar filterOptions al servicio
+      OnboardingAggregationService.getGlobalMetrics(accountId, period || undefined, filterOptions),
+      OnboardingAggregationService.getTopDepartments(accountId, period || undefined, filterOptions),
+      OnboardingAggregationService.getBottomDepartments(accountId, period || undefined, filterOptions),
+      OnboardingAggregationService.getGlobalInsights(accountId, period || undefined, filterOptions),
+      OnboardingAggregationService.getGlobalDemographics(accountId, period || undefined, filterOptions),
+      // Query directa con filtro RBAC
       prisma.departmentOnboardingInsight.findMany({
-        where: { accountId },
+        where: { 
+          accountId,
+          ...(allowedDepartmentIds && { departmentId: { in: allowedDepartmentIds } })
+        },
         orderBy: { updatedAt: 'desc' },
         include: {
           department: {
@@ -344,13 +396,14 @@ export async function GET(request: NextRequest) {
         },
         take: 20
       }),
-      OnboardingAggregationService.getComplianceEfficiency(accountId),
-      calculateLiveMetrics(userContext),
-      // 🚀 OPTIMIZACIÓN: Query acumulado ahora en paralelo
+      OnboardingAggregationService.getComplianceEfficiency(accountId, undefined, filterOptions),
+      calculateLiveMetrics(userContext, allowedDepartmentIds),
+      // Query acumulado con filtro RBAC
       prisma.department.findMany({
         where: { 
           accountId,
-          accumulatedExoScore: { not: null }
+          accumulatedExoScore: { not: null },
+          ...(allowedDepartmentIds && { id: { in: allowedDepartmentIds } })
         },
         select: {
           id: true,
@@ -359,7 +412,10 @@ export async function GET(request: NextRequest) {
           accumulatedExoScore: true,
           accumulatedExoJourneys: true,
           accumulatedPeriodCount: true,
-          accumulatedLastUpdated: true
+          accumulatedLastUpdated: true,
+          level: true,
+          parentId: true,
+          unitType: true
         },
         orderBy: {
           accumulatedExoScore: 'desc'
@@ -474,23 +530,21 @@ export async function GET(request: NextRequest) {
     // 6. FORMATEAR RESPUESTA CON 3 LENTES
     // ========================================================================
     const data = {
-      // LENTE 1: PULSO MENSUAL (existente, sin cambios)
+      // LENTE 1: PULSO MENSUAL (ya filtrado por servicio)
       global: globalMetrics,
-      topDepartments,
-      bottomDepartments,
+      topDepartments,      // ✅ LIMPIO: Ya viene filtrado del servicio
+      bottomDepartments,   // ✅ LIMPIO: Ya viene filtrado del servicio
       insights,
       demographics,
-      departments, // Array original para drill-down futuro
+      departments,
       
-      // LENTE 2: ACUMULADO ESTRATÉGICO 12 MESES (existente, sin cambios)
+      // LENTE 2: ACUMULADO ESTRATÉGICO 12 MESES
       accumulated: {
         globalExoScore: globalAccumulatedExoScore,
         totalJourneys: totalJourneys,
         periodCount: maxPeriodCount,
         lastUpdated: accumulatedDepartments[0]?.accumulatedLastUpdated || null,
         departments: accumulatedDepartments,
-
-        // Balance Departamental
         departmentImpact: departmentImpact
       },
       
@@ -503,6 +557,11 @@ export async function GET(request: NextRequest) {
     const duration = Date.now() - startTime;
     
     console.log(`[API GET /onboarding/metrics] ✅ Success - ${duration}ms`, {
+      rbac: {
+        role: userContext.role,
+        filteredByDepartment: !!allowedDepartmentIds,
+        allowedDepartments: allowedDepartmentIds?.length || 'ALL'
+      },
       globalMetrics: !!globalMetrics.avgEXOScore,
       topDepartments: topDepartments.length,
       bottomDepartments: bottomDepartments.length,
@@ -513,13 +572,11 @@ export async function GET(request: NextRequest) {
         seniority: demographics.bySeniority.length
       },
       departmentsArray: departments.length,
-      // LENTE 2 LOG
       accumulated: {
         globalScore: globalAccumulatedExoScore,
         departmentsWithData: accumulatedDepartments.length,
         hasImpactData: !!departmentImpact
       },
-      // LENTE 3 LOG
       live: {
         period: liveMetrics.period,
         avgEXOScore: liveMetrics.avgEXOScore,

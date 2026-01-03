@@ -412,6 +412,24 @@ export class NPSAggregationService {
       );
     }
     
+    // 4.5 Guardar NPS por departamento (nivel 3+)
+    for (const [departmentId, ratings] of ratingsByDepartment) {
+      // Evitar duplicar si el departamento YA es una gerencia (level 2)
+      if (!ratingsByGerencia.has(departmentId)) {
+        const calc = this.calculateNPS(ratings);
+        await this.upsertNPSInsight(
+          accountId,
+          departmentId,
+          'onboarding',
+          period,
+          periodStart,
+          periodEnd,
+          calc
+        );
+      }
+    }
+  
+    
     // 5. Guardar NPS global
     const allRatings = npsResponses.map(r => r.rating!);
     const globalCalc = this.calculateNPS(allRatings);

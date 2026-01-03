@@ -274,14 +274,13 @@ export default function OnboardingDashboard() {
           )}
 
           {/* TAB CONTENT: eNPS ONBOARDING */}
-          {activeTab === 'enps' && (
-            <NPSOnboardingCard />
-)}
+           {activeTab === 'enps' && (
+            <NPSOnboardingCard viewMode="gerencias" />
+          )}
 
            {/* TAB CONTENT: ALERTAS POR GERENCIA */}
-          {/* TAB CONTENT: ALERTAS POR GERENCIA */}
           {activeTab === 'alertas' && (
-            <AlertasGerenciaRanking />
+            <AlertasGerenciaRanking viewMode="gerencias" />
           )}
 
           {/* CTAs NAVEGACIÓN */}

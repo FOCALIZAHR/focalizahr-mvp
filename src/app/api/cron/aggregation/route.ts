@@ -47,9 +47,23 @@ export async function GET(request: NextRequest) {
         );
       }
     }
-    
+
     console.log('[Cron Aggregation] ✅ Authenticated - Starting job...');
+        // ========================================================================
+    // 1.5 LEER PERÍODO OPCIONAL (para testing)
+    // ========================================================================
+    const { searchParams } = new URL(request.url);
+    const periodParam = searchParams.get('period'); // "2025-12" o null
     
+    let customPeriodStart: Date | undefined;
+    let customPeriodEnd: Date | undefined;
+    
+    if (periodParam && /^\d{4}-\d{2}$/.test(periodParam)) {
+      const [year, month] = periodParam.split('-').map(Number);
+      customPeriodStart = new Date(year, month - 1, 1);
+      customPeriodEnd = new Date(year, month, 0);
+      console.log(`[Cron Aggregation] 📅 Período especificado: ${periodParam}`);
+    }
     // ========================================================================
     // 2. OBTENER CUENTAS ACTIVAS
     // ========================================================================
@@ -86,9 +100,11 @@ export async function GET(request: NextRequest) {
       try {
         console.log(`[Cron Aggregation] → Processing: ${account.companyName}...`);
         
+        // DESPUÉS:
         const result = await OnboardingAggregationService.aggregateAllDepartments(
-          account.id
-          // periodStart y periodEnd = mes actual (default)
+          account.id,
+          customPeriodStart,
+          customPeriodEnd
         );
         
         totalDepartmentsProcessed += result.departmentsProcessed;
@@ -96,21 +112,19 @@ export async function GET(request: NextRequest) {
         await OnboardingAggregationService.updateAccumulatedExoScores(account.id);
         console.log(`[Cron] ✅ Accumulated scores updated for: ${account.companyName}`);
         
+        /// =====================================================================
+        // ✅ AGREGACIÓN NPS ONBOARDING (respeta período custom)
         // =====================================================================
-        // ✅ NUEVO: AGREGACIÓN NPS ONBOARDING
-        // =====================================================================
-        const now = new Date();
-        const periodDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const period = `${periodDate.getFullYear()}-${String(periodDate.getMonth() + 1).padStart(2, '0')}`;
-        const periodStart = new Date(periodDate.getFullYear(), periodDate.getMonth(), 1);
-        const periodEnd = new Date(periodDate.getFullYear(), periodDate.getMonth() + 1, 0, 23, 59, 59);
+        const npsStart = customPeriodStart || new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
+        const npsEnd = customPeriodEnd || new Date(new Date().getFullYear(), new Date().getMonth(), 0, 23, 59, 59);
+        const npsPeriod = periodParam || `${npsStart.getFullYear()}-${String(npsStart.getMonth() + 1).padStart(2, '0')}`;
         
         try {
           await NPSAggregationService.aggregateOnboardingNPS(
             account.id,
-            period,
-            periodStart,
-            periodEnd
+            npsPeriod,
+            npsStart,
+            npsEnd
           );
           console.log(`[Cron] ✅ NPS Onboarding aggregated for: ${account.companyName}`);
         } catch (npsError) {

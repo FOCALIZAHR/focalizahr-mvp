@@ -69,12 +69,23 @@ export async function POST(request: NextRequest) {
     }
     
     // ════════════════════════════════════════════════════════════════════════
+    // PASO 1.5: LEER PERÍODO OPCIONAL (para testing)
+    // ════════════════════════════════════════════════════════════════════════
+
+    const { searchParams } = new URL(request.url);
+    const period = searchParams.get('period'); // "2025-12" o null
+
+    if (period) {
+      console.log(`[CRON Exit Aggregation] 📅 Período especificado: ${period}`);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // PASO 2: EJECUTAR AGREGACIÓN MENSUAL
     // ════════════════════════════════════════════════════════════════════════
     
     console.log('[CRON Exit Aggregation] Phase 1: Monthly aggregation...');
     
-    const aggregationResult = await ExitAggregationService.runMonthlyAggregation();
+    const aggregationResult = await ExitAggregationService.runMonthlyAggregation(period || undefined);
     
     console.log('[CRON Exit Aggregation] Phase 1 completed:', {
       accountsProcessed: aggregationResult.accountsProcessed,
@@ -112,9 +123,10 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({
       success: aggregationResult.success,
-      message: aggregationResult.success 
+      message: aggregationResult.success
         ? 'Agregación Exit completada exitosamente'
         : 'Agregación Exit completada con errores',
+      period: period || 'default (mes anterior)',
       stats: {
         accountsProcessed: aggregationResult.accountsProcessed,
         departmentsProcessed: aggregationResult.departmentsProcessed,

@@ -5,6 +5,7 @@
  * - Calcular EIS (Exit Intelligence Score) desde Response.normalizedScore
  * - Extraer P2+P3 (causas raíz) sin duplicar datos
  * - Detectar alertas Ley Karin (P6 < 2.5)
+ * - Detectar alertas Exit Tóxico (EIS < 25)
  * - Post-proceso automático al completar encuesta exit-survey
  * 
  * PRINCIPIO ARQUITECTÓNICO:
@@ -14,9 +15,14 @@
  * FÓRMULA EIS (validada en /types/exit.ts):
  * EIS = P1(20%) + P4(25%) + P5(20%) + P6(25%) + P7(10%)
  * 
- * @version 1.0
+ * @version 1.1
  * @date December 2025
  * @author FocalizaHR Team
+ * 
+ * CHANGELOG v1.1:
+ * - Agregado checkAndCreateToxicExitAlert() para EIS < 25
+ * - Agregado TOXIC_EIS_THRESHOLD constante
+ * - Modificado processCompletedSurvey() para crear alerta toxic_exit
  */
 
 import { prisma } from '@/lib/prisma';
@@ -54,6 +60,13 @@ const QUESTION_ORDER_MAP = {
  * Si P6 (safety) < 2.5 en escala 1-5, se genera alerta crítica
  */
 const LEY_KARIN_THRESHOLD = 2.5;
+
+/**
+ * Threshold para alerta Exit Tóxico
+ * Si EIS < 25, se genera alerta high severity
+ * @since v1.1
+ */
+const TOXIC_EIS_THRESHOLD = 25;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SERVICIO PRINCIPAL
@@ -371,6 +384,76 @@ export class ExitIntelligenceService {
   
   /**
    * ════════════════════════════════════════════════════════════════════════
+   * Verificar y crear alerta Exit Tóxico
+   * ════════════════════════════════════════════════════════════════════════
+   * 
+   * Condición: EIS < 25 (salida tóxica)
+   * Acción: Crear ExitAlert tipo 'toxic_exit_detected' con severidad 'high'
+   * SLA: 48 horas
+   * 
+   * @since v1.1
+   */
+  static async checkAndCreateToxicExitAlert(
+    exitRecord: {
+      id: string;
+      accountId: string;
+      departmentId: string;
+    },
+    eis: number
+  ): Promise<boolean> {
+    // Verificar si ya existe alerta para este ExitRecord
+    const existingAlert = await prisma.exitAlert.findFirst({
+      where: {
+        exitRecordId: exitRecord.id,
+        alertType: 'toxic_exit_detected'
+      }
+    });
+    
+    if (existingAlert) {
+      console.log('[ExitIntelligence] Toxic Exit alert already exists:', existingAlert.id);
+      return false;
+    }
+    
+    // Obtener nombre departamento para el título
+    const department = await prisma.department.findUnique({
+      where: { id: exitRecord.departmentId },
+      select: { displayName: true }
+    });
+    
+    // Calcular fecha límite SLA (48 horas)
+    const dueDate = new Date();
+    dueDate.setHours(dueDate.getHours() + 48);
+    
+    // Crear alerta
+    const alert = await prisma.exitAlert.create({
+      data: {
+        exitRecordId: exitRecord.id,
+        accountId: exitRecord.accountId,
+        departmentId: exitRecord.departmentId,
+        alertType: 'toxic_exit_detected',
+        severity: 'high',
+        title: `☠️ Exit Tóxico Detectado en ${department?.displayName || 'Departamento'}`,
+        description: `Se detectó una salida con EIS extremadamente bajo (${eis.toFixed(1)}/100 - Clasificación TÓXICA). Esto indica una experiencia laboral muy negativa con alto riesgo de contagio al equipo actual.`,
+        triggerScore: eis,
+        slaHours: 48,
+        dueDate,
+        slaStatus: 'on_track',
+        status: 'pending'
+      }
+    });
+    
+    console.log('[ExitIntelligence] Toxic Exit alert created:', {
+      alertId: alert.id,
+      departmentId: exitRecord.departmentId,
+      eis,
+      dueDate: dueDate.toISOString()
+    });
+    
+    return true;
+  }
+  
+  /**
+   * ════════════════════════════════════════════════════════════════════════
    * MÉTODO CRÍTICO: Procesar encuesta completada (post-proceso)
    * ════════════════════════════════════════════════════════════════════════
    * 
@@ -383,6 +466,9 @@ export class ExitIntelligenceService {
    * 3. Extraer factores P2+P3
    * 4. Actualizar ExitRecord con resultados
    * 5. Crear alerta Ley Karin si aplica
+   * 6. Crear alerta Toxic Exit si aplica (y no hay Ley Karin)
+   * 
+   * @modified v1.1 - Agregado paso 6 para alertas toxic_exit
    */
   static async processCompletedSurvey(participantId: string): Promise<{
     success: boolean;
@@ -390,6 +476,7 @@ export class ExitIntelligenceService {
     eis?: number | null;
     classification?: string | null;
     alertCreated?: boolean;
+    alertType?: string;
     error?: string;
   }> {
     try {
@@ -447,14 +534,27 @@ export class ExitIntelligenceService {
       
       // 5. Crear alerta Ley Karin si aplica
       let alertCreated = false;
+      let alertType: string | undefined;
+      
       if (eisResult.safetyScore !== null && eisResult.safetyScore < LEY_KARIN_THRESHOLD) {
         alertCreated = await this.checkAndCreateLeyKarinAlert(
           exitRecord, 
           eisResult.safetyScore
         );
+        if (alertCreated) alertType = 'ley_karin';
       }
       
-      // 6. Actualizar Participant como respondido
+      // 6. Crear alerta Toxic Exit si EIS < 25 (y no se creó ya Ley Karin)
+      // Nota: Si hay Ley Karin, tiene prioridad (es compliance legal)
+      if (eisResult.score !== null && eisResult.score < TOXIC_EIS_THRESHOLD && !alertCreated) {
+        alertCreated = await this.checkAndCreateToxicExitAlert(
+          exitRecord,
+          eisResult.score
+        );
+        if (alertCreated) alertType = 'toxic_exit_detected';
+      }
+      
+      // 7. Actualizar Participant como respondido
       await prisma.participant.update({
         where: { id: participantId },
         data: {
@@ -467,7 +567,8 @@ export class ExitIntelligenceService {
         exitRecordId: exitRecord.id,
         eis: eisResult.score,
         classification: eisResult.classification,
-        alertCreated
+        alertCreated,
+        alertType
       });
       
       return {
@@ -475,7 +576,8 @@ export class ExitIntelligenceService {
         exitRecordId: exitRecord.id,
         eis: eisResult.score,
         classification: eisResult.classification,
-        alertCreated
+        alertCreated,
+        alertType
       };
       
     } catch (error: any) {
@@ -579,4 +681,4 @@ export class ExitIntelligenceService {
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-export { QUESTION_ORDER_MAP, LEY_KARIN_THRESHOLD };
+export { QUESTION_ORDER_MAP, LEY_KARIN_THRESHOLD, TOXIC_EIS_THRESHOLD };

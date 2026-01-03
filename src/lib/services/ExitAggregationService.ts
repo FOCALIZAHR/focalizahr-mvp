@@ -94,23 +94,36 @@ export class ExitAggregationService {
   // MÉTODO PRINCIPAL: AGREGACIÓN MENSUAL
   // ═══════════════════════════════════════════════════════════════════════════
   
-  /**
+/**
    * Ejecutar agregación mensual completa
    * Llamado por CRON el día 1 de cada mes
+   * 
+   * @param periodOverride - Período "YYYY-MM" opcional (para testing)
    */
-  static async runMonthlyAggregation(): Promise<{
+  static async runMonthlyAggregation(periodOverride?: string): Promise<{
     success: boolean;
     accountsProcessed: number;
     departmentsProcessed: number;
     alertsCreated: number;
     errors: string[];
   }> {
-    const now = new Date();
+    let periodStart: Date;
+    let periodEnd: Date;
+    let period: string;
     
-    // Calcular período del mes anterior
-    const periodEnd = new Date(now.getFullYear(), now.getMonth(), 0); // Último día mes anterior
-    const periodStart = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), 1); // Primer día mes anterior
-    const period = `${periodEnd.getFullYear()}-${String(periodEnd.getMonth() + 1).padStart(2, '0')}`;
+    if (periodOverride && /^\d{4}-\d{2}$/.test(periodOverride)) {
+      // Usar período especificado (para testing)
+      const [year, month] = periodOverride.split('-').map(Number);
+      periodStart = new Date(year, month - 1, 1);
+      periodEnd = new Date(year, month, 0);
+      period = periodOverride;
+    } else {
+      // Default: mes anterior
+      const now = new Date();
+      periodEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      periodStart = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), 1);
+      period = `${periodEnd.getFullYear()}-${String(periodEnd.getMonth() + 1).padStart(2, '0')}`;
+    }
     
     console.log(`[ExitAggregation] 🚀 Starting monthly aggregation for ${period}`);
     console.log(`[ExitAggregation] 📅 Period: ${periodStart.toISOString().split('T')[0]} → ${periodEnd.toISOString().split('T')[0]}`);

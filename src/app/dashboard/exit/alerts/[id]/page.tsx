@@ -3,7 +3,11 @@
 // 🎯 ORQUESTADOR - Exit Alert Detail Page
 // Filosofía: "El WOW viene de contar la historia correcta"
 // Flujo: EMOCIÓN → Contexto → Dato → Acción
-// ⚡ v2.1: ActionPlanCard premium + Flujo 3 estados
+// ⚡ v2.2: Storytelling restaurado + Progressive disclosure
+// CAMBIOS vs v2.1:
+//   - defaultOpen={false} en colapsables
+//   - ActionPlanCard ANTES de contexto adicional
+//   - DepartmentContextCard dentro de colapsable
 // ═══════════════════════════════════════════════════════════════════════════════
 
 'use client';
@@ -19,7 +23,9 @@ import {
   AlertTriangle, 
   Lightbulb, 
   Loader2, 
-  BrainCircuit
+  BrainCircuit,
+  Building2,
+  BookOpen
 } from 'lucide-react';
 
 // Componentes modulares
@@ -31,7 +37,7 @@ import DepartmentContextCard from '@/components/exit/DepartmentContextCard';
 import CollapsibleSection from '@/components/exit/CollapsibleSection';
 import OpportunityTimeline from '@/components/exit/OpportunityTimeline';
 import ResolutionPanel from '@/components/exit/ResolutionPanel';
-import ActionPlanCard from '@/components/exit/ActionPlanCard';  // ⚡ v2.1: Nuevo
+import ActionPlanCard from '@/components/exit/ActionPlanCard';
 
 // Engine y tipos
 import { ExitAlertEngine } from '@/engines/ExitAlertEngine';
@@ -64,24 +70,24 @@ export default function ExitAlertDetailPage() {
   const [businessCase, setBusinessCase] = useState<ExitBusinessCase | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isResolving, setIsResolving] = useState(false);
   
-  // ⚡ v2.1: Estado para flujo 3 estados
+  // ⚡ v2.1: Estado para mostrar ResolutionPanel
   const [showResolutionPanel, setShowResolutionPanel] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // FETCH DATA
   // ═══════════════════════════════════════════════════════════════════════════
   
   useEffect(() => {
-    async function fetchData() {
+    async function fetchAlert() {
       try {
         const res = await fetch(`/api/exit/alerts/${alertId}`);
         if (!res.ok) throw new Error('Error al cargar alerta');
         const { data } = await res.json();
         setAlert(data);
         
-        // Generar BusinessCase con contexto completo
+        // Generar BusinessCase usando el Engine
         const generated = ExitAlertEngine.generateBusinessCaseFromAlert(
           data,
           data.exitRecord || undefined,
@@ -99,14 +105,14 @@ export default function ExitAlertDetailPage() {
         setLoading(false);
       }
     }
-    fetchData();
+    fetchAlert();
   }, [alertId]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLER: RESOLVER ALERTA
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const handleResolve = async (selectedAction: string, notes: string) => {
+  const handleResolve = async (notes: string) => {
     setIsResolving(true);
     try {
       const response = await fetch(`/api/exit/alerts/${alertId}`, {
@@ -114,16 +120,15 @@ export default function ExitAlertDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'resolve',
-          notes: `${selectedAction}${notes ? ` | ${notes}` : ''}`
+          notes
         })
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        console.error('[AlertDetailPage] Error:', error);
-        throw new Error(error.error || 'Error resolviendo alerta');
+        throw new Error('Error resolviendo alerta');
       }
 
+      // Redirigir a lista de alertas
       router.push('/dashboard/exit/alerts');
     } catch (err) {
       console.error('[AlertDetailPage] Error resolving:', err);
@@ -168,10 +173,12 @@ export default function ExitAlertDetailPage() {
   // PREPARAR DATOS
   // ═══════════════════════════════════════════════════════════════════════════
   
-  const config = ALERT_CONFIG[alert.alertType] || ALERT_CONFIG.default;
-  const Icon = config.icon;
-  const eis = alert.exitRecord?.eis ?? businessCase.detection.scoreValue ?? 35;
+  const alertConfig = ALERT_CONFIG[alert.alertType] || ALERT_CONFIG.default;
+  const AlertIcon = alertConfig.icon;
   const isResolved = alert.status === 'resolved' || alert.status === 'resuelta';
+  
+  // EIS Score (con fallback)
+  const eis = alert.exitRecord?.eis ?? businessCase.detection.scoreValue ?? 0;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // RENDER
@@ -179,50 +186,61 @@ export default function ExitAlertDetailPage() {
   
   return (
     <div className="min-h-screen bg-[#0F172A]">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         
         {/* ═══════════════════════════════════════════════════════════════════
-            ACTO 1: HERO
+            HEADER: Back + Badge
             ═══════════════════════════════════════════════════════════════════ */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-10"
+          className="mb-8"
         >
-          {/* Back */}
           <button 
             onClick={() => router.push('/dashboard/exit/alerts')}
-            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-8"
+            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="text-sm">Volver a alertas</span>
           </button>
 
-          {/* Hero Content */}
-          <div className="text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/20 border border-purple-500/30 rounded-full mb-6">
-              <BrainCircuit className="w-4 h-4 text-white" />
-              <span className="text-sm text-slate-300">{config.label} · {businessCase.header.departmentName}</span>
+          {/* Badge tipo de alerta */}
+          <div className="flex justify-center mb-4">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/50 border border-slate-700/50">
+              <AlertIcon className="w-4 h-4 text-cyan-400" />
+              <span className="text-sm text-slate-300">{alertConfig.label}</span>
+              <span className="text-slate-600">·</span>
+              <span className="text-sm text-slate-400">{businessCase.header.departmentName}</span>
             </div>
-
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extralight text-white mb-4">
-              Oportunidad de{' '}
-              <span className="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-                Anticipación
-              </span>
-            </h1>
-
-            {/* Línea decorativa ── • ── */}
-            <div className="flex items-center justify-center gap-4 my-6">
-              <div className="w-16 h-px bg-gradient-to-r from-transparent to-slate-600" />
-              <div className="w-2 h-2 rounded-full bg-cyan-500" />
-              <div className="w-16 h-px bg-gradient-to-l from-transparent to-slate-600" />
-            </div>
-
-            <p className="text-slate-400 text-lg font-light max-w-xl mx-auto">
-              Tienes lo que otras empresas NO tuvieron.
-            </p>
           </div>
+        </motion.div>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            ACTO 1: HERO SECTION
+            ═══════════════════════════════════════════════════════════════════ */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="text-center mb-10"
+        >
+          <h1 className="text-4xl md:text-5xl font-extralight text-white mb-3">
+            Oportunidad de{' '}
+            <span className="bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+              Anticipación
+            </span>
+          </h1>
+          
+          {/* Línea decorativa */}
+          <div className="flex items-center justify-center gap-3 mt-4">
+            <div className="w-16 h-px bg-gradient-to-r from-transparent to-slate-600" />
+            <div className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
+            <div className="w-16 h-px bg-gradient-to-l from-transparent to-slate-600" />
+          </div>
+
+          <p className="text-slate-400 mt-4 text-lg font-light">
+            Tienes lo que otras empresas NO tuvieron.
+          </p>
         </motion.div>
 
         {/* ═══════════════════════════════════════════════════════════════════
@@ -272,41 +290,10 @@ export default function ExitAlertDetailPage() {
           </div>
         </div>
 
-        {/* Contexto Departamental - Datos históricos */}
-        <div className="mb-8">
-          <DepartmentContextCard
-            departmentId={alert.department?.id || ''}
-            departmentName={businessCase.header.departmentName}
-            currentEIS={eis}
-          />
-        </div>
-
         {/* ═══════════════════════════════════════════════════════════════════
-            ACTO 4: OPORTUNIDAD
+            ACTO 4: PLAN DE ACCIÓN
+            ⚡ v2.2: SUBIDO - Ahora está ANTES del contexto adicional
             ═══════════════════════════════════════════════════════════════════ */}
-        <div className="space-y-4 mb-8">
-          <CollapsibleSection 
-            title="La Oportunidad" 
-            icon={<Lightbulb className="w-5 h-5" />}
-            defaultOpen
-          >
-            <OpportunityTimeline
-              companyName={businessCase.header.departmentName || 'Tu Empresa'}
-              currentStage={businessCase.goldenOpportunity.diagram.currentStage}
-              stages={businessCase.goldenOpportunity.diagram.stages}
-              message={businessCase.goldenOpportunity.message}
-              callToAction={businessCase.goldenOpportunity.callToAction}
-              autopsiaCase={businessCase.emblamaticCases?.cases?.[0]}
-            />
-          </CollapsibleSection>
-        </div>
-
-        {/* ═══════════════════════════════════════════════════════════════════
-            ACTO 5: PLAN DE ACCIÓN + RESOLUCIÓN
-            ⚡ v2.1: ActionPlanCard premium con flujo 3 estados
-            ═══════════════════════════════════════════════════════════════════ */}
-        
-        {/* Componente premium de Plan de Acción */}
         <div className="mb-6">
           <ActionPlanCard
             philosophy={businessCase.actionPlan?.philosophy}
@@ -323,7 +310,8 @@ export default function ExitAlertDetailPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+            transition={{ duration: 0.4 }}
+            className="mb-8"
           >
             <ResolutionPanel
               quickPicks={businessCase.resolutionOptions.quickPicks}
@@ -334,6 +322,77 @@ export default function ExitAlertDetailPage() {
             />
           </motion.div>
         )}
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            ACTO 5: CONTEXTO ADICIONAL (Colapsado por defecto)
+            ⚡ v2.2: defaultOpen={false} - Progressive disclosure restaurado
+            ═══════════════════════════════════════════════════════════════════ */}
+        <div className="space-y-4">
+          
+          {/* Contexto Departamental - Ahora en colapsable */}
+          <CollapsibleSection 
+            title="Contexto Departamental" 
+            icon={<Building2 className="w-5 h-5" />}
+            defaultOpen={false}
+          >
+            <DepartmentContextCard
+              departmentId={alert.department?.id || ''}
+              departmentName={businessCase.header.departmentName}
+              currentEIS={eis}
+            />
+          </CollapsibleSection>
+
+          {/* La Oportunidad - Cerrado por defecto */}
+          <CollapsibleSection 
+            title="La Oportunidad" 
+            icon={<Lightbulb className="w-5 h-5" />}
+            defaultOpen={false}
+          >
+            <OpportunityTimeline
+              companyName={businessCase.header.departmentName || 'Tu Empresa'}
+              currentStage={businessCase.goldenOpportunity.diagram.currentStage}
+              stages={businessCase.goldenOpportunity.diagram.stages}
+              message={businessCase.goldenOpportunity.message}
+              callToAction={businessCase.goldenOpportunity.callToAction}
+              autopsiaCase={businessCase.emblamaticCases?.cases?.[0]}
+            />
+          </CollapsibleSection>
+
+          {/* Evidencia Metodológica - Cerrado por defecto */}
+          <CollapsibleSection 
+            title="Evidencia Metodológica" 
+            icon={<BookOpen className="w-5 h-5" />}
+            defaultOpen={false}
+          >
+            <div className="space-y-3">
+              {businessCase.methodology?.sources?.slice(0, 4).map((source: any, idx: number) => (
+                <div 
+                  key={idx}
+                  className="p-3 rounded-lg bg-slate-800/30 border border-slate-700/30"
+                >
+                  <p className="text-sm font-medium text-slate-300">
+                    {source.name}
+                  </p>
+                  {source.description && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      {source.description}
+                    </p>
+                  )}
+                </div>
+              ))}
+              
+              {businessCase.methodology?.disclaimer && (
+                <p className="text-xs text-slate-500 italic mt-3 p-3 bg-slate-800/20 rounded-lg">
+                  {businessCase.methodology.disclaimer}
+                </p>
+              )}
+            </div>
+          </CollapsibleSection>
+          
+        </div>
+
+        {/* Spacing bottom */}
+        <div className="h-16" />
 
       </div>
     </div>

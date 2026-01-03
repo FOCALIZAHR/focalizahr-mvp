@@ -19,6 +19,20 @@ import { startOfMonth, endOfMonth, format } from 'date-fns';
 
 
 // ============================================================================
+// 🔐 RBAC OPTIONS - Filtrado Jerárquico (v3.3.0)
+// ============================================================================
+
+/**
+ * Opciones para filtrado jerárquico RBAC
+ * Si allowedDepartmentIds es null/undefined = sin filtro (acceso global)
+ * Si tiene valores = filtrar solo esos departamentos
+ */
+export interface AggregationFilterOptions {
+  allowedDepartmentIds?: string[] | null;
+}
+
+
+// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -425,7 +439,8 @@ export class OnboardingAggregationService {
    */
   static async getGlobalMetrics(
     accountId: string,
-    period?: string
+    period?: string,
+    options?: AggregationFilterOptions
   ): Promise<{
     avgEXOScore: number | null;
     totalActiveJourneys: number;
@@ -503,7 +518,11 @@ export class OnboardingAggregationService {
         where: {
           accountId,
           periodStart: periodStart,  // ← Búsqueda exacta
-          periodEnd: periodEnd        // ← Búsqueda exacta
+          periodEnd: periodEnd,        // ← Búsqueda exacta
+          // 🔐 RBAC: Filtro jerárquico opcional
+          ...(options?.allowedDepartmentIds && { 
+            departmentId: { in: options.allowedDepartmentIds } 
+          })
         }
       });
       
@@ -545,8 +564,10 @@ export class OnboardingAggregationService {
    */
   static async getTopDepartments(
     accountId: string,
-    period?: string
+    period?: string,
+    options?: AggregationFilterOptions
   ): Promise<Array<{
+    departmentId: string;
     name: string;
     avgEXOScore: number;
     activeJourneys: number;
@@ -562,11 +583,18 @@ export class OnboardingAggregationService {
         accountId,
         periodStart: periodStart,
         periodEnd: periodEnd,
-        avgEXOScore: { not: null }
+        avgEXOScore: { not: null },
+        // 🔐 RBAC: Filtro jerárquico opcional
+        ...(options?.allowedDepartmentIds && { 
+          departmentId: { in: options.allowedDepartmentIds } 
+        })
       },
       include: {
         department: {
-          select: { displayName: true }
+          select: { 
+            id: true,
+            displayName: true 
+          }
         }
       },
       orderBy: { avgEXOScore: 'desc' },
@@ -574,6 +602,7 @@ export class OnboardingAggregationService {
     });
     
     return insights.map(i => ({
+      departmentId: i.department.id,
       name: i.department.displayName,
       avgEXOScore: Number(i.avgEXOScore!.toFixed(1)),
       activeJourneys: i.activeJourneys
@@ -585,8 +614,10 @@ export class OnboardingAggregationService {
    */
   static async getBottomDepartments(
     accountId: string,
-    period?: string
+    period?: string,
+    options?: AggregationFilterOptions
   ): Promise<Array<{
+    departmentId: string;
     name: string;
     avgEXOScore: number;
     atRiskCount: number;
@@ -602,11 +633,18 @@ export class OnboardingAggregationService {
         accountId,
         periodStart: periodStart,
         periodEnd: periodEnd,
-        avgEXOScore: { not: null }
+        avgEXOScore: { not: null },
+        // 🔐 RBAC: Filtro jerárquico opcional
+        ...(options?.allowedDepartmentIds && { 
+          departmentId: { in: options.allowedDepartmentIds } 
+        })
       },
       include: {
         department: {
-          select: { displayName: true }
+          select: { 
+            id: true,
+            displayName: true 
+          }
         }
       },
       orderBy: { avgEXOScore: 'asc' },
@@ -614,6 +652,7 @@ export class OnboardingAggregationService {
     });
     
     return insights.map(i => ({
+      departmentId: i.department.id,
       name: i.department.displayName,
       avgEXOScore: Number(i.avgEXOScore!.toFixed(1)),
       atRiskCount: i.atRiskJourneys
@@ -625,7 +664,8 @@ export class OnboardingAggregationService {
    */
   static async getGlobalInsights(
     accountId: string,
-    period?: string
+    period?: string,
+    options?: AggregationFilterOptions
   ): Promise<{
     topIssues: Array<{ issue: string; count: number }>;
     recommendations: string[];
@@ -641,6 +681,10 @@ export class OnboardingAggregationService {
         accountId,
         periodStart: periodStart,
         periodEnd: periodEnd,
+        // 🔐 RBAC: Filtro jerárquico opcional
+        ...(options?.allowedDepartmentIds && { 
+          departmentId: { in: options.allowedDepartmentIds } 
+        })
       },
       include: {
         department: {
@@ -711,7 +755,8 @@ export class OnboardingAggregationService {
    */
   static async getGlobalDemographics(
     accountId: string,
-    period?: string
+    period?: string,
+    options?: AggregationFilterOptions
   ): Promise<{
     byGeneration: Array<{ generation: string; count: number; avgEXOScore: number; atRiskRate: number }>;
     byGender: Array<{ gender: string; count: number; avgEXOScore: number }>;
@@ -730,7 +775,11 @@ export class OnboardingAggregationService {
         createdAt: {
           gte: periodStart,
           lte: periodEnd
-        }
+        },
+        // 🔐 RBAC: Filtro jerárquico opcional
+        ...(options?.allowedDepartmentIds && { 
+          departmentId: { in: options.allowedDepartmentIds } 
+        })
       },
       select: {
         exoScore: true,
@@ -1069,21 +1118,99 @@ static async updateAccumulatedExoScores(accountId: string): Promise<void> {
       // 4. Guardar con metadatos (🌟 TU MEJORA)
       await prisma.department.update({
         where: { id: dept.id },
-        data: { 
+        data: {
           accumulatedExoScore: accumulatedScore,
           accumulatedExoJourneys: totalJourneys,
           accumulatedPeriodCount: insights.length,        // 🌟 NUEVO
           accumulatedLastUpdated: new Date()              // 🌟 NUEVO
         }
       });
-      
+
       console.log(
         `[Onboarding]   ✅ ${dept.displayName}: ${accumulatedScore} ` +
         `(${insights.length} periods, ${totalJourneys} journeys)`  // 🌟 MEJORADO
       );
     }
-    
+
+    // =========================================================================
+    // PASO 2: PROPAGAR SCORES DE DEPARTAMENTOS (level 3) → GERENCIAS (level 2)
+    // =========================================================================
+    console.log(`[Onboarding] 🔼 Propagating scores to parent gerencias...`);
+
+    const gerencias = await prisma.department.findMany({
+      where: {
+        accountId,
+        isActive: true,
+        level: 2  // Solo gerencias
+      },
+      select: {
+        id: true,
+        displayName: true,
+        accumulatedExoScore: true,
+        accumulatedExoJourneys: true
+      }
+    });
+
+    for (const gerencia of gerencias) {
+      // Obtener departamentos hijos con scores calculados
+      const hijos = await prisma.department.findMany({
+        where: {
+          parentId: gerencia.id,
+          accumulatedExoScore: { not: null }
+        },
+        select: {
+          displayName: true,
+          accumulatedExoScore: true,
+          accumulatedExoJourneys: true
+        }
+      });
+
+      if (hijos.length === 0 && gerencia.accumulatedExoScore === null) {
+        // Sin hijos con data y sin score propio = skip
+        continue;
+      }
+
+      // Calcular promedio ponderado combinando:
+      // - Score propio de la gerencia (si tiene journeys directos)
+      // - Scores de todos sus hijos
+      let totalWeightedScore = 0;
+      let totalJourneys = 0;
+
+      // Incluir score propio de la gerencia si existe
+      if (gerencia.accumulatedExoScore !== null && gerencia.accumulatedExoJourneys) {
+        totalWeightedScore += gerencia.accumulatedExoScore * gerencia.accumulatedExoJourneys;
+        totalJourneys += gerencia.accumulatedExoJourneys;
+      }
+
+      // Sumar scores de hijos
+      for (const hijo of hijos) {
+        if (hijo.accumulatedExoScore !== null && hijo.accumulatedExoJourneys) {
+          totalWeightedScore += hijo.accumulatedExoScore * hijo.accumulatedExoJourneys;
+          totalJourneys += hijo.accumulatedExoJourneys;
+        }
+      }
+
+      const finalScore = totalJourneys > 0
+        ? parseFloat((totalWeightedScore / totalJourneys).toFixed(1))
+        : null;
+
+      // Actualizar gerencia con score combinado
+      await prisma.department.update({
+        where: { id: gerencia.id },
+        data: {
+          accumulatedExoScore: finalScore,
+          accumulatedExoJourneys: totalJourneys,
+          accumulatedLastUpdated: new Date()
+        }
+      });
+
+      console.log(
+        `[Onboarding]   🔼 ${gerencia.displayName}: ${finalScore} ` +
+        `(${hijos.length} children, ${totalJourneys} total journeys)`
+      );
+    }
     console.log(`[Onboarding] ✅ Accumulated scores updated successfully`);
+    
     
   } catch (error) {
     console.error('[Onboarding] ❌ Error updating accumulated scores:', error);
@@ -1109,7 +1236,8 @@ static async updateAccumulatedExoScores(accountId: string): Promise<void> {
  */
 static async getComplianceEfficiency(
   accountId: string,
-  departmentId?: string
+  departmentId?: string,
+  options?: AggregationFilterOptions
 ): Promise<Array<{
   departmentId: string;
   departmentName: string;
@@ -1135,7 +1263,17 @@ static async getComplianceEfficiency(
     status: 'active'
   };
   
-  if (departmentId) {
+  // 🔐 RBAC: Aplicar filtros de departamento
+  if (departmentId && options?.allowedDepartmentIds) {
+    // Si hay ambos: usar departmentId solo si está en los permitidos
+    whereClause.departmentId = options.allowedDepartmentIds.includes(departmentId) 
+      ? departmentId 
+      : { in: [] }; // No mostrar nada si no tiene acceso
+  } else if (options?.allowedDepartmentIds) {
+    // Solo RBAC: filtrar por departamentos permitidos
+    whereClause.departmentId = { in: options.allowedDepartmentIds };
+  } else if (departmentId) {
+    // Solo departmentId específico
     whereClause.departmentId = departmentId;
   }
   
@@ -1301,6 +1439,3 @@ static async getComplianceEfficiency(
   return results.sort((a, b) => a.compliance - b.compliance);
 }
 }
-
-
-
