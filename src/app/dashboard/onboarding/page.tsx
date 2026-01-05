@@ -9,6 +9,7 @@ import { CyanButton, PurpleButton, NeutralButton, ButtonGroup } from '@/componen
 
 
 
+
 // ═══════════════════════════════════════════════════════════════
 // 🆕 NAVEGACIÓN - AGREGAR ESTOS 2 IMPORTS
 // ═══════════════════════════════════════════════════════════════
@@ -31,10 +32,13 @@ import NPSOnboardingCard from '@/components/onboarding/NPSOnboardingCard';
 import OnboardingScoreClassificationCard from '@/components/onboarding/OnboardingScoreClassificationCard';
 import BalanceDepartmentalCard from '@/components/onboarding/BalanceDepartmentalCard';
 import EvolutionTrendCard from '@/components/onboarding/EvolutionTrendCard';
+import ComplianceBanner from '@/components/onboarding/ComplianceBanner';
 
+// Hook actualizado
 // Hook actualizado
 import { useOnboardingMetrics } from '@/hooks/useOnboardingMetrics';
 import type { OnboardingDashboardData } from '@/types/onboarding';
+
 
 export default function OnboardingDashboard() {
   const router = useRouter();
@@ -46,9 +50,9 @@ export default function OnboardingDashboard() {
   
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'resumen' | 'ranking' | 'alertas' | 'enps'>('resumen');
-  
   const { data, loading, error, refetch, timelineStages } = useOnboardingMetrics(
-    selectedDepartment === 'all' ? undefined : selectedDepartment
+    selectedDepartment === 'all' ? undefined : selectedDepartment,
+    'company'  // 🆕 AREA_MANAGER ve todas las gerencias para compararse
   );
 
   // ========================================
@@ -262,6 +266,14 @@ export default function OnboardingDashboard() {
                   />
                 </div>
               </div>
+
+              {/* ✅ NUEVO: Banner Compliance */}
+              {data?.complianceEfficiency && (
+                <ComplianceBanner
+                  departments={data.complianceEfficiency}
+                  loading={loading}
+                />
+              )}
             </div>
           )}
 
@@ -275,12 +287,12 @@ export default function OnboardingDashboard() {
 
           {/* TAB CONTENT: eNPS ONBOARDING */}
            {activeTab === 'enps' && (
-            <NPSOnboardingCard viewMode="gerencias" />
+            <NPSOnboardingCard viewMode="gerencias" scope="company" />
           )}
 
            {/* TAB CONTENT: ALERTAS POR GERENCIA */}
           {activeTab === 'alertas' && (
-            <AlertasGerenciaRanking viewMode="gerencias" />
+            <AlertasGerenciaRanking viewMode="gerencias" scope="company" />
           )}
 
           {/* CTAs NAVEGACIÓN */}

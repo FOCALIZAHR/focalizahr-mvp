@@ -1,140 +1,129 @@
 // ====================================================================
 // VISTA OPERACIONAL - ONBOARDING BY DEPARTAMENTOS
 // src/app/dashboard/onboarding/executive/page.tsx
-// v3.2 - Gauge compacto + UN CTA claro + lista unificada
-// FILOSOFÍA: "Above fold = Decisión en 3 segundos"
+// v5.0 - Layout FocalizaHR + Selector Gerencias RBAC
+// 
+// FILOSOFÍA: 
+// - Página = Orquestador (coordina, no implementa)
+// - Auth = meta del backend (no mocks, no localStorage)
+// - Componentes = Bimodales con viewMode + scope
+// - Estilos = Solo clases .fhr-* + Design System FocalizaHR
+//
+// CAMBIOS v5.0:
+// - Layout clon de /dashboard/onboarding (fondos blur, línea Tesla)
+// - Selector de gerencias para CEO/HR/Admin
+// - AREA_MANAGER ve badge fijo (sin selector)
+// - Responsive mejorado
 // ====================================================================
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { Badge } from '@/components/ui/badge';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import { 
   RefreshCw, 
   ArrowLeft, 
-  ChevronDown, 
-  ChevronRight,
   AlertTriangle,
-  Shield,
-  Users,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Building2,
   LayoutDashboard,
   Trophy,
   BarChart3,
-  ArrowRight
+  Users,
+  Building2,
+  ChevronDown
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
 
-// Navegación
+// ====================================================================
+// NAVEGACIÓN Y LAYOUT
+// ====================================================================
 import DashboardNavigation from '@/components/dashboard/DashboardNavigation';
 import { useSidebar } from '@/hooks/useSidebar';
 
-// Componentes
-import EXOScoreGauge from '@/components/onboarding/EXOScoreGauge';
+// ====================================================================
+// COMPONENTES BIMODALES
+// ====================================================================
 import VerticalTabsNav, { TabItem } from '@/components/ui/VerticalTabsNav';
+import EXOScoreGauge from '@/components/onboarding/EXOScoreGauge';
 import GerenciaOnboardingBimodal from '@/components/onboarding/GerenciaOnboardingBimodal';
 import AlertasGerenciaRanking from '@/components/onboarding/AlertasGerenciaRanking';
 import NPSOnboardingCard from '@/components/onboarding/NPSOnboardingCard';
+import OnboardingScoreClassificationCard from '@/components/onboarding/OnboardingScoreClassificationCard';
+import BalanceDepartmentalCard from '@/components/onboarding/BalanceDepartmentalCard';
+import ComplianceEfficiencyMatrix from '@/components/onboarding/ComplianceEfficiencyMatrix';
 
-
-// Hook y tipos
+// ====================================================================
+// HOOKS
+// ====================================================================
 import { useOnboardingMetrics } from '@/hooks/useOnboardingMetrics';
 import { isGlobalDashboard } from '@/types/onboarding';
-import type { OnboardingDashboardData } from '@/types/onboarding';
 
 // ====================================================================
-// CONSTANTES
+// TYPES
 // ====================================================================
-
-const GLOBAL_ROLES = ['CEO', 'HR_ADMIN', 'HR_MANAGER', 'ACCOUNT_OWNER', 'FOCALIZAHR_ADMIN'];
-
-type TabValue = 'resumen' | 'ranking' | 'alertas' | 'enps';
+type TabValue = 'resumen' | 'equipos' | 'ranking' | 'alertas' | 'enps';
 
 const TABS_CONFIG: TabItem<TabValue>[] = [
   { value: 'resumen', label: 'Resumen', icon: LayoutDashboard, color: 'cyan' },
+  { value: 'equipos', label: 'Equipos', icon: Users, color: 'cyan' },
   { value: 'ranking', label: 'Ranking', icon: Trophy, color: 'cyan' },
   { value: 'alertas', label: 'Alertas', icon: AlertTriangle, color: 'amber' },
   { value: 'enps', label: 'eNPS', icon: BarChart3, color: 'purple' }
 ];
 
-// ====================================================================
-// HELPERS - Clasificación semántica
-// ====================================================================
-
-const getScoreClassification = (score: number) => {
-  if (score >= 80) return { label: 'EXCELENTE', color: '#10B981', bg: 'rgba(16, 185, 129, 0.1)' };
-  if (score >= 60) return { label: 'BUENO', color: '#22D3EE', bg: 'rgba(34, 211, 238, 0.1)' };
-  if (score >= 40) return { label: 'REGULAR', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.1)' };
-  return { label: 'CRÍTICO', color: '#EF4444', bg: 'rgba(239, 68, 68, 0.1)' };
-};
-
-const getInsightMessage = (score: number, benchmark: number) => {
-  const diff = score - benchmark;
-  if (diff >= 10) return 'Muy por encima del mercado. Mantén el ritmo.';
-  if (diff >= 0) return 'Alineado con el mercado. Hay espacio para destacar.';
-  if (diff >= -10) return 'Ligeramente bajo promedio. Oportunidad de mejora.';
-  return 'Tu onboarding tiene fricciones. Los nuevos talentos lo sienten.';
-};
-
-// ====================================================================
-// INTERFACES
-// ====================================================================
-
-interface AccumulatedDepartment {
-  id: string;
-  displayName: string;
-  standardCategory: string;
-  accumulatedExoScore: number | null;
-  accumulatedExoJourneys: number | null;
-  accumulatedPeriodCount: number | null;
-  level?: number;
-  parentId?: string | null;
-  unitType?: string;
-  criticalAlerts?: number;
-  exoScoreTrend?: number;
-}
+// Roles que pueden ver selector de gerencias
+const ROLES_WITH_GERENCIA_SELECTOR = [
+  'FOCALIZAHR_ADMIN',
+  'ACCOUNT_OWNER',
+  'CEO',
+  'HR_MANAGER',
+  'CLIENT' // Compatibilidad sistema antiguo
+];
 
 // ====================================================================
 // COMPONENTE PRINCIPAL
 // ====================================================================
-
-export default function OnboardingExecutiveView() {
+export default function OnboardingExecutivePage() {
   const router = useRouter();
   const { isCollapsed } = useSidebar();
-  const { data, loading, error, refetch } = useOnboardingMetrics();
-
-  const userRole: string = 'CEO';
-  const userDepartmentId: string | null = null;
-
+  const [activeTab, setActiveTab] = useState<TabValue>('resumen');
+  const [selectedGerenciaId, setSelectedGerenciaId] = useState<string | null>(null);
+  
+  // ══════════════════════════════════════════════════════════════════
+  // HOOK CON scope='filtered' - RBAC automático del backend
+  // ══════════════════════════════════════════════════════════════════
+  const { data, loading, error, refetch } = useOnboardingMetrics(undefined, 'filtered');
+  
+  // ══════════════════════════════════════════════════════════════════
+  // ESTADOS: LOADING
+  // ══════════════════════════════════════════════════════════════════
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0F172A] flex">
+      <div className="min-h-screen fhr-bg-main flex">
         <DashboardNavigation />
         <main className={`flex-1 transition-all duration-300 ${isCollapsed ? 'ml-20' : 'ml-72'}`}>
           <div className="flex items-center justify-center h-screen">
-            <RefreshCw className="h-8 w-8 text-cyan-400 animate-spin" />
+            <RefreshCw className="h-8 w-8 text-cyan-400 animate-spin" strokeWidth={1.5} />
           </div>
         </main>
       </div>
     );
   }
 
+  // ══════════════════════════════════════════════════════════════════
+  // ESTADOS: ERROR o datos inválidos
+  // ══════════════════════════════════════════════════════════════════
   if (error || !isGlobalDashboard(data)) {
     return (
-      <div className="min-h-screen bg-[#0F172A] flex">
+      <div className="min-h-screen fhr-bg-main flex">
         <DashboardNavigation />
         <main className={`flex-1 transition-all duration-300 ${isCollapsed ? 'ml-20' : 'ml-72'}`}>
           <div className="flex items-center justify-center h-screen px-4">
-            <div className="text-center space-y-4">
-              <AlertTriangle className="h-12 w-12 text-amber-400 mx-auto" />
+            <div className="fhr-card p-8 text-center space-y-4 max-w-md">
+              <AlertTriangle className="h-12 w-12 text-amber-400 mx-auto" strokeWidth={1.5} />
               <p className="text-slate-300">Error cargando datos</p>
               <button 
                 onClick={() => refetch()}
-                className="px-6 py-2 bg-slate-800 rounded-lg text-white hover:bg-slate-700"
+                className="fhr-btn fhr-btn-secondary"
               >
                 Reintentar
               </button>
@@ -145,166 +134,265 @@ export default function OnboardingExecutiveView() {
     );
   }
 
-  return (
-    <ExecutiveContent 
-      data={data}
-      loading={loading}
-      refetch={refetch}
-      isCollapsed={isCollapsed}
-      userRole={userRole}
-      userDepartmentId={userDepartmentId}
-    />
-  );
-}
-
-// ====================================================================
-// CONTENIDO
-// ====================================================================
-
-interface ExecutiveContentProps {
-  data: OnboardingDashboardData;
-  loading: boolean;
-  refetch: () => void;
-  isCollapsed: boolean;
-  userRole: string;
-  userDepartmentId: string | null;
-}
-
-function ExecutiveContent({
-  data,
-  loading,
-  refetch,
-  isCollapsed,
-  userRole,
-  userDepartmentId
-}: ExecutiveContentProps) {
-  const router = useRouter();
+  // ══════════════════════════════════════════════════════════════════
+  // MÉTRICAS Y META (después del type guard)
+  // ══════════════════════════════════════════════════════════════════
+  const userDepartmentId = data.meta?.userDepartmentId;
+  const userRole = data.meta?.userRole || '';
   
-  const [activeTab, setActiveTab] = useState<TabValue>('resumen');
-  const [selectedGerenciaId, setSelectedGerenciaId] = useState<string | null>(null);
-  const [isListExpanded, setIsListExpanded] = useState(true);
-
-  const showGerenciaFilter = GLOBAL_ROLES.includes(userRole);
-
-  // Gerencias disponibles
-  const gerenciasDisponibles = useMemo(() => {
-    if (!showGerenciaFilter) return [];
-    const depts = data.accumulated?.departments as AccumulatedDepartment[] | undefined;
-    if (!depts) return [];
-    return depts
-      .filter((d) => d.level === 2 || d.unitType === 'gerencia')
-      .map((d) => ({ id: d.id, name: d.displayName }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [data.accumulated?.departments, showGerenciaFilter]);
-
-  // Departamentos filtrados y ordenados
-  const departamentosFiltrados = useMemo(() => {
-    const depts = data.accumulated?.departments as AccumulatedDepartment[] | undefined;
-    if (!depts) return [];
-    
-    let filtered = depts;
-    if (selectedGerenciaId) {
-      filtered = depts.filter(d => 
-        (d.level === 3 || d.unitType === 'departamento') && 
-        d.parentId === selectedGerenciaId
-      );
-    } else {
-      filtered = depts.filter(d => d.level === 3 || d.unitType === 'departamento');
+  // Derivar nombre del departamento del usuario desde accumulated.departments
+  const userDepartmentName = data.accumulated?.departments?.find(
+    d => d.id === userDepartmentId
+  )?.displayName || '';
+  
+  // ══════════════════════════════════════════════════════════════════
+  // SELECTOR DE GERENCIAS - Solo para roles ejecutivos
+  // ══════════════════════════════════════════════════════════════════
+  const canSelectGerencia = ROLES_WITH_GERENCIA_SELECTOR.includes(userRole);
+  
+  // Extraer gerencias (nivel 2) de los datos
+  const gerencias = (data?.accumulated?.departments || [])
+    .filter(d => d.level === 2 || d.unitType === 'gerencia')
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  
+  // ══════════════════════════════════════════════════════════════════
+  // GERENCIA EFECTIVA (selector O RBAC del usuario)
+  // ══════════════════════════════════════════════════════════════════
+  const effectiveGerenciaId = selectedGerenciaId || userDepartmentId;
+  
+  // Buscar la gerencia seleccionada en los datos YA AGREGADOS del backend
+  const selectedGerenciaData = effectiveGerenciaId
+    ? data.accumulated?.departments?.find(d => d.id === effectiveGerenciaId)
+    : null;
+  
+  // Nombre de la gerencia seleccionada
+  const selectedGerenciaName = selectedGerenciaData?.displayName || '';
+  
+  // ══════════════════════════════════════════════════════════════════
+  // MÉTRICAS - Usar datos de gerencia seleccionada O globales
+  // (El backend YA calculó todo, frontend solo SELECCIONA)
+  // ══════════════════════════════════════════════════════════════════
+  const scoreForGauge = selectedGerenciaData?.accumulatedExoScore 
+    ?? data.accumulated?.globalExoScore 
+    ?? data.global?.avgEXOScore 
+    ?? 0;
+  
+  const totalJourneys = selectedGerenciaData?.accumulatedExoJourneys 
+    ?? data.accumulated?.totalJourneys 
+    ?? data.global?.totalActiveJourneys 
+    ?? 0;
+  
+  const periodCount = selectedGerenciaData?.accumulatedPeriodCount 
+    ?? data.accumulated?.periodCount 
+    ?? 1;
+  
+  // Alertas críticas (TODO: el backend debería filtrar por gerencia también)
+  const criticalAlerts = data.live?.criticalAlerts || data.global?.criticalAlerts || 0;
+  
+  // ══════════════════════════════════════════════════════════════════
+  // TOP/BOTTOM INFLUENCER
+  // Si hay gerencia seleccionada → mostrar sus departamentos hijos con contribution calculado
+  // Si no → mostrar global del backend
+  // ══════════════════════════════════════════════════════════════════
+  const { topInfluencer, bottomImpact } = (() => {
+    if (!effectiveGerenciaId) {
+      // Sin filtro: usar global del backend
+      return {
+        topInfluencer: data.accumulated?.departmentImpact?.topInfluencer ?? null,
+        bottomImpact: data.accumulated?.departmentImpact?.bottomImpact ?? null
+      };
     }
-
-    return filtered
-      .filter(d => d.accumulatedExoScore !== null)
-      .sort((a, b) => (b.accumulatedExoScore || 0) - (a.accumulatedExoScore || 0));
-  }, [data.accumulated?.departments, selectedGerenciaId]);
-
-  // Departamento crítico (peor score)
-  const criticalDepartment = useMemo(() => {
-    if (departamentosFiltrados.length === 0) return null;
-    return departamentosFiltrados[departamentosFiltrados.length - 1];
-  }, [departamentosFiltrados]);
-
-  // Datos calculados
-  const { accumulated, global } = data;
-  const scoreForGauge = accumulated?.globalExoScore ?? global?.avgEXOScore ?? 0;
-  const totalJourneys = accumulated?.totalJourneys ?? global?.totalActiveJourneys ?? 0;
-  const criticalAlerts = global?.criticalAlerts || 0;
-  const benchmark = 62; // TODO: Traer de API
-
-  const classification = getScoreClassification(scoreForGauge);
-  const insightMessage = getInsightMessage(scoreForGauge, benchmark);
-  const vsMarket = scoreForGauge - benchmark;
-
-  // Tabs con badge
-  const tabsWithBadges = useMemo(() => 
-    TABS_CONFIG.map(tab => 
-      tab.value === 'alertas' && criticalAlerts > 0
-        ? { ...tab, badge: criticalAlerts }
-        : tab
-    ),
-    [criticalAlerts]
+    
+    // Con filtro: buscar departamentos HIJOS de la gerencia
+    const hijos = (data.accumulated?.departments || [])
+      .filter(d => d.parentId === effectiveGerenciaId && d.accumulatedExoScore > 0);
+    
+    if (hijos.length === 0) {
+      return { topInfluencer: null, bottomImpact: null };
+    }
+    
+    // Calcular contribution de cada hijo respecto al score de la gerencia
+    // Fórmula: (score_hijo - score_gerencia) × (journeys_hijo / total_journeys_gerencia)
+    const gerenciaScore = selectedGerenciaData?.accumulatedExoScore || 0;
+    const gerenciaTotalJourneys = selectedGerenciaData?.accumulatedExoJourneys || 1;
+    
+    const hijosWithContribution = hijos.map(hijo => {
+      const hijoScore = hijo.accumulatedExoScore || 0;
+      const hijoJourneys = hijo.accumulatedExoJourneys || 0;
+      
+      const contribution = (hijoScore - gerenciaScore) * (hijoJourneys / gerenciaTotalJourneys);
+      
+      return {
+        departmentId: hijo.id,
+        departmentName: hijo.displayName,
+        score: hijoScore,
+        journeys: hijoJourneys,
+        contribution: parseFloat(contribution.toFixed(2))
+      };
+    });
+    
+    // Ordenar por contribution (mayor a menor)
+    hijosWithContribution.sort((a, b) => b.contribution - a.contribution);
+    
+    return {
+      topInfluencer: hijosWithContribution[0] || null,
+      bottomImpact: hijosWithContribution[hijosWithContribution.length - 1] || null
+    };
+  })();
+  
+  // ══════════════════════════════════════════════════════════════════
+  // FILTRAR COMPLIANCE DATA POR GERENCIA
+  // ══════════════════════════════════════════════════════════════════
+  const allComplianceData = data.complianceEfficiency || [];
+  const complianceData = !effectiveGerenciaId 
+    ? allComplianceData 
+    : allComplianceData.filter(dept => {
+        if (dept.departmentId === effectiveGerenciaId) return true;
+        // @ts-ignore - parentId puede existir en el tipo extendido
+        if (dept.parentId === effectiveGerenciaId) return true;
+        return false;
+      });
+  
+  // ══════════════════════════════════════════════════════════════════
+  // TABS CON BADGE DE ALERTAS
+  // ══════════════════════════════════════════════════════════════════
+  const tabsWithBadges = TABS_CONFIG.map(tab => 
+    tab.value === 'alertas' && criticalAlerts > 0
+      ? { ...tab, badge: criticalAlerts }
+      : tab
   );
 
-  // ================================================================
-  // RENDER
-  // ================================================================
-  
+  // ══════════════════════════════════════════════════════════════════
+  // RENDER PRINCIPAL
+  // ══════════════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen bg-[#0F172A] flex">
+    <div className="min-h-screen fhr-bg-main flex relative">
+      
+      {/* ════════════════════════════════════════════════════════════
+          FONDOS BLUR - Signature FocalizaHR
+         ════════════════════════════════════════════════════════════ */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-cyan-500/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[120px]" />
+      </div>
+      
       <DashboardNavigation />
       
-      <main className={`flex-1 transition-all duration-300 ${isCollapsed ? 'ml-20' : 'ml-72'}`}>
-        <div className="p-4 md:p-6 lg:p-8">
+      <main className={`
+        flex-1 relative z-10
+        transition-all duration-300 
+        ${isCollapsed ? 'ml-20' : 'ml-72'}
+      `}>
+        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
           
-          {/* ══════════════════════════════════════════════════════
-              HEADER COMPACTO
-             ══════════════════════════════════════════════════════ */}
-          <div className="flex items-center gap-3 mb-4">
-            <button
-              onClick={() => router.push('/dashboard/onboarding')}
-              className="p-2 rounded-lg bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-white transition-all"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-            
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg md:text-xl font-light text-white">Vista Operacional</h1>
-                <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 text-xs">DEPTOS</Badge>
-              </div>
+          {/* ════════════════════════════════════════════════════════
+              HEADER - Estilo FocalizaHR con línea Tesla
+             ════════════════════════════════════════════════════════ */}
+          <div className="mb-8">
+            {/* Navegación superior */}
+            <div className="flex items-center justify-between mb-6">
+              <button
+                onClick={() => router.push('/dashboard/onboarding')}
+                className="p-2 rounded-lg bg-slate-800/30 border border-slate-700/30 text-slate-400 hover:text-white hover:border-slate-600 transition-all"
+              >
+                <ArrowLeft className="h-5 w-5" strokeWidth={1.5} />
+              </button>
+              
+              <button
+                onClick={() => refetch()}
+                disabled={loading}
+                className="p-2 rounded-lg bg-slate-800/30 border border-slate-700/30 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/30 transition-all"
+              >
+                <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.5} />
+              </button>
             </div>
-
-            <button
-              onClick={() => refetch()}
-              disabled={loading}
-              className="p-2 rounded-lg bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-cyan-400 transition-all"
-            >
-              <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-            </button>
+            
+            {/* Título con gradiente */}
+            <div className="text-center">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extralight text-white tracking-tight mb-3">
+                Vista{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400">
+                  Operacional
+                </span>
+              </h1>
+              
+              {/* Línea Tesla - Signature FocalizaHR */}
+              <div className="flex items-center justify-center gap-3 mb-3">
+                <div className="h-px w-12 bg-gradient-to-r from-transparent to-white/20" />
+                <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                <div className="h-px w-12 bg-gradient-to-l from-transparent to-white/20" />
+              </div>
+              
+              <p className="text-sm sm:text-base text-slate-500 font-light">
+                Análisis por departamentos
+              </p>
+            </div>
           </div>
 
-          {/* Filtro gerencia */}
-          {showGerenciaFilter && gerenciasDisponibles.length > 0 && (
-            <div className="relative mb-4 max-w-xs">
-              <select
-                value={selectedGerenciaId || ''}
-                onChange={(e) => setSelectedGerenciaId(e.target.value || null)}
-                className="w-full appearance-none bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-2 pr-10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-              >
-                <option value="">Todas las gerencias</option>
-                {gerenciasDisponibles.map((g) => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+          {/* ════════════════════════════════════════════════════════
+              SELECTOR DE GERENCIA - Solo CEO/HR/Admin
+             ════════════════════════════════════════════════════════ */}
+          {canSelectGerencia && gerencias.length > 1 && (
+            <div className="flex justify-center mb-6">
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <Building2 className="w-4 h-4 text-cyan-400" />
+                </div>
+                
+                <select
+                  value={selectedGerenciaId || ''}
+                  onChange={(e) => setSelectedGerenciaId(e.target.value || null)}
+                  className="
+                    appearance-none
+                    bg-slate-800/50 backdrop-blur-sm
+                    border border-slate-700/50 hover:border-cyan-500/30
+                    rounded-xl pl-10 pr-10 py-3
+                    text-white text-sm font-medium
+                    cursor-pointer
+                    transition-all duration-200
+                    focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/50
+                    min-w-[260px]
+                  "
+                >
+                  <option value="" className="bg-slate-900">
+                    Todas las Gerencias
+                  </option>
+                  {gerencias.map((g) => (
+                    <option key={g.id} value={g.id} className="bg-slate-900">
+                      {g.displayName}
+                    </option>
+                  ))}
+                </select>
+                
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                </div>
+              </div>
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════════════
+          {/* Badge fijo para AREA_MANAGER */}
+          {!canSelectGerencia && userDepartmentName && (
+            <div className="flex justify-center mb-6">
+              <div className="
+                flex items-center gap-2 
+                bg-slate-800/30 border border-slate-700/30 
+                rounded-xl px-4 py-2.5
+              ">
+                <Building2 className="w-4 h-4 text-cyan-400" />
+                <span className="text-sm text-slate-300 font-medium">
+                  {userDepartmentName}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* ════════════════════════════════════════════════════════
               LAYOUT: TABS + CONTENIDO
-             ══════════════════════════════════════════════════════ */}
+             ════════════════════════════════════════════════════════ */}
           <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
             
-            {/* TABS */}
+            {/* TABS VERTICALES */}
             <VerticalTabsNav
               tabs={tabsWithBadges}
               activeTab={activeTab}
@@ -312,224 +400,67 @@ function ExecutiveContent({
             />
 
             {/* CONTENIDO */}
-            <div className="flex-1 min-w-0 space-y-4">
+            <div className="flex-1 min-w-0">
               
-              {/* ════════════════════════════════════════════════
-                  TAB: RESUMEN - ABOVE THE FOLD = DECISIÓN
-                 ════════════════════════════════════════════════ */}
+              {/* ══════════════════════════════════════════════════
+                  TAB: RESUMEN
+                 ══════════════════════════════════════════════════ */}
               {activeTab === 'resumen' && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="space-y-4"
+                  className="space-y-6"
                 >
-                  {/* ═══════════════════════════════════════════════
-                      HERO: Score + Insight + CTA (UN protagonista)
-                     ═══════════════════════════════════════════════ */}
-                  <div 
-                    className="relative rounded-2xl p-4 md:p-6 overflow-hidden"
-                    style={{
-                      background: 'rgba(15, 23, 42, 0.6)',
-                      backdropFilter: 'blur(16px)',
-                      border: '1px solid rgba(51, 65, 85, 0.4)',
-                    }}
-                  >
-                    {/* Línea Tesla */}
-                    <div 
-                      className="absolute top-0 left-0 right-0 h-px"
-                      style={{ background: `linear-gradient(90deg, transparent, ${classification.color}, transparent)` }}
-                    />
-
-                    <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
-                      
-                      {/* Gauge COMPACTO (no gigante) */}
-                      <div className="flex-shrink-0">
+                  {/* Hero: Gauge izquierda + Cards apiladas derecha */}
+                  <div className="fhr-card p-4 sm:p-6">
+                    <div className="fhr-top-line" />
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Gauge - Protagonista (centrado verticalmente) */}
+                      <div className="flex items-center justify-center">
                         <EXOScoreGauge 
                           score={scoreForGauge}
                           label="EXO Score"
-                          size="md"  // ← CAMBIO: de "lg" a "md"
+                          size="md"
                           standardCategory="ALL"
                           country="CL"
                         />
                       </div>
-
-                      {/* Insight + CTA */}
-                      <div className="flex-1 text-center md:text-left">
-                        {/* Clasificación semántica */}
-                        <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
-                          <Badge 
-                            className="text-xs font-semibold"
-                            style={{ backgroundColor: classification.bg, color: classification.color, border: 'none' }}
-                          >
-                            {classification.label}
-                          </Badge>
-                          <span className="text-xs text-slate-500">
-                            {vsMarket >= 0 ? '+' : ''}{vsMarket.toFixed(0)}% vs mercado CL
-                          </span>
-                        </div>
-
-                        {/* Mensaje insight */}
-                        <p className="text-sm text-slate-300 mb-3">
-                          {insightMessage}
-                        </p>
-
-                        {/* Mini stats */}
-                        <div className="flex items-center justify-center md:justify-start gap-4 text-xs text-slate-500 mb-4">
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" /> {totalJourneys} journeys
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <AlertTriangle className={`h-3 w-3 ${criticalAlerts > 0 ? 'text-red-400' : 'text-emerald-400'}`} />
-                            {criticalAlerts} alertas
-                          </span>
-                          <span>{departamentosFiltrados.length} deptos</span>
-                        </div>
-
-                        {/* ═══════════════════════════════════════════
-                            UN CTA CLARO - El más importante
-                           ═══════════════════════════════════════════ */}
-                        {criticalDepartment && criticalDepartment.accumulatedExoScore && criticalDepartment.accumulatedExoScore < 60 && (
-                          <button
-                            onClick={() => router.push(`/dashboard/onboarding/alerts?departmentId=${criticalDepartment.id}`)}
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
-                            style={{
-                              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1))',
-                              border: '1px solid rgba(239, 68, 68, 0.3)',
-                              color: '#EF4444'
-                            }}
-                          >
-                            Intervenir en {criticalDepartment.displayName}
-                            <ArrowRight className="h-4 w-4" />
-                          </button>
-                        )}
+                      
+                      {/* Cards apiladas verticalmente */}
+                      <div className="flex flex-col gap-4">
+                        <OnboardingScoreClassificationCard 
+                          score={scoreForGauge}
+                          periodCount={periodCount}
+                          totalJourneys={totalJourneys}
+                          companyName={selectedGerenciaName || userDepartmentName || 'tu área'}
+                        />
+                        
+                        <BalanceDepartmentalCard 
+                          topInfluencer={topInfluencer}
+                          bottomImpact={bottomImpact}
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Mini stats */}
+                    <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 mt-6 pt-6 border-t border-slate-800/50">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-500">
+                        <Users className="h-4 w-4" strokeWidth={1.5} />
+                        <span>{totalJourneys} journeys activos</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-500">
+                        <AlertTriangle 
+                          className={`h-4 w-4 ${criticalAlerts > 0 ? 'text-red-400' : 'text-emerald-400'}`} 
+                          strokeWidth={1.5} 
+                        />
+                        <span>{criticalAlerts} alertas críticas</span>
                       </div>
                     </div>
                   </div>
-
-                  {/* ═══════════════════════════════════════════════
-                      LISTA UNIFICADA (Score + Journeys + Trend + Alertas)
-                      Sin "Ver Compliance" separado
-                     ═══════════════════════════════════════════════ */}
-                  <div>
-                    <button
-                      onClick={() => setIsListExpanded(!isListExpanded)}
-                      className="w-full flex items-center justify-between p-4 rounded-2xl transition-all group"
-                      style={{
-                        background: 'rgba(15, 23, 42, 0.5)',
-                        border: '1px solid rgba(51, 65, 85, 0.4)',
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Building2 className="h-5 w-5 text-purple-400" />
-                        <span className="text-white font-medium">Mis Departamentos</span>
-                        <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
-                          {departamentosFiltrados.length}
-                        </Badge>
-                      </div>
-                      <motion.div
-                        animate={{ rotate: isListExpanded ? 180 : 0 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <ChevronDown className="h-5 w-5 text-slate-400 group-hover:text-purple-400" />
-                      </motion.div>
-                    </button>
-
-                    <AnimatePresence>
-                      {isListExpanded && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.3 }}
-                          className="overflow-hidden"
-                        >
-                          <div 
-                            className="mt-2 rounded-2xl overflow-hidden"
-                            style={{
-                              background: 'rgba(15, 23, 42, 0.4)',
-                              border: '1px solid rgba(51, 65, 85, 0.3)',
-                            }}
-                          >
-                            {/* Línea Tesla */}
-                            <div 
-                              className="h-px w-full"
-                              style={{ background: 'linear-gradient(90deg, transparent, #A78BFA, transparent)' }}
-                            />
-
-                            {/* Header de tabla */}
-                            <div className="grid grid-cols-12 gap-2 px-4 py-2 text-xs text-slate-500 border-b border-slate-800/50">
-                              <div className="col-span-1">#</div>
-                              <div className="col-span-5">Departamento</div>
-                              <div className="col-span-2 text-center">Journeys</div>
-                              <div className="col-span-2 text-center">Trend</div>
-                              <div className="col-span-2 text-right">Score</div>
-                            </div>
-
-                            {/* Lista */}
-                            <div className="max-h-[300px] overflow-y-auto">
-                              {departamentosFiltrados.map((dept, index) => {
-                                const score = dept.accumulatedExoScore || 0;
-                                const journeys = dept.accumulatedExoJourneys || 0;
-                                const alerts = dept.criticalAlerts || 0;
-                                const trendVal = dept.exoScoreTrend;
-                                const trend = trendVal && trendVal > 1 ? 'up' : trendVal && trendVal < -1 ? 'down' : 'stable';
-                                const scoreClass = getScoreClassification(score);
-
-                                return (
-                                  <div 
-                                    key={dept.id}
-                                    className="grid grid-cols-12 gap-2 px-4 py-3 items-center border-b border-slate-800/30 last:border-0 hover:bg-slate-800/20 transition-colors cursor-pointer"
-                                    onClick={() => router.push(`/dashboard/onboarding/alerts?departmentId=${dept.id}`)}
-                                  >
-                                    {/* Rank */}
-                                    <div className="col-span-1">
-                                      <span className="text-slate-600 text-sm">{index + 1}</span>
-                                    </div>
-
-                                    {/* Nombre + alertas */}
-                                    <div className="col-span-5 flex items-center gap-2 min-w-0">
-                                      <span className="text-white text-sm truncate">{dept.displayName}</span>
-                                      {alerts > 0 && (
-                                        <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] bg-red-500/20 text-red-400">
-                                          {alerts}
-                                        </span>
-                                      )}
-                                    </div>
-
-                                    {/* Journeys */}
-                                    <div className="col-span-2 text-center">
-                                      <span className="text-slate-400 text-sm">{journeys}</span>
-                                    </div>
-
-                                    {/* Trend */}
-                                    <div className="col-span-2 flex justify-center">
-                                      {trend === 'up' && <TrendingUp className="h-4 w-4 text-emerald-400" />}
-                                      {trend === 'down' && <TrendingDown className="h-4 w-4 text-red-400" />}
-                                      {trend === 'stable' && <Minus className="h-4 w-4 text-slate-500" />}
-                                    </div>
-
-                                    {/* Score */}
-                                    <div className="col-span-2 flex items-center justify-end gap-2">
-                                      <span 
-                                        className="text-sm font-medium tabular-nums"
-                                        style={{ color: scoreClass.color }}
-                                      >
-                                        {score.toFixed(0)}
-                                      </span>
-                                      <ChevronRight className="h-4 w-4 text-slate-600" />
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  {/* CTAs secundarios (menos prominentes) */}
-                  <div className="flex items-center justify-center gap-3 pt-4">
+                  
+                  {/* CTAs secundarios */}
+                  <div className="flex items-center justify-center gap-3">
                     <button
                       onClick={() => router.push('/dashboard/onboarding/pipeline')}
                       className="text-sm text-slate-500 hover:text-cyan-400 transition-colors"
@@ -547,9 +478,24 @@ function ExecutiveContent({
                 </motion.div>
               )}
 
-              {/* ════════════════════════════════════════════════
-                  TAB: RANKING (componente existente)
-                 ════════════════════════════════════════════════ */}
+              {/* ══════════════════════════════════════════════════════
+                  TAB: EQUIPOS (ComplianceEfficiencyMatrix)
+                 ══════════════════════════════════════════════════════ */}
+              {activeTab === 'equipos' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <ComplianceEfficiencyMatrix 
+                    departments={complianceData}
+                    loading={loading}
+                  />
+                </motion.div>
+              )}
+
+              {/* ══════════════════════════════════════════════════
+                  TAB: RANKING (viewMode=departamentos)
+                 ══════════════════════════════════════════════════ */}
               {activeTab === 'ranking' && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
@@ -558,31 +504,41 @@ function ExecutiveContent({
                   <GerenciaOnboardingBimodal 
                     data={data}
                     loading={loading}
+                    viewMode="departamentos"
+                    parentDepartmentId={selectedGerenciaId || userDepartmentId || undefined}
                   />
                 </motion.div>
               )}
 
-              {/* ════════════════════════════════════════════════
-                  TAB: ALERTAS (componente existente)
-                 ════════════════════════════════════════════════ */}
+              {/* ══════════════════════════════════════════════════
+                  TAB: ALERTAS (scope=filtered)
+                 ══════════════════════════════════════════════════ */}
               {activeTab === 'alertas' && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                 >
-                  <AlertasGerenciaRanking />
+                  <AlertasGerenciaRanking 
+                    viewMode="departamentos"
+                    scope="filtered"
+                    parentDepartmentId={selectedGerenciaId || userDepartmentId || undefined}
+                  />
                 </motion.div>
               )}
 
-              {/* ════════════════════════════════════════════════
-                  TAB: eNPS (componente existente)
-                 ════════════════════════════════════════════════ */}
+              {/* ══════════════════════════════════════════════════
+                  TAB: eNPS (scope=filtered + parentDepartmentId)
+                 ══════════════════════════════════════════════════ */}
               {activeTab === 'enps' && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                 >
-                  <NPSOnboardingCard viewMode="gerencias" />
+                  <NPSOnboardingCard 
+                    viewMode="departamentos"
+                    scope="filtered"
+                    parentDepartmentId={selectedGerenciaId || userDepartmentId || undefined}
+                  />
                 </motion.div>
               )}
 

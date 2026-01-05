@@ -30,6 +30,11 @@ import {
   Activity
 } from 'lucide-react';
 import { useOnboardingAlerts } from '@/hooks/useOnboardingAlerts';
+import { 
+  calculateTurnoverCostSHRM2024,
+  getOnboardingFinancialConfig,
+  formatCurrencyCLP 
+} from '@/lib/financialCalculations';
 
 // ====================================================================
 // INTERFACES
@@ -38,6 +43,7 @@ import { useOnboardingAlerts } from '@/hooks/useOnboardingAlerts';
 interface AlertasGerenciaRankingProps {
   viewMode?: 'gerencias' | 'departamentos';
   parentDepartmentId?: string;
+  scope?: 'company' | 'filtered';
 }
 
 interface GerenciaAlertData {
@@ -54,7 +60,7 @@ interface GerenciaAlertData {
 // CONSTANTES
 // ====================================================================
 
-const RIESGO_POR_PERSONA = 5400000; // ~$5.4M CLP
+
 
 // ====================================================================
 // COMPONENTE PRINCIPAL
@@ -62,11 +68,22 @@ const RIESGO_POR_PERSONA = 5400000; // ~$5.4M CLP
 
 export default function AlertasGerenciaRanking({ 
   viewMode = 'gerencias',
-  parentDepartmentId
+  parentDepartmentId,
+  scope = 'filtered'
 }: AlertasGerenciaRankingProps) {
   
   const router = useRouter();
-  const { alerts, metrics, loading } = useOnboardingAlerts();
+  const { alerts, metrics, loading } = useOnboardingAlerts(
+    undefined,  // severity
+    undefined,  // status
+    undefined,  // slaStatus
+    scope       // scope - dinámico según prop
+  );
+  // ✅ CÁLCULO COSTO ROTACIÓN - SHRM 2024
+  const costoRotacionPorPersona = useMemo(() => {
+    const config = getOnboardingFinancialConfig();
+    return calculateTurnoverCostSHRM2024(config.avgSalaryChile);
+  }, []);
 
   // ================================================================
   // HELPERS
@@ -112,7 +129,7 @@ export default function AlertasGerenciaRanking({
     });
 
     const personasEnRiesgo = personasUnicas.size;
-    const montoTotal = personasEnRiesgo * RIESGO_POR_PERSONA;
+    const montoTotal = personasEnRiesgo * costoRotacionPorPersona;
     const totalJourneys = metrics?.totalJourneys || personasEnRiesgo;
     const tasaIncidencia = totalJourneys > 0 
       ? Math.round((personasUnicas.size / totalJourneys) * 100)
@@ -206,7 +223,7 @@ export default function AlertasGerenciaRanking({
       const journeyId = alert.journeyId || alert.journey?.id;
       if (journeyId && !personasSet.has(journeyId)) {
         personasSet.add(journeyId);
-        gerencia.montoRiesgo += RIESGO_POR_PERSONA;
+        gerencia.montoRiesgo += costoRotacionPorPersona;
       }
     });
 

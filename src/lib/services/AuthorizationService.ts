@@ -16,6 +16,7 @@ const hierarchyCache = new LRUCache<string, string[]>({
 export interface FilterOptions {
   dataType?: 'participation' | 'results' | 'administrative';
   skipDepartmentFilter?: boolean;
+  scope?: 'company' | 'filtered';  // NUEVO: Para rankings sin filtro departamental
 }
 
 /**
@@ -90,12 +91,12 @@ export async function buildParticipantAccessFilter(
   
   // CASO 2: AREA_MANAGER - filtro por cuenta Y departamentos (CON CONTEXTO)
   if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
-    
-    // NUEVO: Si es contexto de participación o se pide skip explícito, NO filtrar por departamento
-    if (options?.dataType === 'participation' || options?.skipDepartmentFilter) {
-      debugLog(`📊 AREA_MANAGER en modo participación: Sin filtro departamental`);
+
+    // NUEVO: Si es contexto de participación, skip explícito, o scope='company', NO filtrar por departamento
+    if (options?.dataType === 'participation' || options?.skipDepartmentFilter || options?.scope === 'company') {
+      debugLog(`📊 AREA_MANAGER en modo ${options?.scope || options?.dataType || 'skip'}: Sin filtro departamental`);
       return {
-        campaign: { 
+        campaign: {
           accountId: userContext.accountId  // Solo multi-tenant
         }
       };

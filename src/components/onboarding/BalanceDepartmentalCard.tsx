@@ -1,19 +1,7 @@
 // src/components/onboarding/BalanceDepartmentalCard.tsx
 /**
- * CARD 2 - QUIÉN IMPULSA TU SCORE v4.0
- * 
- * DATOS: ✅ YA SON REALES
- * - topInfluencer viene de API /api/onboarding/metrics
- * - bottomImpact viene de API /api/onboarding/metrics
- * - contribution calculado con fórmula real en backend:
- *   (score_dept - score_global) × (journeys_dept / total_journeys)
- * 
- * MEJORAS UX v4.0:
- * - Título claro: "QUIÉN IMPULSA TU SCORE"
- * - Micro-insights que guían acción implícita
- * - Números con unidad: "+4.2 pts"
- * - Ancho controlado: max-w-xs
- * - Sin datos secundarios innecesarios
+ * CARD 2 - QUIÉN IMPULSA TU SCORE v5.0
+ * CORRECCIÓN: Línea Tesla dentro del card (mismo ancho)
  */
 
 'use client';
@@ -26,7 +14,7 @@ interface DepartmentInfluence {
   departmentName: string;
   score: number;
   journeys: number;
-  contribution: number;  // ← DATO REAL de API (fórmula ponderada)
+  contribution: number;
 }
 
 interface BalanceDepartmentalCardProps {
@@ -39,11 +27,7 @@ export default memo(function BalanceDepartmentalCard({
   bottomImpact
 }: BalanceDepartmentalCardProps) {
 
-  // ══════════════════════════════════════════════════════════════
-  // MICRO-INSIGHTS QUE GUÍAN ACCIÓN (basados en contribution real)
-  // ══════════════════════════════════════════════════════════════
   const insights = useMemo(() => {
-    // Insight para top performer - indica QUÉ HACER
     const topInsight = topInfluencer 
       ? topInfluencer.contribution > 5 
         ? 'Benchmark interno a replicar'
@@ -52,7 +36,6 @@ export default memo(function BalanceDepartmentalCard({
           : 'Contribuye positivamente'
       : null;
 
-    // Insight para bottom performer - indica QUÉ HACER
     const bottomInsight = bottomImpact
       ? bottomImpact.contribution < -5
         ? 'Intervención prioritaria'
@@ -64,23 +47,9 @@ export default memo(function BalanceDepartmentalCard({
     return { topInsight, bottomInsight };
   }, [topInfluencer, bottomImpact]);
 
-  // ══════════════════════════════════════════════════════════════
-  // EMPTY STATE
-  // ══════════════════════════════════════════════════════════════
   if (!topInfluencer || !bottomImpact) {
     return (
-      <div 
-        className="
-          relative overflow-hidden
-          bg-slate-900/40 
-          backdrop-blur-xl
-          border border-slate-700/50 
-          rounded-xl 
-          p-4
-          w-full
-          max-w-xs
-        "
-      >
+      <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-700/50 rounded-xl p-4 w-full max-w-xs">
         <div className="flex items-center gap-2 mb-2">
           <div className="p-1.5 bg-slate-800/50 rounded-lg">
             <Users className="h-3 w-3 text-slate-500" />
@@ -90,15 +59,12 @@ export default memo(function BalanceDepartmentalCard({
           </p>
         </div>
         <p className="text-[10px] text-slate-500">
-          Se requieren más datos para este análisis
+          Se requieren más datos
         </p>
       </div>
     );
   }
 
-  // ══════════════════════════════════════════════════════════════
-  // RENDER - DISEÑO SOPORTE CON ACCIÓN IMPLÍCITA
-  // ══════════════════════════════════════════════════════════════
   return (
     <div 
       className="
@@ -115,12 +81,13 @@ export default memo(function BalanceDepartmentalCard({
         hover:border-slate-600/50
       "
     >
-      {/* Efecto decorativo sutil */}
+      {/* Línea Tesla DENTRO del card */}
+      <div className="absolute -top-3 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-purple-400/50 to-transparent" />
+      
+      {/* Glow sutil */}
       <div className="absolute -top-16 -left-16 w-28 h-28 bg-gradient-to-br from-purple-500/5 to-pink-500/5 rounded-full blur-2xl pointer-events-none" />
       
-      {/* ══════════════════════════════════════════════════════════ */}
-      {/* HEADER - TÍTULO QUE EXPLICA */}
-      {/* ══════════════════════════════════════════════════════════ */}
+      {/* HEADER */}
       <div className="relative flex items-center gap-2 mb-3">
         <div className="p-1.5 bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-lg">
           <Users className="h-3 w-3 text-purple-400" />
@@ -132,42 +99,38 @@ export default memo(function BalanceDepartmentalCard({
 
       <div className="relative space-y-2">
         
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* TOP PERFORMER - QUÉ REPLICAR */}
-        {/* ══════════════════════════════════════════════════════════ */}
-        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+        {/* TOP PERFORMER */}
+        <div className="bg-slate-800/30 border border-slate-700/40 rounded-lg px-3 py-2">
           <div className="flex items-center justify-between gap-2 mb-0.5">
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <TrendingUp className="h-3.5 w-3.5 text-emerald-400 flex-shrink-0" />
-              <p className="text-[11px] text-emerald-400 font-medium truncate">
+              <TrendingUp className="h-3.5 w-3.5 text-cyan-400 flex-shrink-0" />
+              <p className="text-[11px] text-slate-200 font-medium truncate">
                 {topInfluencer.departmentName}
               </p>
             </div>
-            <span className="text-sm font-semibold text-emerald-400 whitespace-nowrap">
+            <span className="text-sm font-light text-cyan-400 whitespace-nowrap">
               +{Math.abs(topInfluencer.contribution).toFixed(1)} pts
             </span>
           </div>
-          <p className="text-[9px] text-emerald-300/60 pl-5">
+          <p className="text-[9px] text-slate-400 pl-5">
             {insights.topInsight}
           </p>
         </div>
 
-        {/* ══════════════════════════════════════════════════════════ */}
-        {/* BOTTOM PERFORMER - QUÉ MEJORAR */}
-        {/* ══════════════════════════════════════════════════════════ */}
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+        {/* BOTTOM PERFORMER */}
+        <div className="bg-slate-800/30 border border-slate-700/40 rounded-lg px-3 py-2">
           <div className="flex items-center justify-between gap-2 mb-0.5">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <TrendingDown className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
-              <p className="text-[11px] text-amber-400 font-medium truncate">
+              <p className="text-[11px] text-slate-200 font-medium truncate">
                 {bottomImpact.departmentName}
               </p>
             </div>
-            <span className="text-sm font-semibold text-amber-400 whitespace-nowrap">
+            <span className="text-sm font-light text-amber-400 whitespace-nowrap">
               {bottomImpact.contribution.toFixed(1)} pts
             </span>
           </div>
-          <p className="text-[9px] text-amber-300/60 pl-5">
+          <p className="text-[9px] text-slate-400 pl-5">
             {insights.bottomInsight}
           </p>
         </div>

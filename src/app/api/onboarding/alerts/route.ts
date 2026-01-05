@@ -54,13 +54,14 @@ export async function GET(request: NextRequest) {
     const severity = searchParams.get('severity');
     const status = searchParams.get('status');
     const slaStatus = searchParams.get('slaStatus');
+    const scope = (searchParams.get('scope') || 'filtered') as 'company' | 'filtered';
     
     // ========================================
     // 3. CONSTRUIR FILTROS (necesario antes de Promise.all)
     // ========================================
     const accessFilter = await buildParticipantAccessFilter(
       userContext,
-      { dataType: 'results' }
+      { dataType: 'results', scope }
     );
     
     const whereClause: any = {

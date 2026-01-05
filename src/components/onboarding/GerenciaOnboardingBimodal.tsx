@@ -27,6 +27,8 @@ import type { OnboardingDashboardData } from '@/types/onboarding';
 interface GerenciaOnboardingBimodalProps {
   data: OnboardingDashboardData | null;
   loading: boolean;
+  viewMode?: 'gerencias' | 'departamentos';
+  parentDepartmentId?: string;
 }
 
 interface RankingItem {
@@ -51,20 +53,27 @@ const getScoreColor = (score: number): string => {
 // COMPONENTE PRINCIPAL
 // ====================================================================
 
-export default function GerenciaOnboardingBimodal({ 
-  data, 
-  loading 
+export default function GerenciaOnboardingBimodal({
+  data,
+  loading,
+  viewMode = 'gerencias',
+  parentDepartmentId
 }: GerenciaOnboardingBimodalProps) {
-  
+
   const router = useRouter();
   const [selectedGerencia, setSelectedGerencia] = useState<RankingItem | null>(null);
   const [showAllRest, setShowAllRest] = useState(false);
-  
+
   // ================================================================
   // ALERTAS (misma fuente que AlertasGerenciaRanking)
   // ================================================================
-  const { alerts } = useOnboardingAlerts();
-  
+  const { alerts } = useOnboardingAlerts(
+    undefined,  // severity
+    undefined,  // status
+    undefined,  // slaStatus
+    'company'   // scope - ver alertas de todas las gerencias
+  );
+
   const RIESGO_POR_PERSONA = 5400000; // $5.4M CLP
 
   // ================================================================
@@ -74,7 +83,17 @@ export default function GerenciaOnboardingBimodal({
     const accDepts = data?.accumulated?.departments;
     if (!accDepts || accDepts.length === 0) return [];
 
-    return accDepts
+    // Filtrar según viewMode
+    let filtered = accDepts;
+    if (viewMode === 'departamentos' && parentDepartmentId) {
+      // Modo departamentos: solo hijos de la gerencia
+      filtered = accDepts.filter(d => d.parentId === parentDepartmentId);
+    } else {
+      // Modo gerencias: solo nivel 2 (gerencias)
+      filtered = accDepts.filter(d => d.level === 2 || d.unitType === 'gerencia');
+    }
+
+    return filtered
       .filter(d => d.accumulatedExoScore !== null && d.accumulatedExoScore > 0)
       .sort((a, b) => (b.accumulatedExoScore || 0) - (a.accumulatedExoScore || 0))
       .map((d, i) => ({
@@ -83,11 +102,11 @@ export default function GerenciaOnboardingBimodal({
         score: d.accumulatedExoScore || 0,
         position: i + 1
       }));
-  }, [data?.accumulated?.departments]);
+  }, [data?.accumulated?.departments, viewMode, parentDepartmentId]);
 
   const globalScore = data?.accumulated?.globalExoScore;
-  
-  // Separar top 3 y resto
+
+// Separar top 3 y resto
   const podium = ranking.slice(0, 3);
   const rest = ranking.slice(3);
 

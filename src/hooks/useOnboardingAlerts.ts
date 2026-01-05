@@ -84,7 +84,8 @@ interface UseOnboardingAlertsReturn {
 export function useOnboardingAlerts(
   severity?: string,
   status?: string,
-  slaStatus?: string
+  slaStatus?: string,
+  scope: 'company' | 'filtered' = 'filtered'
 ): UseOnboardingAlertsReturn {
   
   const [alerts, setAlerts] = useState<JourneyAlert[]>([]);
@@ -105,6 +106,7 @@ export function useOnboardingAlerts(
       if (severity) params.append('severity', severity);
       if (status) params.append('status', status);
       if (slaStatus) params.append('slaStatus', slaStatus);
+      if (scope) params.append('scope', scope);
       
       const queryString = params.toString();
       const url = `/api/onboarding/alerts${queryString ? `?${queryString}` : ''}`;
@@ -137,7 +139,7 @@ export function useOnboardingAlerts(
     } finally {
       setLoading(false);
     }
-  }, [severity, status, slaStatus]);
+  }, [severity, status, slaStatus, scope]);
   
   /**
    * ACKNOWLEDGE ALERT

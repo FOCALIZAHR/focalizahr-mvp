@@ -17,6 +17,22 @@
 import { prisma } from '@/lib/prisma';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
 
+// ============================================================================
+// CONSTANTES ONBOARDING DEADLINES
+// ============================================================================
+
+/**
+ * Deadlines por etapa de onboarding (días desde hireDate)
+ * Etapa 1 (Día 1) debe responderse antes del día 7
+ * Etapa 2 (Día 7) debe responderse antes del día 30
+ * etc.
+ */
+const STAGE_DEADLINES: Record<number, number> = {
+  1: 8,    // D1 enviado día 1 + 7 = deadline día 8
+  2: 14,   // D7 enviado día 7 + 7 = deadline día 14
+  3: 37,   // D30 enviado día 30 + 7 = deadline día 37
+  4: 97    // D90 enviado día 90 + 7 = deadline día 97
+};
 
 // ============================================================================
 // 🔐 RBAC OPTIONS - Filtrado Jerárquico (v3.3.0)
@@ -1218,27 +1234,30 @@ static async updateAccumulatedExoScores(accountId: string): Promise<void> {
   }
 }
 // ============================================================================
-// MÉTODO: getComplianceEfficiency (AUDITORÍA COMPLETA)
+// MÉTODO: getComplianceEfficiency V2.0 (AUDITORÍA COMPLETA + MÉTRICAS EXTENDIDAS)
 // Ubicación: src/lib/services/OnboardingAggregationService.ts
 // ============================================================================
 
 /**
- * ✅ COMPLIANCE EFFICIENCY - AUDITORÍA COMPLETA
+ * ✅ COMPLIANCE EFFICIENCY V2.0 - AUDITORÍA COMPLETA + MÉTRICAS EXTENDIDAS
  * 
- * Retorna compliance % por departamento CON lista completa de empleados
- * y su estado individual (Completado/Vencido/Pendiente)
- * 
- * FÓRMULA COMPLIANCE: (Respondidas) / (Respondidas + Vencidas) * 100
+ * CAMBIOS V2 vs código existente:
+ * - department select incluye: level, parentId, unitType (antes solo displayName)
+ * - Promise.all paralelo con DepartmentOnboardingInsight + NPSInsight
+ * - Retorna campos nuevos: level, parentId, unitType, participation, efficiency, scores 4C, npsScore
+ * - employeeDetail incluye array stages[] para timeline visual
  * 
  * @param accountId - ID cuenta
  * @param departmentId - ID departamento específico (opcional)
- * @returns Array de departamentos con compliance y lista completa empleados
+ * @param options - Opciones de filtrado RBAC (opcional)
+ * @returns Array de departamentos con compliance V2
  */
 static async getComplianceEfficiency(
   accountId: string,
   departmentId?: string,
   options?: AggregationFilterOptions
 ): Promise<Array<{
+  // Campos originales (backward compatible)
   departmentId: string;
   departmentName: string;
   compliance: number;
@@ -1246,18 +1265,41 @@ static async getComplianceEfficiency(
   responded: number;
   overdue: number;
   pending: number;
-  employeeDetail: Array<{  // ✅ CAMBIO: De stuckEmployees a employeeDetail
+  employeeDetail: Array<{
     id: string;
     fullName: string;
     currentStage: number;
     daysSinceHire: number;
-    complianceStatus: 'completed' | 'overdue' | 'pending';  // ✅ NUEVO
-    daysOverdue?: number;  // ✅ NUEVO: Solo si está vencido
+    complianceStatus: 'completed' | 'overdue' | 'pending';
+    daysOverdue?: number;
+    stages?: Array<{
+      stage: 1 | 2 | 3 | 4;
+      label: 'D1' | 'D7' | 'D30' | 'D90';
+      status: 'responded' | 'overdue' | 'not_sent';
+    }>;
   }>;
+  // Campos nuevos V2 (todos opcionales para backward compatibility)
+  level?: number;
+  parentId?: string | null;
+  unitType?: 'gerencia' | 'departamento';
+  participation?: number;
+  efficiency?: number;
+  avgComplianceScore?: number | null;
+  avgClarificationScore?: number | null;
+  avgCultureScore?: number | null;
+  avgConnectionScore?: number | null;
+  avgEXOScore?: number | null;
+  npsScore?: number | null;
+  totalJourneys?: number;
+  atRiskJourneys?: number;
+  alertsPercentage?: number;
 }>> {
   const today = new Date();
   
-  // Query base
+  // ════════════════════════════════════════════════════════════════════════
+  // 1. QUERY PRINCIPAL - MISMA ESTRUCTURA QUE CÓDIGO EXISTENTE
+  //    Solo extendido: department select incluye level, parentId, unitType
+  // ════════════════════════════════════════════════════════════════════════
   const whereClause: any = {
     accountId,
     status: 'active'
@@ -1306,19 +1348,87 @@ static async getComplianceEfficiency(
         }
       },
       department: {
-        select: { displayName: true }
+        select: { 
+          displayName: true,
+          level: true,      // ✅ NUEVO V2
+          parentId: true,   // ✅ NUEVO V2
+          unitType: true    // ✅ NUEVO V2
+        }
       }
     }
   });
   
-  // Agrupar por departamento
+  // ════════════════════════════════════════════════════════════════════════
+  // 2. ✅ NUEVO V2: QUERIES PARALELAS - Insights 4C + NPS
+  // ════════════════════════════════════════════════════════════════════════
+  const departmentIds = [...new Set(journeys.map(j => j.departmentId).filter(Boolean))] as string[];
+  
+  const [insightsData, npsData] = await Promise.all([
+    // DepartmentOnboardingInsight para scores 4C
+    prisma.departmentOnboardingInsight.findMany({
+      where: {
+        accountId,
+        departmentId: { in: departmentIds }
+      },
+      orderBy: { periodStart: 'desc' },
+      distinct: ['departmentId'],
+      select: {
+        departmentId: true,
+        avgComplianceScore: true,
+        avgClarificationScore: true,
+        avgCultureScore: true,
+        avgConnectionScore: true,
+        avgEXOScore: true,
+        totalJourneys: true,
+        atRiskJourneys: true
+      }
+    }),
+    
+    // NPSInsight para npsScore (producto onboarding)
+    prisma.nPSInsight.findMany({
+      where: {
+        accountId,
+        departmentId: { in: departmentIds },
+        productType: 'onboarding'
+      },
+      orderBy: { period: 'desc' },
+      distinct: ['departmentId'],
+      select: {
+        departmentId: true,
+        npsScore: true
+      }
+    })
+  ]);
+  
+  // Crear mapas para lookup O(1)
+  const insightMap = new Map(insightsData.map(i => [i.departmentId, i]));
+  const npsMap = new Map(npsData.map(n => [n.departmentId, n.npsScore]));
+
+  // ════════════════════════════════════════════════════════════════════════
+  // 3. CONSTANTES PARA STAGES
+  // ════════════════════════════════════════════════════════════════════════
+  const STAGE_DEADLINES: Record<number, number> = { 1: 1, 2: 7, 3: 30, 4: 90 };
+  const STAGE_LABELS: Record<number, 'D1' | 'D7' | 'D30' | 'D90'> = {
+    1: 'D1', 2: 'D7', 3: 'D30', 4: 'D90'
+  };
+  
+  // ════════════════════════════════════════════════════════════════════════
+  // 4. AGRUPAR POR DEPARTAMENTO - EXTENDIDO CON MÉTRICAS V2
+  // ════════════════════════════════════════════════════════════════════════
   const deptMap = new Map<string, {
     departmentId: string;
     departmentName: string;
+    level: number;
+    parentId: string | null;
+    unitType: string;
     responded: number;
     overdue: number;
     pending: number;
     journeys: typeof journeys;
+    // Para calcular participation/efficiency
+    totalEnviadas: number;
+    totalRespondidas: number;
+    respondidasATiempo: number;
   }>();
   
   for (const journey of journeys) {
@@ -1328,45 +1438,90 @@ static async getComplianceEfficiency(
       deptMap.set(deptId, {
         departmentId: deptId,
         departmentName: journey.department.displayName,
+        level: journey.department.level ?? 3,
+        parentId: journey.department.parentId ?? null,
+        unitType: journey.department.unitType ?? 'departamento',
         responded: 0,
         overdue: 0,
         pending: 0,
-        journeys: []
+        journeys: [],
+        totalEnviadas: 0,
+        totalRespondidas: 0,
+        respondidasATiempo: 0
       });
     }
     
     const dept = deptMap.get(deptId)!;
     dept.journeys.push(journey);
     
-    // Contar estado de cada stage participant
+    // Calcular daysSinceHire para determinar qué stages deberían estar enviadas
+    const daysSinceHire = Math.floor(
+      (today.getTime() - journey.hireDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    
+    // ✅ FIX v2: Contar por PERSONA (no por stage)
     const participants = [
       journey.stage1Participant,
       journey.stage2Participant,
       journey.stage3Participant,
       journey.stage4Participant
+    ].filter(p => p); // Solo los que existen
+
+    // Verificar si la persona ha respondido TODAS sus encuestas
+    const hasRespondedAll = participants.length > 0 &&
+      participants.every(p => p!.hasResponded);
+
+    // Verificar si está vencida según su etapa ACTUAL (usando STAGE_DEADLINES)
+    const currentDeadline = STAGE_DEADLINES[journey.currentStage] || 7;
+    const isOverdue = !hasRespondedAll && daysSinceHire > currentDeadline;
+
+    // Contar UNA vez por persona
+    if (hasRespondedAll) {
+      dept.responded++;  // Persona al día (completó todo)
+    } else if (isOverdue) {
+      dept.overdue++;    // Persona con atraso
+    } else {
+      dept.pending++;    // Persona en plazo
+    }
+    
+    // Calcular métricas de participation/efficiency por stage (para V2)
+    const stageParticipants = [
+      { p: journey.stage1Participant, stage: 1 },
+      { p: journey.stage2Participant, stage: 2 },
+      { p: journey.stage3Participant, stage: 3 },
+      { p: journey.stage4Participant, stage: 4 }
     ];
     
-    for (const p of participants) {
+    for (const { p, stage } of stageParticipants) {
       if (!p) continue;
       
-      if (p.hasResponded) {
-        dept.responded++;
-      } else if (p.campaign.endDate < today) {
-        dept.overdue++;
-      } else {
-        dept.pending++;
+      const deadline = STAGE_DEADLINES[stage];
+      const shouldBeSent = daysSinceHire >= deadline;
+      
+      if (shouldBeSent) {
+        dept.totalEnviadas++;
+        
+        if (p.hasResponded) {
+          dept.totalRespondidas++;
+          // ✅ Efficiency: respondió antes de que cerrara la campaña
+          if (p.campaign.endDate >= today) {
+            dept.respondidasATiempo++;
+          }
+        }
       }
     }
   }
   
-  // Calcular compliance y generar employeeDetail COMPLETO
+  // ════════════════════════════════════════════════════════════════════════
+  // 5. CALCULAR COMPLIANCE Y GENERAR RESULTADOS
+  // ════════════════════════════════════════════════════════════════════════
   const results = Array.from(deptMap.values()).map(dept => {
     const total = dept.responded + dept.overdue;
     const compliance = total > 0 
       ? Math.round((dept.responded / total) * 100) 
       : 0;
     
-    // Determinar status
+    // Determinar status (misma lógica que código existente)
     let status: 'excellent' | 'good' | 'warning' | 'critical' | 'neutral';
     if (total === 0) status = 'neutral';
     else if (compliance >= 90) status = 'excellent';
@@ -1374,7 +1529,31 @@ static async getComplianceEfficiency(
     else if (compliance >= 60) status = 'warning';
     else status = 'critical';
     
-    // ✅ NUEVO: Generar employeeDetail COMPLETO (TODOS los empleados)
+    // ✅ NUEVAS MÉTRICAS DE PROCESO V2
+    const participation = dept.totalEnviadas > 0
+      ? Math.round((dept.totalRespondidas / dept.totalEnviadas) * 100)
+      : 0;
+    
+    const efficiency = dept.totalRespondidas > 0
+      ? Math.round((dept.respondidasATiempo / dept.totalRespondidas) * 100)
+      : 0;
+    
+    // ✅ SCORES 4C + EXO desde Insight
+    const insight = insightMap.get(dept.departmentId);
+    
+    // ✅ NPS desde NPSInsight
+    const npsScore = npsMap.get(dept.departmentId) ?? null;
+    
+    // ✅ ALERTAS
+    const totalJourneys = insight?.totalJourneys ?? dept.journeys.length;
+    const atRiskJourneys = insight?.atRiskJourneys ?? 0;
+    const alertsPercentage = totalJourneys > 0
+      ? Math.round((atRiskJourneys / totalJourneys) * 100)
+      : 0;
+    
+    // ════════════════════════════════════════════════════════════════════
+    // EMPLOYEE DETAIL - EXTENDIDO CON STAGES TIMELINE
+    // ════════════════════════════════════════════════════════════════════
     const employeeDetail = dept.journeys.map(j => {
       const participants = [
         j.stage1Participant,
@@ -1383,9 +1562,16 @@ static async getComplianceEfficiency(
         j.stage4Participant
       ];
       
+      const daysSinceHire = Math.floor(
+        (today.getTime() - j.hireDate.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      
       // Determinar estado global del empleado
       const allResponded = participants.filter(p => p).every(p => p!.hasResponded);
-      const hasOverdue = participants.some(p => p && !p.hasResponded && p.campaign.endDate < today);
+      
+      // ✅ FIX: Verificar overdue usando STAGE_DEADLINES, no campaign.endDate
+      const currentDeadline = STAGE_DEADLINES[j.currentStage] || 7;
+      const hasOverdue = !allResponded && daysSinceHire > currentDeadline;
       
       let complianceStatus: 'completed' | 'overdue' | 'pending';
       let daysOverdue: number | undefined;
@@ -1394,36 +1580,49 @@ static async getComplianceEfficiency(
         complianceStatus = 'completed';
       } else if (hasOverdue) {
         complianceStatus = 'overdue';
-        // Calcular días de atraso del stage más vencido
-        const overdueStages = participants.filter(p => 
-          p && !p.hasResponded && p.campaign.endDate < today
-        );
-        if (overdueStages.length > 0) {
-          const mostOverdue = overdueStages.reduce((max, p) => {
-            const days = Math.floor(
-              (today.getTime() - p!.campaign.endDate.getTime()) / (1000 * 60 * 60 * 24)
-            );
-            return days > max ? days : max;
-          }, 0);
-          daysOverdue = mostOverdue;
-        }
+        // ✅ FIX: Calcular días de atraso desde el deadline de la etapa actual
+        daysOverdue = daysSinceHire - currentDeadline;
       } else {
         complianceStatus = 'pending';
       }
+      
+      // ✅ NUEVO V2: Timeline de stages
+      const stages = participants.map((p, idx) => {
+        const stage = (idx + 1) as 1 | 2 | 3 | 4;
+        const deadline = STAGE_DEADLINES[stage];
+        const shouldBeSent = daysSinceHire >= deadline;
+        
+        let stageStatus: 'responded' | 'overdue' | 'not_sent';
+        if (!shouldBeSent || !p) {
+          stageStatus = 'not_sent';
+        } else if (p.hasResponded) {
+          stageStatus = 'responded';
+        } else if (p.campaign.endDate < today) {
+          stageStatus = 'overdue';
+        } else {
+          stageStatus = 'not_sent'; // Enviada pero aún en plazo
+        }
+        
+        return {
+          stage,
+          label: STAGE_LABELS[stage],
+          status: stageStatus
+        };
+      });
       
       return {
         id: j.id,
         fullName: j.fullName,
         currentStage: j.currentStage,
-        daysSinceHire: Math.floor(
-          (today.getTime() - j.hireDate.getTime()) / (1000 * 60 * 60 * 24)
-        ),
+        daysSinceHire,
         complianceStatus,
-        daysOverdue
+        daysOverdue,
+        stages  // ✅ NUEVO V2
       };
     });
     
     return {
+      // Campos originales (backward compatible)
       departmentId: dept.departmentId,
       departmentName: dept.departmentName,
       compliance,
@@ -1431,7 +1630,23 @@ static async getComplianceEfficiency(
       responded: dept.responded,
       overdue: dept.overdue,
       pending: dept.pending,
-      employeeDetail  // ✅ Lista completa con estados
+      employeeDetail,
+      
+      // ✅ CAMPOS NUEVOS V2
+      level: dept.level,
+      parentId: dept.parentId,
+      unitType: dept.unitType as 'gerencia' | 'departamento',
+      participation,
+      efficiency,
+      avgComplianceScore: insight?.avgComplianceScore ?? null,
+      avgClarificationScore: insight?.avgClarificationScore ?? null,
+      avgCultureScore: insight?.avgCultureScore ?? null,
+      avgConnectionScore: insight?.avgConnectionScore ?? null,
+      avgEXOScore: insight?.avgEXOScore ?? null,
+      npsScore,
+      totalJourneys,
+      atRiskJourneys,
+      alertsPercentage
     };
   });
   

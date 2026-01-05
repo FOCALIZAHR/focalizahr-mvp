@@ -70,7 +70,8 @@ import {
  * ```
  */
 export function useOnboardingMetrics(
-  departmentId?: string
+  departmentId?: string,
+  scope: 'company' | 'filtered' = 'filtered'
 ): UseOnboardingMetricsReturn {
   
   // ========================================================================
@@ -88,10 +89,13 @@ export function useOnboardingMetrics(
       setLoading(true)
       setError(null)
       
-      // 1. Construir URL con query param opcional
-      const url = departmentId 
-        ? `/api/onboarding/metrics?departmentId=${departmentId}`
-        : `/api/onboarding/metrics`
+     // 1. Construir URL con query params
+      const params = new URLSearchParams();
+      if (departmentId) params.set('departmentId', departmentId);
+      if (scope) params.set('scope', scope);
+      
+      const queryString = params.toString();
+      const url = `/api/onboarding/metrics${queryString ? `?${queryString}` : ''}`;
       
       console.log(`[useOnboardingMetrics] 🔄 Fetching: ${url}`)
       
@@ -156,7 +160,7 @@ export function useOnboardingMetrics(
     } finally {
       setLoading(false)
     }
-  }, [departmentId])  // Re-fetch si cambia departmentId
+  }, [departmentId, scope])  // Re-fetch si cambia departmentId o scope
   
   // ========================================================================
   // AUTO-FETCH ON MOUNT + DEPENDENCY CHANGE

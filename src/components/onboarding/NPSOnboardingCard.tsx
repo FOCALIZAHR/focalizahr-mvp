@@ -1,5 +1,5 @@
 // ====================================================================
-// NPS ONBOARDING CARD - DISEÑO FOCALIZAHR PREMIUM v4.1
+// NPS ONBOARDING CARD - DISEÑO FOCALIZAHR PREMIUM v4.3
 // src/components/onboarding/NPSOnboardingCard.tsx
 // ====================================================================
 // 🎯 FILOSOFÍA: BimodalToggle interno + Colores NPS universales
@@ -7,10 +7,16 @@
 // ✅ COLOR TENDENCIA CONTEXTUAL: Cyan si mejoró pero aún negativo
 // ✅ fhr-top-line: Línea Tesla superior
 // ✅ RBAC: Backend filtra automáticamente según rol del usuario
+// ✅ parentDepartmentId: Filtro manual para selector de roles globales
 // ====================================================================
+// CHANGELOG v4.3:
+// - AGREGADO: parentDepartmentId prop para filtro de selector roles globales
+// - AGREGADO: filteredRanking useMemo para filtrar por gerencia seleccionada
+// - MODIFICADO: globalInsight ahora respeta parentDepartmentId
+// CHANGELOG v4.2:
+// - AGREGADO: Lugares 4-5 siempre visibles, 6+ colapsables con "Ver más"
 // CHANGELOG v4.1:
-// - ELIMINADO: parentDepartmentId (innecesario, backend filtra por RBAC)
-// - SIMPLIFICADO: RankingView sin filtrado manual
+// - SIMPLIFICADO: RankingView sin filtrado manual por RBAC
 // - AGREGADO: groupBy dinámico según viewMode ('gerencia' | 'department')
 // - AGREGADO: fhr-top-line (línea Tesla)
 // - ELIMINADO: n=X duplicado de NPSScoreBar (solo en DistributionPanel)
@@ -56,6 +62,10 @@ interface NPSOnboardingCardProps {
    * El filtrado RBAC lo hace el backend automáticamente
    */
   viewMode?: 'gerencias' | 'departamentos';
+  /** Scope: 'company' = todas las gerencias, 'filtered' = solo mi área */
+  scope?: 'company' | 'filtered';
+  /** ID de gerencia para filtrar (usado por selector de roles globales) */
+  parentDepartmentId?: string;
 }
 
 // ============================================
@@ -346,6 +356,7 @@ const DistributionPanel = memo(function DistributionPanel({
 // ============================================
 // SUB-COMPONENTE: VISTA RANKING
 // Backend ya filtra por RBAC, solo renderizamos
+// ✅ v4.2: Top 3 podio + 4-5 visibles + 6+ colapsables
 // ============================================
 const RankingView = memo(function RankingView({
   data,
@@ -355,6 +366,9 @@ const RankingView = memo(function RankingView({
   /** Label para empty state */
   emptyLabel?: string;
 }) {
+  // Estado para expandir/colapsar
+  const [isExpanded, setIsExpanded] = useState(false);
+
   // Backend ya devuelve datos filtrados y agrupados correctamente
   const sortedItems = useMemo(() => {
     return [...data]
@@ -363,7 +377,8 @@ const RankingView = memo(function RankingView({
   }, [data]);
 
   const top3 = sortedItems.slice(0, 3);
-  const rest = sortedItems.slice(3);
+  const visible = sortedItems.slice(3, 5);    // Lugares 4-5 (siempre visibles)
+  const collapsed = sortedItems.slice(5);      // Lugar 6+ (colapsables)
 
   if (sortedItems.length === 0) {
     return (
@@ -372,6 +387,40 @@ const RankingView = memo(function RankingView({
       </div>
     );
   }
+
+  // Helper para renderizar item de lista
+  const renderListItem = (item: NPSInsight, index: number, baseIndex: number) => (
+    <motion.div
+      key={item.id}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 0.3 + index * 0.05 }}
+      className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-slate-800/30 transition-colors"
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-slate-600 text-xs w-5">{String(baseIndex + index).padStart(2, '0')}</span>
+        <span className="text-slate-400 text-sm font-light truncate max-w-[200px]">
+          {item.department?.displayName}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span 
+          className="text-sm font-light"
+          style={{ color: getScoreColor(item.npsScore) }}
+        >
+          {item.npsScore > 0 ? '+' : ''}{item.npsScore}
+        </span>
+        {item.scoreDelta !== null && item.scoreDelta !== 0 && (
+          <span 
+            className="text-[10px]"
+            style={{ color: getTrendColor(item.scoreDelta, item.npsScore) }}
+          >
+            {item.scoreDelta > 0 ? '↑' : '↓'}{Math.abs(item.scoreDelta)}
+          </span>
+        )}
+      </div>
+    </motion.div>
+  );
 
   return (
     <motion.div
@@ -473,42 +522,52 @@ const RankingView = memo(function RankingView({
         )}
       </div>
 
-      {/* Lista del resto */}
-      {rest.length > 0 && (
+      {/* Lista: lugares 4-5 (siempre visibles) */}
+      {visible.length > 0 && (
         <div className="space-y-1.5 pt-2 border-t border-slate-800/50">
-          {rest.map((item, index) => (
-            <motion.div
-              key={item.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 + index * 0.05 }}
-              className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-slate-800/30 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-slate-600 text-xs w-5">{String(index + 4).padStart(2, '0')}</span>
-                <span className="text-slate-400 text-sm font-light truncate max-w-[200px]">
-                  {item.department?.displayName}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span 
-                  className="text-sm font-light"
-                  style={{ color: getScoreColor(item.npsScore) }}
-                >
-                  {item.npsScore > 0 ? '+' : ''}{item.npsScore}
-                </span>
-                {item.scoreDelta !== null && item.scoreDelta !== 0 && (
-                  <span 
-                    className="text-[10px]"
-                    style={{ color: getTrendColor(item.scoreDelta, item.npsScore) }}
-                  >
-                    {item.scoreDelta > 0 ? '↑' : '↓'}{Math.abs(item.scoreDelta)}
-                  </span>
-                )}
-              </div>
-            </motion.div>
-          ))}
+          {visible.map((item, index) => renderListItem(item, index, 4))}
         </div>
+      )}
+
+      {/* Lista: lugares 6+ (colapsables) */}
+      {collapsed.length > 0 && (
+        <>
+          <AnimatePresence>
+            {isExpanded && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-1.5 overflow-hidden"
+              >
+                {collapsed.map((item, index) => renderListItem(item, index, 6))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Botón Ver más / Ver menos */}
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="w-full py-2 text-xs font-light text-slate-400 hover:text-cyan-400 transition-colors flex items-center justify-center gap-1.5"
+          >
+            {isExpanded ? (
+              <>
+                <span>Ver menos</span>
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
+              </>
+            ) : (
+              <>
+                <span>Ver más ({collapsed.length})</span>
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </>
+            )}
+          </button>
+        </>
       )}
     </motion.div>
   );
@@ -581,7 +640,9 @@ const NPSOnboardingSkeleton = () => (
 // COMPONENTE PRINCIPAL
 // ============================================
 export default memo(function NPSOnboardingCard({
-  viewMode = 'gerencias'
+  viewMode = 'gerencias',
+  scope = 'filtered',
+  parentDepartmentId
 }: NPSOnboardingCardProps) {
   const [internalViewMode, setInternalViewMode] = useState<ViewMode>('resumen');
   
@@ -594,22 +655,39 @@ export default memo(function NPSOnboardingCard({
   // Fetch datos
   const { data: globalData, loading: loadingGlobal } = useNPSData({ 
     product: 'onboarding', 
-    period: 'latest' 
+    period: 'latest',
+    scope 
   });
   
   // 🎯 Aquí se aplica el groupBy dinámico
   const { data: rankingData, loading: loadingRanking } = useNPSData({ 
     product: 'onboarding', 
-    groupBy: groupByParam 
+    groupBy: groupByParam,
+    scope 
   });
   
   const loading = loadingGlobal || loadingRanking;
   
   // Extraer insight global
-  const globalInsight = useMemo(() => 
-    globalData?.data?.find((d: NPSInsight) => d.departmentId === null),
-    [globalData]
-  );
+  // Extraer insight principal (global o gerencia según scope/filtro)
+  const globalInsight = useMemo(() => {
+    if (!globalData?.data) return null;
+    
+    // Si hay parentDepartmentId (selector de roles globales), buscar ESA gerencia
+    if (parentDepartmentId) {
+      return globalData.data.find((d: NPSInsight) => 
+        d.departmentId === parentDepartmentId
+      ) || null;
+    }
+    
+    if (scope === 'filtered') {
+      // En modo filtered, usar la gerencia (level 2) como "principal"
+      return globalData.data.find((d: NPSInsight) => d.department?.level === 2) || null;
+    }
+    
+    // En modo company, usar el global real
+    return globalData.data.find((d: NPSInsight) => d.departmentId === null) || null;
+  }, [globalData, scope, parentDepartmentId]);
   
   // Encontrar gerencia con mayor caída
   const criticalGerencia = useMemo(() => {
@@ -619,6 +697,22 @@ export default memo(function NPSOnboardingCard({
       .sort((a: NPSInsight, b: NPSInsight) => (a.scoreDelta || 0) - (b.scoreDelta || 0));
     return withDrop[0] || null;
   }, [rankingData]);
+
+  // 🆕 Filtrar ranking por gerencia seleccionada (para selector de roles globales)
+  const filteredRanking = useMemo(() => {
+    if (!rankingData?.data) return [];
+    
+    // Si hay parentDepartmentId, filtrar solo esa gerencia y sus departamentos hijos
+    if (parentDepartmentId) {
+      return rankingData.data.filter((d: NPSInsight) => 
+        d.departmentId === parentDepartmentId || 
+        d.department?.parentId === parentDepartmentId
+      );
+    }
+    
+    // Sin filtro, devolver todos
+    return rankingData.data;
+  }, [rankingData, parentDepartmentId]);
   
   // Período actual
   const currentPeriod = useMemo(() => {
@@ -728,9 +822,9 @@ export default memo(function NPSOnboardingCard({
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
               >
-                {/* RankingView - datos ya vienen filtrados del backend */}
+                {/* RankingView - datos filtrados por gerencia si aplica */}
                 <RankingView 
-                  data={rankingData?.data || []} 
+                  data={filteredRanking} 
                   emptyLabel={viewMode === 'gerencias' ? 'gerencias' : 'departamentos'}
                 />
               </motion.div>

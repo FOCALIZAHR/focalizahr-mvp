@@ -86,6 +86,8 @@ export interface UseNPSDataParams {
   groupBy?: 'gerencia' | 'department' | 'product'
   /** Incluir histórico para trend */
   history?: boolean
+  /** Scope: 'company' = todas las gerencias, 'filtered' = solo mi área */
+  scope?: 'company' | 'filtered'
 }
 
 /**
@@ -199,6 +201,10 @@ export function useNPSData(params: UseNPSDataParams = {}): UseNPSDataReturn {
       if (params.history) {
         queryParams.set('history', 'true')
       }
+      
+      if (params.scope) {
+        queryParams.set('scope', params.scope)
+      }
 
       const queryString = queryParams.toString()
       const url = `/api/analytics/nps${queryString ? `?${queryString}` : ''}`
@@ -244,7 +250,7 @@ export function useNPSData(params: UseNPSDataParams = {}): UseNPSDataReturn {
     } finally {
       setLoading(false)
     }
-  }, [params.product, params.period, params.groupBy, params.history])
+  }, [params.product, params.period, params.groupBy, params.history, params.scope])
 
   // ============================================================================
   // EFFECT: Auto-fetch on mount and when params change

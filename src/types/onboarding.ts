@@ -224,6 +224,28 @@ export interface OnboardingDashboardData {
   
   // ✅ REFACTORIZADO: Una línea limpia en lugar de 25 líneas anidadas
   complianceEfficiency: ComplianceEfficiencyData[]
+  
+  // ✅ METADATA RBAC (agregado para scope jerárquico)
+  meta?: {
+    canDrillDown: string[]           
+    scope: 'company' | 'filtered'    
+    userRole: string                 
+    userDepartmentId: string | null  
+  }
+  
+  // ✅ LENTE 3: Métricas en vivo
+  live?: {
+    period: string
+    avgEXOScore: number | null
+    totalJourneys: number
+    activeJourneys: number
+    completedJourneys: number
+    atRiskJourneys: number
+    criticalAlerts: number
+    daysElapsed: number
+    daysInMonth: number
+    isPartial: boolean
+  }
 }
 
 // ============================================================================
@@ -553,4 +575,99 @@ export interface ResolutionModalProps {
   alertType: string;
   employeeName: string;
   businessCase: any;
+}
+// ============================================================================
+// PASO 1A: AGREGAR AL FINAL DE src/types/onboarding.ts
+// ============================================================================
+// Acción: Copiar este bloque AL FINAL del archivo existente
+// NO reemplazar nada, solo agregar después de la última línea
+// ============================================================================
+
+/**
+ * Detalle de stage individual para timeline visual
+ * Colores UI: 🔵 cyan (responded), 🟠 amber (overdue), ⚫ slate (not_sent)
+ */
+export interface StageDetail {
+  stage: 1 | 2 | 3 | 4
+  label: 'D1' | 'D7' | 'D30' | 'D90'
+  status: 'responded' | 'overdue' | 'not_sent'
+}
+
+/**
+ * Extensión de ComplianceEfficiencyData con métricas V2
+ * Extiende la interface existente, todos campos nuevos son OPCIONALES
+ * para backward compatibility
+ */
+export interface ComplianceEfficiencyDataV2 extends ComplianceEfficiencyData {
+  // ═══════════════════════════════════════════════════════════════════
+  // CAMPOS JERÁRQUICOS (opcionales)
+  // ═══════════════════════════════════════════════════════════════════
+  level?: number                              // 2=gerencia, 3=departamento
+  parentId?: string | null                    // ID gerencia padre
+  unitType?: 'gerencia' | 'departamento'
+  
+  // ═══════════════════════════════════════════════════════════════════
+  // MÉTRICAS DE PROCESO (opcionales)
+  // ═══════════════════════════════════════════════════════════════════
+  participation?: number                      // (respondidas/enviadas) * 100
+  efficiency?: number                         // (a tiempo/respondidas) * 100
+  
+  // ═══════════════════════════════════════════════════════════════════
+  // SCORES 4C (opcionales) - Escala 0-5, frontend convierte a 0-100
+  // ═══════════════════════════════════════════════════════════════════
+  avgComplianceScore?: number | null
+  avgClarificationScore?: number | null
+  avgCultureScore?: number | null
+  avgConnectionScore?: number | null
+  avgEXOScore?: number | null                 // Ya en 0-100
+  
+  // ═══════════════════════════════════════════════════════════════════
+  // NPS (opcional)
+  // ═══════════════════════════════════════════════════════════════════
+  npsScore?: number | null                    // -100 a +100
+  
+  // ═══════════════════════════════════════════════════════════════════
+  // CONTEOS ADICIONALES (opcionales)
+  // ═══════════════════════════════════════════════════════════════════
+  totalJourneys?: number
+  atRiskJourneys?: number
+  alertsPercentage?: number                   // (atRisk/total) * 100
+}
+
+/**
+ * Extensión de ComplianceEmployeeDetail con timeline de stages
+ */
+export interface ComplianceEmployeeDetailV2 extends ComplianceEmployeeDetail {
+  stages?: StageDetail[]
+}
+
+/**
+ * Helper para calcular dimensión 4C más débil
+ */
+export interface WeakestDimension {
+  name: 'Compliance' | 'Clarificación' | 'Cultura' | 'Conexión'
+  score: number                               // 0-100 normalizado
+  day: 1 | 7 | 30 | 90
+}
+
+/**
+ * Narrativas 4C para UI - Constantes
+ */
+export const NARRATIVES_4C: Record<string, { desc: string; impact: string }> = {
+  Compliance: {
+    desc: "Todo listo para trabajar día 1: equipo, accesos, bienvenida",
+    impact: "Score <50 → 2.3x más renuncia en primeros 30 días"
+  },
+  Clarificación: {
+    desc: "Entiende su rol, responsabilidades y expectativas",
+    impact: "45% renuncias citan 'rol diferente al esperado'"
+  },
+  Cultura: {
+    desc: "Se siente parte del equipo y conectado con valores",
+    impact: "Desajuste cultural → 3x rotación año 1"
+  },
+  Conexión: {
+    desc: "Ve futuro en la organización, tiene relaciones significativas",
+    impact: "Score <60 → 78% probabilidad renuncia en 6 meses"
+  }
 }

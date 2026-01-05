@@ -221,7 +221,13 @@ export async function GET(request: NextRequest) {
       role: userContext.role,
       departmentId: userContext.departmentId
     });
-    
+    // ========================================================================
+    // 2. EXTRAER QUERY PARAMS
+    // ========================================================================
+    const { searchParams } = new URL(request.url);
+    const departmentId = searchParams.get('departmentId');
+    const period = searchParams.get('period');
+    const scope = searchParams.get('scope') || 'filtered'; // 'company' | 'filtered'
     // ========================================================================
     // 🔐 1C. CALCULAR DEPARTAMENTOS PERMITIDOS (UNA VEZ)
     // Según GUÍA MAESTRA RBAC Sección 3.2 - Matriz de Acceso por Rol
@@ -231,18 +237,24 @@ export async function GET(request: NextRequest) {
     // Roles con acceso global (ven toda la empresa)
     const globalRoles = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_ADMIN', 'HR_MANAGER', 'HR_OPERATOR', 'CEO'];
     
-    if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
-      // AREA_MANAGER: Solo ve su departamento + hijos (CTE recursivo)
-      const childIds = await getChildDepartmentIds(userContext.departmentId);
-      allowedDepartmentIds = [userContext.departmentId, ...childIds];
-      
-      console.log('[API GET /onboarding/metrics] 🔐 Filtrado jerárquico calculado:', {
-        role: 'AREA_MANAGER',
-        baseDepartment: userContext.departmentId,
-        childDepartments: childIds.length,
-        totalAllowed: allowedDepartmentIds.length
-      });
-    } else if (globalRoles.includes(userContext.role || '')) {
+   if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
+      // 🆕 SCOPE CHECK: Si scope='company', NO filtrar (para rankings comparativos)
+      if (scope === 'company') {
+        console.log('[API GET /onboarding/metrics] 🌐 Scope "company": Sin filtro departamental (rankings)');
+       // allowedDepartmentIds queda null = ve todos
+     } else {
+       // AREA_MANAGER con filtro normal: Solo ve su departamento + hijos (CTE recursivo)
+       const childIds = await getChildDepartmentIds(userContext.departmentId);
+       allowedDepartmentIds = [userContext.departmentId, ...childIds];
+
+       console.log('[API GET /onboarding/metrics] 🔐 Filtrado jerárquico calculado:', {
+         role: 'AREA_MANAGER',
+         baseDepartment: userContext.departmentId,
+         childDepartments: childIds.length,
+         totalAllowed: allowedDepartmentIds.length
+       });
+     }
+   } else if (globalRoles.includes(userContext.role || '')) {
       // Roles globales: null significa "todos los departamentos"
       console.log('[API GET /onboarding/metrics] ✅ Acceso global:', {
         role: userContext.role
@@ -258,12 +270,7 @@ export async function GET(request: NextRequest) {
     // 🔐 Preparar options para el servicio (LIMPIO - sin workaround)
     const filterOptions = { allowedDepartmentIds };
     
-    // ========================================================================
-    // 2. EXTRAER QUERY PARAMS
-    // ========================================================================
-    const { searchParams } = new URL(request.url);
-    const departmentId = searchParams.get('departmentId');
-    const period = searchParams.get('period');
+    
     
     console.log('[API GET /onboarding/metrics] Params:', {
       departmentId: departmentId || 'ALL',
@@ -515,7 +522,7 @@ export async function GET(request: NextRequest) {
     // ========================================================================
     if (departments.length === 0) {
       console.log('[API GET /onboarding/metrics] Sin métricas disponibles');
-      
+
       return NextResponse.json(
         {
           data: null,
@@ -525,11 +532,26 @@ export async function GET(request: NextRequest) {
         { status: 200 }
       );
     }
-    
+
     // ========================================================================
     // 6. FORMATEAR RESPUESTA CON 3 LENTES
     // ========================================================================
+    // 🆕 Calcular canDrillDown para el frontend
+    let canDrillDown: string[] = [];
+    if (userContext.departmentId) {
+      const childIds = await getChildDepartmentIds(userContext.departmentId);
+      canDrillDown = [userContext.departmentId, ...childIds];
+    }
+
     const data = {
+      // 🆕 META: Permisos de navegación
+      meta: {
+        canDrillDown,  // IDs donde el usuario puede hacer click
+        scope,
+        userRole: userContext.role,
+        userDepartmentId: userContext.departmentId
+      },
+
       // LENTE 1: PULSO MENSUAL (ya filtrado por servicio)
       global: globalMetrics,
       topDepartments,      // ✅ LIMPIO: Ya viene filtrado del servicio

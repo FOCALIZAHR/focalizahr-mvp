@@ -32,7 +32,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { extractUserContext } from '@/lib/services/AuthorizationService';
+import { extractUserContext, getChildDepartmentIds } from '@/lib/services/AuthorizationService';
 import { NPSQueryParams } from '@/types/nps';
 
 // ============================================
@@ -65,6 +65,8 @@ export async function GET(request: NextRequest) {
       history: searchParams.get('history') === 'true'
     };
     
+    const scope = (searchParams.get('scope') || 'filtered') as 'company' | 'filtered';
+    
     // ========================================
     // 3. CONSTRUIR WHERE CLAUSE
     // ========================================
@@ -96,6 +98,29 @@ export async function GET(request: NextRequest) {
       }
     }
     
+    // ========================================
+    // 3B. FILTRADO JERÁRQUICO RBAC
+    // ========================================
+    let allowedDepartmentIds: string[] | null = null;
+    
+    if (userContext.role === 'AREA_MANAGER' && userContext.departmentId && scope !== 'company') {
+      const childIds = await getChildDepartmentIds(userContext.departmentId);
+      allowedDepartmentIds = [userContext.departmentId, ...childIds];
+      
+      // Agregar filtro al whereClause
+      whereClause.OR = [
+        { departmentId: null }, // Siempre incluir global
+        { departmentId: { in: allowedDepartmentIds } }
+      ];
+      
+      console.log('[API /analytics/nps] 🔐 Filtrado AREA_MANAGER:', {
+        scope,
+        allowedDepartments: allowedDepartmentIds.length
+      });
+    } else if (scope === 'company') {
+      console.log('[API /analytics/nps] 🌐 Scope "company": Sin filtro jerárquico');
+    }
+
     // ========================================
     // 4. EJECUTAR QUERY
     // ========================================
