@@ -1,9 +1,10 @@
 // ============================================================================
 // REEMPLAZAR src/components/onboarding/ComplianceEfficiencyMatrix.tsx
 // ============================================================================
-// ComplianceEfficiencyMatrix V2.5 - Fixes Responsive
-// Fecha: 5 Enero 2026
-// Fixes: Columnas redistribuidas, fuentes reducidas, foco compacto
+// ComplianceEfficiencyMatrix V2.8 - Fix Agregación Completa para Gerencias
+// Fecha: 6 Enero 2026
+// Fix V2.8: participation y efficiency ahora se promedian del backend (no se recalculan)
+// Fix V2.7: scores 4C agregados con promedio ponderado
 // ============================================================================
 
 'use client';
@@ -33,6 +34,8 @@ import {
   getPositionLabel,
   getNPSLabel
 } from '@/lib/constants/onboarding-narratives';
+import type { ComplianceEfficiencyDataV2, ComplianceEmployeeDetailV2 } from '@/types/onboarding';
+
 
 // ============================================================================
 // INTERFACES
@@ -54,35 +57,9 @@ interface EmployeeDetail {
   stages?: StageDetail[];
 }
 
-interface ComplianceDepartment {
-  departmentId: string;
-  departmentName: string;
-  compliance: number;
-  status: 'excellent' | 'good' | 'warning' | 'critical' | 'neutral';
-  responded: number;
-  overdue: number;
-  pending: number;
-  employeeDetail: EmployeeDetail[];
-  
-  // Campos V2
-  level?: number;
-  parentId?: string | null;
-  unitType?: 'gerencia' | 'departamento';
-  participation?: number;
-  efficiency?: number;
-  avgComplianceScore?: number | null;
-  avgClarificationScore?: number | null;
-  avgCultureScore?: number | null;
-  avgConnectionScore?: number | null;
-  avgEXOScore?: number | null;
-  npsScore?: number | null;
-  totalJourneys?: number;
-  atRiskJourneys?: number;
-  alertsPercentage?: number;
-}
 
 interface ComplianceEfficiencyMatrixProps {
-  departments: ComplianceDepartment[];
+  departments: ComplianceEfficiencyDataV2[];
   loading?: boolean;
   viewMode?: 'gerencias' | 'departamentos';
   parentDepartmentId?: string;
@@ -140,7 +117,7 @@ const getEmployeeStatusBadge = (status: string, days?: number) => {
   }
 };
 
-const getWeakestDimension = (dept: ComplianceDepartment): { 
+const getWeakestDimension = (dept: ComplianceEfficiencyDataV2): { 
   name: string; 
   score: number; 
   key: keyof typeof DIMENSION_NARRATIVES;
@@ -181,19 +158,189 @@ export default function ComplianceEfficiencyMatrix({
   // Estado para modal
   const [modalData, setModalData] = useState<{
     isOpen: boolean;
-    dept: ComplianceDepartment;
+    dept: ComplianceEfficiencyDataV2;
     weakest: { name: string; score: number; key: keyof typeof DIMENSION_NARRATIVES };
     rank: number;
   } | null>(null);
 
-  // Filtrar departamentos según viewMode
+  // ══════════════════════════════════════════════════════════════════════════
+  // FIX v2.8: Filtrar/AGRUPAR departamentos según viewMode
+  // - Scores 4C: promedio ponderado por totalJourneys
+  // - Participation/Efficiency: promedio ponderado por totalJourneys (del backend)
+  // ══════════════════════════════════════════════════════════════════════════
   const filteredDepartments = useMemo(() => {
+    // CASO 1: Modo departamentos con filtro de padre
     if (viewMode === 'departamentos' && parentDepartmentId) {
       return departments.filter(d => d.parentId === parentDepartmentId);
     }
+    
+    // CASO 2: Modo gerencias - AGREGAR datos de hijos a nivel gerencia
     if (viewMode === 'gerencias') {
-      return departments.filter(d => d.level === 2 || d.unitType === 'gerencia');
+      // Mapa principal de gerencias
+      const gerenciaMap = new Map<string, ComplianceEfficiencyDataV2>();
+      
+      // ✅ FIX v2.8: Mapas auxiliares para acumular TODAS las métricas ponderadas
+      const accumulators = new Map<string, {
+        // Scores 4C
+        sumCompliance: number; countCompliance: number;
+        sumClarification: number; countClarification: number;
+        sumCulture: number; countCulture: number;
+        sumConnection: number; countConnection: number;
+        // ✅ FIX v2.8: Participation y Efficiency del backend
+        sumParticipation: number; countParticipation: number;
+        sumEfficiency: number; countEfficiency: number;
+      }>();
+      
+      for (const dept of departments) {
+        const isGerencia = dept.level === 2 || dept.unitType === 'gerencia';
+        
+        let gerenciaId: string;
+        let gerenciaName: string;
+        
+        if (isGerencia) {
+          // Es una gerencia directa
+          gerenciaId = dept.departmentId;
+          gerenciaName = dept.departmentName;
+        } else if (dept.parentId) {
+          // Es departamento hijo → agregar a su gerencia padre
+          gerenciaId = dept.parentId;
+          gerenciaName = dept.parentName || 'Gerencia';
+        } else {
+          // Sin padre y no es gerencia → skip
+          continue;
+        }
+        
+        // Crear entrada de gerencia si no existe
+        if (!gerenciaMap.has(gerenciaId)) {
+          gerenciaMap.set(gerenciaId, {
+            departmentId: gerenciaId,
+            departmentName: gerenciaName,
+            compliance: 0,
+            status: 'neutral',
+            responded: 0,
+            overdue: 0,
+            pending: 0,
+            employeeDetail: [],
+            level: 2,
+            parentId: null,
+            unitType: 'gerencia',
+            participation: 0,
+            efficiency: 0,
+            avgComplianceScore: null,
+            avgClarificationScore: null,
+            avgCultureScore: null,
+            avgConnectionScore: null,
+            avgEXOScore: null,
+            npsScore: null,
+            totalJourneys: 0,
+            atRiskJourneys: 0,
+            alertsPercentage: 0
+          });
+          
+          // ✅ FIX v2.8: Inicializar acumuladores
+          accumulators.set(gerenciaId, {
+            sumCompliance: 0, countCompliance: 0,
+            sumClarification: 0, countClarification: 0,
+            sumCulture: 0, countCulture: 0,
+            sumConnection: 0, countConnection: 0,
+            sumParticipation: 0, countParticipation: 0,
+            sumEfficiency: 0, countEfficiency: 0
+          });
+        }
+        
+        const gerencia = gerenciaMap.get(gerenciaId)!;
+        const acc = accumulators.get(gerenciaId)!;
+        
+        // Acumular métricas de conteo
+        gerencia.responded += dept.responded;
+        gerencia.overdue += dept.overdue;
+        gerencia.pending += dept.pending;
+        gerencia.employeeDetail = [...gerencia.employeeDetail, ...dept.employeeDetail];
+        gerencia.totalJourneys = (gerencia.totalJourneys || 0) + (dept.totalJourneys || 0);
+        gerencia.atRiskJourneys = (gerencia.atRiskJourneys || 0) + (dept.atRiskJourneys || 0);
+        
+        // Peso para promedios ponderados
+        const weight = dept.totalJourneys || 1;
+        
+        // ✅ Acumular scores 4C
+        if (dept.avgComplianceScore != null) {
+          acc.sumCompliance += dept.avgComplianceScore * weight;
+          acc.countCompliance += weight;
+        }
+        if (dept.avgClarificationScore != null) {
+          acc.sumClarification += dept.avgClarificationScore * weight;
+          acc.countClarification += weight;
+        }
+        if (dept.avgCultureScore != null) {
+          acc.sumCulture += dept.avgCultureScore * weight;
+          acc.countCulture += weight;
+        }
+        if (dept.avgConnectionScore != null) {
+          acc.sumConnection += dept.avgConnectionScore * weight;
+          acc.countConnection += weight;
+        }
+        
+        // ✅ FIX v2.8: Acumular participation y efficiency del BACKEND
+        if (dept.participation != null) {
+          acc.sumParticipation += dept.participation * weight;
+          acc.countParticipation += weight;
+        }
+        if (dept.efficiency != null) {
+          acc.sumEfficiency += dept.efficiency * weight;
+          acc.countEfficiency += weight;
+        }
+      }
+      
+      // Calcular métricas agregadas para cada gerencia
+      return Array.from(gerenciaMap.entries()).map(([gerenciaId, g]) => {
+        const acc = accumulators.get(gerenciaId)!;
+        
+        // Compliance basado en personas
+        const total = g.responded + g.overdue;
+        g.compliance = total > 0 
+          ? Math.round((g.responded / total) * 100) 
+          : 0;
+        
+        // ✅ FIX v2.8: Promediar participation y efficiency del backend
+        g.participation = acc.countParticipation > 0 
+          ? Math.round(acc.sumParticipation / acc.countParticipation)
+          : 0;
+        
+        g.efficiency = acc.countEfficiency > 0 
+          ? Math.round(acc.sumEfficiency / acc.countEfficiency)
+          : 0;
+        
+        // Alertas
+        g.alertsPercentage = g.totalJourneys && g.totalJourneys > 0
+          ? Math.round(((g.atRiskJourneys || 0) / g.totalJourneys) * 100)
+          : 0;
+        
+        // Status
+        g.status = g.compliance >= 80 ? 'excellent' 
+          : g.compliance >= 60 ? 'good' 
+          : g.compliance >= 40 ? 'warning' 
+          : g.compliance > 0 ? 'critical' 
+          : 'neutral';
+        
+        // ✅ Calcular promedios ponderados de 4C
+        g.avgComplianceScore = acc.countCompliance > 0 
+          ? acc.sumCompliance / acc.countCompliance 
+          : null;
+        g.avgClarificationScore = acc.countClarification > 0 
+          ? acc.sumClarification / acc.countClarification 
+          : null;
+        g.avgCultureScore = acc.countCulture > 0 
+          ? acc.sumCulture / acc.countCulture 
+          : null;
+        g.avgConnectionScore = acc.countConnection > 0 
+          ? acc.sumConnection / acc.countConnection 
+          : null;
+        
+        return g;
+      }).sort((a, b) => b.compliance - a.compliance);
     }
+    
+    // CASO 3: Sin filtro - retornar todo
     return departments;
   }, [departments, viewMode, parentDepartmentId]);
 
@@ -208,7 +355,7 @@ export default function ComplianceEfficiencyMatrix({
     });
   };
 
-  const openModal = (dept: ComplianceDepartment, index: number) => {
+  const openModal = (dept: ComplianceEfficiencyDataV2, index: number) => {
     const weakest = getWeakestDimension(dept);
     if (!weakest) return;
     

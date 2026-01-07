@@ -116,6 +116,11 @@ export interface ComplianceEmployeeDetail {
   daysSinceHire: number
   complianceStatus: 'completed' | 'overdue' | 'pending'
   daysOverdue?: number
+  stages?: Array<{                           // ← AGREGAR ESTO
+    stage: 1 | 2 | 3 | 4
+    label: 'D1' | 'D7' | 'D30' | 'D90'
+    status: 'responded' | 'overdue' | 'not_sent'
+  }>
 }
 
 /**
@@ -604,6 +609,7 @@ export interface ComplianceEfficiencyDataV2 extends ComplianceEfficiencyData {
   // ═══════════════════════════════════════════════════════════════════
   level?: number                              // 2=gerencia, 3=departamento
   parentId?: string | null                    // ID gerencia padre
+  parentName?: string | null                  // ← AGREGAR ESTA LÍNEA - Nombre gerencia padre
   unitType?: 'gerencia' | 'departamento'
   
   // ═══════════════════════════════════════════════════════════════════

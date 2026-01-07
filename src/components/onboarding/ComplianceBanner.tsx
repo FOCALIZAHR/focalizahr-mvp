@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Users, AlertTriangle } from 'lucide-react';
+import { ChevronDown, Users, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ComplianceEfficiencyMatrix from './ComplianceEfficiencyMatrix';
 import type { ComplianceEfficiencyData } from '@/types/onboarding';
@@ -19,7 +19,6 @@ export default function ComplianceBanner({
   
   const [isExpanded, setIsExpanded] = useState(false);
   
-  // Calcular métricas
   const total = departments?.length || 0;
   const avgCompliance = total > 0
     ? Math.round(departments.reduce((acc, d) => acc + d.compliance, 0) / total)
@@ -31,7 +30,6 @@ export default function ComplianceBanner({
     return null;
   }
 
-  // Color compliance
   const getComplianceColor = (value: number) => {
     if (value >= 80) return 'text-cyan-400';
     if (value >= 60) return 'text-slate-300';
@@ -42,9 +40,9 @@ export default function ComplianceBanner({
     <div className="w-full max-w-5xl mx-auto mt-8">
       
       {/* Línea Tesla */}
-      <div className="h-[1px] bg-gradient-to-r from-transparent via-purple-400/50 to-transparent mb-4" />
+      <div className="h-[2px] bg-gradient-to-r from-transparent via-purple-400/50 to-transparent mb-4" />
       
-      {/* Banner - COPIANDO EXACTAMENTE el patrón de OnboardingScoreClassificationCard */}
+      {/* Banner - EXACTAMENTE como BalanceDepartmentalCard */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="
@@ -53,7 +51,7 @@ export default function ComplianceBanner({
           bg-slate-800/30
           border border-slate-700/40
           rounded-lg
-          px-4 sm:px-6 py-4
+          px-3 py-3
           overflow-hidden
           transition-all duration-300 ease-out
           hover:bg-slate-900/50
@@ -63,24 +61,26 @@ export default function ComplianceBanner({
         "
       >
         
-        <div className="relative flex items-center justify-between gap-4">
+        <div className="relative flex items-center justify-between gap-3">
           
           {/* Izquierda: Ícono + Métricas */}
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             
-            {/* Ícono */}
-            <div className="p-2 bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-lg flex-shrink-0">
-              <Users className="h-5 w-5 text-purple-400" />
+            {/* Ícono - EXACTO de BalanceDepartmentalCard */}
+            <div className="p-1.5 bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-lg flex-shrink-0">
+              <Users className="h-3 w-3 text-purple-400" />
             </div>
             
-            {/* Texto */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 min-w-0">
+            {/* Texto - EXACTO: text-[11px] font-medium */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 min-w-0">
               
-              <span className="text-sm font-semibold text-slate-200">
+              {/* Título - IGUAL que cards arriba */}
+              <span className="text-[11px] font-medium text-slate-200">
                 Compliance Equipos ({total})
               </span>
               
-              <div className="flex items-center gap-2 sm:gap-3 flex-wrap text-xs sm:text-sm">
+              {/* Métricas - EXACTO: text-[11px] font-light */}
+              <div className="flex items-center gap-2 flex-wrap text-[11px]">
                 
                 <span className="hidden sm:inline text-slate-600">·</span>
                 
@@ -93,29 +93,29 @@ export default function ComplianceBanner({
                 {totalOverdue > 0 && (
                   <>
                     <span className="text-slate-600">·</span>
-                    <span className="flex items-center gap-1.5 font-semibold text-amber-400">
-                      <AlertTriangle className="h-3.5 w-3.5" />
+                    <span className="flex items-center gap-1 font-medium text-amber-400">
+                      <AlertTriangle className="h-3 w-3" />
                       {totalOverdue} requieren atención
                     </span>
                   </>
                 )}
                 
                 <span className="text-slate-600">·</span>
-                <span className={`font-semibold ${getComplianceColor(avgCompliance)}`}>
+                <span className={`font-light ${getComplianceColor(avgCompliance)}`}>
                   {avgCompliance}% compliance
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Derecha: Chevron */}
+          {/* Chevron - más pequeño */}
           <motion.div
             animate={{ rotate: isExpanded ? 180 : 0 }}
             transition={{ duration: 0.3 }}
             className="flex-shrink-0"
           >
             <ChevronDown 
-              className="h-5 w-5 text-slate-400 group-hover:text-cyan-400 transition-colors"
+              className="h-4 w-4 text-slate-400 group-hover:text-cyan-400 transition-colors"
             />
           </motion.div>
         </div>
@@ -129,17 +129,18 @@ export default function ComplianceBanner({
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="overflow-hidden"
-          >
-            <div className="mt-4 bg-slate-800/30 border border-slate-700/40 rounded-lg p-4 sm:p-6">
-              <ComplianceEfficiencyMatrix
-                departments={departments}
-                loading={loading}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
+                        className="overflow-hidden"
+                    >
+                        <div className="mt-4 bg-slate-800/30 border border-slate-700/40 rounded-lg p-4 sm:p-6">
+                            <ComplianceEfficiencyMatrix
+                                departments={departments}
+                                loading={loading}
+                                viewMode="gerencias"
+                            />
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
 }

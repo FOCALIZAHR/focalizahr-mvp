@@ -1281,6 +1281,7 @@ static async getComplianceEfficiency(
   // Campos nuevos V2 (todos opcionales para backward compatibility)
   level?: number;
   parentId?: string | null;
+  parentName?: string | null;  // ✅ NUEVO: Para agrupar por gerencia en frontend
   unitType?: 'gerencia' | 'departamento';
   participation?: number;
   efficiency?: number;
@@ -1350,9 +1351,15 @@ static async getComplianceEfficiency(
       department: {
         select: { 
           displayName: true,
-          level: true,      // ✅ NUEVO V2
-          parentId: true,   // ✅ NUEVO V2
-          unitType: true    // ✅ NUEVO V2
+          level: true,
+          parentId: true,
+          unitType: true,
+          parent: {
+            select: {
+              id: true,
+              displayName: true
+            }
+          }
         }
       }
     }
@@ -1420,6 +1427,7 @@ static async getComplianceEfficiency(
     departmentName: string;
     level: number;
     parentId: string | null;
+    parentName: string | null;  // ✅ NUEVO
     unitType: string;
     responded: number;
     overdue: number;
@@ -1440,6 +1448,7 @@ static async getComplianceEfficiency(
         departmentName: journey.department.displayName,
         level: journey.department.level ?? 3,
         parentId: journey.department.parentId ?? null,
+        parentName: journey.department.parent?.displayName ?? null,  // ✅ NUEVO
         unitType: journey.department.unitType ?? 'departamento',
         responded: 0,
         overdue: 0,
@@ -1635,6 +1644,7 @@ static async getComplianceEfficiency(
       // ✅ CAMPOS NUEVOS V2
       level: dept.level,
       parentId: dept.parentId,
+      parentName: dept.parentName,  // ✅ NUEVO
       unitType: dept.unitType as 'gerencia' | 'departamento',
       participation,
       efficiency,

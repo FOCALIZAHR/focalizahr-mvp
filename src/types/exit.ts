@@ -11,17 +11,44 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Razones de salida válidas
+ * Razones de salida válidas (13 opciones para análisis "Hipótesis RRHH vs Realidad")
  */
 export const EXIT_REASONS = {
-  VOLUNTARY: 'voluntary',
-  TERMINATION: 'termination',
-  CONTRACT_END: 'contract_end',
-  RETIREMENT: 'retirement',
-  OTHER: 'other'
+  MEJOR_OPORTUNIDAD: 'mejor_oportunidad',
+  COMPENSACION: 'compensacion',
+  CRECIMIENTO_CARRERA: 'crecimiento_carrera',
+  BALANCE_VIDA_TRABAJO: 'balance_vida_trabajo',
+  MAL_CLIMA: 'mal_clima',
+  PROBLEMAS_LIDERAZGO: 'problemas_liderazgo',
+  RELOCALIZACION: 'relocalizacion',
+  MOTIVOS_PERSONALES: 'motivos_personales',
+  ESTUDIOS: 'estudios',
+  SALUD: 'salud',
+  ABANDONO_TRABAJO: 'abandono_trabajo',
+  JUBILACION: 'jubilacion',
+  OTRO: 'otro'
 } as const;
 
 export type ExitReason = typeof EXIT_REASONS[keyof typeof EXIT_REASONS];
+
+/**
+ * Labels en español para UI
+ */
+export const EXIT_REASON_LABELS: Record<ExitReason, string> = {
+  'mejor_oportunidad': 'Mejor oportunidad laboral',
+  'compensacion': 'Compensación / Sueldo',
+  'crecimiento_carrera': 'Falta de crecimiento profesional',
+  'balance_vida_trabajo': 'Balance vida-trabajo',
+  'mal_clima': 'Mal clima laboral',
+  'problemas_liderazgo': 'Problemas con liderazgo',
+  'relocalizacion': 'Relocalización geográfica',
+  'motivos_personales': 'Motivos personales',
+  'estudios': 'Estudios / Formación',
+  'salud': 'Motivos de salud',
+  'abandono_trabajo': 'Abandono de trabajo',
+  'jubilacion': 'Jubilación',
+  'otro': 'Otro motivo'
+};
 
 /**
  * Clasificación EIS (Exit Intelligence Score)
@@ -168,6 +195,7 @@ export interface ExitRegistrationResult {
   surveyToken?: string;
   message?: string;
   error?: string;
+  emailScheduledFor?: string;  // ← NUEVO: ISO date del email programado
 }
 
 /**

@@ -70,7 +70,7 @@ export class ExitRegistrationService {
           eis: null // Solo pendientes (sin encuesta completada)
         }
       });
-      
+
       if (existing) {
         console.log('[ExitRegistration] Existing pending record found:', existing.id);
         return {
@@ -78,7 +78,7 @@ export class ExitRegistrationService {
           error: `Ya existe un registro de salida pendiente para RUT ${data.nationalId}`
         };
       }
-      
+
       // 3. Obtener campaign permanente retencion-predictiva
       const campaign = await this.getOrCreateExitCampaign(data.accountId);
       if (!campaign) {
@@ -87,15 +87,15 @@ export class ExitRegistrationService {
           error: 'Campaign retencion-predictiva no encontrada. Verifique que el CampaignType existe con isPermanent=true'
         };
       }
-      
+
       console.log('[ExitRegistration] Using campaign:', campaign.id);
-      
+
       // 4. Buscar correlación onboarding
       const correlation = await this.findOnboardingCorrelation(
         data.accountId,
         data.nationalId
       );
-      
+
       // 5. Crear Participant + ExitRecord en transacción
       const result = await prisma.$transaction(async (tx) => {
         // Crear Participant
@@ -113,14 +113,14 @@ export class ExitRegistrationService {
             hasResponded: false
           }
         });
-        
+
         console.log('[ExitRegistration] Participant created:', participant.id);
-        
+
         // Calcular tenure si hay correlación onboarding
         const tenureMonths = correlation.found && correlation.hireDate
           ? this.calculateTenureMonths(correlation.hireDate, data.exitDate)
           : null;
-        
+
         // Crear ExitRecord
         const exitRecord = await tx.exitRecord.create({
           data: {
@@ -141,29 +141,47 @@ export class ExitRegistrationService {
             tenureMonths
           }
         });
-        
+
         console.log('[ExitRegistration] ExitRecord created:', exitRecord.id);
-        
+
         return { participant, exitRecord };
       });
-      
+
       // 6. Programar email de invitación
       await this.scheduleInvitationEmail(result.participant, data, campaign.id);
-      
+
       console.log('[ExitRegistration] ✅ Registration completed successfully:', {
         exitRecordId: result.exitRecord.id,
         participantId: result.participant.id,
         surveyToken: result.participant.uniqueToken
       });
-      
+
+      // Calcular fecha email (misma lógica que scheduleInvitationEmail)
+      let emailScheduledFor: string | undefined;
+      if (data.email) {
+        const scheduledDate = new Date(data.exitDate);
+        scheduledDate.setDate(scheduledDate.getDate() + 1);
+        scheduledDate.setHours(9, 0, 0, 0);
+        const now = new Date();
+        if (scheduledDate < now) {
+          scheduledDate.setTime(now.getTime());
+          scheduledDate.setDate(scheduledDate.getDate() + 1);
+          scheduledDate.setHours(9, 0, 0, 0);
+        }
+        emailScheduledFor = scheduledDate.toISOString();
+      }
+
       return {
         success: true,
         exitRecordId: result.exitRecord.id,
         participantId: result.participant.id,
         surveyToken: result.participant.uniqueToken,
-        message: 'Salida registrada exitosamente. Email de invitación programado.'
+        emailScheduledFor,
+        message: emailScheduledFor
+          ? `Salida registrada. Email programado para ${new Date(emailScheduledFor).toLocaleDateString('es-CL')}`
+          : 'Salida registrada exitosamente.'
       };
-      
+
     } catch (error: any) {
       console.error('[ExitRegistration] ❌ Error:', error);
       return {

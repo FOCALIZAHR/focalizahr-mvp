@@ -177,6 +177,10 @@ export async function POST(request: NextRequest) {
       if (!item.fullName) errors.push('fullName requerido');
       if (!item.departmentId) errors.push('departmentId requerido');
       if (!item.exitDate) errors.push('exitDate requerido');
+      // ✅ NUEVO: Validar al menos email O phoneNumber
+      if (!item.email && !item.phoneNumber) {
+        errors.push('Debe proporcionar email O teléfono (al menos uno)');
+      }
       
       // Validar fecha
       let exitDate: Date | null = null;
