@@ -824,3 +824,56 @@ export function calculateTenureMonths(hireDate: Date, exitDate: Date): number {
   const diffDays = diffTime / (1000 * 60 * 60 * 24);
   return Math.round(diffDays / 30);
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// INTERFACES PARA DASHBOARD EXIT (Gold Cache + Computed)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Métricas de un departamento para dashboard
+ * Retornado por ExitAggregationService.getDepartmentRanking()
+ */
+export interface DepartmentExitMetrics {
+  departmentId: string;
+  departmentName: string;
+  standardCategory: string | null;
+  level: number;
+  parentId: string | null;
+
+  // Métricas Gold Cache
+  totalExits: number;
+  avgEIS: number | null;
+  conservationIndex: number | null;
+  topFactors: FactorPriority[] | null;
+  enps: number | null;
+  voluntaryRate: number | null;
+
+  // Alertas (computed)
+  pendingAlerts: number;
+  criticalAlerts: number;
+}
+
+/**
+ * Resumen global Exit para dashboard
+ * Retornado por ExitAggregationService.getGlobalMetrics()
+ */
+export interface ExitMetricsSummary {
+  totalDepartments: number;
+  totalExits: number;
+  globalAvgEIS: number | null;
+  topFactorsGlobal: FactorPriority[] | null;
+  alerts: {
+    pending: number;
+    critical: number;
+    leyKarin: number;
+  };
+}
+
+/**
+ * Response completa del API /api/exit/metrics
+ */
+export interface ExitMetricsData {
+  departments: DepartmentExitMetrics[];
+  summary: ExitMetricsSummary;
+  source: 'GLOBAL' | 'DEPARTMENT';
+  responseTime: number;
+}

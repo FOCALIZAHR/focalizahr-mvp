@@ -21,12 +21,18 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import { 
   FactorPriority, 
   ExitInsight,
   EIS_CLASSIFICATIONS 
 } from '@/types/exit';
 import { ExitAlertService } from './ExitAlertService';
+// Al inicio del archivo agregar:
+import type { 
+  DepartmentExitMetrics, 
+  ExitMetricsSummary 
+} from '@/types/exit';
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -448,7 +454,7 @@ export class ExitAggregationService {
     departmentId: string
   ): Promise<void> {
     console.log(`[ExitAggregation] LENTE 2: Updating Gold Cache for dept ${departmentId}`);
-    
+
     // Obtener últimos 12 meses de insights
     const insights = await prisma.departmentExitInsight.findMany({
       where: {
@@ -458,42 +464,99 @@ export class ExitAggregationService {
       orderBy: { periodStart: 'desc' },
       take: 12
     });
-    
+
     if (insights.length === 0) {
       console.log(`[ExitAggregation] No insights for dept ${departmentId}, skipping Gold Cache`);
       return;
     }
-    
+
     // Calcular promedios ponderados por surveysCompleted
     let totalWeight = 0;
     let weightedEIS = 0;
+    let weightedENPS = 0;
+    let enpsWeight = 0;
     let totalExits = 0;
+    let totalVoluntaryExits = 0;
     let totalConservation = 0;
     let conservationCount = 0;
-    
+
+    // Agregar topFactors de todos los períodos
+    const factorStats: Map<string, { mentions: number; severities: number[] }> = new Map();
+
     for (const insight of insights) {
       const weight = insight.surveysCompleted;
       totalWeight += weight;
       totalExits += insight.totalExits;
-      
+      totalVoluntaryExits += insight.voluntaryExits;
+
       if (insight.avgEIS !== null) {
         weightedEIS += insight.avgEIS * weight;
       }
-      
+
+      // eNPS ponderado por surveysCompleted
+      if (insight.enps !== null && weight > 0) {
+        weightedENPS += insight.enps * weight;
+        enpsWeight += weight;
+      }
+
       if (insight.conservationIndex !== null) {
         totalConservation += insight.conservationIndex;
         conservationCount++;
       }
+
+      // Agregar factores de este período
+      const factors = insight.topExitFactors as FactorPriority[] | null;
+      if (factors) {
+        for (const factor of factors) {
+          const stats = factorStats.get(factor.factor) || { mentions: 0, severities: [] };
+          stats.mentions += factor.mentions;
+          stats.severities.push(factor.avgSeverity);
+          factorStats.set(factor.factor, stats);
+        }
+      }
     }
-    
-    const accumulatedEIS = totalWeight > 0 
-      ? Math.round((weightedEIS / totalWeight) * 10) / 10 
+
+    const accumulatedEIS = totalWeight > 0
+      ? Math.round((weightedEIS / totalWeight) * 10) / 10
       : null;
-    
+
+    const accumulatedENPS = enpsWeight > 0
+      ? Math.round((weightedENPS / enpsWeight) * 10) / 10
+      : null;
+
+    const accumulatedVoluntaryRate = totalExits > 0
+      ? Math.round((totalVoluntaryExits / totalExits) * 1000) / 10
+      : null;
+
     const accumulatedConservation = conservationCount > 0
       ? Math.round((totalConservation / conservationCount) * 10) / 10
       : null;
-    
+
+    // Calcular topFactors agregados (rolling 12 meses)
+    const accumulatedTopFactors: FactorPriority[] = [];
+    for (const [factor, stats] of factorStats) {
+      const avgSeverity = stats.severities.length > 0
+        ? stats.severities.reduce((a, b) => a + b, 0) / stats.severities.length
+        : 3.0;
+
+      const mentionRate = totalExits > 0 ? stats.mentions / totalExits : 0;
+      const severityWeight = (5 - avgSeverity) / 4;
+      const priority = Math.round(mentionRate * severityWeight * 100);
+
+      accumulatedTopFactors.push({
+        factor,
+        mentions: stats.mentions,
+        mentionRate: Math.round(mentionRate * 100) / 100,
+        avgSeverity: Math.round(avgSeverity * 10) / 10,
+        priority
+      });
+    }
+
+    // Ordenar por prioridad y tomar top 5
+    const topFactors = accumulatedTopFactors
+      .sort((a, b) => b.priority - a.priority)
+      .slice(0, 5);
+
     // Actualizar Department
     await prisma.department.update({
       where: { id: departmentId },
@@ -502,15 +565,23 @@ export class ExitAggregationService {
         accumulatedExitCount: totalExits,
         accumulatedExitPeriodCount: insights.length,
         accumulatedExitLastUpdated: new Date(),
-        accumulatedConservationIndex: accumulatedConservation
+        accumulatedConservationIndex: accumulatedConservation,
+        accumulatedExitTopFactors: topFactors.length > 0
+          ? (topFactors as unknown as Prisma.InputJsonValue)
+          : Prisma.DbNull,
+        accumulatedExitENPS: accumulatedENPS,
+        accumulatedExitVoluntaryRate: accumulatedVoluntaryRate
       }
     });
-    
+
     console.log(`[ExitAggregation] ✅ LENTE 2 updated for dept ${departmentId}:`, {
       accumulatedEIS,
+      accumulatedENPS,
+      accumulatedVoluntaryRate,
       totalExits,
       periods: insights.length,
-      accumulatedConservation
+      accumulatedConservation,
+      topFactorsCount: topFactors.length
     });
   }
   
@@ -773,5 +844,185 @@ export class ExitAggregationService {
     const [year, month] = period.split('-').map(Number);
     const prevDate = new Date(year, month - 2, 1); // month - 2 porque month es 1-based
     return `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+  }
+  
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MÉTODOS DE CONSULTA (Dashboard)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Ranking departamentos con métricas completas para componentes
+   */
+  static async getDepartmentRanking(
+    accountId: string,
+    options?: { allowedDepartmentIds?: string[] }
+  ): Promise<DepartmentExitMetrics[]> {
+    const whereClause: any = {
+      accountId,
+      isActive: true,
+      accumulatedEISScore: { not: null }
+    };
+
+    if (options?.allowedDepartmentIds) {
+      whereClause.id = { in: options.allowedDepartmentIds };
+    }
+
+    // Query departamentos con alertas
+    const departments = await prisma.department.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        displayName: true,
+        standardCategory: true,
+        level: true,
+        parentId: true,
+        accumulatedEISScore: true,
+        accumulatedExitCount: true,
+        accumulatedConservationIndex: true,
+        accumulatedExitTopFactors: true,
+        accumulatedExitENPS: true,
+        accumulatedExitVoluntaryRate: true,
+        _count: {
+          select: {
+            exitAlerts: {
+              where: { status: 'pending' }
+            }
+          }
+        }
+      },
+      orderBy: { accumulatedEISScore: 'asc' }
+    });
+
+    // Contar alertas críticas por departamento
+    const criticalAlertsByDept = await prisma.exitAlert.groupBy({
+      by: ['departmentId'],
+      where: {
+        accountId,
+        status: 'pending',
+        severity: 'critical',
+        departmentId: { in: departments.map(d => d.id) }
+      },
+      _count: true
+    });
+
+    const criticalMap = new Map(
+      criticalAlertsByDept.map(a => [a.departmentId, a._count])
+    );
+
+    return departments.map(d => ({
+      departmentId: d.id,
+      departmentName: d.displayName,
+      standardCategory: d.standardCategory,
+      level: d.level,
+      parentId: d.parentId,
+      totalExits: d.accumulatedExitCount || 0,
+      avgEIS: d.accumulatedEISScore,
+      conservationIndex: d.accumulatedConservationIndex,
+      topFactors: d.accumulatedExitTopFactors as FactorPriority[] | null,
+      enps: d.accumulatedExitENPS,
+      voluntaryRate: d.accumulatedExitVoluntaryRate,
+      pendingAlerts: d._count.exitAlerts,
+      criticalAlerts: criticalMap.get(d.id) || 0
+    }));
+  }
+
+  /**
+   * Métricas globales Exit completas
+   */
+  static async getGlobalMetrics(
+    accountId: string,
+    options?: { allowedDepartmentIds?: string[] }
+  ): Promise<ExitMetricsSummary> {
+    const deptWhere: any = {
+      accountId,
+      isActive: true,
+      accumulatedEISScore: { not: null }
+    };
+
+    const alertWhere: any = { accountId, status: 'pending' };
+    const exitWhere: any = {
+      accountId,
+      exitDate: { gte: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) }
+    };
+
+    if (options?.allowedDepartmentIds) {
+      deptWhere.id = { in: options.allowedDepartmentIds };
+      alertWhere.departmentId = { in: options.allowedDepartmentIds };
+      exitWhere.departmentId = { in: options.allowedDepartmentIds };
+    }
+
+    const [depts, pending, critical, leyKarin, total] = await Promise.all([
+      prisma.department.findMany({
+        where: deptWhere,
+        select: {
+          accumulatedEISScore: true,
+          accumulatedExitCount: true,
+          accumulatedExitTopFactors: true
+        }
+      }),
+      prisma.exitAlert.count({ where: alertWhere }),
+      prisma.exitAlert.count({ where: { ...alertWhere, severity: 'critical' } }),
+      prisma.exitAlert.count({ where: { ...alertWhere, alertType: 'ley_karin' } }),
+      prisma.exitRecord.count({ where: exitWhere })
+    ]);
+
+    const withData = depts.filter(d => d.accumulatedEISScore);
+    const avg = withData.length > 0
+      ? withData.reduce((a, d) => a + (d.accumulatedEISScore || 0), 0) / withData.length
+      : null;
+
+    // Calcular topFactorsGlobal agregando factores de todos los departamentos
+    const globalFactorStats: Map<string, { mentions: number; severities: number[] }> = new Map();
+    let globalTotalExits = 0;
+
+    for (const dept of depts) {
+      globalTotalExits += dept.accumulatedExitCount || 0;
+      const factors = dept.accumulatedExitTopFactors as FactorPriority[] | null;
+      if (factors) {
+        for (const factor of factors) {
+          const stats = globalFactorStats.get(factor.factor) || { mentions: 0, severities: [] };
+          stats.mentions += factor.mentions;
+          stats.severities.push(factor.avgSeverity);
+          globalFactorStats.set(factor.factor, stats);
+        }
+      }
+    }
+
+    const topFactorsGlobal: FactorPriority[] = [];
+    for (const [factor, stats] of globalFactorStats) {
+      const avgSeverity = stats.severities.length > 0
+        ? stats.severities.reduce((a, b) => a + b, 0) / stats.severities.length
+        : 3.0;
+
+      const mentionRate = globalTotalExits > 0 ? stats.mentions / globalTotalExits : 0;
+      const severityWeight = (5 - avgSeverity) / 4;
+      const priority = Math.round(mentionRate * severityWeight * 100);
+
+      topFactorsGlobal.push({
+        factor,
+        mentions: stats.mentions,
+        mentionRate: Math.round(mentionRate * 100) / 100,
+        avgSeverity: Math.round(avgSeverity * 10) / 10,
+        priority
+      });
+    }
+
+    // Ordenar por prioridad y tomar top 5
+    const sortedTopFactors = topFactorsGlobal
+      .sort((a, b) => b.priority - a.priority)
+      .slice(0, 5);
+
+    return {
+      totalDepartments: depts.length,
+      totalExits: total,
+      globalAvgEIS: avg ? Math.round(avg * 10) / 10 : null,
+      topFactorsGlobal: sortedTopFactors.length > 0 ? sortedTopFactors : null,
+      alerts: {
+        pending,
+        critical,
+        leyKarin
+      }
+    };
   }
 }
