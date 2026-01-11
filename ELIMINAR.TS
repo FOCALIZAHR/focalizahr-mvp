@@ -1,320 +1,700 @@
-// 📍 UBICACIÓN: src/app/admin/email-automation/page.tsx
-// 🎯 REEMPLAZAR: La constante EMAIL_TEMPLATES (líneas ~40-150)
+/**
+ * ============================================
+ * NPSAggregationService - Sistema NPS Transversal
+ * ============================================
+ * 
+ * @version 1.1
+ * @date Enero 2026
+ * @description Servicio centralizado para cálculo y persistencia de NPS
+ *              de todos los productos FocalizaHR.
+ * 
+ * PATRÓN: DepartmentOnboardingInsight (Aggregation Pattern)
+ * 
+ * PRODUCTOS SOPORTADOS:
+ * - onboarding: NPS del día 90 (Onboarding Journey Intelligence)
+ * - exit: NPS de encuesta de salida (Exit Intelligence)
+ * - pulso: eNPS de Pulso Express
+ * - experiencia: eNPS de Experiencia Full
+ * 
+ * UBICACIÓN: src/lib/services/NPSAggregationService.ts
+ * 
+ * @changelog v1.1: Agregado aggregateExitNPS para Exit Intelligence
+ * ============================================
+ */
 
-const EMAIL_TEMPLATES: EmailTemplate[] = [
-  {
-    id: 'retencion_invitation',
-    campaign_type: 'retencion',
-    subject: 'Tu experiencia confidencial - {company_name}',
-    preview_text: 'Comparte tu experiencia de crecimiento profesional de forma confidencial',
-    html_content: `
-      <!DOCTYPE html>
-      <html lang="es">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-        <style>
-          body { margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-          .email-container { max-width: 600px; margin: 0 auto; background: #ffffff; }
-          .email-header { display: flex; justify-content: space-between; align-items: center; padding: 28px 32px; background: #ffffff; border-bottom: 1px solid #F1F5F9; }
-          .logo-empresa-text { font-size: 20px; font-weight: 700; color: #0F172A; }
-          .powered-by { font-size: 11px; color: #94A3B8; }
-          .brand-gradient { background: linear-gradient(135deg, #22D3EE, #A78BFA); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; }
-          .email-hero { padding: 44px 36px 40px; background: #ffffff; text-align: center; }
-          .campaign-badge { display: inline-block; padding: 4px 12px; background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.15); border-radius: 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #6366F1; margin-bottom: 20px; }
-          .email-title { font-size: 32px; font-weight: 600; background: linear-gradient(135deg, #22D3EE, #A78BFA); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 12px 0; line-height: 1.2; }
-          .email-subtitle { font-size: 16px; color: #64748B; font-weight: 400; margin: 0; }
-          .email-content { padding: 36px; background: #ffffff; }
-          .email-greeting { font-size: 18px; color: #22D3EE; font-weight: 600; margin: 0 0 24px 0; }
-          .email-text { font-size: 16px; line-height: 1.75; color: #475569; margin-bottom: 20px; }
-          .email-text strong { color: #0F172A; font-weight: 600; }
-          .guarantees-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 32px 0; }
-          .guarantee-card { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px 20px; text-align: center; }
-          .guarantee-icon { width: 40px; height: 40px; margin: 0 auto 14px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(34,211,238,0.1), rgba(167,139,250,0.1)); }
-          .guarantee-title { font-size: 15px; font-weight: 600; color: #0F172A; margin: 0 0 8px 0; }
-          .guarantee-desc { font-size: 13px; color: #64748B; line-height: 1.5; margin: 0; }
-          .email-cta-section { text-align: center; margin: 36px 0 28px; }
-          .email-cta { display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #22D3EE, #A78BFA); color: white; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; }
-          .deadline-text { font-size: 14px; color: #94A3B8; margin-top: 20px; }
-          .email-footer { background: #F8FAFC; border-top: 1px solid #E2E8F0; padding: 28px 32px; text-align: center; }
-          .footer-powered { font-size: 11px; color: #94A3B8; margin-bottom: 16px; }
-          @media only screen and (max-width: 600px) {
-            .email-header { padding: 20px; flex-direction: column; gap: 16px; }
-            .email-hero { padding: 32px 24px; }
-            .email-content { padding: 28px 24px; }
-            .guarantees-grid { grid-template-columns: 1fr; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="email-container">
-          <div class="email-header">
-            <div class="logo-empresa-text">{company_name}</div>
-            <div class="powered-by">powered by <span class="brand-gradient">FocalizaHR</span></div>
-          </div>
-          
-          <div class="email-hero">
-            <div class="campaign-badge">Retención Predictiva</div>
-            <h1 class="email-title">Tu experiencia confidencial</h1>
-            <p class="email-subtitle">Crecimiento profesional sostenible</p>
-          </div>
-          
-          <div class="email-content">
-            <p class="email-greeting">Hola {participant_name},</p>
-            
-            <p class="email-text">
-              En <strong>{company_name}</strong> valoramos tu experiencia. Esta encuesta confidencial (7 preguntas, 5 min) nos ayudará a crear un ambiente donde todos puedan prosperar.
-            </p>
-            
-            <div class="guarantees-grid">
-              <div class="guarantee-card">
-                <div class="guarantee-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" stroke-width="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                  </svg>
-                </div>
-                <div class="guarantee-title">100% Confidencial</div>
-                <div class="guarantee-desc">Tu identidad protegida. Análisis agregado solamente.</div>
-              </div>
-              
-              <div class="guarantee-card">
-                <div class="guarantee-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22D3EE" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <polyline points="12 6 12 12 16 14"/>
-                  </svg>
-                </div>
-                <div class="guarantee-title">Solo 5 minutos</div>
-                <div class="guarantee-desc">7 preguntas diseñadas científicamente.</div>
-              </div>
-            </div>
-            
-            <div class="email-cta-section">
-              <a href="{survey_url}" class="email-cta">Completar Encuesta Confidencial</a>
-              <div class="deadline-text">Fecha límite: <strong>{deadline}</strong></div>
-            </div>
-          </div>
-          
-          <div class="email-footer">
-            <div class="footer-powered">Powered by <span class="brand-gradient">FocalizaHR</span></div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
-    variables: ['{company_name}', '{participant_name}', '{survey_url}', '{deadline}'],
-    tone: 'confidencial + impacto positivo desarrollo',
-    estimated_time: '5 minutos'
-  },
-  {
-    id: 'pulso_invitation',
-    campaign_type: 'pulso',
-    subject: 'Pulso clima laboral - {company_name} (5 min)',
-    preview_text: 'Tu opinión ayuda a mejorar el ambiente de trabajo para todos',
-    html_content: `
-      <!DOCTYPE html>
-      <html lang="es">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-        <style>
-          body { margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-          .email-container { max-width: 600px; margin: 0 auto; background: #ffffff; }
-          .email-header { display: flex; justify-content: space-between; align-items: center; padding: 28px 32px; background: #ffffff; border-bottom: 1px solid #F1F5F9; }
-          .logo-empresa-text { font-size: 20px; font-weight: 700; color: #0F172A; }
-          .powered-by { font-size: 11px; color: #94A3B8; }
-          .brand-gradient { background: linear-gradient(135deg, #22D3EE, #A78BFA); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; }
-          .email-hero { padding: 44px 36px 40px; background: #ffffff; text-align: center; }
-          .campaign-badge { display: inline-block; padding: 4px 12px; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.15); border-radius: 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #059669; margin-bottom: 20px; }
-          .email-title { font-size: 32px; font-weight: 600; background: linear-gradient(135deg, #22D3EE, #A78BFA); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 12px 0; line-height: 1.2; }
-          .email-subtitle { font-size: 16px; color: #64748B; font-weight: 400; margin: 0; }
-          .email-content { padding: 36px; background: #ffffff; }
-          .email-greeting { font-size: 18px; color: #22D3EE; font-weight: 600; margin: 0 0 24px 0; }
-          .email-text { font-size: 16px; line-height: 1.75; color: #475569; margin-bottom: 20px; }
-          .email-text strong { color: #0F172A; font-weight: 600; }
-          .guarantees-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 32px 0; }
-          .guarantee-card { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px 20px; text-align: center; }
-          .guarantee-icon { width: 40px; height: 40px; margin: 0 auto 14px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(6,182,212,0.1)); }
-          .guarantee-title { font-size: 15px; font-weight: 600; color: #0F172A; margin: 0 0 8px 0; }
-          .guarantee-desc { font-size: 13px; color: #64748B; line-height: 1.5; margin: 0; }
-          .email-cta-section { text-align: center; margin: 36px 0 28px; }
-          .email-cta { display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #22D3EE, #A78BFA); color: white; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; }
-          .deadline-text { font-size: 14px; color: #94A3B8; margin-top: 20px; }
-          .email-footer { background: #F8FAFC; border-top: 1px solid #E2E8F0; padding: 28px 32px; text-align: center; }
-          .footer-powered { font-size: 11px; color: #94A3B8; margin-bottom: 16px; }
-          @media only screen and (max-width: 600px) {
-            .email-header { padding: 20px; flex-direction: column; gap: 16px; }
-            .email-hero { padding: 32px 24px; }
-            .email-content { padding: 28px 24px; }
-            .guarantees-grid { grid-template-columns: 1fr; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="email-container">
-          <div class="email-header">
-            <div class="logo-empresa-text">{company_name}</div>
-            <div class="powered-by">powered by <span class="brand-gradient">FocalizaHR</span></div>
-          </div>
-          
-          <div class="email-hero">
-            <div class="campaign-badge">Pulso Express</div>
-            <h1 class="email-title">5 minutos para un mejor ambiente</h1>
-            <p class="email-subtitle">Diagnóstico organizacional rápido</p>
-          </div>
-          
-          <div class="email-content">
-            <p class="email-greeting">Hola {participant_name},</p>
-            
-            <p class="email-text">
-              <strong>{company_name}</strong> quiere conocer cómo te sientes en tu trabajo actual. Tu opinión es fundamental para crear un mejor ambiente laboral.
-            </p>
-            
-            <div class="guarantees-grid">
-              <div class="guarantee-card">
-                <div class="guarantee-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
-                </div>
-                <div class="guarantee-title">100% Anónimo</div>
-                <div class="guarantee-desc">Sin identificación personal. Resultados agregados.</div>
-              </div>
-              
-              <div class="guarantee-card">
-                <div class="guarantee-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                  </svg>
-                </div>
-                <div class="guarantee-title">Express</div>
-                <div class="guarantee-desc">12 preguntas. Máximo 5 minutos.</div>
-              </div>
-            </div>
-            
-            <div class="email-cta-section">
-              <a href="{survey_url}" class="email-cta">Completar en 5 Minutos</a>
-              <div class="deadline-text">Fecha límite: <strong>{deadline}</strong></div>
-            </div>
-          </div>
-          
-          <div class="email-footer">
-            <div class="footer-powered">Powered by <span class="brand-gradient">FocalizaHR</span></div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
-    variables: ['{company_name}', '{participant_name}', '{survey_url}', '{deadline}'],
-    tone: 'diagnóstico + mejora continua empresarial',
-    estimated_time: '5 minutos'
-  },
-  {
-    id: 'experiencia_invitation',
-    campaign_type: 'experiencia',
-    subject: 'Assessment desarrollo profesional - {company_name}',
-    preview_text: 'Evalúa tu experiencia completa como colaborador',
-    html_content: `
-      <!DOCTYPE html>
-      <html lang="es">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-        <style>
-          body { margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-          .email-container { max-width: 600px; margin: 0 auto; background: #ffffff; }
-          .email-header { display: flex; justify-content: space-between; align-items: center; padding: 28px 32px; background: #ffffff; border-bottom: 1px solid #F1F5F9; }
-          .logo-empresa-text { font-size: 20px; font-weight: 700; color: #0F172A; }
-          .powered-by { font-size: 11px; color: #94A3B8; }
-          .brand-gradient { background: linear-gradient(135deg, #22D3EE, #A78BFA); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; }
-          .email-hero { padding: 44px 36px 40px; background: #ffffff; text-align: center; }
-          .campaign-badge { display: inline-block; padding: 4px 12px; background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.15); border-radius: 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #8B5CF6; margin-bottom: 20px; }
-          .email-title { font-size: 32px; font-weight: 600; background: linear-gradient(135deg, #22D3EE, #A78BFA); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 12px 0; line-height: 1.2; }
-          .email-subtitle { font-size: 16px; color: #64748B; font-weight: 400; margin: 0; }
-          .email-content { padding: 36px; background: #ffffff; }
-          .email-greeting { font-size: 18px; color: #22D3EE; font-weight: 600; margin: 0 0 24px 0; }
-          .email-text { font-size: 16px; line-height: 1.75; color: #475569; margin-bottom: 20px; }
-          .email-text strong { color: #0F172A; font-weight: 600; }
-          .guarantees-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 32px 0; }
-          .guarantee-card { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 24px 20px; text-align: center; }
-          .guarantee-icon { width: 40px; height: 40px; margin: 0 auto 14px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(139,92,246,0.1), rgba(236,72,153,0.1)); }
-          .guarantee-title { font-size: 15px; font-weight: 600; color: #0F172A; margin: 0 0 8px 0; }
-          .guarantee-desc { font-size: 13px; color: #64748B; line-height: 1.5; margin: 0; }
-          .email-cta-section { text-align: center; margin: 36px 0 28px; }
-          .email-cta { display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #22D3EE, #A78BFA); color: white; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; }
-          .deadline-text { font-size: 14px; color: #94A3B8; margin-top: 20px; }
-          .email-footer { background: #F8FAFC; border-top: 1px solid #E2E8F0; padding: 28px 32px; text-align: center; }
-          .footer-powered { font-size: 11px; color: #94A3B8; margin-bottom: 16px; }
-          @media only screen and (max-width: 600px) {
-            .email-header { padding: 20px; flex-direction: column; gap: 16px; }
-            .email-hero { padding: 32px 24px; }
-            .email-content { padding: 28px 24px; }
-            .guarantees-grid { grid-template-columns: 1fr; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="email-container">
-          <div class="email-header">
-            <div class="logo-empresa-text">{company_name}</div>
-            <div class="powered-by">powered by <span class="brand-gradient">FocalizaHR</span></div>
-          </div>
-          
-          <div class="email-hero">
-            <div class="campaign-badge">Experiencia Full</div>
-            <h1 class="email-title">Tu voz importa</h1>
-            <p class="email-subtitle">Assessment desarrollo profesional</p>
-          </div>
-          
-          <div class="email-content">
-            <p class="email-greeting">Hola {participant_name},</p>
-            
-            <p class="email-text">
-              <strong>{company_name}</strong> realizará un assessment completo para entender la experiencia de nuestro equipo y diseñar estrategias de desarrollo organizacional más efectivas.
-            </p>
-            
-            <div class="guarantees-grid">
-              <div class="guarantee-card">
-                <div class="guarantee-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                  </svg>
-                </div>
-                <div class="guarantee-title">Confidencial</div>
-                <div class="guarantee-desc">Respuestas anónimas. Privacidad garantizada.</div>
-              </div>
-              
-              <div class="guarantee-card">
-                <div class="guarantee-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <path d="M12 6v6l4 2"/>
-                  </svg>
-                </div>
-                <div class="guarantee-title">Assessment 360°</div>
-                <div class="guarantee-desc">Evaluación completa de experiencia organizacional.</div>
-              </div>
-            </div>
-            
-            <div class="email-cta-section">
-              <a href="{survey_url}" class="email-cta">Comenzar Assessment</a>
-              <div class="deadline-text">Fecha límite: <strong>{deadline}</strong></div>
-            </div>
-          </div>
-          
-          <div class="email-footer">
-            <div class="footer-powered">Powered by <span class="brand-gradient">FocalizaHR</span></div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
-    variables: ['{company_name}', '{participant_name}', '{survey_url}', '{deadline}'],
-    tone: 'confidencial + impacto positivo desarrollo',
-    estimated_time: '5 minutos'
+import { prisma } from '@/lib/prisma';
+import { 
+  NPSCalculation, 
+  NPSProductType, 
+  NPSPeriodType 
+} from '@/types/nps';
+
+// ============================================
+// SERVICIO PRINCIPAL
+// ============================================
+
+export class NPSAggregationService {
+  
+  // ============================================
+  // CÁLCULO NPS (Core)
+  // ============================================
+  
+  /**
+   * Calcula NPS desde un array de ratings (0-10)
+   * 
+   * Clasificación estándar industria:
+   * - Promotores: 9-10
+   * - Pasivos: 7-8
+   * - Detractores: 0-6
+   * 
+   * Fórmula: NPS = %Promotores - %Detractores
+   * Rango: -100 a +100
+   * 
+   * @param ratings Array de valores 0-10
+   * @returns NPSCalculation con todas las métricas
+   */
+  static calculateNPS(ratings: number[]): NPSCalculation {
+    if (ratings.length === 0) {
+      return {
+        npsScore: 0,
+        promoters: 0,
+        passives: 0,
+        detractors: 0,
+        totalResponses: 0,
+        promotersPct: 0,
+        passivesPct: 0,
+        detractorsPct: 0
+      };
+    }
+    
+    // Clasificar respuestas
+    const promoters = ratings.filter(r => r >= 9).length;
+    const passives = ratings.filter(r => r >= 7 && r <= 8).length;
+    const detractors = ratings.filter(r => r <= 6).length;
+    const total = ratings.length;
+    
+    // Calcular porcentajes
+    const promotersPct = (promoters / total) * 100;
+    const passivesPct = (passives / total) * 100;
+    const detractorsPct = (detractors / total) * 100;
+    
+    // Calcular NPS (-100 a +100)
+    const npsScore = Math.round(promotersPct - detractorsPct);
+    
+    return {
+      npsScore,
+      promoters,
+      passives,
+      detractors,
+      totalResponses: total,
+      promotersPct: Math.round(promotersPct * 10) / 10,
+      passivesPct: Math.round(passivesPct * 10) / 10,
+      detractorsPct: Math.round(detractorsPct * 10) / 10
+    };
   }
-];
+  
+  // ============================================
+  // TREND (vs período anterior)
+  // ============================================
+  
+  /**
+   * Obtiene el score del período anterior para calcular trend
+   * 
+   * @param accountId ID de la cuenta
+   * @param departmentId ID del departamento (null = empresa completa)
+   * @param productType Tipo de producto
+   * @param currentPeriod Período actual (ej: "2025-12")
+   * @returns Score anterior o null si no existe
+   */
+  static async getPreviousScore(
+    accountId: string,
+    departmentId: string | null,
+    productType: NPSProductType,
+    currentPeriod: string
+  ): Promise<number | null> {
+    // Calcular período anterior
+    const [year, month] = currentPeriod.split('-').map(Number);
+    const prevDate = new Date(year, month - 2, 1); // -1 por 0-index, -1 por anterior
+    const prevPeriod = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+    
+    const previous = await prisma.nPSInsight.findFirst({
+      where: {
+        accountId,
+        departmentId: departmentId || null,
+        productType,
+        period: prevPeriod,
+        periodType: 'monthly'
+      },
+      select: { npsScore: true }
+    });
+    
+    return previous?.npsScore ?? null;
+  }
+  
+  // ============================================
+  // PERSISTENCIA (UPSERT)
+  // ============================================
+  
+  /**
+   * Guarda insight de NPS para un departamento/producto/período
+   * 
+   * Usa UPSERT para actualizar si ya existe o crear si no.
+   * Calcula automáticamente el trend vs período anterior.
+   * 
+   * @param accountId ID de la cuenta
+   * @param departmentId ID del departamento (null = empresa completa)
+   * @param productType Tipo de producto
+   * @param period Período (ej: "2025-12")
+   * @param periodStart Inicio del período
+   * @param periodEnd Fin del período
+   * @param calculation Métricas NPS calculadas
+   */
+  static async upsertNPSInsight(
+    accountId: string,
+    departmentId: string | null,
+    productType: NPSProductType,
+    period: string,
+    periodStart: Date,
+    periodEnd: Date,
+    calculation: NPSCalculation
+  ): Promise<void> {
+    // Obtener score anterior para trend
+    const previousScore = await this.getPreviousScore(
+      accountId, 
+      departmentId, 
+      productType, 
+      period
+    );
+    
+    const scoreDelta = previousScore !== null 
+      ? calculation.npsScore - previousScore 
+      : null;
+    
+    // Data común para create/update
+    const data = {
+      periodStart,
+      periodEnd,
+      npsScore: calculation.npsScore,
+      promoters: calculation.promoters,
+      passives: calculation.passives,
+      detractors: calculation.detractors,
+      totalResponses: calculation.totalResponses,
+      promotersPct: calculation.promotersPct,
+      passivesPct: calculation.passivesPct,
+      detractorsPct: calculation.detractorsPct,
+      previousScore,
+      scoreDelta,
+      calculatedAt: new Date()
+    };
+    
+    // Buscar registro existente (maneja null en departmentId correctamente)
+    const existing = await prisma.nPSInsight.findFirst({
+      where: {
+        accountId,
+        departmentId: departmentId, // null es válido aquí
+        productType,
+        period,
+        periodType: 'monthly'
+      }
+    });
+    
+    if (existing) {
+      // Actualizar registro existente
+      await prisma.nPSInsight.update({
+        where: { id: existing.id },
+        data
+      });
+    } else {
+      // Crear nuevo registro
+      await prisma.nPSInsight.create({
+        data: {
+          accountId,
+          departmentId,
+          productType,
+          period,
+          periodType: 'monthly',
+          ...data
+        }
+      });
+    }
+    
+    console.log(
+      `[NPSAggregation] Upserted: ${productType} | ` +
+      `${departmentId ? `Dept: ${departmentId}` : 'Global'} | ` +
+      `Period: ${period} | NPS: ${calculation.npsScore} ` +
+      `(${scoreDelta !== null ? (scoreDelta >= 0 ? '+' : '') + scoreDelta : 'new'})`
+    );
+  }
+  
+  // ============================================
+  // AGREGACIÓN POR PRODUCTO (Genérico)
+  // ============================================
+  
+  /**
+   * Agrega NPS para un producto completo (empresa + gerencias + departamentos)
+   * 
+   * Este método es llamado desde el CRON de cada producto.
+   * Busca todas las respuestas NPS del período y las agrupa.
+   * 
+   * @param accountId ID de la cuenta
+   * @param productType Tipo de producto
+   * @param campaignTypeSlug Slug del tipo de campaña
+   * @param period Período (ej: "2025-12")
+   * @param periodStart Inicio del período
+   * @param periodEnd Fin del período
+   */
+  static async aggregateForProduct(
+    accountId: string,
+    productType: NPSProductType,
+    campaignTypeSlug: string,
+    period: string,
+    periodStart: Date,
+    periodEnd: Date
+  ): Promise<void> {
+    console.log(`[NPSAggregation] Iniciando para ${productType}, período ${period}`);
+    
+    // 1. Obtener todas las respuestas NPS del período
+    const npsResponses = await prisma.response.findMany({
+      where: {
+        question: {
+          responseType: 'nps_scale',
+          campaignType: { slug: campaignTypeSlug }
+        },
+        participant: {
+          campaign: { accountId },
+          hasResponded: true
+        },
+        createdAt: {
+          gte: periodStart,
+          lte: periodEnd
+        },
+        rating: { not: null }
+      },
+      select: {
+        rating: true,
+        participantId: true
+      }
+    });
+    
+    if (npsResponses.length === 0) {
+      console.log(`[NPSAggregation] Sin respuestas NPS para ${productType}`);
+      return;
+    }
+    
+    // 2. Calcular NPS global (empresa)
+    const allRatings = npsResponses.map(r => r.rating!);
+    const globalCalc = this.calculateNPS(allRatings);
+    
+    await this.upsertNPSInsight(
+      accountId,
+      null, // departmentId = null = empresa completa
+      productType,
+      period,
+      periodStart,
+      periodEnd,
+      globalCalc
+    );
+    
+    console.log(
+      `[NPSAggregation] ${productType} global: ` +
+      `NPS ${globalCalc.npsScore} (${globalCalc.totalResponses} respuestas)`
+    );
+    
+    console.log(`[NPSAggregation] ✅ Completado para ${productType}`);
+  }
+  
+  // ============================================
+  // AGREGACIÓN ONBOARDING (Específico)
+  // ============================================
+  
+  /**
+   * Agrega NPS de Onboarding usando JourneyOrchestration
+   * 
+   * Especializado para Onboarding porque el departmentId viene
+   * de JourneyOrchestration, no de Participant directo.
+   * 
+   * @param accountId ID de la cuenta
+   * @param period Período (ej: "2025-12")
+   * @param periodStart Inicio del período
+   * @param periodEnd Fin del período
+   */
+  static async aggregateOnboardingNPS(
+    accountId: string,
+    period: string,
+    periodStart: Date,
+    periodEnd: Date
+  ): Promise<void> {
+    console.log(`[NPSAggregation] Iniciando Onboarding NPS para período ${period}`);
+    
+    // 1. Buscar pregunta NPS del día 90
+    const npsQuestion = await prisma.question.findFirst({
+      where: {
+        campaignType: { slug: 'onboarding-day-90' },
+        responseType: 'nps_scale'
+      }
+    });
+    
+    if (!npsQuestion) {
+      console.log('[NPSAggregation] ⚠️ No se encontró pregunta NPS en onboarding-day-90');
+      return;
+    }
+    
+    // 2. Obtener respuestas NPS del período
+    const npsResponses = await prisma.response.findMany({
+      where: {
+        questionId: npsQuestion.id,
+        createdAt: { gte: periodStart, lte: periodEnd },
+        rating: { not: null },
+        participant: {
+          campaign: { accountId }
+        }
+      },
+      select: {
+        rating: true,
+        participantId: true
+      }
+    });
+    
+    if (npsResponses.length === 0) {
+      console.log('[NPSAggregation] Sin respuestas NPS de Onboarding en el período');
+      return;
+    }
+    
+    // 3. Obtener departamento de cada respuesta via JourneyOrchestration
+    const ratingsByDepartment = new Map<string, number[]>();
+    const ratingsByGerencia = new Map<string, number[]>();
+    
+    for (const response of npsResponses) {
+      // Buscar Journey asociado al participante
+      const journey = await prisma.journeyOrchestration.findFirst({
+        where: {
+          OR: [
+            { stage1ParticipantId: response.participantId },
+            { stage2ParticipantId: response.participantId },
+            { stage3ParticipantId: response.participantId },
+            { stage4ParticipantId: response.participantId }
+          ]
+        },
+        include: {
+          department: {
+            include: { parent: true }
+          }
+        }
+      });
+      
+      if (journey && response.rating !== null) {
+        const departmentId = journey.departmentId;
+        const gerenciaId = journey.department.parentId || journey.departmentId;
+        
+        // Agrupar por departamento
+        if (!ratingsByDepartment.has(departmentId)) {
+          ratingsByDepartment.set(departmentId, []);
+        }
+        ratingsByDepartment.get(departmentId)!.push(response.rating);
+        
+        // Agrupar por gerencia
+        if (!ratingsByGerencia.has(gerenciaId)) {
+          ratingsByGerencia.set(gerenciaId, []);
+        }
+        ratingsByGerencia.get(gerenciaId)!.push(response.rating);
+      }
+    }
+    
+    // 4. Guardar NPS por gerencia (nivel 2)
+    for (const [gerenciaId, ratings] of ratingsByGerencia) {
+      const calc = this.calculateNPS(ratings);
+      await this.upsertNPSInsight(
+        accountId,
+        gerenciaId,
+        'onboarding',
+        period,
+        periodStart,
+        periodEnd,
+        calc
+      );
+    }
+    
+    // 4.5 Guardar NPS por departamento (nivel 3+)
+    for (const [departmentId, ratings] of ratingsByDepartment) {
+      // Evitar duplicar si el departamento YA es una gerencia (level 2)
+      if (!ratingsByGerencia.has(departmentId)) {
+        const calc = this.calculateNPS(ratings);
+        await this.upsertNPSInsight(
+          accountId,
+          departmentId,
+          'onboarding',
+          period,
+          periodStart,
+          periodEnd,
+          calc
+        );
+      }
+    }
+  
+    
+    // 5. Guardar NPS global
+    const allRatings = npsResponses.map(r => r.rating!);
+    const globalCalc = this.calculateNPS(allRatings);
+    
+    await this.upsertNPSInsight(
+      accountId,
+      null,
+      'onboarding',
+      period,
+      periodStart,
+      periodEnd,
+      globalCalc
+    );
+    
+    console.log(
+      `[NPSAggregation] ✅ Onboarding completado: ` +
+      `${ratingsByGerencia.size} gerencias, ` +
+      `NPS global: ${globalCalc.npsScore}`
+    );
+  }
+  
+  // ============================================
+  // AGREGACIÓN EXIT (Específico)
+  // ============================================
+  
+  /**
+   * Agrega NPS de Exit Intelligence usando ExitRecord
+   * 
+   * Especializado para Exit porque el departmentId viene
+   * directamente de ExitRecord, y las respuestas se vinculan
+   * via ExitRecord.participantId → Response.
+   * 
+   * @param accountId ID de la cuenta
+   * @param period Período (ej: "2025-12")
+   * @param periodStart Inicio del período
+   * @param periodEnd Fin del período
+   */
+  static async aggregateExitNPS(
+    accountId: string,
+    period: string,
+    periodStart: Date,
+    periodEnd: Date
+  ): Promise<void> {
+    console.log(`[NPSAggregation] Iniciando Exit NPS para período ${period}`);
+    
+    // 1. Buscar pregunta NPS de Exit (retencion-predictiva, question_order 8)
+    const npsQuestion = await prisma.question.findFirst({
+      where: {
+        campaignType: { slug: 'retencion-predictiva' },
+        responseType: 'nps_scale'
+      }
+    });
+    
+    if (!npsQuestion) {
+      console.log('[NPSAggregation] ⚠️ No se encontró pregunta NPS en retencion-predictiva');
+      return;
+    }
+    
+    // 2. Obtener ExitRecords del período con sus respuestas NPS
+    const exitRecords = await prisma.exitRecord.findMany({
+      where: {
+        accountId,
+        exitDate: {
+          gte: periodStart,
+          lte: periodEnd
+        }
+      },
+      select: {
+        id: true,
+        departmentId: true,
+        participantId: true,
+        department: {
+          select: {
+            id: true,
+            parentId: true,
+            level: true
+          }
+        }
+      }
+    });
+    
+    if (exitRecords.length === 0) {
+      console.log('[NPSAggregation] Sin ExitRecords en el período');
+      return;
+    }
+    
+    // 3. Obtener respuestas NPS para estos participantes
+    const participantIds = exitRecords.map(er => er.participantId);
+    
+    const npsResponses = await prisma.response.findMany({
+      where: {
+        questionId: npsQuestion.id,
+        participantId: { in: participantIds },
+        rating: { not: null }
+      },
+      select: {
+        rating: true,
+        participantId: true
+      }
+    });
+    
+    if (npsResponses.length === 0) {
+      console.log('[NPSAggregation] Sin respuestas NPS de Exit en el período');
+      return;
+    }
+    
+    // 4. Crear mapa participantId → rating para lookup rápido
+    const ratingByParticipant = new Map<string, number>();
+    for (const response of npsResponses) {
+      if (response.rating !== null) {
+        ratingByParticipant.set(response.participantId, response.rating);
+      }
+    }
+    
+    // 5. Agrupar ratings por departamento y gerencia
+    const ratingsByDepartment = new Map<string, number[]>();
+    const ratingsByGerencia = new Map<string, number[]>();
+    
+    for (const exitRecord of exitRecords) {
+      const rating = ratingByParticipant.get(exitRecord.participantId);
+      
+      if (rating !== undefined && exitRecord.department) {
+        const departmentId = exitRecord.departmentId;
+        const gerenciaId = exitRecord.department.parentId || exitRecord.departmentId;
+        
+        // Agrupar por departamento
+        if (!ratingsByDepartment.has(departmentId)) {
+          ratingsByDepartment.set(departmentId, []);
+        }
+        ratingsByDepartment.get(departmentId)!.push(rating);
+        
+        // Agrupar por gerencia
+        if (!ratingsByGerencia.has(gerenciaId)) {
+          ratingsByGerencia.set(gerenciaId, []);
+        }
+        ratingsByGerencia.get(gerenciaId)!.push(rating);
+      }
+    }
+    
+    // 6. Guardar NPS por gerencia (nivel 2)
+    for (const [gerenciaId, ratings] of ratingsByGerencia) {
+      const calc = this.calculateNPS(ratings);
+      await this.upsertNPSInsight(
+        accountId,
+        gerenciaId,
+        'exit',
+        period,
+        periodStart,
+        periodEnd,
+        calc
+      );
+    }
+    
+    // 7. Guardar NPS por departamento (nivel 3+)
+    for (const [departmentId, ratings] of ratingsByDepartment) {
+      // Evitar duplicar si el departamento YA es una gerencia
+      if (!ratingsByGerencia.has(departmentId)) {
+        const calc = this.calculateNPS(ratings);
+        await this.upsertNPSInsight(
+          accountId,
+          departmentId,
+          'exit',
+          period,
+          periodStart,
+          periodEnd,
+          calc
+        );
+      }
+    }
+    
+    // 8. Guardar NPS global (empresa)
+    const allRatings = Array.from(ratingByParticipant.values());
+    const globalCalc = this.calculateNPS(allRatings);
+    
+    await this.upsertNPSInsight(
+      accountId,
+      null,
+      'exit',
+      period,
+      periodStart,
+      periodEnd,
+      globalCalc
+    );
+    
+    console.log(
+      `[NPSAggregation] ✅ Exit completado: ` +
+      `${ratingsByGerencia.size} gerencias, ` +
+      `${ratingsByDepartment.size} departamentos, ` +
+      `NPS global: ${globalCalc.npsScore} (${allRatings.length} respuestas)`
+    );
+  }
+  
+  // ============================================
+  // QUERIES DE CONSULTA
+  // ============================================
+  
+  /**
+   * Obtiene ranking de NPS por gerencia para un producto
+   */
+  static async getRankingByGerencia(
+    accountId: string,
+    productType: NPSProductType,
+    period: string
+  ) {
+    return prisma.nPSInsight.findMany({
+      where: {
+        accountId,
+        productType,
+        period,
+        periodType: 'monthly',
+        department: { level: 2 } // Solo gerencias
+      },
+      include: {
+        department: { select: { displayName: true } }
+      },
+      orderBy: { npsScore: 'desc' }
+    });
+  }
+  
+  /**
+   * Obtiene NPS comparativo cross-producto (Journey NPS)
+   */
+  static async getJourneyNPS(
+    accountId: string,
+    period: string
+  ) {
+    return prisma.nPSInsight.findMany({
+      where: {
+        accountId,
+        departmentId: null, // Empresa completa
+        period,
+        productType: { in: ['onboarding', 'pulso', 'exit'] }
+      }
+    });
+  }
+  
+  /**
+   * Obtiene trend temporal de NPS (últimos N meses)
+   */
+  static async getTrend(
+    accountId: string,
+    productType: NPSProductType,
+    departmentId: string | null,
+    months: number = 12
+  ) {
+    // Generar array de períodos
+    const periods: string[] = [];
+    const now = new Date();
+    
+    for (let i = 0; i < months; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      periods.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+    
+    return prisma.nPSInsight.findMany({
+      where: {
+        accountId,
+        departmentId,
+        productType,
+        periodType: 'monthly',
+        period: { in: periods }
+      },
+      orderBy: { period: 'asc' }
+    });
+  }
+}

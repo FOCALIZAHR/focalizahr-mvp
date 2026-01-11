@@ -454,6 +454,9 @@ model Department {
   accumulatedExitPeriodCount   Int?      @map("accumulated_exit_period_count")
   accumulatedExitLastUpdated   DateTime? @map("accumulated_exit_last_updated")
   accumulatedConservationIndex Float?    @map("accumulated_conservation_index")
+  accumulatedExitTopFactors    Json?     @map("accumulated_exit_top_factors")
+  accumulatedExitENPS          Float?    @map("accumulated_exit_enps")
+  accumulatedExitVoluntaryRate Float?    @map("accumulated_exit_voluntary_rate")
 
   // Jerarquía
   parentId      String?      @map("parent_id")

@@ -1,7 +1,12 @@
 // src/hooks/useExitMetrics.ts
 
+'use client';
+
 import { useState, useEffect, useCallback } from 'react';
-import { EISClassification } from '@/types/exit';
+import type { 
+  DepartmentExitMetrics, 
+  ExitMetricsSummary
+} from '@/types/exit';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -9,85 +14,21 @@ import { EISClassification } from '@/types/exit';
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
-interface FactorPriority {
-  factor: string;
-  mentions: number;
-  mentionRate: number;
-  avgSeverity: number;
-  priority: number;
-}
-
-/**
- * Métricas de un departamento
- */
-export interface DepartmentExitMetrics {
-  departmentId: string;
-  departmentName: string;
-  standardCategory: string | null;
-  
-  // Período
-  period: string;
-  periodStart: string;
-  periodEnd: string;
-  
-  // Básicas
-  totalExits: number;
-  voluntaryExits: number;
-  involuntaryExits: number;
-  surveysCompleted: number;
-  completionRate: number;
-  
-  // EIS
-  avgEIS: number | null;
-  eisClassification: EISClassification | null;
-  eisTrend: number | null;
-  
-  // eNPS
-  enps: number | null;
-  promoters: number;
-  passives: number;
-  detractors: number;
-  
-  // Top Factores
-  topFactors: FactorPriority[];
-  
-  // Correlación Onboarding
-  exitsWithOnboarding: number;
-  exitsWithOnboardingAlerts: number;
-  exitsWithIgnoredAlerts: number;
-  conservationIndex: number | null;
-  alertPredictionRate: number | null;
-  
-  // Alertas activas
-  pendingAlerts: number;
-  criticalAlerts: number;
-}
-
-/**
- * Resumen global de métricas
- */
-export interface ExitMetricsSummary {
-  totalDepartments: number;
-  totalExits: number;
-  globalAvgEIS: number | null;
-  globalEISClassification: EISClassification | null;
-  globalENPS: number | null;
-  surveysCompleted: number;
-  completionRate: number;
-  alerts: {
-    pending: number;
-    critical: number;
-    leyKarin: number;
-  };
-  topFactorsGlobal: FactorPriority[];
-}
-
 interface UseExitMetricsOptions {
   departmentId?: string;
   period?: string; // YYYY-MM formato
 }
 
+/**
+ * Data estructura retornada por el hook
+ */
+export interface ExitMetricsData {
+  departments: DepartmentExitMetrics[];
+  summary: ExitMetricsSummary | null;
+}
+
 interface UseExitMetricsReturn {
+  data: ExitMetricsData | null;
   departments: DepartmentExitMetrics[];
   summary: ExitMetricsSummary | null;
   loading: boolean;
@@ -100,28 +41,42 @@ interface UseExitMetricsReturn {
  * HOOK: useExitMetrics
  * ═══════════════════════════════════════════════════════════════════════════
  * 
- * Fetching de métricas Exit agregadas por departamento.
+ * Hook para obtener métricas Exit Intelligence con soporte RBAC bimodal.
+ * Sigue el patrón arquitectónico SUPERIOR del proyecto (useOnboardingAlerts).
+ * 
+ * SEGURIDAD:
+ * - Usa cookies HttpOnly automáticas (NO localStorage)
+ * - Protección XSS nativa del navegador
+ * - Token no accesible desde JavaScript
+ * - Middleware valida JWT y agrega headers
+ * - Backend aplica RBAC con extractUserContext()
  * 
  * @param options - Opciones de filtrado (departmentId, period)
- * @returns { departments, summary, loading, error, refetch }
+ * @param scope - 'company' (todas gerencias) | 'filtered' (mi área)
+ * @returns { data, departments, summary, loading, error, refetch }
  * 
  * @example
  * ```tsx
- * // Métricas globales
- * const { departments, summary, loading } = useExitMetrics();
+ * // Vista principal - Todas las gerencias
+ * const { departments, summary, loading } = useExitMetrics(undefined, 'company');
  * 
- * // Métricas de un departamento específico
- * const { departments, summary } = useExitMetrics({ departmentId: 'dept_123' });
+ * // Vista executive - Mi área
+ * const { departments, summary } = useExitMetrics(undefined, 'filtered');
  * 
- * // Métricas de un período específico
- * const { departments, summary } = useExitMetrics({ period: '2024-12' });
+ * // Departamento específico con período
+ * const { data } = useExitMetrics({ 
+ *   departmentId: 'dept_123', 
+ *   period: '2024-12' 
+ * }, 'filtered');
  * ```
  */
-export function useExitMetrics(options?: UseExitMetricsOptions): UseExitMetricsReturn {
+export function useExitMetrics(
+  options?: UseExitMetricsOptions,
+  scope: 'company' | 'filtered' = 'filtered'
+): UseExitMetricsReturn {
   const { departmentId, period } = options || {};
   
-  const [departments, setDepartments] = useState<DepartmentExitMetrics[]>([]);
-  const [summary, setSummary] = useState<ExitMetricsSummary | null>(null);
+  const [data, setData] = useState<ExitMetricsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -139,16 +94,32 @@ export function useExitMetrics(options?: UseExitMetricsOptions): UseExitMetricsR
       const params = new URLSearchParams();
       if (departmentId) params.append('departmentId', departmentId);
       if (period) params.append('period', period);
+      if (scope) params.append('scope', scope);
       
       const queryString = params.toString();
       const url = `/api/exit/metrics${queryString ? `?${queryString}` : ''}`;
       
-      console.log('[useExitMetrics] Fetching:', url);
+      console.log(`[useExitMetrics] 🔄 Fetching: ${url}`);
       
+      // ✅ PATRÓN SUPERIOR: Cookie HttpOnly automática
+      // El navegador envía automáticamente la cookie focalizahr_token
+      // NO es necesario ni recomendado agregar Authorization header
+      // Esto previene ataques XSS ya que el token no es accesible desde JS
       const response = await fetch(url);
       
+      // Validar respuesta HTTP
       if (!response.ok) {
-        throw new Error('Error fetching exit metrics');
+        if (response.status === 401) {
+          throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+        }
+        if (response.status === 403) {
+          throw new Error('No tienes permisos para ver estas métricas.');
+        }
+        
+        const errorData = await response.json().catch(() => ({ 
+          error: 'Error desconocido' 
+        }));
+        throw new Error(errorData.error || `Error ${response.status}`);
       }
       
       const result = await response.json();
@@ -157,22 +128,29 @@ export function useExitMetrics(options?: UseExitMetricsOptions): UseExitMetricsR
         throw new Error(result.error || 'Error desconocido');
       }
       
-      console.log('[useExitMetrics] Received:', {
+      console.log('[useExitMetrics] ✅ Data received:', {
         departmentsCount: result.data?.departments?.length || 0,
         hasSummary: !!result.data?.summary,
         source: result.source
       });
       
-      setDepartments(result.data?.departments || []);
-      setSummary(result.data?.summary || null);
+      setData(result.data);
+      setError(null);
       
-    } catch (err: any) {
-      console.error('[useExitMetrics] Error:', err);
-      setError(err.message);
+    } catch (err) {
+      console.error('[useExitMetrics] ❌ Error:', err);
+      
+      const errorMessage = err instanceof Error 
+        ? err.message 
+        : 'Error desconocido al cargar métricas Exit';
+      
+      setError(errorMessage);
+      setData(null);
+      
     } finally {
       setLoading(false);
     }
-  }, [departmentId, period]);
+  }, [departmentId, period, scope]);
   
   /**
    * ════════════════════════════════════════════════════════════════════════
@@ -184,8 +162,9 @@ export function useExitMetrics(options?: UseExitMetricsOptions): UseExitMetricsR
   }, [fetchMetrics]);
   
   return {
-    departments,
-    summary,
+    data,
+    departments: data?.departments || [],
+    summary: data?.summary || null,
     loading,
     error,
     refetch: fetchMetrics

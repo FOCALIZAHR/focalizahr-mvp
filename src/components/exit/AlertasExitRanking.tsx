@@ -1,21 +1,17 @@
 // ====================================================================
-// ALERTAS GERENCIA RANKING v3.0 DEFINITIVO
-// src/components/onboarding/AlertasGerenciaRanking.tsx
+// ALERTAS EXIT RANKING v2.0 - ADAPTADO DE ONBOARDING
+// src/components/exit/AlertasExitRanking.tsx
 // ====================================================================
-// REDISEÑO COMPLETO - Lista escaneable nivel Apple/Tesla
-// 
-// FILOSOFÍA:
-// "Entender en 3 segundos → Decidir en 10 segundos → Actuar en 1 clic"
+// REDISENO COMPLETO - Lista escaneable nivel Apple/Tesla
+//
+// FILOSOFIA:
+// "Entender en 3 segundos -> Decidir en 10 segundos -> Actuar en 1 clic"
 // "Un podio celebra. Las alertas NO se celebran."
-// 
-// CAMBIOS CLAVE v3.0 DEFINITIVO:
-// ✅ UNA lista contenedora (no cards individuales) - divide-y
-// ✅ Mobile-first estricto (grid-cols-2 sm:grid-cols-3)
-// ✅ Altura reducida 44% (~52px por item vs ~100px)
-// ✅ Touch targets min-h-[44px]
-// ✅ UN solo rojo (críticas únicamente)
-// ✅ Navega a /alerts (no expandir in-place)
-// ✅ fhr-divider + fhr-badge classes
+//
+// CAMBIOS DE ONBOARDING A EXIT:
+// - useOnboardingAlerts -> useExitAlerts
+// - Rutas: /dashboard/exit/...
+// - Textos adaptados para Exit Intelligence
 // ====================================================================
 
 'use client';
@@ -23,24 +19,20 @@
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { 
-  AlertTriangle, 
+import {
+  AlertTriangle,
   ChevronRight,
   DollarSign,
-  Activity
+  Activity,
+  ShieldAlert
 } from 'lucide-react';
-import { useOnboardingAlerts } from '@/hooks/useOnboardingAlerts';
-import { 
-  calculateTurnoverCostSHRM2024,
-  getOnboardingFinancialConfig,
-  formatCurrencyCLP 
-} from '@/lib/financialCalculations';
+import { useExitAlerts } from '@/hooks/useExitAlerts';
 
 // ====================================================================
 // INTERFACES
 // ====================================================================
 
-interface AlertasGerenciaRankingProps {
+interface AlertasExitRankingProps {
   viewMode?: 'gerencias' | 'departamentos';
   parentDepartmentId?: string;
   scope?: 'company' | 'filtered';
@@ -52,38 +44,29 @@ interface GerenciaAlertData {
   alertasCriticas: number;
   alertasAltas: number;
   alertasPendientes: number;
+  alertasLeyKarin: number;
   montoRiesgo: number;
-  personasEnRiesgo: number;
+  exitsCount: number;
 }
 
 // ====================================================================
 // CONSTANTES
 // ====================================================================
 
-
+const COSTO_POR_SALIDA = 5400000; // $5.4M CLP estimado por salida
 
 // ====================================================================
 // COMPONENTE PRINCIPAL
 // ====================================================================
 
-export default function AlertasGerenciaRanking({ 
+export default function AlertasExitRanking({
   viewMode = 'gerencias',
   parentDepartmentId,
   scope = 'filtered'
-}: AlertasGerenciaRankingProps) {
-  
+}: AlertasExitRankingProps) {
+
   const router = useRouter();
-  const { alerts, metrics, loading } = useOnboardingAlerts(
-    undefined,  // severity
-    undefined,  // status
-    undefined,  // slaStatus
-    scope       // scope - dinámico según prop
-  );
-  // ✅ CÁLCULO COSTO ROTACIÓN - SHRM 2024
-  const costoRotacionPorPersona = useMemo(() => {
-    const config = getOnboardingFinancialConfig();
-    return calculateTurnoverCostSHRM2024(config.avgSalaryChile);
-  }, []);
+  const { alerts, metrics, loading } = useExitAlerts({ scope });
 
   // ================================================================
   // HELPERS
@@ -104,96 +87,93 @@ export default function AlertasGerenciaRanking({
   };
 
   const handleGerenciaClick = (gerenciaId: string) => {
-    router.push(`/dashboard/onboarding/alerts?gerenciaId=${gerenciaId}`);
+    router.push(`/dashboard/exit?tab=alertas&gerenciaId=${gerenciaId}`);
   };
 
   // ================================================================
   // CEO METRICS
   // ================================================================
-  
+
   const ceoMetrics = useMemo(() => {
     if (!alerts || alerts.length === 0) {
       return {
-        personasEnRiesgo: 0,
+        alertasPendientes: 0,
+        alertasLeyKarin: 0,
         montoTotal: 0,
-        tasaIncidencia: 0
+        tasaCriticas: 0
       };
     }
 
-    const personasUnicas = new Set<string>();
-    alerts.forEach((alert: any) => {
-      if (alert.status === 'pending') {
-        const journeyId = alert.journeyId || alert.journey?.id;
-        if (journeyId) personasUnicas.add(journeyId);
+    const alertasPendientes = alerts.filter((a: any) => a.status === 'pending');
+    const alertasLeyKarin = alertasPendientes.filter((a: any) =>
+      a.alertType === 'ley_karin'
+    ).length;
+
+    // Estimar monto basado en alertas criticas (cada una representa potencial salida)
+    const exitosEnRiesgo = new Set<string>();
+    alertasPendientes.forEach((alert: any) => {
+      if (alert.exitRecord?.id) {
+        exitosEnRiesgo.add(alert.exitRecord.id);
       }
     });
 
-    const personasEnRiesgo = personasUnicas.size;
-    const montoTotal = personasEnRiesgo * costoRotacionPorPersona;
-    const totalJourneys = metrics?.totalJourneys || personasEnRiesgo;
-    const tasaIncidencia = totalJourneys > 0 
-      ? Math.round((personasUnicas.size / totalJourneys) * 100)
+    const montoTotal = exitosEnRiesgo.size * COSTO_POR_SALIDA;
+
+    const totalAlertas = alertasPendientes.length;
+    const criticas = alertasPendientes.filter((a: any) => a.severity === 'critical').length;
+    const tasaCriticas = totalAlertas > 0
+      ? Math.round((criticas / totalAlertas) * 100)
       : 0;
 
-    return { personasEnRiesgo, montoTotal, tasaIncidencia };
-  }, [alerts, metrics]);
+    return {
+      alertasPendientes: alertasPendientes.length,
+      alertasLeyKarin,
+      montoTotal,
+      tasaCriticas
+    };
+  }, [alerts]);
 
   // ================================================================
-  // RANKING POR GERENCIA - Con fix bimodal
+  // RANKING POR GERENCIA
   // ================================================================
-  
+
   const gerenciasRanking = useMemo((): GerenciaAlertData[] => {
     if (!alerts || alerts.length === 0) return [];
 
     const gerenciaMap = new Map<string, GerenciaAlertData>();
-    const deptMap = new Map<string, any>();
-    
-    alerts.forEach((alert: any) => {
-      const dept = alert.journey?.department;
-      if (!dept) return;
-      deptMap.set(dept.id, dept);
-      if (dept.parent) {
-        deptMap.set(dept.parent.id, dept.parent);
-      }
-    });
-
-    const personasPorGerencia = new Map<string, Set<string>>();
     const alertasPendientes = alerts.filter((a: any) => a.status === 'pending');
 
-    // FILTRAR según viewMode (gerencia + sus hijos)
+    // FILTRAR segun viewMode (gerencia + sus hijos)
     const filteredAlerts = viewMode === 'departamentos' && parentDepartmentId
       ? alertasPendientes.filter((a: any) => {
-          const dept = a.journey?.department;
+          const dept = a.department;
           return dept?.id === parentDepartmentId || dept?.parentId === parentDepartmentId;
         })
       : alertasPendientes;
 
     filteredAlerts.forEach((alert: any) => {
-      const dept = alert.journey?.department;
+      const dept = alert.department;
       if (!dept) return;
-      
-      const level = dept.level;
-      const parentId = dept.parentId;
-      const unitType = dept.unitType;
-      
+
       let gerenciaId: string;
       let gerenciaName: string;
-      
+
       if (viewMode === 'departamentos' && parentDepartmentId) {
         gerenciaId = dept.id;
         gerenciaName = dept.displayName;
       } else {
-        const isGerenciaDirecta = level === 2 || (!parentId && unitType === 'gerencia');
-        
-        if (isGerenciaDirecta) {
+        // Agrupar por gerencia (nivel 2) o el departamento si es nivel 2
+        const isGerencia = dept.level === 2;
+        if (isGerencia) {
           gerenciaId = dept.id;
           gerenciaName = dept.displayName;
-        } else if (parentId) {
-          gerenciaId = parentId;
-          const parentDept = deptMap.get(parentId);
-          gerenciaName = parentDept?.displayName || dept.parent?.displayName || 'Gerencia';
+        } else if (dept.parentId) {
+          // Buscar en alertas anteriores si tenemos info del padre
+          gerenciaId = dept.parentId;
+          gerenciaName = dept.parentName || dept.displayName;
         } else {
-          return;
+          gerenciaId = dept.id;
+          gerenciaName = dept.displayName;
         }
       }
 
@@ -204,35 +184,40 @@ export default function AlertasGerenciaRanking({
           alertasCriticas: 0,
           alertasAltas: 0,
           alertasPendientes: 0,
+          alertasLeyKarin: 0,
           montoRiesgo: 0,
-          personasEnRiesgo: 0
+          exitsCount: 0
         });
-        personasPorGerencia.set(gerenciaId, new Set());
       }
 
       const gerencia = gerenciaMap.get(gerenciaId)!;
-      const personasSet = personasPorGerencia.get(gerenciaId)!;
-      
+
       if (alert.severity === 'critical') {
         gerencia.alertasCriticas += 1;
       } else if (alert.severity === 'high') {
         gerencia.alertasAltas += 1;
       }
-      gerencia.alertasPendientes += 1;
-      
-      const journeyId = alert.journeyId || alert.journey?.id;
-      if (journeyId && !personasSet.has(journeyId)) {
-        personasSet.add(journeyId);
-        gerencia.montoRiesgo += costoRotacionPorPersona;
-      }
-    });
 
-    gerenciaMap.forEach((gerencia, id) => {
-      gerencia.personasEnRiesgo = personasPorGerencia.get(id)?.size || 0;
+      if (alert.alertType === 'ley_karin') {
+        gerencia.alertasLeyKarin += 1;
+      }
+
+      gerencia.alertasPendientes += 1;
+
+      // Contar exits unicos
+      if (alert.exitRecord?.id) {
+        gerencia.exitsCount += 1;
+        gerencia.montoRiesgo = gerencia.exitsCount * COSTO_POR_SALIDA;
+      }
     });
 
     return Array.from(gerenciaMap.values())
       .sort((a, b) => {
+        // Priorizar Ley Karin
+        if (b.alertasLeyKarin !== a.alertasLeyKarin) {
+          return b.alertasLeyKarin - a.alertasLeyKarin;
+        }
+        // Luego criticas
         if (b.alertasCriticas !== a.alertasCriticas) {
           return b.alertasCriticas - a.alertasCriticas;
         }
@@ -243,6 +228,7 @@ export default function AlertasGerenciaRanking({
 
   // Datos derivados
   const totalCriticas = gerenciasRanking.reduce((sum, g) => sum + g.alertasCriticas, 0);
+  const totalLeyKarin = gerenciasRanking.reduce((sum, g) => sum + g.alertasLeyKarin, 0);
   const top3 = gerenciasRanking.slice(0, 3);
   const resto45 = gerenciasRanking.slice(3, 5);
   const restantes = gerenciasRanking.length - 5;
@@ -280,10 +266,13 @@ export default function AlertasGerenciaRanking({
     return (
       <div className="w-full max-w-[700px] mx-auto">
         <div className="fhr-card p-6 sm:p-8 text-center">
-          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-slate-800/50 flex items-center justify-center">
-            <AlertTriangle className="w-6 h-6 text-slate-500" strokeWidth={1.5} />
+          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-green-500/10 border border-green-500/30 flex items-center justify-center">
+            <AlertTriangle className="w-6 h-6 text-green-400" strokeWidth={1.5} />
           </div>
-          <p className="text-slate-400 font-light">
+          <p className="text-slate-300 font-light mb-1">
+            Todo en orden
+          </p>
+          <p className="text-slate-500 text-sm">
             No hay alertas activas por {labelUnidad}
           </p>
         </div>
@@ -298,73 +287,69 @@ export default function AlertasGerenciaRanking({
   return (
     <div className="w-full max-w-[700px] mx-auto">
       <div className="fhr-card p-4 sm:p-6 relative overflow-hidden">
-        
-        {/* ═══════════════════════════════════════════════════════════
-            LÍNEA TESLA SUPERIOR
-            ═══════════════════════════════════════════════════════════ */}
+
+        {/* LINEA TESLA SUPERIOR */}
         <div className="fhr-top-line" />
 
-        {/* ═══════════════════════════════════════════════════════════
-            CEO SUMMARY - Mobile-first (2 cols → 3 cols)
-            ═══════════════════════════════════════════════════════════ */}
+        {/* CEO SUMMARY - Mobile-first (2 cols -> 3 cols) */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
-          
-          {/* Personas en Riesgo */}
+
+          {/* Alertas Pendientes */}
           <div className="text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
               <span className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider">
-                En riesgo
+                Pendientes
               </span>
             </div>
             <p className="text-3xl sm:text-4xl font-light text-white tabular-nums">
-              {ceoMetrics.personasEnRiesgo}
+              {ceoMetrics.alertasPendientes}
             </p>
-            <p className="text-[10px] sm:text-xs text-slate-600 mt-1">personas</p>
+            <p className="text-[10px] sm:text-xs text-slate-600 mt-1">alertas</p>
           </div>
-          
-          {/* Monto en Juego */}
+
+          {/* Ley Karin */}
           <div className="text-center">
+            <div className="flex items-center justify-center gap-1.5 mb-1">
+              <ShieldAlert className="w-3 h-3 text-red-400" strokeWidth={1.5} />
+              <span className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider">
+                Ley Karin
+              </span>
+            </div>
+            <p className={`text-3xl sm:text-4xl font-light tabular-nums ${
+              ceoMetrics.alertasLeyKarin > 0 ? 'text-red-400' : 'text-slate-400'
+            }`}>
+              {ceoMetrics.alertasLeyKarin}
+            </p>
+            <p className="text-[10px] sm:text-xs text-slate-600 mt-1">
+              {ceoMetrics.alertasLeyKarin > 0 ? 'atencion' : 'sin alertas'}
+            </p>
+          </div>
+
+          {/* Monto en Juego - Full width en mobile */}
+          <div className="text-center col-span-2 sm:col-span-1">
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <DollarSign className="w-3 h-3 text-slate-500" strokeWidth={1.5} />
               <span className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider">
-                En juego
+                Impacto Est.
               </span>
             </div>
             <p className="text-3xl sm:text-4xl font-light text-white tabular-nums">
               {formatCurrency(ceoMetrics.montoTotal)}
             </p>
-            <p className="text-[10px] sm:text-xs text-slate-600 mt-1">CLP/año</p>
+            <p className="text-[10px] sm:text-xs text-slate-600 mt-1">CLP</p>
           </div>
-          
-          {/* Incidencia - Full width en mobile */}
-          <div className="text-center col-span-2 sm:col-span-1">
-            <div className="flex items-center justify-center gap-1.5 mb-1">
-              <Activity className="w-3 h-3 text-slate-500" strokeWidth={1.5} />
-              <span className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider">
-                Incidencia
-              </span>
-            </div>
-            <p className="text-3xl sm:text-4xl font-light text-white tabular-nums">
-              {ceoMetrics.tasaIncidencia}%
-            </p>
-            <p className="text-[10px] sm:text-xs text-slate-600 mt-1">con alertas</p>
-          </div>
-          
+
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════
-            DIVIDER FOCALIZAHR
-            ═══════════════════════════════════════════════════════════ */}
+        {/* DIVIDER FOCALIZAHR */}
         <div className="fhr-divider my-6">
           <div className="fhr-divider-line" />
           <div className="fhr-divider-dot" />
           <div className="fhr-divider-line" />
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════
-            HEADER SECCIÓN
-            ═══════════════════════════════════════════════════════════ */}
+        {/* HEADER SECCION */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-slate-500" strokeWidth={1.5} />
@@ -372,19 +357,25 @@ export default function AlertasGerenciaRanking({
               Por {viewMode === 'gerencias' ? 'Gerencia' : 'Departamento'}
             </span>
           </div>
-          
-          {totalCriticas > 0 && (
-            <span className="fhr-badge fhr-badge-error text-xs">
-              {totalCriticas} críticas
-            </span>
-          )}
+
+          <div className="flex items-center gap-2">
+            {totalLeyKarin > 0 && (
+              <span className="fhr-badge fhr-badge-error text-xs flex items-center gap-1">
+                <ShieldAlert className="w-3 h-3" />
+                {totalLeyKarin} Ley Karin
+              </span>
+            )}
+            {totalCriticas > 0 && (
+              <span className="fhr-badge fhr-badge-warning text-xs">
+                {totalCriticas} criticas
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════
-            LISTA ÚNICA - UN solo contenedor
-            ═══════════════════════════════════════════════════════════ */}
+        {/* LISTA UNICA - UN solo contenedor */}
         <div className="rounded-xl border border-slate-700/30 overflow-hidden bg-slate-800/20">
-          
+
           {/* TOP 3 - Items destacados */}
           <div className="divide-y divide-slate-700/30">
             {top3.map((gerencia, index) => (
@@ -395,47 +386,53 @@ export default function AlertasGerenciaRanking({
                 transition={{ delay: index * 0.05 }}
                 onClick={() => handleGerenciaClick(gerencia.gerenciaId)}
                 className="
-                  flex items-center justify-between 
+                  flex items-center justify-between
                   p-3 sm:p-4
-                  hover:bg-slate-800/40 
-                  cursor-pointer 
+                  hover:bg-slate-800/40
+                  cursor-pointer
                   transition-colors
                   group
                   min-h-[52px]
                 "
               >
-                {/* Izquierda: Posición + Info */}
+                {/* Izquierda: Posicion + Info */}
                 <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-                  
-                  {/* Posición destacada */}
+
+                  {/* Posicion destacada */}
                   <div className={`
-                    w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center 
+                    w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center
                     text-sm font-medium shrink-0
-                    ${index === 0 
-                      ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' 
-                      : index === 1 
+                    ${index === 0
+                      ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                      : index === 1
                         ? 'bg-slate-500/15 text-slate-300 border border-slate-500/30'
                         : 'bg-amber-700/15 text-amber-600 border border-amber-700/30'
                     }
                   `}>
                     {index + 1}
                   </div>
-                  
-                  {/* Nombre + Personas */}
+
+                  {/* Nombre + Exits */}
                   <div className="min-w-0">
                     <p className="text-sm sm:text-base font-light text-white truncate group-hover:text-cyan-400 transition-colors">
                       {toTitleCase(gerencia.gerenciaName)}
                     </p>
-                    <p className="text-[10px] sm:text-xs text-slate-500">
-                      {gerencia.personasEnRiesgo}p
-                    </p>
+                    <div className="flex items-center gap-2 text-[10px] sm:text-xs text-slate-500">
+                      <span>{gerencia.exitsCount} exits</span>
+                      {gerencia.alertasLeyKarin > 0 && (
+                        <span className="text-red-400 flex items-center gap-0.5">
+                          <ShieldAlert className="w-2.5 h-2.5" />
+                          {gerencia.alertasLeyKarin}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                
-                {/* Derecha: Métricas */}
+
+                {/* Derecha: Metricas */}
                 <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-                  
-                  {/* Críticas - ÚNICO ROJO */}
+
+                  {/* Criticas - UNICO ROJO */}
                   <div className="text-right">
                     <span className={`text-base sm:text-lg font-light tabular-nums ${
                       gerencia.alertasCriticas > 0 ? 'text-red-400' : 'text-slate-600'
@@ -443,30 +440,30 @@ export default function AlertasGerenciaRanking({
                       {gerencia.alertasCriticas}
                     </span>
                     <span className="text-[9px] sm:text-[10px] text-slate-600 uppercase ml-1 hidden sm:inline">
-                      crít
+                      crit
                     </span>
                   </div>
-                  
+
                   {/* Monto - NEUTRO */}
                   <span className="text-xs sm:text-sm font-light text-slate-400 tabular-nums w-14 sm:w-16 text-right">
                     {formatCurrency(gerencia.montoRiesgo)}
                   </span>
-                  
+
                   {/* Arrow */}
-                  <ChevronRight 
-                    className="w-4 h-4 text-slate-600 group-hover:text-cyan-400 transition-colors hidden sm:block" 
-                    strokeWidth={1.5} 
+                  <ChevronRight
+                    className="w-4 h-4 text-slate-600 group-hover:text-cyan-400 transition-colors hidden sm:block"
+                    strokeWidth={1.5}
                   />
                 </div>
               </motion.div>
             ))}
           </div>
-          
+
           {/* Separador visual dashed */}
           {resto45.length > 0 && (
             <div className="border-t border-dashed border-slate-700/50" />
           )}
-          
+
           {/* POSICIONES 4-5 - Compactos */}
           {resto45.map((gerencia, index) => (
             <motion.div
@@ -476,10 +473,10 @@ export default function AlertasGerenciaRanking({
               transition={{ delay: 0.2 + index * 0.03 }}
               onClick={() => handleGerenciaClick(gerencia.gerenciaId)}
               className="
-                flex items-center justify-between 
+                flex items-center justify-between
                 py-2.5 sm:py-3 px-3 sm:px-4
-                hover:bg-slate-800/30 
-                cursor-pointer 
+                hover:bg-slate-800/30
+                cursor-pointer
                 transition-colors
                 group
                 min-h-[44px]
@@ -494,8 +491,11 @@ export default function AlertasGerenciaRanking({
                 <span className="text-slate-400 text-sm font-light truncate group-hover:text-white transition-colors">
                   {toTitleCase(gerencia.gerenciaName)}
                 </span>
+                {gerencia.alertasLeyKarin > 0 && (
+                  <ShieldAlert className="w-3 h-3 text-red-400 shrink-0" />
+                )}
               </div>
-              
+
               {/* Derecha */}
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                 <span className={`text-sm tabular-nums ${
@@ -506,28 +506,26 @@ export default function AlertasGerenciaRanking({
                 <span className="text-xs sm:text-sm text-slate-500 tabular-nums w-14 sm:w-16 text-right">
                   {formatCurrency(gerencia.montoRiesgo)}
                 </span>
-                <ChevronRight 
-                  className="w-4 h-4 text-slate-700 group-hover:text-cyan-400 transition-colors hidden sm:block" 
-                  strokeWidth={1.5} 
+                <ChevronRight
+                  className="w-4 h-4 text-slate-700 group-hover:text-cyan-400 transition-colors hidden sm:block"
+                  strokeWidth={1.5}
                 />
               </div>
             </motion.div>
           ))}
-          
+
         </div>
 
-        {/* ═══════════════════════════════════════════════════════════
-            BOTÓN VER MÁS - Navega a /alerts
-            ═══════════════════════════════════════════════════════════ */}
+        {/* BOTON VER MAS */}
         {restantes > 0 && (
           <motion.button
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            onClick={() => router.push('/dashboard/onboarding/alerts')}
+            onClick={() => router.push('/dashboard/exit?tab=alertas')}
             className="fhr-btn fhr-btn-ghost w-full mt-4 min-h-[44px]"
           >
-            Mostrar {restantes} más
+            Mostrar {restantes} mas
             <ChevronRight className="w-4 h-4 ml-1" strokeWidth={1.5} />
           </motion.button>
         )}

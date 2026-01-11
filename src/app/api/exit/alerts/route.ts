@@ -15,11 +15,20 @@
  * - severity: string (critical|high|medium|low)
  * - alertType: string (ley_karin|liderazgo_concentracion|nps_critico|...)
  * - departmentId: string
+ * - scope: string (opcional) - 'company' | 'filtered' (default: 'filtered')
+ *   · 'company': Rankings comparativos (AREA_MANAGER ve todas las alertas)
+ *   · 'filtered': Vista filtrada (AREA_MANAGER ve solo su área + hijos)
  * 
  * RESPONSE:
  * {
  *   success: boolean;
  *   data: ExitAlert[];
+ *   meta: {
+ *     canDrillDown: string[];
+ *     scope: string;
+ *     userRole: string;
+ *     userDepartmentId: string | null;
+ *   };
  *   metrics: {
  *     total: number;
  *     pending: number;
@@ -28,8 +37,8 @@
  *   };
  * }
  * 
- * @version 1.0
- * @date December 2025
+ * @version 2.0 - RBAC Scope Implementation
+ * @date January 2026
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -72,22 +81,41 @@ export async function GET(request: NextRequest) {
     const severity = searchParams.get('severity') || undefined;
     const alertType = searchParams.get('alertType') || undefined;
     const departmentId = searchParams.get('departmentId') || undefined;
+    const scope = searchParams.get('scope') || 'filtered'; // 'company' | 'filtered'
     
-    console.log('[Exit Alerts] Filters:', { status, severity, alertType, departmentId });
+    console.log('[Exit Alerts] Filters:', { status, severity, alertType, departmentId, scope, userRole: userContext.role });
     
     // ════════════════════════════════════════════════════════════════════════
-    // PASO 3: FILTRADO JERÁRQUICO
+    // PASO 3: FILTRADO JERÁRQUICO CON SCOPE
     // ════════════════════════════════════════════════════════════════════════
     
     let accessibleDepartmentIds: string[] | undefined = undefined;
+    let canDrillDown: string[] = []; // IDs donde usuario puede hacer drill-down
     
-    // Si el usuario es AREA_MANAGER, filtrar por jerarquía
+    // Si el usuario es AREA_MANAGER, aplicar filtrado según scope
     if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
-      const childIds = await getChildDepartmentIds(userContext.departmentId);
-      accessibleDepartmentIds = [userContext.departmentId, ...childIds];
       
-      // Si se pide un departmentId específico, verificar acceso
-      if (departmentId && !accessibleDepartmentIds.includes(departmentId)) {
+      // Calcular jerarquía SIEMPRE (para validaciones y canDrillDown)
+      const childIds = await getChildDepartmentIds(userContext.departmentId);
+      canDrillDown = [userContext.departmentId, ...childIds];
+      
+      // 🆕 SCOPE CHECK: Determinar si aplicar filtro en queries masivas
+      if (scope === 'company') {
+        console.log('[Exit Alerts] 🌐 Scope "company": Rankings sin filtro (ve todas las alertas)');
+        // accessibleDepartmentIds = undefined → queries masivas ven todo
+      } else {
+        // Scope 'filtered': aplicar filtro jerárquico
+        accessibleDepartmentIds = canDrillDown;
+        console.log('[Exit Alerts] 🔐 Filtrado jerárquico aplicado:', {
+          role: 'AREA_MANAGER',
+          baseDepartment: userContext.departmentId,
+          allowedCount: accessibleDepartmentIds.length
+        });
+      }
+      
+      // 🔒 VALIDACIÓN ACCESO ESPECÍFICO (aplica en AMBOS scopes para seguridad)
+      // Rankings públicos SÍ, pero gestión de alerta específica solo si está en su jerarquía
+      if (departmentId && !canDrillDown.includes(departmentId)) {
         return NextResponse.json(
           { success: false, error: 'Acceso denegado a este departamento' },
           { status: 403 }
@@ -122,12 +150,20 @@ export async function GET(request: NextRequest) {
     console.log('[Exit Alerts] ✅ Returning:', {
       alertsCount: alerts.length,
       pending: statistics.byStatus.pending,
-      critical: statistics.bySeverity.critical
+      critical: statistics.bySeverity.critical,
+      scope
     });
     
     return NextResponse.json({
       success: true,
       data: alerts,
+      // 🆕 META: Permisos de navegación RBAC
+      meta: {
+        canDrillDown,
+        scope,
+        userRole: userContext.role,
+        userDepartmentId: userContext.departmentId
+      },
       metrics: {
         total: statistics.total,
         pending: statistics.byStatus.pending,

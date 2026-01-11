@@ -35,6 +35,7 @@ interface UseExitAlertsOptions {
   alertType?: ExitAlertType;
   departmentId?: string;
   slaStatus?: 'on_track' | 'at_risk' | 'breached';
+   scope?: 'company' | 'filtered';  // ← AGREGAR ESTA LÍNEA
 }
 
 interface UseExitAlertsReturn {
@@ -70,7 +71,7 @@ interface UseExitAlertsReturn {
  * ```
  */
 export function useExitAlerts(options?: UseExitAlertsOptions): UseExitAlertsReturn {
-  const { severity, status, alertType, departmentId, slaStatus } = options || {};
+  const { severity, status, alertType, departmentId, slaStatus, scope } = options || {};
   
   const [alerts, setAlerts] = useState<ExitAlertWithRelations[]>([]);
   const [metrics, setMetrics] = useState<ExitAlertMetrics | null>(null);
@@ -93,7 +94,7 @@ export function useExitAlerts(options?: UseExitAlertsOptions): UseExitAlertsRetu
       if (status) params.append('status', status);
       if (alertType) params.append('alertType', alertType);
       if (departmentId) params.append('departmentId', departmentId);
-      if (slaStatus) params.append('slaStatus', slaStatus);
+      if (scope) params.append('scope', scope);
       
       const queryString = params.toString();
       const url = `/api/exit/alerts${queryString ? `?${queryString}` : ''}`;
@@ -126,7 +127,7 @@ export function useExitAlerts(options?: UseExitAlertsOptions): UseExitAlertsRetu
     } finally {
       setLoading(false);
     }
-  }, [severity, status, alertType, departmentId, slaStatus]);
+  }, [severity, status, alertType, departmentId, slaStatus, scope]);
   
   /**
    * ════════════════════════════════════════════════════════════════════════

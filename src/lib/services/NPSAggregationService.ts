@@ -3,8 +3,8 @@
  * NPSAggregationService - Sistema NPS Transversal
  * ============================================
  * 
- * @version 1.0
- * @date Diciembre 2025
+ * @version 1.1
+ * @date Enero 2026
  * @description Servicio centralizado para cálculo y persistencia de NPS
  *              de todos los productos FocalizaHR.
  * 
@@ -17,6 +17,8 @@
  * - experiencia: eNPS de Experiencia Full
  * 
  * UBICACIÓN: src/lib/services/NPSAggregationService.ts
+ * 
+ * @changelog v1.1: Agregado aggregateExitNPS para Exit Intelligence
  * ============================================
  */
 
@@ -448,6 +450,177 @@ export class NPSAggregationService {
       `[NPSAggregation] ✅ Onboarding completado: ` +
       `${ratingsByGerencia.size} gerencias, ` +
       `NPS global: ${globalCalc.npsScore}`
+    );
+  }
+  
+  // ============================================
+  // AGREGACIÓN EXIT (Específico)
+  // ============================================
+  
+  /**
+   * Agrega NPS de Exit Intelligence usando ExitRecord
+   * 
+   * Especializado para Exit porque el departmentId viene
+   * directamente de ExitRecord, y las respuestas se vinculan
+   * via ExitRecord.participantId → Response.
+   * 
+   * @param accountId ID de la cuenta
+   * @param period Período (ej: "2025-12")
+   * @param periodStart Inicio del período
+   * @param periodEnd Fin del período
+   */
+  static async aggregateExitNPS(
+    accountId: string,
+    period: string,
+    periodStart: Date,
+    periodEnd: Date
+  ): Promise<void> {
+    console.log(`[NPSAggregation] Iniciando Exit NPS para período ${period}`);
+    
+    // 1. Buscar pregunta NPS de Exit (retencion-predictiva, question_order 8)
+    const npsQuestion = await prisma.question.findFirst({
+      where: {
+        campaignType: { slug: 'retencion-predictiva' },
+        responseType: 'nps_scale'
+      }
+    });
+    
+    if (!npsQuestion) {
+      console.log('[NPSAggregation] ⚠️ No se encontró pregunta NPS en retencion-predictiva');
+      return;
+    }
+    
+    // 2. Obtener ExitRecords del período con sus respuestas NPS
+    const exitRecords = await prisma.exitRecord.findMany({
+      where: {
+        accountId,
+        exitDate: {
+          gte: periodStart,
+          lte: periodEnd
+        }
+      },
+      select: {
+        id: true,
+        departmentId: true,
+        participantId: true,
+        department: {
+          select: {
+            id: true,
+            parentId: true,
+            level: true
+          }
+        }
+      }
+    });
+    
+    if (exitRecords.length === 0) {
+      console.log('[NPSAggregation] Sin ExitRecords en el período');
+      return;
+    }
+    
+    // 3. Obtener respuestas NPS para estos participantes
+    const participantIds = exitRecords.map(er => er.participantId);
+    
+    const npsResponses = await prisma.response.findMany({
+      where: {
+        questionId: npsQuestion.id,
+        participantId: { in: participantIds },
+        rating: { not: null }
+      },
+      select: {
+        rating: true,
+        participantId: true
+      }
+    });
+    
+    if (npsResponses.length === 0) {
+      console.log('[NPSAggregation] Sin respuestas NPS de Exit en el período');
+      return;
+    }
+    
+    // 4. Crear mapa participantId → rating para lookup rápido
+    const ratingByParticipant = new Map<string, number>();
+    for (const response of npsResponses) {
+      if (response.rating !== null) {
+        ratingByParticipant.set(response.participantId, response.rating);
+      }
+    }
+    
+    // 5. Agrupar ratings por departamento y gerencia
+    const ratingsByDepartment = new Map<string, number[]>();
+    const ratingsByGerencia = new Map<string, number[]>();
+    
+    for (const exitRecord of exitRecords) {
+      const rating = ratingByParticipant.get(exitRecord.participantId);
+      
+      if (rating !== undefined && exitRecord.department) {
+        const departmentId = exitRecord.departmentId;
+        const gerenciaId = exitRecord.department.parentId || exitRecord.departmentId;
+        
+        // Agrupar por departamento
+        if (!ratingsByDepartment.has(departmentId)) {
+          ratingsByDepartment.set(departmentId, []);
+        }
+        ratingsByDepartment.get(departmentId)!.push(rating);
+        
+        // Agrupar por gerencia
+        if (!ratingsByGerencia.has(gerenciaId)) {
+          ratingsByGerencia.set(gerenciaId, []);
+        }
+        ratingsByGerencia.get(gerenciaId)!.push(rating);
+      }
+    }
+    
+    // 6. Guardar NPS por gerencia (nivel 2)
+    for (const [gerenciaId, ratings] of ratingsByGerencia) {
+      const calc = this.calculateNPS(ratings);
+      await this.upsertNPSInsight(
+        accountId,
+        gerenciaId,
+        'exit',
+        period,
+        periodStart,
+        periodEnd,
+        calc
+      );
+    }
+    
+    // 7. Guardar NPS por departamento (nivel 3+)
+    for (const [departmentId, ratings] of ratingsByDepartment) {
+      // Evitar duplicar si el departamento YA es una gerencia
+      if (!ratingsByGerencia.has(departmentId)) {
+        const calc = this.calculateNPS(ratings);
+        await this.upsertNPSInsight(
+          accountId,
+          departmentId,
+          'exit',
+          period,
+          periodStart,
+          periodEnd,
+          calc
+        );
+      }
+    }
+    
+    // 8. Guardar NPS global (empresa)
+    const allRatings = Array.from(ratingByParticipant.values());
+    const globalCalc = this.calculateNPS(allRatings);
+    
+    await this.upsertNPSInsight(
+      accountId,
+      null,
+      'exit',
+      period,
+      periodStart,
+      periodEnd,
+      globalCalc
+    );
+    
+    console.log(
+      `[NPSAggregation] ✅ Exit completado: ` +
+      `${ratingsByGerencia.size} gerencias, ` +
+      `${ratingsByDepartment.size} departamentos, ` +
+      `NPS global: ${globalCalc.npsScore} (${allRatings.length} respuestas)`
     );
   }
   

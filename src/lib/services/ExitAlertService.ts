@@ -554,10 +554,13 @@ export class ExitAlertService {
       where,
       include: {
         department: {
-          select: { 
-            id: true, 
-            displayName: true,
-            standardCategory: true
+          include: {
+            parent: {
+              select: {
+                id: true,
+                displayName: true
+              }
+            }
           }
         },
         exitRecord: {

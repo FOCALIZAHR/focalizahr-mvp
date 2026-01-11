@@ -85,14 +85,18 @@ export async function GET(request: NextRequest) {
       whereClause.period = params.period;
     }
     
-    // Si es "latest", obtener el período más reciente
+    // Si es "latest", obtener el período más reciente PARA ESE PRODUCTO
     if (!params.period || params.period === 'latest') {
       const latestInsight = await prisma.nPSInsight.findFirst({
-        where: { accountId: userContext.accountId },
+        where: {
+          accountId: userContext.accountId,
+          // Filtrar por producto si se especificó uno
+          ...(params.product && params.product !== 'all' ? { productType: params.product } : {})
+        },
         orderBy: { period: 'desc' },
         select: { period: true }
       });
-      
+
       if (latestInsight) {
         whereClause.period = latestInsight.period;
       }

@@ -5,6 +5,7 @@
  * Ejecutar agregación mensual de Exit Intelligence
  * - LENTE 1: DepartmentExitInsight (histórico mensual)
  * - LENTE 2: Department.accumulated* (Gold Cache 12 meses)
+ * - NPS Exit: Agregación a tabla nps_insights
  * - Verificar alertas departamentales
  * - Actualizar SLA de alertas abiertas
  * 
@@ -24,17 +25,21 @@
  *     accountsProcessed: number;
  *     departmentsProcessed: number;
  *     alertsCreated: number;
+ *     npsProcessed: number;
  *     slaUpdated: number;
  *   };
  * }
  * 
- * @version 1.0
- * @date December 2025
+ * @version 1.1
+ * @date January 2026
+ * @changelog v1.1: Agregado NPSAggregationService para NPS Exit
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 import { ExitAggregationService } from '@/lib/services/ExitAggregationService';
 import { ExitAlertService } from '@/lib/services/ExitAlertService';
+import { NPSAggregationService } from '@/lib/services/NPSAggregationService';
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -95,6 +100,53 @@ export async function POST(request: NextRequest) {
     });
     
     // ════════════════════════════════════════════════════════════════════════
+    // PASO 2.5: AGREGACIÓN NPS EXIT
+    // ════════════════════════════════════════════════════════════════════════
+    
+    console.log('[CRON Exit Aggregation] Phase 1.5: NPS Exit aggregation...');
+    
+    let npsProcessed = 0;
+    
+    // Calcular fechas del período
+    let periodStart: Date;
+    let periodEnd: Date;
+    
+    if (period && /^\d{4}-\d{2}$/.test(period)) {
+      const [year, month] = period.split('-').map(Number);
+      periodStart = new Date(year, month - 1, 1);
+      periodEnd = new Date(year, month, 0, 23, 59, 59);
+    } else {
+      const now = new Date();
+      periodEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      periodStart = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), 1);
+    }
+    
+    const npsPeriod = period || `${periodStart.getFullYear()}-${String(periodStart.getMonth() + 1).padStart(2, '0')}`;
+    
+    // Obtener cuentas activas y procesar NPS
+    const accounts = await prisma.account.findMany({
+      where: { status: 'ACTIVE' },
+      select: { id: true, companyName: true }
+    });
+    
+    for (const account of accounts) {
+      try {
+        await NPSAggregationService.aggregateExitNPS(
+          account.id,
+          npsPeriod,
+          periodStart,
+          periodEnd
+        );
+        npsProcessed++;
+        console.log(`[CRON Exit Aggregation] ✅ NPS Exit aggregated for: ${account.companyName}`);
+      } catch (npsError) {
+        console.error(`[CRON Exit Aggregation] ⚠️ Error NPS for ${account.companyName}:`, npsError);
+      }
+    }
+    
+    console.log('[CRON Exit Aggregation] Phase 1.5 completed:', { npsProcessed });
+    
+    // ════════════════════════════════════════════════════════════════════════
     // PASO 3: ACTUALIZAR SLA DE ALERTAS ABIERTAS
     // ════════════════════════════════════════════════════════════════════════
     
@@ -131,6 +183,7 @@ export async function POST(request: NextRequest) {
         accountsProcessed: aggregationResult.accountsProcessed,
         departmentsProcessed: aggregationResult.departmentsProcessed,
         alertsCreated: aggregationResult.alertsCreated,
+        npsProcessed,
         slaUpdated: slaResult.updated,
         errors: aggregationResult.errors.length
       },
@@ -167,6 +220,7 @@ export async function GET(request: NextRequest) {
     tasks: [
       'LENTE 1: DepartmentExitInsight (histórico mensual)',
       'LENTE 2: Department.accumulated* (Gold Cache 12 meses)',
+      'NPS Exit: Agregación a nps_insights (productType: exit)',
       'Verificar alertas departamentales',
       'Actualizar SLA alertas abiertas'
     ]
