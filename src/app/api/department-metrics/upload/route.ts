@@ -325,7 +325,11 @@ export async function POST(request: NextRequest) {
             // Fase 1.5 opcional
             turnoverRegrettableRate: metric.turnoverRegrettableRate,
             turnoverRegrettableCount: metric.turnoverRegrettableCount,
-            
+
+            // Fase 2: Métricas de Desempeño
+            performanceScore: metric.performanceScore,
+            goalsAchievedRate: metric.goalsAchievedRate,
+
             // Notes (solo campo metadata actualizable)
             notes: metric.notes
             
@@ -365,7 +369,11 @@ export async function POST(request: NextRequest) {
             // Fase 1.5
             turnoverRegrettableRate: metric.turnoverRegrettableRate,
             turnoverRegrettableCount: metric.turnoverRegrettableCount,
-            
+
+            // Fase 2: Métricas de Desempeño
+            performanceScore: metric.performanceScore,
+            goalsAchievedRate: metric.goalsAchievedRate,
+
             // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             // METADATA (Backend-Generated - NO viene del frontend)
             // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

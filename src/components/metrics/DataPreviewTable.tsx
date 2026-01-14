@@ -16,6 +16,8 @@ interface PreviewData {
   issueCount?: number;
   overtimeHoursTotal?: number;
   overtimeHoursAvg?: number;
+  performanceScore?: number;
+  goalsAchievedRate?: number;
   validation?: {
     valid: boolean;
     errors: string[];
@@ -126,6 +128,8 @@ export default function DataPreviewTable({
               <th className="text-right py-3 px-4 text-sm font-semibold text-slate-300">Ausentismo</th>
               <th className="text-right py-3 px-4 text-sm font-semibold text-slate-300">Denuncias</th>
               <th className="text-right py-3 px-4 text-sm font-semibold text-slate-300">H. Extras</th>
+              <th className="text-right py-3 px-4 text-sm font-semibold text-slate-300">Desempeño</th>
+              <th className="text-right py-3 px-4 text-sm font-semibold text-slate-300">% Metas</th>
             </tr>
           </thead>
           <tbody>
@@ -180,6 +184,12 @@ export default function DataPreviewTable({
                   </td>
                   <td className="py-3 px-4 text-sm text-right text-slate-300">
                     {row.overtimeHoursTotal !== undefined ? `${row.overtimeHoursTotal}h` : '-'}
+                  </td>
+                  <td className="py-3 px-4 text-sm text-right text-slate-300">
+                    {row.performanceScore !== undefined ? row.performanceScore.toFixed(1) : '-'}
+                  </td>
+                  <td className="py-3 px-4 text-sm text-right text-slate-300">
+                    {row.goalsAchievedRate !== undefined ? `${row.goalsAchievedRate}%` : '-'}
                   </td>
                 </tr>
               );

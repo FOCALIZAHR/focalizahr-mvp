@@ -32,6 +32,35 @@ export const EXIT_REASONS = {
 export type ExitReason = typeof EXIT_REASONS[keyof typeof EXIT_REASONS];
 
 /**
+ * Clasificación de talento (llenado por RRHH al registrar salida)
+ */
+export const TALENT_CLASSIFICATIONS = {
+  KEY_TALENT: 'key_talent',
+  MEETS_EXPECTATIONS: 'meets_expectations',
+  POOR_FIT: 'poor_fit'
+} as const;
+
+export type TalentClassification = typeof TALENT_CLASSIFICATIONS[keyof typeof TALENT_CLASSIFICATIONS];
+
+/**
+ * Labels UX para clasificación de talento
+ */
+export const TALENT_CLASSIFICATION_LABELS: Record<TalentClassification, string> = {
+  'key_talent': '🔴 Talento Clave / Alto Potencial',
+  'meets_expectations': '🟡 Buen Desempeño / Cumple',
+  'poor_fit': '🟢 Bajo Ajuste / Error de Contratación'
+};
+
+/**
+ * Descripciones para UI
+ */
+export const TALENT_CLASSIFICATION_DESCRIPTIONS: Record<TalentClassification, string> = {
+  'key_talent': 'Impacto crítico en el negocio',
+  'meets_expectations': 'Cumple expectativas del rol',
+  'poor_fit': 'No alcanzó el nivel esperado'
+};
+
+/**
  * Labels en español para UI
  */
 export const EXIT_REASON_LABELS: Record<ExitReason, string> = {
@@ -183,6 +212,7 @@ export interface ExitRegistrationData {
   position?: string;
   exitDate: Date;
   exitReason?: ExitReason;
+  talentClassification?: TalentClassification;
 }
 
 /**

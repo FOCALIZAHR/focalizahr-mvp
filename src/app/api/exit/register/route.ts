@@ -41,7 +41,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { ExitRegistrationService } from '@/lib/services/ExitRegistrationService';
-import { EXIT_REASONS, type ExitReason } from '@/types/exit';
+import { EXIT_REASONS, TALENT_CLASSIFICATIONS, type ExitReason, type TalentClassification } from '@/types/exit';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HANDLER POST
@@ -153,7 +153,17 @@ export async function POST(request: NextRequest) {
         );
       }
     }
-    
+
+    // Validar talentClassification si se proporciona
+    if (body.talentClassification) {
+      const validClassifications = Object.values(TALENT_CLASSIFICATIONS);
+      if (!validClassifications.includes(body.talentClassification as TalentClassification)) {
+        validationErrors.push(
+          `talentClassification debe ser uno de: ${validClassifications.join(', ')}`
+        );
+      }
+    }
+
     if (validationErrors.length > 0) {
       return NextResponse.json(
         { 
@@ -185,7 +195,8 @@ export async function POST(request: NextRequest) {
       phoneNumber: body.phoneNumber || undefined,
       position: body.position || undefined,
       exitDate,
-      exitReason: body.exitReason || undefined
+      exitReason: body.exitReason || undefined,
+      talentClassification: body.talentClassification || undefined
     });
     
     // ════════════════════════════════════════════════════════════════════════

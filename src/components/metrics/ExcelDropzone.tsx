@@ -94,6 +94,18 @@ export default function ExcelDropzone({
       'rotacion lamentable %': 'turnoverRegrettableRate',
       'salidas lamentables #': 'turnoverRegrettableCount',
       'salidas lamentables': 'turnoverRegrettableCount',
+      // Fase 2: Métricas de Desempeño
+      'score desempeño': 'performanceScore',
+      'score desempeno': 'performanceScore',
+      'desempeño': 'performanceScore',
+      'desempeno': 'performanceScore',
+      'performance score': 'performanceScore',
+      'performance': 'performanceScore',
+      '% metas cumplidas': 'goalsAchievedRate',
+      '% metas': 'goalsAchievedRate',
+      'metas cumplidas': 'goalsAchievedRate',
+      'goals achieved': 'goalsAchievedRate',
+      'cumplimiento metas': 'goalsAchievedRate',
       'notas': 'notes'
     };
 
@@ -113,7 +125,7 @@ export default function ExcelDropzone({
     const strValue = String(value).trim();
 
     // Campos de porcentaje: eliminar % y convertir a número
-    if (['turnoverRate', 'absenceRate', 'turnoverRegrettableRate'].includes(key)) {
+    if (['turnoverRate', 'absenceRate', 'turnoverRegrettableRate', 'performanceScore', 'goalsAchievedRate'].includes(key)) {
       const cleaned = strValue.replace(/%/g, '').trim();
       const num = parseFloat(cleaned);
       return isNaN(num) ? undefined : num;

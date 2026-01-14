@@ -83,7 +83,7 @@ export default function ExitDashboardPage() {
         `}
       >
         <div className="relative min-h-screen">
-          
+
           {/* ══════════════════════════════════════════════════════
               BACKGROUND EFFECTS (Estilo Torre Control)
              ══════════════════════════════════════════════════════ */}
@@ -96,7 +96,7 @@ export default function ExitDashboardPage() {
               CONTENT CONTAINER
              ══════════════════════════════════════════════════════ */}
           <div className="relative z-10 px-4 sm:px-6 lg:px-8 py-8 max-w-[1600px] mx-auto">
-            
+
             {/* ══════════════════════════════════════════════════════
                 HEADER
                ══════════════════════════════════════════════════════ */}
@@ -135,7 +135,7 @@ export default function ExitDashboardPage() {
               </div>
             </div>
 
-            {/* ══════════════════════════════════════════════════════
+          {/* ══════════════════════════════════════════════════════
                 TABS TOGGLE
                ══════════════════════════════════════════════════════ */}
             <ExitTabsToggle
@@ -145,40 +145,52 @@ export default function ExitDashboardPage() {
 
             {/* ══════════════════════════════════════════════════════
                 TAB CONTENT: RESUMEN
-                Layout: Gauge izquierda (1/2) + ExitBenchmarkCard derecha (1/2)
+                Filosofía FocalizaHR: Gauge 45% (protagonista adecuado) + Cards 55%
+                Contenedor max-w-[700px] alineado con tabs
                ══════════════════════════════════════════════════════ */}
             {activeTab === 'resumen' && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
+                className="flex justify-center"
               >
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Contenedor alineado con tabs (700px) */}
+                <div
+                  className="
+                    relative w-full max-w-[700px]
+                    bg-slate-900/40 backdrop-blur-xl
+                    border border-slate-800/50 rounded-2xl
+                    p-6
+                  "
+                >
+                  {/* Línea Tesla superior */}
+                  <div className="fhr-top-line" />
 
-                  {/* ════════════════════════════════════════════════════
-                      IZQUIERDA: EIS GAUGE
-                     ════════════════════════════════════════════════════ */}
-                  <div className="flex items-center justify-center">
-                    <EXOScoreGauge
-                      score={summary?.globalAvgEIS ?? 0}
-                      label="EIS Score Global"
-                      size="xl"
-                    />
+                  {/* Grid 45/55: Gauge pequeño + Cards con espacio */}
+                  <div className="grid grid-cols-1 lg:grid-cols-[45%_55%] gap-6 items-center">
+
+                    {/* IZQUIERDA: GAUGE (45%) - Protagonista pero adecuado */}
+                    <div className="flex items-center justify-center">
+                      <EXOScoreGauge
+                        score={summary?.globalAvgEIS ?? 0}
+                        label="EIS Score Global"
+                        size="md"
+                      />
+                    </div>
+
+                    {/* DERECHA: CARDS (55%) - Con respiración */}
+                    <div className="flex flex-col gap-4">
+                      <ExitBenchmarkCard
+                        data={{ summary }}
+                        loading={loading}
+                      />
+                      <EfectividadPredictivaCard
+                        viewMode="gerencias"
+                        scope="company"
+                      />
+                    </div>
+
                   </div>
-
-                  {/* ════════════════════════════════════════════════════
-                      DERECHA: 2 Cards (Benchmark + Efectividad)
-                     ════════════════════════════════════════════════════ */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <ExitBenchmarkCard
-                      data={{ summary }}
-                      loading={loading}
-                    />
-                    <EfectividadPredictivaCard
-                      viewMode="gerencias"
-                      scope="company"
-                    />
-                  </div>
-
                 </div>
               </motion.div>
             )}

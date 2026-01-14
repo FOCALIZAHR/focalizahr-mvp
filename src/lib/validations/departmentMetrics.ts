@@ -105,7 +105,20 @@ export const departmentMetricsUploadSchema = z.object({
     .int()
     .min(0)
     .optional(),
-  
+
+  // Fase 2: Métricas de Desempeño
+  performanceScore: z.number()
+    .min(0, 'Score desempeño mínimo es 0')
+    .max(100, 'Score desempeño máximo es 100')
+    .optional()
+    .nullable(),
+
+  goalsAchievedRate: z.number()
+    .min(0, '% metas mínimo es 0')
+    .max(100, '% metas máximo es 100')
+    .optional()
+    .nullable(),
+
   notes: z.string().max(500, 'Notas muy largas').optional()
 }).refine(
   (data) => {

@@ -104,6 +104,16 @@ export default function ExcelTemplateGenerator({
         '2'
       ],
       [
+        'Score Desempeño',
+        'Score promedio de evaluación de desempeño del departamento (0-100)',
+        '72.5'
+      ],
+      [
+        '% Metas Cumplidas',
+        'Porcentaje de objetivos/metas cumplidas en el período (0-100)',
+        '85'
+      ],
+      [
         'Notas',
         'Observaciones adicionales o contexto relevante del período',
         'Q1 con reestructuración organizacional'
@@ -143,6 +153,8 @@ export default function ExcelTemplateGenerator({
       'Empleados Horas Extras',
       'Rotación Lamentable %',
       'Salidas Lamentables #',
+      'Score Desempeño',
+      '% Metas Cumplidas',
       'Notas'
     ];
 

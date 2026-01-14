@@ -130,6 +130,7 @@ export class ExitRegistrationService {
             nationalId: data.nationalId,
             exitDate: data.exitDate,
             exitReason: data.exitReason || null,
+            talentClassification: data.talentClassification || null,
             exitFactors: [], // Se llenará al completar encuesta
             // Correlación onboarding
             hadOnboarding: correlation.found,

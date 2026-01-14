@@ -1033,6 +1033,11 @@ model ExitRecord {
   hasLeyKarinAlert        Boolean  @default(false) @map("has_ley_karin_alert")
 
   // ═══════════════════════════════════════════════════
+  // CLASIFICACIÓN DE TALENTO (RRHH al registrar salida)
+  // ═══════════════════════════════════════════════════
+  talentClassification    String?  @map("talent_classification")
+  
+  // ═══════════════════════════════════════════════════
   // TIMESTAMPS
   // ═══════════════════════════════════════════════════
   createdAt               DateTime @default(now()) @map("created_at")

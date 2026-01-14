@@ -24,6 +24,8 @@ interface MetricData {
   absenceDaysTotal?: number;
   workingDaysTotal?: number;
   overtimeEmployeeCount?: number;
+  performanceScore?: number;
+  goalsAchievedRate?: number;
   notes?: string;
 }
 

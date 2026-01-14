@@ -98,6 +98,30 @@ const EXIT_REASON_OPTIONS = [
   { value: 'otro', label: 'Otro motivo' }
 ] as const;
 
+// ============================================
+// OPCIONES CLASIFICACIÓN TALENTO (OBLIGATORIO)
+// ============================================
+
+const TALENT_CLASSIFICATION_OPTIONS = [
+  {
+    value: 'key_talent',
+    label: '🔴 Talento Clave / Alto Potencial',
+    description: 'Impacto crítico en el negocio'
+  },
+  {
+    value: 'meets_expectations',
+    label: '🟡 Buen Desempeño / Cumple',
+    description: 'Cumple expectativas del rol'
+  },
+  {
+    value: 'poor_fit',
+    label: '🟢 Bajo Ajuste / Error de Contratación',
+    description: 'No alcanzó el nivel esperado'
+  }
+] as const;
+
+type TalentClassificationValue = typeof TALENT_CLASSIFICATION_OPTIONS[number]['value'];
+
 type ExitReasonValue = typeof EXIT_REASON_OPTIONS[number]['value'];
 
 // ============================================
@@ -147,8 +171,14 @@ const exitRegisterSchema = z.object({
     'balance_vida_trabajo', 'mal_clima', 'problemas_liderazgo',
     'relocalizacion', 'motivos_personales', 'estudios',
     'salud', 'abandono_trabajo', 'jubilacion', 'otro'
-  ]).optional()
-  
+  ]).optional(),
+
+  talentClassification: z.enum([
+    'key_talent', 'meets_expectations', 'poor_fit'
+  ], {
+    required_error: 'Clasificación de talento es obligatoria'
+  })
+
 }).refine(
   (data) => data.email || data.phoneNumber,
   {
@@ -265,7 +295,8 @@ export default function ExitRegisterIndividualPage() {
           departmentId: data.departmentId,
           exitDate: data.exitDate,
           position: data.position || undefined,
-          exitReason: data.exitReason || undefined
+          exitReason: data.exitReason || undefined,
+          talentClassification: data.talentClassification
         })
       });
       
@@ -646,6 +677,30 @@ export default function ExitRegisterIndividualPage() {
               </select>
               <p className="text-xs text-slate-500 mt-1">
                 ℹ️ Este motivo se comparará con la respuesta del colaborador en la encuesta
+              </p>
+            </div>
+
+            {/* Clasificación de Talento (OBLIGATORIO) */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">
+                Clasificación de Talento <span className="text-red-400">*</span>
+              </label>
+              <select
+                {...register('talentClassification')}
+                className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition"
+              >
+                <option value="">Seleccione clasificación...</option>
+                {TALENT_CLASSIFICATION_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {errors.talentClassification && (
+                <p className="text-red-400 text-xs mt-1">{errors.talentClassification.message}</p>
+              )}
+              <p className="text-xs text-slate-500 mt-1">
+                ⚠️ Esta clasificación es confidencial y solo visible para RRHH
               </p>
             </div>
           </div>
