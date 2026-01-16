@@ -39,17 +39,22 @@ interface RevelationCardProps {
 // HELPERS
 // ====================================================================
 
-// Obtener top factores por severidad para surveyReality
-function getTopBySeverity(factors: TruthDataPoint[]): Array<{
+// Obtener top factores por % de menciones para surveyReality
+function getTopByMentions(factors: TruthDataPoint[]): Array<{
   name: string;
+  mentionRate: number;
   severity: number;
 }> {
+  const totalFrequency = factors.reduce((sum, f) => sum + f.frequency, 0);
+  if (totalFrequency === 0) return [];
+
   return factors
     .map(f => ({
       name: f.factor,
+      mentionRate: Math.round((f.frequency / totalFrequency) * 100),
       severity: f.avgSeverity
     }))
-    .sort((a, b) => b.severity - a.severity)
+    .sort((a, b) => b.mentionRate - a.mentionRate)
     .slice(0, 3);
 }
 
@@ -71,7 +76,7 @@ function getTopHRReasons(hrHypothesis: HRHypothesisData | null): Array<{
 // Algoritmo para generar insight automático comparando dos fuentes
 function generateInsight(
   hrReasons: Array<{ name: string; percentage: number }>,
-  surveyFactors: Array<{ name: string; severity: number }>,
+  surveyFactors: Array<{ name: string; mentionRate: number; severity: number }>,
   predictability: PredictabilityData | null
 ): string {
   if (hrReasons.length === 0 && surveyFactors.length === 0) {
@@ -80,7 +85,7 @@ function generateInsight(
 
   if (hrReasons.length === 0) {
     const topFactor = surveyFactors[0];
-    return `La encuesta revela que "${topFactor.name}" (severidad ${topFactor.severity.toFixed(1)}) ` +
+    return `La encuesta revela que "${topFactor.name}" (${topFactor.mentionRate}% de menciones) ` +
       `es el dolor principal, pero RRHH no ha registrado razones de salida.`;
   }
 
@@ -106,7 +111,7 @@ function generateInsight(
   if (hrNormalized !== surveyNormalized) {
     let insight = `RRHH registra "${topHR.name}" (${topHR.percentage}%), ` +
       `pero los empleados revelan que huyen de "${topSurvey.name}" ` +
-      `(severidad ${topSurvey.severity.toFixed(1)}).`;
+      `(${topSurvey.mentionRate}% de menciones).`;
 
     if (predictability && predictability.predictabilityRate > 0) {
       insight += ` El ${predictability.predictabilityRate}% tenía alertas de onboarding ignoradas.`;
@@ -117,7 +122,7 @@ function generateInsight(
 
   // Si coinciden = confirmar
   return `"${topHR.name}" coincide en ambas fuentes: ` +
-    `${topHR.percentage}% de registros RRHH y severidad ${topSurvey.severity.toFixed(1)} en encuestas. ` +
+    `${topHR.percentage}% de registros RRHH y ${topSurvey.mentionRate}% de menciones en encuestas. ` +
     `El problema está claramente identificado.`;
 }
 
@@ -132,7 +137,7 @@ export default function RevelationCard({
   // Calcular datos para las dos columnas
   const { hrReasons, surveyFactors, keyInsight, hasRevelation } = useMemo(() => {
     const hrTop = getTopHRReasons(hrHypothesis);
-    const surveyTop = getTopBySeverity(surveyReality);
+    const surveyTop = getTopByMentions(surveyReality);
     const insight = generateInsight(hrTop, surveyTop, predictability);
 
     // Detectar si hay revelación (top HR ≠ top survey)
@@ -212,7 +217,7 @@ export default function RevelationCard({
           <p className="text-xs text-slate-500 mt-3">% de registros de salida</p>
         </div>
 
-        {/* Derecha: Realidad Encuesta (barras CYAN) */}
+        {/* Derecha: Realidad Encuesta (barras CYAN, primera PÚRPURA) */}
         <div className="md:border-l md:border-slate-700 md:pl-8">
           <h3 className="text-sm uppercase tracking-wide text-cyan-400 mb-4">
             Realidad Encuesta
@@ -220,20 +225,30 @@ export default function RevelationCard({
 
           {surveyFactors.length > 0 ? (
             <div className="space-y-3">
-              {surveyFactors.map((item) => (
-                <div key={item.name}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-slate-300 truncate pr-2">{item.name}</span>
-                    <span className="text-cyan-400 flex-shrink-0">{item.severity.toFixed(1)}★</span>
+              {surveyFactors.map((item, index) => {
+                const isFirst = index === 0;
+                return (
+                  <div key={item.name}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-slate-300 truncate pr-2">{item.name}</span>
+                      <span className="flex items-center gap-2 flex-shrink-0">
+                        <span className={isFirst ? 'text-purple-400' : 'text-cyan-400'}>
+                          {item.mentionRate}%
+                        </span>
+                        <span className="text-slate-500 text-xs">
+                          (sev: {item.severity.toFixed(1)})
+                        </span>
+                      </span>
+                    </div>
+                    <div className="h-2 bg-slate-700 rounded-full">
+                      <div
+                        className={`h-full rounded-full transition-all ${isFirst ? 'bg-purple-500' : 'bg-cyan-500'}`}
+                        style={{ width: `${item.mentionRate}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 bg-slate-700 rounded-full">
-                    <div
-                      className="h-full bg-cyan-500 rounded-full transition-all"
-                      style={{ width: `${(item.severity / 5) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-slate-500 italic">
@@ -241,7 +256,7 @@ export default function RevelationCard({
             </p>
           )}
 
-          <p className="text-xs text-slate-500 mt-3">Severidad de impacto (1-5)</p>
+          <p className="text-xs text-slate-500 mt-3">% de menciones en encuesta</p>
         </div>
 
       </div>

@@ -175,6 +175,7 @@ export default function ExitDashboardPage() {
                         score={summary?.globalAvgEIS ?? 0}
                         label="EIS Score Global"
                         size="md"
+                        metricType="eis"
                       />
                     </div>
 

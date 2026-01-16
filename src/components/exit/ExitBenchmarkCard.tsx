@@ -20,6 +20,7 @@ import {
   MessageCircle
 } from 'lucide-react';
 import type { ExitMetricsSummary } from '@/types/exit';
+import { useBenchmark } from '@/hooks/useBenchmark';
 
 // ====================================================================
 // TYPES
@@ -30,7 +31,6 @@ interface ExitBenchmarkCardProps {
     summary: ExitMetricsSummary | null;
   };
   loading?: boolean;
-  benchmarkValue?: number;
 }
 
 // ====================================================================
@@ -89,17 +89,20 @@ function LoadingSkeleton() {
 
 export default memo(function ExitBenchmarkCard({
   data,
-  loading = false,
-  benchmarkValue = 55
+  loading = false
 }: ExitBenchmarkCardProps) {
 
   const { summary } = data;
 
+  // Obtener benchmark real desde el API (misma fuente que el Gauge)
+  const { data: benchmarkData } = useBenchmark('eis', 'ALL', undefined, 'CL');
+  const actualBenchmark = benchmarkData?.benchmark?.avgScore ?? 55;
+
   const comparison = useMemo(() => {
     const score = summary?.globalAvgEIS ?? 0;
-    const delta = score - benchmarkValue;
-    return { score, delta, benchmarkValue, ...getComparisonConfig(delta) };
-  }, [summary?.globalAvgEIS, benchmarkValue]);
+    const delta = score - actualBenchmark;
+    return { score, delta, benchmarkValue: actualBenchmark, ...getComparisonConfig(delta) };
+  }, [summary?.globalAvgEIS, actualBenchmark]);
 
   const topFactor = useMemo(() => {
     const factors = summary?.topFactorsGlobal;

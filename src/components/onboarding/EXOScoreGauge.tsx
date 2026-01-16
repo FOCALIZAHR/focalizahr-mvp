@@ -20,8 +20,9 @@ interface EXOScoreGaugeProps {
   label: string;
   trend?: number | null;
   size?: 'sm' | 'md' | 'lg' | 'xl';
-  standardCategory?: string;  // 🆕 Para benchmark
-  country?: string;            // 🆕 Para benchmark
+  metricType?: string;         // Tipo de métrica para benchmark (ej: 'onboarding_exo', 'eis')
+  standardCategory?: string;   // Para benchmark
+  country?: string;            // Para benchmark
 }
 
 // ============================================
@@ -64,13 +65,14 @@ const SIZE_CONFIG = {
 // ============================================
 // COMPONENT
 // ============================================
-const EXOScoreGauge = memo(function EXOScoreGauge({ 
+const EXOScoreGauge = memo(function EXOScoreGauge({
   score,
   label,
   trend,
   size = 'xl',
-  standardCategory,  // 🆕
-  country            // 🆕
+  metricType = 'onboarding_exo',  // Default para backwards compatibility
+  standardCategory,
+  country
 }: EXOScoreGaugeProps) {
   
   const currentScore = score ?? 0;
@@ -80,7 +82,7 @@ const EXOScoreGauge = memo(function EXOScoreGauge({
   // 🆕 BENCHMARK DATA
   // ========================================
   const { data: benchmarkData } = useBenchmark(
-    'onboarding_exo',
+    metricType,
     standardCategory || 'ALL',
     undefined,
     country || 'CL'

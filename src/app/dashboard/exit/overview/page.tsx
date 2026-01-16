@@ -237,7 +237,7 @@ export default function ExitOverviewPage() {
                 iconPosition="right"
                 size="lg"
                 glow={true}
-                onClick={() => router.push('/dashboard/exit')}
+                onClick={() => router.push('/dashboard/exit/causes')}
               >
                 Analizar en Detalle
               </PrimaryButton>
