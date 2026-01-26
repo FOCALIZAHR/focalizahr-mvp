@@ -77,7 +77,8 @@ export async function GET(request: NextRequest) {
         methodology: true,
         category: true,
         sortOrder: true,
-        
+        flowType: true,  // 🔑 Para wizard Paso 3B (employee-based vs standard)
+
         // ✨ Agregamos estadísticas de uso Chat 3A
         _count: {
           select: {
@@ -126,7 +127,8 @@ export async function GET(request: NextRequest) {
         questionCount: type.questionCount,
         methodology: type.methodology,
         category: type.category,
-        
+        flowType: type.flowType,  // 🔑 'standard' | 'employee-based' para wizard Paso 3B
+
         // ✨ Métricas enriched Chat 3A
         usageCount: type._count.campaigns,
         popularityScore,

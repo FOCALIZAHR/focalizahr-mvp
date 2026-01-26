@@ -27,6 +27,95 @@ enum AccountStatus {
   INACTIVE
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// EMPLOYEE MASTER - Enums
+// ════════════════════════════════════════════════════════════════════════════
+
+enum EmployeeStatus {
+  ACTIVE          // Activo en nómina
+  INACTIVE        // Desvinculado/terminado
+  ON_LEAVE        // Licencia/permiso extendido
+  PENDING_REVIEW  // Requiere revisión manual
+  EXCLUDED        // Excluido manualmente de estudios
+}
+
+enum EmployeeChangeType {
+  HIRE            // Contratación inicial
+  UPDATE          // Actualización de datos
+  TRANSFER        // Cambio de departamento
+  PROMOTION       // Ascenso/cambio de cargo
+  MANAGER_CHANGE  // Cambio de jefe
+  TERMINATE       // Desvinculación
+  REHIRE          // Recontratación
+  JOB_LEVEL_CLASSIFICATION  // 🆕 Cambio de standardJobLevel
+  TRACK_CLASSIFICATION      // 🆕 Cambio de performanceTrack
+}
+
+enum EmployeeImportMode {
+  INCREMENTAL     // Solo upsert, no detecta ausentes
+  FULL            // Detecta ausentes, reconciliación completa
+  PREVIEW         // Solo validación, sin cambios
+}
+
+enum EmployeeImportStatus {
+  PENDING               // Esperando inicio
+  VALIDATING            // Validando archivo
+  PROCESSING            // Procesando cambios
+  AWAITING_CONFIRMATION // Threshold excedido
+  COMPLETED             // Completado
+  FAILED                // Falló
+  CANCELLED             // Cancelado
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PERFORMANCE EVALUATION - Enums
+// ════════════════════════════════════════════════════════════════════════════
+
+enum PerformanceCycleType {
+  MONTHLY       // Mensual
+  QUARTERLY     // Trimestral
+  SEMI_ANNUAL   // Semestral
+  ANNUAL        // Anual
+  IMPACT_PULSE  // Impact Pulse (upward de líderes)
+  PROBATION     // Período de prueba
+  CUSTOM        // Personalizado
+}
+
+enum PerformanceCycleStatus {
+  DRAFT       // Configurando
+  SCHEDULED   // Programado
+  ACTIVE      // En progreso
+  IN_REVIEW   // Revisando resultados
+  COMPLETED   // Cerrado
+  CANCELLED   // Cancelado
+}
+
+enum EvaluationType {
+  SELF                 // Auto-evaluación
+  MANAGER_TO_EMPLOYEE  // Jefe evalúa a subordinado
+  EMPLOYEE_TO_MANAGER  // Subordinado evalúa a jefe (Impact Pulse)
+  PEER                 // Evaluación entre pares
+}
+
+enum EvaluationAssignmentStatus {
+  PENDING     // Pendiente de responder
+  IN_PROGRESS // Iniciada
+  COMPLETED   // Completada
+  EXPIRED     // Venció sin respuesta
+  CANCELLED   // Cancelada
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// COMPETENCY LIBRARY - Categorías de Competencias
+// ════════════════════════════════════════════════════════════════════════════
+
+enum CompetencyCategory {
+  CORE        // Todos los empleados
+  LEADERSHIP  // Managers + Ejecutivos
+  STRATEGIC   // Solo Ejecutivos
+  TECHNICAL   // Por área/departamento (opcional)
+}
+
 // TABLA 1: Cuentas empresa (multi-tenancy)
 model Account {
   id               String        @id @default(cuid())
@@ -76,6 +165,25 @@ model Account {
   exitRecords       ExitRecord[]
   exitAlerts        ExitAlert[]
   exitInsights      DepartmentExitInsight[]
+
+  // ═══════════════════════════════════════════════════
+  // RELACIONES EMPLOYEE MASTER + PERFORMANCE
+  // ═══════════════════════════════════════════════════
+  employees             Employee[]
+  employeeHistory       EmployeeHistory[]
+  employeeImports       EmployeeImport[]
+  performanceCycles     PerformanceCycle[]
+  evaluationAssignments EvaluationAssignment[]
+
+  // ═══════════════════════════════════════════════════
+  // RELACIONES POSITION ADAPTER
+  // ═══════════════════════════════════════════════════
+  jobMappingHistory     JobMappingHistory[]
+
+  // ═══════════════════════════════════════════════════
+  // RELACIONES COMPETENCY LIBRARY
+  // ═══════════════════════════════════════════════════
+  competencies          Competency[]
 
   @@index([adminEmail], map: "idx_accounts_email")
   @@index([subscriptionTier], map: "idx_accounts_tier")
@@ -151,6 +259,9 @@ model Campaign {
   emailLogs        EmailLog[]
   emailAutomations EmailAutomation[]
 
+  // Vínculo con Performance (opcional)
+  performanceCycle PerformanceCycle?
+
   @@index([accountId], map: "idx_campaigns_account")
   @@index([status], map: "idx_campaigns_status")
   @@index([campaignTypeId], map: "idx_campaigns_type")
@@ -176,6 +287,22 @@ model Participant {
   // 🔮 NUEVO CAMPO DE ALTO VALOR (Plan Benchmark)
   standardSeniority String? @map("standard_seniority")
   location       String?
+
+  // ═══════════════════════════════════════════════════
+  // 🆕 POSITION ADAPTER - Nivel Jerárquico Estandarizado
+  // ═══════════════════════════════════════════════════
+  standardJobLevel String?   @map("standard_job_level")
+  // Valores: 'gerente_director' | 'subgerente_subdirector' | 'jefe' |
+  //          'supervisor_coordinador' | 'profesional_analista' |
+  //          'asistente_otros' | 'operativo_auxiliar'
+
+  acotadoGroup     String?   @map("acotado_group")
+  // Valores: 'alta_gerencia' | 'mandos_medios' | 'profesionales' | 'base_operativa'
+
+  jobLevelMethod   String?   @map("job_level_method")
+  // Valores: 'exact' | 'fuzzy' | 'historic' | 'manual' | 'failed'
+
+  jobLevelMappedAt DateTime? @map("job_level_mapped_at")
 
   // Estados:
   hasResponded     Boolean   @default(false) @map("has_responded")
@@ -210,6 +337,13 @@ model Participant {
   // Relación con ExitRecord (1:1 opcional)
   exitRecord  ExitRecord?
 
+  // ═══════════════════════════════════════════════════
+  // RELACIONES EMPLOYEE MASTER + PERFORMANCE
+  // ═══════════════════════════════════════════════════
+  employeeId           String?               @map("employee_id")
+  employee             Employee?             @relation(fields: [employeeId], references: [id])
+  evaluationAssignment EvaluationAssignment?
+
   @@unique([campaignId, nationalId], map: "unique_campaign_rut")
   @@index([campaignId], map: "idx_participants_campaign")
   @@index([uniqueToken], map: "idx_participants_token")
@@ -220,6 +354,9 @@ model Participant {
   @@index([nationalId], map: "idx_participants_national_id") // 🆕 NUEVO ÍNDICE
   @@index([phoneNumber], map: "idx_participants_phone_number") // 🆕 NUEVO ÍNDICE
   @@index([standardSeniority])  // ✅ AGREGAR ESTE ÍNDICE AL FINAL
+  @@index([standardJobLevel], map: "idx_participants_job_level")
+  @@index([acotadoGroup], map: "idx_participants_acotado_group")
+  @@index([campaignId, standardJobLevel], map: "idx_participants_campaign_job_level")
   @@map("participants")
 }
 
@@ -248,6 +385,18 @@ model Question {
   methodologyReference String?  @map("methodology_reference")
   createdAt            DateTime @default(now()) @map("created_at")
 
+  // ═══════════════════════════════════════════════════
+  // COMPETENCY LIBRARY - Vínculo semántico (NO FK)
+  // ═══════════════════════════════════════════════════
+  competencyCode String? @map("competency_code")
+  // Ejemplo: "CORE-COMM", "LEAD-DEV", "STRAT-VISION"
+  // Vínculo con Competency.code (mismo valor)
+
+  audienceRule Json? @map("audience_rule")
+  // null = Sin filtro (todos)
+  // {"minTrack": "MANAGER"} = Solo para evaluar managers+
+  // {"minTrack": "EJECUTIVO"} = Solo para evaluar ejecutivos
+
   // Relaciones
   campaignType CampaignType @relation(fields: [campaignTypeId], references: [id])
   responses    Response[]
@@ -256,6 +405,7 @@ model Question {
   @@index([category], map: "idx_questions_category")
   @@index([questionOrder], map: "idx_questions_order")
   @@index([isActive], map: "idx_questions_active")
+  @@index([competencyCode], map: "idx_questions_competency_code")
   @@map("questions")
 }
 
@@ -488,6 +638,11 @@ model Department {
   exitRecords       ExitRecord[]
   exitInsights      DepartmentExitInsight[]
   exitAlerts        ExitAlert[]
+
+  // ═══════════════════════════════════════════════════
+  // RELACIONES EMPLOYEE MASTER
+  // ═══════════════════════════════════════════════════
+  employees Employee[]
 
   @@unique([accountId, displayName])
   @@index([accountId], map: "idx_departments_account")
@@ -824,6 +979,43 @@ model MarketBenchmark {
   
   @@map("market_benchmarks")
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// 🆕 JOB MAPPING HISTORY - Feedback Loop para PositionAdapter
+// ════════════════════════════════════════════════════════════════════════════
+// Almacena mapeos manuales por account para mejorar el algoritmo
+// Prioridad: histórico > algoritmo
+
+model JobMappingHistory {
+  id                  String   @id @default(cuid())
+  accountId           String   @map("account_id")
+
+  // Input original del cliente
+  clientPositionTitle String   @map("client_position_title")  // "Jefe Bodega Central"
+
+  // Mapeo resultante
+  standardJobLevel    String   @map("standard_job_level")     // "jefe"
+  acotadoGroup        String   @map("acotado_group")          // "mandos_medios"
+
+  // Metadata de mapeo
+  mappingMethod       String   @map("mapping_method")         // 'manual'|'algorithm'|'historic'
+  confidence          Float    @default(1.0)
+  correctedBy         String?  @map("corrected_by")           // Email admin que corrigió
+
+  // Auditoría
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // Constraints
+  @@unique([accountId, clientPositionTitle])
+  @@index([accountId], map: "idx_job_mapping_account")
+  @@index([standardJobLevel], map: "idx_job_mapping_level")
+  @@map("job_mapping_history")
+}
+
 // ============================================================================
 // MODELO NUEVO: OnboardingEffectivenessInsight
 
@@ -1226,4 +1418,405 @@ model DepartmentExitInsight {
   @@index([avgEIS], map: "idx_dept_exit_insights_eis")
   @@index([avgSafety], map: "idx_dept_exit_insights_safety")
   @@map("department_exit_insights")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// EMPLOYEE MASTER + PERFORMANCE EVALUATION
+// Fecha: Enero 2025
+// ════════════════════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════════════════
+// EMPLOYEE - Nómina Permanente
+// ════════════════════════════════════════════════════════════════════════════
+
+model Employee {
+  id        String @id @default(cuid())
+  accountId String @map("account_id")
+
+  // Identificadores
+  nationalId     String  @map("national_id")       // RUT único por account
+  employeeNumber String? @map("employee_number")   // Código interno (EMP-001)
+
+  // Datos personales
+  fullName      String  @map("full_name")
+  preferredName String? @map("preferred_name")
+  email         String?
+  phoneNumber   String? @map("phone_number")
+
+  // Datos organizacionales
+  departmentId   String  @map("department_id")
+  position       String?
+  jobTitle       String? @map("job_title")
+  seniorityLevel String? @map("seniority_level")  // junior|mid|senior|lead|executive
+  employmentType String? @map("employment_type")  // full-time|part-time|contractor
+  managerLevel   Int?    @map("manager_level")    // 1=CEO, 2=Dir, 3=Ger, 4=Jefe, 5=IC
+  costCenter     String? @map("cost_center")
+
+  // ═══════════════════════════════════════════════════
+  // 🆕 CLASIFICACIÓN CARGO (calculado por PositionAdapter)
+  // ═══════════════════════════════════════════════════
+  standardJobLevel String?   @map("standard_job_level")
+  // Valores: 'gerente_director' | 'subgerente_subdirector' | 'jefe' |
+  //          'supervisor_coordinador' | 'profesional_analista' |
+  //          'asistente_otros' | 'operativo_auxiliar'
+
+  acotadoGroup     String?   @map("acotado_group")
+  // Valores: 'alta_gerencia' | 'mandos_medios' | 'profesionales' | 'base_operativa'
+
+  jobLevelMappedAt DateTime? @map("job_level_mapped_at")
+  jobLevelMethod   String?   @map("job_level_method")  // 'auto' | 'manual'
+
+  // ═══════════════════════════════════════════════════
+  // 🆕 CLASIFICACIÓN DESEMPEÑO (derivado de standardJobLevel)
+  // ═══════════════════════════════════════════════════
+  performanceTrack String?   @map("performance_track")
+  // Valores: 'COLABORADOR' | 'MANAGER' | 'EJECUTIVO'
+
+  trackMappedAt    DateTime? @map("track_mapped_at")
+  trackHasAnomaly  Boolean   @default(false) @map("track_has_anomaly")
+  // true si hay inconsistencia entre track derivado y estructura real
+
+  // Jerarquía (self-reference)
+  managerId String? @map("manager_id")
+
+  // Estado y ciclo de vida
+  status            EmployeeStatus @default(ACTIVE)
+  isActive          Boolean        @default(true) @map("is_active")
+  hireDate          DateTime       @map("hire_date")
+  terminatedAt      DateTime?      @map("terminated_at")
+  terminationReason String?        @map("termination_reason")
+  rehireDate        DateTime?      @map("rehire_date")
+  tenureCount       Int            @default(1) @map("tenure_count")
+
+  // Control de sincronización
+  importSource        String?   @map("import_source")
+  lastImportId        String?   @map("last_import_id")
+  lastSeenInImport    DateTime? @map("last_seen_in_import")
+  pendingReview       Boolean   @default(false) @map("pending_review")
+  pendingReviewReason String?   @map("pending_review_reason")
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  account       Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  department    Department       @relation(fields: [departmentId], references: [id])
+  manager       Employee?        @relation("ManagerSubordinates", fields: [managerId], references: [id])
+  directReports Employee[]       @relation("ManagerSubordinates")
+  history       EmployeeHistory[]
+  participants  Participant[]
+
+  // Evaluaciones (se usarán en Performance)
+  evaluationsAsEvaluatee EvaluationAssignment[] @relation("Evaluatee")
+  evaluationsAsEvaluator EvaluationAssignment[] @relation("Evaluator")
+
+  // Índices
+  @@unique([accountId, nationalId], map: "idx_employees_account_national")
+  @@index([accountId, status], map: "idx_employees_account_status")
+  @@index([accountId, departmentId], map: "idx_employees_account_dept")
+  @@index([managerId], map: "idx_employees_manager")
+  @@index([accountId, pendingReview], map: "idx_employees_pending_review")
+  @@index([accountId, standardJobLevel], map: "idx_employees_job_level")
+  @@index([accountId, performanceTrack], map: "idx_employees_performance_track")
+  @@index([accountId, trackHasAnomaly], map: "idx_employees_track_anomaly")
+  @@map("employees")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// EMPLOYEE HISTORY - Auditoría por Campo
+// ════════════════════════════════════════════════════════════════════════════
+
+model EmployeeHistory {
+  id         String   @id @default(cuid())
+  employeeId String   @map("employee_id")
+  accountId  String   @map("account_id")
+
+  // Tipo de cambio
+  changeType EmployeeChangeType @map("change_type")
+
+  // Campo específico que cambió
+  fieldName String? @map("field_name")
+  oldValue  String? @map("old_value")
+  newValue  String? @map("new_value")
+
+  // Snapshot al momento del cambio
+  departmentId String? @map("department_id")
+  managerId    String? @map("manager_id")
+  position     String?
+
+  // Origen del cambio
+  changeSource  String?  @map("change_source")  // MANUAL|BULK_IMPORT|API
+  importId      String?  @map("import_id")
+  changedBy     String?  @map("changed_by")
+  changeReason  String?  @map("change_reason")
+
+  // Timestamp
+  effectiveDate DateTime @default(now()) @map("effective_date")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  account  Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // Índices
+  @@index([employeeId, effectiveDate], map: "idx_employee_history_emp_date")
+  @@index([accountId, changeType], map: "idx_employee_history_account_type")
+  @@index([importId], map: "idx_employee_history_import")
+  @@map("employee_history")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// EMPLOYEE IMPORT - Log de Cargas
+// ════════════════════════════════════════════════════════════════════════════
+
+model EmployeeImport {
+  id        String @id @default(cuid())
+  accountId String @map("account_id")
+
+  // Configuración
+  importMode EmployeeImportMode @map("import_mode")
+  fileName   String?            @map("file_name")
+
+  // Estadísticas
+  totalInFile   Int @map("total_in_file")
+  created       Int @default(0)
+  updated       Int @default(0)
+  rehired       Int @default(0)
+  unchanged     Int @default(0)
+  deactivated   Int @default(0)
+  pendingReview Int @default(0) @map("pending_review")
+  errors        Int @default(0)
+
+  // Control de threshold
+  missingCount      Int     @default(0) @map("missing_count")
+  missingPercent    Float   @default(0) @map("missing_percent")
+  thresholdExceeded Boolean @default(false) @map("threshold_exceeded")
+  thresholdUsed     Float   @default(0.10) @map("threshold_used")
+
+  // Estado
+  status      EmployeeImportStatus @default(PENDING)
+  startedAt   DateTime             @default(now()) @map("started_at")
+  completedAt DateTime?            @map("completed_at")
+
+  // Errores detallados
+  errorLog Json? @map("error_log")
+
+  // Usuario que ejecutó
+  executedBy String? @map("executed_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // Índices
+  @@index([accountId, startedAt], map: "idx_employee_imports_account_date")
+  @@index([status], map: "idx_employee_imports_status")
+  @@map("employee_imports")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PERFORMANCE CYCLE - Ciclo de Evaluación
+// ════════════════════════════════════════════════════════════════════════════
+
+model PerformanceCycle {
+  id        String @id @default(cuid())
+  accountId String @map("account_id")
+
+  // Vínculo con Campaign (para Questions)
+  campaignId String?   @unique @map("campaign_id")
+  campaign   Campaign? @relation(fields: [campaignId], references: [id])
+
+  // Identificación
+  name        String
+  description String?
+
+  // Período
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+
+  // Tipo de ciclo
+  cycleType PerformanceCycleType @default(QUARTERLY) @map("cycle_type")
+
+  // Configuración
+  includesSelf    Boolean @default(false) @map("includes_self")
+  includesManager Boolean @default(true) @map("includes_manager")
+  includesPeer    Boolean @default(false) @map("includes_peer")
+  includesUpward  Boolean @default(false) @map("includes_upward")
+
+  anonymousResults Boolean @default(true) @map("anonymous_results")
+  minSubordinates  Int     @default(3) @map("min_subordinates")
+
+  // Estado
+  status PerformanceCycleStatus @default(DRAFT)
+
+  // ═══════════════════════════════════════════════════
+  // COMPETENCY LIBRARY - Snapshot inmutable
+  // Se congela al crear el ciclo - NO cambia aunque cliente edite biblioteca
+  // ═══════════════════════════════════════════════════
+  competencySnapshot Json? @map("competency_snapshot")
+  // Estructura:
+  // [
+  //   {
+  //     "code": "CORE-COMM",
+  //     "name": "Comunicación Asertiva",
+  //     "category": "CORE",
+  //     "behaviors": ["Escucha activa", ...],
+  //     "audienceRule": null
+  //   },
+  //   ...
+  // ]
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
+
+  // Relaciones
+  account     Account              @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  assignments EvaluationAssignment[]
+
+  // Índices
+  @@index([accountId], map: "idx_performance_cycles_account")
+  @@index([status], map: "idx_performance_cycles_status")
+  @@index([startDate], map: "idx_performance_cycles_start")
+  @@map("performance_cycles")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// EVALUATION ASSIGNMENT - Snapshot "X evalúa a Y"
+// Datos CONGELADOS - NO cambian aunque Employee cambie
+// ════════════════════════════════════════════════════════════════════════════
+
+model EvaluationAssignment {
+  id        String @id @default(cuid())
+  accountId String @map("account_id")
+  cycleId   String @map("cycle_id")
+
+  // Referencias a Employee (para queries)
+  evaluateeId String   @map("evaluatee_id")
+  evaluatee   Employee @relation("Evaluatee", fields: [evaluateeId], references: [id])
+
+  evaluatorId String   @map("evaluator_id")
+  evaluator   Employee @relation("Evaluator", fields: [evaluatorId], references: [id])
+
+  // SNAPSHOT CONGELADO
+  snapshotDate DateTime @map("snapshot_date")
+
+  // Datos del EVALUADO al momento del snapshot
+  evaluateeName         String  @map("evaluatee_name")
+  evaluateeNationalId   String  @map("evaluatee_national_id")
+  evaluateeDepartmentId String  @map("evaluatee_department_id")
+  evaluateeDepartment   String  @map("evaluatee_department")
+  evaluateePosition     String? @map("evaluatee_position")
+
+  // Datos del EVALUADOR al momento del snapshot
+  evaluatorName         String  @map("evaluator_name")
+  evaluatorNationalId   String  @map("evaluator_national_id")
+  evaluatorDepartmentId String  @map("evaluator_department_id")
+  evaluatorDepartment   String  @map("evaluator_department")
+
+  // Tipo de evaluación
+  evaluationType EvaluationType @map("evaluation_type")
+
+  // ═══════════════════════════════════════════════════
+  // COMPETENCY LIBRARY - Track del evaluado para filtrado
+  // ═══════════════════════════════════════════════════
+  evaluateePerformanceTrack String? @map("evaluatee_performance_track")
+  // Valores: "COLABORADOR" | "MANAGER" | "EJECUTIVO"
+  // Se congela al momento de crear el assignment (snapshot)
+
+  // Vínculo con Participant (cuando se crea la encuesta)
+  participantId String?      @unique @map("participant_id")
+  participant   Participant? @relation(fields: [participantId], references: [id])
+
+  // Estado y fechas
+  status  EvaluationAssignmentStatus @default(PENDING)
+  dueDate DateTime?                  @map("due_date")
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  account Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  cycle   PerformanceCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+
+  // Índices
+  @@unique([cycleId, evaluatorId, evaluateeId, evaluationType], map: "idx_eval_assignment_unique")
+  @@index([accountId], map: "idx_eval_assignment_account")
+  @@index([evaluateeId], map: "idx_eval_assignment_evaluatee")
+  @@index([evaluatorId], map: "idx_eval_assignment_evaluator")
+  @@index([status], map: "idx_eval_assignment_status")
+  @@map("evaluation_assignments")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// COMPETENCY LIBRARY - Biblioteca de Competencias por Account
+// Patrón: Competency Library (SAP SuccessFactors, Lattice)
+// Vínculo con Questions: Por código (competencyCode), NO por FK
+// ════════════════════════════════════════════════════════════════════════════
+
+model Competency {
+  id        String @id @default(cuid())
+  accountId String @map("account_id")
+
+  // ═══════════════════════════════════════════════════
+  // IDENTIFICACIÓN
+  // ═══════════════════════════════════════════════════
+  code        String              // "CORE-COMM" - Vínculo con Question.competencyCode
+  name        String              // "Comunicación Efectiva" - Personalizable
+  description String?             // Descripción detallada
+
+  // ═══════════════════════════════════════════════════
+  // CLASIFICACIÓN
+  // ═══════════════════════════════════════════════════
+  category CompetencyCategory // CORE, LEADERSHIP, STRATEGIC, TECHNICAL
+
+  // ═══════════════════════════════════════════════════
+  // VÍNCULO SEMÁNTICO CON CLIMA
+  // Permite correlación cruzada: Desempeño ↔ Clima
+  // ═══════════════════════════════════════════════════
+  dimensionCode    String? @map("dimension_code")    // "liderazgo", "ambiente", etc.
+  subdimensionCode String? @map("subdimension_code") // "feedback", "comunicacion", etc.
+
+  // ═══════════════════════════════════════════════════
+  // COMPORTAMIENTOS OBSERVABLES
+  // ═══════════════════════════════════════════════════
+  behaviors Json? // ["Escucha activamente", "Adapta el mensaje", ...]
+
+  // ═══════════════════════════════════════════════════
+  // REGLA DE AUDIENCIA
+  // ═══════════════════════════════════════════════════
+  audienceRule Json? @map("audience_rule")
+  // null = TODOS (Core)
+  // {"minTrack": "MANAGER"} = Managers y Ejecutivos
+  // {"minTrack": "EJECUTIVO"} = Solo Ejecutivos
+
+  // ═══════════════════════════════════════════════════
+  // CONFIGURACIÓN
+  // ═══════════════════════════════════════════════════
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  // ═══════════════════════════════════════════════════
+  // ORIGEN (para tracking)
+  // ═══════════════════════════════════════════════════
+  sourceTemplate String? @map("source_template") // "focalizahr-standard-v1"
+  isCustom       Boolean @default(false) @map("is_custom")
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // Constraints
+  @@unique([accountId, code], map: "unique_competency_code_per_account")
+  @@index([accountId, isActive], map: "idx_competencies_account_active")
+  @@index([category], map: "idx_competencies_category")
+  @@index([dimensionCode], map: "idx_competencies_dimension")
+  @@map("competencies")
 }

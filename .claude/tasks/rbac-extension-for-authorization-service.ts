@@ -1,183 +1,12 @@
-// src/lib/services/AuthorizationService.ts
-// VERSIÓN FINAL VALIDADA - INCLUYE AMBOS NIVELES DE SEGURIDAD + CONTEXTO
-
-import { prisma } from '@/lib/prisma';
-import { LRUCache } from 'lru-cache';
-
-// Cache para optimizar consultas recursivas
-const hierarchyCache = new LRUCache<string, string[]>({
-  max: 500,
-  ttl: 1000 * 60 * 15 // 15 minutos
-});
-
-/**
- * Interface para opciones de filtrado con contexto
- */
-export interface FilterOptions {
-  dataType?: 'participation' | 'results' | 'administrative';
-  skipDepartmentFilter?: boolean;
-  scope?: 'company' | 'filtered';  // NUEVO: Para rankings sin filtro departamental
-}
-
-/**
- * Obtiene todos los departamentos hijos de una gerencia
- * Utiliza CTE recursivo con cache para optimización
- */
-export async function getChildDepartmentIds(parentId: string): Promise<string[]> {
-  if (hierarchyCache.has(parentId)) {
-    debugLog(`📦 Cache hit para departamento ${parentId}`);
-    return hierarchyCache.get(parentId)!;
-  }
-  
-  debugLog(`🔍 Consultando hijos de departamento ${parentId}`);
-  
-  const result = await prisma.$queryRaw<{ id: string }[]>`
-    WITH RECURSIVE dept_tree AS (
-      SELECT id, 0 as depth 
-      FROM departments 
-      WHERE parent_id = ${parentId}
-      
-      UNION ALL
-      
-      SELECT d.id, dt.depth + 1
-      FROM departments d
-      JOIN dept_tree dt ON d.parent_id = dt.id
-      WHERE dt.depth < 3
-    )
-    SELECT id FROM dept_tree
-  `;
-  
-  const ids = result.map(r => r.id);
-  debugLog(`✅ Encontrados ${ids.length} departamentos hijos`);
-  
-  hierarchyCache.set(parentId, ids);
-  return ids;
-}
-
-/**
- * FUNCIÓN CRÍTICA - Construye filtros de seguridad multi-nivel
- * NIVEL 1: Multi-tenant (accountId) - SIEMPRE
- * NIVEL 2: Departamental (departmentId) - Solo AREA_MANAGER y según contexto
- * 
- * ACTUALIZADO: Ahora soporta contexto para comportamiento diferenciado
- */
-export async function buildParticipantAccessFilter(
-  userContext: {
-    accountId: string;
-    role: string | null;
-    departmentId: string | null;
-  },
-  options?: FilterOptions  // NUEVO: Parámetro opcional para contexto
-): Promise<any> {
-  
-  // Log del contexto si está presente
-  if (options?.dataType) {
-    debugLog(`📋 Contexto: ${options.dataType}`);
-  }
-  
-  debugLog(`🔐 Construyendo filtros para rol: ${userContext.role}, account: ${userContext.accountId}`);
-  
-  const globalRoles = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_MANAGER', 'CEO'];
-  
-  // CASO 1: Roles globales - filtro por cuenta únicamente
-  if (globalRoles.includes(userContext.role || '')) {
-    debugLog(`✅ Acceso total para ${userContext.role} en cuenta ${userContext.accountId}`);
-    return {
-      campaign: { 
-        accountId: userContext.accountId  // CRÍTICO: Filtro multi-tenant
-      }
-    };
-  }
-  
-  // CASO 2: AREA_MANAGER - filtro por cuenta Y departamentos (CON CONTEXTO)
-  if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
-
-    // NUEVO: Si es contexto de participación, skip explícito, o scope='company', NO filtrar por departamento
-    if (options?.dataType === 'participation' || options?.skipDepartmentFilter || options?.scope === 'company') {
-      debugLog(`📊 AREA_MANAGER en modo ${options?.scope || options?.dataType || 'skip'}: Sin filtro departamental`);
-      return {
-        campaign: {
-          accountId: userContext.accountId  // Solo multi-tenant
-        }
-      };
-    }
-    
-    // Comportamiento original: Para resultados o sin contexto, SÍ filtrar
-    debugLog(`🏢 AREA_MANAGER: Aplicando filtros para depto ${userContext.departmentId}`);
-    
-    const childIds = await getChildDepartmentIds(userContext.departmentId);
-    const allAllowedIds = [userContext.departmentId, ...childIds];
-    
-    debugLog(`✅ Puede ver ${allAllowedIds.length} departamentos en cuenta ${userContext.accountId}`);
-    
-    return {
-      campaign: { 
-        accountId: userContext.accountId  // NIVEL 1: Multi-tenant
-      },
-      departmentId: { 
-        in: allAllowedIds  // NIVEL 2: Departamental
-      }
-    };
-  }
-  
-  // CASO 3: Sin acceso (seguridad por defecto)
-  debugLog(`🚫 Sin acceso: rol ${userContext.role} no reconocido`);
-  return {
-    campaign: { 
-      accountId: userContext.accountId 
-    },
-    id: 'no-access-impossible-value'  // Garantiza 0 resultados
-  };
-}
-
-/**
- * Helper para extraer contexto del usuario de los headers
- * Los headers vienen del middleware (Día 3)
- */
-export function extractUserContext(request: Request): {
-  accountId: string;
-  role: string | null;
-  departmentId: string | null;
-  userId: string | null;
-} {
-  return {
-    accountId: request.headers.get('x-account-id') || '',
-    role: request.headers.get('x-user-role'),
-    departmentId: request.headers.get('x-department-id'),
-    userId: request.headers.get('x-user-id')
-  };
-}
-
-/**
- * Logger condicional para desarrollo
- */
-const DEBUG = process.env.NODE_ENV === 'development';
-function debugLog(message: string) {
-  if (DEBUG) {
-    console.log(message);
-  }
-}
-
-/**
- * Invalida el cache cuando hay cambios en estructura organizacional
- */
-export function invalidateDepartmentCache(departmentId?: string) {
-  if (departmentId) {
-    debugLog(`🗑️ Invalidando cache para departamento ${departmentId}`);
-    hierarchyCache.delete(departmentId);
-  } else {
-    debugLog(`🗑️ Limpiando todo el cache de departamentos`);
-    hierarchyCache.clear();
-  }
-}
-
 // =============================================================================
 // 🔐 EXTENSIÓN RBAC CENTRALIZADA (FocalizaHR Enterprise v3.0)
 // =============================================================================
-//
+// 
+// AGREGAR AL FINAL DE: src/lib/services/AuthorizationService.ts
+// 
 // BASADO EN: Investigación Claude Code - Matriz REAL del código (Enero 2025)
 // NO MODIFICA: Código existente - Es 100% aditivo
-//
+// 
 // PROPÓSITO:
 // - Centralizar permisos que hoy están hardcodeados en 14+ endpoints
 // - Permitir migración gradual (endpoints viejos siguen funcionando)
@@ -187,7 +16,7 @@ export function invalidateDepartmentCache(departmentId?: string) {
 // =============================================================================
 // MATRIZ DE PERMISOS - BASADA EN CÓDIGO REAL (Claude Code Investigation)
 // =============================================================================
-//
+// 
 // Fuentes verificadas:
 // - department-metrics/upload/route.ts línea 76
 // - campaigns/[id]/participants/upload/route.ts línea 629
@@ -208,8 +37,8 @@ export const PERMISSIONS = {
   // PARTICIPANTES (campaigns/[id]/participants)
   // ─────────────────────────────────────────────────────────────────────────
   'participants:read': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
+    'FOCALIZAHR_ADMIN', 
+    'ACCOUNT_OWNER', 
     'HR_MANAGER',      // De campaigns/[id]/participants GET línea 145
     'HR_ADMIN',
     'HR_OPERATOR',
@@ -217,90 +46,90 @@ export const PERMISSIONS = {
     'AREA_MANAGER'     // Implícito - con filtrado jerárquico
   ],
   'participants:write': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
-    'HR_ADMIN',
+    'FOCALIZAHR_ADMIN', 
+    'ACCOUNT_OWNER', 
+    'HR_ADMIN', 
     'HR_OPERATOR'
     // NOTA: CEO excluido intencionalmente - es rol de solo lectura
   ],
-
+  
   // ─────────────────────────────────────────────────────────────────────────
   // MÉTRICAS DEPARTAMENTALES (department-metrics/upload)
   // ─────────────────────────────────────────────────────────────────────────
   'metrics:upload': [
-    'ACCOUNT_OWNER',
+    'ACCOUNT_OWNER', 
     'FOCALIZAHR_ADMIN'
     // Más restrictivo - solo dueños pueden cargar datos crudos
   ],
-
+  
   // ─────────────────────────────────────────────────────────────────────────
   // ONBOARDING
   // ─────────────────────────────────────────────────────────────────────────
   'onboarding:enroll': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
-    'HR_ADMIN',
+    'FOCALIZAHR_ADMIN', 
+    'ACCOUNT_OWNER', 
+    'HR_ADMIN', 
     'HR_OPERATOR'
   ],
   'onboarding:enroll:batch': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
+    'FOCALIZAHR_ADMIN', 
+    'ACCOUNT_OWNER', 
     'HR_ADMIN'
     // Más restrictivo para batch - sin HR_OPERATOR
   ],
   'onboarding:read': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
-    'HR_ADMIN',
+    'FOCALIZAHR_ADMIN', 
+    'ACCOUNT_OWNER', 
+    'HR_ADMIN', 
     'HR_MANAGER',
-    'HR_OPERATOR',
+    'HR_OPERATOR', 
     'CEO',
     'AREA_MANAGER'     // Con filtrado jerárquico
   ],
   'onboarding:journeys:read': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
-    'HR_ADMIN',
+    'FOCALIZAHR_ADMIN', 
+    'ACCOUNT_OWNER', 
+    'HR_ADMIN', 
     'HR_OPERATOR',
     'AREA_MANAGER'     // Con validación jerárquica en detalle
   ],
-
+  
   // ─────────────────────────────────────────────────────────────────────────
   // EXIT INTELLIGENCE
   // ─────────────────────────────────────────────────────────────────────────
   'exit:register': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
-    'HR_ADMIN',
+    'FOCALIZAHR_ADMIN', 
+    'ACCOUNT_OWNER', 
+    'HR_ADMIN', 
     'HR_MANAGER'
   ],
   'exit:register:batch': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
+    'FOCALIZAHR_ADMIN', 
+    'ACCOUNT_OWNER', 
     'HR_ADMIN'
     // Más restrictivo para batch
   ],
   'exit:records:read': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
-    'HR_ADMIN',
+    'FOCALIZAHR_ADMIN', 
+    'ACCOUNT_OWNER', 
+    'HR_ADMIN', 
     'CEO'
     // NOTA: Más restrictivo que onboarding - sin HR_OPERATOR ni HR_MANAGER
   ],
   'exit:alerts:manage': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
-    'HR_ADMIN',
-    'HR_MANAGER',
+    'FOCALIZAHR_ADMIN', 
+    'ACCOUNT_OWNER', 
+    'HR_ADMIN', 
+    'HR_MANAGER', 
     'AREA_MANAGER'     // Puede gestionar alertas de su jerarquía
   ],
-
+  
   // ─────────────────────────────────────────────────────────────────────────
   // ADMINISTRACIÓN
   // ─────────────────────────────────────────────────────────────────────────
   'admin:access': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
+    'FOCALIZAHR_ADMIN', 
+    'ACCOUNT_OWNER', 
     'HR_MANAGER'
     // De middleware.ts línea 222
   ],
@@ -308,94 +137,36 @@ export const PERMISSIONS = {
     'FOCALIZAHR_ADMIN'
     // Solo superadmin puede gestionar cuentas
   ],
-
+  
   // ─────────────────────────────────────────────────────────────────────────
   // SISTEMA
   // ─────────────────────────────────────────────────────────────────────────
   'system:full': [
     'FOCALIZAHR_ADMIN'
   ],
-
+  
   // ─────────────────────────────────────────────────────────────────────────
   // FUTURO: EMPLOYEE MASTER (para nuevos desarrollos)
   // ─────────────────────────────────────────────────────────────────────────
   'employees:read': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
+    'FOCALIZAHR_ADMIN', 
+    'ACCOUNT_OWNER', 
     'HR_ADMIN',
     'HR_MANAGER',
-    'HR_OPERATOR',
+    'HR_OPERATOR', 
     'AREA_MANAGER'
   ],
   'employees:write': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
+    'FOCALIZAHR_ADMIN', 
+    'ACCOUNT_OWNER', 
     'HR_ADMIN',
     'HR_MANAGER'
   ],
   'employees:sync': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
+    'FOCALIZAHR_ADMIN', 
+    'ACCOUNT_OWNER', 
     'HR_ADMIN',
     'HR_MANAGER'
-  ],
-  'employees:terminate': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
-    'HR_ADMIN',
-    'HR_MANAGER'
-  ],
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // PERFORMANCE CYCLES (Evaluación de desempeño)
-  // ─────────────────────────────────────────────────────────────────────────
-  'performance:view': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
-    'HR_ADMIN',
-    'HR_MANAGER',
-    'HR_OPERATOR',
-    'CEO',
-    'AREA_MANAGER'
-  ],
-  'performance:manage': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
-    'HR_ADMIN',
-    'HR_MANAGER'
-  ],
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // EVALUATOR PORTAL (Portal de evaluaciones para usuarios)
-  // ─────────────────────────────────────────────────────────────────────────
-  'evaluations:view': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
-    'HR_ADMIN',
-    'HR_MANAGER',
-    'HR_OPERATOR',
-    'CEO',
-    'AREA_MANAGER',
-    'EVALUATOR'
-  ],
-  'evaluations:submit': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
-    'HR_ADMIN',
-    'HR_MANAGER',
-    'HR_OPERATOR',
-    'AREA_MANAGER',
-    'EVALUATOR'
-  ],
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // COMPETENCY LIBRARY
-  // ─────────────────────────────────────────────────────────────────────────
-  'competencies:manage': [
-    'FOCALIZAHR_ADMIN',
-    'ACCOUNT_OWNER',
-    'HR_ADMIN'
-    // Solo roles con capacidad de configurar evaluaciones
   ],
 } as const;
 
@@ -411,15 +182,15 @@ export type PermissionType = keyof typeof PERMISSIONS;
 
 /**
  * Valida si un rol tiene permiso para ejecutar una acción.
- *
+ * 
  * @param role - Rol del usuario (puede ser null)
  * @param action - Acción a validar (type-safe con PermissionType)
  * @returns boolean - true si tiene permiso
- *
+ * 
  * @example
  * // En un endpoint nuevo:
  * import { hasPermission, extractUserContext } from '@/lib/services/AuthorizationService';
- *
+ * 
  * const userContext = extractUserContext(request);
  * if (!hasPermission(userContext.role, 'employees:sync')) {
  *   return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -430,18 +201,18 @@ export function hasPermission(role: string | null, action: PermissionType): bool
     debugLog(`🚫 hasPermission: rol es null, denegando acceso a ${action}`);
     return false;
   }
-
+  
   const allowedRoles = PERMISSIONS[action];
-
+  
   if (!allowedRoles) {
     debugLog(`⚠️ hasPermission: acción ${action} no definida en PERMISSIONS`);
     return false;
   }
-
+  
   const hasAccess = (allowedRoles as readonly string[]).includes(role);
-
+  
   debugLog(`🔐 hasPermission: ${role} -> ${action} = ${hasAccess ? '✅' : '❌'}`);
-
+  
   return hasAccess;
 }
 
@@ -452,11 +223,11 @@ export function hasPermission(role: string | null, action: PermissionType): bool
 /**
  * Valida permiso y lanza excepción si no tiene acceso.
  * Útil para simplificar código en endpoints.
- *
+ * 
  * @param role - Rol del usuario
  * @param action - Acción a validar
  * @throws Error si no tiene permiso
- *
+ * 
  * @example
  * try {
  *   checkPermissionOrFail(userContext.role, 'employees:write');
@@ -478,23 +249,23 @@ export function checkPermissionOrFail(role: string | null, action: PermissionTyp
 /**
  * Obtiene todas las acciones permitidas para un rol.
  * Útil para debugging y UI de permisos.
- *
+ * 
  * @param role - Rol a consultar
  * @returns Array de acciones permitidas
- *
+ * 
  * @example
  * const perms = getPermissionsForRole('HR_OPERATOR');
  * // ['participants:read', 'participants:write', 'onboarding:enroll', ...]
  */
 export function getPermissionsForRole(role: string): PermissionType[] {
   const permissions: PermissionType[] = [];
-
+  
   for (const [action, allowedRoles] of Object.entries(PERMISSIONS)) {
     if ((allowedRoles as readonly string[]).includes(role)) {
       permissions.push(action as PermissionType);
     }
   }
-
+  
   return permissions;
 }
 
@@ -514,7 +285,6 @@ export const ALL_ROLES = [
   'HR_OPERATOR',        // RRHH operacional
   'CEO',                // Ejecutivo (solo lectura)
   'AREA_MANAGER',       // Gerente de área (filtrado jerárquico)
-  'EVALUATOR',          // Usuario evaluador (portal de evaluaciones)
   'VIEWER',             // Solo lectura limitada
   'CLIENT',             // Legacy (default en middleware)
 ] as const;
@@ -526,9 +296,9 @@ export type RoleType = typeof ALL_ROLES[number];
  * Coincide con globalRoles en buildParticipantAccessFilter línea 80.
  */
 export const GLOBAL_ACCESS_ROLES = [
-  'FOCALIZAHR_ADMIN',
-  'ACCOUNT_OWNER',
-  'HR_MANAGER',
+  'FOCALIZAHR_ADMIN', 
+  'ACCOUNT_OWNER', 
+  'HR_MANAGER', 
   'CEO'
 ] as const;
 

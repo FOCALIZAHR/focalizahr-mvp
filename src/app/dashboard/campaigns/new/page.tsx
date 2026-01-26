@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,8 +23,23 @@ import {
   AlertTriangle,
   Info,
   Upload,
-  Mail
+  Mail,
+  UserCheck
 } from 'lucide-react';
+
+// Wizard Paso 3B Components
+import {
+  ParticipantCriteriaSelector,
+  ParticipantEligibilityPreview,
+  ParticipantManualAdjustment,
+  calculateEligibility,
+  DEFAULT_CRITERIA,
+  type InclusionCriteria,
+  type EligibleEmployee,
+  type Department,
+  type ManualOverrides,
+  type ManualOverride
+} from '@/components/campaigns/wizard';
 
 // Tipos para el wizard (extendiendo los existentes)
 interface WizardStep {
@@ -62,6 +77,7 @@ interface CampaignType {
   methodology: string;
   category: string;
   isRecommended?: boolean;
+  flowType?: 'standard' | 'employee-based';  // Paso 3B support
   features: {
     quickSetup: boolean;
     deepInsights: boolean;
@@ -127,6 +143,28 @@ export default function NewCampaignPage() {
   const [isLoadingTypes, setIsLoadingTypes] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // PASO 3B: Employee-Based Flow State
+  // ════════════════════════════════════════════════════════════════════════════
+  const [employees, setEmployees] = useState<EligibleEmployee[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
+  const [criteria, setCriteria] = useState<InclusionCriteria>(DEFAULT_CRITERIA);
+  const [manualOverrides, setManualOverrides] = useState<ManualOverrides>({});
+  const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // SUCCESS STATE: Pantalla de éxito después de crear Campaign + Cycle
+  // ════════════════════════════════════════════════════════════════════════════
+  const [creationSuccess, setCreationSuccess] = useState<{
+    campaign: { id: string; name: string };
+    cycle?: { id: string; name: string; hasSnapshot: boolean };
+    eligibleCount: number;
+  } | null>(null);
+
+  // Nombre del usuario actual para auditoría (en producción vendría del contexto de auth)
+  const currentUserName = 'Admin'; // TODO: Obtener del contexto de autenticación
+
   // Cargar tipos de campaña desde API
   useEffect(() => {
     const fetchCampaignTypes = async () => {
@@ -171,6 +209,139 @@ export default function NewCampaignPage() {
 
     fetchCampaignTypes();
   }, []);
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // PASO 3B: Cargar empleados cuando flowType es 'employee-based'
+  // ════════════════════════════════════════════════════════════════════════════
+  const isEmployeeBasedFlow = useMemo(() => {
+    const selected = (campaignTypes.length > 0 ? campaignTypes : mockCampaignTypes)
+      .find(type => type.id === formData.campaignTypeId);
+    return selected?.flowType === 'employee-based';
+  }, [formData.campaignTypeId, campaignTypes]);
+
+  useEffect(() => {
+    if (!isEmployeeBasedFlow || employees.length > 0) return;
+
+    const fetchEmployees = async () => {
+      try {
+        setIsLoadingEmployees(true);
+        const token = localStorage.getItem('focalizahr_token');
+
+        if (!token) {
+          console.error('No authentication token found');
+          return;
+        }
+
+        const response = await fetch('/api/admin/employees?limit=1000', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.data) {
+          // Mapear empleados al formato EligibleEmployee
+          const mappedEmployees: EligibleEmployee[] = data.data.map((emp: any) => ({
+            id: emp.id,
+            fullName: emp.fullName,
+            email: emp.email,
+            nationalId: emp.nationalId,
+            position: emp.position,
+            hireDate: emp.hireDate,
+            status: emp.status,
+            managerId: emp.managerId,
+            department: emp.department ? {
+              id: emp.department.id,
+              displayName: emp.department.displayName
+            } : null
+          }));
+          setEmployees(mappedEmployees);
+
+          // Extraer departamentos únicos
+          const deptMap = new Map<string, Department>();
+          mappedEmployees.forEach(emp => {
+            if (emp.department) {
+              deptMap.set(emp.department.id, emp.department);
+            }
+          });
+          setDepartments(Array.from(deptMap.values()));
+
+          console.log('✅ Employees loaded for wizard:', mappedEmployees.length);
+        }
+      } catch (error) {
+        console.error('❌ Error loading employees:', error);
+      } finally {
+        setIsLoadingEmployees(false);
+      }
+    };
+
+    fetchEmployees();
+  }, [isEmployeeBasedFlow, employees.length]);
+
+  // Handler para cambios en criterios
+  const handleCriteriaChange = useCallback((newCriteria: InclusionCriteria) => {
+    setCriteria(newCriteria);
+  }, []);
+
+  // Handler para exclusiones manuales con auditoría
+  const handleManualExclusionChange = useCallback((
+    employeeId: string,
+    excluded: boolean,
+    originalStatus: 'eligible' | 'excluded_by_criteria' = 'eligible'
+  ) => {
+    setManualOverrides(prev => {
+      const newOverrides = { ...prev };
+
+      if (excluded || originalStatus === 'excluded_by_criteria') {
+        // Agregar o actualizar override
+        newOverrides[employeeId] = {
+          excluded,
+          updatedBy: currentUserName,
+          updatedAt: new Date(),
+          originalStatus
+        };
+      } else {
+        // Si vuelve a su estado original, eliminar el override
+        delete newOverrides[employeeId];
+      }
+
+      return newOverrides;
+    });
+  }, [currentUserName]);
+
+  // Convertir manualOverrides a array de IDs excluidos para compatibilidad con calculateEligibility
+  const manualExclusionIds = useMemo(() => {
+    return Object.entries(manualOverrides)
+      .filter(([, override]) => override.excluded)
+      .map(([id]) => id);
+  }, [manualOverrides]);
+
+  // Calcular elegibles para employee-based flow
+  const eligibilitySummary = useMemo(() => {
+    if (!isEmployeeBasedFlow || employees.length === 0) {
+      return { eligible: 0, excluded: 0, total: 0 };
+    }
+
+    let eligible = 0;
+    let excluded = 0;
+
+    for (const emp of employees) {
+      const result = calculateEligibility(emp, criteria, manualExclusionIds);
+      if (result.eligible) {
+        eligible++;
+      } else {
+        excluded++;
+      }
+    }
+
+    return { eligible, excluded, total: employees.length };
+  }, [employees, criteria, manualExclusionIds, isEmployeeBasedFlow]);
 
   const steps: WizardStep[] = [
     {
@@ -221,11 +392,19 @@ export default function NewCampaignPage() {
     }
 
     if (step === 2) {
-      if (formData.estimatedParticipants < 5) {
-        errors.estimatedParticipants = 'Mínimo 5 participantes requeridos';
-      }
-      if (formData.estimatedParticipants > 500) {
-        errors.estimatedParticipants = 'Máximo 500 participantes permitidos';
+      if (isEmployeeBasedFlow) {
+        // Validación para employee-based flow
+        if (eligibilitySummary.eligible < 5) {
+          errors.participants = 'Se requieren al menos 5 participantes elegibles';
+        }
+      } else {
+        // Validación para concierge flow
+        if (formData.estimatedParticipants < 5) {
+          errors.estimatedParticipants = 'Mínimo 5 participantes requeridos';
+        }
+        if (formData.estimatedParticipants > 500) {
+          errors.estimatedParticipants = 'Máximo 500 participantes permitidos';
+        }
       }
     }
 
@@ -272,7 +451,7 @@ export default function NewCampaignPage() {
       }
 
       // Preparar datos para la API según schema existente
-      const campaignData = {
+      const campaignData: Record<string, any> = {
         name: formData.name.trim(),
         description: formData.description?.trim() || undefined,
         campaignTypeId: formData.campaignTypeId,
@@ -281,6 +460,23 @@ export default function NewCampaignPage() {
         sendReminders: formData.sendReminders,
         anonymousResults: formData.anonymousResults
       };
+
+      // Si es employee-based flow, incluir los IDs de empleados elegibles y auditoría
+      if (isEmployeeBasedFlow) {
+        const eligibleEmployeeIds: string[] = [];
+        for (const emp of employees) {
+          const result = calculateEligibility(emp, criteria, manualExclusionIds);
+          if (result.eligible) {
+            eligibleEmployeeIds.push(emp.id);
+          }
+        }
+        campaignData.eligibleEmployeeIds = eligibleEmployeeIds;
+        campaignData.inclusionCriteria = criteria;
+        // Incluir auditoría de overrides manuales
+        if (Object.keys(manualOverrides).length > 0) {
+          campaignData.manualOverrides = manualOverrides;
+        }
+      }
 
       console.log('🚀 Enviando datos a API:', campaignData);
 
@@ -304,13 +500,77 @@ export default function NewCampaignPage() {
 
       // ✨ ÉXITO: Procesar respuesta del backend
       const createdCampaign = responseData.campaign;
-      
+
       // Guardar ID de campaña para próximos pasos del enfoque concierge
       if (createdCampaign?.id) {
         localStorage.setItem('lastCreatedCampaignId', createdCampaign.id);
       }
 
-      // Redirect con parámetros de éxito
+      // ════════════════════════════════════════════════════════════════
+      // EMPLOYEE-BASED FLOW: Crear PerformanceCycle asociado
+      // El API genera competencySnapshot automáticamente
+      // ════════════════════════════════════════════════════════════════
+      if (isEmployeeBasedFlow) {
+        console.log('🎯 Creando PerformanceCycle para evaluación de desempeño...');
+
+        const cycleResponse = await fetch('/api/admin/performance-cycles', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name: formData.name.trim(),
+            description: formData.description?.trim() || `Ciclo de evaluación: ${formData.name}`,
+            startDate: formData.startDate,
+            endDate: formData.endDate,
+            cycleType: 'QUARTERLY',
+            includesSelf: false,
+            includesManager: true,
+            includesPeer: false,
+            includesUpward: false,
+            anonymousResults: formData.anonymousResults,
+            minSubordinates: 3
+          })
+        });
+
+        const cycleData = await cycleResponse.json();
+
+        if (!cycleResponse.ok) {
+          // Campaign ya fue creada, pero cycle falló - mostrar warning
+          console.error('⚠️ Error creando PerformanceCycle:', cycleData);
+          setCreationSuccess({
+            campaign: { id: createdCampaign.id, name: createdCampaign.name },
+            cycle: undefined,
+            eligibleCount: eligibilitySummary.eligible
+          });
+          return;
+        }
+
+        console.log('✅ PerformanceCycle creado:', cycleData);
+
+        const createdCycle = cycleData.data;
+        const hasSnapshot = createdCycle?.competencySnapshot &&
+          Array.isArray(createdCycle.competencySnapshot) &&
+          createdCycle.competencySnapshot.length > 0;
+
+        // Mostrar pantalla de éxito con ambos recursos
+        setCreationSuccess({
+          campaign: { id: createdCampaign.id, name: createdCampaign.name },
+          cycle: {
+            id: createdCycle.id,
+            name: createdCycle.name,
+            hasSnapshot
+          },
+          eligibleCount: eligibilitySummary.eligible
+        });
+
+        console.log(`🎉 Creación completa: Campaign ${createdCampaign.id} + Cycle ${createdCycle.id}`);
+        console.log(`📊 CompetencySnapshot: ${hasSnapshot ? 'SÍ' : 'NO'}`);
+        return;
+      }
+
+      // STANDARD FLOW: Redirect al dashboard
       const redirectUrl = `/dashboard?` + new URLSearchParams({
         created: 'true',
         campaign: createdCampaign.id,
@@ -351,10 +611,120 @@ export default function NewCampaignPage() {
     }
   };
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // PANTALLA DE ÉXITO: Employee-Based Flow completado
+  // ════════════════════════════════════════════════════════════════════════════
+  if (creationSuccess) {
+    return (
+      <div className="main-layout">
+        <div className="container mx-auto px-4 py-8 max-w-2xl">
+          <Card className="professional-card">
+            <CardContent className="p-8 text-center">
+              {/* Icono de éxito */}
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/20 flex items-center justify-center">
+                <CheckCircle className="h-10 w-10 text-green-500" />
+              </div>
+
+              <h1 className="text-2xl font-bold mb-2">
+                ¡Evaluación de Desempeño Creada!
+              </h1>
+              <p className="text-muted-foreground mb-6">
+                Se han creado los recursos necesarios para tu ciclo de evaluación.
+              </p>
+
+              {/* Resumen de lo creado */}
+              <div className="bg-muted/50 rounded-lg p-4 mb-6 text-left space-y-3">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+                  <div>
+                    <span className="font-medium">Campaña:</span>{' '}
+                    <span className="text-muted-foreground">{creationSuccess.campaign.name}</span>
+                  </div>
+                </div>
+
+                {creationSuccess.cycle ? (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium">Ciclo de Performance:</span>{' '}
+                        <span className="text-muted-foreground">{creationSuccess.cycle.name}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {creationSuccess.cycle.hasSnapshot ? (
+                        <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+                      ) : (
+                        <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                      )}
+                      <div>
+                        <span className="font-medium">Competency Snapshot:</span>{' '}
+                        <span className={creationSuccess.cycle.hasSnapshot ? 'text-green-500' : 'text-amber-500'}>
+                          {creationSuccess.cycle.hasSnapshot ? 'Generado ✓' : 'No disponible (inicializa competencias primero)'}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                    <div>
+                      <span className="font-medium">Ciclo de Performance:</span>{' '}
+                      <span className="text-amber-500">Error al crear (puedes crearlo manualmente)</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3">
+                  <Users className="h-5 w-5 text-cyan-500 flex-shrink-0" />
+                  <div>
+                    <span className="font-medium">Participantes elegibles:</span>{' '}
+                    <span className="text-cyan-500 font-semibold">{creationSuccess.eligibleCount}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Próximos pasos */}
+              <Alert className="mb-6 text-left">
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Próximos pasos:</strong>
+                  <ol className="list-decimal list-inside mt-2 space-y-1 text-sm">
+                    <li>Configura las asignaciones de evaluadores</li>
+                    <li>Activa el ciclo cuando estés listo</li>
+                    <li>Los evaluadores recibirán sus notificaciones</li>
+                  </ol>
+                </AlertDescription>
+              </Alert>
+
+              {/* Botones de acción */}
+              <div className="flex gap-3 justify-center">
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/dashboard')}
+                >
+                  Ir al Dashboard
+                </Button>
+                <Button
+                  className="btn-gradient"
+                  onClick={() => router.push(`/dashboard/campaigns/${creationSuccess.campaign.id}/monitor`)}
+                >
+                  Ver Campaña
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="main-layout">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        
+
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
@@ -367,7 +737,7 @@ export default function NewCampaignPage() {
               Volver al Dashboard
             </Button>
           </div>
-          
+
           <h1 className="text-3xl font-bold focalizahr-gradient-text mb-2">
             Nueva Campaña de Medición
           </h1>
@@ -604,105 +974,218 @@ export default function NewCampaignPage() {
           </div>
         )}
 
-        {/* Paso 2: Participantes (Enfoque Concierge) */}
+        {/* Paso 2: Participantes */}
         {currentStep === 2 && (
           <div className="space-y-6">
-            
-            {/* Enfoque Concierge Explicación */}
-            <Alert className="border-primary bg-primary/5">
-              <Mail className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Enfoque Concierge FocalizaHR:</strong> Nuestro equipo se encargará de cargar y validar 
-                los participantes por ti. Solo necesitas enviarnos la información básica.
-              </AlertDescription>
-            </Alert>
 
-            <Card className="professional-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Configuración de Participantes
-                </CardTitle>
-                <CardDescription>
-                  Proporciona la información para que nuestro equipo configure tu campaña
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                
-                {/* Estimación de Participantes */}
-                <div>
-                  <Label htmlFor="estimatedParticipants">Número Estimado de Participantes *</Label>
-                  <Input
-                    id="estimatedParticipants"
-                    type="number"
-                    min="5"
-                    max="500"
-                    value={formData.estimatedParticipants || ''}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      estimatedParticipants: parseInt(e.target.value) || 0 
-                    }))}
-                    placeholder="Ej: 25"
-                    className={validationErrors.estimatedParticipants ? 'border-destructive' : ''}
+            {/* ═══════════════════════════════════════════════════════════════════
+                PASO 3B: EMPLOYEE-BASED FLOW (Criterios + Preview)
+            ═══════════════════════════════════════════════════════════════════ */}
+            {isEmployeeBasedFlow ? (
+              <>
+                {/* Header explicativo */}
+                <Alert className="border-cyan-500/50 bg-cyan-500/5">
+                  <UserCheck className="h-4 w-4 text-cyan-400" />
+                  <AlertDescription>
+                    <strong>Selección por Criterios:</strong> Define criterios de inclusión y el sistema
+                    seleccionará automáticamente a los empleados elegibles de tu base de datos.
+                  </AlertDescription>
+                </Alert>
+
+                {isLoadingEmployees ? (
+                  <Card className="professional-card">
+                    <CardContent className="p-8 text-center">
+                      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Cargando empleados...</p>
+                    </CardContent>
+                  </Card>
+                ) : employees.length === 0 ? (
+                  <Card className="professional-card">
+                    <CardContent className="p-8 text-center">
+                      <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-medium mb-2">Sin Empleados</h3>
+                      <p className="text-muted-foreground mb-4">
+                        No hay empleados registrados en tu empresa. Primero debes cargar
+                        la nómina desde la sección de Colaboradores.
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => router.push('/dashboard/employees')}
+                      >
+                        Ir a Colaboradores
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <>
+                    {/* Criteria Selector */}
+                    <Card className="professional-card">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Users className="h-5 w-5" />
+                          Criterios de Inclusión
+                        </CardTitle>
+                        <CardDescription>
+                          Define qué empleados participarán según sus características
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ParticipantCriteriaSelector
+                          departments={departments}
+                          onCriteriaChange={handleCriteriaChange}
+                          initialCriteria={criteria}
+                          eligibleCount={eligibilitySummary.eligible}
+                          excludedCount={eligibilitySummary.excluded}
+                        />
+                      </CardContent>
+                    </Card>
+
+                    {/* Eligibility Preview */}
+                    <Card className="professional-card">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <BarChart3 className="h-5 w-5" />
+                          Vista Previa de Participantes
+                        </CardTitle>
+                        <CardDescription>
+                          Resumen de elegibilidad según los criterios definidos
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ParticipantEligibilityPreview
+                          employees={employees}
+                          criteria={criteria}
+                          manualExclusions={manualExclusionIds}
+                          onManualExclusionChange={(empId, excluded) => handleManualExclusionChange(empId, excluded)}
+                          onOpenAdjustment={() => setShowAdjustmentModal(true)}
+                        />
+                      </CardContent>
+                    </Card>
+
+                    {/* Validation Error */}
+                    {validationErrors.participants && (
+                      <Alert className="border-destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>{validationErrors.participants}</AlertDescription>
+                      </Alert>
+                    )}
+                  </>
+                )}
+
+                {/* Modal de Ajuste Manual */}
+                {showAdjustmentModal && (
+                  <ParticipantManualAdjustment
+                    employees={employees}
+                    criteria={criteria}
+                    manualOverrides={manualOverrides}
+                    onManualOverrideChange={handleManualExclusionChange}
+                    onClose={() => setShowAdjustmentModal(false)}
+                    currentUserName={currentUserName}
                   />
-                  {validationErrors.estimatedParticipants && (
-                    <p className="text-sm text-destructive mt-1">{validationErrors.estimatedParticipants}</p>
-                  )}
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Mínimo 5 participantes, máximo 500
-                  </p>
-                </div>
+                )}
+              </>
+            ) : (
+              /* ═══════════════════════════════════════════════════════════════════
+                  PASO 3A: CONCIERGE FLOW (Original)
+              ═══════════════════════════════════════════════════════════════════ */
+              <>
+                {/* Enfoque Concierge Explicación */}
+                <Alert className="border-primary bg-primary/5">
+                  <Mail className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Enfoque Concierge FocalizaHR:</strong> Nuestro equipo se encargará de cargar y validar
+                    los participantes por ti. Solo necesitas enviarnos la información básica.
+                  </AlertDescription>
+                </Alert>
 
-                {/* Proceso Concierge */}
-                <Card className="glass-card">
-                  <CardContent className="p-6">
-                    <h3 className="font-semibold mb-3 flex items-center gap-2">
-                      <Upload className="h-4 w-4" />
-                      Proceso de Carga de Participantes
-                    </h3>
-                    <div className="space-y-3 text-sm">
-                      <div className="flex gap-3">
-                        <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">1</div>
-                        <div>
-                          <strong>Envía tu lista:</strong> Te enviaremos un email con instrucciones para enviar 
-                          la lista de participantes (Excel/CSV con emails y datos opcionales)
+                <Card className="professional-card">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Configuración de Participantes
+                    </CardTitle>
+                    <CardDescription>
+                      Proporciona la información para que nuestro equipo configure tu campaña
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+
+                    {/* Estimación de Participantes */}
+                    <div>
+                      <Label htmlFor="estimatedParticipants">Número Estimado de Participantes *</Label>
+                      <Input
+                        id="estimatedParticipants"
+                        type="number"
+                        min="5"
+                        max="500"
+                        value={formData.estimatedParticipants || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          estimatedParticipants: parseInt(e.target.value) || 0
+                        }))}
+                        placeholder="Ej: 25"
+                        className={validationErrors.estimatedParticipants ? 'border-destructive' : ''}
+                      />
+                      {validationErrors.estimatedParticipants && (
+                        <p className="text-sm text-destructive mt-1">{validationErrors.estimatedParticipants}</p>
+                      )}
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Mínimo 5 participantes, máximo 500
+                      </p>
+                    </div>
+
+                    {/* Proceso Concierge */}
+                    <Card className="glass-card">
+                      <CardContent className="p-6">
+                        <h3 className="font-semibold mb-3 flex items-center gap-2">
+                          <Upload className="h-4 w-4" />
+                          Proceso de Carga de Participantes
+                        </h3>
+                        <div className="space-y-3 text-sm">
+                          <div className="flex gap-3">
+                            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">1</div>
+                            <div>
+                              <strong>Envía tu lista:</strong> Te enviaremos un email con instrucciones para enviar
+                              la lista de participantes (Excel/CSV con emails y datos opcionales)
+                            </div>
+                          </div>
+                          <div className="flex gap-3">
+                            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">2</div>
+                            <div>
+                              <strong>Procesamos y validamos:</strong> Nuestro equipo limpia los datos,
+                              elimina duplicados y configura la campaña
+                            </div>
+                          </div>
+                          <div className="flex gap-3">
+                            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">3</div>
+                            <div>
+                              <strong>Confirmas y activamos:</strong> Revisas la configuración final
+                              y activas la campaña cuando estés listo
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex gap-3">
-                        <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">2</div>
-                        <div>
-                          <strong>Procesamos y validamos:</strong> Nuestro equipo limpia los datos, 
-                          elimina duplicados y configura la campaña
-                        </div>
-                      </div>
-                      <div className="flex gap-3">
-                        <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">3</div>
-                        <div>
-                          <strong>Confirmas y activamos:</strong> Revisas la configuración final 
-                          y activas la campaña cuando estés listo
-                        </div>
-                      </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Instrucciones Adicionales */}
+                    <div>
+                      <Label htmlFor="participantInstructions">Instrucciones Adicionales (Opcional)</Label>
+                      <textarea
+                        id="participantInstructions"
+                        value={formData.participantInstructions}
+                        onChange={(e) => setFormData(prev => ({ ...prev, participantInstructions: e.target.value }))}
+                        placeholder="Ej: Incluir empleados de todas las sucursales, excluir practicantes, segmentar por departamento..."
+                        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-called disabled:opacity-50 min-h-[100px]"
+                        rows={4}
+                      />
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Cualquier información adicional que ayude a nuestro equipo a configurar tu campaña
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
-
-                {/* Instrucciones Adicionales */}
-                <div>
-                  <Label htmlFor="participantInstructions">Instrucciones Adicionales (Opcional)</Label>
-                  <textarea
-                    id="participantInstructions"
-                    value={formData.participantInstructions}
-                    onChange={(e) => setFormData(prev => ({ ...prev, participantInstructions: e.target.value }))}
-                    placeholder="Ej: Incluir empleados de todas las sucursales, excluir practicantes, segmentar por departamento..."
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-called disabled:opacity-50 min-h-[100px]"
-                    rows={4}
-                  />
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Cualquier información adicional que ayude a nuestro equipo a configurar tu campaña
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+              </>
+            )}
           </div>
         )}
 
@@ -750,9 +1233,23 @@ export default function NewCampaignPage() {
                     <h3 className="font-semibold mb-3">Participantes</h3>
                     <dl className="space-y-2 text-sm">
                       <div>
-                        <dt className="text-muted-foreground">Participantes Estimados:</dt>
-                        <dd className="font-medium">{formData.estimatedParticipants}</dd>
+                        <dt className="text-muted-foreground">
+                          {isEmployeeBasedFlow ? 'Participantes Elegibles:' : 'Participantes Estimados:'}
+                        </dt>
+                        <dd className="font-medium">
+                          {isEmployeeBasedFlow ? (
+                            <span className="text-cyan-500">{eligibilitySummary.eligible}</span>
+                          ) : (
+                            formData.estimatedParticipants
+                          )}
+                        </dd>
                       </div>
+                      {isEmployeeBasedFlow && (
+                        <div>
+                          <dt className="text-muted-foreground">Excluidos:</dt>
+                          <dd className="font-medium text-amber-500">{eligibilitySummary.excluded}</dd>
+                        </div>
+                      )}
                       <div>
                         <dt className="text-muted-foreground">Tiempo por Participante:</dt>
                         <dd className="font-medium">{selectedCampaignType?.estimatedDuration} minutos</dd>
@@ -831,9 +1328,19 @@ export default function NewCampaignPage() {
             <Alert className="border-primary bg-primary/5">
               <Info className="h-4 w-4" />
               <AlertDescription>
-                <strong>Próximos Pasos:</strong> Al crear la campaña, te enviaremos un email con las 
-                instrucciones para enviar la lista de participantes. Nuestro equipo la procesará 
-                y te notificará cuando esté lista para activar.
+                {isEmployeeBasedFlow ? (
+                  <>
+                    <strong>Próximos Pasos:</strong> Al crear la campaña, se generarán automáticamente
+                    los tokens de participación para los {eligibilitySummary.eligible} empleados elegibles.
+                    Podrás activar la campaña desde el panel de control cuando estés listo.
+                  </>
+                ) : (
+                  <>
+                    <strong>Próximos Pasos:</strong> Al crear la campaña, te enviaremos un email con las
+                    instrucciones para enviar la lista de participantes. Nuestro equipo la procesará
+                    y te notificará cuando esté lista para activar.
+                  </>
+                )}
               </AlertDescription>
             </Alert>
           </div>
