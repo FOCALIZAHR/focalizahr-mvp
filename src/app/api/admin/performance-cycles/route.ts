@@ -24,8 +24,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // FOCALIZAHR_ADMIN puede consultar cualquier cuenta via query param
+    const { searchParams } = new URL(request.url);
+    const queryAccountId = searchParams.get('accountId');
+    const effectiveAccountId = (userContext.role === 'FOCALIZAHR_ADMIN' && queryAccountId)
+      ? queryAccountId
+      : userContext.accountId;
+
     const cycles = await prisma.performanceCycle.findMany({
-      where: { accountId: userContext.accountId },
+      where: { accountId: effectiveAccountId },
       include: {
         _count: {
           select: { assignments: true }
@@ -66,6 +73,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
+      campaignId,
       name,
       description,
       startDate,
@@ -95,6 +103,7 @@ export async function POST(request: NextRequest) {
     const cycle = await prisma.performanceCycle.create({
       data: {
         accountId: userContext.accountId,
+        campaignId: campaignId || undefined,
         name,
         description,
         startDate: new Date(startDate),

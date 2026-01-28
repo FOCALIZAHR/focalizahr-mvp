@@ -32,8 +32,11 @@ export async function POST(
       );
     }
 
+    // FOCALIZAHR_ADMIN puede generar en ciclos de cualquier cuenta
+    const isSuperAdmin = userContext.role === 'FOCALIZAHR_ADMIN';
+
     const cycle = await prisma.performanceCycle.findFirst({
-      where: { id, accountId: userContext.accountId }
+      where: { id, ...(isSuperAdmin ? {} : { accountId: userContext.accountId }) }
     });
 
     if (!cycle) {
@@ -50,24 +53,27 @@ export async function POST(
       );
     }
 
+    // Usar accountId del ciclo (no del admin) para buscar empleados
+    const effectiveAccountId = cycle.accountId;
+
     const results: Record<string, any> = {};
     const options = { minSubordinates: cycle.minSubordinates, dueDate: cycle.endDate };
 
     // Generar según configuración del ciclo
     if (cycle.includesSelf) {
-      results.self = await generateSelfEvaluations(id, userContext.accountId, options);
+      results.self = await generateSelfEvaluations(id, effectiveAccountId, options);
     }
 
     if (cycle.includesManager) {
-      results.manager = await generateManagerEvaluations(id, userContext.accountId, options);
+      results.manager = await generateManagerEvaluations(id, effectiveAccountId, options);
     }
 
     if (cycle.includesUpward) {
-      results.upward = await generateUpwardEvaluations(id, userContext.accountId, options);
+      results.upward = await generateUpwardEvaluations(id, effectiveAccountId, options);
     }
 
     if (cycle.includesPeer) {
-      results.peer = await generatePeerEvaluations(id, userContext.accountId, options);
+      results.peer = await generatePeerEvaluations(id, effectiveAccountId, options);
     }
 
     // Calcular totales
@@ -75,12 +81,21 @@ export async function POST(
     const totalSkipped = Object.values(results).reduce((sum: number, r: any) => sum + (r.skipped || 0), 0);
     const allErrors = Object.values(results).flatMap((r: any) => r.errors || []);
 
+    // Cambiar a SCHEDULED si se generaron evaluaciones exitosamente
+    if (totalCreated > 0 && cycle.status === 'DRAFT') {
+      await prisma.performanceCycle.update({
+        where: { id },
+        data: { status: 'SCHEDULED' }
+      });
+    }
+
     return NextResponse.json({
       success: true,
       totalCreated,
       totalSkipped,
       errors: allErrors,
-      details: results
+      details: results,
+      statusChanged: totalCreated > 0 && cycle.status === 'DRAFT' ? 'SCHEDULED' : null
     });
 
   } catch (error: any) {

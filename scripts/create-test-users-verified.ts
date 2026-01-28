@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -57,7 +58,7 @@ async function createTestUsers() {
     );
     
     // 4. Crear usuarios de prueba
-    const passwordHash = userBase!.passwordHash;
+    const passwordHash = await bcrypt.hash('Test123!', 12);
     
     // CEO
     const ceo = await prisma.user.upsert({
@@ -143,11 +144,30 @@ async function createTestUsers() {
       console.log(`   → Departamento: ${marketingDept.displayName}`);
     }
     
+    // María García - Evaluadora para testing Performance
+    // Account: Corporación Enterprise (cmfgedx7b00012413i92048wl)
+    // Employee existente con 3 evaluaciones asignadas
+    await prisma.user.upsert({
+      where: { email: 'maria@empresa.cl' },
+      update: { passwordHash },
+      create: {
+        accountId: 'cmfgedx7b00012413i92048wl',
+        email: 'maria@empresa.cl',
+        name: 'Maria Garcia',
+        passwordHash,
+        role: 'HR_MANAGER',
+        departmentId: null,
+        isActive: true
+      }
+    });
+    console.log('✅ María García creada/actualizada');
+
     console.log('\n════════════════════════════════');
     console.log('USUARIOS LISTOS PARA TESTING:');
     console.log('════════════════════════════════');
     console.log('CEO/HR: Ven TODO');
     console.log('Gerentes: Ven SOLO su área');
+    console.log('María: Evaluadora Performance');
     console.log('Password: El mismo del usuario original');
     
   } catch (error) {

@@ -86,6 +86,7 @@ export async function GET(request: NextRequest) {
     const activeCycle = await prisma.performanceCycle.findFirst({
       where: {
         accountId: userContext.accountId,
+        status: 'ACTIVE',
         startDate: { lte: now },
         endDate: { gte: now }
       },

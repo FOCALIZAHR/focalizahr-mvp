@@ -43,7 +43,12 @@ export interface Campaign {
     id: string;
     name: string;
     slug: string;
-    isPermanent?: boolean;  // ✅ AGREGAR ESTA LÍNEA
+    isPermanent?: boolean;
+    flowType?: 'standard' | 'employee-based';
+  };
+  performanceCycle?: {
+    id: string;
+    status: string;
   };
   company?: {
     name: string;

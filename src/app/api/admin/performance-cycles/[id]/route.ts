@@ -27,11 +27,13 @@ export async function GET(
       );
     }
 
+    // FOCALIZAHR_ADMIN puede ver ciclos de cualquier cuenta
+    const whereClause = userContext.role === 'FOCALIZAHR_ADMIN'
+      ? { id }
+      : { id, accountId: userContext.accountId };
+
     const cycle = await prisma.performanceCycle.findFirst({
-      where: {
-        id,
-        accountId: userContext.accountId
-      },
+      where: whereClause,
       include: {
         assignments: {
           include: {
@@ -108,8 +110,13 @@ export async function PATCH(
       );
     }
 
+    // FOCALIZAHR_ADMIN puede gestionar ciclos de cualquier cuenta
+    const whereClause = userContext.role === 'FOCALIZAHR_ADMIN'
+      ? { id }
+      : { id, accountId: userContext.accountId };
+
     const cycle = await prisma.performanceCycle.findFirst({
-      where: { id, accountId: userContext.accountId }
+      where: whereClause
     });
 
     if (!cycle) {
@@ -167,6 +174,24 @@ export async function PATCH(
         ...(status && { status })
       }
     });
+
+    // Sincronizar Campaign asociada cuando el ciclo se activa
+    if (status === 'ACTIVE' && cycle.campaignId) {
+      const campaign = await prisma.campaign.findUnique({
+        where: { id: cycle.campaignId }
+      });
+
+      if (campaign && campaign.status === 'draft') {
+        await prisma.campaign.update({
+          where: { id: campaign.id },
+          data: {
+            status: 'active',
+            activatedAt: new Date()
+          }
+        });
+        console.log(`[Performance] Campaign ${campaign.id} activada junto con ciclo ${id}`);
+      }
+    }
 
     return NextResponse.json({ success: true, data: updated });
 

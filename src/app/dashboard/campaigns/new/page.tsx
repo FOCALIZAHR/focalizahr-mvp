@@ -520,6 +520,7 @@ export default function NewCampaignPage() {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
+            campaignId: createdCampaign.id,
             name: formData.name.trim(),
             description: formData.description?.trim() || `Ciclo de evaluación: ${formData.name}`,
             startDate: formData.startDate,

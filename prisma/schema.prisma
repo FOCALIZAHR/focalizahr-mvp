@@ -342,9 +342,11 @@ model Participant {
   // ═══════════════════════════════════════════════════
   employeeId           String?               @map("employee_id")
   employee             Employee?             @relation(fields: [employeeId], references: [id])
-  evaluationAssignment EvaluationAssignment?
+  // Vínculo con EvaluationAssignment (para Performance)
+  evaluationAssignmentId  String?  @unique @map("evaluation_assignment_id")
+  evaluationAssignment    EvaluationAssignment? @relation(fields: [evaluationAssignmentId], references: [id])
 
-  @@unique([campaignId, nationalId], map: "unique_campaign_rut")
+  @@unique([campaignId, nationalId, evaluationAssignmentId], map: "unique_participant_evaluation")
   @@index([campaignId], map: "idx_participants_campaign")
   @@index([uniqueToken], map: "idx_participants_token")
   @@index([email], map: "idx_participants_email")
@@ -1728,8 +1730,7 @@ model EvaluationAssignment {
   // Se congela al momento de crear el assignment (snapshot)
 
   // Vínculo con Participant (cuando se crea la encuesta)
-  participantId String?      @unique @map("participant_id")
-  participant   Participant? @relation(fields: [participantId], references: [id])
+  participant   Participant?
 
   // Estado y fechas
   status  EvaluationAssignmentStatus @default(PENDING)

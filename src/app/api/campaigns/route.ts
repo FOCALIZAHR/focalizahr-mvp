@@ -156,7 +156,14 @@ export async function GET(request: NextRequest) {
               estimatedDuration: true,
               questionCount: true,
               methodology: true,
-              isPermanent: true  // ✅ AGREGAR ESTA LÍNEA
+              isPermanent: true,
+              flowType: true
+            }
+          },
+          performanceCycle: {
+            select: {
+              id: true,
+              status: true
             }
           },
           _count: {
@@ -207,7 +214,8 @@ export async function GET(request: NextRequest) {
         description: campaign.description,
         status: campaign.status,
         campaignType: campaign.campaignType,
-        
+        performanceCycle: campaign.performanceCycle || undefined,
+
         // Métricas básicas
         totalInvited: campaign.totalInvited,
         totalResponded: campaign.totalResponded,

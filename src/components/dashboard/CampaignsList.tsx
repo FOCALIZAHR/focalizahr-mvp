@@ -189,6 +189,20 @@ export default function EnhancedCampaignsList() {
   // Obtener acciones disponibles para cada campaña
   const getAvailableActions = (campaign: Campaign) => {
     const actions = [];
+    const isEmployeeBased = campaign.campaignType?.flowType === 'employee-based';
+    const cycleId = campaign.performanceCycle?.id;
+
+    // Employee-based: botón principal redirige al ciclo
+    if (isEmployeeBased && cycleId) {
+      actions.push({
+        id: 'manage-cycle',
+        label: 'Gestionar Ciclo',
+        icon: BarChart3,
+        variant: 'default' as const,
+        onClick: () => router.push(`/dashboard/admin/performance-cycles/${cycleId}`)
+      });
+      return actions;
+    }
 
     // Acción ver siempre disponible
     actions.push({
@@ -408,7 +422,8 @@ export default function EnhancedCampaignsList() {
                             const IconComponent = action.icon;
                             
                             // Determinar si es botón primario
-                            const isPrimary = (campaign.status === 'active' && action.id === 'monitor') || 
+                            const isPrimary = action.id === 'manage-cycle' ||
+                                            (campaign.status === 'active' && action.id === 'monitor') ||
                                             (campaign.status === 'draft' && (action.id === 'activate' || action.id === 'manage-participants')) ||
                                             (campaign.status === 'completed' && action.id === 'results');
                             
