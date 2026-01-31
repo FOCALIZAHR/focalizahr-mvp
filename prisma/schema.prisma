@@ -141,6 +141,11 @@ model Account {
   maxParticipantsPerCampaign Int @default(500) @map("max_participants_per_campaign")
   maxCampaignDurationDays    Int @default(30) @map("max_campaign_duration_days")
 
+  // Configuración reportes individuales Performance
+  reportDeliveryDelayDays  Int     @default(7) @map("report_delivery_delay_days")
+  reportLinkExpirationDays Int     @default(30) @map("report_link_expiration_days")
+  enableEmployeeReports    Boolean @default(true) @map("enable_employee_reports")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -346,6 +351,9 @@ model Participant {
   evaluationAssignmentId  String?  @unique @map("evaluation_assignment_id")
   evaluationAssignment    EvaluationAssignment? @relation(fields: [evaluationAssignmentId], references: [id])
 
+  // Feedback Delivery (reportes individuales Performance)
+  feedbackDeliveries FeedbackDeliveryConfirmation[] @relation("FeedbackDeliveryEmployee")
+
   @@unique([campaignId, nationalId, evaluationAssignmentId], map: "unique_participant_evaluation")
   @@index([campaignId], map: "idx_participants_campaign")
   @@index([uniqueToken], map: "idx_participants_token")
@@ -382,6 +390,13 @@ model Question {
   isActive   Boolean @default(true) @map("is_active")
   minValue   Int     @default(1) @map("min_value")
   maxValue   Int     @default(5) @map("max_value")
+
+  // ═══════════════════════════════════════════════════
+  // LABELS DINÁMICOS UI
+  // ═══════════════════════════════════════════════════
+  minLabel    String? @map("min_label")
+  maxLabel    String? @map("max_label")
+  scaleLabels Json?   @map("scale_labels")
 
   // Metadatos:
   methodologyReference String?  @map("methodology_reference")
@@ -1679,6 +1694,9 @@ model PerformanceCycle {
   account     Account              @relation(fields: [accountId], references: [id], onDelete: Cascade)
   assignments EvaluationAssignment[]
 
+  // Feedback Delivery (reportes individuales Performance)
+  feedbackDeliveries FeedbackDeliveryConfirmation[] @relation("FeedbackDeliveryCycle")
+
   // Índices
   @@index([accountId], map: "idx_performance_cycles_account")
   @@index([status], map: "idx_performance_cycles_status")
@@ -1820,4 +1838,37 @@ model Competency {
   @@index([category], map: "idx_competencies_category")
   @@index([dimensionCode], map: "idx_competencies_dimension")
   @@map("competencies")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// FEEDBACK DELIVERY CONFIRMATION - Auditoría entrega reportes individuales
+// ════════════════════════════════════════════════════════════════════════════
+
+model FeedbackDeliveryConfirmation {
+  id               String    @id @default(cuid())
+
+  // Relaciones
+  employeeId       String
+  employee         Participant @relation("FeedbackDeliveryEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+
+  cycleId          String
+  cycle            PerformanceCycle @relation("FeedbackDeliveryCycle", fields: [cycleId], references: [id], onDelete: Cascade)
+
+  // Token acceso reporte
+  reportToken      String    @unique
+
+  // Timestamps
+  sentAt           DateTime
+  confirmedAt      DateTime?
+
+  // Metadata
+  receivedOnTime   Boolean?
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@map("feedback_delivery_confirmations")
+  @@index([employeeId])
+  @@index([cycleId])
+  @@index([reportToken])
 }

@@ -28,6 +28,7 @@ export interface EmailTemplate {
   variables: string[];
   tone: string;
   estimatedTime: string;
+  ccManager?: boolean;
 }
 
 // ========================================
@@ -662,7 +663,205 @@ export const PREMIUM_EMAIL_TEMPLATES: Record<string, EmailTemplate> = {
     tone: 'Urgente pero respetuoso, última llamada',
     estimatedTime: 'Última oportunidad'
   },
-  
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // PERFORMANCE EVALUATION - RECORDATORIOS ESCALAMIENTO 3 NIVELES
+  // ════════════════════════════════════════════════════════════════════════════
+
+  'performance-reminder-level-1': {
+    id: 'perf_reminder_1',
+    campaignTypeSlug: 'performance-reminder-level-1',
+    subject: '🔔 Recordatorio Amigable - Evaluación {evaluatee_name}',
+    previewText: 'Tu feedback es valioso para el desarrollo del equipo',
+    variables: ['evaluator_name', 'evaluatee_name', 'evaluatee_position', 'days_remaining', 'evaluation_url', 'company_name'],
+    tone: 'Amigable, respetuoso, sin presión',
+    estimatedTime: '10 minutos',
+    htmlContent: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #22D3EE;">Hola {evaluator_name},</h2>
+
+        <p style="color: #64748B; line-height: 1.6;">
+          Te recordamos que tienes pendiente completar la evaluación de desempeño de:
+        </p>
+
+        <div style="background: linear-gradient(135deg, #22D3EE20, #A78BFA20); padding: 20px; border-radius: 12px; margin: 20px 0;">
+          <p style="margin: 0; color: #1E293B;">
+            <strong style="color: #22D3EE;">{evaluatee_name}</strong><br>
+            <span style="color: #64748B; font-size: 14px;">{evaluatee_position}</span>
+          </p>
+        </div>
+
+        <p style="color: #64748B;">
+          El ciclo cierra en <strong style="color: #F59E0B;">{days_remaining} días</strong>.
+          Tu feedback es muy valioso para el desarrollo del equipo.
+        </p>
+
+        <a href="{evaluation_url}" style="display: inline-block; background: linear-gradient(90deg, #22D3EE, #06B6D4); color: #FFF; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin: 20px 0;">
+          Completar Evaluación
+        </a>
+
+        <p style="color: #94A3B8; font-size: 12px; margin-top: 30px;">
+          ¿Necesitas ayuda? Responde a este email o contacta a RRHH.
+        </p>
+      </div>
+    `
+  },
+
+  'performance-reminder-level-2': {
+    id: 'perf_reminder_2',
+    campaignTypeSlug: 'performance-reminder-level-2',
+    subject: '⏰ Urgente - Evaluación {evaluatee_name} por Vencer',
+    previewText: 'El plazo está por cumplirse',
+    variables: ['evaluator_name', 'evaluatee_name', 'days_remaining', 'evaluation_url'],
+    tone: 'Urgente pero profesional',
+    estimatedTime: '10 minutos',
+    htmlContent: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #F59E0B20; border-left: 4px solid #F59E0B; padding: 15px; margin-bottom: 20px;">
+          <p style="margin: 0; color: #92400E;">
+            <strong>⏰ RECORDATORIO URGENTE</strong>
+          </p>
+        </div>
+
+        <h2 style="color: #1E293B;">{evaluator_name},</h2>
+
+        <p style="color: #64748B; line-height: 1.6;">
+          El plazo para completar la evaluación de <strong>{evaluatee_name}</strong>
+          está por vencer en <strong style="color: #F59E0B;">{days_remaining} días</strong>.
+        </p>
+
+        <p style="color: #64748B;">
+          Tu evaluación es fundamental para:
+        </p>
+        <ul style="color: #64748B;">
+          <li>Decisiones de desarrollo profesional</li>
+          <li>Planificación de capacitaciones</li>
+          <li>Feedback constructivo al colaborador</li>
+        </ul>
+
+        <a href="{evaluation_url}" style="display: inline-block; background: #F59E0B; color: #FFF; padding: 14px 28px; border-radius: 8px; text-decoration: none; margin: 20px 0; font-weight: 600;">
+          Completar Ahora
+        </a>
+
+        <p style="color: #94A3B8; font-size: 12px;">
+          Si tienes algún impedimento, por favor contacta a RRHH cuanto antes.
+        </p>
+      </div>
+    `
+  },
+
+  'performance-reminder-level-3': {
+    id: 'perf_reminder_3',
+    campaignTypeSlug: 'performance-reminder-level-3',
+    subject: '🚨 CRÍTICO - Última Oportunidad Evaluación {evaluatee_name}',
+    previewText: 'Acción requerida inmediata',
+    variables: ['evaluator_name', 'evaluatee_name', 'days_remaining', 'evaluation_url'],
+    tone: 'Crítico, escalado a gerencia',
+    estimatedTime: '10 minutos',
+    ccManager: true,
+    htmlContent: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #EF444420; border-left: 4px solid #EF4444; padding: 15px; margin-bottom: 20px;">
+          <p style="margin: 0; color: #991B1B;">
+            <strong>🚨 ACCIÓN REQUERIDA INMEDIATA</strong>
+          </p>
+        </div>
+
+        <h2 style="color: #1E293B;">{evaluator_name},</h2>
+
+        <p style="color: #EF4444; font-weight: 600; font-size: 16px;">
+          El ciclo de evaluación cierra en {days_remaining} días y tu evaluación de
+          <strong>{evaluatee_name}</strong> aún está pendiente.
+        </p>
+
+        <p style="color: #64748B; line-height: 1.6;">
+          <strong>Impacto de no completar a tiempo:</strong>
+        </p>
+        <ul style="color: #64748B;">
+          <li>{evaluatee_name} no recibirá feedback constructivo</li>
+          <li>Proceso de calibración se verá afectado</li>
+          <li>Decisiones de talento podrían retrasarse</li>
+        </ul>
+
+        <div style="background: #FEF3C7; border: 1px solid #F59E0B; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0; color: #92400E; font-size: 14px;">
+            <strong>⚠️ Nota:</strong> Este mensaje ha sido copiado a tu gerente.
+            Si no completas antes del cierre, se escalará a HR Leadership.
+          </p>
+        </div>
+
+        <a href="{evaluation_url}" style="display: inline-block; background: #EF4444; color: #FFF; padding: 16px 32px; border-radius: 8px; text-decoration: none; margin: 20px 0; font-weight: 700; font-size: 16px;">
+          COMPLETAR AHORA
+        </a>
+
+        <p style="color: #94A3B8; font-size: 12px;">
+          Para cualquier consulta urgente, contacta a RRHH inmediatamente.
+        </p>
+      </div>
+    `
+  },
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // PERFORMANCE EVALUATION - REPORTE INDIVIDUAL DISPONIBLE
+  // ════════════════════════════════════════════════════════════════════════════
+
+  'performance-report-ready': {
+    id: 'performance_report_ready',
+    campaignTypeSlug: 'performance-report-ready',
+    subject: '📊 Tu Reporte de Desempeño está Disponible - {cycle_name}',
+    previewText: 'Accede a tu feedback 360° personalizado',
+    variables: ['employee_name', 'cycle_name', 'report_url', 'expiration_days', 'company_name'],
+    tone: 'Profesional, motivador',
+    estimatedTime: '5 minutos',
+    htmlContent: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #22D3EE, #A78BFA); padding: 30px; text-align: center; border-radius: 12px; margin-bottom: 30px;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">Tu Reporte de Desempeño</h1>
+          <p style="color: #E0E7FF; margin: 10px 0 0 0;">Feedback 360° Personalizado</p>
+        </div>
+
+        <h2 style="color: #1E293B;">Hola {employee_name},</h2>
+
+        <p style="color: #64748B; line-height: 1.6;">
+          Nos complace informarte que tu reporte de desempeño del ciclo
+          <strong>{cycle_name}</strong> ya está disponible.
+        </p>
+
+        <div style="background: #F0FDF4; border-left: 4px solid #10B981; padding: 15px; margin: 20px 0;">
+          <p style="margin: 0; color: #065F46;">
+            <strong>✨ Tu reporte incluye:</strong>
+          </p>
+          <ul style="color: #047857; margin: 10px 0 0 20px;">
+            <li>Resultados consolidados 360°</li>
+            <li>Fortalezas destacadas</li>
+            <li>Áreas de desarrollo priorizadas</li>
+            <li>Plan de acción sugerido</li>
+          </ul>
+        </div>
+
+        <a href="{report_url}" style="display: inline-block; background: linear-gradient(90deg, #22D3EE, #06B6D4); color: #FFF; padding: 16px 32px; border-radius: 8px; text-decoration: none; margin: 20px 0; font-weight: 600; font-size: 16px;">
+          Acceder a Mi Reporte
+        </a>
+
+        <div style="background: #FEF3C7; border: 1px solid #F59E0B; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="margin: 0; color: #92400E; font-size: 14px;">
+            <strong>⏰ Importante:</strong> Este link estará disponible por {expiration_days} días.
+            Te recomendamos revisarlo pronto y guardar una copia si lo necesitas.
+          </p>
+        </div>
+
+        <p style="color: #64748B; font-size: 14px; line-height: 1.6;">
+          Este reporte es <strong>confidencial</strong> y solo para tu uso personal.
+          Úsalo como guía para tu desarrollo profesional y conversaciones con tu manager.
+        </p>
+
+        <p style="color: #94A3B8; font-size: 12px; margin-top: 30px;">
+          ¿Preguntas sobre tu reporte? Contacta a RRHH o tu manager directo.
+        </p>
+      </div>
+    `
+  },
+
   'general': {
     id: 'general_invitation',
     campaignTypeSlug: 'general',
@@ -681,11 +880,7 @@ export const PREMIUM_EMAIL_TEMPLATES: Record<string, EmailTemplate> = {
 
 export function renderEmailTemplate(
   campaignTypeSlug: string,
-  variables: {
-    participant_name: string;
-    company_name: string;
-    survey_url: string;
-  }
+  variables: Record<string, string>
 ): { subject: string; html: string } {
   // Buscar template específico o usar general como fallback
   const template = PREMIUM_EMAIL_TEMPLATES[campaignTypeSlug] || PREMIUM_EMAIL_TEMPLATES['general'];

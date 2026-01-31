@@ -5,7 +5,7 @@
 // src/components/evaluator/EvaluatorDashboard.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
@@ -14,11 +14,14 @@ import {
   ClipboardList,
   PartyPopper,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  ListFilter
 } from 'lucide-react'
 import EvaluatorProgressCard from './EvaluatorProgressCard'
 import SubordinateEvaluationList from './SubordinateEvaluationList'
 import { EvaluationAssignment } from './SubordinateEvaluationCard'
+
+type FilterTab = 'all' | 'pending' | 'completed'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -57,6 +60,16 @@ export default function EvaluatorDashboard() {
   const [assignments, setAssignments] = useState<EvaluationAssignment[]>([])
   const [stats, setStats] = useState<EvaluatorStats>({ total: 0, completed: 0, pending: 0 })
   const [employee, setEmployee] = useState<EvaluatorEmployee | null>(null)
+  const [activeTab, setActiveTab] = useState<FilterTab>('all')
+
+  // Filtrar assignments según tab activo
+  const filteredAssignments = useMemo(() => {
+    if (activeTab === 'all') return assignments
+    if (activeTab === 'pending') {
+      return assignments.filter(a => a.status === 'pending' || a.status === 'in_progress')
+    }
+    return assignments.filter(a => a.status === 'completed')
+  }, [assignments, activeTab])
 
   // Cargar datos
   const loadData = useCallback(async () => {
@@ -226,9 +239,16 @@ export default function EvaluatorDashboard() {
           </p>
         </motion.div>
 
+        {/* Filtros Tab */}
+        <FilterTabs
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          stats={stats}
+        />
+
         {/* Lista de evaluaciones completadas */}
         <SubordinateEvaluationList
-          assignments={assignments}
+          assignments={filteredAssignments}
           onEvaluate={handleEvaluate}
           onViewSummary={handleViewSummary}
         />
@@ -248,9 +268,16 @@ export default function EvaluatorDashboard() {
         total={stats.total}
       />
 
+      {/* Filtros Tab */}
+      <FilterTabs
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        stats={stats}
+      />
+
       {/* Lista de evaluaciones */}
       <SubordinateEvaluationList
-        assignments={assignments}
+        assignments={filteredAssignments}
         onEvaluate={handleEvaluate}
         onViewSummary={handleViewSummary}
       />
@@ -261,6 +288,52 @@ export default function EvaluatorDashboard() {
 // ════════════════════════════════════════════════════════════════════════════
 // SUBCOMPONENT: Cycle Header
 // ════════════════════════════════════════════════════════════════════════════
+
+function FilterTabs({
+  activeTab,
+  onTabChange,
+  stats
+}: {
+  activeTab: FilterTab
+  onTabChange: (tab: FilterTab) => void
+  stats: EvaluatorStats
+}) {
+  const tabs: { key: FilterTab; label: string; count: number }[] = [
+    { key: 'all', label: 'Todas', count: stats.total },
+    { key: 'pending', label: 'Pendientes', count: stats.pending },
+    { key: 'completed', label: 'Completadas', count: stats.completed }
+  ]
+
+  return (
+    <div className="flex items-center gap-1 p-1 bg-slate-800/50 rounded-lg border border-slate-700/50">
+      <ListFilter className="w-4 h-4 text-slate-500 ml-2 mr-1" />
+      {tabs.map(tab => (
+        <button
+          key={tab.key}
+          onClick={() => onTabChange(tab.key)}
+          className={`
+            flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all
+            ${activeTab === tab.key
+              ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+            }
+          `}
+        >
+          <span>{tab.label}</span>
+          <span className={`
+            text-xs px-1.5 py-0.5 rounded-full
+            ${activeTab === tab.key
+              ? 'bg-cyan-500/20 text-cyan-300'
+              : 'bg-slate-700 text-slate-500'
+            }
+          `}>
+            {tab.count}
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+}
 
 function CycleHeader({ cycle }: { cycle: PerformanceCycle }) {
   const formatDate = (dateString: string) => {

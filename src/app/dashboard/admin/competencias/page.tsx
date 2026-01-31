@@ -25,13 +25,17 @@ import {
   Target,
   Zap,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
   Sparkles,
   RefreshCw,
   X,
   Save,
   Building2,
-  Database
+  Database,
+  Award,
+  TrendingUp,
+  Check
 } from 'lucide-react'
 import { toast } from 'sonner'
 import AccountSelector from '@/components/admin/AccountSelector'
@@ -72,6 +76,31 @@ interface Template {
   categories: string[]
   byCategory: Record<string, number>
   preview: Array<{ code: string; name: string; category: string }>
+  methodology: string
+  methodologyIcon: string
+  idealFor: string[]
+  highlight: string
+  breakdown: {
+    CORE: number
+    LEADERSHIP: number
+    STRATEGIC: number
+    TECHNICAL: number
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ICON MAP - Con fallback robusto
+// ════════════════════════════════════════════════════════════════════════════
+
+const METHODOLOGY_ICON_MAP: Record<string, any> = {
+  Award,
+  Users,
+  TrendingUp,
+  BookOpen
+}
+
+const getMethodologyIcon = (iconName: string) => {
+  return METHODOLOGY_ICON_MAP[iconName] || BookOpen
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -156,6 +185,23 @@ export default function CompetenciasPage() {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingCompetency, setEditingCompetency] = useState<Competency | null>(null)
   const [templateModalOpen, setTemplateModalOpen] = useState(false)
+
+  // Template Progressive Disclosure
+  const [expandedTemplate, setExpandedTemplate] = useState<string | null>(null)
+
+  const handleToggleExpand = (templateId: string) => {
+    const newExpanded = expandedTemplate === templateId ? null : templateId
+    setExpandedTemplate(newExpanded)
+    if (newExpanded) {
+      setTimeout(() => {
+        document.getElementById(`template-${templateId}`)?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+          inline: 'nearest'
+        })
+      }, 100)
+    }
+  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // DATA FETCHING
@@ -506,37 +552,197 @@ export default function CompetenciasPage() {
               El cliente podrá personalizarlo según sus necesidades.
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
-              {templates.map(template => (
-                <motion.button
-                  key={template.id}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handleInitializeTemplate(template.id)}
-                  disabled={actionLoading !== null}
-                  className="fhr-card p-6 text-left hover:border-cyan-500/50 transition-all group"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center">
-                      <BookOpen className="w-5 h-5 text-cyan-400" />
+            <div className="space-y-4 max-w-4xl mx-auto">
+              {templates.map(template => {
+                const isExpanded = expandedTemplate === template.id
+                const MethodIcon = getMethodologyIcon(template.methodologyIcon)
+
+                return (
+                  <motion.div
+                    key={template.id}
+                    id={`template-${template.id}`}
+                    layout
+                    className="fhr-card p-6 hover:border-cyan-500/30 transition-all cursor-pointer"
+                    onClick={() => handleToggleExpand(template.id)}
+                  >
+                    {/* TOP: Siempre visible */}
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        {/* Badge Metodologia */}
+                        <div className="flex items-center gap-2 mb-3">
+                          <MethodIcon className="w-4 h-4 text-cyan-400" />
+                          <span className="text-xs text-slate-400 uppercase tracking-wide">
+                            {template.methodology}
+                          </span>
+                        </div>
+
+                        <h3 className="text-xl font-medium text-white mb-2">
+                          {template.name}
+                        </h3>
+
+                        <p className="text-sm text-slate-400 mb-3">
+                          {template.description}
+                        </p>
+
+                        {/* Highlight - Visible en collapsed */}
+                        {!isExpanded && template.highlight && (
+                          <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-3 mb-4">
+                            <p className="text-sm text-cyan-300">
+                              {template.highlight}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Stats rapidos */}
+                        <div className="flex items-center gap-4 text-sm text-slate-500">
+                          <span>{template.competencyCount} competencias</span>
+                          <span>·</span>
+                          <span>{isExpanded ? 'Click para colapsar' : 'Click para ver detalles'}</span>
+                        </div>
+                      </div>
+
+                      {/* Derecha: Icon expandir/colapsar */}
+                      <button
+                        className="ml-4 p-2 hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleToggleExpand(template.id)
+                        }}
+                        aria-expanded={isExpanded}
+                      >
+                        {isExpanded
+                          ? <ChevronUp className="w-5 h-5 text-slate-400" />
+                          : <ChevronDown className="w-5 h-5 text-slate-400" />
+                        }
+                      </button>
                     </div>
-                    {actionLoading === template.id && (
-                      <Loader2 className="w-5 h-5 animate-spin text-cyan-400" />
+
+                    {/* EXPANDED CONTENT */}
+                    <AnimatePresence initial={false}>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.3, ease: 'easeInOut' }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mt-6 pt-6 border-t border-slate-800 space-y-6">
+
+                            {/* Highlight expandido */}
+                            {template.highlight && (
+                              <div className="bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border border-cyan-500/20 rounded-lg p-4">
+                                <p className="text-sm text-cyan-200">
+                                  <span className="font-semibold">Diferenciador clave:</span> {template.highlight}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Breakdown por categoria */}
+                            {template.breakdown && (
+                              <div>
+                                <h4 className="text-sm font-medium text-white mb-3">
+                                  Distribucion por Categoria
+                                </h4>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                  {Object.entries(template.breakdown).map(([cat, count]) => {
+                                    if (count === 0) return null
+                                    const config = CATEGORY_CONFIG[cat as keyof typeof CATEGORY_CONFIG]
+                                    if (!config) return null
+                                    const CategoryIcon = config.icon
+
+                                    return (
+                                      <div
+                                        key={cat}
+                                        className={`${config.color} rounded-lg p-3 flex items-center gap-2`}
+                                      >
+                                        <CategoryIcon className="w-4 h-4" />
+                                        <div>
+                                          <div className="text-xs font-medium">{config.label}</div>
+                                          <div className="text-lg font-bold">{count}</div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Preview competencias */}
+                            {template.preview && template.preview.length > 0 && (
+                              <div>
+                                <h4 className="text-sm font-medium text-white mb-3">
+                                  Preview Competencias (primeras {template.preview.length})
+                                </h4>
+                                <div className="space-y-2">
+                                  {template.preview.map((comp) => {
+                                    const config = CATEGORY_CONFIG[comp.category as keyof typeof CATEGORY_CONFIG]
+                                    return (
+                                      <div
+                                        key={comp.code}
+                                        className="flex items-center gap-3 text-sm bg-slate-800/30 rounded-lg p-3"
+                                      >
+                                        <span className={`px-2 py-0.5 rounded text-xs ${config?.color || 'bg-slate-700 text-slate-400'}`}>
+                                          {config?.label || comp.category}
+                                        </span>
+                                        <span className="text-slate-300">{comp.name}</span>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Ideal para */}
+                            {template.idealFor && template.idealFor.length > 0 && (
+                              <div>
+                                <h4 className="text-sm font-medium text-white mb-3">
+                                  Ideal Para:
+                                </h4>
+                                <ul className="space-y-2">
+                                  {template.idealFor.map((item, idx) => (
+                                    <li key={idx} className="flex items-start gap-2 text-sm text-slate-400">
+                                      <Check className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                                      <span>{item}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Footer: Boton seleccionar */}
+                    {isExpanded && (
+                      <div className="mt-6 pt-4 border-t border-slate-800">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleInitializeTemplate(template.id)
+                          }}
+                          disabled={actionLoading !== null}
+                          className="w-full fhr-btn fhr-btn-primary flex items-center justify-center gap-2"
+                        >
+                          {actionLoading === template.id ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Inicializando...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4" />
+                              Seleccionar este modelo
+                            </>
+                          )}
+                        </button>
+                      </div>
                     )}
-                  </div>
-                  <h3 className="font-medium text-slate-200 mb-1 group-hover:text-cyan-400 transition-colors">
-                    {template.name}
-                  </h3>
-                  <p className="text-sm text-slate-400 mb-3 line-clamp-2">
-                    {template.description}
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <span className="fhr-badge fhr-badge-active">
-                      {template.competencyCount} competencias
-                    </span>
-                  </div>
-                </motion.button>
-              ))}
+                  </motion.div>
+                )
+              })}
             </div>
           </motion.div>
         ) : (

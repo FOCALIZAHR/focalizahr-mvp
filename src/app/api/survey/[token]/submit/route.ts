@@ -45,6 +45,7 @@ export async function POST(
         id: true,
         email: true,
         hasResponded: true,
+        evaluationAssignmentId: true,
         campaign: {
           select: {
             id: true,
@@ -54,6 +55,7 @@ export async function POST(
               select: {
                 slug: true,
                 isPermanent: true,
+                flowType: true,
                 questions: {
                   select: {
                     id: true,
@@ -193,8 +195,24 @@ export async function POST(
         })
       ])
 
-      return { 
-        participant: updatedParticipant, 
+      // NUEVO: Si tiene EvaluationAssignment, marcarlo como COMPLETED
+      if (participant.evaluationAssignmentId) {
+        await tx.evaluationAssignment.update({
+          where: { id: participant.evaluationAssignmentId },
+          data: {
+            status: 'COMPLETED',
+            updatedAt: new Date()
+          }
+        });
+
+        console.log('[Performance] EvaluationAssignment marcado como COMPLETED', {
+          assignmentId: participant.evaluationAssignmentId,
+          participantId: participant.id
+        });
+      }
+
+      return {
+        participant: updatedParticipant,
         responsesCount: createdResponses.count,
         campaignId: participant.campaign.id,
         campaignType: participant.campaign.campaignType.slug

@@ -48,11 +48,17 @@ export async function GET(request: NextRequest) {
     // Obtener templates disponibles
     const templates = CompetencyService.getAvailableTemplates()
 
-    // Enriquecer con conteo por categoría
+    // Enriquecer con conteo por categoría y metadata expandida
     const templatesWithDetails = templates.map(template => ({
       ...template,
       byCategory: countByCategory(template.id),
-      preview: COMPETENCY_TEMPLATES[template.id]?.competencies.slice(0, 3).map(c => ({
+      breakdown: {
+        CORE: COMPETENCY_TEMPLATES[template.id]?.competencies.filter(c => c.category === 'CORE').length || 0,
+        LEADERSHIP: COMPETENCY_TEMPLATES[template.id]?.competencies.filter(c => c.category === 'LEADERSHIP').length || 0,
+        STRATEGIC: COMPETENCY_TEMPLATES[template.id]?.competencies.filter(c => c.category === 'STRATEGIC').length || 0,
+        TECHNICAL: COMPETENCY_TEMPLATES[template.id]?.competencies.filter(c => c.category === 'TECHNICAL').length || 0
+      },
+      preview: COMPETENCY_TEMPLATES[template.id]?.competencies.slice(0, 4).map(c => ({
         code: c.code,
         name: c.name,
         category: c.category

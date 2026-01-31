@@ -1,16 +1,20 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
 
-import { 
-  ArrowRight, 
+import {
+  ArrowRight,
   ArrowLeft,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  ClipboardCheck,
+  Save
 } from 'lucide-react';
+
+import EvaluationReviewModal from '@/components/performance/EvaluationReviewModal';
 
 // Import refactored components
 import { SurveyHeader } from './sections/SurveyHeader';
@@ -19,14 +23,18 @@ import  WelcomeScreen  from './sections/WelcomeScreen'; // IMPORTAMOS TU COMPONE
 import { fadeIn } from './constants/animations';
 
 // Import all renderers from index barrel
-import { 
+import {
   RatingScaleRenderer,
   TextOpenRenderer,
   MultipleChoiceRenderer,
   SingleChoiceRenderer,
   RatingMatrixRenderer,
-  NPSScaleRenderer  // ← AGREGAR ESTA LÍNEA
+  NPSScaleRenderer,
+  CompetencyBehaviorRenderer
 } from './renderers';
+
+// Import helpers
+import { getScaleLabels } from '@/lib/survey/getScaleLabels';
 
 // Import hook and types
 import { useSurveyEngine } from '@/hooks/useSurveyEngine';
@@ -75,12 +83,19 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
 }) => {
   // Estado para controlar la pantalla de bienvenida
   const [showWelcome, setShowWelcome] = useState(true);
+  // Estado para modal de revisión pre-envío
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  // Estado para auto-save
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const hasChangesRef = useRef(false);
 
   // Hook principal con toda la lógica
   const {
     currentStep,
     currentQuestionIndex,
     currentQuestion,
+    responses,
     selectedAspects,
     isLoading,
     config,
@@ -98,7 +113,45 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
 
   const progress = getProgress();
   const currentCategory = getCurrentCategory();  // ← LÍNEA NUEVA
-  
+
+  // Track changes for auto-save
+  const prevResponsesRef = useRef<string>('');
+  useEffect(() => {
+    const currentSerialized = JSON.stringify(responses);
+    if (prevResponsesRef.current && prevResponsesRef.current !== currentSerialized) {
+      hasChangesRef.current = true;
+    }
+    prevResponsesRef.current = currentSerialized;
+  }, [responses]);
+
+  // Auto-save cada 30 segundos
+  useEffect(() => {
+    if (!onSave || showWelcome) return;
+
+    const interval = setInterval(async () => {
+      if (hasChangesRef.current) {
+        try {
+          setIsSaving(true);
+          await handleSave();
+          hasChangesRef.current = false;
+          setLastSavedAt(new Date());
+        } catch (err) {
+          console.error('Auto-save failed:', err);
+        } finally {
+          setIsSaving(false);
+        }
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [onSave, handleSave, showWelcome]);
+
+  // Handler para confirmar envío desde modal
+  const handleConfirmSubmit = useCallback(async () => {
+    await handleSubmit();
+    setShowReviewModal(false);
+  }, [handleSubmit]);
+
   // Estado local para categorías vistas
   const [viewedCategories, setViewedCategories] = useState<Set<string>>(new Set());
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(0);
@@ -154,9 +207,21 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
       case 'text_open':
         return <TextOpenRenderer response={response} updateResponse={updateResponse} />;
 
-      case 'rating_scale':
-        return <RatingScaleRenderer response={response} updateResponse={updateResponse} />;
-      // ← AGREGAR ESTE CASE COMPLETO
+      case 'rating_scale': {
+        const ratingLabels = getScaleLabels(currentQuestion, config);
+        return <RatingScaleRenderer response={response} updateResponse={updateResponse} labels={ratingLabels} />;
+      }
+      case 'competency_behavior': {
+        const competencyLabels = getScaleLabels(currentQuestion, config);
+        return (
+          <CompetencyBehaviorRenderer
+            response={response}
+            updateResponse={updateResponse}
+            labels={competencyLabels}
+          />
+        );
+      }
+
       case 'nps_scale':
         return <NPSScaleRenderer response={response} updateResponse={updateResponse} />;
       
@@ -287,7 +352,7 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
                         Anterior
                       </button>
 
-                      {/* Botón Siguiente/Finalizar */}
+                      {/* Botón Siguiente/Revisar y Enviar */}
                       {currentQuestionIndex < questions.length - 1 ? (
                         <button
                           onClick={goToNext}
@@ -303,7 +368,7 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
                         </button>
                       ) : (
                         <button
-                          onClick={handleSubmit}
+                          onClick={() => setShowReviewModal(true)}
                           disabled={!isCurrentResponseValid() || isSubmitting}
                           className="px-8 py-2.5 text-sm font-medium
                                    bg-[#22D3EE] text-[#0F172A] rounded-full
@@ -311,17 +376,8 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
                                    disabled:opacity-30 disabled:cursor-not-allowed
                                    transition-all duration-200 flex items-center gap-2"
                         >
-                          {isSubmitting ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Enviando...
-                            </>
-                          ) : (
-                            <>
-                              Finalizar
-                              <CheckCircle2 className="w-4 h-4" />
-                            </>
-                          )}
+                          <ClipboardCheck className="w-4 h-4" />
+                          Revisar y Enviar
                         </button>
                       )}
                     </div>
@@ -332,6 +388,42 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
           )}
         </AnimatePresence>
       </div>
+
+      {/* Auto-save indicator */}
+      {onSave && !showWelcome && (
+        <div className="fixed bottom-4 left-4 z-40">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/90 border border-slate-700/50 rounded-full text-xs backdrop-blur-sm">
+            {isSaving ? (
+              <>
+                <Save className="w-3 h-3 text-cyan-400 animate-pulse" />
+                <span className="text-cyan-400">Guardando...</span>
+              </>
+            ) : lastSavedAt ? (
+              <>
+                <CheckCircle2 className="w-3 h-3 text-green-400" />
+                <span className="text-slate-400">
+                  Guardado {lastSavedAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </>
+            ) : (
+              <>
+                <Save className="w-3 h-3 text-slate-500" />
+                <span className="text-slate-500">Auto-guardado activo</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Review Modal */}
+      <EvaluationReviewModal
+        isOpen={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
+        onConfirm={handleConfirmSubmit}
+        questions={questions}
+        responses={responses}
+        isSubmitting={isSubmitting}
+      />
     </div>
   );
 };

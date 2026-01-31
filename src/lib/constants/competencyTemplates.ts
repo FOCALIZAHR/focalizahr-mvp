@@ -25,6 +25,10 @@ export interface CompetencyTemplate {
   id: string
   name: string
   description: string
+  methodology: string
+  methodologyIcon: string
+  idealFor: string[]
+  highlight: string
   competencies: CompetencyTemplateItem[]
 }
 
@@ -37,6 +41,14 @@ export const FOCALIZAHR_STANDARD_TEMPLATE: CompetencyTemplate = {
   id: 'focalizahr-standard-v1',
   name: 'Modelo FocalizaHR Estándar',
   description: 'Basado en Lominger, Great Place to Work y mejores prácticas LATAM. 12 competencias organizadas por nivel.',
+  methodology: 'Lominger + GPTW',
+  methodologyIcon: 'Award',
+  idealFor: [
+    'Empresas tradicionales LATAM',
+    'Cultura colaborativa enfocada',
+    'Primera implementación de competencias'
+  ],
+  highlight: 'Equilibrio ideal entre rigor y simplicidad',
   competencies: [
 
     // ══════════════════════════════════════════════════════════════════
@@ -257,6 +269,14 @@ export const FOCALIZAHR_LEADERSHIP_360_TEMPLATE: CompetencyTemplate = {
   id: 'focalizahr-leadership-360-v1',
   name: 'Modelo Liderazgo 360°',
   description: 'Enfocado en competencias de people managers. Ideal para evaluaciones de líderes.',
+  methodology: 'Assessment 360° + Coaching',
+  methodologyIcon: 'Users',
+  idealFor: [
+    'Desarrollo de managers y ejecutivos',
+    'Planes de sucesión',
+    'Evaluación multifuente (360°)'
+  ],
+  highlight: 'Enfoque específico en habilidades de liderazgo',
   competencies: [
     {
       code: 'L360-VISION',
@@ -398,6 +418,14 @@ export const FOCALIZAHR_HIGH_PERFORMANCE_TEMPLATE: CompetencyTemplate = {
   id: 'focalizahr-high-perf-v1',
   name: 'Modelo High Performance',
   description: 'Basado en Google Project Oxygen y Netflix Culture. Para organizaciones de alto rendimiento.',
+  methodology: 'Google Project Oxygen + Netflix',
+  methodologyIcon: 'TrendingUp',
+  idealFor: [
+    'Startups tech y scale-ups',
+    'Cultura de alto rendimiento',
+    'Equipos ágiles y autónomos'
+  ],
+  highlight: 'Estándares de excelencia Silicon Valley',
   competencies: [
     {
       code: 'HP-IMPACT',
@@ -592,13 +620,21 @@ export function listAvailableTemplates(): Array<{
   description: string
   competencyCount: number
   categories: string[]
+  methodology: string
+  methodologyIcon: string
+  idealFor: string[]
+  highlight: string
 }> {
   return Object.entries(COMPETENCY_TEMPLATES).map(([id, template]) => ({
     id,
     name: template.name,
     description: template.description,
     competencyCount: template.competencies.length,
-    categories: [...new Set(template.competencies.map(c => c.category))]
+    categories: [...new Set(template.competencies.map(c => c.category))],
+    methodology: template.methodology,
+    methodologyIcon: template.methodologyIcon,
+    idealFor: template.idealFor,
+    highlight: template.highlight
   }))
 }
 

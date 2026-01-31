@@ -121,7 +121,12 @@ export async function GET(
         questionOrder: true,
         responseType: true,
         choiceOptions: true,
-        conditionalLogic: true
+        conditionalLogic: true,
+        scaleLabels: true,
+        minLabel: true,
+        maxLabel: true,
+        minValue: true,
+        maxValue: true
       },
       orderBy: { questionOrder: 'asc' }
     })
@@ -155,7 +160,12 @@ export async function GET(
         questionOrder: q.questionOrder,
         responseType: q.responseType,
         choiceOptions: q.choiceOptions || null,
-        conditionalLogic: q.conditionalLogic || null
+        conditionalLogic: q.conditionalLogic || null,
+        scaleLabels: q.scaleLabels || null,
+        minLabel: q.minLabel || null,
+        maxLabel: q.maxLabel || null,
+        minValue: q.minValue ?? null,
+        maxValue: q.maxValue ?? null
       }))
     }
 

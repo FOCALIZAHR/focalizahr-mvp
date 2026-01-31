@@ -155,7 +155,10 @@ export async function GET(
       minValue: q.minValue,
       maxValue: q.maxValue,
       isRequired: q.isRequired,
-      choiceOptions: q.choiceOptions || null
+      choiceOptions: q.choiceOptions || null,
+      scaleLabels: q.scaleLabels || null,
+      minLabel: q.minLabel || null,
+      maxLabel: q.maxLabel || null
     }))
 
     const processingTime = Date.now() - startTime

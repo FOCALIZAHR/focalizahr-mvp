@@ -37,6 +37,13 @@ export interface UISettings {
     questionsPerPage?: number;
     breakDuration?: number;
   };
+  defaultLabels?: {
+    [responseType: string]: {
+      min?: string;
+      max?: string;
+      scale?: string[];
+    };
+  };
 }
 
 export interface ValidationRule {

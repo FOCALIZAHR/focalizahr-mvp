@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { ArrowLeft, CheckCircle, AlertCircle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -66,6 +66,7 @@ interface SurveyData {
 
 export default function SurveyPage() {
   const params = useParams()
+  const router = useRouter()
   const token = params.token as string
 
   const [surveyData, setSurveyData] = useState<SurveyData | null>(null)
@@ -73,6 +74,7 @@ export default function SurveyPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCompleted, setIsCompleted] = useState(false)
+  const [postSubmitMessage, setPostSubmitMessage] = useState<string | null>(null)
 
   // Hook para obtener la configuración de la encuesta
   const { configuration } = useSurveyConfiguration(
@@ -154,6 +156,15 @@ const handleSubmit = async (responses: Array<{questionId: string, rating?: numbe
     console.log('✅ Respuestas enviadas exitosamente')
     setIsCompleted(true)
 
+    // Para evaluaciones de desempeño (employee-based), redirect automático
+    if (flowType === 'employee-based') {
+      const evaluateeName = surveyData?.participant.campaign.name || 'el colaborador'
+      setPostSubmitMessage(`Tu evaluacion de ${evaluateeName} ha sido enviada exitosamente.`)
+      setTimeout(() => {
+        router.push('/dashboard/evaluaciones')
+      }, 3000)
+    }
+
   } catch (err) {
     console.error('❌ Error enviando respuestas:', err)
     setError(err instanceof Error ? err.message : 'Error enviando respuestas')
@@ -211,19 +222,29 @@ const handleSubmit = async (responses: Array<{questionId: string, rating?: numbe
 
   // Estado completado
   if (isCompleted) {
+    const isEmployeeBased = surveyData?.participant.campaign.campaignType.flowType === 'employee-based'
+
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
         <Card className="w-full max-w-md bg-slate-800 border-slate-700">
           <CardHeader className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <CardTitle className="text-green-400">¡Encuesta completada!</CardTitle>
+            <CardTitle className="text-green-400">
+              {isEmployeeBased ? 'Evaluacion Enviada' : '¡Encuesta completada!'}
+            </CardTitle>
             <CardDescription className="text-slate-300">
-              Gracias por tu participación en "{surveyData.participant.campaign.name}"
+              {postSubmitMessage
+                ? postSubmitMessage
+                : `Gracias por tu participación en "${surveyData.participant.campaign.name}"`
+              }
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
             <p className="text-slate-300 mb-4">
-              Tus respuestas han sido registradas exitosamente. Los resultados ayudarán a mejorar el ambiente laboral.
+              {isEmployeeBased
+                ? 'Tu feedback es valioso para el desarrollo del equipo.'
+                : 'Tus respuestas han sido registradas exitosamente. Los resultados ayudarán a mejorar el ambiente laboral.'
+              }
             </p>
             <Alert className="mb-4 bg-green-950 border-green-800">
               <CheckCircle className="h-4 w-4 text-green-400" />
@@ -231,6 +252,24 @@ const handleSubmit = async (responses: Array<{questionId: string, rating?: numbe
                 Tu participación es completamente anónima y confidencial.
               </AlertDescription>
             </Alert>
+
+            {/* Redirect notice para Performance */}
+            {isEmployeeBased && postSubmitMessage && (
+              <p className="text-xs text-slate-500 mb-4">
+                Redirigiendo al panel de evaluaciones...
+              </p>
+            )}
+
+            {/* Botón Volver solo para Performance (employee-based) */}
+            {isEmployeeBased && (
+              <Button
+                onClick={() => router.push('/dashboard/evaluaciones')}
+                className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Volver al Panel de Evaluaciones
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -240,13 +279,26 @@ const handleSubmit = async (responses: Array<{questionId: string, rating?: numbe
   const { participant, questions } = surveyData
   const { campaign } = participant
 
+  // Handler para auto-save parcial
+  const handleSave = async (responses: Array<{questionId: string, rating?: number, textResponse?: string, choiceResponse?: string[]}>) => {
+    try {
+      await fetch(`/api/survey/${token}/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ responses })
+      })
+    } catch (err) {
+      console.error('Auto-save error:', err)
+    }
+  }
+
   // LA PÁGINA SOLO PASA EL COMPONENTE, SIN CONTENIDO ADICIONAL
   return (
     <UnifiedSurveyComponent
       campaignId={campaign.id}
       participantToken={token}
       questions={questions}
-      companyLogo={campaign.account?.companyLogo} // CORRECTO// AGREGAR ESTA LÍNEA
+      companyLogo={campaign.account?.companyLogo}
       configuration={configuration || undefined}
       campaignName={campaign.name}
       campaignTypeName={campaign.campaignType.name}
@@ -254,6 +306,7 @@ const handleSubmit = async (responses: Array<{questionId: string, rating?: numbe
       estimatedDuration={campaign.campaignType.estimatedDuration}
       questionCount={campaign.campaignType.questionCount}
       onSubmit={handleSubmit}
+      onSave={handleSave}
       isSubmitting={isSubmitting}
     />
   )

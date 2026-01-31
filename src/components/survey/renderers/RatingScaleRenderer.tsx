@@ -4,29 +4,37 @@ import { motion } from 'framer-motion';
 import { scaleIn } from '../constants/animations';
 import type { SurveyResponse } from '@/hooks/useSurveyEngine';
 
+export interface RatingScaleLabels {
+  min: string;
+  max: string;
+  scale: string[];
+}
+
 interface RatingScaleRendererProps {
   response: SurveyResponse;
   updateResponse: (update: Partial<SurveyResponse>) => void;
+  labels?: RatingScaleLabels;
 }
 
-export const RatingScaleRenderer: React.FC<RatingScaleRendererProps> = ({ 
-  response, 
-  updateResponse 
+const DEFAULT_SCALE_LABELS: RatingScaleLabels = {
+  min: 'Muy en desacuerdo',
+  max: 'Muy de acuerdo',
+  scale: ['Muy en desacuerdo', 'En desacuerdo', 'Neutral', 'De acuerdo', 'Muy de acuerdo']
+};
+
+export const RatingScaleRenderer: React.FC<RatingScaleRendererProps> = ({
+  response,
+  updateResponse,
+  labels = DEFAULT_SCALE_LABELS
 }) => {
-  const scaleLabels = [
-    'Muy en desacuerdo',
-    'En desacuerdo',
-    'Neutral',
-    'De acuerdo',
-    'Muy de acuerdo'
-  ];
+  const scaleLabels = labels.scale || DEFAULT_SCALE_LABELS.scale;
 
   return (
-    <motion.div 
-      variants={scaleIn} 
-      initial="initial" 
-      animate="animate" 
-      transition={{ duration: 0.2, ease: "easeOut" }}  // Para scaleIn
+    <motion.div
+      variants={scaleIn}
+      initial="initial"
+      animate="animate"
+      transition={{ duration: 0.2, ease: "easeOut" }}
       className="space-y-6"
     >
       {/* Botones de escala */}
@@ -46,6 +54,12 @@ export const RatingScaleRenderer: React.FC<RatingScaleRendererProps> = ({
             )}
           </button>
         ))}
+      </div>
+
+      {/* Labels de extremos */}
+      <div className="flex justify-between max-w-md mx-auto px-2">
+        <span className="text-xs text-slate-500">{labels.min}</span>
+        <span className="text-xs text-slate-500">{labels.max}</span>
       </div>
 
       {/* Mostrar label del valor seleccionado */}

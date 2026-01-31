@@ -291,7 +291,10 @@ export async function GET(
         isRequired: true,
         minValue: true,
         maxValue: true,
-        choiceOptions: true
+        choiceOptions: true,
+        scaleLabels: true,
+        minLabel: true,
+        maxLabel: true
       }
     });
 

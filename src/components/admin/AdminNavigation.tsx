@@ -26,7 +26,8 @@ import {
   X,
   AlertCircle,
   AlertTriangle,
-  GitBranch
+  GitBranch,
+  Users
 } from 'lucide-react';
 
 interface NavigationItem {
@@ -240,6 +241,13 @@ export default function AdminNavigation() {
       href: '/dashboard/admin/analytics',
       icon: TrendingUp,
       description: 'Métricas cross-cliente'
+    },
+    {
+      id: 'users',
+      label: 'Usuarios',
+      href: '/dashboard/admin/users',
+      icon: Users,
+      description: 'Gestión de usuarios'
     }
   ];
 

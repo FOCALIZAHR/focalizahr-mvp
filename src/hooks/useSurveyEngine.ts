@@ -15,9 +15,15 @@ export interface Question {
   | 'rating_matrix_conditional'
   | 'rating_scale'
   | 'single_choice'
-  | 'nps_scale'; // ← AGREGAR ESTE TIPO
+  | 'nps_scale'
+  | 'competency_behavior';
   choiceOptions?: string[] | null;
   conditionalLogic?: any;
+  minValue?: number;
+  maxValue?: number;
+  minLabel?: string | null;
+  maxLabel?: string | null;
+  scaleLabels?: string[] | null;
 }
 
 export interface SurveyResponse {
@@ -62,6 +68,13 @@ export interface UISettings {
     showMotivationalMessages?: boolean;
     questionsPerPage?: number;
     breakDuration?: number;
+  };
+  defaultLabels?: {
+    [responseType: string]: {
+      min?: string;
+      max?: string;
+      scale?: string[];
+    };
   };
 }
 
@@ -274,7 +287,10 @@ export function useSurveyEngine(
         return completedAspects === requiredAspects && requiredAspects > 0;
       case 'rating_scale':
         return response.rating && response.rating >= 1 && response.rating <= 5;
-      // ← AGREGAR ESTA VALIDACIÓN
+      case 'competency_behavior':
+        return response.rating !== undefined &&
+          response.rating >= 1 &&
+          response.rating <= 5;
       case 'nps_scale':
         return response.rating !== undefined &&
           response.rating >= 0 &&
