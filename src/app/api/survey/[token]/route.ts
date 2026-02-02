@@ -26,6 +26,7 @@ export async function GET(
         createdAt: true,
         lastReminderSent: true,
         responseDate: true,
+        evaluationAssignmentId: true,
         campaign: {
           select: {
             id: true,
@@ -107,6 +108,34 @@ export async function GET(
       )
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // EVALUATION CONTEXT (solo para employee-based/performance)
+    // ═══════════════════════════════════════════════════════════════
+    let evaluationContext = null
+
+    if (participant.evaluationAssignmentId) {
+      const assignment = await prisma.evaluationAssignment.findUnique({
+        where: { id: participant.evaluationAssignmentId },
+        select: {
+          evaluateeName: true,
+          evaluateePosition: true,
+          evaluateeDepartment: true,
+          evaluationType: true,
+          evaluateePerformanceTrack: true
+        }
+      })
+
+      if (assignment) {
+        evaluationContext = {
+          evaluateeName: assignment.evaluateeName,
+          evaluateePosition: assignment.evaluateePosition,
+          evaluateeDepartment: assignment.evaluateeDepartment,
+          evaluationType: assignment.evaluationType,
+          evaluateeTrack: assignment.evaluateePerformanceTrack
+        }
+      }
+    }
+
     // OPTIMIZACIÓN CRÍTICA: Cargar solo las preguntas cuando se necesiten
     // En lugar de cargar todas las 35 preguntas, las cargaremos por demanda
     const questions = await prisma.question.findMany({
@@ -126,10 +155,25 @@ export async function GET(
         minLabel: true,
         maxLabel: true,
         minValue: true,
-        maxValue: true
+        maxValue: true,
+        competencyCode: true
       },
       orderBy: { questionOrder: 'asc' }
     })
+
+    // Resolve competency names for questions that have competencyCode
+    const competencyCodes = questions
+      .map(q => q.competencyCode)
+      .filter((c): c is string => c != null)
+
+    let competencyMap: Record<string, string> = {}
+    if (competencyCodes.length > 0) {
+      const competencies = await prisma.competency.findMany({
+        where: { code: { in: competencyCodes } },
+        select: { code: true, name: true }
+      })
+      competencyMap = Object.fromEntries(competencies.map(c => [c.code, c.name]))
+    }
 
     const processingTime = Date.now() - startTime
 
@@ -153,6 +197,7 @@ export async function GET(
           campaignType: participant.campaign.campaignType
         }
       },
+      evaluationContext,
       questions: questions.map(q => ({
         id: q.id,
         text: q.text,
@@ -165,7 +210,9 @@ export async function GET(
         minLabel: q.minLabel || null,
         maxLabel: q.maxLabel || null,
         minValue: q.minValue ?? null,
-        maxValue: q.maxValue ?? null
+        maxValue: q.maxValue ?? null,
+        competencyCode: q.competencyCode || null,
+        competencyName: q.competencyCode ? (competencyMap[q.competencyCode] || null) : null
       }))
     }
 

@@ -13,6 +13,7 @@ import SurveyForm from '@/components/forms/SurveyForm'
 import ConditionalSurveyComponent from '@/components/forms/ConditionalSurveyComponent'
 import UnifiedSurveyComponent from '@/components/survey/UnifiedSurveyComponent'
 import { useSurveyConfiguration } from '@/hooks/useSurveyConfiguration'
+import { useToast } from '@/components/ui/toast-system'
 
 interface Campaign {
   id: string
@@ -51,8 +52,17 @@ interface Participant {
   campaign: Campaign
 }
 
+interface EvaluationContext {
+  evaluateeName: string
+  evaluateePosition?: string | null
+  evaluateeDepartment?: string
+  evaluationType: string
+  evaluateeTrack?: string | null
+}
+
 interface SurveyData {
   participant: Participant
+  evaluationContext?: EvaluationContext | null
   questions: Array<{
     id: string
     text: string
@@ -75,6 +85,7 @@ export default function SurveyPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCompleted, setIsCompleted] = useState(false)
   const [postSubmitMessage, setPostSubmitMessage] = useState<string | null>(null)
+  const toast = useToast()
 
   // Hook para obtener la configuración de la encuesta
   const { configuration } = useSurveyConfiguration(
@@ -156,10 +167,14 @@ const handleSubmit = async (responses: Array<{questionId: string, rating?: numbe
     console.log('✅ Respuestas enviadas exitosamente')
     setIsCompleted(true)
 
-    // Para evaluaciones de desempeño (employee-based), redirect automático
+    // Para evaluaciones de desempeño (employee-based), toast + redirect automático
     if (flowType === 'employee-based') {
-      const evaluateeName = surveyData?.participant.campaign.name || 'el colaborador'
+      const evaluateeName = surveyData?.evaluationContext?.evaluateeName || surveyData?.participant.campaign.name || 'el colaborador'
       setPostSubmitMessage(`Tu evaluacion de ${evaluateeName} ha sido enviada exitosamente.`)
+      toast.success(
+        `Tu evaluacion de ${evaluateeName} ha sido enviada correctamente.`,
+        'Evaluacion Enviada'
+      )
       setTimeout(() => {
         router.push('/dashboard/evaluaciones')
       }, 3000)
@@ -308,6 +323,7 @@ const handleSubmit = async (responses: Array<{questionId: string, rating?: numbe
       onSubmit={handleSubmit}
       onSave={handleSave}
       isSubmitting={isSubmitting}
+      evaluationContext={surveyData.evaluationContext}
     />
   )
 }

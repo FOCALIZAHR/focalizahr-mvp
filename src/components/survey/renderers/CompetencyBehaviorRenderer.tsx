@@ -2,22 +2,22 @@
 
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check } from "lucide-react";
+import { Check, MousePointerClick } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ═══════════════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════════════
 
-export interface CompetencyLabels {
+interface CompetencyLabels {
   min: string;
   max: string;
   scale: string[];
 }
 
-interface ParsedLevel {
-  id: number;
-  title: string;
+interface ParsedOption {
+  value: number;
+  label: string;
   description: string;
 }
 
@@ -31,7 +31,7 @@ interface CompetencyBehaviorRendererProps {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CONSTANTS - Alineados a focalizahr-unified.css
+// CONSTANTS
 // ═══════════════════════════════════════════════════════════════
 
 const DEFAULT_LABELS: CompetencyLabels = {
@@ -50,19 +50,19 @@ const DEFAULT_LABELS: CompetencyLabels = {
 // HELPERS
 // ═══════════════════════════════════════════════════════════════
 
-function parseLabel(labelString: string, index: number): ParsedLevel {
+function parseLabel(labelString: string, index: number): ParsedOption {
   const hasColon = labelString.includes(":");
   if (hasColon) {
-    const [title, ...descParts] = labelString.split(":");
+    const [label, ...descParts] = labelString.split(":");
     return {
-      id: index + 1,
-      title: title.trim(),
+      value: index + 1,
+      label: label.trim().toUpperCase(),
       description: descParts.join(":").trim()
     };
   }
   return {
-    id: index + 1,
-    title: `Nivel ${index + 1}`,
+    value: index + 1,
+    label: `NIVEL ${index + 1}`,
     description: labelString
   };
 }
@@ -76,170 +76,188 @@ export const CompetencyBehaviorRenderer: React.FC<CompetencyBehaviorRendererProp
   updateResponse,
   labels = DEFAULT_LABELS
 }) => {
-  const currentLevel = response?.rating || 1;
+  // Parse options from labels
+  const options: ParsedOption[] = labels.scale.map((label, idx) => parseLabel(label, idx));
+  
+  // Current selection (undefined = Estado Cero)
+  const selectedValue = response?.rating;
+  const selectedOption = options.find((o) => o.value === selectedValue);
+  const hasUserSelected = response?.rating != null && response.rating >= 1;
 
-  // Parse all labels
-  const levels: ParsedLevel[] = labels.scale.map((label, idx) => parseLabel(label, idx));
-  const activeLevel = levels.find(l => l.id === currentLevel) || levels[0];
-
-  const handleSelect = (level: number) => {
-    updateResponse({ rating: level });
+  const handleSelect = (value: number) => {
+    updateResponse({ rating: value });
   };
 
   return (
-    <div className="w-full flex flex-col gap-5">
-
+    <div className="w-full flex flex-col gap-6">
+      
       {/* ════════════════════════════════════════════════════════
-          NAVEGADOR ARRIBA - Pills con Número + Título
-          Estilos alineados al survey: fondos sutiles, slate base
+          PANTALLA VISUALIZADORA (Cinema Display)
           ════════════════════════════════════════════════════════ */}
-      <div
+      <div 
         className={cn(
-          "relative rounded-xl p-1.5",
-          "bg-slate-900/40",
-          "border border-slate-700/30"
+          "relative w-full h-[200px] md:h-[220px] rounded-2xl overflow-hidden",
+          "bg-slate-900/80 backdrop-blur-xl",
+          "border transition-all duration-500",
+          selectedOption 
+            ? "border-slate-700/50 shadow-xl shadow-purple-900/10" 
+            : "border-slate-800"
         )}
       >
-        {/* Animated Pill Background - Purple solo en activo */}
-        <motion.div
-          className={cn(
-            "absolute top-1.5 left-1.5 h-[60px] rounded-lg",
-            "bg-purple-600/80"
+        {/* ENERGY BEAM (Tesla Line) - Solo cuando hay selección */}
+        <div className="absolute top-0 left-0 right-0 h-[2px] overflow-hidden">
+          <motion.div 
+            className="w-full h-full bg-gradient-to-r from-transparent via-cyan-400 to-transparent"
+            style={{ boxShadow: "0 0 15px #22d3ee" }}
+            initial={{ x: "-100%" }}
+            animate={{ 
+              x: selectedOption ? "0%" : "-100%", 
+              opacity: selectedOption ? 1 : 0 
+            }}
+            transition={{ duration: 0.6, ease: "circOut" }}
+          />
+        </div>
+
+        {/* WATERMARK (Background Number) */}
+        <AnimatePresence mode="popLayout">
+          {selectedOption && (
+            <motion.div
+              key={`wm-${selectedOption.value}`}
+              initial={{ opacity: 0, x: 50, scale: 0.9 }}
+              animate={{ opacity: 0.06, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="absolute -bottom-8 -right-4 text-[180px] font-black text-white leading-none tracking-tighter select-none pointer-events-none z-0"
+            >
+              {selectedOption.value}
+            </motion.div>
           )}
-          initial={false}
-          animate={{
-            x: `${(currentLevel - 1) * 100}%`,
-          }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          style={{ width: `calc((100% - 12px) / 5)` }}
-        />
+        </AnimatePresence>
 
-        {/* Nav Items */}
-        <div className="relative z-10 flex">
-          {levels.map((level) => {
-            const isActive = level.id === currentLevel;
-
-            return (
-              <button
-                key={level.id}
-                onClick={() => handleSelect(level.id)}
-                className={cn(
-                  "flex-1 h-[60px]",
-                  "flex flex-col items-center justify-center gap-0.5",
-                  "rounded-lg",
-                  "transition-colors duration-200",
-                  "cursor-pointer",
-                  !isActive && "hover:bg-white/5"
-                )}
+        {/* CONTENIDO PRINCIPAL */}
+        <div className="relative z-10 w-full h-full flex flex-col items-center justify-center px-6 py-4 text-center">
+          <AnimatePresence mode="wait">
+            {!selectedOption ? (
+              /* ══════════════════════════════════════════════════
+                 ESTADO CERO - Instrucción Clara
+                 ══════════════════════════════════════════════════ */
+              <motion.div
+                key="zero"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center gap-3"
               >
-                <span
-                  className={cn(
-                    "font-mono font-bold text-sm leading-none transition-all duration-200",
-                    isActive ? "text-white" : "text-slate-500"
+                <div className="w-14 h-14 rounded-full border border-dashed border-slate-600 flex items-center justify-center bg-slate-800/30">
+                  <MousePointerClick className="w-6 h-6 text-cyan-400 animate-pulse" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-semibold text-slate-300">
+                    Seleccione un nivel para evaluar
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-500 tracking-widest uppercase">
+                    Haga clic en los números abajo
+                  </span>
+                </div>
+              </motion.div>
+            ) : (
+              /* ══════════════════════════════════════════════════
+                 ESTADO SELECCIONADO - Hero Content
+                 ══════════════════════════════════════════════════ */
+              <motion.div
+                key={selectedOption.value}
+                initial={{ y: 15, opacity: 0, filter: "blur(5px)" }}
+                animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+                exit={{ y: -15, opacity: 0, filter: "blur(5px)" }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                className="flex flex-col items-center justify-between w-full h-full"
+              >
+                {/* Fila superior: Badge izquierda + Check derecha */}
+                <div className="flex justify-between items-center w-full">
+                  <span className="font-mono text-[10px] tracking-[2px] uppercase text-cyan-400/70">
+                    Nivel 0{selectedOption.value} / 05
+                  </span>
+
+                  {hasUserSelected && (
+                    <motion.div
+                      className="relative w-8 h-8 rounded-full bg-cyan-500/20 backdrop-blur-sm border border-cyan-400/30 flex items-center justify-center overflow-hidden"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-transparent" />
+                      <Check className="w-4 h-4 text-cyan-400 relative z-10" strokeWidth={3} />
+                    </motion.div>
                   )}
-                >
-                  0{level.id}
-                </span>
-                <span
-                  className={cn(
-                    "text-[9px] uppercase tracking-wide font-semibold transition-all duration-200",
-                    "max-w-full px-1 truncate",
-                    isActive ? "text-white/90" : "text-slate-500"
-                  )}
-                >
-                  {level.title}
-                </span>
-              </button>
-            );
-          })}
+                </div>
+
+                {/* Centro: Título + Descripción */}
+                <div className="flex flex-col items-center">
+                  <h3 className="text-3xl md:text-4xl font-bold tracking-tight mb-2 leading-none uppercase bg-gradient-to-b from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+                    {selectedOption.label}
+                  </h3>
+                  <p className="text-slate-400 text-sm leading-relaxed max-w-[90%]">
+                    {selectedOption.description}
+                  </p>
+                </div>
+
+                {/* Spacer inferior para balancear */}
+                <div />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
       {/* ════════════════════════════════════════════════════════
-          VISOR ABAJO - Card con Descripción Detallada
-          ESTILOS ALINEADOS AL SURVEY (.fhr-card-question)
+          SELECTOR CIRCULAR (The Dials)
+          Consistente con RatingScaleRenderer
           ════════════════════════════════════════════════════════ */}
-      <div className="relative w-full h-[320px]">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentLevel}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.3, ease: [0.25, 1, 0.5, 1] }}
-            className={cn(
-              "absolute inset-0",
-              // ══════════════════════════════════════════════════
-              // FONDOS ALINEADOS AL SURVEY - valores exactos
-              // ══════════════════════════════════════════════════
-              "bg-slate-800/50",           // rgba(30, 41, 59, 0.5) - NO 0.8
-              "backdrop-blur-[12px]",       // blur(12px) como .fhr-card-question
-              "border border-slate-700/50", // slate, NO purple
-              "rounded-xl",
-              "p-6",
-              "flex flex-col justify-between",
-              "overflow-hidden"
-            )}
-          >
-            {/* Energy Beam - Cyan sutil, 2px */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-slate-700/30 overflow-hidden">
-              <motion.div
-                className="h-full bg-cyan-400/70"
-                initial={{ width: "0%" }}
-                animate={{ width: "100%" }}
-                transition={{ duration: 0.5, delay: 0.1 }}
-              />
-            </div>
-
-            {/* Watermark - GRANDE (180px) pero muy sutil */}
-            <motion.div
-              className={cn(
-                "absolute -bottom-6 -right-4",
-                "text-[180px] font-black leading-none",
-                "pointer-events-none select-none",
-                "text-purple-500/[0.06]"  // Muy sutil, casi invisible
-              )}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.4, delay: 0.1 }}
-            >
-              {activeLevel.id}
-            </motion.div>
-
-            {/* Content */}
-            <div className="relative z-10 flex flex-col h-full">
-              {/* Tech Label - Cyan sutil */}
-              <span className="font-mono text-[10px] tracking-[2px] uppercase text-cyan-400/70 mb-4">
-                NIVEL 0{activeLevel.id} / 05
-              </span>
-
-              {/* Title & Description */}
-              <div className="flex-1">
-                <h3 className="text-2xl font-bold text-white/90 mb-3 leading-tight">
-                  {activeLevel.title}
-                </h3>
-                <p className="text-[15px] text-slate-400 leading-relaxed">
-                  {activeLevel.description}
-                </p>
-              </div>
-
-              {/* Check Icon - Cyan moderado */}
-              <motion.div
+      <div className="w-full flex justify-between items-start px-2 md:px-4">
+        {options.map((option) => {
+          const isActive = selectedValue === option.value;
+          
+          return (
+            <div key={option.value} className="flex flex-col items-center gap-2">
+              {/* Botón Circular */}
+              <button
+                onClick={() => handleSelect(option.value)}
                 className={cn(
-                  "mt-auto self-start",
-                  "w-9 h-9 rounded-full",
-                  "bg-cyan-500/80 text-slate-900",
-                  "flex items-center justify-center"
+                  "relative flex items-center justify-center transition-all duration-300 outline-none",
+                  "w-12 h-12 md:w-14 md:h-14 rounded-full",
+                  isActive 
+                    ? "bg-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)] scale-110 -translate-y-1" 
+                    : "bg-slate-800/50 border border-slate-700 text-slate-400 hover:border-slate-500 hover:bg-slate-700/80 hover:text-white hover:scale-105"
                 )}
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 400, damping: 20, delay: 0.2 }}
               >
-                <Check className="w-4 h-4" strokeWidth={3} />
-              </motion.div>
+                {/* Número */}
+                <span className={cn(
+                  "font-mono text-lg md:text-xl font-bold z-10",
+                  isActive ? "text-slate-900" : "text-inherit"
+                )}>
+                  {option.value}
+                </span>
+
+                {/* Anillo exterior animado (solo activo) */}
+                {isActive && (
+                  <motion.div
+                    layoutId="competencyActiveRing"
+                    className="absolute inset-[-4px] rounded-full border-2 border-cyan-400/30"
+                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                  />
+                )}
+              </button>
+              
+              {/* Label SIEMPRE visible */}
+              <span className={cn(
+                "text-[9px] md:text-[10px] font-semibold uppercase tracking-wide transition-all duration-300 text-center max-w-[60px] leading-tight",
+                isActive ? "text-cyan-400" : "text-slate-500"
+              )}>
+                {option.label}
+              </span>
             </div>
-          </motion.div>
-        </AnimatePresence>
+          );
+        })}
       </div>
     </div>
   );

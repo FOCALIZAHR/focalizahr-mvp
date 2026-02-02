@@ -116,7 +116,13 @@ export async function GET(request: NextRequest) {
       include: {
         cycle: true,
         participant: {
-          select: { uniqueToken: true }
+          select: {
+            uniqueToken: true,
+            id: true,
+            responses: {
+              select: { normalizedScore: true, rating: true }
+            }
+          }
         },
         evaluatee: {
           select: {
@@ -132,24 +138,53 @@ export async function GET(request: NextRequest) {
     });
 
     // Mapear a formato de UI
-    const mappedAssignments = assignments.map(a => ({
-      id: a.id,
-      status: a.status.toLowerCase(),
-      completedAt: a.status === 'COMPLETED' ? a.updatedAt.toISOString() : undefined,
-      dueDate: a.dueDate?.toISOString(),
-      evaluationType: a.evaluationType,
-      evaluatee: {
-        id: a.evaluateeId,
-        fullName: a.evaluateeName,
-        position: a.evaluateePosition,
-        departmentName: a.evaluateeDepartment,
-        tenure: calculateTenureString(a.evaluatee.hireDate)
-      },
-      participantToken: a.participant?.uniqueToken || null,
-      surveyUrl: a.participant?.uniqueToken
-        ? `/encuesta/${a.participant.uniqueToken}`
-        : null
-    }))
+    const mappedAssignments = assignments.map(a => {
+      // Calculate avgScore for completed assignments (0-100 scale)
+      let avgScore: number | null = null
+      if (a.status === 'COMPLETED' && a.participant?.responses?.length) {
+        // Try normalizedScore first (0-100)
+        const normalizedScores = a.participant.responses
+          .map(r => r.normalizedScore)
+          .filter((s): s is number => s !== null)
+
+        if (normalizedScores.length > 0) {
+          avgScore = normalizedScores.reduce((sum, s) => sum + s, 0) / normalizedScores.length
+        } else {
+          // Fallback: calculate from rating (1-5) → convert to 0-100
+          const ratings = a.participant.responses
+            .map(r => r.rating)
+            .filter((r): r is number => r !== null)
+          if (ratings.length > 0) {
+            const avgRating = ratings.reduce((sum, r) => sum + r, 0) / ratings.length
+            avgScore = (avgRating / 5) * 100
+          }
+        }
+      }
+
+      if (a.status === 'COMPLETED') {
+        console.log(`[API] Assignment ${a.id}: participant=${!!a.participant}, responses=${a.participant?.responses?.length ?? 0}, avgScore=${avgScore}`)
+      }
+
+      return {
+        id: a.id,
+        status: a.status.toLowerCase(),
+        completedAt: a.status === 'COMPLETED' ? a.updatedAt.toISOString() : undefined,
+        dueDate: a.dueDate?.toISOString(),
+        evaluationType: a.evaluationType,
+        avgScore,
+        evaluatee: {
+          id: a.evaluateeId,
+          fullName: a.evaluateeName,
+          position: a.evaluateePosition,
+          departmentName: a.evaluateeDepartment,
+          tenure: calculateTenureString(a.evaluatee.hireDate)
+        },
+        participantToken: a.participant?.uniqueToken || null,
+        surveyUrl: a.participant?.uniqueToken
+          ? `/encuesta/${a.participant.uniqueToken}`
+          : null
+      }
+    })
 
     // Stats
     const completed = mappedAssignments.filter(a => a.status === 'completed').length

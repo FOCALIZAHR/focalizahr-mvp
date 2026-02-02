@@ -154,6 +154,16 @@ export default function NewCampaignPage() {
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
 
   // ════════════════════════════════════════════════════════════════════════════
+  // TIPOS DE EVALUACIÓN 360°
+  // ════════════════════════════════════════════════════════════════════════════
+  const [evaluationTypes, setEvaluationTypes] = useState({
+    includesManager: true,
+    includesSelf: false,
+    includesUpward: false,
+    includesPeer: false
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════
   // SUCCESS STATE: Pantalla de éxito después de crear Campaign + Cycle
   // ════════════════════════════════════════════════════════════════════════════
   const [creationSuccess, setCreationSuccess] = useState<{
@@ -397,6 +407,11 @@ export default function NewCampaignPage() {
         if (eligibilitySummary.eligible < 5) {
           errors.participants = 'Se requieren al menos 5 participantes elegibles';
         }
+        // Validar al menos un tipo de evaluación seleccionado
+        if (!evaluationTypes.includesManager && !evaluationTypes.includesSelf &&
+            !evaluationTypes.includesUpward && !evaluationTypes.includesPeer) {
+          errors.evaluationTypes = 'Selecciona al menos un tipo de evaluación';
+        }
       } else {
         // Validación para concierge flow
         if (formData.estimatedParticipants < 5) {
@@ -526,10 +541,7 @@ export default function NewCampaignPage() {
             startDate: formData.startDate,
             endDate: formData.endDate,
             cycleType: 'QUARTERLY',
-            includesSelf: false,
-            includesManager: true,
-            includesPeer: false,
-            includesUpward: false,
+            ...evaluationTypes,
             anonymousResults: formData.anonymousResults,
             minSubordinates: 3
           })
@@ -1063,11 +1075,101 @@ export default function NewCampaignPage() {
                       </CardContent>
                     </Card>
 
-                    {/* Validation Error */}
+                    {/* Tipos de Evaluación 360° */}
+                    <Card className="professional-card">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Users className="h-5 w-5" />
+                          Tipos de Evaluación a Incluir
+                        </CardTitle>
+                        <CardDescription>
+                          Selecciona las perspectivas que deseas incluir en este ciclo de evaluación
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <label className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 border border-border cursor-pointer hover:border-primary/50 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={evaluationTypes.includesManager}
+                              onChange={(e) => setEvaluationTypes(prev => ({ ...prev, includesManager: e.target.checked }))}
+                              className="mt-1 h-4 w-4 rounded border-input"
+                            />
+                            <div>
+                              <span className="text-sm font-medium">Jefe → Colaborador</span>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                El supervisor evalúa a sus reportes directos
+                              </p>
+                            </div>
+                          </label>
+
+                          <label className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 border border-border cursor-pointer hover:border-primary/50 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={evaluationTypes.includesSelf}
+                              onChange={(e) => setEvaluationTypes(prev => ({ ...prev, includesSelf: e.target.checked }))}
+                              className="mt-1 h-4 w-4 rounded border-input"
+                            />
+                            <div>
+                              <span className="text-sm font-medium">Autoevaluación</span>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Cada persona evalúa su propio desempeño
+                              </p>
+                            </div>
+                          </label>
+
+                          <label className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 border border-border cursor-pointer hover:border-primary/50 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={evaluationTypes.includesUpward}
+                              onChange={(e) => setEvaluationTypes(prev => ({ ...prev, includesUpward: e.target.checked }))}
+                              className="mt-1 h-4 w-4 rounded border-input"
+                            />
+                            <div>
+                              <span className="text-sm font-medium">Colaborador → Jefe</span>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Feedback ascendente anónimo (mín. 3 subordinados)
+                              </p>
+                            </div>
+                          </label>
+
+                          <label className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 border border-border cursor-pointer hover:border-primary/50 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={evaluationTypes.includesPeer}
+                              onChange={(e) => setEvaluationTypes(prev => ({ ...prev, includesPeer: e.target.checked }))}
+                              className="mt-1 h-4 w-4 rounded border-input"
+                            />
+                            <div>
+                              <span className="text-sm font-medium">Entre Pares</span>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Colegas del mismo departamento se evalúan mutuamente
+                              </p>
+                            </div>
+                          </label>
+                        </div>
+
+                        {!evaluationTypes.includesManager && !evaluationTypes.includesSelf &&
+                         !evaluationTypes.includesUpward && !evaluationTypes.includesPeer && (
+                          <p className="text-sm text-destructive flex items-center gap-1 mt-3">
+                            <AlertTriangle className="w-3 h-3" />
+                            Selecciona al menos un tipo de evaluación
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Validation Errors */}
                     {validationErrors.participants && (
                       <Alert className="border-destructive">
                         <AlertTriangle className="h-4 w-4" />
                         <AlertDescription>{validationErrors.participants}</AlertDescription>
+                      </Alert>
+                    )}
+                    {validationErrors.evaluationTypes && (
+                      <Alert className="border-destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>{validationErrors.evaluationTypes}</AlertDescription>
                       </Alert>
                     )}
                   </>
@@ -1246,10 +1348,23 @@ export default function NewCampaignPage() {
                         </dd>
                       </div>
                       {isEmployeeBasedFlow && (
-                        <div>
-                          <dt className="text-muted-foreground">Excluidos:</dt>
-                          <dd className="font-medium text-amber-500">{eligibilitySummary.excluded}</dd>
-                        </div>
+                        <>
+                          <div>
+                            <dt className="text-muted-foreground">Excluidos:</dt>
+                            <dd className="font-medium text-amber-500">{eligibilitySummary.excluded}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground">Tipos de Evaluación:</dt>
+                            <dd className="font-medium">
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {evaluationTypes.includesManager && <Badge variant="outline">Jefe → Colaborador</Badge>}
+                                {evaluationTypes.includesSelf && <Badge variant="outline">Autoevaluación</Badge>}
+                                {evaluationTypes.includesUpward && <Badge variant="outline">Colaborador → Jefe</Badge>}
+                                {evaluationTypes.includesPeer && <Badge variant="outline">Entre Pares</Badge>}
+                              </div>
+                            </dd>
+                          </div>
+                        </>
                       )}
                       <div>
                         <dt className="text-muted-foreground">Tiempo por Participante:</dt>

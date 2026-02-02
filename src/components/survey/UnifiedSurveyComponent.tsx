@@ -61,6 +61,13 @@ interface UnifiedSurveyProps {
   onSubmit: (responses: SurveyResponse[]) => void;
   onSave?: (responses: SurveyResponse[]) => void;
   isSubmitting?: boolean;
+  evaluationContext?: {
+    evaluateeName: string;
+    evaluateePosition?: string | null;
+    evaluateeDepartment?: string;
+    evaluationType: string;
+    evaluateeTrack?: string | null;
+  } | null;
 }
 
 // ========================================
@@ -79,7 +86,8 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
   estimatedDuration = 10,
   onSubmit,
   onSave,
-  isSubmitting = false
+  isSubmitting = false,
+  evaluationContext
 }) => {
   // Estado para controlar la pantalla de bienvenida
   const [showWelcome, setShowWelcome] = useState(true);
@@ -288,12 +296,13 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
   return (
     <div className="survey-container">
       {/* Header fijo con progress bar */}
-      <SurveyHeader 
+      <SurveyHeader
         companyName={companyName}
         campaignName={campaignName}
         campaignTypeName={campaignTypeName}
         progress={progress}
         estimatedDuration={estimatedDuration}
+        evaluationContext={evaluationContext}
       />
 
       {/* Contenido principal con padding para header */}
@@ -422,6 +431,9 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
         onConfirm={handleConfirmSubmit}
         questions={questions}
         responses={responses}
+        evaluateeName={evaluationContext?.evaluateeName}
+        evaluateePosition={evaluationContext?.evaluateePosition ?? undefined}
+        evaluateeDepartment={evaluationContext?.evaluateeDepartment}
         isSubmitting={isSubmitting}
       />
     </div>

@@ -1,5 +1,6 @@
 // src/hooks/useSurveyEngine.ts
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { isResponseAnswered } from '@/lib/validators/responseValidator';
 
 // ========================================
 // TIPOS E INTERFACES
@@ -24,6 +25,8 @@ export interface Question {
   minLabel?: string | null;
   maxLabel?: string | null;
   scaleLabels?: string[] | null;
+  competencyCode?: string | null;
+  competencyName?: string | null;
 }
 
 export interface SurveyResponse {
@@ -276,30 +279,14 @@ export function useSurveyEngine(
       }
     }
 
-    switch (currentQuestion.responseType) {
-      case 'text_open':
-        return response.textResponse && response.textResponse.trim().length >= 10;
-      case 'multiple_choice':
-        return response.choiceResponse && response.choiceResponse.length > 0;
-      case 'rating_matrix_conditional':
-        const requiredAspects = selectedAspects.length;
-        const completedAspects = Object.keys(response.matrixResponses || {}).length;
-        return completedAspects === requiredAspects && requiredAspects > 0;
-      case 'rating_scale':
-        return response.rating && response.rating >= 1 && response.rating <= 5;
-      case 'competency_behavior':
-        return response.rating !== undefined &&
-          response.rating >= 1 &&
-          response.rating <= 5;
-      case 'nps_scale':
-        return response.rating !== undefined &&
-          response.rating >= 0 &&
-          response.rating <= 10;
-      case 'single_choice':
-        return response.choiceResponse && response.choiceResponse.length === 1;
-      default:
-        return false;
+    // rating_matrix_conditional has specialized logic with selectedAspects
+    if (currentQuestion.responseType === 'rating_matrix_conditional') {
+      const requiredAspects = selectedAspects.length;
+      const completedAspects = Object.keys(response.matrixResponses || {}).length;
+      return completedAspects === requiredAspects && requiredAspects > 0;
     }
+
+    return isResponseAnswered(currentQuestion, response);
   }, [currentQuestion, getCurrentResponse, config.validationRules, selectedAspects]);
 
   // Navegación (memoizado)

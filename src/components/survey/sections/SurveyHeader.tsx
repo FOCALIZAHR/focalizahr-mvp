@@ -8,20 +8,47 @@ interface SurveyHeaderProps {
   companyName?: string;
   companyLogo?: string;
   campaignName?: string;
-  campaignTypeName?: string;      // ← AGREGAR
-  estimatedDuration?: number;     // ← AGREGAR
+  campaignTypeName?: string;
+  estimatedDuration?: number;
   progress: {
     current: number;
     total: number;
     percentage: number;
   };
+  evaluationContext?: {
+    evaluateeName: string;
+    evaluateePosition?: string | null;
+    evaluateeDepartment?: string;
+    evaluationType: string;
+    evaluateeTrack?: string | null;
+  } | null;
 }
+
+const formatEvaluationType = (type: string): string => {
+  const labels: Record<string, string> = {
+    'SELF': 'Autoevaluacion',
+    'MANAGER_TO_EMPLOYEE': 'Jefe \u2192 Colaborador',
+    'EMPLOYEE_TO_MANAGER': 'Colaborador \u2192 Jefe',
+    'PEER': 'Entre Pares'
+  };
+  return labels[type] || type;
+};
+
+const formatTrack = (track: string | null | undefined): string => {
+  const labels: Record<string, string> = {
+    'COLABORADOR': 'Colaborador',
+    'MANAGER': 'Manager',
+    'EJECUTIVO': 'Ejecutivo'
+  };
+  return labels[track || ''] || '';
+};
 
 export const SurveyHeader: React.FC<SurveyHeaderProps> = ({
   companyName = "Empresa",
   companyLogo,
   campaignName = "Encuesta",
-  progress
+  progress,
+  evaluationContext
 }) => {
   return (
     <>
@@ -38,11 +65,11 @@ export const SurveyHeader: React.FC<SurveyHeaderProps> = ({
         <div className="max-w-3xl mx-auto">
           <div className="px-8 pt-6 pb-4 pointer-events-auto">
             
-            {/* Línea 1: Logo/Empresa + Badge */}
-            <div className="flex justify-between items-center mb-2">
+            {/* Línea 1: Empresa | Nombre evaluado (centro) | Confidencial */}
+            <div className="flex justify-between items-start mb-2">
               {companyLogo ? (
-                <img 
-                  src={companyLogo} 
+                <img
+                  src={companyLogo}
                   alt={companyName}
                   className="h-5 w-auto opacity-70"
                 />
@@ -50,6 +77,17 @@ export const SurveyHeader: React.FC<SurveyHeaderProps> = ({
                 <span className="text-xs text-slate-500">
                   {companyName}
                 </span>
+              )}
+
+              {evaluationContext && (
+                <div className="flex flex-col items-center">
+                  <span className="text-sm text-cyan-400 font-semibold">
+                    {evaluationContext.evaluateeName}
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    {formatTrack(evaluationContext.evaluateeTrack)}{formatTrack(evaluationContext.evaluateeTrack) && ' · '}{formatEvaluationType(evaluationContext.evaluationType)}
+                  </span>
+                </div>
               )}
 
               <div className="flex items-center gap-2">
