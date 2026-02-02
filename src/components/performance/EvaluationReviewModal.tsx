@@ -23,61 +23,25 @@ import {
 import type { Question, SurveyResponse } from '@/hooks/useSurveyEngine'
 import { isResponseAnswered } from '@/lib/validators/responseValidator'
 import { PrimaryButton, GhostButton, ButtonGroup } from '@/components/ui/PremiumButton'
+import {
+  getPerformanceClassification,
+  PerformanceLevel
+} from '@/config/performanceClassification'
 
 // ════════════════════════════════════════════════════════════════════════════
-// CLASSIFICATION - Alineada al motor (getScale5Classification)
-// Lucide icons, NO emojis
+// ICON MAP - UI concern, maps centralized levels to Lucide icons
 // ════════════════════════════════════════════════════════════════════════════
 
-const PERFORMANCE_CLASSIFICATION = {
-  exceptional: {
-    min: 4.5,
-    label: 'Excepcional',
-    Icon: Star,
-    bgClass: 'bg-cyan-500/10',
-    textClass: 'text-cyan-400',
-    borderClass: 'border-cyan-500/30'
-  },
-  good: {
-    min: 4.0,
-    label: 'Buen Desempe\u00f1o',
-    Icon: CheckCircle,
-    bgClass: 'bg-emerald-500/10',
-    textClass: 'text-emerald-400',
-    borderClass: 'border-emerald-500/30'
-  },
-  meets: {
-    min: 3.5,
-    label: 'Cumple Expectativas',
-    Icon: CheckCircle,
-    bgClass: 'bg-emerald-500/10',
-    textClass: 'text-emerald-400',
-    borderClass: 'border-emerald-500/30'
-  },
-  developing: {
-    min: 2.5,
-    label: 'En Desarrollo',
-    Icon: TrendingUp,
-    bgClass: 'bg-amber-500/10',
-    textClass: 'text-amber-400',
-    borderClass: 'border-amber-500/30'
-  },
-  needs: {
-    min: 0,
-    label: 'Requiere Atencion',
-    Icon: AlertTriangle,
-    bgClass: 'bg-red-500/10',
-    textClass: 'text-red-400',
-    borderClass: 'border-red-500/30'
-  }
-} as const
+const LEVEL_ICONS: Record<string, typeof Star> = {
+  [PerformanceLevel.EXCEPTIONAL]: Star,
+  [PerformanceLevel.EXCEEDS]: CheckCircle,
+  [PerformanceLevel.MEETS]: CheckCircle,
+  [PerformanceLevel.DEVELOPING]: TrendingUp,
+  [PerformanceLevel.NEEDS_IMPROVEMENT]: AlertTriangle
+}
 
-function getPerformanceClassification(score: number) {
-  if (score >= 4.5) return PERFORMANCE_CLASSIFICATION.exceptional
-  if (score >= 4.0) return PERFORMANCE_CLASSIFICATION.good
-  if (score >= 3.5) return PERFORMANCE_CLASSIFICATION.meets
-  if (score >= 2.5) return PERFORMANCE_CLASSIFICATION.developing
-  return PERFORMANCE_CLASSIFICATION.needs
+function getClassificationIcon(level: string) {
+  return LEVEL_ICONS[level] || CheckCircle
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -315,12 +279,14 @@ function EvaluationReviewModal({
 
                   {/* Clasificacion con icono Lucide */}
                   <div className="text-center">
+                    {(() => { const Icon = getClassificationIcon(summary.classification.level); return (
                     <div className={`flex items-center justify-center gap-2 ${summary.classification.textClass}`}>
-                      <summary.classification.Icon className="w-5 h-5" />
+                      <Icon className="w-5 h-5" />
                       <span className="text-lg font-medium">
                         {summary.classification.label}
                       </span>
                     </div>
+                    ) })()}
                     <div className="text-xs text-slate-500 uppercase tracking-wider mt-1">
                       Clasificacion
                     </div>

@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, CheckCircle2, Eye } from 'lucide-react'
 import { getInitials } from '@/lib/utils/formatName'
 import { StatusBadge } from './StatusBadge'
 import InsightCard from './InsightCard'
+import { PerformanceResultCard } from '@/components/performance/PerformanceResultCard'
 import type { SpotlightCardProps } from '@/types/evaluator-cinema'
 
 export default function SpotlightCard({
@@ -21,7 +22,7 @@ export default function SpotlightCard({
       transition={{ type: 'spring', stiffness: 220, damping: 30 }}
       className="w-full max-w-5xl"
     >
-      <div className="bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[24px] overflow-hidden shadow-2xl flex flex-col md:flex-row relative">
+      <div className="bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[24px] shadow-2xl flex flex-col md:flex-row relative max-h-[90vh] md:max-h-none overflow-y-auto md:overflow-visible">
 
         {/* LINEA TESLA */}
         <div
@@ -71,17 +72,33 @@ export default function SpotlightCard({
         </div>
 
         {/* COLUMNA DERECHA: Inteligencia (65%) */}
-        <div className="w-full md:w-[65%] p-10 md:p-12 flex flex-col justify-between bg-gradient-to-br from-[#0F172A] to-[#162032]">
+        <div className="w-full md:w-[65%] p-6 md:p-8 flex flex-col justify-between bg-gradient-to-br from-[#0F172A] to-[#162032]">
 
           {/* Grid de datos */}
-          <div className="grid grid-cols-2 gap-4 mb-8">
-            {employee.insights.map((insight) => (
-              <InsightCard key={insight.type} insight={insight} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+            {employee.insights.map((insight, idx) => (
+              insight.type === 'resultado' ? (
+                <PerformanceResultCard
+                  key={idx}
+                  score={employee.avgScore ?? 0}
+                  variant="compact"
+                />
+              ) : (
+                <InsightCard
+                  key={insight.type}
+                  insight={insight}
+                  rawDate={
+                    insight.type === 'completedAt' ? employee.completedAt :
+                    insight.type === 'dueDate' ? employee.dueDate :
+                    undefined
+                  }
+                />
+              )
             ))}
           </div>
 
           {/* CTAs */}
-          <div className="flex items-center gap-4 mt-auto pt-6 border-t border-slate-800">
+          <div className="flex items-center gap-4 mt-auto pt-4 border-t border-slate-800">
 
             {/* CTA Primario */}
             {employee.status !== 'completed' && employee.participantToken && (

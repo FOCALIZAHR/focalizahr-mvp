@@ -10,6 +10,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { ArrowLeft, CheckCircle2, Clock, AlertTriangle } from 'lucide-react'
 import { formatDisplayNameFull } from '@/lib/utils/formatName'
+import { getPerformanceClassification } from '@/config/performanceClassification'
 
 interface CategorizedResponse {
   questionId: string
@@ -160,21 +161,58 @@ export default function EvaluationSummaryPage() {
           </div>
         </div>
 
-        {/* Average score - convert from 0-100 to 1-5 scale */}
-        {summary.averageScore !== null && summary.averageScore !== undefined && (
-          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-6 mb-6 text-center">
-            <p className="text-slate-400 text-sm mb-2">Score Promedio</p>
-            <p className="text-4xl font-bold text-cyan-400">
-              {(summary.averageScore / 20).toFixed(1)}<span className="text-xl text-slate-500">/5</span>
-            </p>
-            <p className="text-sm text-slate-500 mt-1">
-              {summary.averageScore / 20 >= 4.5 ? 'Excepcional' :
-               summary.averageScore / 20 >= 4.0 ? 'Excelente' :
-               summary.averageScore / 20 >= 3.5 ? 'Competente' :
-               summary.averageScore / 20 >= 3.0 ? 'En Desarrollo' : 'Necesita Apoyo'}
-            </p>
-          </div>
-        )}
+        {/* Resultado - Card premium con línea Tesla */}
+        {summary.averageScore !== null && summary.averageScore !== undefined && (() => {
+          const avgScore = summary.averageScore / 20
+          const classification = getPerformanceClassification(avgScore)
+          const progressPercent = (avgScore / 5) * 100
+
+          return (
+            <div className="fhr-card relative overflow-hidden mb-6">
+              {/* Línea Tesla - color dinámico */}
+              <div
+                className="absolute top-0 left-0 right-0 h-px"
+                style={{
+                  background: `linear-gradient(90deg, transparent, ${classification.color}, transparent)`
+                }}
+              />
+
+              <div className="p-4">
+                {/* Label */}
+                <p className="text-xs uppercase tracking-wider text-slate-500 mb-3">
+                  Resultado
+                </p>
+
+                {/* Clasificación - PROTAGONISTA */}
+                <p
+                  className="text-base font-medium mb-3"
+                  style={{ color: classification.color }}
+                >
+                  {classification.label}
+                </p>
+
+                {/* Barra + Nota */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700 ease-out"
+                      style={{
+                        width: `${progressPercent}%`,
+                        background: `linear-gradient(90deg, ${classification.color}80, ${classification.color})`
+                      }}
+                    />
+                  </div>
+                  <span
+                    className="text-sm font-semibold tabular-nums"
+                    style={{ color: classification.color }}
+                  >
+                    {avgScore.toFixed(1)}/5
+                  </span>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Responses by category */}
         {Object.entries(summary.categorizedResponses).map(([category, responses]) => (

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import WelcomeScreenManager from '@/components/survey/WelcomeScreenManager'
+import { PerformanceResultCard } from '@/components/performance/PerformanceResultCard'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -376,14 +377,12 @@ function EvaluationSummaryView({
             </p>
           </div>
 
-          {/* Score Promedio */}
+          {/* Card Resultado - FocalizaHR Premium */}
           {summary.averageScore != null && (
-            <div className="text-center flex-shrink-0">
-              <div className="text-3xl font-bold text-cyan-400">
-                {summary.averageScore.toFixed(0)}
-              </div>
-              <div className="text-xs text-slate-400">Score Promedio</div>
-            </div>
+            <PerformanceResultCard
+              score={summary.averageScore}
+              variant="compact"
+            />
           )}
         </div>
       </motion.div>

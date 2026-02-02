@@ -1,11 +1,12 @@
 // src/lib/utils/calculateInsights.ts
 // Dynamic insight calculation for Cinema Mode SpotlightCard
 
-import { Calendar, TrendingUp, AlertTriangle, CheckCircle2, ClipboardList, Clock, Award } from 'lucide-react'
+import { Calendar, AlertTriangle, CheckCircle2, ClipboardList, Clock, Award } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { getPerformanceClassification, PerformanceLevel } from '@/config/performanceClassification'
 
 export interface Insight {
-  type: 'tenure' | 'lastScore' | 'gap' | 'selfEval' | 'evaluationType' | 'dueDate' | 'completedAt' | 'category'
+  type: 'tenure' | 'resultado' | 'gap' | 'selfEval' | 'evaluationType' | 'dueDate' | 'completedAt'
   icon: LucideIcon
   label: string
   value: string
@@ -46,11 +47,15 @@ function isUrgent(dateStr: string): boolean {
 }
 
 function getCategory(scoreOn5: number): { label: string; variant: 'default' | 'warning' | 'success' } {
-  if (scoreOn5 >= 4.5) return { label: 'Excepcional', variant: 'success' }
-  if (scoreOn5 >= 4.0) return { label: 'Excelente', variant: 'success' }
-  if (scoreOn5 >= 3.5) return { label: 'Competente', variant: 'default' }
-  if (scoreOn5 >= 3.0) return { label: 'En Desarrollo', variant: 'warning' }
-  return { label: 'Necesita Apoyo', variant: 'warning' }
+  const classification = getPerformanceClassification(scoreOn5)
+  const level = classification.level
+  if (level === PerformanceLevel.EXCEPTIONAL || level === PerformanceLevel.EXCEEDS) {
+    return { label: classification.label, variant: 'success' }
+  }
+  if (level === PerformanceLevel.MEETS) {
+    return { label: classification.label, variant: 'default' }
+  }
+  return { label: classification.label, variant: 'warning' }
 }
 
 export function calculateInsights(employee: EmployeeData): Insight[] {
@@ -87,24 +92,16 @@ export function calculateInsights(employee: EmployeeData): Insight[] {
     })
   }
 
-  // Average score (only for completed) - convert from 0-100 to 1-5 scale
+  // Result: score + classification combined (only for completed)
   if (employee.status === 'completed' && employee.avgScore != null) {
     const scoreOn5 = employee.avgScore / 20
     const category = getCategory(scoreOn5)
 
     insights.push({
-      type: 'lastScore',
-      icon: TrendingUp,
-      label: 'Score Promedio',
-      value: `${scoreOn5.toFixed(1)}/5`,
-      variant: 'success'
-    })
-
-    insights.push({
-      type: 'category',
+      type: 'resultado',
       icon: Award,
-      label: 'Categoria',
-      value: category.label,
+      label: 'Resultado',
+      value: `${scoreOn5.toFixed(1)}/5 · ${category.label}`,
       variant: category.variant
     })
   }
