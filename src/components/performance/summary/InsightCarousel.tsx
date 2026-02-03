@@ -267,10 +267,7 @@ export default memo(function InsightCarousel({
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-3">
                   {config.actionLabel}
                 </p>
-                <p className={cn(
-                  'text-base font-medium italic leading-relaxed',
-                  config.accentColor
-                )}>
+                <p className="text-base font-medium italic leading-relaxed text-slate-300">
                   "{current.action}"
                 </p>
               </div>
