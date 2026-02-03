@@ -20,13 +20,15 @@ import type { CinemaSummaryData, CompetencyScoreSummary } from '@/types/evaluato
 
 interface CinemaSummaryOrchestratorProps {
   summary: CinemaSummaryData
+  /** Contenido custom para inyectar en columna derecha del header */
+  rightColumnSlot?: React.ReactNode
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 
-export default function CinemaSummaryOrchestrator({ summary }: CinemaSummaryOrchestratorProps) {
+export default function CinemaSummaryOrchestrator({ summary, rightColumnSlot }: CinemaSummaryOrchestratorProps) {
   // ═══════════════════════════════════════════════════════════════════════
   // STATE
   // ═══════════════════════════════════════════════════════════════════════
@@ -89,6 +91,7 @@ export default function CinemaSummaryOrchestrator({ summary }: CinemaSummaryOrch
           completedAt={summary.completedAt}
           score={summary.overallScore || summary.averageScore}
           gapAnalysis={summary.gapAnalysis}
+          rightColumnSlot={rightColumnSlot}
         />
 
         {/* Carrusel de Competencias */}

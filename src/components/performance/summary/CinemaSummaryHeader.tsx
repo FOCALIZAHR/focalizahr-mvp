@@ -16,6 +16,15 @@ import { getPerformanceClassification } from '@/config/performanceClassification
 import type { CinemaSummaryHeaderProps } from '@/types/evaluator-cinema'
 
 // ═══════════════════════════════════════════════════════════════════════════
+// EXTENDED PROPS - Permite inyectar contenido custom en columna derecha
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface ExtendedHeaderProps extends CinemaSummaryHeaderProps {
+  /** Contenido custom para la columna derecha (reemplaza PerformanceResultCard si se provee) */
+  rightColumnSlot?: React.ReactNode
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -23,8 +32,9 @@ export default memo(function CinemaSummaryHeader({
   evaluatee,
   completedAt,
   score,
-  gapAnalysis
-}: CinemaSummaryHeaderProps) {
+  gapAnalysis,
+  rightColumnSlot
+}: ExtendedHeaderProps) {
   const router = useRouter()
 
   // Formatear nombre PRIMERO, luego extraer iniciales
@@ -114,52 +124,59 @@ export default memo(function CinemaSummaryHeader({
 
       {/* ═══════════════════════════════════════════════════════════════════
           COLUMNA DERECHA: Resultado + Insights (65%)
-          PerformanceResultCard + Badges de Gap Analysis
+          Usa rightColumnSlot si se provee, sino PerformanceResultCard default
       ═══════════════════════════════════════════════════════════════════ */}
       <div className="w-full md:w-[65%] p-6 md:p-8 flex flex-col justify-center bg-gradient-to-br from-[#0F172A] to-[#162032]">
 
-        {/* Score Principal - Usando componente existente */}
-        {scoreOn5 !== null && (
-          <div className="mb-6">
-            <PerformanceResultCard
-              score={scoreOn5 * 20}
-              variant="expanded"
-              className="max-w-sm"
-            />
-          </div>
-        )}
+        {/* Si hay slot custom, usarlo. Sino, contenido por defecto */}
+        {rightColumnSlot ? (
+          rightColumnSlot
+        ) : (
+          <>
+            {/* Score Principal - Usando componente existente */}
+            {scoreOn5 !== null && (
+              <div className="mb-6">
+                <PerformanceResultCard
+                  score={scoreOn5 * 20}
+                  variant="expanded"
+                  className="max-w-sm"
+                />
+              </div>
+            )}
 
-        {/* Gap Insights - Fortalezas y Áreas de Desarrollo */}
-        {gapAnalysis && (
-          <div className="flex flex-wrap gap-2">
-            {gapAnalysis.strengths.slice(0, 2).map((s) => (
-              <span
-                key={s.competencyCode}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-              >
-                <span>{'\uD83D\uDD25'}</span>
-                <span>{s.competencyName}</span>
-              </span>
-            ))}
+            {/* Gap Insights - Fortalezas y Áreas de Desarrollo */}
+            {gapAnalysis && (
+              <div className="flex flex-wrap gap-2">
+                {gapAnalysis.strengths.slice(0, 2).map((s) => (
+                  <span
+                    key={s.competencyCode}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                  >
+                    <span>{'\uD83D\uDD25'}</span>
+                    <span>{s.competencyName}</span>
+                  </span>
+                ))}
 
-            {gapAnalysis.developmentAreas.slice(0, 2).map((d) => (
-              <span
-                key={d.competencyCode}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20"
-              >
-                <span>{'\u26A0\uFE0F'}</span>
-                <span>{d.competencyName}</span>
-              </span>
-            ))}
-          </div>
-        )}
+                {gapAnalysis.developmentAreas.slice(0, 2).map((d) => (
+                  <span
+                    key={d.competencyCode}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                  >
+                    <span>{'\u26A0\uFE0F'}</span>
+                    <span>{d.competencyName}</span>
+                  </span>
+                ))}
+              </div>
+            )}
 
-        {/* Fallback si no hay score ni gap */}
-        {scoreOn5 === null && !gapAnalysis && (
-          <div className="text-center py-8">
-            <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-            <p className="text-slate-300">Evaluación completada exitosamente</p>
-          </div>
+            {/* Fallback si no hay score ni gap */}
+            {scoreOn5 === null && !gapAnalysis && (
+              <div className="text-center py-8">
+                <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
+                <p className="text-slate-300">Evaluación completada exitosamente</p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </motion.div>

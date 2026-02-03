@@ -5,14 +5,20 @@
 // src/app/dashboard/evaluaciones/[assignmentId]/page.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
+import { motion } from 'framer-motion'
 import {
   ArrowLeft,
-  AlertTriangle
+  AlertTriangle,
+  FileText,
+  Users,
+  Bell
 } from 'lucide-react'
 import WelcomeScreenManager from '@/components/survey/WelcomeScreenManager'
 import CinemaSummaryOrchestrator from './components/CinemaSummaryOrchestrator'
+import TeamCalibrationHUD from '@/components/performance/TeamCalibrationHUD'
+import ManagementAlertsHUD from '@/components/performance/ManagementAlertsHUD'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -244,6 +250,72 @@ export default function EvaluacionDetallePage() {
 // SUBCOMPONENT: Evaluation Summary - Cinema Mode View
 // ════════════════════════════════════════════════════════════════════════════
 
+// ════════════════════════════════════════════════════════════════════════════
+// TOGGLE DE 3 OPCIONES - Inline Component
+// ════════════════════════════════════════════════════════════════════════════
+
+type ViewMode = 'respuestas' | 'calibracion' | 'alertas'
+
+interface ToggleOption {
+  value: ViewMode
+  label: string
+  icon: React.ElementType
+}
+
+function ThreeWayToggle({
+  options,
+  activeValue,
+  onChange
+}: {
+  options: ToggleOption[]
+  activeValue: ViewMode
+  onChange: (value: ViewMode) => void
+}) {
+  return (
+    <div
+      className="inline-flex gap-2 p-1 rounded-2xl"
+      style={{
+        background: 'rgba(15, 23, 42, 0.4)',
+        backdropFilter: 'blur(20px)',
+        border: '1px solid rgba(71, 85, 105, 0.2)'
+      }}
+    >
+      {options.map((option, index) => {
+        const isActive = option.value === activeValue
+        const Icon = option.icon
+
+        return (
+          <motion.button
+            key={option.value}
+            onClick={() => onChange(option.value)}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-all duration-250"
+            style={{
+              color: isActive
+                ? 'rgba(15, 23, 42, 0.95)'
+                : 'rgba(148, 163, 184, 0.8)',
+              background: isActive
+                ? (index === 0 ? '#22D3EE' : index === 1 ? '#A78BFA' : '#F59E0B')
+                : 'transparent',
+              boxShadow: isActive
+                ? `0 2px 8px ${index === 0 ? 'rgba(34, 211, 238, 0.3)' : index === 1 ? 'rgba(167, 139, 250, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`
+                : 'none'
+            }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Icon size={16} />
+            <span>{option.label}</span>
+          </motion.button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SUBCOMPONENT: Evaluation Summary - Cinema Mode View + Intelligence Panels
+// ════════════════════════════════════════════════════════════════════════════
+
 function EvaluationSummaryView({
   assignmentId,
   evaluatee
@@ -255,6 +327,17 @@ function EvaluationSummaryView({
   const [summary, setSummary] = useState<SummaryData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Estado para toggle de vistas
+  // ═══════════════════════════════════════════════════════════════════════════
+  const [activeView, setActiveView] = useState<ViewMode>('respuestas')
+
+  const toggleOptions: ToggleOption[] = [
+    { value: 'respuestas', label: 'Respuestas', icon: FileText },
+    { value: 'calibracion', label: 'Calibración', icon: Users },
+    { value: 'alertas', label: 'Alertas', icon: Bell }
+  ]
 
   useEffect(() => {
     const loadSummary = async () => {
@@ -302,6 +385,35 @@ function EvaluationSummaryView({
     loadSummary()
   }, [assignmentId, router])
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Datos para ManagementAlertsHUD (competencias con scores)
+  // Los datos están disponibles en summary.categorizedResponses
+  // ═══════════════════════════════════════════════════════════════════════════
+  const competencies = useMemo(() => {
+    if (!summary?.categorizedResponses) return []
+
+    return Object.entries(summary.categorizedResponses).map(([name, responses]) => {
+      // Obtener ratings válidos (ya están en escala 1-5)
+      const ratings = (responses as any[])
+        .filter(r => r.rating !== null && r.rating !== undefined)
+        .map(r => r.rating as number)
+
+      // Calcular promedio
+      const avgScore = ratings.length > 0
+        ? ratings.reduce((a, b) => a + b, 0) / ratings.length
+        : 0
+
+      return { name, score: avgScore }
+    })
+  }, [summary?.categorizedResponses])
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Datos para TeamCalibrationHUD
+  // NOTA: Requiere fetch adicional para obtener otros evaluados del mismo ciclo
+  // Por ahora, mostramos mensaje de "no disponible"
+  // ═══════════════════════════════════════════════════════════════════════════
+  const teamMembers: { id: string; name: string; score: number }[] = []
+
   // Loading state - Cinema style
   if (isLoading) {
     return (
@@ -337,26 +449,109 @@ function EvaluationSummaryView({
     )
   }
 
-  // Success - Cinema Summary Orchestrator
+  // Success - Vista con Toggle de Inteligencia
   return (
-    <CinemaSummaryOrchestrator
-      summary={{
-        assignmentId: summary.assignmentId,
-        evaluationType: summary.evaluationType,
-        completedAt: summary.completedAt,
-        evaluatee: {
-          fullName: summary.evaluatee.fullName,
-          position: summary.evaluatee.position,
-          department: summary.evaluatee.department
-        },
-        cycle: summary.cycle,
-        averageScore: summary.averageScore,
-        totalQuestions: summary.totalQuestions,
-        categorizedResponses: summary.categorizedResponses,
-        competencyScores: summary.competencyScores,
-        gapAnalysis: summary.gapAnalysis,
-        overallScore: summary.overallScore
-      }}
-    />
+    <div className="min-h-screen bg-[#0F172A]">
+      {/* ═══════════════════════════════════════════════════════════════════════
+          Toggle de Vistas - Posicionado en la parte superior
+          ═══════════════════════════════════════════════════════════════════════ */}
+      <div className="sticky top-0 z-50 bg-[#0F172A]/95 backdrop-blur-sm border-b border-white/5">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex justify-center">
+          <ThreeWayToggle
+            options={toggleOptions}
+            activeValue={activeView}
+            onChange={setActiveView}
+          />
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          Contenido según vista activa
+          ═══════════════════════════════════════════════════════════════════════ */}
+
+      {/* Vista 1: Respuestas - Cinema Summary Orchestrator */}
+      {activeView === 'respuestas' && (
+        <CinemaSummaryOrchestrator
+          summary={{
+            assignmentId: summary.assignmentId,
+            evaluationType: summary.evaluationType,
+            completedAt: summary.completedAt,
+            evaluatee: {
+              fullName: summary.evaluatee.fullName,
+              position: summary.evaluatee.position,
+              department: summary.evaluatee.department
+            },
+            cycle: summary.cycle,
+            averageScore: summary.averageScore,
+            totalQuestions: summary.totalQuestions,
+            categorizedResponses: summary.categorizedResponses,
+            competencyScores: summary.competencyScores,
+            gapAnalysis: summary.gapAnalysis,
+            overallScore: summary.overallScore
+          }}
+        />
+      )}
+
+      {/* Vista 2: Calibración - Ranking del equipo */}
+      {activeView === 'calibracion' && (
+        <div className="max-w-2xl mx-auto p-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {teamMembers.length > 1 ? (
+              <TeamCalibrationHUD
+                teamMembers={teamMembers}
+                currentEvaluateeId={assignmentId}
+                maxVisible={5}
+              />
+            ) : (
+              <div className="bg-slate-800/50 backdrop-blur border border-white/10 rounded-2xl p-8 text-center">
+                <Users className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-300 mb-2">
+                  Calibración de Equipo
+                </h3>
+                <p className="text-slate-500 text-sm mb-4">
+                  La calibración de equipo no está disponible para esta evaluación.
+                </p>
+                <p className="text-slate-600 text-xs">
+                  Se requieren múltiples evaluaciones completadas del mismo evaluador
+                  para comparar el desempeño relativo en el equipo.
+                </p>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      )}
+
+      {/* Vista 3: Alertas - Intelligence HUD */}
+      {activeView === 'alertas' && (
+        <div className="max-w-2xl mx-auto p-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {competencies.length > 0 ? (
+              <ManagementAlertsHUD
+                competencies={competencies}
+                employeeName={evaluatee.fullName}
+              />
+            ) : (
+              <div className="bg-slate-800/50 backdrop-blur border border-white/10 rounded-2xl p-8 text-center">
+                <Bell className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-300 mb-2">
+                  Alertas de Gestión
+                </h3>
+                <p className="text-slate-500 text-sm">
+                  No hay datos de competencias disponibles para generar alertas.
+                </p>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      )}
+    </div>
   )
 }
