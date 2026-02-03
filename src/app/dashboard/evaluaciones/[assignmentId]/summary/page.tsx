@@ -245,9 +245,9 @@ export default function EvaluationSummaryPage() {
         </div>
       </div>
 
-      {/* Contenido según vista activa - Ancho ~85% centrado */}
+      {/* Contenido según vista activa */}
       {activeView === 'calibracion' ? (
-        <div className="space-y-3 w-[85%] mx-auto">
+        <div className="space-y-3">
           {/* PerformanceScoreCard - Score en escala 1-5 */}
           {scoreOn5 !== null && (
             <PerformanceScoreCard
@@ -277,7 +277,7 @@ export default function EvaluationSummaryPage() {
         </div>
       ) : (
         /* InsightCarousel - Consola de Inteligencia */
-        <div className="w-[85%] mx-auto">
+        <div>
           {competencies.length > 0 ? (
             <InsightCarousel
               competencies={competencies}
