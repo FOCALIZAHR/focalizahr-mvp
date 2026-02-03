@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import CinemaSummaryOrchestrator from '../components/CinemaSummaryOrchestrator'
 import TeamCalibrationHUD from '@/components/performance/TeamCalibrationHUD'
-import ManagementAlertsHUD from '@/components/performance/ManagementAlertsHUD'
+import InsightCarousel from '@/components/performance/summary/InsightCarousel'
 import PerformanceScoreCard from '@/components/performance/PerformanceScoreCard'
 import type { CinemaSummaryData } from '@/types/evaluator-cinema'
 
@@ -245,9 +245,9 @@ export default function EvaluationSummaryPage() {
         </div>
       </div>
 
-      {/* Contenido según vista activa - Ancho ~75% centrado */}
+      {/* Contenido según vista activa - Ancho ~85% centrado */}
       {activeView === 'calibracion' ? (
-        <div className="space-y-3 w-[75%] mx-auto">
+        <div className="space-y-3 w-[85%] mx-auto">
           {/* PerformanceScoreCard - Score en escala 1-5 */}
           {scoreOn5 !== null && (
             <PerformanceScoreCard
@@ -276,10 +276,10 @@ export default function EvaluationSummaryPage() {
           )}
         </div>
       ) : (
-        /* ManagementAlertsHUD - Consola de Inteligencia */
-        <div className="w-[75%] mx-auto">
+        /* InsightCarousel - Consola de Inteligencia */
+        <div className="w-[85%] mx-auto">
           {competencies.length > 0 ? (
-            <ManagementAlertsHUD
+            <InsightCarousel
               competencies={competencies}
               employeeName={displayName}
               className="w-full"

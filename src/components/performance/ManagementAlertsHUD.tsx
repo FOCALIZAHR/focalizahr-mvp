@@ -1,9 +1,9 @@
 // ════════════════════════════════════════════════════════════════════════════
-// MANAGEMENT ALERTS HUD - Consola de Inteligencia Unificada
+// MANAGEMENT ALERTS HUD v2.0 - Consola de Inteligencia (Mobile First)
 // src/components/performance/ManagementAlertsHUD.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// FILOSOFÍA: NO es una lista de post-its. ES un sistema inteligente cohesivo.
-// DISEÑO: Monolito único con línea de circuito conectando hallazgos.
+// FILOSOFÍA: "Si funciona en un celular, funciona en cualquier lado"
+// DISEÑO: Stack vertical limpio, border-left semántico, cero ruido visual
 // PRINCIPIO: "FocalizaHR no muestra datos. FocalizaHR guía decisiones."
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -11,15 +11,7 @@
 
 import { memo, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Brain,
-  AlertTriangle,
-  Zap,
-  Activity,
-  ChevronDown,
-  ChevronUp,
-  MessageCircle
-} from 'lucide-react'
+import { Brain, ChevronDown } from 'lucide-react'
 import {
   getManagementInsights,
   type ManagementInsight,
@@ -29,7 +21,7 @@ import { getPerformanceClassification } from '@/config/performanceClassification
 import { formatDisplayName } from '@/lib/utils/formatName'
 
 // ════════════════════════════════════════════════════════════════════════════
-// TYPES
+// TIPOS
 // ════════════════════════════════════════════════════════════════════════════
 
 interface ManagementAlertsHUDProps {
@@ -39,42 +31,40 @@ interface ManagementAlertsHUDProps {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// CONFIGURACIÓN VISUAL
+// TIPOS - Configuración de sección de insights
 // ════════════════════════════════════════════════════════════════════════════
 
-const SECTION_CONFIG = {
+type InsightType = 'CRITICAL' | 'STRENGTH' | 'MONITOR'
+
+interface InsightSectionConfig {
+  label: string
+  borderClass: string
+  accentClass: string
+  actionLabel: string
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CONFIGURACIÓN VISUAL - Solo border-left semántico
+// ════════════════════════════════════════════════════════════════════════════
+
+const SECTION_CONFIG: Record<InsightType, InsightSectionConfig> = {
   CRITICAL: {
-    title: 'REQUIERE TU ATENCIÓN',
-    subtitle: 'Agenda una conversación pronto',
-    icon: AlertTriangle,
-    accentColor: 'text-red-400',
-    bgColor: 'bg-red-500/5',
-    borderColor: 'border-red-500/20',
-    dotColor: 'bg-red-500',
-    lineColor: 'from-red-500',
-    labelAction: 'Pregunta sugerida para tu 1:1:'
+    label: 'ATENCIÓN',
+    borderClass: 'border-l-4 border-l-red-500',
+    accentClass: 'text-red-400',
+    actionLabel: 'Pregunta'
   },
   STRENGTH: {
-    title: 'FORTALEZA PARA APROVECHAR',
-    subtitle: 'Oportunidad de desarrollo',
-    icon: Zap,
-    accentColor: 'text-emerald-400',
-    bgColor: 'bg-emerald-500/5',
-    borderColor: 'border-emerald-500/20',
-    dotColor: 'bg-emerald-500',
-    lineColor: 'from-emerald-500',
-    labelAction: 'Acción recomendada:'
+    label: 'FORTALEZA',
+    borderClass: 'border-l-4 border-l-emerald-500',
+    accentClass: 'text-emerald-400',
+    actionLabel: 'Acción'
   },
   MONITOR: {
-    title: 'MONITOREAR',
-    subtitle: 'Seguimiento próximo ciclo',
-    icon: Activity,
-    accentColor: 'text-amber-400',
-    bgColor: 'bg-amber-500/5',
-    borderColor: 'border-amber-500/20',
-    dotColor: 'bg-amber-500',
-    lineColor: 'from-amber-500',
-    labelAction: 'Pregunta opcional para tu 1:1:'
+    label: 'MONITOREAR',
+    borderClass: 'border-l-4 border-l-amber-500',
+    accentClass: 'text-amber-400',
+    actionLabel: 'Seguimiento'
   }
 }
 
@@ -87,13 +77,15 @@ export default memo(function ManagementAlertsHUD({
   employeeName,
   className = ''
 }: ManagementAlertsHUDProps) {
-  const [isExpanded, setIsExpanded] = useState(true)
   const [showMonitor, setShowMonitor] = useState(false)
 
-  // Obtener primer nombre para mensajes naturales
-  const firstName = useMemo(() => formatDisplayName(employeeName, 'short'), [employeeName])
+  // Nombre corto para mensajes naturales
+  const firstName = useMemo(
+    () => formatDisplayName(employeeName, 'short'),
+    [employeeName]
+  )
 
-  // Generar insights con nombre personalizado
+  // Generar insights
   const insights = useMemo(
     () => getManagementInsights(competencies, firstName),
     [competencies, firstName]
@@ -104,16 +96,15 @@ export default memo(function ManagementAlertsHUD({
   const strengthInsights = insights.filter(i => i.type === 'STRENGTH')
   const monitorInsights = insights.filter(i => i.type === 'MONITOR')
 
-  // Si no hay alertas, no mostrar nada
-  const hasAlerts = criticalInsights.length > 0 || strengthInsights.length > 0
-  if (!hasAlerts && monitorInsights.length === 0) {
+  // Estado vacío
+  const hasContent = criticalInsights.length > 0 || strengthInsights.length > 0 || monitorInsights.length > 0
+  if (!hasContent) {
     return (
-      <div className={`fhr-card p-6 ${className}`}>
-        <div className="flex items-center gap-3 text-slate-400">
-          <Brain className="w-5 h-5" />
+      <div className={`rounded-xl bg-slate-900/60 border border-slate-800 p-4 md:p-5 ${className}`}>
+        <div className="flex items-center gap-3 text-slate-500">
+          <Brain className="w-4 h-4" />
           <p className="text-sm">
-            No hay alertas de gestión para {firstName}. 
-            Todas las competencias están en rango saludable.
+            Sin alertas para <span className="font-semibold text-cyan-400">{firstName}</span>. Competencias en rango saludable.
           </p>
         </div>
       </div>
@@ -121,247 +112,177 @@ export default memo(function ManagementAlertsHUD({
   }
 
   return (
-    <div className={`fhr-card overflow-hidden ${className}`}>
-      {/* ══════════════════════════════════════════════════════════════════ */}
-      {/* HEADER - Línea Tesla + Título */}
-      {/* ══════════════════════════════════════════════════════════════════ */}
+    <div className={`rounded-xl bg-slate-900/60 border border-slate-800 overflow-hidden ${className}`}>
+      {/* ════════════════════════════════════════════════════════════════════ */}
+      {/* HEADER - Línea Tesla + Título minimalista */}
+      {/* ════════════════════════════════════════════════════════════════════ */}
       <div className="relative">
-        {/* Línea Tesla superior */}
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500 to-transparent" />
-        
-        <div className="px-5 py-4 border-b border-slate-700/50">
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="w-full flex items-center justify-between group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-cyan-500/10">
-                <Brain className="w-4 h-4 text-cyan-400" />
-              </div>
-              <div className="text-left">
+        {/* Línea Tesla */}
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/60 to-transparent" />
+
+        <div className="px-4 py-3 md:px-5 md:py-4 border-b border-slate-800/50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Brain className="w-4 h-4 text-cyan-400" />
+              <div>
                 <h3 className="text-sm font-medium text-slate-200">
                   Inteligencia de Gestión
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Análisis para tu próxima conversación con {firstName}
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Para tu conversación con <span className="font-semibold text-cyan-400">{firstName}</span>
                 </p>
               </div>
             </div>
-            
-            <div className="flex items-center gap-3">
-              {/* Badges resumen */}
-              <div className="flex items-center gap-2">
-                {criticalInsights.length > 0 && (
-                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-500/20 text-red-400">
-                    {criticalInsights.length} atención
-                  </span>
-                )}
-                {strengthInsights.length > 0 && (
-                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-500/20 text-emerald-400">
-                    {strengthInsights.length} fortaleza{strengthInsights.length > 1 ? 's' : ''}
-                  </span>
-                )}
-              </div>
-              
-              {/* Chevron */}
-              <motion.div
-                animate={{ rotate: isExpanded ? 180 : 0 }}
-                transition={{ duration: 0.2 }}
-                className="text-slate-400 group-hover:text-slate-200"
-              >
-                <ChevronDown className="w-4 h-4" />
-              </motion.div>
+
+            {/* Badges resumen - Solo si hay contenido relevante */}
+            <div className="flex items-center gap-1.5">
+              {criticalInsights.length > 0 && (
+                <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-red-500/15 text-red-400">
+                  {criticalInsights.length}
+                </span>
+              )}
+              {strengthInsights.length > 0 && (
+                <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/15 text-emerald-400">
+                  {strengthInsights.length}
+                </span>
+              )}
             </div>
-          </button>
+          </div>
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════ */}
-      {/* BODY - Consola de Inteligencia */}
-      {/* ══════════════════════════════════════════════════════════════════ */}
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <div className="relative">
-              {/* ════════════════════════════════════════════════════════════ */}
-              {/* LÍNEA DE CIRCUITO - Conecta todos los hallazgos */}
-              {/* ════════════════════════════════════════════════════════════ */}
-              <div className="absolute left-7 top-6 bottom-6 w-px">
-                <div className="h-full bg-gradient-to-b from-red-500 via-emerald-500 to-amber-500 opacity-30" />
-              </div>
+      {/* ════════════════════════════════════════════════════════════════════ */}
+      {/* BODY - Stack vertical limpio */}
+      {/* ════════════════════════════════════════════════════════════════════ */}
+      <div className="p-4 md:p-5 space-y-4">
+        {/* CRÍTICOS */}
+        {criticalInsights.map((insight, idx) => (
+          <InsightCard
+            key={`critical-${idx}`}
+            insight={insight}
+            config={SECTION_CONFIG.CRITICAL}
+          />
+        ))}
 
-              <div className="p-5 pl-12 space-y-6">
-                {/* ══════════════════════════════════════════════════════════ */}
-                {/* SECCIÓN CRÍTICA */}
-                {/* ══════════════════════════════════════════════════════════ */}
-                {criticalInsights.length > 0 && (
-                  <InsightSection
-                    type="CRITICAL"
-                    insights={criticalInsights}
-                  />
-                )}
+        {/* FORTALEZAS */}
+        {strengthInsights.map((insight, idx) => (
+          <InsightCard
+            key={`strength-${idx}`}
+            insight={insight}
+            config={SECTION_CONFIG.STRENGTH}
+          />
+        ))}
 
-                {/* ══════════════════════════════════════════════════════════ */}
-                {/* SECCIÓN FORTALEZAS */}
-                {/* ══════════════════════════════════════════════════════════ */}
-                {strengthInsights.length > 0 && (
-                  <InsightSection
-                    type="STRENGTH"
-                    insights={strengthInsights}
-                  />
-                )}
+        {/* MONITOREAR - Progressive Disclosure */}
+        {monitorInsights.length > 0 && (
+          <div className="pt-2">
+            <button
+              onClick={() => setShowMonitor(!showMonitor)}
+              className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors py-2"
+            >
+              <span>
+                {showMonitor ? 'Ocultar' : 'Ver'} {monitorInsights.length} área{monitorInsights.length > 1 ? 's' : ''} a monitorear
+              </span>
+              <ChevronDown 
+                className={`w-3.5 h-3.5 transition-transform duration-200 ${showMonitor ? 'rotate-180' : ''}`} 
+              />
+            </button>
 
-                {/* ══════════════════════════════════════════════════════════ */}
-                {/* SECCIÓN MONITOREAR (Colapsable) */}
-                {/* ══════════════════════════════════════════════════════════ */}
-                {monitorInsights.length > 0 && (
-                  <div>
-                    <button
-                      onClick={() => setShowMonitor(!showMonitor)}
-                      className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
-                    >
-                      <Activity className="w-3 h-3" />
-                      <span>
-                        {showMonitor ? 'Ocultar' : 'Ver'} {monitorInsights.length} área{monitorInsights.length > 1 ? 's' : ''} a monitorear
-                      </span>
-                      <ChevronDown className={`w-3 h-3 transition-transform ${showMonitor ? 'rotate-180' : ''}`} />
-                    </button>
-                    
-                    <AnimatePresence>
-                      {showMonitor && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="mt-4"
-                        >
-                          <InsightSection
-                            type="MONITOR"
-                            insights={monitorInsights}
-                            compact
-                          />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                )}
-              </div>
-            </div>
-          </motion.div>
+            <AnimatePresence>
+              {showMonitor && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-3 overflow-hidden"
+                >
+                  {monitorInsights.map((insight, idx) => (
+                    <InsightCard
+                      key={`monitor-${idx}`}
+                      insight={insight}
+                      config={SECTION_CONFIG.MONITOR}
+                      compact
+                    />
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         )}
-      </AnimatePresence>
+      </div>
     </div>
   )
 })
 
 // ════════════════════════════════════════════════════════════════════════════
-// COMPONENTE: SECCIÓN DE INSIGHTS
+// COMPONENTE: INSIGHT CARD (Mobile First)
 // ════════════════════════════════════════════════════════════════════════════
 
-interface InsightSectionProps {
-  type: 'CRITICAL' | 'STRENGTH' | 'MONITOR'
-  insights: ManagementInsight[]
-  compact?: boolean
-}
-
-function InsightSection({ type, insights, compact = false }: InsightSectionProps) {
-  const config = SECTION_CONFIG[type]
-  const Icon = config.icon
-
-  return (
-    <div className="relative">
-      {/* Dot en la línea de circuito */}
-      <div className={`absolute -left-7 top-1 w-3 h-3 rounded-full ${config.dotColor} ring-2 ring-slate-900`} />
-      
-      {/* Header de sección */}
-      <div className="flex items-center gap-2 mb-3">
-        <Icon className={`w-4 h-4 ${config.accentColor}`} />
-        <span className={`text-xs font-semibold uppercase tracking-wider ${config.accentColor}`}>
-          {config.title}
-        </span>
-      </div>
-
-      {/* Lista de insights */}
-      <div className="space-y-4">
-        {insights.map((insight, index) => (
-          <InsightItem
-            key={`${insight.competencyName}-${index}`}
-            insight={insight}
-            config={config}
-            compact={compact}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// COMPONENTE: ITEM DE INSIGHT
-// ════════════════════════════════════════════════════════════════════════════
-
-interface InsightItemProps {
+interface InsightCardProps {
   insight: ManagementInsight
-  config: typeof SECTION_CONFIG.CRITICAL
+  config: InsightSectionConfig
   compact?: boolean
 }
 
-function InsightItem({ insight, config, compact = false }: InsightItemProps) {
+function InsightCard({ insight, config, compact = false }: InsightCardProps) {
   const classification = getPerformanceClassification(insight.score)
 
   return (
-    <div className={`rounded-lg border ${config.borderColor} ${config.bgColor} overflow-hidden`}>
-      {/* Header del insight */}
-      <div className="px-4 py-3 border-b border-slate-700/30">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-slate-200">
-            {insight.competencyName}
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className={`
+        rounded-r-lg bg-slate-800/40 
+        ${config.borderClass}
+        overflow-hidden
+      `}
+    >
+      {/* Header: Competencia + Score */}
+      <div className="px-4 py-3 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          {/* Label de sección */}
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${config.accentClass}`}>
+            {config.label}
           </span>
-          <div className="flex items-center gap-2">
-            <span className={`text-sm font-semibold ${config.accentColor}`}>
-              {insight.score.toFixed(1)}/5
-            </span>
-            <span className={`text-xs px-2 py-0.5 rounded ${classification.bgClass} ${classification.textClass}`}>
-              {classification.label}
-            </span>
-          </div>
+          
+          {/* Nombre competencia */}
+          <h4 className="text-sm font-medium text-slate-100 mt-1 truncate">
+            {insight.competencyName}
+          </h4>
+        </div>
+
+        {/* Score + Clasificación */}
+        <div className="text-right flex-shrink-0">
+          <span className={`text-lg font-semibold ${config.accentClass}`}>
+            {insight.score.toFixed(1)}
+          </span>
+          <p className="text-[10px] text-slate-500 uppercase tracking-wide">
+            {classification.labelShort || classification.label}
+          </p>
         </div>
       </div>
 
-      {/* Body del insight */}
-      <div className="px-4 py-3 space-y-3">
+      {/* Body: Insight + Acción */}
+      <div className="px-4 pb-4 space-y-3">
         {/* Insight principal */}
         <p className="text-sm text-slate-300 leading-relaxed">
           {insight.insight}
         </p>
 
-        {/* Acción sugerida */}
+        {/* Acción sugerida - Solo si no es compact */}
         {!compact && (
-          <div className="pt-2 border-t border-slate-700/30">
-            <div className="flex items-start gap-2">
-              <MessageCircle className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-xs text-slate-500 mb-1">
-                  {config.labelAction}
-                </p>
-                <p className="text-sm text-cyan-300 italic">
-                  "{insight.action}"
-                </p>
-              </div>
-            </div>
+          <div className="pt-3 border-t border-slate-700/30">
+            <p className="text-[10px] text-slate-500 uppercase tracking-wide font-semibold mb-1">
+              {config.actionLabel}
+            </p>
+            <p className={`text-sm italic ${config.accentClass}`}>
+              "{insight.action}"
+            </p>
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   )
 }
-
-// ════════════════════════════════════════════════════════════════════════════
-// NOTA: El componente se exporta como default arriba con:
-// export default memo(function ManagementAlertsHUD(...))
-// ════════════════════════════════════════════════════════════════════════════
