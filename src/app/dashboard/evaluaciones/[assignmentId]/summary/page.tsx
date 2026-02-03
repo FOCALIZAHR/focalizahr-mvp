@@ -1,55 +1,21 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// EVALUATION SUMMARY - Read-only view of a completed evaluation
+// EVALUATION SUMMARY - Cinema Mode Summary via CinemaSummaryOrchestrator
 // src/app/dashboard/evaluaciones/[assignmentId]/summary/page.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
-import { ArrowLeft, CheckCircle2, Clock, AlertTriangle } from 'lucide-react'
-import { formatDisplayNameFull } from '@/lib/utils/formatName'
-import { getPerformanceClassification } from '@/config/performanceClassification'
-
-interface CategorizedResponse {
-  questionId: string
-  questionText: string
-  questionOrder: number
-  responseType: string
-  rating: number | null
-  textResponse: string | null
-  choiceResponse: string | null
-  normalizedScore: number | null
-}
-
-interface SummaryData {
-  success: boolean
-  summary: {
-    assignmentId: string
-    evaluationType: string
-    completedAt: string
-    evaluatee: {
-      fullName: string
-      position: string | null
-      department: string
-    }
-    cycle: {
-      name: string
-      endDate: string
-    }
-    averageScore: number | null
-    totalQuestions: number
-    categorizedResponses: Record<string, CategorizedResponse[]>
-  }
-}
+import CinemaSummaryOrchestrator from '../components/CinemaSummaryOrchestrator'
+import type { CinemaSummaryData } from '@/types/evaluator-cinema'
 
 export default function EvaluationSummaryPage() {
   const params = useParams()
   const router = useRouter()
   const assignmentId = params.assignmentId as string
 
-  const [data, setData] = useState<SummaryData | null>(null)
+  const [summary, setSummary] = useState<CinemaSummaryData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -78,7 +44,7 @@ export default function EvaluationSummaryPage() {
 
         const json = await res.json()
         if (json.success) {
-          setData(json)
+          setSummary(json.summary)
         } else {
           throw new Error(json.error || 'Error cargando resumen')
         }
@@ -91,150 +57,39 @@ export default function EvaluationSummaryPage() {
     fetchSummary()
   }, [assignmentId, router])
 
+  // Loading
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0F172A] flex items-center justify-center">
-        <Clock className="w-8 h-8 text-cyan-400 animate-spin" />
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+          <p className="text-slate-400 text-sm">Cargando resumen...</p>
+        </div>
       </div>
     )
   }
 
-  if (error || !data?.summary) {
+  // Error
+  if (error || !summary) {
     return (
       <div className="min-h-screen bg-[#0F172A] flex items-center justify-center p-4">
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 max-w-sm text-center">
-          <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-4" />
-          <h2 className="text-lg font-medium text-slate-200 mb-2">Error al cargar resumen</h2>
-          <p className="text-sm text-slate-400 mb-6">{error || 'No se encontraron datos'}</p>
+        <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-2xl p-8 text-center max-w-md">
+          <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto mb-4">
+            <span className="text-red-400 text-xl">!</span>
+          </div>
+          <p className="text-red-400 mb-2 font-medium">Error al cargar</p>
+          <p className="text-slate-400 text-sm mb-6">{error || 'No se pudo cargar el resumen'}</p>
           <button
             onClick={() => router.push('/dashboard/evaluaciones')}
-            className="inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300 text-sm transition-colors"
+            className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Volver a Mis Evaluaciones
+            Volver al Portal
           </button>
         </div>
       </div>
     )
   }
 
-  const { summary } = data
-  const displayName = formatDisplayNameFull(summary.evaluatee.fullName)
-
-  return (
-    <div className="min-h-screen bg-[#0F172A] p-4 md:p-8">
-      <div className="max-w-3xl mx-auto">
-
-        {/* Back button */}
-        <button
-          onClick={() => router.push('/dashboard/evaluaciones')}
-          className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-6 text-sm"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Volver a Mis Evaluaciones
-        </button>
-
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <h1 className="text-2xl font-bold text-white mb-1">
-            Resumen de Evaluacion
-          </h1>
-          <p className="text-slate-400">
-            {displayName} · {summary.evaluatee.position || 'Sin cargo'}
-          </p>
-        </motion.div>
-
-        {/* Completed banner */}
-        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mb-6 flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-          <div>
-            <p className="text-emerald-400 font-medium text-sm">Evaluacion Completada</p>
-            {summary.completedAt && (
-              <p className="text-emerald-400/70 text-xs">
-                Completada el {new Date(summary.completedAt).toLocaleDateString('es-CL')}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Resultado - Card premium con línea Tesla */}
-        {summary.averageScore !== null && summary.averageScore !== undefined && (() => {
-          const avgScore = summary.averageScore / 20
-          const classification = getPerformanceClassification(avgScore)
-          const progressPercent = (avgScore / 5) * 100
-
-          return (
-            <div className="fhr-card relative overflow-hidden mb-6">
-              {/* Línea Tesla - color dinámico */}
-              <div
-                className="absolute top-0 left-0 right-0 h-px"
-                style={{
-                  background: `linear-gradient(90deg, transparent, ${classification.color}, transparent)`
-                }}
-              />
-
-              <div className="p-4">
-                {/* Label */}
-                <p className="text-xs uppercase tracking-wider text-slate-500 mb-3">
-                  Resultado
-                </p>
-
-                {/* Clasificación - PROTAGONISTA */}
-                <p
-                  className="text-base font-medium mb-3"
-                  style={{ color: classification.color }}
-                >
-                  {classification.label}
-                </p>
-
-                {/* Barra + Nota */}
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-700 ease-out"
-                      style={{
-                        width: `${progressPercent}%`,
-                        background: `linear-gradient(90deg, ${classification.color}80, ${classification.color})`
-                      }}
-                    />
-                  </div>
-                  <span
-                    className="text-sm font-semibold tabular-nums"
-                    style={{ color: classification.color }}
-                  >
-                    {avgScore.toFixed(1)}/5
-                  </span>
-                </div>
-              </div>
-            </div>
-          )
-        })()}
-
-        {/* Responses by category */}
-        {Object.entries(summary.categorizedResponses).map(([category, responses]) => (
-          <div key={category} className="mb-6">
-            <h3 className="text-lg font-semibold text-white mb-3">{category}</h3>
-            <div className="space-y-3">
-              {responses.map((r) => (
-                <div key={r.questionId} className="bg-slate-800/50 border border-slate-700/30 rounded-lg p-4">
-                  <p className="text-slate-300 text-sm mb-2">{r.questionText}</p>
-                  {r.rating !== null && (
-                    <p className="text-cyan-400 font-medium">{r.rating}/5</p>
-                  )}
-                  {r.textResponse && (
-                    <p className="text-slate-400 text-sm italic mt-1">&ldquo;{r.textResponse}&rdquo;</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-
-      </div>
-    </div>
-  )
+  // Success - Renderizar Cinema Summary
+  return <CinemaSummaryOrchestrator summary={summary} />
 }

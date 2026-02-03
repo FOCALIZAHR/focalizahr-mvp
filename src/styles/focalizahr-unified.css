@@ -1873,3 +1873,70 @@
 .fhr-icon-warning { color: var(--fhr-warning); }
 .fhr-icon-danger { color: var(--fhr-error); }
 .fhr-icon-muted { color: var(--fhr-text-muted); }
+
+/* ============================================================================
+   SCROLLBAR UTILITIES
+   Clases para control de scrollbar en carruseles y contenedores
+   ============================================================================ */
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.3);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(100, 116, 139, 0.5);
+}
+
+/* ============================================================================
+   CINEMA MODE SPECIFIC STYLES
+   ============================================================================ */
+
+.cinema-carousel {
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+}
+
+.cinema-carousel > * {
+  scroll-snap-align: start;
+}
+
+.carousel-fade-edges {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 20px,
+    black calc(100% - 20px),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 20px,
+    black calc(100% - 20px),
+    transparent
+  );
+}

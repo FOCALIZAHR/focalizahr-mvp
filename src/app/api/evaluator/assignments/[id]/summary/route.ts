@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { extractUserContext } from '@/lib/services/AuthorizationService';
+import PerformanceResultsService from '@/lib/services/PerformanceResultsService';
 
 /**
  * GET /api/evaluator/assignments/[id]/summary
@@ -40,7 +41,7 @@ export async function GET(
       },
       include: {
         cycle: {
-          select: { name: true, endDate: true }
+          select: { id: true, name: true, endDate: true }
         },
         evaluator: {
           select: { email: true }
@@ -92,7 +93,8 @@ export async function GET(
               category: true,
               questionOrder: true,
               responseType: true,
-              choiceOptions: true
+              choiceOptions: true,
+              competencyCode: true
             }
           }
         },
@@ -102,15 +104,40 @@ export async function GET(
       });
     }
 
-    // Agrupar respuestas por categoría
+    // ═══════════════════════════════════════════════════════════════════════
+    // LOOKUP COMPETENCIAS: code → name
+    // ═══════════════════════════════════════════════════════════════════════
+    const competencyCodes = [...new Set(
+      responses
+        .map(r => r.question.competencyCode)
+        .filter((c): c is string => c != null && c.trim() !== '')
+    )];
+
+    let competencyNameMap: Record<string, string> = {};
+    if (competencyCodes.length > 0) {
+      const competencies = await prisma.competency.findMany({
+        where: {
+          accountId: userContext.accountId,
+          code: { in: competencyCodes }
+        },
+        select: { code: true, name: true }
+      });
+      competencyNameMap = Object.fromEntries(
+        competencies.map(c => [c.code, c.name])
+      );
+    }
+
+    // Agrupar respuestas por competencia (nombre) o categoría
     const categorizedResponses: Record<string, any[]> = {};
     responses.forEach(r => {
-      const category = r.question.category || 'General';
-      if (!categorizedResponses[category]) {
-        categorizedResponses[category] = [];
+      const code = r.question.competencyCode || r.question.category || 'General';
+      const groupName = competencyNameMap[code] || code;
+
+      if (!categorizedResponses[groupName]) {
+        categorizedResponses[groupName] = [];
       }
 
-      categorizedResponses[category].push({
+      categorizedResponses[groupName].push({
         questionId: r.questionId,
         questionText: r.question.text,
         questionOrder: r.question.questionOrder,
@@ -118,7 +145,8 @@ export async function GET(
         rating: r.rating,
         textResponse: r.textResponse,
         choiceResponse: r.choiceResponse,
-        normalizedScore: r.normalizedScore
+        normalizedScore: r.normalizedScore,
+        competencyCode: r.question.competencyCode || null
       });
     });
 
@@ -127,6 +155,42 @@ export async function GET(
     const avgScore = scoredResponses.length > 0
       ? scoredResponses.reduce((sum, r) => sum + (r.normalizedScore || 0), 0) / scoredResponses.length
       : null;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // DATOS ENRIQUECIDOS DE COMPETENCIAS (si aplica)
+    // ═══════════════════════════════════════════════════════════════════════
+    let competencyData: {
+      competencyScores: any[] | null;
+      gapAnalysis: any | null;
+      overallAvgScore: number | null;
+    } = {
+      competencyScores: null,
+      gapAnalysis: null,
+      overallAvgScore: null
+    };
+
+    if (assignment.cycle?.id && assignment.evaluateeId) {
+      try {
+        const results360 = await PerformanceResultsService.getEvaluateeResults(
+          assignment.cycle.id,
+          assignment.evaluateeId
+        );
+
+        competencyData = {
+          competencyScores: results360.competencyScores || null,
+          gapAnalysis: results360.gapAnalysis || null,
+          overallAvgScore: results360.overallAvgScore || null
+        };
+
+        console.log('[Summary API] Datos de competencias cargados:', {
+          competenciesCount: results360.competencyScores?.length || 0,
+          hasGapAnalysis: !!results360.gapAnalysis
+        });
+      } catch (err) {
+        // No fallar si no hay datos de competencias - es opcional
+        console.warn('[Summary API] No se pudieron obtener datos de competencias:', err);
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -148,7 +212,12 @@ export async function GET(
 
         averageScore: avgScore,
         totalQuestions: responses.length,
-        categorizedResponses
+        categorizedResponses,
+
+        // Datos de competencias (null si no aplica)
+        competencyScores: competencyData.competencyScores,
+        gapAnalysis: competencyData.gapAnalysis,
+        overallScore: competencyData.overallAvgScore
       }
     });
 
