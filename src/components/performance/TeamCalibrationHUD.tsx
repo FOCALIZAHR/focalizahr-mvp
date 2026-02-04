@@ -87,7 +87,18 @@ export default memo(function TeamCalibrationHUD({
   const isTopPerformer = currentPosition > 0 && currentPosition <= Math.ceil(sorted.length * 0.1)
 
   return (
-    <div className={`bg-slate-800/60 rounded-lg border border-slate-700/50 overflow-hidden ${className}`}>
+    <div className={`relative bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[24px] overflow-hidden ${className}`}>
+      {/* ════════════════════════════════════════════════════════════════════
+          LÍNEA TESLA PURPLE - Signature Element FocalizaHR
+          ════════════════════════════════════════════════════════════════════ */}
+      <div
+        className="absolute top-0 left-0 right-0 h-[1px] z-10"
+        style={{
+          background: 'linear-gradient(90deg, transparent, #A78BFA, transparent)',
+          boxShadow: '0 0 15px #A78BFA'
+        }}
+      />
+
       {/* Header - Compacto */}
       <div className="px-3 py-2 border-b border-slate-700/30 flex items-center justify-between">
         <div className="flex items-center gap-1.5">

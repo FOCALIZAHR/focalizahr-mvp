@@ -81,20 +81,21 @@ export default memo(function PerformanceScoreCard({
   return (
     <div
       className={cn(
-        // Clase base FocalizaHR con glassmorphism
-        'fhr-card relative overflow-hidden',
+        // Cinema Mode FocalizaHR
+        'relative bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[24px] overflow-hidden',
         styles.padding,
         className
       )}
     >
       {/* ════════════════════════════════════════════════════════════════════
-          LÍNEA TESLA - Signature Element FocalizaHR
+          LÍNEA TESLA CYAN - Signature Element FocalizaHR
           ════════════════════════════════════════════════════════════════════ */}
       {showTeslaLine && (
         <div
-          className="absolute top-0 left-0 right-0 h-[2px]"
+          className="absolute top-0 left-0 right-0 h-[1px] z-10"
           style={{
-            background: `linear-gradient(90deg, transparent, ${classification.color}, transparent)`
+            background: 'linear-gradient(90deg, transparent, #22D3EE, transparent)',
+            boxShadow: '0 0 15px #22D3EE'
           }}
         />
       )}
