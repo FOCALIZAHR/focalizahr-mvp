@@ -18,5 +18,10 @@ export { default as TeamCalibrationHUD } from './TeamCalibrationHUD'
 export { default as ManagementAlertsHUD } from './ManagementAlertsHUD'
 export { default as EvaluationReviewModal } from './EvaluationReviewModal'
 
+// Potential assignment
+export { default as RatingRow } from './RatingRow'
+export { default as DistributionGauge } from './DistributionGauge'
+
 // Type exports
 export type { Employee9Box, GridCell, NineBoxGridProps } from './NineBoxGrid'
+export type { RatingData, RatingRowProps } from './RatingRow'

@@ -176,6 +176,7 @@ export default memo(function NineBoxGrid({
               isSelected={isSelected}
               isFaded={selectedPosition !== null && !isSelected}
               hasEmployees={hasEmployees}
+              employees={cell?.employees || []}
               onClick={() => handleCellClick(position)}
             />
           )
@@ -215,6 +216,7 @@ interface NineBoxCellProps {
   isSelected: boolean
   isFaded: boolean
   hasEmployees: boolean
+  employees?: Employee9Box[]  // ← NUEVO: Lista de empleados
   onClick: () => void
 }
 
@@ -226,29 +228,46 @@ const NineBoxCell = memo(function NineBoxCell({
   isSelected,
   isFaded,
   hasEmployees,
+  employees,
   onClick
 }: NineBoxCellProps) {
+
+  // Helper para iniciales
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(' ').filter(Boolean)
+    if (parts.length === 0) return '?'
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase()
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  }
+
+  // Subtítulos descriptivos para cada posición
+  const POSITION_SUBTITLES: Record<string, string> = {
+    star: 'Top Talent',
+    growth_potential: 'Alto Potencial',
+    potential_gem: 'Diamante en Bruto',
+    high_performer: 'Alto Rendimiento',
+    core_player: 'Motor de la empresa',
+    inconsistent: 'Rendimiento Variable',
+    trusted_professional: 'Profesional Confiable',
+    average_performer: 'Rendimiento Promedio',
+    underperformer: 'Requiere Atención',
+  }
+
+  // Máximo empleados visibles sin scroll
+  const MAX_VISIBLE = 3
 
   return (
     <motion.button
       onClick={onClick}
       disabled={!hasEmployees}
       className={cn(
-        // Base: Glassmorphism
-        'relative min-h-[120px] p-3 rounded-xl transition-all duration-300',
+        'relative min-h-[140px] p-3 rounded-xl transition-all duration-300',
         'bg-slate-800/40 backdrop-blur-md',
         'border border-slate-700/40',
-
-        // Hover (solo si tiene empleados)
-        hasEmployees && 'hover:bg-slate-800/60 hover:border-slate-600/60 hover:scale-[1.02] cursor-pointer',
-
-        // Sin empleados: más opaco
+        'flex flex-col text-left',
+        hasEmployees && 'hover:bg-slate-800/60 hover:border-slate-600/60 cursor-pointer',
         !hasEmployees && 'opacity-40 cursor-not-allowed',
-
-        // Cinema Focus: faded cuando otra celda está seleccionada
         isFaded && 'opacity-20 scale-95',
-
-        // Seleccionada: destacada con glow
         isSelected && 'z-50 scale-105 border-white/30 shadow-2xl shadow-cyan-500/20'
       )}
       animate={isSelected ? { scale: 1.05 } : { scale: 1 }}
@@ -264,38 +283,71 @@ const NineBoxCell = memo(function NineBoxCell({
         />
       )}
 
-      {/* Contenido */}
-      <div className="flex flex-col items-center justify-center h-full gap-2">
-        {/* Label corto */}
-        <span className="text-lg font-bold text-slate-400">
-          {config.labelShort}
-        </span>
+      {/* ── HEADER: Nombre posición + Badge contador ── */}
+      <div className="flex items-start justify-between w-full mb-1">
+        <div className="flex-1 min-w-0">
+          <h4
+            className="text-xs font-bold uppercase tracking-wide truncate"
+            style={{ color: hasEmployees ? config.color : '#64748b' }}
+          >
+            {config.label}
+          </h4>
+          <p className="text-[9px] text-slate-500 truncate mt-0.5">
+            {POSITION_SUBTITLES[position] || ''}
+          </p>
+        </div>
 
-        {/* Nombre de la posición */}
-        <span
-          className="text-[11px] font-medium text-center leading-tight"
-          style={{ color: hasEmployees ? config.color : '#64748b' }}
-        >
-          {config.label}
-        </span>
-
-        {/* Contador */}
-        <div className={cn(
-          'px-2.5 py-1 rounded-full text-xs font-bold',
+        {/* Badge contador */}
+        <span className={cn(
+          'flex-shrink-0 ml-2 px-1.5 py-0.5 rounded-md text-[10px] font-bold',
           hasEmployees
             ? 'bg-slate-700/60 text-slate-200'
             : 'bg-slate-800/40 text-slate-600'
         )}>
           {count}
-        </div>
-
-        {/* Porcentaje (solo si hay empleados) */}
-        {hasEmployees && percent > 0 && (
-          <span className="text-[9px] text-slate-500">
-            {percent}%
-          </span>
-        )}
+        </span>
       </div>
+
+      {/* ── LISTA DE EMPLEADOS (solo si hay) ── */}
+      {hasEmployees && employees && employees.length > 0 && (
+        <div className="flex-1 w-full mt-2 space-y-1.5 overflow-y-auto max-h-[100px] scrollbar-thin">
+          {employees.slice(0, MAX_VISIBLE).map((emp) => (
+            <div
+              key={emp.id}
+              className="flex items-center gap-2 p-1.5 rounded-lg bg-slate-900/40 hover:bg-slate-900/60 transition-colors"
+            >
+              {/* Avatar con iniciales */}
+              <div
+                className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold border"
+                style={{
+                  borderColor: `${config.color}40`,
+                  color: config.color,
+                  backgroundColor: `${config.color}10`
+                }}
+              >
+                {getInitials(emp.employeeName)}
+              </div>
+
+              {/* Nombre + cargo */}
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-medium text-slate-200 truncate">
+                  {emp.employeeName}
+                </p>
+                <p className="text-[9px] text-slate-500 truncate">
+                  {emp.department || emp.employeePosition || ''}
+                </p>
+              </div>
+            </div>
+          ))}
+
+          {/* Indicador "+N más" */}
+          {employees.length > MAX_VISIBLE && (
+            <p className="text-[9px] text-slate-500 text-center pt-0.5">
+              +{employees.length - MAX_VISIBLE} más...
+            </p>
+          )}
+        </div>
+      )}
     </motion.button>
   )
 })

@@ -4,12 +4,14 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server'
-import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationService'
+import { extractUserContext, hasPermission, getChildDepartmentIds } from '@/lib/services/AuthorizationService'
 import { PerformanceRatingService } from '@/lib/services/PerformanceRatingService'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   try {
     const userContext = extractUserContext(request)
+    const userEmail = request.headers.get('x-user-email')
 
     if (!userContext.accountId) {
       return NextResponse.json(
@@ -35,20 +37,76 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const result = await PerformanceRatingService.listRatingsForCycle(cycleId, {
-      page: parseInt(searchParams.get('page') || '1'),
-      limit: parseInt(searchParams.get('limit') || '20'),
-      sortBy: (searchParams.get('sortBy') as 'name' | 'score' | 'level') || 'name',
-      sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'asc',
-      filterLevel: searchParams.get('filterLevel') || undefined,
-      filterNineBox: searchParams.get('filterNineBox') || undefined,
-      filterCalibrated: searchParams.get('filterCalibrated') === 'true' ? true :
-                        searchParams.get('filterCalibrated') === 'false' ? false : undefined
-    })
+    // ════════════════════════════════════════════════════════════════════════════
+    // SECURITY FIX: Calcular filtro jerárquico según rol
+    // Patrón: GUIA_MAESTRA_RBAC Sección 4.3
+    // ════════════════════════════════════════════════════════════════════════════
+    let departmentIds: string[] | undefined = undefined
+
+    if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
+      const childIds = await getChildDepartmentIds(userContext.departmentId)
+      departmentIds = [userContext.departmentId, ...childIds]
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // SERVER-SIDE FILTERING: Leer nuevos query params
+    // ════════════════════════════════════════════════════════════════════════════
+    const evaluationStatus = searchParams.get('evaluationStatus') as 'all' | 'evaluated' | 'not_evaluated' | null
+    const potentialStatus = searchParams.get('potentialStatus') as 'all' | 'assigned' | 'pending' | null
+    const search = searchParams.get('search') || undefined
+
+    const result = await PerformanceRatingService.listRatingsForCycle(
+      cycleId,
+      userContext.accountId,  // SECURITY: Obligatorio
+      {
+        page: parseInt(searchParams.get('page') || '1'),
+        limit: parseInt(searchParams.get('limit') || '20'),
+        sortBy: (searchParams.get('sortBy') as 'name' | 'score' | 'level') || 'name',
+        sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'asc',
+        filterLevel: searchParams.get('filterLevel') || undefined,
+        filterNineBox: searchParams.get('filterNineBox') || undefined,
+        filterCalibrated: searchParams.get('filterCalibrated') === 'true' ? true :
+                          searchParams.get('filterCalibrated') === 'false' ? false : undefined,
+        departmentIds,  // SECURITY: Para AREA_MANAGER
+        // ═══ NUEVOS FILTROS SERVER-SIDE ═══
+        evaluationStatus: evaluationStatus || undefined,
+        potentialStatus: potentialStatus || undefined,
+        search
+      }
+    )
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // CAMPO COMPUTADO: canAssignPotential
+    // Admins pueden asignar a cualquiera, otros solo a sus reportes directos
+    // ════════════════════════════════════════════════════════════════════════════
+    const isSystemAdmin = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_ADMIN']
+      .includes(userContext.role || '')
+
+    let loggedInEmployeeId: string | null = null
+    if (!isSystemAdmin && userEmail) {
+      const loggedInEmployee = await prisma.employee.findFirst({
+        where: {
+          accountId: userContext.accountId,
+          email: userEmail,
+          isActive: true
+        },
+        select: { id: true }
+      })
+      loggedInEmployeeId = loggedInEmployee?.id || null
+    }
+
+    // Agregar canAssignPotential a cada rating
+    const dataWithPermissions = result.data.map((r: { employee?: { managerId?: string | null } | null }) => ({
+      ...r,
+      canAssignPotential: isSystemAdmin ||
+        (loggedInEmployeeId && r.employee?.managerId === loggedInEmployeeId)
+    }))
 
     return NextResponse.json({
       success: true,
-      ...result
+      data: dataWithPermissions,
+      pagination: result.pagination,
+      stats: result.stats
     })
 
   } catch (error) {

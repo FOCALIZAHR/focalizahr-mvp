@@ -366,6 +366,29 @@ export const PERMISSIONS = {
   ],
 
   // ─────────────────────────────────────────────────────────────────────────
+  // NINE-BOX / POTENTIAL ASSIGNMENT
+  // Estos roles PUEDEN asignar potencial, pero HR_MANAGER/CEO/AREA_MANAGER
+  // requieren ser jefe directo (Capa 2 en API)
+  // ─────────────────────────────────────────────────────────────────────────
+  'potential:assign': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'CEO',
+    'AREA_MANAGER'
+  ],
+  'potential:view': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'HR_OPERATOR',
+    'CEO',
+    'AREA_MANAGER'
+  ],
+
+  // ─────────────────────────────────────────────────────────────────────────
   // EVALUATOR PORTAL (Portal de evaluaciones para usuarios)
   // ─────────────────────────────────────────────────────────────────────────
   'evaluations:view': [

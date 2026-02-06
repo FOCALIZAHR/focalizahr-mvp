@@ -1,14 +1,16 @@
 // ════════════════════════════════════════════════════════════════════════════
 // NINE BOX PAGE - Dashboard Cinema FocalizaHR
-// src/app/dashboard/evaluaciones/nine-box/page.tsx
+// src/app/dashboard/performance/nine-box/page.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { RefreshCw, Users, Star, Target, AlertTriangle } from 'lucide-react'
+import { RefreshCw, Users, Star, Target, AlertTriangle, ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import Link from 'next/link'
 
 import NineBoxGrid, { type Employee9Box, type GridCell } from '@/components/performance/NineBoxGrid'
 import NineBoxDrawer from '@/components/performance/NineBoxDrawer'
@@ -29,8 +31,11 @@ interface Cycle {
 // ════════════════════════════════════════════════════════════════════════════
 
 export default function NineBoxPage() {
+  const searchParams = useSearchParams()
+  const cycleIdFromUrl = searchParams.get('cycleId')
+
   const [cycles, setCycles] = useState<Cycle[]>([])
-  const [selectedCycleId, setSelectedCycleId] = useState<string | null>(null)
+  const [selectedCycleId, setSelectedCycleId] = useState<string | null>(cycleIdFromUrl)
   const [gridData, setGridData] = useState<GridCell[]>([])
   const [totalInGrid, setTotalInGrid] = useState(0)
 
@@ -46,19 +51,22 @@ export default function NineBoxPage() {
       .then(json => {
         if (json.success) {
           setCycles(json.data || [])
-          const completed = json.data?.find((c: Cycle) => c.status === 'COMPLETED')
-          if (completed) setSelectedCycleId(completed.id)
+          // Si no hay cycleId en la URL, usar el primero completado
+          if (!cycleIdFromUrl) {
+            const completed = json.data?.find((c: Cycle) => c.status === 'COMPLETED')
+            if (completed) setSelectedCycleId(completed.id)
+          }
         }
       })
       .catch(err => console.error('Error fetching cycles:', err))
-  }, [])
+  }, [cycleIdFromUrl])
 
   // Fetch 9-box data
   const fetchData = useCallback(async () => {
     if (!selectedCycleId) return
     setIsLoading(true)
     try {
-      const res = await fetch(`/api/admin/performance-ratings/nine-box?cycleId=${selectedCycleId}`)
+      const res = await fetch(`/api/performance-ratings/nine-box?cycleId=${selectedCycleId}`)
       const json = await res.json()
       if (json.success) {
         setGridData(json.data.grid)
@@ -95,11 +103,24 @@ export default function NineBoxPage() {
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
         >
-          <div>
-            <h1 className="text-2xl md:text-3xl font-light text-white">
-              Matriz <span className="font-semibold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">9-Box</span>
-            </h1>
-            <p className="text-sm text-slate-400 mt-1">Mapeo de talento: Desempeno vs Potencial</p>
+          <div className="flex items-center gap-4">
+            {/* Botón Volver */}
+            <Link
+              href={selectedCycleId
+                ? `/dashboard/performance/cycles/${selectedCycleId}/ratings`
+                : '/dashboard/performance/cycles'
+              }
+              className="group p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            </Link>
+
+            <div>
+              <h1 className="text-2xl md:text-3xl font-light text-white">
+                Matriz <span className="font-semibold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">9-Box</span>
+              </h1>
+              <p className="text-sm text-slate-400 mt-1">Mapeo de talento: Desempeno vs Potencial</p>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">

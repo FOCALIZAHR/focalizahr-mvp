@@ -423,9 +423,12 @@ export class PerformanceRatingService {
 
   /**
    * Lista ratings de un ciclo con clasificaciones
+   * SECURITY FIX: Agregado accountId obligatorio + departmentIds para AREA_MANAGER
+   * SERVER-SIDE FILTERING: evaluationStatus, potentialStatus, search + stats backend
    */
   static async listRatingsForCycle(
     cycleId: string,
+    accountId: string,  // SECURITY: Obligatorio para defense-in-depth
     options?: {
       page?: number
       limit?: number
@@ -434,6 +437,11 @@ export class PerformanceRatingService {
       filterLevel?: string
       filterNineBox?: string
       filterCalibrated?: boolean
+      departmentIds?: string[]  // SECURITY: Para AREA_MANAGER (filtro jerárquico)
+      // ═══ NUEVOS FILTROS SERVER-SIDE ═══
+      evaluationStatus?: 'all' | 'evaluated' | 'not_evaluated'
+      potentialStatus?: 'all' | 'assigned' | 'pending'
+      search?: string  // búsqueda por nombre empleado
     }
   ) {
     const {
@@ -443,10 +451,74 @@ export class PerformanceRatingService {
       sortOrder = 'asc',
       filterLevel,
       filterNineBox,
-      filterCalibrated
+      filterCalibrated,
+      departmentIds,
+      evaluationStatus,
+      potentialStatus,
+      search
     } = options || {}
 
-    const where: any = { cycleId }
+    // ════════════════════════════════════════════════════════════════════════════
+    // BASE WHERE para stats (solo cycleId + accountId + departmentIds)
+    // ════════════════════════════════════════════════════════════════════════════
+    const baseWhere: any = { cycleId, accountId }
+    if (departmentIds?.length) {
+      baseWhere.employee = { departmentId: { in: departmentIds } }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // STATS con COUNT queries — eficientes, sin traer data
+    // Se calculan sobre el scope COMPLETO (no filtrado por evaluationStatus/potentialStatus)
+    // ════════════════════════════════════════════════════════════════════════════
+    const [totalRatings, evaluatedCount, potentialAssignedCount] = await Promise.all([
+      prisma.performanceRating.count({ where: baseWhere }),
+      prisma.performanceRating.count({
+        where: { ...baseWhere, calculatedScore: { gt: 0 } }
+      }),
+      prisma.performanceRating.count({
+        where: { ...baseWhere, potentialScore: { not: null }, calculatedScore: { gt: 0 } }
+      })
+    ])
+
+    const notEvaluatedCount = totalRatings - evaluatedCount
+    const potentialPendingCount = evaluatedCount - potentialAssignedCount
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // QUERY WHERE con todos los filtros (para paginación)
+    // ════════════════════════════════════════════════════════════════════════════
+    const where: any = { cycleId, accountId }
+
+    // SECURITY: Filtro departamental para AREA_MANAGER
+    if (departmentIds?.length) {
+      where.employee = { departmentId: { in: departmentIds } }
+    }
+
+    // Filtro evaluación (reemplaza lógica client-side)
+    if (evaluationStatus === 'evaluated') {
+      where.calculatedScore = { gt: 0 }
+    } else if (evaluationStatus === 'not_evaluated') {
+      where.calculatedScore = 0
+    }
+
+    // Filtro potencial
+    if (potentialStatus === 'assigned') {
+      where.potentialScore = { not: null }
+      where.calculatedScore = { gt: 0 }  // solo evaluados con potencial
+    } else if (potentialStatus === 'pending') {
+      where.potentialScore = null
+      where.calculatedScore = { gt: 0 }  // evaluados SIN potencial
+    }
+
+    // Búsqueda por nombre (server-side)
+    if (search?.trim()) {
+      where.employee = {
+        ...where.employee,  // preservar filtro departamental si existe
+        fullName: {
+          contains: search.trim(),
+          mode: 'insensitive'
+        }
+      }
+    }
 
     if (filterLevel) {
       where.OR = [
@@ -474,6 +546,7 @@ export class PerformanceRatingService {
             fullName: true,
             position: true,
             departmentId: true,
+            managerId: true,  // Para canAssignPotential (jefe directo)
             department: {
               select: {
                 displayName: true
@@ -494,7 +567,20 @@ export class PerformanceRatingService {
     if (ratings.length === 0) {
       return {
         data: [],
-        pagination: { page, limit, total, pages: 0 }
+        pagination: { page, limit, total, pages: 0 },
+        stats: {
+          totalRatings,
+          evaluatedCount,
+          notEvaluatedCount,
+          potentialAssignedCount,
+          potentialPendingCount,
+          evaluationProgress: totalRatings > 0
+            ? Math.round((evaluatedCount / totalRatings) * 100)
+            : 0,
+          potentialProgress: evaluatedCount > 0
+            ? Math.round((potentialAssignedCount / evaluatedCount) * 100)
+            : 0
+        }
       }
     }
 
@@ -519,6 +605,19 @@ export class PerformanceRatingService {
         limit,
         total,
         pages: Math.ceil(total / limit)
+      },
+      stats: {
+        totalRatings,
+        evaluatedCount,
+        notEvaluatedCount,
+        potentialAssignedCount,
+        potentialPendingCount,
+        evaluationProgress: totalRatings > 0
+          ? Math.round((evaluatedCount / totalRatings) * 100)
+          : 0,
+        potentialProgress: evaluatedCount > 0
+          ? Math.round((potentialAssignedCount / evaluatedCount) * 100)
+          : 0
       }
     }
   }
@@ -570,13 +669,28 @@ export class PerformanceRatingService {
 
   /**
    * Obtiene datos para 9-Box Grid
+   * SECURITY FIX: Agregado accountId + departmentIds
    */
-  static async get9BoxData(cycleId: string) {
+  static async get9BoxData(
+    cycleId: string,
+    accountId: string,  // SECURITY: Obligatorio
+    departmentIds?: string[]  // SECURITY: Para AREA_MANAGER
+  ) {
+    const where: any = {
+      cycleId,
+      accountId,  // SECURITY: Defense-in-depth
+      nineBoxPosition: { not: null }
+    }
+
+    // SECURITY: Filtro departamental para AREA_MANAGER
+    if (departmentIds?.length) {
+      where.employee = {
+        departmentId: { in: departmentIds }
+      }
+    }
+
     const ratings = await prisma.performanceRating.findMany({
-      where: {
-        cycleId,
-        nineBoxPosition: { not: null }
-      },
+      where,
       include: {
         employee: {
           select: {

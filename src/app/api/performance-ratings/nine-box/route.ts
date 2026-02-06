@@ -1,10 +1,12 @@
 // ════════════════════════════════════════════════════════════════════════════
-// API: /api/admin/performance-ratings/nine-box
+// API: /api/performance-ratings/nine-box
 // GET - Datos para renderizar 9-Box Grid
+// ════════════════════════════════════════════════════════════════════════════
+// TODO: FOCALIZAHR_ADMIN deberia tener acceso solo si cycle.shareWithConcierge === true
 // ════════════════════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server'
-import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationService'
+import { extractUserContext, hasPermission, getChildDepartmentIds } from '@/lib/services/AuthorizationService'
 import { PerformanceRatingService } from '@/lib/services/PerformanceRatingService'
 import { NINE_BOX_POSITIONS, type NineBoxPosition } from '@/config/performanceClassification'
 
@@ -37,8 +39,22 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Obtener datos del 9-Box
-    const nineBoxData = await PerformanceRatingService.get9BoxData(cycleId)
+    // ════════════════════════════════════════════════════════════════════════════
+    // SECURITY FIX: Calcular filtro jerárquico según rol
+    // ════════════════════════════════════════════════════════════════════════════
+    let departmentIds: string[] | undefined = undefined
+
+    if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
+      const childIds = await getChildDepartmentIds(userContext.departmentId)
+      departmentIds = [userContext.departmentId, ...childIds]
+    }
+
+    // Obtener datos del 9-Box con seguridad
+    const nineBoxData = await PerformanceRatingService.get9BoxData(
+      cycleId,
+      userContext.accountId,  // SECURITY: Defense-in-depth
+      departmentIds  // SECURITY: Filtro AREA_MANAGER
+    )
 
     // Filtrar por departamento si se especifica
     type EmployeeWithDepartment = {
@@ -114,7 +130,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('[API] Error en GET /api/admin/performance-ratings/nine-box:', error)
+    console.error('[API] Error en GET /api/performance-ratings/nine-box:', error)
     return NextResponse.json(
       { success: false, error: 'Error interno del servidor' },
       { status: 500 }
