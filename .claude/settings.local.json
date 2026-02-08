@@ -9,7 +9,10 @@
       "Bash(npx prisma db push:*)",
       "Bash(npx next build:*)",
       "Bash(npx prisma generate:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(npm install:*)",
+      "Bash(taskkill:*)",
+      "Bash(timeout /t:*)"
     ]
   }
 }

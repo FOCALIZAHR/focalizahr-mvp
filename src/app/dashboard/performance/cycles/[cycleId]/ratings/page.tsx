@@ -13,12 +13,14 @@ import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import {
   ArrowLeft, RefreshCw, Grid3X3, Search,
-  Users, Sparkles, CheckCircle2, AlertTriangle, ArrowRight,
+  Users,
   ChevronLeft, ChevronRight as ChevronRightIcon
 } from 'lucide-react'
 import Link from 'next/link'
 import RatingRow, { type RatingData } from '@/components/performance/RatingRow'
 import DistributionGauge from '@/components/performance/DistributionGauge'
+import DistributionModal from '@/components/performance/DistributionModal'
+import { SecondaryButton } from '@/components/ui/PremiumButton'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -85,6 +87,9 @@ export default function CycleRatingsPage({ params }: PageProps) {
   const [filterTab, setFilterTab] = useState<'evaluated' | 'all' | 'pending' | 'assigned'>('evaluated')
   const [currentPage, setCurrentPage] = useState(1)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  // State - Distribution Modal (Progressive Disclosure)
+  const [showDistributionModal, setShowDistributionModal] = useState(false)
 
   // Debounced search - waits 300ms before triggering fetch
   const debouncedSearch = useDebounce(searchInput, 300)
@@ -249,7 +254,7 @@ export default function CycleRatingsPage({ params }: PageProps) {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col gap-4"
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
         >
           {/* Back + Title */}
           <div className="flex items-center gap-4">
@@ -261,7 +266,7 @@ export default function CycleRatingsPage({ params }: PageProps) {
             </Link>
             <div>
               <h1 className="text-2xl font-light text-white">
-                Asignar <span className="font-semibold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">Potencial</span>
+                Asignar <span className="font-semibold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">Potencial</span>
               </h1>
               <p className="text-sm text-slate-400 mt-0.5">
                 {cycle?.name || 'Cargando...'}
@@ -270,116 +275,96 @@ export default function CycleRatingsPage({ params }: PageProps) {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleRefresh}
-                disabled={isLoading}
-                className="p-2.5 rounded-xl bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors disabled:opacity-50"
-              >
-                <RefreshCw className={cn('w-4 h-4', isLoading && 'animate-spin')} />
-              </button>
-            </div>
-
-            {/* 9-Box Button */}
-            <Link
-              href={`/dashboard/performance/nine-box?cycleId=${cycleId}`}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all',
-                assignedCount > 0
-                  ? 'bg-gradient-to-r from-cyan-600 to-purple-600 text-white hover:shadow-lg hover:shadow-cyan-500/20'
-                  : 'bg-slate-800/50 text-slate-500 cursor-not-allowed pointer-events-none'
-              )}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleRefresh}
+              disabled={isLoading}
+              className="p-2.5 rounded-xl bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors disabled:opacity-50"
             >
-              <Grid3X3 className="w-4 h-4" />
-              Ver 9-Box
+              <RefreshCw className={cn('w-4 h-4', isLoading && 'animate-spin')} />
+            </button>
+
+            {/* 9-Box Button - Premium SecondaryButton */}
+            <Link href={`/dashboard/performance/nine-box?cycleId=${cycleId}`}>
+              <SecondaryButton
+                icon={Grid3X3}
+                size="md"
+                disabled={assignedCount === 0}
+              >
+                Ver 9-Box
+              </SecondaryButton>
             </Link>
           </div>
         </motion.div>
 
-        {/* PROGRESS CARD - Stats from backend */}
+        {/* PROGRESS CARD UNIFICADO - Layout 50/50 Cinema */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="relative p-5 rounded-2xl bg-slate-800/30 backdrop-blur-xl border border-slate-700/30 overflow-hidden"
+          className="relative p-6 rounded-2xl bg-slate-800/30 backdrop-blur-xl border border-slate-700/30 overflow-hidden"
         >
-          {/* Linea Tesla de progreso */}
-          <div
-            className="absolute top-0 left-0 h-[2px] transition-all duration-500"
-            style={{
-              width: `${progressPercent}%`,
-              background: 'linear-gradient(90deg, #22D3EE, #A78BFA)'
-            }}
-          />
+          {/* Tesla line top */}
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
 
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-            {/* Izquierda: Stats del backend */}
-            <div className="flex items-center justify-between lg:justify-start gap-6 flex-1">
-              <div className="flex items-center gap-6">
-                <StatMini icon={<Users />} label="Evaluados" value={evaluatedCount} color="cyan" />
-                <StatMini icon={<CheckCircle2 />} label="Asignados" value={assignedCount} color="emerald" />
-                <StatMini icon={<Sparkles />} label="Pendientes" value={pendingCount} color="amber" />
-              </div>
+          <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+            {/* IZQUIERDA: Progress Ring (50%) */}
+            <div className="flex-1 flex flex-col items-center lg:items-start">
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                <ProgressRing percent={progressPercent} size={140} strokeWidth={10} />
 
-              <div className="text-right lg:ml-6">
-                <div className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-                  {progressPercent}%
+                <div className="text-center sm:text-left">
+                  <p className="text-sm text-slate-400">
+                    <span className="text-white font-semibold">{assignedCount}</span> asignados
+                    {' · '}
+                    <span className="text-amber-400 font-semibold">{pendingCount}</span> pendientes
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    de {evaluatedCount} evaluados
+                  </p>
                 </div>
-                <div className="text-xs text-slate-500">completado</div>
               </div>
             </div>
 
-            {/* Derecha: Curva Gauss en vivo */}
-            <div className="w-full lg:w-[280px] lg:border-l lg:border-slate-700/30 lg:pl-4 mt-4 lg:mt-0">
-              <DistributionGauge assignedScores={assignedPotentialScores} />
+            {/* Divider */}
+            <div className="hidden lg:block w-px h-32 bg-slate-700/50" />
+
+            {/* DERECHA: Distribution Gauge Clickable (50%) */}
+            <div
+              className="flex-1 cursor-pointer group"
+              onClick={() => setShowDistributionModal(true)}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-slate-500 uppercase tracking-wider">
+                  Distribución Potencial
+                </p>
+                <span className="text-xs text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                  Ver detalle
+                </span>
+              </div>
+
+              {/* Gauge Preview con hover effect */}
+              <div className="p-3 rounded-xl bg-slate-900/50 group-hover:bg-slate-800/50
+                              border border-transparent group-hover:border-cyan-500/30 transition-all">
+                <DistributionGauge assignedScores={assignedPotentialScores} variant="compact" />
+              </div>
+
+              {/* Hint mobile */}
+              <p className="text-xs text-slate-500 mt-2 text-center lg:hidden">
+                Toca para ver detalle
+              </p>
             </div>
           </div>
         </motion.div>
 
-        {/* BANNER PENDIENTES - ABOVE THE FOLD (Cinema Focus) */}
-        {notEvaluatedCount > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.12 }}
-            className="relative overflow-hidden rounded-xl border border-amber-500/30
-                       bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent
-                       p-4 backdrop-blur-sm"
-          >
-            {/* Tesla line amber */}
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
+        {/* MODAL DE DISTRIBUCIÓN (Progressive Disclosure) */}
+        <DistributionModal
+          isOpen={showDistributionModal}
+          onClose={() => setShowDistributionModal(false)}
+          assignedScores={assignedPotentialScores}
+          totalEvaluated={evaluatedCount}
+        />
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg
-                                bg-amber-500/20 border border-amber-400/30">
-                  <AlertTriangle className="h-5 w-5 text-amber-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-amber-200">
-                    {notEvaluatedCount} colaboradores pendientes de evaluación
-                  </p>
-                  <p className="text-xs text-amber-300/60">
-                    Completa las evaluaciones para habilitar la Matriz 9-Box
-                  </p>
-                </div>
-              </div>
-
-              {/* Mini progress */}
-              <div className="text-right hidden sm:block">
-                <span className="text-2xl font-light text-amber-300">
-                  {stats?.totalRatings && stats.totalRatings > 0
-                    ? Math.round((evaluatedCount / stats.totalRatings) * 100)
-                    : 0}%
-                </span>
-                <p className="text-[10px] text-amber-400/50 uppercase tracking-wider">
-                  evaluados
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        )}
 
         {/* FILTERS - Trigger server-side fetch */}
         <motion.div
@@ -509,6 +494,13 @@ export default function CycleRatingsPage({ params }: PageProps) {
           </motion.div>
         )}
 
+        {/* FOOTNOTE - Colaboradores sin evaluar (sutil, no intrusivo) */}
+        {notEvaluatedCount > 0 && (
+          <p className="text-xs text-slate-500 text-center mt-4">
+            {notEvaluatedCount} colaboradores aún sin evaluación de desempeño
+          </p>
+        )}
+
       </div>
     </div>
   )
@@ -518,30 +510,58 @@ export default function CycleRatingsPage({ params }: PageProps) {
 // SUB-COMPONENTS
 // ════════════════════════════════════════════════════════════════════════════
 
-function StatMini({
-  icon,
-  label,
-  value,
-  color = 'slate'
+// Progress Ring - Cinema Apple Style
+function ProgressRing({
+  percent,
+  size = 120,
+  strokeWidth = 8
 }: {
-  icon: React.ReactNode
-  label: string
-  value: number
-  color?: string
+  percent: number
+  size?: number
+  strokeWidth?: number
 }) {
-  const colors: Record<string, string> = {
-    slate: 'text-slate-400',
-    emerald: 'text-emerald-400',
-    amber: 'text-amber-400',
-    cyan: 'text-cyan-400'
-  }
+  const radius = (size - strokeWidth) / 2
+  const circumference = radius * 2 * Math.PI
+  const offset = circumference - (percent / 100) * circumference
 
   return (
-    <div className="flex items-center gap-2">
-      <span className={cn('w-4 h-4', colors[color])}>{icon}</span>
-      <div>
-        <div className={cn('text-lg font-semibold', colors[color])}>{value}</div>
-        <div className="text-[10px] text-slate-500">{label}</div>
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg className="transform -rotate-90" width={size} height={size}>
+        {/* Background circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          strokeWidth={strokeWidth}
+          stroke="rgb(51, 65, 85)"
+          fill="transparent"
+        />
+        {/* Progress circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          strokeWidth={strokeWidth}
+          stroke="url(#progressGradient)"
+          fill="transparent"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className="transition-all duration-500 ease-out"
+        />
+        <defs>
+          <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#22D3EE" />
+            <stop offset="100%" stopColor="#A78BFA" />
+          </linearGradient>
+        </defs>
+      </svg>
+      {/* Center text */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+          {percent}%
+        </span>
+        <span className="text-xs text-slate-500">completado</span>
       </div>
     </div>
   )

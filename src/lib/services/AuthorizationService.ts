@@ -420,6 +420,24 @@ export const PERMISSIONS = {
     'HR_ADMIN'
     // Solo roles con capacidad de configurar evaluaciones
   ],
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CALIBRATION SESSIONS
+  // ─────────────────────────────────────────────────────────────────────────
+  'calibration:view': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'CEO',
+    'AREA_MANAGER'
+  ],
+  'calibration:manage': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER'
+  ],
 } as const;
 
 // =============================================================================

@@ -2004,6 +2004,9 @@ model PerformanceRating {
   cycle       PerformanceCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
   employee    Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
+  // Relación inversa calibración
+  calibrationAdjustments CalibrationAdjustment[]
+
   @@unique([cycleId, employeeId], map: "unique_rating_per_cycle_employee")
   @@index([accountId, cycleId], map: "idx_ratings_account_cycle")
   @@index([finalLevel], map: "idx_ratings_final_level")
@@ -2013,41 +2016,146 @@ model PerformanceRating {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// CALIBRATION SESSION - Sesiones de Calibración Grupal
+// CALIBRATION SESSION - Sesión de calibración grupal v2
 // ════════════════════════════════════════════════════════════════════════════
 
+enum CalibrationStatus {
+  DRAFT        // Creada pero no iniciada
+  IN_PROGRESS  // Sesión activa
+  CLOSED       // Cerrada, ratings finales aplicados
+  CANCELLED    // Cancelada
+}
+
+enum CalibrationRole {
+  FACILITATOR   // HR que conduce la sesión (puede ajustar + cerrar)
+  REVIEWER      // Gerente/experto que revisa y opina (PUEDE ajustar)
+  OBSERVER      // Solo observa, NO puede ajustar
+}
+
 model CalibrationSession {
-  id          String   @id @default(cuid())
-  accountId   String   @map("account_id")
-  cycleId     String   @map("cycle_id")
+  id                String    @id @default(cuid())
 
-  name        String
-  description String?  @db.Text
-  status      String   @default("draft")
+  // Relaciones multi-tenant
+  accountId         String    @map("account_id")
+  account           Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  cycleId           String    @map("cycle_id")
+  cycle             PerformanceCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
 
-  facilitatorId   String?  @map("facilitator_id")
-  participantIds  Json     @default("[]") @map("participant_ids")
+  // Info básica
+  name              String              // "Calibración Q4 2025 - Comercial"
+  description       String?   @db.Text // Notas/objetivo de la sesión
 
-  departmentIds   Json?    @map("department_ids")
-  levelFilter     Json?    @map("level_filter")
+  // Estado
+  status            CalibrationStatus   @default(DRAFT)
 
-  targetDistribution  Json?  @map("target_distribution")
-  actualDistribution  Json?  @map("actual_distribution")
+  // Fechas
+  scheduledAt       DateTime? @map("scheduled_at") // Fecha programada reunión
+  startedAt         DateTime? @map("started_at")   // Cuándo inició realmente
+  closedAt          DateTime? @map("closed_at")    // Cuándo se cerró
 
-  totalEmployees      Int?   @map("total_employees")
-  calibratedCount     Int?   @map("calibrated_count")
+  // Configuración - Distribución Forzada (Curva de Bell)
+  enableForcedDistribution  Boolean @default(false) @map("enable_forced_distribution")
+  distributionTargets       Json?   @map("distribution_targets")
+  // Ejemplo: {"exceptional": 10, "exceeds": 20, "meets": 40, "developing": 20, "needs_improvement": 10}
 
-  scheduledAt   DateTime? @map("scheduled_at")
-  startedAt     DateTime? @map("started_at")
-  completedAt   DateTime? @map("completed_at")
+  // Scope (si vacío = cross-departamental toda la empresa)
+  departmentIds     String[]  @default([]) @map("department_ids")
 
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  // Multi-criterio v3.1+ (TASK 17A) - departmentIds se mantiene para backward compat
+  filterMode        String    @default("jobLevel") @map("filter_mode")
+  filterConfig      Json?     @map("filter_config")
 
-  account     Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  cycle       PerformanceCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  // Facilitador principal
+  facilitatorId     String?   @map("facilitator_id") // Email de quien conduce
 
-  @@index([accountId, cycleId], map: "idx_calibration_account_cycle")
-  @@index([status], map: "idx_calibration_status")
+  // Audit PDF
+  auditPdfUrl       String?   @map("audit_pdf_url") // URL del PDF de auditoría en Storage
+
+  // Audit
+  createdBy         String    @map("created_by")  // Email de quien creó
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relaciones
+  participants      CalibrationParticipant[]
+  adjustments       CalibrationAdjustment[]
+
+  @@index([accountId])
+  @@index([cycleId])
+  @@index([status])
+  @@index([accountId, cycleId])
   @@map("calibration_sessions")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CALIBRATION PARTICIPANT - Participantes de la sesión
+// IMPORTANTE: Roles son TEMPORALES y específicos a ESTA sesión
+// Una misma persona puede tener roles diferentes en sesiones diferentes
+// ════════════════════════════════════════════════════════════════════════════
+
+model CalibrationParticipant {
+  id              String    @id @default(cuid())
+
+  sessionId       String    @map("session_id")
+  session         CalibrationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Participante
+  participantEmail String   @map("participant_email") // Email del participante
+  participantName  String   @map("participant_name")  // Nombre para display
+  role             CalibrationRole   @default(REVIEWER)
+
+  // Estado
+  invitedAt       DateTime  @default(now()) @map("invited_at")
+  acceptedAt      DateTime? @map("accepted_at")
+
+  // Constraint: una persona solo una vez por sesión
+  @@unique([sessionId, participantEmail])
+  @@index([sessionId])
+  @@index([participantEmail]) // Para encontrar sesiones de un usuario
+  @@map("calibration_participants")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CALIBRATION ADJUSTMENT - Ajustes realizados durante calibración
+// ════════════════════════════════════════════════════════════════════════════
+
+model CalibrationAdjustment {
+  id              String    @id @default(cuid())
+
+  sessionId       String    @map("session_id")
+  session         CalibrationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  ratingId        String    @map("rating_id") // PerformanceRating que se ajustó
+  rating          PerformanceRating @relation(fields: [ratingId], references: [id], onDelete: Cascade)
+
+  // Snapshot de valores ANTERIORES (antes del ajuste)
+  previousFinalScore      Float?  @map("previous_final_score")
+  previousFinalLevel      String? @map("previous_final_level")
+  previousPotentialScore  Float?  @map("previous_potential_score")
+  previousPotentialLevel  String? @map("previous_potential_level")
+  previousNineBox         String? @map("previous_nine_box")
+
+  // Valores NUEVOS (después del ajuste)
+  newFinalScore         Float?  @map("new_final_score")
+  newFinalLevel         String? @map("new_final_level")
+  newPotentialScore     Float?  @map("new_potential_score")
+  newPotentialLevel     String? @map("new_potential_level")
+  newNineBox            String? @map("new_nine_box")
+
+  // Justificación (OBLIGATORIA - mínimo 10 caracteres)
+  justification   String    @db.Text
+
+  // Estado transitorio: PENDING → APPLIED | CANCELLED
+  status          String    @default("PENDING") // PENDING | APPLIED | CANCELLED
+  appliedAt       DateTime? @map("applied_at")  // Cuándo se aplicó al cerrar sesión
+
+  // Audit
+  adjustedBy      String    @map("adjusted_by")  // Email de quien ajustó
+  adjustedAt      DateTime  @default(now()) @map("adjusted_at")
+
+  @@index([sessionId])
+  @@index([ratingId])
+  @@index([adjustedBy]) // Para audit trail por usuario
+  @@index([status])     // Para queries de PENDING en cierre
+  @@map("calibration_adjustments")
 }

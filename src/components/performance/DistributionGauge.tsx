@@ -35,6 +35,8 @@ interface DistributionGaugeProps {
   assignedScores: number[]
   /** Mínimo de asignaciones para mostrar el gráfico */
   minToShow?: number
+  /** Variante de tamaño: compact (preview), large (modal), default */
+  variant?: 'compact' | 'large' | 'default'
 }
 
 interface ChartDataItem {
@@ -51,8 +53,14 @@ interface ChartDataItem {
 
 export default memo(function DistributionGauge({
   assignedScores,
-  minToShow = 3
+  minToShow = 3,
+  variant = 'default'
 }: DistributionGaugeProps) {
+
+  // Tamaños según variante
+  const chartHeight = variant === 'compact' ? 60 : variant === 'large' ? 160 : 80
+  const showLabels = variant !== 'compact'
+  const showSummary = variant !== 'compact'
 
   // Calcular distribución real
   const chartData = useMemo(() => {
@@ -90,27 +98,29 @@ export default memo(function DistributionGauge({
   }
 
   return (
-    <div className="space-y-2">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
-          Distribución
-        </span>
-        <div className="flex items-center gap-3 text-[10px]">
-          <span className="flex items-center gap-1.5">
-            <span className="w-4 h-[2px] border-t-2 border-dashed border-cyan-500/60" />
-            <span className="text-slate-500">Target</span>
+    <div className={variant === 'compact' ? 'space-y-1' : 'space-y-2'}>
+      {/* Header - Solo en default y large */}
+      {showLabels && (
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+            Distribución
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-4 h-[2px] bg-purple-400 rounded" />
-            <span className="text-slate-500">Real</span>
-          </span>
+          <div className="flex items-center gap-3 text-[10px]">
+            <span className="flex items-center gap-1.5">
+              <span className="w-4 h-[2px] border-t-2 border-dashed border-cyan-500/60" />
+              <span className="text-slate-500">Target</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-4 h-[2px] bg-purple-400 rounded" />
+              <span className="text-slate-500">Real</span>
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Gráfico Curva Gauss */}
       <div className="relative">
-        <ResponsiveContainer width="100%" height={80}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
           <AreaChart
             data={chartData}
             margin={{ top: 5, right: 5, left: 0, bottom: 0 }}
@@ -130,8 +140,9 @@ export default memo(function DistributionGauge({
               dataKey="label"
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#64748B', fontSize: 9 }}
+              tick={showLabels ? { fill: '#64748B', fontSize: variant === 'large' ? 11 : 9 } : false}
               dy={2}
+              hide={!showLabels}
             />
 
             <YAxis hide domain={[0, 50]} />
@@ -141,7 +152,7 @@ export default memo(function DistributionGauge({
               type="monotone"
               dataKey="target"
               stroke="#22D3EE"
-              strokeWidth={1.5}
+              strokeWidth={variant === 'large' ? 2 : 1.5}
               strokeDasharray="4 3"
               fill="url(#gradientTarget)"
               fillOpacity={1}
@@ -154,19 +165,19 @@ export default memo(function DistributionGauge({
               type="monotone"
               dataKey="real"
               stroke="#A78BFA"
-              strokeWidth={2}
+              strokeWidth={variant === 'large' ? 3 : 2}
               fill="url(#gradientReal)"
               fillOpacity={1}
               animationDuration={1200}
               animationBegin={300}
               dot={{
                 fill: '#A78BFA',
-                r: 2.5,
+                r: variant === 'large' ? 4 : 2.5,
                 strokeWidth: 0
               }}
               activeDot={{
                 fill: '#A78BFA',
-                r: 4,
+                r: variant === 'large' ? 6 : 4,
                 stroke: '#A78BFA',
                 strokeWidth: 2,
                 strokeOpacity: 0.3
@@ -181,8 +192,10 @@ export default memo(function DistributionGauge({
         </ResponsiveContainer>
       </div>
 
-      {/* Resumen rápido (1 línea) */}
-      <DistributionSummary chartData={chartData} total={assignedScores.length} />
+      {/* Resumen rápido (1 línea) - Solo en default y large */}
+      {showSummary && (
+        <DistributionSummary chartData={chartData} total={assignedScores.length} />
+      )}
     </div>
   )
 })
