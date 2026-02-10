@@ -137,6 +137,40 @@ export async function GET(request: NextRequest) {
       ]
     });
 
+    // ════════════════════════════════════════════════════════════════════════════
+    // BATCH: Obtener potentialScore de PerformanceRating
+    // No hay FK directa, usamos cycleId + evaluateeId
+    // ════════════════════════════════════════════════════════════════════════════
+    const cycleId = activeCycle?.id
+    let ratingsMap = new Map<string, { ratingId: string; potentialScore: number | null; potentialLevel: string | null; nineBoxPosition: string | null }>()
+
+    if (cycleId && assignments.length > 0) {
+      const employeeIds = [...new Set(assignments.map(a => a.evaluateeId))]
+
+      const performanceRatings = await prisma.performanceRating.findMany({
+        where: {
+          cycleId,
+          employeeId: { in: employeeIds }
+        },
+        select: {
+          id: true,
+          employeeId: true,
+          potentialScore: true,
+          potentialLevel: true,
+          nineBoxPosition: true
+        }
+      })
+
+      ratingsMap = new Map(
+        performanceRatings.map(r => [r.employeeId, {
+          ratingId: r.id,
+          potentialScore: r.potentialScore,
+          potentialLevel: r.potentialLevel,
+          nineBoxPosition: r.nineBoxPosition
+        }])
+      )
+    }
+
     // Mapear a formato de UI
     const mappedAssignments = assignments.map(a => {
       // Calculate avgScore for completed assignments (0-100 scale)
@@ -165,6 +199,9 @@ export async function GET(request: NextRequest) {
         console.log(`[API] Assignment ${a.id}: participant=${!!a.participant}, responses=${a.participant?.responses?.length ?? 0}, avgScore=${avgScore}`)
       }
 
+      // Lookup de PerformanceRating para datos de potencial
+      const ratingData = ratingsMap.get(a.evaluateeId)
+
       return {
         id: a.id,
         status: a.status.toLowerCase(),
@@ -172,6 +209,12 @@ export async function GET(request: NextRequest) {
         dueDate: a.dueDate?.toISOString(),
         evaluationType: a.evaluationType,
         avgScore,
+        // Campos de potencial (desde PerformanceRating batch)
+        ratingId: ratingData?.ratingId ?? null,
+        potentialScore: ratingData?.potentialScore ?? null,
+        potentialLevel: ratingData?.potentialLevel ?? null,
+        nineBoxPosition: ratingData?.nineBoxPosition ?? null,
+        cycleId: a.cycleId,
         evaluatee: {
           id: a.evaluateeId,
           fullName: a.evaluateeName,

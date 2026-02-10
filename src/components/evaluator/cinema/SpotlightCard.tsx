@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, CheckCircle2, Eye } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Star, Pencil, Eye } from 'lucide-react'
 import { getInitials } from '@/lib/utils/formatName'
 import { StatusBadge } from './StatusBadge'
 import InsightCard from './InsightCard'
@@ -12,8 +12,12 @@ export default function SpotlightCard({
   employee,
   onBack,
   onEvaluate,
-  onViewSummary
+  onViewSummary,
+  onEvaluatePotential
 }: SpotlightCardProps) {
+  const isCompleted = employee.status === 'completed'
+  const hasPotential = employee.potentialScore != null
+  const needsPotential = isCompleted && !hasPotential
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95, y: 30 }}
@@ -97,34 +101,83 @@ export default function SpotlightCard({
             ))}
           </div>
 
-          {/* CTAs */}
-          <div className="flex items-center gap-4 mt-auto pt-4 border-t border-slate-800">
+          {/* CTAs dinámicos según estado */}
+          <div className="flex flex-col gap-3 mt-auto pt-4 border-t border-slate-800">
 
-            {/* CTA Primario */}
-            {employee.status !== 'completed' && employee.participantToken && (
+            {/* CASO 1: No completado → Comenzar Evaluación */}
+            {!isCompleted && employee.participantToken && (
               <button
                 onClick={() => onEvaluate(employee.participantToken!)}
-                className="flex-1 h-14 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:to-cyan-400 text-white rounded-xl font-semibold text-sm shadow-lg shadow-cyan-500/20 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-3"
+                className="w-full h-14 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:to-cyan-400 text-white rounded-xl font-semibold text-sm shadow-lg shadow-cyan-500/20 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-3"
               >
                 <span>COMENZAR EVALUACION</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             )}
 
-            {employee.status === 'completed' && (
-              <button
-                onClick={() => onViewSummary(employee.assignmentId)}
-                className="flex-1 h-14 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 rounded-xl font-semibold text-sm flex items-center justify-center gap-3 transition-all"
-              >
-                <Eye className="w-5 h-5" />
-                <span>VER RESUMEN</span>
-              </button>
+            {/* CASO 2: Completado SIN potencial → Evaluar Potencial + Resumen deshabilitado */}
+            {needsPotential && (
+              <>
+                <button
+                  onClick={onEvaluatePotential}
+                  className="w-full h-14 bg-gradient-to-r from-purple-500 to-purple-600 hover:to-purple-400 text-white rounded-xl font-semibold text-sm shadow-lg shadow-purple-500/20 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-3"
+                >
+                  <Star className="w-4 h-4" />
+                  <span>EVALUAR POTENCIAL</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+
+                <button
+                  disabled
+                  className="w-full h-12 bg-slate-800/50 text-slate-500 cursor-not-allowed rounded-xl font-semibold text-sm flex items-center justify-center gap-3"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span>VER RESUMEN</span>
+                </button>
+                <p className="text-[10px] text-slate-600 text-center -mt-1">
+                  Completa el potencial para ver el resumen
+                </p>
+              </>
             )}
 
-            {/* CTA Secundario */}
-            <button className="h-14 px-6 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 hover:bg-slate-800/50 transition-all text-sm font-medium">
-              Historial
-            </button>
+            {/* CASO 3: Completado CON potencial → Info 9-Box + Resumen activo */}
+            {isCompleted && hasPotential && (
+              <>
+                <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400">Potencial:</span>
+                    <span className="text-purple-400 font-semibold">
+                      {employee.potentialScore?.toFixed(1)} ({employee.potentialLevel})
+                    </span>
+                  </div>
+                  {employee.nineBoxPosition && (
+                    <div className="flex items-center justify-between text-sm mt-1">
+                      <span className="text-slate-400">9-Box:</span>
+                      <span className="text-cyan-400 font-semibold">
+                        {employee.nineBoxPosition.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => onViewSummary(employee.assignmentId)}
+                  className="w-full h-14 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:to-cyan-400 text-white rounded-xl font-semibold text-sm shadow-lg shadow-cyan-500/20 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-3"
+                >
+                  <Eye className="w-5 h-5" />
+                  <span>VER RESUMEN COMPLETO</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={onEvaluatePotential}
+                  className="w-full h-10 bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50 hover:text-white rounded-xl font-medium text-xs flex items-center justify-center gap-2 transition-all"
+                >
+                  <Pencil className="w-3 h-3" />
+                  <span>Reevaluar Potencial</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

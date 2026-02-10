@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationService';
+import { PerformanceRatingService } from '@/lib/services/PerformanceRatingService';
 
 // GET - Detalle de ciclo
 export async function GET(
@@ -174,6 +175,17 @@ export async function PATCH(
         ...(status && { status })
       }
     });
+
+    // Auto-generar PerformanceRatings al entrar a IN_REVIEW
+    if (status === 'IN_REVIEW') {
+      try {
+        const result = await PerformanceRatingService.generateRatingsForCycle(id, cycle.accountId)
+        console.log(`[Performance] Auto-generated ratings on IN_REVIEW: ${result.success} success, ${result.failed} failed`)
+      } catch (err) {
+        console.error('[Performance] Error auto-generating ratings:', err)
+        // No fallar la transición de estado
+      }
+    }
 
     // Sincronizar Campaign asociada cuando el ciclo se activa
     if (status === 'ACTIVE' && cycle.campaignId) {

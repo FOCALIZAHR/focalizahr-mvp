@@ -40,9 +40,12 @@ export function useEvaluatorCinemaMode() {
   // API data
   const [rawAssignments, setRawAssignments] = useState<EvaluatorAssignment[]>([])
   const [cycle, setCycle] = useState<CinemaCycle | null>(null)
-  const [rawStats, setRawStats] = useState<CinemaStats>({ total: 0, completed: 0, pending: 0 })
+  const [rawStats, setRawStats] = useState<Omit<CinemaStats, 'pendingPotential'>>({ total: 0, completed: 0, pending: 0 })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Evaluator info
+  const [evaluatorName, setEvaluatorName] = useState<string | null>(null)
 
   // UI state
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -79,6 +82,7 @@ export function useEvaluatorCinemaMode() {
           setCycle(json.cycle)
           setRawAssignments(json.assignments || [])
           setRawStats(json.stats || { total: 0, completed: 0, pending: 0 })
+          setEvaluatorName(json.employee?.fullName || null)
         } else {
           throw new Error(json.error || 'Error cargando datos')
         }
@@ -108,9 +112,20 @@ export function useEvaluatorCinemaMode() {
       evaluationType: a.evaluationType || 'Evaluacion',
       dueDate: a.dueDate,
       completedAt: a.completedAt,
-      avgScore: a.avgScore ?? null
+      avgScore: a.avgScore ?? null,
+      // Campos de potencial
+      ratingId: a.ratingId ?? null,
+      potentialScore: a.potentialScore ?? null,
+      potentialLevel: a.potentialLevel ?? null,
+      nineBoxPosition: a.nineBoxPosition ?? null,
+      cycleId: a.cycleId
     }))
   }, [rawAssignments])
+
+  // Count employees needing potential evaluation (completed desempeno but no potential)
+  const pendingPotential = useMemo(() => {
+    return employees.filter(e => e.status === 'completed' && e.potentialScore === null).length
+  }, [employees])
 
   // Selected employee with insights
   const selectedEmployee = useMemo<SelectedEmployee | null>(() => {
@@ -123,11 +138,12 @@ export function useEvaluatorCinemaMode() {
     }
   }, [selectedId, employees])
 
-  // Next employee (priority: in_progress > ready > waiting)
+  // Next employee (priority: in_progress > ready > waiting > completed-needs-potential)
   const nextEmployee = useMemo(() => {
     const next = employees.find(e => e.status === 'in_progress')
       || employees.find(e => e.status === 'ready')
       || employees.find(e => e.status === 'waiting')
+      || employees.find(e => e.status === 'completed' && e.potentialScore === null)
       || null
     if (!next) return null
     return { id: next.id, displayName: next.displayName }
@@ -175,6 +191,7 @@ export function useEvaluatorCinemaMode() {
         setCycle(json.cycle)
         setRawAssignments(json.assignments || [])
         setRawStats(json.stats || { total: 0, completed: 0, pending: 0 })
+        setEvaluatorName(json.employee?.fullName || null)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido')
@@ -188,8 +205,9 @@ export function useEvaluatorCinemaMode() {
     employees,
     selectedEmployee,
     nextEmployee,
-    stats: rawStats,
+    stats: { ...rawStats, pendingPotential },
     cycle,
+    evaluatorName,
 
     // UI State
     selectedId,

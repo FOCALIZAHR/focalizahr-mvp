@@ -129,7 +129,7 @@ export default function Rail({
               >
                 {tab === 'all' && `Todos ${counts.all}`}
                 {tab === 'pending' && `Pendientes ${counts.pending}`}
-                {tab === 'completed' && `Completadas ${counts.completed}`}
+                {tab === 'completed' && `Último Paso ${counts.completed}`}
               </button>
             )
           })}

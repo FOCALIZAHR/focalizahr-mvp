@@ -6,16 +6,21 @@
 // src/app/dashboard/evaluaciones/components/CinemaModeOrchestrator.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
+import { useState, useEffect, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { RefreshCw, AlertTriangle, ClipboardList, ArrowLeft } from 'lucide-react'
+import { RefreshCw, AlertTriangle, ClipboardList, ArrowLeft, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useEvaluatorCinemaMode } from '@/hooks/useEvaluatorCinemaMode'
+import { AAEPotentialRenderer } from '@/components/potential'
+import type { PotentialFactors } from '@/types/potential'
+import type { SelectedEmployee } from '@/types/evaluator-cinema'
 
 import CinemaHeader from '@/components/evaluator/cinema/CinemaHeader'
 import MissionControl from '@/components/evaluator/cinema/MissionControl'
 import SpotlightCard from '@/components/evaluator/cinema/SpotlightCard'
 import VictoryScreen from '@/components/evaluator/cinema/VictoryScreen'
+import VictoryOverlay from '@/components/evaluator/cinema/VictoryOverlay'
 import Rail from '@/components/evaluator/cinema/Rail'
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -124,6 +129,7 @@ export default function CinemaModeOrchestrator() {
     nextEmployee,
     stats,
     cycle,
+    evaluatorName,
     selectedId,
     isRailExpanded,
     activeTab,
@@ -138,8 +144,71 @@ export default function CinemaModeOrchestrator() {
     reload
   } = useEvaluatorCinemaMode()
 
-  // Determine view
-  const isVictory = stats.pending === 0 && stats.total > 0
+  // AAE Potential Modal state
+  const [potentialTarget, setPotentialTarget] = useState<SelectedEmployee | null>(null)
+
+  // Victory Overlay state
+  const [showVictoryOverlay, setShowVictoryOverlay] = useState(false)
+
+  // Detect victory: all desempeño + all potential complete
+  useEffect(() => {
+    if (!employees.length || !cycle?.id) return
+
+    const allDesempenoComplete = employees.every(e => e.status === 'completed')
+    const allPotentialComplete = employees.every(e => e.potentialScore !== null)
+
+    if (allDesempenoComplete && allPotentialComplete) {
+      const victoryKey = `victory-shown-${cycle.id}`
+      if (!sessionStorage.getItem(victoryKey)) {
+        setShowVictoryOverlay(true)
+        sessionStorage.setItem(victoryKey, 'true')
+      }
+    }
+  }, [employees, cycle?.id])
+
+  const handleCloseVictory = useCallback(() => {
+    setShowVictoryOverlay(false)
+  }, [])
+
+  const handleEvaluatePotential = useCallback(() => {
+    if (selectedEmployee) {
+      setPotentialTarget(selectedEmployee)
+    }
+  }, [selectedEmployee])
+
+  const handlePotentialSave = useCallback(async (factors: PotentialFactors, notes: string) => {
+    if (!potentialTarget) {
+      throw new Error('No se encontró el colaborador seleccionado.')
+    }
+
+    const token = localStorage.getItem('focalizahr_token')
+    const res = await fetch('/api/evaluator/potential', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        cycleId: potentialTarget.cycleId,
+        employeeId: potentialTarget.id,
+        aspiration: factors.aspiration,
+        ability: factors.ability,
+        engagement: factors.engagement,
+        notes: notes || undefined
+      })
+    })
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}))
+      throw new Error(errorData.error || `Error ${res.status} guardando potencial`)
+    }
+
+    setPotentialTarget(null)
+    await reload()
+  }, [potentialTarget, reload])
+
+  // Determine view — Victory only when BOTH desempeno AND potential are complete
+  const isVictory = stats.pending === 0 && stats.pendingPotential === 0 && stats.total > 0
   const isSpotlight = selectedId !== null && selectedEmployee !== null
 
   if (isLoading) return <CinemaModeSkeleton />
@@ -150,8 +219,16 @@ export default function CinemaModeOrchestrator() {
   return (
     <div className="h-screen w-full bg-[#0F172A] text-white flex flex-col font-sans overflow-hidden">
 
+      {/* Victory Overlay - z-[100] sobre todo */}
+      {showVictoryOverlay && (
+        <VictoryOverlay
+          onClose={handleCloseVictory}
+          evaluatorName={evaluatorName || undefined}
+        />
+      )}
+
       {/* Header */}
-      <CinemaHeader cycle={cycle} />
+      <CinemaHeader cycle={cycle} cycleId={cycle?.id} />
 
       {/* Stage */}
       <div className={cn(
@@ -186,6 +263,7 @@ export default function CinemaModeOrchestrator() {
               onBack={handleBack}
               onEvaluate={handleEvaluate}
               onViewSummary={handleViewSummary}
+              onEvaluatePotential={handleEvaluatePotential}
             />
           )}
 
@@ -215,6 +293,70 @@ export default function CinemaModeOrchestrator() {
         onSelect={handleSelect}
         onTabChange={setActiveTab}
       />
+
+      {/* AAE POTENTIAL MODAL */}
+      <AnimatePresence>
+        {potentialTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          >
+            {/* Backdrop */}
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setPotentialTarget(null)}
+            />
+
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className={cn(
+                "relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto",
+                "bg-slate-900/95 backdrop-blur-xl border border-slate-700/50",
+                "rounded-2xl p-6 shadow-2xl"
+              )}
+            >
+              {/* Tesla line */}
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-purple-400 to-transparent rounded-t-2xl" />
+
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">
+                    {potentialTarget.displayNameFull}
+                  </h2>
+                  <p className="text-sm text-slate-400">
+                    {potentialTarget.position}
+                    {' · Score: '}
+                    {(potentialTarget.avgScore ?? 0).toFixed(1)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setPotentialTarget(null)}
+                  className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* AAE Renderer */}
+              {/* avgScore es 0-100, performanceScore necesita 1-5 para 9-box */}
+              <AAEPotentialRenderer
+                ratingId={potentialTarget.ratingId || ''}
+                employeeName={potentialTarget.displayNameFull}
+                performanceScore={potentialTarget.avgScore ? (potentialTarget.avgScore / 100) * 5 : 0}
+                existingNotes={''}
+                onSave={handlePotentialSave}
+                onCancel={() => setPotentialTarget(null)}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

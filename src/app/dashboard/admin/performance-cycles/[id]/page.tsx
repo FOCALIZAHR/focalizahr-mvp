@@ -106,6 +106,8 @@ export default function PerformanceCycleDetailPage({
   const [generateResult, setGenerateResult] = useState<any>(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [showActivateModal, setShowActivateModal] = useState(false);
+  const [generatingRatings, setGeneratingRatings] = useState(false);
+  const [ratingsResult, setRatingsResult] = useState<{ generated: number; failed: number } | null>(null);
 
   // ══════════════════════════════════════════════════════════════════════════
   // FETCH DATA
@@ -242,6 +244,44 @@ export default function PerformanceCycleDetailPage({
       toast.error(err.message, 'Error al generar');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // GENERAR / RECALCULAR RATINGS (PerformanceRatings)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const handleGenerateRatings = async () => {
+    if (!cycle) return;
+
+    try {
+      setGeneratingRatings(true);
+      setRatingsResult(null);
+      const token = localStorage.getItem('focalizahr_token');
+
+      const response = await fetch(`/api/admin/performance-cycles/${id}/generate-ratings`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setRatingsResult(data.data);
+        toast.success(
+          `${data.data.generated} ratings calculados para "${cycle.name}"`,
+          'Ratings Generados'
+        );
+      } else {
+        throw new Error(data.error || 'Error generando ratings');
+      }
+    } catch (err: any) {
+      toast.error(err.message, 'Error al generar ratings');
+    } finally {
+      setGeneratingRatings(false);
     }
   };
 
@@ -522,6 +562,52 @@ export default function PerformanceCycleDetailPage({
             <p className="text-xs text-slate-500 mt-3">
               Solo se pueden generar evaluaciones en estado DRAFT o SCHEDULED
             </p>
+          )}
+
+          {/* Recalcular Ratings - visible en ACTIVE, IN_REVIEW o COMPLETED */}
+          {(cycle.status === 'ACTIVE' || cycle.status === 'IN_REVIEW' || cycle.status === 'COMPLETED') && (
+            <div className="mt-6 pt-4 border-t border-slate-700">
+              <h4 className="text-xs font-medium uppercase tracking-wider text-slate-400 mb-3">
+                Performance Ratings
+              </h4>
+
+              {ratingsResult && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30"
+                >
+                  <p className="text-sm text-emerald-400">
+                    {ratingsResult.generated} ratings calculados
+                    {ratingsResult.failed > 0 && (
+                      <span className="text-amber-400"> · {ratingsResult.failed} errores</span>
+                    )}
+                  </p>
+                </motion.div>
+              )}
+
+              <Button
+                variant="outline"
+                onClick={handleGenerateRatings}
+                disabled={generatingRatings}
+                className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10 disabled:opacity-50"
+              >
+                {generatingRatings ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Calculando...
+                  </>
+                ) : (
+                  <>
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    {cycle.status === 'ACTIVE' ? 'Generar Ratings (Parciales)' : 'Recalcular Ratings'}
+                  </>
+                )}
+              </Button>
+              <p className="text-xs text-slate-500 mt-2">
+                Calcula scores ponderados desde evaluaciones completadas
+              </p>
+            </div>
           )}
         </Card>
 

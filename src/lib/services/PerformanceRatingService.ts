@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { PerformanceResultsService } from './PerformanceResultsService'
+import { calculatePotentialScore } from '@/lib/potential-assessment'
 import {
   FOCALIZAHR_DEFAULT_CONFIG,
   getPerformanceClassification,
@@ -48,7 +49,10 @@ export interface CalibrateRatingInput {
 
 export interface RatePotentialInput {
   ratingId: string
-  potentialScore: number
+  potentialScore?: number         // Opcional si se envían factores AAE
+  aspiration?: 1 | 2 | 3          // Factor Aspiración
+  ability?: 1 | 2 | 3             // Factor Capacidad
+  engagement?: 1 | 2 | 3          // Factor Compromiso
   notes?: string
   ratedBy: string
 }
@@ -212,6 +216,28 @@ export class PerformanceRatingService {
       }
     })
 
+    // 7. Si ya tiene potentialScore, recalcular nineBoxPosition con el nuevo score
+    if (rating.potentialScore != null) {
+      await this.recalculate9BoxPosition(rating.id)
+    }
+
+    // 8. Audit log
+    await prisma.auditLog.create({
+      data: {
+        action: 'PERFORMANCE_RATING_GENERATED',
+        accountId,
+        entityType: 'performance_rating',
+        entityId: rating.id,
+        newValues: {
+          cycleId,
+          employeeId,
+          calculatedScore: weightedScore,
+          trigger: 'bulk_generate',
+          hadPreviousPotential: rating.potentialScore !== null
+        }
+      }
+    })
+
     return {
       rating: {
         id: rating.id,
@@ -322,9 +348,18 @@ export class PerformanceRatingService {
 
   /**
    * Agrega rating de potencial (para 9-Box)
+   * Acepta score directo O factores AAE (aspiration, ability, engagement)
    */
   static async ratePotential(input: RatePotentialInput) {
-    const { ratingId, potentialScore, notes, ratedBy } = input
+    const {
+      ratingId,
+      potentialScore: directScore,
+      aspiration,
+      ability,
+      engagement,
+      notes,
+      ratedBy
+    } = input
 
     const rating = await prisma.performanceRating.findUnique({
       where: { id: ratingId }
@@ -334,7 +369,19 @@ export class PerformanceRatingService {
       throw new Error('Rating no encontrado')
     }
 
-    const potentialLevel = scoreToNineBoxLevel(potentialScore)
+    // Calcular score desde factores AAE o usar score directo
+    const hasAllFactors = aspiration !== undefined && ability !== undefined && engagement !== undefined
+    let finalScore: number
+
+    if (hasAllFactors) {
+      finalScore = calculatePotentialScore({ aspiration, ability, engagement })
+    } else if (directScore !== undefined) {
+      finalScore = directScore
+    } else {
+      throw new Error('Se requiere potentialScore o los 3 factores (aspiration, ability, engagement)')
+    }
+
+    const potentialLevel = scoreToNineBoxLevel(finalScore)
     const performanceScore = rating.finalScore ?? rating.calculatedScore
     const performanceLevel = scoreToNineBoxLevel(performanceScore)
     const nineBoxPosition = calculate9BoxPosition(performanceLevel, potentialLevel)
@@ -342,12 +389,16 @@ export class PerformanceRatingService {
     return prisma.performanceRating.update({
       where: { id: ratingId },
       data: {
-        potentialScore,
+        potentialScore: finalScore,
         potentialLevel,
         potentialRatedBy: ratedBy,
         potentialRatedAt: new Date(),
         potentialNotes: notes || null,
         nineBoxPosition,
+        // Factores AAE separados (null si se usó score directo)
+        potentialAspiration: hasAllFactors ? aspiration : null,
+        potentialAbility: hasAllFactors ? ability : null,
+        potentialEngagement: hasAllFactors ? engagement : null,
         updatedAt: new Date()
       }
     })
@@ -444,6 +495,21 @@ export class PerformanceRatingService {
       search?: string  // búsqueda por nombre empleado
     }
   ) {
+    // ════════════════════════════════════════════════════════════════════════════
+    // HYBRID DISPATCH: Ciclo ACTIVE usa modelo híbrido (EvaluationAssignment)
+    // Ciclo IN_REVIEW/COMPLETED usa modelo tradicional (PerformanceRating)
+    // ════════════════════════════════════════════════════════════════════════════
+    const cycleRecord = await prisma.performanceCycle.findUnique({
+      where: { id: cycleId },
+      select: { status: true }
+    })
+    if (cycleRecord?.status === 'ACTIVE') {
+      return this.listRatingsHybrid(cycleId, accountId, options)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // TRADITIONAL PATH: IN_REVIEW / COMPLETED (solo PerformanceRating)
+    // ══════════════════════════════════════════════════════════════════════════
     const {
       page = 1,
       limit = 20,
@@ -619,6 +685,252 @@ export class PerformanceRatingService {
           ? Math.round((potentialAssignedCount / evaluatedCount) * 100)
           : 0
       }
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // HYBRID MODEL: EvaluationAssignment (Mundo 1) + PerformanceRating (Mundo 2)
+  // Se usa durante ciclo ACTIVE para mostrar todos los evaluados,
+  // incluso los que aún no tienen PerformanceRating generado.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  private static async listRatingsHybrid(
+    cycleId: string,
+    accountId: string,
+    options?: {
+      page?: number
+      limit?: number
+      sortBy?: 'name' | 'score' | 'level'
+      sortOrder?: 'asc' | 'desc'
+      departmentIds?: string[]
+      evaluationStatus?: 'all' | 'evaluated' | 'not_evaluated'
+      potentialStatus?: 'all' | 'assigned' | 'pending'
+      search?: string
+      [key: string]: any  // Accept extra options from traditional path
+    }
+  ) {
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = 'name',
+      sortOrder = 'asc',
+      departmentIds,
+      evaluationStatus,
+      potentialStatus,
+      search
+    } = options || {}
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // PASO 1: WHERE para Mundo 1 (EvaluationAssignment)
+    // ════════════════════════════════════════════════════════════════════════════
+    const baseWhere: any = {
+      cycleId,
+      accountId,
+      status: 'COMPLETED'
+    }
+
+    // RBAC: Filtro jerárquico para AREA_MANAGER
+    if (departmentIds?.length) {
+      baseWhere.evaluatee = {
+        departmentId: { in: departmentIds }
+      }
+    }
+
+    // Search: Filtrar por nombre
+    if (search?.trim()) {
+      baseWhere.evaluateeName = {
+        contains: search.trim(),
+        mode: 'insensitive'
+      }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // PASO 2: Evaluados únicos (Mundo 1) con paginación
+    // ════════════════════════════════════════════════════════════════════════════
+    const allEvaluatees = await prisma.evaluationAssignment.findMany({
+      where: baseWhere,
+      distinct: ['evaluateeId'],
+      select: {
+        evaluateeId: true,
+        evaluateeName: true,
+        evaluateePosition: true,
+        evaluatee: {
+          select: {
+            id: true,
+            departmentId: true,
+            managerId: true,
+            department: {
+              select: { displayName: true }
+            }
+          }
+        }
+      },
+      orderBy: sortBy === 'name'
+        ? { evaluateeName: sortOrder }
+        : undefined
+    })
+
+    const totalEvaluatees = allEvaluatees.length
+    const skip = (page - 1) * limit
+    const paginatedEvaluatees = allEvaluatees.slice(skip, skip + limit)
+    const evaluateeIds = paginatedEvaluatees.map(e => e.evaluateeId)
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // PASO 3: Ratings existentes (Mundo 2) solo para esta página
+    // ════════════════════════════════════════════════════════════════════════════
+    const existingRatings = await prisma.performanceRating.findMany({
+      where: {
+        cycleId,
+        employeeId: { in: evaluateeIds }
+      },
+      select: {
+        id: true,
+        employeeId: true,
+        calculatedScore: true,
+        calculatedLevel: true,
+        finalScore: true,
+        finalLevel: true,
+        potentialScore: true,
+        potentialLevel: true,
+        nineBoxPosition: true,
+        potentialNotes: true
+      }
+    })
+
+    const ratingsMap = new Map(
+      existingRatings.map(r => [r.employeeId, r])
+    )
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // PASO 4: Combinar Mundo 1 + Mundo 2 con scores en tiempo real
+    // ════════════════════════════════════════════════════════════════════════════
+    const config = await this.getConfig(accountId)
+
+    const combinedData = await Promise.all(
+      paginatedEvaluatees.map(async (ev) => {
+        const rating = ratingsMap.get(ev.evaluateeId)
+
+        // Calcular score en tiempo real si no hay rating persistido
+        let calculatedScore = rating?.calculatedScore ?? 0
+        if (!rating || rating.calculatedScore === 0) {
+          try {
+            const results = await PerformanceResultsService.getEvaluateeResults(
+              cycleId,
+              ev.evaluateeId
+            )
+            const scores = [
+              results.selfScore,
+              results.managerScore,
+              results.peerAvgScore,
+              results.upwardAvgScore
+            ].filter((s): s is number => s !== null)
+
+            if (scores.length > 0) {
+              calculatedScore = scores.reduce((a, b) => a + b, 0) / scores.length
+            }
+          } catch {
+            calculatedScore = 0
+          }
+        }
+
+        calculatedScore = Math.round(calculatedScore * 100) / 100
+        const effectiveScore = rating?.finalScore ?? calculatedScore
+        const calcLevel = getPerformanceLevel(calculatedScore)
+        const classification = getPerformanceClassification(effectiveScore, config)
+
+        // Retornar shape compatible con el path tradicional
+        return {
+          id: rating?.id || `pending_${ev.evaluateeId}`,
+          accountId,
+          cycleId,
+          employeeId: ev.evaluateeId,
+          employee: {
+            id: ev.evaluatee.id,
+            fullName: ev.evaluateeName,
+            position: ev.evaluateePosition || null,
+            departmentId: ev.evaluatee.departmentId,
+            managerId: ev.evaluatee.managerId || null,
+            department: ev.evaluatee.department
+          },
+          calculatedScore,
+          calculatedLevel: calcLevel,
+          finalScore: rating?.finalScore ?? null,
+          finalLevel: rating?.finalLevel ?? null,
+          potentialScore: rating?.potentialScore ?? null,
+          potentialLevel: rating?.potentialLevel ?? null,
+          nineBoxPosition: rating?.nineBoxPosition ?? null,
+          potentialNotes: rating?.potentialNotes ?? null,
+          calibrated: false,
+          effectiveScore,
+          effectiveLevel: rating?.finalLevel ?? calcLevel,
+          classification
+        }
+      })
+    )
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // PASO 5: Filtros post-combinación
+    // ════════════════════════════════════════════════════════════════════════════
+    let filteredData = combinedData
+
+    if (evaluationStatus === 'evaluated') {
+      filteredData = filteredData.filter(d => d.calculatedScore > 0)
+    } else if (evaluationStatus === 'not_evaluated') {
+      filteredData = filteredData.filter(d => d.calculatedScore === 0)
+    }
+
+    if (potentialStatus === 'assigned') {
+      filteredData = filteredData.filter(d => d.potentialScore !== null)
+    } else if (potentialStatus === 'pending') {
+      filteredData = filteredData.filter(d => d.potentialScore === null)
+    }
+
+    if (sortBy === 'score') {
+      filteredData.sort((a, b) =>
+        sortOrder === 'asc'
+          ? a.calculatedScore - b.calculatedScore
+          : b.calculatedScore - a.calculatedScore
+      )
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // PASO 6: Stats (queries paralelos)
+    // ════════════════════════════════════════════════════════════════════════════
+    const [totalWithRating, totalWithPotential] = await Promise.all([
+      prisma.performanceRating.count({
+        where: { cycleId, calculatedScore: { gt: 0 } }
+      }),
+      prisma.performanceRating.count({
+        where: { cycleId, potentialScore: { not: null } }
+      })
+    ])
+
+    const stats = {
+      totalRatings: totalEvaluatees,
+      evaluatedCount: totalWithRating,
+      notEvaluatedCount: totalEvaluatees - totalWithRating,
+      potentialAssignedCount: totalWithPotential,
+      potentialPendingCount: totalEvaluatees - totalWithPotential,
+      evaluationProgress: totalEvaluatees > 0
+        ? Math.round((totalWithRating / totalEvaluatees) * 100)
+        : 0,
+      potentialProgress: totalEvaluatees > 0
+        ? Math.round((totalWithPotential / totalEvaluatees) * 100)
+        : 0
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // PASO 7: Retornar resultado compatible con UI
+    // ════════════════════════════════════════════════════════════════════════════
+    return {
+      data: filteredData,
+      pagination: {
+        page,
+        limit,
+        total: totalEvaluatees,
+        pages: Math.ceil(totalEvaluatees / limit)
+      },
+      stats
     }
   }
 

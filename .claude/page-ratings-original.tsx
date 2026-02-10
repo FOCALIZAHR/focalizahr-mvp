@@ -9,7 +9,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import {
@@ -21,10 +20,7 @@ import Link from 'next/link'
 import RatingRow, { type RatingData } from '@/components/performance/RatingRow'
 import DistributionGauge from '@/components/performance/DistributionGauge'
 import DistributionModal from '@/components/performance/DistributionModal'
-import { EvaluationProfileHeader } from '@/components/performance/EvaluationProfileHeader'
-import EvaluationDiagnosticModal from '@/components/performance/EvaluationDiagnosticModal'
 import { SecondaryButton } from '@/components/ui/PremiumButton'
-import type { EvaluationStatus } from '@/lib/utils/evaluatorStatsEngine'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -55,13 +51,6 @@ interface ApiPagination {
   pages: number
 }
 
-interface EvalStatsData {
-  desempeno: { status: EvaluationStatus; avg: number; stdDev: number; count: number; distribution: number[] }
-  potencial: { status: EvaluationStatus; avg: number; stdDev: number; count: number; distribution: number[] } | null
-  teamDna: { top: { code: string; name: string; avgScore: number }; low: { code: string; name: string; avgScore: number } } | null
-  competencies: Array<{ code: string; name: string; avgScore: number }>
-}
-
 interface PageProps {
   params: { cycleId: string }
 }
@@ -85,7 +74,6 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export default function CycleRatingsPage({ params }: PageProps) {
   const { cycleId } = params
-  const router = useRouter()
 
   // State - Data from backend
   const [cycle, setCycle] = useState<CycleInfo | null>(null)
@@ -98,15 +86,10 @@ export default function CycleRatingsPage({ params }: PageProps) {
   const [searchInput, setSearchInput] = useState('')
   const [filterTab, setFilterTab] = useState<'evaluated' | 'all' | 'pending' | 'assigned'>('evaluated')
   const [currentPage, setCurrentPage] = useState(1)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   // State - Distribution Modal (Progressive Disclosure)
   const [showDistributionModal, setShowDistributionModal] = useState(false)
-
-  // State - Diagnostic Modal (from EvaluationProfileHeader click)
-  const [showDiagnosticModal, setShowDiagnosticModal] = useState(false)
-
-  // State - Evaluator calibration stats
-  const [evalStats, setEvalStats] = useState<EvalStatsData | null>(null)
 
   // Debounced search - waits 300ms before triggering fetch
   const debouncedSearch = useDebounce(searchInput, 300)
@@ -201,27 +184,10 @@ export default function CycleRatingsPage({ params }: PageProps) {
     }
   }, [cycleId])
 
-  // Fetch evaluator calibration stats
-  const fetchEvalStats = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('focalizahr_token')
-      const res = await fetch(`/api/evaluator/stats?cycleId=${cycleId}`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      })
-      const json = await res.json()
-      if (json.success && json.data) {
-        setEvalStats(json.data)
-      }
-    } catch {
-      /* silent - non-critical data */
-    }
-  }, [cycleId])
-
   // Initial fetch
   useEffect(() => {
     fetchCycle()
-    fetchEvalStats()
-  }, [fetchCycle, fetchEvalStats])
+  }, [fetchCycle])
 
   // Re-fetch when filters change
   useEffect(() => {
@@ -236,6 +202,26 @@ export default function CycleRatingsPage({ params }: PageProps) {
   // ══════════════════════════════════════════════════════════════════════════
   // HANDLERS
   // ══════════════════════════════════════════════════════════════════════════
+
+  const handlePotentialAssigned = (ratingId: string, newPotential: number) => {
+    // Optimistic update
+    setRatings(prev => prev.map(r =>
+      r.id === ratingId
+        ? { ...r, potentialScore: newPotential }
+        : r
+    ))
+    // Update stats optimistically
+    if (stats) {
+      setStats(prev => prev ? {
+        ...prev,
+        potentialAssignedCount: prev.potentialAssignedCount + 1,
+        potentialPendingCount: prev.potentialPendingCount - 1,
+        potentialProgress: prev.evaluatedCount > 0
+          ? Math.round(((prev.potentialAssignedCount + 1) / prev.evaluatedCount) * 100)
+          : 0
+      } : prev)
+    }
+  }
 
   const handleRefresh = () => {
     fetchRatings()
@@ -272,15 +258,15 @@ export default function CycleRatingsPage({ params }: PageProps) {
         >
           {/* Back + Title */}
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.back()}
+            <Link
+              href="/dashboard/performance/cycles"
               className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
-            </button>
+            </Link>
             <div>
               <h1 className="text-2xl font-light text-white">
-                Resumen <span className="font-semibold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">Potencial</span>
+                Asignar <span className="font-semibold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">Potencial</span>
               </h1>
               <p className="text-sm text-slate-400 mt-0.5">
                 {cycle?.name || 'Cargando...'}
@@ -371,15 +357,6 @@ export default function CycleRatingsPage({ params }: PageProps) {
           </div>
         </motion.div>
 
-        {/* EVALUATION PROFILE HEADER - 3 Columnas: Distribución + ADN + Smart Feedback */}
-        {evalStats?.desempeno && evalStats.desempeno.count > 0 && (
-          <EvaluationProfileHeader
-            desempeno={evalStats.desempeno}
-            teamDna={evalStats.teamDna}
-            onOpenDiagnostic={() => setShowDiagnosticModal(true)}
-          />
-        )}
-
         {/* MODAL DE DISTRIBUCIÓN (Progressive Disclosure) */}
         <DistributionModal
           isOpen={showDistributionModal}
@@ -387,6 +364,7 @@ export default function CycleRatingsPage({ params }: PageProps) {
           assignedScores={assignedPotentialScores}
           totalEvaluated={evaluatedCount}
         />
+
 
         {/* FILTERS - Trigger server-side fetch */}
         <motion.div
@@ -475,6 +453,11 @@ export default function CycleRatingsPage({ params }: PageProps) {
               >
                 <RatingRow
                   rating={rating}
+                  isExpanded={expandedId === rating.id}
+                  onToggleExpand={() => setExpandedId(
+                    expandedId === rating.id ? null : rating.id
+                  )}
+                  onPotentialAssigned={handlePotentialAssigned}
                 />
               </motion.div>
             ))
@@ -519,19 +502,6 @@ export default function CycleRatingsPage({ params }: PageProps) {
         )}
 
       </div>
-
-      {/* DIAGNOSTIC MODAL - Outside max-w container, uses createPortal to document.body */}
-      {evalStats?.desempeno && (
-        <EvaluationDiagnosticModal
-          isOpen={showDiagnosticModal}
-          onClose={() => setShowDiagnosticModal(false)}
-          data={{
-            desempeno: evalStats.desempeno,
-            competencies: evalStats.competencies || [],
-            teamDna: evalStats.teamDna
-          }}
-        />
-      )}
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ExitIntelligenceService } from '@/lib/services/ExitIntelligenceService';
 import { calculateNormalizedScore } from '@/lib/utils/responseNormalizer';  // ← CAMBIO 1
+import { getPerformanceLevel } from '@/config/performanceClassification';
 
 interface SurveyResponse {
   questionId: string
@@ -264,6 +265,78 @@ export async function POST(
       }
     }
     
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 🆕 POST-PROCESO: PARTIAL PERFORMANCE RATING (Manager → Evaluatee)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Cuando un jefe completa su evaluación, crear/actualizar PerformanceRating
+    // parcial para que el jefe pueda asignar potencial inmediatamente
+    // sin esperar a que el admin cambie el ciclo a IN_REVIEW.
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    if (participant.evaluationAssignmentId) {
+      try {
+        const assignment = await prisma.evaluationAssignment.findUnique({
+          where: { id: participant.evaluationAssignmentId },
+          select: {
+            evaluationType: true,
+            evaluateeId: true,
+            cycleId: true,
+            accountId: true
+          }
+        })
+
+        if (assignment && assignment.evaluationType === 'MANAGER_TO_EMPLOYEE') {
+          // Calcular avgScore desde ratings 1-5 de las respuestas
+          const ratings15 = responseData
+            .filter(r => r.rating != null && r.rating > 0)
+            .map(r => r.rating!)
+
+          if (ratings15.length > 0) {
+            const avgScore = ratings15.reduce((a, b) => a + b, 0) / ratings15.length
+            const roundedScore = Math.round(avgScore * 100) / 100
+            const level = getPerformanceLevel(roundedScore)
+
+            await prisma.performanceRating.upsert({
+              where: {
+                cycleId_employeeId: {
+                  cycleId: assignment.cycleId,
+                  employeeId: assignment.evaluateeId
+                }
+              },
+              create: {
+                accountId: assignment.accountId,
+                cycleId: assignment.cycleId,
+                employeeId: assignment.evaluateeId,
+                managerScore: roundedScore,
+                calculatedScore: roundedScore,
+                calculatedLevel: level,
+                totalEvaluations: 1,
+                completedEvaluations: 1
+              },
+              update: {
+                managerScore: roundedScore,
+                calculatedScore: roundedScore,
+                calculatedLevel: level,
+                updatedAt: new Date()
+              }
+            })
+
+            console.log('[Performance] Partial rating created/updated for manager evaluation', {
+              evaluateeId: assignment.evaluateeId,
+              cycleId: assignment.cycleId,
+              managerScore: roundedScore,
+              level
+            })
+          }
+        }
+      } catch (ratingErr) {
+        // No fallar el submit si falla la creación del rating parcial
+        console.error('[Performance] Error creating partial rating:', ratingErr)
+      }
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
 
     return NextResponse.json({

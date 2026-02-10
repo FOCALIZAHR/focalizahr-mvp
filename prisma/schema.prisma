@@ -1986,6 +1986,11 @@ model PerformanceRating {
   potentialNotes        String?  @map("potential_notes") @db.Text
   nineBoxPosition       String?  @map("nine_box_position")
 
+  // Factores AAE (Aspiración, Ability, Engagement) - campos separados para queries de inteligencia
+  potentialAspiration   Int?     @map("potential_aspiration")   // 1, 2 o 3
+  potentialAbility      Int?     @map("potential_ability")      // 1, 2 o 3
+  potentialEngagement   Int?     @map("potential_engagement")   // 1, 2 o 3
+
   // Succession Readiness
   successionReadiness   String?  @map("succession_readiness")
   targetRoles           Json?    @map("target_roles")

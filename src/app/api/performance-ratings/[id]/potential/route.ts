@@ -102,20 +102,46 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { potentialScore, notes } = body
+    const { potentialScore, notes, aspiration, ability, engagement } = body
 
-    // Validaciones
-    if (typeof potentialScore !== 'number' || potentialScore < 1 || potentialScore > 5) {
+    // Validar: debe venir score directo O los 3 factores AAE
+    const hasAllFactors = aspiration !== undefined && ability !== undefined && engagement !== undefined
+
+    if (potentialScore === undefined && !hasAllFactors) {
       return NextResponse.json(
-        { success: false, error: 'potentialScore debe ser un número entre 1 y 5' },
+        { success: false, error: 'Se requiere potentialScore o los 3 factores (aspiration, ability, engagement)' },
         { status: 400 }
       )
+    }
+
+    // Validar factores AAE (cada uno debe ser 1, 2 o 3)
+    if (hasAllFactors) {
+      const validLevels = [1, 2, 3]
+      if (!validLevels.includes(aspiration) || !validLevels.includes(ability) || !validLevels.includes(engagement)) {
+        return NextResponse.json(
+          { success: false, error: 'Cada factor (aspiration, ability, engagement) debe ser 1, 2 o 3' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Validar score directo (backward compatible)
+    if (potentialScore !== undefined && !hasAllFactors) {
+      if (typeof potentialScore !== 'number' || potentialScore < 1 || potentialScore > 5) {
+        return NextResponse.json(
+          { success: false, error: 'potentialScore debe ser un número entre 1 y 5' },
+          { status: 400 }
+        )
+      }
     }
 
     // Asignar potencial usando el service
     const updated = await PerformanceRatingService.ratePotential({
       ratingId,
-      potentialScore,
+      potentialScore: hasAllFactors ? undefined : potentialScore,
+      aspiration: hasAllFactors ? aspiration : undefined,
+      ability: hasAllFactors ? ability : undefined,
+      engagement: hasAllFactors ? engagement : undefined,
       notes: notes || undefined,
       ratedBy: userEmail
     })
@@ -128,7 +154,10 @@ export async function POST(
         potentialLevel: updated.potentialLevel,
         nineBoxPosition: updated.nineBoxPosition,
         potentialRatedBy: updated.potentialRatedBy,
-        potentialRatedAt: updated.potentialRatedAt
+        potentialRatedAt: updated.potentialRatedAt,
+        potentialAspiration: updated.potentialAspiration,
+        potentialAbility: updated.potentialAbility,
+        potentialEngagement: updated.potentialEngagement
       },
       message: `Potencial asignado: ${updated.potentialLevel} → Posición 9-Box: ${updated.nineBoxPosition}`
     })
@@ -182,6 +211,9 @@ export async function GET(
         potentialRatedAt: true,
         potentialNotes: true,
         nineBoxPosition: true,
+        potentialAspiration: true,
+        potentialAbility: true,
+        potentialEngagement: true,
         employee: {
           select: {
             id: true,
@@ -312,7 +344,7 @@ export async function DELETE(
       }
     }
 
-    // Limpiar campos de potencial
+    // Limpiar campos de potencial (incluye factores AAE)
     const cleared = await prisma.performanceRating.update({
       where: { id: ratingId },
       data: {
@@ -322,6 +354,9 @@ export async function DELETE(
         potentialRatedAt: null,
         potentialNotes: null,
         nineBoxPosition: null,
+        potentialAspiration: null,
+        potentialAbility: null,
+        potentialEngagement: null,
         updatedAt: new Date()
       }
     })

@@ -26,6 +26,13 @@ export interface EvaluatorAssignment {
   avgScore: number | null
   participantToken: string | null
   surveyUrl: string | null
+
+  // Campos de potencial (desde PerformanceRating)
+  ratingId: string | null
+  potentialScore: number | null
+  potentialLevel: string | null
+  nineBoxPosition: string | null
+  cycleId: string
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -51,6 +58,13 @@ export interface EmployeeCardData {
   dueDate?: string
   completedAt?: string
   avgScore: number | null
+
+  // Campos de potencial
+  ratingId: string | null
+  potentialScore: number | null
+  potentialLevel: string | null
+  nineBoxPosition: string | null
+  cycleId: string
 }
 
 export interface SelectedEmployee extends EmployeeCardData {
@@ -61,6 +75,7 @@ export interface CinemaStats {
   total: number
   completed: number
   pending: number
+  pendingPotential: number
 }
 
 export interface CinemaCycle {
@@ -88,6 +103,7 @@ export interface SpotlightCardProps {
   onBack: () => void
   onEvaluate: (token: string) => void
   onViewSummary: (assignmentId: string) => void
+  onEvaluatePotential: () => void
 }
 
 export interface VictoryScreenProps {
@@ -113,6 +129,7 @@ export interface EmployeeRailCardProps {
 
 export interface CinemaHeaderProps {
   cycle: CinemaCycle | null
+  cycleId?: string | null
 }
 
 export interface InsightCardProps {
