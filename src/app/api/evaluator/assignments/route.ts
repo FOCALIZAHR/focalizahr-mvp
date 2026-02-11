@@ -81,34 +81,46 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Obtener ciclo activo
+    // Determinar ciclo target: ?cycleId=xxx o ciclo activo
+    const { searchParams } = new URL(request.url)
+    const cycleIdParam = searchParams.get('cycleId')
     const now = new Date()
-    const activeCycle = await prisma.performanceCycle.findFirst({
-      where: {
-        accountId: userContext.accountId,
-        status: 'ACTIVE',
-        startDate: { lte: now },
-        endDate: { gte: now }
-      },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        startDate: true,
-        endDate: true,
-        cycleType: true
-      }
-    })
 
-    // Obtener ALL assignments (pending + completed) para el ciclo activo
+    let targetCycle: { id: string; name: string; description: string | null; startDate: Date; endDate: Date; cycleType: string; status: string } | null = null
+
+    if (cycleIdParam) {
+      // Modo histórico: ciclo específico con validación de seguridad
+      targetCycle = await prisma.performanceCycle.findFirst({
+        where: {
+          id: cycleIdParam,
+          accountId: userContext.accountId,
+          status: { in: ['ACTIVE', 'COMPLETED', 'IN_REVIEW'] }
+        },
+        select: { id: true, name: true, description: true, startDate: true, endDate: true, cycleType: true, status: true }
+      })
+      if (!targetCycle) {
+        return NextResponse.json({ success: false, error: 'Ciclo no encontrado' }, { status: 404 })
+      }
+    } else {
+      // Modo normal: ciclo activo
+      targetCycle = await prisma.performanceCycle.findFirst({
+        where: {
+          accountId: userContext.accountId,
+          status: 'ACTIVE'
+        },
+        select: { id: true, name: true, description: true, startDate: true, endDate: true, cycleType: true, status: true }
+      })
+    }
+
+    // Obtener ALL assignments (pending + completed) para el ciclo target
     const whereClause: any = {
       accountId: userContext.accountId,
       evaluatorId: employee.id,
       status: { in: ['PENDING', 'IN_PROGRESS', 'COMPLETED'] }
     }
 
-    if (activeCycle) {
-      whereClause.cycleId = activeCycle.id
+    if (targetCycle) {
+      whereClause.cycleId = targetCycle.id
     }
 
     const assignments = await prisma.evaluationAssignment.findMany({
@@ -141,7 +153,7 @@ export async function GET(request: NextRequest) {
     // BATCH: Obtener potentialScore de PerformanceRating
     // No hay FK directa, usamos cycleId + evaluateeId
     // ════════════════════════════════════════════════════════════════════════════
-    const cycleId = activeCycle?.id
+    const cycleId = targetCycle?.id
     let ratingsMap = new Map<string, { ratingId: string; potentialScore: number | null; potentialLevel: string | null; nineBoxPosition: string | null }>()
 
     if (cycleId && assignments.length > 0) {
@@ -237,13 +249,17 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      cycle: activeCycle ? {
-        id: activeCycle.id,
-        name: activeCycle.name,
-        description: activeCycle.description,
-        startDate: activeCycle.startDate.toISOString(),
-        endDate: activeCycle.endDate.toISOString(),
-        daysRemaining: Math.max(0, Math.ceil((activeCycle.endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+      cycle: targetCycle ? {
+        id: targetCycle.id,
+        name: targetCycle.name,
+        description: targetCycle.description,
+        startDate: targetCycle.startDate.toISOString(),
+        endDate: targetCycle.endDate.toISOString(),
+        status: targetCycle.status,
+        isHistoryMode: targetCycle.status !== 'ACTIVE',
+        daysRemaining: targetCycle.status === 'ACTIVE'
+          ? Math.max(0, Math.ceil((targetCycle.endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+          : 0
       } : null,
       assignments: mappedAssignments,
       stats: {

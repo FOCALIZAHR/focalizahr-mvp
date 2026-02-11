@@ -19,7 +19,6 @@ import type { SelectedEmployee } from '@/types/evaluator-cinema'
 import CinemaHeader from '@/components/evaluator/cinema/CinemaHeader'
 import MissionControl from '@/components/evaluator/cinema/MissionControl'
 import SpotlightCard from '@/components/evaluator/cinema/SpotlightCard'
-import VictoryScreen from '@/components/evaluator/cinema/VictoryScreen'
 import VictoryOverlay from '@/components/evaluator/cinema/VictoryOverlay'
 import Rail from '@/components/evaluator/cinema/Rail'
 
@@ -207,8 +206,6 @@ export default function CinemaModeOrchestrator() {
     await reload()
   }, [potentialTarget, reload])
 
-  // Determine view — Victory only when BOTH desempeno AND potential are complete
-  const isVictory = stats.pending === 0 && stats.pendingPotential === 0 && stats.total > 0
   const isSpotlight = selectedId !== null && selectedEmployee !== null
 
   if (isLoading) return <CinemaModeSkeleton />
@@ -238,15 +235,7 @@ export default function CinemaModeOrchestrator() {
       )}>
         <AnimatePresence mode="wait">
 
-          {isVictory && (
-            <VictoryScreen
-              key="victory"
-              total={stats.total}
-              onViewTeam={handleToggleRail}
-            />
-          )}
-
-          {!isVictory && !isSpotlight && (
+          {!isSpotlight && (
             <MissionControl
               key="lobby"
               stats={stats}
@@ -256,7 +245,7 @@ export default function CinemaModeOrchestrator() {
             />
           )}
 
-          {!isVictory && isSpotlight && (
+          {isSpotlight && (
             <SpotlightCard
               key={`spotlight-${selectedId}`}
               employee={selectedEmployee}

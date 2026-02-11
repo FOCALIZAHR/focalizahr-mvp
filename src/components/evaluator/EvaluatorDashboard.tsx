@@ -52,6 +52,13 @@ interface EvaluatorEmployee {
 // COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
+interface AvailableCycle {
+  id: string
+  name: string
+  status: string
+  endDate: string
+}
+
 export default function EvaluatorDashboard() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
@@ -62,6 +69,10 @@ export default function EvaluatorDashboard() {
   const [employee, setEmployee] = useState<EvaluatorEmployee | null>(null)
   const [activeTab, setActiveTab] = useState<FilterTab>('all')
 
+  // Ciclos históricos
+  const [availableCycles, setAvailableCycles] = useState<AvailableCycle[]>([])
+  const [selectedCycleId, setSelectedCycleId] = useState<string | null>(null)
+
   // Filtrar assignments según tab activo
   const filteredAssignments = useMemo(() => {
     if (activeTab === 'all') return assignments
@@ -71,8 +82,8 @@ export default function EvaluatorDashboard() {
     return assignments.filter(a => a.status === 'completed')
   }, [assignments, activeTab])
 
-  // Cargar datos
-  const loadData = useCallback(async () => {
+  // Cargar datos (con cycleId opcional para históricos)
+  const loadData = useCallback(async (cycleId?: string | null) => {
     try {
       setIsLoading(true)
       setError(null)
@@ -83,7 +94,11 @@ export default function EvaluatorDashboard() {
         return
       }
 
-      const response = await fetch('/api/evaluator/assignments', {
+      const url = cycleId
+        ? `/api/evaluator/assignments?cycleId=${cycleId}`
+        : '/api/evaluator/assignments'
+
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -117,8 +132,49 @@ export default function EvaluatorDashboard() {
     }
   }, [router])
 
+  // Carga inicial: primero ciclos disponibles, luego decidir cuál cargar
   useEffect(() => {
-    loadData()
+    async function init() {
+      const token = localStorage.getItem('focalizahr_token')
+      if (!token) {
+        router.push('/login?redirect=/dashboard/evaluaciones')
+        return
+      }
+
+      // 1. Obtener lista de ciclos del evaluador
+      let cycles: AvailableCycle[] = []
+      try {
+        const res = await fetch('/api/evaluator/cycles', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.success) cycles = data.cycles || []
+        }
+      } catch { /* silencioso */ }
+      setAvailableCycles(cycles)
+
+      // 2. Decidir ciclo por defecto: ACTIVE primero, luego el más reciente
+      const activeCycle = cycles.find(c => c.status === 'ACTIVE')
+      const defaultCycle = activeCycle || cycles[0] || null // cycles ya viene ordenado por endDate desc
+
+      if (defaultCycle) {
+        setSelectedCycleId(defaultCycle.id)
+        loadData(defaultCycle.id)
+      } else {
+        // Sin ciclos disponibles
+        loadData()
+      }
+    }
+    init()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Handler cambio de ciclo
+  const handleCycleChange = useCallback((newCycleId: string) => {
+    setSelectedCycleId(newCycleId)
+    setActiveTab('all')
+    loadData(newCycleId)
   }, [loadData])
 
   // Handlers
@@ -159,7 +215,7 @@ export default function EvaluatorDashboard() {
           </h2>
           <p className="text-slate-400 mb-4">{error}</p>
           <button
-            onClick={loadData}
+            onClick={() => loadData(selectedCycleId)}
             className="fhr-btn fhr-btn-secondary flex items-center gap-2 mx-auto"
           >
             <RefreshCw className="w-4 h-4" />
@@ -170,17 +226,17 @@ export default function EvaluatorDashboard() {
     )
   }
 
-  // No cycle active
+  // Sin ciclos disponibles
   if (!cycle) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="fhr-card p-8 text-center max-w-md">
           <ClipboardList className="w-12 h-12 text-slate-500 mx-auto mb-4" />
           <h2 className="text-lg font-medium text-slate-200 mb-2">
-            Sin Ciclo Activo
+            Sin Ciclos Disponibles
           </h2>
           <p className="text-slate-400">
-            No hay ciclos de evaluación de desempeño activos en este momento.
+            No hay ciclos de evaluacion de desempeno disponibles en este momento.
             Te notificaremos cuando haya evaluaciones pendientes.
           </p>
         </div>
@@ -193,7 +249,7 @@ export default function EvaluatorDashboard() {
     return (
       <div className="space-y-6">
         {/* Header del ciclo */}
-        <CycleHeader cycle={cycle} />
+        <CycleHeader cycle={cycle} availableCycles={availableCycles} selectedCycleId={selectedCycleId} onCycleChange={handleCycleChange} />
 
         <div className="fhr-card p-8 text-center">
           <ClipboardList className="w-12 h-12 text-slate-500 mx-auto mb-4" />
@@ -213,7 +269,7 @@ export default function EvaluatorDashboard() {
     return (
       <div className="space-y-6">
         {/* Header del ciclo */}
-        <CycleHeader cycle={cycle} />
+        <CycleHeader cycle={cycle} availableCycles={availableCycles} selectedCycleId={selectedCycleId} onCycleChange={handleCycleChange} />
 
         {/* Progress Card */}
         <EvaluatorProgressCard
@@ -260,7 +316,7 @@ export default function EvaluatorDashboard() {
   return (
     <div className="space-y-6">
       {/* Header del ciclo */}
-      <CycleHeader cycle={cycle} />
+      <CycleHeader cycle={cycle} availableCycles={availableCycles} selectedCycleId={selectedCycleId} onCycleChange={handleCycleChange} />
 
       {/* Progress Card */}
       <EvaluatorProgressCard
@@ -335,7 +391,12 @@ function FilterTabs({
   )
 }
 
-function CycleHeader({ cycle }: { cycle: PerformanceCycle }) {
+function CycleHeader({ cycle, availableCycles, selectedCycleId, onCycleChange }: {
+  cycle: PerformanceCycle
+  availableCycles: AvailableCycle[]
+  selectedCycleId: string | null
+  onCycleChange: (id: string) => void
+}) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString('es-CL', {
@@ -345,19 +406,39 @@ function CycleHeader({ cycle }: { cycle: PerformanceCycle }) {
     })
   }
 
+  const isHistoryMode = cycle.daysRemaining === 0 && selectedCycleId !== null
+  const showSelect = availableCycles.length > 1
+
   return (
     <div className="fhr-card p-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-light text-slate-200 mb-1">
-            {cycle.name}
-          </h1>
-          {cycle.description && (
-            <p className="text-sm text-slate-400">{cycle.description}</p>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="min-w-0">
+            <h1 className="text-xl font-light text-slate-200 mb-1 truncate">
+              {cycle.name}
+            </h1>
+            {cycle.description && (
+              <p className="text-sm text-slate-400 truncate">{cycle.description}</p>
+            )}
+          </div>
+
+          {/* Select de ciclos */}
+          {showSelect && (
+            <select
+              value={selectedCycleId || cycle.id}
+              onChange={(e) => onCycleChange(e.target.value)}
+              className="ml-2 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-xs cursor-pointer hover:border-cyan-500/50 transition-colors focus:outline-none focus:border-cyan-500/50"
+            >
+              {availableCycles.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.name}{c.status !== 'ACTIVE' ? ' (cerrado)' : ''}
+                </option>
+              ))}
+            </select>
           )}
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 shrink-0">
           {/* Fechas */}
           <div className="flex items-center gap-2 text-sm text-slate-400">
             <Calendar className="w-4 h-4" />
@@ -366,26 +447,33 @@ function CycleHeader({ cycle }: { cycle: PerformanceCycle }) {
             </span>
           </div>
 
-          {/* Días restantes */}
-          <div className={`
-            flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium
-            ${cycle.daysRemaining <= 3
-              ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-              : cycle.daysRemaining <= 7
-                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-            }
-          `}>
-            <Clock className="w-4 h-4" />
-            <span>
-              {cycle.daysRemaining === 0
-                ? 'Último día'
-                : cycle.daysRemaining === 1
-                  ? '1 día restante'
-                  : `${cycle.daysRemaining} días restantes`
+          {/* Badge: días restantes o "Cerrado" */}
+          {isHistoryMode ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              <Clock className="w-4 h-4" />
+              <span>Cerrado</span>
+            </div>
+          ) : (
+            <div className={`
+              flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium
+              ${cycle.daysRemaining <= 3
+                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                : cycle.daysRemaining <= 7
+                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
               }
-            </span>
-          </div>
+            `}>
+              <Clock className="w-4 h-4" />
+              <span>
+                {cycle.daysRemaining === 0
+                  ? 'Ultimo dia'
+                  : cycle.daysRemaining === 1
+                    ? '1 dia restante'
+                    : `${cycle.daysRemaining} dias restantes`
+                }
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -84,7 +84,7 @@ interface CycleWarning {
 
 export const DEFAULT_SYNC_CONFIG: EmployeeSyncConfig = {
   mode: 'FULL',
-  missingThreshold: 0.10,  // 10%
+  missingThreshold: 0.80,  // 10% normal-80% para pruebas con menos datos
   autoDeactivateMissing: false,
   preserveManualExclusions: true
 };
