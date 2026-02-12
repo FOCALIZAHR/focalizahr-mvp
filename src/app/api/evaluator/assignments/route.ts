@@ -116,6 +116,7 @@ export async function GET(request: NextRequest) {
     const whereClause: any = {
       accountId: userContext.accountId,
       evaluatorId: employee.id,
+      evaluationType: 'MANAGER_TO_EMPLOYEE',  // Solo evaluaciones downward del jefe
       status: { in: ['PENDING', 'IN_PROGRESS', 'COMPLETED'] }
     }
 

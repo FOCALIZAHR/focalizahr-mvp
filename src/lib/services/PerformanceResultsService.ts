@@ -419,7 +419,10 @@ export class PerformanceResultsService {
   /**
    * Lista todos los evaluados de un ciclo con stats básicos
    */
-  static async listEvaluateesInCycle(cycleId: string): Promise<Array<{
+  static async listEvaluateesInCycle(
+    cycleId: string,
+    evaluatorId?: string  // Opcional: filtra por evaluador + tipo MANAGER_TO_EMPLOYEE
+  ): Promise<Array<{
     evaluateeId: string
     evaluateeName: string
     evaluateePosition: string | null
@@ -428,9 +431,18 @@ export class PerformanceResultsService {
     totalEvaluations: number
     completedEvaluations: number
   }>> {
+    // Construir where dinámicamente
+    const whereClause: any = { cycleId }
+
+    // Si se especifica evaluatorId, filtrar por evaluador Y tipo
+    if (evaluatorId) {
+      whereClause.evaluatorId = evaluatorId
+      whereClause.evaluationType = 'MANAGER_TO_EMPLOYEE'
+    }
+
     // Obtener todos los evaluatees únicos del ciclo
     const assignments = await prisma.evaluationAssignment.findMany({
-      where: { cycleId },
+      where: whereClause,
       select: {
         evaluateeId: true,
         evaluateeName: true,

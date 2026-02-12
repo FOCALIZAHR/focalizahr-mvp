@@ -175,8 +175,13 @@ const handleSubmit = async (responses: Array<{questionId: string, rating?: numbe
         `Tu evaluacion de ${evaluateeName} ha sido enviada correctamente.`,
         'Evaluacion Enviada'
       )
+      // Solo redirigir si hay sesión activa (usuario logueado)
       setTimeout(() => {
-        router.push('/dashboard/evaluaciones')
+        const storedToken = localStorage.getItem('focalizahr_token')
+        if (storedToken) {
+          router.push('/dashboard/evaluaciones')
+        }
+        // Si no hay token, quedarse en pantalla de éxito
       }, 3000)
     }
 
