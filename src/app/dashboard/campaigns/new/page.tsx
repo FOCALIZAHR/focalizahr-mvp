@@ -242,7 +242,7 @@ export default function NewCampaignPage() {
           return;
         }
 
-        const response = await fetch('/api/admin/employees?limit=1000', {
+        const response = await fetch('/api/admin/employees?limit=1000&status=ACTIVE', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'

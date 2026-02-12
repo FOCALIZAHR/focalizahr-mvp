@@ -136,7 +136,7 @@ export async function PATCH(
         'DRAFT': ['SCHEDULED', 'CANCELLED'],
         'SCHEDULED': ['ACTIVE', 'CANCELLED'],
         'ACTIVE': ['IN_REVIEW', 'CANCELLED'],
-        'IN_REVIEW': ['COMPLETED'],
+        'IN_REVIEW': ['COMPLETED', 'ACTIVE'],
         'COMPLETED': [],
         'CANCELLED': []
       };

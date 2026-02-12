@@ -3,7 +3,8 @@
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Upload, UserPlus, RefreshCw, UserMinus,
-         CheckCircle, AlertTriangle, X, Download, Users } from 'lucide-react'
+         CheckCircle, AlertTriangle, X, Download, Users,
+         XCircle, Clock, RotateCcw, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   PrimaryButton,
@@ -40,6 +41,13 @@ export default function EmployeeSyncWizard({ accountId, onComplete, onCancel }: 
   const [error, setError] = useState<string | null>(null)
   const [confirmText, setConfirmText] = useState('')
   const [isUploading, setIsUploading] = useState(false)
+
+  // Auto-deactivate state
+  const [autoDeactivateMissing, setAutoDeactivateMissing] = useState(false)
+  const [showDeactivateConfirmModal, setShowDeactivateConfirmModal] = useState(false)
+  const [pendingDeactivateCount, setPendingDeactivateCount] = useState(0)
+  const [parsedEmployees, setParsedEmployees] = useState<any[]>([])
+  const [isDeactivating, setIsDeactivating] = useState(false)
 
   // Robust CSV line parser that handles quoted values
   const parseCSVLine = (line: string, delimiter: string): string[] => {
@@ -143,10 +151,13 @@ export default function EmployeeSyncWizard({ accountId, onComplete, onCancel }: 
         throw new Error('No se pudieron parsear empleados del CSV. Verifica que tenga columnas nationalId/rut y fullName/nombre.')
       }
 
+      // Guardar para posible re-envío con autoDeactivate
+      setParsedEmployees(employees)
+
       // Enviar a API
       setIsUploading(true)
       const token = localStorage.getItem('focalizahr_token')
-      console.log('[API] Sending:', { employees: employees.length, config: { mode: 'INCREMENTAL' }, accountId })
+      console.log('[API] Sending:', { employees: employees.length, accountId })
 
       const response = await fetch('/api/admin/employees/sync', {
         method: 'POST',
@@ -156,7 +167,6 @@ export default function EmployeeSyncWizard({ accountId, onComplete, onCancel }: 
         },
         body: JSON.stringify({
           employees,
-          config: { mode: 'INCREMENTAL' },
           ...(accountId && { accountId })  // Solo incluir si viene de admin
         })
       })
@@ -198,7 +208,52 @@ export default function EmployeeSyncWizard({ accountId, onComplete, onCancel }: 
 
   const handleConfirm = async () => {
     if (result?.status === 'AWAITING_CONFIRMATION' && confirmText !== 'CONFIRMAR') return
+
+    // Si autoDeactivate activo, mostrar modal de confirmación
+    if (autoDeactivateMissing && result && result.pendingReview > 0) {
+      setPendingDeactivateCount(result.pendingReview)
+      setShowDeactivateConfirmModal(true)
+      return
+    }
+
     setStep('success')
+  }
+
+  // Ejecutar sync con autoDeactivateMissing
+  const executeSync = async () => {
+    setIsDeactivating(true)
+    try {
+      const token = localStorage.getItem('focalizahr_token')
+      const response = await fetch('/api/admin/employees/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          employees: parsedEmployees,
+          config: { autoDeactivateMissing: true },
+          ...(accountId && { accountId })
+        })
+      })
+
+      const data = await response.json()
+
+      if (!data.success) {
+        throw new Error(data.error || 'Error en sincronizacion')
+      }
+
+      setResult(data)
+      setShowDeactivateConfirmModal(false)
+      setStep('success')
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+      setShowDeactivateConfirmModal(false)
+      setError(errorMessage)
+      setStep('error')
+    } finally {
+      setIsDeactivating(false)
+    }
   }
 
   const downloadTemplate = () => {
@@ -330,6 +385,47 @@ export default function EmployeeSyncWizard({ accountId, onComplete, onCancel }: 
                   </p>
                 )}
 
+                {/* Opción avanzada: desactivar empleados no incluidos */}
+                <div className="p-4 bg-slate-900/50 border border-slate-700 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className="flex items-center h-6">
+                      <input
+                        type="checkbox"
+                        id="autoDeactivateMissing"
+                        checked={autoDeactivateMissing}
+                        onChange={(e) => setAutoDeactivateMissing(e.target.checked)}
+                        className="w-4 h-4 text-cyan-500 border-slate-600 rounded
+                                   focus:ring-cyan-500 focus:ring-offset-slate-900
+                                   bg-slate-800 cursor-pointer"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label
+                        htmlFor="autoDeactivateMissing"
+                        className="font-medium text-slate-200 cursor-pointer"
+                      >
+                        Desactivar empleados no incluidos en el archivo
+                      </label>
+                      <p className="text-sm text-slate-400 mt-1">
+                        Los empleados activos que no aparezcan en este archivo seran
+                        marcados como INACTIVE automaticamente.
+                      </p>
+
+                      {autoDeactivateMissing && (
+                        <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                            <span className="text-sm text-amber-400">
+                              Esta opcion desactivara empleados que no esten en el CSV.
+                              Se solicitara confirmacion antes de proceder.
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <ButtonGroup spacing={12} fullWidth>
                   <GhostButton fullWidth onClick={onCancel}>
                     Cancelar
@@ -453,6 +549,94 @@ export default function EmployeeSyncWizard({ accountId, onComplete, onCancel }: 
           </AnimatePresence>
         </div>
       </motion.div>
+
+      {/* MODAL CONFIRMACIÓN DESACTIVACIÓN MASIVA */}
+      {showDeactivateConfirmModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl
+                          max-w-md w-full mx-4 overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 bg-red-500/10 border-b border-red-500/30">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-red-500/20 rounded-lg">
+                  <AlertTriangle className="w-6 h-6 text-red-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-red-400">
+                  Confirmar Desactivacion Masiva
+                </h3>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6">
+              <p className="text-slate-300 mb-4">
+                Se desactivaran <span className="font-bold text-red-400">
+                  {pendingDeactivateCount} empleados
+                </span> que no estan incluidos en el archivo cargado.
+              </p>
+
+              <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 mb-4">
+                <h4 className="text-sm font-medium text-slate-400 mb-2">
+                  Esta accion:
+                </h4>
+                <ul className="text-sm text-slate-300 space-y-1">
+                  <li className="flex items-center gap-2">
+                    <XCircle className="w-4 h-4 text-red-500" />
+                    Cambiara su estado a INACTIVE
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-slate-500" />
+                    Quedara registrada en el historial
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <RotateCcw className="w-4 h-4 text-cyan-500" />
+                    Puede revertirse en futuros imports
+                  </li>
+                </ul>
+              </div>
+
+              <p className="text-sm text-slate-400">
+                Desea continuar con la sincronizacion?
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-slate-800/50 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowDeactivateConfirmModal(false)
+                  setAutoDeactivateMissing(false)
+                }}
+                disabled={isDeactivating}
+                className="px-4 py-2 text-slate-300 hover:text-white
+                           hover:bg-slate-700 rounded-lg transition-colors
+                           disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  executeSync()
+                }}
+                disabled={isDeactivating}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white
+                           rounded-lg transition-colors font-medium
+                           disabled:opacity-50 disabled:cursor-not-allowed
+                           flex items-center justify-center"
+              >
+                {isDeactivating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Procesando...
+                  </>
+                ) : (
+                  'Si, Desactivar y Continuar'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

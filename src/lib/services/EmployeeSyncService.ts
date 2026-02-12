@@ -1023,32 +1023,47 @@ export async function processEmployeeImport(
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // FASE 6: MISSING - Marcar ausentes (generalmente pocos, una sola transacción)
+    // FASE 6: MISSING - Marcar ausentes en batches para evitar connection pool timeout
     // ════════════════════════════════════════════════════════════════════════
     if (missing.length > 0) {
-      const missingIds = missing.map(e => e.id);
-      await prisma.$transaction(async (tx) => {
-        if (config.autoDeactivateMissing) {
-          await tx.employee.updateMany({
-            where: { id: { in: missingIds } },
-            data: {
-              status: 'INACTIVE',
-              isActive: false,
-              terminatedAt: now,
-              terminationReason: 'not_in_import'
-            }
-          });
-        } else {
-          await tx.employee.updateMany({
-            where: { id: { in: missingIds } },
-            data: {
-              pendingReview: true,
-              pendingReviewReason: `No incluido en import del ${now.toISOString().split('T')[0]}`
-            }
-          });
+      const missingChunks = chunkArray(missing, BATCH_SIZE);
+      console.log(`[Import] 📦 Procesando ${missing.length} ausentes en ${missingChunks.length} lotes`);
+
+      for (let i = 0; i < missingChunks.length; i++) {
+        const chunk = missingChunks[i];
+        const chunkIds = chunk.map(e => e.id);
+
+        await prisma.$transaction(async (tx) => {
+          if (config.autoDeactivateMissing) {
+            await tx.employee.updateMany({
+              where: { id: { in: chunkIds } },
+              data: {
+                status: 'INACTIVE',
+                isActive: false,
+                terminatedAt: now,
+                terminationReason: 'not_in_import'
+              }
+            });
+          } else {
+            await tx.employee.updateMany({
+              where: { id: { in: chunkIds } },
+              data: {
+                pendingReview: true,
+                pendingReviewReason: `No incluido en import del ${now.toISOString().split('T')[0]}`
+              }
+            });
+          }
+        }, { timeout: BATCH_TIMEOUT });
+
+        console.log(`[Import] ✅ Lote MISSING ${i + 1}/${missingChunks.length}: ${chunk.length} empleados`);
+
+        // Pausa entre lotes para no saturar connection pool
+        if (i < missingChunks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
-      }, { timeout: BATCH_TIMEOUT });
-      console.log(`[Import] ✅ Marcados ${missing.length} ausentes para revisión`);
+      }
+
+      console.log(`[Import] ✅ Total ${missing.length} ausentes procesados (${config.autoDeactivateMissing ? 'desactivados' : 'marcados para revisión'})`);
     }
 
     // ════════════════════════════════════════════════════════════════════════

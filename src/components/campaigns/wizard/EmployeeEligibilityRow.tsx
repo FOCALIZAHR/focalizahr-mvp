@@ -53,9 +53,12 @@ function formatAuditDate(date: Date): string {
 // ════════════════════════════════════════════════════════════════════════════
 
 export function calculateTenureMonths(hireDate: string): number {
+  if (!hireDate) return 0
   const hire = new Date(hireDate)
+  if (isNaN(hire.getTime())) return 0
   const now = new Date()
   const diffTime = now.getTime() - hire.getTime()
+  if (diffTime < 0) return 0
   const diffMonths = diffTime / (1000 * 60 * 60 * 24 * 30.44) // Average month
   return Math.floor(diffMonths)
 }

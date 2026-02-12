@@ -17,6 +17,12 @@ import {
   RefreshCw,
   UserCheck,
   Loader2,
+  Rocket,
+  Bell,
+  UserCircle,
+  ClipboardCheck,
+  CheckCircle,
+  RotateCcw,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -108,6 +114,20 @@ export default function PerformanceCycleDetailPage({
   const [showActivateModal, setShowActivateModal] = useState(false);
   const [generatingRatings, setGeneratingRatings] = useState(false);
   const [ratingsResult, setRatingsResult] = useState<{ generated: number; failed: number } | null>(null);
+
+  // Estados para modales de cierre
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [showReopenModal, setShowReopenModal] = useState(false);
+  const [transitionLoading, setTransitionLoading] = useState(false);
+
+  // Stats para validación pre-cierre
+  const [closureStats, setClosureStats] = useState<{
+    totalAssignments: number;
+    completedAssignments: number;
+    pendingRatings: number;
+    pendingPotential: number;
+  } | null>(null);
 
   // ══════════════════════════════════════════════════════════════════════════
   // FETCH DATA
@@ -286,6 +306,93 @@ export default function PerformanceCycleDetailPage({
   };
 
   // ══════════════════════════════════════════════════════════════════════════
+  // FETCH CYCLE STATS (para validación pre-cierre)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const fetchCycleStats = async () => {
+    try {
+      const response = await fetch(
+        `/api/admin/performance-cycles/${id}/stats`,
+        { credentials: 'include' }
+      );
+      const data = await response.json();
+      if (data.success) {
+        setClosureStats(data.stats);
+      }
+    } catch (error) {
+      console.error('Error fetching cycle stats:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (id) fetchCycleStats();
+  }, [id]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // TRANSICIONES DE ESTADO (DRY - handler unificado)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const handleStatusTransition = async (
+    newStatus: 'IN_REVIEW' | 'COMPLETED' | 'ACTIVE',
+    options: {
+      setModal: (v: boolean) => void;
+      successTitle: string;
+      successDescription: string;
+    }
+  ) => {
+    options.setModal(false);
+    setTransitionLoading(true);
+
+    try {
+      const response = await fetch(`/api/admin/performance-cycles/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error en la transición');
+      }
+
+      if (data.success) {
+        // Fix A: Actualizar estado local inmediatamente (sin esperar refetch)
+        setCycle(prev => prev ? { ...prev, status: newStatus } : prev);
+
+        toast.success(options.successDescription, options.successTitle);
+        await fetchCycle();
+        await fetchCycleStats();
+      } else {
+        throw new Error(data.error || 'Error desconocido');
+      }
+    } catch (error: any) {
+      toast.error(error.message, 'Error');
+    } finally {
+      setTransitionLoading(false);
+    }
+  };
+
+  const handleReviewConfirmed = () => handleStatusTransition('IN_REVIEW', {
+    setModal: setShowReviewModal,
+    successTitle: 'Ciclo en revisión',
+    successDescription: 'Los evaluadores ya no pueden responder. Revisa los resultados.'
+  });
+
+  const handleCompleteConfirmed = () => handleStatusTransition('COMPLETED', {
+    setModal: setShowCompleteModal,
+    successTitle: 'Ciclo completado',
+    successDescription: 'El cron enviará los reportes en el próximo ciclo programado.'
+  });
+
+  const handleReopenConfirmed = () => handleStatusTransition('ACTIVE', {
+    setModal: setShowReopenModal,
+    successTitle: 'Ciclo reabierto',
+    successDescription: 'Los evaluadores pueden volver a responder.'
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
   // HELPERS
   // ══════════════════════════════════════════════════════════════════════════
 
@@ -339,6 +446,11 @@ export default function PerformanceCycleDetailPage({
   const canGenerate = cycle.status === 'DRAFT' || cycle.status === 'SCHEDULED';
   const hasAssignments = stats && stats.total > 0;
 
+  // Datos para modal de activación
+  const evaluatorCount = new Set(cycle.assignments.map(a => a.evaluatorName)).size;
+  const selfEvaluationCount = cycle.assignments.filter(a => a.evaluationType === 'SELF').length;
+  const managerEvaluationCount = cycle.assignments.filter(a => a.evaluationType === 'MANAGER_TO_EMPLOYEE').length;
+
   return (
     <div className="min-h-screen bg-slate-950 p-6">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -363,6 +475,7 @@ export default function PerformanceCycleDetailPage({
             ${cycle.status === 'DRAFT' ? 'bg-slate-500/20 text-slate-400' : ''}
             ${cycle.status === 'SCHEDULED' ? 'bg-blue-500/20 text-blue-400' : ''}
             ${cycle.status === 'ACTIVE' ? 'bg-cyan-500/20 text-cyan-400' : ''}
+            ${cycle.status === 'IN_REVIEW' ? 'bg-amber-500/20 text-amber-400' : ''}
             ${cycle.status === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400' : ''}
           `}>
             {cycle.status}
@@ -494,6 +607,7 @@ export default function PerformanceCycleDetailPage({
               {cycle.status === 'DRAFT' && hasAssignments && 'Borrador con evaluaciones listas para activar'}
               {cycle.status === 'SCHEDULED' && 'Programado - evaluaciones generadas'}
               {cycle.status === 'ACTIVE' && 'Ciclo activo - evaluaciones en progreso'}
+              {cycle.status === 'IN_REVIEW' && 'En revisión - evaluadores no pueden responder'}
               {cycle.status === 'COMPLETED' && 'Ciclo completado'}
             </p>
           </div>
@@ -558,7 +672,49 @@ export default function PerformanceCycleDetailPage({
             </Button>
           </div>
 
-          {!canGenerate && (
+          {/* Botones de transición de estado (cierre) */}
+          {(cycle.status === 'ACTIVE' || cycle.status === 'IN_REVIEW') && (
+            <div className="flex items-center gap-3 flex-wrap mt-4">
+              {cycle.status === 'ACTIVE' && (
+                <button
+                  onClick={() => setShowReviewModal(true)}
+                  disabled={transitionLoading}
+                  className="fhr-btn fhr-btn-sm"
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #F59E0B',
+                    color: '#F59E0B'
+                  }}
+                >
+                  <ClipboardCheck className="w-4 h-4" />
+                  Pasar a Revisión
+                </button>
+              )}
+
+              {cycle.status === 'IN_REVIEW' && (
+                <>
+                  <button
+                    onClick={() => setShowCompleteModal(true)}
+                    disabled={transitionLoading}
+                    className="fhr-btn fhr-btn-sm fhr-btn-success"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Cerrar Ciclo
+                  </button>
+                  <button
+                    onClick={() => setShowReopenModal(true)}
+                    disabled={transitionLoading}
+                    className="fhr-btn fhr-btn-sm fhr-btn-ghost"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Reabrir
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {!canGenerate && cycle.status !== 'ACTIVE' && cycle.status !== 'IN_REVIEW' && cycle.status !== 'COMPLETED' && (
             <p className="text-xs text-slate-500 mt-3">
               Solo se pueden generar evaluaciones en estado DRAFT o SCHEDULED
             </p>
@@ -729,48 +885,273 @@ export default function PerformanceCycleDetailPage({
         </Dialog>
 
         {/* ══════════════════════════════════════════════════════════════ */}
-        {/* MODAL: Confirmar Activar Ciclo                               */}
+        {/* MODAL: PASAR A REVISIÓN (ACTIVE → IN_REVIEW)                 */}
         {/* ══════════════════════════════════════════════════════════════ */}
-        <Dialog open={showActivateModal} onOpenChange={setShowActivateModal}>
-          <DialogContent className="bg-slate-900 border-slate-700">
+        <Dialog open={showReviewModal} onOpenChange={setShowReviewModal}>
+          <DialogContent className="sm:max-w-md bg-slate-900 border-slate-700">
             <DialogHeader>
-              <DialogTitle className="text-white text-lg">
-                ¿Activar Ciclo de Evaluación?
-              </DialogTitle>
+              <DialogTitle className="text-slate-100">Pasar a Revisión</DialogTitle>
               <DialogDescription className="text-slate-400">
-                Esto habilitará las evaluaciones y los evaluadores podrán comenzar a responder.
+                Los evaluadores ya no podrán responder encuestas pendientes.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-3 py-3">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
-                <Users className="w-5 h-5 text-cyan-400" />
-                <div>
-                  <p className="text-sm text-white font-medium">{stats?.total || 0} evaluaciones</p>
-                  <p className="text-xs text-slate-400">serán habilitadas para responder</p>
+            <div className="py-4 space-y-3">
+              {closureStats && closureStats.completedAssignments < closureStats.totalAssignments && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                  <p className="text-sm text-amber-200">
+                    ⚠️ Hay {closureStats.totalAssignments - closureStats.completedAssignments} evaluaciones sin completar
+                  </p>
                 </div>
+              )}
+
+              <p className="text-sm text-slate-400">
+                Podrás reabrir el ciclo si necesitas dar más tiempo.
+              </p>
+            </div>
+
+            <DialogFooter>
+              <button
+                className="fhr-btn fhr-btn-sm fhr-btn-ghost"
+                onClick={() => setShowReviewModal(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleReviewConfirmed}
+                disabled={transitionLoading}
+                className="fhr-btn fhr-btn-sm fhr-btn-primary"
+                style={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)' }}
+              >
+                {transitionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                Confirmar
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ══════════════════════════════════════════════════════════════ */}
+        {/* MODAL: CERRAR CICLO (IN_REVIEW → COMPLETED)                  */}
+        {/* ══════════════════════════════════════════════════════════════ */}
+        <Dialog open={showCompleteModal} onOpenChange={setShowCompleteModal}>
+          <DialogContent className="sm:max-w-md bg-slate-900 border-slate-700">
+            <DialogHeader>
+              <DialogTitle className="text-slate-100">Cerrar Ciclo</DialogTitle>
+              <DialogDescription className="text-slate-400">
+                Esta acción es permanente. Los resultados se marcarán como finales.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="py-4 space-y-3">
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                <p className="text-sm text-red-200">
+                  No podrás reabrir el ciclo después de completarlo.
+                </p>
               </div>
 
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-amber-300">
-                  Esta acción no se puede deshacer. Una vez activado, el ciclo pasará a estado activo.
+              {closureStats && closureStats.pendingRatings > 0 && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                  <p className="text-sm text-amber-200">
+                    ⚠️ Hay {closureStats.pendingRatings} ratings sin calcular
+                  </p>
+                </div>
+              )}
+
+              {closureStats && closureStats.pendingPotential > 0 && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                  <p className="text-sm text-amber-200">
+                    ⚠️ Hay {closureStats.pendingPotential} empleados sin potencial asignado
+                  </p>
+                </div>
+              )}
+
+              <p className="text-sm text-slate-400">
+                El cron de reportes enviará los resultados individuales a los empleados
+                en el próximo ciclo programado (9:00 UTC diario).
+              </p>
+            </div>
+
+            <DialogFooter>
+              <button
+                className="fhr-btn fhr-btn-sm fhr-btn-ghost"
+                onClick={() => setShowCompleteModal(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCompleteConfirmed}
+                disabled={transitionLoading}
+                className="fhr-btn fhr-btn-sm fhr-btn-success"
+              >
+                {transitionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                Confirmar
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ══════════════════════════════════════════════════════════════ */}
+        {/* MODAL: REABRIR CICLO (IN_REVIEW → ACTIVE)                    */}
+        {/* ══════════════════════════════════════════════════════════════ */}
+        <Dialog open={showReopenModal} onOpenChange={setShowReopenModal}>
+          <DialogContent className="sm:max-w-md bg-slate-900 border-slate-700">
+            <DialogHeader>
+              <DialogTitle className="text-slate-100">Reabrir Ciclo</DialogTitle>
+              <DialogDescription className="text-slate-400">
+                Los evaluadores podrán volver a responder sus encuestas pendientes.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="py-4 space-y-3">
+              <p className="text-sm text-slate-400">
+                Considera extender la fecha de cierre si vas a dar más tiempo.
+              </p>
+              <div className="p-3 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
+                <p className="text-sm text-cyan-200">
+                  Tip: Después de reabrir, puedes editar la fecha de cierre del ciclo.
                 </p>
               </div>
             </div>
 
-            <DialogFooter className="gap-2">
+            <DialogFooter>
+              <button
+                className="fhr-btn fhr-btn-sm fhr-btn-ghost"
+                onClick={() => setShowReopenModal(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleReopenConfirmed}
+                disabled={transitionLoading}
+                className="fhr-btn fhr-btn-sm fhr-btn-primary"
+              >
+                {transitionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                Confirmar
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ══════════════════════════════════════════════════════════════ */}
+        {/* MODAL: Confirmar Activar Ciclo                               */}
+        {/* ══════════════════════════════════════════════════════════════ */}
+        <Dialog open={showActivateModal} onOpenChange={setShowActivateModal}>
+          <DialogContent className="sm:max-w-lg bg-slate-900/95 backdrop-blur-xl border border-white/10">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20">
+                  <Rocket className="w-6 h-6 text-cyan-400" />
+                </div>
+                <DialogTitle className="text-xl font-semibold text-white">
+                  Activar Ciclo de Evaluacion?
+                </DialogTitle>
+              </div>
+              <DialogDescription className="text-slate-400 mt-2">
+                Al activar, se ejecutaran las siguientes acciones:
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3 my-6">
+              {/* Card 1: Emails */}
+              <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                <div className="flex items-start gap-3">
+                  <Mail className="w-5 h-5 text-cyan-400 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-white">
+                      {evaluatorCount} evaluadores recibiran email de invitacion
+                    </p>
+                    <p className="text-sm text-slate-400 mt-1">
+                      Envio inmediato a sus correos corporativos
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Evaluaciones jefe → colaborador */}
+              {managerEvaluationCount > 0 && (
+                <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                  <div className="flex items-start gap-3">
+                    <Users className="w-5 h-5 text-cyan-400 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-white">
+                        {managerEvaluationCount} evaluaciones jefe → colaborador
+                      </p>
+                      <p className="text-sm text-slate-400 mt-1">
+                        Los jefes evaluaran a sus reportes directos
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Card 3: Autoevaluaciones (si aplica) */}
+              {cycle.includesSelf && selfEvaluationCount > 0 && (
+                <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                  <div className="flex items-start gap-3">
+                    <UserCircle className="w-5 h-5 text-purple-400 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-white">
+                        {selfEvaluationCount} autoevaluaciones habilitadas
+                      </p>
+                      <p className="text-sm text-slate-400 mt-1">
+                        Cada colaborador podra evaluarse a si mismo
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Card 4: Fecha límite */}
+              <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                <div className="flex items-start gap-3">
+                  <Calendar className="w-5 h-5 text-amber-400 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-white">
+                      Fecha limite: {formatDate(cycle.endDate)}
+                    </p>
+                    <p className="text-sm text-slate-400 mt-1">
+                      Los evaluadores tendran {daysRemaining} dias para completar
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 5: Recordatorios */}
+              <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
+                <div className="flex items-start gap-3">
+                  <Bell className="w-5 h-5 text-green-400 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-white">
+                      Recordatorios automaticos activados
+                    </p>
+                    <p className="text-sm text-slate-400 mt-1">
+                      Dia 7: Amigable → Dia 3: Urgente → Dia 1: CC Gerente
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Warning */}
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+              <p className="text-sm text-amber-200">
+                Esta accion no se puede deshacer
+              </p>
+            </div>
+
+            <DialogFooter className="mt-6 gap-3">
               <Button
-                variant="outline"
+                variant="ghost"
                 onClick={() => setShowActivateModal(false)}
-                className="border-slate-600 text-slate-300 hover:bg-slate-800"
+                className="text-slate-400 hover:text-white"
               >
                 Cancelar
               </Button>
               <Button
                 onClick={handleActivateCycle}
                 disabled={activating}
-                className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600"
+                className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600 text-white font-medium"
               >
                 {activating ? (
                   <>
@@ -778,7 +1159,10 @@ export default function PerformanceCycleDetailPage({
                     Activando...
                   </>
                 ) : (
-                  'Sí, Activar Ciclo'
+                  <>
+                    <Rocket className="w-4 h-4 mr-2" />
+                    Activar y Notificar
+                  </>
                 )}
               </Button>
             </DialogFooter>
