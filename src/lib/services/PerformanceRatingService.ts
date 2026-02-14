@@ -255,6 +255,7 @@ export class PerformanceRatingService {
 
   /**
    * Genera ratings para todos los empleados de un ciclo
+   * OPTIMIZADO: Pre-carga config/weights + chunks paralelos de 10
    */
   static async generateRatingsForCycle(
     cycleId: string,
@@ -262,26 +263,136 @@ export class PerformanceRatingService {
   ): Promise<BulkGenerateResult> {
     const evaluatees = await PerformanceResultsService.listEvaluateesInCycle(cycleId)
 
+    // Pre-cargar datos comunes (1 vez en lugar de N)
+    const [config, weights] = await Promise.all([
+      this.getConfig(accountId),
+      this.getResolvedWeights(accountId, cycleId)
+    ])
+
     const result: BulkGenerateResult = {
       success: 0,
       failed: 0,
       errors: []
     }
 
-    for (const evaluatee of evaluatees) {
-      try {
-        await this.generateRating(cycleId, evaluatee.evaluateeId, accountId)
-        result.success++
-      } catch (error) {
-        result.failed++
-        result.errors.push({
-          employeeId: evaluatee.evaluateeId,
-          error: error instanceof Error ? error.message : 'Error desconocido'
-        })
+    // Procesar en chunks paralelos de 10
+    const CHUNK_SIZE = 10
+    for (let i = 0; i < evaluatees.length; i += CHUNK_SIZE) {
+      const chunk = evaluatees.slice(i, i + CHUNK_SIZE)
+      const settled = await Promise.allSettled(
+        chunk.map(ev =>
+          this.generateRatingWithContext(cycleId, ev.evaluateeId, accountId, config, weights)
+        )
+      )
+
+      for (let j = 0; j < settled.length; j++) {
+        if (settled[j].status === 'fulfilled') {
+          result.success++
+        } else {
+          result.failed++
+          result.errors.push({
+            employeeId: chunk[j].evaluateeId,
+            error: (settled[j] as PromiseRejectedResult).reason instanceof Error
+              ? ((settled[j] as PromiseRejectedResult).reason as Error).message
+              : 'Error desconocido'
+          })
+        }
       }
     }
 
     return result
+  }
+
+  /**
+   * Internal: genera rating con config/weights pre-cargados
+   * Misma lógica que generateRating pero sin queries redundantes
+   */
+  private static async generateRatingWithContext(
+    cycleId: string,
+    employeeId: string,
+    accountId: string,
+    config: PerformanceRatingConfigData,
+    weights: EvaluatorWeights
+  ): Promise<GenerateRatingResult> {
+    const results = await PerformanceResultsService.getEvaluateeResults(cycleId, employeeId)
+
+    const weightedScore = calculateWeightedScore(
+      {
+        self: results.selfScore,
+        manager: results.managerScore,
+        peer: results.peerAvgScore,
+        upward: results.upwardAvgScore
+      },
+      weights
+    )
+
+    const classification = getPerformanceClassification(weightedScore, config)
+
+    const rating = await prisma.performanceRating.upsert({
+      where: {
+        cycleId_employeeId: { cycleId, employeeId }
+      },
+      create: {
+        accountId,
+        cycleId,
+        employeeId,
+        calculatedScore: weightedScore,
+        calculatedLevel: classification.level,
+        selfScore: results.selfScore,
+        managerScore: results.managerScore,
+        peerAvgScore: results.peerAvgScore,
+        upwardAvgScore: results.upwardAvgScore,
+        evaluationCompleteness: results.evaluationCompleteness,
+        totalEvaluations: results.totalEvaluations,
+        completedEvaluations: results.completedEvaluations
+      },
+      update: {
+        calculatedScore: weightedScore,
+        calculatedLevel: classification.level,
+        selfScore: results.selfScore,
+        managerScore: results.managerScore,
+        peerAvgScore: results.peerAvgScore,
+        upwardAvgScore: results.upwardAvgScore,
+        evaluationCompleteness: results.evaluationCompleteness,
+        totalEvaluations: results.totalEvaluations,
+        completedEvaluations: results.completedEvaluations,
+        updatedAt: new Date()
+      }
+    })
+
+    if (rating.potentialScore != null) {
+      await this.recalculate9BoxPosition(rating.id)
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'PERFORMANCE_RATING_GENERATED',
+        accountId,
+        entityType: 'performance_rating',
+        entityId: rating.id,
+        newValues: {
+          cycleId,
+          employeeId,
+          calculatedScore: weightedScore,
+          trigger: 'bulk_generate',
+          hadPreviousPotential: rating.potentialScore !== null
+        }
+      }
+    })
+
+    return {
+      rating: {
+        id: rating.id,
+        calculatedScore: rating.calculatedScore,
+        calculatedLevel: rating.calculatedLevel,
+        selfScore: rating.selfScore,
+        managerScore: rating.managerScore,
+        peerAvgScore: rating.peerAvgScore,
+        upwardAvgScore: rating.upwardAvgScore,
+        evaluationCompleteness: rating.evaluationCompleteness
+      },
+      classification
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════

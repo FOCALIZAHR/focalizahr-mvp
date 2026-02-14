@@ -137,7 +137,7 @@ export default memo(function CinemaSummaryHeader({
             {scoreOn5 !== null && (
               <div className="mb-6">
                 <PerformanceResultCard
-                  score={scoreOn5 * 20}
+                  score={scoreOn5}
                   variant="expanded"
                   className="max-w-sm"
                 />

@@ -186,10 +186,10 @@ export async function GET(request: NextRequest) {
 
     // Mapear a formato de UI
     const mappedAssignments = assignments.map(a => {
-      // Calculate avgScore for completed assignments (0-100 scale)
+      // Calculate avgScore (escala 1-5, como normalizedScore)
       let avgScore: number | null = null
       if (a.status === 'COMPLETED' && a.participant?.responses?.length) {
-        // Try normalizedScore first (0-100)
+        // Priorizar normalizedScore (ya está en escala 1-5)
         const normalizedScores = a.participant.responses
           .map(r => r.normalizedScore)
           .filter((s): s is number => s !== null)
@@ -197,13 +197,12 @@ export async function GET(request: NextRequest) {
         if (normalizedScores.length > 0) {
           avgScore = normalizedScores.reduce((sum, s) => sum + s, 0) / normalizedScores.length
         } else {
-          // Fallback: calculate from rating (1-5) → convert to 0-100
+          // Fallback: rating directo (también escala 1-5)
           const ratings = a.participant.responses
             .map(r => r.rating)
             .filter((r): r is number => r !== null)
           if (ratings.length > 0) {
-            const avgRating = ratings.reduce((sum, r) => sum + r, 0) / ratings.length
-            avgScore = (avgRating / 5) * 100
+            avgScore = ratings.reduce((sum, r) => sum + r, 0) / ratings.length
           }
         }
       }

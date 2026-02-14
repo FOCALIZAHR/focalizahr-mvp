@@ -167,22 +167,16 @@ const handleSubmit = async (responses: Array<{questionId: string, rating?: numbe
     console.log('✅ Respuestas enviadas exitosamente')
     setIsCompleted(true)
 
-    // Para evaluaciones de desempeño (employee-based), toast + redirect automático
+    // Para evaluaciones de desempeño (employee-based), toast SIN redirección automática
     if (flowType === 'employee-based') {
       const evaluateeName = surveyData?.evaluationContext?.evaluateeName || surveyData?.participant.campaign.name || 'el colaborador'
-      setPostSubmitMessage(`Tu evaluacion de ${evaluateeName} ha sido enviada exitosamente.`)
+      setPostSubmitMessage(`Tu evaluacion de ${evaluateeName} ha sido enviada exitosamente. Puedes cerrar esta ventana.`)
       toast.success(
         `Tu evaluacion de ${evaluateeName} ha sido enviada correctamente.`,
         'Evaluacion Enviada'
       )
-      // Solo redirigir si hay sesión activa (usuario logueado)
-      setTimeout(() => {
-        const storedToken = localStorage.getItem('focalizahr_token')
-        if (storedToken) {
-          router.push('/dashboard/evaluaciones')
-        }
-        // Si no hay token, quedarse en pantalla de éxito
-      }, 3000)
+      // NO redirigir - usuario anónimo debe permanecer en pantalla de éxito
+      // El jefe puede navegar desde su sesión autenticada si lo desea
     }
 
   } catch (err) {

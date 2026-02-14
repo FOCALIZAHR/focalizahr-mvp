@@ -19,7 +19,7 @@ import { getPerformanceClassification } from '@/config/performanceClassification
 // ════════════════════════════════════════════════════════════════════════════
 
 export interface PerformanceResultCardProps {
-  /** Score promedio en escala 0-100 (normalizedScore del API) */
+  /** Score promedio en escala 1-5 */
   score: number
   /** Mostrar card compacta o expandida */
   variant?: 'compact' | 'expanded'
@@ -36,8 +36,8 @@ export const PerformanceResultCard = memo(function PerformanceResultCard({
   variant = 'compact',
   className = ''
 }: PerformanceResultCardProps) {
-  // Convertir 0-100 → 1-5
-  const scoreOn5 = score / 20
+  // Score ya viene en escala 1-5
+  const scoreOn5 = score
   const classification = getPerformanceClassification(scoreOn5)
   const barWidth = (scoreOn5 / 5) * 100
 

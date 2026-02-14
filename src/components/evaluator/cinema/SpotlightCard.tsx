@@ -6,6 +6,8 @@ import { getInitials } from '@/lib/utils/formatName'
 import { StatusBadge } from './StatusBadge'
 import InsightCard from './InsightCard'
 import { PerformanceResultCard } from '@/components/performance/PerformanceResultCard'
+import PotentialNineBoxCard from '@/components/performance/PotentialNineBoxCard'
+import { GhostButton } from '@/components/ui/PremiumButton'
 import type { SpotlightCardProps } from '@/types/evaluator-cinema'
 
 export default function SpotlightCard({
@@ -100,6 +102,31 @@ export default function SpotlightCard({
               )
             ))}
           </div>
+
+          {/* Potencial y 9-Box */}
+          {employee.potentialScore && (
+            <div className="flex items-start gap-3 mb-4">
+              <PotentialNineBoxCard
+                potentialScore={employee.potentialScore}
+                potentialLevel={employee.potentialLevel}
+                nineBoxPosition={employee.nineBoxPosition}
+                showTeslaLine={true}
+                className="flex-1"
+              />
+
+              <GhostButton
+                icon={Eye}
+                size="sm"
+                onClick={() => {
+                  if (employee.status === 'completed' && employee.assignmentId) {
+                    onViewSummary(employee.assignmentId)
+                  }
+                }}
+              >
+                Ver Resumen
+              </GhostButton>
+            </div>
+          )}
 
           {/* CTAs dinámicos según estado */}
           <div className="flex flex-col gap-3 mt-auto pt-4 border-t border-slate-800">

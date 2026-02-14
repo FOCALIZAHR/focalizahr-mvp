@@ -118,7 +118,8 @@ export default memo(function CompetencyDetailPanel({
               <div className="flex items-center gap-2">
                 <div className="flex gap-1">
                   {Array.from({ length: 5 }).map((_, i) => {
-                    const scoreOn5 = r.normalizedScore! / 20
+                    // normalizedScore ya está en escala 1-5
+                    const scoreOn5 = r.normalizedScore!
                     return (
                       <Star
                         key={i}
@@ -132,7 +133,7 @@ export default memo(function CompetencyDetailPanel({
                   })}
                 </div>
                 <span className="text-sm font-medium text-cyan-400 ml-1">
-                  {(r.normalizedScore! / 20).toFixed(1)}/5
+                  {r.normalizedScore!.toFixed(1)}/5
                 </span>
               </div>
             )}

@@ -1,0 +1,31 @@
+diff --git a/src/app/dashboard/evaluaciones/[assignmentId]/page.tsx b/src/app/dashboard/evaluaciones/[assignmentId]/page.tsx
+index d20bd89..902460d 100644
+--- a/src/app/dashboard/evaluaciones/[assignmentId]/page.tsx
++++ b/src/app/dashboard/evaluaciones/[assignmentId]/page.tsx
+@@ -49,11 +49,13 @@ interface SummaryData {
+   evaluationType: string
+   completedAt: string
+   evaluatee: {
++    id: string
+     fullName: string
+     position: string | null
+     department: string
+   }
+   cycle: {
++    id: string
+     name: string
+     endDate: string
+   }
+@@ -476,11 +478,7 @@ function EvaluationSummaryView({
+             assignmentId: summary.assignmentId,
+             evaluationType: summary.evaluationType,
+             completedAt: summary.completedAt,
+-            evaluatee: {
+-              fullName: summary.evaluatee.fullName,
+-              position: summary.evaluatee.position,
+-              department: summary.evaluatee.department
+-            },
++            evaluatee: summary.evaluatee,
+             cycle: summary.cycle,
+             averageScore: summary.averageScore,
+             totalQuestions: summary.totalQuestions,

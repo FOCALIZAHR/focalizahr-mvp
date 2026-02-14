@@ -36,7 +36,16 @@ export function formatDisplayName(
     return `${toTitleCase(nombres)} ${toTitleCase(apellidos)}`
   }
 
-  // Normal "Nombre Apellido" format
+  // Manejar nombres SIN coma
+  // Asume formato: "Apellido1 Apellido2 Nombre1 Nombre2"
+  const parts = fullName.trim().split(' ').filter(Boolean)
+
+  if (format === 'short' && parts.length >= 3) {
+    const primerApellido = toTitleCase(parts[0])
+    const primerNombre = toTitleCase(parts[2])
+    return `${primerNombre} ${primerApellido}`
+  }
+
   return toTitleCase(fullName)
 }
 

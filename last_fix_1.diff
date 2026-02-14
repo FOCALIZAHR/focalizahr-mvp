@@ -1,0 +1,19 @@
+diff --git a/src/app/api/evaluator/assignments/[id]/summary/route.ts b/src/app/api/evaluator/assignments/[id]/summary/route.ts
+index 2947e1c..6019359 100644
+--- a/src/app/api/evaluator/assignments/[id]/summary/route.ts
++++ b/src/app/api/evaluator/assignments/[id]/summary/route.ts
+@@ -200,12 +200,14 @@ export async function GET(
+         completedAt: assignment.updatedAt.toISOString(),
+ 
+         evaluatee: {
++          id: assignment.evaluateeId,
+           fullName: assignment.evaluateeName,
+           position: assignment.evaluateePosition,
+           department: assignment.evaluateeDepartment
+         },
+ 
+         cycle: {
++          id: assignment.cycle.id,
+           name: assignment.cycle.name,
+           endDate: assignment.cycle.endDate.toISOString()
+         },

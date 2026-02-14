@@ -136,9 +136,9 @@ export default function CinemaSummaryOrchestrator({ summary, rightColumnSlot }: 
                 const competencyCode = competencyData?.competencyCode
                   || getCompetencyCodeFromResponses(categoryResponses)
 
-                // Calcular promedio de esta categoría
+                // Calcular promedio de esta categoría (normalizedScore ya está en escala 1-5)
                 const ratings = categoryResponses
-                  .map(r => r.rating ?? (r.normalizedScore ? r.normalizedScore / 20 : null))
+                  .map(r => r.rating ?? (r.normalizedScore ? r.normalizedScore : null))
                   .filter((r): r is number => r !== null)
                 const avgScore = ratings.length > 0
                   ? ratings.reduce((a, b) => a + b, 0) / ratings.length
@@ -210,7 +210,7 @@ function calculateCategoryAverage(responses: any[]): number | null {
   if (!responses || responses.length === 0) return null
 
   const ratings = responses
-    .map(r => r.rating ?? (r.normalizedScore ? r.normalizedScore / 20 : null))
+    .map(r => r.rating ?? (r.normalizedScore ? r.normalizedScore : null))
     .filter((r): r is number => r !== null)
 
   if (ratings.length === 0) return null

@@ -40,6 +40,8 @@ import {
   type ManualOverrides,
   type ManualOverride
 } from '@/components/campaigns/wizard';
+import { JobClassificationCinema } from '@/components/job-classification';
+import EmployeeSyncWizard from '@/components/admin/employees/EmployeeSyncWizard';
 
 // Tipos para el wizard (extendiendo los existentes)
 interface WizardStep {
@@ -152,6 +154,7 @@ export default function NewCampaignPage() {
   const [criteria, setCriteria] = useState<InclusionCriteria>(DEFAULT_CRITERIA);
   const [manualOverrides, setManualOverrides] = useState<ManualOverrides>({});
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+  const [showEmployeeSyncWizard, setShowEmployeeSyncWizard] = useState(false);
 
   // ════════════════════════════════════════════════════════════════════════════
   // TIPOS DE EVALUACIÓN 360°
@@ -353,29 +356,22 @@ export default function NewCampaignPage() {
     return { eligible, excluded, total: employees.length };
   }, [employees, criteria, manualExclusionIds, isEmployeeBasedFlow]);
 
-  const steps: WizardStep[] = [
-    {
-      id: 1,
-      title: 'Información Básica',
-      description: 'Tipo de estudio, nombre y fechas',
-      completed: currentStep > 1,
-      active: currentStep === 1
-    },
-    {
-      id: 2,
-      title: 'Participantes',
-      description: 'Configuración enfoque concierge',
-      completed: currentStep > 2,
-      active: currentStep === 2
-    },
-    {
-      id: 3,
-      title: 'Confirmación',
-      description: 'Revisar y crear campaña',
-      completed: false,
-      active: currentStep === 3
-    }
-  ];
+  // Total de pasos depende del flow type
+  const totalSteps = isEmployeeBasedFlow ? 4 : 3;
+  const confirmStep = totalSteps; // Último paso siempre es confirmación
+
+  const steps: WizardStep[] = isEmployeeBasedFlow
+    ? [
+        { id: 1, title: 'Información Básica', description: 'Tipo de estudio, nombre y fechas', completed: currentStep > 1, active: currentStep === 1 },
+        { id: 2, title: 'Participantes', description: 'Criterios de elegibilidad', completed: currentStep > 2, active: currentStep === 2 },
+        { id: 3, title: 'Cargos', description: 'Clasificación de cargos', completed: currentStep > 3, active: currentStep === 3 },
+        { id: 4, title: 'Confirmación', description: 'Revisar y crear campaña', completed: false, active: currentStep === 4 }
+      ]
+    : [
+        { id: 1, title: 'Información Básica', description: 'Tipo de estudio, nombre y fechas', completed: currentStep > 1, active: currentStep === 1 },
+        { id: 2, title: 'Participantes', description: 'Configuración enfoque concierge', completed: currentStep > 2, active: currentStep === 2 },
+        { id: 3, title: 'Confirmación', description: 'Revisar y crear campaña', completed: false, active: currentStep === 3 }
+      ];
 
   // Validaciones por paso
   const validateStep = (step: number): boolean => {
@@ -439,7 +435,7 @@ export default function NewCampaignPage() {
   // Navegación del wizard
   const nextStep = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep(prev => Math.min(prev + 1, 3));
+      setCurrentStep(prev => Math.min(prev + 1, totalSteps));
     }
   };
 
@@ -452,7 +448,7 @@ export default function NewCampaignPage() {
 
   // Envío del formulario - CONECTADO CON API REAL
   const handleSubmit = async () => {
-    if (!validateStep(3)) return;
+    if (!validateStep(confirmStep)) return;
 
     setIsSubmitting(true);
     setSubmitError(null);
@@ -755,7 +751,7 @@ export default function NewCampaignPage() {
             Nueva Campaña de Medición
           </h1>
           <p className="text-muted-foreground">
-            Crea una nueva medición de clima organizacional en 3 pasos simples
+            Crea una nueva medición de clima organizacional en {totalSteps} pasos simples
           </p>
         </div>
 
@@ -1013,22 +1009,73 @@ export default function NewCampaignPage() {
                     </CardContent>
                   </Card>
                 ) : employees.length === 0 ? (
-                  <Card className="professional-card">
-                    <CardContent className="p-8 text-center">
-                      <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-medium mb-2">Sin Empleados</h3>
-                      <p className="text-muted-foreground mb-4">
-                        No hay empleados registrados en tu empresa. Primero debes cargar
-                        la nómina desde la sección de Colaboradores.
-                      </p>
-                      <Button
-                        variant="outline"
-                        onClick={() => router.push('/dashboard/employees')}
-                      >
-                        Ir a Colaboradores
-                      </Button>
-                    </CardContent>
-                  </Card>
+                  <>
+                    <Card className="professional-card">
+                      <CardContent className="p-8 text-center">
+                        <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                        <h3 className="text-lg font-medium mb-2">Sin Empleados</h3>
+                        <p className="text-muted-foreground mb-4">
+                          No hay empleados registrados en tu empresa. Carga tu nómina
+                          para continuar con la creación de la campaña.
+                        </p>
+                        <Button
+                          className="btn-gradient"
+                          onClick={() => setShowEmployeeSyncWizard(true)}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Cargar Colaboradores
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    {showEmployeeSyncWizard && (
+                      <EmployeeSyncWizard
+                        onComplete={async () => {
+                          setShowEmployeeSyncWizard(false);
+                          setIsLoadingEmployees(true);
+                          try {
+                            const token = localStorage.getItem('focalizahr_token');
+                            const response = await fetch('/api/admin/employees?limit=1000&status=ACTIVE', {
+                              headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                              }
+                            });
+                            const data = await response.json();
+                            if (data.success && data.data) {
+                              const mappedEmployees = data.data.map((emp: any) => ({
+                                id: emp.id,
+                                fullName: emp.fullName,
+                                email: emp.email,
+                                nationalId: emp.nationalId,
+                                position: emp.position,
+                                hireDate: emp.hireDate,
+                                status: emp.status,
+                                managerId: emp.managerId,
+                                department: emp.department ? {
+                                  id: emp.department.id,
+                                  displayName: emp.department.displayName
+                                } : null
+                              }));
+                              setEmployees(mappedEmployees);
+                              const deptMap = new Map();
+                              mappedEmployees.forEach((emp: any) => {
+                                if (emp.department) {
+                                  deptMap.set(emp.department.id, emp.department);
+                                }
+                              });
+                              setDepartments(Array.from(deptMap.values()));
+                            }
+                          } catch (error) {
+                            console.error('Error reloading employees:', error);
+                          } finally {
+                            setIsLoadingEmployees(false);
+                          }
+                        }}
+                        onCancel={() => setShowEmployeeSyncWizard(false)}
+                      />
+                    )}
+                  </>
                 ) : (
                   <>
                     {/* Criteria Selector */}
@@ -1292,8 +1339,19 @@ export default function NewCampaignPage() {
           </div>
         )}
 
-        {/* Paso 3: Confirmación */}
-        {currentStep === 3 && (
+        {/* Paso 3: Clasificación de Cargos (solo employee-based flow) */}
+        {currentStep === 3 && isEmployeeBasedFlow && (
+          <div className="space-y-6">
+            <JobClassificationCinema
+              mode="client"
+              onComplete={() => setCurrentStep(confirmStep)}
+              onCancel={() => setCurrentStep(2)}
+            />
+          </div>
+        )}
+
+        {/* Paso Confirmación */}
+        {currentStep === confirmStep && (
           <div className="space-y-6">
             
             {/* Resumen de la Campaña */}
@@ -1485,10 +1543,11 @@ export default function NewCampaignPage() {
           </Button>
 
           <div className="flex gap-2">
-            {currentStep < 3 ? (
+            {currentStep < confirmStep ? (
               <Button
                 onClick={nextStep}
                 className="btn-gradient focus-ring"
+                disabled={currentStep === 3 && isEmployeeBasedFlow}
               >
                 Siguiente
                 <ChevronRight className="h-4 w-4 ml-2" />

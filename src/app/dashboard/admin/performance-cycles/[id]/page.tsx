@@ -12,9 +12,10 @@ import {
   Clock,
   AlertTriangle,
   BarChart3,
-  Play,
+  Wand2,
+  Zap,
   Mail,
-  RefreshCw,
+  Calculator,
   UserCheck,
   Loader2,
   Rocket,
@@ -23,13 +24,14 @@ import {
   ClipboardCheck,
   CheckCircle,
   RotateCcw,
+  ChevronRight,
+  Check,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/components/ui/toast-system';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -89,6 +91,93 @@ const STATUS_COLORS: Record<string, string> = {
   COMPLETED: 'bg-emerald-500/20 text-emerald-400',
   EXPIRED: 'bg-red-500/20 text-red-400'
 };
+
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTE: StepIndicator - Wizard visual step
+// ════════════════════════════════════════════════════════════════════════════
+
+interface StepIndicatorProps {
+  step: number;
+  label: string;
+  completed: boolean;
+  active: boolean;
+}
+
+function StepIndicator({ step, label, completed, active }: StepIndicatorProps) {
+  return (
+    <div className="flex flex-col items-center gap-1 flex-shrink-0">
+      <div className={`
+        w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
+        transition-all duration-300
+        ${completed
+          ? 'bg-emerald-500 text-white'
+          : active
+            ? 'bg-cyan-500 text-white ring-2 ring-cyan-500/50'
+            : 'bg-slate-700 text-slate-400'
+        }
+      `}>
+        {completed ? <Check className="w-4 h-4" /> : step}
+      </div>
+      <span className={`text-xs ${active ? 'text-cyan-400' : completed ? 'text-emerald-400' : 'text-slate-500'}`}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTE: ActionButton - Enterprise action with loading + description
+// ════════════════════════════════════════════════════════════════════════════
+
+interface ActionButtonProps {
+  icon: React.ReactNode;
+  label: string;
+  description: string;
+  onClick: () => void;
+  loading?: boolean;
+  variant: 'primary' | 'success' | 'warning' | 'danger';
+}
+
+function ActionButton({
+  icon,
+  label,
+  description,
+  onClick,
+  loading,
+  variant
+}: ActionButtonProps) {
+  const variantClasses = {
+    primary: 'fhr-btn-primary',
+    success: 'fhr-btn-success',
+    warning: 'bg-amber-600 hover:bg-amber-700 text-white',
+    danger: 'fhr-btn-danger'
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      className={`
+        fhr-btn fhr-btn-full
+        ${variantClasses[variant]}
+        !h-auto !py-4 text-left
+      `}
+    >
+      <div className="flex items-center gap-3 w-full">
+        {loading ? (
+          <Loader2 className="w-5 h-5 animate-spin flex-shrink-0" />
+        ) : (
+          <span className="flex-shrink-0">{icon}</span>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold">{label}</div>
+          <div className="text-xs opacity-80 truncate">{description}</div>
+        </div>
+        <ChevronRight className="w-5 h-5 opacity-50 flex-shrink-0" />
+      </div>
+    </button>
+  );
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
@@ -195,29 +284,19 @@ export default function PerformanceCycleDetailPage({
         throw new Error(data.error || 'Error activando ciclo');
       }
 
-      // 2. Activar Campaign vinculada → requiere body: { action: 'activate' }
-      if (cycle.campaignId) {
-        const campaignRes = await fetch(`/api/campaigns/${cycle.campaignId}/activate`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ action: 'activate' })
-        });
+      // Campaign vinculada se activa automáticamente en el backend PATCH handler
+      // (performance-cycles/[id]/route.ts lines 190-206)
 
-        if (!campaignRes.ok) {
-          console.warn('Warning: Error activando campaña vinculada');
-        }
-      }
-
-      // 3. Refresh data
-      await fetchCycle();
+      // 2. Optimistic update BEFORE refetch
+      setCycle(prev => prev ? { ...prev, status: 'ACTIVE' } : prev);
 
       toast.success(
         `Ciclo "${cycle.name}" activado. ${stats?.total || 0} evaluaciones habilitadas.`,
         'Ciclo Activado'
       );
+
+      // 4. Background refetch for full data sync
+      await fetchCycle();
 
     } catch (err: any) {
       toast.error(err.message, 'Error al activar');
@@ -251,12 +330,17 @@ export default function PerformanceCycleDetailPage({
 
       if (data.success) {
         setGenerateResult(data);
-        await fetchCycle();
+
+        // Optimistic update: generate moves DRAFT → SCHEDULED
+        setCycle(prev => prev ? { ...prev, status: 'SCHEDULED' } : prev);
 
         toast.success(
           `Se generaron ${data.totalCreated} evaluaciones para "${cycle.name}"`,
           'Evaluaciones Generadas'
         );
+
+        // Background refetch for full data sync (assignments, stats)
+        await fetchCycle();
       } else {
         throw new Error(data.error || 'Error generando evaluaciones');
       }
@@ -342,8 +426,10 @@ export default function PerformanceCycleDetailPage({
   ) => {
     options.setModal(false);
     setTransitionLoading(true);
+    console.log(`[Transition] 1. Starting → ${newStatus}`);
 
     try {
+      console.log('[Transition] 2. Before PATCH');
       const response = await fetch(`/api/admin/performance-cycles/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -352,6 +438,7 @@ export default function PerformanceCycleDetailPage({
       });
 
       const data = await response.json();
+      console.log('[Transition] 3. PATCH response:', response.status, data.success);
 
       if (!response.ok) {
         throw new Error(data.error || 'Error en la transición');
@@ -360,16 +447,22 @@ export default function PerformanceCycleDetailPage({
       if (data.success) {
         // Fix A: Actualizar estado local inmediatamente (sin esperar refetch)
         setCycle(prev => prev ? { ...prev, status: newStatus } : prev);
+        console.log('[Transition] 4. setCycle done');
 
         toast.success(options.successDescription, options.successTitle);
+        console.log('[Transition] 5. Before fetchCycle (⚠️ sets loading=true!)');
         await fetchCycle();
+        console.log('[Transition] 6. After fetchCycle');
         await fetchCycleStats();
+        console.log('[Transition] 7. After fetchCycleStats');
       } else {
         throw new Error(data.error || 'Error desconocido');
       }
     } catch (error: any) {
+      console.error('[Transition] ERROR:', error.message);
       toast.error(error.message, 'Error');
     } finally {
+      console.log('[Transition] 8. Finally block — setTransitionLoading(false)');
       setTransitionLoading(false);
     }
   };
@@ -431,19 +524,17 @@ export default function PerformanceCycleDetailPage({
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center">
         <AlertTriangle className="w-12 h-12 text-red-400 mb-4" />
         <p className="text-slate-400">{error || 'Ciclo no encontrado'}</p>
-        <Button
-          variant="outline"
-          className="mt-4"
+        <button
+          className="fhr-btn fhr-btn-secondary mt-4"
           onClick={() => router.push('/dashboard/admin/performance-cycles')}
         >
           Volver a Ciclos
-        </Button>
+        </button>
       </div>
     );
   }
 
   const daysRemaining = calculateDaysRemaining();
-  const canGenerate = cycle.status === 'DRAFT' || cycle.status === 'SCHEDULED';
   const hasAssignments = stats && stats.total > 0;
 
   // Datos para modal de activación
@@ -586,33 +677,55 @@ export default function PerformanceCycleDetailPage({
           </Card>
         </div>
 
-        {/* Actions Card */}
-        <Card
-          className="p-6"
-          style={{
-            background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.05), rgba(167, 139, 250, 0.05))',
-            border: '1px solid rgba(34, 211, 238, 0.2)',
-            borderRadius: '12px'
-          }}
-        >
-          <h3 className="text-sm font-medium uppercase tracking-wider text-white mb-4">
-            Acciones Principales
-          </h3>
-
-          {/* Estado actual */}
-          <div className="mb-4 p-3 rounded-lg bg-slate-800/50">
-            <p className="text-sm text-slate-400">
-              <span className="text-white font-medium">Estado actual:</span>{' '}
-              {cycle.status === 'DRAFT' && !hasAssignments && 'Borrador sin evaluaciones generadas'}
-              {cycle.status === 'DRAFT' && hasAssignments && 'Borrador con evaluaciones listas para activar'}
-              {cycle.status === 'SCHEDULED' && 'Programado - evaluaciones generadas'}
-              {cycle.status === 'ACTIVE' && 'Ciclo activo - evaluaciones en progreso'}
-              {cycle.status === 'IN_REVIEW' && 'En revisión - evaluadores no pueden responder'}
-              {cycle.status === 'COMPLETED' && 'Ciclo completado'}
-            </p>
+        {/* Actions Card - Wizard Enterprise */}
+        <div className="fhr-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium uppercase tracking-wider text-white">
+              Acciones
+            </h3>
+            <Badge className={`
+              ${cycle.status === 'DRAFT' ? 'bg-slate-500/20 text-slate-400' : ''}
+              ${cycle.status === 'SCHEDULED' ? 'bg-blue-500/20 text-blue-400' : ''}
+              ${cycle.status === 'ACTIVE' ? 'bg-cyan-500/20 text-cyan-400' : ''}
+              ${cycle.status === 'IN_REVIEW' ? 'bg-amber-500/20 text-amber-400' : ''}
+              ${cycle.status === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400' : ''}
+            `}>
+              {cycle.status}
+            </Badge>
           </div>
 
-          {/* Generate Result */}
+          {/* Wizard Step Indicators */}
+          <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2">
+            <StepIndicator
+              step={1}
+              label="Generar"
+              completed={cycle.status !== 'DRAFT'}
+              active={cycle.status === 'DRAFT'}
+            />
+            <div className="w-8 h-px bg-slate-700 flex-shrink-0" />
+            <StepIndicator
+              step={2}
+              label="Activar"
+              completed={['ACTIVE', 'IN_REVIEW', 'COMPLETED'].includes(cycle.status)}
+              active={cycle.status === 'SCHEDULED'}
+            />
+            <div className="w-8 h-px bg-slate-700 flex-shrink-0" />
+            <StepIndicator
+              step={3}
+              label="Revisar"
+              completed={cycle.status === 'COMPLETED'}
+              active={cycle.status === 'ACTIVE' || cycle.status === 'IN_REVIEW'}
+            />
+            <div className="w-8 h-px bg-slate-700 flex-shrink-0" />
+            <StepIndicator
+              step={4}
+              label="Cerrar"
+              completed={cycle.status === 'COMPLETED'}
+              active={cycle.status === 'IN_REVIEW'}
+            />
+          </div>
+
+          {/* Generate Result Feedback */}
           {generateResult && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
@@ -632,140 +745,134 @@ export default function PerformanceCycleDetailPage({
             </motion.div>
           )}
 
-          {/* Buttons */}
-          <div className="flex items-center gap-4">
-            <Button
-              onClick={() => setShowGenerateModal(true)}
-              disabled={!canGenerate || generating}
-              className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600 disabled:opacity-50"
+          {/* Ratings Result Feedback */}
+          {ratingsResult && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30"
             >
-              {generating ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Generando...
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4 mr-2" />
-                  Generar Evaluaciones
-                </>
-              )}
-            </Button>
-
-            <Button
-              variant="outline"
-              disabled={!hasAssignments || cycle.status !== 'DRAFT' && cycle.status !== 'SCHEDULED' || activating}
-              onClick={() => setShowActivateModal(true)}
-              className="border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 disabled:opacity-50"
-            >
-              {activating ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Activando...
-                </>
-              ) : (
-                <>
-                  <Mail className="w-4 h-4 mr-2" />
-                  Activar Ciclo
-                </>
-              )}
-            </Button>
-          </div>
-
-          {/* Botones de transición de estado (cierre) */}
-          {(cycle.status === 'ACTIVE' || cycle.status === 'IN_REVIEW') && (
-            <div className="flex items-center gap-3 flex-wrap mt-4">
-              {cycle.status === 'ACTIVE' && (
-                <button
-                  onClick={() => setShowReviewModal(true)}
-                  disabled={transitionLoading}
-                  className="fhr-btn fhr-btn-sm"
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid #F59E0B',
-                    color: '#F59E0B'
-                  }}
-                >
-                  <ClipboardCheck className="w-4 h-4" />
-                  Pasar a Revisión
-                </button>
-              )}
-
-              {cycle.status === 'IN_REVIEW' && (
-                <>
-                  <button
-                    onClick={() => setShowCompleteModal(true)}
-                    disabled={transitionLoading}
-                    className="fhr-btn fhr-btn-sm fhr-btn-success"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    Cerrar Ciclo
-                  </button>
-                  <button
-                    onClick={() => setShowReopenModal(true)}
-                    disabled={transitionLoading}
-                    className="fhr-btn fhr-btn-sm fhr-btn-ghost"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    Reabrir
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-
-          {!canGenerate && cycle.status !== 'ACTIVE' && cycle.status !== 'IN_REVIEW' && cycle.status !== 'COMPLETED' && (
-            <p className="text-xs text-slate-500 mt-3">
-              Solo se pueden generar evaluaciones en estado DRAFT o SCHEDULED
-            </p>
-          )}
-
-          {/* Recalcular Ratings - visible en ACTIVE, IN_REVIEW o COMPLETED */}
-          {(cycle.status === 'ACTIVE' || cycle.status === 'IN_REVIEW' || cycle.status === 'COMPLETED') && (
-            <div className="mt-6 pt-4 border-t border-slate-700">
-              <h4 className="text-xs font-medium uppercase tracking-wider text-slate-400 mb-3">
-                Performance Ratings
-              </h4>
-
-              {ratingsResult && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mb-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30"
-                >
-                  <p className="text-sm text-emerald-400">
-                    {ratingsResult.generated} ratings calculados
-                    {ratingsResult.failed > 0 && (
-                      <span className="text-amber-400"> · {ratingsResult.failed} errores</span>
-                    )}
-                  </p>
-                </motion.div>
-              )}
-
-              <Button
-                variant="outline"
-                onClick={handleGenerateRatings}
-                disabled={generatingRatings}
-                className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10 disabled:opacity-50"
-              >
-                {generatingRatings ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Calculando...
-                  </>
-                ) : (
-                  <>
-                    <BarChart3 className="w-4 h-4 mr-2" />
-                    {cycle.status === 'ACTIVE' ? 'Generar Ratings (Parciales)' : 'Recalcular Ratings'}
-                  </>
+              <p className="text-sm text-emerald-400">
+                {ratingsResult.generated} ratings calculados
+                {ratingsResult.failed > 0 && (
+                  <span className="text-amber-400"> · {ratingsResult.failed} errores</span>
                 )}
-              </Button>
-              <p className="text-xs text-slate-500 mt-2">
-                Calcula scores ponderados desde evaluaciones completadas
               </p>
-            </div>
+            </motion.div>
           )}
-        </Card>
+
+          {/* Current Action - Only shows relevant action per status */}
+          <div className="space-y-3">
+            {/* DRAFT: Generate Evaluations */}
+            {cycle.status === 'DRAFT' && (
+              <ActionButton
+                icon={<Wand2 className="w-5 h-5" />}
+                label="Generar Evaluaciones"
+                description="Crear assignments según configuración del ciclo"
+                onClick={() => setShowGenerateModal(true)}
+                loading={generating}
+                variant="primary"
+              />
+            )}
+
+            {/* SCHEDULED: Activate Cycle */}
+            {cycle.status === 'SCHEDULED' && (
+              <ActionButton
+                icon={<Zap className="w-5 h-5" />}
+                label="Activar Ciclo"
+                description={`Enviar invitaciones a ${cycle._count?.assignments || 0} evaluadores`}
+                onClick={() => setShowActivateModal(true)}
+                loading={activating}
+                variant="primary"
+              />
+            )}
+
+            {/* ACTIVE: Review + Calculate Ratings */}
+            {cycle.status === 'ACTIVE' && (
+              <>
+                <ActionButton
+                  icon={<ClipboardCheck className="w-5 h-5" />}
+                  label="Pasar a Revisión"
+                  description="Cerrar recepción de evaluaciones"
+                  onClick={() => setShowReviewModal(true)}
+                  loading={transitionLoading}
+                  variant="warning"
+                />
+                <button
+                  onClick={handleGenerateRatings}
+                  disabled={generatingRatings}
+                  className="fhr-btn fhr-btn-ghost fhr-btn-full flex items-center justify-center gap-2"
+                >
+                  {generatingRatings ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Calculator className="w-4 h-4" />
+                  )}
+                  Calcular Ratings
+                </button>
+              </>
+            )}
+
+            {/* IN_REVIEW: Close + Reopen + Recalculate */}
+            {cycle.status === 'IN_REVIEW' && (
+              <>
+                <ActionButton
+                  icon={<CheckCircle className="w-5 h-5" />}
+                  label="Cerrar Ciclo"
+                  description="Finalizar y habilitar envío de reportes"
+                  onClick={() => setShowCompleteModal(true)}
+                  loading={transitionLoading}
+                  variant="success"
+                />
+                <button
+                  onClick={() => setShowReopenModal(true)}
+                  disabled={transitionLoading}
+                  className="fhr-btn fhr-btn-ghost fhr-btn-full flex items-center justify-center gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Reabrir para más evaluaciones
+                </button>
+                <button
+                  onClick={handleGenerateRatings}
+                  disabled={generatingRatings}
+                  className="fhr-btn fhr-btn-ghost fhr-btn-full flex items-center justify-center gap-2"
+                >
+                  {generatingRatings ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Calculator className="w-4 h-4" />
+                  )}
+                  Recalcular Ratings
+                </button>
+              </>
+            )}
+
+            {/* COMPLETED: Done + Recalculate */}
+            {cycle.status === 'COMPLETED' && (
+              <>
+                <div className="text-center py-4">
+                  <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-2" />
+                  <p className="text-slate-400">Ciclo completado exitosamente</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Los reportes se enviarán automáticamente
+                  </p>
+                </div>
+                <button
+                  onClick={handleGenerateRatings}
+                  disabled={generatingRatings}
+                  className="fhr-btn fhr-btn-ghost fhr-btn-full flex items-center justify-center gap-2"
+                >
+                  {generatingRatings ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Calculator className="w-4 h-4" />
+                  )}
+                  Recalcular Ratings
+                </button>
+              </>
+            )}
+          </div>
+        </div>
 
         {/* Assignments Table */}
         {hasAssignments && (
@@ -830,18 +937,18 @@ export default function PerformanceCycleDetailPage({
         {/* MODAL: Confirmar Generar Evaluaciones                        */}
         {/* ══════════════════════════════════════════════════════════════ */}
         <Dialog open={showGenerateModal} onOpenChange={setShowGenerateModal}>
-          <DialogContent className="bg-slate-900 border-slate-700">
+          <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col bg-slate-900 border-slate-700">
             <DialogHeader>
-              <DialogTitle className="text-white text-lg">
+              <DialogTitle className="text-lg text-white">
                 ¿Generar Evaluaciones?
               </DialogTitle>
               <DialogDescription className="text-slate-400">
-                Se crearán asignaciones de evaluación basadas en la estructura organizacional actual para "{cycle.name}".
+                Se crearán asignaciones basadas en la estructura organizacional para &quot;{cycle.name}&quot;.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-2 py-3">
-              <p className="text-sm text-slate-400 mb-2">Tipos de evaluación incluidos:</p>
+            <div className="flex-1 overflow-y-auto py-4 space-y-3">
+              <p className="text-sm text-slate-400">Tipos de evaluación incluidos:</p>
               {[
                 { enabled: cycle.includesManager, label: 'Jefe evalúa a Subordinado' },
                 { enabled: cycle.includesUpward, label: 'Subordinado evalúa a Jefe' },
@@ -855,32 +962,31 @@ export default function PerformanceCycleDetailPage({
               ))}
             </div>
 
-            <DialogFooter className="gap-2">
-              <Button
-                variant="outline"
+            <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4 border-t border-slate-700">
+              <button
+                className="fhr-btn fhr-btn-ghost fhr-btn-full sm:w-auto"
                 onClick={() => setShowGenerateModal(false)}
-                className="border-slate-600 text-slate-300 hover:bg-slate-800"
               >
                 Cancelar
-              </Button>
-              <Button
+              </button>
+              <button
                 onClick={handleGenerateEvaluations}
                 disabled={generating}
-                className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600"
+                className="fhr-btn fhr-btn-primary fhr-btn-full sm:w-auto flex items-center justify-center gap-2"
               >
                 {generating ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     Generando...
                   </>
                 ) : (
                   <>
-                    <Play className="w-4 h-4 mr-2" />
+                    <Wand2 className="w-4 h-4" />
                     Generar Evaluaciones
                   </>
                 )}
-              </Button>
-            </DialogFooter>
+              </button>
+            </div>
           </DialogContent>
         </Dialog>
 
@@ -888,31 +994,34 @@ export default function PerformanceCycleDetailPage({
         {/* MODAL: PASAR A REVISIÓN (ACTIVE → IN_REVIEW)                 */}
         {/* ══════════════════════════════════════════════════════════════ */}
         <Dialog open={showReviewModal} onOpenChange={setShowReviewModal}>
-          <DialogContent className="sm:max-w-md bg-slate-900 border-slate-700">
+          <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col bg-slate-900 border-slate-700">
             <DialogHeader>
-              <DialogTitle className="text-slate-100">Pasar a Revisión</DialogTitle>
-              <DialogDescription className="text-slate-400">
-                Los evaluadores ya no podrán responder encuestas pendientes.
-              </DialogDescription>
+              <DialogTitle className="text-lg text-white">Pasar a Revisión</DialogTitle>
             </DialogHeader>
 
-            <div className="py-4 space-y-3">
+            <div className="flex-1 overflow-y-auto py-4 space-y-3">
+              <p className="text-sm text-slate-400">
+                Los evaluadores ya no podrán responder encuestas pendientes.
+              </p>
+
               {closureStats && closureStats.completedAssignments < closureStats.totalAssignments && (
                 <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                   <p className="text-sm text-amber-200">
-                    ⚠️ Hay {closureStats.totalAssignments - closureStats.completedAssignments} evaluaciones sin completar
+                    ⚠️ {closureStats.totalAssignments - closureStats.completedAssignments} evaluaciones pendientes
                   </p>
                 </div>
               )}
 
-              <p className="text-sm text-slate-400">
-                Podrás reabrir el ciclo si necesitas dar más tiempo.
-              </p>
+              <div className="p-3 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
+                <p className="text-sm text-cyan-200">
+                  Podrás reabrir el ciclo si necesitas dar más tiempo.
+                </p>
+              </div>
             </div>
 
-            <DialogFooter>
+            <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4 border-t border-slate-700">
               <button
-                className="fhr-btn fhr-btn-sm fhr-btn-ghost"
+                className="fhr-btn fhr-btn-ghost fhr-btn-full sm:w-auto"
                 onClick={() => setShowReviewModal(false)}
               >
                 Cancelar
@@ -920,13 +1029,12 @@ export default function PerformanceCycleDetailPage({
               <button
                 onClick={handleReviewConfirmed}
                 disabled={transitionLoading}
-                className="fhr-btn fhr-btn-sm fhr-btn-primary"
-                style={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)' }}
+                className="fhr-btn fhr-btn-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-2"
               >
                 {transitionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                 Confirmar
               </button>
-            </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
 
@@ -934,25 +1042,22 @@ export default function PerformanceCycleDetailPage({
         {/* MODAL: CERRAR CICLO (IN_REVIEW → COMPLETED)                  */}
         {/* ══════════════════════════════════════════════════════════════ */}
         <Dialog open={showCompleteModal} onOpenChange={setShowCompleteModal}>
-          <DialogContent className="sm:max-w-md bg-slate-900 border-slate-700">
+          <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col bg-slate-900 border-slate-700">
             <DialogHeader>
-              <DialogTitle className="text-slate-100">Cerrar Ciclo</DialogTitle>
-              <DialogDescription className="text-slate-400">
-                Esta acción es permanente. Los resultados se marcarán como finales.
-              </DialogDescription>
+              <DialogTitle className="text-lg text-white">Cerrar Ciclo</DialogTitle>
             </DialogHeader>
 
-            <div className="py-4 space-y-3">
+            <div className="flex-1 overflow-y-auto py-4 space-y-3">
               <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
                 <p className="text-sm text-red-200">
-                  No podrás reabrir el ciclo después de completarlo.
+                  Esta acción es permanente. No podrás reabrir el ciclo.
                 </p>
               </div>
 
               {closureStats && closureStats.pendingRatings > 0 && (
                 <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                   <p className="text-sm text-amber-200">
-                    ⚠️ Hay {closureStats.pendingRatings} ratings sin calcular
+                    ⚠️ {closureStats.pendingRatings} ratings sin calcular
                   </p>
                 </div>
               )}
@@ -960,20 +1065,19 @@ export default function PerformanceCycleDetailPage({
               {closureStats && closureStats.pendingPotential > 0 && (
                 <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                   <p className="text-sm text-amber-200">
-                    ⚠️ Hay {closureStats.pendingPotential} empleados sin potencial asignado
+                    ⚠️ {closureStats.pendingPotential} empleados sin potencial asignado
                   </p>
                 </div>
               )}
 
               <p className="text-sm text-slate-400">
-                El cron de reportes enviará los resultados individuales a los empleados
-                en el próximo ciclo programado (9:00 UTC diario).
+                Los reportes se enviarán automáticamente a los empleados.
               </p>
             </div>
 
-            <DialogFooter>
+            <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4 border-t border-slate-700">
               <button
-                className="fhr-btn fhr-btn-sm fhr-btn-ghost"
+                className="fhr-btn fhr-btn-ghost fhr-btn-full sm:w-auto"
                 onClick={() => setShowCompleteModal(false)}
               >
                 Cancelar
@@ -981,12 +1085,12 @@ export default function PerformanceCycleDetailPage({
               <button
                 onClick={handleCompleteConfirmed}
                 disabled={transitionLoading}
-                className="fhr-btn fhr-btn-sm fhr-btn-success"
+                className="fhr-btn fhr-btn-success fhr-btn-full sm:w-auto flex items-center justify-center gap-2"
               >
                 {transitionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                Confirmar
+                Cerrar Ciclo
               </button>
-            </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
 
@@ -994,28 +1098,25 @@ export default function PerformanceCycleDetailPage({
         {/* MODAL: REABRIR CICLO (IN_REVIEW → ACTIVE)                    */}
         {/* ══════════════════════════════════════════════════════════════ */}
         <Dialog open={showReopenModal} onOpenChange={setShowReopenModal}>
-          <DialogContent className="sm:max-w-md bg-slate-900 border-slate-700">
+          <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col bg-slate-900 border-slate-700">
             <DialogHeader>
-              <DialogTitle className="text-slate-100">Reabrir Ciclo</DialogTitle>
-              <DialogDescription className="text-slate-400">
-                Los evaluadores podrán volver a responder sus encuestas pendientes.
-              </DialogDescription>
+              <DialogTitle className="text-lg text-white">Reabrir Ciclo</DialogTitle>
             </DialogHeader>
 
-            <div className="py-4 space-y-3">
+            <div className="flex-1 overflow-y-auto py-4 space-y-3">
               <p className="text-sm text-slate-400">
-                Considera extender la fecha de cierre si vas a dar más tiempo.
+                Los evaluadores podrán volver a responder sus encuestas.
               </p>
               <div className="p-3 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
                 <p className="text-sm text-cyan-200">
-                  Tip: Después de reabrir, puedes editar la fecha de cierre del ciclo.
+                  Considera extender la fecha de cierre después de reabrir.
                 </p>
               </div>
             </div>
 
-            <DialogFooter>
+            <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4 border-t border-slate-700">
               <button
-                className="fhr-btn fhr-btn-sm fhr-btn-ghost"
+                className="fhr-btn fhr-btn-ghost fhr-btn-full sm:w-auto"
                 onClick={() => setShowReopenModal(false)}
               >
                 Cancelar
@@ -1023,12 +1124,12 @@ export default function PerformanceCycleDetailPage({
               <button
                 onClick={handleReopenConfirmed}
                 disabled={transitionLoading}
-                className="fhr-btn fhr-btn-sm fhr-btn-primary"
+                className="fhr-btn fhr-btn-primary fhr-btn-full sm:w-auto flex items-center justify-center gap-2"
               >
                 {transitionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                Confirmar
+                Reabrir
               </button>
-            </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
 
@@ -1036,32 +1137,33 @@ export default function PerformanceCycleDetailPage({
         {/* MODAL: Confirmar Activar Ciclo                               */}
         {/* ══════════════════════════════════════════════════════════════ */}
         <Dialog open={showActivateModal} onOpenChange={setShowActivateModal}>
-          <DialogContent className="sm:max-w-lg bg-slate-900/95 backdrop-blur-xl border border-white/10">
+          <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col bg-slate-900/95 backdrop-blur-xl border border-white/10">
             <DialogHeader>
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20">
                   <Rocket className="w-6 h-6 text-cyan-400" />
                 </div>
                 <DialogTitle className="text-xl font-semibold text-white">
-                  Activar Ciclo de Evaluacion?
+                  Activar Ciclo de Evaluación?
                 </DialogTitle>
               </div>
-              <DialogDescription className="text-slate-400 mt-2">
-                Al activar, se ejecutaran las siguientes acciones:
-              </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-3 my-6">
+            <div className="flex-1 overflow-y-auto py-4 space-y-3">
+              <p className="text-sm text-slate-400 mb-1">
+                Al activar, se ejecutarán las siguientes acciones:
+              </p>
+
               {/* Card 1: Emails */}
               <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
                 <div className="flex items-start gap-3">
-                  <Mail className="w-5 h-5 text-cyan-400 mt-0.5" />
+                  <Mail className="w-5 h-5 text-cyan-400 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="font-medium text-white">
-                      {evaluatorCount} evaluadores recibiran email de invitacion
+                      {evaluatorCount} evaluadores recibirán email
                     </p>
                     <p className="text-sm text-slate-400 mt-1">
-                      Envio inmediato a sus correos corporativos
+                      Envío inmediato a sus correos corporativos
                     </p>
                   </div>
                 </div>
@@ -1071,30 +1173,30 @@ export default function PerformanceCycleDetailPage({
               {managerEvaluationCount > 0 && (
                 <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
                   <div className="flex items-start gap-3">
-                    <Users className="w-5 h-5 text-cyan-400 mt-0.5" />
+                    <Users className="w-5 h-5 text-cyan-400 mt-0.5 flex-shrink-0" />
                     <div>
                       <p className="font-medium text-white">
                         {managerEvaluationCount} evaluaciones jefe → colaborador
                       </p>
                       <p className="text-sm text-slate-400 mt-1">
-                        Los jefes evaluaran a sus reportes directos
+                        Los jefes evaluarán a sus reportes directos
                       </p>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Card 3: Autoevaluaciones (si aplica) */}
+              {/* Card 3: Autoevaluaciones */}
               {cycle.includesSelf && selfEvaluationCount > 0 && (
                 <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
                   <div className="flex items-start gap-3">
-                    <UserCircle className="w-5 h-5 text-purple-400 mt-0.5" />
+                    <UserCircle className="w-5 h-5 text-purple-400 mt-0.5 flex-shrink-0" />
                     <div>
                       <p className="font-medium text-white">
                         {selfEvaluationCount} autoevaluaciones habilitadas
                       </p>
                       <p className="text-sm text-slate-400 mt-1">
-                        Cada colaborador podra evaluarse a si mismo
+                        Cada colaborador podrá evaluarse a sí mismo
                       </p>
                     </div>
                   </div>
@@ -1104,13 +1206,13 @@ export default function PerformanceCycleDetailPage({
               {/* Card 4: Fecha límite */}
               <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
                 <div className="flex items-start gap-3">
-                  <Calendar className="w-5 h-5 text-amber-400 mt-0.5" />
+                  <Calendar className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="font-medium text-white">
-                      Fecha limite: {formatDate(cycle.endDate)}
+                      Fecha límite: {formatDate(cycle.endDate)}
                     </p>
                     <p className="text-sm text-slate-400 mt-1">
-                      Los evaluadores tendran {daysRemaining} dias para completar
+                      Los evaluadores tendrán {daysRemaining} días para completar
                     </p>
                   </div>
                 </div>
@@ -1119,53 +1221,52 @@ export default function PerformanceCycleDetailPage({
               {/* Card 5: Recordatorios */}
               <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
                 <div className="flex items-start gap-3">
-                  <Bell className="w-5 h-5 text-green-400 mt-0.5" />
+                  <Bell className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="font-medium text-white">
-                      Recordatorios automaticos activados
+                      Recordatorios automáticos activados
                     </p>
                     <p className="text-sm text-slate-400 mt-1">
-                      Dia 7: Amigable → Dia 3: Urgente → Dia 1: CC Gerente
+                      Día 7: Amigable → Día 3: Urgente → Día 1: CC Gerente
                     </p>
                   </div>
                 </div>
               </div>
+
+              {/* Warning */}
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <p className="text-sm text-amber-200">
+                  Esta acción no se puede deshacer
+                </p>
+              </div>
             </div>
 
-            {/* Warning */}
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-              <p className="text-sm text-amber-200">
-                Esta accion no se puede deshacer
-              </p>
-            </div>
-
-            <DialogFooter className="mt-6 gap-3">
-              <Button
-                variant="ghost"
+            <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4 border-t border-slate-700">
+              <button
+                className="fhr-btn fhr-btn-ghost fhr-btn-full sm:w-auto"
                 onClick={() => setShowActivateModal(false)}
-                className="text-slate-400 hover:text-white"
               >
                 Cancelar
-              </Button>
-              <Button
+              </button>
+              <button
                 onClick={handleActivateCycle}
                 disabled={activating}
-                className="bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600 text-white font-medium"
+                className="fhr-btn fhr-btn-primary fhr-btn-full sm:w-auto flex items-center justify-center gap-2"
               >
                 {activating ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     Activando...
                   </>
                 ) : (
                   <>
-                    <Rocket className="w-4 h-4 mr-2" />
+                    <Rocket className="w-4 h-4" />
                     Activar y Notificar
                   </>
                 )}
-              </Button>
-            </DialogFooter>
+              </button>
+            </div>
           </DialogContent>
         </Dialog>
 
