@@ -214,6 +214,43 @@ export function middleware(request: NextRequest) {
   headers.set('x-effective-role', effectiveRole);
   
   console.log(`[Middleware] ✅ Auth OK - Role: ${effectiveRole}`);
+
+  // ============================================================================
+// 🔒 RESTRICCIONES POR ROL: EVALUATOR
+// ============================================================================
+if (effectiveRole === 'EVALUATOR') {
+  const evaluatorAllowedPaths = [
+    '/dashboard/evaluaciones',    // Portal del Jefe
+    '/dashboard/performance',     // Nine-box, calibración, cycles
+    '/encuesta',                  
+    '/api/evaluator',             
+    '/api/auth',                  
+    '/api/survey',                
+    '/api/admin/performance',     
+  ];
+  
+  const isAllowedPath = evaluatorAllowedPaths.some(path => 
+    pathname.startsWith(path)
+  );
+  
+  // /dashboard → Redirect a evaluaciones
+  if (pathname === '/dashboard' || pathname === '/dashboard/') {
+    return NextResponse.redirect(new URL('/dashboard/evaluaciones', request.url));
+  }
+  
+  // Dashboard NO permitido → Redirect
+  if (pathname.startsWith('/dashboard') && !isAllowedPath) {
+    return NextResponse.redirect(new URL('/dashboard/evaluaciones', request.url));
+  }
+  
+  // API NO permitida → 403
+  if (pathname.startsWith('/api') && !isAllowedPath) {
+    return NextResponse.json(
+      { error: 'Acceso restringido', success: false },
+      { status: 403 }
+    );
+  }
+}
   
   // ============================================================================
   // 🛡️ VERIFICACIÓN DE PERMISOS PARA RUTAS ADMIN

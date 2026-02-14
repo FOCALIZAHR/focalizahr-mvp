@@ -119,7 +119,7 @@ export default function EvaluationSummaryPage() {
               id: a.evaluatee?.id || a.id,
               name: a.evaluatee?.fullName || 'Sin nombre',
               // avgScore del API /assignments está en escala 0-100, convertir a 1-5
-              score: a.avgScore / 20
+              score: a.avgScore 
             }))
             .sort((a: any, b: any) => b.score - a.score)
 

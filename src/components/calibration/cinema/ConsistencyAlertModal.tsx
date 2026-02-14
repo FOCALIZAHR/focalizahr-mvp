@@ -2,9 +2,9 @@
 // ConsistencyAlertModal - Alerta de incoherencia AAE en calibración
 // src/components/calibration/cinema/ConsistencyAlertModal.tsx
 // ════════════════════════════════════════════════════════════════════════════
+// REDISEÑO v2.0 - Filosofía Tesla/Apple FocalizaHR
 // Muestra cuando un movimiento 9-Box contradice los datos AAE del empleado.
-// Severidades: critical (rose), warning (amber), info (blue).
-// Requiere justificación >= 10 chars para "Forzar Cambio".
+// Severidades comunicadas de forma sutil, elegante, no agresiva.
 // ════════════════════════════════════════════════════════════════════════════
 
 'use client'
@@ -45,59 +45,42 @@ interface ConsistencyAlertModalProps {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// SEVERITY STYLES
+// SEVERITY STYLES - Minimalista Tesla/Apple
+// Solo iconos y líneas sutiles, NO fondos coloreados agresivos
 // ════════════════════════════════════════════════════════════════════════════
 
 const SEVERITY_STYLES: Record<RuleSeverity, {
   icon: typeof AlertTriangle
-  bgHeader: string
-  borderColor: string
+  accentColor: string
+  borderAccent: string
   iconColor: string
-  badgeBg: string
-  badgeText: string
-  buttonBg: string
-  buttonHover: string
+  lineGradient: string
 }> = {
   critical: {
     icon: AlertOctagon,
-    bgHeader: 'bg-rose-500/10',
-    borderColor: 'border-rose-500/30',
+    accentColor: 'rgba(244, 63, 94, 0.15)',
+    borderAccent: 'border-rose-500/20',
     iconColor: 'text-rose-400',
-    badgeBg: 'bg-rose-500/20',
-    badgeText: 'text-rose-300',
-    buttonBg: 'bg-rose-600',
-    buttonHover: 'hover:bg-rose-500',
+    lineGradient: 'from-transparent via-rose-500/40 to-transparent',
   },
   warning: {
     icon: AlertTriangle,
-    bgHeader: 'bg-amber-500/10',
-    borderColor: 'border-amber-500/30',
+    accentColor: 'rgba(251, 191, 36, 0.1)',
+    borderAccent: 'border-amber-500/20',
     iconColor: 'text-amber-400',
-    badgeBg: 'bg-amber-500/20',
-    badgeText: 'text-amber-300',
-    buttonBg: 'bg-amber-600',
-    buttonHover: 'hover:bg-amber-500',
+    lineGradient: 'from-transparent via-amber-500/40 to-transparent',
   },
   info: {
     icon: Info,
-    bgHeader: 'bg-cyan-500/10',
-    borderColor: 'border-cyan-500/30',
+    accentColor: 'rgba(34, 211, 238, 0.08)',
+    borderAccent: 'border-cyan-500/20',
     iconColor: 'text-cyan-400',
-    badgeBg: 'bg-cyan-500/20',
-    badgeText: 'text-cyan-300',
-    buttonBg: 'bg-cyan-600',
-    buttonHover: 'hover:bg-cyan-500',
+    lineGradient: 'from-transparent via-cyan-500/40 to-transparent',
   },
 }
 
-const SEVERITY_LABELS: Record<RuleSeverity, string> = {
-  critical: 'Alerta Crítica',
-  warning: 'Advertencia',
-  info: 'Información',
-}
-
 // ════════════════════════════════════════════════════════════════════════════
-// COMPONENTE
+// COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
 
 export default memo(function ConsistencyAlertModal({
@@ -137,68 +120,80 @@ export default memo(function ConsistencyAlertModal({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="max-w-[480px] bg-[#0B1120] border-slate-800 p-0 overflow-hidden max-h-[85vh] flex flex-col"
+        className="max-w-[480px] bg-[#0B1120] border border-slate-800 p-0 overflow-hidden max-h-[85vh] flex flex-col"
         showCloseButton={false}
       >
+        {/* ═══ LÍNEA TESLA SUPERIOR (indicador sutil de severidad) ═══ */}
+        <div className={cn(
+          'h-[1px] w-full bg-gradient-to-r',
+          styles.lineGradient
+        )} />
 
-        {/* ═══ HEADER CON SEVERIDAD ═══ */}
-        <div className={cn('px-6 py-4 border-b shrink-0', styles.bgHeader, styles.borderColor)}>
-          <div className="flex items-start gap-3">
-            <div className={cn('p-2 rounded-lg shrink-0', styles.badgeBg)}>
-              <SeverityIcon size={20} className={styles.iconColor} />
+        {/* ═══ HEADER MINIMALISTA ═══ */}
+        <div className="px-6 py-5 border-b border-slate-800/60 bg-[#0f1523]">
+          <div className="flex items-start gap-4">
+            {/* Icono de severidad - sutil, no gritón */}
+            <div className={cn(
+              'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
+              'bg-slate-800/60 border border-slate-700/50'
+            )}>
+              <SeverityIcon size={18} className={cn(styles.iconColor, 'opacity-80')} />
             </div>
-            <div className="flex-1 min-w-0">
-              {/* Badge de severidad */}
-              <span className={cn(
-                'inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest mb-2',
-                styles.badgeBg, styles.badgeText
-              )}>
-                {SEVERITY_LABELS[severity]}
-              </span>
 
-              {/* Título */}
-              <DialogTitle className="text-base font-bold text-white leading-tight">
+            <div className="flex-1 min-w-0">
+              {/* Título - limpio, sin badge */}
+              <DialogTitle className="text-[15px] font-semibold text-slate-100 leading-snug tracking-tight">
                 {validation.title}
               </DialogTitle>
 
-              {/* Indicador de movimiento */}
-              <div className="flex items-center gap-2 mt-3 px-3 py-2 rounded-lg bg-[#111827] border border-slate-800 text-xs">
-                <span className="text-slate-400">{quadrantNames[fromQuadrant]}</span>
-                <ArrowRight size={14} className="text-cyan-400 shrink-0" />
-                <span className="text-white font-bold">{quadrantNames[toQuadrant]}</span>
+              {/* Indicador de movimiento - elegante como en JustificationDrawer */}
+              <div className="flex items-center gap-2 mt-3 px-3 py-2 rounded-lg bg-[#111827] border border-slate-800/80">
+                <span className="text-xs text-slate-400 font-medium">
+                  {quadrantNames[fromQuadrant]}
+                </span>
+                <ArrowRight size={12} className="text-cyan-400/70 shrink-0" />
+                <span className="text-xs text-slate-200 font-semibold">
+                  {quadrantNames[toQuadrant]}
+                </span>
               </div>
             </div>
           </div>
         </div>
 
         {/* ═══ BODY ═══ */}
-        <div className="px-6 py-5 space-y-4 flex-1 overflow-y-auto">
+        <div className="px-6 py-5 space-y-5 flex-1 overflow-y-auto">
 
           {/* Empleado + DiamondVisual */}
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-5">
             {/* Info del empleado */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-12 h-12 rounded-full bg-[#111827] border border-slate-700 flex items-center justify-center text-sm font-bold text-white shrink-0">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-11 h-11 rounded-full bg-[#111827] border border-slate-700/70 flex items-center justify-center text-sm font-semibold text-slate-200 shrink-0">
                   {employee.avatar}
                 </div>
                 <div className="min-w-0">
-                  <h3 className="font-bold text-white truncate">{employee.name}</h3>
-                  <p className="text-xs text-slate-400 truncate">{employee.role}</p>
+                  <h3 className="font-semibold text-slate-100 truncate text-[14px]">
+                    {employee.name}
+                  </h3>
+                  <p className="text-xs text-slate-500 truncate">{employee.role}</p>
                 </div>
               </div>
 
-              {/* Scores */}
+              {/* Scores - estilo JustificationDrawer */}
               <div className="grid grid-cols-2 gap-2">
-                <div className="bg-[#111827] p-2.5 rounded border border-slate-800">
-                  <span className="text-[9px] text-slate-500 uppercase font-bold">Desempeño</span>
-                  <div className="text-lg font-mono font-bold text-white">
+                <div className="bg-[#111827] p-3 rounded-lg border border-slate-800/80">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">
+                    Desempeño
+                  </span>
+                  <div className="text-lg font-mono font-semibold text-slate-100 mt-0.5">
                     {employee.effectiveScore.toFixed(1)}
                   </div>
                 </div>
-                <div className="bg-[#111827] p-2.5 rounded border border-slate-800">
-                  <span className="text-[9px] text-slate-500 uppercase font-bold">Potencial</span>
-                  <div className="text-lg font-mono font-bold text-cyan-400">
+                <div className="bg-[#111827] p-3 rounded-lg border border-slate-800/80">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">
+                    Potencial
+                  </span>
+                  <div className="text-lg font-mono font-semibold text-cyan-400/90 mt-0.5">
                     {employee.effectivePotentialScore?.toFixed(1) ?? '\u2014'}
                   </div>
                 </div>
@@ -218,66 +213,87 @@ export default memo(function ConsistencyAlertModal({
             </div>
           </div>
 
-          {/* Mensaje de la regla */}
-          <div className={cn('p-3 rounded-lg border', styles.bgHeader, styles.borderColor)}>
-            <p className="text-sm text-slate-300 leading-relaxed">{validation.message}</p>
+          {/* Mensaje de la regla - elegante, no como error box */}
+          <div className="pl-4 border-l-2 border-slate-700/50">
+            <p className="text-sm text-slate-400 leading-relaxed">
+              {validation.message}
+            </p>
           </div>
 
-          {/* Recomendación */}
+          {/* Recomendación - sutil con icono pequeño */}
           {validation.recommendation && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
-              <Lightbulb size={14} className="text-cyan-400 mt-0.5 shrink-0" />
-              <p className="text-xs text-cyan-300/90">{validation.recommendation}</p>
+            <div className="flex items-start gap-2.5 py-3 px-4 rounded-lg bg-slate-800/30 border border-slate-700/30">
+              <Lightbulb size={14} className="text-cyan-400/70 mt-0.5 shrink-0" />
+              <p className="text-xs text-slate-400 leading-relaxed">
+                {validation.recommendation}
+              </p>
             </div>
           )}
 
           {/* Justificación OBLIGATORIA */}
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">
-              Justificación de la Excepción *
+          <div className="pt-1">
+            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2.5 block">
+              Justificación de la Excepción
             </label>
             <textarea
               value={justification}
               onChange={(e) => setJustification(e.target.value)}
               placeholder="Explica por qué decides proceder a pesar de la alerta. Esta justificación quedará en el registro de auditoría..."
-              className="w-full h-24 bg-[#111827] border border-slate-700 rounded-lg p-3 text-sm text-slate-300 placeholder-slate-600 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none resize-none transition-all"
+              className={cn(
+                'w-full h-24 bg-[#111827] rounded-lg p-3.5',
+                'text-sm text-slate-300 placeholder-slate-600',
+                'border border-slate-700/70',
+                'focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20',
+                'outline-none resize-none transition-all duration-200'
+              )}
             />
-            <div className="flex justify-between mt-1">
+            <div className="flex justify-between mt-2">
               <p className="text-[10px] text-slate-600">
                 Mínimo 10 caracteres
               </p>
               <p className={cn(
-                'text-[10px]',
-                justification.length >= 10 ? 'text-emerald-400' : 'text-slate-600'
+                'text-[10px] font-medium transition-colors',
+                justification.length >= 10 ? 'text-emerald-500/80' : 'text-slate-600'
               )}>
                 {justification.length}/10
               </p>
             </div>
             {error && (
-              <p className="text-xs text-rose-400 mt-1">{error}</p>
+              <p className="text-xs text-rose-400/90 mt-1.5">{error}</p>
             )}
           </div>
         </div>
 
-        {/* ═══ FOOTER ═══ */}
-        <DialogFooter className="px-6 py-4 bg-[#111827] border-t border-slate-800 shrink-0 flex gap-3">
+        {/* ═══ FOOTER - Botones estilo FocalizaHR Premium ═══ */}
+        <DialogFooter className="px-6 py-4 bg-[#0f1523] border-t border-slate-800/60 shrink-0 flex gap-3">
+          {/* Ghost Button - Cancelar */}
           <button
             onClick={onClose}
-            className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold uppercase tracking-wider rounded border border-slate-700 transition-all"
+            className={cn(
+              'flex-1 py-3 rounded-lg',
+              'bg-slate-800/60 border border-slate-700/50',
+              'text-slate-400 text-xs font-semibold uppercase tracking-wider',
+              'hover:bg-slate-800 hover:border-slate-600/50 hover:text-slate-300',
+              'transition-all duration-200'
+            )}
           >
-            Cancelar Movimiento
+            Cancelar
           </button>
+
+          {/* Primary Button - Confirmar */}
           <button
             onClick={handleConfirm}
             disabled={justification.trim().length < 10}
             className={cn(
-              'flex-1 py-3 text-white text-xs font-bold uppercase tracking-wider rounded shadow-lg transition-all',
+              'flex-1 py-3 rounded-lg',
+              'text-xs font-semibold uppercase tracking-wider',
+              'transition-all duration-200',
               justification.trim().length >= 10
-                ? cn(styles.buttonBg, styles.buttonHover)
-                : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                ? 'bg-cyan-600 hover:bg-cyan-500 text-slate-900 shadow-lg shadow-cyan-900/20'
+                : 'bg-slate-700/50 text-slate-500 cursor-not-allowed border border-slate-700/30'
             )}
           >
-            Forzar Cambio y Registrar
+            Confirmar y Registrar
           </button>
         </DialogFooter>
 

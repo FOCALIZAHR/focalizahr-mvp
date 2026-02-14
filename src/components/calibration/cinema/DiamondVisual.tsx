@@ -2,8 +2,9 @@
 // DiamondVisual - Radar AAE (Aspiración, Capacidad, Compromiso)
 // src/components/calibration/cinema/DiamondVisual.tsx
 // ════════════════════════════════════════════════════════════════════════════
+// REDISEÑO v2.0 - Filosofía Tesla/Apple FocalizaHR
 // Muestra los 3 factores AAE en un RadarChart triangular.
-// Estados: vacío, incompleto (badge amarillo), conflicto (badge rojo pulsante).
+// Indicadores sutiles: sin badges gritones, señales elegantes.
 // ════════════════════════════════════════════════════════════════════════════
 
 'use client'
@@ -18,7 +19,6 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { cn } from '@/lib/utils'
-import { AlertTriangle } from 'lucide-react'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -35,7 +35,7 @@ interface DiamondVisualProps {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// CONSTANTS
+// CONSTANTS - Colores más sutiles y elegantes
 // ════════════════════════════════════════════════════════════════════════════
 
 const SIZES = {
@@ -44,15 +44,16 @@ const SIZES = {
   lg: { width: 220, height: 220, fontSize: 12, dotSize: 5 },
 }
 
+// Colores más desaturados y elegantes - línea Tesla
 const VALUE_COLORS: Record<string, string> = {
-  '3': 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30',
-  '2': 'text-amber-400 bg-amber-500/20 border-amber-500/30',
-  '1': 'text-rose-400 bg-rose-500/20 border-rose-500/30',
-  'null': 'text-slate-500 bg-slate-500/20 border-slate-500/30',
+  '3': 'text-emerald-400/80 bg-emerald-500/10 border-emerald-500/20',
+  '2': 'text-amber-400/80 bg-amber-500/10 border-amber-500/20',
+  '1': 'text-rose-400/80 bg-rose-500/10 border-rose-500/20',
+  'null': 'text-slate-500/80 bg-slate-500/10 border-slate-500/20',
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// FACTOR PILL (leyenda)
+// FACTOR PILL (leyenda) - Más sutil y minimalista
 // ════════════════════════════════════════════════════════════════════════════
 
 const FactorPill = memo(function FactorPill({
@@ -69,13 +70,14 @@ const FactorPill = memo(function FactorPill({
   return (
     <div
       className={cn(
-        'flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border',
+        'flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-medium border',
         colorClass,
-        isConflict && 'ring-2 ring-rose-500 ring-offset-1 ring-offset-[#0B1120]'
+        // Conflicto: borde sutil pulsante, no ring agresivo
+        isConflict && 'border-rose-500/40 animate-pulse'
       )}
     >
-      <span>{label}:</span>
-      <span>{value ?? '\u2014'}</span>
+      <span className="opacity-70">{label}:</span>
+      <span className="font-semibold">{value ?? '\u2014'}</span>
     </div>
   )
 })
@@ -117,19 +119,19 @@ export default memo(function DiamondVisual({
   const isComplete = aspiration !== null && ability !== null && engagement !== null
   const hasConflicts = conflicts.length > 0
 
-  // Estado vacío
+  // Estado vacío - minimalista
   if (!hasAnyData) {
     return (
       <div
         className={cn(
-          'flex flex-col items-center justify-center bg-[#111827]/60 rounded-lg border border-slate-800',
+          'flex flex-col items-center justify-center',
+          'bg-slate-800/30 rounded-lg border border-slate-700/30',
           className
         )}
         style={{ width: sizeConfig.width, height: sizeConfig.height }}
       >
-        <AlertTriangle size={20} className="text-slate-600 mb-1.5" />
         <span className="text-[10px] text-slate-500 text-center px-2">
-          Sin evaluación AAE
+          Sin evaluación
         </span>
       </div>
     )
@@ -137,54 +139,49 @@ export default memo(function DiamondVisual({
 
   return (
     <div className={cn('relative', className)}>
-      {/* Badge de datos incompletos */}
+      {/* Indicador de datos incompletos - punto sutil, no badge gritón */}
       {!isComplete && (
-        <div className="absolute -top-1 -right-1 z-10">
-          <div className="w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center">
-            <span className="text-[8px] font-bold text-slate-900">!</span>
-          </div>
+        <div className="absolute -top-0.5 -right-0.5 z-10">
+          <div className="w-2 h-2 bg-amber-500/60 rounded-full" />
         </div>
       )}
 
-      {/* Badge de conflictos */}
+      {/* Indicador de conflictos - línea lateral sutil, no badge pulsante */}
       {hasConflicts && (
-        <div className="absolute -top-1 -left-1 z-10">
-          <div className="w-4 h-4 bg-rose-500 rounded-full flex items-center justify-center animate-pulse">
-            <AlertTriangle size={10} className="text-white" />
-          </div>
-        </div>
+        <div className="absolute top-0 left-0 w-0.5 h-full bg-gradient-to-b from-rose-500/50 via-rose-500/30 to-transparent rounded-full" />
       )}
 
       {/* RadarChart */}
       <div style={{ width: sizeConfig.width, height: sizeConfig.height }}>
         <ResponsiveContainer width="100%" height="100%">
-          <RadarChart data={chartData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+          <RadarChart data={chartData} margin={{ top: 12, right: 12, bottom: 12, left: 12 }}>
             <defs>
               <linearGradient id="diamondGradient" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#22D3EE" stopOpacity={0.6} />
-                <stop offset="50%" stopColor="#3B82F6" stopOpacity={0.4} />
-                <stop offset="100%" stopColor="#A78BFA" stopOpacity={0.6} />
+                <stop offset="0%" stopColor="#22D3EE" stopOpacity={0.5} />
+                <stop offset="50%" stopColor="#3B82F6" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#A78BFA" stopOpacity={0.5} />
               </linearGradient>
             </defs>
 
             <PolarGrid
-              stroke="#1e293b"
-              strokeDasharray="3 3"
+              stroke="#334155"
+              strokeDasharray="2 4"
+              strokeOpacity={0.5}
             />
 
             <PolarAngleAxis
               dataKey="factor"
               tick={{
-                fill: '#94A3B8',
+                fill: '#64748B',
                 fontSize: sizeConfig.fontSize,
-                fontWeight: 500,
+                fontWeight: 400,
               }}
             />
 
             <PolarRadiusAxis
               angle={90}
               domain={[0, 3]}
-              tick={{ fill: '#64748B', fontSize: 8 }}
+              tick={{ fill: '#475569', fontSize: 8 }}
               tickCount={4}
               axisLine={false}
             />
@@ -194,22 +191,24 @@ export default memo(function DiamondVisual({
               dataKey="value"
               stroke="#22D3EE"
               fill="url(#diamondGradient)"
-              fillOpacity={0.4}
-              strokeWidth={2}
+              fillOpacity={0.35}
+              strokeWidth={1.5}
+              strokeOpacity={0.8}
               dot={{
                 r: sizeConfig.dotSize,
                 fill: '#22D3EE',
                 stroke: '#0f172a',
                 strokeWidth: 2,
+                fillOpacity: 0.9,
               }}
             />
           </RadarChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Legend */}
+      {/* Legend - más sutil */}
       {showLegend && (
-        <div className="flex justify-center gap-2 mt-2">
+        <div className="flex justify-center gap-1.5 mt-2">
           <FactorPill label="A" value={aspiration} isConflict={conflicts.includes('aspiration')} />
           <FactorPill label="C" value={ability} isConflict={conflicts.includes('ability')} />
           <FactorPill label="E" value={engagement} isConflict={conflicts.includes('engagement')} />
