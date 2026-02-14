@@ -50,6 +50,11 @@ export interface CinemaEmployee {
 
   // Flag: jefe no asignó potencial y no hay adjustment de potencial
   isPendingPotential: boolean
+
+  // AAE Factors (Aspiración, Ability, Engagement)
+  aspiration: 1 | 2 | 3 | null
+  ability: 1 | 2 | 3 | null
+  engagement: 1 | 2 | 3 | null
 }
 
 export interface CalibrationStats {
@@ -260,6 +265,11 @@ export function useCalibrationRoom({ sessionId }: UseCalibrationRoomProps) {
 
         // Flag: jefe no asignó potencial y tampoco hay adjustment
         isPendingPotential: originalPotentialMissing && effectivePotentialScore == null,
+
+        // AAE Factors
+        aspiration: (rating.potentialAspiration as 1 | 2 | 3) ?? null,
+        ability: (rating.potentialAbility as 1 | 2 | 3) ?? null,
+        engagement: (rating.potentialEngagement as 1 | 2 | 3) ?? null,
       }
     })
   }, [ratings, adjustments])

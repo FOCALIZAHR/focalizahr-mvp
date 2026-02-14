@@ -19,10 +19,12 @@ import {
   type DragEndEvent
 } from '@dnd-kit/core'
 import { useCalibrationRoom, type CinemaEmployee } from '@/components/calibration/hooks/useCalibrationRoom'
+import { useCalibrationRules, QUADRANT_NAMES, type ValidationResult } from '@/components/calibration/hooks/useCalibrationRules'
 import CinemaHeader from '@/components/calibration/cinema/CinemaHeader'
 import CinemaGrid from '@/components/calibration/cinema/CinemaGrid'
 import { CinemaCardOverlay } from '@/components/calibration/cinema/CinemaCard'
 import JustificationDrawer from '@/components/calibration/cinema/JustificationDrawer'
+import ConsistencyAlertModal from '@/components/calibration/cinema/ConsistencyAlertModal'
 import ClosingCeremonyModal from '@/components/calibration/closing/ClosingCeremonyModal'
 
 // ═══ COMPONENTES EXISTENTES (NO crear de nuevo) ═══
@@ -65,6 +67,8 @@ export default function CalibrationCinemaPage() {
     startSession
   } = useCalibrationRoom({ sessionId })
 
+  const { validateMove } = useCalibrationRules()
+
   const [selectedEmp, setSelectedEmp] = useState<CinemaEmployee | null>(null)
   const [pendingMove, setPendingMove] = useState<{
     employee: CinemaEmployee
@@ -74,6 +78,12 @@ export default function CalibrationCinemaPage() {
   const [showDistModal, setShowDistModal] = useState(false)
   const [showCeremony, setShowCeremony] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [consistencyWarning, setConsistencyWarning] = useState<{
+    employee: CinemaEmployee
+    validation: ValidationResult
+    fromQuadrant: string
+    toQuadrant: string
+  } | null>(null)
 
   // ═══════════════════════════════════════════════════════════
   // CLOSING CEREMONY DATA
@@ -189,10 +199,23 @@ export default function CalibrationCinemaPage() {
     const employee = employeeList.find(e => e.id === employeeId)
     if (!employee) return
 
-    // Si cambió de cuadrante, abrir drawer para justificación
+    // Si cambió de cuadrante, validar AAE antes de pedir justificación
     if (employee.quadrant !== newQuadrant) {
-      setPendingMove({ employee, newQuadrant })
-      setSelectedEmp(employee)
+      const validation = validateMove(employee, newQuadrant)
+
+      if (validation.hasWarning) {
+        // AAE incoherencia → ConsistencyAlertModal
+        setConsistencyWarning({
+          employee,
+          validation,
+          fromQuadrant: employee.quadrant,
+          toQuadrant: newQuadrant,
+        })
+      } else {
+        // Sin alertas → flujo normal (JustificationDrawer)
+        setPendingMove({ employee, newQuadrant })
+        setSelectedEmp(employee)
+      }
     }
   }
 
@@ -219,6 +242,20 @@ export default function CalibrationCinemaPage() {
     if (!pendingMove) {
       setSelectedEmp(emp)
     }
+  }
+
+  async function handleForceMove(justification: string) {
+    if (!consistencyWarning) return
+
+    const { employee, toQuadrant, validation } = consistencyWarning
+    const fullJustification = `[EXCEPCIÓN: ${validation.ruleId}] ${justification}`
+
+    await moveEmployee(employee.id, toQuadrant, fullJustification)
+    setConsistencyWarning(null)
+  }
+
+  function handleDismissWarning() {
+    setConsistencyWarning(null)
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -307,6 +344,20 @@ export default function CalibrationCinemaPage() {
           onClose={handleCancelMove}
           onConfirm={handleConfirmMove}
         />
+
+        {/* CONSISTENCY ALERT MODAL (Árbitro AAE) */}
+        {consistencyWarning && (
+          <ConsistencyAlertModal
+            isOpen={!!consistencyWarning}
+            onClose={handleDismissWarning}
+            onConfirm={handleForceMove}
+            employee={consistencyWarning.employee}
+            validation={consistencyWarning.validation}
+            fromQuadrant={consistencyWarning.fromQuadrant}
+            toQuadrant={consistencyWarning.toQuadrant}
+            quadrantNames={QUADRANT_NAMES}
+          />
+        )}
 
         {/* DISTRIBUTION MODAL (componente existente) */}
         <DistributionModal

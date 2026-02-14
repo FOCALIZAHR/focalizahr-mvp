@@ -35,6 +35,24 @@ const QUADRANT_LABELS: Record<string, string> = {
   q9: 'Estrellas',
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// MAPEO REAL DEL 9-BOX (por filas y columnas)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Fila de potencial (1=bajo, 2=medio, 3=alto)
+const POTENTIAL_ROW: Record<string, number> = {
+  q1: 1, q2: 1, q3: 1,  // Fila inferior (bajo potencial)
+  q4: 2, q5: 2, q6: 2,  // Fila media
+  q7: 3, q8: 3, q9: 3,  // Fila superior (alto potencial)
+}
+
+// Columna de desempeño (1=bajo, 2=medio, 3=alto)
+const PERFORMANCE_COL: Record<string, number> = {
+  q1: 1, q4: 1, q7: 1,  // Columna izquierda (bajo desempeño)
+  q2: 2, q5: 2, q8: 2,  // Columna media
+  q3: 3, q6: 3, q9: 3,  // Columna derecha (alto desempeño)
+}
+
 interface JustificationDrawerProps {
   employee: CinemaEmployee | null
   targetQuadrant?: string
@@ -64,9 +82,34 @@ export default memo(function JustificationDrawer({
   if (!employee) return null
 
   const style = STATUS_COLORS[employee.status] || STATUS_COLORS.NEUTRAL
-  const isDowngrade = targetQuadrant
-    ? parseInt(targetQuadrant.replace('q', '')) < parseInt(employee.quadrant.replace('q', ''))
-    : false
+
+  // Calcular downgrade real basado en posición en matriz
+  const isDowngrade = (() => {
+    if (!targetQuadrant) return false
+
+    const fromPotential = POTENTIAL_ROW[employee.quadrant] || 2
+    const toPotential = POTENTIAL_ROW[targetQuadrant] || 2
+    const fromPerformance = PERFORMANCE_COL[employee.quadrant] || 2
+    const toPerformance = PERFORMANCE_COL[targetQuadrant] || 2
+
+    // Es downgrade si baja en potencial O en desempeño
+    return toPotential < fromPotential || toPerformance < fromPerformance
+  })()
+
+  // Caso especial: mover a Riesgo (q1) siempre es crítico
+  const isMoveToRisk = targetQuadrant === 'q1' && employee.quadrant !== 'q1'
+
+  // Salto masivo (3+ posiciones de diferencia)
+  const isMassiveJump = (() => {
+    if (!targetQuadrant) return false
+    const potentialDiff = Math.abs(
+      (POTENTIAL_ROW[employee.quadrant] || 2) - (POTENTIAL_ROW[targetQuadrant] || 2)
+    )
+    const performanceDiff = Math.abs(
+      (PERFORMANCE_COL[employee.quadrant] || 2) - (PERFORMANCE_COL[targetQuadrant] || 2)
+    )
+    return potentialDiff + performanceDiff >= 3
+  })()
 
   function handleConfirm() {
     if (justification.trim().length < 10) {
@@ -161,12 +204,30 @@ export default memo(function JustificationDrawer({
 
             {/* Justification Form */}
             <div className="flex-1 p-6 overflow-y-auto">
-              {/* Downgrade warning */}
-              {isDowngrade && (
+              {/* Movement warnings */}
+              {isMoveToRisk && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 mb-4">
+                  <AlertTriangle size={14} className="text-rose-400 mt-0.5 shrink-0" />
+                  <p className="text-xs text-rose-300">
+                    <strong>Movimiento a Zona de Riesgo.</strong> Esta clasificación puede afectar significativamente la carrera del colaborador.
+                  </p>
+                </div>
+              )}
+
+              {isDowngrade && !isMoveToRisk && (
                 <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 mb-4">
                   <AlertTriangle size={14} className="text-amber-400 mt-0.5 shrink-0" />
                   <p className="text-xs text-amber-300">
                     Este movimiento baja de categoría al colaborador. Se requiere justificación detallada.
+                  </p>
+                </div>
+              )}
+
+              {isMassiveJump && !isDowngrade && !isMoveToRisk && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 mb-4">
+                  <AlertTriangle size={14} className="text-blue-400 mt-0.5 shrink-0" />
+                  <p className="text-xs text-blue-300">
+                    Este es un cambio significativo de posición. Asegúrate de documentar las razones.
                   </p>
                 </div>
               )}
