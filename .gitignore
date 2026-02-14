@@ -47,3 +47,7 @@ next-env.d.ts
 
 # OS
 Thumbs.dbnul
+
+# Claude & Temporal fixes
+.claude/tasks/
+*.diff
