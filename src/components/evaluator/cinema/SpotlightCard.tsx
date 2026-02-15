@@ -170,23 +170,6 @@ export default function SpotlightCard({
             {/* CASO 3: Completado CON potencial → Info 9-Box + Resumen activo */}
             {isCompleted && hasPotential && (
               <>
-                <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-400">Potencial:</span>
-                    <span className="text-purple-400 font-semibold">
-                      {employee.potentialScore?.toFixed(1)} ({employee.potentialLevel})
-                    </span>
-                  </div>
-                  {employee.nineBoxPosition && (
-                    <div className="flex items-center justify-between text-sm mt-1">
-                      <span className="text-slate-400">9-Box:</span>
-                      <span className="text-cyan-400 font-semibold">
-                        {employee.nineBoxPosition.replace(/_/g, ' ')}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
                 <button
                   onClick={() => onViewSummary(employee.assignmentId)}
                   className="w-full h-14 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:to-cyan-400 text-white rounded-xl font-semibold text-sm shadow-lg shadow-cyan-500/20 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-3"
@@ -198,7 +181,7 @@ export default function SpotlightCard({
 
                 <button
                   onClick={onEvaluatePotential}
-                  className="w-full h-10 bg-slate-800/50 text-slate-400 border border-slate-700 hover:bg-slate-700/50 hover:text-white rounded-xl font-medium text-xs flex items-center justify-center gap-2 transition-all"
+                  className="w-full h-10 bg-transparent text-purple-400 border border-purple-500/30 hover:bg-purple-500/10 hover:text-purple-300 rounded-xl font-medium text-xs flex items-center justify-center gap-2 transition-all"
                 >
                   <Pencil className="w-3 h-3" />
                   <span>Reevaluar Potencial</span>

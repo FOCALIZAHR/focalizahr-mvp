@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { CompetencyFilterService } from '@/lib/services/CompetencyFilterService'
 
 // GET /api/survey/[token] - OPTIMIZADO: Solo datos esenciales, NO todas las preguntas
 export async function GET(
@@ -156,7 +157,8 @@ export async function GET(
         maxLabel: true,
         minValue: true,
         maxValue: true,
-        competencyCode: true
+        competencyCode: true,
+        audienceRule: true
       },
       orderBy: { questionOrder: 'asc' }
     })
@@ -173,6 +175,21 @@ export async function GET(
         select: { code: true, name: true }
       })
       competencyMap = Object.fromEntries(competencies.map(c => [c.code, c.name]))
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // FILTRADO POR PERFORMANCE TRACK (employee-based flow)
+    // Solo aplica cuando hay evaluationContext con track definido
+    // COLABORADOR: 10 preguntas | MANAGER: 16 | EJECUTIVO: 20
+    // ═══════════════════════════════════════════════════════════════
+    let filteredQuestions = questions
+
+    if (evaluationContext?.evaluateeTrack) {
+      filteredQuestions = questions.filter(q =>
+        CompetencyFilterService.questionAppliesToTrack(q as any, evaluationContext.evaluateeTrack!)
+      )
+
+      console.log(`[Survey] Filtrado por track ${evaluationContext.evaluateeTrack}: ${filteredQuestions.length}/${questions.length} preguntas`)
     }
 
     const processingTime = Date.now() - startTime
@@ -198,7 +215,7 @@ export async function GET(
         }
       },
       evaluationContext,
-      questions: questions.map(q => ({
+      questions: filteredQuestions.map(q => ({
         id: q.id,
         text: q.text,
         category: q.category,
@@ -219,7 +236,7 @@ export async function GET(
     console.log('✅ Survey data loaded successfully (OPTIMIZED)')
     console.log(`   - Campaign: ${participant.campaign.name}`)
     console.log(`   - Type: ${participant.campaign.campaignType.name}`)
-    console.log(`   - Questions: ${questions.length}`)
+    console.log(`   - Questions: ${filteredQuestions.length}${evaluationContext?.evaluateeTrack ? ` (filtered from ${questions.length})` : ''}`)
     console.log(`   - Processing time: ${processingTime}ms`)
     console.log(`   - Status: ${participant.hasResponded ? 'completed' : 'pending'}`)
 
