@@ -430,7 +430,8 @@ export const PERMISSIONS = {
     'HR_ADMIN',
     'HR_MANAGER',
     'CEO',
-    'AREA_MANAGER'
+    'AREA_MANAGER',
+    'EVALUATOR'
   ],
   'calibration:manage': [
     'FOCALIZAHR_ADMIN',
