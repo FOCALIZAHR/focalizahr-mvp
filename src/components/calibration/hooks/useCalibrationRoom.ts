@@ -427,6 +427,10 @@ export function useCalibrationRoom({ sessionId }: UseCalibrationRoomProps) {
     employeeList,
     stats,
 
+    // Para LiveFeed
+    adjustments,
+    participants: (session?.participants || []) as any[],
+
     // State
     isLoading: !sessionData || !ratingsData || !adjustmentsData,
     isReadOnly,

@@ -26,6 +26,7 @@ import { CinemaCardOverlay } from '@/components/calibration/cinema/CinemaCard'
 import JustificationDrawer from '@/components/calibration/cinema/JustificationDrawer'
 import ConsistencyAlertModal from '@/components/calibration/cinema/ConsistencyAlertModal'
 import ClosingCeremonyModal from '@/components/calibration/closing/ClosingCeremonyModal'
+import CalibrationLiveFeed from '@/components/calibration/cinema/CalibrationLiveFeed'
 
 // ═══ COMPONENTES EXISTENTES (NO crear de nuevo) ═══
 import DistributionGauge from '@/components/performance/DistributionGauge'
@@ -58,6 +59,8 @@ export default function CalibrationCinemaPage() {
     session,
     employeeList,
     stats,
+    adjustments,
+    participants,
     isLoading,
     isReadOnly,
     canEdit,
@@ -383,6 +386,12 @@ export default function CalibrationCinemaPage() {
           calibratedBonusFactor={ceremonyData.calibratedBonusFactor}
           totalEmployees={stats.total}
           totalAdjustments={ceremonyData.totalAdjustments}
+        />
+
+        {/* LIVE FEED (esquina inferior izquierda) */}
+        <CalibrationLiveFeed
+          adjustments={adjustments}
+          participants={participants}
         />
 
       </div>
