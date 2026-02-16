@@ -8,6 +8,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import CinemaSummaryOrchestrator from '../components/CinemaSummaryOrchestrator'
+import { GapInsightCarousel } from '@/components/performance/gap-analysis'
 import TeamCalibrationHUD from '@/components/performance/TeamCalibrationHUD'
 import InsightCarousel from '@/components/performance/summary/InsightCarousel'
 import PerformanceScoreCard from '@/components/performance/PerformanceScoreCard'
@@ -17,7 +18,7 @@ import type { CinemaSummaryData } from '@/types/evaluator-cinema'
 // TIPOS
 // ════════════════════════════════════════════════════════════════════════════
 
-type IntelligenceView = 'calibracion' | 'alertas'
+type IntelligenceView = 'calibracion' | 'brechas' | 'alertas'
 
 export default function EvaluationSummaryPage() {
   const params = useParams()
@@ -230,7 +231,17 @@ export default function EvaluationSummaryPage() {
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Calibración
+            Evaluación
+          </button>
+          <button
+            onClick={() => setActiveView('brechas')}
+            className={`px-3 py-1 text-xs font-medium rounded transition-all ${
+              activeView === 'brechas'
+                ? 'bg-blue-500 text-slate-900'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Brechas
           </button>
           <button
             onClick={() => setActiveView('alertas')}
@@ -240,13 +251,13 @@ export default function EvaluationSummaryPage() {
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Alertas
+            Coaching
           </button>
         </div>
       </div>
 
       {/* Contenido según vista activa */}
-      {activeView === 'calibracion' ? (
+      {activeView === 'calibracion' && (
         <div className="space-y-3">
           {/* PerformanceScoreCard - Score en escala 1-5 */}
           {scoreOn5 !== null && (
@@ -275,8 +286,18 @@ export default function EvaluationSummaryPage() {
             </div>
           )}
         </div>
-      ) : (
-        /* InsightCarousel - Consola de Inteligencia */
+      )}
+
+      {activeView === 'brechas' && summary?.competencyScores && (
+        <div className="max-w-2xl mx-auto p-6">
+          <GapInsightCarousel
+            competencyScores={summary.competencyScores}
+            employeeName={summary.evaluatee.fullName}
+          />
+        </div>
+      )}
+
+      {activeView === 'alertas' && (
         <div>
           {competencies.length > 0 ? (
             <InsightCarousel

@@ -12,11 +12,13 @@ import {
   ArrowLeft,
   AlertTriangle,
   FileText,
+  ArrowLeftRight,
   Users,
   Bell
 } from 'lucide-react'
 import WelcomeScreenManager from '@/components/survey/WelcomeScreenManager'
 import CinemaSummaryOrchestrator from './components/CinemaSummaryOrchestrator'
+import { GapInsightCarousel } from '@/components/performance/gap-analysis'
 import TeamCalibrationHUD from '@/components/performance/TeamCalibrationHUD'
 import ManagementAlertsHUD from '@/components/performance/ManagementAlertsHUD'
 
@@ -254,7 +256,7 @@ export default function EvaluacionDetallePage() {
 // TOGGLE DE 3 OPCIONES - Inline Component
 // ════════════════════════════════════════════════════════════════════════════
 
-type ViewMode = 'respuestas' | 'calibracion' | 'alertas'
+type ViewMode = 'respuestas' | 'brechas' | 'calibracion' | 'alertas'
 
 interface ToggleOption {
   value: ViewMode
@@ -294,10 +296,10 @@ function ThreeWayToggle({
                 ? 'rgba(15, 23, 42, 0.95)'
                 : 'rgba(148, 163, 184, 0.8)',
               background: isActive
-                ? (index === 0 ? '#22D3EE' : index === 1 ? '#A78BFA' : '#F59E0B')
+                ? (['#22D3EE', '#3B82F6', '#A78BFA', '#F59E0B'][index] ?? '#22D3EE')
                 : 'transparent',
               boxShadow: isActive
-                ? `0 2px 8px ${index === 0 ? 'rgba(34, 211, 238, 0.3)' : index === 1 ? 'rgba(167, 139, 250, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`
+                ? `0 2px 8px ${['rgba(34, 211, 238, 0.3)', 'rgba(59, 130, 246, 0.3)', 'rgba(167, 139, 250, 0.3)', 'rgba(245, 158, 11, 0.3)'][index] ?? 'rgba(34, 211, 238, 0.3)'}`
                 : 'none'
             }}
             whileHover={{ scale: 1.02 }}
@@ -335,6 +337,7 @@ function EvaluationSummaryView({
 
   const toggleOptions: ToggleOption[] = [
     { value: 'respuestas', label: 'Respuestas', icon: FileText },
+    { value: 'brechas', label: 'Brechas', icon: ArrowLeftRight },
     { value: 'calibracion', label: 'Calibración', icon: Users },
     { value: 'alertas', label: 'Alertas', icon: Bell }
   ]
@@ -490,6 +493,16 @@ function EvaluationSummaryView({
             overallScore: summary.overallScore
           }}
         />
+      )}
+
+      {/* Vista: Brechas - Análisis Self vs Manager */}
+      {activeView === 'brechas' && summary.competencyScores && (
+        <div className="max-w-2xl mx-auto p-6">
+          <GapInsightCarousel
+            competencyScores={summary.competencyScores}
+            employeeName={summary.evaluatee.fullName}
+          />
+        </div>
       )}
 
       {/* Vista 2: Calibración - Ranking del equipo */}
