@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     // ═══ CHECK 2: hasPermission (NO arrays hardcodeados) ═══
+    console.log('[DEBUG calibration] role:', userContext.role, 'hasPermission:', hasPermission(userContext.role, 'calibration:view'));
     if (!hasPermission(userContext.role, 'calibration:view')) {
       return NextResponse.json(
         { success: false, error: 'Sin permisos para ver calibraciones' },
