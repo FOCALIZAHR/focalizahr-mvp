@@ -226,7 +226,8 @@ if (effectiveRole === 'EVALUATOR') {
     '/api/evaluator',             
     '/api/auth',                  
     '/api/survey',                
-    '/api/admin/performance',     
+    '/api/admin/performance',
+    '/api/calibration',
   ];
   
   const isAllowedPath = evaluatorAllowedPaths.some(path => 
