@@ -45,7 +45,30 @@ export async function GET(request: NextRequest) {
     if (cycleId) where.cycleId = cycleId
     if (status) where.status = status
 
-    // ═══ CHECK 4: Filtrado jerárquico AREA_MANAGER ═══
+    // ═══ CHECK 4a: EVALUATOR solo ve sesiones donde es participante ═══
+    if (userContext.role === 'EVALUATOR') {
+      const userEmail = request.headers.get('x-user-email') || ''
+
+      const participantSessions = await prisma.calibrationParticipant.findMany({
+        where: { participantEmail: userEmail },
+        select: { sessionId: true }
+      })
+
+      const sessionIds = participantSessions.map(p => p.sessionId)
+
+      if (sessionIds.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          permissions: { canManage: false },
+          userRole: userContext.role
+        })
+      }
+
+      where.id = { in: sessionIds }
+    }
+
+    // ═══ CHECK 4b: Filtrado jerárquico AREA_MANAGER ═══
     if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
       const childIds = await getChildDepartmentIds(userContext.departmentId)
       const allowedDepts = [userContext.departmentId, ...childIds]
