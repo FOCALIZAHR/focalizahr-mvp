@@ -196,6 +196,7 @@ model Account {
   performanceRatingConfig  PerformanceRatingConfig?
   performanceRatings       PerformanceRating[]
   calibrationSessions      CalibrationSession[]
+  developmentPlans         DevelopmentPlan[]
 
   @@index([adminEmail], map: "idx_accounts_email")
   @@index([subscriptionTier], map: "idx_accounts_tier")
@@ -1538,6 +1539,10 @@ model Employee {
   // Performance Classification
   performanceRatings     PerformanceRating[]
 
+  // PDI (Plan de Desarrollo Individual)
+  developmentPlans       DevelopmentPlan[] @relation("EmployeePDI")
+  managedPDIs            DevelopmentPlan[] @relation("ManagerPDI")
+
   // Índices
   @@unique([accountId, nationalId], map: "idx_employees_account_national")
   @@index([accountId, status], map: "idx_employees_account_status")
@@ -1712,6 +1717,7 @@ model PerformanceCycle {
   // ═══════════════════════════════════════════════════
   performanceRatings       PerformanceRating[]
   calibrationSessions      CalibrationSession[]
+  developmentPlans         DevelopmentPlan[]
 
   // PONDERACIÓN OVERRIDE (Nivel 2: Override por Ciclo)
   // JSON: {self: 10, manager: 50, peer: 25, upward: 15} - casos especiales
@@ -2163,4 +2169,170 @@ model CalibrationAdjustment {
   @@index([adjustedBy]) // Para audit trail por usuario
   @@index([status])     // Para queries de PENDING en cierre
   @@map("calibration_adjustments")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// MÓDULO PDI (PLAN DE DESARROLLO INDIVIDUAL)
+// Permite crear planes de desarrollo desde Gap Analysis del 360°
+// ════════════════════════════════════════════════════════════════════════════
+
+// ────────────────────────────────────────────────────────────────────────────
+// PLAN DE DESARROLLO (Cabecera)
+// ────────────────────────────────────────────────────────────────────────────
+
+model DevelopmentPlan {
+  id                String   @id @default(cuid())
+  accountId         String
+  employeeId        String
+  managerId         String
+  cycleId           String
+
+  status            DevelopmentPlanStatus @default(DRAFT)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  agreedAt          DateTime?
+  completedAt       DateTime?
+
+  validFrom         DateTime  @default(now())
+  validUntil        DateTime?
+
+  originGapAnalysis Json?
+  aiSuggestionsUsed Boolean  @default(false)
+
+  account           Account  @relation(fields: [accountId], references: [id])
+  employee          Employee @relation("EmployeePDI", fields: [employeeId], references: [id])
+  manager           Employee @relation("ManagerPDI", fields: [managerId], references: [id])
+  cycle             PerformanceCycle @relation(fields: [cycleId], references: [id])
+
+  goals             DevelopmentGoal[]
+  checkIns          PDICheckIn[]
+
+  @@unique([employeeId, cycleId])
+  @@index([accountId])
+  @@index([managerId])
+  @@index([status])
+  @@map("development_plans")
+}
+
+enum DevelopmentPlanStatus {
+  DRAFT
+  PENDING_REVIEW
+  AGREED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// OBJETIVO DE DESARROLLO (Detalle)
+// ────────────────────────────────────────────────────────────────────────────
+
+model DevelopmentGoal {
+  id                String   @id @default(cuid())
+  planId            String
+
+  competencyCode    String
+  competencyName    String
+  originalGap       Float?
+  gapType           DevelopmentGapType?
+
+  title             String
+  description       String?  @db.Text
+  targetOutcome     String
+  measurementCriteria String?
+
+  priority          DevelopmentPriority @default(MEDIA)
+  category          DevelopmentCategory @default(SKILL_DEVELOPMENT)
+
+  startDate         DateTime  @default(now())
+  targetDate        DateTime
+
+  progressPercent   Int       @default(0)
+  status            DevelopmentGoalStatus @default(NOT_STARTED)
+
+  suggestedResources Json?
+
+  linkedBusinessGoalId String?
+
+  aiGenerated       Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  completedAt       DateTime?
+
+  plan              DevelopmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@index([competencyCode])
+  @@index([status])
+  @@map("development_goals")
+}
+
+enum DevelopmentGapType {
+  BLIND_SPOT
+  HIDDEN_STRENGTH
+  DEVELOPMENT_AREA
+  PEER_DISCONNECT
+}
+
+enum DevelopmentPriority {
+  ALTA
+  MEDIA
+  BAJA
+}
+
+enum DevelopmentCategory {
+  SKILL_DEVELOPMENT
+  BEHAVIORAL_CHANGE
+  KNOWLEDGE_ACQUISITION
+  EXPERIENCE_BUILDING
+  CERTIFICATION
+  MENTORING
+}
+
+enum DevelopmentGoalStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  ON_TRACK
+  AT_RISK
+  COMPLETED
+  CANCELLED
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// CHECK-INS DE SEGUIMIENTO
+// ────────────────────────────────────────────────────────────────────────────
+
+model PDICheckIn {
+  id                String   @id @default(cuid())
+  planId            String
+
+  scheduledDate     DateTime
+  completedDate     DateTime?
+
+  status            CheckInStatus @default(SCHEDULED)
+
+  managerNotes      String?  @db.Text
+  employeeNotes     String?  @db.Text
+
+  goalProgress      Json?
+  actionItems       Json?
+
+  nextCheckInDate   DateTime?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  plan              DevelopmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@index([scheduledDate])
+  @@map("pdi_check_ins")
+}
+
+enum CheckInStatus {
+  SCHEDULED
+  COMPLETED
+  SKIPPED
+  RESCHEDULED
 }

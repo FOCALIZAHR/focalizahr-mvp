@@ -1,0 +1,1279 @@
+import { CompetencyTemplate } from '@/lib/types/pdi-suggestion'
+
+// ════════════════════════════════════════════════════════════════════════════
+// BIBLIOTECA DE COMPETENCIAS PARA PDI
+// 12 Competencias del Template FocalizaHR Estándar
+// Sugerencias adaptadas por performanceTrack
+// Tono: Simple y directo para TODOS
+// ════════════════════════════════════════════════════════════════════════════
+
+export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CORE - 5 COMPETENCIAS (Todos los empleados)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 1. COMUNICACIÓN EFECTIVA (CORE-COMM)
+  // ──────────────────────────────────────────────────────────────────────────
+  'CORE-COMM': {
+    code: 'CORE-COMM',
+    name: 'Comunicación Efectiva',
+    keywords: ['comunicacion', 'communication', 'expresion', 'mensaje', 'claridad', 'escucha', 'presentaciones'],
+
+    strategies: {
+      EJECUTIVO: {
+        blindSpot: [{
+          title: "Valida cómo llega tu mensaje al Directorio",
+          description: "Tu autoevaluación es más alta que la de tu jefatura. Puede haber una brecha entre lo que crees comunicar y lo que realmente llega.",
+          action: "Después de tu próxima presentación, pregunta a 2 personas: '¿Qué entendiste que hay que hacer?'",
+          targetOutcome: "Obtener feedback directo de al menos 3 stakeholders",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'PRACTICE', title: "Técnica del 'Mirror Back': pide que te repitan el mensaje" }
+          ],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Simplifica tu mensaje estratégico",
+          description: "Los mejores líderes explican cosas complejas de forma simple. Si tu equipo no puede repetir tu estrategia en 30 segundos, es demasiado compleja.",
+          action: "Reescribe tu próxima comunicación importante usando máximo 3 ideas principales",
+          targetOutcome: "Tu equipo directo puede explicar la estrategia sin ayuda",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'BOOK', title: "Made to Stick", provider: "Chip & Dan Heath" }
+          ],
+          estimatedWeeks: 6
+        }],
+        strength: [{
+          title: "Lidera comunicaciones críticas de la organización",
+          description: "Tu fortaleza en comunicación puede tener más impacto si la usas en momentos clave.",
+          action: "Ofrécete para comunicar el próximo cambio importante o resultado estratégico",
+          targetOutcome: "Ser referente de comunicación ejecutiva",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 8
+        }]
+      },
+      MANAGER: {
+        blindSpot: [{
+          title: "Revisa si tu equipo te entiende",
+          description: "Hay una diferencia entre cómo te evalúas y cómo te ve tu jefatura. Puede que el mensaje no esté llegando como crees.",
+          action: "Al dar una instrucción, pide que te la repitan con sus palabras. Si hay diferencias, ahí está la brecha.",
+          targetOutcome: "Reducir malentendidos en instrucciones del día a día",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'PRACTICE', title: "Técnica de parafraseo: '¿Me puedes explicar qué entendiste?'" }
+          ],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Estructura tus reuniones de equipo",
+          description: "Una reunión sin estructura clara genera confusión. Define siempre: qué vamos a decidir, quién hace qué, para cuándo.",
+          action: "Usa los últimos 2 minutos de cada reunión para que alguien resuma los acuerdos",
+          targetOutcome: "Tu equipo sale de las reuniones sabiendo exactamente qué hacer",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'TEMPLATE', title: "Minuta: Decisiones + Responsables + Fechas" }
+          ],
+          estimatedWeeks: 4
+        }],
+        strength: [{
+          title: "Entrena a otros managers en comunicación",
+          description: "Si esto es tu fortaleza, compártela. Otros managers pueden aprender de ti.",
+          action: "Ofrece hacer una sesión corta sobre cómo comunicas con tu equipo",
+          targetOutcome: "Aportar al desarrollo de otros líderes",
+          category: 'MENTORING',
+          priority: 'BAJA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }]
+      },
+      COLABORADOR: {
+        blindSpot: [{
+          title: "Pide feedback sobre cómo te expresas",
+          description: "Tu jefatura ve algo diferente a lo que tú percibes. Vale la pena explorar dónde está la diferencia.",
+          action: "Pregúntale a un compañero de confianza: '¿Soy claro cuando explico algo?' Escucha sin defenderte.",
+          targetOutcome: "Identificar un área específica de mejora",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'PRACTICE', title: "Pedir feedback específico, no general" }
+          ],
+          estimatedWeeks: 2
+        }],
+        development: [{
+          title: "Prepara tus ideas antes de hablar",
+          description: "Cuando improvisamos, el mensaje puede perderse. Tomarte 1 minuto para ordenar ideas hace la diferencia.",
+          action: "Antes de tu próxima reunión importante, escribe 3 puntos que quieres decir",
+          targetOutcome: "Sentirte más seguro al expresar tus ideas",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'MEDIA',
+          suggestedResources: [
+            { type: 'TEMPLATE', title: "Formato: Situación → Propuesta → Beneficio" }
+          ],
+          estimatedWeeks: 4
+        }],
+        strength: [{
+          title: "Ayuda a comunicar en tu equipo",
+          description: "Si comunicas bien, puedes ayudar cuando hay que explicar algo al grupo.",
+          action: "Ofrécete para explicar un proceso o novedad a tus compañeros",
+          targetOutcome: "Ser referente de comunicación en tu equipo",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'BAJA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
+      }
+    },
+    coachingTips: {
+      blindSpot: [
+        "El colaborador cree comunicarse mejor de lo que perciben otros. Usa ejemplos concretos.",
+        "Pregunta: '¿En qué situación específica sentiste que tu mensaje no llegó bien?'"
+      ],
+      development: [
+        "Enfócate en situaciones del día a día, no en grandes presentaciones.",
+        "Sugiere grabar una reunión y revisarla juntos (si hay confianza)."
+      ],
+      strength: [
+        "Busca oportunidades para que lidere comunicaciones del equipo.",
+        "Puede ser mentor de otros en esta competencia."
+      ]
+    }
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 2. TRABAJO EN EQUIPO (CORE-TEAM)
+  // ──────────────────────────────────────────────────────────────────────────
+  'CORE-TEAM': {
+    code: 'CORE-TEAM',
+    name: 'Trabajo en Equipo',
+    keywords: ['equipo', 'team', 'colaboracion', 'cooperacion', 'sinergia', 'compañeros', 'juntos'],
+
+    strategies: {
+      EJECUTIVO: {
+        blindSpot: [{
+          title: "Revisa si tu estilo facilita o complica la colaboración",
+          description: "A veces, sin querer, nuestro estilo de trabajo dificulta que otros colaboren con nosotros.",
+          action: "Pregunta a un par: '¿Qué podría hacer para que sea más fácil trabajar conmigo?'",
+          targetOutcome: "Identificar un comportamiento específico a ajustar",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Crea espacios de colaboración cross-área",
+          description: "Los silos se rompen cuando la gente se conoce. Facilita que eso pase.",
+          action: "Organiza una sesión de trabajo con otra área que necesites y que no suelas involucrar",
+          targetOutcome: "Mejorar un proceso que requiere dos áreas",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 8
+        }],
+        strength: []
+      },
+      MANAGER: {
+        blindSpot: [{
+          title: "¿Tu equipo colabora entre ellos o solo contigo?",
+          description: "Si todo pasa por ti, no hay equipo, hay individuos que te reportan.",
+          action: "En tu próxima reunión, no resuelvas tú. Pregunta: '¿Quién puede ayudar con esto?'",
+          targetOutcome: "Tu equipo se apoya sin necesitar tu mediación",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Define roles claros en el equipo",
+          description: "Cuando no está claro quién hace qué, la gente duplica esfuerzos o deja huecos.",
+          action: "Haz un ejercicio con tu equipo: cada uno explica qué hace y los demás confirman si coincide",
+          targetOutcome: "Todos saben quién hace qué sin confusión",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'MEDIA',
+          suggestedResources: [
+            { type: 'TEMPLATE', title: "Matriz RACI simplificada" }
+          ],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      },
+      COLABORADOR: {
+        blindSpot: [{
+          title: "Revisa si otros quieren trabajar contigo",
+          description: "Todos creemos ser buen compañero. Pero la percepción de los demás es la que cuenta.",
+          action: "Pregúntale a alguien con quien trabajaste recientemente: '¿Qué podría haber hecho mejor?'",
+          targetOutcome: "Identificar un área de mejora en tu colaboración",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 2
+        }],
+        development: [{
+          title: "Ofrece ayuda sin que te lo pidan",
+          description: "El mejor compañero ve que alguien está complicado y ofrece una mano.",
+          action: "Esta semana, identifica a alguien con mucha carga y ofrécele ayuda en algo específico",
+          targetOutcome: "Ser reconocido como alguien que aporta al equipo",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      }
+    },
+    coachingTips: {
+      blindSpot: [
+        "¿Hay feedback de que es difícil trabajar con esta persona?",
+        "Observa en reuniones: ¿escucha o solo espera su turno para hablar?"
+      ],
+      development: [
+        "Asigna proyectos que requieran colaborar con otros.",
+        "Reconoce públicamente cuando ayude a un compañero."
+      ],
+      strength: [
+        "Es un conector natural. Úsalo para integrar equipos.",
+        "Puede facilitar sesiones de trabajo cross-área."
+      ]
+    }
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 3. ORIENTACIÓN A RESULTADOS (CORE-RESULTS)
+  // ──────────────────────────────────────────────────────────────────────────
+  'CORE-RESULTS': {
+    code: 'CORE-RESULTS',
+    name: 'Orientación a Resultados',
+    keywords: ['resultados', 'results', 'logros', 'metas', 'objetivos', 'cumplimiento', 'ejecucion', 'accountability'],
+
+    strategies: {
+      EJECUTIVO: {
+        blindSpot: [{
+          title: "Revisa si tus prioridades son las del negocio",
+          description: "A veces estamos ocupados en lo que nos gusta, no en lo que más impacta.",
+          action: "Lista tus 5 actividades principales de la semana. ¿Cuántas impactan el resultado del trimestre?",
+          targetOutcome: "Alinear tiempo invertido con impacto real",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'PRACTICE', title: "Auditoría semanal: ¿Dónde invertí mi tiempo?" }
+          ],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Define métricas de éxito antes de empezar",
+          description: "Si no sabes cómo vas a medir el éxito, no puedes gestionarlo.",
+          action: "Para tu próxima iniciativa, escribe primero: '¿Cómo voy a saber si funcionó?'",
+          targetOutcome: "Todas tus iniciativas tienen KPIs definidos desde el inicio",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'BOOK', title: "Measure What Matters", provider: "John Doerr" }
+          ],
+          estimatedWeeks: 6
+        }],
+        strength: []
+      },
+      MANAGER: {
+        blindSpot: [{
+          title: "Revisa si tu equipo tiene claridad de prioridades",
+          description: "Si les preguntas a 3 personas de tu equipo cuál es la prioridad, ¿dirían lo mismo?",
+          action: "Haz la prueba: pregúntale a cada uno '¿Cuál es tu prioridad #1?' y compara respuestas.",
+          targetOutcome: "Alineación del equipo en las 3 prioridades principales",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'PRACTICE', title: "Reunión semanal de 15 min: solo prioridades" }
+          ],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Haz seguimiento sistemático",
+          description: "No basta con definir objetivos. Hay que revisarlos regularmente.",
+          action: "Implementa un check-in semanal de 15 minutos solo para revisar avance de metas",
+          targetOutcome: "Detectar atrasos antes de que sean crisis",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'TEMPLATE', title: "Check-in: Meta → Avance → Bloqueadores → Acción" }
+          ],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      },
+      COLABORADOR: {
+        blindSpot: [{
+          title: "Pregunta si estás trabajando en lo correcto",
+          description: "Estar ocupado no es lo mismo que ser productivo.",
+          action: "Pregúntale a tu jefe: '¿Estoy enfocado en lo que más te importa?'",
+          targetOutcome: "Confirmar que tus esfuerzos están alineados",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 2
+        }],
+        development: [{
+          title: "Termina lo que empiezas",
+          description: "Es fácil empezar muchas cosas. Lo difícil es cerrarlas.",
+          action: "Haz una lista de pendientes. Elige 3 para terminar esta semana y di no a lo demás.",
+          targetOutcome: "Reducir tu lista de pendientes a la mitad",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      }
+    },
+    coachingTips: {
+      blindSpot: [
+        "¿Está confundiendo actividad con resultados?",
+        "Pregunta: '¿Cuál fue tu logro más importante del mes?'"
+      ],
+      development: [
+        "Ayúdale a priorizar. A veces el problema no es capacidad, es foco.",
+        "Revisen juntos cómo invierte su tiempo."
+      ],
+      strength: ["Dale los proyectos más críticos.", "Puede enseñar su método a otros."]
+    }
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 4. ADAPTABILIDAD (CORE-ADAPT)
+  // ──────────────────────────────────────────────────────────────────────────
+  'CORE-ADAPT': {
+    code: 'CORE-ADAPT',
+    name: 'Adaptabilidad',
+    keywords: ['adaptabilidad', 'flexibilidad', 'cambio', 'resiliencia', 'ajuste', 'agil'],
+
+    strategies: {
+      EJECUTIVO: {
+        blindSpot: [{
+          title: "Revisa si tu resistencia al cambio es visible",
+          description: "A veces creemos ser flexibles, pero otros ven rigidez en nuestras decisiones.",
+          action: "Pregunta a alguien de confianza: '¿En qué situaciones me ves resistente al cambio?'",
+          targetOutcome: "Identificar patrones de rigidez no conscientes",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Practica cambiar de opinión públicamente",
+          description: "Los líderes que nunca cambian de opinión generan culturas rígidas.",
+          action: "La próxima vez que alguien te convenza con un buen argumento, reconócelo frente al equipo",
+          targetOutcome: "Modelar que cambiar de opinión es válido",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        strength: []
+      },
+      MANAGER: {
+        blindSpot: [{
+          title: "¿Tu equipo siente que puede proponer cambios?",
+          description: "Si siempre defiendes 'cómo se ha hecho siempre', tu equipo dejará de proponer.",
+          action: "Pregunta a tu equipo: '¿Qué proceso cambiarían si pudieran?'",
+          targetOutcome: "Abrir espacio para ideas nuevas",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Implementa un cambio pequeño propuesto por tu equipo",
+          description: "La mejor forma de demostrar apertura es actuar, no solo escuchar.",
+          action: "Elige una sugerencia de tu equipo e impleméntala este mes",
+          targetOutcome: "Tu equipo ve que sus ideas se concretan",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      },
+      COLABORADOR: {
+        blindSpot: [{
+          title: "Revisa cómo reaccionas ante cambios",
+          description: "Puede que no notes que tu primera reacción es resistir.",
+          action: "La próxima vez que anuncien un cambio, espera 24 horas antes de opinar.",
+          targetOutcome: "Responder en vez de reaccionar",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Ofrécete para algo nuevo",
+          description: "La adaptabilidad se ejercita saliendo de la zona cómoda.",
+          action: "Pide participar en un proyecto o tarea diferente a lo que haces normalmente",
+          targetOutcome: "Demostrar flexibilidad ante lo nuevo",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        strength: []
+      }
+    },
+    coachingTips: {
+      blindSpot: [
+        "¿Cómo reacciona cuando le cambian las reglas del juego?",
+        "Observa si su primera respuesta ante cambios es buscar problemas o soluciones."
+      ],
+      development: [
+        "Exponlo gradualmente a situaciones de cambio controlado.",
+        "Celebra cuando maneje bien una situación inesperada."
+      ],
+      strength: ["Es ideal para liderar pilotos o proyectos nuevos.", "Puede ayudar a otros a adaptarse."]
+    }
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 5. ORIENTACIÓN AL CLIENTE (CORE-CLIENT)
+  // ──────────────────────────────────────────────────────────────────────────
+  'CORE-CLIENT': {
+    code: 'CORE-CLIENT',
+    name: 'Orientación al Cliente',
+    keywords: ['cliente', 'customer', 'servicio', 'usuario', 'necesidades', 'satisfaccion'],
+
+    strategies: {
+      EJECUTIVO: {
+        blindSpot: [{
+          title: "¿Cuándo fue la última vez que hablaste con un cliente?",
+          description: "Es fácil alejarse del cliente cuando subes de nivel. Eso distorsiona las decisiones.",
+          action: "Agenda una conversación directa con un cliente este mes, sin intermediarios",
+          targetOutcome: "Reconectar con la realidad del cliente",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Incluye la voz del cliente en tus decisiones",
+          description: "Antes de decidir algo importante, pregunta: ¿qué diría el cliente?",
+          action: "En tu próxima decisión estratégica, pide datos de satisfacción o feedback de clientes",
+          targetOutcome: "Decisiones basadas en necesidades reales",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        strength: []
+      },
+      MANAGER: {
+        blindSpot: [{
+          title: "¿Tu equipo conoce el impacto de su trabajo en el cliente?",
+          description: "Si no saben cómo afectan al cliente, no pueden priorizarlo.",
+          action: "Comparte con tu equipo un caso real de cómo su trabajo afectó a un cliente",
+          targetOutcome: "Conectar el trabajo diario con el cliente final",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Crea un canal de feedback del cliente",
+          description: "Si el feedback del cliente no llega, no puede mejorar nada.",
+          action: "Implementa una forma simple de que el feedback del cliente llegue a tu equipo",
+          targetOutcome: "Tu equipo escucha al cliente regularmente",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        strength: []
+      },
+      COLABORADOR: {
+        blindSpot: [{
+          title: "Pregunta cómo impactas al cliente",
+          description: "Si no sabes cómo tu trabajo afecta al cliente, es difícil priorizarlo.",
+          action: "Pregunta a tu jefe: '¿Cómo afecta mi trabajo al cliente final?'",
+          targetOutcome: "Entender tu rol en la cadena de valor",
+          category: 'KNOWLEDGE_ACQUISITION',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 2
+        }],
+        development: [{
+          title: "Ponte en los zapatos del cliente",
+          description: "La mejor forma de entender al cliente es experimentar lo que él experimenta.",
+          action: "Si es posible, usa tu producto/servicio como lo haría un cliente",
+          targetOutcome: "Empatía real con la experiencia del cliente",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      }
+    },
+    coachingTips: {
+      blindSpot: [
+        "¿Habla del cliente o solo de procesos internos?",
+        "Pregunta: '¿Quién es tu cliente y qué necesita?'"
+      ],
+      development: [
+        "Exponlo a feedback directo de clientes.",
+        "Asigna tareas donde vea el impacto en el cliente."
+      ],
+      strength: ["Puede ser embajador de la voz del cliente.", "Ideal para proyectos de mejora de experiencia."]
+    }
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // LEADERSHIP - 4 COMPETENCIAS (Managers + Ejecutivos)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 6. DESARROLLO DE PERSONAS (LEAD-DEV)
+  // ──────────────────────────────────────────────────────────────────────────
+  'LEAD-DEV': {
+    code: 'LEAD-DEV',
+    name: 'Desarrollo de Personas',
+    keywords: ['desarrollo', 'personas', 'coaching', 'mentoring', 'crecimiento', 'feedback', 'talento'],
+
+    strategies: {
+      EJECUTIVO: {
+        blindSpot: [{
+          title: "¿Estás desarrollando sucesores?",
+          description: "Si nadie puede reemplazarte, no estás desarrollando a tu equipo.",
+          action: "Identifica a 2 personas que podrían asumir tu rol y pregúntales qué les falta",
+          targetOutcome: "Tener un plan de sucesión claro",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 8
+        }],
+        development: [{
+          title: "Dedica tiempo a conversaciones de desarrollo",
+          description: "El desarrollo no pasa en evaluaciones anuales. Pasa en conversaciones frecuentes.",
+          action: "Agenda 30 minutos mensuales con cada reporte directo solo para hablar de su desarrollo",
+          targetOutcome: "Cada persona tiene un plan de desarrollo activo",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        strength: []
+      },
+      MANAGER: {
+        blindSpot: [{
+          title: "¿Cuándo fue tu última conversación de desarrollo?",
+          description: "Si solo hablas de tareas, no estás desarrollando a nadie.",
+          action: "Esta semana, pregúntale a alguien de tu equipo: '¿En qué te gustaría crecer?'",
+          targetOutcome: "Conocer las aspiraciones de tu equipo",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 2
+        }],
+        development: [{
+          title: "Da feedback en el momento",
+          description: "El feedback pierde valor con el tiempo. Dalo cuando pasa, no meses después.",
+          action: "La próxima vez que veas algo que mejorar, dilo en las siguientes 24 horas",
+          targetOutcome: "Feedback oportuno se vuelve hábito",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'PRACTICE', title: "Formato SBI: Situación-Comportamiento-Impacto" }
+          ],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      },
+      COLABORADOR: {
+        blindSpot: [{
+          title: "El desarrollo no es solo responsabilidad de tu jefe",
+          description: "Puedes ayudar a crecer a otros aunque no tengas gente a cargo.",
+          action: "Ofrécete para enseñar algo que sabes a un compañero que lo necesite",
+          targetOutcome: "Practicar habilidades de mentoría",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        development: [{
+          title: "Aprende a dar feedback constructivo",
+          description: "Dar feedback es una habilidad que te servirá siempre, seas jefe o no.",
+          action: "Practica dando feedback positivo a un compañero esta semana",
+          targetOutcome: "Comodidad al dar feedback",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      }
+    },
+    coachingTips: {
+      blindSpot: [
+        "¿Habla de su equipo como 'recursos' o como personas con potencial?",
+        "Pregunta: '¿Quién ha crecido gracias a ti?'"
+      ],
+      development: [
+        "Modela cómo dar feedback efectivo.",
+        "Asigna un 'pupilo' para que practique."
+      ],
+      strength: ["Puede liderar programas de mentoría.", "Ideal para onboarding de nuevos."]
+    }
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 7. TOMA DE DECISIONES (LEAD-DECISION)
+  // ──────────────────────────────────────────────────────────────────────────
+  'LEAD-DECISION': {
+    code: 'LEAD-DECISION',
+    name: 'Toma de Decisiones',
+    keywords: ['decision', 'decisiones', 'criterio', 'juicio', 'analisis', 'riesgo'],
+
+    strategies: {
+      EJECUTIVO: {
+        blindSpot: [{
+          title: "¿Tus decisiones consideran perspectivas diversas?",
+          description: "Rodearte de gente que piensa igual genera puntos ciegos.",
+          action: "Antes de tu próxima decisión importante, pide opinión a alguien que suele pensar diferente",
+          targetOutcome: "Decisiones más robustas",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Acelera tus decisiones reversibles",
+          description: "No todas las decisiones merecen el mismo análisis. Las reversibles pueden ser rápidas.",
+          action: "Clasifica tus próximas decisiones: ¿reversibles o irreversibles? Acelera las primeras.",
+          targetOutcome: "Mayor velocidad sin perder calidad",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'PRACTICE', title: "Framework: Decisiones Tipo 1 vs Tipo 2 (Bezos)" }
+          ],
+          estimatedWeeks: 6
+        }],
+        strength: []
+      },
+      MANAGER: {
+        blindSpot: [{
+          title: "¿Estás decidiendo cosas que tu equipo podría decidir?",
+          description: "Si todo pasa por ti, eres cuello de botella y no desarrollas autonomía.",
+          action: "Identifica 3 tipos de decisiones que puedes delegar esta semana",
+          targetOutcome: "Tu equipo decide más cosas sin consultarte",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Comunica el 'por qué' de tus decisiones",
+          description: "Si tu equipo no entiende tu lógica, no aprende a decidir como tú.",
+          action: "La próxima vez que tomes una decisión, explica brevemente tu razonamiento",
+          targetOutcome: "Tu equipo entiende cómo piensas",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      },
+      COLABORADOR: {
+        blindSpot: [{
+          title: "¿Llevas opciones o solo problemas?",
+          description: "Llevar siempre el problema sin propuesta te hace ver dependiente.",
+          action: "La próxima vez que tengas un problema, lleva al menos 2 opciones de solución",
+          targetOutcome: "Ser visto como alguien que propone, no solo reporta",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Practica decidir en lo pequeño",
+          description: "La toma de decisiones se ejercita. Empieza con lo que sí puedes decidir.",
+          action: "Identifica algo en tu trabajo que puedes decidir sin consultar, y hazlo",
+          targetOutcome: "Mayor autonomía en tu rol",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      }
+    },
+    coachingTips: {
+      blindSpot: [
+        "¿Paraliza por análisis o decide impulsivamente?",
+        "Pregunta: '¿Cuál fue tu última decisión difícil y cómo la tomaste?'"
+      ],
+      development: [
+        "Dale decisiones pequeñas para practicar.",
+        "Revisen juntos decisiones pasadas: qué funcionó, qué no."
+      ],
+      strength: ["Puede facilitar sesiones de toma de decisiones.", "Buen candidato para proyectos complejos."]
+    }
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 8. INNOVACIÓN Y MEJORA CONTINUA (LEAD-INNOV)
+  // ──────────────────────────────────────────────────────────────────────────
+  'LEAD-INNOV': {
+    code: 'LEAD-INNOV',
+    name: 'Innovación y Mejora Continua',
+    keywords: ['innovacion', 'mejora', 'creatividad', 'ideas', 'procesos', 'optimizar'],
+
+    strategies: {
+      EJECUTIVO: {
+        blindSpot: [{
+          title: "¿Estás matando ideas sin darte cuenta?",
+          description: "A veces rechazamos ideas nuevas tan rápido que dejamos de recibirlas.",
+          action: "La próxima vez que alguien proponga algo, di 'cuéntame más' antes de evaluar",
+          targetOutcome: "Crear espacio para ideas nuevas",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Asigna tiempo para experimentar",
+          description: "Sin tiempo protegido, la innovación siempre pierde ante lo urgente.",
+          action: "Define un porcentaje de tiempo de tu equipo para explorar mejoras",
+          targetOutcome: "Innovación como práctica, no accidente",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 8
+        }],
+        strength: []
+      },
+      MANAGER: {
+        blindSpot: [{
+          title: "¿Tu equipo propone mejoras o solo ejecuta?",
+          description: "Si nadie propone nada, puede que no sientan que es seguro hacerlo.",
+          action: "En tu próxima reunión, pregunta: '¿Qué deberíamos dejar de hacer?'",
+          targetOutcome: "Abrir espacio para cuestionar lo establecido",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Implementa una mejora sugerida por tu equipo",
+          description: "Si las ideas nunca se concretan, la gente deja de proponerlas.",
+          action: "Elige una sugerencia de mejora de tu equipo y ejecútala este mes",
+          targetOutcome: "Tu equipo ve que sus ideas importan",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      },
+      COLABORADOR: {
+        blindSpot: [{
+          title: "¿Propones mejoras o solo te quejas?",
+          description: "Hay una diferencia entre identificar problemas y proponer soluciones.",
+          action: "La próxima vez que veas algo que no funciona, lleva una propuesta de mejora",
+          targetOutcome: "Ser visto como alguien que aporta soluciones",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Mejora algo pequeño de tu proceso",
+          description: "No necesitas permiso para optimizar cómo haces tu trabajo.",
+          action: "Identifica una tarea repetitiva y busca una forma de hacerla más rápido",
+          targetOutcome: "Demostrar mentalidad de mejora continua",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      }
+    },
+    coachingTips: {
+      blindSpot: [
+        "¿Rechaza ideas nuevas con 'ya lo intentamos' o 'aquí no funciona'?",
+        "Observa si defiende el status quo por comodidad."
+      ],
+      development: [
+        "Asigna un proceso para que lo mejore.",
+        "Celebra las mejoras, aunque sean pequeñas."
+      ],
+      strength: ["Ideal para liderar iniciativas de innovación.", "Puede inspirar a otros a proponer."]
+    }
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 9. EMPODERAMIENTO (LEAD-EMPOW)
+  // ──────────────────────────────────────────────────────────────────────────
+  'LEAD-EMPOW': {
+    code: 'LEAD-EMPOW',
+    name: 'Empoderamiento',
+    keywords: ['empoderamiento', 'delegacion', 'autonomia', 'confianza', 'empoderar'],
+
+    strategies: {
+      EJECUTIVO: {
+        blindSpot: [{
+          title: "¿Tu equipo puede actuar sin tu aprobación?",
+          description: "Si todo requiere tu visto bueno, no estás empoderando.",
+          action: "Define 3 áreas donde tu equipo puede decidir sin consultarte y comunícalo",
+          targetOutcome: "Mayor autonomía de tu equipo directo",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        development: [{
+          title: "Delega un proyecto completo, no solo tareas",
+          description: "Empoderar es dar la responsabilidad completa, no micro-tareas.",
+          action: "Asigna un proyecto de principio a fin a alguien de tu equipo",
+          targetOutcome: "Desarrollar ownership en tu equipo",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'BOOK', title: "Turn the Ship Around!", provider: "David Marquet" }
+          ],
+          estimatedWeeks: 8
+        }],
+        strength: []
+      },
+      MANAGER: {
+        blindSpot: [{
+          title: "¿Confías en tu equipo o verificas todo?",
+          description: "Si revisas cada detalle, estás comunicando desconfianza.",
+          action: "Elige algo que normalmente revisas y déjalo pasar sin verificar esta semana",
+          targetOutcome: "Demostrar confianza con acciones",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Pregunta antes de instruir",
+          description: "Empoderar es dejar que piensen, no darles la respuesta.",
+          action: "Cuando te pregunten algo, responde: '¿Tú qué harías?' antes de dar tu opinión",
+          targetOutcome: "Tu equipo resuelve más solo",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      },
+      COLABORADOR: {
+        blindSpot: [{
+          title: "¿Esperas instrucciones o tomas iniciativa?",
+          description: "El empoderamiento es recíproco. Si esperas que te digan todo, no lo estás aprovechando.",
+          action: "Identifica algo que podrías decidir por tu cuenta y hazlo",
+          targetOutcome: "Demostrar que puedes manejar más autonomía",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Pide más responsabilidad",
+          description: "Si quieres más empoderamiento, pídelo con una propuesta concreta.",
+          action: "Dile a tu jefe: 'Me gustaría hacerme cargo de X. ¿Qué necesitarías ver para confiarme eso?'",
+          targetOutcome: "Abrir conversación sobre mayor autonomía",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      }
+    },
+    coachingTips: {
+      blindSpot: [
+        "¿Dice que delega pero revisa cada detalle?",
+        "Pregunta: '¿Qué pasaría si no estuvieras una semana?'"
+      ],
+      development: [
+        "Ayúdale a soltar control gradualmente.",
+        "Muestra ejemplos de delegación efectiva."
+      ],
+      strength: ["Su equipo probablemente es autónomo.", "Puede enseñar a otros managers."]
+    }
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // STRATEGIC - 3 COMPETENCIAS (Solo Ejecutivos)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 10. VISIÓN ESTRATÉGICA (STRAT-VISION)
+  // ──────────────────────────────────────────────────────────────────────────
+  'STRAT-VISION': {
+    code: 'STRAT-VISION',
+    name: 'Visión Estratégica',
+    keywords: ['vision', 'estrategia', 'futuro', 'largo plazo', 'direccion'],
+
+    strategies: {
+      EJECUTIVO: {
+        blindSpot: [{
+          title: "¿Tu equipo conoce tu visión?",
+          description: "Tener visión no sirve si nadie más la conoce.",
+          action: "Pregunta a 3 personas: '¿Hacia dónde vamos como área?' Si las respuestas varían mucho, hay trabajo por hacer.",
+          targetOutcome: "Alineación de tu equipo con la visión",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Dedica tiempo a pensar en el futuro",
+          description: "Si el día a día te consume, no hay espacio para la estrategia.",
+          action: "Bloquea 2 horas semanales en tu agenda solo para pensar, sin reuniones ni emails",
+          targetOutcome: "Espacio protegido para pensamiento estratégico",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        strength: []
+      },
+      MANAGER: {
+        blindSpot: [{
+          title: "¿Conectas tu trabajo con la estrategia mayor?",
+          description: "Si solo ves tu área, pierdes la perspectiva del negocio.",
+          action: "Pregunta a tu jefe: '¿Cómo contribuye mi área a la estrategia de la empresa?'",
+          targetOutcome: "Claridad de cómo encaja tu trabajo en el todo",
+          category: 'KNOWLEDGE_ACQUISITION',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Mira más allá de tu área",
+          description: "La visión estratégica requiere entender el contexto completo.",
+          action: "Agenda un café con alguien de otra área para entender qué hacen y cómo se conecta contigo",
+          targetOutcome: "Visión más amplia del negocio",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        strength: []
+      },
+      COLABORADOR: {
+        blindSpot: [{
+          title: "¿Sabes cómo tu trabajo impacta el objetivo mayor?",
+          description: "Es difícil priorizar si no ves el panorama completo.",
+          action: "Pregunta a tu jefe cómo tu trabajo contribuye a los objetivos del área",
+          targetOutcome: "Entender tu impacto en la estrategia",
+          category: 'KNOWLEDGE_ACQUISITION',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 2
+        }],
+        development: [{
+          title: "Interésate por el negocio, no solo tu tarea",
+          description: "Entender el contexto te hace más valioso.",
+          action: "Lee las comunicaciones de la empresa sobre estrategia y resultados",
+          targetOutcome: "Mayor conocimiento del negocio",
+          category: 'KNOWLEDGE_ACQUISITION',
+          priority: 'BAJA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      }
+    },
+    coachingTips: {
+      blindSpot: [
+        "¿Habla solo de tareas o también de hacia dónde va?",
+        "Pregunta: '¿Cómo se ve el éxito en 3 años?'"
+      ],
+      development: [
+        "Exponlo a discusiones estratégicas.",
+        "Asigna proyectos que requieran pensar en el futuro."
+      ],
+      strength: ["Puede facilitar sesiones de estrategia.", "Ideal para comunicar el rumbo."]
+    }
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 11. GESTIÓN DEL CAMBIO (STRAT-CHANGE)
+  // ──────────────────────────────────────────────────────────────────────────
+  'STRAT-CHANGE': {
+    code: 'STRAT-CHANGE',
+    name: 'Gestión del Cambio',
+    keywords: ['cambio', 'transformacion', 'transicion', 'resistencia', 'adopcion'],
+
+    strategies: {
+      EJECUTIVO: {
+        blindSpot: [{
+          title: "¿Comunicas el 'por qué' del cambio?",
+          description: "Sin el 'por qué', la gente resiste. Con el 'por qué', la gente colabora.",
+          action: "En tu próximo cambio, dedica el doble de tiempo a explicar el por qué que al qué",
+          targetOutcome: "Menor resistencia a tus iniciativas",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'BOOK', title: "Start with Why", provider: "Simon Sinek" }
+          ],
+          estimatedWeeks: 6
+        }],
+        development: [{
+          title: "Involucra a los afectados antes de decidir",
+          description: "La gente apoya lo que ayuda a crear.",
+          action: "Antes de tu próximo cambio importante, consulta a quienes se verán afectados",
+          targetOutcome: "Cambios con mayor adopción",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 8
+        }],
+        strength: []
+      },
+      MANAGER: {
+        blindSpot: [{
+          title: "¿Proteges a tu equipo del cambio o los ayudas a navegarlo?",
+          description: "Proteger del cambio no es sostenible. Equiparlos para manejarlo sí lo es.",
+          action: "Cuando venga un cambio, en vez de absorberlo solo, prepara a tu equipo para entenderlo",
+          targetOutcome: "Equipo más resiliente ante cambios",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        development: [{
+          title: "Identifica a los resistentes y entiéndelos",
+          description: "La resistencia tiene razones. Entenderlas es el primer paso para manejarlas.",
+          action: "Habla 1:1 con quien más resista el cambio y pregunta qué le preocupa",
+          targetOutcome: "Convertir resistentes en aliados",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      },
+      COLABORADOR: {
+        blindSpot: [{
+          title: "¿Cómo reaccionas cuando cambian las cosas?",
+          description: "Tu primera reacción al cambio dice mucho de ti.",
+          action: "La próxima vez que anuncien un cambio, espera antes de quejarte y pregunta: '¿Qué oportunidad hay aquí?'",
+          targetOutcome: "Reacción más constructiva ante cambios",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Sé de los primeros en adoptar",
+          description: "Los early adopters son más visibles y valiosos en procesos de cambio.",
+          action: "En el próximo cambio, ofrécete como piloto o usuario temprano",
+          targetOutcome: "Ser visto como alguien que facilita el cambio",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        strength: []
+      }
+    },
+    coachingTips: {
+      blindSpot: [
+        "¿Impone cambios o los facilita?",
+        "Pregunta: '¿Cómo manejaste la resistencia en tu último cambio?'"
+      ],
+      development: [
+        "Asigna un cambio pequeño para que practique.",
+        "Revisen juntos qué funcionó y qué no."
+      ],
+      strength: ["Ideal para liderar transformaciones.", "Puede enseñar a otros managers."]
+    }
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 12. INFLUENCIA ORGANIZACIONAL (STRAT-INFLUENCE)
+  // ──────────────────────────────────────────────────────────────────────────
+  'STRAT-INFLUENCE': {
+    code: 'STRAT-INFLUENCE',
+    name: 'Influencia Organizacional',
+    keywords: ['influencia', 'politica', 'stakeholders', 'persuasion', 'alianzas'],
+
+    strategies: {
+      EJECUTIVO: {
+        blindSpot: [{
+          title: "¿Tienes aliados fuera de tu área?",
+          description: "Si solo tienes poder en tu área, tu influencia es limitada.",
+          action: "Identifica 2 pares de otras áreas con quienes deberías tener mejor relación y agenda un café",
+          targetOutcome: "Ampliar tu red de influencia",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        development: [{
+          title: "Entiende las prioridades de otros",
+          description: "Para influir, primero hay que entender qué le importa al otro.",
+          action: "Antes de pedir apoyo para algo, pregunta: '¿Qué necesitas tú?' y busca cómo ayudar primero",
+          targetOutcome: "Relaciones de reciprocidad",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'BOOK', title: "Influence Without Authority", provider: "Cohen & Bradford" }
+          ],
+          estimatedWeeks: 8
+        }],
+        strength: []
+      },
+      MANAGER: {
+        blindSpot: [{
+          title: "¿Dependes solo de tu jefe para conseguir cosas?",
+          description: "Si tu única vía es escalar, tu capacidad de acción es limitada.",
+          action: "Identifica algo que necesitas de otra área y consíguelo directamente, sin escalar",
+          targetOutcome: "Resolver cosas lateralmente",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        development: [{
+          title: "Construye relaciones antes de necesitarlas",
+          description: "La influencia se construye con el tiempo, no en el momento que la necesitas.",
+          action: "Agenda un café con alguien de otra área con quien podrías colaborar en el futuro",
+          targetOutcome: "Red de contactos más amplia",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 8
+        }],
+        strength: []
+      },
+      COLABORADOR: {
+        blindSpot: [{
+          title: "¿Conoces gente fuera de tu equipo inmediato?",
+          description: "Tu red de contactos afecta tu capacidad de hacer cosas.",
+          action: "Preséntate a alguien de otra área con quien tu trabajo se relaciona",
+          targetOutcome: "Ampliar tu red dentro de la empresa",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'BAJA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        development: [{
+          title: "Aprende a pedir ayuda efectivamente",
+          description: "Pedir ayuda es una habilidad. Hazlo fácil para el otro.",
+          action: "La próxima vez que necesites algo, sé específico: qué necesitas, para cuándo, y cómo impacta",
+          targetOutcome: "Mayor efectividad al pedir colaboración",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      }
+    },
+    coachingTips: {
+      blindSpot: [
+        "¿Tiene buenas relaciones fuera de su área?",
+        "Pregunta: '¿Quién te apoyaría si necesitaras algo de otra área?'"
+      ],
+      development: [
+        "Asigna proyectos que requieran coordinación lateral.",
+        "Modela cómo construir alianzas."
+      ],
+      strength: ["Es un conector natural.", "Ideal para proyectos cross-funcionales."]
+    }
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// TEMPLATE GENÉRICO (Fallback cuando no hay match)
+// ──────────────────────────────────────────────────────────────────────────
+export const GENERIC_COMPETENCY_TEMPLATE: CompetencyTemplate = {
+  code: 'GENERIC',
+  name: 'Competencia General',
+  keywords: [],
+
+  strategies: {
+    EJECUTIVO: {
+      blindSpot: [{
+        title: "Busca perspectivas diferentes a la tuya",
+        description: "Hay una diferencia entre cómo te evalúas y cómo te ven. Esa información es valiosa.",
+        action: "Pide a 2 personas de confianza feedback específico sobre esta competencia",
+        targetOutcome: "Entender la brecha de percepción",
+        category: 'BEHAVIORAL_CHANGE',
+        priority: 'ALTA',
+        suggestedResources: [],
+        estimatedWeeks: 4
+      }],
+      development: [{
+        title: "Define una práctica semanal",
+        description: "Las competencias se desarrollan con práctica deliberada, no con buenas intenciones.",
+        action: "Elige una acción pequeña relacionada con esta competencia y hazla cada semana",
+        targetOutcome: "Crear un hábito de mejora",
+        category: 'SKILL_DEVELOPMENT',
+        priority: 'MEDIA',
+        suggestedResources: [],
+        estimatedWeeks: 8
+      }],
+      strength: []
+    },
+    MANAGER: {
+      blindSpot: [{
+        title: "Pide feedback a tu equipo",
+        description: "Tu equipo ve cosas que tu jefe no ve. Esa perspectiva completa el cuadro.",
+        action: "Pregunta a 2 personas de tu equipo cómo perciben esta competencia en ti",
+        targetOutcome: "Obtener una visión más completa",
+        category: 'BEHAVIORAL_CHANGE',
+        priority: 'ALTA',
+        suggestedResources: [],
+        estimatedWeeks: 4
+      }],
+      development: [{
+        title: "Observa a alguien que lo haga bien",
+        description: "A veces la mejor forma de aprender es observar. Identifica a alguien que destaque en esto.",
+        action: "Pide permiso para observar cómo maneja situaciones relacionadas con esta competencia",
+        targetOutcome: "Aprender de un modelo a seguir",
+        category: 'KNOWLEDGE_ACQUISITION',
+        priority: 'MEDIA',
+        suggestedResources: [],
+        estimatedWeeks: 6
+      }],
+      strength: []
+    },
+    COLABORADOR: {
+      blindSpot: [{
+        title: "Entiende cómo te perciben",
+        description: "Hay una diferencia entre tu autoevaluación y la de tu jefatura. Vale la pena explorarla.",
+        action: "Pregunta a tu jefe o a un compañero: '¿Cómo me ves en esta área?'",
+        targetOutcome: "Identificar la brecha de percepción",
+        category: 'BEHAVIORAL_CHANGE',
+        priority: 'MEDIA',
+        suggestedResources: [],
+        estimatedWeeks: 2
+      }],
+      development: [{
+        title: "Practica en situaciones de bajo riesgo",
+        description: "Las competencias se desarrollan practicando. Busca oportunidades pequeñas para ejercitar.",
+        action: "Identifica una situación esta semana donde puedas practicar esta competencia",
+        targetOutcome: "Ganar confianza gradualmente",
+        category: 'EXPERIENCE_BUILDING',
+        priority: 'MEDIA',
+        suggestedResources: [],
+        estimatedWeeks: 6
+      }],
+      strength: []
+    }
+  },
+
+  coachingTips: {
+    blindSpot: ["Usa ejemplos concretos, no opiniones generales."],
+    development: ["Enfócate en prácticas, no en teoría."],
+    strength: ["Busca oportunidades para que enseñe a otros."]
+  }
+}
