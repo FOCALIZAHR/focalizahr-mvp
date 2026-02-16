@@ -12,6 +12,9 @@ import { GapInsightCarousel } from '@/components/performance/gap-analysis'
 import TeamCalibrationHUD from '@/components/performance/TeamCalibrationHUD'
 import InsightCarousel from '@/components/performance/summary/InsightCarousel'
 import PerformanceScoreCard from '@/components/performance/PerformanceScoreCard'
+import CompetencyRadarModal from '@/components/performance/gap-analysis/CompetencyRadarModal'
+import { GhostButton } from '@/components/ui/PremiumButton'
+import { Radar } from 'lucide-react'
 import type { CinemaSummaryData } from '@/types/evaluator-cinema'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -33,6 +36,7 @@ export default function EvaluationSummaryPage() {
   // Estado para toggle de vistas de inteligencia
   // ═══════════════════════════════════════════════════════════════════════════
   const [activeView, setActiveView] = useState<IntelligenceView>('calibracion')
+  const [showRadarModal, setShowRadarModal] = useState(false)
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Estado para team members (ranking de calibración)
@@ -254,6 +258,15 @@ export default function EvaluationSummaryPage() {
             Coaching
           </button>
         </div>
+        {summary?.competencyScores && (
+          <GhostButton
+            icon={Radar}
+            size="sm"
+            onClick={() => setShowRadarModal(true)}
+          >
+            Radar
+          </GhostButton>
+        )}
       </div>
 
       {/* Contenido según vista activa */}
@@ -313,6 +326,14 @@ export default function EvaluationSummaryPage() {
             </div>
           )}
         </div>
+      )}
+      {summary?.competencyScores && (
+        <CompetencyRadarModal
+          isOpen={showRadarModal}
+          onClose={() => setShowRadarModal(false)}
+          competencyScores={summary.competencyScores}
+          employeeName={summary.evaluatee.fullName}
+        />
       )}
     </div>
   )
