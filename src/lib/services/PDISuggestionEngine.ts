@@ -187,24 +187,28 @@ export class PDISuggestionEngine {
       return []
     }
 
-    // Filtrar solo gaps que necesitan desarrollo (IMPROVE o CRITICAL)
-    const developmentGaps = roleFit.gaps.filter(
-      g => g.status === 'IMPROVE' || g.status === 'CRITICAL'
+    // Procesar EXCEEDS (talentos) + IMPROVE + CRITICAL (desarrollo)
+    // Solo excluir MATCH (cumple exactamente, sin brecha)
+    const relevantGaps = roleFit.gaps.filter(
+      g => g.status !== 'MATCH'
     )
 
-    if (developmentGaps.length === 0) {
-      console.log('[PDIEngine] Employee cumple o excede todos los targets')
+    if (relevantGaps.length === 0) {
+      console.log('[PDIEngine] Employee cumple todos los targets sin brechas')
       return []
     }
 
     // Transformar a formato del engine existente
-    // Siempre DEVELOPMENT_AREA: PDI compara nota jefe vs target del cargo, no hay autoevaluación
-    const gapInputs: GapAnalysisInput[] = developmentGaps.map(gap => ({
+    // EXCEEDS → HIDDEN_STRENGTH (reconocer talento, sugerencias de potenciación)
+    // IMPROVE/CRITICAL → DEVELOPMENT_AREA (sugerencias de desarrollo)
+    const gapInputs: GapAnalysisInput[] = relevantGaps.map(gap => ({
       competencyCode: gap.competencyCode,
       competencyName: gap.competencyName,
       selfScore: gap.actualScore,
       managerScore: gap.targetScore,
-      gapType: 'DEVELOPMENT_AREA' as DevelopmentGapType,
+      gapType: gap.status === 'EXCEEDS'
+        ? ('HIDDEN_STRENGTH' as DevelopmentGapType)
+        : ('DEVELOPMENT_AREA' as DevelopmentGapType),
       gapValue: gap.rawGap
     }))
 

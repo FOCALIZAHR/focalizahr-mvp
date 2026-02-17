@@ -177,7 +177,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 8
         }],
-        strength: []
+        strength: [{
+          title: "Conecta lo que está desconectado",
+          description: "Tu capacidad de colaborar es excepcional. Úsala para unir áreas que hoy no se hablan.",
+          action: "Identifica dos gerencias aisladas y lidera una iniciativa conjunta entre ellas.",
+          targetOutcome: "Crear un flujo de trabajo cross-funcional exitoso",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 12
+        }]
       },
       MANAGER: {
         blindSpot: [{
@@ -202,7 +211,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           ],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Enseña a construir confianza",
+          description: "Has creado un entorno seguro. Otros líderes necesitan aprender eso de ti.",
+          action: "Invita a otro manager a observar una de tus reuniones para que vea cómo fomentas la participación.",
+          targetOutcome: "Mentorear a un par en dinámicas de equipo",
+          category: 'MENTORING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       },
       COLABORADOR: {
         blindSpot: [{
@@ -225,7 +243,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Sé el mentor de los nuevos",
+          description: "Eres el modelo de cómo trabajar en equipo aquí. Eres la mejor persona para recibir a los nuevos.",
+          action: "Ofrécete voluntariamente para acompañar al próximo ingreso de tu área durante su primera semana.",
+          targetOutcome: "Acelerar la integración de nuevos compañeros",
+          category: 'MENTORING',
+          priority: 'BAJA',
+          suggestedResources: [],
+          estimatedWeeks: 2
+        }]
       }
     },
     coachingTips: {
@@ -278,7 +305,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           ],
           estimatedWeeks: 6
         }],
-        strength: []
+        strength: [{
+          title: "Eleva la ambición de la organización",
+          description: "Logras lo que te propones. Ayuda a definir metas más agresivas para la compañía.",
+          action: "Lidera la definición de los OKRs del próximo año para toda tu división.",
+          targetOutcome: "Alinear estrategia con ejecución de excelencia",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 8
+        }]
       },
       MANAGER: {
         blindSpot: [{
@@ -305,7 +341,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           ],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Exporta tu fórmula de éxito",
+          description: "Tu equipo cumple consistentemente. Tienes un método que el resto debería copiar.",
+          action: "Documenta tu proceso de seguimiento semanal y compártelo en la reunión de gerencia.",
+          targetOutcome: "Que otros equipos adopten tus buenas prácticas",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       },
       COLABORADOR: {
         blindSpot: [{
@@ -328,7 +373,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Optimiza un proceso lento",
+          description: "Eres muy eficiente. Seguramente ves pasos inútiles que otros ignoran.",
+          action: "Elige una tarea repetitiva del equipo y propón una forma de hacerla en la mitad del tiempo.",
+          targetOutcome: "Ahorrar tiempo operativo a todo el equipo",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       }
     },
     coachingTips: {
@@ -374,7 +428,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 6
         }],
-        strength: []
+        strength: [{
+          title: "Patrocina la transformación",
+          description: "Navegas la incertidumbre mejor que nadie. Sé la cara visible del próximo gran cambio.",
+          action: "Ofrécete para comunicar las noticias difíciles o cambios complejos en la próxima reunión general.",
+          targetOutcome: "Transmitir calma y dirección en momentos inciertos",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }]
       },
       MANAGER: {
         blindSpot: [{
@@ -397,7 +460,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Lidera los pilotos de innovación",
+          description: "Tu equipo se adapta rápido gracias a ti. Son el laboratorio ideal.",
+          action: "Ofrécete para que tu equipo sea el primero en probar la nueva herramienta o proceso corporativo.",
+          targetOutcome: "Ser el equipo pionero en adopción tecnológica",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 8
+        }]
       },
       COLABORADOR: {
         blindSpot: [{
@@ -420,7 +492,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 6
         }],
-        strength: []
+        strength: [{
+          title: "Ayuda a los que se resisten",
+          description: "No le temes a lo nuevo. Ayuda a tus compañeros que sí le temen.",
+          action: "Cuando se anuncie un cambio, identifica a un compañero resistente y ayúdalo a entender los beneficios.",
+          targetOutcome: "Facilitar la adopción de cambios en tu entorno",
+          category: 'MENTORING',
+          priority: 'BAJA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       }
     },
     coachingTips: {
@@ -466,7 +547,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 6
         }],
-        strength: []
+        strength: [{
+          title: "Trae al cliente a la mesa directiva",
+          description: "Tu conexión con el mercado es única. Asegura que la estrategia no pierda eso.",
+          action: "Invita a un cliente clave a una sesión de estrategia con el directorio o gerencia.",
+          targetOutcome: "Decisiones directivas centradas en el cliente real",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       },
       MANAGER: {
         blindSpot: [{
@@ -489,7 +579,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 6
         }],
-        strength: []
+        strength: [{
+          title: "Crea la 'Universidad del Cliente'",
+          description: "Tu equipo da un servicio estelar. Enseña a otras áreas cómo lo hacen.",
+          action: "Graba una cápsula de 5 minutos con un 'caso de éxito' de tu equipo y compártela.",
+          targetOutcome: "Difundir historias de éxito de servicio",
+          category: 'MENTORING',
+          priority: 'BAJA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       },
       COLABORADOR: {
         blindSpot: [{
@@ -512,7 +611,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Maneja las situaciones críticas",
+          description: "Tienes un don para calmar aguas turbulentas. Eres el experto en casos difíciles.",
+          action: "Ofrécete para atender al próximo cliente difícil o enojado y enseña a otros cómo lo resolviste.",
+          targetOutcome: "Resolver conflictos que otros no pueden",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 2
+        }]
       }
     },
     coachingTips: {
@@ -562,7 +670,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 6
         }],
-        strength: []
+        strength: [{
+          title: "Diseña la sucesión organizacional",
+          description: "Desarrollas gente increíblemente bien. Asegura el futuro de la empresa.",
+          action: "Identifica a los Top 5 talentos jóvenes de la empresa y diseña un plan de rotación para ellos.",
+          targetOutcome: "Tener un pipeline de talento listo para ascender",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 12
+        }]
       },
       MANAGER: {
         blindSpot: [{
@@ -587,7 +704,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           ],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Convierte tu equipo en semillero",
+          description: "La mejor señal de un gran líder es que sus empleados son promovidos.",
+          action: "Ayuda a uno de tus mejores empleados a conseguir un ascenso o movimiento lateral este semestre.",
+          targetOutcome: "Promover a un miembro del equipo fuera de tu área",
+          category: 'MENTORING',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 12
+        }]
       },
       COLABORADOR: {
         blindSpot: [{
@@ -610,7 +736,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Sé el referente técnico",
+          description: "Sabes tanto que deberías estar enseñando. No te guardes el conocimiento.",
+          action: "Organiza una sesión de 'Almuerzo y Aprendizaje' para enseñar una habilidad técnica a tus pares.",
+          targetOutcome: "Compartir conocimiento experto",
+          category: 'MENTORING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       }
     },
     coachingTips: {
@@ -658,7 +793,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           ],
           estimatedWeeks: 6
         }],
-        strength: []
+        strength: [{
+          title: "Decide en la incertidumbre",
+          description: "Tienes un instinto afilado. Úsalo para desbloquear temas que nadie se atreve a tocar.",
+          action: "Pide que te asignen la decisión más compleja o ambigua del trimestre.",
+          targetOutcome: "Desbloquear una situación estancada por indecisión",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       },
       MANAGER: {
         blindSpot: [{
@@ -681,7 +825,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Enseña a pensar, no qué hacer",
+          description: "Tomas buenas decisiones. Ahora enseña a tu equipo tu proceso mental.",
+          action: "Crea una guía simple de 'Criterios para Decidir' para que tu equipo la use cuando no estás.",
+          targetOutcome: "Delegar la toma de decisiones operativa",
+          category: 'MENTORING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }]
       },
       COLABORADOR: {
         blindSpot: [{
@@ -704,7 +857,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Actúa con autonomía",
+          description: "Tu criterio es sólido. No necesitas pedir permiso para todo.",
+          action: "Identifica un área donde sueles consultar a tu jefe y empieza a decidir solo, informando después.",
+          targetOutcome: "Operar con autonomía total en tu rol",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'BAJA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       }
     },
     coachingTips: {
@@ -750,7 +912,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 8
         }],
-        strength: []
+        strength: [{
+          title: "Patrocina un 'Moonshot'",
+          description: "Tienes visión de futuro. Apadrina un proyecto arriesgado pero de alto potencial.",
+          action: "Asigna presupuesto y protección política a un proyecto experimental de alto riesgo.",
+          targetOutcome: "Lanzar un piloto disruptivo",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 12
+        }]
       },
       MANAGER: {
         blindSpot: [{
@@ -773,7 +944,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Facilita la innovación en otros",
+          description: "Eres creativo. Usa eso para desbloquear la creatividad de tu equipo.",
+          action: "Dirige una sesión de brainstorming o hackathon para resolver un problema crónico del área.",
+          targetOutcome: "Generar 3 soluciones implementables",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       },
       COLABORADOR: {
         blindSpot: [{
@@ -796,7 +976,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Lidera una iniciativa de mejora",
+          description: "Tienes ideas que valen oro. Haz que sucedan.",
+          action: "Escribe una propuesta de una página para un nuevo producto o mejora y preséntala a la gerencia.",
+          targetOutcome: "Validar una idea de negocio o mejora",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }]
       }
     },
     coachingTips: {
@@ -844,7 +1033,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           ],
           estimatedWeeks: 8
         }],
-        strength: []
+        strength: [{
+          title: "Aplana la organización",
+          description: "Confías en la gente. Ayuda a eliminar burocracia innecesaria.",
+          action: "Identifica 3 niveles de aprobación en tu área que puedas eliminar hoy mismo.",
+          targetOutcome: "Acelerar la velocidad de ejecución",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       },
       MANAGER: {
         blindSpot: [{
@@ -867,7 +1065,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Hazte innecesario",
+          description: "Tu equipo vuela solo. El siguiente nivel es que funcionen perfecto sin ti.",
+          action: "Delega tu rol completamente a un miembro del equipo durante tus próximas vacaciones.",
+          targetOutcome: "Probar la autonomía total del equipo",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 8
+        }]
       },
       COLABORADOR: {
         blindSpot: [{
@@ -890,7 +1097,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Adueñate del resultado final",
+          description: "Actúas como dueño. Pide la responsabilidad completa.",
+          action: "Pide ser el 'Owner' oficial de un proceso clave, de principio a fin.",
+          targetOutcome: "Liderar sin cargo formal",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }]
       }
     },
     coachingTips: {
@@ -936,7 +1152,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 6
         }],
-        strength: []
+        strength: [{
+          title: "Define el ADN de la empresa",
+          description: "Lideras con el ejemplo. Ayuda a definir qué significa ser líder aquí.",
+          action: "Participa en la inducción de nuevos gerentes para transmitir la cultura de liderazgo.",
+          targetOutcome: "Alinear a los nuevos líderes con la cultura",
+          category: 'MENTORING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 8
+        }]
       },
       MANAGER: {
         blindSpot: [{
@@ -961,7 +1186,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           ],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Ayuda a un equipo en problemas",
+          description: "Tu equipo funciona como reloj. Hay otros equipos que sufren.",
+          action: "Ofrécete para diagnosticar y ayudar a un par cuyo equipo tenga baja moral o desempeño.",
+          targetOutcome: "Mejorar el clima de un equipo vecino",
+          category: 'MENTORING',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 12
+        }]
       },
       COLABORADOR: {
         blindSpot: [{
@@ -984,7 +1218,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 6
         }],
-        strength: []
+        strength: [{
+          title: "Sé el líder informal",
+          description: "Tus compañeros te siguen. Usa esa influencia para bien.",
+          action: "Organiza una actividad de integración o técnica para el equipo sin que te lo pida el jefe.",
+          targetOutcome: "Mejorar la cohesión del grupo",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'BAJA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       }
     },
     coachingTips: {
@@ -1032,7 +1275,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 6
         }],
-        strength: []
+        strength: [{
+          title: "Delega todo lo táctico",
+          description: "Eres un maestro delegando. Llévalo al extremo para enfocarte solo en el futuro.",
+          action: "Revisa tu agenda y delega el 100% de las reuniones de seguimiento operativo este mes.",
+          targetOutcome: "Liberar 20% de tu tiempo para estrategia pura",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       },
       MANAGER: {
         blindSpot: [{
@@ -1057,7 +1309,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           ],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Usa la delegación como entrenamiento",
+          description: "Delegas bien. Ahora usa la delegación para preparar a tu sucesor.",
+          action: "Delega tus tareas más visibles y complejas a tu potencial sucesor.",
+          targetOutcome: "Preparar a alguien para tu puesto",
+          category: 'MENTORING',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 8
+        }]
       },
       COLABORADOR: {
         blindSpot: [{
@@ -1080,7 +1341,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Coordina el trabajo de otros",
+          description: "Sabes organizarte. Ayuda a organizar el trabajo del grupo.",
+          action: "Ofrécete para llevar el seguimiento de un proyecto grupal.",
+          targetOutcome: "Desarrollar habilidades de gestión",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }]
       }
     },
     coachingTips: {
@@ -1128,7 +1398,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           ],
           estimatedWeeks: 8
         }],
-        strength: []
+        strength: [{
+          title: "Instaura una cultura de franqueza",
+          description: "Das feedback duro pero útil. Necesitamos que toda la empresa sea así.",
+          action: "En tus reuniones públicas, pide feedback crítico sobre tu gestión frente a todos.",
+          targetOutcome: "Modelar que el feedback es seguro y necesario",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }]
       },
       MANAGER: {
         blindSpot: [{
@@ -1153,7 +1432,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 6
         }],
-        strength: []
+        strength: [{
+          title: "Enseña a tener conversaciones difíciles",
+          description: "Manejas bien el conflicto. Muchos managers le huyen.",
+          action: "Haz un role-play con un manager junior para prepararlo para una conversación de corrección.",
+          targetOutcome: "Aumentar la valentía gerencial de otros",
+          category: 'MENTORING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       },
       COLABORADOR: {
         blindSpot: [{
@@ -1176,7 +1464,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Eleva el estándar de tus pares",
+          description: "Ves lo que otros no ven. Ayuda a tus compañeros a mejorar.",
+          action: "Pide permiso a un compañero para darle feedback constructivo sobre su último trabajo.",
+          targetOutcome: "Mejorar la calidad del trabajo del equipo",
+          category: 'MENTORING',
+          priority: 'BAJA',
+          suggestedResources: [],
+          estimatedWeeks: 2
+        }]
       }
     },
     coachingTips: {
@@ -1226,7 +1523,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 6
         }],
-        strength: []
+        strength: [{
+          title: "Comparte la visión externamente",
+          description: "Tienes una visión clara del futuro. Posiciónate como referente.",
+          action: "Escribe un artículo o da una charla sobre el futuro de la industria en un evento externo.",
+          targetOutcome: "Posicionar a la empresa como líder de pensamiento",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 8
+        }]
       },
       MANAGER: {
         blindSpot: [{
@@ -1249,7 +1555,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 6
         }],
-        strength: []
+        strength: [{
+          title: "Conecta la tarea con la misión",
+          description: "Entiendes el negocio. Ayuda a que los operativos entiendan el 'por qué'.",
+          action: "Crea una presentación simple que explique la estrategia anual y preséntala a niveles operativos.",
+          targetOutcome: "Alineación total desde la base hasta la cima",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       },
       COLABORADOR: {
         blindSpot: [{
@@ -1272,7 +1587,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Ayuda a conectar los puntos",
+          description: "Ves más allá de tu tarea. Ayuda a otros a ver el impacto global.",
+          action: "Cuando haya un problema complejo, dibuja el flujo completo y explícalo al equipo.",
+          targetOutcome: "Evitar soluciones parche que rompen otras cosas",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'BAJA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       }
     },
     coachingTips: {
@@ -1320,7 +1644,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 8
         }],
-        strength: []
+        strength: [{
+          title: "Lidera la transformación crítica",
+          description: "Manejas el cambio con maestría. Toma el proyecto más difícil.",
+          action: "Lidera el comité de gestión de cambio para la transformación más crítica del año.",
+          targetOutcome: "Ejecutar un cambio complejo sin perder talento",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 12
+        }]
       },
       MANAGER: {
         blindSpot: [{
@@ -1343,7 +1676,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Mantén la moral alta en la tormenta",
+          description: "Tu equipo no entra en pánico. Ayuda a otros equipos a mantener la calma.",
+          action: "Comparte tus técnicas de gestión de crisis con otros líderes que estén sufriendo.",
+          targetOutcome: "Estabilizar el clima laboral en momentos duros",
+          category: 'MENTORING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }]
       },
       COLABORADOR: {
         blindSpot: [{
@@ -1366,7 +1708,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 6
         }],
-        strength: []
+        strength: [{
+          title: "Sé el primero en la fila",
+          description: "Te adaptas rápido. Muestra a los demás que el cambio no muerde.",
+          action: "Sé el usuario experto del nuevo sistema y ofrece soporte a tus compañeros.",
+          targetOutcome: "Reducir la curva de aprendizaje del equipo",
+          category: 'MENTORING',
+          priority: 'BAJA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }]
       }
     },
     coachingTips: {
@@ -1414,7 +1765,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           ],
           estimatedWeeks: 8
         }],
-        strength: []
+        strength: [{
+          title: "Construye alianzas estratégicas",
+          description: "Tienes capital político. Úsalo para abrir puertas externas.",
+          action: "Establece una alianza con una empresa partner o gobierno que beneficie al negocio.",
+          targetOutcome: "Generar una ventaja competitiva externa",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 12
+        }]
       },
       MANAGER: {
         blindSpot: [{
@@ -1437,7 +1797,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 8
         }],
-        strength: []
+        strength: [{
+          title: "Desbloquea recursos escasos",
+          description: "Sabes negociar. Consigue lo que tu equipo necesita.",
+          action: "Negocia con otra área para compartir recursos o presupuesto en un proyecto común.",
+          targetOutcome: "Optimizar recursos de la compañía",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }]
       },
       COLABORADOR: {
         blindSpot: [{
@@ -1460,7 +1829,16 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
           suggestedResources: [],
           estimatedWeeks: 4
         }],
-        strength: []
+        strength: [{
+          title: "Conecta personas clave",
+          description: "Conoces a todos. Haz que la gente correcta se hable.",
+          action: "Presenta a dos personas de distintas áreas que podrían beneficiarse de conocerse.",
+          targetOutcome: "Fomentar la colaboración informal",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'BAJA',
+          suggestedResources: [],
+          estimatedWeeks: 2
+        }]
       }
     },
     coachingTips: {
@@ -1507,7 +1885,16 @@ export const GENERIC_COMPETENCY_TEMPLATE: CompetencyTemplate = {
         suggestedResources: [],
         estimatedWeeks: 8
       }],
-      strength: []
+      strength: [{
+        title: "Comparte tu maestría",
+        description: "Eres un referente en esta competencia. Eleva el estándar de la organización.",
+        action: "Prepara una Masterclass o documento de visión sobre este tema para la empresa.",
+        targetOutcome: "Difundir conocimiento experto",
+        category: 'MENTORING',
+        priority: 'MEDIA',
+        suggestedResources: [],
+        estimatedWeeks: 6
+      }]
     },
     MANAGER: {
       blindSpot: [{
@@ -1530,7 +1917,16 @@ export const GENERIC_COMPETENCY_TEMPLATE: CompetencyTemplate = {
         suggestedResources: [],
         estimatedWeeks: 6
       }],
-      strength: []
+      strength: [{
+        title: "Documenta la mejor práctica",
+        description: "Lo haces mejor que nadie. Asegúrate de que no se pierda si te vas.",
+        action: "Crea un playbook o guía de 'Cómo hacerlo bien' para futuros líderes.",
+        targetOutcome: "Estandarizar la excelencia",
+        category: 'SKILL_DEVELOPMENT',
+        priority: 'MEDIA',
+        suggestedResources: [],
+        estimatedWeeks: 4
+      }]
     },
     COLABORADOR: {
       blindSpot: [{
@@ -1553,7 +1949,16 @@ export const GENERIC_COMPETENCY_TEMPLATE: CompetencyTemplate = {
         suggestedResources: [],
         estimatedWeeks: 6
       }],
-      strength: []
+      strength: [{
+        title: "Ayuda a un compañero",
+        description: "Tienes talento de sobra en esto. Úsalo para ayudar a alguien que le cuesta.",
+        action: "Identifica a un colega con dificultades en esta área y ofrécele apoyo puntual.",
+        targetOutcome: "Elevar el nivel del equipo",
+        category: 'MENTORING',
+        priority: 'BAJA',
+        suggestedResources: [],
+        estimatedWeeks: 4
+      }]
     }
   },
 
