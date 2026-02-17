@@ -31,6 +31,7 @@ interface AssignmentDetail {
   status: string
   evaluationType: string
   dueDate?: string
+  cycleId: string
   evaluatee: {
     id: string
     fullName: string
@@ -41,6 +42,7 @@ interface AssignmentDetail {
   surveyUrl: string | null
   participantToken: string | null
   cycle: {
+    id: string
     name: string
     endDate: string
   }
@@ -48,6 +50,8 @@ interface AssignmentDetail {
 
 interface SummaryData {
   assignmentId: string
+  evaluateeId: string
+  cycleId: string
   evaluationType: string
   completedAt: string
   evaluatee: {
@@ -477,6 +481,8 @@ function EvaluationSummaryView({
         <CinemaSummaryOrchestrator
           summary={{
             assignmentId: summary.assignmentId,
+            evaluateeId: summary.evaluateeId,
+            cycleId: summary.cycleId,
             evaluationType: summary.evaluationType,
             completedAt: summary.completedAt,
             evaluatee: {
@@ -565,6 +571,7 @@ function EvaluationSummaryView({
           </motion.div>
         </div>
       )}
+
     </div>
   )
 }

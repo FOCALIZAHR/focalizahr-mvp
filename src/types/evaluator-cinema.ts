@@ -192,6 +192,8 @@ export interface CategorizedResponse {
  */
 export interface CinemaSummaryData {
   assignmentId: string
+  evaluateeId: string
+  cycleId: string
   evaluationType: string
   completedAt: string
 

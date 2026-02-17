@@ -14,14 +14,16 @@ import InsightCarousel from '@/components/performance/summary/InsightCarousel'
 import PerformanceScoreCard from '@/components/performance/PerformanceScoreCard'
 import CompetencyRadarModal from '@/components/performance/gap-analysis/CompetencyRadarModal'
 import { GhostButton } from '@/components/ui/PremiumButton'
-import { Radar } from 'lucide-react'
+import PDIWizardOrchestrator from '@/components/pdi/PDIWizardOrchestrator'
+import PDIDetailView from '@/components/pdi/PDIDetailView'
+import { Radar, Target } from 'lucide-react'
 import type { CinemaSummaryData } from '@/types/evaluator-cinema'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
 // ════════════════════════════════════════════════════════════════════════════
 
-type IntelligenceView = 'calibracion' | 'brechas' | 'alertas'
+type IntelligenceView = 'calibracion' | 'brechas' | 'alertas' | 'desarrollo'
 
 export default function EvaluationSummaryPage() {
   const params = useParams()
@@ -37,6 +39,7 @@ export default function EvaluationSummaryPage() {
   // ═══════════════════════════════════════════════════════════════════════════
   const [activeView, setActiveView] = useState<IntelligenceView>('calibracion')
   const [showRadarModal, setShowRadarModal] = useState(false)
+  const [existingPDI, setExistingPDI] = useState<{ id: string; status: string } | null>(null)
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Estado para team members (ranking de calibración)
@@ -138,6 +141,21 @@ export default function EvaluationSummaryPage() {
 
     fetchTeamData()
   }, [])
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Fetch PDI existente para el evaluado en este ciclo
+  // ═══════════════════════════════════════════════════════════════════════════
+  useEffect(() => {
+    if (!summary?.evaluateeId || !summary?.cycleId) return
+    fetch(`/api/pdi?employeeId=${summary.evaluateeId}&cycleId=${summary.cycleId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data?.length > 0) {
+          setExistingPDI({ id: data.data[0].id, status: data.data[0].status })
+        }
+      })
+      .catch(() => { /* silently ignore */ })
+  }, [summary?.evaluateeId, summary?.cycleId])
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Calcular competencias desde categorizedResponses para ManagementAlertsHUD
@@ -257,6 +275,17 @@ export default function EvaluationSummaryPage() {
           >
             Coaching
           </button>
+          <button
+            onClick={() => setActiveView('desarrollo')}
+            className={`px-3 py-1 text-xs font-medium rounded transition-all flex items-center gap-1 ${
+              activeView === 'desarrollo'
+                ? 'bg-emerald-500 text-slate-900'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Target size={12} />
+            {existingPDI ? 'Ver PDI' : 'PDI'}
+          </button>
         </div>
         {summary?.competencyScores && (
           <GhostButton
@@ -324,6 +353,23 @@ export default function EvaluationSummaryPage() {
                 No hay datos de competencias disponibles para generar alertas.
               </p>
             </div>
+          )}
+        </div>
+      )}
+
+      {activeView === 'desarrollo' && summary && (
+        <div>
+          {existingPDI ? (
+            <PDIDetailView pdiId={existingPDI.id} />
+          ) : (
+            <PDIWizardOrchestrator
+              employeeId={summary.evaluateeId}
+              cycleId={summary.cycleId}
+              employeeName={summary.evaluatee.fullName}
+              onComplete={(pdiId) => {
+                setExistingPDI({ id: pdiId, status: 'DRAFT' })
+              }}
+            />
           )}
         </div>
       )}

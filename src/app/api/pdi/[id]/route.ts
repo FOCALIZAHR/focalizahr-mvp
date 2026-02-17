@@ -75,15 +75,16 @@ const UpdatePDISchema = z.object({
   validUntil: z.string().datetime().optional(),
   goals: z.array(z.object({
     id: z.string().optional(),
-    title: z.string().min(1),
+    title: z.string().min(1).optional(),
     description: z.string().optional(),
-    targetOutcome: z.string().min(1),
-    targetDate: z.string().datetime(),
+    targetOutcome: z.string().min(1).optional(),
+    targetDate: z.string().datetime().optional(),
     priority: z.enum(['ALTA', 'MEDIA', 'BAJA']).optional(),
     category: z.enum([
       'SKILL_DEVELOPMENT', 'BEHAVIORAL_CHANGE', 'KNOWLEDGE_ACQUISITION',
       'EXPERIENCE_BUILDING', 'CERTIFICATION', 'MENTORING'
     ]).optional(),
+    aiGenerated: z.boolean().optional(),
     _delete: z.boolean().optional()
   })).optional()
 })
@@ -140,25 +141,34 @@ export async function PATCH(
       const toUpdate = data.goals.filter(g => g.id && !g._delete)
       const toCreate = data.goals.filter(g => !g.id && !g._delete)
 
+      // Construir datos de update solo con campos presentes
+      const updateOps = toUpdate
+        .filter(g => g.title || g.description || g.targetOutcome || g.targetDate || g.priority || g.category)
+        .map(g => {
+          const updateData: any = {}
+          if (g.title) updateData.title = g.title
+          if (g.description !== undefined) updateData.description = g.description
+          if (g.targetOutcome) updateData.targetOutcome = g.targetOutcome
+          if (g.targetDate) updateData.targetDate = new Date(g.targetDate)
+          if (g.priority) updateData.priority = g.priority
+          if (g.category) updateData.category = g.category
+          return prisma.developmentGoal.update({
+            where: { id: g.id },
+            data: updateData
+          })
+        })
+
+      // Calcular targetDate por defecto: 8 semanas desde ahora
+      const defaultTargetDate = new Date()
+      defaultTargetDate.setDate(defaultTargetDate.getDate() + 56)
+
       await prisma.$transaction([
         // Eliminar marcados
         ...(toDelete.length > 0 ? [
-          prisma.developmentGoal.deleteMany({ where: { id: { in: toDelete } } })
+          prisma.developmentGoal.deleteMany({ where: { id: { in: toDelete }, planId: id } })
         ] : []),
-        // Actualizar existentes
-        ...toUpdate.map(g =>
-          prisma.developmentGoal.update({
-            where: { id: g.id },
-            data: {
-              title: g.title,
-              description: g.description,
-              targetOutcome: g.targetOutcome,
-              targetDate: new Date(g.targetDate),
-              priority: g.priority,
-              category: g.category
-            }
-          })
-        ),
+        // Actualizar existentes (solo los que tienen campos modificados)
+        ...updateOps,
         // Crear nuevos
         ...toCreate.map(g =>
           prisma.developmentGoal.create({
@@ -166,13 +176,13 @@ export async function PATCH(
               planId: id,
               competencyCode: 'CUSTOM',
               competencyName: 'Objetivo Manual',
-              title: g.title,
+              title: g.title || 'Objetivo personalizado',
               description: g.description,
-              targetOutcome: g.targetOutcome,
-              targetDate: new Date(g.targetDate),
+              targetOutcome: g.targetOutcome || 'Meta por definir',
+              targetDate: g.targetDate ? new Date(g.targetDate) : defaultTargetDate,
               priority: g.priority || 'MEDIA',
               category: g.category || 'SKILL_DEVELOPMENT',
-              aiGenerated: false
+              aiGenerated: g.aiGenerated ?? false
             }
           })
         )

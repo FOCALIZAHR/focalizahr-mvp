@@ -47,6 +47,8 @@ export async function GET(request: NextRequest) {
     } else {
       // Por defecto: ver PDIs donde soy manager
       where.managerId = currentEmployee.id
+      // Si se especifica employeeId, filtrar también por ese empleado
+      if (employeeId) where.employeeId = employeeId
     }
 
     if (cycleId) where.cycleId = cycleId

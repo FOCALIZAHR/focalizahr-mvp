@@ -196,6 +196,8 @@ export async function GET(
       success: true,
       summary: {
         assignmentId: assignment.id,
+        evaluateeId: assignment.evaluateeId,
+        cycleId: assignment.cycle.id,
         evaluationType: assignment.evaluationType,
         completedAt: assignment.updatedAt.toISOString(),
 

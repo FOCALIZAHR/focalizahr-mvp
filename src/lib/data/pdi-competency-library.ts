@@ -906,6 +906,292 @@ export const PDI_COMPETENCY_LIBRARY: Record<string, CompetencyTemplate> = {
     }
   },
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // LIDERAZGO DE EQUIPO (LEAD-TEAM)
+  // ──────────────────────────────────────────────────────────────────────────
+  'LEAD-TEAM': {
+    code: 'LEAD-TEAM',
+    name: 'Liderazgo de Equipo',
+    keywords: ['liderazgo equipo', 'liderar', 'dirigir', 'conducir equipo', 'gestion equipo'],
+
+    strategies: {
+      EJECUTIVO: {
+        blindSpot: [{
+          title: "Revisa si tu estilo de liderazgo inspira o controla",
+          description: "Liderar un equipo de alto nivel requiere inspirar, no controlar. Si tu equipo solo ejecuta lo que dices, falta liderazgo real.",
+          action: "Pregunta a tu equipo: '¿Qué harían diferente si yo no estuviera una semana?'",
+          targetOutcome: "Equipo capaz de funcionar con autonomía",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        development: [{
+          title: "Crea una visión compartida con tu equipo",
+          description: "Un equipo sin visión compartida es un grupo de individuos. Construye el 'para qué' juntos.",
+          action: "Facilita una sesión donde el equipo defina sus 3 prioridades y cómo medirán el éxito",
+          targetOutcome: "Equipo alineado en propósito y métricas",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        strength: []
+      },
+      MANAGER: {
+        blindSpot: [{
+          title: "¿Tu equipo sabe hacia dónde van?",
+          description: "Gestionar tareas no es liderar. Liderar es dar dirección y sentido.",
+          action: "En tu próxima reunión, dedica 5 minutos a recordar el objetivo del mes y por qué importa",
+          targetOutcome: "Tu equipo conecta sus tareas con un propósito",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Desarrolla rituales de equipo",
+          description: "Los equipos fuertes tienen rituales: kick-offs, retros, celebraciones. No son pérdida de tiempo.",
+          action: "Implementa una reunión semanal de 15 minutos: logros + aprendizajes + prioridades",
+          targetOutcome: "Mayor cohesión y alineación del equipo",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'TEMPLATE', title: "Agenda: Logros → Aprendizajes → Prioridades (15 min)" }
+          ],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      },
+      COLABORADOR: {
+        blindSpot: [{
+          title: "Lidera desde donde estás",
+          description: "No necesitas un título para liderar. Tomar iniciativa y ayudar a otros es liderazgo.",
+          action: "Identifica algo que tu equipo necesita y ofrécete para coordinarlo",
+          targetOutcome: "Ser reconocido como referente en tu equipo",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        development: [{
+          title: "Aprende a influir sin autoridad",
+          description: "La influencia viene de la credibilidad y el ejemplo, no del cargo.",
+          action: "Cuando haya un problema, propone una solución y coordina con tus compañeros para implementarla",
+          targetOutcome: "Demostrar capacidad de liderazgo informal",
+          category: 'EXPERIENCE_BUILDING',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        strength: []
+      }
+    },
+    coachingTips: {
+      blindSpot: [
+        "¿Su equipo lo sigue por convicción o por obligación?",
+        "Pregunta: '¿Qué hace que tu equipo confíe en ti?'"
+      ],
+      development: [
+        "Asigna un proyecto donde deba coordinar a otros.",
+        "Observa cómo maneja conflictos dentro del equipo."
+      ],
+      strength: ["Puede mentorear a otros líderes.", "Ideal para liderar equipos cross-funcionales."]
+    }
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // DELEGACIÓN (LEAD-DELEG)
+  // ──────────────────────────────────────────────────────────────────────────
+  'LEAD-DELEG': {
+    code: 'LEAD-DELEG',
+    name: 'Delegación',
+    keywords: ['delegacion', 'delegar', 'asignar', 'soltar', 'distribuir'],
+
+    strategies: {
+      EJECUTIVO: {
+        blindSpot: [{
+          title: "¿Tu agenda refleja tu nivel o el de tu equipo?",
+          description: "Si estás en reuniones operativas todo el día, estás haciendo el trabajo de otros.",
+          action: "Revisa tu agenda de la semana: ¿cuántas reuniones podrían ser lideradas por alguien de tu equipo?",
+          targetOutcome: "Liberar al menos 3 horas semanales delegando reuniones",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'PRACTICE', title: "Auditoría de agenda: ¿Esto lo puedo delegar?" }
+          ],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Delega resultados, no tareas",
+          description: "Delegar tareas es micromanagement con otro nombre. Delega el resultado esperado y deja que elijan el camino.",
+          action: "En tu próxima asignación, di solo qué necesitas lograr y para cuándo, no cómo hacerlo",
+          targetOutcome: "Tu equipo desarrolla criterio propio",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        strength: []
+      },
+      MANAGER: {
+        blindSpot: [{
+          title: "¿Delegas o solo distribuyes tareas?",
+          description: "Delegar incluye dar autoridad para decidir, no solo la tarea.",
+          action: "Elige una responsabilidad que hoy es tuya y entrégala completa (decisión incluida) a alguien",
+          targetOutcome: "Alguien de tu equipo es dueño de algo sin tu supervisión constante",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Establece checkpoints, no supervisión constante",
+          description: "Delegar bien = acordar puntos de revisión, no estar encima.",
+          action: "Define con tu equipo: 'Te reviso en X fecha, entre medio decides tú'",
+          targetOutcome: "Balance entre autonomía y control",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'TEMPLATE', title: "Delegación: Resultado + Deadline + Checkpoint" }
+          ],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      },
+      COLABORADOR: {
+        blindSpot: [{
+          title: "¿Pides ayuda o tratas de hacer todo solo?",
+          description: "Delegar no es solo para jefes. Coordinar con compañeros también es delegación.",
+          action: "Si tienes mucha carga, pide ayuda a un compañero para una tarea específica",
+          targetOutcome: "Aprender a distribuir trabajo efectivamente",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Aprende a priorizar y decir no",
+          description: "Si aceptas todo, no puedes delegar nada. Primero aprende qué es tuyo y qué no.",
+          action: "Haz una lista de tus tareas. Marca cuáles son solo tuyas y cuáles podría hacer otro",
+          targetOutcome: "Claridad sobre qué delegar o redistribuir",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      }
+    },
+    coachingTips: {
+      blindSpot: [
+        "¿Revisa todo antes de que salga o confía en su equipo?",
+        "Pregunta: '¿Qué pasaría si delegaras esto completamente?'"
+      ],
+      development: [
+        "Empieza delegando algo de bajo riesgo para ganar confianza.",
+        "Celebra cuando alguien resuelve algo sin su intervención."
+      ],
+      strength: ["Su equipo probablemente es muy autónomo.", "Puede enseñar a otros cómo soltar control."]
+    }
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // FEEDBACK (LEAD-FEEDBACK)
+  // ──────────────────────────────────────────────────────────────────────────
+  'LEAD-FEEDBACK': {
+    code: 'LEAD-FEEDBACK',
+    name: 'Feedback Efectivo',
+    keywords: ['feedback', 'retroalimentacion', 'reconocimiento', 'correccion', 'conversaciones dificiles'],
+
+    strategies: {
+      EJECUTIVO: {
+        blindSpot: [{
+          title: "¿Tu equipo recibe feedback tuyo o solo por evaluaciones?",
+          description: "Si el feedback solo llega en la evaluación anual, ya es tarde para corregir.",
+          action: "Esta semana, da feedback específico (positivo o constructivo) a al menos 2 reportes directos",
+          targetOutcome: "Feedback como hábito, no como evento",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Crea una cultura de feedback bidireccional",
+          description: "Si solo tú das feedback, no estás creando una cultura. También necesitas recibirlo.",
+          action: "Al final de tu próxima reunión 1:1, pregunta: '¿Qué podría hacer mejor como tu líder?'",
+          targetOutcome: "Feedback fluye en ambas direcciones",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'BOOK', title: "Radical Candor", provider: "Kim Scott" }
+          ],
+          estimatedWeeks: 8
+        }],
+        strength: []
+      },
+      MANAGER: {
+        blindSpot: [{
+          title: "¿Das feedback o solo corriges errores?",
+          description: "Si solo hablas cuando algo sale mal, tu equipo asocia feedback con castigo.",
+          action: "Por cada feedback correctivo, da 2 positivos esta semana. Sé específico en ambos.",
+          targetOutcome: "Balance entre reconocimiento y corrección",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'ALTA',
+          suggestedResources: [
+            { type: 'PRACTICE', title: "Formato SBI: Situación → Comportamiento → Impacto" }
+          ],
+          estimatedWeeks: 4
+        }],
+        development: [{
+          title: "Practica conversaciones difíciles",
+          description: "El feedback más valioso suele ser el más incómodo de dar.",
+          action: "Identifica una conversación pendiente que has evitado y agenda un espacio para tenerla",
+          targetOutcome: "Comodidad con feedback difícil",
+          category: 'SKILL_DEVELOPMENT',
+          priority: 'ALTA',
+          suggestedResources: [],
+          estimatedWeeks: 6
+        }],
+        strength: []
+      },
+      COLABORADOR: {
+        blindSpot: [{
+          title: "¿Pides feedback o esperas que llegue?",
+          description: "No esperes la evaluación para saber cómo vas. Pide feedback proactivamente.",
+          action: "Pregúntale a tu jefe: '¿Qué debería seguir haciendo y qué debería cambiar?'",
+          targetOutcome: "Tener claridad sobre tu desempeño en tiempo real",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 2
+        }],
+        development: [{
+          title: "Aprende a recibir feedback sin defenderte",
+          description: "La reacción natural es justificarse. La reacción productiva es escuchar y agradecer.",
+          action: "La próxima vez que recibas feedback, solo di 'gracias' y anota qué hacer diferente",
+          targetOutcome: "Recibir feedback como herramienta de crecimiento",
+          category: 'BEHAVIORAL_CHANGE',
+          priority: 'MEDIA',
+          suggestedResources: [],
+          estimatedWeeks: 4
+        }],
+        strength: []
+      }
+    },
+    coachingTips: {
+      blindSpot: [
+        "¿Da feedback específico o genérico ('buen trabajo')?",
+        "Pregunta: '¿Cuándo fue la última vez que reconociste algo específico?'"
+      ],
+      development: [
+        "Practica el formato SBI juntos.",
+        "Roleplay: simula una conversación de feedback difícil."
+      ],
+      strength: ["Puede capacitar a otros en técnicas de feedback.", "Ideal para ser coach interno."]
+    }
+  },
+
   // ══════════════════════════════════════════════════════════════════════════
   // STRATEGIC - 3 COMPETENCIAS (Solo Ejecutivos)
   // ══════════════════════════════════════════════════════════════════════════

@@ -114,7 +114,9 @@ export async function GET(
         },
 
         // Datos del ciclo
+        cycleId: assignment.cycle.id,
         cycle: {
+          id: assignment.cycle.id,
           name: assignment.cycle.name,
           endDate: assignment.cycle.endDate.toISOString()
         },

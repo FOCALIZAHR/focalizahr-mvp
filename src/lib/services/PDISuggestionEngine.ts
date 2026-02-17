@@ -5,6 +5,7 @@ import {
   PerformanceTrack,
   SuggestionGoal
 } from '@/lib/types/pdi-suggestion'
+import { RoleFitAnalyzer } from './RoleFitAnalyzer'
 import {
   PDI_COMPETENCY_LIBRARY,
   GENERIC_COMPETENCY_TEMPLATE
@@ -54,14 +55,22 @@ export class PDISuggestionEngine {
    * Smart matching: busca template por código o keywords
    */
   private static findCompetencyTemplate(code: string, name: string): CompetencyTemplate {
+    const libraryKeys = Object.keys(PDI_COMPETENCY_LIBRARY)
+    console.log('[PDI] Buscando código:', code, '| nombre:', name)
+    console.log('[PDI] Códigos en biblioteca:', libraryKeys)
+
     // 1. Buscar por código exacto
     const normalizedCode = code.toUpperCase().replace(/[-_\s]/g, '-')
 
     for (const [key, template] of Object.entries(PDI_COMPETENCY_LIBRARY)) {
       if (key === code || key === normalizedCode || template.code === code || template.code === normalizedCode) {
+        console.log('[PDI] ✅ MATCH exacto:', code, '→', key)
         return template
       }
     }
+
+    console.log('[PDI] ⚠️ No match exacto para:', code, '(normalizado:', normalizedCode, ')')
+    console.log('[PDI] Intentando keyword match...')
 
     // 2. Buscar por keywords
     const searchTerms = [
@@ -73,13 +82,14 @@ export class PDISuggestionEngine {
     for (const template of Object.values(PDI_COMPETENCY_LIBRARY)) {
       for (const keyword of template.keywords) {
         if (searchTerms.some(term => term.includes(keyword) || keyword.includes(term))) {
+          console.log('[PDI] ⚠️ KEYWORD match:', code, '→', template.code, '(keyword:', keyword, ')')
           return template
         }
       }
     }
 
     // 3. Fallback a template genérico
-    console.warn(`[PDISuggestionEngine] No template found for: ${code} / ${name}. Using generic.`)
+    console.warn('[PDI] ❌ GENERIC fallback para:', code, '/', name)
     return GENERIC_COMPETENCY_TEMPLATE
   }
 
@@ -158,6 +168,47 @@ export class PDISuggestionEngine {
   private static sortByPriority(suggestions: GeneratedSuggestion[]): GeneratedSuggestion[] {
     const priorityOrder: Record<DevelopmentPriority, number> = { 'ALTA': 0, 'MEDIA': 1, 'BAJA': 2 }
     return suggestions.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
+  }
+
+  /**
+   * Genera sugerencias basadas en Role Fit (Actual vs Target)
+   * Método principal para PDI Enterprise
+   */
+  static async generateFromRoleFit(
+    employeeId: string,
+    cycleId: string,
+    performanceTrack: PerformanceTrack
+  ): Promise<GeneratedSuggestion[]> {
+
+    const roleFit = await RoleFitAnalyzer.calculateRoleFit(employeeId, cycleId)
+
+    if (!roleFit || roleFit.gaps.length === 0) {
+      console.warn('[PDIEngine] No se pudo calcular Role Fit, retornando vacío')
+      return []
+    }
+
+    // Filtrar solo gaps que necesitan desarrollo (IMPROVE o CRITICAL)
+    const developmentGaps = roleFit.gaps.filter(
+      g => g.status === 'IMPROVE' || g.status === 'CRITICAL'
+    )
+
+    if (developmentGaps.length === 0) {
+      console.log('[PDIEngine] Employee cumple o excede todos los targets')
+      return []
+    }
+
+    // Transformar a formato del engine existente
+    // Siempre DEVELOPMENT_AREA: PDI compara nota jefe vs target del cargo, no hay autoevaluación
+    const gapInputs: GapAnalysisInput[] = developmentGaps.map(gap => ({
+      competencyCode: gap.competencyCode,
+      competencyName: gap.competencyName,
+      selfScore: gap.actualScore,
+      managerScore: gap.targetScore,
+      gapType: 'DEVELOPMENT_AREA' as DevelopmentGapType,
+      gapValue: gap.rawGap
+    }))
+
+    return this.generateSuggestions(gapInputs, performanceTrack)
   }
 
   /**

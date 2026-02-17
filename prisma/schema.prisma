@@ -197,6 +197,7 @@ model Account {
   performanceRatings       PerformanceRating[]
   calibrationSessions      CalibrationSession[]
   developmentPlans         DevelopmentPlan[]
+  competencyTargets        CompetencyTarget[]
 
   @@index([adminEmail], map: "idx_accounts_email")
   @@index([subscriptionTier], map: "idx_accounts_tier")
@@ -2335,4 +2336,41 @@ enum CheckInStatus {
   COMPLETED
   SKIPPED
   RESCHEDULED
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// COMPETENCY TARGET - Nivel esperado por cargo (Role Fit)
+// ════════════════════════════════════════════════════════════════════════════
+
+model CompetencyTarget {
+  id              String   @id @default(cuid())
+  accountId       String   @map("account_id")
+
+  // Competencia
+  competencyCode  String   @map("competency_code")  // CORE-COMM, LEAD-DEV, etc.
+
+  // Cargo (por nivel estándar, no FK — Employee.standardJobLevel)
+  standardJobLevel String  @map("standard_job_level")
+  // Valores: 'gerente_director' | 'subgerente_subdirector' | 'jefe' |
+  //          'supervisor_coordinador' | 'profesional_analista' |
+  //          'asistente_otros' | 'operativo_auxiliar'
+
+  // Nivel esperado (null = N/A, no aplica)
+  targetScore     Float?   @map("target_score")  // 1.0 - 5.0 o null
+
+  // Auditoría
+  isDefault       Boolean  @default(true) @map("is_default")
+  ratifiedAt      DateTime? @map("ratified_at")
+  ratifiedBy      String?   @map("ratified_by")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  account         Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, competencyCode, standardJobLevel], map: "unique_target_per_job_level")
+  @@index([accountId], map: "idx_comp_targets_account")
+  @@index([standardJobLevel], map: "idx_comp_targets_job_level")
+  @@map("competency_targets")
 }
