@@ -1,18 +1,34 @@
 // ════════════════════════════════════════════════════════════════════════════
-// SEED: Performance Evaluation - 20 Preguntas con Competency Library
+// SEED: Performance Evaluation - 26 Preguntas con Competency Library
 // prisma/seeds/performance-evaluation-seed.ts
 // ════════════════════════════════════════════════════════════════════════════
 // Estrategia: Upsert Lógico (UPDATE existentes, CREATE faltantes)
 // Preguntas organizadas por competencia:
-// - CORE (8 preguntas) → Todos los tracks
-// - LEADERSHIP (6 preguntas) → minTrack: MANAGER
-// - STRATEGIC (4 preguntas) → minTrack: EJECUTIVO
+// - CORE (10 preguntas) → Todos los tracks
+// - LEADERSHIP (8 preguntas) → minTrack: MANAGER
+// - STRATEGIC (6 preguntas) → minTrack: EJECUTIVO
 // - FEEDBACK (2 preguntas) → Sin competencia, texto abierto
 // ════════════════════════════════════════════════════════════════════════════
 
 import { PrismaClient, Prisma } from '@prisma/client'
 
 const prisma = new PrismaClient()
+
+// ════════════════════════════════════════════════════════════════
+// CONSTANTES DE COMPETENCIAS (evita errores de typo)
+// ════════════════════════════════════════════════════════════════
+const CORE_COMM = 'CORE-COMM'
+const CORE_TEAM = 'CORE-TEAM'
+const CORE_RESULTS = 'CORE-RESULTS'
+const CORE_ADAPT = 'CORE-ADAPT'
+const CORE_CLIENT = 'CORE-CLIENT'
+const LEAD_DEV = 'LEAD-DEV'
+const LEAD_TEAM = 'LEAD-TEAM'
+const LEAD_DELEG = 'LEAD-DELEG'
+const LEAD_FEEDBACK = 'LEAD-FEEDBACK'
+const STRAT_VISION = 'STRAT-VISION'
+const STRAT_CHANGE = 'STRAT-CHANGE'
+const STRAT_INFLUENCE = 'STRAT-INFLUENCE'
 
 async function seedPerformanceEvaluation() {
   console.log('🎯 Iniciando Seed Performance Evaluation v1.0')
@@ -30,7 +46,7 @@ async function seedPerformanceEvaluation() {
     update: {
       name: 'Evaluación de Desempeño',
       description: 'Evaluación integral de competencias organizacionales con filtrado por nivel (COLABORADOR/MANAGER/EJECUTIVO)',
-      questionCount: 20,
+      questionCount: 26,
       estimatedDuration: 15,
       methodology: 'Competency-Based Assessment + FocalizaHR Framework',
       category: 'desempeno',
@@ -43,7 +59,7 @@ async function seedPerformanceEvaluation() {
       name: 'Evaluación de Desempeño',
       slug: 'performance-evaluation',
       description: 'Evaluación integral de competencias organizacionales con filtrado por nivel (COLABORADOR/MANAGER/EJECUTIVO)',
-      questionCount: 20,
+      questionCount: 26,
       estimatedDuration: 15,
       methodology: 'Competency-Based Assessment + FocalizaHR Framework',
       category: 'desempeno',
@@ -58,10 +74,10 @@ async function seedPerformanceEvaluation() {
   console.log('')
 
   // ════════════════════════════════════════════════════════════════
-  // PASO 2: Definir las 20 preguntas con competencyCode y audienceRule
+  // PASO 2: Definir las 26 preguntas con competencyCode y audienceRule
   // ════════════════════════════════════════════════════════════════
 
-  console.log('📝 Definiendo 20 preguntas...')
+  console.log('📝 Definiendo 26 preguntas...')
 
   const questionsDefinition = [
 
@@ -72,10 +88,10 @@ async function seedPerformanceEvaluation() {
     {
       questionOrder: 1,
       text: 'Comunica sus ideas de forma clara y comprensible para diferentes audiencias.',
-      category: 'competencia',
+      category: CORE_COMM,
       subcategory: 'comunicacion',
-      responseType: 'rating_scale',
-      competencyCode: 'CORE-COMM',
+      responseType: 'competency_behavior',
+      competencyCode: CORE_COMM,
       audienceRule: null,
       minValue: 1,
       maxValue: 5,
@@ -84,10 +100,10 @@ async function seedPerformanceEvaluation() {
     {
       questionOrder: 2,
       text: 'Escucha activamente y considera las opiniones de otros antes de responder.',
-      category: 'competencia',
+      category: CORE_COMM,
       subcategory: 'comunicacion',
-      responseType: 'rating_scale',
-      competencyCode: 'CORE-COMM',
+      responseType: 'competency_behavior',
+      competencyCode: CORE_COMM,
       audienceRule: null,
       minValue: 1,
       maxValue: 5,
@@ -100,10 +116,10 @@ async function seedPerformanceEvaluation() {
     {
       questionOrder: 3,
       text: 'Colabora efectivamente con su equipo para lograr objetivos comunes.',
-      category: 'competencia',
+      category: CORE_TEAM,
       subcategory: 'equipo',
-      responseType: 'rating_scale',
-      competencyCode: 'CORE-TEAM',
+      responseType: 'competency_behavior',
+      competencyCode: CORE_TEAM,
       audienceRule: null,
       minValue: 1,
       maxValue: 5,
@@ -112,10 +128,10 @@ async function seedPerformanceEvaluation() {
     {
       questionOrder: 4,
       text: 'Apoya a sus compañeros y contribuye positivamente al ambiente laboral.',
-      category: 'competencia',
+      category: CORE_TEAM,
       subcategory: 'equipo',
-      responseType: 'rating_scale',
-      competencyCode: 'CORE-TEAM',
+      responseType: 'competency_behavior',
+      competencyCode: CORE_TEAM,
       audienceRule: null,
       minValue: 1,
       maxValue: 5,
@@ -128,10 +144,10 @@ async function seedPerformanceEvaluation() {
     {
       questionOrder: 5,
       text: 'Cumple sus compromisos y entrega resultados en tiempo y forma.',
-      category: 'competencia',
+      category: CORE_RESULTS,
       subcategory: 'resultados',
-      responseType: 'rating_scale',
-      competencyCode: 'CORE-RESULTS',
+      responseType: 'competency_behavior',
+      competencyCode: CORE_RESULTS,
       audienceRule: null,
       minValue: 1,
       maxValue: 5,
@@ -140,10 +156,10 @@ async function seedPerformanceEvaluation() {
     {
       questionOrder: 6,
       text: 'Prioriza tareas según su impacto y busca mejorar continuamente.',
-      category: 'competencia',
+      category: CORE_RESULTS,
       subcategory: 'resultados',
-      responseType: 'rating_scale',
-      competencyCode: 'CORE-RESULTS',
+      responseType: 'competency_behavior',
+      competencyCode: CORE_RESULTS,
       audienceRule: null,
       minValue: 1,
       maxValue: 5,
@@ -156,10 +172,10 @@ async function seedPerformanceEvaluation() {
     {
       questionOrder: 7,
       text: 'Se adapta positivamente a los cambios y nuevos desafíos.',
-      category: 'competencia',
+      category: CORE_ADAPT,
       subcategory: 'adaptabilidad',
-      responseType: 'rating_scale',
-      competencyCode: 'CORE-ADAPT',
+      responseType: 'competency_behavior',
+      competencyCode: CORE_ADAPT,
       audienceRule: null,
       minValue: 1,
       maxValue: 5,
@@ -168,10 +184,39 @@ async function seedPerformanceEvaluation() {
     {
       questionOrder: 8,
       text: 'Mantiene su efectividad bajo presión y propone alternativas ante obstáculos.',
-      category: 'competencia',
+      category: CORE_ADAPT,
       subcategory: 'adaptabilidad',
-      responseType: 'rating_scale',
-      competencyCode: 'CORE-ADAPT',
+      responseType: 'competency_behavior',
+      competencyCode: CORE_ADAPT,
+      audienceRule: null,
+      minValue: 1,
+      maxValue: 5,
+      isRequired: true
+    },
+
+    // ═══════════════════════════════════════════════════════════════
+    // CORE - Orientación al Cliente (CORE-CLIENT) - 2 preguntas
+    // audienceRule: null → Todos los tracks
+    // ═══════════════════════════════════════════════════════════════
+    {
+      questionOrder: 9,
+      text: 'Entiende las necesidades del cliente interno o externo y responde oportunamente a sus solicitudes.',
+      category: CORE_CLIENT,
+      subcategory: 'cliente',
+      responseType: 'competency_behavior',
+      competencyCode: CORE_CLIENT,
+      audienceRule: null,
+      minValue: 1,
+      maxValue: 5,
+      isRequired: true
+    },
+    {
+      questionOrder: 10,
+      text: 'Busca superar las expectativas del cliente y mantiene relaciones positivas.',
+      category: CORE_CLIENT,
+      subcategory: 'cliente',
+      responseType: 'competency_behavior',
+      competencyCode: CORE_CLIENT,
       audienceRule: null,
       minValue: 1,
       maxValue: 5,
@@ -183,24 +228,24 @@ async function seedPerformanceEvaluation() {
     // audienceRule: { minTrack: "MANAGER" } → Solo managers y ejecutivos
     // ═══════════════════════════════════════════════════════════════
     {
-      questionOrder: 9,
+      questionOrder: 11,
       text: 'Dedica tiempo a desarrollar las habilidades de los miembros de su equipo.',
-      category: 'competencia',
+      category: LEAD_DEV,
       subcategory: 'desarrollo_personas',
-      responseType: 'rating_scale',
-      competencyCode: 'LEAD-DEV',
+      responseType: 'competency_behavior',
+      competencyCode: LEAD_DEV,
       audienceRule: { minTrack: 'MANAGER' },
       minValue: 1,
       maxValue: 5,
       isRequired: true
     },
     {
-      questionOrder: 10,
+      questionOrder: 12,
       text: 'Proporciona feedback constructivo de manera regular y oportuna.',
-      category: 'competencia',
+      category: LEAD_DEV,
       subcategory: 'desarrollo_personas',
-      responseType: 'rating_scale',
-      competencyCode: 'LEAD-DEV',
+      responseType: 'competency_behavior',
+      competencyCode: LEAD_DEV,
       audienceRule: { minTrack: 'MANAGER' },
       minValue: 1,
       maxValue: 5,
@@ -211,24 +256,24 @@ async function seedPerformanceEvaluation() {
     // LEADERSHIP - Liderazgo de Equipos (LEAD-TEAM) - 2 preguntas
     // ═══════════════════════════════════════════════════════════════
     {
-      questionOrder: 11,
+      questionOrder: 13,
       text: 'Establece una dirección clara y motiva al equipo hacia los objetivos.',
-      category: 'competencia',
+      category: LEAD_TEAM,
       subcategory: 'liderazgo_equipos',
-      responseType: 'rating_scale',
-      competencyCode: 'LEAD-TEAM',
+      responseType: 'competency_behavior',
+      competencyCode: LEAD_TEAM,
       audienceRule: { minTrack: 'MANAGER' },
       minValue: 1,
       maxValue: 5,
       isRequired: true
     },
     {
-      questionOrder: 12,
+      questionOrder: 14,
       text: 'Genera confianza y credibilidad en su equipo.',
-      category: 'competencia',
+      category: LEAD_TEAM,
       subcategory: 'liderazgo_equipos',
-      responseType: 'rating_scale',
-      competencyCode: 'LEAD-TEAM',
+      responseType: 'competency_behavior',
+      competencyCode: LEAD_TEAM,
       audienceRule: { minTrack: 'MANAGER' },
       minValue: 1,
       maxValue: 5,
@@ -239,24 +284,53 @@ async function seedPerformanceEvaluation() {
     // LEADERSHIP - Delegación Efectiva (LEAD-DELEG) - 2 preguntas
     // ═══════════════════════════════════════════════════════════════
     {
-      questionOrder: 13,
+      questionOrder: 15,
       text: 'Delega responsabilidades de forma apropiada según las capacidades de cada persona.',
-      category: 'competencia',
+      category: LEAD_DELEG,
       subcategory: 'delegacion',
-      responseType: 'rating_scale',
-      competencyCode: 'LEAD-DELEG',
+      responseType: 'competency_behavior',
+      competencyCode: LEAD_DELEG,
       audienceRule: { minTrack: 'MANAGER' },
       minValue: 1,
       maxValue: 5,
       isRequired: true
     },
     {
-      questionOrder: 14,
+      questionOrder: 16,
       text: 'Da seguimiento sin caer en microgestión y asume responsabilidad por los resultados del equipo.',
-      category: 'competencia',
+      category: LEAD_DELEG,
       subcategory: 'delegacion',
-      responseType: 'rating_scale',
-      competencyCode: 'LEAD-DELEG',
+      responseType: 'competency_behavior',
+      competencyCode: LEAD_DELEG,
+      audienceRule: { minTrack: 'MANAGER' },
+      minValue: 1,
+      maxValue: 5,
+      isRequired: true
+    },
+
+    // ═══════════════════════════════════════════════════════════════
+    // LEADERSHIP - Feedback y Coaching (LEAD-FEEDBACK) - 2 preguntas
+    // audienceRule: { minTrack: "MANAGER" } → Solo managers y ejecutivos
+    // ═══════════════════════════════════════════════════════════════
+    {
+      questionOrder: 17,
+      text: 'Proporciona retroalimentación oportuna y constructiva que ayuda a mejorar el desempeño.',
+      category: LEAD_FEEDBACK,
+      subcategory: 'feedback_coaching',
+      responseType: 'competency_behavior',
+      competencyCode: LEAD_FEEDBACK,
+      audienceRule: { minTrack: 'MANAGER' },
+      minValue: 1,
+      maxValue: 5,
+      isRequired: true
+    },
+    {
+      questionOrder: 18,
+      text: 'Dedica tiempo a conversaciones de coaching que desarrollan el potencial de su equipo.',
+      category: LEAD_FEEDBACK,
+      subcategory: 'feedback_coaching',
+      responseType: 'competency_behavior',
+      competencyCode: LEAD_FEEDBACK,
       audienceRule: { minTrack: 'MANAGER' },
       minValue: 1,
       maxValue: 5,
@@ -268,24 +342,24 @@ async function seedPerformanceEvaluation() {
     // audienceRule: { minTrack: "EJECUTIVO" } → Solo ejecutivos
     // ═══════════════════════════════════════════════════════════════
     {
-      questionOrder: 15,
+      questionOrder: 19,
       text: 'Tiene una visión clara del rumbo estratégico de la organización.',
-      category: 'competencia',
+      category: STRAT_VISION,
       subcategory: 'vision_estrategica',
-      responseType: 'rating_scale',
-      competencyCode: 'STRAT-VISION',
+      responseType: 'competency_behavior',
+      competencyCode: STRAT_VISION,
       audienceRule: { minTrack: 'EJECUTIVO' },
       minValue: 1,
       maxValue: 5,
       isRequired: true
     },
     {
-      questionOrder: 16,
+      questionOrder: 20,
       text: 'Comunica la visión de forma inspiradora y genera compromiso.',
-      category: 'competencia',
+      category: STRAT_VISION,
       subcategory: 'vision_estrategica',
-      responseType: 'rating_scale',
-      competencyCode: 'STRAT-VISION',
+      responseType: 'competency_behavior',
+      competencyCode: STRAT_VISION,
       audienceRule: { minTrack: 'EJECUTIVO' },
       minValue: 1,
       maxValue: 5,
@@ -296,24 +370,53 @@ async function seedPerformanceEvaluation() {
     // STRATEGIC - Gestión del Cambio (STRAT-CHANGE) - 2 preguntas
     // ═══════════════════════════════════════════════════════════════
     {
-      questionOrder: 17,
+      questionOrder: 21,
       text: 'Lidera efectivamente iniciativas de cambio organizacional.',
-      category: 'competencia',
+      category: STRAT_CHANGE,
       subcategory: 'gestion_cambio',
-      responseType: 'rating_scale',
-      competencyCode: 'STRAT-CHANGE',
+      responseType: 'competency_behavior',
+      competencyCode: STRAT_CHANGE,
       audienceRule: { minTrack: 'EJECUTIVO' },
       minValue: 1,
       maxValue: 5,
       isRequired: true
     },
     {
-      questionOrder: 18,
+      questionOrder: 22,
       text: 'Maneja las resistencias al cambio de manera constructiva.',
-      category: 'competencia',
+      category: STRAT_CHANGE,
       subcategory: 'gestion_cambio',
-      responseType: 'rating_scale',
-      competencyCode: 'STRAT-CHANGE',
+      responseType: 'competency_behavior',
+      competencyCode: STRAT_CHANGE,
+      audienceRule: { minTrack: 'EJECUTIVO' },
+      minValue: 1,
+      maxValue: 5,
+      isRequired: true
+    },
+
+    // ═══════════════════════════════════════════════════════════════
+    // STRATEGIC - Influencia Organizacional (STRAT-INFLUENCE) - 2 preguntas
+    // audienceRule: { minTrack: "EJECUTIVO" } → Solo ejecutivos
+    // ═══════════════════════════════════════════════════════════════
+    {
+      questionOrder: 23,
+      text: 'Construye relaciones estratégicas que facilitan el logro de objetivos organizacionales.',
+      category: STRAT_INFLUENCE,
+      subcategory: 'influencia_organizacional',
+      responseType: 'competency_behavior',
+      competencyCode: STRAT_INFLUENCE,
+      audienceRule: { minTrack: 'EJECUTIVO' },
+      minValue: 1,
+      maxValue: 5,
+      isRequired: true
+    },
+    {
+      questionOrder: 24,
+      text: 'Influye positivamente en decisiones clave a través de argumentos sólidos y credibilidad.',
+      category: STRAT_INFLUENCE,
+      subcategory: 'influencia_organizacional',
+      responseType: 'competency_behavior',
+      competencyCode: STRAT_INFLUENCE,
       audienceRule: { minTrack: 'EJECUTIVO' },
       minValue: 1,
       maxValue: 5,
@@ -325,7 +428,7 @@ async function seedPerformanceEvaluation() {
     // Aplica a todos los tracks
     // ═══════════════════════════════════════════════════════════════
     {
-      questionOrder: 19,
+      questionOrder: 25,
       text: '¿Qué aspectos destacarías del desempeño de esta persona?',
       category: 'feedback',
       subcategory: 'fortalezas',
@@ -337,7 +440,7 @@ async function seedPerformanceEvaluation() {
       isRequired: false
     },
     {
-      questionOrder: 20,
+      questionOrder: 26,
       text: '¿Qué áreas de mejora identificas y qué sugerencias le darías?',
       category: 'feedback',
       subcategory: 'mejoras',
@@ -354,7 +457,7 @@ async function seedPerformanceEvaluation() {
   // PASO 3: Upsert de preguntas
   // ════════════════════════════════════════════════════════════════
 
-  console.log('⚙️ Procesando 20 preguntas...')
+  console.log('⚙️ Procesando 26 preguntas...')
 
   let updatedCount = 0
   let createdCount = 0
@@ -416,21 +519,23 @@ async function seedPerformanceEvaluation() {
   console.log(`   Total: ${updatedCount + createdCount}`)
   console.log('')
   console.log('📈 Preguntas por nivel:')
-  console.log('   COLABORADOR: 8 preguntas (CORE)')
-  console.log('   MANAGER: 14 preguntas (CORE + LEADERSHIP)')
-  console.log('   EJECUTIVO: 18 preguntas (CORE + LEADERSHIP + STRATEGIC)')
-  console.log('   + 2 preguntas de feedback abierto (todos)')
+  console.log('   COLABORADOR: 10 preguntas (CORE) + 2 feedback = 12')
+  console.log('   MANAGER: 18 preguntas (CORE + LEADERSHIP) + 2 feedback = 20')
+  console.log('   EJECUTIVO: 24 preguntas (CORE + LEADERSHIP + STRATEGIC) + 2 feedback = 26')
   console.log('')
   console.log('📋 Preguntas por competencia:')
   console.log('   CORE-COMM: 2')
   console.log('   CORE-TEAM: 2')
   console.log('   CORE-RESULTS: 2')
   console.log('   CORE-ADAPT: 2')
+  console.log('   CORE-CLIENT: 2')
   console.log('   LEAD-DEV: 2')
   console.log('   LEAD-TEAM: 2')
   console.log('   LEAD-DELEG: 2')
+  console.log('   LEAD-FEEDBACK: 2')
   console.log('   STRAT-VISION: 2')
   console.log('   STRAT-CHANGE: 2')
+  console.log('   STRAT-INFLUENCE: 2')
   console.log('   FEEDBACK: 2')
   console.log('')
   console.log('✅ Seed Performance Evaluation completado exitosamente')

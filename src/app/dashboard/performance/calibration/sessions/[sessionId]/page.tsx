@@ -157,7 +157,7 @@ export default function CalibrationCinemaPage() {
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 200,
+        delay: 250,
         tolerance: 5,
       },
     }),

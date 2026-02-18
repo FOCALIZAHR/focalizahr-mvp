@@ -48,7 +48,7 @@ export default memo(function CinemaCard({
   return (
     <div
       ref={setNodeRef}
-      style={dragStyle}
+      style={{ ...dragStyle, touchAction: isReadOnly ? 'auto' : 'none' }}
       {...listeners}
       {...attributes}
       onClick={() => onClick(employee)}
