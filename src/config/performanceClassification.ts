@@ -18,6 +18,14 @@ export enum PerformanceLevel {
   NEEDS_IMPROVEMENT = 'needs_improvement'
 }
 
+export enum RoleFitLevel {
+  OPTIMAL = 'optimal',
+  SOLID = 'solid',
+  DEVELOPING = 'developing',
+  GAP = 'gap',
+  RISK = 'risk'
+}
+
 export enum PotentialLevel {
   HIGH = 'high',
   MEDIUM = 'medium',
@@ -65,6 +73,19 @@ export interface PerformanceLevelConfig {
   borderClass: string
   description: string
   distributionTarget?: number
+}
+
+export interface RoleFitLevelConfig {
+  level: RoleFitLevel
+  minScore: number
+  label: string
+  labelShort: string
+  question: string
+  description: string
+  color: string
+  bgClass: string
+  textClass: string
+  borderClass: string
 }
 
 export interface PerformanceRatingConfigData {
@@ -213,6 +234,73 @@ export const FOCALIZAHR_DEFAULT_CONFIG: PerformanceRatingConfigData = {
     }
   ]
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// CONFIGURACION ROLE FIT - 5 NIVELES (Diagnóstico Radical Candor)
+// ════════════════════════════════════════════════════════════════════════════
+
+export const ROLE_FIT_DEFAULT_CONFIG: RoleFitLevelConfig[] = [
+  {
+    level: RoleFitLevel.OPTIMAL,
+    minScore: 90,
+    label: 'Ajuste Óptimo',
+    labelShort: 'Óptimo',
+    question: '¿Cómo podemos expandir su alcance e influencia hoy?',
+    description: 'Dominio total del perfil. Actúa como referente técnico y cultural, con capacidad de mentorear a otros y liderar proyectos de alta complejidad.',
+    color: '#22D3EE',
+    bgClass: 'fhr-bg-elevated',
+    textClass: 'fhr-text-accent',
+    borderClass: 'border-cyan-400/30'
+  },
+  {
+    level: RoleFitLevel.SOLID,
+    minScore: 75,
+    label: 'Ajuste Sólido',
+    labelShort: 'Sólido',
+    question: '¿Qué pequeños ajustes llevarían este desempeño al siguiente nivel?',
+    description: 'Ajuste consistente. Ejecución sólida con oportunidades de optimización en competencias secundarias para alcanzar la excelencia en el rol.',
+    color: '#94A3B8',
+    bgClass: 'fhr-bg-elevated',
+    textClass: 'fhr-text',
+    borderClass: 'border-slate-500/30'
+  },
+  {
+    level: RoleFitLevel.DEVELOPING,
+    minScore: 60,
+    label: 'Potencial Activo',
+    labelShort: 'Potencial',
+    question: '¿Estamos acelerando su aprendizaje a la velocidad correcta?',
+    description: 'Fase de aceleración. Presenta brechas en competencias clave que requieren un enfoque de desarrollo dirigido para asegurar el ajuste operativo.',
+    color: '#A78BFA',
+    bgClass: 'fhr-bg-elevated',
+    textClass: 'text-purple-400',
+    borderClass: 'border-purple-500/30'
+  },
+  {
+    level: RoleFitLevel.GAP,
+    minScore: 40,
+    label: 'Desajuste Crítico',
+    labelShort: 'Crítico',
+    question: '¿Es este el rol donde sus fortalezas pueden brillar realmente?',
+    description: 'Las brechas en competencias fundamentales impactan la calidad del output. Requiere intervención inmediata del líder y un plan de acción prioritario.',
+    color: '#F59E0B',
+    bgClass: 'fhr-bg-elevated',
+    textClass: 'text-amber-400',
+    borderClass: 'border-amber-500/30'
+  },
+  {
+    level: RoleFitLevel.RISK,
+    minScore: 0,
+    label: 'Incompatibilidad Estratégica',
+    labelShort: 'Riesgo',
+    question: '¿Cuál es el costo de mantener este desajuste para el equipo?',
+    description: 'El perfil actual no se alinea con las exigencias críticas del cargo. Se requiere una auditoría urgente de la posición y decisiones de estructura inmediatas.',
+    color: '#EF4444',
+    bgClass: 'fhr-bg-elevated',
+    textClass: 'text-red-400',
+    borderClass: 'border-red-500/30'
+  }
+]
 
 // ════════════════════════════════════════════════════════════════════════════
 // CONFIGURACION ALTERNATIVA - 3 NIVELES
@@ -629,6 +717,34 @@ export function calculateWeightedScore(
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// FUNCIONES ROLE FIT
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Obtiene la clasificación de Role Fit basada en porcentaje
+ * @param roleFitScore - Porcentaje 0-100
+ * @param config - Configuración personalizada (opcional)
+ */
+export function getRoleFitClassification(
+  roleFitScore: number,
+  config: RoleFitLevelConfig[] = ROLE_FIT_DEFAULT_CONFIG
+): RoleFitLevelConfig {
+  const sortedConfig = [...config].sort((a, b) => b.minScore - a.minScore)
+  const found = sortedConfig.find(level => roleFitScore >= level.minScore)
+  return found || sortedConfig[sortedConfig.length - 1]
+}
+
+/**
+ * Obtiene solo el nivel (enum) de Role Fit
+ */
+export function getRoleFitLevel(
+  roleFitScore: number,
+  config: RoleFitLevelConfig[] = ROLE_FIT_DEFAULT_CONFIG
+): RoleFitLevel {
+  return getRoleFitClassification(roleFitScore, config).level
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // EXPORTS DEFAULT
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -639,12 +755,15 @@ export default {
   NINE_BOX_THRESHOLDS,
   NINE_BOX_POSITIONS,
   SUCCESSION_READINESS_CONFIG,
+  ROLE_FIT_DEFAULT_CONFIG,
 
   FOCALIZAHR_DEFAULT_WEIGHTS,
   ENTERPRISE_TYPICAL_WEIGHTS,
 
   getPerformanceClassification,
   getPerformanceLevel,
+  getRoleFitClassification,
+  getRoleFitLevel,
   scoreToNineBoxLevel,
   calculate9BoxPosition,
   getNineBoxPositionConfig,

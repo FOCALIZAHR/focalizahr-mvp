@@ -4,6 +4,7 @@ import { memo, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Sparkles, ChevronDown, ChevronUp, BookOpen, Lightbulb, Clock, Pencil } from 'lucide-react'
 import PDIGapBar from './PDIGapBar'
+import { useDebounce } from '@/hooks/useDebounce'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -84,8 +85,51 @@ export default memo(function PDIWizardCard({
   const [isEditingOutcome, setIsEditingOutcome] = useState(false)
   const [editedTitle, setEditedTitle] = useState(suggestion.title)
   const [editedOutcome, setEditedOutcome] = useState(suggestion.targetOutcome)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [lastSaved, setLastSaved] = useState<Date | null>(null)
 
   const config = SEVERITY_CONFIG[gap.status]
+
+  // ── Auto-save con debounce ──
+  const saveGoalChanges = useCallback(async (
+    gId: string,
+    updates: { title?: string; targetOutcome?: string }
+  ) => {
+    if (!gId || gId.startsWith('gap-')) return
+
+    setIsSaving(true)
+    setSaveError(null)
+
+    try {
+      const res = await fetch(`/api/pdi/goals/${gId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      })
+
+      if (!res.ok) throw new Error('Error guardando cambios')
+
+      setLastSaved(new Date())
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Error desconocido')
+      console.error('[PDI] Auto-save error:', err)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [])
+
+  const debouncedSave = useDebounce(saveGoalChanges, 1500)
+
+  const handleTitleChange = useCallback((newTitle: string) => {
+    setEditedTitle(newTitle)
+    debouncedSave(goalId, { title: newTitle })
+  }, [debouncedSave, goalId])
+
+  const handleOutcomeChange = useCallback((newOutcome: string) => {
+    setEditedOutcome(newOutcome)
+    debouncedSave(goalId, { targetOutcome: newOutcome })
+  }, [debouncedSave, goalId])
 
   const handleAddToPlan = useCallback(() => {
     onNext({
@@ -169,9 +213,30 @@ export default memo(function PDIWizardCard({
         <div className="h-px bg-slate-800 mb-6" />
 
         {/* Plan de acción header */}
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-5">
-          Plan de Acción
-        </p>
+        <div className="flex items-center justify-between mb-5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+            Plan de Acción
+          </p>
+          {/* Indicador de auto-save */}
+          <div className="flex items-center gap-2 text-[10px]">
+            {isSaving && (
+              <span className="text-slate-500 flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                Guardando...
+              </span>
+            )}
+            {!isSaving && lastSaved && !saveError && (
+              <span className="text-slate-600">
+                Guardado
+              </span>
+            )}
+            {saveError && (
+              <span className="text-red-400">
+                Error al guardar
+              </span>
+            )}
+          </div>
+        </div>
 
         {/* Editable title */}
         <div className="rounded-xl bg-slate-800/50 border border-slate-700/50 p-4 mb-4">
@@ -191,7 +256,7 @@ export default memo(function PDIWizardCard({
           {isEditingTitle ? (
             <textarea
               value={editedTitle}
-              onChange={(e) => setEditedTitle(e.target.value)}
+              onChange={(e) => handleTitleChange(e.target.value)}
               onBlur={() => setIsEditingTitle(false)}
               autoFocus
               rows={2}
@@ -222,7 +287,7 @@ export default memo(function PDIWizardCard({
           {isEditingOutcome ? (
             <textarea
               value={editedOutcome}
-              onChange={(e) => setEditedOutcome(e.target.value)}
+              onChange={(e) => handleOutcomeChange(e.target.value)}
               onBlur={() => setIsEditingOutcome(false)}
               autoFocus
               rows={2}

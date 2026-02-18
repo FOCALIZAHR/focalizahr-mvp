@@ -3,6 +3,7 @@
 import { memo } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle, ArrowRight } from 'lucide-react'
+import { getRoleFitClassification } from '@/config/performanceClassification'
 
 interface SummaryGoal {
   competencyCode: string
@@ -70,16 +71,35 @@ export default memo(function PDISummaryCard({
           {/* Role Fit */}
           <div className="rounded-xl bg-slate-800/50 border border-slate-700/50 p-4 text-center">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Role Fit</p>
-            <div className="text-3xl font-extralight tabular-nums text-cyan-400">
-              {roleFitScore !== null ? `${roleFitScore}%` : 'N/A'}
-            </div>
-            {roleFitScore !== null && (
-              <div className="mt-2 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-purple-500 transition-all duration-700"
-                  style={{ width: `${roleFitScore}%` }}
-                />
-              </div>
+            {roleFitScore !== null ? (() => {
+              const classification = getRoleFitClassification(roleFitScore)
+              return (
+                <>
+                  <div
+                    className="text-3xl font-extralight tabular-nums"
+                    style={{ color: classification.color }}
+                  >
+                    {roleFitScore}%
+                  </div>
+                  <p
+                    className="text-xs font-medium mt-1"
+                    style={{ color: classification.color }}
+                  >
+                    {classification.labelShort}
+                  </p>
+                  <div className="mt-2 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${roleFitScore}%`,
+                        backgroundColor: classification.color
+                      }}
+                    />
+                  </div>
+                </>
+              )
+            })() : (
+              <div className="text-3xl font-extralight tabular-nums text-slate-500">N/A</div>
             )}
           </div>
 

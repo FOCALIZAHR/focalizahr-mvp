@@ -3,6 +3,7 @@
 import { memo } from 'react'
 import { motion } from 'framer-motion'
 import { Target, Plus, CheckCircle } from 'lucide-react'
+import { getRoleFitClassification } from '@/config/performanceClassification'
 
 interface RoleFitSummary {
   roleFitScore: number
@@ -67,12 +68,31 @@ export default memo(function PDINoGapsCard({
         {roleFit && (
           <div className="flex items-center gap-8 mb-8">
             <div className="text-center">
-              <div className="text-5xl font-extralight text-emerald-400 tabular-nums">
-                {roleFit.roleFitScore}%
-              </div>
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">
-                Role Fit
-              </p>
+              {(() => {
+                const classification = getRoleFitClassification(roleFit.roleFitScore)
+                return (
+                  <>
+                    <div
+                      className="text-5xl font-extralight tabular-nums"
+                      style={{ color: classification.color }}
+                    >
+                      {roleFit.roleFitScore}%
+                    </div>
+                    <p
+                      className="text-sm font-medium mt-1"
+                      style={{ color: classification.color }}
+                    >
+                      {classification.label}
+                    </p>
+                    <p className="text-xs text-slate-400 italic mt-3 leading-relaxed text-left">
+                      {classification.question}
+                    </p>
+                    <p className="text-xs text-slate-200 font-medium mt-2 leading-relaxed text-left">
+                      {classification.description}
+                    </p>
+                  </>
+                )
+              })()}
             </div>
 
             <div className="flex-1 space-y-2">
