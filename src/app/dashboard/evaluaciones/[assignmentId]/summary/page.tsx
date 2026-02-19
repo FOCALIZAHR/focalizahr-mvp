@@ -143,19 +143,35 @@ export default function EvaluationSummaryPage() {
   }, [])
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Fetch PDI existente para el evaluado en este ciclo
+  // Cargar PDI existente al cambiar a tab "desarrollo"
   // ═══════════════════════════════════════════════════════════════════════════
   useEffect(() => {
-    if (!summary?.evaluateeId || !summary?.cycleId) return
-    fetch(`/api/pdi?employeeId=${summary.evaluateeId}&cycleId=${summary.cycleId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.data?.length > 0) {
-          setExistingPDI({ id: data.data[0].id, status: data.data[0].status })
+    if (activeView !== 'desarrollo' || !summary) return
+    const { evaluateeId, cycleId } = summary
+
+    async function checkExistingPDI() {
+      try {
+        const res = await fetch(
+          `/api/pdi/by-employee?employeeId=${evaluateeId}&cycleId=${cycleId}`
+        )
+        const data = await res.json()
+
+        if (data.success && data.exists) {
+          setExistingPDI({
+            id: data.data.id,
+            status: data.data.status
+          })
+        } else {
+          setExistingPDI(null)
         }
-      })
-      .catch(() => { /* silently ignore */ })
-  }, [summary?.evaluateeId, summary?.cycleId])
+      } catch (err) {
+        console.error('[Summary] Error checking PDI:', err)
+        setExistingPDI(null)
+      }
+    }
+
+    checkExistingPDI()
+  }, [activeView, summary])
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Calcular competencias desde categorizedResponses para ManagementAlertsHUD
@@ -360,14 +376,25 @@ export default function EvaluationSummaryPage() {
       {activeView === 'desarrollo' && summary && (
         <div>
           {existingPDI ? (
-            <PDIDetailView pdiId={existingPDI.id} />
+            existingPDI.status === 'DRAFT' ? (
+              <PDIWizardOrchestrator
+                employeeId={summary.evaluateeId}
+                cycleId={summary.cycleId}
+                employeeName={summary.evaluatee.fullName}
+                onComplete={(pdiId) => {
+                  setExistingPDI({ id: pdiId, status: 'PENDING_REVIEW' })
+                }}
+              />
+            ) : (
+              <PDIDetailView pdiId={existingPDI.id} />
+            )
           ) : (
             <PDIWizardOrchestrator
               employeeId={summary.evaluateeId}
               cycleId={summary.cycleId}
               employeeName={summary.evaluatee.fullName}
               onComplete={(pdiId) => {
-                setExistingPDI({ id: pdiId, status: 'DRAFT' })
+                setExistingPDI({ id: pdiId, status: 'PENDING_REVIEW' })
               }}
             />
           )}

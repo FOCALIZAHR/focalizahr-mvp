@@ -114,6 +114,63 @@ export async function POST(request: NextRequest) {
     const t3 = Date.now()
     console.log(`[PDI] RoleFit + Engine: ${t3 - t1}ms`)
 
+    // ════════════════════════════════════════════════════════════════════════════
+    // 7.5 VERIFICAR SI YA EXISTE PDI EN DRAFT (NO REGENERAR)
+    // ════════════════════════════════════════════════════════════════════════════
+
+    const existingPDI = await prisma.developmentPlan.findUnique({
+      where: { employeeId_cycleId: { employeeId, cycleId } },
+      include: {
+        goals: { orderBy: { priority: 'asc' } },
+        employee: { select: { fullName: true, email: true } }
+      }
+    })
+
+    // Si existe en DRAFT y tiene goals → retornar el existente SIN regenerar
+    if (existingPDI && existingPDI.status === 'DRAFT' && existingPDI.goals.length > 0) {
+      console.log(`[PDI] Existing DRAFT found (${existingPDI.id}), returning without regeneration`)
+
+      const t4 = Date.now()
+
+      return NextResponse.json({
+        success: true,
+        data: existingPDI,
+        meta: {
+          suggestionsGenerated: existingPDI.goals.length,
+          executiveSummary: 'PDI existente cargado sin regenerar',
+          roleFit: roleFit ? {
+            roleFitScore: roleFit.roleFitScore,
+            standardJobLevel: roleFit.standardJobLevel,
+            gaps: roleFit.gaps,
+            summary: roleFit.summary
+          } : null,
+          enrichedSuggestions: existingPDI.goals.map(g => ({
+            competencyCode: g.competencyCode,
+            coachingTip: '',
+            estimatedWeeks: 8,
+            action: ''
+          })),
+          fromCache: true,
+          timing: { total: t4 - t0, queries: t1 - t0, cached: true }
+        }
+      })
+    }
+
+    // Si existe pero NO está en DRAFT → 409 Conflict
+    if (existingPDI && existingPDI.status !== 'DRAFT') {
+      console.log(`[PDI] Existing PDI in ${existingPDI.status}, cannot regenerate`)
+
+      return NextResponse.json({
+        success: false,
+        error: `PDI ya existe en estado ${existingPDI.status}`,
+        existingId: existingPDI.id,
+        existingStatus: existingPDI.status
+      }, { status: 409 })
+    }
+
+    // Si no existe O existe sin goals → continuar con generación normal
+    console.log(`[PDI] No existing DRAFT with goals, proceeding with generation`)
+
     // 8. Upsert PDI con goals — resuelve race condition P2002
     const goalsData = suggestions.map(s => ({
       competencyCode: s.competencyCode,

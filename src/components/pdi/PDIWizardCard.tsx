@@ -1,10 +1,9 @@
 'use client'
 
-import { memo, useState, useCallback } from 'react'
+import { memo, useState, useCallback, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Sparkles, ChevronDown, ChevronUp, BookOpen, Lightbulb, Clock, Pencil } from 'lucide-react'
+import { Sparkles, ChevronDown, ChevronUp, BookOpen, Lightbulb, Clock } from 'lucide-react'
 import PDIGapBar from './PDIGapBar'
-import { useDebounce } from '@/hooks/useDebounce'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -27,6 +26,11 @@ export interface WizardSuggestion {
   coachingTip: string
   action: string
   estimatedWeeks: number
+  // Smart Router fields
+  narrative?: string
+  category?: 'URGENTE' | 'IMPACTO' | 'QUICK_WIN' | 'POTENCIAR'
+  categoryLabel?: string
+  categoryColor?: string
 }
 
 export interface EditedGoal {
@@ -46,6 +50,7 @@ interface PDIWizardCardProps {
   direction: number
   onNext: (edited: EditedGoal) => void
   onPrevious: () => void
+  onUpdateGoal?: (updates: { title?: string; targetOutcome?: string }) => void
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -78,68 +83,58 @@ export default memo(function PDIWizardCard({
   totalCount,
   direction,
   onNext,
-  onPrevious
+  onPrevious,
+  onUpdateGoal
 }: PDIWizardCardProps) {
-  const [showDetail, setShowDetail] = useState(false)
-  const [isEditingTitle, setIsEditingTitle] = useState(false)
-  const [isEditingOutcome, setIsEditingOutcome] = useState(false)
+  const [step, setStep] = useState<'brecha' | 'plan'>('brecha')
   const [editedTitle, setEditedTitle] = useState(suggestion.title)
   const [editedOutcome, setEditedOutcome] = useState(suggestion.targetOutcome)
-  const [isSaving, setIsSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [lastSaved, setLastSaved] = useState<Date | null>(null)
 
-  const config = SEVERITY_CONFIG[gap.status]
+  // Sincronizar cuando cambia de card (goalId cambia)
+  useEffect(() => {
+    setEditedTitle(suggestion.title)
+    setEditedOutcome(suggestion.targetOutcome)
+    setStep('brecha')
+  }, [goalId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Auto-save con debounce ──
-  const saveGoalChanges = useCallback(async (
-    gId: string,
-    updates: { title?: string; targetOutcome?: string }
-  ) => {
-    if (!gId || gId.startsWith('gap-')) return
+  // Debounced autosave: guarda 1s después de dejar de escribir
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
-    setIsSaving(true)
-    setSaveError(null)
+  useEffect(() => {
+    if (editedTitle === suggestion.title && editedOutcome === suggestion.targetOutcome) return
 
-    try {
-      const res = await fetch(`/api/pdi/goals/${gId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      })
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      const updates: { title?: string; targetOutcome?: string } = {}
+      if (editedTitle !== suggestion.title) updates.title = editedTitle
+      if (editedOutcome !== suggestion.targetOutcome) updates.targetOutcome = editedOutcome
+      if (Object.keys(updates).length > 0) onUpdateGoal?.(updates)
+    }, 1000)
 
-      if (!res.ok) throw new Error('Error guardando cambios')
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [editedTitle, editedOutcome]) // eslint-disable-line react-hooks/exhaustive-deps
 
-      setLastSaved(new Date())
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Error desconocido')
-      console.error('[PDI] Auto-save error:', err)
-    } finally {
-      setIsSaving(false)
-    }
-  }, [])
-
-  const debouncedSave = useDebounce(saveGoalChanges, 1500)
-
-  const handleTitleChange = useCallback((newTitle: string) => {
-    setEditedTitle(newTitle)
-    debouncedSave(goalId, { title: newTitle })
-  }, [debouncedSave, goalId])
-
-  const handleOutcomeChange = useCallback((newOutcome: string) => {
-    setEditedOutcome(newOutcome)
-    debouncedSave(goalId, { targetOutcome: newOutcome })
-  }, [debouncedSave, goalId])
-
-  const handleAddToPlan = useCallback(() => {
+  const handleNext = useCallback((included: boolean) => {
     onNext({
       goalId,
       competencyCode: gap.competencyCode,
       title: editedTitle,
       targetOutcome: editedOutcome,
-      included: true
+      included
     })
-  }, [onNext, goalId, gap.competencyCode, editedTitle, editedOutcome])
+  }, [goalId, gap.competencyCode, editedTitle, editedOutcome, onNext])
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // TESLA LINE - Siempre cyan corporativo FocalizaHR
+  // ════════════════════════════════════════════════════════════════════════════
+
+  const getTeslaLineColor = () => {
+    return 'linear-gradient(90deg, transparent, #22D3EE, #22D3EE, transparent)'
+  }
+
+  const getTeslaGlow = () => {
+    return '0 0 20px #22D3EE, 0 0 40px rgba(34, 211, 238, 0.4)'
+  }
 
   return (
     <motion.div
@@ -149,206 +144,262 @@ export default memo(function PDIWizardCard({
       initial="enter"
       animate="center"
       exit="exit"
-      transition={{ duration: 0.3, ease: 'easeInOut' }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="relative bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[24px] overflow-hidden"
+      onKeyDown={(e) => {
+        const el = e.target as HTMLElement
+        const isTyping = el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.isContentEditable
+        console.log('[PDIWizardCard onKeyDown]', {
+          key: e.key,
+          targetTag: el.tagName,
+          targetClass: el.className?.slice?.(0, 50),
+          isTyping
+        })
+        if (isTyping) return
+        e.stopPropagation()
+      }}
     >
-      {/* Tesla line */}
+      {/* Tesla Line Dinámica */}
       <div
-        className="absolute top-0 left-0 right-0 h-[1px] z-10"
+        className="absolute top-0 left-0 right-0 h-[2px] z-10"
         style={{
-          background: `linear-gradient(90deg, transparent, ${config.color}, transparent)`,
-          boxShadow: `0 0 15px ${config.color}`
+          background: getTeslaLineColor(),
+          boxShadow: getTeslaGlow()
         }}
       />
 
-      <div className="p-8 md:p-10">
-        {/* Top bar */}
-        <div className="mb-8">
-          <span className="text-xs text-slate-500">
-            BRECHA {currentIndex + 1} de {totalCount}
-          </span>
-        </div>
+      <div className="p-6 md:p-8">
+        {/* Header con Badge de Categoría */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            {/* Dot de severidad */}
+            <div
+              className={`w-3 h-3 rounded-full ${
+                suggestion.category === 'URGENTE'
+                  ? 'bg-red-400'
+                  : suggestion.category === 'IMPACTO'
+                  ? 'bg-amber-400'
+                  : suggestion.category === 'QUICK_WIN'
+                  ? 'bg-purple-400'
+                  : suggestion.category === 'POTENCIAR'
+                  ? 'bg-emerald-400'
+                  : 'bg-cyan-400'
+              }`}
+            />
+            <h3 className="text-lg font-medium text-white">
+              {gap.competencyName}
+            </h3>
+          </div>
 
-        {/* Competency name + score */}
-        <h3 className="text-2xl font-light text-white mb-6">
-          {gap.competencyName}
-        </h3>
-
-        {/* Gap bar */}
-        <div className="mb-4">
-          <PDIGapBar actual={gap.actualScore} target={gap.targetScore} />
-        </div>
-
-        {/* Severity badge (dot + neutral text) */}
-        <div className="flex items-center gap-2 mb-6">
-          <div className={`w-2 h-2 rounded-full ${config.dot}`} />
-          <span className="text-xs text-slate-400">
-            {config.label} &middot; {gap.rawGap > 0 ? '+' : ''}{gap.rawGap.toFixed(1)} puntos
-          </span>
-        </div>
-
-        {/* Expandable detail */}
-        <button
-          onClick={() => setShowDetail(!showDetail)}
-          className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors mb-6"
-        >
-          {showDetail ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          Ver origen del dato
-        </button>
-
-        {showDetail && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="rounded-lg bg-slate-800/30 border border-slate-700/30 p-4 mb-6 text-xs text-slate-400 space-y-1"
+          {/* Badge de categoría */}
+          <div
+            className={`px-3 py-1 rounded-full text-xs font-medium ${
+              suggestion.category === 'URGENTE'
+                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                : suggestion.category === 'IMPACTO'
+                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                : suggestion.category === 'QUICK_WIN'
+                ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                : suggestion.category === 'POTENCIAR'
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+            }`}
           >
-            <p>Score actual (evaluación 360°): <span className="text-cyan-400">{gap.actualScore.toFixed(1)}</span></p>
-            <p>Meta del cargo: <span className="text-white">{gap.targetScore.toFixed(1)}</span></p>
-            <p>Diferencia: <span className={gap.rawGap < 0 ? 'text-amber-400' : 'text-emerald-400'}>{gap.rawGap.toFixed(1)}</span></p>
+            {suggestion.categoryLabel || SEVERITY_CONFIG[gap.status]?.label}
+          </div>
+        </div>
+
+        {/* Indicador de progreso */}
+        <div className="flex items-center gap-2 text-xs text-slate-500 mb-6">
+          <span>Card {currentIndex + 1} de {totalCount}</span>
+          <span>&middot;</span>
+          <span className={step === 'brecha' ? 'text-cyan-400' : 'text-slate-500'}>
+            Entender
+          </span>
+          <span>&rarr;</span>
+          <span className={step === 'plan' ? 'text-cyan-400' : 'text-slate-500'}>
+            Decidir
+          </span>
+        </div>
+
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {/* PASO 1: ENTENDER LA BRECHA */}
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {step === 'brecha' && (
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.3 }}
+          >
+            {/* Encabezado explicativo */}
+            <div className="text-center mb-4">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Diagnóstico de Brecha
+              </span>
+            </div>
+
+            {/* Barra de Gap */}
+            <div className="mb-6">
+              <PDIGapBar
+                actual={gap.actualScore}
+                target={gap.targetScore}
+              />
+            </div>
+
+            {/* Narrativa de la brecha */}
+            <div className="rounded-xl bg-slate-800/50 border border-slate-700/50 p-4 mb-4">
+              <p className="text-sm text-slate-300 leading-relaxed">
+                {suggestion.narrative ||
+                 `Esta competencia presenta una brecha de ${Math.abs(gap.rawGap).toFixed(1)} puntos respecto al nivel esperado para el cargo.`}
+              </p>
+            </div>
+
+            {/* Coaching Tip */}
+            {suggestion.coachingTip && (
+              <div className="flex items-start gap-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 p-4 mb-6">
+                <Lightbulb className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-medium text-cyan-400 mb-1">Tip para tu 1:1</p>
+                  <p className="text-sm text-slate-300">{suggestion.coachingTip}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Instrucción clara */}
+            <p className="text-xs text-slate-500 text-center mt-4 mb-2">
+              Revisa esta brecha y luego define el plan de acción &rarr;
+            </p>
+
+            {/* Botones Paso 1 */}
+            <div className="flex items-center justify-between pt-4">
+              <button
+                onClick={onPrevious}
+                disabled={currentIndex === 0}
+                className="fhr-btn fhr-btn-ghost flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronUp className="w-4 h-4 rotate-[-90deg]" />
+                Anterior
+              </button>
+
+              <button
+                onClick={() => setStep('plan')}
+                className="fhr-btn fhr-btn-primary flex items-center gap-2"
+              >
+                Ver Plan Sugerido
+                <ChevronDown className="w-4 h-4 rotate-[-90deg]" />
+              </button>
+            </div>
           </motion.div>
         )}
 
-        {/* Divider */}
-        <div className="h-px bg-slate-800 mb-6" />
-
-        {/* Plan de acción header */}
-        <div className="flex items-center justify-between mb-5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
-            Plan de Acción
-          </p>
-          {/* Indicador de auto-save */}
-          <div className="flex items-center gap-2 text-[10px]">
-            {isSaving && (
-              <span className="text-slate-500 flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                Guardando...
-              </span>
-            )}
-            {!isSaving && lastSaved && !saveError && (
-              <span className="text-slate-600">
-                Guardado
-              </span>
-            )}
-            {saveError && (
-              <span className="text-red-400">
-                Error al guardar
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Editable title */}
-        <div className="rounded-xl bg-slate-800/50 border border-slate-700/50 p-4 mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Objetivo</span>
-            <div className="flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-purple-400" />
-              <span className="text-[10px] text-purple-400">IA</span>
-              <button
-                onClick={() => setIsEditingTitle(!isEditingTitle)}
-                className="ml-2 text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                <Pencil className="w-3 h-3" />
-              </button>
-            </div>
-          </div>
-          {isEditingTitle ? (
-            <textarea
-              value={editedTitle}
-              onChange={(e) => handleTitleChange(e.target.value)}
-              onBlur={() => setIsEditingTitle(false)}
-              autoFocus
-              rows={2}
-              className="w-full bg-transparent text-sm text-slate-200 leading-relaxed resize-none focus:outline-none focus:ring-1 focus:ring-cyan-500/30 rounded p-1"
-            />
-          ) : (
-            <p className="text-sm text-slate-200 leading-relaxed">{editedTitle}</p>
-          )}
-        </div>
-
-        {/* Description (read-only) */}
-        <div className="rounded-xl bg-slate-800/50 border border-slate-700/50 p-4 mb-4">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-2">Descripción</span>
-          <p className="text-sm text-slate-300 leading-relaxed">{suggestion.description}</p>
-        </div>
-
-        {/* Editable target outcome */}
-        <div className="rounded-xl bg-slate-800/50 border border-slate-700/50 p-4 mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Meta Medible</span>
-            <button
-              onClick={() => setIsEditingOutcome(!isEditingOutcome)}
-              className="text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              <Pencil className="w-3 h-3" />
-            </button>
-          </div>
-          {isEditingOutcome ? (
-            <textarea
-              value={editedOutcome}
-              onChange={(e) => handleOutcomeChange(e.target.value)}
-              onBlur={() => setIsEditingOutcome(false)}
-              autoFocus
-              rows={2}
-              className="w-full bg-transparent text-sm text-slate-200 leading-relaxed resize-none focus:outline-none focus:ring-1 focus:ring-cyan-500/30 rounded p-1"
-            />
-          ) : (
-            <p className="text-sm text-slate-200 leading-relaxed">{editedOutcome}</p>
-          )}
-        </div>
-
-        {/* Resources + tip + time */}
-        <div className="rounded-xl bg-slate-800/30 border border-slate-700/30 p-4 space-y-3">
-          {suggestion.suggestedResources.length > 0 && (
-            <div className="flex items-start gap-2">
-              <BookOpen className="w-3.5 h-3.5 text-slate-500 mt-0.5 shrink-0" />
-              <p className="text-xs text-slate-400">
-                {suggestion.suggestedResources.map(r => r.title).join(' · ')}
-              </p>
-            </div>
-          )}
-          {suggestion.coachingTip && (
-            <div className="flex items-start gap-2">
-              <Lightbulb className="w-3.5 h-3.5 text-slate-500 mt-0.5 shrink-0" />
-              <p className="text-xs text-slate-400 italic">"{suggestion.coachingTip}"</p>
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-            <p className="text-xs text-slate-400">Tiempo estimado: {suggestion.estimatedWeeks} semanas</p>
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-800">
-          <button
-            onClick={onPrevious}
-            disabled={currentIndex === 0}
-            className="px-4 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {/* PASO 2: DECIDIR EL PLAN */}
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {step === 'plan' && (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3 }}
           >
-            &larr; Anterior
-          </button>
+            {/* Mini-resumen del gap */}
+            <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-700/50">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  gap.status === 'CRITICAL' ? 'bg-red-400' :
+                  gap.status === 'IMPROVE' ? 'bg-amber-400' :
+                  'bg-cyan-400'
+                }`} />
+                <span className="text-sm text-slate-400">
+                  Brecha: <span className="text-white font-medium">{Math.abs(gap.rawGap).toFixed(1)}</span> puntos
+                </span>
+              </div>
+              <span className="text-xs text-slate-500">
+                {gap.actualScore.toFixed(1)} &rarr; {gap.targetScore.toFixed(1)}
+              </span>
+            </div>
 
-          {/* Dots */}
-          <div className="flex items-center gap-1.5">
-            {Array.from({ length: totalCount }).map((_, i) => (
-              <div
-                key={i}
-                className={`h-1.5 rounded-full transition-all duration-200 ${
-                  i === currentIndex ? 'w-4 bg-cyan-400' : 'w-1.5 bg-slate-600'
-                }`}
+            {/* Instrucción clara */}
+            <p className="text-xs text-cyan-400 mb-4">
+              Revisa y ajusta el plan sugerido, luego agr&eacute;galo o s&aacute;ltalo
+            </p>
+
+            {/* Título del objetivo */}
+            <div className="mb-4">
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2">
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                Objetivo sugerido
+              </label>
+              <textarea
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                rows={2}
+                className="w-full bg-transparent text-sm text-slate-200 leading-relaxed p-4 resize-none border border-slate-600/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 placeholder:text-slate-600"
+                placeholder="Escribe el objetivo de desarrollo..."
               />
-            ))}
-          </div>
+            </div>
 
-          <button
-            onClick={handleAddToPlan}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-500 text-white text-sm font-medium hover:opacity-90 transition-opacity"
-          >
-            Agregar al Plan &rarr;
-          </button>
-        </div>
+            {/* Meta medible */}
+            <div className="mb-4">
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2">
+                <BookOpen className="w-3.5 h-3.5 text-purple-400" />
+                Meta medible
+              </label>
+              <textarea
+                value={editedOutcome}
+                onChange={(e) => setEditedOutcome(e.target.value)}
+                rows={2}
+                className="w-full bg-transparent text-sm text-slate-200 leading-relaxed p-4 resize-none border border-slate-600/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 placeholder:text-slate-600"
+                placeholder="¿Cómo se medirá el éxito?"
+              />
+            </div>
+
+            {/* Recursos y tiempo */}
+            <div className="flex items-center gap-4 text-xs text-slate-500 mb-6">
+              {suggestion.suggestedResources?.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>{suggestion.suggestedResources.length} recursos</span>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                <span>{suggestion.estimatedWeeks} semanas</span>
+              </div>
+            </div>
+
+            {/* Botones Paso 2 */}
+            <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+              <button
+                onClick={() => setStep('brecha')}
+                className="fhr-btn fhr-btn-ghost flex items-center gap-2"
+              >
+                <ChevronUp className="w-4 h-4 rotate-[-90deg]" />
+                Ver Brecha
+              </button>
+
+              <div className="flex items-center gap-3">
+                {/* Omitir */}
+                <button
+                  onClick={() => handleNext(false)}
+                  className="fhr-btn fhr-btn-ghost"
+                >
+                  Omitir
+                </button>
+
+                {/* Agregar al Plan */}
+                <button
+                  onClick={() => handleNext(true)}
+                  className="fhr-btn fhr-btn-primary flex items-center gap-2"
+                >
+                  Agregar al Plan
+                  <ChevronDown className="w-4 h-4 rotate-[-90deg]" />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </div>
     </motion.div>
   )
