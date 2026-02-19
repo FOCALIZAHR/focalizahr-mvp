@@ -199,6 +199,13 @@ model Account {
   developmentPlans         DevelopmentPlan[]
   competencyTargets        CompetencyTarget[]
 
+  // ═══════════════════════════════════════════════════
+  // RELACIONES METAS (BUSINESS GOALS ENGINE)
+  // ═══════════════════════════════════════════════════
+  goals                    Goal[]
+  goalProgressUpdates      GoalProgressUpdate[]
+  goalLibrary              GoalLibrary[]
+
   @@index([adminEmail], map: "idx_accounts_email")
   @@index([subscriptionTier], map: "idx_accounts_tier")
   // 🌍 AGREGAR ESTOS 3 ÍNDICES:
@@ -669,6 +676,9 @@ model Department {
   // RELACIONES EMPLOYEE MASTER
   // ═══════════════════════════════════════════════════
   employees Employee[]
+
+  // Metas (Business Goals Engine)
+  goals     Goal[]
 
   @@unique([accountId, displayName])
   @@index([accountId], map: "idx_departments_account")
@@ -1544,6 +1554,9 @@ model Employee {
   developmentPlans       DevelopmentPlan[] @relation("EmployeePDI")
   managedPDIs            DevelopmentPlan[] @relation("ManagerPDI")
 
+  // Metas (Business Goals Engine)
+  goals                  Goal[]
+
   // Índices
   @@unique([accountId, nationalId], map: "idx_employees_account_national")
   @@index([accountId, status], map: "idx_employees_account_status")
@@ -2263,6 +2276,9 @@ model DevelopmentGoal {
 
   plan              DevelopmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
+  // Metas (Business Goals Engine) - link inverso
+  linkedBusinessGoal Goal?
+
   @@index([planId])
   @@index([competencyCode])
   @@index([status])
@@ -2373,4 +2389,206 @@ model CompetencyTarget {
   @@index([accountId], map: "idx_comp_targets_account")
   @@index([standardJobLevel], map: "idx_comp_targets_job_level")
   @@map("competency_targets")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// MÓDULO DE ESTRATEGIA Y METAS (BUSINESS GOALS ENGINE) - SOBERANO
+// Vive independiente de los ciclos de evaluación
+// ════════════════════════════════════════════════════════════════════════════
+
+model Goal {
+  id              String   @id @default(cuid())
+  accountId       String   @map("account_id")
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // 1. JERARQUÍA Y CASCADA (The Alignment Tree)
+  // ────────────────────────────────────────────────────────────────────────────
+  parentId        String?  @map("parent_id")
+  parent          Goal?    @relation("GoalCascade", fields: [parentId], references: [id], onDelete: SetNull)
+  children        Goal[]   @relation("GoalCascade")
+
+  level           GoalLevel @default(INDIVIDUAL)
+  originType      GoalOriginType @map("origin_type")
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // 2. PROPIEDAD
+  // ────────────────────────────────────────────────────────────────────────────
+  employeeId      String?  @map("employee_id")    // Null si es meta de empresa/área
+  departmentId    String?  @map("department_id")  // Para metas de área (Nivel 1)
+  createdById     String   @map("created_by_id")  // Auditoría de creación
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // 3. DEFINICIÓN
+  // ────────────────────────────────────────────────────────────────────────────
+  title           String
+  description     String?  @db.Text
+  type            GoalType @default(KPI)
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // 4. TIEMPO (Vigencia de Negocio - Independiente de ciclos)
+  // ────────────────────────────────────────────────────────────────────────────
+  startDate       DateTime @map("start_date")
+  dueDate         DateTime @map("due_date")
+  periodYear      Int      @map("period_year")  // Ej: 2026
+  periodQuarter   Int?     @map("period_quarter") // 1-4 opcional
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // 5. MEDICIÓN (Motor Determinista)
+  // ────────────────────────────────────────────────────────────────────────────
+  metricType      GoalMetricType @default(PERCENTAGE) @map("metric_type")
+  startValue      Float    @default(0) @map("start_value")
+  targetValue     Float    @default(100) @map("target_value")
+  currentValue    Float    @default(0) @map("current_value")
+  unit            String?  // Ej: "USD", "%", "Tickets", "Clientes"
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // 6. RESULTADOS E INTELIGENCIA
+  // ────────────────────────────────────────────────────────────────────────────
+  progress        Float    @default(0)  // (Current-Start)/(Target-Start)*100
+  status          GoalStatus @default(NOT_STARTED)
+
+  isAligned       Boolean  @default(false) @map("is_aligned")  // True si traza ruta hasta Nivel 0
+  isOrphan        Boolean  @default(true)  @map("is_orphan")   // True si no tiene padre y no es Nivel 0
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // 7. INTEGRACIÓN PERFORMANCE
+  // ────────────────────────────────────────────────────────────────────────────
+  weight          Float    @default(0)  // Peso relativo (0-100) para nota final
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // 8. CONEXIÓN PDI (opcional)
+  // ────────────────────────────────────────────────────────────────────────────
+  linkedDevGoalId String?  @unique @map("linked_dev_goal_id")  // Si nació de un DevelopmentGoal
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // TIMESTAMPS
+  // ────────────────────────────────────────────────────────────────────────────
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  completedAt     DateTime? @map("completed_at")
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // RELACIONES
+  // ────────────────────────────────────────────────────────────────────────────
+  account         Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  owner           Employee?  @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  department      Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  linkedDevGoal   DevelopmentGoal? @relation(fields: [linkedDevGoalId], references: [id], onDelete: SetNull)
+
+  progressUpdates GoalProgressUpdate[]
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // ÍNDICES
+  // ────────────────────────────────────────────────────────────────────────────
+  @@index([accountId])
+  @@index([parentId])
+  @@index([employeeId])
+  @@index([departmentId])
+  @@index([level])
+  @@index([status])
+  @@index([periodYear])
+  @@index([dueDate])
+  @@map("goals")
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// TIME TRAVEL: Historial para reconstruir estado en fecha pasada
+// ────────────────────────────────────────────────────────────────────────────
+
+model GoalProgressUpdate {
+  id               String   @id @default(cuid())
+  goalId           String   @map("goal_id")
+  accountId        String   @map("account_id")
+
+  // Snapshot del cambio
+  previousValue    Float    @map("previous_value")
+  newValue         Float    @map("new_value")
+  previousProgress Float    @map("previous_progress")
+  newProgress      Float    @map("new_progress")
+
+  // Contexto
+  comment          String?  @db.Text
+  evidence         String?  // URL o referencia a evidencia
+
+  // Auditoría
+  updatedById      String   @map("updated_by_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  goal             Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  account          Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+  @@index([accountId])
+  @@index([createdAt])  // VITAL para queries de rango de fecha (Time Travel)
+  @@map("goal_progress_updates")
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// BANCO DE TEMPLATES (Evita "Síndrome Hoja en Blanco")
+// ────────────────────────────────────────────────────────────────────────────
+
+model GoalLibrary {
+  id              String   @id @default(cuid())
+  accountId       String   @map("account_id")
+
+  title           String
+  description     String?  @db.Text
+  category        String   // "Ventas", "Operaciones", "Liderazgo", "Finanzas"
+
+  // Template de medición
+  metricType      GoalMetricType @default(PERCENTAGE) @map("metric_type")
+  suggestedTarget Float?   @map("suggested_target")
+  unit            String?
+
+  // Metadata
+  isActive        Boolean  @default(true) @map("is_active")
+  usageCount      Int      @default(0) @map("usage_count")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  account         Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([category])
+  @@map("goal_library")
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// ENUMS - METAS
+// ────────────────────────────────────────────────────────────────────────────
+
+enum GoalLevel {
+  COMPANY      // Nivel 0 - Metas corporativas
+  AREA         // Nivel 1 - Metas de gerencia/departamento
+  INDIVIDUAL   // Nivel 2 - Metas de empleado
+}
+
+enum GoalOriginType {
+  STRATEGIC_CASCADE   // Viene de arriba (cascadeo)
+  MANAGER_CREATED     // Nace localmente (jefe crea)
+}
+
+enum GoalType {
+  KPI           // Meta numérica simple
+  OBJECTIVE     // El "O" de OKR (contenedor)
+  KEY_RESULT    // El "KR" de OKR (medible)
+  PROJECT       // Hito binario (completado/no completado)
+}
+
+enum GoalMetricType {
+  PERCENTAGE    // 0-100%
+  CURRENCY      // Dinero (USD, CLP, etc)
+  NUMBER        // Cantidad absoluta
+  BINARY        // 0 o 100 (completado/no)
+}
+
+enum GoalStatus {
+  NOT_STARTED   // Sin iniciar
+  ON_TRACK      // En tiempo
+  AT_RISK       // En riesgo
+  BEHIND        // Atrasado
+  COMPLETED     // Completado
+  CANCELLED     // Cancelado
 }
