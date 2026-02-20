@@ -4,7 +4,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationService'
+import {
+  extractUserContext,
+  hasPermission,
+  GLOBAL_ACCESS_ROLES,
+  getChildDepartmentIds
+} from '@/lib/services/AuthorizationService'
 
 export async function PATCH(
   request: NextRequest,
@@ -19,6 +24,10 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
+    if (!hasPermission(userContext.role, 'performance:view')) {
+      return NextResponse.json({ success: false, error: 'Sin permisos' }, { status: 403 })
+    }
+
     const currentEmployee = await prisma.employee.findFirst({
       where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' }
     })
@@ -30,7 +39,7 @@ export async function PATCH(
     // Obtener goal con su plan para verificar acceso
     const goal = await prisma.developmentGoal.findUnique({
       where: { id: goalId },
-      include: { plan: { select: { managerId: true, status: true, accountId: true } } }
+      include: { plan: { select: { managerId: true, employeeId: true, status: true, accountId: true } } }
     })
 
     if (!goal) {
@@ -42,9 +51,27 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: 'Sin acceso' }, { status: 403 })
     }
 
-    // Solo el manager o HR pueden editar
-    const isHR = hasPermission(userContext.role, 'employees:read')
-    if (goal.plan.managerId !== currentEmployee.id && !isHR) {
+    // ════════════════════════════════════════════════════════════════════════
+    // Capa 1: GLOBAL_ACCESS_ROLES - Acceso total a la empresa
+    // ════════════════════════════════════════════════════════════════════════
+    const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(userContext.role as any)
+    const isDirectManager = goal.plan.managerId === currentEmployee.id
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Capa 2: AREA_MANAGER - Filtro jerárquico
+    // ════════════════════════════════════════════════════════════════════════
+    let hasHierarchicalAccess = false
+    if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
+      const childDeptIds = await getChildDepartmentIds(userContext.departmentId)
+      const allowedDepts = [userContext.departmentId, ...childDeptIds]
+      const employeeInScope = await prisma.employee.findFirst({
+        where: { id: goal.plan.employeeId, departmentId: { in: allowedDepts } },
+        select: { id: true }
+      })
+      hasHierarchicalAccess = !!employeeInScope
+    }
+
+    if (!hasGlobalAccess && !isDirectManager && !hasHierarchicalAccess) {
       return NextResponse.json({ success: false, error: 'Solo el manager puede editar' }, { status: 403 })
     }
 

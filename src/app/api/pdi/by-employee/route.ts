@@ -5,7 +5,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { extractUserContext } from '@/lib/services/AuthorizationService'
+import {
+  extractUserContext,
+  hasPermission,
+  GLOBAL_ACCESS_ROLES,
+  getChildDepartmentIds
+} from '@/lib/services/AuthorizationService'
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,6 +35,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    if (!hasPermission(userContext.role, 'performance:view')) {
+      return NextResponse.json(
+        { success: false, error: 'Sin permisos' },
+        { status: 403 }
+      )
+    }
+
     // Buscar PDI existente con goals
     const pdi = await prisma.developmentPlan.findUnique({
       where: {
@@ -44,7 +56,8 @@ export async function GET(request: NextRequest) {
             fullName: true,
             email: true,
             performanceTrack: true,
-            standardJobLevel: true
+            standardJobLevel: true,
+            departmentId: true
           }
         },
         manager: {
@@ -73,7 +86,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Verificar acceso: debe ser manager, el empleado, o admin
+    // ════════════════════════════════════════════════════════════════════════
+    // Verificar acceso según rol
+    // ════════════════════════════════════════════════════════════════════════
     const userEmail = request.headers.get('x-user-email') || ''
     const currentEmployee = await prisma.employee.findFirst({
       where: {
@@ -90,13 +105,18 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(userContext.role as any)
     const isManager = pdi.managerId === currentEmployee.id
     const isEmployee = pdi.employeeId === currentEmployee.id
-    const isAdmin = userContext.role === 'FOCALIZAHR_ADMIN' ||
-                    userContext.role === 'ACCOUNT_OWNER' ||
-                    userContext.role === 'HR_ADMIN'
 
-    if (!isManager && !isEmployee && !isAdmin) {
+    let hasHierarchicalAccess = false
+    if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
+      const childDeptIds = await getChildDepartmentIds(userContext.departmentId)
+      const allowedDepts = [userContext.departmentId, ...childDeptIds]
+      hasHierarchicalAccess = allowedDepts.includes(pdi.employee.departmentId)
+    }
+
+    if (!hasGlobalAccess && !isManager && !isEmployee && !hasHierarchicalAccess) {
       return NextResponse.json(
         { success: false, error: 'Sin acceso a este PDI' },
         { status: 403 }

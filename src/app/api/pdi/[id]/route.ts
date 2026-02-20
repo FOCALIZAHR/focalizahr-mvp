@@ -5,7 +5,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationService'
+import {
+  extractUserContext,
+  hasPermission,
+  GLOBAL_ACCESS_ROLES,
+  getChildDepartmentIds
+} from '@/lib/services/AuthorizationService'
 import { z } from 'zod'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -25,6 +30,10 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
+    if (!hasPermission(userContext.role, 'performance:view')) {
+      return NextResponse.json({ success: false, error: 'Sin permisos' }, { status: 403 })
+    }
+
     const currentEmployee = await prisma.employee.findFirst({
       where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' }
     })
@@ -38,7 +47,7 @@ export async function GET(
       include: {
         goals: { orderBy: { priority: 'asc' } },
         checkIns: { orderBy: { scheduledDate: 'desc' } },
-        employee: { select: { fullName: true, email: true, performanceTrack: true } },
+        employee: { select: { fullName: true, email: true, performanceTrack: true, departmentId: true } },
         manager: { select: { fullName: true, email: true } },
         cycle: { select: { name: true, startDate: true, endDate: true } }
       }
@@ -48,14 +57,26 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'PDI no encontrado' }, { status: 404 })
     }
 
-    // Verificar acceso: manager, empleado, o HR
-    const isHR = hasPermission(userContext.role, 'employees:read')
-    const hasAccess =
-      pdi.managerId === currentEmployee.id ||
-      pdi.employeeId === currentEmployee.id ||
-      isHR
+    // Verificar que pertenece a la misma cuenta
+    if (pdi.accountId !== userContext.accountId) {
+      return NextResponse.json({ success: false, error: 'Sin acceso' }, { status: 403 })
+    }
 
-    if (!hasAccess) {
+    // ════════════════════════════════════════════════════════════════════════
+    // Verificar acceso según rol
+    // ════════════════════════════════════════════════════════════════════════
+    const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(userContext.role as any)
+    const isDirectManager = pdi.managerId === currentEmployee.id
+    const isEmployee = pdi.employeeId === currentEmployee.id
+
+    let hasHierarchicalAccess = false
+    if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
+      const childDeptIds = await getChildDepartmentIds(userContext.departmentId)
+      const allowedDepts = [userContext.departmentId, ...childDeptIds]
+      hasHierarchicalAccess = allowedDepts.includes(pdi.employee.departmentId)
+    }
+
+    if (!hasGlobalAccess && !isDirectManager && !isEmployee && !hasHierarchicalAccess) {
       return NextResponse.json({ success: false, error: 'Sin acceso a este PDI' }, { status: 403 })
     }
 
@@ -68,7 +89,7 @@ export async function GET(
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// PATCH - Actualizar PDI (solo en DRAFT, solo el manager)
+// PATCH - Actualizar PDI (solo en DRAFT, solo manager o HR global)
 // ════════════════════════════════════════════════════════════════════════════
 
 const UpdatePDISchema = z.object({
@@ -102,6 +123,10 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
+    if (!hasPermission(userContext.role, 'performance:view')) {
+      return NextResponse.json({ success: false, error: 'Sin permisos' }, { status: 403 })
+    }
+
     const currentEmployee = await prisma.employee.findFirst({
       where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' }
     })
@@ -112,15 +137,31 @@ export async function PATCH(
 
     const pdi = await prisma.developmentPlan.findUnique({
       where: { id },
-      include: { goals: true }
+      include: { goals: true, employee: { select: { departmentId: true } } }
     })
 
     if (!pdi) {
       return NextResponse.json({ success: false, error: 'PDI no encontrado' }, { status: 404 })
     }
 
-    // Solo el manager puede editar
-    if (pdi.managerId !== currentEmployee.id) {
+    if (pdi.accountId !== userContext.accountId) {
+      return NextResponse.json({ success: false, error: 'Sin acceso' }, { status: 403 })
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Verificar acceso de escritura
+    // ════════════════════════════════════════════════════════════════════════
+    const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(userContext.role as any)
+    const isDirectManager = pdi.managerId === currentEmployee.id
+
+    let hasHierarchicalAccess = false
+    if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
+      const childDeptIds = await getChildDepartmentIds(userContext.departmentId)
+      const allowedDepts = [userContext.departmentId, ...childDeptIds]
+      hasHierarchicalAccess = allowedDepts.includes(pdi.employee.departmentId)
+    }
+
+    if (!hasGlobalAccess && !isDirectManager && !hasHierarchicalAccess) {
       return NextResponse.json({ success: false, error: 'Solo el manager puede editar este PDI' }, { status: 403 })
     }
 

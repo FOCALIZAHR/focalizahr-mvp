@@ -563,14 +563,34 @@ export const ALL_ROLES = [
 
 export type RoleType = typeof ALL_ROLES[number];
 
-/**
- * Roles con acceso global (ven toda la empresa).
- * Coincide con globalRoles en buildParticipantAccessFilter línea 80.
- */
+// =============================================================================
+// GLOBAL_ACCESS_ROLES - Roles que ven TODA la empresa (sin filtro jerárquico)
+// =============================================================================
+//
+// IMPORTANTE: Estos roles NO tienen filtro por departamento en
+// buildParticipantAccessFilter. Ven todos los datos de su cuenta.
+//
+// TODO POST-LANZAMIENTO:
+// ─────────────────────────────────────────────────────────────────────────────
+// A) REFACTORIZAR APIs ANTIGUAS: Migrar de allowedRoles hardcodeados a
+//    hasPermission() centralizado. Ver endpoints en:
+//    - campaigns/[id]/participants/upload (línea 629)
+//    - onboarding/enroll (línea 76)
+//    - exit/register (línea 81)
+//    - Y 11+ endpoints más con arrays hardcodeados
+//
+// B) RESTRICCIÓN PERFORMANCE: Evaluar si HR_ADMIN/HR_OPERATOR deben ver
+//    evaluaciones de desempeño de gerentes/ejecutivos. Actualmente ven todo.
+//    Considerar: Solo ACCOUNT_OWNER y CEO ven evaluaciones de nivel gerencial.
+//    Afecta: performance:view, potential:view en PERMISSIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const GLOBAL_ACCESS_ROLES = [
   'FOCALIZAHR_ADMIN',
   'ACCOUNT_OWNER',
+  'HR_ADMIN',      // Agregado: Scope empresa completa según documentación
   'HR_MANAGER',
+  'HR_OPERATOR',   // Agregado: Scope empresa completa según documentación
   'CEO'
 ] as const;
 

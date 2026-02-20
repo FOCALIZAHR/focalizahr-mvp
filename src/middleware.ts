@@ -227,6 +227,7 @@ if (effectiveRole === 'EVALUATOR') {
     '/api/auth',                  
     '/api/survey',                
     '/api/admin/performance',
+    '/api/performance/role-fit',
     '/api/calibration',
     '/api/pdi',
   ];
