@@ -8,19 +8,32 @@ import EmployeeRailCard from './EmployeeRailCard'
 import type { RailProps, CarouselTab } from '@/types/evaluator-cinema'
 
 const TAB_STYLES = {
-  all: {
+  sinED: {
+    active: 'bg-amber-400 text-slate-950 shadow-[0_2px_10px_rgba(251,191,36,0.3)]',
+    inactive: 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700'
+  },
+  sinPT: {
     active: 'bg-cyan-400 text-slate-950 shadow-[0_2px_10px_rgba(34,211,238,0.3)]',
     inactive: 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700'
   },
-  pending: {
+  sinPDI: {
     active: 'bg-purple-400 text-slate-950 shadow-[0_2px_10px_rgba(167,139,250,0.3)]',
     inactive: 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700'
   },
-  completed: {
+  listos: {
     active: 'bg-emerald-400 text-slate-950 shadow-[0_2px_10px_rgba(16,185,129,0.3)]',
     inactive: 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700'
   }
 } as const
+
+const TAB_LABELS: Record<CarouselTab, string> = {
+  sinED: 'Sin ED',
+  sinPT: 'Sin PT',
+  sinPDI: 'Sin PDI',
+  listos: 'Listos'
+}
+
+const TAB_ORDER: CarouselTab[] = ['sinED', 'sinPT', 'sinPDI', 'listos']
 
 export default function Rail({
   employees,
@@ -35,15 +48,36 @@ export default function Rail({
   const carouselRef = useRef<HTMLDivElement>(null)
 
   const filteredEmployees = useMemo(() => {
-    if (activeTab === 'all') return employees
-    if (activeTab === 'pending') return employees.filter(e => e.status !== 'completed')
-    return employees.filter(e => e.status === 'completed')
+    switch (activeTab) {
+      case 'sinED':
+        return employees.filter(e => e.status !== 'completed')
+      case 'sinPT':
+        return employees.filter(e => e.status === 'completed' && !e.potentialScore)
+      case 'sinPDI':
+        return employees.filter(e =>
+          e.status === 'completed' &&
+          e.potentialScore !== null &&
+          !e.hasPDI
+        )
+      case 'listos':
+      default:
+        return employees.filter(e =>
+          e.status === 'completed' &&
+          e.potentialScore !== null &&
+          e.hasPDI
+        )
+    }
   }, [employees, activeTab])
 
   const counts = useMemo(() => ({
-    all: employees.length,
-    pending: employees.filter(e => e.status !== 'completed').length,
-    completed: employees.filter(e => e.status === 'completed').length
+    sinED: employees.filter(e => e.status !== 'completed').length,
+    sinPT: employees.filter(e => e.status === 'completed' && !e.potentialScore).length,
+    sinPDI: employees.filter(e =>
+      e.status === 'completed' && e.potentialScore !== null && !e.hasPDI
+    ).length,
+    listos: employees.filter(e =>
+      e.status === 'completed' && e.potentialScore !== null && e.hasPDI
+    ).length
   }), [employees])
 
   const scrollLeft = () => {
@@ -91,7 +125,7 @@ export default function Rail({
           </div>
         )}
 
-        {/* CTA Button - Point 2 */}
+        {/* CTA Button */}
         <button
           onClick={(e) => {
             e.stopPropagation()
@@ -109,11 +143,12 @@ export default function Rail({
         isExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'
       )}>
 
-        {/* TABS DE FILTRO - Point 4: Premium solid colors */}
-        <div className="px-8 pb-4 flex gap-2 flex-shrink-0">
-          {(['all', 'pending', 'completed'] as const).map((tab) => {
+        {/* TABS DE FILTRO - 5 tabs multifase */}
+        <div className="px-8 pb-4 flex gap-2 flex-shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+          {TAB_ORDER.map((tab) => {
             const isActive = activeTab === tab
             const styles = TAB_STYLES[tab]
+            const count = counts[tab]
 
             return (
               <button
@@ -123,19 +158,17 @@ export default function Rail({
                   onTabChange(tab)
                 }}
                 className={cn(
-                  'px-5 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all',
+                  'px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all whitespace-nowrap',
                   isActive ? styles.active : styles.inactive
                 )}
               >
-                {tab === 'all' && `Todos ${counts.all}`}
-                {tab === 'pending' && `Pendientes ${counts.pending}`}
-                {tab === 'completed' && `Último Paso ${counts.completed}`}
+                {TAB_LABELS[tab]} {count}
               </button>
             )
           })}
         </div>
 
-        {/* CARRUSEL HORIZONTAL - Point 5: Navigation arrows */}
+        {/* CARRUSEL HORIZONTAL */}
         <div className="relative group">
           {/* Left arrow */}
           <button

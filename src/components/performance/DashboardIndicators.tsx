@@ -21,12 +21,14 @@ interface DashboardIndicatorsProps {
   edStatus: EvaluationStatus | null
   ptStatus: EvaluationStatus | null
   cycleId: string
+  layout?: 'horizontal' | 'vertical'
 }
 
 export function DashboardIndicators({
   edStatus,
   ptStatus,
-  cycleId
+  cycleId,
+  layout = 'horizontal'
 }: DashboardIndicatorsProps) {
   const router = useRouter()
 
@@ -39,14 +41,19 @@ export function DashboardIndicators({
   return (
     <div
       onClick={handleClick}
-      className="flex items-center justify-center gap-8 py-3 cursor-pointer
-        hover:opacity-80 transition-opacity select-none"
+      className={cn(
+        "flex items-center justify-center py-3 cursor-pointer hover:opacity-80 transition-opacity select-none",
+        layout === 'vertical' ? "flex-col gap-4" : "gap-8"
+      )}
       role="button"
       aria-label="Ver detalles de evaluación"
     >
       <StatusIndicator label="ED" status={edStatus} />
 
-      <div className="w-px h-4 bg-white/10" />
+      <div className={cn(
+        "bg-white/10",
+        layout === 'vertical' ? "h-px w-8" : "w-px h-4"
+      )} />
 
       {ptStatus ? (
         <StatusIndicator label="PT" status={ptStatus} />

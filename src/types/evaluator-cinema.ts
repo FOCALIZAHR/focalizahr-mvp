@@ -33,6 +33,7 @@ export interface EvaluatorAssignment {
   potentialLevel: string | null
   nineBoxPosition: string | null
   cycleId: string
+  hasPDI: boolean
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -41,7 +42,7 @@ export interface EvaluatorAssignment {
 
 export type EmployeeCardStatus = 'ready' | 'waiting' | 'in_progress' | 'completed'
 
-export type CarouselTab = 'all' | 'pending' | 'completed'
+export type CarouselTab = 'sinED' | 'sinPT' | 'sinPDI' | 'listos'
 
 export interface EmployeeCardData {
   id: string
@@ -65,6 +66,9 @@ export interface EmployeeCardData {
   potentialLevel: string | null
   nineBoxPosition: string | null
   cycleId: string
+
+  // Indica si tiene PDI creado
+  hasPDI: boolean
 }
 
 export interface SelectedEmployee extends EmployeeCardData {

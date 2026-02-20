@@ -1,19 +1,37 @@
 'use client'
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { getInitials } from '@/lib/utils/formatName'
-import { StatusDot } from './StatusDot'
+import ProgressDots from './ProgressDots'
 import type { EmployeeRailCardProps } from '@/types/evaluator-cinema'
+
+// Colores de linea Tesla segun estado
+function getTeslaColor(hasED: boolean, hasPT: boolean, hasPDI: boolean): string {
+  if (!hasED) return 'bg-amber-500'      // Sin ED = amber
+  if (!hasPT) return 'bg-cyan-500'       // Sin PT = cyan
+  if (!hasPDI) return 'bg-purple-500'    // Sin PDI = purple
+  return 'bg-emerald-500'                 // Completo = emerald
+}
 
 export default function EmployeeRailCard({
   employee,
   isSelected,
   onClick
 }: EmployeeRailCardProps) {
+  const [isHovered, setIsHovered] = useState(false)
+
+  const hasED = employee.status === 'completed'
+  const hasPT = employee.potentialScore !== null
+  const hasPDI = employee.hasPDI ?? false
+  const teslaColor = getTeslaColor(hasED, hasPT, hasPDI)
+
   return (
     <motion.div
       onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       whileHover={{ y: -5 }}
       className={cn(
         'snap-start flex-shrink-0 w-[160px] h-[200px] rounded-xl cursor-pointer',
@@ -23,12 +41,12 @@ export default function EmployeeRailCard({
           : 'bg-slate-900/40 border-white/5 hover:bg-slate-800 hover:border-white/10'
       )}
     >
-      {/* Linea Tesla Mini */}
+      {/* Linea Tesla TOP - Color dinamico segun estado */}
       <div className={cn(
         'absolute top-0 left-0 right-0 h-[2px] transition-all duration-300',
-        isSelected
-          ? 'bg-cyan-400 opacity-100'
-          : 'bg-cyan-400 opacity-0 group-hover:opacity-50'
+        isSelected || isHovered ? teslaColor : 'bg-slate-700',
+        isSelected ? 'opacity-100' : isHovered ? 'opacity-80' : 'opacity-30',
+        (isSelected || isHovered) && 'shadow-[0_0_10px_currentColor]'
       )} />
 
       <div className="flex flex-col items-center justify-center h-full p-4">
@@ -57,9 +75,17 @@ export default function EmployeeRailCard({
           </p>
         </div>
 
-        {/* Status Indicator */}
+        {/* Progress Dots (reemplaza StatusDot) */}
         <div className="mt-3">
-          <StatusDot status={employee.status} />
+          <ProgressDots
+            hasED={hasED}
+            hasPT={hasPT}
+            hasPDI={hasPDI}
+            edScore={employee.avgScore}
+            edLevel={employee.status === 'completed' ? 'Completado' : undefined}
+            ptScore={employee.potentialScore}
+            ptLevel={employee.potentialLevel}
+          />
         </div>
       </div>
     </motion.div>

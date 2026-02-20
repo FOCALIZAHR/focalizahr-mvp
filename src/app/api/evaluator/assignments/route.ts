@@ -184,6 +184,31 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // ════════════════════════════════════════════════════════════════════════════
+    // BATCH: Obtener hasPDI desde DevelopmentPlan
+    // Usa índice compuesto @@unique([employeeId, cycleId])
+    // ════════════════════════════════════════════════════════════════════════════
+    let pdiMap = new Map<string, boolean>()
+
+    if (cycleId && assignments.length > 0) {
+      const employeeIds = [...new Set(assignments.map(a => a.evaluateeId))]
+
+      const developmentPlans = await prisma.developmentPlan.findMany({
+        where: {
+          cycleId,
+          employeeId: { in: employeeIds },
+          status: { not: 'CANCELLED' }
+        },
+        select: {
+          employeeId: true
+        }
+      })
+
+      pdiMap = new Map(
+        developmentPlans.map(p => [p.employeeId, true])
+      )
+    }
+
     // Mapear a formato de UI
     const mappedAssignments = assignments.map(a => {
       // Calculate avgScore (escala 1-5, como normalizedScore)
@@ -226,6 +251,7 @@ export async function GET(request: NextRequest) {
         potentialScore: ratingData?.potentialScore ?? null,
         potentialLevel: ratingData?.potentialLevel ?? null,
         nineBoxPosition: ratingData?.nineBoxPosition ?? null,
+        hasPDI: pdiMap.get(a.evaluateeId) ?? false,
         cycleId: a.cycleId,
         evaluatee: {
           id: a.evaluateeId,

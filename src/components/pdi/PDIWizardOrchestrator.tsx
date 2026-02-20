@@ -834,7 +834,7 @@ export default function PDIWizardOrchestrator({
   }
 
   // Gap cards
-  if (phase === 'gaps' && currentGapIndex < gaps.length) {
+  if (phase === 'gaps' && currentGapIndex < gaps.length && suggestions[currentGapIndex]) {
     const currentGap = gaps[currentGapIndex]
     const currentSuggestion = suggestions[currentGapIndex]
     const goalId = pdiGoals.find(

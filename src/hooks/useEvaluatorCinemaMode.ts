@@ -50,7 +50,7 @@ export function useEvaluatorCinemaMode() {
   // UI state
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [isRailExpanded, setRailExpanded] = useState(true)
-  const [activeTab, setActiveTab] = useState<CarouselTab>('all')
+  const [activeTab, setActiveTab] = useState<CarouselTab>('sinED')
 
   // Fetch data
   useEffect(() => {
@@ -118,7 +118,8 @@ export function useEvaluatorCinemaMode() {
       potentialScore: a.potentialScore ?? null,
       potentialLevel: a.potentialLevel ?? null,
       nineBoxPosition: a.nineBoxPosition ?? null,
-      cycleId: a.cycleId
+      cycleId: a.cycleId,
+      hasPDI: a.hasPDI ?? false
     }))
   }, [rawAssignments])
 
@@ -138,15 +139,31 @@ export function useEvaluatorCinemaMode() {
     }
   }, [selectedId, employees])
 
-  // Next employee (priority: in_progress > ready > waiting > completed-needs-potential)
+  // Next employee (priority: Sin ED → Sin PT → Sin PDI → all done)
   const nextEmployee = useMemo(() => {
-    const next = employees.find(e => e.status === 'in_progress')
+    // 1. Sin ED (mas urgente): in_progress o ready/waiting
+    const sinED = employees.find(e => e.status === 'in_progress')
       || employees.find(e => e.status === 'ready')
       || employees.find(e => e.status === 'waiting')
-      || employees.find(e => e.status === 'completed' && e.potentialScore === null)
-      || null
-    if (!next) return null
-    return { id: next.id, displayName: next.displayName }
+    if (sinED) return { id: sinED.id, displayName: sinED.displayName }
+
+    // 2. Sin PT: ED completado pero sin potencial
+    const sinPT = employees.find(e =>
+      e.status === 'completed' && e.potentialScore === null
+    )
+    if (sinPT) return { id: sinPT.id, displayName: sinPT.displayName }
+
+    // 3. Sin PDI: ED+PT listos, falta plan de desarrollo
+    const sinPDI = employees.find(e =>
+      e.status === 'completed' &&
+      e.potentialScore !== null &&
+      !e.hasPDI
+    )
+    if (sinPDI) return { id: sinPDI.id, displayName: sinPDI.displayName }
+
+    // 4. Todos completos - retorna el primero para poder ver resumen
+    const first = employees[0]
+    return first ? { id: first.id, displayName: first.displayName } : null
   }, [employees])
 
   // Handlers
