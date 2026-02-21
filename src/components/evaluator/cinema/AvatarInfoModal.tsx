@@ -2,13 +2,14 @@
 
 import { memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Building2, Briefcase, Calendar, Users, Check, Clock } from 'lucide-react'
+import { X, Building2, Briefcase, Calendar, Users, Check, Clock, Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { LucideIcon } from 'lucide-react'
 
 interface AvatarInfoModalProps {
   isOpen: boolean
   onClose: () => void
+  onViewSummary?: () => void
   employee: {
     displayName: string
     position: string
@@ -24,6 +25,7 @@ interface AvatarInfoModalProps {
 export default memo(function AvatarInfoModal({
   isOpen,
   onClose,
+  onViewSummary,
   employee
 }: AvatarInfoModalProps) {
 
@@ -56,9 +58,9 @@ export default memo(function AvatarInfoModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-sm mx-4"
+            className="fixed inset-0 flex items-center justify-center z-50 p-4"
           >
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden w-full max-w-sm max-h-[85vh] overflow-y-auto">
 
               {/* Tesla line */}
               <div className="h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
@@ -120,6 +122,22 @@ export default memo(function AvatarInfoModal({
                   />
                 </div>
               </div>
+
+              {/* Botón Ver Resumen - Solo si ED completado */}
+              {hasED && onViewSummary && (
+                <div className="px-6 pb-6 pt-2">
+                  <button
+                    onClick={() => {
+                      onViewSummary()
+                      onClose()
+                    }}
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-white font-medium text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-cyan-500/20"
+                  >
+                    <Eye className="w-4 h-4" />
+                    Ver Resumen Completo
+                  </button>
+                </div>
+              )}
 
             </div>
           </motion.div>

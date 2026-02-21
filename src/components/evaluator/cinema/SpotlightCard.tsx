@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Eye } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { getInitials } from '@/lib/utils/formatName'
 import { StatusBadge } from './StatusBadge'
 import StorytellingGuide from './StorytellingGuide'
@@ -17,7 +17,6 @@ export default function SpotlightCard({
   onEvaluatePotential
 }: SpotlightCardProps) {
   const [showAvatarModal, setShowAvatarModal] = useState(false)
-  const hasPotential = employee.potentialScore != null
 
   return (
     <motion.div
@@ -27,7 +26,7 @@ export default function SpotlightCard({
       transition={{ type: 'spring', stiffness: 220, damping: 30 }}
       className="w-full max-w-5xl"
     >
-      <div className="bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[24px] shadow-2xl flex flex-col md:flex-row relative max-h-[90vh] md:max-h-none overflow-y-auto md:overflow-visible">
+      <div className="bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[24px] shadow-2xl flex flex-col md:flex-row relative overflow-y-auto md:overflow-visible">
 
         {/* LINEA TESLA */}
         <div
@@ -47,14 +46,14 @@ export default function SpotlightCard({
         </button>
 
         {/* COLUMNA IZQUIERDA: Identidad (280px fijo) */}
-        <div className="w-full md:w-[280px] md:flex-shrink-0 bg-slate-900/50 p-8 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-800">
+        <div className="w-full md:w-[250px] md:flex-shrink-0 bg-slate-900/50 p-8 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-800">
 
           {/* Avatar CLICKEABLE con hover effect */}
           <div
             onClick={() => setShowAvatarModal(true)}
             className="relative mb-6 cursor-pointer group"
           >
-            <div className="w-28 h-28 rounded-full bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center text-2xl font-bold text-slate-400 border border-slate-700 shadow-2xl group-hover:border-cyan-500/50 transition-colors">
+            <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center text-2xl font-bold text-slate-400 border border-slate-700 shadow-2xl group-hover:border-cyan-500/50 transition-colors">
               {getInitials(employee.displayNameFull)}
             </div>
 
@@ -87,23 +86,10 @@ export default function SpotlightCard({
             </p>
           </div>
 
-          {/* BOTÓN VER RESUMEN - Solo si tiene PT */}
-          {hasPotential && (
-            <button
-              onClick={() => onViewSummary(employee.assignmentId)}
-              className="w-full py-2.5 px-4 rounded-xl bg-slate-800/50 border border-slate-700/50
-                        hover:bg-slate-800 hover:border-cyan-500/30 transition-all
-                        text-sm text-slate-400 hover:text-cyan-400 font-medium
-                        flex items-center justify-center gap-2"
-            >
-              <Eye className="w-4 h-4" />
-              Ver Resumen
-            </button>
-          )}
         </div>
 
         {/* COLUMNA DERECHA: StorytellingGuide */}
-        <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-[#0F172A] to-[#162032]">
+        <div className="flex-1 flex flex-col min-h-[500px] pt-4 bg-gradient-to-br from-[#0F172A] to-[#162032]">
           <StorytellingGuide
             employee={{
               id: employee.id,
@@ -126,6 +112,7 @@ export default function SpotlightCard({
       <AvatarInfoModal
         isOpen={showAvatarModal}
         onClose={() => setShowAvatarModal(false)}
+        onViewSummary={() => onViewSummary(employee.assignmentId)}
         employee={{
           displayName: employee.displayNameFull,
           position: employee.position,

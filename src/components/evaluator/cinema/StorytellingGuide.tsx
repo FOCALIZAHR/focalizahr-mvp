@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, Star, Eye, Check, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatDisplayName } from '@/lib/utils/formatName'
 
 interface StorytellingGuideProps {
   employee: {
@@ -39,7 +40,7 @@ interface StoryContent {
 }
 
 function getStoryContent(employee: StorytellingGuideProps['employee']): StoryContent {
-  const firstName = employee.displayName.split(' ')[0]
+  const firstName = formatDisplayName(employee.displayName, 'short').split(' ')[0]
   const hasED = employee.status === 'completed'
   const hasPT = employee.potentialScore !== null
 
@@ -110,63 +111,62 @@ export default memo(function StorytellingGuide({
   const isPurpleCTA = story.action === 'potential'
 
   return (
-    <div className="flex flex-col items-center justify-center h-full px-8 py-10">
+    <div className="flex flex-col items-center justify-between h-full px-8 py-10">
 
-      {/* MENSAJE PROTAGONISTA */}
+      {/* 1. ARRIBA: Progress Dots */}
+      <div className="mb-16">
+        <ProgressDotsMinimal
+          hasED={hasED}
+          hasPT={hasPT}
+          hasPDI={false}
+          edScore={employee.avgScore}
+          ptScore={employee.potentialScore}
+          ptLevel={employee.potentialLevel}
+        />
+      </div>
+
+      {/* 2. CENTRO: Mensaje Protagonista */}
       <motion.div
         key={employee.id}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="text-center mb-10"
+        className="text-center flex-1 flex items-center"
       >
-        <p className="text-2xl md:text-3xl font-light text-white leading-relaxed">
+        <p className="text-3xl md:text-4xl lg:text-5xl font-light text-white leading-tight tracking-tight">
           {story.prefix}
-          <span className="text-cyan-400 font-medium">{story.name}</span>
+          <span className="text-cyan-400 font-semibold">{story.name}</span>
           {story.suffix}
         </p>
       </motion.div>
 
-      {/* CTA PRINCIPAL */}
+      {/* 3. ABAJO: CTA */}
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.2 }}
-        className="flex flex-col items-center gap-2 mb-10"
+        className="flex flex-col items-center gap-2 mt-16"
       >
         <motion.button
           onClick={handleCTA}
           className={cn(
-            "flex items-center justify-center gap-3 py-4 px-10 rounded-2xl font-semibold text-lg transition-all",
-            "shadow-2xl",
+            "flex items-center justify-center gap-3 py-3 px-8 rounded-xl font-medium text-base transition-all",
+            "shadow-xl",
             isPurpleCTA
-              ? "bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white shadow-purple-500/30"
-              : "bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-300 hover:to-cyan-400 text-slate-900 shadow-cyan-500/30"
+              ? "bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white shadow-purple-500/25"
+              : "bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-300 hover:to-cyan-400 text-slate-900 shadow-cyan-500/25"
           )}
-          whileHover={{ scale: 1.03, y: -2 }}
+          whileHover={{ scale: 1.02, y: -2 }}
           whileTap={{ scale: 0.98 }}
         >
           <span>{story.cta}</span>
-          <story.ctaIcon className="w-5 h-5" />
+          <story.ctaIcon className="w-4 h-4" />
         </motion.button>
 
         {story.time && (
           <span className="text-xs text-slate-500 font-medium">{story.time}</span>
         )}
       </motion.div>
-
-      {/* SEPARADOR ELEGANTE */}
-      <div className="w-full max-w-xs h-px bg-gradient-to-r from-transparent via-slate-700 to-transparent mb-8" />
-
-      {/* PROGRESS DOTS MINIMALISTAS */}
-      <ProgressDotsMinimal
-        hasED={hasED}
-        hasPT={hasPT}
-        hasPDI={false}
-        edScore={employee.avgScore}
-        ptScore={employee.potentialScore}
-        ptLevel={employee.potentialLevel}
-      />
 
     </div>
   )
@@ -235,7 +235,9 @@ function ProgressDotsMinimal({
 
   return (
     <>
-      <div className="flex items-center justify-center gap-8">
+      <div className="relative flex items-center justify-center gap-16">
+        {/* Línea slate conectora */}
+        <div className="absolute top-1 left-1/2 -translate-x-1/2 w-44 h-px bg-gradient-to-r from-slate-700/20 via-slate-600/30 to-slate-700/20" />
         {dots.map((dot) => (
           <div
             key={dot.key}
@@ -244,7 +246,7 @@ function ProgressDotsMinimal({
             onMouseLeave={() => setHoveredDot(null)}
           >
             <div className={cn(
-              "w-3 h-3 rounded-full transition-all duration-300",
+              "w-2.5 h-2.5 rounded-full transition-all duration-300",
               dot.done
                 ? "bg-purple-400 shadow-[0_0_10px_rgba(167,139,250,0.7)]"
                 : "bg-slate-700"
