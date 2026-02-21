@@ -1,29 +1,14 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// EVALUATION SUMMARY - Cinema Mode Summary + Intelligence Sidekick Panel
+// EVALUATION SUMMARY - Guided Experience (FASE 3)
 // src/app/dashboard/evaluaciones/[assignmentId]/summary/page.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import CinemaSummaryOrchestrator from '../components/CinemaSummaryOrchestrator'
-import { GapInsightCarousel } from '@/components/performance/gap-analysis'
-import TeamCalibrationHUD from '@/components/performance/TeamCalibrationHUD'
-import InsightCarousel from '@/components/performance/summary/InsightCarousel'
-import PerformanceScoreCard from '@/components/performance/PerformanceScoreCard'
-import CompetencyRadarModal from '@/components/performance/gap-analysis/CompetencyRadarModal'
-import { GhostButton } from '@/components/ui/PremiumButton'
-import PDIWizardOrchestrator from '@/components/pdi/PDIWizardOrchestrator'
-import PDIDetailView from '@/components/pdi/PDIDetailView'
-import { Radar, Target } from 'lucide-react'
+import GuidedSummaryOrchestrator from '@/components/performance/summary/GuidedSummaryOrchestrator'
 import type { CinemaSummaryData } from '@/types/evaluator-cinema'
-
-// ════════════════════════════════════════════════════════════════════════════
-// TIPOS
-// ════════════════════════════════════════════════════════════════════════════
-
-type IntelligenceView = 'calibracion' | 'brechas' | 'alertas' | 'desarrollo'
 
 export default function EvaluationSummaryPage() {
   const params = useParams()
@@ -35,14 +20,7 @@ export default function EvaluationSummaryPage() {
   const [error, setError] = useState<string | null>(null)
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Estado para toggle de vistas de inteligencia
-  // ═══════════════════════════════════════════════════════════════════════════
-  const [activeView, setActiveView] = useState<IntelligenceView>('calibracion')
-  const [showRadarModal, setShowRadarModal] = useState(false)
-  const [existingPDI, setExistingPDI] = useState<{ id: string; status: string } | null>(null)
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Estado para team members (ranking de calibración)
+  // Team members para ranking de calibración
   // ═══════════════════════════════════════════════════════════════════════════
   const [teamMembers, setTeamMembers] = useState<Array<{
     id: string
@@ -50,6 +28,18 @@ export default function EvaluationSummaryPage() {
     score: number
   }>>([])
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Datos de potencial (desde assignments API)
+  // ═══════════════════════════════════════════════════════════════════════════
+  const [potentialData, setPotentialData] = useState<{
+    potentialScore: number | null
+    potentialLevel: string | null
+    nineBoxPosition: string | null
+  }>({ potentialScore: null, potentialLevel: null, nineBoxPosition: null })
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Fetch summary data
+  // ═══════════════════════════════════════════════════════════════════════════
   useEffect(() => {
     async function fetchSummary() {
       try {
@@ -89,7 +79,7 @@ export default function EvaluationSummaryPage() {
   }, [assignmentId, router])
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Fetch team data para calibración (todos los assignments del evaluador)
+  // Fetch team data + potential data para calibración y 9-box
   // ═══════════════════════════════════════════════════════════════════════════
   useEffect(() => {
     async function fetchTeamData() {
@@ -108,15 +98,7 @@ export default function EvaluationSummaryPage() {
 
         const json = await res.json()
         if (json.success && json.assignments) {
-          // DEBUG: Ver qué retorna el API
-          console.log('[Summary] Raw assignments:', json.assignments.map((a: any) => ({
-            status: a.status,
-            avgScore: a.avgScore,
-            evaluatee: a.evaluatee?.fullName
-          })))
-
-          // Filtrar solo completados con score y transformar
-          // NOTA: El API retorna status en minúsculas ('completed', no 'COMPLETED')
+          // Team members for ranking
           const members = json.assignments
             .filter((a: any) => {
               const isCompleted = a.status?.toLowerCase() === 'completed'
@@ -126,13 +108,21 @@ export default function EvaluationSummaryPage() {
             .map((a: any) => ({
               id: a.evaluatee?.id || a.id,
               name: a.evaluatee?.fullName || 'Sin nombre',
-              // avgScore del API /assignments está en escala 0-100, convertir a 1-5
-              score: a.avgScore 
+              score: a.avgScore
             }))
             .sort((a: any, b: any) => b.score - a.score)
 
-          console.log('[Summary] Filtered teamMembers:', members)
           setTeamMembers(members)
+
+          // Potential data for current assignment
+          const currentAssignment = json.assignments.find((a: any) => a.id === assignmentId)
+          if (currentAssignment) {
+            setPotentialData({
+              potentialScore: currentAssignment.potentialScore ?? null,
+              potentialLevel: currentAssignment.potentialLevel ?? null,
+              nineBoxPosition: currentAssignment.nineBoxPosition ?? null
+            })
+          }
         }
       } catch (err) {
         console.error('[Summary] Error fetching team data:', err)
@@ -140,74 +130,7 @@ export default function EvaluationSummaryPage() {
     }
 
     fetchTeamData()
-  }, [])
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Cargar PDI existente al cambiar a tab "desarrollo"
-  // ═══════════════════════════════════════════════════════════════════════════
-  useEffect(() => {
-    if (activeView !== 'desarrollo' || !summary) return
-    const { evaluateeId, cycleId } = summary
-
-    async function checkExistingPDI() {
-      try {
-        const res = await fetch(
-          `/api/pdi/by-employee?employeeId=${evaluateeId}&cycleId=${cycleId}`
-        )
-        const data = await res.json()
-
-        if (data.success && data.exists) {
-          setExistingPDI({
-            id: data.data.id,
-            status: data.data.status
-          })
-        } else {
-          setExistingPDI(null)
-        }
-      } catch (err) {
-        console.error('[Summary] Error checking PDI:', err)
-        setExistingPDI(null)
-      }
-    }
-
-    checkExistingPDI()
-  }, [activeView, summary])
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Calcular competencias desde categorizedResponses para ManagementAlertsHUD
-  // ═══════════════════════════════════════════════════════════════════════════
-  const competencies = useMemo(() => {
-    if (!summary?.categorizedResponses) return []
-
-    return Object.entries(summary.categorizedResponses).map(([name, responses]) => {
-      const ratings = (responses as any[])
-        .filter((r: any) => r.rating !== null && r.rating !== undefined)
-        .map((r: any) => r.rating as number)
-
-      const avgScore = ratings.length > 0
-        ? ratings.reduce((a, b) => a + b, 0) / ratings.length
-        : 0
-
-      return { name, score: avgScore }
-    })
-  }, [summary?.categorizedResponses])
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Encontrar el ID del evaluatee actual en teamMembers (por nombre)
-  // ═══════════════════════════════════════════════════════════════════════════
-  const currentEvaluateeId = useMemo(() => {
-    if (!summary?.evaluatee?.fullName || teamMembers.length === 0) return null
-
-    const evaluateeName = summary.evaluatee.fullName.toLowerCase()
-    const found = teamMembers.find(m =>
-      m.name.toLowerCase().includes(evaluateeName) ||
-      evaluateeName.includes(m.name.toLowerCase())
-    )
-
-    console.log('[Summary] Looking for evaluatee:', evaluateeName, 'Found:', found?.name, 'ID:', found?.id)
-
-    return found?.id || null
-  }, [summary?.evaluatee?.fullName, teamMembers])
+  }, [assignmentId])
 
   // Loading
   if (isLoading) {
@@ -242,179 +165,16 @@ export default function EvaluationSummaryPage() {
     )
   }
 
-  // Success - Renderizar con Panel de Inteligencia DENTRO del header
-  const displayName = summary.evaluatee?.fullName || 'Colaborador'
-
-  // DEBUG: Ver qué score retorna el API /summary
-  console.log('[Summary] averageScore from API:', summary.averageScore, 'overallScore:', summary.overallScore)
-
-  // El score del API /summary YA viene en escala 1-5 (NO convertir)
-  const scoreOn5 = summary.averageScore ?? summary.overallScore ?? null
-
-  console.log('[Summary] scoreOn5 for PerformanceScoreCard:', scoreOn5)
-
   // ═══════════════════════════════════════════════════════════════════════════
-  // Contenido para la columna derecha del header (rightColumnSlot)
+  // RENDER - Guided Experience
   // ═══════════════════════════════════════════════════════════════════════════
-  const rightColumnContent = (
-    <div className="space-y-4">
-      {/* Toggle minimalista - Arriba a la derecha */}
-      <div className="flex justify-end mb-2">
-        <div className="inline-flex bg-slate-800/50 rounded-md p-0.5 border border-slate-700/50">
-          <button
-            onClick={() => setActiveView('calibracion')}
-            className={`px-3 py-1 text-xs font-medium rounded transition-all ${
-              activeView === 'calibracion'
-                ? 'bg-cyan-500 text-slate-900'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Evaluación
-          </button>
-          <button
-            onClick={() => setActiveView('brechas')}
-            className={`px-3 py-1 text-xs font-medium rounded transition-all ${
-              activeView === 'brechas'
-                ? 'bg-blue-500 text-slate-900'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Brechas
-          </button>
-          <button
-            onClick={() => setActiveView('alertas')}
-            className={`px-3 py-1 text-xs font-medium rounded transition-all ${
-              activeView === 'alertas'
-                ? 'bg-cyan-500 text-slate-900'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Coaching
-          </button>
-          <button
-            onClick={() => setActiveView('desarrollo')}
-            className={`px-3 py-1 text-xs font-medium rounded transition-all flex items-center gap-1 ${
-              activeView === 'desarrollo'
-                ? 'bg-emerald-500 text-slate-900'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Target size={12} />
-            {existingPDI ? 'Ver PDI' : 'PDI'}
-          </button>
-        </div>
-        {summary?.competencyScores && (
-          <GhostButton
-            icon={Radar}
-            size="sm"
-            onClick={() => setShowRadarModal(true)}
-          >
-            Radar
-          </GhostButton>
-        )}
-      </div>
-
-      {/* Contenido según vista activa */}
-      {activeView === 'calibracion' && (
-        <div className="space-y-3">
-          {/* PerformanceScoreCard - Score en escala 1-5 */}
-          {scoreOn5 !== null && (
-            <PerformanceScoreCard
-              score={scoreOn5}
-              showProgressBar
-              showTeslaLine
-              size="sm"
-              className="w-full"
-            />
-          )}
-
-          {/* TeamCalibrationHUD - ranking del equipo */}
-          {teamMembers.length > 0 ? (
-            <TeamCalibrationHUD
-              teamMembers={teamMembers}
-              currentEvaluateeId={currentEvaluateeId || undefined}
-              maxVisible={5}
-              className="w-full"
-            />
-          ) : (
-            <div className="w-full bg-slate-800/30 rounded-lg p-3 border border-slate-700/30 text-center">
-              <p className="text-xs text-slate-400">
-                No hay suficientes evaluaciones completadas para mostrar el ranking.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeView === 'brechas' && summary?.competencyScores && (
-        <div className="max-w-2xl mx-auto p-6">
-          <GapInsightCarousel
-            competencyScores={summary.competencyScores}
-            employeeName={summary.evaluatee.fullName}
-          />
-        </div>
-      )}
-
-      {activeView === 'alertas' && (
-        <div>
-          {competencies.length > 0 ? (
-            <InsightCarousel
-              competencies={competencies}
-              employeeName={displayName}
-              className="w-full"
-            />
-          ) : (
-            <div className="w-full p-3 bg-slate-800/30 rounded-lg border border-slate-700/30 text-center">
-              <p className="text-xs text-slate-400">
-                No hay datos de competencias disponibles para generar alertas.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeView === 'desarrollo' && summary && (
-        <div>
-          {existingPDI ? (
-            existingPDI.status === 'DRAFT' ? (
-              <PDIWizardOrchestrator
-                employeeId={summary.evaluateeId}
-                cycleId={summary.cycleId}
-                employeeName={summary.evaluatee.fullName}
-                onComplete={(pdiId) => {
-                  setExistingPDI({ id: pdiId, status: 'PENDING_REVIEW' })
-                }}
-              />
-            ) : (
-              <PDIDetailView pdiId={existingPDI.id} />
-            )
-          ) : (
-            <PDIWizardOrchestrator
-              employeeId={summary.evaluateeId}
-              cycleId={summary.cycleId}
-              employeeName={summary.evaluatee.fullName}
-              onComplete={(pdiId) => {
-                setExistingPDI({ id: pdiId, status: 'PENDING_REVIEW' })
-              }}
-            />
-          )}
-        </div>
-      )}
-      {summary?.competencyScores && (
-        <CompetencyRadarModal
-          isOpen={showRadarModal}
-          onClose={() => setShowRadarModal(false)}
-          competencyScores={summary.competencyScores}
-          employeeName={summary.evaluatee.fullName}
-        />
-      )}
-    </div>
-  )
-
   return (
-    <CinemaSummaryOrchestrator
+    <GuidedSummaryOrchestrator
       summary={summary}
-      rightColumnSlot={rightColumnContent}
+      teamMembers={teamMembers}
+      potentialScore={potentialData.potentialScore}
+      potentialLevel={potentialData.potentialLevel}
+      nineBoxPosition={potentialData.nineBoxPosition}
     />
   )
 }
