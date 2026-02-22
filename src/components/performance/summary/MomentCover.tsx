@@ -5,62 +5,113 @@
 // src/components/performance/summary/MomentCover.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
-import { memo } from 'react'
+import { memo, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { formatDisplayName } from '@/lib/utils/formatName'
+import { getPerformanceClassification } from '@/config/performanceClassification'
+import type { CinemaSummaryData } from '@/types/evaluator-cinema'
 import type { Moment, MomentData } from './SummaryHub'
 
 interface MomentCoverProps {
   moment: Moment
   momentData: MomentData
   evaluateeName: string
+  summary: CinemaSummaryData
   onBack: () => void
   onEnter: () => void
 }
 
-const MOMENT_NARRATIVES: Record<Moment, {
-  getNarrative: (name: string, data: MomentData) => string
-  cta: string
-  color: string
-}> = {
-  diagnostico: {
-    getNarrative: (name, data) =>
-      data.metric
-        ? `obtuvo ${data.metric}. Revisa su desempeño detallado.`
-        : `tiene resultados listos para revisar.`,
-    cta: 'Ver Diagnóstico',
-    color: '#22D3EE'
-  },
-  conversacion: {
-    getNarrative: (name, data) =>
-      data.metric
-        ? `tiene ${data.metric} importantes. Prepara tu próxima conversación con insights específicos.`
-        : `tiene resultados listos. Prepara tu próxima conversación.`,
-    cta: 'Preparar mi 1:1',
-    color: '#A78BFA'
-  },
-  desarrollo: {
-    getNarrative: () =>
-      `necesita un plan de crecimiento. Define su camino de desarrollo.`,
-    cta: 'Trazar el Futuro',
-    color: '#10B981'
+// ════════════════════════════════════════════════════════════════════════════
+// NARRATIVAS CON DATOS REALES + PÚRPURA EN MÉTRICAS
+// ════════════════════════════════════════════════════════════════════════════
+
+function getDiagnosticoNarrative(firstName: string, summary: CinemaSummaryData): ReactNode {
+  const score = summary.overallScore ?? summary.averageScore
+  if (score != null) {
+    const classification = getPerformanceClassification(score)
+    return (
+      <>
+        <span className="text-cyan-400 font-medium">{firstName}</span>
+        {' obtuvo '}
+        <span className="text-purple-400 font-medium">{classification.label}</span>
+        {'. Revisa su desempeño detallado.'}
+      </>
+    )
   }
+  return (
+    <>
+      <span className="text-cyan-400 font-medium">{firstName}</span>
+      {' tiene resultados listos para revisar.'}
+    </>
+  )
+}
+
+function getConversacionNarrative(firstName: string, summary: CinemaSummaryData): ReactNode {
+  const totalBrechas = summary.gapAnalysis?.developmentAreas?.length || 0
+
+  if (totalBrechas === 0) {
+    return (
+      <>
+        {'Las percepciones están alineadas con '}
+        <span className="text-cyan-400 font-medium">{firstName}</span>
+        {'. ¡Excelente base para tu conversación!'}
+      </>
+    )
+  }
+
+  return (
+    <>
+      <span className="text-cyan-400 font-medium">{firstName}</span>
+      {' tiene '}
+      <span className="text-purple-400 font-medium">{totalBrechas} brechas</span>
+      {' de percepción que debes conocer antes de tu próxima conversación.'}
+    </>
+  )
+}
+
+function getDesarrolloNarrative(firstName: string): ReactNode {
+  return (
+    <>
+      {'Define el camino de crecimiento de '}
+      <span className="text-cyan-400 font-medium">{firstName}</span>
+      {'.'}
+    </>
+  )
+}
+
+const MOMENT_CTA: Record<Moment, { cta: string; color: string }> = {
+  diagnostico: { cta: 'Ver Diagnóstico', color: '#22D3EE' },
+  conversacion: { cta: 'Preparar mi 1:1', color: '#A78BFA' },
+  desarrollo: { cta: 'Trazar el Futuro', color: '#10B981' }
 }
 
 const MOMENTS_ORDER: Moment[] = ['diagnostico', 'conversacion', 'desarrollo']
 
 export default memo(function MomentCover({
   moment,
-  momentData,
   evaluateeName,
+  summary,
   onBack,
   onEnter
 }: MomentCoverProps) {
 
   const firstName = formatDisplayName(evaluateeName, 'short').split(' ')[0]
-  const config = MOMENT_NARRATIVES[moment]
-  const narrative = config.getNarrative(firstName, momentData)
+  const config = MOMENT_CTA[moment]
+
+  // Build narrative based on moment + real data
+  let narrative: ReactNode
+  switch (moment) {
+    case 'diagnostico':
+      narrative = getDiagnosticoNarrative(firstName, summary)
+      break
+    case 'conversacion':
+      narrative = getConversacionNarrative(firstName, summary)
+      break
+    case 'desarrollo':
+      narrative = getDesarrolloNarrative(firstName)
+      break
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -89,7 +140,7 @@ export default memo(function MomentCover({
           {MOMENTS_ORDER.map((m, idx) => {
             const isActive = m === moment
             const isPast = MOMENTS_ORDER.indexOf(m) < MOMENTS_ORDER.indexOf(moment)
-            const color = MOMENT_NARRATIVES[m].color
+            const color = MOMENT_CTA[m].color
 
             return (
               <div key={m} className="flex items-center">
@@ -130,8 +181,7 @@ export default memo(function MomentCover({
           animate={{ opacity: 1, y: 0 }}
           className="text-2xl md:text-3xl font-light text-white leading-relaxed max-w-lg"
         >
-          <span className="text-cyan-400 font-medium">{firstName}</span>
-          {' '}{narrative}
+          {narrative}
         </motion.p>
       </div>
 

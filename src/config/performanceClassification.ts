@@ -258,11 +258,11 @@ export const ROLE_FIT_DEFAULT_CONFIG: RoleFitLevelConfig[] = [
     label: 'Ajuste Sólido',
     labelShort: 'Sólido',
     question: '¿Qué pequeños ajustes llevarían este desempeño al siguiente nivel?',
-    description: 'Ajuste consistente. Ejecución sólida con oportunidades de optimización en competencias secundarias para alcanzar la excelencia en el rol.',
-    color: '#94A3B8',
+    description: 'Ejecución sólida con oportunidades de optimización en competencias secundarias para alcanzar la excelencia en el rol.',
+    color: '#A78BFA',
     bgClass: 'fhr-bg-elevated',
-    textClass: 'fhr-text',
-    borderClass: 'border-slate-500/30'
+    textClass: 'text-purple-400',
+    borderClass: 'border-purple-500/30'
   },
   {
     level: RoleFitLevel.DEVELOPING,
@@ -271,10 +271,10 @@ export const ROLE_FIT_DEFAULT_CONFIG: RoleFitLevelConfig[] = [
     labelShort: 'Potencial',
     question: '¿Estamos acelerando su aprendizaje a la velocidad correcta?',
     description: 'Fase de aceleración. Presenta brechas en competencias clave que requieren un enfoque de desarrollo dirigido para asegurar el ajuste operativo.',
-    color: '#A78BFA',
+    color: '#F59E0B',
     bgClass: 'fhr-bg-elevated',
-    textClass: 'text-purple-400',
-    borderClass: 'border-purple-500/30'
+    textClass: 'text-amber-400',
+    borderClass: 'border-amber-500/30'
   },
   {
     level: RoleFitLevel.GAP,
@@ -283,10 +283,10 @@ export const ROLE_FIT_DEFAULT_CONFIG: RoleFitLevelConfig[] = [
     labelShort: 'Crítico',
     question: '¿Es este el rol donde sus fortalezas pueden brillar realmente?',
     description: 'Las brechas en competencias fundamentales impactan la calidad del output. Requiere intervención inmediata del líder y un plan de acción prioritario.',
-    color: '#F59E0B',
+    color: '#EF4444',
     bgClass: 'fhr-bg-elevated',
-    textClass: 'text-amber-400',
-    borderClass: 'border-amber-500/30'
+    textClass: 'text-red-400',
+    borderClass: 'border-red-500/30'
   },
   {
     level: RoleFitLevel.RISK,

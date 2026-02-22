@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { extractUserContext } from '@/lib/services/AuthorizationService';
 import PerformanceResultsService from '@/lib/services/PerformanceResultsService';
+import { RoleFitAnalyzer } from '@/lib/services/RoleFitAnalyzer';
 
 /**
  * GET /api/evaluator/assignments/[id]/summary
@@ -192,6 +193,27 @@ export async function GET(
       }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // ROLE FIT (aditivo - null si no aplica)
+    // ═══════════════════════════════════════════════════════════════════════
+    let roleFitData = null;
+    try {
+      const roleFit = await RoleFitAnalyzer.calculateRoleFit(
+        assignment.evaluateeId,
+        assignment.cycle.id
+      );
+      if (roleFit) {
+        roleFitData = {
+          roleFitScore: roleFit.roleFitScore,
+          standardJobLevel: roleFit.standardJobLevel,
+          gaps: roleFit.gaps,
+          summary: roleFit.summary
+        };
+      }
+    } catch (err) {
+      console.warn('[Summary API] Error calculando Role Fit:', err);
+    }
+
     return NextResponse.json({
       success: true,
       summary: {
@@ -219,7 +241,10 @@ export async function GET(
         // Datos de competencias (null si no aplica)
         competencyScores: competencyData.competencyScores,
         gapAnalysis: competencyData.gapAnalysis,
-        overallScore: competencyData.overallAvgScore
+        overallScore: competencyData.overallAvgScore,
+
+        // Role Fit (null si no aplica)
+        roleFit: roleFitData
       }
     });
 

@@ -1,7 +1,7 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// MOMENT CONTENT - Componente con Sub-tabs (DEFINITIVA)
+// MOMENT CONTENT - Componente con Sub-tabs (AJUSTES SUMMARY)
 // src/components/performance/summary/MomentContent.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -10,19 +10,18 @@ import { motion } from 'framer-motion'
 import { ArrowLeft, Home, MessageCircle } from 'lucide-react'
 import { formatDisplayName } from '@/lib/utils/formatName'
 
-// Componentes existentes (NO modificados)
+// Componentes existentes
 import { GapInsightCarousel } from '@/components/performance/gap-analysis'
 import TeamCalibrationHUD from '@/components/performance/TeamCalibrationHUD'
 import InsightCarousel from '@/components/performance/summary/InsightCarousel'
 import PerformanceScoreCard from '@/components/performance/PerformanceScoreCard'
 import PotentialNineBoxCard from '@/components/performance/PotentialNineBoxCard'
 import CompetencyDetailPanel from '@/components/performance/summary/CompetencyDetailPanel'
+import CompetencyCarouselCard from '@/components/performance/summary/CompetencyCarouselCard'
+import RoleFitDisplayCard from '@/components/performance/RoleFitDisplayCard'
 import PDIWizardOrchestrator from '@/components/pdi/PDIWizardOrchestrator'
 import PDIDetailView from '@/components/pdi/PDIDetailView'
-
-// Nuevos componentes
 import FallbackCard from './FallbackCard'
-import CompetencyRadarInline from './CompetencyRadarInline'
 
 import type { CinemaSummaryData } from '@/types/evaluator-cinema'
 import type { Moment } from './SummaryHub'
@@ -42,15 +41,16 @@ interface MomentContentProps {
 
 const SUB_TABS: Record<Moment, { key: string; label: string }[]> = {
   diagnostico: [
-    { key: 'resultados', label: 'Resultados' },
-    { key: 'competencias', label: 'Competencias' }
+    { key: 'resultados', label: 'Resultados' }
   ],
   conversacion: [
-    { key: 'guia', label: 'Guía 1:1' },
-    { key: 'brechas', label: 'Brechas' }
+    { key: 'competencias', label: 'Detalle Competencias' },
+    { key: 'brechas', label: 'Brechas' },
+    { key: 'coaching', label: 'Coaching' }
   ],
   desarrollo: [
-    { key: 'pdi', label: 'Plan de Desarrollo' }
+    { key: 'rolefit', label: 'Role Fit' },
+    { key: 'pdi', label: 'Plan de Acción' }
   ]
 }
 
@@ -95,7 +95,7 @@ export default memo(function MomentContent({
     checkPDI()
   }, [moment, summary.evaluateeId, summary.cycleId])
 
-  // Competencies for coaching (Guía 1:1)
+  // Competencies for coaching
   const competencies = useMemo(() => {
     if (!summary?.categorizedResponses) return []
     return Object.entries(summary.categorizedResponses).map(([name, responses]) => {
@@ -128,7 +128,7 @@ export default memo(function MomentContent({
     return summary.competencyScores?.some(c => c.selfScore != null) ?? false
   }, [summary.competencyScores])
 
-  const scoreOn5 = summary.averageScore ?? summary.overallScore ?? null
+  const scoreOn5 = summary.overallScore ?? summary.averageScore ?? null
 
   // Selected competency for detail panel (Competencias tab)
   const [selectedCompetency, setSelectedCompetency] = useState<string | null>(null)
@@ -192,7 +192,7 @@ export default memo(function MomentContent({
           {/* ═══════════════ DIAGNÓSTICO: RESULTADOS ═══════════════ */}
           {moment === 'diagnostico' && currentTab === 'resultados' && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Score Card */}
+              {/* 1. Score Card */}
               {scoreOn5 != null && (
                 <PerformanceScoreCard
                   score={scoreOn5}
@@ -203,7 +203,7 @@ export default memo(function MomentContent({
                 />
               )}
 
-              {/* 9-Box Card or Fallback */}
+              {/* 2. 9-Box Card or Fallback */}
               {hasPotential ? (
                 <PotentialNineBoxCard
                   potentialScore={potentialScore ?? null}
@@ -217,12 +217,12 @@ export default memo(function MomentContent({
                 />
               )}
 
-              {/* Ranking */}
+              {/* 3. Ranking */}
               {teamMembers.length > 0 ? (
                 <TeamCalibrationHUD
                   teamMembers={teamMembers}
                   currentEvaluateeId={currentEvaluateeId}
-                  maxVisible={10}
+                  maxVisible={5}
                   className="w-full"
                 />
               ) : (
@@ -233,79 +233,61 @@ export default memo(function MomentContent({
             </div>
           )}
 
-          {/* ═══════════════ DIAGNÓSTICO: COMPETENCIAS ═══════════════ */}
-          {moment === 'diagnostico' && currentTab === 'competencias' && (
+          {/* ═══════════════ CONVERSACIÓN: DETALLE COMPETENCIAS ═══════════════ */}
+          {moment === 'conversacion' && currentTab === 'competencias' && (
             <div className="space-y-6">
-              {/* Radar INLINE */}
-              {summary.competencyScores && summary.competencyScores.length > 0 && (
-                <CompetencyRadarInline competencyScores={summary.competencyScores} />
-              )}
+              {/* Carrusel de competencias */}
+              {Object.keys(summary.categorizedResponses).length > 0 ? (
+                <>
+                  <div className="flex gap-3 overflow-x-auto pb-4">
+                    {Object.entries(summary.categorizedResponses).map(([category, responses]) => {
+                      const ratings = (responses as any[])
+                        .filter((r: any) => r.rating != null)
+                        .map((r: any) => r.rating as number)
+                      const avgScore = ratings.length > 0
+                        ? ratings.reduce((a, b) => a + b, 0) / ratings.length
+                        : 0
 
-              {/* Competency chips */}
-              {Object.keys(summary.categorizedResponses).length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {Object.entries(summary.categorizedResponses).map(([category, responses]) => {
-                    const ratings = (responses as any[])
-                      .filter((r: any) => r.rating != null)
-                      .map((r: any) => r.rating as number)
-                    const avg = ratings.length > 0
-                      ? ratings.reduce((a, b) => a + b, 0) / ratings.length
-                      : null
-                    const isSelected = selectedCompetency === category
+                      return (
+                        <CompetencyCarouselCard
+                          key={category}
+                          code={category}
+                          name={category}
+                          score={avgScore}
+                          questionCount={(responses as any[]).length}
+                          isSelected={selectedCompetency === category}
+                          onClick={() => setSelectedCompetency(
+                            selectedCompetency === category ? null : category
+                          )}
+                        />
+                      )
+                    })}
+                  </div>
 
-                    return (
-                      <button
-                        key={category}
-                        onClick={() => setSelectedCompetency(isSelected ? null : category)}
-                        className={`
-                          px-3 py-2 rounded-xl text-xs font-medium transition-all border
-                          ${isSelected
-                            ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
-                            : 'bg-[#0F172A]/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300'
-                          }
-                        `}
-                      >
-                        {category}
-                        {avg != null && (
-                          <span className={`ml-2 font-bold ${isSelected ? 'text-cyan-400' : 'text-white'}`}>
-                            {avg.toFixed(1)}
-                          </span>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* Detail panel for selected competency */}
-              {selectedCompetency && summary.categorizedResponses[selectedCompetency] && (
-                <CompetencyDetailPanel
-                  categoryName={selectedCompetency}
-                  responses={summary.categorizedResponses[selectedCompetency]}
-                  avgScore={(() => {
-                    const ratings = (summary.categorizedResponses[selectedCompetency] as any[])
-                      .filter((r: any) => r.rating != null)
-                      .map((r: any) => r.rating as number)
-                    return ratings.length > 0
-                      ? ratings.reduce((a, b) => a + b, 0) / ratings.length
-                      : null
-                  })()}
-                />
+                  {/* Detalle de competencia seleccionada */}
+                  {selectedCompetency && summary.categorizedResponses[selectedCompetency] ? (
+                    <CompetencyDetailPanel
+                      categoryName={selectedCompetency}
+                      responses={summary.categorizedResponses[selectedCompetency]}
+                      avgScore={(() => {
+                        const ratings = (summary.categorizedResponses[selectedCompetency] as any[])
+                          .filter((r: any) => r.rating != null)
+                          .map((r: any) => r.rating as number)
+                        return ratings.length > 0
+                          ? ratings.reduce((a, b) => a + b, 0) / ratings.length
+                          : null
+                      })()}
+                    />
+                  ) : (
+                    <div className="text-center text-slate-500 py-8">
+                      Selecciona una competencia para ver el detalle
+                    </div>
+                  )}
+                </>
+              ) : (
+                <FallbackCard message="No hay datos de competencias disponibles." />
               )}
             </div>
-          )}
-
-          {/* ═══════════════ CONVERSACIÓN: GUÍA 1:1 ═══════════════ */}
-          {moment === 'conversacion' && currentTab === 'guia' && (
-            competencies.length > 0 ? (
-              <InsightCarousel
-                competencies={competencies}
-                employeeName={summary.evaluatee.fullName}
-                className="w-full"
-              />
-            ) : (
-              <FallbackCard message="No hay datos de competencias disponibles para generar la guía." />
-            )
           )}
 
           {/* ═══════════════ CONVERSACIÓN: BRECHAS ═══════════════ */}
@@ -318,34 +300,54 @@ export default memo(function MomentContent({
               />
             ) : (
               <FallbackCard
-                message={`Aún no recibimos la autoevaluación de ${firstName}, motívalo para completarla ya que es parte importante de su feedback cruzado.`}
+                message={`Lamentablemente aún no recibimos la autoevaluación de ${firstName}. Motívalo para que la complete ya que es parte importante de su feedback.`}
                 icon={MessageCircle}
               />
             )
           )}
 
-          {/* ═══════════════ DESARROLLO: PDI ═══════════════ */}
-          {moment === 'desarrollo' && currentTab === 'pdi' && (
-            <div className="space-y-4">
-              {/* Fallback Role Fit */}
+          {/* ═══════════════ CONVERSACIÓN: COACHING ═══════════════ */}
+          {moment === 'conversacion' && currentTab === 'coaching' && (
+            competencies.length > 0 ? (
+              <InsightCarousel
+                competencies={competencies}
+                employeeName={summary.evaluatee.fullName}
+                className="w-full"
+              />
+            ) : (
+              <FallbackCard message="No hay datos de competencias disponibles para generar coaching." />
+            )
+          )}
+
+          {/* ═══════════════ DESARROLLO: ROLE FIT ═══════════════ */}
+          {moment === 'desarrollo' && currentTab === 'rolefit' && (
+            (summary as any).roleFit ? (
+              <RoleFitDisplayCard
+                roleFit={(summary as any).roleFit}
+                employeeName={summary.evaluatee.fullName}
+                variant="full"
+              />
+            ) : (
               <FallbackCard
                 message={`Recuerda evaluar a ${firstName} para calcular su Role Fit y trazar mejor su camino de crecimiento.`}
               />
+            )
+          )}
 
-              {/* PDI Wizard or Detail */}
-              {existingPDI && existingPDI.status !== 'DRAFT' ? (
-                <PDIDetailView pdiId={existingPDI.id} />
-              ) : (
-                <PDIWizardOrchestrator
-                  employeeId={summary.evaluateeId}
-                  cycleId={summary.cycleId}
-                  employeeName={summary.evaluatee.fullName}
-                  onComplete={(pdiId) => {
-                    setExistingPDI({ id: pdiId, status: 'PENDING_REVIEW' })
-                  }}
-                />
-              )}
-            </div>
+          {/* ═══════════════ DESARROLLO: PLAN DE ACCIÓN ═══════════════ */}
+          {moment === 'desarrollo' && currentTab === 'pdi' && (
+            existingPDI && existingPDI.status !== 'DRAFT' ? (
+              <PDIDetailView pdiId={existingPDI.id} />
+            ) : (
+              <PDIWizardOrchestrator
+                employeeId={summary.evaluateeId}
+                cycleId={summary.cycleId}
+                employeeName={summary.evaluatee.fullName}
+                onComplete={(pdiId) => {
+                  setExistingPDI({ id: pdiId, status: 'PENDING_REVIEW' })
+                }}
+              />
+            )
           )}
 
         </motion.div>

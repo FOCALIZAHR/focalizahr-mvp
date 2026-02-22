@@ -156,6 +156,7 @@ export default function GuidedSummaryOrchestrator({
                     moment={activeMoment}
                     momentData={momentData[activeMoment]}
                     evaluateeName={summary.evaluatee.fullName}
+                    summary={summary}
                     onBack={handleBack}
                     onEnter={handleEnterContent}
                   />
@@ -203,8 +204,8 @@ export default function GuidedSummaryOrchestrator({
 function getDefaultSubTab(moment: Moment): string {
   switch (moment) {
     case 'diagnostico': return 'resultados'
-    case 'conversacion': return 'guia'
-    case 'desarrollo': return 'pdi'
+    case 'conversacion': return 'competencias'
+    case 'desarrollo': return 'rolefit'
   }
 }
 
