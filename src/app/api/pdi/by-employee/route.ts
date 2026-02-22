@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    if (!hasPermission(userContext.role, 'performance:view')) {
+    if (!hasPermission(userContext.role, 'evaluations:view')) {
       return NextResponse.json(
         { success: false, error: 'Sin permisos' },
         { status: 403 }

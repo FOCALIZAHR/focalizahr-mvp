@@ -24,7 +24,7 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
-    if (!hasPermission(userContext.role, 'performance:view')) {
+    if (!hasPermission(userContext.role, 'evaluations:view')) {
       return NextResponse.json({ success: false, error: 'Sin permisos' }, { status: 403 })
     }
 

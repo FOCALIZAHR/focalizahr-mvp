@@ -2266,6 +2266,7 @@ model DevelopmentGoal {
   status            DevelopmentGoalStatus @default(NOT_STARTED)
 
   suggestedResources Json?
+  action            String?  @db.Text
 
   linkedBusinessGoalId String?
 
