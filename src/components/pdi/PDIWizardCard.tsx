@@ -335,7 +335,7 @@ export default memo(function PDIWizardCard({
                 value={editedTitle}
                 onChange={(e) => setEditedTitle(e.target.value)}
                 rows={2}
-                className="w-full bg-transparent text-sm text-slate-200 leading-relaxed p-4 resize-none border border-slate-600/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 placeholder:text-slate-600"
+                className="w-full bg-slate-900/50 border-0 rounded-xl p-4 text-sm text-slate-200 placeholder:text-slate-500 resize-none focus:outline-none focus:ring-1 focus:ring-cyan-500/50 transition-all duration-200"
                 placeholder="Escribe el objetivo de desarrollo..."
               />
             </div>
@@ -350,7 +350,7 @@ export default memo(function PDIWizardCard({
                 value={editedOutcome}
                 onChange={(e) => setEditedOutcome(e.target.value)}
                 rows={2}
-                className="w-full bg-transparent text-sm text-slate-200 leading-relaxed p-4 resize-none border border-slate-600/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 placeholder:text-slate-600"
+                className="w-full bg-slate-900/50 border-0 rounded-xl p-4 text-sm text-slate-200 placeholder:text-slate-500 resize-none focus:outline-none focus:ring-1 focus:ring-cyan-500/50 transition-all duration-200"
                 placeholder="¿Cómo se medirá el éxito?"
               />
             </div>
@@ -393,7 +393,7 @@ export default memo(function PDIWizardCard({
                   onClick={() => handleNext(true)}
                   className="fhr-btn fhr-btn-primary flex items-center gap-2"
                 >
-                  Agregar al Plan
+                  Aprobar y Agregar al Plan
                   <ChevronDown className="w-4 h-4 rotate-[-90deg]" />
                 </button>
               </div>

@@ -10,7 +10,6 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { getRoleFitClassification } from '@/config/performanceClassification'
 import { useDebounce } from '@/hooks/useDebounce'
 
 // Existing PDI components (reused)
@@ -20,7 +19,6 @@ import PDINoGapsCard from '../PDINoGapsCard'
 import PDISelectionList from '../PDISelectionList'
 
 // Guided experience components
-import PDILeftColumn from './PDILeftColumn'
 import PDIHub from './PDIHub'
 import PDICategoryCover from './PDICategoryCover'
 import PDICategoryContent from './PDICategoryContent'
@@ -604,11 +602,6 @@ export default function PDIGuidedOrchestrator({
     return (['URGENTE', 'IMPACTO', 'QUICK_WIN', 'POTENCIAR'] as Category[]).filter(c => cats.has(c))
   }, [enrichedGaps])
 
-  const roleFitConfig = useMemo(() => {
-    if (!roleFit) return null
-    return getRoleFitClassification(roleFit.roleFitScore)
-  }, [roleFit])
-
   const summaryGoals = useMemo(() => [
     ...editedGoals
       .filter(g => g.included)
@@ -630,7 +623,7 @@ export default function PDIGuidedOrchestrator({
 
   if (viewLevel === 'loading') {
     return (
-      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center p-4">
+      <div className="w-full flex items-center justify-center py-16">
         <div className="flex flex-col items-center">
           <motion.div
             animate={{ rotate: 360 }}
@@ -663,7 +656,7 @@ export default function PDIGuidedOrchestrator({
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center p-4">
+      <div className="w-full flex items-center justify-center py-16">
         <div className="bg-slate-800/50 backdrop-blur border border-red-500/20 rounded-2xl p-8 text-center max-w-md">
           <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto mb-4">
             <span className="text-red-400 text-xl">!</span>
@@ -755,73 +748,48 @@ export default function PDIGuidedOrchestrator({
   // ═══════════════════════════════════════════════════════════════════════════
 
   return (
-    <div className="min-h-screen bg-[#0F172A] p-4 md:p-6">
-      <motion.div className="max-w-6xl mx-auto">
-        <div className="relative bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[24px] shadow-2xl flex flex-col md:flex-row overflow-hidden">
+    <div className="w-full">
+      <AnimatePresence mode="wait">
 
-          {/* Tesla Line */}
-          <div
-            className="absolute top-0 left-0 right-0 h-[1px] z-20"
-            style={{
-              background: 'linear-gradient(90deg, transparent, #22D3EE, transparent)',
-              boxShadow: '0 0 15px #22D3EE'
-            }}
-          />
-
-          {/* Left Column (25%) */}
-          <PDILeftColumn
+        {viewLevel === 'hub' && (
+          <PDIHub
+            key="hub"
             employeeName={employeeName}
-            roleFitScore={roleFit?.roleFitScore}
-            roleFitConfig={roleFitConfig}
+            roleFitScore={roleFit?.roleFitScore ?? null}
+            enrichedGaps={enrichedGaps}
+            onSelectCategory={handleSelectCategory}
+            onCreatePlan={handleCreatePlan}
           />
+        )}
 
-          {/* Right Column (75%) */}
-          <div className="w-full md:w-[75%] min-h-[500px] flex flex-col">
-            <AnimatePresence mode="wait">
+        {viewLevel === 'cover' && activeCategory && (
+          <PDICategoryCover
+            key={`cover-${activeCategory}`}
+            category={activeCategory}
+            gaps={categoryGaps}
+            employeeName={employeeName}
+            allCategories={activeCategories}
+            onBack={handleBack}
+            onEnter={handleEnterContent}
+          />
+        )}
 
-              {viewLevel === 'hub' && (
-                <PDIHub
-                  key="hub"
-                  employeeName={employeeName}
-                  roleFitScore={roleFit?.roleFitScore ?? null}
-                  enrichedGaps={enrichedGaps}
-                  onSelectCategory={handleSelectCategory}
-                  onCreatePlan={handleCreatePlan}
-                />
-              )}
+        {viewLevel === 'content' && activeCategory && (
+          <PDICategoryContent
+            key={`content-${activeCategory}`}
+            category={activeCategory}
+            gaps={categoryGaps}
+            suggestions={categorySuggestions}
+            pdiGoals={pdiGoals}
+            onBack={handleBack}
+            onBackToHub={handleBackToHub}
+            onAddGoal={handleAddGoal}
+            onUpdateGoal={updateGoalInState}
+            onCategoryComplete={handleCategoryComplete}
+          />
+        )}
 
-              {viewLevel === 'cover' && activeCategory && (
-                <PDICategoryCover
-                  key={`cover-${activeCategory}`}
-                  category={activeCategory}
-                  gaps={categoryGaps}
-                  employeeName={employeeName}
-                  allCategories={activeCategories}
-                  onBack={handleBack}
-                  onEnter={handleEnterContent}
-                />
-              )}
-
-              {viewLevel === 'content' && activeCategory && (
-                <PDICategoryContent
-                  key={`content-${activeCategory}`}
-                  category={activeCategory}
-                  gaps={categoryGaps}
-                  suggestions={categorySuggestions}
-                  pdiGoals={pdiGoals}
-                  onBack={handleBack}
-                  onBackToHub={handleBackToHub}
-                  onAddGoal={handleAddGoal}
-                  onUpdateGoal={updateGoalInState}
-                  onCategoryComplete={handleCategoryComplete}
-                />
-              )}
-
-            </AnimatePresence>
-          </div>
-
-        </div>
-      </motion.div>
+      </AnimatePresence>
     </div>
   )
 }

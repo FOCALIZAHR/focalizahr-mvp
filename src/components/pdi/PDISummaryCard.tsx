@@ -57,7 +57,7 @@ export default memo(function PDISummaryCard({
         </div>
 
         <h2 className="text-2xl font-light text-white mb-1">
-          Plan de Desarrollo de <span className="text-cyan-400 font-medium">{firstName}</span>
+          Plan estructurado con éxito para <span className="text-cyan-400 font-medium">{firstName}</span>
         </h2>
         <p className="text-sm text-slate-400 mb-8">
           Ciclo actual
@@ -161,7 +161,7 @@ export default memo(function PDISummaryCard({
             onClick={onViewPlan}
             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-500 text-white text-sm font-medium hover:opacity-90 transition-opacity"
           >
-            Ver Plan Completo
+            Guardar Plan y Finalizar
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

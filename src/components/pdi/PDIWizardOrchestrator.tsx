@@ -9,6 +9,9 @@ import PDINoGapsCard from './PDINoGapsCard'
 import PDISelectionList from './PDISelectionList'
 import { useDebounce } from '@/hooks/useDebounce'
 import type { WizardGap, WizardSuggestion, EditedGoal } from './PDIWizardCard'
+import GuidedGateway from '@/components/ui/GuidedGateway'
+import RoleFitDisplayCard from '@/components/performance/RoleFitDisplayCard'
+import { getRoleFitClassification } from '@/config/performanceClassification'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -47,7 +50,7 @@ interface PDIWizardOrchestratorProps {
   onComplete?: (pdiId: string) => void
 }
 
-type WizardPhase = 'loading' | 'selection' | 'gaps' | 'manual' | 'summary' | 'no-gaps'
+type WizardPhase = 'loading' | 'intro' | 'selection-warning' | 'selection' | 'gaps' | 'manual' | 'summary' | 'no-gaps'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS PARA SMART ROUTING
@@ -358,7 +361,7 @@ export default function PDIWizardOrchestrator({
 
     setGaps(routerResult.allItems)
     setSuggestions(wizardSuggestions)
-    setPhase('gaps')
+    setPhase('intro')
   }
 
   function processGeneratedData(postData: any) {
@@ -427,16 +430,9 @@ export default function PDIWizardOrchestrator({
     setGaps(routerResult.selectedItems)
     setSuggestions(wizardSuggestions)
 
-    // Decidir flujo
-    if (routerResult.skipSelectionList) {
-      // ≤4 items: directo al carrusel
-      setSelectedCodes(routerResult.selectedItems.map(g => g.competencyCode))
-      setPhase('gaps')
-    } else {
-      // >4 items: mostrar lista de selección
-      setSelectedCodes(routerResult.selectedItems.map(g => g.competencyCode))
-      setPhase('selection')
-    }
+    // Siempre ir a 'intro' primero - la intro decidirá el siguiente paso
+    setSelectedCodes(routerResult.selectedItems.map(g => g.competencyCode))
+    setPhase('intro')
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -639,6 +635,13 @@ export default function PDIWizardOrchestrator({
     if (!pdiId) return
     setIsSaving(true)
 
+    // Mapeo de priority numérico a string enum
+    const PRIORITY_MAP: Record<number, string> = {
+      1: 'BAJA',
+      2: 'MEDIA',
+      3: 'ALTA'
+    }
+
     try {
       // Build goals payload: keep included, mark excluded for deletion
       const includedGoalIds = new Set(
@@ -649,10 +652,14 @@ export default function PDIWizardOrchestrator({
       const goalsPayload = pdiGoals.map((g: any) => {
         const edited = editedGoals.find(e => e.goalId === g.id)
         if (edited && edited.included) {
+          const mappedPriority = typeof g.priority === 'number'
+            ? PRIORITY_MAP[g.priority] || 'MEDIA'
+            : g.priority
           return {
             id: g.id,
             title: edited.title,
-            targetOutcome: edited.targetOutcome
+            targetOutcome: edited.targetOutcome,
+            ...(mappedPriority ? { priority: mappedPriority } : {})
           }
         }
         if (edited && !edited.included) {
@@ -672,12 +679,12 @@ export default function PDIWizardOrchestrator({
         return { id: g.id }
       })
 
-      // Add manual goals
+      // Add manual goals (priority mapped to string enum)
       const manualGoalsPayload = manualGoals.map(mg => ({
         title: mg.title,
         targetOutcome: mg.targetOutcome,
         aiGenerated: false,
-        priority: 99
+        priority: 'MEDIA'
       }))
 
       await fetch(`/api/pdi/${pdiId}`, {
@@ -801,21 +808,100 @@ export default function PDIWizardOrchestrator({
     )
   }
 
-  // NoGaps
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FASE NO-GAPS - Talento sólido, sin brechas detectadas
+  // ═══════════════════════════════════════════════════════════════════════════
   if (phase === 'no-gaps') {
+    const firstName = employeeName.split(' ')[0]
+    const roleFitConfig = roleFit ? getRoleFitClassification(roleFit.roleFitScore) : null
+
     return (
-      <PDINoGapsCard
-        employeeName={employeeName}
-        roleFit={roleFit ? {
-          roleFitScore: roleFit.roleFitScore,
-          summary: {
-            totalCompetencies: roleFit.summary.totalCompetencies,
-            matching: roleFit.summary.matching,
-            exceeds: roleFit.summary.exceeds
-          }
-        } : null}
-        onAddManual={handleNoGapsAddManual}
-        onFinish={handleNoGapsFinish}
+      <GuidedGateway
+        title="Excelente desempeño detectado"
+        narrative={
+          <>
+            <span className="text-cyan-400 font-semibold">{firstName}</span> no presenta brechas de percepción en esta evaluación.
+            {roleFitConfig && (
+              <> Su nivel actual indica un <span className="text-purple-400 font-medium">{roleFitConfig.label}</span>: {roleFitConfig.description}</>
+            )}
+          </>
+        }
+        instruction={
+          roleFitConfig?.question
+            ? `💡 Reflexión para tu 1:1: ${roleFitConfig.question}`
+            : 'La misión ahora es prepararlo para el futuro. ¿Qué nuevo desafío, proyecto o responsabilidad le permitiría ampliar su impacto en el equipo?'
+        }
+        ctaText="Definir objetivo de crecimiento"
+        onCtaClick={() => setPhase('manual')}
+        secondaryCtaText="Finalizar sin objetivos en este ciclo"
+        onSecondaryCta={() => onComplete?.(pdiId || '')}
+        activePhase="PDI"
+        completedPhases={['ED', 'PT']}
+      />
+    )
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FASE INTRO - Pantalla de bienvenida antes de comenzar
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (phase === 'intro') {
+    const firstName = employeeName.split(' ')[0]
+    const roleFitConfig = roleFit ? getRoleFitClassification(roleFit.roleFitScore) : null
+
+    return (
+      <GuidedGateway
+        title="Plan de Desarrollo Inteligente"
+        narrative={
+          <>
+            Hemos detectado <span className="text-cyan-400 font-semibold">{gaps.length}</span> oportunidades
+            de desarrollo claras para <span className="text-cyan-400 font-semibold">{firstName}</span>.
+            {roleFitConfig && (
+              <> Su nivel actual refleja un <span className="text-purple-400 font-medium">{roleFitConfig.label}</span>: {roleFitConfig.description}</>
+            )}
+          </>
+        }
+        instruction="Para ahorrarte tiempo, nuestro motor ya redactó una propuesta para cada una. Tu misión como líder no es crear desde cero. Solo revisar, calibrar y aprobar."
+        ctaText="Comenzar revisión del plan"
+        onCtaClick={() => setPhase(enrichedGaps.length > 4 ? 'selection-warning' : 'gaps')}
+        activePhase="PDI"
+        completedPhases={['ED', 'PT']}
+      />
+    )
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FASE SELECTION-WARNING - Advertencia de foco estratégico
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (phase === 'selection-warning') {
+    const firstName = employeeName.split(' ')[0]
+    const roleFitConfig = roleFit ? getRoleFitClassification(roleFit.roleFitScore) : null
+
+    return (
+      <GuidedGateway
+        title="Foco estratégico requerido"
+        narrative={
+          <>
+            <span className="text-cyan-400 font-semibold">{firstName}</span> presenta{' '}
+            <span className="text-amber-400 font-semibold">{enrichedGaps.length}</span> oportunidades de desarrollo.
+            {roleFitConfig && (
+              <> Su nivel actual refleja un <span className="text-purple-400 font-medium">{roleFitConfig.label}</span>.</>
+            )}{' '}
+            Este volumen excede lo que una persona puede trabajar de manera realista en un solo ciclo sin descuidar su operación diaria.
+          </>
+        }
+        instruction={
+          <>
+            {roleFitConfig?.question && (
+              <span className="block mb-4">💡 Reflexión antes de armar el plan: {roleFitConfig.question}</span>
+            )}
+            Para garantizar el éxito, te pedimos priorizar. Selecciona un máximo de 4 focos críticos y 2 victorias rápidas.
+          </>
+        }
+        escapeNote="Si tus prioridades son otras, selecciona lo mínimo aquí y agrega objetivos personalizados en el siguiente paso."
+        ctaText="Priorizar focos de desarrollo"
+        onCtaClick={() => setPhase('selection')}
+        activePhase="PDI"
+        completedPhases={['ED', 'PT']}
       />
     )
   }
@@ -842,20 +928,33 @@ export default function PDIWizardOrchestrator({
     )?.id || `gap-${currentGapIndex}`
 
     return (
-      <AnimatePresence mode="wait" custom={direction}>
-        <PDIWizardCard
-          key={`gap-${currentGapIndex}`}
-          gap={currentGap}
-          suggestion={currentSuggestion}
-          goalId={goalId}
-          currentIndex={currentGapIndex}
-          totalCount={gaps.length}
-          direction={direction}
-          onNext={handleAddGoal}
-          onPrevious={handlePreviousGap}
-          onUpdateGoal={(updates) => updateGoalInState(goalId, updates)}
-        />
-      </AnimatePresence>
+      <div className="w-full">
+        {/* Header persistente con Role Fit */}
+        {roleFit && (
+          <div className="mb-4 flex justify-end">
+            <RoleFitDisplayCard
+              roleFit={roleFit}
+              employeeName={employeeName}
+              variant="mini"
+            />
+          </div>
+        )}
+
+        <AnimatePresence mode="wait" custom={direction}>
+          <PDIWizardCard
+            key={`gap-${currentGapIndex}`}
+            gap={currentGap}
+            suggestion={currentSuggestion}
+            goalId={goalId}
+            currentIndex={currentGapIndex}
+            totalCount={gaps.length}
+            direction={direction}
+            onNext={handleAddGoal}
+            onPrevious={handlePreviousGap}
+            onUpdateGoal={(updates) => updateGoalInState(goalId, updates)}
+          />
+        </AnimatePresence>
+      </div>
     )
   }
 
