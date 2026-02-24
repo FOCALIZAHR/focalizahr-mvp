@@ -2,7 +2,8 @@
 
 import { memo, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Plus } from 'lucide-react'
+import { Plus, ArrowLeft, Compass } from 'lucide-react'
+import { GhostButton, SecondaryButton } from '@/components/ui/PremiumButton'
 
 interface PDIManualGoalCardProps {
   onAdd: (goal: { title: string; targetOutcome: string }) => void
@@ -31,89 +32,107 @@ export default memo(function PDIManualGoalCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       transition={{ type: 'spring', stiffness: 220, damping: 30 }}
-      className="relative bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[24px] overflow-hidden"
+      className="relative bg-[#0F172A] backdrop-blur-2xl border border-slate-800 rounded-2xl overflow-hidden"
     >
-      {/* Tesla line cyan-purple */}
+      {/* ═══ LÍNEA TESLA PÚRPURA (Creatividad/Estrategia) ═══ */}
       <div
-        className="absolute top-0 left-0 right-0 h-[1px] z-10"
-        style={{
-          background: 'linear-gradient(90deg, transparent, #22D3EE, #A78BFA, transparent)',
-          boxShadow: '0 0 15px #22D3EE'
-        }}
+        className="absolute top-0 left-0 right-0 h-[2px] z-10 bg-purple-500"
+        style={{ boxShadow: '0 0 15px rgba(167, 139, 250, 0.4)' }}
       />
 
-      <div className="p-8 md:p-10">
-        {/* Header */}
-        <div className="flex items-center gap-2 mb-2">
-          <Plus className="w-5 h-5 text-cyan-400" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
-            Objetivo Adicional
+      <div className="p-6 sm:p-8">
+        {/* ═══ ENCABEZADO ═══ */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20
+            flex items-center justify-center">
+            <Compass className="w-5 h-5 text-purple-400" />
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-purple-400">
+            Objetivo Estratégico
           </span>
         </div>
 
-        <h3 className="text-2xl font-light text-white mb-2">
+        <h2 className="text-3xl font-light text-white mb-3">
           Objetivo personalizado
-        </h3>
+        </h2>
 
-        <p className="text-sm text-slate-400 mb-8">
-          Agrega un objetivo de desarrollo que no esté relacionado con las brechas detectadas.
+        <p className="text-slate-400 leading-relaxed mb-8">
+          Este es tu espacio de liderazgo puro. Aquí puedes agregar un desafío estratégico,
+          un proyecto de innovación o una mentoría clave que tú sabes que hará crecer a tu colaborador.
         </p>
 
-        {/* Divider */}
-        <div className="h-px bg-slate-800 mb-6" />
-
-        {/* Title */}
-        <div className="rounded-xl bg-slate-800/50 border border-slate-700/50 p-4 mb-4">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-2">
+        {/* ═══ INPUT: Objetivo ═══ */}
+        <div className="mb-5">
+          <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
             Objetivo
-          </span>
+          </label>
           <textarea
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="¿Qué quieres desarrollar?"
+            placeholder="Ej: Liderar la migración de la base de datos del cliente X para Q3"
             rows={2}
-            className="w-full bg-transparent text-sm text-slate-200 leading-relaxed resize-none focus:outline-none placeholder:text-slate-600"
+            className="w-full bg-slate-900/50 backdrop-blur border border-slate-700 rounded-xl
+              p-5 text-lg text-white placeholder:text-slate-500 resize-none
+              transition-all duration-200
+              hover:border-slate-600
+              focus:border-purple-400 focus:ring-1 focus:ring-purple-400/20 focus:outline-none"
           />
         </div>
 
-        {/* Target Outcome */}
-        <div className="rounded-xl bg-slate-800/50 border border-slate-700/50 p-4 mb-8">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-2">
+        {/* ═══ INPUT: Meta Medible ═══ */}
+        <div className="mb-8">
+          <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
             Meta Medible
-          </span>
+          </label>
           <textarea
             value={targetOutcome}
             onChange={(e) => setTargetOutcome(e.target.value)}
-            placeholder="¿Cómo sabrás que lo lograste?"
+            placeholder="Ej: Migración completada con 0% de pérdida de datos y aprobada por el cliente."
             rows={2}
-            className="w-full bg-transparent text-sm text-slate-200 leading-relaxed resize-none focus:outline-none placeholder:text-slate-600"
+            className="w-full bg-slate-900/50 backdrop-blur border border-slate-700 rounded-xl
+              p-5 text-lg text-white placeholder:text-slate-500 resize-none
+              transition-all duration-200
+              hover:border-slate-600
+              focus:border-purple-400 focus:ring-1 focus:ring-purple-400/20 focus:outline-none"
           />
         </div>
 
-        {/* Navigation */}
-        <div className="flex items-center justify-between pt-6 border-t border-slate-800">
-          <button
-            onClick={onPrevious}
-            className="px-4 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white transition-colors"
-          >
-            &larr; Anterior
-          </button>
+        {/* ═══ BARRA DE ACCIÓN (Responsive) ═══ */}
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between w-full gap-3 pt-6 border-t border-slate-800/50">
+          <div className="w-full sm:w-auto">
+            <GhostButton
+              icon={ArrowLeft}
+              onClick={onPrevious}
+              size="md"
+              fullWidth
+            >
+              Anterior
+            </GhostButton>
+          </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onSkip}
-              className="px-4 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white transition-colors"
-            >
-              Omitir
-            </button>
-            <button
-              onClick={handleAdd}
-              disabled={!canAdd}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-500 text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
-            >
-              <Plus className="w-4 h-4" />
-              Agregar objetivo
-            </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            <div className="w-full sm:w-auto order-2 sm:order-1">
+              <GhostButton
+                onClick={onSkip}
+                size="md"
+                fullWidth
+              >
+                Omitir
+              </GhostButton>
+            </div>
+
+            <div className="w-full sm:w-auto order-1 sm:order-2">
+              <SecondaryButton
+                icon={Plus}
+                onClick={handleAdd}
+                disabled={!canAdd}
+                size="lg"
+                glow
+                fullWidth
+              >
+                Agregar objetivo estratégico
+              </SecondaryButton>
+            </div>
           </div>
         </div>
       </div>

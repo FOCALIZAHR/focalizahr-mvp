@@ -15,11 +15,15 @@ import {
   calculateAdjustmentType,
   resolveEvaluatorWeights,
   calculateWeightedScore,
+  getRoleFitLevel,
   type PerformanceRatingConfigData,
   type PerformanceLevelConfig,
   type EvaluatorWeights,
   AdjustmentType
 } from '@/config/performanceClassification'
+import { TalentIntelligenceService } from './TalentIntelligenceService'
+import { RoleFitAnalyzer } from './RoleFitAnalyzer'
+import { GoalsService } from './GoalsService'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -148,12 +152,96 @@ export class PerformanceRatingService {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
+  // HYBRID SCORE: Competencias + Metas
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Calcula el score híbrido: Competencias (ponderado) + Metas (normalizado 1-5)
+   * Si no hay metas o el ciclo no las incluye, retorna solo competencias.
+   */
+  static async calculateHybridScore(
+    employeeId: string,
+    competenciesScore: number,
+    cycleEndDate: Date,
+    cycleConfig: { competenciesWeight: number; goalsWeight: number; includeGoals: boolean }
+  ): Promise<{
+    competenciesScore: number
+    competenciesWeight: number
+    goalsScore: number | null
+    goalsRawPercent: number | null
+    goalsWeight: number
+    goalsCount: number
+    hybridScore: number
+    includesGoals: boolean
+  }> {
+    const { competenciesWeight, goalsWeight, includeGoals } = cycleConfig
+
+    // Si el ciclo no incluye metas, retornar solo competencias
+    if (!includeGoals) {
+      return {
+        competenciesScore,
+        competenciesWeight: 100,
+        goalsScore: null,
+        goalsRawPercent: null,
+        goalsWeight: 0,
+        goalsCount: 0,
+        hybridScore: competenciesScore,
+        includesGoals: false
+      }
+    }
+
+    // Obtener score de metas con Time Travel (a la fecha del ciclo)
+    let goalsData: { score: number; goalsCount: number } | null = null
+    try {
+      goalsData = await GoalsService.getEmployeeGoalsScore(employeeId, cycleEndDate)
+    } catch (err) {
+      console.warn(`[calculateHybridScore] Error obteniendo metas para ${employeeId}:`, err)
+    }
+
+    // Si no hay metas, usar solo competencias
+    if (!goalsData || goalsData.goalsCount === 0) {
+      return {
+        competenciesScore,
+        competenciesWeight: 100,
+        goalsScore: null,
+        goalsRawPercent: null,
+        goalsWeight: 0,
+        goalsCount: 0,
+        hybridScore: competenciesScore,
+        includesGoals: false
+      }
+    }
+
+    // Normalizar porcentaje de metas a escala 1-5
+    // 0% = 1.0, 50% = 3.0, 100% = 5.0
+    const goalsPercent = goalsData.score
+    const goalsNormalized = 1 + (goalsPercent / 100) * 4
+
+    // Calcular score híbrido ponderado
+    const compContribution = competenciesScore * (competenciesWeight / 100)
+    const goalsContribution = goalsNormalized * (goalsWeight / 100)
+    const hybridScore = compContribution + goalsContribution
+
+    return {
+      competenciesScore,
+      competenciesWeight,
+      goalsScore: Math.round(goalsNormalized * 100) / 100,
+      goalsRawPercent: Math.round(goalsPercent * 100) / 100,
+      goalsWeight,
+      goalsCount: goalsData.goalsCount,
+      hybridScore: Math.round(hybridScore * 100) / 100,
+      includesGoals: true
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
   // GENERACIÓN DE RATINGS
   // ══════════════════════════════════════════════════════════════════════════
 
   /**
    * Genera rating para un empleado en un ciclo
    * IMPORTANTE: Usa ponderación configurable (cycle ?? account ?? default)
+   * Integra Goals Score cuando el ciclo tiene includeGoals=true
    */
   static async generateRating(
     cycleId: string,
@@ -180,10 +268,48 @@ export class PerformanceRatingService {
       weights
     )
 
-    // 5. Clasificar según config
-    const classification = getPerformanceClassification(weightedScore, config)
+    // 5. Obtener config del ciclo para hybrid score
+    const cycle = await prisma.performanceCycle.findUnique({
+      where: { id: cycleId },
+      select: { endDate: true, competenciesWeight: true, goalsWeight: true, includeGoals: true }
+    })
 
-    // 6. Upsert rating en DB
+    // 5b. Calcular hybrid score (Competencias + Metas)
+    const hybridResult = await this.calculateHybridScore(
+      employeeId,
+      weightedScore,
+      cycle?.endDate ?? new Date(),
+      {
+        competenciesWeight: cycle?.competenciesWeight ?? 70,
+        goalsWeight: cycle?.goalsWeight ?? 30,
+        includeGoals: cycle?.includeGoals ?? true
+      }
+    )
+
+    // 6. Clasificar según hybridScore si incluye metas, sino por weightedScore
+    const effectiveScoreForClassification = hybridResult.includesGoals
+      ? hybridResult.hybridScore
+      : weightedScore
+    const classification = getPerformanceClassification(effectiveScoreForClassification, config)
+
+    // ════════════════════════════════════════════════════════════════════════
+    // CALCULAR ROLE FIT (Trigger 1: Post-360)
+    // ════════════════════════════════════════════════════════════════════════
+    let roleFitScore: number | null = null
+    let roleFitLevel: string | null = null
+
+    try {
+      const roleFitResult = await RoleFitAnalyzer.calculateRoleFit(employeeId, cycleId)
+      if (roleFitResult) {
+        roleFitScore = roleFitResult.roleFitScore
+        roleFitLevel = getRoleFitLevel(roleFitResult.roleFitScore)
+      }
+    } catch (err) {
+      console.warn(`[generateRating] Error calculando Role Fit para ${employeeId}:`, err)
+      // Continuar sin Role Fit - no es bloqueante
+    }
+
+    // 7. Upsert rating en DB
     const rating = await prisma.performanceRating.upsert({
       where: {
         cycleId_employeeId: { cycleId, employeeId }
@@ -200,7 +326,14 @@ export class PerformanceRatingService {
         upwardAvgScore: results.upwardAvgScore,
         evaluationCompleteness: results.evaluationCompleteness,
         totalEvaluations: results.totalEvaluations,
-        completedEvaluations: results.completedEvaluations
+        completedEvaluations: results.completedEvaluations,
+        roleFitScore,
+        roleFitLevel,
+        roleFitCalculatedAt: roleFitScore !== null ? new Date() : null,
+        goalsScore: hybridResult.goalsScore,
+        goalsRawPercent: hybridResult.goalsRawPercent,
+        goalsCount: hybridResult.goalsCount,
+        hybridScore: hybridResult.includesGoals ? hybridResult.hybridScore : null,
       },
       update: {
         calculatedScore: weightedScore,
@@ -212,6 +345,13 @@ export class PerformanceRatingService {
         evaluationCompleteness: results.evaluationCompleteness,
         totalEvaluations: results.totalEvaluations,
         completedEvaluations: results.completedEvaluations,
+        roleFitScore,
+        roleFitLevel,
+        roleFitCalculatedAt: roleFitScore !== null ? new Date() : null,
+        goalsScore: hybridResult.goalsScore,
+        goalsRawPercent: hybridResult.goalsRawPercent,
+        goalsCount: hybridResult.goalsCount,
+        hybridScore: hybridResult.includesGoals ? hybridResult.hybridScore : null,
         updatedAt: new Date()
       }
     })
@@ -264,10 +404,23 @@ export class PerformanceRatingService {
     const evaluatees = await PerformanceResultsService.listEvaluateesInCycle(cycleId)
 
     // Pre-cargar datos comunes (1 vez en lugar de N)
-    const [config, weights] = await Promise.all([
+    const [config, weights, cycleRecord] = await Promise.all([
       this.getConfig(accountId),
-      this.getResolvedWeights(accountId, cycleId)
+      this.getResolvedWeights(accountId, cycleId),
+      prisma.performanceCycle.findUnique({
+        where: { id: cycleId },
+        select: { endDate: true, competenciesWeight: true, goalsWeight: true, includeGoals: true }
+      })
     ])
+
+    const cycleHybridConfig = cycleRecord
+      ? {
+          endDate: cycleRecord.endDate,
+          competenciesWeight: cycleRecord.competenciesWeight,
+          goalsWeight: cycleRecord.goalsWeight,
+          includeGoals: cycleRecord.includeGoals
+        }
+      : undefined
 
     const result: BulkGenerateResult = {
       success: 0,
@@ -281,7 +434,7 @@ export class PerformanceRatingService {
       const chunk = evaluatees.slice(i, i + CHUNK_SIZE)
       const settled = await Promise.allSettled(
         chunk.map(ev =>
-          this.generateRatingWithContext(cycleId, ev.evaluateeId, accountId, config, weights)
+          this.generateRatingWithContext(cycleId, ev.evaluateeId, accountId, config, weights, cycleHybridConfig)
         )
       )
 
@@ -312,7 +465,8 @@ export class PerformanceRatingService {
     employeeId: string,
     accountId: string,
     config: PerformanceRatingConfigData,
-    weights: EvaluatorWeights
+    weights: EvaluatorWeights,
+    cycleHybridConfig?: { endDate: Date; competenciesWeight: number; goalsWeight: number; includeGoals: boolean }
   ): Promise<GenerateRatingResult> {
     const results = await PerformanceResultsService.getEvaluateeResults(cycleId, employeeId)
 
@@ -326,7 +480,24 @@ export class PerformanceRatingService {
       weights
     )
 
-    const classification = getPerformanceClassification(weightedScore, config)
+    // Calcular hybrid score si hay config de ciclo
+    const hybridResult = cycleHybridConfig
+      ? await this.calculateHybridScore(
+          employeeId,
+          weightedScore,
+          cycleHybridConfig.endDate,
+          {
+            competenciesWeight: cycleHybridConfig.competenciesWeight,
+            goalsWeight: cycleHybridConfig.goalsWeight,
+            includeGoals: cycleHybridConfig.includeGoals
+          }
+        )
+      : null
+
+    const effectiveScoreForClassification = hybridResult?.includesGoals
+      ? hybridResult.hybridScore
+      : weightedScore
+    const classification = getPerformanceClassification(effectiveScoreForClassification, config)
 
     const rating = await prisma.performanceRating.upsert({
       where: {
@@ -344,7 +515,11 @@ export class PerformanceRatingService {
         upwardAvgScore: results.upwardAvgScore,
         evaluationCompleteness: results.evaluationCompleteness,
         totalEvaluations: results.totalEvaluations,
-        completedEvaluations: results.completedEvaluations
+        completedEvaluations: results.completedEvaluations,
+        goalsScore: hybridResult?.goalsScore ?? null,
+        goalsRawPercent: hybridResult?.goalsRawPercent ?? null,
+        goalsCount: hybridResult?.goalsCount ?? null,
+        hybridScore: hybridResult?.includesGoals ? hybridResult.hybridScore : null,
       },
       update: {
         calculatedScore: weightedScore,
@@ -356,6 +531,10 @@ export class PerformanceRatingService {
         evaluationCompleteness: results.evaluationCompleteness,
         totalEvaluations: results.totalEvaluations,
         completedEvaluations: results.completedEvaluations,
+        goalsScore: hybridResult?.goalsScore ?? null,
+        goalsRawPercent: hybridResult?.goalsRawPercent ?? null,
+        goalsCount: hybridResult?.goalsCount ?? null,
+        hybridScore: hybridResult?.includesGoals ? hybridResult.hybridScore : null,
         updatedAt: new Date()
       }
     })
@@ -374,6 +553,7 @@ export class PerformanceRatingService {
           cycleId,
           employeeId,
           calculatedScore: weightedScore,
+          hybridScore: hybridResult?.hybridScore ?? null,
           trigger: 'bulk_generate',
           hadPreviousPotential: rating.potentialScore !== null
         }
@@ -497,6 +677,36 @@ export class PerformanceRatingService {
     const performanceLevel = scoreToNineBoxLevel(performanceScore)
     const nineBoxPosition = calculate9BoxPosition(performanceLevel, potentialLevel)
 
+    // ════════════════════════════════════════════════════════════════════════
+    // CALCULAR MATRICES DE TALENTO (Trigger 2: Post-AAE)
+    // ════════════════════════════════════════════════════════════════════════
+    let mobilityQuadrant: string | null = null
+    let riskQuadrant: string | null = null
+    let riskAlertLevel: string | null = null
+
+    // Solo calcular si tenemos Role Fit persistido
+    if (rating.roleFitScore !== null) {
+      const talentResult = TalentIntelligenceService.analyze({
+        roleFitScore: rating.roleFitScore,
+        aspiration: (hasAllFactors ? aspiration : null) as 1 | 2 | 3 | null,
+        engagement: (hasAllFactors ? engagement : null) as 1 | 2 | 3 | null
+      })
+
+      mobilityQuadrant = talentResult.mobility.quadrant
+      riskQuadrant = talentResult.risk.quadrant
+      riskAlertLevel = talentResult.risk.alertLevel
+
+      // Log para alertas críticas
+      if (TalentIntelligenceService.isCriticalAlert(talentResult.risk.quadrant)) {
+        console.warn(
+          `[ratePotential] ALERTA CRITICA: ${ratingId} ` +
+          `clasificado como ${riskQuadrant} (${riskAlertLevel})`
+        )
+      }
+    } else {
+      console.warn(`[ratePotential] Role Fit no disponible para ${ratingId}, matrices no calculadas`)
+    }
+
     return prisma.performanceRating.update({
       where: { id: ratingId },
       data: {
@@ -510,6 +720,11 @@ export class PerformanceRatingService {
         potentialAspiration: hasAllFactors ? aspiration : null,
         potentialAbility: hasAllFactors ? ability : null,
         potentialEngagement: hasAllFactors ? engagement : null,
+        // Matrices de Talento
+        mobilityQuadrant,
+        riskQuadrant,
+        riskAlertLevel,
+        talentAnalyzedAt: mobilityQuadrant || riskQuadrant ? new Date() : null,
         updatedAt: new Date()
       }
     })
@@ -600,6 +815,7 @@ export class PerformanceRatingService {
       filterNineBox?: string
       filterCalibrated?: boolean
       departmentIds?: string[]  // SECURITY: Para AREA_MANAGER (filtro jerárquico)
+      managerFilterId?: string  // SECURITY: Para EVALUATOR (solo subordinados directos)
       // ═══ NUEVOS FILTROS SERVER-SIDE ═══
       evaluationStatus?: 'all' | 'evaluated' | 'not_evaluated'
       potentialStatus?: 'all' | 'assigned' | 'pending'
@@ -630,17 +846,21 @@ export class PerformanceRatingService {
       filterNineBox,
       filterCalibrated,
       departmentIds,
+      managerFilterId,
       evaluationStatus,
       potentialStatus,
       search
     } = options || {}
 
     // ════════════════════════════════════════════════════════════════════════════
-    // BASE WHERE para stats (solo cycleId + accountId + departmentIds)
+    // BASE WHERE para stats (solo cycleId + accountId + filtro jerárquico)
     // ════════════════════════════════════════════════════════════════════════════
     const baseWhere: any = { cycleId, accountId }
     if (departmentIds?.length) {
       baseWhere.employee = { departmentId: { in: departmentIds } }
+    }
+    if (managerFilterId) {
+      baseWhere.employee = { ...baseWhere.employee, managerId: managerFilterId }
     }
 
     // ════════════════════════════════════════════════════════════════════════════
@@ -668,6 +888,10 @@ export class PerformanceRatingService {
     // SECURITY: Filtro departamental para AREA_MANAGER
     if (departmentIds?.length) {
       where.employee = { departmentId: { in: departmentIds } }
+    }
+    // SECURITY: Filtro por managerId para EVALUATOR
+    if (managerFilterId) {
+      where.employee = { ...where.employee, managerId: managerFilterId }
     }
 
     // Filtro evaluación (reemplaza lógica client-side)
@@ -814,6 +1038,7 @@ export class PerformanceRatingService {
       sortBy?: 'name' | 'score' | 'level'
       sortOrder?: 'asc' | 'desc'
       departmentIds?: string[]
+      managerFilterId?: string
       evaluationStatus?: 'all' | 'evaluated' | 'not_evaluated'
       potentialStatus?: 'all' | 'assigned' | 'pending'
       search?: string
@@ -826,6 +1051,7 @@ export class PerformanceRatingService {
       sortBy = 'name',
       sortOrder = 'asc',
       departmentIds,
+      managerFilterId,
       evaluationStatus,
       potentialStatus,
       search
@@ -844,6 +1070,13 @@ export class PerformanceRatingService {
     if (departmentIds?.length) {
       baseWhere.evaluatee = {
         departmentId: { in: departmentIds }
+      }
+    }
+    // RBAC: Filtro por managerId para EVALUATOR
+    if (managerFilterId) {
+      baseWhere.evaluatee = {
+        ...baseWhere.evaluatee,
+        managerId: managerFilterId
       }
     }
 
@@ -1148,6 +1381,91 @@ export class PerformanceRatingService {
         count: employees.length,
         percent: ratings.length > 0 ? Math.round((employees.length / ratings.length) * 100) : 0
       }))
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // TALENT INTELLIGENCE - Recálculo manual
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Recalcula Role Fit para un rating existente
+   * Útil para migraciones o correcciones
+   */
+  static async recalculateRoleFit(
+    ratingId: string,
+    cycleId: string,
+    employeeId: string
+  ): Promise<{ roleFitScore: number | null; roleFitLevel: string | null }> {
+
+    let roleFitScore: number | null = null
+    let roleFitLevel: string | null = null
+
+    try {
+      const roleFitResult = await RoleFitAnalyzer.calculateRoleFit(employeeId, cycleId)
+      if (roleFitResult) {
+        roleFitScore = roleFitResult.roleFitScore
+        roleFitLevel = getRoleFitLevel(roleFitResult.roleFitScore)
+      }
+    } catch (err) {
+      console.error(`[recalculateRoleFit] Error para ${employeeId}:`, err)
+    }
+
+    await prisma.performanceRating.update({
+      where: { id: ratingId },
+      data: {
+        roleFitScore,
+        roleFitLevel,
+        roleFitCalculatedAt: roleFitScore !== null ? new Date() : null
+      }
+    })
+
+    return { roleFitScore, roleFitLevel }
+  }
+
+  /**
+   * Recalcula matrices de talento para un rating existente
+   * Requiere que AAE ya esté asignado
+   */
+  static async recalculateTalentMatrices(ratingId: string): Promise<{
+    mobilityQuadrant: string | null
+    riskQuadrant: string | null
+    riskAlertLevel: string | null
+  }> {
+
+    const rating = await prisma.performanceRating.findUnique({
+      where: { id: ratingId },
+      select: {
+        roleFitScore: true,
+        potentialAspiration: true,
+        potentialEngagement: true
+      }
+    })
+
+    if (!rating) {
+      throw new Error(`Rating ${ratingId} no encontrado`)
+    }
+
+    const talentResult = TalentIntelligenceService.analyze({
+      roleFitScore: rating.roleFitScore,
+      aspiration: rating.potentialAspiration as 1 | 2 | 3 | null,
+      engagement: rating.potentialEngagement as 1 | 2 | 3 | null
+    })
+
+    await prisma.performanceRating.update({
+      where: { id: ratingId },
+      data: {
+        mobilityQuadrant: talentResult.mobility.quadrant,
+        riskQuadrant: talentResult.risk.quadrant,
+        riskAlertLevel: talentResult.risk.alertLevel,
+        talentAnalyzedAt: new Date()
+      }
+    })
+
+    return {
+      mobilityQuadrant: talentResult.mobility.quadrant,
+      riskQuadrant: talentResult.risk.quadrant,
+      riskAlertLevel: talentResult.risk.alertLevel
     }
   }
 }

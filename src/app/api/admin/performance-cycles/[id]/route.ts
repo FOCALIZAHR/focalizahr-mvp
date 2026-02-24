@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationService';
+import { extractUserContext, hasPermission, GLOBAL_ACCESS_ROLES, getChildDepartmentIds } from '@/lib/services/AuthorizationService';
 import { PerformanceRatingService } from '@/lib/services/PerformanceRatingService';
 
 // GET - Detalle de ciclo
@@ -21,22 +21,52 @@ export async function GET(
       );
     }
 
-    if (!hasPermission(userContext.role, 'performance:view')) {
+    if (!hasPermission(userContext.role, 'evaluations:view')) {
       return NextResponse.json(
         { success: false, error: 'Sin permisos' },
         { status: 403 }
       );
     }
 
+    // ════════════════════════════════════════════════════════════════════════════
+    // SECURITY: Filtrado jerárquico de assignments según rol
+    // ════════════════════════════════════════════════════════════════════════════
+    const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(userContext.role as any)
+
     // FOCALIZAHR_ADMIN puede ver ciclos de cualquier cuenta
     const whereClause = userContext.role === 'FOCALIZAHR_ADMIN'
       ? { id }
       : { id, accountId: userContext.accountId };
 
+    // Construir filtro de assignments según rol
+    let assignmentFilter: any = {}
+    if (!hasGlobalAccess) {
+      if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
+        const childDeptIds = await getChildDepartmentIds(userContext.departmentId)
+        const allowedDepts = [userContext.departmentId, ...childDeptIds]
+        assignmentFilter = { evaluatee: { departmentId: { in: allowedDepts } } }
+      } else if (userContext.role === 'EVALUATOR') {
+        const userEmail = request.headers.get('x-user-email') || ''
+        const currentEmployee = await prisma.employee.findFirst({
+          where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' },
+          select: { id: true }
+        })
+        if (currentEmployee) {
+          assignmentFilter = { evaluatee: { managerId: currentEmployee.id } }
+        } else {
+          return NextResponse.json(
+            { success: false, error: 'Empleado no encontrado' },
+            { status: 404 }
+          );
+        }
+      }
+    }
+
     const cycle = await prisma.performanceCycle.findFirst({
       where: whereClause,
       include: {
         assignments: {
+          where: assignmentFilter,
           include: {
             evaluator: { select: { id: true, fullName: true } },
             evaluatee: { select: { id: true, fullName: true } }
@@ -55,7 +85,7 @@ export async function GET(
       );
     }
 
-    // Stats por estado
+    // Stats por estado (sobre assignments filtrados por rol)
     const stats = {
       total: cycle.assignments.length,
       pending: cycle.assignments.filter(a => a.status === 'PENDING').length,
@@ -149,11 +179,25 @@ export async function PATCH(
       }
     }
 
+    // Validar pesos si se envían
+    if (updateData.includeGoals !== undefined || updateData.competenciesWeight !== undefined || updateData.goalsWeight !== undefined) {
+      const incGoals = updateData.includeGoals ?? cycle.includeGoals
+      const compW = updateData.competenciesWeight ?? cycle.competenciesWeight
+      const goalW = updateData.goalsWeight ?? cycle.goalsWeight
+      if (incGoals && (compW + goalW !== 100)) {
+        return NextResponse.json(
+          { success: false, error: 'Los pesos de competencias y metas deben sumar 100%' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Sanitizar campos actualizables
     const allowedFields = [
       'name', 'description', 'startDate', 'endDate',
       'includesSelf', 'includesManager', 'includesPeer', 'includesUpward',
-      'anonymousResults', 'minSubordinates'
+      'anonymousResults', 'minSubordinates',
+      'competenciesWeight', 'goalsWeight', 'includeGoals'
     ];
 
     const sanitizedData: any = {};

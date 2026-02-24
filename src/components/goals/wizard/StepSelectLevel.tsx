@@ -39,21 +39,18 @@ const LEVELS = [
     label: 'Corporativa',
     description: 'Meta de toda la empresa',
     icon: Building2,
-    color: 'from-amber-500/20 to-amber-600/20 border-amber-500/30',
   },
   {
     value: 'AREA' as const,
     label: 'De Area',
     description: 'Meta de un departamento o gerencia',
     icon: Users,
-    color: 'from-purple-500/20 to-purple-600/20 border-purple-500/30',
   },
   {
     value: 'INDIVIDUAL' as const,
     label: 'Individual',
     description: 'Meta de un colaborador especifico',
     icon: User,
-    color: 'from-cyan-500/20 to-cyan-600/20 border-cyan-500/30',
   },
 ]
 
@@ -77,9 +74,12 @@ export default memo(function StepSelectLevel({
       })
         .then((res) => res.json())
         .then((res) => {
-          if (res.success) setDepartments(res.data || [])
+          // API retorna { departments: [...], total }
+          if (res.departments) {
+            setDepartments(res.departments)
+          }
         })
-        .catch(() => {})
+        .catch((err) => console.error('Error cargando departamentos:', err))
     }
   }, [data.level])
 
@@ -87,16 +87,16 @@ export default memo(function StepSelectLevel({
   useEffect(() => {
     if (data.level === 'INDIVIDUAL') {
       const token = localStorage.getItem('focalizahr_token')
-      fetch('/api/admin/participants?limit=500', {
+      fetch('/api/admin/employees?limit=500&status=ACTIVE', {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
         .then((res) => {
-          if (res.success && res.data?.participants) {
+          if (res.success && res.data) {
             setEmployees(
-              res.data.participants.map((p: { id: string; fullName: string }) => ({
-                id: p.id,
-                fullName: p.fullName,
+              res.data.map((emp: { id: string; fullName: string }) => ({
+                id: emp.id,
+                fullName: emp.fullName,
               }))
             )
           }
@@ -151,25 +151,34 @@ export default memo(function StepSelectLevel({
               key={level.value}
               onClick={() => handleSelect(level.value)}
               className={cn(
-                'p-4 rounded-xl border-2 text-left transition-all',
-                'bg-gradient-to-r',
+                'relative p-4 rounded-xl border-2 text-left transition-all overflow-hidden',
+                'bg-slate-800/50',
                 isSelected
-                  ? level.color
-                  : 'from-slate-800/50 to-slate-800/50 border-slate-700',
-                isSelected ? 'scale-[1.02]' : 'hover:border-slate-600'
+                  ? 'border-cyan-500/50'
+                  : 'border-slate-700 hover:border-slate-600'
               )}
             >
+              {/* Tesla line on selected */}
+              {isSelected && (
+                <div
+                  className="absolute top-0 left-0 right-0 h-[2px]"
+                  style={{
+                    background: 'linear-gradient(90deg, transparent, #22D3EE, #A78BFA, transparent)',
+                  }}
+                />
+              )}
+
               <div className="flex items-center gap-4">
                 <div
                   className={cn(
                     'w-12 h-12 rounded-xl flex items-center justify-center',
-                    isSelected ? 'bg-white/10' : 'bg-slate-800'
+                    isSelected ? 'bg-cyan-500/10' : 'bg-slate-700/50'
                   )}
                 >
                   <Icon
                     className={cn(
                       'w-6 h-6',
-                      isSelected ? 'text-white' : 'text-slate-400'
+                      isSelected ? 'text-cyan-400' : 'text-slate-400'
                     )}
                   />
                 </div>

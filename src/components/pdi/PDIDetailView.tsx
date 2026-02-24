@@ -1,20 +1,24 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Target, CheckCircle2, Plus } from 'lucide-react'
 import PDIGoalCard from './PDIGoalCard'
 import PDICheckInModal from './PDICheckInModal'
 import PDIStatusBadge from './PDIStatusBadge'
+import { LinkGoalToPDIModal } from './LinkGoalToPDIModal'
 
 interface PDIDetailViewProps {
   pdiId: string
 }
 
 export default function PDIDetailView({ pdiId }: PDIDetailViewProps) {
+  const router = useRouter()
   const [pdi, setPdi] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showCheckInModal, setShowCheckInModal] = useState(false)
+  const [linkGoalDevId, setLinkGoalDevId] = useState<string | null>(null)
 
   const fetchPDI = useCallback(async () => {
     try {
@@ -161,7 +165,11 @@ export default function PDIDetailView({ pdiId }: PDIDetailViewProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05, type: 'spring', stiffness: 220, damping: 30 }}
             >
-              <PDIGoalCard goal={goal} />
+              <PDIGoalCard
+                goal={goal}
+                onLinkGoal={(devGoalId) => setLinkGoalDevId(devGoalId)}
+                onViewGoal={(goalId) => router.push(`/dashboard/metas/${goalId}`)}
+              />
             </motion.div>
           ))}
         </div>
@@ -211,6 +219,28 @@ export default function PDIDetailView({ pdiId }: PDIDetailViewProps) {
           }}
         />
       )}
+
+      {/* Modal Vincular Meta */}
+      {linkGoalDevId && pdi.employeeId && (() => {
+        const devGoal = pdi.goals?.find((g: any) => g.id === linkGoalDevId)
+        if (!devGoal) return null
+        return (
+          <LinkGoalToPDIModal
+            devGoal={{
+              id: devGoal.id,
+              title: devGoal.title,
+              competencyName: devGoal.competencyName,
+              targetOutcome: devGoal.targetOutcome
+            }}
+            employeeId={pdi.employeeId}
+            onClose={() => setLinkGoalDevId(null)}
+            onSuccess={() => {
+              setLinkGoalDevId(null)
+              fetchPDI()
+            }}
+          />
+        )
+      })()}
     </div>
   )
 }

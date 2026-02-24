@@ -9,6 +9,7 @@ import { memo, useCallback, useMemo } from 'react'
 import { Percent, DollarSign, Hash, ToggleLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import GoalProgressBar from '../GoalProgressBar'
+import PercentageSlider from '@/components/ui/PercentageSlider'
 import type { GoalWizardData } from './CreateGoalWizard'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -156,46 +157,65 @@ export default memo(function StepConfigureMetric({
       {/* Valores (oculto si BINARY) */}
       {!isBinary && (
         <>
-          <div className="grid grid-cols-2 gap-4">
-            {/* Valor inicial */}
-            <div className="space-y-2">
-              <label className="text-sm text-slate-300">Valor inicial</label>
-              <input
-                type="number"
+          {data.metricType === 'PERCENTAGE' ? (
+            <div className="space-y-4">
+              <PercentageSlider
                 value={data.startValue}
-                onChange={handleStartValueChange}
-                className="fhr-input w-full"
-                step={data.metricType === 'PERCENTAGE' ? 1 : 0.01}
+                onChange={(v) => updateData({ startValue: v })}
+                label="Valor inicial"
+                step={5}
               />
-            </div>
-
-            {/* Valor objetivo */}
-            <div className="space-y-2">
-              <label className="text-sm text-slate-300">Valor objetivo</label>
-              <input
-                type="number"
+              <PercentageSlider
                 value={data.targetValue}
-                onChange={handleTargetValueChange}
-                className="fhr-input w-full"
-                step={data.metricType === 'PERCENTAGE' ? 1 : 0.01}
+                onChange={(v) => updateData({ targetValue: v })}
+                label="Valor objetivo"
+                step={5}
               />
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              {/* Valor inicial */}
+              <div className="space-y-2">
+                <label className="text-sm text-slate-300">Valor inicial</label>
+                <input
+                  type="number"
+                  value={data.startValue}
+                  onChange={handleStartValueChange}
+                  className="fhr-input w-full"
+                  step={0.01}
+                />
+              </div>
 
-          {/* Unidad */}
-          <div className="space-y-2">
-            <label className="text-sm text-slate-300">
-              Unidad <span className="text-slate-500">(opcional)</span>
-            </label>
-            <input
-              type="text"
-              value={data.unit}
-              onChange={handleUnitChange}
-              placeholder="Ej: %, USD, tickets, clientes"
-              className="fhr-input w-full"
-              maxLength={20}
-            />
-          </div>
+              {/* Valor objetivo */}
+              <div className="space-y-2">
+                <label className="text-sm text-slate-300">Valor objetivo</label>
+                <input
+                  type="number"
+                  value={data.targetValue}
+                  onChange={handleTargetValueChange}
+                  className="fhr-input w-full"
+                  step={0.01}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Unidad (oculto si PERCENTAGE ya que siempre es %) */}
+          {data.metricType !== 'PERCENTAGE' && (
+            <div className="space-y-2">
+              <label className="text-sm text-slate-300">
+                Unidad <span className="text-slate-500">(opcional)</span>
+              </label>
+              <input
+                type="text"
+                value={data.unit}
+                onChange={handleUnitChange}
+                placeholder="Ej: USD, tickets, clientes"
+                className="fhr-input w-full"
+                maxLength={20}
+              />
+            </div>
+          )}
         </>
       )}
 

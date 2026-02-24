@@ -82,8 +82,45 @@ export async function GET(
       )
     }
 
+    // Enriquecer progressUpdates con nombres de quién actualizó
+    let enrichedUpdates = goal.progressUpdates
+    if (goal.progressUpdates.length > 0) {
+      const updaterIds = [...new Set(goal.progressUpdates.map(u => u.updatedById))]
+
+      // Buscar en Employee
+      const employees = await prisma.employee.findMany({
+        where: { id: { in: updaterIds } },
+        select: { id: true, fullName: true }
+      })
+
+      // Fallback a Account para IDs que no se encontraron
+      const foundIds = new Set(employees.map(e => e.id))
+      const missingIds = updaterIds.filter(uid => !foundIds.has(uid))
+
+      let accounts: { id: string; adminName: string | null }[] = []
+      if (missingIds.length > 0) {
+        accounts = await prisma.account.findMany({
+          where: { id: { in: missingIds } },
+          select: { id: true, adminName: true }
+        })
+      }
+
+      // Mapa de nombres
+      const nameMap = new Map<string, string>()
+      employees.forEach(e => nameMap.set(e.id, e.fullName))
+      accounts.forEach(a => nameMap.set(a.id, a.adminName || 'Administrador'))
+
+      enrichedUpdates = goal.progressUpdates.map(update => ({
+        ...update,
+        updatedByName: nameMap.get(update.updatedById) || 'Usuario'
+      }))
+    }
+
     return NextResponse.json({
-      data: goal,
+      data: {
+        ...goal,
+        progressUpdates: enrichedUpdates
+      },
       success: true,
     })
 

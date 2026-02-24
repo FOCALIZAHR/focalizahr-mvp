@@ -188,13 +188,23 @@ export async function POST(request: NextRequest) {
     }))
 
     const originGap = JSON.parse(JSON.stringify({
-      suggestions: suggestions.map(s => ({
-        competencyCode: s.competencyCode,
-        competencyName: s.competencyName,
-        gapType: s.gapType,
-        originalGap: s.originalGap,
-        priority: s.priority
-      })),
+      // ═══════════════════════════════════════════════════════════════════════
+      // SNAPSHOT DE GAPS (Para fallback del wizard al recargar)
+      // ═══════════════════════════════════════════════════════════════════════
+      suggestions: suggestions.map(s => {
+        const roleFitGap = roleFit?.gaps?.find(g => g.competencyCode === s.competencyCode)
+        return {
+          competencyCode: s.competencyCode,
+          competencyName: s.competencyName,
+          gapType: s.gapType,
+          originalGap: s.originalGap,
+          priority: s.priority,
+          actualScore: roleFitGap?.actualScore ?? null,
+          targetScore: roleFitGap?.targetScore ?? null
+        }
+      }),
+      roleFitScore: roleFit?.roleFitScore ?? null,
+      roleFitLevel: roleFit?.standardJobLevel ?? null,
       generatedAt: new Date().toISOString()
     }))
 

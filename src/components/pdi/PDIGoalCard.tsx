@@ -1,8 +1,16 @@
 'use client'
 
 import { memo } from 'react'
-import { Target, Clock, CheckCircle2, BookOpen } from 'lucide-react'
+import { Target, Clock, CheckCircle2, BookOpen, Link2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { GhostButton } from '@/components/ui/PremiumButton'
+
+interface LinkedGoal {
+  id: string
+  title: string
+  progress: number
+  status: string
+}
 
 interface PDIGoalCardProps {
   goal: {
@@ -17,7 +25,10 @@ interface PDIGoalCardProps {
     progressPercent: number
     targetDate: string | null
     suggestedResources?: Array<{ type: string; title: string }> | null
+    linkedBusinessGoal?: LinkedGoal | null
   }
+  onLinkGoal?: (devGoalId: string) => void
+  onViewGoal?: (goalId: string) => void
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -40,10 +51,11 @@ const PRIORITY_COLORS: Record<string, string> = {
   BAJA: 'text-slate-400'
 }
 
-export default memo(function PDIGoalCard({ goal }: PDIGoalCardProps) {
+export default memo(function PDIGoalCard({ goal, onLinkGoal, onViewGoal }: PDIGoalCardProps) {
   const resources = Array.isArray(goal.suggestedResources) ? goal.suggestedResources : []
   const isCompleted = goal.status === 'COMPLETED'
   const progressColor = isCompleted ? 'bg-emerald-500' : goal.progressPercent > 50 ? 'bg-cyan-500' : 'bg-amber-500'
+  const linkedGoal = goal.linkedBusinessGoal
 
   return (
     <div
@@ -102,6 +114,35 @@ export default memo(function PDIGoalCard({ goal }: PDIGoalCardProps) {
           )}
         </div>
       </div>
+
+      {/* ═══ SECCIÓN META VINCULADA ═══ */}
+      {linkedGoal ? (
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-700/50">
+          <Link2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          <span className="text-xs text-emerald-400 truncate flex-1">
+            Meta vinculada: {linkedGoal.title}
+          </span>
+          {onViewGoal && (
+            <button
+              onClick={() => onViewGoal(linkedGoal.id)}
+              className="text-xs text-cyan-400 hover:underline flex-shrink-0"
+            >
+              Ver meta
+            </button>
+          )}
+        </div>
+      ) : onLinkGoal ? (
+        <div className="mt-3 pt-3 border-t border-slate-700/50">
+          <GhostButton
+            size="sm"
+            icon={Target}
+            onClick={() => onLinkGoal(goal.id)}
+            className="w-full justify-center"
+          >
+            Crear Meta de Negocio
+          </GhostButton>
+        </div>
+      ) : null}
     </div>
   )
 })

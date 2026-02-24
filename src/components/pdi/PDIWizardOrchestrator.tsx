@@ -19,6 +19,7 @@ import { getRoleFitClassification } from '@/config/performanceClassification'
 
 interface RoleFitResult {
   roleFitScore: number
+  performanceTrack?: string
   gaps: Array<{
     competencyCode: string
     competencyName: string
@@ -257,19 +258,94 @@ export default function PDIWizardOrchestrator({
   // Helpers para procesar datos
   // ═══════════════════════════════════════════════════════════════════════════
 
-  async function processExistingGoals(goalsFromDB: any[], employeeIdParam: string, cycleIdParam: string) {
-    // Si no hay goals guardados → ir a no-gaps
+  // ════════════════════════════════════════════════════════════════════════════
+  // HELPER: Detectar si un goal fue editado (comparar con template generado)
+  // ════════════════════════════════════════════════════════════════════════════
+
+  function detectGoalEditions(goals: any[]): {
+    hasEditions: boolean
+    editedGoals: EditedGoal[]
+  } {
+    if (!goals || goals.length === 0) {
+      return { hasEditions: false, editedGoals: [] }
+    }
+
+    const editedGoals: EditedGoal[] = []
+    let hasEditions = false
+
+    for (const goal of goals) {
+      // Un goal se considera "editado" si:
+      // 1. Tiene title y targetOutcome definidos (no vacíos)
+      // 2. El aiGenerated es true pero el contenido fue modificado
+      // Para simplificar: si tiene contenido sustancial, asumimos que fue revisado
+
+      const hasContent =
+        (goal.title?.trim()?.length > 10) &&
+        (goal.targetOutcome?.trim()?.length > 10)
+
+      if (hasContent) {
+        hasEditions = true
+        editedGoals.push({
+          goalId: goal.id,
+          competencyCode: goal.competencyCode,
+          title: goal.title,
+          targetOutcome: goal.targetOutcome,
+          included: true // Si está en BD, fue incluido
+        })
+      }
+    }
+
+    return { hasEditions, editedGoals }
+  }
+
+  async function processExistingGoals(
+    goalsFromDB: any[],
+    employeeIdParam: string,
+    cycleIdParam: string,
+    originGapAnalysis?: any
+  ) {
+    console.log(`[PDI] Processing ${goalsFromDB?.length || 0} existing goals`)
+
+    // ─────────────────────────────────────────────────────────────────────
+    // CASO 1: No hay goals → ir a selection o no-gaps
+    // ─────────────────────────────────────────────────────────────────────
     if (!goalsFromDB || goalsFromDB.length === 0) {
+      console.log('[PDI] No goals found, checking for gaps...')
+
+      // Intentar obtener RoleFit para ver si hay brechas
+      try {
+        const roleFitRes = await fetch(
+          `/api/performance/role-fit?employeeId=${employeeIdParam}&cycleId=${cycleIdParam}`
+        )
+
+        if (roleFitRes.ok) {
+          const roleFitData = await roleFitRes.json()
+          if (roleFitData.success && roleFitData.data?.gaps?.length > 0) {
+            setRoleFit(roleFitData.data)
+            // Hay brechas pero no goals → regenerar
+            console.log('[PDI] Has gaps but no goals, will regenerate')
+            // Dejar que el flujo normal genere el PDI
+            return 'regenerate'
+          }
+        }
+      } catch (err) {
+        console.log('[PDI] RoleFit check failed, going to no-gaps')
+      }
+
       setPhase('no-gaps')
       return
     }
 
-    console.log(`[PDI] Processing ${goalsFromDB.length} existing goals`)
+    // ─────────────────────────────────────────────────────────────────────
+    // CASO 2: Hay goals → detectar si fueron editados
+    // ─────────────────────────────────────────────────────────────────────
+    const { hasEditions, editedGoals: recoveredEdits } = detectGoalEditions(goalsFromDB)
 
-    // Los goals YA están en BD, mostrarlos tal cual
-    // Intentar enriquecer con RoleFit para scores actualizados, pero NO filtrar
+    console.log(`[PDI] Goals analysis: hasEditions=${hasEditions}, count=${recoveredEdits.length}`)
 
+    // Cargar RoleFit para enriquecer datos
     let roleFitGapsMap = new Map<string, any>()
+    let roleFitData: RoleFitResult | null = null
 
     try {
       const controller = new AbortController()
@@ -282,86 +358,132 @@ export default function PDIWizardOrchestrator({
       clearTimeout(timeoutId)
 
       if (roleFitRes.ok) {
-        const roleFitData = await roleFitRes.json()
-        if (roleFitData.success && roleFitData.data?.gaps) {
-          setRoleFit(roleFitData.data)
-          // Crear mapa para lookup rápido
-          for (const gap of roleFitData.data.gaps) {
+        const data = await roleFitRes.json()
+        if (data.success && data.data?.gaps) {
+          roleFitData = data.data
+          setRoleFit(data.data)
+          for (const gap of data.data.gaps) {
             roleFitGapsMap.set(gap.competencyCode, gap)
           }
         }
       }
     } catch (err) {
       console.log('[PDI] RoleFit API unavailable, using stored data')
+
+      // Fallback: intentar obtener roleFitScore del snapshot del plan
+      const planSnapshot = originGapAnalysis as { roleFitScore?: number } | null
+      if (planSnapshot?.roleFitScore) {
+        setRoleFit({
+          roleFitScore: planSnapshot.roleFitScore,
+          gaps: [],
+          summary: { totalCompetencies: 0, matching: 0, exceeds: 0, needsImprovement: 0, critical: 0 }
+        })
+      }
     }
 
-    // Convertir TODOS los goals guardados a WizardGap
-    // Usar datos de RoleFit si disponibles, sino usar datos del goal
+    // Convertir goals a WizardGap format
     const gapsWithScores: WizardGap[] = goalsFromDB.map(goal => {
       const roleFitGap = roleFitGapsMap.get(goal.competencyCode)
 
       if (roleFitGap) {
-        // Usar datos frescos de RoleFit
         return {
           competencyCode: goal.competencyCode,
-          competencyName: goal.competencyName,
+          competencyName: roleFitGap.competencyName || goal.competencyCode,
           actualScore: roleFitGap.actualScore,
           targetScore: roleFitGap.targetScore,
           rawGap: roleFitGap.rawGap,
           status: roleFitGap.status
         }
-      } else {
-        // Fallback: reconstruir desde originalGap
-        const gap = goal.originalGap || 0
-        const targetScore = 3.0
-        const actualScore = Math.max(0, targetScore + gap)
+      }
 
-        let status: 'CRITICAL' | 'IMPROVE' | 'MATCH' | 'EXCEEDS' = 'IMPROVE'
-        if (gap <= -1.5) status = 'CRITICAL'
-        else if (gap < -0.5) status = 'IMPROVE'
-        else if (gap > 0.5) status = 'EXCEEDS'
-        else status = 'MATCH'
+      // ═══════════════════════════════════════════════════════════════════════
+      // FALLBACK: Leer del snapshot originGapAnalysis guardado en el plan
+      // ═══════════════════════════════════════════════════════════════════════
+      const planSnapshot = originGapAnalysis as {
+        suggestions?: Array<{
+          competencyCode: string
+          competencyName?: string
+          actualScore?: number
+          targetScore?: number
+          originalGap?: number
+        }>
+      } | null
 
-        return {
-          competencyCode: goal.competencyCode,
-          competencyName: goal.competencyName,
-          actualScore: Number(actualScore.toFixed(1)),
-          targetScore: targetScore,
-          rawGap: gap,
-          status
-        }
+      const snapshotGap = planSnapshot?.suggestions?.find(
+        s => s.competencyCode === goal.competencyCode
+      )
+
+      const targetScore = snapshotGap?.targetScore ?? 3.0
+      const actualScore = snapshotGap?.actualScore ?? Math.max(0, targetScore + (goal.originalGap || -1))
+      const gap = snapshotGap?.originalGap ?? goal.originalGap ?? -1
+
+      let status: 'CRITICAL' | 'IMPROVE' | 'MATCH' | 'EXCEEDS' = 'IMPROVE'
+      if (gap <= -1.5) status = 'CRITICAL'
+      else if (gap < -0.5) status = 'IMPROVE'
+      else if (gap > 0.5) status = 'EXCEEDS'
+      else status = 'MATCH'
+
+      return {
+        competencyCode: goal.competencyCode,
+        competencyName: snapshotGap?.competencyName || goal.competencyName || goal.competencyCode,
+        actualScore: Number(actualScore.toFixed(1)),
+        targetScore,
+        rawGap: gap,
+        status
       }
     })
 
-    // Obtener track del empleado
-    const track = 'COLABORADOR' as const
+    // Obtener track para Smart Router
+    const track = roleFitData?.performanceTrack || 'COLABORADOR'
 
-    // Aplicar Smart Router para enriquecer con categorías y narrativas
-    const routerResult = smartRouteItems(gapsWithScores, track)
+    // Enriquecer gaps
+    const enrichedItems = gapsWithScores.map((gap, idx) =>
+      enrichGapWithLibrary(
+        gap,
+        idx,
+        gapsWithScores.filter(g => g.status === 'CRITICAL').length,
+        track as any
+      )
+    )
 
-    setEnrichedGaps(routerResult.allItems)
+    setEnrichedGaps(enrichedItems)
 
-    // Para PDI existente, mostrar TODOS los goals (ya fueron seleccionados antes)
-    const wizardSuggestions = routerResult.allItems.map((g: EnrichedGap) => {
-      const goalData = goalsFromDB.find((goal: any) => goal.competencyCode === g.competencyCode)
+    // Crear suggestions desde goals existentes
+    const wizardSuggestions: WizardSuggestion[] = goalsFromDB.map((goal, idx) => {
+      const enrichedGap = enrichedItems[idx]
       return {
-        title: goalData?.title || `Desarrollar ${g.competencyName}`,
-        description: goalData?.description || '',
-        targetOutcome: goalData?.targetOutcome || '',
-        suggestedResources: goalData?.suggestedResources || [],
-        coachingTip: g.coachingTip,
+        title: goal.title || `Desarrollar ${goal.competencyCode}`,
+        description: goal.description || '',
+        targetOutcome: goal.targetOutcome || '',
+        suggestedResources: goal.suggestedResources || [],
+        coachingTip: enrichedGap?.coachingTip || '',
         action: '',
         estimatedWeeks: 8,
-        narrative: g.narrative,
-        category: g.category,
-        categoryLabel: g.categoryLabel,
-        categoryColor: g.categoryColor
+        narrative: enrichedGap?.narrative || '',
+        category: enrichedGap?.category,
+        categoryLabel: enrichedGap?.categoryLabel,
+        categoryColor: enrichedGap?.categoryColor
       }
     })
 
-    setGaps(routerResult.allItems)
+    setGaps(enrichedItems)
     setSuggestions(wizardSuggestions)
-    setPhase('intro')
+    setSelectedCodes(goalsFromDB.map((g: any) => g.competencyCode))
+
+    // ─────────────────────────────────────────────────────────────────────
+    // DECISIÓN: ¿A qué phase ir?
+    // ─────────────────────────────────────────────────────────────────────
+    if (hasEditions) {
+      // Usuario ya editó goals → ir directo a summary
+      console.log('[PDI] Goals have edits, jumping to summary')
+      setEditedGoals(recoveredEdits)
+      setPhase('summary')
+    } else {
+      // Goals existen pero sin ediciones → ir a gaps para que los revise
+      console.log('[PDI] Goals exist but no edits, starting gaps review')
+      setCurrentGapIndex(0)
+      setPhase('gaps')
+    }
   }
 
   function processGeneratedData(postData: any) {
@@ -471,8 +593,9 @@ export default function PDIWizardOrchestrator({
           setPdiId(existingPDI.id)
           setPdiGoals(existingPDI.goals || [])
 
-          await processExistingGoals(existingPDI.goals || [], employeeId, cycleId)
-          return
+          const result = await processExistingGoals(existingPDI.goals || [], employeeId, cycleId, existingPDI.originGapAnalysis)
+          if (result !== 'regenerate') return
+          // Si retornó 'regenerate', continuar al PASO 2 para generar nuevo PDI
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -503,7 +626,19 @@ export default function PDIWizardOrchestrator({
 
       } catch (err) {
         console.error('[PDI Orchestrator] Load error:', err)
-        setError(err instanceof Error ? err.message : 'Error cargando PDI')
+
+        // ─────────────────────────────────────────────────────────────────
+        // FALLBACK SEGURO: Si algo falla, ir a un estado recuperable
+        // ─────────────────────────────────────────────────────────────────
+        const errorMessage = err instanceof Error ? err.message : 'Error cargando PDI'
+        setError(errorMessage)
+
+        // Si tenemos pdiId, intentar ir a summary con lo que hay
+        if (pdiId && pdiGoals.length > 0) {
+          console.log('[PDI] Error recovery: jumping to summary with existing data')
+          setPhase('summary')
+        }
+        // Si no hay datos, mostrar error (ya manejado por el estado error)
       }
     }
 
@@ -713,20 +848,33 @@ export default function PDIWizardOrchestrator({
   // ═══════════════════════════════════════════════════════════════════════════
   // Build summary goals list
   // ═══════════════════════════════════════════════════════════════════════════
-  const summaryGoals = [
-    ...editedGoals
+  // Build summary goals: priorizar editedGoals, fallback a pdiGoals
+  const summaryGoals = (() => {
+    const fromEdited = editedGoals
       .filter(g => g.included)
       .map(g => ({
         competencyCode: g.competencyCode,
         title: g.title,
         isManual: false
-      })),
-    ...manualGoals.map(g => ({
+      }))
+
+    // Si no hay editedGoals pero sí pdiGoals (recuperación), usar esos
+    const fromPdi = fromEdited.length === 0 && pdiGoals.length > 0
+      ? pdiGoals.map((g: any) => ({
+          competencyCode: g.competencyCode,
+          title: g.title,
+          isManual: !g.aiGenerated
+        }))
+      : []
+
+    const fromManual = manualGoals.map(g => ({
       competencyCode: 'MANUAL',
       title: g.title,
       isManual: true
     }))
-  ]
+
+    return [...fromEdited, ...fromPdi, ...fromManual]
+  })()
 
   // ═══════════════════════════════════════════════════════════════════════════
   // RENDER

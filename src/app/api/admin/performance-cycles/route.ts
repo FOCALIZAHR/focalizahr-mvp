@@ -84,12 +84,23 @@ export async function POST(request: NextRequest) {
       includesPeer,
       includesUpward,
       anonymousResults,
-      minSubordinates
+      minSubordinates,
+      competenciesWeight = 70,
+      goalsWeight = 30,
+      includeGoals = true
     } = body;
 
     if (!name || !startDate || !endDate) {
       return NextResponse.json(
         { success: false, error: 'name, startDate y endDate son requeridos' },
+        { status: 400 }
+      );
+    }
+
+    // Validar que los pesos de competencias y metas sumen 100%
+    if (includeGoals && (competenciesWeight + goalsWeight !== 100)) {
+      return NextResponse.json(
+        { success: false, error: 'Los pesos de competencias y metas deben sumar 100%' },
         { status: 400 }
       );
     }
@@ -117,6 +128,9 @@ export async function POST(request: NextRequest) {
         minSubordinates: minSubordinates ?? 3,
         status: 'DRAFT',
         createdBy: userContext.userId,
+        competenciesWeight: includeGoals ? competenciesWeight : 100,
+        goalsWeight: includeGoals ? goalsWeight : 0,
+        includeGoals,
         // Snapshot congelado de competencias al momento de crear el ciclo
         competencySnapshot: competencySnapshot.length > 0
           ? JSON.parse(JSON.stringify(competencySnapshot))

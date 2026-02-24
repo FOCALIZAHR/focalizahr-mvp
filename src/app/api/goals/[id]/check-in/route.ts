@@ -57,7 +57,34 @@ export async function PATCH(
     }
 
     const { currentValue, comment, evidence } = validation.data
-    const updatedById = context.userId || context.accountId
+
+    // Validación BINARY: solo 0 o 1
+    if (existing.metricType === 'BINARY') {
+      if (currentValue !== 0 && currentValue !== 1) {
+        return NextResponse.json(
+          { error: 'Meta tipo Si/No solo acepta valores 0 (No) o 1 (Si)', success: false },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Obtener employeeId desde el email del usuario logueado
+    const userEmail = request.headers.get('x-user-email') || ''
+    let updatedById = context.userId || context.accountId
+
+    if (userEmail) {
+      const employee = await prisma.employee.findFirst({
+        where: {
+          accountId: context.accountId,
+          email: userEmail,
+          status: 'ACTIVE'
+        },
+        select: { id: true }
+      })
+      if (employee) {
+        updatedById = employee.id
+      }
+    }
 
     // Actualizar con auditoría (Time Travel)
     const updated = await GoalsService.updateProgress({

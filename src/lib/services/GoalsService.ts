@@ -483,6 +483,148 @@ export class GoalsService {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
+  // INTEGRACIÓN PDI → METAS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Verifica si el empleado puede tener más metas individuales
+   */
+  static async checkGoalLimit(
+    accountId: string,
+    employeeId: string
+  ): Promise<{ canCreate: boolean; current: number; max: number }> {
+    const account = await prisma.account.findUnique({
+      where: { id: accountId },
+      select: { maxIndividualGoals: true }
+    })
+
+    const max = account?.maxIndividualGoals ?? 10
+
+    const current = await prisma.goal.count({
+      where: {
+        accountId,
+        employeeId,
+        level: 'INDIVIDUAL',
+        status: { in: ['NOT_STARTED', 'ON_TRACK', 'AT_RISK', 'BEHIND'] }
+      }
+    })
+
+    return { canCreate: current < max, current, max }
+  }
+
+  /**
+   * Crea una Meta de negocio desde un DevelopmentGoal del PDI
+   */
+  static async createFromDevelopmentGoal(
+    accountId: string,
+    employeeId: string,
+    createdById: string,
+    input: {
+      devGoalId: string
+      title: string
+      description?: string
+      targetValue: number
+      unit?: string
+      dueDate: string
+      weight?: number
+    }
+  ): Promise<Goal> {
+    // 1. Verificar límite
+    const limitCheck = await this.checkGoalLimit(accountId, employeeId)
+    if (!limitCheck.canCreate) {
+      throw new Error(`Límite de metas alcanzado (${limitCheck.current}/${limitCheck.max})`)
+    }
+
+    // 2. Verificar que el DevelopmentGoal existe y pertenece al empleado
+    const devGoal = await prisma.developmentGoal.findFirst({
+      where: {
+        id: input.devGoalId,
+        plan: { employeeId, accountId }
+      },
+      include: { linkedBusinessGoal: true }
+    })
+
+    if (!devGoal) {
+      throw new Error('Objetivo de desarrollo no encontrado')
+    }
+
+    // 3. Verificar que no tenga ya una meta vinculada activa
+    if (devGoal.linkedBusinessGoal && devGoal.linkedBusinessGoal.status !== 'CANCELLED') {
+      throw new Error('Este objetivo ya tiene una meta vinculada')
+    }
+
+    // 4. Crear la meta con la conexión
+    return prisma.goal.create({
+      data: {
+        accountId,
+        employeeId,
+        createdById,
+        title: input.title,
+        description: input.description || `Meta derivada de PDI: ${devGoal.title}`,
+        level: 'INDIVIDUAL',
+        type: 'KPI',
+        originType: 'MANAGER_CREATED',
+        metricType: 'PERCENTAGE',
+        startValue: 0,
+        currentValue: 0,
+        targetValue: input.targetValue,
+        unit: input.unit || '%',
+        startDate: new Date(),
+        dueDate: new Date(input.dueDate),
+        periodYear: new Date().getFullYear(),
+        weight: input.weight || 0,
+        status: 'NOT_STARTED',
+        linkedDevGoalId: input.devGoalId
+      }
+    })
+  }
+
+  /**
+   * Vincula una meta EXISTENTE a un DevelopmentGoal del PDI
+   */
+  static async linkExistingGoal(
+    accountId: string,
+    goalId: string,
+    devGoalId: string
+  ): Promise<Goal> {
+    // 1. Verificar que la meta existe y pertenece a la cuenta
+    const goal = await prisma.goal.findFirst({
+      where: { id: goalId, accountId, level: 'INDIVIDUAL' }
+    })
+
+    if (!goal) {
+      throw new Error('Meta no encontrada')
+    }
+
+    if (goal.linkedDevGoalId) {
+      throw new Error('Esta meta ya está vinculada a otro objetivo de desarrollo')
+    }
+
+    // 2. Verificar que el DevelopmentGoal existe y no tiene meta activa
+    const devGoal = await prisma.developmentGoal.findFirst({
+      where: {
+        id: devGoalId,
+        plan: { accountId }
+      },
+      include: { linkedBusinessGoal: true }
+    })
+
+    if (!devGoal) {
+      throw new Error('Objetivo de desarrollo no encontrado')
+    }
+
+    if (devGoal.linkedBusinessGoal && devGoal.linkedBusinessGoal.status !== 'CANCELLED') {
+      throw new Error('Este objetivo de desarrollo ya tiene una meta vinculada')
+    }
+
+    // 3. Actualizar la meta con el link
+    return prisma.goal.update({
+      where: { id: goalId },
+      data: { linkedDevGoalId: devGoalId }
+    })
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
   // HELPERS PRIVADOS
   // ══════════════════════════════════════════════════════════════════════════
 
@@ -530,16 +672,16 @@ export class GoalsService {
     targetValue: number,
     currentValue: number
   ): number {
-    // BINARY: 0 o 100
+    // BINARY: Solo 0% o 100% (estricto)
     if (metricType === 'BINARY') {
-      return currentValue >= 1 ? 100 : 0
+      return currentValue === 1 ? 100 : 0
     }
 
     // Evitar división por cero
     const range = targetValue - startValue
     if (range === 0) return currentValue >= targetValue ? 100 : 0
 
-    // Cálculo estándar: (current - start) / (target - start) * 100
+    // PERCENTAGE, CURRENCY, NUMBER: Cálculo proporcional
     const progress = ((currentValue - startValue) / range) * 100
 
     // Clamp entre 0 y 150 (permitir sobre-cumplimiento hasta 150%)

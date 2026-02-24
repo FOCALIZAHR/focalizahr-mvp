@@ -146,6 +146,9 @@ model Account {
   reportLinkExpirationDays Int     @default(30) @map("report_link_expiration_days")
   enableEmployeeReports    Boolean @default(true) @map("enable_employee_reports")
 
+  // Límite de metas individuales por empleado
+  maxIndividualGoals       Int     @default(10) @map("max_individual_goals")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -1738,6 +1741,11 @@ model PerformanceCycle {
   // Si null, usa config de cuenta o default FocalizaHR
   evaluatorWeightsOverride Json?   @map("evaluator_weights_override")
 
+  // HYBRID SCORE: Pesos para cálculo Competencias + Metas (suman 100)
+  competenciesWeight  Int      @default(70)   @map("competencies_weight")
+  goalsWeight         Int      @default(30)   @map("goals_weight")
+  includeGoals        Boolean  @default(true) @map("include_goals")
+
   // Índices
   @@index([accountId], map: "idx_performance_cycles_account")
   @@index([status], map: "idx_performance_cycles_status")
@@ -2010,6 +2018,29 @@ model PerformanceRating {
   potentialAspiration   Int?     @map("potential_aspiration")   // 1, 2 o 3
   potentialAbility      Int?     @map("potential_ability")      // 1, 2 o 3
   potentialEngagement   Int?     @map("potential_engagement")   // 1, 2 o 3
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // ROLE FIT (Calculado post-360, persistido para reportes)
+  // ════════════════════════════════════════════════════════════════════════════
+  roleFitScore          Float?    @map("role_fit_score")
+  roleFitLevel          String?   @map("role_fit_level")       // OPTIMAL|SOLID|DEVELOPING|GAP|RISK
+  roleFitCalculatedAt   DateTime? @map("role_fit_calculated_at")
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // HYBRID SCORE: Competencias + Metas ponderado
+  // ════════════════════════════════════════════════════════════════════════════
+  goalsScore            Float?    @map("goals_score")            // Score metas normalizado (1-5)
+  goalsRawPercent       Float?    @map("goals_raw_percent")      // Porcentaje original (0-100)
+  goalsCount            Int?      @map("goals_count")            // Cantidad de metas evaluadas
+  hybridScore           Float?    @map("hybrid_score")           // Competencias + Metas ponderado
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // MATRICES DE TALENTO (Calculadas post-AAE desde Role Fit + AAE)
+  // ════════════════════════════════════════════════════════════════════════════
+  mobilityQuadrant      String?   @map("mobility_quadrant")    // SUCESOR_NATURAL|EXPERTO_ANCLA|AMBICIOSO_PREMATURO|EN_DESARROLLO
+  riskQuadrant          String?   @map("risk_quadrant")        // MOTOR_EQUIPO|FUGA_CEREBROS|BURNOUT_RISK|BAJO_RENDIMIENTO
+  riskAlertLevel        String?   @map("risk_alert_level")     // GREEN|YELLOW|ORANGE|RED
+  talentAnalyzedAt      DateTime? @map("talent_analyzed_at")
 
   // Succession Readiness
   successionReadiness   String?  @map("succession_readiness")

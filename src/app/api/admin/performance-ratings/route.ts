@@ -4,7 +4,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server'
-import { extractUserContext, hasPermission, getChildDepartmentIds } from '@/lib/services/AuthorizationService'
+import { extractUserContext, hasPermission, getChildDepartmentIds, GLOBAL_ACCESS_ROLES } from '@/lib/services/AuthorizationService'
 import { PerformanceRatingService } from '@/lib/services/PerformanceRatingService'
 import { prisma } from '@/lib/prisma'
 
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    if (!hasPermission(userContext.role, 'performance:view')) {
+    if (!hasPermission(userContext.role, 'evaluations:view')) {
       return NextResponse.json(
         { success: false, error: 'Sin permisos' },
         { status: 403 }
@@ -38,14 +38,37 @@ export async function GET(request: NextRequest) {
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    // SECURITY FIX: Calcular filtro jerárquico según rol
-    // Patrón: GUIA_MAESTRA_RBAC Sección 4.3
+    // SECURITY FIX: Filtrado jerárquico según rol
+    // GLOBAL_ACCESS_ROLES → toda la empresa
+    // AREA_MANAGER → departamento + hijos
+    // EVALUATOR → solo subordinados directos (managerId)
     // ════════════════════════════════════════════════════════════════════════════
+    const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(userContext.role as any)
     let departmentIds: string[] | undefined = undefined
+    let managerFilterId: string | undefined = undefined
 
-    if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
-      const childIds = await getChildDepartmentIds(userContext.departmentId)
-      departmentIds = [userContext.departmentId, ...childIds]
+    if (!hasGlobalAccess) {
+      if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
+        const childIds = await getChildDepartmentIds(userContext.departmentId)
+        departmentIds = [userContext.departmentId, ...childIds]
+      } else if (userContext.role === 'EVALUATOR') {
+        const currentEmployee = await prisma.employee.findFirst({
+          where: {
+            accountId: userContext.accountId,
+            email: userEmail || '',
+            status: 'ACTIVE'
+          },
+          select: { id: true }
+        })
+        if (currentEmployee) {
+          managerFilterId = currentEmployee.id
+        } else {
+          return NextResponse.json(
+            { success: false, error: 'Empleado no encontrado' },
+            { status: 404 }
+          )
+        }
+      }
     }
 
     // ════════════════════════════════════════════════════════════════════════════
@@ -68,6 +91,7 @@ export async function GET(request: NextRequest) {
         filterCalibrated: searchParams.get('filterCalibrated') === 'true' ? true :
                           searchParams.get('filterCalibrated') === 'false' ? false : undefined,
         departmentIds,  // SECURITY: Para AREA_MANAGER
+        managerFilterId,  // SECURITY: Para EVALUATOR
         // ═══ NUEVOS FILTROS SERVER-SIDE ═══
         evaluationStatus: evaluationStatus || undefined,
         potentialStatus: potentialStatus || undefined,

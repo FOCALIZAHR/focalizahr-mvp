@@ -21,6 +21,7 @@ interface ProgressUpdate {
   newProgress: number
   comment?: string | null
   createdAt: string
+  updatedByName?: string | null
 }
 
 interface GoalProgressTimelineProps {
@@ -112,14 +113,19 @@ export default memo(function GoalProgressTimeline({
                   </span>
                 </div>
 
-                <div className="fhr-text-sm text-slate-500">
-                  {new Date(update.createdAt).toLocaleDateString('es-CL', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                <div className="flex items-center gap-2 fhr-text-sm text-slate-500">
+                  {update.updatedByName && (
+                    <span className="text-slate-400">{update.updatedByName}</span>
+                  )}
+                  <span>
+                    {new Date(update.createdAt).toLocaleDateString('es-CL', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
                 </div>
 
                 {update.comment && (

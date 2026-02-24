@@ -6,7 +6,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // DISEÑO: Apple 70% + Tesla 20% + FocalizaHR 10%
 // PROTAGONISTA: Narrativa con jerarquía visual
-// CONTEXTO: Gauge con glow (30%)
+// CONTEXTO: Gauge limpio (30%)
 // ACCIÓN: Pregunta coaching del motor
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -15,6 +15,8 @@ import { motion } from 'framer-motion'
 import { Target, AlertCircle } from 'lucide-react'
 import { getRoleFitClassification } from '@/config/performanceClassification'
 import { cn } from '@/lib/utils'
+import { formatDisplayName } from '@/lib/utils/formatName'
+import { PositionAdapter } from '@/lib/services/PositionAdapter'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -45,63 +47,54 @@ export interface RoleFitDisplayCardProps {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// GAUGE PREMIUM - Con glow real estilo FocalizaHR
+// GAUGE PREMIUM - Limpio, sin glow
 // ════════════════════════════════════════════════════════════════════════════
 
-const RoleFitGauge = memo(function RoleFitGauge({ 
-  value, 
-  color 
-}: { 
+const RoleFitGauge = memo(function RoleFitGauge({
+  value,
+  color
+}: {
   value: number
   color: string
 }) {
-  const circumference = 2 * Math.PI * 38
+  const circumference = 2 * Math.PI * 42
   const dashOffset = circumference - (circumference * value / 100)
 
   return (
-    <div className="relative w-28 h-28">
+    <div className="relative w-28 h-28 md:w-36 md:h-36">
       <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
         {/* Track de fondo */}
         <circle
-          cx="50" cy="50" r="38"
+          cx="50" cy="50" r="42"
           fill="none"
           stroke="#1E293B"
-          strokeWidth="8"
+          strokeWidth="7"
         />
-        {/* Progreso con glow */}
+        {/* Progreso limpio */}
         <motion.circle
-          cx="50" cy="50" r="38"
+          cx="50" cy="50" r="42"
           fill="none"
           stroke={color}
-          strokeWidth="8"
+          strokeWidth="7"
           strokeLinecap="round"
           strokeDasharray={circumference}
           initial={{ strokeDashoffset: circumference }}
           animate={{ strokeDashoffset: dashOffset }}
           transition={{ duration: 1.2, ease: 'easeOut' }}
-          style={{ 
-            filter: `drop-shadow(0 0 8px ${color}) drop-shadow(0 0 16px ${color}50)` 
-          }}
         />
       </svg>
       {/* Score centrado */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <motion.span 
+        <motion.span
           initial={{ opacity: 0, scale: 0.5 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3, type: 'spring' }}
           className="text-4xl font-light tabular-nums"
-          style={{ 
-            color,
-            textShadow: `0 0 20px ${color}60, 0 0 40px ${color}30`
-          }}
+          style={{ color }}
         >
           {value}
         </motion.span>
-        <span 
-          className="text-sm font-medium"
-          style={{ color: `${color}90` }}
-        >
+        <span className="text-sm font-medium text-slate-400">
           %
         </span>
       </div>
@@ -119,8 +112,8 @@ export default memo(function RoleFitDisplayCard({
   variant = 'full',
   className = ''
 }: RoleFitDisplayCardProps) {
-  
-  const firstName = employeeName.split(' ')[0]
+
+  const displayName = formatDisplayName(employeeName)
 
   // ══════════════════════════════════════════════════════════════════════════
   // FALLBACK: roleFit es null
@@ -141,7 +134,7 @@ export default memo(function RoleFitDisplayCard({
           }}
         />
 
-        <div className="p-8">
+        <div className="p-5 sm:p-6 md:p-8">
           <div className="flex items-center gap-2 mb-6">
             <Target className="w-4 h-4 text-slate-500" />
             <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
@@ -183,12 +176,9 @@ export default memo(function RoleFitDisplayCard({
           className
         )}
       >
-        <span 
+        <span
           className="font-semibold tabular-nums"
-          style={{ 
-            color: classification.color,
-            textShadow: `0 0 8px ${classification.color}50`
-          }}
+          style={{ color: classification.color }}
         >
           {roleFit.roleFitScore}%
         </span>
@@ -211,20 +201,16 @@ export default memo(function RoleFitDisplayCard({
         <div
           className="absolute top-0 left-0 right-0 h-[2px]"
           style={{
-            background: `linear-gradient(90deg, transparent, ${classification.color}, transparent)`,
-            boxShadow: `0 0 15px ${classification.color}`
+            background: `linear-gradient(90deg, transparent, ${classification.color}, transparent)`
           }}
         />
 
-        <div className="p-5">
-          <div className="flex items-center gap-4">
+        <div className="p-4 md:p-5">
+          <div className="flex items-center gap-3 md:gap-4">
             <div className="flex flex-col items-center flex-shrink-0">
-              <span 
+              <span
                 className="text-3xl font-light tabular-nums"
-                style={{ 
-                  color: classification.color,
-                  textShadow: `0 0 15px ${classification.color}50`
-                }}
+                style={{ color: classification.color }}
               >
                 {roleFit.roleFitScore}
                 <span className="text-lg">%</span>
@@ -233,19 +219,18 @@ export default memo(function RoleFitDisplayCard({
                 Role Fit
               </span>
             </div>
-            
+
             {/* Línea Tesla vertical */}
-            <div 
+            <div
               className="w-px h-12 flex-shrink-0"
-              style={{ 
-                background: `linear-gradient(180deg, transparent, ${classification.color}60, transparent)`,
-                boxShadow: `0 0 8px ${classification.color}30`
+              style={{
+                background: `linear-gradient(180deg, transparent, ${classification.color}60, transparent)`
               }}
             />
-            
+
             <div className="flex-1 min-w-0">
               <p className="text-sm text-slate-300">
-                <span className="text-cyan-400 font-medium">{firstName}</span>
+                <span className="text-cyan-400 font-medium">{displayName}</span>
                 {' tiene un '}
                 <span className="text-purple-400 font-semibold">{classification.label}</span>
               </p>
@@ -269,49 +254,48 @@ export default memo(function RoleFitDisplayCard({
         className
       )}
     >
-      {/* ═══ LÍNEA TESLA SUPERIOR con glow real ═══ */}
+      {/* ═══ LÍNEA TESLA SUPERIOR - solo gradient, sin glow ═══ */}
       <div
         className="absolute top-0 left-0 right-0 h-[2px] z-10"
         style={{
-          background: `linear-gradient(90deg, transparent, ${classification.color}, transparent)`,
-          boxShadow: `0 0 20px ${classification.color}, 0 0 40px ${classification.color}40`
+          background: `linear-gradient(90deg, transparent, ${classification.color}, transparent)`
         }}
       />
 
-      <div className="p-8">
+      <div className="p-5 sm:p-6 md:p-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6 md:mb-8">
           <div className="flex items-center gap-2">
-            <Target 
-              className="w-4 h-4" 
-              style={{ color: classification.color }} 
+            <Target
+              className="w-4 h-4"
+              style={{ color: classification.color }}
             />
             <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
               Adecuación al Cargo
             </span>
           </div>
           {roleFit.standardJobLevel && (
-            <span 
+            <span
               className="text-[10px] font-medium px-2.5 py-1 rounded-lg border"
-              style={{ 
+              style={{
                 color: classification.color,
                 borderColor: `${classification.color}40`,
                 backgroundColor: `${classification.color}10`
               }}
             >
-              {roleFit.standardJobLevel}
+              {PositionAdapter.getLevelLabel(roleFit.standardJobLevel || '')}
             </span>
           )}
         </div>
 
         {/* ═══ CONTENIDO: Split 30/70 ═══ */}
-        <div className="flex items-start gap-8">
-          
+        <div className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-8">
+
           {/* IZQUIERDA 30% - Gauge como contexto */}
           <div className="flex flex-col items-center flex-shrink-0">
-            <RoleFitGauge 
-              value={roleFit.roleFitScore} 
-              color={classification.color} 
+            <RoleFitGauge
+              value={roleFit.roleFitScore}
+              color={classification.color}
             />
             {/* Categoría debajo del gauge */}
             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mt-3">
@@ -319,20 +303,19 @@ export default memo(function RoleFitDisplayCard({
             </span>
           </div>
 
-          {/* LÍNEA TESLA VERTICAL - Separador sutil */}
-          <div 
-            className="w-px self-stretch flex-shrink-0"
-            style={{ 
-              background: `linear-gradient(180deg, transparent, ${classification.color}50, ${classification.color}50, transparent)`,
-              boxShadow: `0 0 10px ${classification.color}20`
+          {/* LÍNEA TESLA VERTICAL - Separador sutil (solo desktop) */}
+          <div
+            className="hidden md:block w-px self-stretch flex-shrink-0"
+            style={{
+              background: `linear-gradient(180deg, transparent, ${classification.color}50, ${classification.color}50, transparent)`
             }}
           />
 
           {/* DERECHA 70% - Narrativa PROTAGONISTA */}
-          <div className="flex-1 min-w-0 py-2">
+          <div className="flex-1 min-w-0 py-2 text-center md:text-left">
             {/* TÍTULO - Headline */}
             <p className="text-lg text-slate-200">
-              <span className="text-cyan-400 font-semibold">{firstName}</span>
+              <span className="text-cyan-400 font-semibold">{displayName}</span>
               {' tiene un '}
               <span className="text-purple-400 font-semibold">{classification.label}</span>
               {'.'}
@@ -363,7 +346,7 @@ export default memo(function RoleFitDisplayCard({
           >
             {/* Línea Tesla sutil separadora */}
             <div
-              className="h-px mt-8 mb-6"
+              className="h-px mt-6 mb-5 md:mt-8 md:mb-6"
               style={{
                 background: `linear-gradient(90deg, transparent, ${classification.color}40, transparent)`
               }}

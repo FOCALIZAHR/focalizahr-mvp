@@ -5,13 +5,14 @@
 
 'use client'
 
-import { memo, useMemo, useCallback } from 'react'
+import { memo, useMemo, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Calendar, Target, Link2, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Calendar, Target, Link2, AlertTriangle, BookOpen, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import GoalLevelBadge from './GoalLevelBadge'
 import GoalProgressBar from './GoalProgressBar'
-import { PrimaryButton } from '@/components/ui/PremiumButton'
+import CancelGoalModal from './CancelGoalModal'
+import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -37,8 +38,10 @@ interface GoalDetailHeaderProps {
     isOrphan: boolean
     parent?: { id: string; title: string } | null
     owner?: { id: string; fullName: string } | null
+    linkedDevGoal?: { id: string; title: string } | null
   }
   onCheckIn: () => void
+  onCancelGoal?: () => void
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -48,8 +51,10 @@ interface GoalDetailHeaderProps {
 export default memo(function GoalDetailHeader({
   goal,
   onCheckIn,
+  onCancelGoal,
 }: GoalDetailHeaderProps) {
   const router = useRouter()
+  const [showCancelModal, setShowCancelModal] = useState(false)
 
   const daysRemaining = useMemo(
     () => Math.ceil((new Date(goal.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
@@ -69,6 +74,22 @@ export default memo(function GoalDetailHeader({
       router.push(`/dashboard/metas/${goal.parent.id}`)
     }
   }, [router, goal.parent])
+
+  const handleCancelGoal = useCallback(async () => {
+    const token = localStorage.getItem('focalizahr_token')
+    const res = await fetch(`/api/goals/${goal.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    const data = await res.json()
+    if (data.success) {
+      if (onCancelGoal) {
+        onCancelGoal()
+      } else {
+        router.push('/dashboard/metas')
+      }
+    }
+  }, [goal.id, router, onCancelGoal])
 
   return (
     <div className="space-y-6">
@@ -105,13 +126,30 @@ export default memo(function GoalDetailHeader({
             )}
           </div>
 
-          <PrimaryButton
-            icon={Target}
-            onClick={onCheckIn}
-            disabled={isFinished}
-          >
-            Registrar Avance
-          </PrimaryButton>
+          <div className="flex items-center gap-2">
+            {/* Cancelar meta */}
+            {!isFinished && (
+              <button
+                onClick={() => setShowCancelModal(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors bg-slate-800 text-slate-400 hover:text-red-400"
+              >
+                <Trash2 className="w-4 h-4" />
+                Cancelar meta
+              </button>
+            )}
+            {goal.status === 'CANCELLED' && (
+              <span className="px-3 py-1 rounded-full bg-slate-700 text-slate-400 text-xs">
+                Cancelada
+              </span>
+            )}
+            <PrimaryButton
+              icon={Target}
+              onClick={onCheckIn}
+              disabled={isFinished}
+            >
+              Registrar Avance
+            </PrimaryButton>
+          </div>
         </div>
 
         {/* Progreso grande */}
@@ -176,6 +214,15 @@ export default memo(function GoalDetailHeader({
             </button>
           )}
 
+          {/* Origen PDI */}
+          {goal.linkedDevGoal && (
+            <div className="flex items-center gap-2 text-sm">
+              <BookOpen className="w-4 h-4 text-purple-400" />
+              <span className="text-slate-400">Origen PDI:</span>
+              <span className="text-purple-400">{goal.linkedDevGoal.title}</span>
+            </div>
+          )}
+
           {/* Owner */}
           {goal.owner && (
             <span className="fhr-text-sm text-slate-400">
@@ -184,6 +231,14 @@ export default memo(function GoalDetailHeader({
           )}
         </div>
       </div>
+
+      {/* Modal de confirmación */}
+      <CancelGoalModal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        onConfirm={handleCancelGoal}
+        goalTitle={goal.title}
+      />
     </div>
   )
 })

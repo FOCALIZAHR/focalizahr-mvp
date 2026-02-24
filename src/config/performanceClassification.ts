@@ -745,6 +745,243 @@ export function getRoleFitLevel(
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// TALENT INTELLIGENCE - THRESHOLDS
+// ════════════════════════════════════════════════════════════════════════════
+
+export const TALENT_INTELLIGENCE_THRESHOLDS = {
+  ROLE_FIT_HIGH: 70,        // ≥70% = "domina el rol" (industria: 70% Rule)
+  ASPIRATION_HIGH: 3,       // Solo nivel 3 = alta aspiración
+  ASPIRATION_LOW: 1,        // Solo nivel 1 = baja aspiración
+  ENGAGEMENT_HIGH: 3,       // Solo nivel 3 = alto compromiso
+  ENGAGEMENT_LOW: 1,        // Solo nivel 1 = bajo compromiso (alerta fuga)
+} as const
+
+// ════════════════════════════════════════════════════════════════════════════
+// MOBILITY QUADRANT - Configuración (Role Fit × Aspiración)
+// ════════════════════════════════════════════════════════════════════════════
+
+export enum MobilityQuadrant {
+  SUCESOR_NATURAL = 'SUCESOR_NATURAL',
+  EXPERTO_ANCLA = 'EXPERTO_ANCLA',
+  AMBICIOSO_PREMATURO = 'AMBICIOSO_PREMATURO',
+  EN_DESARROLLO = 'EN_DESARROLLO'
+}
+
+export interface MobilityQuadrantConfig {
+  quadrant: MobilityQuadrant
+  label: string
+  labelShort: string
+  description: string
+  question: string
+  color: string
+  bgClass: string
+  textClass: string
+  borderClass: string
+  recommendedActions: string[]
+}
+
+export const MOBILITY_QUADRANT_CONFIG: Record<MobilityQuadrant, MobilityQuadrantConfig> = {
+  [MobilityQuadrant.SUCESOR_NATURAL]: {
+    quadrant: MobilityQuadrant.SUCESOR_NATURAL,
+    label: 'Sucesor Natural',
+    labelShort: 'Sucesor',
+    description: 'Domina el cargo actual y busca activamente crecer. Candidato natural para plan de sucesión.',
+    question: '¿Está este talento en el pipeline de sucesión formal?',
+    color: '#10B981',
+    bgClass: 'bg-emerald-500/10',
+    textClass: 'text-emerald-400',
+    borderClass: 'border-emerald-500/30',
+    recommendedActions: [
+      'Incluir en plan de sucesión formal',
+      'Asignar proyectos estratégicos cross-funcionales',
+      'Conectar con mentoría ejecutiva',
+      'PDI enfocado en competencias del cargo superior'
+    ]
+  },
+  [MobilityQuadrant.EXPERTO_ANCLA]: {
+    quadrant: MobilityQuadrant.EXPERTO_ANCLA,
+    label: 'Experto Ancla',
+    labelShort: 'Experto',
+    description: 'Excelente en su rol actual, valora la estabilidad. Prefiere profundizar expertise sobre ascender.',
+    question: '¿Estamos aprovechando su expertise como multiplicador?',
+    color: '#22D3EE',
+    bgClass: 'bg-cyan-500/10',
+    textClass: 'text-cyan-400',
+    borderClass: 'border-cyan-500/30',
+    recommendedActions: [
+      'NO ascender a jefatura (riesgo de perder experto)',
+      'Rol de mentor técnico para juniors',
+      'Liderar proyectos técnicos complejos',
+      'Reconocimiento como referente de área',
+      'PDI enfocado en maestría técnica avanzada'
+    ]
+  },
+  [MobilityQuadrant.AMBICIOSO_PREMATURO]: {
+    quadrant: MobilityQuadrant.AMBICIOSO_PREMATURO,
+    label: 'Ambicioso Prematuro',
+    labelShort: 'Ambicioso',
+    description: 'Quiere crecer activamente pero tiene brechas importantes en el rol actual.',
+    question: '¿Le hemos dado un reality check honesto sobre sus brechas?',
+    color: '#F59E0B',
+    bgClass: 'bg-amber-500/10',
+    textClass: 'text-amber-400',
+    borderClass: 'border-amber-500/30',
+    recommendedActions: [
+      'Conversación honesta sobre brechas actuales',
+      'PDI 100% enfocado en cerrar gaps del rol actual',
+      'Definir hitos medibles antes de considerar promoción',
+      'Monitorear satisfacción (riesgo fuga si no ve progreso)',
+      'Feedback frecuente sobre avances'
+    ]
+  },
+  [MobilityQuadrant.EN_DESARROLLO]: {
+    quadrant: MobilityQuadrant.EN_DESARROLLO,
+    label: 'En Desarrollo',
+    labelShort: 'Desarrollo',
+    description: 'Tiene brechas y no busca ascenso activamente. Foco en consolidar rol actual.',
+    question: '¿Tiene el apoyo necesario para cerrar sus brechas?',
+    color: '#64748B',
+    bgClass: 'bg-slate-500/10',
+    textClass: 'text-slate-400',
+    borderClass: 'border-slate-500/30',
+    recommendedActions: [
+      'PDI estándar con foco en competencias técnicas',
+      'Capacitación estructurada',
+      'Seguimiento regular de avances',
+      'Evaluar fit cultural y motivación'
+    ]
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// RISK QUADRANT - Configuración (Role Fit × Engagement)
+// ════════════════════════════════════════════════════════════════════════════
+
+export enum RiskQuadrant {
+  MOTOR_EQUIPO = 'MOTOR_EQUIPO',
+  FUGA_CEREBROS = 'FUGA_CEREBROS',
+  BURNOUT_RISK = 'BURNOUT_RISK',
+  BAJO_RENDIMIENTO = 'BAJO_RENDIMIENTO'
+}
+
+export enum RiskAlertLevel {
+  GREEN = 'GREEN',
+  YELLOW = 'YELLOW',
+  ORANGE = 'ORANGE',
+  RED = 'RED'
+}
+
+export interface RiskQuadrantConfig {
+  quadrant: RiskQuadrant
+  label: string
+  labelShort: string
+  description: string
+  question: string
+  alertLevel: RiskAlertLevel
+  color: string
+  bgClass: string
+  textClass: string
+  borderClass: string
+  recommendedActions: string[]
+  slaHours?: number
+}
+
+export const RISK_QUADRANT_CONFIG: Record<RiskQuadrant, RiskQuadrantConfig> = {
+  [RiskQuadrant.MOTOR_EQUIPO]: {
+    quadrant: RiskQuadrant.MOTOR_EQUIPO,
+    label: 'Motor del Equipo',
+    labelShort: 'Motor',
+    description: 'Alto desempeño y alto compromiso. Columna vertebral del equipo.',
+    question: '¿Estamos cuidando y reconociendo a este talento clave?',
+    alertLevel: RiskAlertLevel.GREEN,
+    color: '#10B981',
+    bgClass: 'bg-emerald-500/10',
+    textClass: 'text-emerald-400',
+    borderClass: 'border-emerald-500/30',
+    recommendedActions: [
+      'Reconocimiento visible y frecuente',
+      'Proteger de sobrecarga (burnout preventivo)',
+      'Evaluar para matriz de movilidad',
+      'Mantener engagement con proyectos desafiantes'
+    ]
+  },
+  [RiskQuadrant.FUGA_CEREBROS]: {
+    quadrant: RiskQuadrant.FUGA_CEREBROS,
+    label: 'Fuga de Cerebros',
+    labelShort: 'Fuga',
+    description: 'Experto valioso pero desencantado. Riesgo crítico de pérdida de talento clave.',
+    question: '¿Por qué este talento está desconectado?',
+    alertLevel: RiskAlertLevel.RED,
+    color: '#EF4444',
+    bgClass: 'bg-red-500/10',
+    textClass: 'text-red-400',
+    borderClass: 'border-red-500/30',
+    slaHours: 48,
+    recommendedActions: [
+      'INTERVENCIÓN GERENCIAL INMEDIATA',
+      '1:1 urgente para identificar causa raíz',
+      'Evaluar: salario, flexibilidad, propósito, liderazgo',
+      'Plan de retención personalizado en 48hrs',
+      'Escalar a HRBP si no hay progreso'
+    ]
+  },
+  [RiskQuadrant.BURNOUT_RISK]: {
+    quadrant: RiskQuadrant.BURNOUT_RISK,
+    label: 'Riesgo de Burnout',
+    labelShort: 'Burnout',
+    description: 'Alta motivación pero sin las herramientas o competencias. Esfuerzo sin resultados.',
+    question: '¿Fue ascendido prematuramente o le faltan recursos?',
+    alertLevel: RiskAlertLevel.ORANGE,
+    color: '#F97316',
+    bgClass: 'bg-orange-500/10',
+    textClass: 'text-orange-400',
+    borderClass: 'border-orange-500/30',
+    slaHours: 168,
+    recommendedActions: [
+      'Capacitación urgente en brechas críticas',
+      'Evaluar si fue ascendido prematuramente',
+      'Considerar reasignación temporal',
+      'Reducir carga mientras se capacita',
+      'Monitorear señales de agotamiento'
+    ]
+  },
+  [RiskQuadrant.BAJO_RENDIMIENTO]: {
+    quadrant: RiskQuadrant.BAJO_RENDIMIENTO,
+    label: 'Bajo Rendimiento',
+    labelShort: 'Bajo',
+    description: 'Bajo desempeño y bajo compromiso. Impacto negativo en el equipo.',
+    question: '¿Cuál es el costo de mantener esta situación?',
+    alertLevel: RiskAlertLevel.RED,
+    color: '#EF4444',
+    bgClass: 'bg-red-500/10',
+    textClass: 'text-red-400',
+    borderClass: 'border-red-500/30',
+    slaHours: 72,
+    recommendedActions: [
+      'PIP (Plan de Mejora) formal documentado',
+      'Plazo de 90 días con hitos medibles',
+      'Reuniones semanales de seguimiento',
+      'Si no mejora: plan de salida',
+      'Proteger moral del equipo'
+    ]
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS - TALENT INTELLIGENCE
+// ════════════════════════════════════════════════════════════════════════════
+
+export function getMobilityQuadrantConfig(quadrant: MobilityQuadrant | string | null): MobilityQuadrantConfig | null {
+  if (!quadrant) return null
+  return MOBILITY_QUADRANT_CONFIG[quadrant as MobilityQuadrant] || null
+}
+
+export function getRiskQuadrantConfig(quadrant: RiskQuadrant | string | null): RiskQuadrantConfig | null {
+  if (!quadrant) return null
+  return RISK_QUADRANT_CONFIG[quadrant as RiskQuadrant] || null
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // EXPORTS DEFAULT
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -772,5 +1009,15 @@ export default {
 
   validateEvaluatorWeights,
   resolveEvaluatorWeights,
-  calculateWeightedScore
+  calculateWeightedScore,
+
+  // Talent Intelligence
+  TALENT_INTELLIGENCE_THRESHOLDS,
+  MOBILITY_QUADRANT_CONFIG,
+  RISK_QUADRANT_CONFIG,
+  getMobilityQuadrantConfig,
+  getRiskQuadrantConfig,
+  MobilityQuadrant,
+  RiskQuadrant,
+  RiskAlertLevel
 }

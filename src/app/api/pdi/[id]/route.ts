@@ -45,7 +45,14 @@ export async function GET(
     const pdi = await prisma.developmentPlan.findUnique({
       where: { id },
       include: {
-        goals: { orderBy: { priority: 'asc' } },
+        goals: {
+          orderBy: { priority: 'asc' },
+          include: {
+            linkedBusinessGoal: {
+              select: { id: true, title: true, progress: true, status: true }
+            }
+          }
+        },
         checkIns: { orderBy: { scheduledDate: 'desc' } },
         employee: { select: { fullName: true, email: true, performanceTrack: true, departmentId: true } },
         manager: { select: { fullName: true, email: true } },

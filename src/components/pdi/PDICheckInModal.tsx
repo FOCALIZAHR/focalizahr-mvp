@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, MessageSquare, Save } from 'lucide-react'
+import PercentageSlider from '@/components/ui/PercentageSlider'
 
 interface GoalEntry {
   id: string
@@ -112,24 +113,13 @@ export default function PDICheckInModal({ pdiId, goals, onClose, onSuccess }: PD
           {/* Goals Progress */}
           <div className="p-5 space-y-4 max-h-[50vh] overflow-y-auto">
             {goals.filter(g => g.status !== 'COMPLETED' && g.status !== 'CANCELLED').map((goal) => (
-              <div key={goal.id} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-200">{goal.title}</p>
-                    <p className="text-[10px] text-slate-500">{goal.competencyName}</p>
-                  </div>
-                  <span className="text-sm font-bold text-cyan-400">
-                    {goalProgress[goal.id]}%
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={5}
+              <div key={goal.id} className="space-y-1">
+                <p className="text-sm font-medium text-slate-200">{goal.title}</p>
+                <p className="text-[10px] text-slate-500">{goal.competencyName}</p>
+                <PercentageSlider
                   value={goalProgress[goal.id] ?? 0}
-                  onChange={(e) => updateGoalProgress(goal.id, parseInt(e.target.value))}
-                  className="w-full h-1.5 rounded-full appearance-none bg-slate-700 accent-cyan-500 cursor-pointer"
+                  onChange={(v) => updateGoalProgress(goal.id, v)}
+                  step={5}
                 />
               </div>
             ))}

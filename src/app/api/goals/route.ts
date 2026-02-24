@@ -69,9 +69,18 @@ export async function GET(request: NextRequest) {
     if (departmentId) where.departmentId = departmentId
     if (level) where.level = level
     if (periodYear) where.periodYear = parseInt(periodYear)
-    if (status) where.status = status
+    if (status) {
+      const statuses = status.split(',').map(s => s.trim()).filter(Boolean)
+      where.status = statuses.length === 1 ? statuses[0] : { in: statuses }
+    }
     if (!includeCompleted && !status) {
       where.status = { notIn: ['COMPLETED', 'CANCELLED'] }
+    }
+
+    // Filtrar metas sin vincular a PDI
+    const unlinked = searchParams.get('unlinked')
+    if (unlinked === 'true') {
+      where.linkedDevGoalId = null
     }
 
     const goals = await prisma.goal.findMany({
