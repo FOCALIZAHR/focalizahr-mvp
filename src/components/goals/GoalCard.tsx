@@ -28,6 +28,7 @@ interface GoalCardData {
   dueDate: string
   isAligned: boolean
   isOrphan: boolean
+  isLeaderGoal?: boolean
   owner?: { id: string; fullName: string; position?: string | null } | null
   department?: { id: string; displayName: string } | null
   _count?: { children: number }
@@ -107,7 +108,7 @@ export default memo(function GoalCard({
     >
       {/* Header: Badge + Alignment */}
       <div className="flex items-center justify-between mb-3">
-        <GoalLevelBadge level={goal.level} />
+        <GoalLevelBadge level={goal.level} isLeaderGoal={goal.isLeaderGoal} />
 
         <div className="flex items-center gap-2">
           {goal.isAligned ? (

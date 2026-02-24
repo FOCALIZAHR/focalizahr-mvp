@@ -208,6 +208,9 @@ model Account {
   goals                    Goal[]
   goalProgressUpdates      GoalProgressUpdate[]
   goalLibrary              GoalLibrary[]
+  goalJobConfigs           GoalJobConfig[]
+  goalGroups               GoalGroup[]
+  goalCascadeRules         GoalCascadeRule[]
 
   @@index([adminEmail], map: "idx_accounts_email")
   @@index([subscriptionTier], map: "idx_accounts_tier")
@@ -2508,6 +2511,10 @@ model Goal {
   linkedDevGoal   DevelopmentGoal? @relation(fields: [linkedDevGoalId], references: [id], onDelete: SetNull)
 
   progressUpdates GoalProgressUpdate[]
+  cascadeRules    GoalCascadeRule[]
+
+  // G4: Meta solo para líderes
+  isLeaderGoal    Boolean  @default(false) @map("is_leader_goal")
 
   // ────────────────────────────────────────────────────────────────────────────
   // ÍNDICES
@@ -2585,6 +2592,89 @@ model GoalLibrary {
   @@index([accountId])
   @@index([category])
   @@map("goal_library")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// G1: CONFIGURACIÓN DE ELEGIBILIDAD POR NIVEL DE CARGO
+// ════════════════════════════════════════════════════════════════════════════
+
+model GoalJobConfig {
+  id                 String   @id @default(cuid())
+  accountId          String   @map("account_id")
+  standardJobLevel   String   @map("standard_job_level")
+  hasGoals           Boolean  @default(false) @map("has_goals")
+  goalGroupId        String?  @map("goal_group_id")
+
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  account            Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  goalGroup          GoalGroup? @relation(fields: [goalGroupId], references: [id])
+
+  @@unique([accountId, standardJobLevel])
+  @@map("goal_job_configs")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// G2: GRUPOS DE PONDERACIÓN
+// ════════════════════════════════════════════════════════════════════════════
+
+model GoalGroup {
+  id              String   @id @default(cuid())
+  accountId       String   @map("account_id")
+
+  name            String
+  code            String
+
+  weightBusiness  Float    @default(0) @map("weight_business")
+  weightLeader    Float    @default(0) @map("weight_leader")
+  weightNPS       Float    @default(0) @map("weight_nps")
+  weightSpecific  Float    @default(0) @map("weight_specific")
+
+  isActive        Boolean  @default(true) @map("is_active")
+  isDefault       Boolean  @default(false) @map("is_default")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  account         Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  jobConfigs      GoalJobConfig[]
+  cascadeRules    GoalCascadeRule[]
+
+  @@unique([accountId, code])
+  @@map("goal_groups")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// G3: REGLAS DE CASCADA AUTOMÁTICA
+// ════════════════════════════════════════════════════════════════════════════
+
+model GoalCascadeRule {
+  id              String   @id @default(cuid())
+  accountId       String   @map("account_id")
+
+  name            String
+  description     String?
+
+  sourceGoalId    String   @map("source_goal_id")
+  targetGroupId   String?  @map("target_group_id")
+
+  assignedWeight  Float    @default(0) @map("assigned_weight")
+  isLeaderOnly    Boolean  @default(false) @map("is_leader_only")
+
+  isActive        Boolean  @default(true) @map("is_active")
+  lastExecutedAt  DateTime? @map("last_executed_at")
+  lastExecutedBy  String?  @map("last_executed_by")
+  executionCount  Int      @default(0) @map("execution_count")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  account         Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sourceGoal      Goal       @relation(fields: [sourceGoalId], references: [id])
+  targetGroup     GoalGroup? @relation(fields: [targetGroupId], references: [id])
+
+  @@map("goal_cascade_rules")
 }
 
 // ────────────────────────────────────────────────────────────────────────────

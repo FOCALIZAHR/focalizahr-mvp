@@ -6,7 +6,7 @@
 'use client'
 
 import { memo } from 'react'
-import { Building2, Users, User } from 'lucide-react'
+import { Building2, Users, User, Crown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -17,6 +17,7 @@ type GoalLevel = 'COMPANY' | 'AREA' | 'INDIVIDUAL'
 
 interface GoalLevelBadgeProps {
   level: GoalLevel
+  isLeaderGoal?: boolean
   className?: string
 }
 
@@ -52,8 +53,19 @@ const LEVEL_CONFIG: Record<GoalLevel, {
 
 export default memo(function GoalLevelBadge({
   level,
+  isLeaderGoal,
   className = '',
 }: GoalLevelBadgeProps) {
+  // Badge especial para meta líder
+  if (isLeaderGoal) {
+    return (
+      <span className={cn('fhr-badge fhr-badge-premium', className)}>
+        <Crown className="w-3 h-3" />
+        Líder
+      </span>
+    )
+  }
+
   const config = LEVEL_CONFIG[level] || LEVEL_CONFIG.INDIVIDUAL
   const Icon = config.icon
 

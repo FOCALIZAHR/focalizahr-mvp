@@ -63,6 +63,9 @@ export interface GoalWizardData {
   parentId?: string
   parentTitle?: string
   weight: number
+
+  // Meta Líder
+  isLeaderGoal: boolean
 }
 
 const initialData: GoalWizardData = {
@@ -78,6 +81,7 @@ const initialData: GoalWizardData = {
   dueDate: '',
   periodYear: new Date().getFullYear(),
   weight: 0,
+  isLeaderGoal: false,
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -176,6 +180,7 @@ export default function CreateGoalWizard() {
         periodQuarter: data.periodQuarter || undefined,
         parentId: data.parentId || undefined,
         weight: data.weight,
+        isLeaderGoal: data.isLeaderGoal || false,
       }
 
       const res = await fetch('/api/goals', {

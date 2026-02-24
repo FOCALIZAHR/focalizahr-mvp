@@ -39,6 +39,9 @@ const createGoalSchema = z.object({
 
   // PDI link (opcional)
   linkedDevGoalId: z.string().optional(),
+
+  // Meta líder
+  isLeaderGoal: z.boolean().default(false),
 })
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -76,6 +79,11 @@ export async function GET(request: NextRequest) {
     if (!includeCompleted && !status) {
       where.status = { notIn: ['COMPLETED', 'CANCELLED'] }
     }
+
+    // Filtro isLeaderGoal
+    const isLeaderGoal = searchParams.get('isLeaderGoal')
+    if (isLeaderGoal === 'true') where.isLeaderGoal = true
+    if (isLeaderGoal === 'false') where.isLeaderGoal = false
 
     // Filtrar metas sin vincular a PDI
     const unlinked = searchParams.get('unlinked')

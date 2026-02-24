@@ -134,6 +134,24 @@ export default memo(function StepDefineGoal({
           ))}
         </div>
       </div>
+
+      {/* Solo para líderes */}
+      <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={data.isLeaderGoal || false}
+            onChange={(e) => updateData({ isLeaderGoal: e.target.checked })}
+            className="w-5 h-5 rounded border-slate-600 text-purple-500 focus:ring-purple-500"
+          />
+          <div>
+            <span className="text-sm text-white">Solo para líderes</span>
+            <p className="text-xs text-slate-400">
+              Esta meta solo aplica a empleados con equipos a cargo
+            </p>
+          </div>
+        </label>
+      </div>
     </div>
   )
 })

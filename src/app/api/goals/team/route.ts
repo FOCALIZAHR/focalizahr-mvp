@@ -10,18 +10,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    // Obtener niveles de cargo con metas habilitadas
+    const eligibleConfigs = await prisma.goalJobConfig.findMany({
+      where: { accountId: context.accountId, hasGoals: true },
+      select: { standardJobLevel: true },
+    })
+    const eligibleLevels = new Set(eligibleConfigs.map((c) => c.standardJobLevel))
+
     // Get employees with their goals count and avg progress
     const employees = await prisma.employee.findMany({
       where: {
         accountId: context.accountId,
-        isActive: true,
+        status: 'ACTIVE',
       },
       select: {
         id: true,
         fullName: true,
         position: true,
         departmentId: true,
+        standardJobLevel: true,
         acotadoGroup: true,
+        _count: { select: { directReports: true } },
         goals: {
           where: {
             level: 'INDIVIDUAL',
@@ -30,21 +39,35 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             progress: true,
-          }
-        }
+            isLeaderGoal: true,
+          },
+        },
       },
       orderBy: { fullName: 'asc' },
     })
 
     // Transform into team members with stats
-    const teamMembers = employees.map(emp => {
-      const goalsCount = emp.goals.length
-      const avgProgress = goalsCount > 0
-        ? emp.goals.reduce((sum, g) => sum + g.progress, 0) / goalsCount
-        : 0
+    const teamMembers = employees.map((emp) => {
+      const hasDirectReports = emp._count.directReports > 0
 
-      // Cargos operativos/auxiliares typically don't have business goals
-      const hasGoalsConfigured = emp.acotadoGroup !== 'base_operativa'
+      // Filtrar metas líder si no es líder
+      const visibleGoals = emp.goals.filter(
+        (g) => !g.isLeaderGoal || hasDirectReports
+      )
+
+      const goalsCount = visibleGoals.length
+      const avgProgress =
+        goalsCount > 0
+          ? visibleGoals.reduce((sum, g) => sum + g.progress, 0) / goalsCount
+          : 0
+
+      // Elegibilidad: usar GoalJobConfig si hay configs, fallback a acotadoGroup
+      const hasGoalsConfigured =
+        eligibleLevels.size > 0
+          ? emp.standardJobLevel
+            ? eligibleLevels.has(emp.standardJobLevel)
+            : false
+          : emp.acotadoGroup !== 'base_operativa'
 
       return {
         id: emp.id,
@@ -54,21 +77,23 @@ export async function GET(request: NextRequest) {
         goalsCount,
         avgProgress: Math.round(avgProgress * 10) / 10,
         hasGoalsConfigured,
+        hasDirectReports,
       }
     })
 
     // Calculate stats
     const total = teamMembers.length
-    const noGoalsRequired = teamMembers.filter(m => !m.hasGoalsConfigured).length
-    const withGoals = teamMembers.filter(m => m.hasGoalsConfigured && m.goalsCount > 0).length
-    const withoutGoals = teamMembers.filter(m => m.hasGoalsConfigured && m.goalsCount === 0).length
+    const noGoalsRequired = teamMembers.filter((m) => !m.hasGoalsConfigured).length
+    const withGoals = teamMembers.filter((m) => m.hasGoalsConfigured && m.goalsCount > 0).length
+    const withoutGoals = teamMembers.filter(
+      (m) => m.hasGoalsConfigured && m.goalsCount === 0
+    ).length
 
     return NextResponse.json({
       data: teamMembers,
       stats: { total, withGoals, withoutGoals, noGoalsRequired },
       success: true,
     })
-
   } catch (error: any) {
     console.error('[API Goals Team]:', error)
     return NextResponse.json(

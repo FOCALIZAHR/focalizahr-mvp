@@ -51,6 +51,9 @@ interface CreateGoalInput {
 
   // PDI link
   linkedDevGoalId?: string
+
+  // Meta líder
+  isLeaderGoal?: boolean
 }
 
 interface UpdateProgressInput {
@@ -660,6 +663,9 @@ export class GoalsService {
 
       // PDI
       linkedDevGoalId: input.linkedDevGoalId,
+
+      // Meta líder
+      isLeaderGoal: input.isLeaderGoal || false,
     }
   }
 
