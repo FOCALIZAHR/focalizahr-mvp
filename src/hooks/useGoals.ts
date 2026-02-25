@@ -28,7 +28,7 @@ const fetcher = (url: string) => {
 // ════════════════════════════════════════════════════════════════════════════
 
 type GoalLevel = 'COMPANY' | 'AREA' | 'INDIVIDUAL'
-type GoalStatus = 'NOT_STARTED' | 'ON_TRACK' | 'AT_RISK' | 'BEHIND' | 'COMPLETED' | 'CANCELLED'
+type GoalStatus = 'NOT_STARTED' | 'ON_TRACK' | 'AT_RISK' | 'BEHIND' | 'PENDING_CLOSURE' | 'COMPLETED' | 'CANCELLED'
 
 interface GoalData {
   id: string

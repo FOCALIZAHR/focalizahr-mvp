@@ -5,9 +5,9 @@
 
 'use client'
 
-import { memo, useMemo, useCallback } from 'react'
+import { memo, useMemo, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Link2, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Calendar, Link2, AlertTriangle, CheckCircle2, Clock, Send } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import GoalProgressBar from './GoalProgressBar'
 import GoalLevelBadge from './GoalLevelBadge'
@@ -17,7 +17,7 @@ import GoalLevelBadge from './GoalLevelBadge'
 // ════════════════════════════════════════════════════════════════════════════
 
 type GoalLevel = 'COMPANY' | 'AREA' | 'INDIVIDUAL'
-type GoalStatus = 'NOT_STARTED' | 'ON_TRACK' | 'AT_RISK' | 'BEHIND' | 'COMPLETED' | 'CANCELLED'
+type GoalStatus = 'NOT_STARTED' | 'ON_TRACK' | 'AT_RISK' | 'BEHIND' | 'PENDING_CLOSURE' | 'COMPLETED' | 'CANCELLED'
 
 interface GoalCardData {
   id: string
@@ -32,6 +32,9 @@ interface GoalCardData {
   owner?: { id: string; fullName: string; position?: string | null } | null
   department?: { id: string; displayName: string } | null
   _count?: { children: number }
+  // Campos de cierre
+  closureRequestedAt?: string | null
+  closureRequestedBy?: string | null
 }
 
 interface GoalCardProps {
@@ -39,6 +42,7 @@ interface GoalCardProps {
   size?: 'compact' | 'full'
   showOwner?: boolean
   className?: string
+  onRequestClosure?: (goalId: string) => Promise<void>
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -50,6 +54,7 @@ const STATUS_LABELS: Record<GoalStatus, { label: string; className: string }> = 
   ON_TRACK: { label: 'En tiempo', className: 'text-cyan-400' },
   AT_RISK: { label: 'En riesgo', className: 'text-amber-400' },
   BEHIND: { label: 'Atrasada', className: 'text-red-400' },
+  PENDING_CLOSURE: { label: 'Pendiente Aprobación', className: 'text-amber-400' },
   COMPLETED: { label: 'Completada', className: 'text-emerald-400' },
   CANCELLED: { label: 'Cancelada', className: 'text-slate-500' },
 }
@@ -79,8 +84,10 @@ export default memo(function GoalCard({
   size = 'full',
   showOwner = false,
   className = '',
+  onRequestClosure,
 }: GoalCardProps) {
   const router = useRouter()
+  const [isRequestingClosure, setIsRequestingClosure] = useState(false)
 
   const statusConfig = useMemo(
     () => STATUS_LABELS[goal.status] || STATUS_LABELS.NOT_STARTED,
@@ -97,6 +104,24 @@ export default memo(function GoalCard({
   }, [router, goal.id])
 
   const isCompact = size === 'compact'
+
+  // ═══ LÓGICA CIERRE ═══
+  const canRequestClosure = useMemo(() => {
+    return goal.progress >= 80 &&
+           !['PENDING_CLOSURE', 'COMPLETED', 'CANCELLED'].includes(goal.status)
+  }, [goal.progress, goal.status])
+
+  const handleRequestClosure = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation() // Evitar navegación al detalle
+    if (!onRequestClosure || isRequestingClosure) return
+
+    setIsRequestingClosure(true)
+    try {
+      await onRequestClosure(goal.id)
+    } finally {
+      setIsRequestingClosure(false)
+    }
+  }, [goal.id, onRequestClosure, isRequestingClosure])
 
   return (
     <div
@@ -116,6 +141,13 @@ export default memo(function GoalCard({
           ) : goal.isOrphan ? (
             <AlertTriangle className="w-4 h-4 text-amber-400" />
           ) : null}
+
+          {goal.status === 'PENDING_CLOSURE' && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs">
+              <Clock className="w-3 h-3" />
+              Pendiente
+            </span>
+          )}
 
           {goal.status === 'COMPLETED' && (
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -163,6 +195,18 @@ export default memo(function GoalCard({
         <p className="fhr-text-sm text-slate-500 mt-2">
           {goal._count.children} meta{goal._count.children > 1 ? 's' : ''} hija{goal._count.children > 1 ? 's' : ''}
         </p>
+      )}
+
+      {/* Botón solicitar cierre */}
+      {!isCompact && canRequestClosure && onRequestClosure && (
+        <button
+          onClick={handleRequestClosure}
+          disabled={isRequestingClosure}
+          className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 disabled:opacity-50"
+        >
+          <Send className="w-4 h-4" />
+          {isRequestingClosure ? 'Solicitando...' : 'Solicitar Cierre'}
+        </button>
       )}
     </div>
   )

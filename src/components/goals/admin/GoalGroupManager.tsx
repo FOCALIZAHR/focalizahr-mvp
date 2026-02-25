@@ -60,7 +60,7 @@ function WeightBar({ label, value, color }: { label: string; value: number; colo
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
 
-export default function GoalGroupManager() {
+export default function GoalGroupManager({ embedded }: { embedded?: boolean }) {
   const [groups, setGroups] = useState<GoalGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -131,18 +131,20 @@ export default function GoalGroupManager() {
   return (
     <div className="space-y-6">
       {/* HEADER */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20">
-            <Layers className="w-6 h-6 text-cyan-400" />
+      <div className={`flex items-center ${embedded ? 'justify-end' : 'justify-between'}`}>
+        {!embedded && (
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20">
+              <Layers className="w-6 h-6 text-cyan-400" />
+            </div>
+            <div>
+              <h2 className="text-xl text-white font-medium">Grupos de Ponderación</h2>
+              <p className="text-slate-400 text-sm">
+                Define qué porcentaje de cada tipo de meta aplica según el nivel del cargo
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl text-white font-medium">Grupos de Ponderación</h2>
-            <p className="text-slate-400 text-sm">
-              Define qué porcentaje de cada tipo de meta aplica según el nivel del cargo
-            </p>
-          </div>
-        </div>
+        )}
         <button
           onClick={() => setIsCreating(true)}
           className="fhr-btn fhr-btn-primary flex items-center gap-2 px-4 py-2"

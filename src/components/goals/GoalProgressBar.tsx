@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 // TIPOS
 // ════════════════════════════════════════════════════════════════════════════
 
-type GoalStatus = 'NOT_STARTED' | 'ON_TRACK' | 'AT_RISK' | 'BEHIND' | 'COMPLETED' | 'CANCELLED'
+type GoalStatus = 'NOT_STARTED' | 'ON_TRACK' | 'AT_RISK' | 'BEHIND' | 'PENDING_CLOSURE' | 'COMPLETED' | 'CANCELLED'
 
 interface GoalProgressBarProps {
   progress: number
@@ -42,6 +42,10 @@ const STATUS_COLORS: Record<GoalStatus, { bar: string; bg: string }> = {
   BEHIND: {
     bar: 'bg-gradient-to-r from-red-600 to-red-400',
     bg: 'bg-red-950/30',
+  },
+  PENDING_CLOSURE: {
+    bar: 'bg-gradient-to-r from-amber-500 to-purple-400',
+    bg: 'bg-purple-950/30',
   },
   COMPLETED: {
     bar: 'bg-gradient-to-r from-emerald-600 to-emerald-400',

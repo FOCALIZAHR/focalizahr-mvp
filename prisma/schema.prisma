@@ -2517,6 +2517,16 @@ model Goal {
   isLeaderGoal    Boolean  @default(false) @map("is_leader_goal")
 
   // ────────────────────────────────────────────────────────────────────────────
+  // CIERRE DE META (Flujo de aprobación)
+  // ────────────────────────────────────────────────────────────────────────────
+  closureRequestedAt  DateTime? @map("closure_requested_at")
+  closureRequestedBy  String?   @map("closure_requested_by")
+  closedAt            DateTime? @map("closed_at")
+  closedBy            String?   @map("closed_by")
+  closureApprovedBy   String?   @map("closure_approved_by")
+  closureNotes        String?   @map("closure_notes")
+
+  // ────────────────────────────────────────────────────────────────────────────
   // ÍNDICES
   // ────────────────────────────────────────────────────────────────────────────
   @@index([accountId])
@@ -2707,10 +2717,11 @@ enum GoalMetricType {
 }
 
 enum GoalStatus {
-  NOT_STARTED   // Sin iniciar
-  ON_TRACK      // En tiempo
-  AT_RISK       // En riesgo
-  BEHIND        // Atrasado
-  COMPLETED     // Completado
-  CANCELLED     // Cancelado
+  NOT_STARTED      // Sin iniciar
+  ON_TRACK         // En tiempo
+  AT_RISK          // En riesgo
+  BEHIND           // Atrasado
+  PENDING_CLOSURE  // Pendiente de aprobación de cierre
+  COMPLETED        // Completado
+  CANCELLED        // Cancelado
 }

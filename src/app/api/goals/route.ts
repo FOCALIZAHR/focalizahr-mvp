@@ -2,7 +2,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { GoalsService } from '@/lib/services/GoalsService'
-import { extractUserContext } from '@/lib/services/AuthorizationService'
+import {
+  extractUserContext,
+  hasPermission,
+  getChildDepartmentIds,
+  GLOBAL_ACCESS_ROLES
+} from '@/lib/services/AuthorizationService'
 import { z } from 'zod'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -45,14 +50,28 @@ const createGoalSchema = z.object({
 })
 
 // ════════════════════════════════════════════════════════════════════════════
-// GET - Listar metas con filtros
+// GET - Listar metas con filtros + SEGURIDAD
 // ════════════════════════════════════════════════════════════════════════════
 
 export async function GET(request: NextRequest) {
   try {
+    // ═══ CHECK 1: extractUserContext ═══
     const context = extractUserContext(request)
+    const userEmail = request.headers.get('x-user-email') || ''
+
     if (!context.accountId) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+      return NextResponse.json(
+        { error: 'No autorizado', success: false },
+        { status: 401 }
+      )
+    }
+
+    // ═══ CHECK 2: hasPermission ═══
+    if (!hasPermission(context.role, 'goals:view')) {
+      return NextResponse.json(
+        { error: 'Sin permisos para ver metas', success: false },
+        { status: 403 }
+      )
     }
 
     const { searchParams } = new URL(request.url)
@@ -63,11 +82,49 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const includeCompleted = searchParams.get('includeCompleted') === 'true'
 
-    // Construir filtro
+    // ═══ CHECK 3: accountId en WHERE (base multi-tenant) ═══
     const where: any = {
       accountId: context.accountId,
     }
 
+    // ═══ CHECK 4: Filtrado jerárquico según rol ═══
+    const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(context.role as any)
+
+    if (!hasGlobalAccess) {
+      if (context.role === 'AREA_MANAGER' && context.departmentId) {
+        // AREA_MANAGER: Ve COMPANY + AREA/INDIVIDUAL de su scope
+        const childIds = await getChildDepartmentIds(context.departmentId)
+        const allowedDepts = [context.departmentId, ...childIds]
+
+        where.OR = [
+          { level: 'COMPANY' },
+          { level: 'AREA', departmentId: { in: allowedDepts } },
+          { level: 'INDIVIDUAL', owner: { departmentId: { in: allowedDepts } } }
+        ]
+      } else if (context.role === 'EVALUATOR') {
+        // EVALUATOR: Ve COMPANY + INDIVIDUAL de sus subordinados directos
+        const currentEmployee = await prisma.employee.findFirst({
+          where: {
+            accountId: context.accountId,
+            email: userEmail,
+            status: 'ACTIVE'
+          },
+          select: { id: true }
+        })
+
+        if (currentEmployee) {
+          where.OR = [
+            { level: 'COMPANY' },
+            { level: 'INDIVIDUAL', owner: { managerId: currentEmployee.id } }
+          ]
+        } else {
+          // Sin empleado asociado, solo corporativas
+          where.level = 'COMPANY'
+        }
+      }
+    }
+
+    // Filtros adicionales del query string
     if (employeeId) where.employeeId = employeeId
     if (departmentId) where.departmentId = departmentId
     if (level) where.level = level
@@ -122,14 +179,28 @@ export async function GET(request: NextRequest) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// POST - Crear meta
+// POST - Crear meta + SEGURIDAD
 // ════════════════════════════════════════════════════════════════════════════
 
 export async function POST(request: NextRequest) {
   try {
+    // ═══ CHECK 1: extractUserContext ═══
     const context = extractUserContext(request)
+    const userEmail = request.headers.get('x-user-email') || ''
+
     if (!context.accountId) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+      return NextResponse.json(
+        { error: 'No autorizado', success: false },
+        { status: 401 }
+      )
+    }
+
+    // ═══ CHECK 2: hasPermission ═══
+    if (!hasPermission(context.role, 'goals:create')) {
+      return NextResponse.json(
+        { error: 'Sin permisos para crear metas', success: false },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
@@ -144,7 +215,99 @@ export async function POST(request: NextRequest) {
 
     const data = validation.data
 
-    // Validaciones de negocio
+    // ═══ CHECK 6: Validación de escritura - Restricción EVALUATOR ═══
+    if (context.role === 'EVALUATOR') {
+      // EVALUATOR solo puede crear metas INDIVIDUAL
+      if (data.level !== 'INDIVIDUAL') {
+        return NextResponse.json(
+          { error: 'Solo puede crear metas individuales', success: false },
+          { status: 403 }
+        )
+      }
+
+      // Obtener el empleado actual (el EVALUATOR)
+      const currentEmployee = await prisma.employee.findFirst({
+        where: {
+          accountId: context.accountId,
+          email: userEmail,
+          status: 'ACTIVE'
+        },
+        select: { id: true }
+      })
+
+      if (!currentEmployee) {
+        return NextResponse.json(
+          { error: 'Usuario no tiene empleado asociado', success: false },
+          { status: 403 }
+        )
+      }
+
+      // Validar que el empleado destino es su subordinado directo
+      if (!data.employeeId) {
+        return NextResponse.json(
+          { error: 'Debe especificar employeeId para metas individuales', success: false },
+          { status: 400 }
+        )
+      }
+
+      const isSubordinate = await prisma.employee.findFirst({
+        where: {
+          id: data.employeeId,
+          managerId: currentEmployee.id,
+          accountId: context.accountId
+        }
+      })
+
+      if (!isSubordinate) {
+        return NextResponse.json(
+          { error: 'Solo puede asignar metas a sus subordinados directos', success: false },
+          { status: 403 }
+        )
+      }
+    }
+
+    // ═══ CHECK 4: Validación AREA_MANAGER - Solo su scope ═══
+    if (context.role === 'AREA_MANAGER' && context.departmentId) {
+      if (data.level === 'COMPANY') {
+        return NextResponse.json(
+          { error: 'No tiene permisos para crear metas corporativas', success: false },
+          { status: 403 }
+        )
+      }
+
+      if (data.level === 'AREA' || data.level === 'INDIVIDUAL') {
+        const childIds = await getChildDepartmentIds(context.departmentId)
+        const allowedDepts = [context.departmentId, ...childIds]
+
+        // Validar departamento destino
+        if (data.departmentId && !allowedDepts.includes(data.departmentId)) {
+          return NextResponse.json(
+            { error: 'No tiene permisos sobre ese departamento', success: false },
+            { status: 403 }
+          )
+        }
+
+        // Validar empleado destino
+        if (data.employeeId) {
+          const employee = await prisma.employee.findFirst({
+            where: {
+              id: data.employeeId,
+              accountId: context.accountId
+            },
+            select: { departmentId: true }
+          })
+
+          if (!employee || !allowedDepts.includes(employee.departmentId)) {
+            return NextResponse.json(
+              { error: 'No tiene permisos sobre ese empleado', success: false },
+              { status: 403 }
+            )
+          }
+        }
+      }
+    }
+
+    // Validaciones de negocio (existentes)
     if (data.level === 'INDIVIDUAL' && !data.employeeId) {
       return NextResponse.json(
         { error: 'employeeId es requerido para metas individuales', success: false },

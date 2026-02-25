@@ -31,6 +31,7 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   ON_TRACK: { label: 'En tiempo', className: 'text-cyan-400' },
   AT_RISK: { label: 'En riesgo', className: 'text-amber-400' },
   BEHIND: { label: 'Atrasada', className: 'text-red-400' },
+  PENDING_CLOSURE: { label: 'Pendiente cierre', className: 'text-purple-400' },
   COMPLETED: { label: 'Completada', className: 'text-emerald-400' },
   CANCELLED: { label: 'Cancelada', className: 'text-slate-500' },
 }

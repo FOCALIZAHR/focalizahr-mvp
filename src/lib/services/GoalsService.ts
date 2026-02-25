@@ -628,6 +628,116 @@ export class GoalsService {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
+  // CIERRE DE METAS (Flujo de aprobación CEO)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Solicitar cierre de meta (Gerente)
+   */
+  static async requestClosure(
+    goalId: string,
+    accountId: string,
+    requestedBy: string
+  ): Promise<Goal> {
+    const goal = await prisma.goal.findFirst({
+      where: { id: goalId, accountId }
+    })
+
+    if (!goal) throw new Error('Meta no encontrada')
+    if (goal.status === 'COMPLETED') throw new Error('Meta ya está cerrada')
+    if (goal.status === 'PENDING_CLOSURE') throw new Error('Ya hay una solicitud de cierre pendiente')
+
+    return prisma.goal.update({
+      where: { id: goalId },
+      data: {
+        status: 'PENDING_CLOSURE',
+        closureRequestedAt: new Date(),
+        closureRequestedBy: requestedBy,
+      },
+    })
+  }
+
+  /**
+   * Aprobar cierre de meta (CEO)
+   */
+  static async approveClosure(
+    goalId: string,
+    accountId: string,
+    approvedBy: string,
+    notes?: string
+  ): Promise<Goal> {
+    const goal = await prisma.goal.findFirst({
+      where: { id: goalId, accountId, status: 'PENDING_CLOSURE' }
+    })
+
+    if (!goal) throw new Error('Meta no encontrada o no está pendiente de cierre')
+
+    return prisma.goal.update({
+      where: { id: goalId },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        closedAt: new Date(),
+        closedBy: approvedBy,
+        closureApprovedBy: approvedBy,
+        closureNotes: notes,
+      },
+    })
+  }
+
+  /**
+   * Rechazar cierre de meta (CEO)
+   */
+  static async rejectClosure(
+    goalId: string,
+    accountId: string,
+    rejectedBy: string,
+    notes?: string
+  ): Promise<Goal> {
+    const goal = await prisma.goal.findFirst({
+      where: { id: goalId, accountId, status: 'PENDING_CLOSURE' }
+    })
+
+    if (!goal) throw new Error('Meta no encontrada o no está pendiente de cierre')
+
+    // Determinar status basado en progreso
+    const newStatus: GoalStatus =
+      goal.progress >= 90 ? 'ON_TRACK' : goal.progress >= 70 ? 'AT_RISK' : 'BEHIND'
+
+    return prisma.goal.update({
+      where: { id: goalId },
+      data: {
+        status: newStatus,
+        closureRequestedAt: null,
+        closureRequestedBy: null,
+        closureNotes: `Rechazado por ${rejectedBy}: ${notes || 'Sin comentarios'}`,
+      },
+    })
+  }
+
+  /**
+   * Obtener metas pendientes de cierre
+   */
+  static async getPendingClosures(accountId: string) {
+    return prisma.goal.findMany({
+      where: {
+        accountId,
+        status: 'PENDING_CLOSURE',
+      },
+      include: {
+        owner: {
+          select: { id: true, fullName: true, email: true, standardJobLevel: true },
+        },
+        progressUpdates: {
+          orderBy: { createdAt: 'desc' as const },
+          take: 5,
+        },
+      },
+      orderBy: { closureRequestedAt: 'asc' },
+    })
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
   // HELPERS PRIVADOS
   // ══════════════════════════════════════════════════════════════════════════
 

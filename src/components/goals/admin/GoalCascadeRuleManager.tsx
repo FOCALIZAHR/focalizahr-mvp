@@ -49,7 +49,7 @@ interface PreviewData {
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
 
-export default function GoalCascadeRuleManager() {
+export default function GoalCascadeRuleManager({ embedded }: { embedded?: boolean }) {
   const [rules, setRules] = useState<CascadeRule[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -142,18 +142,20 @@ export default function GoalCascadeRuleManager() {
   return (
     <div className="space-y-6">
       {/* HEADER */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20">
-            <Workflow className="w-6 h-6 text-cyan-400" />
+      <div className={`flex items-center ${embedded ? 'justify-end' : 'justify-between'}`}>
+        {!embedded && (
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20">
+              <Workflow className="w-6 h-6 text-cyan-400" />
+            </div>
+            <div>
+              <h2 className="text-xl text-white font-medium">Reglas de Cascada</h2>
+              <p className="text-slate-400 text-sm">
+                Automatiza la asignación de metas corporativas a empleados
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl text-white font-medium">Reglas de Cascada</h2>
-            <p className="text-slate-400 text-sm">
-              Automatiza la asignación de metas corporativas a empleados
-            </p>
-          </div>
-        </div>
+        )}
         <button
           onClick={() => setIsCreating(true)}
           className="fhr-btn fhr-btn-primary flex items-center gap-2 px-4 py-2"

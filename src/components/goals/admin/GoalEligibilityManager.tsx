@@ -36,7 +36,7 @@ interface EligibilityConfig {
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
 
-export default function GoalEligibilityManager() {
+export default function GoalEligibilityManager({ embedded }: { embedded?: boolean }) {
   const [configs, setConfigs] = useState<EligibilityConfig[]>([])
   const [goalGroups, setGoalGroups] = useState<GoalGroup[]>([])
   const [loading, setLoading] = useState(true)
@@ -144,16 +144,18 @@ export default function GoalEligibilityManager() {
   return (
     <div className="space-y-6">
       {/* HEADER */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-            <Settings2 className="w-5 h-5 text-cyan-400" />
-            Elegibilidad de Metas por Cargo
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">
-            Define qué niveles de cargo participan en el sistema de metas
-          </p>
-        </div>
+      <div className={`flex items-center ${embedded ? 'justify-end' : 'justify-between'}`}>
+        {!embedded && (
+          <div>
+            <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+              <Settings2 className="w-5 h-5 text-cyan-400" />
+              Elegibilidad de Metas por Cargo
+            </h2>
+            <p className="text-sm text-slate-400 mt-1">
+              Define qué niveles de cargo participan en el sistema de metas
+            </p>
+          </div>
+        )}
 
         <button
           onClick={handleSave}

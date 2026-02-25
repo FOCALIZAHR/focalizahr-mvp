@@ -1,7 +1,12 @@
 // src/app/api/goals/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { extractUserContext } from '@/lib/services/AuthorizationService'
+import {
+  extractUserContext,
+  hasPermission,
+  getChildDepartmentIds,
+  GLOBAL_ACCESS_ROLES
+} from '@/lib/services/AuthorizationService'
 import { z } from 'zod'
 
 const updateGoalSchema = z.object({
@@ -27,6 +32,14 @@ export async function GET(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
+    // ═══ CHECK 2: hasPermission ═══
+    if (!hasPermission(context.role, 'goals:view')) {
+      return NextResponse.json(
+        { error: 'Sin permisos para ver metas', success: false },
+        { status: 403 }
+      )
+    }
+
     const { id } = await params
 
     const goal = await prisma.goal.findFirst({
@@ -50,7 +63,7 @@ export async function GET(
           orderBy: { createdAt: 'asc' },
         },
         owner: {
-          select: { id: true, fullName: true, position: true, email: true }
+          select: { id: true, fullName: true, position: true, email: true, departmentId: true, managerId: true }
         },
         department: {
           select: { id: true, displayName: true }
@@ -80,6 +93,48 @@ export async function GET(
         { error: 'Meta no encontrada', success: false },
         { status: 404 }
       )
+    }
+
+    // ═══ CHECK 4: Validar scope jerárquico ═══
+    const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(context.role as any)
+
+    if (!hasGlobalAccess && goal) {
+      const userEmail = request.headers.get('x-user-email') || ''
+
+      if (context.role === 'AREA_MANAGER' && context.departmentId) {
+        const childIds = await getChildDepartmentIds(context.departmentId)
+        const allowedDepts = [context.departmentId, ...childIds]
+
+        // Validar según nivel de la meta
+        if (goal.level === 'AREA' && goal.departmentId && !allowedDepts.includes(goal.departmentId)) {
+          return NextResponse.json(
+            { error: 'Sin acceso a esta meta', success: false },
+            { status: 403 }
+          )
+        }
+        if (goal.level === 'INDIVIDUAL' && goal.owner?.departmentId &&
+            !allowedDepts.includes(goal.owner.departmentId)) {
+          return NextResponse.json(
+            { error: 'Sin acceso a esta meta', success: false },
+            { status: 403 }
+          )
+        }
+      } else if (context.role === 'EVALUATOR') {
+        const currentEmployee = await prisma.employee.findFirst({
+          where: { accountId: context.accountId, email: userEmail, status: 'ACTIVE' },
+          select: { id: true }
+        })
+
+        // EVALUATOR solo ve COMPANY o metas de subordinados
+        if (goal.level !== 'COMPANY') {
+          if (!currentEmployee || goal.owner?.managerId !== currentEmployee.id) {
+            return NextResponse.json(
+              { error: 'Sin acceso a esta meta', success: false },
+              { status: 403 }
+            )
+          }
+        }
+      }
     }
 
     // Enriquecer progressUpdates con nombres de quién actualizó
@@ -145,6 +200,14 @@ export async function PATCH(
     const context = extractUserContext(request)
     if (!context.accountId) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    // ═══ CHECK 2: hasPermission (usar 'goals:create' para modificar) ═══
+    if (!hasPermission(context.role, 'goals:create')) {
+      return NextResponse.json(
+        { error: 'Sin permisos para modificar metas', success: false },
+        { status: 403 }
+      )
     }
 
     const { id } = await params
@@ -215,6 +278,14 @@ export async function DELETE(
     const context = extractUserContext(request)
     if (!context.accountId) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    // ═══ CHECK 2: hasPermission ═══
+    if (!hasPermission(context.role, 'goals:create')) {
+      return NextResponse.json(
+        { error: 'Sin permisos para eliminar metas', success: false },
+        { status: 403 }
+      )
     }
 
     const { id } = await params

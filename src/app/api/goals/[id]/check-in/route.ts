@@ -2,7 +2,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { GoalsService } from '@/lib/services/GoalsService'
-import { extractUserContext } from '@/lib/services/AuthorizationService'
+import {
+  extractUserContext,
+  hasPermission
+} from '@/lib/services/AuthorizationService'
 import { z } from 'zod'
 
 const checkInSchema = z.object({
@@ -19,6 +22,14 @@ export async function PATCH(
     const context = extractUserContext(request)
     if (!context.accountId) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    // ═══ CHECK 2: hasPermission ═══
+    if (!hasPermission(context.role, 'goals:view')) {
+      return NextResponse.json(
+        { error: 'Sin permisos para actualizar progreso', success: false },
+        { status: 403 }
+      )
     }
 
     const { id } = await params

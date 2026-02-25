@@ -1,13 +1,26 @@
 // src/app/api/goals/team/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { extractUserContext } from '@/lib/services/AuthorizationService'
+import {
+  extractUserContext,
+  hasPermission,
+  getChildDepartmentIds,
+  GLOBAL_ACCESS_ROLES
+} from '@/lib/services/AuthorizationService'
 
 export async function GET(request: NextRequest) {
   try {
     const context = extractUserContext(request)
     if (!context.accountId) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    // ═══ CHECK 2: hasPermission ═══
+    if (!hasPermission(context.role, 'goals:view')) {
+      return NextResponse.json(
+        { error: 'Sin permisos para ver equipo', success: false },
+        { status: 403 }
+      )
     }
 
     // Obtener niveles de cargo con metas habilitadas
@@ -17,12 +30,38 @@ export async function GET(request: NextRequest) {
     })
     const eligibleLevels = new Set(eligibleConfigs.map((c) => c.standardJobLevel))
 
+    // ═══ CHECK 4: Filtrado jerárquico ═══
+    const employeeWhere: any = {
+      accountId: context.accountId,
+      status: 'ACTIVE',
+    }
+
+    const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(context.role as any)
+
+    if (!hasGlobalAccess) {
+      if (context.role === 'AREA_MANAGER' && context.departmentId) {
+        const childIds = await getChildDepartmentIds(context.departmentId)
+        const allowedDepts = [context.departmentId, ...childIds]
+        employeeWhere.departmentId = { in: allowedDepts }
+      } else if (context.role === 'EVALUATOR') {
+        const userEmail = request.headers.get('x-user-email') || ''
+        const currentEmployee = await prisma.employee.findFirst({
+          where: { accountId: context.accountId, email: userEmail, status: 'ACTIVE' },
+          select: { id: true }
+        })
+        if (currentEmployee) {
+          // EVALUATOR solo ve subordinados directos
+          employeeWhere.managerId = currentEmployee.id
+        } else {
+          // Sin empleado, no ve nada
+          employeeWhere.id = 'no-access'
+        }
+      }
+    }
+
     // Get employees with their goals count and avg progress
     const employees = await prisma.employee.findMany({
-      where: {
-        accountId: context.accountId,
-        status: 'ACTIVE',
-      },
+      where: employeeWhere,
       select: {
         id: true,
         fullName: true,

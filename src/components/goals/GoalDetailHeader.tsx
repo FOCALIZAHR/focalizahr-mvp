@@ -7,7 +7,7 @@
 
 import { memo, useMemo, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Calendar, Target, Link2, AlertTriangle, BookOpen, Trash2 } from 'lucide-react'
+import { ArrowLeft, Calendar, Target, Link2, AlertTriangle, BookOpen, Trash2, Clock, Send } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import GoalLevelBadge from './GoalLevelBadge'
 import GoalProgressBar from './GoalProgressBar'
@@ -19,7 +19,7 @@ import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton'
 // ════════════════════════════════════════════════════════════════════════════
 
 type GoalLevel = 'COMPANY' | 'AREA' | 'INDIVIDUAL'
-type GoalStatus = 'NOT_STARTED' | 'ON_TRACK' | 'AT_RISK' | 'BEHIND' | 'COMPLETED' | 'CANCELLED'
+type GoalStatus = 'NOT_STARTED' | 'ON_TRACK' | 'AT_RISK' | 'BEHIND' | 'PENDING_CLOSURE' | 'COMPLETED' | 'CANCELLED'
 
 interface GoalDetailHeaderProps {
   goal: {
@@ -39,9 +39,13 @@ interface GoalDetailHeaderProps {
     parent?: { id: string; title: string } | null
     owner?: { id: string; fullName: string } | null
     linkedDevGoal?: { id: string; title: string } | null
+    // Campos de cierre
+    closureRequestedAt?: string | null
+    closureRequestedBy?: string | null
   }
   onCheckIn: () => void
   onCancelGoal?: () => void
+  onRequestClosure?: () => Promise<void>
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -52,6 +56,7 @@ export default memo(function GoalDetailHeader({
   goal,
   onCheckIn,
   onCancelGoal,
+  onRequestClosure,
 }: GoalDetailHeaderProps) {
   const router = useRouter()
   const [showCancelModal, setShowCancelModal] = useState(false)
@@ -64,6 +69,32 @@ export default memo(function GoalDetailHeader({
   const isOverdue = daysRemaining < 0
   const isUrgent = daysRemaining >= 0 && daysRemaining <= 7
   const isFinished = goal.status === 'COMPLETED' || goal.status === 'CANCELLED'
+  const isPendingClosure = goal.status === 'PENDING_CLOSURE'
+  const [isRequestingClosure, setIsRequestingClosure] = useState(false)
+
+  const canRequestClosure = useMemo(() => {
+    return goal.progress >= 80 &&
+           !['PENDING_CLOSURE', 'COMPLETED', 'CANCELLED'].includes(goal.status)
+  }, [goal.progress, goal.status])
+
+  const handleRequestClosure = useCallback(async () => {
+    if (!onRequestClosure || isRequestingClosure) return
+
+    setIsRequestingClosure(true)
+    try {
+      await onRequestClosure()
+    } finally {
+      setIsRequestingClosure(false)
+    }
+  }, [onRequestClosure, isRequestingClosure])
+
+  const closureRequestDate = useMemo(() => {
+    if (!goal.closureRequestedAt) return null
+    return new Date(goal.closureRequestedAt).toLocaleDateString('es-CL', {
+      day: 'numeric',
+      month: 'short',
+    })
+  }, [goal.closureRequestedAt])
 
   const handleBack = useCallback(() => {
     router.push('/dashboard/metas')
@@ -115,6 +146,12 @@ export default memo(function GoalDetailHeader({
                   Sin alinear
                 </span>
               )}
+              {isPendingClosure && (
+                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 text-sm">
+                  <Clock className="w-3.5 h-3.5" />
+                  Pendiente Aprobación
+                </span>
+              )}
             </div>
             <h1 className="text-2xl md:text-3xl font-light text-white">
               {goal.title}
@@ -127,8 +164,20 @@ export default memo(function GoalDetailHeader({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Solicitar cierre */}
+            {canRequestClosure && onRequestClosure && (
+              <button
+                onClick={handleRequestClosure}
+                disabled={isRequestingClosure}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" />
+                {isRequestingClosure ? 'Solicitando...' : 'Solicitar Cierre'}
+              </button>
+            )}
+
             {/* Cancelar meta */}
-            {!isFinished && (
+            {!isFinished && !isPendingClosure && (
               <button
                 onClick={() => setShowCancelModal(true)}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors bg-slate-800 text-slate-400 hover:text-red-400"
@@ -145,7 +194,7 @@ export default memo(function GoalDetailHeader({
             <PrimaryButton
               icon={Target}
               onClick={onCheckIn}
-              disabled={isFinished}
+              disabled={isFinished || isPendingClosure}
             >
               Registrar Avance
             </PrimaryButton>
@@ -228,6 +277,17 @@ export default memo(function GoalDetailHeader({
             <span className="fhr-text-sm text-slate-400">
               Responsable: {goal.owner.fullName}
             </span>
+          )}
+
+          {/* Info de solicitud de cierre */}
+          {isPendingClosure && goal.closureRequestedBy && (
+            <div className="flex items-center gap-2 text-sm text-amber-400">
+              <Clock className="w-4 h-4" />
+              <span>
+                Solicitado por {goal.closureRequestedBy}
+                {closureRequestDate && ` el ${closureRequestDate}`}
+              </span>
+            </div>
           )}
         </div>
       </div>

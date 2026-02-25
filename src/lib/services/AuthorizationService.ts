@@ -441,8 +441,78 @@ export const PERMISSIONS = {
   ],
 
   // ─────────────────────────────────────────────────────────────────────────
-  // GOALS CONFIGURATION
+  // GOALS (OKRs/Metas)
   // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * goals:view - Ver y listar metas
+   *
+   * GLOBAL_ACCESS_ROLES (ven toda la empresa):
+   *   - FOCALIZAHR_ADMIN, ACCOUNT_OWNER, HR_ADMIN, HR_MANAGER, CEO
+   *
+   * HIERARCHICAL_FILTER_ROLES (filtrado por departamento):
+   *   - AREA_MANAGER: Ve metas COMPANY + metas AREA/INDIVIDUAL de su scope
+   *
+   * EVALUATOR (filtrado por managerId):
+   *   - Ve metas COMPANY (corporativas visibles para todos)
+   *   - Ve metas INDIVIDUAL de sus subordinados directos (managerId)
+   *
+   * IMPORTANTE: El filtrado específico de EVALUATOR se implementa en la API,
+   * NO aquí. Este permiso solo autoriza el acceso al endpoint.
+   */
+  'goals:view': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'CEO',
+    'AREA_MANAGER',
+    'EVALUATOR'
+  ],
+
+  /**
+   * goals:create - Crear metas nuevas
+   *
+   * Niveles permitidos por rol:
+   *   - CEO/ACCOUNT_OWNER: Pueden crear COMPANY goals
+   *   - HR_ADMIN/HR_MANAGER: Pueden crear COMPANY + AREA goals
+   *   - AREA_MANAGER: Pueden crear AREA + INDIVIDUAL para su equipo
+   *   - EVALUATOR: Solo INDIVIDUAL para sus subordinados directos (managerId)
+   *
+   * IMPORTANTE: La validación de nivel y ownership se hace en la API.
+   * Este permiso solo autoriza acceso al endpoint POST.
+   */
+  'goals:create': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'CEO',
+    'AREA_MANAGER',
+    'EVALUATOR'
+  ],
+
+  /**
+   * goals:approve - Aprobar/rechazar solicitudes de cierre de metas
+   *
+   * Lógica de aprobación:
+   *   - COMPANY goals: CEO o ACCOUNT_OWNER aprueban
+   *   - AREA goals: HR_MANAGER o el jefe de área aprueba
+   *   - INDIVIDUAL goals: AREA_MANAGER (jefe directo) aprueba
+   *
+   * NOTA: La validación de quién puede aprobar qué se hace
+   * en la lógica de negocio, no solo con este permiso.
+   */
+  'goals:approve': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'CEO',
+    'AREA_MANAGER'
+  ],
+
+  // GOALS CONFIGURATION (ya existía - NO modificar)
   'goals:config': [
     'FOCALIZAHR_ADMIN',
     'ACCOUNT_OWNER',

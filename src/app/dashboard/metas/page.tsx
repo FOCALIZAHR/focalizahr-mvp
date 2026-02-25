@@ -15,18 +15,56 @@ import {
   Plus,
   Filter,
   RefreshCw,
+  Clock,
+  ArrowRight,
+  Users,
+  BarChart3,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton'
 import GoalCard from '@/components/goals/GoalCard'
+import useSWR from 'swr'
 import { useGoals, useAlignmentReport } from '@/hooks/useGoals'
 import type { GoalLevel } from '@/hooks/useGoals'
+
+// ════════════════════════════════════════════════════════════════════════════
+// ROLES Y PERMISOS
+// ════════════════════════════════════════════════════════════════════════════
+
+const GLOBAL_ACCESS_ROLES = [
+  'FOCALIZAHR_ADMIN',
+  'ACCOUNT_OWNER',
+  'HR_ADMIN',
+  'HR_MANAGER',
+  'CEO'
+] as const
+
+const APPROVE_ROLES = [
+  'FOCALIZAHR_ADMIN',
+  'ACCOUNT_OWNER',
+  'HR_ADMIN',
+  'HR_MANAGER',
+  'CEO',
+  'AREA_MANAGER'
+] as const
+
+// Fetcher para pending-closure
+const pendingFetcher = (url: string) => {
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('focalizahr_token')
+    : null
+  return fetch(url, {
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    credentials: 'include',
+  }).then(res => res.ok ? res.json() : null)
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
 // ════════════════════════════════════════════════════════════════════════════
 
 type TabKey = 'ALL' | 'COMPANY' | 'AREA' | 'INDIVIDUAL'
+type HybridView = 'team' | 'strategy'
 
 interface Tab {
   key: TabKey
@@ -38,12 +76,44 @@ interface Tab {
 // CONFIGURACIÓN
 // ════════════════════════════════════════════════════════════════════════════
 
-const TABS: Tab[] = [
+const ALL_TABS: Tab[] = [
   { key: 'ALL', label: 'Todas' },
   { key: 'COMPANY', label: 'Corporativas', level: 'COMPANY' },
   { key: 'AREA', label: 'De Área', level: 'AREA' },
   { key: 'INDIVIDUAL', label: 'Individuales', level: 'INDIVIDUAL' },
 ]
+
+// Tabs filtradas según rol (se calculan en el componente)
+
+// ════════════════════════════════════════════════════════════════════════════
+// HOOK: useUserRole - Obtener rol del usuario actual
+// ════════════════════════════════════════════════════════════════════════════
+
+function useUserRole() {
+  const { data, isLoading } = useSWR('/api/auth/me', pendingFetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60000,
+  })
+
+  const role = data?.user?.role || data?.role || null
+  const hasGlobalAccess = role ? GLOBAL_ACCESS_ROLES.includes(role as any) : false
+  const canApprove = role ? APPROVE_ROLES.includes(role as any) : false
+
+  // Detectar si tiene subordinados (viene de /api/auth/me)
+  const hasDirectReports = data?.user?.hasDirectReports || data?.hasDirectReports || false
+
+  // Usuario híbrido: tiene acceso global Y tiene subordinados
+  const isHybridUser = hasGlobalAccess && hasDirectReports
+
+  return {
+    role,
+    isLoading,
+    hasGlobalAccess,
+    canApprove,
+    hasDirectReports,
+    isHybridUser,
+  }
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE: MetricCard
@@ -74,6 +144,100 @@ const MetricCard = memo(function MetricCard({
 })
 
 // ════════════════════════════════════════════════════════════════════════════
+// COMPONENTE: PendingApprovalsBanner
+// ════════════════════════════════════════════════════════════════════════════
+
+const PendingApprovalsBanner = memo(function PendingApprovalsBanner({
+  canApprove,
+}: {
+  canApprove: boolean
+}) {
+  const router = useRouter()
+
+  // Solo fetch si puede aprobar
+  const { data } = useSWR(
+    canApprove ? '/api/goals/pending-closure' : null,
+    pendingFetcher,
+    { revalidateOnFocus: false }
+  )
+
+  const pendingCount = data?.stats?.total || 0
+  const urgentCount = data?.stats?.urgent || 0
+
+  if (!canApprove || pendingCount === 0) return null
+
+  return (
+    <div
+      onClick={() => router.push('/dashboard/metas/aprobaciones')}
+      className="fhr-card cursor-pointer mb-6 border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 transition-colors"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-amber-500/20">
+            <Clock className="w-5 h-5 text-amber-400" />
+          </div>
+          <div>
+            <p className="text-white font-medium">
+              Tienes {pendingCount} meta{pendingCount > 1 ? 's' : ''} pendiente{pendingCount > 1 ? 's' : ''} de aprobación
+            </p>
+            {urgentCount > 0 && (
+              <p className="text-xs text-amber-400">
+                {urgentCount} urgente{urgentCount > 1 ? 's' : ''} (más de 3 días esperando)
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-amber-400">
+          <span className="text-sm font-medium">Revisar</span>
+          <ArrowRight className="w-4 h-4" />
+        </div>
+      </div>
+    </div>
+  )
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENTE: HybridViewSwitcher
+// ════════════════════════════════════════════════════════════════════════════
+
+const HybridViewSwitcher = memo(function HybridViewSwitcher({
+  currentView,
+  onChange,
+}: {
+  currentView: HybridView
+  onChange: (view: HybridView) => void
+}) {
+  return (
+    <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-800/50 border border-slate-700/50 mb-6">
+      <button
+        onClick={() => onChange('team')}
+        className={cn(
+          'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+          currentView === 'team'
+            ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+            : 'text-slate-400 hover:text-slate-200'
+        )}
+      >
+        <Users className="w-4 h-4" />
+        Mi Equipo
+      </button>
+      <button
+        onClick={() => onChange('strategy')}
+        className={cn(
+          'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+          currentView === 'strategy'
+            ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+            : 'text-slate-400 hover:text-slate-200'
+        )}
+      >
+        <BarChart3 className="w-4 h-4" />
+        Estrategia
+      </button>
+    </div>
+  )
+})
+
+// ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -81,11 +245,44 @@ export default memo(function GoalsHubPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabKey>('ALL')
   const [showCompleted, setShowCompleted] = useState(false)
+  const [hybridView, setHybridView] = useState<HybridView>('team')
+
+  // Obtener rol del usuario
+  const { role, hasGlobalAccess, canApprove, isHybridUser, isLoading: roleLoading } = useUserRole()
+
+  // Tabs disponibles según rol y vista híbrida
+  const availableTabs = useMemo(() => {
+    // Usuario híbrido en vista "Mi Equipo"
+    if (isHybridUser && hybridView === 'team') {
+      return [
+        { key: 'ALL' as TabKey, label: 'Mi Equipo' },
+        { key: 'INDIVIDUAL' as TabKey, label: 'Individuales', level: 'INDIVIDUAL' as GoalLevel },
+      ]
+    }
+
+    // Usuario híbrido en vista "Estrategia" o global sin subordinados
+    if (hasGlobalAccess) {
+      return ALL_TABS
+    }
+
+    if (role === 'AREA_MANAGER') {
+      return ALL_TABS.filter(t => t.key !== 'COMPANY')
+    }
+
+    if (role === 'EVALUATOR') {
+      return [
+        { key: 'ALL' as TabKey, label: 'Mis Subordinados' },
+        { key: 'INDIVIDUAL' as TabKey, label: 'Individuales', level: 'INDIVIDUAL' as GoalLevel },
+      ]
+    }
+
+    return ALL_TABS
+  }, [hasGlobalAccess, role, isHybridUser, hybridView])
 
   // Determinar filtros
   const currentLevel = useMemo(
-    () => TABS.find(t => t.key === activeTab)?.level,
-    [activeTab]
+    () => availableTabs.find(t => t.key === activeTab)?.level,
+    [activeTab, availableTabs]
   )
 
   const { goals, count, isLoading, error, mutate } = useGoals({
@@ -107,6 +304,11 @@ export default memo(function GoalsHubPage() {
   const handleRetry = useCallback(() => {
     mutate()
   }, [mutate])
+
+  const handleHybridViewChange = useCallback((view: HybridView) => {
+    setHybridView(view)
+    setActiveTab('ALL') // Reset tab al cambiar vista
+  }, [])
 
   // ════════════════════════════════════════════════════════════════════════
   // RENDER: Error
@@ -146,23 +348,48 @@ export default memo(function GoalsHubPage() {
                 Módulo de Metas
               </p>
               <h1 className="fhr-hero-title">
-                <span className="fhr-title-gradient">Metas</span> Enterprise
+                {isHybridUser && hybridView === 'team' ? (
+                  <>
+                    <span className="fhr-title-gradient">Mi Equipo</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="fhr-title-gradient">Metas</span> Enterprise
+                  </>
+                )}
               </h1>
               <p className="fhr-text text-slate-400 mt-2 max-w-lg">
-                Define, cascadea y monitorea tus metas estratégicas con trazabilidad completa.
+                {isHybridUser && hybridView === 'team'
+                  ? 'Gestiona las metas de tu equipo directo'
+                  : 'Define, cascadea y monitorea tus metas estratégicas con trazabilidad completa.'
+                }
               </p>
             </div>
 
-            <PrimaryButton icon={Plus} size="lg" onClick={handleCreateGoal}>
-              Nueva Meta
-            </PrimaryButton>
+            {role !== 'EVALUATOR' && (
+              <PrimaryButton icon={Plus} size="lg" onClick={handleCreateGoal}>
+                Nueva Meta
+              </PrimaryButton>
+            )}
           </div>
         </div>
 
         {/* ── Divider ── */}
         <div className="fhr-divider mb-8" />
 
-        {/* ── Métricas Resumen ── */}
+        {/* ── Switcher Vista Híbrida ── */}
+        {isHybridUser && (
+          <HybridViewSwitcher
+            currentView={hybridView}
+            onChange={handleHybridViewChange}
+          />
+        )}
+
+        {/* ── Banner Aprobaciones Pendientes ── */}
+        <PendingApprovalsBanner canApprove={canApprove} />
+
+        {/* ── Métricas Resumen (solo en vista estrategia o no híbrido) ── */}
+        {(!isHybridUser || hybridView === 'strategy') && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
           {reportLoading ? (
             <>
@@ -199,10 +426,11 @@ export default memo(function GoalsHubPage() {
             </>
           )}
         </div>
+        )}
 
         {/* ── Tabs ── */}
         <div className="flex items-center gap-2 mb-6 overflow-x-auto scrollbar-hide">
-          {TABS.map(tab => (
+          {availableTabs.map(tab => (
             <button
               key={tab.key}
               onClick={() => handleTabChange(tab.key)}
@@ -244,8 +472,10 @@ export default memo(function GoalsHubPage() {
             <Target className="w-10 h-10 text-slate-600 mx-auto mb-4" />
             <h3 className="fhr-title-card text-slate-300 mb-2">
               {activeTab === 'ALL'
-                ? 'Aún no tienes metas definidas'
-                : `Sin metas ${TABS.find(t => t.key === activeTab)?.label.toLowerCase()}`}
+                ? role === 'EVALUATOR'
+                  ? 'Tus subordinados aún no tienen metas'
+                  : 'Aún no tienes metas definidas'
+                : `Sin metas ${availableTabs.find(t => t.key === activeTab)?.label.toLowerCase()}`}
             </h3>
             <p className="fhr-text-sm text-slate-500 mb-6 max-w-sm mx-auto">
               Crea tu primera meta para comenzar a monitorear el progreso de tu equipo.
@@ -266,8 +496,8 @@ export default memo(function GoalsHubPage() {
           </div>
         )}
 
-        {/* ── Recomendaciones ── */}
-        {report && report.recommendations.length > 0 && (
+        {/* ── Recomendaciones (solo en vista estrategia) ── */}
+        {(!isHybridUser || hybridView === 'strategy') && report && report.recommendations.length > 0 && (
           <div className="fhr-card mt-8">
             <h3 className="fhr-title-card mb-4">
               <span className="fhr-title-gradient">Recomendaciones</span>
