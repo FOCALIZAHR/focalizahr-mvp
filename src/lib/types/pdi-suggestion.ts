@@ -19,6 +19,11 @@ export interface SuggestionGoal {
   priority: DevelopmentPriority
   suggestedResources: SuggestedResource[]
   estimatedWeeks?: number
+  scientificBasis?: {
+    summary: string
+    source: string
+    insight?: string
+  }
 }
 
 export interface SuggestedResource {

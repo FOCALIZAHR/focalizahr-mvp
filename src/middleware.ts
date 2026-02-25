@@ -222,14 +222,18 @@ if (effectiveRole === 'EVALUATOR') {
   const evaluatorAllowedPaths = [
     '/dashboard/evaluaciones',    // Portal del Jefe
     '/dashboard/performance',     // Nine-box, calibración, cycles
-    '/encuesta',                  
-    '/api/evaluator',             
-    '/api/auth',                  
-    '/api/survey',                
+    '/dashboard/metas',            // Redirector hub metas
+    '/dashboard/metas/equipo',    // Mission Control metas equipo
+    '/dashboard/metas/crear',     // Crear meta individual
+    '/encuesta',
+    '/api/evaluator',
+    '/api/auth',
+    '/api/survey',
     '/api/admin/performance',
     '/api/performance/role-fit',
     '/api/calibration',
     '/api/pdi',
+    '/api/goals',                 // APIs de metas
   ];
   
   const isAllowedPath = evaluatorAllowedPaths.some(path => 

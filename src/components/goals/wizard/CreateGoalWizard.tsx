@@ -103,10 +103,20 @@ const stepTransition = {
 // COMPONENTE
 // ════════════════════════════════════════════════════════════════════════════
 
-export default function CreateGoalWizard() {
+interface CreateGoalWizardProps {
+  employeeId?: string
+  context?: string
+}
+
+export default function CreateGoalWizard({ employeeId: initialEmployeeId, context }: CreateGoalWizardProps) {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
-  const [data, setData] = useState<GoalWizardData>(initialData)
+  const [data, setData] = useState<GoalWizardData>(() => {
+    if (initialEmployeeId) {
+      return { ...initialData, level: 'INDIVIDUAL', employeeId: initialEmployeeId }
+    }
+    return initialData
+  })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
 

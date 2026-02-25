@@ -266,6 +266,16 @@ export default function TeamGoalsPage() {
               <div key={i} className="fhr-skeleton h-40 rounded-xl" />
             ))}
           </div>
+        ) : team.length === 0 ? (
+          <div className="fhr-card text-center py-12">
+            <Users className="w-10 h-10 text-slate-600 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-slate-300 mb-2">
+              No tienes equipo asignado
+            </h3>
+            <p className="text-sm text-slate-500">
+              No hay colaboradores que te reporten directamente.
+            </p>
+          </div>
         ) : filteredTeam.length === 0 ? (
           <div className="fhr-card p-8 text-center">
             <p className="text-slate-400">No hay colaboradores en esta categoría</p>

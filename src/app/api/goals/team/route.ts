@@ -4,8 +4,6 @@ import { prisma } from '@/lib/prisma'
 import {
   extractUserContext,
   hasPermission,
-  getChildDepartmentIds,
-  GLOBAL_ACCESS_ROLES
 } from '@/lib/services/AuthorizationService'
 
 export async function GET(request: NextRequest) {
@@ -30,33 +28,28 @@ export async function GET(request: NextRequest) {
     })
     const eligibleLevels = new Set(eligibleConfigs.map((c) => c.standardJobLevel))
 
-    // ═══ CHECK 4: Filtrado jerárquico ═══
+    // ═══ CHECK 4: /team SIEMPRE filtra por managerId - sin excepción ═══
+    const userEmail = request.headers.get('x-user-email') || ''
+    const currentEmployee = await prisma.employee.findFirst({
+      where: {
+        accountId: context.accountId,
+        email: userEmail,
+        status: 'ACTIVE',
+      },
+      select: { id: true },
+    })
+
+    if (!currentEmployee) {
+      return NextResponse.json(
+        { error: 'Empleado no encontrado', success: false },
+        { status: 404 }
+      )
+    }
+
     const employeeWhere: any = {
       accountId: context.accountId,
       status: 'ACTIVE',
-    }
-
-    const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(context.role as any)
-
-    if (!hasGlobalAccess) {
-      if (context.role === 'AREA_MANAGER' && context.departmentId) {
-        const childIds = await getChildDepartmentIds(context.departmentId)
-        const allowedDepts = [context.departmentId, ...childIds]
-        employeeWhere.departmentId = { in: allowedDepts }
-      } else if (context.role === 'EVALUATOR') {
-        const userEmail = request.headers.get('x-user-email') || ''
-        const currentEmployee = await prisma.employee.findFirst({
-          where: { accountId: context.accountId, email: userEmail, status: 'ACTIVE' },
-          select: { id: true }
-        })
-        if (currentEmployee) {
-          // EVALUATOR solo ve subordinados directos
-          employeeWhere.managerId = currentEmployee.id
-        } else {
-          // Sin empleado, no ve nada
-          employeeWhere.id = 'no-access'
-        }
-      }
+      managerId: currentEmployee.id,
     }
 
     // Get employees with their goals count and avg progress

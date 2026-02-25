@@ -5,9 +5,11 @@
 
 'use client'
 
-import { memo, useCallback, useState, useEffect } from 'react'
+import { memo, useCallback, useState, useEffect, useMemo } from 'react'
 import { Building2, Users, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getCurrentUser } from '@/lib/auth'
+import { GLOBAL_ACCESS_ROLES } from '@/lib/services/AuthorizationService'
 import type { GoalWizardData } from './CreateGoalWizard'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -65,6 +67,19 @@ export default memo(function StepSelectLevel({
   const [departments, setDepartments] = useState<DepartmentOption[]>([])
   const [employees, setEmployees] = useState<EmployeeOption[]>([])
 
+  // Obtener rol del usuario
+  const user = getCurrentUser()
+  const role = (user as any)?.userRole || user?.role || null
+  const hasGlobalAccess = role ? GLOBAL_ACCESS_ROLES.includes(role as any) : false
+
+  // Filtrar niveles según rol
+  const allowedLevels = useMemo(() => {
+    if (hasGlobalAccess) return LEVELS
+    if (role === 'AREA_MANAGER') return LEVELS.filter(l => l.value !== 'COMPANY')
+    if (role === 'EVALUATOR') return LEVELS.filter(l => l.value === 'INDIVIDUAL')
+    return LEVELS
+  }, [hasGlobalAccess, role])
+
   // Cargar departamentos cuando se selecciona AREA
   useEffect(() => {
     if (data.level === 'AREA') {
@@ -74,36 +89,59 @@ export default memo(function StepSelectLevel({
       })
         .then((res) => res.json())
         .then((res) => {
-          // API retorna { departments: [...], total }
           if (res.departments) {
-            setDepartments(res.departments)
+            // AREA_MANAGER: filtrar solo su departamento
+            if (role === 'AREA_MANAGER' && (user as any)?.departmentId) {
+              const myDeptId = (user as any).departmentId
+              setDepartments(res.departments.filter((d: DepartmentOption) => d.id === myDeptId))
+            } else {
+              setDepartments(res.departments)
+            }
           }
         })
         .catch((err) => console.error('Error cargando departamentos:', err))
     }
-  }, [data.level])
+  }, [data.level, role, user])
 
   // Cargar empleados cuando se selecciona INDIVIDUAL
   useEffect(() => {
     if (data.level === 'INDIVIDUAL') {
       const token = localStorage.getItem('focalizahr_token')
-      fetch('/api/admin/employees?limit=500&status=ACTIVE', {
+      // AREA_MANAGER/EVALUATOR: solo subordinados directos
+      const needsSubordinatesOnly = role === 'AREA_MANAGER' || role === 'EVALUATOR'
+      const url = needsSubordinatesOnly
+        ? '/api/goals/team'
+        : '/api/admin/employees?limit=500&status=ACTIVE'
+
+      fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
         .then((res) => {
-          if (res.success && res.data) {
-            setEmployees(
-              res.data.map((emp: { id: string; fullName: string }) => ({
-                id: emp.id,
-                fullName: emp.fullName,
-              }))
-            )
+          if (needsSubordinatesOnly) {
+            // /api/goals/team retorna { success, data: [...] }
+            if (res.success && res.data) {
+              setEmployees(
+                res.data.map((emp: { id: string; fullName: string }) => ({
+                  id: emp.id,
+                  fullName: emp.fullName,
+                }))
+              )
+            }
+          } else {
+            if (res.success && res.data) {
+              setEmployees(
+                res.data.map((emp: { id: string; fullName: string }) => ({
+                  id: emp.id,
+                  fullName: emp.fullName,
+                }))
+              )
+            }
           }
         })
         .catch(() => {})
     }
-  }, [data.level])
+  }, [data.level, role])
 
   const handleSelect = useCallback(
     (value: string) => {
@@ -142,7 +180,7 @@ export default memo(function StepSelectLevel({
       </div>
 
       <div className="grid gap-4">
-        {LEVELS.map((level) => {
+        {allowedLevels.map((level) => {
           const Icon = level.icon
           const isSelected = data.level === level.value
 
