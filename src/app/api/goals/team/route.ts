@@ -21,6 +21,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Obtener maxGoals de la cuenta
+    const account = await prisma.account.findUnique({
+      where: { id: context.accountId },
+      select: { maxIndividualGoals: true }
+    })
+    const maxGoals = account?.maxIndividualGoals ?? 10
+
     // Obtener niveles de cargo con metas habilitadas
     const eligibleConfigs = await prisma.goalJobConfig.findMany({
       where: { accountId: context.accountId, hasGoals: true },
@@ -71,6 +78,8 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             progress: true,
+            status: true,
+            weight: true,
             isLeaderGoal: true,
           },
         },
@@ -101,6 +110,24 @@ export async function GET(request: NextRequest) {
             : false
           : emp.acotadoGroup !== 'base_operativa'
 
+      // assignmentStatus: metas activas (no completadas ni canceladas)
+      const activeGoals = visibleGoals.filter(
+        (g) => ['NOT_STARTED', 'ON_TRACK', 'AT_RISK', 'BEHIND'].includes(g.status)
+      )
+      const totalWeight = activeGoals.reduce((sum, g) => sum + (g.weight || 0), 0)
+      const goalCount = activeGoals.length
+
+      let assignmentStatusValue: 'EMPTY' | 'INCOMPLETE' | 'READY' | 'EXCEEDED'
+      if (goalCount === 0) {
+        assignmentStatusValue = 'EMPTY'
+      } else if (totalWeight > 100) {
+        assignmentStatusValue = 'EXCEEDED'
+      } else if (totalWeight === 100) {
+        assignmentStatusValue = 'READY'
+      } else {
+        assignmentStatusValue = 'INCOMPLETE'
+      }
+
       return {
         id: emp.id,
         fullName: emp.fullName,
@@ -110,6 +137,13 @@ export async function GET(request: NextRequest) {
         avgProgress: Math.round(avgProgress * 10) / 10,
         hasGoalsConfigured,
         hasDirectReports,
+        assignmentStatus: {
+          totalWeight,
+          goalCount,
+          maxGoals,
+          status: assignmentStatusValue,
+          isComplete: totalWeight === 100,
+        },
       }
     })
 

@@ -1,5 +1,6 @@
 // src/lib/services/GoalRulesEngine.ts
 import { prisma } from '@/lib/prisma'
+import { GoalsService } from '@/lib/services/GoalsService'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -147,35 +148,28 @@ export class GoalRulesEngine {
 
     for (const employee of toCreate) {
       try {
-        await prisma.goal.create({
-          data: {
-            accountId,
-            employeeId: employee.id,
-            title: rule.sourceGoal.title,
-            description: `Cascadeada desde: ${rule.sourceGoal.title}`,
-            level: 'INDIVIDUAL',
-            originType: 'STRATEGIC_CASCADE',
-            type: rule.sourceGoal.type,
-            metricType: rule.sourceGoal.metricType,
-            startValue: rule.sourceGoal.startValue,
-            currentValue: rule.sourceGoal.startValue,
-            targetValue: rule.sourceGoal.targetValue,
-            unit: rule.sourceGoal.unit,
-            startDate: rule.sourceGoal.startDate,
-            dueDate: rule.sourceGoal.dueDate,
-            periodYear: rule.sourceGoal.periodYear,
-            periodQuarter: rule.sourceGoal.periodQuarter,
-            weight: rule.assignedWeight,
-            status: 'NOT_STARTED',
-            parentId: rule.sourceGoalId,
-            createdById: executedBy,
-            isAligned: true,
-            isOrphan: false,
-          },
+        await GoalsService.cascadeGoal(rule.sourceGoalId, {
+          accountId,
+          employeeId: employee.id,
+          createdById: executedBy,
+          title: rule.sourceGoal.title,
+          description: `Cascadeada desde: ${rule.sourceGoal.title}`,
+          level: 'INDIVIDUAL',
+          type: rule.sourceGoal.type,
+          metricType: rule.sourceGoal.metricType,
+          startValue: rule.sourceGoal.startValue,
+          targetValue: rule.sourceGoal.targetValue,
+          unit: rule.sourceGoal.unit ?? undefined,
+          startDate: rule.sourceGoal.startDate,
+          dueDate: rule.sourceGoal.dueDate,
+          periodYear: rule.sourceGoal.periodYear,
+          periodQuarter: rule.sourceGoal.periodQuarter ?? undefined,
+          weight: rule.assignedWeight,
+          isLeaderGoal: rule.isLeaderOnly,
         })
         created++
       } catch (err) {
-        errors.push(`Error creando meta para ${employee.fullName}: ${err}`)
+        errors.push(`${employee.fullName}: ${err instanceof Error ? err.message : 'Error desconocido'}`)
       }
     }
 

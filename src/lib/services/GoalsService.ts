@@ -113,6 +113,9 @@ export class GoalsService {
    * Siempre isAligned: true, isOrphan: false
    */
   static async createCorporateGoal(input: Omit<CreateGoalInput, 'level' | 'originType' | 'parentId'>): Promise<Goal> {
+    // Validar duplicado corporativo
+    await this.validateCompanyAreaDuplicate(input.accountId, input.title, 'COMPANY', input.periodYear)
+
     const data = this.prepareGoalData(input)
     data.level = 'COMPANY'
     data.originType = 'STRATEGIC_CASCADE'
@@ -138,6 +141,18 @@ export class GoalsService {
       throw new Error(`Goal padre no encontrado: ${parentId}`)
     }
 
+    // Validaciones si es meta individual (tiene employeeId)
+    if (input.employeeId) {
+      await this.validateGoalLimit(input.accountId, input.employeeId)
+      await this.validateTotalWeight(input.accountId, input.employeeId, input.weight || 0)
+      await this.validateDuplicate(input.accountId, parentId, input.employeeId)
+    }
+
+    // Validación para metas AREA (sin employeeId)
+    if (input.level === 'AREA') {
+      await this.validateCompanyAreaDuplicate(input.accountId, input.title, 'AREA', input.periodYear)
+    }
+
     const data = this.prepareGoalData(input)
     data.parentId = parentId
     data.originType = 'STRATEGIC_CASCADE'
@@ -150,6 +165,12 @@ export class GoalsService {
    * Crear meta de jefe (sin padre, válida pero no alineada)
    */
   static async createManagerGoal(input: Omit<CreateGoalInput, 'originType' | 'parentId'>): Promise<Goal> {
+    // Validaciones si es meta individual (tiene employeeId)
+    if (input.employeeId) {
+      await this.validateGoalLimit(input.accountId, input.employeeId)
+      await this.validateTotalWeight(input.accountId, input.employeeId, input.weight || 0)
+    }
+
     const data = this.prepareGoalData(input)
     data.originType = 'MANAGER_CREATED'
     data.isAligned = false
@@ -515,6 +536,83 @@ export class GoalsService {
     return { canCreate: current < max, current, max }
   }
 
+  private static async validateGoalLimit(
+    accountId: string,
+    employeeId: string
+  ): Promise<void> {
+    const check = await this.checkGoalLimit(accountId, employeeId)
+    if (!check.canCreate) {
+      throw new Error(`Límite de metas alcanzado (${check.current}/${check.max})`)
+    }
+  }
+
+  private static async validateTotalWeight(
+    accountId: string,
+    employeeId: string,
+    newWeight: number
+  ): Promise<void> {
+    const currentGoals = await prisma.goal.findMany({
+      where: {
+        accountId,
+        employeeId,
+        level: 'INDIVIDUAL',
+        status: { in: ['NOT_STARTED', 'ON_TRACK', 'AT_RISK', 'BEHIND'] }
+      },
+      select: { weight: true }
+    })
+
+    const currentTotalWeight = currentGoals.reduce((sum, g) => sum + (g.weight || 0), 0)
+
+    if (currentTotalWeight + newWeight > 100) {
+      throw new Error(
+        `Peso total excede 100%. Actual: ${currentTotalWeight}%, Nuevo: ${newWeight}%, Total: ${currentTotalWeight + newWeight}%`
+      )
+    }
+  }
+
+  private static async validateDuplicate(
+    accountId: string,
+    parentId: string,
+    employeeId: string
+  ): Promise<void> {
+    const existing = await prisma.goal.findFirst({
+      where: {
+        accountId,
+        employeeId,
+        parentId,
+        status: { notIn: ['CANCELLED'] }
+      }
+    })
+
+    if (existing) {
+      throw new Error('Este empleado ya tiene asignada esta meta')
+    }
+  }
+
+  private static async validateCompanyAreaDuplicate(
+    accountId: string,
+    title: string,
+    level: GoalLevel,
+    periodYear: number
+  ): Promise<void> {
+    if (level !== 'COMPANY' && level !== 'AREA') return
+
+    const existing = await prisma.goal.findFirst({
+      where: {
+        accountId,
+        title,
+        level,
+        periodYear,
+        status: { notIn: ['CANCELLED'] }
+      }
+    })
+
+    if (existing) {
+      const levelLabel = level === 'COMPANY' ? 'corporativa' : 'de área'
+      throw new Error(`Ya existe una meta ${levelLabel} "${title}" para el período ${periodYear}`)
+    }
+  }
+
   /**
    * Crea una Meta de negocio desde un DevelopmentGoal del PDI
    */
@@ -537,6 +635,9 @@ export class GoalsService {
     if (!limitCheck.canCreate) {
       throw new Error(`Límite de metas alcanzado (${limitCheck.current}/${limitCheck.max})`)
     }
+
+    // 1b. Verificar peso total
+    await this.validateTotalWeight(accountId, employeeId, input.weight || 0)
 
     // 2. Verificar que el DevelopmentGoal existe y pertenece al empleado
     const devGoal = await prisma.developmentGoal.findFirst({
