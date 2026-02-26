@@ -155,9 +155,31 @@ export async function GET(request: NextRequest) {
       (m) => m.hasGoalsConfigured && m.goalsCount === 0
     ).length
 
+    // Calcular teamStats agregados
+    const totalEmployees = teamMembers.length
+    const completedCount = teamMembers.filter(e => e.assignmentStatus.status === 'READY').length
+    const incompleteCount = teamMembers.filter(e => e.assignmentStatus.status === 'INCOMPLETE').length
+    const emptyCount = teamMembers.filter(e => e.assignmentStatus.status === 'EMPTY').length
+    const exceededCount = teamMembers.filter(e => e.assignmentStatus.status === 'EXCEEDED').length
+
+    const totalWeightSum = teamMembers.reduce((sum, e) => sum + e.assignmentStatus.totalWeight, 0)
+    const averageWeight = totalEmployees > 0 ? Math.round(totalWeightSum / totalEmployees) : 0
+    const completionRate = totalEmployees > 0 ? Math.round((completedCount / totalEmployees) * 100) : 0
+
+    const teamStats = {
+      totalEmployees,
+      averageWeight,
+      completedCount,
+      incompleteCount,
+      emptyCount,
+      exceededCount,
+      completionRate,
+    }
+
     return NextResponse.json({
       data: teamMembers,
       stats: { total, withGoals, withoutGoals, noGoalsRequired },
+      teamStats,
       success: true,
     })
   } catch (error: any) {
