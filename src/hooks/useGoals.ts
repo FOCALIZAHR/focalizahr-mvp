@@ -30,6 +30,8 @@ const fetcher = (url: string) => {
 type GoalLevel = 'COMPANY' | 'AREA' | 'INDIVIDUAL'
 type GoalStatus = 'NOT_STARTED' | 'ON_TRACK' | 'AT_RISK' | 'BEHIND' | 'PENDING_CLOSURE' | 'COMPLETED' | 'CANCELLED'
 
+type GoalOriginType = 'STRATEGIC_CASCADE' | 'MANAGER_CREATED'
+
 interface GoalData {
   id: string
   title: string
@@ -44,6 +46,7 @@ interface GoalData {
   targetValue: number
   currentValue: number
   weight: number
+  originType?: GoalOriginType
   owner?: { id: string; fullName: string; position?: string | null } | null
   department?: { id: string; displayName: string } | null
   parent?: { id: string; title: string; level?: GoalLevel } | null
@@ -127,4 +130,4 @@ export function useAlignmentReport() {
 }
 
 // Re-export types para consumidores
-export type { GoalData, AlignmentReport, GoalsFilters, GoalLevel, GoalStatus }
+export type { GoalData, AlignmentReport, GoalsFilters, GoalLevel, GoalStatus, GoalOriginType }

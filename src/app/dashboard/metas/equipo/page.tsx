@@ -1,6 +1,8 @@
 // ════════════════════════════════════════════════════════════════════════════
 // TEAM GOALS PAGE - Dashboard de metas del equipo
 // src/app/dashboard/metas/equipo/page.tsx
+// 
+// MODIFICACIÓN: Feature flag para alternar entre vista clásica y Cinema Mode
 // ════════════════════════════════════════════════════════════════════════════
 
 'use client'
@@ -17,6 +19,18 @@ import BulkAssignWizard from '@/components/goals/team/BulkAssignWizard'
 import { EmployeeGoalsModal } from '@/components/goals/team/EmployeeGoalsModal'
 import type { TeamMember } from '@/hooks/useTeamGoals'
 import { PrimaryButton, SecondaryButton } from '@/components/ui/PremiumButton'
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CINEMA MODE IMPORT
+// ═══════════════════════════════════════════════════════════════════════════
+import GoalsCinemaOrchestrator from './cinema/GoalsCinemaOrchestrator'
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FEATURE FLAG
+// Para activar Cinema Mode, cambiar a true
+// En producción, esto podría venir de una variable de entorno o configuración
+// ═══════════════════════════════════════════════════════════════════════════
+const USE_CINEMA_MODE = true
 
 // ════════════════════════════════════════════════════════════════════════════
 // FETCHER PARA PENDING CLOSURE
@@ -37,6 +51,13 @@ const pendingFetcher = (url: string) => {
 // ════════════════════════════════════════════════════════════════════════════
 
 type FilterType = 'all' | 'withGoals' | 'withoutGoals' | 'noGoalsRequired'
+
+const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'withGoals', label: 'Con metas' },
+  { value: 'withoutGoals', label: 'Sin metas' },
+  { value: 'noGoalsRequired', label: 'Cargo sin metas' },
+]
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE: DynamicCTA
@@ -62,76 +83,57 @@ const DynamicCTA = memo(function DynamicCTA({
 }: DynamicCTAProps) {
   const router = useRouter()
 
-  // Determinar qué CTA mostrar
   const hasWithoutGoals = stats.withoutGoals > 0
   const hasPending = pendingCount > 0
   const allCovered = stats.withoutGoals === 0 && (stats.total - stats.noGoalsRequired) > 0
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      {/* CTA Principal según estado */}
       {hasWithoutGoals ? (
         <PrimaryButton icon={Plus} onClick={onAssignClick}>
           Asignar Metas ({stats.withoutGoals})
         </PrimaryButton>
       ) : allCovered ? (
-        <SecondaryButton
-          icon={CheckCircle2}
-          onClick={() => router.push('/dashboard/metas')}
-        >
-          Ver Progreso
-        </SecondaryButton>
+        <div className="flex items-center gap-2 text-emerald-400 text-sm">
+          <CheckCircle2 className="w-4 h-4" />
+          <span>Equipo cubierto</span>
+        </div>
       ) : null}
 
-      {/* CTA Aprobaciones si hay pendientes */}
       {hasPending && (
-        <button
-          onClick={onApprovalsClick}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30"
-        >
-          <Clock className="w-4 h-4" />
-          Aprobar Cierres
-          <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/30 text-xs">
-            {pendingCount}
-          </span>
-          <ArrowRight className="w-4 h-4" />
-        </button>
+        <SecondaryButton icon={Clock} onClick={onApprovalsClick}>
+          Aprobar ({pendingCount})
+        </SecondaryButton>
       )}
     </div>
   )
 })
 
-const FILTER_OPTIONS: Array<{ value: FilterType; label: string }> = [
-  { value: 'all', label: 'Todos' },
-  { value: 'withGoals', label: 'Con metas' },
-  { value: 'withoutGoals', label: 'Sin metas' },
-  { value: 'noGoalsRequired', label: 'Cargo sin metas' },
-]
-
 // ════════════════════════════════════════════════════════════════════════════
-// COMPONENTE
+// VISTA CLÁSICA (Grid)
 // ════════════════════════════════════════════════════════════════════════════
 
-export default function TeamGoalsPage() {
+function ClassicTeamView() {
   const router = useRouter()
-
-  // Fetch aprobaciones pendientes
-  const { data: pendingData } = useSWR(
-    '/api/goals/pending-closure',
-    pendingFetcher,
-    { revalidateOnFocus: false }
-  )
-  const pendingCount = pendingData?.stats?.total || 0
   const {
-    team, stats, isLoading, selectedIds, selectedCount,
-    toggleSelection, clearSelection, refresh,
+    team,
+    stats,
+    isLoading,
+    selectedIds,
+    toggleSelection,
+    clearSelection,
+    refresh,
   } = useTeamGoals()
 
   const [filter, setFilter] = useState<FilterType>('all')
   const [showBulkWizard, setShowBulkWizard] = useState(false)
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null)
 
-  // Filter team
+  const { data: pendingData } = useSWR('/api/goals/pending-closure', pendingFetcher, {
+    revalidateOnFocus: false,
+  })
+  const pendingCount = pendingData?.data?.length ?? 0
+
   const filteredTeam = useMemo(() => {
     return team.filter((member: TeamMember) => {
       switch (filter) {
@@ -174,14 +176,12 @@ export default function TeamGoalsPage() {
   }, [])
 
   const handleAssignFromCTA = useCallback(() => {
-    // Seleccionar todos los empleados sin metas
     const withoutGoals = team.filter(e => e.hasGoalsConfigured && e.goalsCount === 0)
     withoutGoals.forEach(e => {
       if (!selectedIds.has(e.id)) {
         toggleSelection(e.id)
       }
     })
-    // Abrir wizard si hay seleccionados
     if (withoutGoals.length > 0) {
       setShowBulkWizard(true)
     }
@@ -225,7 +225,6 @@ export default function TeamGoalsPage() {
               </div>
             </div>
 
-            {/* CTA Dinámico */}
             {!isLoading && (
               <DynamicCTA
                 stats={stats}
@@ -266,19 +265,9 @@ export default function TeamGoalsPage() {
               <div key={i} className="fhr-skeleton h-40 rounded-xl" />
             ))}
           </div>
-        ) : team.length === 0 ? (
-          <div className="fhr-card text-center py-12">
-            <Users className="w-10 h-10 text-slate-600 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-slate-300 mb-2">
-              No tienes equipo asignado
-            </h3>
-            <p className="text-sm text-slate-500">
-              No hay colaboradores que te reporten directamente.
-            </p>
-          </div>
         ) : filteredTeam.length === 0 ? (
-          <div className="fhr-card p-8 text-center">
-            <p className="text-slate-400">No hay colaboradores en esta categoría</p>
+          <div className="text-center py-12">
+            <p className="text-slate-500">No hay colaboradores en esta categoría</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
@@ -295,23 +284,23 @@ export default function TeamGoalsPage() {
         )}
       </div>
 
-      {/* Selection bar */}
+      {/* Selection Bar */}
       <SelectionBar
-        selectedCount={selectedCount}
+        selectedCount={selectedIds.size}
         onClear={clearSelection}
         onAssign={handleBulkAssign}
       />
 
-      {/* Bulk wizard */}
+      {/* Bulk Assign Wizard */}
       {showBulkWizard && (
         <BulkAssignWizard
           employees={selectedEmployees}
-          onClose={handleCloseWizard}
           onComplete={handleBulkComplete}
+          onClose={handleCloseWizard}
         />
       )}
 
-      {/* Individual modal */}
+      {/* Employee Goals Modal */}
       {selectedEmployeeId && (
         <EmployeeGoalsModal
           employeeId={selectedEmployeeId}
@@ -320,4 +309,19 @@ export default function TeamGoalsPage() {
       )}
     </div>
   )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PÁGINA PRINCIPAL - Condiciona vista según feature flag
+// ════════════════════════════════════════════════════════════════════════════
+
+export default function TeamGoalsPage() {
+  // ═══════════════════════════════════════════════════════════════════════
+  // FEATURE FLAG: Alternar entre Cinema Mode y vista clásica
+  // ═══════════════════════════════════════════════════════════════════════
+  if (USE_CINEMA_MODE) {
+    return <GoalsCinemaOrchestrator />
+  }
+
+  return <ClassicTeamView />
 }
