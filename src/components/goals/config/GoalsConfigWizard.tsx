@@ -17,10 +17,12 @@ import {
   Workflow,
   Rocket,
   Loader2,
+  HelpCircle,
+  AlertCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { PrimaryButton, GhostButton, SecondaryButton } from '@/components/ui/PremiumButton'
-import GoalEligibilityManager from '@/components/goals/admin/GoalEligibilityManager'
+import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton'
+import GoalEligibilityManager, { type EligibilityStats } from '@/components/goals/admin/GoalEligibilityManager'
 import GoalGroupManager from '@/components/goals/admin/GoalGroupManager'
 import GoalCascadeRuleManager from '@/components/goals/admin/GoalCascadeRuleManager'
 
@@ -36,31 +38,48 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  {
-    id: 1,
-    name: 'Elegibilidad',
-    description: '¿Quiénes participan?',
-    icon: Users
-  },
-  {
-    id: 2,
-    name: 'Grupos',
-    description: '¿Cuáles son los pesos?',
-    icon: Settings2
-  },
-  {
-    id: 3,
-    name: 'Automatización',
-    description: '¿Cómo se cascadea?',
-    icon: Workflow
-  },
-  {
-    id: 4,
-    name: 'Impacto',
-    description: 'Revisar y confirmar',
-    icon: Rocket
-  },
+  { id: 1, name: 'Grupos', description: '¿Cuáles son los pesos?', icon: Settings2 },
+  { id: 2, name: 'Elegibilidad', description: '¿Quiénes participan?', icon: Users },
+  { id: 3, name: 'Automatización', description: '¿Cómo se cascadea?', icon: Workflow },
+  { id: 4, name: 'Impacto', description: 'Revisar y confirmar', icon: Rocket },
 ]
+
+const STEP_COVERS: Record<number, {
+  step: string
+  title: string
+  subtitle: string
+  cta: string
+  smartTip: string
+}> = {
+  1: {
+    step: 'Paso 1 de 4',
+    title: 'Crea los grupos de ponderación',
+    subtitle: 'Tu misión: definir cómo se distribuye el 100% de la evaluación por tipo de cargo.',
+    cta: 'Comenzar',
+    smartTip: 'Ejemplo: Gerentes pueden tener 40% negocio, 30% liderazgo, 30% específico.'
+  },
+  2: {
+    step: 'Paso 2 de 4',
+    title: 'Asigna cargos a los grupos',
+    subtitle: 'Tu misión: definir qué cargos participan y a qué grupo pertenecen.',
+    cta: 'Continuar',
+    smartTip: 'Los cargos sin grupo asignado no tendrán metas en su evaluación.'
+  },
+  3: {
+    step: 'Paso 3 de 4',
+    title: 'Define el cascadeo automático',
+    subtitle: 'Tu misión: conectar metas corporativas con los grupos que las recibirán.',
+    cta: 'Continuar',
+    smartTip: 'Esto ahorra tiempo y asegura alineamiento estratégico.'
+  }
+}
+
+const STEP_NAMES: Record<number, string> = {
+  1: 'Grupos',
+  2: 'Elegibilidad',
+  3: 'Automatización',
+  4: 'Impacto'
+}
 
 interface ImpactData {
   eligibleEmployees: number
@@ -241,8 +260,8 @@ const ImpactScreen = memo(function ImpactScreen({
         <GhostButton icon={ArrowLeft} onClick={onBack} disabled={isLoading}>
           Atrás
         </GhostButton>
-        <PrimaryButton icon={Check} onClick={onConfirm} disabled={isLoading}>
-          {isLoading ? 'Confirmando...' : 'Confirmar Configuración'}
+        <PrimaryButton icon={Rocket} onClick={onConfirm} disabled={isLoading}>
+          {isLoading ? 'Ejecutando...' : 'Ejecutar Configuración'}
         </PrimaryButton>
       </div>
     </div>
@@ -266,22 +285,63 @@ const stepVariants = {
 export default function GoalsConfigWizard() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
+  const [stepPhase, setStepPhase] = useState<'cover' | 'form'>('cover')
   const [isConfirming, setIsConfirming] = useState(false)
+
+  // Eligibility confirmation modal
+  const [showEligibilityConfirmModal, setShowEligibilityConfirmModal] = useState(false)
+  const [isSavingEligibility, setIsSavingEligibility] = useState(false)
+  const [eligibilitySaveError, setEligibilitySaveError] = useState<string | null>(null)
+  const [eligibilityStats, setEligibilityStats] = useState<EligibilityStats>({
+    eligibleLevels: 0,
+    totalLevels: 0,
+    affectedEmployees: 0,
+    hasChanges: false,
+    pendingConfigs: [],
+  })
 
   // Navigation handlers
   const handleNext = useCallback(() => {
-    if (currentStep < STEPS.length) {
-      setCurrentStep(prev => prev + 1)
+    if (currentStep === 4) return // Paso 4 tiene su propio botón de confirmar
+
+    if (stepPhase === 'cover') {
+      setStepPhase('form')
+      return
     }
-  }, [currentStep])
+
+    // Interceptar paso 2 (Elegibilidad) si hay cambios sin guardar
+    if (currentStep === 2 && eligibilityStats.hasChanges) {
+      setEligibilitySaveError(null)
+      setShowEligibilityConfirmModal(true)
+      return
+    }
+
+    if (currentStep < 4) {
+      setCurrentStep(prev => prev + 1)
+      setStepPhase(currentStep + 1 === 4 ? 'form' : 'cover')
+    }
+  }, [currentStep, stepPhase, eligibilityStats.hasChanges])
 
   const handleBack = useCallback(() => {
-    if (currentStep > 1) {
-      setCurrentStep(prev => prev - 1)
-    } else {
+    if (currentStep === 1 && stepPhase === 'cover') {
       router.push('/dashboard/metas/configuracion')
+      return
     }
-  }, [currentStep, router])
+
+    if (stepPhase === 'form') {
+      // Si estamos en paso 4 (sin cover), volver al form del paso 3
+      if (currentStep === 4) {
+        setCurrentStep(3)
+        setStepPhase('form')
+      } else {
+        setStepPhase('cover')
+      }
+    } else {
+      // En cover, volver al form del paso anterior
+      setCurrentStep(prev => prev - 1)
+      setStepPhase('form')
+    }
+  }, [currentStep, stepPhase, router])
 
   const handleConfirm = useCallback(async () => {
     setIsConfirming(true)
@@ -300,13 +360,38 @@ export default function GoalsConfigWizard() {
     }
   }, [router])
 
+  // Guardar elegibilidad desde modal y avanzar
+  const handleEligibilityConfirm = useCallback(async () => {
+    setIsSavingEligibility(true)
+    setEligibilitySaveError(null)
+    try {
+      const res = await fetch('/api/config/goal-eligibility', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ configs: eligibilityStats.pendingConfigs }),
+      })
+      if (!res.ok) throw new Error('Error guardando configuración de elegibilidad')
+
+      setShowEligibilityConfirmModal(false)
+      setEligibilityStats(prev => ({ ...prev, hasChanges: false }))
+
+      // Avanzar al paso 3
+      setCurrentStep(3)
+      setStepPhase('cover')
+    } catch (err: any) {
+      setEligibilitySaveError(err.message || 'Error guardando')
+    } finally {
+      setIsSavingEligibility(false)
+    }
+  }, [eligibilityStats.pendingConfigs])
+
   // Render step content
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
-        return <GoalEligibilityManager embedded />
-      case 2:
         return <GoalGroupManager embedded />
+      case 2:
+        return <GoalEligibilityManager embedded onStatsChange={setEligibilityStats} />
       case 3:
         return <GoalCascadeRuleManager embedded />
       case 4:
@@ -322,11 +407,68 @@ export default function GoalsConfigWizard() {
     }
   }
 
+  const renderStepCover = () => {
+    const cover = STEP_COVERS[currentStep]
+    if (!cover) return null
+
+    return (
+      <div className="flex flex-col items-center justify-center text-center px-6 py-6 min-h-[400px]">
+        <span className="text-sm font-semibold text-cyan-400 tracking-widest uppercase mb-4">
+          {cover.step}
+        </span>
+
+        <h1 className="text-3xl font-light text-white mb-4">
+          {cover.title}
+        </h1>
+
+        <p className="text-lg text-slate-400 mb-4 max-w-md">
+          {cover.subtitle}
+        </p>
+
+        <div className="flex items-center gap-2 text-slate-500 text-sm mb-6">
+          <HelpCircle className="w-4 h-4" />
+          <span className="italic">{cover.smartTip}</span>
+        </div>
+
+        <PrimaryButton onClick={handleNext} icon={ArrowRight}>
+          {cover.cta}
+        </PrimaryButton>
+      </div>
+    )
+  }
+
+  const renderStepForm = () => {
+    const cover = STEP_COVERS[currentStep]
+
+    return (
+      <div>
+        {/* Header minimalista */}
+        <div className="flex items-center justify-between mb-6">
+          <span className="text-sm font-semibold text-cyan-400">
+            Paso {currentStep} de 4 · {STEP_NAMES[currentStep]}
+          </span>
+
+          {cover?.smartTip && (
+            <div className="group relative">
+              <HelpCircle className="w-4 h-4 text-slate-500 hover:text-cyan-400 cursor-help transition-colors" />
+              <div className="absolute right-0 top-6 w-64 p-3 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                {cover.smartTip}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Contenido del step */}
+        {renderStepContent()}
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen fhr-bg-main">
-      <div className="max-w-5xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-light text-white">
               Configurar <span className="fhr-title-gradient">Metas</span>
@@ -346,32 +488,98 @@ export default function GoalsConfigWizard() {
         {/* Step Indicator */}
         <WizardStepIndicator steps={STEPS} currentStep={currentStep} />
 
-        {/* Step Content */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentStep}
-            variants={stepVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={{ duration: 0.2 }}
-          >
-            {renderStepContent()}
-          </motion.div>
-        </AnimatePresence>
+        {/* Contenedor card */}
+        <div className="fhr-card p-4 sm:p-6">
+          {/* Step Content */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`${currentStep}-${stepPhase}`}
+              variants={stepVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.2 }}
+            >
+              {currentStep < 4 && stepPhase === 'cover'
+                ? renderStepCover()
+                : renderStepForm()
+              }
+            </motion.div>
+          </AnimatePresence>
 
-        {/* Navigation (solo para pasos 1-3) */}
-        {currentStep < 4 && (
-          <div className="flex justify-between mt-8 pt-6 border-t border-slate-700/50">
-            <GhostButton icon={ArrowLeft} onClick={handleBack}>
-              {currentStep === 1 ? 'Cancelar' : 'Atrás'}
-            </GhostButton>
-            <PrimaryButton icon={ArrowRight} onClick={handleNext}>
-              Siguiente
-            </PrimaryButton>
-          </div>
-        )}
+          {/* Navigation - Solo mostrar en form, no en cover */}
+          {stepPhase === 'form' && currentStep < 4 && (
+            <div className="flex justify-between mt-6 pt-6 border-t border-slate-700/50">
+              <GhostButton icon={ArrowLeft} onClick={handleBack}>
+                Atrás
+              </GhostButton>
+              <PrimaryButton icon={ArrowRight} onClick={handleNext}>
+                Siguiente
+              </PrimaryButton>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Modal confirmación elegibilidad */}
+      {showEligibilityConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2 }}
+            className="w-full max-w-md fhr-card p-6"
+          >
+            <h3 className="text-lg font-medium text-white mb-3">
+              Confirmar cambios de Elegibilidad
+            </h3>
+
+            <p className="text-sm text-slate-400 mb-4">
+              Esta configuración afecta a toda la empresa. Los cambios se aplicarán inmediatamente.
+            </p>
+
+            <div className="rounded-lg bg-slate-900/50 border border-slate-700/50 p-4 mb-5 space-y-2">
+              <p className="text-sm font-medium text-slate-300">Resumen de impacto:</p>
+              <div className="flex items-center gap-2 text-sm text-slate-400">
+                <Settings2 className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                <span>
+                  <span className="text-white font-medium">{eligibilityStats.eligibleLevels}</span> de {eligibilityStats.totalLevels} niveles tendrán metas
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-400">
+                <Users className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                <span>
+                  <span className="text-white font-medium">{eligibilityStats.affectedEmployees}</span> empleados afectados
+                </span>
+              </div>
+            </div>
+
+            {eligibilitySaveError && (
+              <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {eligibilitySaveError}
+              </div>
+            )}
+
+            <div className="flex gap-3 justify-end">
+              <GhostButton
+                onClick={() => setShowEligibilityConfirmModal(false)}
+                disabled={isSavingEligibility}
+              >
+                Cancelar
+              </GhostButton>
+              <PrimaryButton
+                icon={isSavingEligibility ? Loader2 : Check}
+                onClick={handleEligibilityConfirm}
+                disabled={isSavingEligibility}
+                isLoading={isSavingEligibility}
+              >
+                {isSavingEligibility ? 'Guardando...' : 'Guardar y Continuar'}
+              </PrimaryButton>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   )
 }

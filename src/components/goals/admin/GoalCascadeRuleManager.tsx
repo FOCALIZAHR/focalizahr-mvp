@@ -142,10 +142,10 @@ export default function GoalCascadeRuleManager({ embedded }: { embedded?: boolea
   return (
     <div className="space-y-6">
       {/* HEADER */}
-      <div className={`flex items-center ${embedded ? 'justify-end' : 'justify-between'}`}>
+      <div className={`flex flex-col sm:flex-row sm:items-center gap-3 ${embedded ? 'sm:justify-end' : 'sm:justify-between'}`}>
         {!embedded && (
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex-shrink-0">
               <Workflow className="w-6 h-6 text-cyan-400" />
             </div>
             <div>
@@ -158,7 +158,7 @@ export default function GoalCascadeRuleManager({ embedded }: { embedded?: boolea
         )}
         <button
           onClick={() => setIsCreating(true)}
-          className="fhr-btn fhr-btn-primary flex items-center gap-2 px-4 py-2"
+          className="fhr-btn fhr-btn-primary flex items-center justify-center gap-2 px-4 py-2 w-full sm:w-auto"
         >
           <Plus className="w-4 h-4" />
           Nueva Regla
@@ -196,58 +196,60 @@ export default function GoalCascadeRuleManager({ embedded }: { embedded?: boolea
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05 }}
-              className="fhr-card p-5"
+              className="fhr-card p-4 sm:p-5"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 rounded-lg bg-amber-500/10">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                  <div className="p-2 rounded-lg bg-amber-500/10 flex-shrink-0">
                     <Target className="w-5 h-5 text-amber-400" />
                   </div>
-                  <div>
-                    <h3 className="text-white font-medium">{rule.name}</h3>
-                    <p className="text-sm text-slate-400">
+                  <div className="min-w-0">
+                    <h3 className="text-white font-medium truncate">{rule.name}</h3>
+                    <p className="text-sm text-slate-400 truncate">
                       {rule.sourceGoal?.title || 'Meta origen'} →{' '}
                       {rule.targetGroup?.name || 'Todos elegibles'}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   {rule.lastExecutedAt && (
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-slate-500 text-center sm:text-left">
                       Última: {new Date(rule.lastExecutedAt).toLocaleDateString()}
                     </span>
                   )}
-                  <button
-                    onClick={() => handlePreview(rule.id)}
-                    className="fhr-btn fhr-btn-ghost px-3 py-1.5 text-sm flex items-center gap-1"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    Preview
-                  </button>
-                  <button
-                    onClick={() => handleExecute(rule.id)}
-                    disabled={executing === rule.id}
-                    className="fhr-btn fhr-btn-secondary px-3 py-1.5 text-sm flex items-center gap-1 disabled:opacity-50"
-                  >
-                    {executing === rule.id ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Play className="w-3.5 h-3.5" />
-                    )}
-                    {executing === rule.id ? 'Ejecutando...' : 'Ejecutar'}
-                  </button>
-                  <button
-                    onClick={() => handleDelete(rule.id)}
-                    className="p-2 text-slate-400 hover:text-red-400 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handlePreview(rule.id)}
+                      className="fhr-btn fhr-btn-ghost px-3 py-1.5 text-sm flex items-center justify-center gap-1 flex-1 sm:flex-none"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      Preview
+                    </button>
+                    <button
+                      onClick={() => handleExecute(rule.id)}
+                      disabled={executing === rule.id}
+                      className="fhr-btn fhr-btn-secondary px-3 py-1.5 text-sm flex items-center justify-center gap-1 disabled:opacity-50 flex-1 sm:flex-none"
+                    >
+                      {executing === rule.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Play className="w-3.5 h-3.5" />
+                      )}
+                      {executing === rule.id ? 'Ejecutando...' : 'Ejecutar'}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(rule.id)}
+                      className="p-2 text-slate-400 hover:text-red-400 transition-colors flex-shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* Info adicional */}
-              <div className="mt-4 pt-4 border-t border-slate-700/50 flex items-center gap-6 text-sm">
+              <div className="mt-4 pt-4 border-t border-slate-700/50 flex flex-wrap items-center gap-4 sm:gap-6 text-sm">
                 <span className="flex items-center gap-2 text-slate-400">
                   <Users className="w-4 h-4" />
                   {rule.isLeaderOnly ? 'Solo líderes' : 'Todos elegibles'}

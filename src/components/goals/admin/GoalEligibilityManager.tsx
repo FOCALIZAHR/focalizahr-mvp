@@ -33,10 +33,25 @@ interface EligibilityConfig {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// TIPOS EXPORTADOS
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface EligibilityStats {
+  eligibleLevels: number
+  totalLevels: number
+  affectedEmployees: number
+  hasChanges: boolean
+  pendingConfigs: Array<{ standardJobLevel: string; hasGoals: boolean; goalGroupId: string | null }>
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
 
-export default function GoalEligibilityManager({ embedded }: { embedded?: boolean }) {
+export default function GoalEligibilityManager({ embedded, onStatsChange }: {
+  embedded?: boolean
+  onStatsChange?: (stats: EligibilityStats) => void
+}) {
   const [configs, setConfigs] = useState<EligibilityConfig[]>([])
   const [goalGroups, setGoalGroups] = useState<GoalGroup[]>([])
   const [loading, setLoading] = useState(true)
@@ -127,6 +142,21 @@ export default function GoalEligibilityManager({ embedded }: { embedded?: boolea
 
   const eligibleCount = configs.filter(c => c.hasGoals).length
   const totalEmployees = configs.reduce((sum, c) => sum + (c.hasGoals ? c.employeeCount : 0), 0)
+
+  // Reportar stats al padre (wizard)
+  useEffect(() => {
+    onStatsChange?.({
+      eligibleLevels: eligibleCount,
+      totalLevels: configs.length,
+      affectedEmployees: totalEmployees,
+      hasChanges,
+      pendingConfigs: configs.map(c => ({
+        standardJobLevel: c.standardJobLevel,
+        hasGoals: c.hasGoals,
+        goalGroupId: c.goalGroupId,
+      })),
+    })
+  }, [eligibleCount, totalEmployees, hasChanges, configs, onStatsChange])
 
   // ──────────────────────────────────────────────────────────────────────
   // RENDER
