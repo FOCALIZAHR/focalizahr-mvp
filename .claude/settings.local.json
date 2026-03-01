@@ -14,7 +14,8 @@
       "Bash(taskkill:*)",
       "Bash(timeout /t:*)",
       "Bash(ls:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(node:*)"
     ]
   }
 }
