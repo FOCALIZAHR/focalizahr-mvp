@@ -6,6 +6,7 @@
 'use client'
 
 import { memo, useCallback, useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { Link2, Search, X, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import GoalLevelBadge from '../GoalLevelBadge'
@@ -19,6 +20,7 @@ import type { GoalWizardData } from './CreateGoalWizard'
 interface StepLinkParentProps {
   data: GoalWizardData
   updateData: (updates: Partial<GoalWizardData>) => void
+  availableWeight?: number
 }
 
 type GoalLevel = 'COMPANY' | 'AREA' | 'INDIVIDUAL'
@@ -39,44 +41,79 @@ interface ParentGoal {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// COMPONENTE: WeightAlert
+// ════════════════════════════════════════════════════════════════════════════
+
+const WeightAlert = memo(function WeightAlert({
+  currentWeight,
+  availableWeight,
+}: {
+  currentWeight: number
+  availableWeight: number
+}) {
+  const isExceeded = currentWeight > availableWeight
+
+  if (!isExceeded) return null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      className="mt-2 p-3 rounded-lg text-sm flex items-start gap-2 bg-red-500/10 border border-red-500/20 text-red-400"
+    >
+      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+      <div>
+        <strong>Peso excede lo disponible.</strong>
+        <br />
+        Solo puedes asignar hasta {availableWeight}%.
+      </div>
+    </motion.div>
+  )
+})
+
+// ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE
 // ════════════════════════════════════════════════════════════════════════════
 
 export default memo(function StepLinkParent({
   data,
   updateData,
+  availableWeight = 100,
 }: StepLinkParentProps) {
   const [parentGoals, setParentGoals] = useState<ParentGoal[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
-  // Determinar nivel padre valido
-  const parentLevel =
+  // Determinar niveles padre válidos
+  const parentLevels: GoalLevel[] =
     data.level === 'INDIVIDUAL'
-      ? 'AREA'
+      ? ['AREA', 'COMPANY']
       : data.level === 'AREA'
-        ? 'COMPANY'
-        : null
+        ? ['COMPANY']
+        : []
 
-  // Cargar metas padre posibles
+  // Cargar metas padre posibles (fetch por cada nivel y merge)
   useEffect(() => {
-    if (!parentLevel) return
+    if (parentLevels.length === 0) return
 
     setIsLoading(true)
     const token = localStorage.getItem('focalizahr_token')
+    const headers = { Authorization: `Bearer ${token}` }
 
-    fetch(`/api/goals?level=${parentLevel}&status=ON_TRACK,NOT_STARTED`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((res) => {
-        if (res.success) {
-          setParentGoals(res.data || [])
-        }
+    Promise.all(
+      parentLevels.map(level =>
+        fetch(`/api/goals?level=${level}&status=ON_TRACK,NOT_STARTED`, { headers })
+          .then(res => res.json())
+          .then(res => (res.success ? res.data || [] : []))
+          .catch(() => [] as ParentGoal[])
+      )
+    )
+      .then(results => {
+        setParentGoals(results.flat())
       })
-      .catch(() => {})
       .finally(() => setIsLoading(false))
-  }, [parentLevel])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.level])
 
   // Filtrar por busqueda
   const filteredGoals = searchTerm
@@ -114,20 +151,12 @@ export default memo(function StepLinkParent({
   if (data.level === 'COMPANY') {
     return (
       <div className="space-y-6">
-        <div className="text-center">
-          <h2 className="fhr-title-card text-xl mb-2">Cascada</h2>
-          <p className="text-slate-400 text-sm">
-            Las metas corporativas son de nivel superior y no se vinculan a otra
-            meta
-          </p>
-        </div>
-
         <div className="p-6 bg-slate-800/30 rounded-xl text-center">
           <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-amber-500/10 flex items-center justify-center">
             <AlertTriangle className="w-6 h-6 text-amber-400" />
           </div>
           <p className="text-slate-300 text-sm">
-            Esta es una meta corporativa (Nivel 0). Las demas metas podran
+            Esta es una meta corporativa (Nivel 0). Las demás metas podrán
             derivar de ella.
           </p>
         </div>
@@ -135,16 +164,28 @@ export default memo(function StepLinkParent({
         {/* Peso */}
         <div className="space-y-2">
           <label className="text-sm text-slate-300">
-            Peso en evaluacion{' '}
+            Peso en evaluación{' '}
             <span className="text-slate-500">(0-100)</span>
           </label>
+          {availableWeight < 100 && (
+            <p className="text-xs text-cyan-400 mb-2">
+              Peso disponible: {availableWeight}%
+            </p>
+          )}
           <input
             type="number"
             value={data.weight}
             onChange={handleWeightChange}
             min={0}
             max={100}
-            className="fhr-input w-full"
+            className={cn(
+              'fhr-input w-full',
+              data.weight > availableWeight && 'border-red-500/50 focus:border-red-500'
+            )}
+          />
+          <WeightAlert
+            currentWeight={data.weight}
+            availableWeight={availableWeight}
           />
         </div>
       </div>
@@ -153,17 +194,6 @@ export default memo(function StepLinkParent({
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="fhr-title-card text-xl mb-2">
-          Vincular a meta superior
-        </h2>
-        <p className="text-slate-400 text-sm">
-          Conecta esta meta con una meta de nivel{' '}
-          {parentLevel === 'COMPANY' ? 'corporativo' : 'de area'} para
-          cascadeo
-        </p>
-      </div>
-
       {/* Meta seleccionada */}
       {data.parentId && data.parentTitle && (
         <div className="p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-xl flex items-center justify-between">
@@ -196,8 +226,8 @@ export default memo(function StepLinkParent({
             />
           </div>
 
-          {/* Lista de metas */}
-          <div className="space-y-2 max-h-60 overflow-y-auto">
+          {/* Lista de metas agrupadas por nivel */}
+          <div className="space-y-4 max-h-72 overflow-y-auto">
             {isLoading ? (
               <div className="space-y-2">
                 <div className="fhr-skeleton h-16 w-full rounded-lg" />
@@ -205,34 +235,54 @@ export default memo(function StepLinkParent({
               </div>
             ) : filteredGoals.length === 0 ? (
               <p className="text-center text-slate-500 text-sm py-4">
-                No se encontraron metas de nivel{' '}
-                {parentLevel === 'COMPANY' ? 'corporativo' : 'area'}
+                No se encontraron metas para vincular
               </p>
             ) : (
-              filteredGoals.map((goal) => (
-                <button
-                  key={goal.id}
-                  onClick={() => handleSelectParent(goal)}
-                  className="w-full p-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <GoalLevelBadge level={goal.level} />
-                    <span className="text-sm text-white truncate">
-                      {goal.title}
-                    </span>
+              <>
+                {/* Metas Corporativas */}
+                {filteredGoals.some(g => g.level === 'COMPANY') && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Corporativas</p>
+                    {filteredGoals.filter(g => g.level === 'COMPANY').map(goal => (
+                      <button
+                        key={goal.id}
+                        onClick={() => handleSelectParent(goal)}
+                        className="w-full p-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <GoalLevelBadge level={goal.level} />
+                          <span className="text-sm text-white truncate">{goal.title}</span>
+                        </div>
+                        <GoalProgressBar progress={goal.progress} status={goal.status} size="sm" />
+                      </button>
+                    ))}
                   </div>
-                  <GoalProgressBar
-                    progress={goal.progress}
-                    status={goal.status}
-                    size="sm"
-                  />
-                </button>
-              ))
+                )}
+                {/* Metas de Área */}
+                {filteredGoals.some(g => g.level === 'AREA') && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">De Área</p>
+                    {filteredGoals.filter(g => g.level === 'AREA').map(goal => (
+                      <button
+                        key={goal.id}
+                        onClick={() => handleSelectParent(goal)}
+                        className="w-full p-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <GoalLevelBadge level={goal.level} />
+                          <span className="text-sm text-white truncate">{goal.title}</span>
+                        </div>
+                        <GoalProgressBar progress={goal.progress} status={goal.status} size="sm" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           <p className="text-xs text-slate-500 text-center">
-            Este paso es opcional. Puedes vincularla despues.
+            Este paso es opcional. Puedes vincularla después.
           </p>
         </>
       )}
@@ -240,19 +290,31 @@ export default memo(function StepLinkParent({
       {/* Peso */}
       <div className="space-y-2 pt-4 border-t border-slate-700/50">
         <label className="text-sm text-slate-300">
-          Peso en evaluacion{' '}
+          Peso en evaluación{' '}
           <span className="text-slate-500">(0-100)</span>
         </label>
+        {availableWeight < 100 && (
+          <p className="text-xs text-cyan-400 mb-2">
+            Peso disponible: {availableWeight}%
+          </p>
+        )}
         <input
           type="number"
           value={data.weight}
           onChange={handleWeightChange}
           min={0}
           max={100}
-          className="fhr-input w-full"
+          className={cn(
+            'fhr-input w-full',
+            data.weight > availableWeight && 'border-red-500/50 focus:border-red-500'
+          )}
+        />
+        <WeightAlert
+          currentWeight={data.weight}
+          availableWeight={availableWeight}
         />
         <p className="text-xs text-slate-500">
-          Define cuanto pesa esta meta en la evaluacion de desempeno del
+          Define cuánto pesa esta meta en la evaluación de desempeño del
           colaborador
         </p>
       </div>

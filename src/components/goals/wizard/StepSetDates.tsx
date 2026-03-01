@@ -86,13 +86,6 @@ export default memo(function StepSetDates({
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="fhr-title-card text-xl mb-2">Plazos y periodo</h2>
-        <p className="text-slate-400 text-sm">
-          Define cuando inicia y cuando debe completarse la meta
-        </p>
-      </div>
-
       {/* Fechas */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Fecha inicio */}

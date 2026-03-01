@@ -170,15 +170,6 @@ export default memo(function StepSelectLevel({
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="fhr-title-card text-xl mb-2">
-          Que tipo de meta quieres crear?
-        </h2>
-        <p className="text-slate-400 text-sm">
-          Selecciona el nivel organizacional de la meta
-        </p>
-      </div>
-
       <div className="grid gap-4">
         {allowedLevels.map((level) => {
           const Icon = level.icon

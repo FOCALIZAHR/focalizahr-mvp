@@ -113,13 +113,6 @@ export default memo(function StepConfigureMetric({
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="fhr-title-card text-xl mb-2">Como se mide?</h2>
-        <p className="text-slate-400 text-sm">
-          Define el tipo de metrica y los valores objetivo
-        </p>
-      </div>
-
       {/* Tipo de metrica */}
       <div className="space-y-2">
         <label className="text-sm text-slate-300">Tipo de metrica</label>

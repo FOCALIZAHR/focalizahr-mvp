@@ -72,13 +72,6 @@ export default memo(function StepDefineGoal({
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="fhr-title-card text-xl mb-2">Define tu meta</h2>
-        <p className="text-slate-400 text-sm">
-          Un buen titulo es claro, especifico y accionable
-        </p>
-      </div>
-
       {/* Titulo */}
       <div className="space-y-2">
         <label className="text-sm text-slate-300">

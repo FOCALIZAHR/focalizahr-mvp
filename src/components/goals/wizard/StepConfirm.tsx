@@ -85,13 +85,6 @@ export default memo(function StepConfirm({ data }: StepConfirmProps) {
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="fhr-title-card text-xl mb-2">Confirmar meta</h2>
-        <p className="text-slate-400 text-sm">
-          Revisa los datos antes de crear la meta
-        </p>
-      </div>
-
       {/* Card resumen */}
       <div className="space-y-4">
         {/* Titulo y nivel */}
