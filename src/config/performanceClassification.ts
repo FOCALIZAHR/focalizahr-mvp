@@ -749,7 +749,7 @@ export function getRoleFitLevel(
 // ════════════════════════════════════════════════════════════════════════════
 
 export const TALENT_INTELLIGENCE_THRESHOLDS = {
-  ROLE_FIT_HIGH: 70,        // ≥70% = "domina el rol" (industria: 70% Rule)
+  ROLE_FIT_HIGH: 75,        // Alineado con SOLID. "Domina el rol" = autonomía operativa.
   ASPIRATION_HIGH: 3,       // Solo nivel 3 = alta aspiración
   ASPIRATION_LOW: 1,        // Solo nivel 1 = baja aspiración
   ENGAGEMENT_HIGH: 3,       // Solo nivel 3 = alto compromiso

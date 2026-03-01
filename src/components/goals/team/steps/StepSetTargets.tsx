@@ -7,6 +7,7 @@
 
 import { memo, useCallback } from 'react'
 import { Target } from 'lucide-react'
+import { formatDisplayName } from '@/lib/utils/formatName'
 import type { BulkAssignData } from '../BulkAssignWizard'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -51,14 +52,7 @@ export default memo(function StepSetTargets({
   }, [data.targets, updateData])
 
   return (
-    <div className="space-y-6">
-      <div className="text-center mb-4">
-        <h3 className="text-lg text-white font-medium">Personalizar targets</h3>
-        <p className="text-sm text-slate-400 mt-1">
-          Define el objetivo específico de cada colaborador
-        </p>
-      </div>
-
+    <div className="space-y-4">
       <div className="space-y-3">
         {data.employees.map(emp => {
           if (!data.employeeIds.includes(emp.id)) return null
@@ -74,7 +68,7 @@ export default memo(function StepSetTargets({
                   <Target className="w-4 h-4 text-cyan-400" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-white text-sm font-medium truncate">{emp.fullName}</p>
+                  <p className="text-white text-sm font-medium truncate">{formatDisplayName(emp.fullName, 'short')}</p>
                   <p className="text-xs text-slate-400 truncate">{emp.position}</p>
                 </div>
               </div>

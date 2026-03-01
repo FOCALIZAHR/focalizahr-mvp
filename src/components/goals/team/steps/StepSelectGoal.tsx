@@ -46,13 +46,6 @@ export default memo(function StepSelectGoal({
 
   return (
     <div className="space-y-6">
-      <div className="text-center mb-4">
-        <h3 className="text-lg text-white font-medium">Elige la meta base</h3>
-        <p className="text-sm text-slate-400 mt-1">
-          Cascadea desde una meta existente o crea una nueva
-        </p>
-      </div>
-
       {/* Source toggle */}
       <div className="grid grid-cols-2 gap-3">
         <button

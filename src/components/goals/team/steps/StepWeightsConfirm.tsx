@@ -7,7 +7,8 @@
 
 import { memo, useCallback, useMemo } from 'react'
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
-import type { BulkAssignData } from '../BulkAssignWizard'
+import { formatDisplayName } from '@/lib/utils/formatName'
+import type { BulkAssignData, EmployeeWithStatus } from '../BulkAssignWizard'
 
 // ════════════════════════════════════════════════════════════════════════════
 // PROPS
@@ -16,6 +17,8 @@ import type { BulkAssignData } from '../BulkAssignWizard'
 interface StepWeightsConfirmProps {
   data: BulkAssignData
   updateData: (updates: Partial<BulkAssignData>) => void
+  employeesWithStatus: EmployeeWithStatus[]
+  isLoadingStatus: boolean
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -25,6 +28,8 @@ interface StepWeightsConfirmProps {
 export default memo(function StepWeightsConfirm({
   data,
   updateData,
+  employeesWithStatus,
+  isLoadingStatus,
 }: StepWeightsConfirmProps) {
   const handleWeightChange = useCallback((employeeId: string, weight: number) => {
     updateData({
@@ -35,10 +40,21 @@ export default memo(function StepWeightsConfirm({
     })
   }, [data.weights, updateData])
 
-  // Check if any weight exceeds 100%
+  // Calcular peso disponible por persona
+  const getAvailableWeight = useCallback((employeeId: string) => {
+    const emp = employeesWithStatus.find(e => e.id === employeeId)
+    if (!emp?.assignmentStatus) return 100
+    return 100 - emp.assignmentStatus.totalWeight
+  }, [employeesWithStatus])
+
+  // Check if any weight exceeds available
   const hasWeightWarning = useMemo(() => {
-    return Object.values(data.weights).some(w => w > 100)
-  }, [data.weights])
+    return data.employeeIds.some(id => {
+      const assigned = data.weights[id] || 0
+      const available = getAvailableWeight(id)
+      return assigned > available
+    })
+  }, [data.weights, data.employeeIds, getAvailableWeight])
 
   const goalTitle = data.goalSource === 'cascade'
     ? data.parentGoalTitle
@@ -46,13 +62,6 @@ export default memo(function StepWeightsConfirm({
 
   return (
     <div className="space-y-6">
-      <div className="text-center mb-4">
-        <h3 className="text-lg text-white font-medium">Pesos y confirmación</h3>
-        <p className="text-sm text-slate-400 mt-1">
-          Define el peso de esta meta para cada colaborador
-        </p>
-      </div>
-
       {/* Summary */}
       <div className="p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/20">
         <div className="flex items-start gap-3">
@@ -74,7 +83,7 @@ export default memo(function StepWeightsConfirm({
         <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
           <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
           <p className="text-xs text-amber-400">
-            Algún peso supera 100%. Verifica que la suma de pesos de las metas sea correcta.
+            Algún peso supera el disponible. Verifica que la suma de pesos sea correcta.
           </p>
         </div>
       )}
@@ -85,22 +94,31 @@ export default memo(function StepWeightsConfirm({
           if (!data.employeeIds.includes(emp.id)) return null
           const weight = data.weights[emp.id] ?? 0
           const target = data.targets[emp.id]
+          const available = getAvailableWeight(emp.id)
+          const exceeded = weight > available
 
           return (
             <div
               key={emp.id}
-              className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50"
+              className={`p-4 rounded-xl bg-slate-800/50 border ${exceeded ? 'border-red-500/50' : 'border-slate-700/50'}`}
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="min-w-0">
-                  <p className="text-white text-sm font-medium truncate">{emp.fullName}</p>
+                  <p className="text-white text-sm font-medium truncate">{formatDisplayName(emp.fullName, 'short')}</p>
                   <p className="text-xs text-slate-400">
                     Target: {target?.targetValue || 100} {target?.unit || '%'}
                   </p>
                 </div>
-                <span className="text-sm text-cyan-400 font-medium flex-shrink-0 ml-2">
-                  {weight}%
-                </span>
+                <div className="text-right flex-shrink-0 ml-2">
+                  <span className="text-sm text-cyan-400 font-medium">
+                    {weight}%
+                  </span>
+                  {!isLoadingStatus && (
+                    <p className={`text-xs ${exceeded ? 'text-red-400' : 'text-slate-500'}`}>
+                      Disponible: {available}%
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-3">
@@ -118,9 +136,13 @@ export default memo(function StepWeightsConfirm({
                   max={100}
                   value={weight}
                   onChange={e => handleWeightChange(emp.id, parseInt(e.target.value) || 0)}
-                  className="fhr-input w-16 text-center text-sm"
+                  className={`fhr-input w-16 text-center text-sm ${exceeded ? 'border-red-500' : ''}`}
                 />
               </div>
+
+              {exceeded && (
+                <p className="text-xs text-red-400 mt-2">Excede el peso disponible</p>
+              )}
             </div>
           )
         })}

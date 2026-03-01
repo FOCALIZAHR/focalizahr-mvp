@@ -356,7 +356,7 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
     if (!cover) return null
 
     return (
-      <div className="h-full flex flex-col items-center justify-center text-center px-8 py-12">
+      <div className="flex flex-col items-center justify-center text-center px-8 py-12">
         {/* Indicador paso */}
         <motion.span
           initial={{ opacity: 0 }}
@@ -549,7 +549,7 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
         <WizardProgress steps={steps} currentStep={currentStep} />
 
         {/* Step content with animation */}
-        <div className="fhr-card p-6 md:p-8">
+        <div className="fhr-card p-6 md:p-8 overflow-visible">
           <AnimatePresence mode="wait">
             <motion.div
               key={`${currentStep}-${stepPhase}`}
