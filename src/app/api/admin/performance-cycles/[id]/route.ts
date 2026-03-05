@@ -102,11 +102,23 @@ export async function GET(
       peer: cycle.assignments.filter(a => a.evaluationType === 'PEER').length
     };
 
+    // Detectar departamentos huérfanos (level=3 sin parentId, excluyendo paraguas)
+    const orphanDepartmentCount = await prisma.department.count({
+      where: {
+        accountId: cycle.accountId,
+        level: 3,
+        parentId: null,
+        isActive: true,
+        NOT: { displayName: 'Departamentos sin Asignar' }
+      }
+    });
+
     return NextResponse.json({
       success: true,
       data: cycle,
       stats,
-      byType
+      byType,
+      orphanDepartmentCount
     });
 
   } catch (error: any) {

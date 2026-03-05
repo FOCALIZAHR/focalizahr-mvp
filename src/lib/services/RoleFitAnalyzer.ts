@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { PositionAdapter, ACOTADO_LABELS } from '@/lib/services/PositionAdapter'
 
 // ════════════════════════════════════════════════════════════════════════════
 // ROLE FIT ANALYZER
@@ -35,6 +36,32 @@ export interface RoleFitResult {
     critical: number       // gap <= -2
     exceeds: number        // gap >= +2 (riesgo fuga)
   }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// TIPOS AGREGACIÓN ORGANIZACIONAL
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface LayerGerenciaFit {
+  avgRoleFit: number
+  count: number
+  topGaps: Array<{ competency: string; gap: number; affectedCount: number }>
+}
+
+export interface RoleFitMatrix {
+  overall: number
+  byLayer: Record<string, number>
+  matrix: Record<string, Record<string, LayerGerenciaFit>>
+  worstCell: { layer: string; gerencia: string; score: number }
+  investmentPriorities: Array<{
+    layer: string
+    layerLabel: string
+    gerencia: string
+    avgRoleFit: number
+    gap: number
+    headcount: number
+    topGaps: string[]
+  }>
 }
 
 export class RoleFitAnalyzer {
@@ -233,5 +260,126 @@ export class RoleFitAnalyzer {
         ratifiedBy: userId
       }
     })
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // AGREGACIÓN ORGANIZACIONAL: Role Fit por Capa × Gerencia
+  // ════════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Role Fit agregado por Capa organizacional × Gerencia
+   * Lee roleFitScore persistido en PerformanceRating (1 query, sin N+1)
+   */
+  static async getOrgRoleFitMatrix(
+    accountId: string,
+    cycleId: string,
+    departmentIds?: string[]
+  ): Promise<RoleFitMatrix> {
+
+    // 1. Single query: ratings con roleFit persistido + employee data
+    const ratingWhere: any = {
+      cycleId,
+      employee: { accountId, status: 'ACTIVE', standardJobLevel: { not: null } },
+      roleFitScore: { not: null }
+    }
+
+    if (departmentIds?.length) {
+      ratingWhere.employee.departmentId = { in: departmentIds }
+    }
+
+    const ratings = await prisma.performanceRating.findMany({
+      where: ratingWhere,
+      select: {
+        roleFitScore: true,
+        employee: {
+          select: {
+            standardJobLevel: true,
+            department: {
+              select: {
+                displayName: true,
+                parent: { select: { displayName: true } }
+              }
+            }
+          }
+        }
+      }
+    })
+
+    // 2. Agregar por Capa × Gerencia in-memory
+    const matrix: Record<string, Record<string, { sum: number; count: number }>> = {}
+
+    for (const r of ratings) {
+      const layer = PositionAdapter.getAcotadoGroup(r.employee.standardJobLevel || '') || 'sin_clasificar'
+      const gerencia = r.employee.department?.parent?.displayName
+        || r.employee.department?.displayName
+        || 'Sin Asignar'
+
+      if (!matrix[layer]) matrix[layer] = {}
+      if (!matrix[layer][gerencia]) matrix[layer][gerencia] = { sum: 0, count: 0 }
+
+      matrix[layer][gerencia].sum += r.roleFitScore!
+      matrix[layer][gerencia].count++
+    }
+
+    // 3. Calcular promedios y encontrar peor celda
+    let worstScore = 100
+    let worstCell = { layer: '', gerencia: '', score: 100 }
+    let overallSum = 0
+    let overallCount = 0
+    const byLayer: Record<string, number> = {}
+    const finalMatrix: Record<string, Record<string, LayerGerenciaFit>> = {}
+    const priorities: RoleFitMatrix['investmentPriorities'] = []
+
+    for (const [layer, gerencias] of Object.entries(matrix)) {
+      finalMatrix[layer] = {}
+      let layerSum = 0
+      let layerCount = 0
+
+      for (const [gerencia, data] of Object.entries(gerencias)) {
+        const avg = Math.round(data.sum / data.count)
+
+        finalMatrix[layer][gerencia] = {
+          avgRoleFit: avg,
+          count: data.count,
+          topGaps: []  // Gaps detallados disponibles via drill-down individual
+        }
+
+        if (avg < worstScore) {
+          worstScore = avg
+          worstCell = { layer, gerencia, score: avg }
+        }
+
+        if (avg < 75) {
+          priorities.push({
+            layer,
+            layerLabel: ACOTADO_LABELS[layer] || layer,
+            gerencia,
+            avgRoleFit: avg,
+            gap: avg - 80,
+            headcount: data.count,
+            topGaps: []
+          })
+        }
+
+        layerSum += avg * data.count
+        layerCount += data.count
+        overallSum += avg * data.count
+        overallCount += data.count
+      }
+
+      if (layerCount > 0) {
+        byLayer[layer] = Math.round(layerSum / layerCount)
+      }
+    }
+
+    priorities.sort((a, b) => a.avgRoleFit - b.avgRoleFit)
+
+    return {
+      overall: overallCount > 0 ? Math.round(overallSum / overallCount) : 0,
+      byLayer,
+      matrix: finalMatrix,
+      worstCell,
+      investmentPriorities: priorities.slice(0, 10)
+    }
   }
 }

@@ -22,6 +22,7 @@ import {
   AdjustmentType
 } from '@/config/performanceClassification'
 import { TalentIntelligenceService } from './TalentIntelligenceService'
+import { getEvaluationClassification, STATUS_CONFIG, type EvaluationStatus } from '@/lib/utils/evaluatorStatsEngine'
 import { RoleFitAnalyzer } from './RoleFitAnalyzer'
 import { GoalsService } from './GoalsService'
 
@@ -499,6 +500,20 @@ export class PerformanceRatingService {
       : weightedScore
     const classification = getPerformanceClassification(effectiveScoreForClassification, config)
 
+    // Calcular Role Fit (mismo bloque que generateRating individual)
+    let roleFitScore: number | null = null
+    let roleFitLevel: string | null = null
+
+    try {
+      const roleFitResult = await RoleFitAnalyzer.calculateRoleFit(employeeId, cycleId)
+      if (roleFitResult) {
+        roleFitScore = roleFitResult.roleFitScore
+        roleFitLevel = getRoleFitLevel(roleFitResult.roleFitScore)
+      }
+    } catch (err) {
+      console.warn(`[generateRatingWithContext] Error Role Fit para ${employeeId}:`, err)
+    }
+
     const rating = await prisma.performanceRating.upsert({
       where: {
         cycleId_employeeId: { cycleId, employeeId }
@@ -516,6 +531,9 @@ export class PerformanceRatingService {
         evaluationCompleteness: results.evaluationCompleteness,
         totalEvaluations: results.totalEvaluations,
         completedEvaluations: results.completedEvaluations,
+        roleFitScore,
+        roleFitLevel,
+        roleFitCalculatedAt: roleFitScore !== null ? new Date() : null,
         goalsScore: hybridResult?.goalsScore ?? null,
         goalsRawPercent: hybridResult?.goalsRawPercent ?? null,
         goalsCount: hybridResult?.goalsCount ?? null,
@@ -531,6 +549,9 @@ export class PerformanceRatingService {
         evaluationCompleteness: results.evaluationCompleteness,
         totalEvaluations: results.totalEvaluations,
         completedEvaluations: results.completedEvaluations,
+        roleFitScore,
+        roleFitLevel,
+        roleFitCalculatedAt: roleFitScore !== null ? new Date() : null,
         goalsScore: hybridResult?.goalsScore ?? null,
         goalsRawPercent: hybridResult?.goalsRawPercent ?? null,
         goalsCount: hybridResult?.goalsCount ?? null,
@@ -1280,10 +1301,24 @@ export class PerformanceRatingService {
 
   /**
    * Obtiene distribución de ratings de un ciclo
+   * SECURITY FIX: Agregado accountId + departmentIds para RBAC
    */
-  static async getRatingDistribution(cycleId: string) {
+  static async getRatingDistribution(
+    cycleId: string,
+    accountId: string,
+    departmentIds?: string[]
+  ) {
+    const where: any = {
+      cycleId,
+      accountId,
+    }
+
+    if (departmentIds?.length) {
+      where.employee = { departmentId: { in: departmentIds } }
+    }
+
     const ratings = await prisma.performanceRating.findMany({
-      where: { cycleId },
+      where,
       select: {
         calculatedLevel: true,
         finalLevel: true,
@@ -1467,6 +1502,537 @@ export class PerformanceRatingService {
       riskQuadrant: talentResult.risk.quadrant,
       riskAlertLevel: talentResult.risk.alertLevel
     }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // EXECUTIVE HUB - Calibration Stats by Department
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Estadísticas de calibración agrupadas por departamento del manager
+   * Usa evaluatorStatsEngine para clasificación OPTIMA/CENTRAL/SEVERA/INDULGENTE
+   */
+  static async getCalibrationStatsByDepartment(
+    cycleId: string,
+    accountId: string,
+    departmentIds?: string[]
+  ): Promise<CalibrationSummary> {
+
+    // 1. Obtener ratings agrupados por departamento del evaluador
+    const whereClause: any = {
+      cycleId,
+      accountId,
+    }
+
+    if (departmentIds?.length) {
+      whereClause.employee = { departmentId: { in: departmentIds } }
+    }
+
+    const ratings = await prisma.performanceRating.findMany({
+      where: whereClause,
+      select: {
+        calculatedScore: true,
+        employee: {
+          select: {
+            managerId: true,
+            manager: {
+              select: {
+                fullName: true,
+                position: true,
+                departmentId: true,
+                department: { select: { displayName: true } }
+              }
+            }
+          }
+        }
+      }
+    })
+
+    // 2. Agrupar por MANAGER INDIVIDUAL (no por departamento)
+    //    Cada manager se clasifica independientemente → heatmap muestra
+    //    cuántos evaluadores de cada gerencia son OPTIMA/CENTRAL/SEVERA/INDULGENTE
+    const byManager: Record<string, { deptId: string; deptName: string; managerName: string; scores: number[] }> = {}
+
+    for (const r of ratings) {
+      if (!r.calculatedScore || !r.employee.managerId || !r.employee.manager) continue
+
+      const managerId = r.employee.managerId
+      if (!byManager[managerId]) {
+        const deptId = r.employee.manager.departmentId || 'sin_asignar'
+        const deptName = r.employee.manager.department?.displayName || 'Sin Asignar'
+        const managerName = r.employee.manager.fullName || 'Sin Nombre'
+        byManager[managerId] = { deptId, deptName, managerName, scores: [] }
+      }
+      byManager[managerId].scores.push(r.calculatedScore)
+    }
+
+    // 3. Clasificar cada evaluador individualmente
+    const results: DepartmentCalibration[] = []
+    const statusCounts: Record<EvaluationStatus, number> = {
+      'OPTIMA': 0, 'CENTRAL': 0, 'SEVERA': 0, 'INDULGENTE': 0
+    }
+
+    for (const [managerId, data] of Object.entries(byManager)) {
+      if (data.scores.length < 3) continue // Mínimo para clasificar
+
+      const avg = data.scores.reduce((a, b) => a + b, 0) / data.scores.length
+      const variance = data.scores.reduce((sum, s) => sum + Math.pow(s - avg, 2), 0) / data.scores.length
+      const stdDev = Math.sqrt(variance)
+
+      // Distribución 1-5
+      const distribution = [0, 0, 0, 0, 0]
+      data.scores.forEach(s => {
+        const bucket = Math.min(Math.floor(s), 4) // 0-4 index
+        distribution[bucket]++
+      })
+
+      // Clasificar usando evaluatorStatsEngine
+      const status = getEvaluationClassification(avg, stdDev, data.scores.length)
+      statusCounts[status]++
+
+      results.push({
+        managerId,
+        managerName: data.managerName,
+        departmentId: data.deptId,
+        departmentName: data.deptName,
+        status,
+        statusLabel: STATUS_CONFIG[status].label,
+        avgScore: Math.round(avg * 100) / 100,
+        stdDev: Math.round(stdDev * 100) / 100,
+        evaluatorCount: data.scores.length,
+        distribution
+      })
+    }
+
+    // 4. Calcular confianza global
+    const totalDepts = results.length
+    const optimalDepts = statusCounts['OPTIMA']
+    const overallConfidence = totalDepts > 0
+      ? Math.round((optimalDepts / totalDepts) * 100)
+      : 0
+
+    // 5. Encontrar peor departamento
+    const worst = results
+      .filter(r => r.status === 'SEVERA' || r.status === 'INDULGENTE')
+      .sort((a, b) => Math.abs(b.avgScore - 3) - Math.abs(a.avgScore - 3))
+      [0] || null
+
+    return {
+      overallConfidence,
+      byStatus: statusCounts,
+      byDepartment: results.sort((a, b) => a.departmentName.localeCompare(b.departmentName)),
+      worstDepartment: worst
+        ? { name: worst.departmentName, status: worst.status, statusLabel: STATUS_CONFIG[worst.status].label }
+        : null
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // EXECUTIVE HUB - Calibration Stats AGGREGATED by GERENCIA (level 2)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Estadísticas de calibración agregadas por GERENCIA (departamento level 2).
+   * Agrupa los stats de evaluadores individuales (de getCalibrationStatsByDepartment)
+   * por su gerencia padre en la jerarquía organizacional.
+   */
+  static async getCalibrationStatsByGerencia(
+    cycleId: string,
+    accountId: string,
+    departmentIds?: string[]
+  ): Promise<GerenciaCalibrationStats[]> {
+
+    // 1. Obtener stats por evaluador individual (función existente)
+    const calibration = await this.getCalibrationStatsByDepartment(cycleId, accountId, departmentIds)
+    const byDepartment = calibration.byDepartment
+
+    // 2. Obtener mapa de departamentos → gerencia padre (level 2)
+    const departments = await prisma.department.findMany({
+      where: { accountId, isActive: true },
+      select: {
+        id: true,
+        displayName: true,
+        level: true,
+        parentId: true,
+      }
+    })
+
+    // Index rápido por id
+    const deptById = new Map(departments.map(d => [d.id, d]))
+
+    // 3. Resolver departmentId → gerencia (level 2) subiendo por la jerarquía
+    const deptToGerencia = new Map<string, { id: string; name: string }>()
+
+    for (const dept of departments) {
+      if (dept.level === 2) {
+        deptToGerencia.set(dept.id, { id: dept.id, name: dept.displayName })
+      } else if (dept.level === 1) {
+        // Holding: no se agrupa bajo ninguna gerencia
+        continue
+      } else {
+        // level >= 3: subir hasta encontrar ancestro level 2
+        let current = dept
+        let maxIterations = 10 // Prevenir loops infinitos
+        while (current.parentId && current.level > 2 && maxIterations-- > 0) {
+          const parent = deptById.get(current.parentId)
+          if (!parent) break
+          if (parent.level === 2) {
+            deptToGerencia.set(dept.id, { id: parent.id, name: parent.displayName })
+            break
+          }
+          current = parent
+        }
+      }
+    }
+
+    // 4. Pre-seed accumulator con TODAS las gerencias (level 2)
+    const gerenciaAcc: Record<string, {
+      id: string
+      name: string
+      scores: number[]
+      counts: { OPTIMA: number; CENTRAL: number; SEVERA: number; INDULGENTE: number }
+      evaluatorCount: number
+      distributions: number[][]
+      deptAcc: Record<string, {
+        id: string; name: string; scores: number[]
+        statuses: string[]; evaluatorCount: number
+        evaluatorDetails: EvaluatorDetail[]
+      }>
+    }> = {}
+
+    for (const dept of departments) {
+      if (dept.level === 2) {
+        gerenciaAcc[dept.id] = {
+          id: dept.id,
+          name: dept.displayName,
+          scores: [],
+          counts: { OPTIMA: 0, CENTRAL: 0, SEVERA: 0, INDULGENTE: 0 },
+          evaluatorCount: 0,
+          distributions: [],
+          deptAcc: {}
+        }
+      }
+    }
+
+    // Pre-seed department accumulators (child departments under each gerencia)
+    for (const dept of departments) {
+      const gerencia = deptToGerencia.get(dept.id)
+      if (!gerencia || !gerenciaAcc[gerencia.id]) continue
+      // Include level 2 itself + all children
+      gerenciaAcc[gerencia.id].deptAcc[dept.id] = {
+        id: dept.id,
+        name: dept.displayName,
+        scores: [],
+        statuses: [],
+        evaluatorCount: 0,
+        evaluatorDetails: []
+      }
+    }
+
+    // 5. Llenar con datos reales de evaluadores
+    for (const evaluator of byDepartment) {
+      const gerencia = deptToGerencia.get(evaluator.departmentId)
+      if (!gerencia || !gerenciaAcc[gerencia.id]) continue
+
+      const acc = gerenciaAcc[gerencia.id]
+      acc.scores.push(evaluator.avgScore)
+      const status = evaluator.status as keyof typeof acc.counts
+      if (status in acc.counts) acc.counts[status]++
+      acc.evaluatorCount++
+
+      if (evaluator.distribution) {
+        acc.distributions.push(evaluator.distribution)
+      }
+
+      // Acumular por departamento
+      const deptData = acc.deptAcc[evaluator.departmentId]
+      if (deptData) {
+        deptData.scores.push(evaluator.avgScore)
+        deptData.statuses.push(evaluator.status)
+        deptData.evaluatorCount++
+        deptData.evaluatorDetails.push({
+          managerId: evaluator.managerId,
+          managerName: evaluator.managerName,
+          avg: evaluator.avgScore,
+          stdDev: evaluator.stdDev,
+          status: evaluator.status,
+          ratingsCount: evaluator.evaluatorCount
+        })
+      }
+    }
+
+    // 6. Calcular métricas finales por gerencia (incluye las sin datos)
+    const result: GerenciaCalibrationStats[] = []
+
+    for (const acc of Object.values(gerenciaAcc)) {
+      const { scores } = acc
+      const count = scores.length
+
+      // Calcular stats de departamentos anidados
+      const deptStats: GerenciaDepartmentStats[] = []
+      let hasDepartmentWithBias = false
+
+      for (const da of Object.values(acc.deptAcc)) {
+        if (da.evaluatorCount === 0) {
+          deptStats.push({
+            departmentId: da.id,
+            departmentName: da.name,
+            avg: null,
+            stdDev: null,
+            status: null,
+            evaluatorCount: 0,
+            evaluators: []
+          })
+          continue
+        }
+        const dAvg = da.scores.reduce((a, b) => a + b, 0) / da.scores.length
+        const dVar = da.scores.reduce((a, b) => a + Math.pow(b - dAvg, 2), 0) / da.scores.length
+        const dStdDev = Math.sqrt(dVar)
+
+        // Status: regla de contaminación (severidad gana sobre cantidad)
+        const dStatus: EvaluationStatus =
+          da.statuses.includes('SEVERA') ? 'SEVERA' :
+          da.statuses.includes('INDULGENTE') ? 'INDULGENTE' :
+          da.statuses.includes('CENTRAL') ? 'CENTRAL' :
+          'OPTIMA'
+
+        if (dStatus !== 'OPTIMA') hasDepartmentWithBias = true
+
+        deptStats.push({
+          departmentId: da.id,
+          departmentName: da.name,
+          avg: Number(dAvg.toFixed(2)),
+          stdDev: Number(dStdDev.toFixed(2)),
+          status: dStatus,
+          evaluatorCount: da.evaluatorCount,
+          evaluators: da.evaluatorDetails.sort((a, b) => a.managerName.localeCompare(b.managerName))
+        })
+      }
+
+      deptStats.sort((a, b) => a.departmentName.localeCompare(b.departmentName))
+
+      // Gerencia sin evaluadores → emitir con null
+      if (count === 0) {
+        result.push({
+          gerenciaId: acc.id,
+          gerenciaName: acc.name,
+          avg: null,
+          stdDev: null,
+          status: null,
+          confidenceScore: null,
+          counts: acc.counts,
+          evaluatorCount: 0,
+          distribution: [0, 0, 0, 0, 0],
+          departments: deptStats,
+          hasDepartmentWithBias
+        })
+        continue
+      }
+
+      const avg = scores.reduce((a, b) => a + b, 0) / count
+      const variance = scores.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / count
+      const stdDev = Math.sqrt(variance)
+
+      // Status: regla de contaminación (severidad gana sobre cantidad)
+      const dominantStatus: EvaluationStatus =
+        acc.counts.SEVERA > 0 ? 'SEVERA' :
+        acc.counts.INDULGENTE > 0 ? 'INDULGENTE' :
+        acc.counts.CENTRAL > 0 ? 'CENTRAL' :
+        'OPTIMA'
+
+      // Confianza = % de evaluadores OPTIMA
+      const confidenceScore = Math.round((acc.counts.OPTIMA / count) * 100)
+
+      // Distribución agregada (promedio de distribuciones individuales)
+      const aggregatedDistribution = [0, 0, 0, 0, 0]
+      if (acc.distributions.length > 0) {
+        for (let i = 0; i < 5; i++) {
+          const sum = acc.distributions.reduce((a, d) => a + (d[i] || 0), 0)
+          aggregatedDistribution[i] = Math.round(sum / acc.distributions.length)
+        }
+      }
+
+      result.push({
+        gerenciaId: acc.id,
+        gerenciaName: acc.name,
+        avg: Number(avg.toFixed(2)),
+        stdDev: Number(stdDev.toFixed(2)),
+        status: dominantStatus,
+        confidenceScore,
+        counts: acc.counts,
+        evaluatorCount: acc.evaluatorCount,
+        distribution: aggregatedDistribution,
+        departments: deptStats,
+        hasDepartmentWithBias
+      })
+    }
+
+    result.sort((a, b) => a.gerenciaName.localeCompare(b.gerenciaName))
+    return result
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// TIPOS EXECUTIVE HUB
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface DepartmentCalibration {
+  managerId: string
+  managerName: string
+  departmentId: string
+  departmentName: string
+  status: EvaluationStatus
+  statusLabel: string
+  avgScore: number
+  stdDev: number
+  evaluatorCount: number
+  distribution: number[]
+}
+
+export interface CalibrationSummary {
+  overallConfidence: number
+  byStatus: Record<EvaluationStatus, number>
+  byDepartment: DepartmentCalibration[]
+  worstDepartment: { name: string; status: EvaluationStatus; statusLabel: string } | null
+}
+
+export interface EvaluatorDetail {
+  managerId: string
+  managerName: string
+  avg: number
+  stdDev: number
+  status: EvaluationStatus
+  ratingsCount: number
+}
+
+export interface GerenciaDepartmentStats {
+  departmentId: string
+  departmentName: string
+  avg: number | null
+  stdDev: number | null
+  status: EvaluationStatus | null
+  evaluatorCount: number
+  evaluators: EvaluatorDetail[]
+}
+
+export interface GerenciaCalibrationStats {
+  gerenciaId: string
+  gerenciaName: string
+  avg: number | null
+  stdDev: number | null
+  status: EvaluationStatus | null
+  confidenceScore: number | null
+  counts: {
+    OPTIMA: number
+    CENTRAL: number
+    SEVERA: number
+    INDULGENTE: number
+  }
+  evaluatorCount: number
+  distribution: number[]
+  departments: GerenciaDepartmentStats[]
+  hasDepartmentWithBias: boolean
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// FÓRMULA DE INTEGRIDAD FOCALIZA v1.1
+// Confianza ajustada por sesgos y varianza
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface IntegrityScore {
+  score: number
+  baseScore: number
+  penalties: {
+    bias: { type: string; points: number; reason: string } | null
+    variance: { level: string; points: number; reason: string } | null
+  }
+  level: 'HIGH' | 'MEDIUM' | 'LOW'
+  narrative: string
+}
+
+const BIAS_PENALTIES: Record<string, { points: number; reason: string }> = {
+  'SEVERITY': {
+    points: 20,
+    reason: 'Estándar de Hierro: Riesgo de fuga de talento estrella y frustración generalizada'
+  },
+  'LENIENCY': {
+    points: 15,
+    reason: 'Mano Blanda: Dilución del presupuesto de bonos y falta de meritocracia'
+  },
+  'CENTRAL_TENDENCY': {
+    points: 10,
+    reason: 'Zona Gris: Invisibilidad del talento, nadie brilla ni falla'
+  }
+}
+
+const BIAS_NAMES: Record<string, string> = {
+  'SEVERITY': 'un Estándar de Hierro',
+  'LENIENCY': 'una Mano Blanda generalizada',
+  'CENTRAL_TENDENCY': 'una Zona Gris de no-diferenciación'
+}
+
+export function calculateIntegrityScore(params: {
+  optimaCount: number
+  totalDepartments: number
+  biasType: string | null
+  avgVariance: number
+}): IntegrityScore {
+  const { optimaCount, totalDepartments, biasType, avgVariance } = params
+
+  // Base: % de evaluadores con distribución saludable
+  const baseScore = totalDepartments > 0
+    ? Math.round((optimaCount / totalDepartments) * 100)
+    : 0
+
+  // Penalización por sesgo
+  const biasPenalty = biasType && BIAS_PENALTIES[biasType]
+    ? BIAS_PENALTIES[biasType]
+    : { points: 0, reason: '' }
+
+  // Penalización por varianza
+  let variancePenalty: { level: string; points: number; reason: string }
+  if (avgVariance >= 1.0) {
+    variancePenalty = { level: 'ALTA', points: 10, reason: 'Efecto Lotería: La evaluación depende del criterio individual de cada jefe' }
+  } else if (avgVariance >= 0.5) {
+    variancePenalty = { level: 'MEDIA', points: 5, reason: 'Criterios en proceso de desalineación entre evaluadores' }
+  } else {
+    variancePenalty = { level: 'BAJA', points: 0, reason: '' }
+  }
+
+  // Score final
+  const score = Math.max(0, baseScore - biasPenalty.points - variancePenalty.points)
+
+  const level: 'HIGH' | 'MEDIUM' | 'LOW' =
+    score >= 75 ? 'HIGH' :
+    score >= 50 ? 'MEDIUM' : 'LOW'
+
+  // Narrativa ejecutiva
+  let narrative: string
+  if (level === 'HIGH') {
+    narrative = 'Datos con alta integridad. Puedes tomar decisiones de talento con confianza.'
+  } else if (level === 'MEDIUM') {
+    narrative = 'Datos con ruido moderado. Revisa los sesgos detectados antes de ejecutar presupuesto.'
+  } else {
+    narrative = 'Datos con ruido crítico. Calibra los criterios de evaluación antes de tomar decisiones.'
+  }
+
+  if (biasType && BIAS_NAMES[biasType]) {
+    narrative += ` Detectamos ${BIAS_NAMES[biasType]} que distorsiona tu visión de talento.`
+  }
+
+  return {
+    score,
+    baseScore,
+    penalties: {
+      bias: biasType && biasPenalty.points > 0
+        ? { type: biasType, points: biasPenalty.points, reason: biasPenalty.reason }
+        : null,
+      variance: variancePenalty.points > 0
+        ? { level: variancePenalty.level, points: variancePenalty.points, reason: variancePenalty.reason }
+        : null
+    },
+    level,
+    narrative
   }
 }
 

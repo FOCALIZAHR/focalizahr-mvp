@@ -218,6 +218,9 @@ export default function PerformanceCycleDetailPage({
     pendingPotential: number;
   } | null>(null);
 
+  // Alerta de departamentos huérfanos
+  const [orphanDepartmentCount, setOrphanDepartmentCount] = useState(0);
+
   // ══════════════════════════════════════════════════════════════════════════
   // FETCH DATA
   // ══════════════════════════════════════════════════════════════════════════
@@ -243,6 +246,9 @@ export default function PerformanceCycleDetailPage({
       if (data.success) {
         setCycle(data.data);
         setStats(data.stats);
+        if (data.orphanDepartmentCount !== undefined) {
+          setOrphanDepartmentCount(data.orphanDepartmentCount);
+        }
       } else {
         throw new Error(data.error || 'Error desconocido');
       }
@@ -1232,6 +1238,33 @@ export default function PerformanceCycleDetailPage({
                   </div>
                 </div>
               </div>
+
+              {/* Alerta huérfanos */}
+              {orphanDepartmentCount > 0 && (
+                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-amber-300">
+                        {orphanDepartmentCount} {orphanDepartmentCount === 1 ? 'departamento sin gerencia' : 'departamentos sin gerencia'} asignada
+                      </p>
+                      <p className="text-sm text-amber-200/70 mt-1">
+                        Se recomienda arreglar la estructura organizacional antes de continuar.
+                        Los departamentos huérfanos no aparecerán correctamente en reportes por gerencia.
+                      </p>
+                      <button
+                        onClick={() => {
+                          setShowActivateModal(false);
+                          router.push('/dashboard/admin/structure');
+                        }}
+                        className="mt-2 text-xs text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition-colors"
+                      >
+                        Ver estructura organizacional
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Warning */}
               <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">

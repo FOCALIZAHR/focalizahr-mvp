@@ -122,3 +122,29 @@ export function generateTeamInsight(
 export function requiresAttention(status: EvaluationStatus): boolean {
   return status !== 'OPTIMA'
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// CLASSIFICATION
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Clasifica el conjunto de datos de evaluación basándose en promedio y desviación estándar
+ * Escala: 1-5
+ * - INDULGENTE: avg >= 4.2 (sesgo alto)
+ * - SEVERA: avg <= 2.5 (sesgo bajo)
+ * - CENTRAL: stdDev < 0.5 y count >= 5 (poca diferenciación)
+ * - OPTIMA: distribución saludable
+ */
+export function getEvaluationClassification(
+  avg: number,
+  stdDev: number,
+  count: number
+): EvaluationStatus {
+  if (count < 3) return 'OPTIMA' // Insuficiente para clasificar sesgo
+
+  if (avg >= 4.2) return 'INDULGENTE'
+  if (avg <= 2.5) return 'SEVERA'
+  if (stdDev < 0.5 && count >= 5) return 'CENTRAL'
+
+  return 'OPTIMA'
+}

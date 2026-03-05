@@ -7,6 +7,7 @@
 // Metodología: Test Ácido (solo niveles extremos 1 y 3 generan clasificación)
 // ════════════════════════════════════════════════════════════════════════════
 
+import { prisma } from '@/lib/prisma'
 import {
   TALENT_INTELLIGENCE_THRESHOLDS,
   MobilityQuadrant,
@@ -60,6 +61,32 @@ export interface TalentIntelligenceResult {
   dataCompleteness: 'FULL' | 'PARTIAL_ROLE_FIT' | 'PARTIAL_AAE' | 'INSUFFICIENT'
   canClassify: boolean
   analyzedAt: Date
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// TIPOS ALERTAS
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface ActiveAlert {
+  id: string
+  employeeId: string
+  employeeName: string
+  position: string
+  departmentName: string
+  riskQuadrant: RiskQuadrant
+  alertLevel: 'RED' | 'ORANGE'
+  message: string
+  recommendation: string
+  slaHours: number
+  createdAt: Date
+}
+
+export interface AlertsSummary {
+  total: number
+  critical: number
+  high: number
+  byType: Record<RiskQuadrant, number>
+  alerts: ActiveAlert[]
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -269,6 +296,80 @@ export class TalentIntelligenceService {
    */
   static filterSuccessionReady(quadrant: MobilityQuadrant | null): boolean {
     return quadrant === MobilityQuadrant.SUCESOR_NATURAL
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // ALERTAS ACTIVAS
+  // ════════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Obtiene alertas activas de talento para un ciclo
+   * Solo riskAlertLevel RED (crítico) y ORANGE (alto)
+   */
+  static async getActiveAlerts(
+    cycleId: string,
+    accountId: string,
+    departmentIds?: string[]
+  ): Promise<AlertsSummary> {
+
+    const where: any = {
+      cycleId,
+      accountId,
+      riskAlertLevel: { in: ['RED', 'ORANGE'] }
+    }
+
+    if (departmentIds?.length) {
+      where.employee = { departmentId: { in: departmentIds } }
+    }
+
+    const ratings = await prisma.performanceRating.findMany({
+      where,
+      include: {
+        employee: {
+          select: {
+            id: true,
+            fullName: true,
+            position: true,
+            department: { select: { displayName: true } }
+          }
+        }
+      },
+      orderBy: [
+        { riskAlertLevel: 'asc' },  // RED primero (alphabetically before ORANGE)
+        { updatedAt: 'desc' }
+      ]
+    })
+
+    const alerts: ActiveAlert[] = ratings.map(r => {
+      const config = RISK_QUADRANT_CONFIG[r.riskQuadrant as RiskQuadrant]
+      return {
+        id: r.id,
+        employeeId: r.employeeId,
+        employeeName: r.employee.fullName,
+        position: r.employee.position || 'Sin cargo',
+        departmentName: r.employee.department?.displayName || 'Sin departamento',
+        riskQuadrant: (r.riskQuadrant as RiskQuadrant) || RiskQuadrant.BAJO_RENDIMIENTO,
+        alertLevel: r.riskAlertLevel as 'RED' | 'ORANGE',
+        message: config?.label || 'Alerta de talento',
+        recommendation: config?.recommendedActions?.[0] || 'Revisar situación',
+        slaHours: r.riskAlertLevel === 'RED' ? 48 : 72,
+        createdAt: r.updatedAt
+      }
+    })
+
+    // Contar por tipo
+    const byType: Record<string, number> = {}
+    alerts.forEach(a => {
+      byType[a.riskQuadrant] = (byType[a.riskQuadrant] || 0) + 1
+    })
+
+    return {
+      total: alerts.length,
+      critical: alerts.filter(a => a.alertLevel === 'RED').length,
+      high: alerts.filter(a => a.alertLevel === 'ORANGE').length,
+      byType: byType as Record<RiskQuadrant, number>,
+      alerts
+    }
   }
 }
 

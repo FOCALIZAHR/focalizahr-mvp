@@ -35,6 +35,7 @@ import {
   FileSpreadsheet,
   Plus,
   Building2,
+  Zap,
 } from 'lucide-react';
 
 // ============================================================================
@@ -104,6 +105,12 @@ export default function DashboardNavigation({
   
   const canSeeOperations = user?.role && operationsAllowedRoles.includes(user.role);
 
+  // RBAC: Roles que pueden ver Executive Hub
+  const executiveHubRoles = [
+    'FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_MANAGER', 'HR_ADMIN', 'CEO', 'AREA_MANAGER', 'CLIENT'
+  ];
+  const canSeeExecutiveHub = user?.role && executiveHubRoles.includes(user.role);
+
   // Navigation Config con Dropdowns
   const navigationItems: NavigationItem[] = [
     {
@@ -117,6 +124,14 @@ export default function DashboardNavigation({
         { id: 'exit', label: 'Exit Intelligence', href: '/dashboard/exit/overview', icon: DoorOpen },
       ],
     },
+    // Executive Hub - Solo roles ejecutivos
+    ...(canSeeExecutiveHub ? [{
+      id: 'executive-hub',
+      label: 'Executive Hub',
+      href: '/dashboard/executive-hub',
+      icon: Zap,
+      active: pathname.startsWith('/dashboard/executive-hub'),
+    }] : []),
     // ✅ CAMBIO 6: NUEVO ITEM "SEGUIMIENTO"
     {
       id: 'seguimiento',

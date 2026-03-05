@@ -154,7 +154,7 @@ const ExecutiveHero = memo(function ExecutiveHero({
   const strokeDashoffset = circumference - (alignmentRate / 100) * circumference
 
   return (
-    <div className="fhr-card p-6 sm:p-8 relative overflow-hidden">
+    <div className="fhr-card p-8 sm:p-10 relative overflow-hidden">
       {/* Línea Tesla superior */}
       <div
         className="absolute top-0 left-0 right-0 h-[2px]"
@@ -178,7 +178,10 @@ const ExecutiveHero = memo(function ExecutiveHero({
               strokeLinecap="round"
               strokeDasharray={circumference}
               strokeDashoffset={strokeDashoffset}
-              style={{ transition: 'stroke-dashoffset 1.2s ease-out' }}
+              style={{
+                transition: 'stroke-dashoffset 1.2s ease-out',
+                filter: 'drop-shadow(0 0 8px rgba(34, 211, 238, 0.3))',
+              }}
             />
             <defs>
               <linearGradient id="executiveGaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -253,10 +256,11 @@ const CorporateGoalCard = memo(function CorporateGoalCard({
       onClick={onClick}
       whileHover={{ scale: 1.02, y: -2 }}
       whileTap={{ scale: 0.98 }}
-      className="flex-shrink-0 w-48 p-4 rounded-xl bg-slate-800/50 border border-slate-700/50
+      title={goal.title}
+      className="flex-shrink-0 min-w-[200px] w-52 p-4 rounded-xl bg-slate-800/50 border border-slate-700/50
                  hover:border-cyan-500/30 transition-all text-left group"
     >
-      <p className="text-white text-sm font-medium truncate mb-2 group-hover:text-cyan-400 transition-colors">
+      <p className="text-white text-sm font-medium line-clamp-2 mb-2 group-hover:text-cyan-400 transition-colors">
         {goal.title}
       </p>
 
@@ -476,7 +480,7 @@ export default memo(function GoalsStrategyPage() {
       <div className="max-w-5xl mx-auto px-4 py-6 md:px-8 md:py-10">
 
         {/* Header */}
-        <div className="flex items-start justify-between flex-wrap gap-4 mb-6 md:mb-8">
+        <div className="flex items-start justify-between flex-wrap gap-4 mb-8">
           <div>
             <h1 className="fhr-hero-title text-2xl md:text-3xl">
               Torre de{' '}
@@ -489,16 +493,16 @@ export default memo(function GoalsStrategyPage() {
 
           <div className="flex items-center gap-3">
             {canConfigure && (
-              <SecondaryButton
+              <GhostButton
                 icon={Settings2}
                 onClick={() => router.push('/dashboard/metas/configuracion/wizard')}
               >
                 Configurar Sistema
-              </SecondaryButton>
+              </GhostButton>
             )}
-            <PrimaryButton icon={Plus} onClick={handleCreateGoal}>
+            <SecondaryButton icon={Plus} onClick={handleCreateGoal}>
               Nueva Meta
-            </PrimaryButton>
+            </SecondaryButton>
           </div>
         </div>
 
@@ -515,7 +519,7 @@ export default memo(function GoalsStrategyPage() {
         />
 
         {/* RAIL: Metas Corporativas */}
-        <div className="mt-6">
+        <div className="mt-8">
           <CorporateGoalsRail
             goals={corporateGoals}
             onGoalClick={handleGoalClick}

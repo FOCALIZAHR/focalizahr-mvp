@@ -15,7 +15,8 @@
       "Bash(timeout /t:*)",
       "Bash(ls:*)",
       "Bash(grep:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(done)"
     ]
   }
 }

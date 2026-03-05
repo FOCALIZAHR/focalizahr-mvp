@@ -33,8 +33,7 @@ export function buildCandidatesQuery(
     isActive: true,
     performanceRatings: {
       some: {
-        cycleId: session.cycleId,
-        calculatedScore: { not: null }
+        cycleId: session.cycleId
       }
     }
   }
