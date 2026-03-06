@@ -28,6 +28,7 @@ import {
   Mail,
   ChevronLeft,
   ChevronRight,
+  Crown,
   Heart,
   Rocket,
   DoorOpen,
@@ -131,6 +132,14 @@ export default function DashboardNavigation({
       href: '/dashboard/executive-hub',
       icon: Zap,
       active: pathname.startsWith('/dashboard/executive-hub'),
+    }] : []),
+    // Sucesion Inteligente - Mismos roles que Executive Hub
+    ...(canSeeExecutiveHub ? [{
+      id: 'sucesion',
+      label: 'Sucesion',
+      href: '/dashboard/succession',
+      icon: Crown,
+      active: pathname.startsWith('/dashboard/succession'),
     }] : []),
     // ✅ CAMBIO 6: NUEVO ITEM "SEGUIMIENTO"
     {

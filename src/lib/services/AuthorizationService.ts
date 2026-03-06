@@ -518,6 +518,22 @@ export const PERMISSIONS = {
     'ACCOUNT_OWNER',
     'HR_ADMIN'
   ],
+
+  // SUCCESSION INTELLIGENCE
+  'succession:view': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'CEO',
+    'AREA_MANAGER'
+  ],
+  'succession:manage': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'CEO'
+  ],
 } as const;
 
 // =============================================================================

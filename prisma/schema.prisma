@@ -212,6 +212,10 @@ model Account {
   goalGroups               GoalGroup[]
   goalCascadeRules         GoalCascadeRule[]
 
+  // Sucesion Inteligente
+  criticalPositions        CriticalPosition[]
+  successionCandidates     SuccessionCandidate[]
+
   @@index([adminEmail], map: "idx_accounts_email")
   @@index([subscriptionTier], map: "idx_accounts_tier")
   // 🌍 AGREGAR ESTOS 3 ÍNDICES:
@@ -685,6 +689,9 @@ model Department {
 
   // Metas (Business Goals Engine)
   goals     Goal[]
+
+  // Sucesion Inteligente
+  criticalPositions CriticalPosition[]
 
   @@unique([accountId, displayName])
   @@index([accountId], map: "idx_departments_account")
@@ -1563,6 +1570,10 @@ model Employee {
   // Metas (Business Goals Engine)
   goals                  Goal[]
 
+  // Sucesion Inteligente
+  incumbentOfPositions   CriticalPosition[]      @relation("PositionIncumbent")
+  successionCandidacies  SuccessionCandidate[]   @relation("SuccessionCandidateEmployee")
+
   // Índices
   @@unique([accountId, nationalId], map: "idx_employees_account_national")
   @@index([accountId, status], map: "idx_employees_account_status")
@@ -2256,6 +2267,9 @@ model DevelopmentPlan {
   goals             DevelopmentGoal[]
   checkIns          PDICheckIn[]
 
+  // Sucesion Inteligente
+  successionCandidate SuccessionCandidate?
+
   @@unique([employeeId, cycleId])
   @@index([accountId])
   @@index([managerId])
@@ -2724,4 +2738,142 @@ enum GoalStatus {
   PENDING_CLOSURE  // Pendiente de aprobación de cierre
   COMPLETED        // Completado
   CANCELLED        // Cancelado
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SUCESION INTELIGENTE - Enums
+// ════════════════════════════════════════════════════════════════════════════
+
+enum BenchStrengthLevel {
+  STRONG    // 2+ Ready Now
+  MODERATE  // 1 Ready Now + 2+ Ready 1-2 anios
+  WEAK      // Solo Ready 1-2 anios, sin Ready Now
+  NONE      // Sin candidatos viables
+  UNKNOWN   // No calculado aun
+}
+
+enum ReadinessLevel {
+  READY_NOW
+  READY_1_2_YEARS
+  READY_3_PLUS
+  NOT_VIABLE
+}
+
+enum CandidateStatus {
+  ACTIVE        // Candidato vigente
+  PROMOTED      // Fue promovido a este rol
+  WITHDRAWN     // Retirado de consideracion
+  DISQUALIFIED  // Ya no cumple umbral 75% o Aspiracion cayo a 1
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// POSICION CRITICA (El cargo que necesita sucesor)
+// ════════════════════════════════════════════════════════════════════════════
+
+model CriticalPosition {
+  id                String   @id @default(cuid())
+  accountId         String   @map("account_id")
+
+  // Identificacion del rol
+  positionTitle     String   @map("position_title")
+  standardJobLevel  String   @map("standard_job_level")
+  departmentId      String?  @map("department_id")
+
+  // Incumbent actual (puede ser null si vacante)
+  incumbentId       String?  @map("incumbent_id")
+
+  // Bench Strength (calculado automaticamente)
+  benchStrength         BenchStrengthLevel @default(UNKNOWN) @map("bench_strength")
+  benchCalculatedAt     DateTime?          @map("bench_calculated_at")
+
+  // Flight Risk del Incumbent (de TalentIntelligence)
+  incumbentFlightRisk       String?    @map("incumbent_flight_risk")
+  incumbentRetirementDate   DateTime?  @map("incumbent_retirement_date")
+
+  // Auditoria
+  createdBy         String   @map("created_by")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  isActive          Boolean  @default(true) @map("is_active")
+
+  // Relaciones
+  account           Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  incumbent         Employee?   @relation("PositionIncumbent", fields: [incumbentId], references: [id])
+  department        Department? @relation(fields: [departmentId], references: [id])
+  candidates        SuccessionCandidate[]
+
+  @@unique([accountId, positionTitle, departmentId], map: "unique_position_per_dept")
+  @@index([accountId], map: "idx_critical_pos_account")
+  @@index([benchStrength], map: "idx_critical_pos_bench")
+  @@index([incumbentFlightRisk], map: "idx_critical_pos_flight_risk")
+  @@map("critical_positions")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CANDIDATO A SUCESION (La nominacion)
+// ════════════════════════════════════════════════════════════════════════════
+
+model SuccessionCandidate {
+  id                  String   @id @default(cuid())
+  accountId           String   @map("account_id")
+
+  // Relacion Posicion <-> Candidato
+  criticalPositionId  String   @map("critical_position_id")
+  employeeId          String   @map("employee_id")
+
+  // Filtro inicial (snapshot al momento de nominar)
+  currentRoleFit      Float    @map("current_role_fit")
+  passedThreshold     Boolean  @map("passed_threshold")
+  nineBoxPosition     String?  @map("nine_box_position")
+  aspirationLevel     Int?     @map("aspiration_level")
+
+  // Match vs Target (calculado)
+  matchPercent        Float    @map("match_percent")
+  gapsJson            Json     @map("gaps_json")
+  gapsCriticalCount   Int      @map("gaps_critical_count")
+  gapsStrategicCount  Int      @map("gaps_strategic_count")
+  gapsLeadershipCount Int      @map("gaps_leadership_count")
+
+  // Readiness (calculado por algoritmo)
+  readinessLevel      ReadinessLevel @map("readiness_level")
+  readinessScore      Float          @map("readiness_score")
+  readinessReasoning  Json           @map("readiness_reasoning")
+  estimatedMonths     Int?           @map("estimated_months")
+
+  // Override humano (con accountability)
+  readinessOverride   ReadinessLevel? @map("readiness_override")
+  overrideReason      String?         @map("override_reason") @db.Text
+  overrideBy          String?         @map("override_by")
+  overrideAt          DateTime?       @map("override_at")
+
+  // Contexto adicional
+  flightRisk          String?  @map("flight_risk")
+
+  // AAE Snapshot
+  ability             Int?
+  engagement          Int?
+
+  // Link a PDI
+  developmentPlanId   String?  @unique @map("development_plan_id")
+
+  // Estado y auditoria
+  status              CandidateStatus @default(ACTIVE)
+  nominatedBy         String          @map("nominated_by")
+  nominatedAt         DateTime        @default(now()) @map("nominated_at")
+  lastCalculatedAt    DateTime        @default(now()) @map("last_calculated_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  // Relaciones
+  account             Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  criticalPosition    CriticalPosition @relation(fields: [criticalPositionId], references: [id], onDelete: Cascade)
+  employee            Employee         @relation("SuccessionCandidateEmployee", fields: [employeeId], references: [id])
+  developmentPlan     DevelopmentPlan? @relation(fields: [developmentPlanId], references: [id])
+
+  @@unique([criticalPositionId, employeeId], map: "unique_candidate_per_position")
+  @@index([accountId], map: "idx_succ_cand_account")
+  @@index([readinessLevel], map: "idx_succ_cand_readiness")
+  @@index([status], map: "idx_succ_cand_status")
+  @@index([flightRisk], map: "idx_succ_cand_flight_risk")
+  @@index([matchPercent], map: "idx_succ_cand_match")
+  @@map("succession_candidates")
 }

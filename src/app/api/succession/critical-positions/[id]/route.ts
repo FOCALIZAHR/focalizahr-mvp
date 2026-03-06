@@ -1,0 +1,172 @@
+// ════════════════════════════════════════════════════════════════════════════
+// API: /api/succession/critical-positions/[id]
+// GET - Detalle de posicion con candidatos
+// PUT - Actualizar posicion
+// DELETE - Soft-delete (isActive=false)
+// ════════════════════════════════════════════════════════════════════════════
+
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import {
+  extractUserContext,
+  hasPermission,
+} from '@/lib/services/AuthorizationService'
+import { sortCandidates } from '@/config/successionConstants'
+import { SuccessionService } from '@/lib/services/SuccessionService'
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const userContext = extractUserContext(request)
+    const { id } = await params
+
+    if (!userContext.accountId) {
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
+    }
+
+    if (!hasPermission(userContext.role, 'succession:view')) {
+      return NextResponse.json({ success: false, error: 'Sin permisos' }, { status: 403 })
+    }
+
+    const position = await prisma.criticalPosition.findFirst({
+      where: { id, accountId: userContext.accountId, isActive: true },
+      include: {
+        department: { select: { displayName: true } },
+        incumbent: {
+          select: {
+            id: true, fullName: true, position: true,
+            department: { select: { displayName: true } },
+          }
+        },
+        candidates: {
+          where: { status: 'ACTIVE' },
+          include: {
+            employee: {
+              select: {
+                id: true, fullName: true, position: true,
+                department: { select: { displayName: true } },
+              }
+            },
+            developmentPlan: { select: { id: true, status: true } },
+          }
+        },
+      },
+    })
+
+    if (!position) {
+      return NextResponse.json({ success: false, error: 'Posicion no encontrada' }, { status: 404 })
+    }
+
+    // Recalculate matchPercent + readiness from gapsJson (fixes stale stored values)
+    const recalculated = position.candidates.map(c => {
+      const recalc = SuccessionService.recalculateFromGaps(c)
+      return {
+        ...c,
+        matchPercent: recalc.matchPercent,
+        readinessLevel: (c.readinessOverride || recalc.readinessLevel) as string,
+      }
+    })
+
+    // Sort candidates by readiness
+    const sortedCandidates = sortCandidates(recalculated)
+
+    return NextResponse.json({
+      success: true,
+      data: { ...position, candidates: sortedCandidates },
+      permissions: { canManage: hasPermission(userContext.role, 'succession:manage') },
+    })
+  } catch (error: any) {
+    console.error('[Succession Position GET] Error:', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const userContext = extractUserContext(request)
+    const { id } = await params
+
+    if (!userContext.accountId) {
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
+    }
+
+    if (!hasPermission(userContext.role, 'succession:manage')) {
+      return NextResponse.json({ success: false, error: 'Sin permisos' }, { status: 403 })
+    }
+
+    // Verify ownership
+    const existing = await prisma.criticalPosition.findFirst({
+      where: { id, accountId: userContext.accountId, isActive: true },
+    })
+    if (!existing) {
+      return NextResponse.json({ success: false, error: 'Posicion no encontrada' }, { status: 404 })
+    }
+
+    const body = await request.json()
+    const { positionTitle, standardJobLevel, departmentId, incumbentId, incumbentRetirementDate } = body
+
+    const updated = await prisma.criticalPosition.update({
+      where: { id },
+      data: {
+        ...(positionTitle !== undefined && { positionTitle }),
+        ...(standardJobLevel !== undefined && { standardJobLevel }),
+        ...(departmentId !== undefined && { departmentId: departmentId || null }),
+        ...(incumbentId !== undefined && { incumbentId: incumbentId || null }),
+        ...(incumbentRetirementDate !== undefined && {
+          incumbentRetirementDate: incumbentRetirementDate ? new Date(incumbentRetirementDate) : null
+        }),
+      },
+      include: {
+        department: { select: { displayName: true } },
+        incumbent: { select: { id: true, fullName: true, position: true } },
+      },
+    })
+
+    return NextResponse.json({ success: true, data: updated })
+  } catch (error: any) {
+    console.error('[Succession Position PUT] Error:', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const userContext = extractUserContext(request)
+    const { id } = await params
+
+    if (!userContext.accountId) {
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
+    }
+
+    if (!hasPermission(userContext.role, 'succession:manage')) {
+      return NextResponse.json({ success: false, error: 'Sin permisos' }, { status: 403 })
+    }
+
+    // Verify ownership
+    const existing = await prisma.criticalPosition.findFirst({
+      where: { id, accountId: userContext.accountId, isActive: true },
+    })
+    if (!existing) {
+      return NextResponse.json({ success: false, error: 'Posicion no encontrada' }, { status: 404 })
+    }
+
+    // Soft delete
+    await prisma.criticalPosition.update({
+      where: { id },
+      data: { isActive: false },
+    })
+
+    return NextResponse.json({ success: true, message: 'Posicion desactivada' })
+  } catch (error: any) {
+    console.error('[Succession Position DELETE] Error:', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  }
+}

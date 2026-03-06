@@ -1,0 +1,539 @@
+'use client'
+
+import { useState, useCallback, useEffect } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Crown } from 'lucide-react'
+import { useToast } from '@/components/ui/toast-system'
+import SuccessionCinemaHeader from './SuccessionCinemaHeader'
+import { SuccessionMissionControl } from '@/components/succession/SuccessionMissionControl'
+import { SuccessionRail, type FilterKey } from '@/components/succession/SuccessionRail'
+import SuccessionWizard from '@/components/succession/SuccessionWizard'
+import SuccessionCandidateModal from './SuccessionCandidateModal'
+import SuccessionSpotlightCard from './SuccessionSpotlightCard'
+
+// ════════════════════════════════════════════════════════════════════════════
+// TYPES
+// ════════════════════════════════════════════════════════════════════════════
+
+interface SuccessionDashboard {
+  summary: {
+    coverage: number
+    coveredRoles: number
+    totalRoles: number
+    uncoveredRoles: Array<{
+      role: string
+      bestCandidate: { name: string; readiness: string; readinessLabel: string } | null
+    }>
+    bench: { readyNow: number; ready1to2Years: number; notReady: number }
+    hasData: boolean
+  }
+  positions: {
+    total: number
+    byBenchStrength: Record<string, number>
+  }
+  cycleId: string
+}
+
+interface CriticalPosition {
+  id: string
+  positionTitle: string
+  standardJobLevel: string
+  benchStrength: string
+  incumbentFlightRisk: string | null
+  department: { displayName: string } | null
+  incumbent: { id: string; fullName: string; position: string } | null
+  _count: { candidates: number }
+}
+
+type View = 'LOBBY' | 'SPOTLIGHT'
+
+interface SuccessionOrchestratorProps {
+  initialPositions: CriticalPosition[]
+  dashboardStats: SuccessionDashboard | null
+  canManage: boolean
+  onRefresh: () => void
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ANIMATION VARIANTS
+// ════════════════════════════════════════════════════════════════════════════
+
+const slideVariants = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? '100%' : '-100%',
+    opacity: 0,
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+  },
+  exit: (direction: number) => ({
+    x: direction > 0 ? '-100%' : '100%',
+    opacity: 0,
+  }),
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ORCHESTRATOR
+// ════════════════════════════════════════════════════════════════════════════
+
+export default function SuccessionOrchestrator({
+  initialPositions,
+  dashboardStats,
+  canManage,
+  onRefresh,
+}: SuccessionOrchestratorProps) {
+  // View states
+  const [view, setView] = useState<View>('LOBBY')
+  const [direction, setDirection] = useState(1) // 1=forward, -1=back
+  const [selectedPosition, setSelectedPosition] = useState<CriticalPosition | null>(null)
+
+  // Spotlight states
+  const [positionDetail, setPositionDetail] = useState<any>(null)
+  const [suggestions, setSuggestions] = useState<any[]>([])
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const [suggestionsFilter, setSuggestionsFilter] = useState<'all' | 'area'>('all')
+  const [selectedCandidate, setSelectedCandidate] = useState<any>(null)
+  const [showCandidateModal, setShowCandidateModal] = useState(false)
+  const [nominating, setNominating] = useState<string | null>(null)
+  const [promotingCandidate, setPromotingCandidate] = useState<{
+    name: string; position: string; department?: string
+  } | null>(null)
+  const [recentNomination, setRecentNomination] = useState<{ name: string } | null>(null)
+
+  // Wizard state
+  const [showWizard, setShowWizard] = useState(false)
+  const [showNominateWizard, setShowNominateWizard] = useState(false)
+
+  // Rail state
+  const [isRailExpanded, setIsRailExpanded] = useState(false)
+  const [railTab, setRailTab] = useState<FilterKey>('ALL')
+
+  const toast = useToast()
+  const summary = dashboardStats?.summary
+
+  // ── Navigate to Spotlight ──
+  const handlePositionClick = useCallback((positionId: string) => {
+    const pos = initialPositions.find(p => p.id === positionId)
+    if (!pos) return
+    setSelectedPosition(pos)
+    setDirection(1)
+    setView('SPOTLIGHT')
+    setSuggestions([])
+    setRecentNomination(null)
+    setPromotingCandidate(null)
+    setSelectedCandidate(null)
+    setShowCandidateModal(false)
+  }, [initialPositions])
+
+  // ── Back to Lobby ──
+  const handleBack = useCallback(() => {
+    setDirection(-1)
+    setView('LOBBY')
+    setSelectedPosition(null)
+    setPositionDetail(null)
+  }, [])
+
+  // ── Load position detail when entering Spotlight ──
+  useEffect(() => {
+    if (view !== 'SPOTLIGHT' || !selectedPosition) return
+    async function load() {
+      try {
+        const res = await fetch(`/api/succession/critical-positions/${selectedPosition!.id}`)
+        const data = await res.json()
+        if (data.success) setPositionDetail(data.data)
+      } catch (err) {
+        console.error('[Succession] Error loading position detail:', err)
+      }
+    }
+    load()
+  }, [view, selectedPosition])
+
+  // ── Load suggestions ──
+  const loadSuggestions = useCallback(async (filterByArea = false) => {
+    if (!selectedPosition) return
+    setLoadingSuggestions(true)
+    try {
+      const url = `/api/succession/critical-positions/${selectedPosition.id}/suggestions${filterByArea ? '?filterByArea=true' : ''}`
+      const res = await fetch(url)
+      const data = await res.json()
+      if (data.success) setSuggestions(data.data)
+    } catch (err) {
+      console.error(err)
+    }
+    setLoadingSuggestions(false)
+  }, [selectedPosition])
+
+  // ── Nominate handler ──
+  const handleNominate = useCallback(async (
+    employeeId: string,
+    overrideReadiness?: string,
+    justification?: string,
+  ) => {
+    if (!selectedPosition || nominating) return
+    setNominating(employeeId)
+    const candidateName = suggestions.find(s => s.employeeId === employeeId)?.employeeName || ''
+    try {
+      const body: Record<string, unknown> = { employeeId }
+      if (overrideReadiness) body.readinessOverride = overrideReadiness
+      if (justification) body.overrideJustification = justification
+
+      const res = await fetch(`/api/succession/critical-positions/${selectedPosition.id}/candidates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(`"${candidateName}" nominado para ${selectedPosition.positionTitle}`)
+        setShowCandidateModal(false)
+        setSelectedCandidate(null)
+        setRecentNomination({ name: candidateName })
+        // Reload position detail
+        const posRes = await fetch(`/api/succession/critical-positions/${selectedPosition.id}`)
+        const posData = await posRes.json()
+        if (posData.success) setPositionDetail(posData.data)
+        setSuggestions(prev => prev.filter(s => s.employeeId !== employeeId))
+        onRefresh()
+      } else {
+        if (data.error?.includes('Ya nominado')) {
+          toast.error(`"${candidateName}" ya esta en la terna`)
+        } else {
+          toast.error(data.error || 'Error al nominar')
+        }
+      }
+    } catch {
+      toast.error('Error al nominar')
+    }
+    setNominating(null)
+  }, [selectedPosition, nominating, suggestions, toast, onRefresh])
+
+  // ── Header stats ──
+  const headerStats = {
+    totalPositions: initialPositions.length,
+    coveredPositions: initialPositions.filter(p => p.benchStrength === 'STRONG' || p.benchStrength === 'MODERATE').length,
+    totalCandidates: initialPositions.reduce((sum, p) => sum + p._count.candidates, 0),
+  }
+
+  return (
+    <div className="h-full bg-[#0A0F1E] flex flex-col overflow-hidden">
+      {/* ── HEADER ── */}
+      <SuccessionCinemaHeader stats={headerStats} />
+
+      {/* ── MAIN CONTENT (fills between header h-14 and rail 50px) ── */}
+      <div className="flex-1 relative overflow-hidden">
+        <AnimatePresence mode="wait" custom={direction}>
+          {view === 'LOBBY' ? (
+            <motion.div
+              key="lobby"
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className="absolute inset-0 flex flex-col items-center justify-center pb-[50px]"
+            >
+              {/* MissionControl centered (evaluator pattern) */}
+              {summary && (
+                <SuccessionMissionControl
+                  coverage={summary.coverage}
+                  coveredRoles={summary.coveredRoles}
+                  totalRoles={summary.totalRoles}
+                  positions={initialPositions}
+                  onPositionClick={handlePositionClick}
+                />
+              )}
+
+            </motion.div>
+          ) : (
+            <motion.div
+              key="spotlight"
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className="absolute inset-0 flex items-center justify-center pb-[50px] overflow-y-auto"
+            >
+              {selectedPosition && (
+                <SuccessionSpotlightCard
+                  position={selectedPosition}
+                  positionDetail={positionDetail}
+                  suggestions={suggestions}
+                  loadingSuggestions={loadingSuggestions}
+                  suggestionsFilter={suggestionsFilter}
+                  recentNomination={recentNomination}
+                  promotingCandidate={promotingCandidate}
+                  nominating={nominating}
+                  canManage={canManage}
+                  onBack={handleBack}
+                  onLoadSuggestions={loadSuggestions}
+                  onFilterChange={(mode) => {
+                    setSuggestionsFilter(mode)
+                    loadSuggestions(mode === 'area')
+                  }}
+                  onCandidateClick={(candidate) => {
+                    setSelectedCandidate(candidate)
+                    setShowCandidateModal(true)
+                  }}
+                  onPromotingCandidate={setPromotingCandidate}
+                />
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* ── RAIL (fixed bottom, evaluator pattern) ── */}
+      {initialPositions.length > 0 && (
+        <SuccessionRail
+          positions={initialPositions}
+          selectedPositionId={selectedPosition?.id || null}
+          isExpanded={isRailExpanded}
+          activeTab={railTab}
+          onToggle={() => setIsRailExpanded(!isRailExpanded)}
+          onPositionClick={handlePositionClick}
+          onTabChange={setRailTab}
+          onCreatePosition={canManage ? () => setShowWizard(true) : undefined}
+        />
+      )}
+
+      {/* ── CANDIDATE MODAL (fixed inset-0, AvatarInfoModal pattern) ── */}
+      <AnimatePresence>
+        {showCandidateModal && selectedCandidate && (
+          <SuccessionCandidateModal
+            candidate={selectedCandidate}
+            targetPosition={selectedPosition?.positionTitle || ''}
+            isNominating={nominating === selectedCandidate.employeeId}
+            onNominate={(overrideReadiness, justification) => {
+              handleNominate(selectedCandidate.employeeId, overrideReadiness, justification)
+            }}
+            onClose={() => setShowCandidateModal(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── CREATE POSITION WIZARD ── */}
+      {showWizard && (
+        <CreatePositionModal
+          onClose={() => setShowWizard(false)}
+          onCreated={() => {
+            setShowWizard(false)
+            onRefresh()
+          }}
+        />
+      )}
+
+      {/* ── NOMINATE WIZARD ── */}
+      {showNominateWizard && selectedPosition && (
+        <SuccessionWizard
+          positionId={selectedPosition.id}
+          onClose={() => setShowNominateWizard(false)}
+          onNominated={async () => {
+            setShowNominateWizard(false)
+            const res = await fetch(`/api/succession/critical-positions/${selectedPosition.id}`)
+            const data = await res.json()
+            if (data.success) setPositionDetail(data.data)
+            onRefresh()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CREATE POSITION MODAL (moved from page.tsx)
+// ════════════════════════════════════════════════════════════════════════════
+
+function CreatePositionModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [gerenciaId, setGerenciaId] = useState('')
+  const [departmentId, setDepartmentId] = useState('')
+  const [jobLevel, setJobLevel] = useState('')
+  const [incumbentId, setIncumbentId] = useState('')
+  const [customTitle, setCustomTitle] = useState('')
+  const [departments, setDepartments] = useState<Array<{ id: string; displayName: string; parentId: string | null; level: number }>>([])
+  const [employees, setEmployees] = useState<Array<{ id: string; fullName: string; position: string | null; standardJobLevel: string | null }>>([])
+  const [loadingDepts, setLoadingDepts] = useState(true)
+  const [loadingEmployees, setLoadingEmployees] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const toast = useToast()
+
+  const JOB_LEVELS = [
+    { value: 'gerente_director', label: 'Gerente / Director' },
+    { value: 'subgerente_subdirector', label: 'Subgerente / Subdirector' },
+    { value: 'jefe', label: 'Jefe' },
+    { value: 'supervisor_coordinador', label: 'Supervisor / Coordinador' },
+    { value: 'profesional_analista', label: 'Profesional / Analista' },
+    { value: 'asistente_otros', label: 'Asistente / Otros' },
+    { value: 'operativo_auxiliar', label: 'Operativo / Auxiliar' },
+  ]
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch('/api/succession/departments')
+        const data = await res.json()
+        if (data.success) setDepartments(data.data)
+      } catch (err) {
+        console.error(err)
+      }
+      setLoadingDepts(false)
+    }
+    load()
+  }, [])
+
+  const gerencias = departments.filter(d => d.parentId === null || d.level <= 2)
+  const subDepartments = departments.filter(d => d.parentId === gerenciaId)
+
+  useEffect(() => {
+    const deptId = departmentId || gerenciaId
+    if (!deptId || !jobLevel) {
+      setEmployees([])
+      return
+    }
+    setLoadingEmployees(true)
+    fetch(`/api/succession/employees?departmentId=${deptId}&jobLevel=${jobLevel}`)
+      .then(r => r.json())
+      .then(data => { if (data.success) setEmployees(data.data) })
+      .catch(console.error)
+      .finally(() => setLoadingEmployees(false))
+  }, [departmentId, gerenciaId, jobLevel])
+
+  const selectedEmployee = employees.find(e => e.id === incumbentId)
+  const positionTitle = selectedEmployee?.position || customTitle.trim()
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!positionTitle || !jobLevel) return
+    setSaving(true)
+    setError('')
+    try {
+      const res = await fetch('/api/succession/critical-positions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          positionTitle,
+          standardJobLevel: jobLevel,
+          departmentId: departmentId || gerenciaId || undefined,
+          incumbentId: incumbentId || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(`Posicion "${positionTitle}" creada exitosamente`)
+        onCreated()
+      } else {
+        setError(data.error || 'Error al crear')
+      }
+    } catch {
+      setError('Error de conexion')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="fhr-card p-6 w-full max-w-lg">
+        <h2 className="fhr-title-card mb-4">Nueva Posicion Critica</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="fhr-text-sm text-slate-400 block mb-1">Gerencia</label>
+            {loadingDepts ? (
+              <div className="fhr-input w-full text-slate-500 animate-pulse">Cargando...</div>
+            ) : (
+              <select
+                className="fhr-input w-full"
+                value={gerenciaId}
+                onChange={e => { setGerenciaId(e.target.value); setDepartmentId(''); setIncumbentId('') }}
+              >
+                <option value="">Seleccionar gerencia...</option>
+                {gerencias.map(g => (
+                  <option key={g.id} value={g.id}>{g.displayName}</option>
+                ))}
+              </select>
+            )}
+          </div>
+          <div>
+            <label className="fhr-text-sm text-slate-400 block mb-1">Departamento</label>
+            <select
+              className="fhr-input w-full"
+              value={departmentId}
+              onChange={e => { setDepartmentId(e.target.value); setIncumbentId('') }}
+              disabled={!gerenciaId || subDepartments.length === 0}
+            >
+              <option value="">
+                {!gerenciaId ? 'Selecciona gerencia primero' : subDepartments.length === 0 ? 'Sin sub-departamentos' : 'Seleccionar departamento...'}
+              </option>
+              {subDepartments.map(d => (
+                <option key={d.id} value={d.id}>{d.displayName}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="fhr-text-sm text-slate-400 block mb-1">Nivel de Cargo</label>
+            <select
+              className="fhr-input w-full"
+              value={jobLevel}
+              onChange={e => { setJobLevel(e.target.value); setIncumbentId('') }}
+            >
+              <option value="">Seleccionar nivel...</option>
+              {JOB_LEVELS.map(l => (
+                <option key={l.value} value={l.value}>{l.label}</option>
+              ))}
+            </select>
+          </div>
+          {(gerenciaId && jobLevel) && (
+            <div>
+              <label className="fhr-text-sm text-slate-400 block mb-1">
+                Titular actual <span className="text-slate-600">(opcional)</span>
+              </label>
+              {loadingEmployees ? (
+                <div className="fhr-input w-full text-slate-500 animate-pulse">Buscando...</div>
+              ) : employees.length > 0 ? (
+                <select
+                  className="fhr-input w-full"
+                  value={incumbentId}
+                  onChange={e => setIncumbentId(e.target.value)}
+                >
+                  <option value="">Sin titular / Cargo nuevo</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.fullName}{emp.position ? ` — ${emp.position}` : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-xs text-slate-500">Sin empleados en este departamento y nivel</p>
+              )}
+            </div>
+          )}
+          {!incumbentId && (
+            <div>
+              <label className="fhr-text-sm text-slate-400 block mb-1">
+                Titulo del Cargo {!selectedEmployee && <span className="text-rose-400">*</span>}
+              </label>
+              <input
+                className="fhr-input w-full"
+                value={customTitle}
+                onChange={e => setCustomTitle(e.target.value)}
+                placeholder="Ej: Gerente Comercial"
+              />
+            </div>
+          )}
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+          <div className="flex gap-3 justify-end">
+            <button type="button" onClick={onClose} className="fhr-btn fhr-btn-ghost">Cancelar</button>
+            <button type="submit" disabled={saving || !positionTitle || !jobLevel} className="fhr-btn fhr-btn-primary">
+              {saving ? 'Creando...' : 'Crear'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
