@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import SuccessionCandidateCard from '@/components/succession/SuccessionCandidateCard'
 import DominoEffect from '@/components/succession/DominoEffect'
+import SuccessionCandidatesCover from '@/components/succession/SuccessionCandidatesCover'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -32,6 +33,7 @@ export interface SuccessionSpotlightCardProps {
   promotingCandidate: { name: string; position: string; department?: string } | null
   nominating: string | null
   canManage: boolean
+  filterStats: { totalEmployees: number; finalCandidates: number } | null
   onBack: () => void
   onLoadSuggestions: (filterByArea?: boolean) => void
   onFilterChange: (mode: 'all' | 'area') => void
@@ -106,9 +108,11 @@ export default function SuccessionSpotlightCard({
   onFilterChange,
   onCandidateClick,
   onPromotingCandidate,
+  filterStats,
 }: SuccessionSpotlightCardProps) {
   const [tab, setTab] = useState<'candidates' | 'suggestions'>('candidates')
   const [showMethodology, setShowMethodology] = useState(false)
+  const [showCover, setShowCover] = useState(true)
   const rawCandidates = positionDetail?.candidates || []
 
   // Sort candidates: READY_NOW > READY_1_2 > READY_3_PLUS, then matchPercent DESC
@@ -153,7 +157,7 @@ export default function SuccessionSpotlightCard({
       transition={{ type: 'spring', stiffness: 220, damping: 30 }}
       className="w-full max-w-5xl"
     >
-      <div className="bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[24px] shadow-2xl flex flex-col md:flex-row relative overflow-y-auto md:overflow-visible">
+      <div className="bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[24px] shadow-2xl flex flex-col md:flex-row relative overflow-visible">
 
         {/* TESLA LINE */}
         <div
@@ -293,7 +297,7 @@ export default function SuccessionSpotlightCard({
           </div>
 
           {/* Tab Content */}
-          <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="flex-1 px-6 py-4">
             {tab === 'candidates' ? (
               candidates.length > 0 ? (
                 <div className="space-y-3">
@@ -321,7 +325,10 @@ export default function SuccessionSpotlightCard({
                               flightRisk: c.flightRisk || null,
                               gapsCriticalCount: c.gapsCriticalCount ?? 0,
                               potentialAspiration: c.aspirationLevel ?? c.potentialAspiration,
+                              hireDate: c.employee?.hireDate ?? c.hireDate ?? null,
                               gaps: Array.isArray(gaps) ? gaps : [],
+                              isNominated: true,
+                              nominatedId: c.id,
                             })
                           }}
                         >
@@ -446,6 +453,15 @@ export default function SuccessionSpotlightCard({
                 {loadingSuggestions ? (
                   <div className="flex items-center justify-center h-48 text-slate-500 animate-pulse text-sm">
                     Buscando candidatos elegibles...
+                  </div>
+                ) : showCover && suggestions.length > 0 && filterStats ? (
+                  <div className="h-[420px]">
+                    <SuccessionCandidatesCover
+                      positionTitle={position.positionTitle}
+                      totalEmployees={filterStats.totalEmployees}
+                      candidatesFound={filterStats.finalCandidates}
+                      onEnter={() => setShowCover(false)}
+                    />
                   </div>
                 ) : suggestions.length > 0 ? (
                   <div className="space-y-3">

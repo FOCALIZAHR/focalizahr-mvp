@@ -1,15 +1,20 @@
 'use client'
 
-import { useState } from 'react'
-import { X, AlertTriangle, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
+import { X, ChevronDown, ChevronUp, Check, Brain, Info, UserMinus } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { DangerButton, GhostButton, ButtonGroup } from '@/components/ui/PremiumButton'
+import { useToast } from '@/components/ui/toast-system'
+import { formatDisplayName, getInitials } from '@/lib/utils/formatName'
+import { getNineBoxPositionConfig, NineBoxPosition } from '@/config/performanceClassification'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
 // ════════════════════════════════════════════════════════════════════════════
 
-type GapStatus = 'READY' | 'GAP_SMALL' | 'GAP_CRITICAL' | 'NOT_EVALUATED'
+type GapStatus = 'READY' | 'GAP_SMALL' | 'GAP_CRITICAL' | 'NOT_EVALUATED' | 'EXCEEDS'
 
 interface GapDetail {
   competencyCode: string
@@ -38,12 +43,19 @@ interface CandidateProfile {
   gapsCriticalCount: number
   potentialAspiration?: number | null
   gaps?: GapDetail[]
+  hireDate?: string | null
+  isNominated?: boolean
+  nominatedId?: string
 }
 
 interface SuccessionCandidateModalProps {
   candidate: CandidateProfile
   targetPosition: string
+  targetJobLevel?: string
+  filterStats?: { totalEmployees: number; candidateRank: number } | null
+  mode?: 'suggestion' | 'nominated'
   onNominate: (overrideReadiness?: string, justification?: string) => void
+  onWithdraw?: () => void
   onClose: () => void
   isNominating?: boolean
 }
@@ -52,11 +64,11 @@ interface SuccessionCandidateModalProps {
 // CONSTANTS
 // ════════════════════════════════════════════════════════════════════════════
 
-const READINESS_STYLES: Record<string, { color: string; text: string; label: string; description: string }> = {
-  READY_NOW:       { color: '#10B981', text: 'text-emerald-400', label: 'Listo ahora',  description: 'Listo para asumir el cargo hoy' },
-  READY_1_2_YEARS: { color: '#F59E0B', text: 'text-amber-400',  label: '1-2 anos',     description: 'Listo en 12-24 meses con PDI dirigido' },
-  READY_3_PLUS:    { color: '#EF4444', text: 'text-rose-400',   label: '3+ anos',      description: 'Requiere 3+ anos de desarrollo' },
-  NOT_VIABLE:      { color: '#64748B', text: 'text-slate-400',  label: 'No viable',    description: 'No viable para esta posicion' },
+const READINESS_CONFIG: Record<string, { color: string; badge: string; label: string }> = {
+  READY_NOW:       { color: '#10B981', badge: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', label: 'Listo ahora' },
+  READY_1_2_YEARS: { color: '#F59E0B', badge: 'bg-amber-500/20 text-amber-400 border-amber-500/30',     label: 'Listo en 1-2 anos' },
+  READY_3_PLUS:    { color: '#A78BFA', badge: 'bg-purple-500/20 text-purple-400 border-purple-500/30',   label: 'Listo en 3+ anos' },
+  NOT_VIABLE:      { color: '#64748B', badge: 'bg-slate-500/20 text-slate-400 border-slate-500/30',      label: 'No viable' },
 }
 
 const OVERRIDE_OPTIONS = [
@@ -65,104 +77,31 @@ const OVERRIDE_OPTIONS = [
   { value: 'READY_3_PLUS', label: '3+ anos' },
 ]
 
-const NINE_BOX_LABELS: Record<string, string> = {
-  star: 'Estrella',
-  high_performer: 'Alto Desempeno',
-  consistent_star: 'Estrella Consistente',
-  core_player: 'Jugador Clave',
-  growth_potential: 'Potencial de Crecimiento',
-  solid_contributor: 'Contribuidor Solido',
-  question_mark: 'Signo de Pregunta',
-  underperformer: 'Bajo Desempeno',
-  risk: 'En Riesgo',
-}
-
-const NINE_BOX_DESC: Record<string, string> = {
-  star: 'alto desempeno y alto potencial',
-  high_performer: 'alto desempeno con potencial moderado',
-  consistent_star: 'desempeno consistente y potencial alto',
-  core_player: 'desempeno solido, pilar del equipo',
-  growth_potential: 'potencial alto con desempeno en desarrollo',
-  solid_contributor: 'contribucion estable y confiable',
-  question_mark: 'potencial incierto, requiere atencion',
-  underperformer: 'desempeno bajo, requiere intervencion',
-  risk: 'riesgo para la organizacion',
-}
-
-const ASPIRATION_LABELS: Record<number, string> = {
-  1: 'No desea ascender',
-  2: 'Abierto/a a crecer',
-  3: 'Busca activamente ascender',
-}
-
 // ════════════════════════════════════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════════════════════════════════════
 
 function safeNum(val: unknown): number {
-  const n = Number(val)
-  return isNaN(n) ? 0 : n
+  const n = Number(val); return isNaN(n) ? 0 : n
 }
 
 function deriveStatus(g: GapDetail): GapStatus {
-  // 1. Respect pre-computed status from SuccessionService
-  if (g.status) return g.status
-  // 2. Explicit notEvaluated flag
+  if (g.status) return g.status as GapStatus
   if (g.notEvaluated) return 'NOT_EVALUATED'
-  // 3. No actual score at all (null or undefined)
   if (g.actualScore == null) return 'NOT_EVALUATED'
-  // 4. Score is 0 AND no current-role target → competency doesn't apply to current role
   if (g.actualScore === 0 && g.targetCurrentRole == null) return 'NOT_EVALUATED'
-  // 5. No gap computed
   if (g.rawGap == null) return 'NOT_EVALUATED'
-  // 6. Normal gap classification
+  if (g.rawGap > 0.5) return 'EXCEEDS'
   if (g.rawGap >= 0) return 'READY'
   if (g.rawGap > -1) return 'GAP_SMALL'
   return 'GAP_CRITICAL'
 }
 
-function generateNarrative(candidate: CandidateProfile, targetPosition: string): string[] {
-  const name = (candidate.employeeName || '').split(' ')[0] || 'Candidato'
-  const roleFit = safeNum(candidate.roleFitScore)
-  const match = safeNum(candidate.matchPercent)
-  const acts: string[] = []
-
-  // Acto 1: Role Fit
-  acts.push(`${name} fue evaluado en el ciclo 360 con ${Math.round(roleFit)}% de adecuacion a su rol actual.`)
-
-  // Acto 2: Calibracion 9-Box
-  if (candidate.nineBoxPosition) {
-    const label = NINE_BOX_LABELS[candidate.nineBoxPosition] || candidate.nineBoxPosition
-    const desc = NINE_BOX_DESC[candidate.nineBoxPosition] || ''
-    acts.push(`En calibracion fue clasificado como "${label}"${desc ? ` — ${desc}` : ''}.`)
-  }
-
-  // Acto 3: Aspiracion
-  if (candidate.potentialAspiration) {
-    const aspLabel = ASPIRATION_LABELS[candidate.potentialAspiration] || `Nivel ${candidate.potentialAspiration}/3`
-    const wants = candidate.potentialAspiration >= 2 ? 'quiere' : 'no quiere'
-    acts.push(`Su nivel de aspiracion es ${candidate.potentialAspiration}/3 — ${aspLabel}. ${candidate.potentialAspiration >= 2 ? 'Quiere' : 'No quiere'} asumir roles mayores.`)
-  }
-
-  // Acto 4: Match + gaps + conclusion
-  const allGaps = (candidate.gaps || []).map(g => ({ ...g, _status: deriveStatus(g) }))
-  const evaluated = allGaps.filter(g => g._status !== 'NOT_EVALUATED')
-  const criticalGaps = allGaps.filter(g => g._status === 'GAP_CRITICAL')
-  const notEvaluated = allGaps.filter(g => g._status === 'NOT_EVALUATED')
-
-  let act4 = `Para ${targetPosition}: Match ${Math.round(match)}% sobre ${evaluated.length} competencias evaluadas.`
-  if (criticalGaps.length > 0) {
-    act4 += ` ${criticalGaps.length} brecha${criticalGaps.length !== 1 ? 's' : ''} critica${criticalGaps.length !== 1 ? 's' : ''}.`
-  }
-  if (notEvaluated.length > 0) {
-    act4 += ` ${notEvaluated.length} sin evaluar.`
-  }
-
-  const rs = READINESS_STYLES[candidate.readinessLevel]
-  if (rs) act4 += ` Tiempo estimado: ${rs.label}.`
-  acts.push(act4)
-
-  return acts
+function getFirstName(fullName: string): string {
+  const parts = (fullName || '').split(' ').filter(Boolean)
+  if (parts.length === 0) return 'Candidato'
+  const capitalized = parts.find(p => p.length > 2 && p[0] === p[0].toUpperCase() && p.slice(1) === p.slice(1).toLowerCase())
+  return capitalized || parts[0]
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -172,39 +111,102 @@ function generateNarrative(candidate: CandidateProfile, targetPosition: string):
 export default function SuccessionCandidateModal({
   candidate,
   targetPosition,
+  filterStats,
+  mode = 'suggestion',
   onNominate,
+  onWithdraw,
   onClose,
   isNominating,
 }: SuccessionCandidateModalProps) {
+  const { success, error } = useToast()
+  const [showEvidence, setShowEvidence] = useState(false)
   const [showOverride, setShowOverride] = useState(false)
+  const [showBrainTooltip, setShowBrainTooltip] = useState(false)
+  const [brainTooltipPos, setBrainTooltipPos] = useState({ x: 0, y: 0 })
+  const [brainTooltipBelow, setBrainTooltipBelow] = useState(false)
+  const [metricTooltip, setMetricTooltip] = useState<{ key: string; x: number; y: number; below: boolean } | null>(null)
+  const [mounted, setMounted] = useState(false)
+  const brainRef = useRef<HTMLDivElement>(null)
   const [overrideReadiness, setOverrideReadiness] = useState(candidate.readinessLevel)
+
+  useEffect(() => { setMounted(true) }, [])
   const [justification, setJustification] = useState('')
-  const [showAllGapRows, setShowAllGapRows] = useState(false)
-  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
 
-  const toggleSection = (key: string) => setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }))
-
-  const readinessStyle = READINESS_STYLES[candidate.readinessLevel] || READINESS_STYLES.NOT_VIABLE
+  const rc = READINESS_CONFIG[candidate.readinessLevel] || READINESS_CONFIG.NOT_VIABLE
   const roleFit = safeNum(candidate.roleFitScore)
   const matchPct = safeNum(candidate.matchPercent)
+  const displayName = formatDisplayName(candidate.employeeName || '', 'short')
+  const firstName = getFirstName(displayName)
+  const initials = getInitials(displayName)
 
   const gaps = (candidate.gaps || []).map(g => ({ ...g, _status: deriveStatus(g) }))
-  const readyGaps = gaps.filter(g => g._status === 'READY')
-  const exceedsGaps = readyGaps.filter(g => g.rawGap !== null && g.rawGap > 0.5)
-  const matchingGaps = readyGaps.filter(g => !g.rawGap || g.rawGap <= 0.5)
-  const smallGaps = gaps.filter(g => g._status === 'GAP_SMALL')
-  const criticalGaps = gaps.filter(g => g._status === 'GAP_CRITICAL')
-  const notEvaluatedGaps = gaps.filter(g => g._status === 'NOT_EVALUATED')
+  const strengths = gaps.filter(g => g._status === 'READY' || g._status === 'EXCEEDS')
+    .sort((a, b) => (b.fitPercent || 0) - (a.fitPercent || 0))
+  const brechas = gaps.filter(g => g._status === 'GAP_SMALL' || g._status === 'GAP_CRITICAL')
+    .sort((a, b) => (a.rawGap ?? 0) - (b.rawGap ?? 0))
+  const notEval = gaps.filter(g => g._status === 'NOT_EVALUATED')
+  const criticalCount = brechas.filter(g => g._status === 'GAP_CRITICAL').length
+  const evaluatedGaps = gaps.filter(g => g._status !== 'NOT_EVALUATED')
 
-  const initials = (candidate.employeeName || '')
-    .split(' ')
-    .filter(Boolean)
+  const formattedPosition = targetPosition
+    ? targetPosition.split(' ')
+        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ')
+    : 'este cargo'
+
+  const aspLabel = candidate.potentialAspiration === 3
+    ? `busca activamente crecer — lo declaró su jefe en la evaluación de potencial`
+    : `está abierto a nuevos desafíos cuando se presentan — evaluación de potencial`
+
+  const brainTooltipText = `Algoritmo FocalizaHR® analiza la evaluación de potencial del colaborador para determinar su orientación de carrera. No es una inferencia — es lo que su jefe declaró formalmente en el último ciclo de evaluación.`
+
+  // Narrative helpers
+  const aspText = candidate.potentialAspiration === 3
+    ? `Detectó que ${displayName} busca activamente crecer, según su última evaluación de potencial.`
+    : `Detectó que ${displayName} se abre a nuevos desafíos cuando se presentan, según su última evaluación de potencial.`
+  const top2Names = brechas
+    .filter(g => g._status === 'GAP_CRITICAL')
     .slice(0, 2)
-    .map(w => w[0])
-    .join('')
-    .toUpperCase()
+    .map(g => g.competencyName || g.competencyCode)
+    .join(', ')
 
-  const narrativeActs = generateNarrative(candidate, targetPosition)
+  const METRIC_TOOLTIPS: Record<string, { title: string; lines: string[]; accent: string }> = {
+    fit: {
+      title: 'Fit Rol',
+      lines: [
+        'Qué tan bien domina su cargo actual.',
+        'FocalizaHR® compara sus competencias evaluadas en 360° contra el perfil requerido para su nivel.',
+      ],
+      accent: '100% = cumple o supera todas.',
+    },
+    match: {
+      title: 'Match',
+      lines: [
+        'Qué tan preparado/a está para el cargo objetivo.',
+        'FocalizaHR® analiza sus competencias actuales contra las requeridas para la posición crítica.',
+      ],
+      accent: '100% = listo/a para asumir hoy.',
+    },
+    talent: {
+      title: 'Matriz Talento',
+      lines: [
+        'Clasificación calibrada en sesión de liderazgo.',
+        'FocalizaHR® cruza desempeño objetivo (360°) con potencial evaluado por su jefe (Aspiración + Capacidad).',
+      ],
+      accent: '⭐ Estrella = Alto en ambos ejes.',
+    },
+  }
+
+  function handleMetricHover(key: string, e: React.MouseEvent) {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const showBelow = rect.top < 120
+    setMetricTooltip({
+      key,
+      x: rect.left + rect.width / 2,
+      y: showBelow ? rect.bottom + 8 : rect.top - 8,
+      below: showBelow,
+    })
+  }
 
   function handleConfirm() {
     if (showOverride && overrideReadiness !== candidate.readinessLevel) {
@@ -214,15 +216,53 @@ export default function SuccessionCandidateModal({
     }
   }
 
+  const [withdrawing, setWithdrawing] = useState(false)
+  async function handleWithdraw() {
+    if (!candidate.nominatedId) return
+    setWithdrawing(true)
+    try {
+      const res = await fetch(`/api/succession/candidates/${candidate.nominatedId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'WITHDRAWN' }),
+      })
+      if (!res.ok) {
+        error(
+          `No se pudo retirar a ${displayName}. Intenta nuevamente.`,
+          'Error'
+        )
+        return
+      }
+      success(
+        `${displayName} fue retirado como sucesor de ${formattedPosition}`,
+        'Sucesor retirado'
+      )
+      onWithdraw?.()
+      setTimeout(() => onClose(), 400)
+    } catch {
+      error(
+        `No se pudo retirar a ${displayName}. Intenta nuevamente.`,
+        'Error'
+      )
+    } finally {
+      setWithdrawing(false)
+    }
+  }
+
   const canConfirm = !showOverride || (
     overrideReadiness !== candidate.readinessLevel
       ? justification.trim().length > 0
       : true
   )
 
+  // NineBox mapping
+  const nineBoxEnum = candidate.nineBoxPosition
+    ? (Object.values(NineBoxPosition).find(v => v === candidate.nineBoxPosition) as NineBoxPosition | undefined)
+    : undefined
+
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center z-[60] bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 flex items-center justify-center z-[100] bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
       <motion.div
@@ -230,333 +270,380 @@ export default function SuccessionCandidateModal({
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl bg-[#0F172A]/95 backdrop-blur-2xl border border-slate-700/50 shadow-2xl"
+        className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-[24px] bg-[#0F172A]/95 backdrop-blur-2xl border border-slate-800 shadow-2xl relative"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Tesla line top */}
+        {/* Tesla line */}
         <div
-          className="h-[3px] w-full rounded-t-2xl"
+          className="absolute top-0 left-0 right-0 h-[1px] z-20 rounded-t-[24px]"
           style={{
-            background: `linear-gradient(90deg, transparent, ${readinessStyle.color}, transparent)`,
-            boxShadow: `0 0 15px ${readinessStyle.color}`,
+            background: `linear-gradient(90deg, transparent, ${rc.color}, transparent)`,
+            boxShadow: `0 0 15px ${rc.color}`,
           }}
         />
 
-        {/* ── HEADER: Identidad ── */}
-        <div className="p-6 border-b border-slate-700/50">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
+        <div className="p-6">
+          {/* ═══════════ ZONA 1 — IDENTIDAD ═══════════ */}
+          <div className="flex items-start justify-between mb-5">
+            <div className="flex items-center gap-3">
               <div
-                className="w-14 h-14 rounded-full border-2 flex items-center justify-center text-lg font-bold"
-                style={{ borderColor: readinessStyle.color + '40', background: '#0B1120', color: readinessStyle.color }}
+                className="w-11 h-11 rounded-full border-2 flex items-center justify-center text-sm font-bold flex-shrink-0"
+                style={{ borderColor: rc.color + '40', background: '#0B1120', color: rc.color }}
               >
                 {initials || '?'}
               </div>
               <div>
-                <h2 className="text-lg font-medium text-white">{candidate.employeeName || 'Sin nombre'}</h2>
-                <p className="text-sm text-slate-400">
-                  {candidate.position || 'Sin cargo'}
-                  {candidate.departmentName ? ` · ${candidate.departmentName}` : ''}
+                <h2 className="text-base font-medium text-white leading-tight">{displayName || 'Sin nombre'}</h2>
+                <p className="text-xs text-slate-400">
+                  {candidate.position || 'Sin cargo'}{candidate.departmentName ? ` · ${candidate.departmentName}` : ''}
                 </p>
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <span className={cn(
+                    'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border',
+                    rc.badge
+                  )}>
+                    {candidate.readinessLevel === 'READY_NOW' && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    )}
+                    {rc.label}
+                  </span>
+                  <div
+                    ref={brainRef}
+                    onMouseEnter={() => {
+                      const rect = brainRef.current?.getBoundingClientRect()
+                      if (rect) {
+                        const showBelow = rect.top < 120
+                        setBrainTooltipPos({
+                          x: rect.left + rect.width / 2,
+                          y: showBelow ? rect.bottom + 12 : rect.top - 12,
+                        })
+                        setBrainTooltipBelow(showBelow)
+                      }
+                      setShowBrainTooltip(true)
+                    }}
+                    onMouseLeave={() => setShowBrainTooltip(false)}
+                  >
+                    <Brain className="w-3.5 h-3.5 text-purple-400 cursor-help" />
+                  </div>
+                  <button
+                    onClick={() => setShowOverride(!showOverride)}
+                    className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-0.5"
+                  >
+                    Cambiar
+                    <ChevronDown className="w-2.5 h-2.5" />
+                  </button>
+                </div>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-slate-200 transition-colors p-1"
+              className="text-slate-500 hover:text-slate-300 transition-colors p-1"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Badges row */}
-          <div className="flex flex-wrap items-center gap-2 mt-4">
-            <span className={cn(
-              'px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border',
-              readinessStyle.text
-            )} style={{ borderColor: readinessStyle.color + '40', background: readinessStyle.color + '15' }}>
-              {candidate.readinessLabel || readinessStyle.label}
-            </span>
-            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-              Fit {Math.round(roleFit)}%
-            </span>
-            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold font-mono bg-white/5 text-white border border-white/10">
-              Match {Math.round(matchPct)}%
-            </span>
-            {candidate.nineBoxPosition && (
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/30">
-                {NINE_BOX_LABELS[candidate.nineBoxPosition] || candidate.nineBoxPosition}
-              </span>
+          {/* Override panel (inline under readiness) */}
+          <AnimatePresence>
+            {showOverride && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="mb-4 space-y-2">
+                  <select
+                    className="fhr-input w-full text-sm"
+                    value={overrideReadiness}
+                    onChange={e => setOverrideReadiness(e.target.value)}
+                  >
+                    {OVERRIDE_OPTIONS.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                  {overrideReadiness !== candidate.readinessLevel && (
+                    <>
+                      <textarea
+                        className="fhr-input w-full min-h-[60px] resize-none text-sm"
+                        placeholder="Razon del cambio (requerida)..."
+                        value={justification}
+                        onChange={e => setJustification(e.target.value)}
+                      />
+                      {justification.trim().length === 0 && (
+                        <p className="text-[11px] text-rose-400">Justificacion obligatoria</p>
+                      )}
+                    </>
+                  )}
+                </div>
+              </motion.div>
             )}
-            {candidate.flightRisk === 'HIGH' && (
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />
-                Riesgo fuga
-              </span>
-            )}
-          </div>
-        </div>
+          </AnimatePresence>
 
-        {/* ── SECCION 1: Analisis de Inteligencia (narrativa) ── */}
-        <div className="p-6 border-b border-slate-700/50">
-          <h3 className="text-xs text-slate-500 uppercase tracking-wider mb-3 font-bold">
-            Analisis de Inteligencia
-          </h3>
-          <div className="space-y-2">
-            {narrativeActs.map((act, i) => (
-              <p key={i} className="text-sm text-slate-300 leading-relaxed">
-                {act}
-              </p>
-            ))}
-          </div>
-        </div>
-
-        {/* ── SECCION 2: Resumen Gaps (badges horizontales) ── */}
-        {gaps.length > 0 && (
-          <div className="px-6 py-4 border-b border-slate-700/50">
-            <div className="flex flex-wrap gap-2">
-              {matchingGaps.length > 0 && (
-                <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  {matchingGaps.length} Cumple
+          {/* ═══════════ ZONA 2 — METRICAS ═══════════ */}
+          <div className="flex gap-2 mb-5">
+            <div
+              className="flex-1 bg-white/5 rounded-xl p-3 text-center cursor-help"
+              onMouseEnter={(e) => handleMetricHover('fit', e)}
+              onMouseLeave={() => setMetricTooltip(null)}
+            >
+              <span className="text-2xl font-bold text-[#22D3EE] block">{Math.round(roleFit)}%</span>
+              <span className="text-[10px] text-slate-400 uppercase tracking-wide">Fit Rol <Info className="w-3 h-3 opacity-40 inline ml-0.5" /></span>
+            </div>
+            <div
+              className="flex-1 bg-white/5 rounded-xl p-3 text-center cursor-help"
+              onMouseEnter={(e) => handleMetricHover('match', e)}
+              onMouseLeave={() => setMetricTooltip(null)}
+            >
+              <span className="text-2xl font-bold text-[#22D3EE] block">{Math.round(matchPct)}%</span>
+              <span className="text-[10px] text-slate-400 uppercase tracking-wide">Match <Info className="w-3 h-3 opacity-40 inline ml-0.5" /></span>
+            </div>
+            <div
+              className="flex-1 bg-white/5 rounded-xl p-3 text-center flex flex-col items-center justify-center cursor-help"
+              onMouseEnter={(e) => handleMetricHover('talent', e)}
+              onMouseLeave={() => setMetricTooltip(null)}
+            >
+              {nineBoxEnum ? (
+                <span className="text-sm font-bold text-[#A78BFA] block leading-tight">
+                  {getNineBoxPositionConfig(nineBoxEnum)?.label || nineBoxEnum}
                 </span>
+              ) : (
+                <span className="text-sm text-slate-500 font-medium">Sin evaluar</span>
               )}
-              {exceedsGaps.length > 0 && (
-                <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                  {exceedsGaps.length} Supera
-                </span>
-              )}
-              {smallGaps.length > 0 && (
-                <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  {smallGaps.length} Mejora
-                </span>
-              )}
-              {criticalGaps.length > 0 && (
-                <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                  {criticalGaps.length} Criticas
-                </span>
-              )}
-              {notEvaluatedGaps.length > 0 && (
-                <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-slate-500/10 text-slate-400 border border-slate-500/20">
-                  {notEvaluatedGaps.length} Sin evaluar
-                </span>
-              )}
+              <span className="text-[10px] text-slate-400 uppercase tracking-wide mt-1">Matriz Talento <Info className="w-3 h-3 opacity-40 inline ml-0.5" /></span>
             </div>
           </div>
-        )}
 
-        {/* ── SECCION 3: Tabla Competencias (3 dimensiones colapsables) ── */}
-        {gaps.length > 0 && (
-          <div className="p-6 border-b border-slate-700/50 space-y-4">
+          {/* ═══════════ ZONA 3 — NARRATIVA ═══════════ */}
+          <p className="text-sm text-slate-300 italic leading-relaxed mb-5">
+            {brechas.length === 0 && notEval.length === 0 && (
+              <>{displayName} no presenta brechas bloqueantes para asumir como {formattedPosition}.{' '}</>
+            )}
+            {brechas.length === 0 && notEval.length > 0 && (
+              <>{displayName} no presenta brechas bloqueantes para asumir como {formattedPosition}. Hay que tener atención: {notEval.length} competencias son nuevas para su rol, pero es el aprendizaje natural del ascenso.{' '}</>
+            )}
+            {brechas.length > 0 && (
+              <>{displayName} tiene {brechas.length} brecha{brechas.length !== 1 ? 's' : ''} a desarrollar para asumir como {formattedPosition}: {top2Names}. Tiempo estimado: {rc.label.toLowerCase()}.{' '}</>
+            )}
+            <span className="flex items-start gap-1.5 mt-1.5 not-italic">
+              <Brain className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" />
+              <span className="text-slate-400 text-xs leading-relaxed">{aspText}</span>
+            </span>
+          </p>
 
-            {/* A — LISTO (READY) */}
-            {readyGaps.length > 0 && (
-              <div>
-                <button
-                  onClick={() => toggleSection('ready')}
-                  className="flex items-center gap-2 text-xs text-emerald-400 uppercase tracking-wider mb-2 font-bold hover:text-emerald-300 transition-colors w-full"
+          {/* ═══════════ ZONA 4 — EVIDENCIA ═══════════ */}
+          <div className="mb-5">
+            <button
+              onClick={() => setShowEvidence(!showEvidence)}
+              className="w-full flex items-center justify-center gap-2 py-2 text-xs text-slate-500 hover:text-slate-300 transition-colors border-t border-b border-slate-800/50"
+            >
+              <span className="h-px flex-1 bg-slate-800/50" />
+              <span className="flex items-center gap-1">
+                {showEvidence ? 'Ocultar analisis' : 'Ver analisis completo'}
+                {showEvidence ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </span>
+              <span className="h-px flex-1 bg-slate-800/50" />
+            </button>
+          </div>
+
+          <AnimatePresence>
+            {showEvidence && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.15 }}
+                  className="space-y-4 pb-5"
                 >
-                  {collapsedSections.ready ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
-                  Listo ({readyGaps.length})
-                </button>
-                {!collapsedSections.ready && (
-                  <div className="space-y-1.5">
-                    {readyGaps.map(g => (
-                      <div
-                        key={g.competencyCode}
-                        className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm text-slate-200 truncate block">{g.competencyName || g.competencyCode}</span>
-                          <span className="text-[10px] text-slate-500">{g.category || '—'}</span>
+                  {/* Fortalezas / Brechas side by side */}
+                  {gaps.length > 0 && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Fortalezas */}
+                      {strengths.length > 0 && (
+                        <div>
+                          <h4 className="text-[10px] text-emerald-400 uppercase tracking-wider font-bold mb-1.5">
+                            Fortalezas ({strengths.length})
+                          </h4>
+                          <div className="space-y-1">
+                            {strengths.slice(0, 3).map(g => {
+                              const pct = Math.min(safeNum(g.fitPercent), 100)
+                              return (
+                                <div key={g.competencyCode} className="p-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15">
+                                  <div className="flex items-center justify-between mb-0.5">
+                                    <span className="text-[11px] text-slate-200 truncate">{g.competencyName || g.competencyCode}</span>
+                                    <span className="text-[10px] text-emerald-400 font-mono flex-shrink-0 ml-1">
+                                      {g.actualScore !== null ? Number(g.actualScore).toFixed(1) : '—'}/{Number(g.targetScore || 0).toFixed(1)}
+                                    </span>
+                                  </div>
+                                  <div className="h-1 rounded-full bg-slate-800 overflow-hidden">
+                                    <div
+                                      className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          <span className="text-xs text-emerald-400 font-mono">
-                            {g.actualScore !== null ? Number(g.actualScore).toFixed(1) : '—'}/{Number(g.targetScore || 0).toFixed(1)}
-                          </span>
-                          <span className="fhr-badge fhr-badge-success text-[9px]">Cumple</span>
-                        </div>
+                      )}
+
+                      {/* Brechas */}
+                      <div>
+                        <h4 className="text-[10px] text-amber-400 uppercase tracking-wider font-bold mb-1.5">
+                          Brechas ({brechas.length})
+                        </h4>
+                        {brechas.length === 0 ? (
+                          <div className="p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/15">
+                            <span className="text-[11px] text-emerald-400">Sin brechas</span>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            {brechas.slice(0, 3).map(g => (
+                              <div key={g.competencyCode} className="p-1.5 rounded-lg bg-slate-800/40 border border-slate-700/30">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] text-slate-200 truncate">{g.competencyName || g.competencyCode}</span>
+                                  <span className={cn(
+                                    'px-1 py-0.5 rounded text-[8px] font-bold border flex-shrink-0 ml-1',
+                                    g._status === 'GAP_CRITICAL'
+                                      ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                                      : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                  )}>
+                                    {g._status === 'GAP_CRITICAL' ? 'Critica' : 'Menor'}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  {g.actualScore !== null ? Number(g.actualScore).toFixed(1) : '—'}-&gt;{Number(g.targetScore || 0).toFixed(1)}
+                                  <span className={cn(
+                                    'ml-1.5',
+                                    g._status === 'GAP_CRITICAL' ? 'text-rose-400' : 'text-amber-400'
+                                  )}>
+                                    {g.rawGap !== null ? Number(g.rawGap).toFixed(1) : ''}
+                                  </span>
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* B — BRECHAS A DESARROLLAR (GAP_SMALL + GAP_CRITICAL) */}
-            {(smallGaps.length + criticalGaps.length) > 0 && (
-              <div>
-                <button
-                  onClick={() => toggleSection('gaps')}
-                  className="flex items-center gap-2 text-xs text-amber-400 uppercase tracking-wider mb-2 font-bold hover:text-amber-300 transition-colors w-full"
-                >
-                  {collapsedSections.gaps ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
-                  Brechas a Desarrollar ({smallGaps.length + criticalGaps.length})
-                </button>
-                {!collapsedSections.gaps && (
-                  <>
-                    <div className="space-y-1.5">
-                      {(showAllGapRows
-                        ? [...criticalGaps, ...smallGaps]
-                        : [...criticalGaps, ...smallGaps].slice(0, 6)
-                      ).map(g => (
-                        <div
-                          key={g.competencyCode}
-                          className="flex items-center justify-between p-2.5 rounded-lg bg-slate-800/40 border border-slate-700/30"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <span className="text-sm text-slate-200 truncate block">{g.competencyName || g.competencyCode}</span>
-                            <span className="text-[10px] text-slate-500">{g.category || '—'}</span>
-                          </div>
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            <span className="text-xs text-slate-400 font-mono w-8 text-right">
-                              {g.actualScore !== null ? Number(g.actualScore).toFixed(1) : '—'}
-                            </span>
-                            <span className="text-[10px] text-slate-600">/</span>
-                            <span className="text-xs text-slate-400 font-mono w-8">
-                              {Number(g.targetScore || 0).toFixed(1)}
-                            </span>
-                            <span className={cn(
-                              'text-xs font-mono w-12 text-right',
-                              g._status === 'GAP_CRITICAL' ? 'text-rose-400' : 'text-amber-400'
-                            )}>
-                              {g.rawGap !== null ? Number(g.rawGap).toFixed(1) : '—'}
-                            </span>
-                            <span className={`fhr-badge ${g._status === 'GAP_CRITICAL' ? 'fhr-badge-error' : 'fhr-badge-warning'} text-[9px]`}>
-                              {g._status === 'GAP_CRITICAL' ? 'Critica' : 'Menor'}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
                     </div>
-                    {(smallGaps.length + criticalGaps.length) > 6 && (
-                      <button
-                        className="mt-2 text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
-                        onClick={() => setShowAllGapRows(!showAllGapRows)}
-                      >
-                        {showAllGapRows ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                        {showAllGapRows ? 'Ver menos' : `Ver todas (${smallGaps.length + criticalGaps.length})`}
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
+                  )}
 
-            {/* C — SIN EVALUACION PREVIA (NOT_EVALUATED) */}
-            {notEvaluatedGaps.length > 0 && (
-              <div>
-                <button
-                  onClick={() => toggleSection('noteval')}
-                  className="flex items-center gap-2 text-xs text-slate-400 uppercase tracking-wider mb-2 font-bold hover:text-slate-300 transition-colors w-full"
-                >
-                  {collapsedSections.noteval ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
-                  <HelpCircle className="w-3 h-3" />
-                  Sin evaluacion previa ({notEvaluatedGaps.length})
-                </button>
-                {!collapsedSections.noteval && (
-                  <>
-                    <div className="p-3 rounded-lg bg-slate-800/30 border border-slate-700/20 mb-2">
-                      <p className="text-[11px] text-slate-500 leading-relaxed">
-                        Estas competencias aplican al cargo objetivo pero no han sido evaluadas en el rol actual.
-                        Requiere evaluacion ejecutiva antes de promover.
+                  {/* Sin evaluar */}
+                  {notEval.length > 0 && (
+                    <div className="p-2.5 rounded-lg bg-slate-800/20 border border-slate-700/20">
+                      <h4 className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-1">
+                        Sin evaluar ({notEval.length})
+                      </h4>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        {notEval.map(g => g.competencyName || g.competencyCode).join(' · ')}
+                      </p>
+                      <p className="text-[9px] text-slate-400 mt-0.5">
+                        {notEval.length} competencia{notEval.length !== 1 ? 's' : ''} son nuevas para su rol actual. No son brechas — son el aprendizaje natural del ascenso, que se deben acompanar.
                       </p>
                     </div>
-                    <div className="space-y-1">
-                      {notEvaluatedGaps.map(g => (
-                        <div
-                          key={g.competencyCode}
-                          className="flex items-center justify-between p-2 rounded-lg bg-slate-800/20 border border-slate-700/20"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <span className="text-sm text-slate-400 truncate block">{g.competencyName || g.competencyCode}</span>
-                            <span className="text-[10px] text-slate-600">{g.category || '—'}</span>
-                          </div>
-                          <span className="fhr-badge fhr-badge-draft text-[9px] flex-shrink-0">Sin evaluar</span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
+                  )}
+                </motion.div>
+              </motion.div>
             )}
-          </div>
-        )}
+          </AnimatePresence>
 
-        {/* ── SECCION 4: Tiempo Estimado ── */}
-        <div className="px-6 py-5 border-b border-slate-700/50 flex justify-center">
-          <div
-            className="px-6 py-3 rounded-xl text-center border"
-            style={{
-              borderColor: readinessStyle.color + '40',
-              background: readinessStyle.color + '10',
-            }}
-          >
-            <span className="text-lg font-bold" style={{ color: readinessStyle.color }}>
-              {readinessStyle.label}
-            </span>
-            <p className="text-xs text-slate-400 mt-1">
-              {readinessStyle.description}
-            </p>
-          </div>
-        </div>
-
-        {/* ── SECCION 5: Override Humano ── */}
-        <div className="p-6 border-b border-slate-700/50">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showOverride}
-              onChange={e => setShowOverride(e.target.checked)}
-              className="rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-cyan-500/30"
-            />
-            <span className="text-sm text-slate-400">Modificar estimacion del sistema</span>
-          </label>
-
-          {showOverride && (
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="fhr-text-sm text-slate-400 block mb-1">Readiness</label>
-                <select
-                  className="fhr-input w-full"
-                  value={overrideReadiness}
-                  onChange={e => setOverrideReadiness(e.target.value)}
-                >
-                  {OVERRIDE_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="fhr-text-sm text-slate-400 block mb-1">
-                  Justificacion <span className="text-rose-400">*</span>
-                </label>
-                <textarea
-                  className="fhr-input w-full min-h-[80px] resize-none"
-                  placeholder="Justificacion del cambio..."
-                  value={justification}
-                  onChange={e => setJustification(e.target.value)}
-                />
-                {overrideReadiness !== candidate.readinessLevel && justification.trim().length === 0 && (
-                  <p className="text-xs text-rose-400 mt-1">La justificacion es obligatoria al cambiar la estimacion</p>
-                )}
-              </div>
-            </div>
+          {/* ═══════════ ZONA 5 — ACCIONES ═══════════ */}
+          {mode === 'nominated' ? (
+            <ButtonGroup spacing={8}>
+              <DangerButton
+                icon={UserMinus}
+                size="md"
+                isLoading={withdrawing}
+                onClick={handleWithdraw}
+              >
+                {withdrawing ? 'Retirando...' : 'Retirar como sucesor'}
+              </DangerButton>
+              <GhostButton icon={X} size="md" onClick={onClose}>
+                Cerrar
+              </GhostButton>
+            </ButtonGroup>
+          ) : (
+            <button
+              onClick={handleConfirm}
+              disabled={isNominating || !canConfirm}
+              className={cn(
+                'w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium text-sm transition-all',
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+              )}
+              style={{
+                background: 'linear-gradient(135deg, #22D3EE, #0891B2)',
+                boxShadow: '0 4px 20px rgba(34, 211, 238, 0.3)',
+                color: '#0F172A',
+              }}
+            >
+              {isNominating ? (
+                <span className="animate-pulse">Nominando...</span>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  Confirmar Nominacion
+                </>
+              )}
+            </button>
           )}
         </div>
-
-        {/* ── SECCION 6: CTA ── */}
-        <div className="p-6 flex gap-3">
-          <button onClick={onClose} className="fhr-btn fhr-btn-ghost flex-1">
-            Cancelar
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={isNominating || !canConfirm}
-            className="fhr-btn fhr-btn-primary flex-1"
-          >
-            {isNominating ? 'Nominando...' : 'Confirmar Nominacion'}
-          </button>
-        </div>
       </motion.div>
+
+      {/* Metric tooltip portal */}
+      {mounted && metricTooltip && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            left: metricTooltip.x,
+            top: metricTooltip.y,
+            transform: metricTooltip.below ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
+            zIndex: 99999,
+            pointerEvents: 'none',
+            transition: 'opacity 0.15s ease-out',
+          }}
+        >
+          <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-700/50 rounded-xl max-w-[280px] p-4 shadow-2xl">
+            <p className="text-xs font-semibold text-white mb-1.5">{METRIC_TOOLTIPS[metricTooltip.key].title}</p>
+            {METRIC_TOOLTIPS[metricTooltip.key].lines.map((line, i) => (
+              <p key={i} className="text-[10px] text-slate-300 leading-relaxed">{line}</p>
+            ))}
+            <p className="text-[10px] text-[#22D3EE] mt-1.5 font-medium">{METRIC_TOOLTIPS[metricTooltip.key].accent}</p>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Brain tooltip portal */}
+      {mounted && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            left: brainTooltipPos.x,
+            top: brainTooltipPos.y,
+            transform: brainTooltipBelow ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
+            zIndex: 99999,
+            pointerEvents: 'none',
+            opacity: showBrainTooltip ? 1 : 0,
+            transition: 'opacity 0.2s ease-out',
+          }}
+        >
+          <div className="relative bg-slate-950 border border-slate-700 rounded-xl p-2.5 shadow-2xl w-64">
+            <div className="absolute inset-x-0 top-0 h-[2px] rounded-t-xl bg-gradient-to-r from-transparent via-purple-400/60 to-transparent" />
+            <p className="text-[10px] text-slate-300 leading-relaxed whitespace-pre-line">
+              {brainTooltipText}
+            </p>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

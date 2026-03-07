@@ -40,7 +40,41 @@ export async function GET(
 
     const suggestions = await SuccessionService.getSuggestedCandidates(id, { filterByArea })
 
-    return NextResponse.json({ success: true, data: suggestions })
+    // Build filterStats for intelligence story
+    const cycleId = await SuccessionService.getCurrentCycleId(position.accountId)
+    let filterStats = null
+
+    if (cycleId) {
+      const [totalEmployees, passedRoleFit, passedAspiration] = await Promise.all([
+        prisma.employee.count({
+          where: { accountId: userContext.accountId, status: 'ACTIVE' },
+        }),
+        prisma.performanceRating.count({
+          where: {
+            cycleId,
+            accountId: userContext.accountId,
+            roleFitScore: { gte: 75 },
+          },
+        }),
+        prisma.performanceRating.count({
+          where: {
+            cycleId,
+            accountId: userContext.accountId,
+            roleFitScore: { gte: 75 },
+            potentialAspiration: { gte: 2 },
+          },
+        }),
+      ])
+
+      filterStats = {
+        totalEmployees,
+        passedRoleFit,
+        passedAspiration,
+        finalCandidates: suggestions.length,
+      }
+    }
+
+    return NextResponse.json({ success: true, data: suggestions, filterStats })
   } catch (error: any) {
     console.error('[Succession Suggestions] Error:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })

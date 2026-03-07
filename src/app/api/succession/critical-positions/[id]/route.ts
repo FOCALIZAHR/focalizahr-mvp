@@ -45,7 +45,7 @@ export async function GET(
           include: {
             employee: {
               select: {
-                id: true, fullName: true, position: true,
+                id: true, fullName: true, position: true, hireDate: true,
                 department: { select: { displayName: true } },
               }
             },

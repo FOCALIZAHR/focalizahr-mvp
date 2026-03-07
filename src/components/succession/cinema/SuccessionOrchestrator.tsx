@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Crown } from 'lucide-react'
 import { useToast } from '@/components/ui/toast-system'
-import SuccessionCinemaHeader from './SuccessionCinemaHeader'
 import { SuccessionMissionControl } from '@/components/succession/SuccessionMissionControl'
 import { SuccessionRail, type FilterKey } from '@/components/succession/SuccessionRail'
 import SuccessionWizard from '@/components/succession/SuccessionWizard'
@@ -95,11 +94,15 @@ export default function SuccessionOrchestrator({
   const [suggestionsFilter, setSuggestionsFilter] = useState<'all' | 'area'>('all')
   const [selectedCandidate, setSelectedCandidate] = useState<any>(null)
   const [showCandidateModal, setShowCandidateModal] = useState(false)
+  const [selectedCandidateMode, setSelectedCandidateMode] = useState<'suggestion' | 'nominated'>('suggestion')
   const [nominating, setNominating] = useState<string | null>(null)
   const [promotingCandidate, setPromotingCandidate] = useState<{
     name: string; position: string; department?: string
   } | null>(null)
   const [recentNomination, setRecentNomination] = useState<{ name: string } | null>(null)
+
+  // Filter stats for intelligence story
+  const [filterStats, setFilterStats] = useState<any>(null)
 
   // Wizard state
   const [showWizard, setShowWizard] = useState(false)
@@ -157,7 +160,10 @@ export default function SuccessionOrchestrator({
       const url = `/api/succession/critical-positions/${selectedPosition.id}/suggestions${filterByArea ? '?filterByArea=true' : ''}`
       const res = await fetch(url)
       const data = await res.json()
-      if (data.success) setSuggestions(data.data)
+      if (data.success) {
+        setSuggestions(data.data)
+        setFilterStats(data.filterStats ?? null)
+      }
     } catch (err) {
       console.error(err)
     }
@@ -208,19 +214,25 @@ export default function SuccessionOrchestrator({
     setNominating(null)
   }, [selectedPosition, nominating, suggestions, toast, onRefresh])
 
-  // ── Header stats ──
-  const headerStats = {
-    totalPositions: initialPositions.length,
-    coveredPositions: initialPositions.filter(p => p.benchStrength === 'STRONG' || p.benchStrength === 'MODERATE').length,
-    totalCandidates: initialPositions.reduce((sum, p) => sum + p._count.candidates, 0),
-  }
+  // ── Withdraw handler ──
+  const handleWithdraw = useCallback(async (employeeId?: string) => {
+    if (!employeeId || !selectedPosition) return
+    setShowCandidateModal(false)
+    // Refresh position detail
+    try {
+      const res = await fetch(`/api/succession/critical-positions/${selectedPosition.id}`)
+      const data = await res.json()
+      if (data.success) setPositionDetail(data.data)
+    } catch { /* silent */ }
+    onRefresh()
+  }, [selectedPosition, onRefresh])
+
+  // ── Rail stats ──
+  const totalCandidates = initialPositions.reduce((sum, p) => sum + p._count.candidates, 0)
 
   return (
     <div className="h-full bg-[#0A0F1E] flex flex-col overflow-hidden">
-      {/* ── HEADER ── */}
-      <SuccessionCinemaHeader stats={headerStats} />
-
-      {/* ── MAIN CONTENT (fills between header h-14 and rail 50px) ── */}
+      {/* ── MAIN CONTENT (fills above rail 50px) ── */}
       <div className="flex-1 relative overflow-hidden">
         <AnimatePresence mode="wait" custom={direction}>
           {view === 'LOBBY' ? (
@@ -255,7 +267,7 @@ export default function SuccessionOrchestrator({
               animate="center"
               exit="exit"
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="absolute inset-0 flex items-center justify-center pb-[50px] overflow-y-auto"
+              className="absolute inset-0 flex items-start justify-center pt-4 pb-[50px] overflow-y-auto"
             >
               {selectedPosition && (
                 <SuccessionSpotlightCard
@@ -276,9 +288,11 @@ export default function SuccessionOrchestrator({
                   }}
                   onCandidateClick={(candidate) => {
                     setSelectedCandidate(candidate)
+                    setSelectedCandidateMode(candidate.isNominated ? 'nominated' : 'suggestion')
                     setShowCandidateModal(true)
                   }}
                   onPromotingCandidate={setPromotingCandidate}
+                  filterStats={filterStats}
                 />
               )}
             </motion.div>
@@ -293,6 +307,7 @@ export default function SuccessionOrchestrator({
           selectedPositionId={selectedPosition?.id || null}
           isExpanded={isRailExpanded}
           activeTab={railTab}
+          totalCandidates={totalCandidates}
           onToggle={() => setIsRailExpanded(!isRailExpanded)}
           onPositionClick={handlePositionClick}
           onTabChange={setRailTab}
@@ -306,10 +321,17 @@ export default function SuccessionOrchestrator({
           <SuccessionCandidateModal
             candidate={selectedCandidate}
             targetPosition={selectedPosition?.positionTitle || ''}
+            targetJobLevel={selectedPosition?.standardJobLevel}
+            filterStats={filterStats ? {
+              ...filterStats,
+              candidateRank: (suggestions.findIndex(s => s.employeeId === selectedCandidate.employeeId) + 1) || 1,
+            } : undefined}
+            mode={selectedCandidateMode}
             isNominating={nominating === selectedCandidate.employeeId}
             onNominate={(overrideReadiness, justification) => {
               handleNominate(selectedCandidate.employeeId, overrideReadiness, justification)
             }}
+            onWithdraw={() => handleWithdraw(selectedCandidate?.employeeId)}
             onClose={() => setShowCandidateModal(false)}
           />
         )}

@@ -3,8 +3,9 @@
 
 import { memo, useMemo, useRef, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronUp, ChevronLeft, ChevronRight, Check, Clock, Plus } from 'lucide-react'
+import { ChevronUp, ChevronLeft, ChevronRight, Check, Clock, Plus, ArrowLeft } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -23,6 +24,7 @@ interface SuccessionRailProps {
   selectedPositionId?: string | null
   isExpanded: boolean
   activeTab: FilterKey
+  totalCandidates?: number
   onToggle: () => void
   onPositionClick: (positionId: string) => void
   onTabChange: (tab: FilterKey) => void
@@ -292,11 +294,13 @@ export const SuccessionRail = memo(function SuccessionRail({
   selectedPositionId,
   isExpanded,
   activeTab,
+  totalCandidates,
   onToggle,
   onPositionClick,
   onTabChange,
   onCreatePosition,
 }: SuccessionRailProps) {
+  const router = useRouter()
   const selectedPosition = positions.find(p => p.id === selectedPositionId)
   const carouselRef = useRef<HTMLDivElement>(null)
 
@@ -344,6 +348,9 @@ export const SuccessionRail = memo(function SuccessionRail({
           <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">
             Roles Criticos ({positions.length})
           </h3>
+          <span className="text-[10px] text-slate-500 font-mono">
+            {positions.length} posiciones · {totalCandidates ?? 0} candidatos
+          </span>
           <ChevronUp className={cn(
             'w-3 h-3 text-slate-600 transition-transform duration-300',
             isExpanded ? 'rotate-180' : 'rotate-0'
@@ -361,6 +368,15 @@ export const SuccessionRail = memo(function SuccessionRail({
         )}
 
         <div className="flex items-center gap-2">
+          {/* Dashboard link */}
+          <button
+            onClick={(e) => { e.stopPropagation(); router.push('/dashboard') }}
+            className="flex items-center gap-1 text-slate-500 hover:text-slate-300 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-colors"
+          >
+            <ArrowLeft className="w-3 h-3" />
+            Dashboard
+          </button>
+
           {/* Nueva Posicion */}
           {onCreatePosition && (
             <button

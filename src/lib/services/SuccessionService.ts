@@ -93,6 +93,7 @@ export interface SuggestedCandidate {
   readinessLabel: string
   flightRisk: string | null
   gapsCriticalCount: number
+  hireDate?: string | null
   gaps?: CompetencyGapDetail[]
 }
 
@@ -499,6 +500,7 @@ export class SuccessionService {
             fullName: true,
             position: true,
             standardJobLevel: true,
+            hireDate: true,
             department: { select: { displayName: true } },
           }
         }
@@ -641,6 +643,7 @@ export class SuccessionService {
         readinessLabel: READINESS_LABELS[readiness.level] || readiness.level,
         flightRisk,
         gapsCriticalCount: counts.critical,
+        hireDate: r.employee.hireDate?.toISOString() ?? null,
         gaps: sortedGaps,
       })
     }
