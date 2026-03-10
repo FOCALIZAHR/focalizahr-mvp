@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Crown, ChevronDown, ChevronUp, Filter, ArrowLeft } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
-import SuccessionCandidateCard from '@/components/succession/SuccessionCandidateCard'
+import SuccessionCandidateRow from '@/components/succession/cinema/SuccessionCandidateRow'
 import DominoEffect from '@/components/succession/DominoEffect'
 import SuccessionCandidatesCover from '@/components/succession/SuccessionCandidatesCover'
 import SuccessionPositionBriefing from '@/components/succession/SuccessionPositionBriefing'
@@ -41,37 +41,6 @@ export interface SuccessionSpotlightCardProps {
   onFilterChange: (mode: 'all' | 'area') => void
   onCandidateClick: (candidate: any) => void
   onPromotingCandidate: (c: { name: string; position: string; department?: string } | null) => void
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// SMART BADGES
-// ════════════════════════════════════════════════════════════════════════════
-
-interface Badge { label: string; color: string }
-
-const NINE_BOX_TOP = ['star', 'high_performer', 'consistent_star']
-
-function deriveBadges(s: any): Badge[] {
-  const badges: Badge[] = []
-  const fit = s.roleFitScore ?? s.currentRoleFit ?? 0
-  const aspiration = s.potentialAspiration
-
-  if (fit >= 75 && aspiration === 3) {
-    badges.push({ label: 'Sucesor Natural', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' })
-  }
-  if (s.nineBoxPosition && NINE_BOX_TOP.includes(s.nineBoxPosition)) {
-    badges.push({ label: 'Top Performer', color: 'bg-amber-500/20 text-amber-400 border-amber-500/40' })
-  }
-  if (aspiration === 3 && !(fit >= 75 && aspiration === 3)) {
-    badges.push({ label: 'Quiere Crecer', color: 'bg-purple-500/20 text-purple-400 border-purple-500/40' })
-  }
-  if (s.gapsCriticalCount === 0 || (s.gaps && s.gaps.filter((g: any) => g.status === 'GAP_CRITICAL').length === 0)) {
-    badges.push({ label: 'Sin Gaps Criticos', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40' })
-  }
-  if (s.flightRisk === 'HIGH') {
-    badges.push({ label: 'Riesgo Fuga', color: 'bg-rose-500/20 text-rose-400 border-rose-500/40' })
-  }
-  return badges
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -304,7 +273,7 @@ export default function SuccessionSpotlightCard({
               )}
               onClick={() => setTab('candidates')}
             >
-              Candidatos ({candidates.length})
+              Confirmados ({candidates.length})
             </button>
             {canManage && (
               <button
@@ -317,7 +286,7 @@ export default function SuccessionSpotlightCard({
                   if (suggestions.length === 0 && !loadingSuggestions) onLoadSuggestions(suggestionsFilter === 'area')
                 }}
               >
-                Sugeridos
+                Sugerencias
               </button>
             )}
           </div>
@@ -329,78 +298,52 @@ export default function SuccessionSpotlightCard({
                 <div className="space-y-3">
                   {candidates.map((c: any, idx: number) => {
                     const effective = c.readinessOverride || c.readinessLevel
-                    const rankBadge = idx < 3 ? `#${idx + 1}` : null
                     return (
-                      <div key={c.id} className="space-y-2">
-                        <div
-                          className="cursor-pointer relative"
-                          onClick={() => {
-                            // gapsJson is stored as Prisma Json — parse if string
-                            const rawGaps = c.gapsJson ?? c.gaps
-                            const gaps = typeof rawGaps === 'string' ? JSON.parse(rawGaps) : rawGaps
-                            onCandidateClick({
-                              employeeId: c.employeeId || c.employee?.id,
-                              employeeName: c.employee?.fullName || c.employeeName,
-                              position: c.employee?.position || c.position,
-                              departmentName: c.employee?.department?.displayName || c.departmentName,
-                              roleFitScore: c.currentRoleFit ?? c.roleFitScore ?? 0,
-                              nineBoxPosition: c.nineBoxPosition || null,
-                              matchPercent: c.matchPercent ?? 0,
-                              readinessLevel: effective,
-                              readinessLabel: c.readinessLabel || '',
-                              flightRisk: c.flightRisk || null,
-                              riskQuadrant: c.riskQuadrant ?? null,
-                              mobilityQuadrant: c.mobilityQuadrant ?? null,
-                              gapsCriticalCount: c.gapsCriticalCount ?? 0,
-                              potentialAspiration: c.aspirationLevel ?? c.potentialAspiration,
-                              hireDate: c.employee?.hireDate ?? c.hireDate ?? null,
-                              gaps: Array.isArray(gaps) ? gaps : [],
-                              isNominated: true,
-                              nominatedId: c.id,
-                            })
-                          }}
-                        >
-                          {rankBadge && (
-                            <span className={cn(
-                              'absolute -left-1 -top-1 z-10 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black',
-                              idx === 0 ? 'bg-amber-400 text-slate-950' :
-                              idx === 1 ? 'bg-slate-300 text-slate-950' :
-                              'bg-amber-700 text-white'
-                            )}>
-                              {rankBadge}
-                            </span>
-                          )}
-                          <SuccessionCandidateCard
-                            candidate={{
-                              id: c.id,
-                              employeeId: c.employeeId || c.employee?.id,
-                              employeeName: c.employee.fullName,
-                              position: c.employee.position,
-                              departmentName: c.employee.department?.displayName,
-                              currentRoleFit: c.currentRoleFit,
-                              matchPercent: c.matchPercent,
-                              readinessLevel: effective,
-                              flightRisk: c.flightRisk,
-                              hasPDI: !!c.developmentPlan,
-                            }}
-                            onViewPDI={c.developmentPlan ? () => {
-                              window.open(`/dashboard/pdi/${c.developmentPlan.id}`, '_blank')
-                            } : undefined}
-                          />
-                        </div>
-                        {canManage && effective === 'READY_NOW' && (
-                          <button
-                            className="ml-11 text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors"
-                            onClick={() => onPromotingCandidate({
-                              name: c.employee.fullName,
-                              position: c.employee.position || 'Posicion actual',
-                              department: c.employee.department?.displayName,
-                            })}
-                          >
-                            Ver efecto domino
-                          </button>
-                        )}
-                      </div>
+                      <SuccessionCandidateRow
+                        key={c.id}
+                        rank={idx + 1}
+                        index={idx}
+                        variant="nominated"
+                        candidate={{
+                          employeeId: c.employeeId || c.employee?.id,
+                          employeeName: c.employee?.fullName || c.employeeName,
+                          position: c.employee?.position || c.position,
+                          departmentName: c.employee?.department?.displayName || c.departmentName,
+                          roleFitScore: c.currentRoleFit ?? c.roleFitScore ?? 0,
+                          matchPercent: c.matchPercent ?? 0,
+                          readinessLevel: effective,
+                          readinessLabel: c.readinessLabel || '',
+                          nineBoxPosition: c.nineBoxPosition || null,
+                          flightRisk: c.flightRisk || null,
+                          riskQuadrant: c.riskQuadrant ?? null,
+                          mobilityQuadrant: c.mobilityQuadrant ?? null,
+                          gapsCriticalCount: c.gapsCriticalCount ?? 0,
+                          potentialAspiration: c.aspirationLevel ?? c.potentialAspiration,
+                          hireDate: c.employee?.hireDate ?? c.hireDate ?? null,
+                          gaps: (() => {
+                            const raw = c.gapsJson ?? c.gaps
+                            return typeof raw === 'string' ? JSON.parse(raw) : (raw ?? [])
+                          })(),
+                          isNominated: true,
+                          nominatedId: c.id,
+                          developmentPlan: c.developmentPlan ?? null,
+                        }}
+                        onCandidateClick={onCandidateClick}
+                        onDominoClick={
+                          canManage && effective === 'READY_NOW'
+                            ? () => onPromotingCandidate({
+                                name: c.employee.fullName,
+                                position: c.employee.position || 'Posicion actual',
+                                department: c.employee.department?.displayName,
+                              })
+                            : undefined
+                        }
+                        onViewPDI={
+                          c.developmentPlan
+                            ? () => window.open(`/dashboard/pdi/${c.developmentPlan.id}`, '_blank')
+                            : undefined
+                        }
+                      />
                     )
                   })}
 
@@ -493,43 +436,34 @@ export default function SuccessionSpotlightCard({
                   </div>
                 ) : suggestions.length > 0 ? (
                   <div className="space-y-3">
-                    {suggestions.map((s: any) => {
-                      const badges = deriveBadges(s)
-                      return (
-                        <div
-                          key={s.employeeId}
-                          className="cursor-pointer"
-                          onClick={() => onCandidateClick(s)}
-                        >
-                          <SuccessionCandidateCard
-                            candidate={{
-                              employeeId: s.employeeId,
-                              employeeName: s.employeeName,
-                              position: s.position,
-                              departmentName: s.departmentName,
-                              roleFitScore: s.roleFitScore,
-                              matchPercent: s.matchPercent,
-                              readinessLevel: s.readinessLevel,
-                              readinessLabel: s.readinessLabel,
-                              flightRisk: s.flightRisk,
-                              nineBoxPosition: s.nineBoxPosition,
-                            }}
-                          />
-                          {badges.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-1 ml-14">
-                              {badges.map(b => (
-                                <span
-                                  key={b.label}
-                                  className={`px-2 py-0.5 rounded-full text-[9px] font-medium border ${b.color}`}
-                                >
-                                  {b.label}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
+                    {suggestions.map((s: any, idx: number) => (
+                      <SuccessionCandidateRow
+                        key={s.employeeId}
+                        rank={idx + 1}
+                        index={idx}
+                        variant="suggestion"
+                        candidate={{
+                          employeeId: s.employeeId,
+                          employeeName: s.employeeName,
+                          position: s.position,
+                          departmentName: s.departmentName,
+                          roleFitScore: s.roleFitScore,
+                          matchPercent: s.matchPercent ?? 0,
+                          readinessLevel: s.readinessLevel,
+                          readinessLabel: s.readinessLabel || '',
+                          nineBoxPosition: s.nineBoxPosition || null,
+                          flightRisk: s.flightRisk || null,
+                          riskQuadrant: s.riskQuadrant ?? null,
+                          mobilityQuadrant: s.mobilityQuadrant ?? null,
+                          gapsCriticalCount: s.gapsCriticalCount ?? 0,
+                          potentialAspiration: s.potentialAspiration,
+                          hireDate: s.hireDate ?? null,
+                          gaps: s.gaps ?? [],
+                          isNominated: false,
+                        }}
+                        onCandidateClick={onCandidateClick}
+                      />
+                    ))}
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-48 text-slate-500 text-sm">
