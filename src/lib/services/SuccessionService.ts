@@ -92,6 +92,8 @@ export interface SuggestedCandidate {
   readinessLevel: string
   readinessLabel: string
   flightRisk: string | null
+  riskQuadrant: string | null
+  mobilityQuadrant: string | null
   gapsCriticalCount: number
   hireDate?: string | null
   gaps?: CompetencyGapDetail[]
@@ -494,6 +496,7 @@ export class SuccessionService {
         potentialAspiration: true,
         riskAlertLevel: true,
         riskQuadrant: true,
+        mobilityQuadrant: true,
         employee: {
           select: {
             id: true,
@@ -642,6 +645,8 @@ export class SuccessionService {
         readinessLevel: readiness.level,
         readinessLabel: READINESS_LABELS[readiness.level] || readiness.level,
         flightRisk,
+        riskQuadrant: r.riskQuadrant ?? null,
+        mobilityQuadrant: r.mobilityQuadrant ?? null,
         gapsCriticalCount: counts.critical,
         hireDate: r.employee.hireDate?.toISOString() ?? null,
         gaps: sortedGaps,
@@ -1166,6 +1171,45 @@ export class SuccessionService {
       }
     } catch (err) {
       console.error('[Succession] Error batch employee scores:', err)
+    }
+
+    return result
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // enrichWithTalentQuadrants: Fetch riskQuadrant + mobilityQuadrant
+  // from PerformanceRating for a batch of employees (1 query)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  static async enrichWithTalentQuadrants(
+    employeeIds: string[],
+    accountId: string
+  ): Promise<Map<string, { riskQuadrant: string | null; mobilityQuadrant: string | null; riskAlertLevel: string | null }>> {
+    const result = new Map<string, { riskQuadrant: string | null; mobilityQuadrant: string | null; riskAlertLevel: string | null }>()
+    if (employeeIds.length === 0) return result
+
+    const cycleId = await this.getCurrentCycleId(accountId)
+    if (!cycleId) return result
+
+    const ratings = await prisma.performanceRating.findMany({
+      where: {
+        cycleId,
+        employeeId: { in: employeeIds },
+      },
+      select: {
+        employeeId: true,
+        riskQuadrant: true,
+        mobilityQuadrant: true,
+        riskAlertLevel: true,
+      },
+    })
+
+    for (const r of ratings) {
+      result.set(r.employeeId, {
+        riskQuadrant: r.riskQuadrant ?? null,
+        mobilityQuadrant: r.mobilityQuadrant ?? null,
+        riskAlertLevel: r.riskAlertLevel ?? null,
+      })
     }
 
     return result

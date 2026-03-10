@@ -2,21 +2,16 @@
 // API: /api/evaluator/potential
 // POST - Jefe asigna potencial AAE a un evaluatee
 // ════════════════════════════════════════════════════════════════════════════
-// A diferencia de /api/performance-ratings/[id]/potential, este endpoint:
-// 1. NO requiere ratingId - usa cycleId + employeeId
-// 2. Auto-crea el PerformanceRating si no existe
-// 3. Verifica que el usuario es evaluador del empleado
+// Delega a PerformanceRatingService.ratePotential() que calcula:
+// - potentialScore, nineBoxPosition (9-Box)
+// - mobilityQuadrant, riskQuadrant, riskAlertLevel (Matrices de Talento)
 // ════════════════════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server'
 import { extractUserContext } from '@/lib/services/AuthorizationService'
 import { prisma } from '@/lib/prisma'
-import {
-  scoreToNineBoxLevel,
-  calculate9BoxPosition,
-  getPerformanceLevel
-} from '@/config/performanceClassification'
-import { calculatePotentialScore } from '@/lib/potential-assessment'
+import { getPerformanceLevel } from '@/config/performanceClassification'
+import { PerformanceRatingService } from '@/lib/services/PerformanceRatingService'
 
 export async function POST(request: NextRequest) {
   try {
@@ -106,36 +101,22 @@ export async function POST(request: NextRequest) {
       console.log('[Evaluator/Potential] Auto-created PerformanceRating:', rating.id)
     }
 
-    // Calcular potencial desde factores AAE
-    const potentialScore = calculatePotentialScore({ aspiration, ability, engagement })
-    const potentialLevel = scoreToNineBoxLevel(potentialScore)
-    const performanceScore = rating.finalScore ?? rating.calculatedScore
-    const performanceLevel = scoreToNineBoxLevel(performanceScore)
-    const nineBoxPosition = calculate9BoxPosition(performanceLevel, potentialLevel)
-
-    // Actualizar rating con potencial
-    const updated = await prisma.performanceRating.update({
-      where: { id: rating.id },
-      data: {
-        potentialScore,
-        potentialLevel,
-        potentialRatedBy: userEmail,
-        potentialRatedAt: new Date(),
-        potentialNotes: notes || null,
-        nineBoxPosition,
-        potentialAspiration: aspiration,
-        potentialAbility: ability,
-        potentialEngagement: engagement,
-        updatedAt: new Date()
-      }
+    // Delegar a ratePotential() — calcula 9-Box + Matrices de Talento
+    const updated = await PerformanceRatingService.ratePotential({
+      ratingId: rating.id,
+      aspiration,
+      ability,
+      engagement,
+      notes,
+      ratedBy: userEmail,
     })
 
     console.log('[Evaluator/Potential] Saved potential:', {
       ratingId: updated.id,
       employeeId,
-      potentialScore,
-      potentialLevel,
-      nineBoxPosition
+      nineBoxPosition: updated.nineBoxPosition,
+      mobilityQuadrant: updated.mobilityQuadrant,
+      riskQuadrant: updated.riskQuadrant,
     })
 
     return NextResponse.json({
@@ -149,7 +130,10 @@ export async function POST(request: NextRequest) {
         potentialRatedAt: updated.potentialRatedAt,
         potentialAspiration: updated.potentialAspiration,
         potentialAbility: updated.potentialAbility,
-        potentialEngagement: updated.potentialEngagement
+        potentialEngagement: updated.potentialEngagement,
+        mobilityQuadrant: updated.mobilityQuadrant,
+        riskQuadrant: updated.riskQuadrant,
+        riskAlertLevel: updated.riskAlertLevel,
       },
       message: `Potencial asignado: ${updated.potentialLevel} → 9-Box: ${updated.nineBoxPosition}`
     })

@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import SuccessionCandidateCard from '@/components/succession/SuccessionCandidateCard'
 import DominoEffect from '@/components/succession/DominoEffect'
 import SuccessionCandidatesCover from '@/components/succession/SuccessionCandidatesCover'
+import SuccessionPositionBriefing from '@/components/succession/SuccessionPositionBriefing'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -18,6 +19,7 @@ interface CriticalPosition {
   standardJobLevel: string
   benchStrength: string
   incumbentFlightRisk: string | null
+  incumbentRetirementDate: string | null
   department: { displayName: string } | null
   incumbent: { id: string; fullName: string; position: string } | null
   _count: { candidates: number }
@@ -113,6 +115,10 @@ export default function SuccessionSpotlightCard({
   const [tab, setTab] = useState<'candidates' | 'suggestions'>('candidates')
   const [showMethodology, setShowMethodology] = useState(false)
   const [showCover, setShowCover] = useState(true)
+
+  // ── Briefing state — portada del CARGO, antes de las tabs ──
+  // Independiente de showCover (que controla portada del tab SUGERIDOS)
+  const [showBriefing, setShowBriefing] = useState(true)
   const rawCandidates = positionDetail?.candidates || []
 
   // Sort candidates: READY_NOW > READY_1_2 > READY_3_PLUS, then matchPercent DESC
@@ -148,6 +154,26 @@ export default function SuccessionSpotlightCard({
   const noGapsCritical = suggestions.filter((s: any) =>
     s.gapsCriticalCount === 0 || (s.gaps && s.gaps.filter((g: any) => g.status === 'GAP_CRITICAL').length === 0)
   ).length
+
+  // Si showBriefing está activo, mostrar portada ejecutiva antes de las tabs
+  if (showBriefing) {
+    return (
+      <div className="flex items-start justify-center p-6 min-h-[500px]">
+        <SuccessionPositionBriefing
+          position={{
+            ...position,
+            incumbentRetirementDate: position.incumbentRetirementDate ?? null,
+            incumbent: positionDetail?.incumbent ?? position.incumbent ?? null,
+          }}
+          candidates={positionDetail?.candidates || []}
+          onContinue={(initialTab) => {
+            setTab(initialTab)
+            setShowBriefing(false)
+          }}
+        />
+      </div>
+    )
+  }
 
   return (
     <motion.div
@@ -323,6 +349,8 @@ export default function SuccessionSpotlightCard({
                               readinessLevel: effective,
                               readinessLabel: c.readinessLabel || '',
                               flightRisk: c.flightRisk || null,
+                              riskQuadrant: c.riskQuadrant ?? null,
+                              mobilityQuadrant: c.mobilityQuadrant ?? null,
                               gapsCriticalCount: c.gapsCriticalCount ?? 0,
                               potentialAspiration: c.aspirationLevel ?? c.potentialAspiration,
                               hireDate: c.employee?.hireDate ?? c.hireDate ?? null,

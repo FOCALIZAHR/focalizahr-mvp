@@ -9,6 +9,7 @@ import { DangerButton, GhostButton, ButtonGroup } from '@/components/ui/PremiumB
 import { useToast } from '@/components/ui/toast-system'
 import { formatDisplayName, getInitials } from '@/lib/utils/formatName'
 import { getNineBoxPositionConfig, NineBoxPosition } from '@/config/performanceClassification'
+import { TalentNarrativeService } from '@/lib/services/TalentNarrativeService'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -42,6 +43,8 @@ interface CandidateProfile {
   flightRisk: string | null
   gapsCriticalCount: number
   potentialAspiration?: number | null
+  riskQuadrant?: string | null
+  mobilityQuadrant?: string | null
   gaps?: GapDetail[]
   hireDate?: string | null
   isNominated?: boolean
@@ -147,6 +150,14 @@ export default function SuccessionCandidateModal({
   const notEval = gaps.filter(g => g._status === 'NOT_EVALUATED')
   const criticalCount = brechas.filter(g => g._status === 'GAP_CRITICAL').length
   const evaluatedGaps = gaps.filter(g => g._status !== 'NOT_EVALUATED')
+
+  // Talent narrative from TalentNarrativeService
+  const talentNarrative = TalentNarrativeService.getIndividualNarrative(
+    candidate.riskQuadrant ?? null,
+    candidate.mobilityQuadrant ?? null,
+    roleFit,
+    displayName
+  )
 
   const formattedPosition = targetPosition
     ? targetPosition.split(' ')
@@ -432,6 +443,41 @@ export default function SuccessionCandidateModal({
             </span>
           </p>
 
+          {/* ═══════════ ZONA 3.5 — NARRATIVA TALENTO ═══════════ */}
+          {talentNarrative && (
+            <div className="relative mb-5 p-3 rounded-xl bg-slate-900/60 border border-slate-800 overflow-hidden">
+              {/* Tesla line cyan */}
+              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/60 to-transparent" />
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className={cn(
+                  'px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border',
+                  talentNarrative.urgencyLevel === 'CRITICA'
+                    ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                    : talentNarrative.urgencyLevel === 'ALTA'
+                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                    : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+                )}>
+                  {talentNarrative.urgencyLevel}
+                </span>
+                <span className="text-xs font-semibold text-white">{talentNarrative.headline}</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed mb-1">{talentNarrative.context}</p>
+              {talentNarrative.urgencySignal && (
+                <p className="text-[11px] text-slate-300 leading-relaxed mb-1.5">{talentNarrative.urgencySignal}</p>
+              )}
+              <p className="text-[11px] text-slate-200 leading-relaxed">
+                <span className="text-slate-500 font-medium">Accion: </span>{talentNarrative.recommendedAction}
+              </p>
+              {talentNarrative.conflictAlert && (
+                <div className="mt-2 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20">
+                  <p className="text-[10px] text-rose-400 leading-relaxed font-medium">
+                    {talentNarrative.conflictAlert}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ═══════════ ZONA 4 — EVIDENCIA ═══════════ */}
           <div className="mb-5">
             <button
@@ -472,19 +518,21 @@ export default function SuccessionCandidateModal({
                             Fortalezas ({strengths.length})
                           </h4>
                           <div className="space-y-1">
-                            {strengths.slice(0, 3).map(g => {
-                              const pct = Math.min(safeNum(g.fitPercent), 100)
+                            {strengths.slice(0, 4).map(g => {
+                              const target = g.targetCurrentRole != null ? Number(g.targetCurrentRole) : Number(g.targetScore || 0)
+                              const actual = g.actualScore !== null ? Number(g.actualScore) : 0
+                              const pct = target > 0 ? Math.min((actual / target) * 100, 100) : 0
                               return (
                                 <div key={g.competencyCode} className="p-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15">
                                   <div className="flex items-center justify-between mb-0.5">
                                     <span className="text-[11px] text-slate-200 truncate">{g.competencyName || g.competencyCode}</span>
                                     <span className="text-[10px] text-emerald-400 font-mono flex-shrink-0 ml-1">
-                                      {g.actualScore !== null ? Number(g.actualScore).toFixed(1) : '—'}/{Number(g.targetScore || 0).toFixed(1)}
+                                      {g.actualScore !== null ? Number(g.actualScore).toFixed(1) : '—'}/{target.toFixed(1)}
                                     </span>
                                   </div>
                                   <div className="h-1 rounded-full bg-slate-800 overflow-hidden">
                                     <div
-                                      className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                                      className="h-full rounded-full bg-emerald-500/60 transition-all duration-500"
                                       style={{ width: `${pct}%` }}
                                     />
                                   </div>
@@ -506,33 +554,68 @@ export default function SuccessionCandidateModal({
                           </div>
                         ) : (
                           <div className="space-y-1">
-                            {brechas.slice(0, 3).map(g => (
-                              <div key={g.competencyCode} className="p-1.5 rounded-lg bg-slate-800/40 border border-slate-700/30">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-[11px] text-slate-200 truncate">{g.competencyName || g.competencyCode}</span>
-                                  <span className={cn(
-                                    'px-1 py-0.5 rounded text-[8px] font-bold border flex-shrink-0 ml-1',
-                                    g._status === 'GAP_CRITICAL'
-                                      ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-                                      : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                                  )}>
-                                    {g._status === 'GAP_CRITICAL' ? 'Critica' : 'Menor'}
-                                  </span>
+                            {brechas.slice(0, 4).map(g => {
+                              const target = g.targetCurrentRole != null ? Number(g.targetCurrentRole) : Number(g.targetScore || 0)
+                              const actual = g.actualScore !== null ? Number(g.actualScore) : 0
+                              const pct = target > 0 ? Math.min((actual / target) * 100, 100) : 0
+                              return (
+                                <div key={g.competencyCode} className="p-1.5 rounded-lg bg-amber-500/5 border border-amber-500/15">
+                                  <div className="flex items-center justify-between mb-0.5">
+                                    <span className="text-[11px] text-slate-200 truncate">{g.competencyName || g.competencyCode}</span>
+                                    <span className="text-[10px] text-amber-400 font-mono flex-shrink-0 ml-1">
+                                      {g.actualScore !== null ? Number(g.actualScore).toFixed(1) : '—'}/{target.toFixed(1)}
+                                    </span>
+                                  </div>
+                                  <div className="h-1 rounded-full bg-slate-800 overflow-hidden">
+                                    <div
+                                      className="h-full rounded-full bg-amber-500/60 transition-all duration-500"
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
                                 </div>
-                                <span className="text-[10px] text-slate-500 font-mono">
-                                  {g.actualScore !== null ? Number(g.actualScore).toFixed(1) : '—'}-&gt;{Number(g.targetScore || 0).toFixed(1)}
-                                  <span className={cn(
-                                    'ml-1.5',
-                                    g._status === 'GAP_CRITICAL' ? 'text-rose-400' : 'text-amber-400'
-                                  )}>
-                                    {g.rawGap !== null ? Number(g.rawGap).toFixed(1) : ''}
-                                  </span>
-                                </span>
-                              </div>
-                            ))}
+                              )
+                            })}
                           </div>
                         )}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Apoyo Requerido */}
+                  {brechas.length > 0 && (
+                    <div className="relative rounded-xl bg-slate-900/60 border border-slate-800 p-4">
+                      {/* Tesla line purple */}
+                      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-400/60 to-transparent rounded-t-xl" />
+
+                      <div className="flex items-center gap-1 mb-2">
+                        <p>
+                          <span className="text-slate-400 font-normal text-[9px] uppercase tracking-widest">Apoyo requerido para </span>
+                          <span className="text-slate-200 font-semibold text-[9px] uppercase tracking-widest">{displayName}</span>
+                          <span className="text-slate-400 font-normal text-[9px] uppercase tracking-widest"> en rol de </span>
+                          <span className="text-slate-200 font-semibold text-[9px] uppercase tracking-widest">{formattedPosition}</span>
+                        </p>
+                        <div className="group relative inline-flex items-center gap-1 cursor-help">
+                          <span className="text-slate-500 text-[10px]">ⓘ</span>
+                          <div className="absolute bottom-5 right-0 hidden group-hover:block w-56 bg-slate-900 border border-slate-700 rounded-lg p-3 text-[10px] text-slate-400 leading-relaxed z-20 shadow-xl">
+                            Diferencia entre el nivel actual de esta persona y lo que requiere el nuevo cargo. No es una falla — es lo que la organización debe acompañar para que el ascenso sea exitoso.
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {brechas.map(g => (
+                          <div key={g.competencyCode} className="flex items-center justify-between">
+                            <span className="text-[11px] text-slate-300 truncate">{g.competencyName || g.competencyCode}</span>
+                            <span className="text-[10px] font-mono flex-shrink-0 ml-2 font-semibold text-purple-400">
+                              {g.actualScore !== null ? Number(g.actualScore).toFixed(1) : '—'}/{Number(g.targetScore || 0).toFixed(1)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <p className="text-[10px] text-slate-500 italic mt-2">
+                        Estas competencias requieren desarrollo en la nueva posición.
+                      </p>
                     </div>
                   )}
 

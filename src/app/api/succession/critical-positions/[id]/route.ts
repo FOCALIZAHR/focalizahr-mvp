@@ -72,9 +72,28 @@ export async function GET(
     // Sort candidates by readiness
     const sortedCandidates = sortCandidates(recalculated)
 
+    // Enrich with talent quadrants (riskQuadrant + mobilityQuadrant from PerformanceRating)
+    const allEmployeeIds = [
+      ...(position.incumbentId ? [position.incumbentId] : []),
+      ...sortedCandidates.map(c => c.employeeId),
+    ]
+    const quadrantsMap = await SuccessionService.enrichWithTalentQuadrants(
+      allEmployeeIds,
+      userContext.accountId
+    )
+
+    const enrichedIncumbent = position.incumbent
+      ? { ...position.incumbent, ...(quadrantsMap.get(position.incumbentId!) ?? { riskQuadrant: null, mobilityQuadrant: null, riskAlertLevel: null }) }
+      : null
+
+    const enrichedCandidates = sortedCandidates.map(c => ({
+      ...c,
+      ...(quadrantsMap.get(c.employeeId) ?? { riskQuadrant: null, mobilityQuadrant: null, riskAlertLevel: null }),
+    }))
+
     return NextResponse.json({
       success: true,
-      data: { ...position, candidates: sortedCandidates },
+      data: { ...position, incumbent: enrichedIncumbent, candidates: enrichedCandidates },
       permissions: { canManage: hasPermission(userContext.role, 'succession:manage') },
     })
   } catch (error: any) {

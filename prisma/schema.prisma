@@ -2056,6 +2056,14 @@ model PerformanceRating {
   riskAlertLevel        String?   @map("risk_alert_level")     // GREEN|YELLOW|ORANGE|RED
   talentAnalyzedAt      DateTime? @map("talent_analyzed_at")
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // TENDENCIA DE CUADRANTES (Para detectar transiciones entre ciclos)
+  // ════════════════════════════════════════════════════════════════════════════
+  previousRiskQuadrant      String?   @map("previous_risk_quadrant")
+  previousMobilityQuadrant  String?   @map("previous_mobility_quadrant")
+  riskQuadrantChangedAt     DateTime? @map("risk_quadrant_changed_at")
+  quadrantTrend             String?   @map("quadrant_trend")             // IMPROVING | STABLE | DECLINING | NEW
+
   // Succession Readiness
   successionReadiness   String?  @map("succession_readiness")
   targetRoles           Json?    @map("target_roles")

@@ -5,7 +5,7 @@ import {
   PerformanceTrack,
   SuggestionGoal
 } from '@/lib/types/pdi-suggestion'
-import { RoleFitAnalyzer } from './RoleFitAnalyzer'
+import { RoleFitAnalyzer, RoleFitResult } from './RoleFitAnalyzer'
 import {
   PDI_COMPETENCY_LIBRARY,
   GENERIC_COMPETENCY_TEMPLATE
@@ -177,10 +177,13 @@ export class PDISuggestionEngine {
   static async generateFromRoleFit(
     employeeId: string,
     cycleId: string,
-    performanceTrack: PerformanceTrack
+    performanceTrack: PerformanceTrack,
+    precomputedRoleFit?: RoleFitResult | null
   ): Promise<GeneratedSuggestion[]> {
 
-    const roleFit = await RoleFitAnalyzer.calculateRoleFit(employeeId, cycleId)
+    const roleFit = precomputedRoleFit !== undefined
+      ? precomputedRoleFit
+      : await RoleFitAnalyzer.calculateRoleFit(employeeId, cycleId)
 
     if (!roleFit || roleFit.gaps.length === 0) {
       console.warn('[PDIEngine] No se pudo calcular Role Fit, retornando vacío')

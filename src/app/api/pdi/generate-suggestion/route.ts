@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     const track = (employee.performanceTrack as PerformanceTrack) || 'COLABORADOR'
     const roleFit = await RoleFitAnalyzer.calculateRoleFit(employeeId, cycleId)
 
-    let suggestions = await PDISuggestionEngine.generateFromRoleFit(employeeId, cycleId, track)
+    let suggestions = await PDISuggestionEngine.generateFromRoleFit(employeeId, cycleId, track, roleFit)
 
     if (suggestions.length === 0) {
       console.log('[PDI] No Role Fit gaps, fallback a método legacy (Self vs Manager)')

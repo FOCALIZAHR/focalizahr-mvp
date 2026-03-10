@@ -32,6 +32,7 @@ interface CriticalPosition {
   standardJobLevel: string
   benchStrength: string
   incumbentFlightRisk: string | null
+  incumbentRetirementDate: string | null
   department: { displayName: string } | null
   incumbent: { id: string; fullName: string; position: string } | null
   _count: { candidates: number }

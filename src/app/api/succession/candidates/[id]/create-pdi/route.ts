@@ -99,8 +99,26 @@ export async function POST(
     // Generate suggestions
     const suggestions = PDISuggestionEngine.generateSuggestions(gapInputs, track)
 
-    // Determine manager (use employee's manager or the nominator)
-    const managerId = candidate.employee.managerId || candidate.employeeId
+    // Determine manager (use employee's manager, or the current user as fallback)
+    const currentEmployee = await prisma.employee.findFirst({
+      where: {
+        accountId: userContext.accountId,
+        email: userEmail,
+        status: 'ACTIVE',
+      },
+      select: { id: true },
+    })
+
+    const managerId = candidate.employee.managerId
+      ?? currentEmployee?.id
+      ?? null
+
+    if (!managerId) {
+      return NextResponse.json(
+        { success: false, error: 'No se puede crear PDI sin manager o usuario responsable' },
+        { status: 400 }
+      )
+    }
 
     // Create the PDI
     const now = new Date()

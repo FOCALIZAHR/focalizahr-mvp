@@ -706,12 +706,18 @@ export class PerformanceRatingService {
     let riskAlertLevel: string | null = null
 
     // Solo calcular si tenemos Role Fit persistido
+    console.log('[ratePotential] roleFitScore:', rating.roleFitScore)
+    console.log('[ratePotential] hasAllFactors:', hasAllFactors)
+    console.log('[ratePotential] aspiration:', aspiration, 'engagement:', engagement)
+
     if (rating.roleFitScore !== null) {
       const talentResult = TalentIntelligenceService.analyze({
         roleFitScore: rating.roleFitScore,
         aspiration: (hasAllFactors ? aspiration : null) as 1 | 2 | 3 | null,
         engagement: (hasAllFactors ? engagement : null) as 1 | 2 | 3 | null
       })
+
+      console.log('[ratePotential] talentResult:', JSON.stringify(talentResult))
 
       mobilityQuadrant = talentResult.mobility.quadrant
       riskQuadrant = talentResult.risk.quadrant
@@ -727,6 +733,8 @@ export class PerformanceRatingService {
     } else {
       console.warn(`[ratePotential] Role Fit no disponible para ${ratingId}, matrices no calculadas`)
     }
+
+    console.log('[ratePotential] PERSISTING:', { mobilityQuadrant, riskQuadrant, riskAlertLevel })
 
     return prisma.performanceRating.update({
       where: { id: ratingId },

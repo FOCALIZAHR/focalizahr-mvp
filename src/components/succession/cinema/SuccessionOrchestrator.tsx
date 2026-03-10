@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Crown } from 'lucide-react'
+import { Crown, Shield, ArrowRight } from 'lucide-react'
 import { useToast } from '@/components/ui/toast-system'
 import { SuccessionMissionControl } from '@/components/succession/SuccessionMissionControl'
 import { SuccessionRail, type FilterKey } from '@/components/succession/SuccessionRail'
@@ -39,6 +39,7 @@ interface CriticalPosition {
   standardJobLevel: string
   benchStrength: string
   incumbentFlightRisk: string | null
+  incumbentRetirementDate: string | null
   department: { displayName: string } | null
   incumbent: { id: string; fullName: string; position: string } | null
   _count: { candidates: number }
@@ -371,11 +372,11 @@ export default function SuccessionOrchestrator({
 // ════════════════════════════════════════════════════════════════════════════
 
 function CreatePositionModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [showCover, setShowCover] = useState(true)
   const [gerenciaId, setGerenciaId] = useState('')
   const [departmentId, setDepartmentId] = useState('')
   const [jobLevel, setJobLevel] = useState('')
   const [incumbentId, setIncumbentId] = useState('')
-  const [customTitle, setCustomTitle] = useState('')
   const [departments, setDepartments] = useState<Array<{ id: string; displayName: string; parentId: string | null; level: number }>>([])
   const [employees, setEmployees] = useState<Array<{ id: string; fullName: string; position: string | null; standardJobLevel: string | null }>>([])
   const [loadingDepts, setLoadingDepts] = useState(true)
@@ -426,7 +427,7 @@ function CreatePositionModal({ onClose, onCreated }: { onClose: () => void; onCr
   }, [departmentId, gerenciaId, jobLevel])
 
   const selectedEmployee = employees.find(e => e.id === incumbentId)
-  const positionTitle = selectedEmployee?.position || customTitle.trim()
+  const positionTitle = selectedEmployee?.position || ''
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -458,10 +459,97 @@ function CreatePositionModal({ onClose, onCreated }: { onClose: () => void; onCr
     }
   }
 
+  // ── Portada SmartRouter ──
+  if (showCover) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+          className="relative bg-[#0F172A]/95 backdrop-blur-xl rounded-2xl border border-slate-800 overflow-hidden w-full max-w-md mx-4"
+        >
+          {/* Tesla line cyan */}
+          <div
+            className="absolute top-0 left-0 right-0 h-[3px]"
+            style={{
+              background: 'linear-gradient(90deg, transparent 0%, #22D3EE 30%, #22D3EE 70%, transparent 100%)',
+            }}
+          />
+
+          <div className="p-8 flex flex-col items-center text-center space-y-6">
+
+            {/* Icono */}
+            <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+              <Shield className="w-8 h-8 text-cyan-400" />
+            </div>
+
+            {/* Titulo */}
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-white tracking-tight">
+                Proteger un cargo clave
+              </h2>
+              <p className="text-sm text-slate-400 leading-relaxed max-w-sm">
+                Dinos quien ocupa un cargo que no puede quedar vacante. El sistema identificara automaticamente quienes en tu empresa estan mejor preparados para sucederlo.
+              </p>
+            </div>
+
+            {/* Que pasara */}
+            <div className="w-full space-y-2 text-left">
+              {[
+                'Seleccionas el cargo y quien lo ocupa hoy',
+                'FocalizaHR analiza a toda tu empresa',
+                'Te presenta los mejores candidatos listos para asumir',
+              ].map((step, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-[10px] font-bold text-cyan-400">{i + 1}</span>
+                  </span>
+                  <span className="text-xs text-slate-400 leading-relaxed">{step}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* CTA */}
+            <button
+              onClick={() => setShowCover(false)}
+              className="w-full py-3 px-5 rounded-xl font-semibold text-sm text-slate-950
+                         flex items-center justify-center gap-2 transition-all duration-200
+                         bg-cyan-400 hover:bg-cyan-300 active:scale-[0.98]
+                         shadow-[0_4px_20px_rgba(34,211,238,0.30)]"
+            >
+              Comenzar registro
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
+            {/* Cancelar */}
+            <button
+              onClick={onClose}
+              className="text-xs text-slate-600 hover:text-slate-400 transition-colors"
+            >
+              Cancelar
+            </button>
+
+          </div>
+        </motion.div>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="fhr-card p-6 w-full max-w-lg">
-        <h2 className="fhr-title-card mb-4">Nueva Posicion Critica</h2>
+      <div className="relative bg-[#0F172A]/95 backdrop-blur-xl rounded-2xl border border-slate-800 overflow-hidden w-full max-w-lg mx-4">
+
+        {/* Tesla line cyan */}
+        <div
+          className="absolute top-0 left-0 right-0 h-[3px]"
+          style={{
+            background: 'linear-gradient(90deg, transparent 0%, #22D3EE 30%, #22D3EE 70%, transparent 100%)',
+          }}
+        />
+
+        <div className="p-6">
+        <h2 className="text-lg font-bold text-white tracking-tight mb-5">Nueva Posicion Critica</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="fhr-text-sm text-slate-400 block mb-1">Gerencia</label>
@@ -512,7 +600,7 @@ function CreatePositionModal({ onClose, onCreated }: { onClose: () => void; onCr
           {(gerenciaId && jobLevel) && (
             <div>
               <label className="fhr-text-sm text-slate-400 block mb-1">
-                Titular actual <span className="text-slate-600">(opcional)</span>
+                Titular actual <span className="text-rose-400">*</span>
               </label>
               {loadingEmployees ? (
                 <div className="fhr-input w-full text-slate-500 animate-pulse">Buscando...</div>
@@ -522,7 +610,7 @@ function CreatePositionModal({ onClose, onCreated }: { onClose: () => void; onCr
                   value={incumbentId}
                   onChange={e => setIncumbentId(e.target.value)}
                 >
-                  <option value="">Sin titular / Cargo nuevo</option>
+                  <option value="">— Seleccionar titular —</option>
                   {employees.map(emp => (
                     <option key={emp.id} value={emp.id}>
                       {emp.fullName}{emp.position ? ` — ${emp.position}` : ''}
@@ -534,27 +622,29 @@ function CreatePositionModal({ onClose, onCreated }: { onClose: () => void; onCr
               )}
             </div>
           )}
-          {!incumbentId && (
-            <div>
-              <label className="fhr-text-sm text-slate-400 block mb-1">
-                Titulo del Cargo {!selectedEmployee && <span className="text-rose-400">*</span>}
-              </label>
-              <input
-                className="fhr-input w-full"
-                value={customTitle}
-                onChange={e => setCustomTitle(e.target.value)}
-                placeholder="Ej: Gerente Comercial"
-              />
-            </div>
-          )}
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <div className="flex gap-3 justify-end">
-            <button type="button" onClick={onClose} className="fhr-btn fhr-btn-ghost">Cancelar</button>
-            <button type="submit" disabled={saving || !positionTitle || !jobLevel} className="fhr-btn fhr-btn-primary">
-              {saving ? 'Creando...' : 'Crear'}
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-sm text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving || !incumbentId || !jobLevel}
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
+                         bg-cyan-400 hover:bg-cyan-300 text-slate-950
+                         shadow-[0_4px_20px_rgba(34,211,238,0.30)]
+                         disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none
+                         active:scale-[0.98]"
+            >
+              {saving ? 'Creando...' : 'Crear cargo'}
             </button>
           </div>
         </form>
+        </div>
       </div>
     </div>
   )
