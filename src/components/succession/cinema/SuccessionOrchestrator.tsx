@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Crown, Shield, ArrowRight } from 'lucide-react'
 import { useToast } from '@/components/ui/toast-system'
@@ -9,6 +10,8 @@ import { SuccessionRail, type FilterKey } from '@/components/succession/Successi
 import SuccessionWizard from '@/components/succession/SuccessionWizard'
 import SuccessionCandidateModal from './SuccessionCandidateModal'
 import SuccessionSpotlightCard from './SuccessionSpotlightCard'
+import DominoResolutionModal from './DominoResolutionModal'
+import EmployeeSearchInput from './EmployeeSearchInput'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -102,6 +105,11 @@ export default function SuccessionOrchestrator({
   } | null>(null)
   const [recentNomination, setRecentNomination] = useState<{ name: string } | null>(null)
 
+  // Domino states
+  const [showDominoModal, setShowDominoModal] = useState(false)
+  const [dominoData, setDominoData] = useState<any>(null)
+  const [dominoLoading, setDominoLoading] = useState(false)
+
   // Filter stats for intelligence story
   const [filterStats, setFilterStats] = useState<any>(null)
 
@@ -114,6 +122,7 @@ export default function SuccessionOrchestrator({
   const [railTab, setRailTab] = useState<FilterKey>('ALL')
 
   const toast = useToast()
+  const router = useRouter()
   const summary = dashboardStats?.summary
 
   // ── Navigate to Spotlight ──
@@ -192,7 +201,6 @@ export default function SuccessionOrchestrator({
       })
       const data = await res.json()
       if (data.success) {
-        toast.success(`"${candidateName}" nominado para ${selectedPosition.positionTitle}`)
         setShowCandidateModal(false)
         setSelectedCandidate(null)
         setRecentNomination({ name: candidateName })
@@ -201,7 +209,34 @@ export default function SuccessionOrchestrator({
         const posData = await posRes.json()
         if (posData.success) setPositionDetail(posData.data)
         setSuggestions(prev => prev.filter(s => s.employeeId !== employeeId))
-        onRefresh()
+
+        // Post-nomination: detect domino effect
+        const newCandidateId = data.data?.id || data.candidateId
+        if (newCandidateId) {
+          try {
+            const dominoRes = await fetch(`/api/succession/candidates/${newCandidateId}/domino`)
+            const dominoResult = await dominoRes.json()
+            if (dominoResult.detected) {
+              setDominoData({
+                ...dominoResult,
+                candidateId: newCandidateId,
+                isMandatory: dominoResult.nivel2?.esCargoCritico ?? false,
+              })
+              setShowDominoModal(true)
+              // Don't show toast yet — wait for modal resolution
+            } else {
+              toast.success(`"${candidateName}" nominado para ${selectedPosition.positionTitle}`)
+              onRefresh()
+            }
+          } catch {
+            // If domino check fails, still show success
+            toast.success(`"${candidateName}" nominado para ${selectedPosition.positionTitle}`)
+            onRefresh()
+          }
+        } else {
+          toast.success(`"${candidateName}" nominado para ${selectedPosition.positionTitle}`)
+          onRefresh()
+        }
       } else {
         if (data.error?.includes('Ya nominado')) {
           toast.error(`"${candidateName}" ya esta en la terna`)
@@ -227,6 +262,49 @@ export default function SuccessionOrchestrator({
     } catch { /* silent */ }
     onRefresh()
   }, [selectedPosition, onRefresh])
+
+  // ── Backfill confirm handler ──
+  const handleBackfillConfirm = useCallback(async (resolution: any) => {
+    if (!dominoData?.candidateId) return
+    setDominoLoading(true)
+    try {
+      await fetch(`/api/succession/candidates/${dominoData.candidateId}/backfill`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(resolution),
+      })
+      toast.success('Candidato nominado. Plan de backfill guardado.')
+      setShowDominoModal(false)
+      setDominoData(null)
+      setPromotingCandidate(null)
+      if (selectedPosition) {
+        const posRes = await fetch(`/api/succession/critical-positions/${selectedPosition.id}`)
+        const posData = await posRes.json()
+        if (posData.success) setPositionDetail(posData.data)
+      }
+      onRefresh()
+    } catch {
+      toast.error('Error al guardar plan de backfill')
+    }
+    setDominoLoading(false)
+  }, [dominoData, selectedPosition, toast, onRefresh])
+
+  // ── Backfill skip handler (Omitir or close X) ──
+  const handleBackfillSkip = useCallback(async () => {
+    if (!dominoData?.candidateId) return
+    try {
+      await fetch(`/api/succession/candidates/${dominoData.candidateId}/backfill`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolution: 'PENDING' }),
+      })
+      toast.info('Resolucion pospuesta')
+    } catch { /* silent */ }
+    setShowDominoModal(false)
+    setDominoData(null)
+    setPromotingCandidate(null)
+    onRefresh()
+  }, [dominoData, toast, onRefresh])
 
   // ── Rail stats ──
   const totalCandidates = initialPositions.reduce((sum, p) => sum + p._count.candidates, 0)
@@ -337,6 +415,51 @@ export default function SuccessionOrchestrator({
           />
         )}
       </AnimatePresence>
+
+      {/* ── DOMINO RESOLUTION MODAL ── */}
+      {showDominoModal && dominoData && (
+        <DominoResolutionModal
+          isOpen={showDominoModal}
+          candidateId={dominoData.candidateId ?? ''}
+          onClose={() => {
+            setShowDominoModal(false)
+            setDominoData(null)
+            setPromotingCandidate(null)
+          }}
+          nivel1={dominoData.nivel1 ? {
+            candidatoNombre: dominoData.nivel1.candidatoNombre,
+            posicionAsume: dominoData.nivel1.posicionAsume,
+            matchPercent: dominoData.nivel1.matchPercent ?? 0,
+            readinessLevel: dominoData.nivel1.readinessLevel ?? '',
+          } : { candidatoNombre: '', posicionAsume: '', matchPercent: 0, readinessLevel: '' }}
+          nivel2={dominoData.nivel2 ? {
+            posicionDejaId: dominoData.nivel2.posicionDejaId ?? null,
+            posicionDejaTitulo: dominoData.nivel2.posicionDejaTitulo,
+            posicionDejaDepartamento: dominoData.nivel2.posicionDejaDepartamento,
+            posicionDejaJobLevel: dominoData.nivel2.posicionDejaJobLevel,
+            esCargoCritico: dominoData.nivel2.esCargoCritico ?? false,
+            benchStrength: dominoData.nivel2.benchStrength,
+            benchStatus: dominoData.nivel2.benchStatus ?? 'NON_CRITICAL',
+            benchCandidates: dominoData.nivel2.benchCandidates ?? [],
+          } : {
+            posicionDejaId: null, posicionDejaTitulo: '', posicionDejaDepartamento: null,
+            posicionDejaJobLevel: null, esCargoCritico: false, benchStrength: null,
+            benchStatus: 'NON_CRITICAL' as const, benchCandidates: [],
+          }}
+          isMandatory={dominoData.isMandatory ?? false}
+          onConfirm={handleBackfillConfirm}
+          onSkip={handleBackfillSkip}
+          isLoading={dominoLoading}
+          onNavigate={(url) => router.push(url)}
+          renderEmployeeSearch={(props) => (
+            <EmployeeSearchInput
+              positionId={props.positionId || undefined}
+              onSelect={props.onSelect}
+              onClear={props.onClear}
+            />
+          )}
+        />
+      )}
 
       {/* ── CREATE POSITION WIZARD ── */}
       {showWizard && (

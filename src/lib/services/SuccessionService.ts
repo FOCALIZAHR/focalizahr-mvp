@@ -1177,6 +1177,250 @@ export class SuccessionService {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
+  // getChainCoverage: KPI — % de backfills resueltos vs total
+  // ──────────────────────────────────────────────────────────────────────────
+
+  static async getChainCoverage(accountId: string): Promise<number | null> {
+    const stats = await prisma.successionBackfillPlan.groupBy({
+      by: ['resolution'],
+      where: { accountId },
+      _count: true,
+    })
+    const total = stats.reduce((sum, s) => sum + s._count, 0)
+    if (total === 0) return null
+    const resolved = stats
+      .filter(s => s.resolution !== 'PENDING')
+      .reduce((sum, s) => sum + s._count, 0)
+    return Math.round((resolved / total) * 100)
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // saveBackfillPlan: Guarda plan de backfill para una nominación
+  // ──────────────────────────────────────────────────────────────────────────
+
+  static async saveBackfillPlan(
+    candidateId: string,
+    data: {
+      resolution: string
+      backfillEmployeeId?: string
+      backfillEmployeeName?: string
+      externalReason?: string
+    },
+    resolvedBy: string
+  ): Promise<{ success: boolean; error?: string }> {
+    // 1. Buscar candidato + employee
+    const candidate = await prisma.successionCandidate.findFirst({
+      where: { id: candidateId, status: 'ACTIVE' },
+      select: {
+        id: true,
+        accountId: true,
+        employeeId: true,
+        employee: {
+          select: { position: true, departmentId: true },
+        },
+      },
+    })
+    if (!candidate) {
+      return { success: false, error: 'Candidato no encontrado o no está activo' }
+    }
+
+    // 2. Buscar si el cargo es CriticalPosition con incumbentId = employeeId
+    const criticalPos = await prisma.criticalPosition.findFirst({
+      where: {
+        incumbentId: candidate.employeeId,
+        isActive: true,
+        accountId: candidate.accountId,
+      },
+      select: { id: true },
+    })
+
+    // 3. Upsert BackfillPlan
+    const vacatedPositionTitle = candidate.employee.position || 'Cargo no especificado'
+    const isResolved = data.resolution !== 'PENDING'
+
+    await prisma.successionBackfillPlan.upsert({
+      where: { sourceCandidateId: candidateId },
+      create: {
+        accountId: candidate.accountId,
+        sourceCandidateId: candidateId,
+        vacatedPositionTitle,
+        vacatedPositionId: criticalPos?.id ?? null,
+        vacatedDepartmentId: candidate.employee.departmentId,
+        resolution: data.resolution,
+        backfillEmployeeId: data.backfillEmployeeId ?? null,
+        backfillEmployeeName: data.backfillEmployeeName ?? null,
+        externalReason: data.externalReason ?? null,
+        resolvedAt: isResolved ? new Date() : null,
+        resolvedBy: isResolved ? resolvedBy : null,
+      },
+      update: {
+        resolution: data.resolution,
+        backfillEmployeeId: data.backfillEmployeeId ?? null,
+        backfillEmployeeName: data.backfillEmployeeName ?? null,
+        externalReason: data.externalReason ?? null,
+        resolvedAt: isResolved ? new Date() : null,
+        resolvedBy: isResolved ? resolvedBy : null,
+      },
+    })
+
+    return { success: true }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // detectDominoEffect: Detecta si nominar a un candidato genera backfill
+  // detected=true si employee.position existe y no está vacío
+  // ──────────────────────────────────────────────────────────────────────────
+
+  static async detectDominoEffect(candidateId: string, accountId: string): Promise<{
+    detected: boolean
+    nivel1: {
+      candidatoId: string
+      candidatoNombre: string
+      posicionAsume: string
+      posicionAsumeId: string
+      matchPercent: number
+      readinessLevel: string
+    }
+    nivel2: {
+      posicionDejaTitulo: string
+      posicionDejaId: string | null
+      posicionDejaDepartamento: string | null
+      posicionDejaJobLevel: string | null
+      vacatedDepartmentId: string | null
+      esCargoCritico: boolean
+      benchStrength: string | null
+      benchStatus: 'HEALTHY' | 'EMPTY' | 'NON_CRITICAL'
+      benchCandidates: Array<{
+        id: string
+        employeeId: string
+        employeeName: string
+        position: string | null
+        departmentName: string | null
+        readinessLevel: string
+        matchPercent: number
+      }>
+      candidatosDisponibles: Array<{
+        id: string
+        employeeId: string
+        nombre: string
+        cargo: string | null
+        matchPercent: number
+        readinessLevel: string
+      }>
+    } | null
+  }> {
+    const candidate = await prisma.successionCandidate.findFirst({
+      where: { id: candidateId, accountId, status: 'ACTIVE' },
+      select: {
+        id: true,
+        employeeId: true,
+        matchPercent: true,
+        readinessLevel: true,
+        readinessOverride: true,
+        employee: {
+          select: {
+            fullName: true,
+            position: true,
+            departmentId: true,
+            department: { select: { displayName: true } },
+          },
+        },
+        criticalPosition: { select: { id: true, positionTitle: true } },
+      },
+    })
+    if (!candidate) {
+      return { detected: false, nivel1: { candidatoId: '', candidatoNombre: '', posicionAsume: '', posicionAsumeId: '', matchPercent: 0, readinessLevel: '' }, nivel2: null }
+    }
+
+    const nivel1 = {
+      candidatoId: candidate.id,
+      candidatoNombre: candidate.employee.fullName,
+      posicionAsume: candidate.criticalPosition.positionTitle,
+      posicionAsumeId: candidate.criticalPosition.id,
+      matchPercent: candidate.matchPercent,
+      readinessLevel: (candidate.readinessOverride || candidate.readinessLevel) as string,
+    }
+
+    // ¿El empleado tiene un cargo definido?
+    const employeePosition = candidate.employee.position?.trim()
+    if (!employeePosition) {
+      return { detected: false, nivel1, nivel2: null }
+    }
+
+    // ¿Es incumbent de una CriticalPosition?
+    const posicionQueDeja = await prisma.criticalPosition.findFirst({
+      where: {
+        incumbentId: candidate.employeeId,
+        isActive: true,
+        accountId,
+      },
+      include: {
+        candidates: {
+          where: { status: 'ACTIVE' },
+          include: {
+            employee: {
+              select: {
+                id: true, fullName: true, position: true,
+                department: { select: { displayName: true } },
+              },
+            },
+          },
+        },
+        department: { select: { displayName: true } },
+      },
+    })
+
+    const esCargoCritico = !!posicionQueDeja
+    const sorted = posicionQueDeja ? sortCandidates(posicionQueDeja.candidates) : []
+
+    // Derive benchStatus from criticality + candidate count
+    const benchStatus: 'HEALTHY' | 'EMPTY' | 'NON_CRITICAL' = !esCargoCritico
+      ? 'NON_CRITICAL'
+      : sorted.length > 0
+        ? 'HEALTHY'
+        : 'EMPTY'
+
+    // benchCandidates: enriched view of available successors
+    const benchCandidates = sorted.map(c => ({
+      id: c.id,
+      employeeId: c.employee.id,
+      employeeName: c.employee.fullName,
+      position: c.employee.position,
+      departmentName: (c.employee as any).department?.displayName ?? null,
+      readinessLevel: ((c as any).readinessOverride || c.readinessLevel) as string,
+      matchPercent: c.matchPercent,
+    }))
+
+    return {
+      detected: true,
+      nivel1,
+      nivel2: {
+        posicionDejaTitulo: esCargoCritico ? posicionQueDeja!.positionTitle : employeePosition,
+        posicionDejaId: posicionQueDeja?.id ?? null,
+        posicionDejaDepartamento: esCargoCritico
+          ? (posicionQueDeja!.department?.displayName || null)
+          : (candidate.employee.department?.displayName || null),
+        posicionDejaJobLevel: posicionQueDeja?.standardJobLevel || null,
+        vacatedDepartmentId: esCargoCritico
+          ? (posicionQueDeja!.departmentId || null)
+          : (candidate.employee.departmentId || null),
+        esCargoCritico,
+        benchStrength: posicionQueDeja?.benchStrength as string || null,
+        benchStatus,
+        benchCandidates,
+        candidatosDisponibles: sorted.map(c => ({
+          id: c.id,
+          employeeId: c.employee.id,
+          nombre: c.employee.fullName,
+          cargo: c.employee.position,
+          matchPercent: c.matchPercent,
+          readinessLevel: ((c as any).readinessOverride || c.readinessLevel) as string,
+        })),
+      },
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
   // enrichWithTalentQuadrants: Fetch riskQuadrant + mobilityQuadrant
   // from PerformanceRating for a batch of employees (1 query)
   // ──────────────────────────────────────────────────────────────────────────

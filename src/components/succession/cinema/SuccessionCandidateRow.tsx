@@ -29,6 +29,7 @@ interface SuccessionCandidateRowProps {
     riskQuadrant?: string | null
     mobilityQuadrant?: string | null
     developmentPlan?: { id: string; status: string } | null
+    backfillResolution?: string | null
   }
   rank: number
   index: number
@@ -157,6 +158,21 @@ export default function SuccessionCandidateRow({
                 <span> · Match {Math.round(candidate.matchPercent)}%</span>
               )}
             </p>
+            {/* Backfill badge */}
+            {candidate.backfillResolution && (
+              <span className={`inline-block mt-1 text-[9px] px-2 py-0.5 rounded-full border ${
+                candidate.backfillResolution === 'PENDING'
+                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                  : candidate.backfillResolution === 'COVERED'
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                    : 'bg-slate-700/30 text-slate-400 border-slate-600/30'
+              }`}>
+                {candidate.backfillResolution === 'PENDING' ? 'Backfill pendiente' :
+                 candidate.backfillResolution === 'COVERED' ? 'Backfill cubierto' :
+                 candidate.backfillResolution === 'EXTERNAL_SEARCH' ? 'Busqueda externa' :
+                 'Backfill'}
+              </span>
+            )}
           </div>
         </div>
 

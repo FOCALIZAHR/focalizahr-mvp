@@ -215,6 +215,7 @@ model Account {
   // Sucesion Inteligente
   criticalPositions        CriticalPosition[]
   successionCandidates     SuccessionCandidate[]
+  successionBackfillPlans  SuccessionBackfillPlan[]
 
   @@index([adminEmail], map: "idx_accounts_email")
   @@index([subscriptionTier], map: "idx_accounts_tier")
@@ -691,7 +692,8 @@ model Department {
   goals     Goal[]
 
   // Sucesion Inteligente
-  criticalPositions CriticalPosition[]
+  criticalPositions      CriticalPosition[]
+  successionBackfillPlans SuccessionBackfillPlan[]
 
   @@unique([accountId, displayName])
   @@index([accountId], map: "idx_departments_account")
@@ -1573,6 +1575,7 @@ model Employee {
   // Sucesion Inteligente
   incumbentOfPositions   CriticalPosition[]      @relation("PositionIncumbent")
   successionCandidacies  SuccessionCandidate[]   @relation("SuccessionCandidateEmployee")
+  backfillAssignments    SuccessionBackfillPlan[] @relation("BackfillEmployee")
 
   // Índices
   @@unique([accountId, nationalId], map: "idx_employees_account_national")
@@ -2876,6 +2879,7 @@ model SuccessionCandidate {
   criticalPosition    CriticalPosition @relation(fields: [criticalPositionId], references: [id], onDelete: Cascade)
   employee            Employee         @relation("SuccessionCandidateEmployee", fields: [employeeId], references: [id])
   developmentPlan     DevelopmentPlan? @relation(fields: [developmentPlanId], references: [id])
+  backfillPlan        SuccessionBackfillPlan?
 
   @@unique([criticalPositionId, employeeId], map: "unique_candidate_per_position")
   @@index([accountId], map: "idx_succ_cand_account")
@@ -2884,4 +2888,47 @@ model SuccessionCandidate {
   @@index([flightRisk], map: "idx_succ_cand_flight_risk")
   @@index([matchPercent], map: "idx_succ_cand_match")
   @@map("succession_candidates")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PLAN DE BACKFILL (Efecto Dominó — planificación de cobertura post-nominación)
+// ════════════════════════════════════════════════════════════════════════════
+
+model SuccessionBackfillPlan {
+  id                   String    @id @default(cuid())
+  accountId            String    @map("account_id")
+
+  // Una nominación genera máximo un plan de backfill
+  sourceCandidateId    String    @unique @map("source_candidate_id")
+
+  // Snapshot del cargo que quedaría vacante
+  vacatedPositionTitle String    @map("vacated_position_title")
+  vacatedPositionId    String?   @map("vacated_position_id")
+  vacatedDepartmentId  String?   @map("vacated_department_id")
+
+  // PENDING | COVERED | EXTERNAL_SEARCH | POSITION_ELIMINATED
+  resolution           String    @default("PENDING")
+
+  // Si COVERED
+  backfillEmployeeId   String?   @map("backfill_employee_id")
+  backfillEmployeeName String?   @map("backfill_employee_name")
+
+  // Si EXTERNAL_SEARCH
+  externalReason       String?   @db.Text @map("external_reason")
+
+  // Auditoría
+  resolvedAt           DateTime? @map("resolved_at")
+  resolvedBy           String?   @map("resolved_by")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  account              Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sourceCandidate      SuccessionCandidate  @relation(fields: [sourceCandidateId], references: [id], onDelete: Cascade)
+  backfillEmployee     Employee?            @relation("BackfillEmployee", fields: [backfillEmployeeId], references: [id])
+  vacatedDepartment    Department?          @relation(fields: [vacatedDepartmentId], references: [id])
+
+  @@index([accountId])
+  @@index([resolution])
+  @@index([vacatedDepartmentId])
+  @@map("succession_backfill_plans")
 }

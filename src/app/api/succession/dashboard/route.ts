@@ -69,6 +69,9 @@ export async function GET(request: NextRequest) {
       byBenchStrength[p.benchStrength] = (byBenchStrength[p.benchStrength] || 0) + 1
     }
 
+    // Chain coverage KPI (backfill resolution)
+    const chainCoverage = await SuccessionService.getChainCoverage(userContext.accountId)
+
     return NextResponse.json({
       success: true,
       data: {
@@ -77,6 +80,7 @@ export async function GET(request: NextRequest) {
           total: positions.length,
           byBenchStrength,
         },
+        chainCoverage,
         cycleId,
       }
     })

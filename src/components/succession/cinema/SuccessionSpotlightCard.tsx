@@ -327,15 +327,18 @@ export default function SuccessionSpotlightCard({
                           isNominated: true,
                           nominatedId: c.id,
                           developmentPlan: c.developmentPlan ?? null,
+                          backfillResolution: c.backfillPlan?.resolution ?? null,
                         }}
                         onCandidateClick={onCandidateClick}
                         onDominoClick={
                           canManage && effective === 'READY_NOW'
-                            ? () => onPromotingCandidate({
-                                name: c.employee.fullName,
-                                position: c.employee.position || 'Posicion actual',
-                                department: c.employee.department?.displayName,
-                              })
+                            ? () => {
+                                onPromotingCandidate({
+                                  name: c.employee.fullName,
+                                  position: c.employee.position || 'Posicion actual',
+                                  department: c.employee.department?.displayName,
+                                })
+                              }
                             : undefined
                         }
                         onViewPDI={
