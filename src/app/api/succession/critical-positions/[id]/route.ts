@@ -130,6 +130,18 @@ export async function PUT(
     const body = await request.json()
     const { positionTitle, standardJobLevel, departmentId, incumbentId, incumbentRetirementDate } = body
 
+    if (incumbentId) {
+      const employee = await prisma.employee.findFirst({
+        where: { id: incumbentId, accountId: userContext.accountId, status: 'ACTIVE' }
+      })
+      if (!employee) {
+        return NextResponse.json(
+          { error: 'Empleado no encontrado', success: false },
+          { status: 404 }
+        )
+      }
+    }
+
     const updated = await prisma.criticalPosition.update({
       where: { id },
       data: {

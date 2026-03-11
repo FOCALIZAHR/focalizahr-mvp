@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, CheckCircle, AlertTriangle, Shield, ShieldAlert,
-  Search, Building2, ChevronRight, Brain,
+  ChevronRight,
 } from 'lucide-react'
 import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton'
-import { useToast } from '@/components/ui/toast-system'
 import { formatDisplayName } from '@/lib/utils/formatName'
+import BackfillWizard from '@/components/succession/BackfillWizard'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -30,14 +30,6 @@ export interface DominoResolution {
   backfillEmployeeName?: string
   manualEmployeeId?: string
   externalReason?: string
-}
-
-interface BackfillSuggestion {
-  employeeId: string
-  employeeName: string
-  position: string | null
-  departmentName: string | null
-  roleFitScore: number
 }
 
 interface DominoResolutionModalProps {
@@ -136,17 +128,26 @@ export default function DominoResolutionModal({
 
   if (!isOpen) return null
 
-  // ── CASO C: shell propio ──
+  // ── CASO C: delegado a BackfillWizard ──
   if (benchStatus === 'NON_CRITICAL') {
+    function handleBackfillConfirm(resolution: string, data?: Record<string, string>) {
+      const mapped: DominoResolution = {
+        resolution: resolution as DominoResolution['resolution'],
+        ...(data?.backfillEmployeeId && {
+          backfillEmployeeId: data.backfillEmployeeId,
+          backfillEmployeeName: data.backfillEmployeeName,
+        }),
+        ...(data?.externalReason && { externalReason: data.externalReason }),
+      }
+      onConfirm(mapped)
+      onClose()
+    }
     return (
-      <ViewNonCritical
+      <BackfillWizard
         candidateId={candidateId}
-        positionTitle={nivel2.posicionDejaTitulo}
-        onConfirm={onConfirm}
-        onSkip={onSkip}
-        onClose={onClose}
-        isLoading={isLoading}
-        renderEmployeeSearch={renderEmployeeSearch}
+        vacatedPositionTitle={nivel2.posicionDejaTitulo}
+        onClose={() => { onSkip(); onClose() }}
+        onConfirm={handleBackfillConfirm}
       />
     )
   }
@@ -337,363 +338,3 @@ function ViewEmpty({
   )
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// VISTA 3 — CASO C (NON_CRITICAL): Una sola pantalla, divulgacion progresiva
-// Shell propio con Tesla cyan + titulo "Asegurar Continuidad"
-// ════════════════════════════════════════════════════════════════════════════
-
-function ViewNonCritical({
-  candidateId,
-  positionTitle,
-  onConfirm,
-  onSkip,
-  onClose,
-  isLoading,
-  renderEmployeeSearch,
-}: {
-  candidateId: string
-  positionTitle: string
-  onConfirm: (resolution: DominoResolution) => Promise<void>
-  onSkip: () => void
-  onClose: () => void
-  isLoading: boolean
-  renderEmployeeSearch?: DominoResolutionModalProps['renderEmployeeSearch']
-}) {
-  const toast = useToast()
-  const [wasResolved, setWasResolved] = useState(false)
-
-  // Suggestions (lazy loaded on mount)
-  const [suggestions, setSuggestions] = useState<BackfillSuggestion[]>([])
-  const [loadingSuggestions, setLoadingSuggestions] = useState(true)
-
-  // Selection state
-  const [selectedSuggestion, setSelectedSuggestion] = useState<BackfillSuggestion | null>(null)
-  const [expandedAlt, setExpandedAlt] = useState<'search' | 'external' | null>(null)
-  const [manualEmployee, setManualEmployee] = useState<{ id: string; fullName: string; roleFitScore: number; meetsThreshold: boolean } | null>(null)
-  const [confirmLowFit, setConfirmLowFit] = useState(false)
-  const [externalReason, setExternalReason] = useState('')
-
-  // Lazy load on mount
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      try {
-        const res = await fetch(`/api/succession/candidates/${candidateId}/backfill-suggestions`)
-        const data = await res.json()
-        if (!cancelled && data.success) setSuggestions(data.data ?? [])
-      } catch { /* silent */ }
-      if (!cancelled) setLoadingSuggestions(false)
-    }
-    load()
-    return () => { cancelled = true }
-  }, [candidateId])
-
-  function handleCloseX() {
-    if (!wasResolved) onSkip()
-    onClose()
-  }
-
-  // Determine what is selected
-  const hasSelection = !!selectedSuggestion || !!manualEmployee || expandedAlt === 'external'
-
-  function canConfirm(): boolean {
-    if (isLoading) return false
-    if (selectedSuggestion) return true
-    if (manualEmployee) {
-      if (!manualEmployee.meetsThreshold && !confirmLowFit) return false
-      return true
-    }
-    if (expandedAlt === 'external') return true
-    return false
-  }
-
-  async function handleConfirm() {
-    if (selectedSuggestion) {
-      await onConfirm({
-        resolution: 'COVERED',
-        backfillEmployeeId: selectedSuggestion.employeeId,
-        backfillEmployeeName: selectedSuggestion.employeeName,
-      })
-      setWasResolved(true)
-      toast.success(
-        `"${formatDisplayName(selectedSuggestion.employeeName, 'short')}" quedara a cargo de la posicion. Plan de continuidad registrado.`,
-        'Continuidad asegurada'
-      )
-    } else if (manualEmployee) {
-      await onConfirm({
-        resolution: 'COVERED',
-        backfillEmployeeId: manualEmployee.id,
-        backfillEmployeeName: manualEmployee.fullName,
-      })
-      setWasResolved(true)
-      toast.success(
-        `"${formatDisplayName(manualEmployee.fullName, 'short')}" quedara a cargo de la posicion. Plan de continuidad registrado.`,
-        'Continuidad asegurada'
-      )
-    } else if (expandedAlt === 'external') {
-      await onConfirm({
-        resolution: 'EXTERNAL_SEARCH',
-        externalReason: externalReason.trim() || undefined,
-      })
-      setWasResolved(true)
-      toast.success(
-        `Busqueda externa registrada para "${positionTitle}". RRHH tomara el proceso.`,
-        'Proceso iniciado'
-      )
-    }
-  }
-
-  async function handleSkip() {
-    await onConfirm({ resolution: 'PENDING' })
-    setWasResolved(true)
-    toast.info(
-      'La posicion quedara sin cobertura designada. Puedes resolverlo desde el perfil del candidato.',
-      'Pendiente de resolucion'
-    )
-  }
-
-  // Select a suggestion (deselect alternatives)
-  function selectSuggestion(s: BackfillSuggestion) {
-    setSelectedSuggestion(s)
-    setExpandedAlt(null)
-    setManualEmployee(null)
-    setConfirmLowFit(false)
-  }
-
-  // Expand alternative (deselect suggestion)
-  function expandAlternative(alt: 'search' | 'external') {
-    if (expandedAlt === alt) {
-      setExpandedAlt(null)
-      return
-    }
-    setExpandedAlt(alt)
-    setSelectedSuggestion(null)
-    setManualEmployee(null)
-    setConfirmLowFit(false)
-    setExternalReason('')
-  }
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 flex items-center justify-center z-[100] bg-black/60 backdrop-blur-sm"
-      >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          transition={{ duration: 0.25 }}
-          className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-[24px] bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 shadow-2xl relative"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Tesla line — cyan fija */}
-          <div
-            className="absolute top-0 left-0 right-0 h-[1px] rounded-t-[24px]"
-            style={{
-              background: 'linear-gradient(90deg, transparent, #22D3EE, transparent)',
-              boxShadow: '0 0 15px #22D3EE',
-            }}
-          />
-
-          {/* Close */}
-          <button onClick={handleCloseX} className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition-colors z-10">
-            <X className="w-5 h-5" />
-          </button>
-
-          <div className="p-6 space-y-5">
-            {/* ── 1. Header ── */}
-            <div>
-              <h2 className="text-lg font-bold text-white tracking-tight">
-                Asegurar Continuidad: {positionTitle}
-              </h2>
-            </div>
-
-            {/* Banner */}
-            <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg px-4 py-2">
-              <p className="text-sm text-cyan-400">
-                Nominacion guardada. Su posicion actual quedara vacante.
-              </p>
-            </div>
-
-            {/* ── 2. AI Suggestions ── */}
-            {loadingSuggestions ? (
-              <div className="flex items-center justify-center h-16 text-slate-500 animate-pulse text-sm">
-                Analizando talento interno...
-              </div>
-            ) : suggestions.length > 0 ? (
-              <div className="space-y-3">
-                {/* AI Branding */}
-                <div className="flex items-center gap-2">
-                  <Brain className="w-4 h-4 text-purple-400 flex-shrink-0" />
-                  <p className="text-xs text-purple-300">
-                    <span className="font-medium">FocalizaHR</span><span className="text-purple-500">&reg;</span> sugiere estos perfiles por su alto Fit:
-                  </p>
-                </div>
-
-                {/* Radio-style suggestion cards */}
-                <div className="space-y-2">
-                  {suggestions.map(s => {
-                    const isSelected = selectedSuggestion?.employeeId === s.employeeId
-                    return (
-                      <div
-                        key={s.employeeId}
-                        onClick={() => selectSuggestion(s)}
-                        className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
-                          isSelected
-                            ? 'bg-purple-500/10 border border-purple-500/50'
-                            : 'bg-slate-800/40 border border-slate-700/30 hover:border-slate-600/50'
-                        }`}
-                      >
-                        {/* Radio */}
-                        <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${
-                          isSelected ? 'border-purple-400 bg-purple-400/20' : 'border-slate-600'
-                        }`}>
-                          {isSelected && <div className="w-full h-full rounded-full bg-purple-400 scale-50" />}
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-white truncate">{formatDisplayName(s.employeeName, 'short')}</p>
-                          <p className="text-[10px] text-slate-500 truncate">
-                            {s.position || 'Sin cargo'}
-                          </p>
-                        </div>
-
-                        {/* Fit badge */}
-                        <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
-                          isSelected
-                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                            : 'bg-slate-700/50 text-slate-400 border border-slate-600/30'
-                        }`}>
-                          Fit {Math.round(s.roleFitScore)}%
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ) : null}
-
-            {/* ── 3. Otras alternativas (divulgacion progresiva) ── */}
-            <div className="space-y-2">
-              <p className="text-slate-500 text-xs uppercase tracking-wider">Otras alternativas:</p>
-
-              {/* Search */}
-              <button
-                onClick={() => expandAlternative('search')}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
-                  expandedAlt === 'search'
-                    ? 'bg-slate-800/60 border-cyan-500/40'
-                    : 'bg-slate-900/40 border-slate-700/30 hover:border-slate-600/50'
-                }`}
-              >
-                <Search className={`w-4 h-4 flex-shrink-0 ${expandedAlt === 'search' ? 'text-cyan-400' : 'text-slate-500'}`} />
-                <span className={`text-sm ${expandedAlt === 'search' ? 'text-white font-medium' : 'text-slate-300'}`}>
-                  Buscar otro talento
-                </span>
-              </button>
-
-              <AnimatePresence>
-                {expandedAlt === 'search' && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="pl-3 pr-1 pb-1">
-                      {renderEmployeeSearch ? (
-                        renderEmployeeSearch({
-                          positionId: '',
-                          onSelect: (emp) => {
-                            setManualEmployee(emp)
-                            setConfirmLowFit(false)
-                          },
-                          onClear: () => {
-                            setManualEmployee(null)
-                            setConfirmLowFit(false)
-                          },
-                        })
-                      ) : (
-                        <p className="text-xs text-slate-500 italic">Busqueda de empleados no disponible</p>
-                      )}
-                      {manualEmployee && !manualEmployee.meetsThreshold && (
-                        <div className="mt-2 p-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                          <p className="text-xs text-purple-300">
-                            {manualEmployee.fullName} tiene RoleFit {Math.round(manualEmployee.roleFitScore)}% (bajo umbral 75%)
-                          </p>
-                          <label className="flex items-center gap-2 mt-1.5 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={confirmLowFit}
-                              onChange={(e) => setConfirmLowFit(e.target.checked)}
-                              className="accent-purple-400"
-                            />
-                            <span className="text-[10px] text-slate-400">Confirmo que deseo nominar a este empleado</span>
-                          </label>
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* External */}
-              <button
-                onClick={() => expandAlternative('external')}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
-                  expandedAlt === 'external'
-                    ? 'bg-slate-800/60 border-cyan-500/40'
-                    : 'bg-slate-900/40 border-slate-700/30 hover:border-slate-600/50'
-                }`}
-              >
-                <Building2 className={`w-4 h-4 flex-shrink-0 ${expandedAlt === 'external' ? 'text-cyan-400' : 'text-slate-500'}`} />
-                <span className={`text-sm ${expandedAlt === 'external' ? 'text-white font-medium' : 'text-slate-300'}`}>
-                  Declarar busqueda externa
-                </span>
-              </button>
-
-              <AnimatePresence>
-                {expandedAlt === 'external' && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="pl-3 pr-1 pb-1">
-                      <label className="text-xs text-slate-400 block mb-1">
-                        Justificacion (opcional)
-                      </label>
-                      <textarea
-                        value={externalReason}
-                        onChange={(e) => setExternalReason(e.target.value)}
-                        placeholder="Motivo de busqueda externa..."
-                        className="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50 resize-none"
-                        rows={2}
-                      />
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* ── 4. Footer ── */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-800/50">
-              <GhostButton size="sm" onClick={handleSkip} disabled={isLoading}>
-                Dejar vacante por ahora
-              </GhostButton>
-              <PrimaryButton size="sm" onClick={handleConfirm} disabled={!canConfirm()}>
-                {isLoading ? 'Procesando...' : 'Confirmar Reemplazo'}
-              </PrimaryButton>
-            </div>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  )
-}
