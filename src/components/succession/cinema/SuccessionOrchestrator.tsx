@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Crown, Shield, ArrowRight } from 'lucide-react'
@@ -121,6 +121,7 @@ export default function SuccessionOrchestrator({
   const toast = useToast()
   const router = useRouter()
   const summary = dashboardStats?.summary
+  const suggestionsAbortRef = useRef<AbortController | null>(null)
 
   // ── Navigate to Spotlight ──
   const handlePositionClick = useCallback((positionId: string) => {
@@ -146,32 +147,38 @@ export default function SuccessionOrchestrator({
   // ── Load position detail when entering Spotlight ──
   useEffect(() => {
     if (view !== 'SPOTLIGHT' || !selectedPosition) return
+    const controller = new AbortController()
     async function load() {
       try {
-        const res = await fetch(`/api/succession/critical-positions/${selectedPosition!.id}`)
+        const res = await fetch(`/api/succession/critical-positions/${selectedPosition!.id}`, { signal: controller.signal })
         const data = await res.json()
         if (data.success) setPositionDetail(data.data)
-      } catch (err) {
-        console.error('[Succession] Error loading position detail:', err)
+      } catch (err: any) {
+        if (err.name !== 'AbortError') console.error('[Succession] Error loading position detail:', err)
       }
     }
     load()
+    return () => controller.abort()
   }, [view, selectedPosition])
 
   // ── Load suggestions ──
   const loadSuggestions = useCallback(async (filterByArea = false) => {
     if (!selectedPosition) return
+    // Cancel any previous suggestions fetch
+    suggestionsAbortRef.current?.abort()
+    const controller = new AbortController()
+    suggestionsAbortRef.current = controller
     setLoadingSuggestions(true)
     try {
       const url = `/api/succession/critical-positions/${selectedPosition.id}/suggestions${filterByArea ? '?filterByArea=true' : ''}`
-      const res = await fetch(url)
+      const res = await fetch(url, { signal: controller.signal })
       const data = await res.json()
       if (data.success) {
         setSuggestions(data.data)
         setFilterStats(data.filterStats ?? null)
       }
-    } catch (err) {
-      console.error(err)
+    } catch (err: any) {
+      if (err.name !== 'AbortError') console.error(err)
     }
     setLoadingSuggestions(false)
   }, [selectedPosition])
@@ -300,6 +307,29 @@ export default function SuccessionOrchestrator({
     onRefresh()
   }, [dominoData, toast, onRefresh])
 
+  // ── Resume domino (re-open wizard for PENDING backfills) ──
+  const handleResumeDomino = useCallback(async (candidateId: string) => {
+    if (dominoLoading || showDominoModal) return
+    setDominoLoading(true)
+    try {
+      const res = await fetch(`/api/succession/candidates/${candidateId}/domino`)
+      const result = await res.json()
+      if (result.detected) {
+        setDominoData({
+          ...result,
+          candidateId,
+          isMandatory: result.nivel2?.esCargoCritico ?? false,
+        })
+        setShowDominoModal(true)
+      } else {
+        toast.info('No se detectó efecto dominó para este candidato')
+      }
+    } catch {
+      toast.error('Error al cargar datos del efecto dominó')
+    }
+    setDominoLoading(false)
+  }, [toast, dominoLoading, showDominoModal])
+
   // ── Rail stats ──
   const totalCandidates = initialPositions.reduce((sum, p) => sum + p._count.candidates, 0)
 
@@ -363,6 +393,7 @@ export default function SuccessionOrchestrator({
                     setSelectedCandidateMode(candidate.isNominated ? 'nominated' : 'suggestion')
                     setShowCandidateModal(true)
                   }}
+                  onResumeDomino={handleResumeDomino}
                   filterStats={filterStats}
                 />
               )}
@@ -533,11 +564,15 @@ function CreatePositionModal({ onClose, onCreated }: { onClose: () => void; onCr
       return
     }
     setLoadingEmployees(true)
-    fetch(`/api/succession/employees?departmentId=${deptId}&jobLevel=${jobLevel}`)
-      .then(r => r.json())
-      .then(data => { if (data.success) setEmployees(data.data) })
-      .catch(console.error)
-      .finally(() => setLoadingEmployees(false))
+    const timer = setTimeout(() => {
+      const controller = new AbortController()
+      fetch(`/api/succession/employees?departmentId=${deptId}&jobLevel=${jobLevel}`, { signal: controller.signal })
+        .then(r => r.json())
+        .then(data => { if (data.success) setEmployees(data.data) })
+        .catch(err => { if (err.name !== 'AbortError') console.error(err) })
+        .finally(() => setLoadingEmployees(false))
+    }, 300)
+    return () => clearTimeout(timer)
   }, [departmentId, gerenciaId, jobLevel])
 
   const selectedEmployee = employees.find(e => e.id === incumbentId)

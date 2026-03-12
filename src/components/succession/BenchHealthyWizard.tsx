@@ -8,7 +8,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowRight, X, ShieldCheck } from 'lucide-react'
+import { ArrowRight, X, ShieldCheck, Check } from 'lucide-react'
 import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton'
 import { useToast } from '@/components/ui/toast-system'
 import { formatDisplayName } from '@/lib/utils/formatName'
@@ -17,17 +17,20 @@ import { formatDisplayName } from '@/lib/utils/formatName'
 // TYPES
 // ════════════════════════════════════════════════════════════════════════════
 
+interface BenchCandidate {
+  employeeId: string
+  name: string
+  position: string
+  readinessLevel: string
+  matchPercent: number
+}
+
 interface BenchHealthyWizardProps {
   candidateName: string
   vacatedPositionTitle: string
-  benchCandidates: Array<{
-    name: string
-    position: string
-    readinessLevel: string
-    matchPercent: number
-  }>
+  benchCandidates: BenchCandidate[]
   posicionDejaId: string | null
-  onConfirm: (resolution: 'COVERED' | 'PENDING') => void
+  onConfirm: (resolution: 'COVERED' | 'PENDING', data?: { backfillEmployeeId: string; backfillEmployeeName: string }) => void
   onNavigate: (url: string) => void
   onClose: () => void
 }
@@ -55,12 +58,17 @@ export default function BenchHealthyWizard({
   const toast = useToast()
   const [step, setStep] = useState<1 | 2>(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedCandidate, setSelectedCandidate] = useState<{ employeeId: string; employeeName: string } | null>(null)
 
   function handleCovered() {
+    if (!selectedCandidate) return
     setIsSubmitting(true)
-    onConfirm('COVERED')
+    onConfirm('COVERED', {
+      backfillEmployeeId: selectedCandidate.employeeId,
+      backfillEmployeeName: selectedCandidate.employeeName,
+    })
     toast.success(
-      `"${vacatedPositionTitle}" tiene sucesor designado. Plan de continuidad activo.`,
+      `"${formatDisplayName(selectedCandidate.employeeName, 'short')}" cubre "${vacatedPositionTitle}". Plan de continuidad activo.`,
       '¡Cobertura confirmada!'
     )
   }
@@ -173,10 +181,10 @@ export default function BenchHealthyWizard({
                     </motion.button>
 
                     <button
-                      onClick={handleCovered}
+                      onClick={onClose}
                       className="text-sm text-slate-500 hover:text-slate-300 transition-colors py-2"
                     >
-                      Confirmar y cerrar
+                      Resolver después
                     </button>
                   </motion.div>
                 </motion.div>
@@ -200,15 +208,29 @@ export default function BenchHealthyWizard({
                   <div className="space-y-2 flex-1">
                     {benchCandidates.map((c, i) => {
                       const readiness = READINESS_CONFIG[c.readinessLevel] ?? READINESS_CONFIG.NOT_VIABLE
+                      const isSelected = selectedCandidate?.employeeId === c.employeeId
                       return (
                         <div
                           key={i}
-                          className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/40 border border-slate-700/30"
+                          onClick={() => setSelectedCandidate({ employeeId: c.employeeId, employeeName: c.name })}
+                          className={`flex items-center gap-3 p-3 rounded-xl bg-slate-800/40 border cursor-pointer transition-all duration-200 ${
+                            isSelected
+                              ? 'border-cyan-500/60 ring-1 ring-cyan-500/20'
+                              : 'border-slate-700/30 hover:border-slate-600/50'
+                          }`}
                         >
-                          <div className="w-8 h-8 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center flex-shrink-0">
-                            <span className="text-xs font-bold text-cyan-400">
-                              {(c.name || '').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()}
-                            </span>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            isSelected
+                              ? 'bg-cyan-500/20 border border-cyan-500/50'
+                              : 'bg-cyan-500/10 border border-cyan-500/30'
+                          }`}>
+                            {isSelected ? (
+                              <Check className="w-4 h-4 text-cyan-400" />
+                            ) : (
+                              <span className="text-xs font-bold text-cyan-400">
+                                {(c.name || '').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+                              </span>
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-white truncate">{formatDisplayName(c.name, 'short')}</p>
@@ -230,7 +252,7 @@ export default function BenchHealthyWizard({
                     <GhostButton size="sm" onClick={handleEditBench} disabled={isSubmitting} title="En deportes, la 'banca' son los jugadores listos para entrar al campo. Tu banca de sucesores funciona igual.">
                       Gestionar sucesores
                     </GhostButton>
-                    <PrimaryButton size="sm" onClick={handleCovered} disabled={isSubmitting}>
+                    <PrimaryButton size="sm" onClick={handleCovered} disabled={isSubmitting || !selectedCandidate}>
                       {isSubmitting ? 'Procesando...' : 'Confirmar sucesores'}
                     </PrimaryButton>
                   </div>

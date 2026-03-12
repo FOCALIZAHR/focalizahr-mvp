@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { formatDisplayName, getInitials } from '@/lib/utils/formatName'
 import { GhostButton } from '@/components/ui/PremiumButton'
+import DominoEffect from '@/components/succession/DominoEffect'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -30,12 +32,16 @@ interface SuccessionCandidateRowProps {
     mobilityQuadrant?: string | null
     developmentPlan?: { id: string; status: string } | null
     backfillResolution?: string | null
+    backfillEmployeeName?: string | null
+    vacatedPositionTitle?: string | null
   }
   rank: number
   index: number
   variant?: 'nominated' | 'suggestion'
+  targetPositionTitle?: string
   onCandidateClick: (candidate: any) => void
   onDominoClick?: () => void
+  onResumeDomino?: (candidateId: string) => void
   onViewPDI?: () => void
 }
 
@@ -83,10 +89,13 @@ export default function SuccessionCandidateRow({
   rank,
   index,
   variant = 'nominated',
+  targetPositionTitle,
   onCandidateClick,
   onDominoClick,
+  onResumeDomino,
   onViewPDI,
 }: SuccessionCandidateRowProps) {
+  const [showDomino, setShowDomino] = useState(false)
   const displayName = formatDisplayName(candidate.employeeName || '', 'short')
   const initials = getInitials(displayName)
   const readinessText = READINESS_LABEL[candidate.readinessLevel] || candidate.readinessLevel
@@ -191,16 +200,53 @@ export default function SuccessionCandidateRow({
               </GhostButton>
             )}
             {onDominoClick && (
-              <GhostButton
-                size="sm"
-                onClick={(e: React.MouseEvent) => {
-                  e.stopPropagation()
-                  onDominoClick()
-                }}
-              >
-                Efecto dominó
-              </GhostButton>
+              <span className="relative group">
+                <GhostButton
+                  size="sm"
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation()
+                    if (candidate.backfillResolution === 'PENDING' && candidate.nominatedId) {
+                      onResumeDomino?.(candidate.nominatedId)
+                    } else {
+                      setShowDomino(prev => !prev)
+                    }
+                  }}
+                >
+                  <span className="flex items-center gap-2">
+                    {candidate.backfillResolution === 'PENDING' && (
+                      <span className="relative flex h-2 w-2 flex-shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
+                      </span>
+                    )}
+                    Efecto dominó
+                  </span>
+                </GhostButton>
+                {candidate.backfillResolution === 'PENDING' && (
+                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-800 text-amber-300 text-xs px-2 py-1 rounded border border-amber-500/30 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                    Clic para definir quién cubre este cargo
+                  </span>
+                )}
+              </span>
             )}
+          </div>
+        )}
+
+        {/* Inline Domino Effect */}
+        {showDomino && onDominoClick && (
+          <div className="mt-3 pl-[52px]">
+            <DominoEffect
+              candidateName={displayName}
+              candidatePosition={candidate.position || 'Sin cargo'}
+              targetPosition={targetPositionTitle || 'Posición destino'}
+              roleFitScore={candidate.roleFitScore}
+              readinessLevel={candidate.readinessLevel}
+              nineBoxPosition={candidate.nineBoxPosition}
+              flightRisk={candidate.flightRisk}
+              vacatedPosition={candidate.vacatedPositionTitle ?? candidate.position}
+              backfillResolution={candidate.backfillResolution}
+              backfillEmployeeName={candidate.backfillEmployeeName}
+            />
           </div>
         )}
       </div>

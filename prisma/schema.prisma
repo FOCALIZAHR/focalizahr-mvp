@@ -394,6 +394,7 @@ model Participant {
   @@index([standardJobLevel], map: "idx_participants_job_level")
   @@index([acotadoGroup], map: "idx_participants_acotado_group")
   @@index([campaignId, standardJobLevel], map: "idx_participants_campaign_job_level")
+  @@index([employeeId], map: "idx_participants_employee")
   @@map("participants")
 }
 
@@ -1834,6 +1835,7 @@ model EvaluationAssignment {
   @@index([evaluateeId], map: "idx_eval_assignment_evaluatee")
   @@index([evaluatorId], map: "idx_eval_assignment_evaluator")
   @@index([status], map: "idx_eval_assignment_status")
+  @@index([cycleId], map: "idx_eval_assignment_cycle")
   @@map("evaluation_assignments")
 }
 
@@ -2093,6 +2095,7 @@ model PerformanceRating {
   @@index([finalLevel], map: "idx_ratings_final_level")
   @@index([nineBoxPosition], map: "idx_ratings_nine_box")
   @@index([calibrated], map: "idx_ratings_calibrated")
+  @@index([employeeId], map: "idx_ratings_employee")
   @@map("performance_ratings")
 }
 
@@ -2817,6 +2820,8 @@ model CriticalPosition {
   @@index([accountId], map: "idx_critical_pos_account")
   @@index([benchStrength], map: "idx_critical_pos_bench")
   @@index([incumbentFlightRisk], map: "idx_critical_pos_flight_risk")
+  @@index([incumbentId], map: "idx_critical_pos_incumbent")
+  @@index([departmentId], map: "idx_critical_pos_department")
   @@map("critical_positions")
 }
 
@@ -2887,6 +2892,8 @@ model SuccessionCandidate {
   @@index([status], map: "idx_succ_cand_status")
   @@index([flightRisk], map: "idx_succ_cand_flight_risk")
   @@index([matchPercent], map: "idx_succ_cand_match")
+  @@index([criticalPositionId], map: "idx_succ_cand_position")
+  @@index([employeeId], map: "idx_succ_cand_employee")
   @@map("succession_candidates")
 }
 
@@ -2930,5 +2937,6 @@ model SuccessionBackfillPlan {
   @@index([accountId])
   @@index([resolution])
   @@index([vacatedDepartmentId])
+  @@index([backfillEmployeeId], map: "idx_backfill_employee")
   @@map("succession_backfill_plans")
 }

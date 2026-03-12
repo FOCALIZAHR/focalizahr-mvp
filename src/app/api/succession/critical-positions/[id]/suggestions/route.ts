@@ -38,9 +38,12 @@ export async function GET(
     const { searchParams } = new URL(request.url)
     const filterByArea = searchParams.get('filterByArea') === 'true'
 
+    console.time('[SuggestionsAPI] getSuggestedCandidates')
     const suggestions = await SuccessionService.getSuggestedCandidates(id, { filterByArea })
+    console.timeEnd('[SuggestionsAPI] getSuggestedCandidates')
 
     // Build filterStats for intelligence story
+    console.time('[SuggestionsAPI] filterStats')
     const cycleId = await SuccessionService.getCurrentCycleId(position.accountId)
     let filterStats = null
 
@@ -74,6 +77,7 @@ export async function GET(
       }
     }
 
+    console.timeEnd('[SuggestionsAPI] filterStats')
     return NextResponse.json({ success: true, data: suggestions, filterStats })
   } catch (error: any) {
     console.error('[Succession Suggestions] Error:', error)

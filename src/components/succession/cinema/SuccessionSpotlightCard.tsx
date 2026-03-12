@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { formatDisplayName } from '@/lib/utils/formatName'
 import SuccessionCandidateRow from '@/components/succession/cinema/SuccessionCandidateRow'
-import DominoEffect from '@/components/succession/DominoEffect'
 import SuccessionCandidatesCover from '@/components/succession/SuccessionCandidatesCover'
 import SuccessionPositionBriefing from '@/components/succession/SuccessionPositionBriefing'
 
@@ -40,6 +39,7 @@ export interface SuccessionSpotlightCardProps {
   onLoadSuggestions: (filterByArea?: boolean) => void
   onFilterChange: (mode: 'all' | 'area') => void
   onCandidateClick: (candidate: any) => void
+  onResumeDomino?: (candidateId: string) => void
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -76,12 +76,12 @@ export default function SuccessionSpotlightCard({
   onLoadSuggestions,
   onFilterChange,
   onCandidateClick,
+  onResumeDomino,
   filterStats,
 }: SuccessionSpotlightCardProps) {
   const [tab, setTab] = useState<'candidates' | 'suggestions'>('candidates')
   const [showMethodology, setShowMethodology] = useState(false)
   const [showCover, setShowCover] = useState(true)
-  const [expandedDominoId, setExpandedDominoId] = useState<string | null>(null)
 
   // ── Briefing state — portada del CARGO, antes de las tabs ──
   // Independiente de showCover (que controla portada del tab SUGERIDOS)
@@ -303,13 +303,13 @@ export default function SuccessionSpotlightCard({
                 <div className="space-y-3">
                   {candidates.map((c: any, idx: number) => {
                     const effective = c.readinessOverride || c.readinessLevel
-                    const isExpanded = expandedDominoId === c.id
                     return (
                       <div key={c.id}>
                         <SuccessionCandidateRow
                           rank={idx + 1}
                           index={idx}
                           variant="nominated"
+                          targetPositionTitle={position.positionTitle}
                           candidate={{
                             employeeId: c.employeeId || c.employee?.id,
                             employeeName: c.employee?.fullName || c.employeeName,
@@ -334,39 +334,22 @@ export default function SuccessionSpotlightCard({
                             nominatedId: c.id,
                             developmentPlan: c.developmentPlan ?? null,
                             backfillResolution: c.backfillPlan?.resolution ?? null,
+                            backfillEmployeeName: c.backfillPlan?.backfillEmployeeName ?? null,
+                            vacatedPositionTitle: c.backfillPlan?.vacatedPositionTitle ?? null,
                           }}
                           onCandidateClick={onCandidateClick}
                           onDominoClick={
                             canManage && effective === 'READY_NOW'
-                              ? () => setExpandedDominoId(isExpanded ? null : c.id)
+                              ? () => {}
                               : undefined
                           }
+                          onResumeDomino={onResumeDomino}
                           onViewPDI={
                             c.developmentPlan
                               ? () => window.open(`/dashboard/pdi/${c.developmentPlan.id}`, '_blank')
                               : undefined
                           }
                         />
-                        {isExpanded && (
-                          <div className="mt-2 mb-1 ml-[52px]">
-                            <DominoEffect
-                              candidateName={formatDisplayName(c.employee?.fullName || '', 'short')}
-                              targetPosition={position.positionTitle}
-                              chain={[{
-                                positionTitle: c.employee?.position || 'Posicion actual',
-                                employeeName: c.backfillPlan?.backfillEmployeeName
-                                  ? formatDisplayName(c.backfillPlan.backfillEmployeeName, 'short')
-                                  : formatDisplayName(c.employee?.fullName || '', 'short'),
-                                department: c.employee?.department?.displayName,
-                                action: c.backfillPlan?.resolution === 'COVERED'
-                                  ? 'COVERED'
-                                  : c.backfillPlan?.resolution === 'EXTERNAL_SEARCH'
-                                  ? 'EXTERNAL_HIRE'
-                                  : 'VACANT',
-                              }]}
-                            />
-                          </div>
-                        )}
                       </div>
                     )
                   })}

@@ -16,7 +16,7 @@ export class SuccessionSyncService {
    * Sincroniza datos de un candidato al PerformanceRating del empleado.
    * Escribe successionReadiness (legacy) + targetRoles (JSON array de positionTitles).
    */
-  static async syncToPerformanceRating(candidateId: string): Promise<void> {
+  static async syncToPerformanceRating(candidateId: string, knownCycleId?: string): Promise<void> {
     const candidate = await prisma.successionCandidate.findUnique({
       where: { id: candidateId },
       select: {
@@ -35,7 +35,7 @@ export class SuccessionSyncService {
 
     if (!candidate) return
 
-    const cycleId = await SuccessionService.getCurrentCycleId(candidate.criticalPosition.accountId)
+    const cycleId = knownCycleId ?? await SuccessionService.getCurrentCycleId(candidate.criticalPosition.accountId)
     if (!cycleId) return
 
     // Get effective readiness

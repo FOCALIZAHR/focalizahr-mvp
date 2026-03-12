@@ -107,8 +107,18 @@ export default function DominoResolutionModal({
 
   // ── CASO A: delegado a BenchHealthyWizard ──
   if (benchStatus === 'HEALTHY') {
-    function handleHealthyWizardConfirm(resolution: 'COVERED' | 'PENDING') {
-      onConfirm({ resolution })
+    function handleHealthyWizardConfirm(
+      resolution: 'COVERED' | 'PENDING',
+      data?: { backfillEmployeeId: string; backfillEmployeeName: string }
+    ) {
+      const mapped: DominoResolution = {
+        resolution,
+        ...(data && {
+          backfillEmployeeId: data.backfillEmployeeId,
+          backfillEmployeeName: data.backfillEmployeeName,
+        }),
+      }
+      onConfirm(mapped)
       setWasResolved(true)
       onClose()
     }
@@ -117,6 +127,7 @@ export default function DominoResolutionModal({
         candidateName={nivel1.candidatoNombre}
         vacatedPositionTitle={nivel2.posicionDejaTitulo}
         benchCandidates={nivel2.benchCandidates.map(c => ({
+          employeeId: c.employeeId,
           name: c.employeeName,
           position: c.position || '',
           readinessLevel: c.readinessLevel,

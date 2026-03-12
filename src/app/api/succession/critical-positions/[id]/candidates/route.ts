@@ -48,6 +48,13 @@ export async function GET(
           }
         },
         developmentPlan: { select: { id: true, status: true } },
+        backfillPlan: {
+          select: {
+            resolution: true,
+            backfillEmployeeName: true,
+            vacatedPositionTitle: true,
+          },
+        },
       },
     })
 
@@ -109,16 +116,20 @@ export async function POST(
     }
 
     // Nominate via service
+    console.time('[CandidatesPOST] nominateCandidate')
     const result = await SuccessionService.nominateCandidate(id, employeeId, userEmail)
+    console.timeEnd('[CandidatesPOST] nominateCandidate')
 
     if (!result.success) {
       return NextResponse.json({ success: false, error: result.error }, { status: 400 })
     }
 
-    // Sync to PerformanceRating
+    // Sync to PerformanceRating (pass cycleId to avoid duplicate query)
+    console.time('[CandidatesPOST] syncToPerformanceRating')
     if (result.candidateId) {
-      await SuccessionSyncService.syncToPerformanceRating(result.candidateId)
+      await SuccessionSyncService.syncToPerformanceRating(result.candidateId, result.cycleId)
     }
+    console.timeEnd('[CandidatesPOST] syncToPerformanceRating')
 
     return NextResponse.json({ success: true, candidateId: result.candidateId }, { status: 201 })
   } catch (error: any) {

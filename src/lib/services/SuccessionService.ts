@@ -77,6 +77,10 @@ export interface EligibilityResult {
   roleFitScore: number | null
   nineBoxPosition: string | null
   potentialAspiration: number | null
+  potentialAbility: number | null
+  potentialEngagement: number | null
+  riskQuadrant: string | null
+  riskAlertLevel: string | null
   reasons: string[]
 }
 
@@ -146,6 +150,10 @@ export class SuccessionService {
         roleFitScore: true,
         nineBoxPosition: true,
         potentialAspiration: true,
+        potentialAbility: true,
+        potentialEngagement: true,
+        riskQuadrant: true,
+        riskAlertLevel: true,
       }
     })
 
@@ -155,6 +163,10 @@ export class SuccessionService {
         roleFitScore: null,
         nineBoxPosition: null,
         potentialAspiration: null,
+        potentialAbility: null,
+        potentialEngagement: null,
+        riskQuadrant: null,
+        riskAlertLevel: null,
         reasons: ['Sin evaluacion en este ciclo']
       }
     }
@@ -179,6 +191,10 @@ export class SuccessionService {
       roleFitScore: roleFit,
       nineBoxPosition: nineBox,
       potentialAspiration: aspiration,
+      potentialAbility: rating.potentialAbility ?? null,
+      potentialEngagement: rating.potentialEngagement ?? null,
+      riskQuadrant: rating.riskQuadrant ?? null,
+      riskAlertLevel: rating.riskAlertLevel ?? null,
       reasons,
     }
   }
@@ -193,38 +209,38 @@ export class SuccessionService {
     cycleId: string,
     accountId: string
   ): Promise<MatchResult> {
-    // 1. Fetch targets para el nivel del cargo critico
-    const targets = await prisma.competencyTarget.findMany({
-      where: {
-        accountId,
-        standardJobLevel: targetJobLevel,
-        targetScore: { not: null },
-      }
-    })
+    console.time('[CalcMatch] TOTAL')
+    // Batch 1: 3 independent reads in parallel
+    console.time('[CalcMatch] Batch 1: targets + scores + employee')
+    const [targets, competencyScores, employee] = await Promise.all([
+      prisma.competencyTarget.findMany({
+        where: { accountId, standardJobLevel: targetJobLevel, targetScore: { not: null } },
+      }),
+      this.getEmployeeScores(employeeId, cycleId),
+      prisma.employee.findUnique({
+        where: { id: employeeId },
+        select: { standardJobLevel: true },
+      }),
+    ])
+
+    console.timeEnd('[CalcMatch] Batch 1: targets + scores + employee')
 
     if (targets.length === 0) {
+      console.timeEnd('[CalcMatch] TOTAL')
       return { matchPercent: 0, gaps: [], counts: { critical: 0, strategic: 0, leadership: 0, core: 0 } }
     }
 
-    // 2. Fetch scores reales del empleado
-    const competencyScores = await this.getEmployeeScores(employeeId, cycleId)
-
-    // 3. Fetch competency names
-    const competencyNames = await this.getCompetencyNames(
-      accountId,
-      targets.map(t => t.competencyCode)
-    )
-
-    // 4. Fetch current role targets for the employee
-    const employee = await prisma.employee.findUnique({
-      where: { id: employeeId },
-      select: { standardJobLevel: true },
-    })
-    const currentRoleTargets = employee?.standardJobLevel
-      ? await prisma.competencyTarget.findMany({
-          where: { accountId, standardJobLevel: employee.standardJobLevel, targetScore: { not: null } },
-        })
-      : []
+    // Batch 2: 2 reads that depend on batch 1 results
+    console.time('[CalcMatch] Batch 2: names + currentRoleTargets')
+    const [competencyNames, currentRoleTargets] = await Promise.all([
+      this.getCompetencyNames(accountId, targets.map(t => t.competencyCode)),
+      employee?.standardJobLevel
+        ? prisma.competencyTarget.findMany({
+            where: { accountId, standardJobLevel: employee.standardJobLevel, targetScore: { not: null } },
+          })
+        : Promise.resolve([]),
+    ])
+    console.timeEnd('[CalcMatch] Batch 2: names + currentRoleTargets')
     const currentRoleMap = new Map(currentRoleTargets.map(t => [t.competencyCode, t.targetScore]))
 
     // 5. Calcular gaps (3-dimension model)
@@ -285,6 +301,7 @@ export class SuccessionService {
       ? Math.round(totalFitPercent / evaluatedCount)
       : 0
 
+    console.timeEnd('[CalcMatch] TOTAL')
     return {
       matchPercent,
       gaps: gaps.sort((a, b) => {
@@ -445,6 +462,8 @@ export class SuccessionService {
     positionId: string,
     options: { filterByArea?: boolean } = {}
   ): Promise<SuggestedCandidate[]> {
+    console.time('[Suggestions] TOTAL')
+    console.time('[Suggestions] Paso 1: position + cycleId')
     // Get the position details
     const position = await prisma.criticalPosition.findUnique({
       where: { id: positionId },
@@ -457,10 +476,11 @@ export class SuccessionService {
       }
     })
 
-    if (!position) return []
+    if (!position) { console.timeEnd('[Suggestions] TOTAL'); return [] }
 
     const cycleId = await this.getCurrentCycleId(position.accountId)
-    if (!cycleId) return []
+    if (!cycleId) { console.timeEnd('[Suggestions] TOTAL'); return [] }
+    console.timeEnd('[Suggestions] Paso 1: position + cycleId')
 
     // Exclude already-nominated + incumbent
     const excludeIds = [
@@ -481,6 +501,7 @@ export class SuccessionService {
     }
 
     // Get eligible employees with their ratings
+    console.time('[Suggestions] Paso 2: ratings findMany')
     const ratings = await prisma.performanceRating.findMany({
       where: {
         cycleId,
@@ -510,14 +531,18 @@ export class SuccessionService {
       }
     })
 
+    console.timeEnd('[Suggestions] Paso 2: ratings findMany')
+
     // Filter out aspiration=1
     const eligible = ratings.filter(r => r.potentialAspiration !== 1)
-    if (eligible.length === 0) return []
+    if (eligible.length === 0) { console.timeEnd('[Suggestions] TOTAL'); return [] }
 
+    console.log(`[Suggestions] Eligible employees: ${eligible.length}`)
     const employeeIds = eligible.map(r => r.employeeId)
 
     // ── PRE-FETCH: all data needed for match calculation (replaces N*5 queries) ──
 
+    console.time('[Suggestions] Paso 3: targets + names')
     // Q1: CompetencyTarget for OBJECTIVE job level
     const targets = await prisma.competencyTarget.findMany({
       where: {
@@ -527,18 +552,23 @@ export class SuccessionService {
       }
     })
 
-    if (targets.length === 0) return []
+    if (targets.length === 0) { console.timeEnd('[Suggestions] TOTAL'); return [] }
 
     // Q2: Competency names
     const competencyNames = await this.getCompetencyNames(
       position.accountId,
       targets.map(t => t.competencyCode)
     )
+    console.timeEnd('[Suggestions] Paso 3: targets + names')
+    console.log(`[Suggestions] Targets: ${targets.length}, CompetencyCodes: ${competencyNames.size}`)
 
     // Q3+Q4: Batch employee scores
+    console.time('[Suggestions] Paso 4: getBatchEmployeeScores')
     const batchScores = await this.getBatchEmployeeScores(employeeIds, cycleId)
+    console.timeEnd('[Suggestions] Paso 4: getBatchEmployeeScores')
 
     // Q5: Current role targets for all unique job levels among candidates
+    console.time('[Suggestions] Paso 5: currentRoleTargets')
     const uniqueJobLevels = [...new Set(eligible.map(r => r.employee.standardJobLevel).filter(Boolean))] as string[]
     const allCurrentRoleTargets = uniqueJobLevels.length > 0
       ? await prisma.competencyTarget.findMany({
@@ -558,7 +588,10 @@ export class SuccessionService {
       currentRoleTargetsByLevel.get(t.standardJobLevel)!.set(t.competencyCode, t.targetScore)
     }
 
+    console.timeEnd('[Suggestions] Paso 5: currentRoleTargets')
+
     // ── LOOP: pure computation, zero queries ──
+    console.time('[Suggestions] Paso 6: gap computation loop')
     const suggestions: SuggestedCandidate[] = []
 
     for (const r of eligible) {
@@ -653,6 +686,8 @@ export class SuccessionService {
       })
     }
 
+    console.timeEnd('[Suggestions] Paso 6: gap computation loop')
+    console.timeEnd('[Suggestions] TOTAL')
     return sortCandidates(suggestions)
   }
 
@@ -664,35 +699,43 @@ export class SuccessionService {
     positionId: string,
     employeeId: string,
     nominatedBy: string
-  ): Promise<{ success: boolean; candidateId?: string; error?: string }> {
+  ): Promise<{ success: boolean; candidateId?: string; cycleId?: string; error?: string }> {
+    console.time('[Nominate] TOTAL')
     // 1. Get position
+    console.time('[Nominate] Paso 1: position + cycleId')
     const position = await prisma.criticalPosition.findUnique({
       where: { id: positionId },
       select: { accountId: true, standardJobLevel: true },
     })
-    if (!position) return { success: false, error: 'Posicion no encontrada' }
+    if (!position) { console.timeEnd('[Nominate] TOTAL'); return { success: false, error: 'Posicion no encontrada' } }
 
-    // 2. Get current cycle
+    // 2. Get current cycle (ONCE — passed down to all subsequent calls)
     const cycleId = await this.getCurrentCycleId(position.accountId)
-    if (!cycleId) return { success: false, error: 'Sin ciclo activo con datos de Role Fit' }
+    if (!cycleId) { console.timeEnd('[Nominate] TOTAL'); return { success: false, error: 'Sin ciclo activo con datos de Role Fit' } }
+    console.timeEnd('[Nominate] Paso 1: position + cycleId')
 
-    // 3. Check eligibility
-    const eligibility = await this.checkEligibility(employeeId, cycleId)
+    // 3+4. Eligibility + duplicate check in parallel (independent reads)
+    console.time('[Nominate] Paso 2: eligibility + duplicate check')
+    const [eligibility, existing] = await Promise.all([
+      this.checkEligibility(employeeId, cycleId),
+      prisma.successionCandidate.findUnique({
+        where: {
+          criticalPositionId_employeeId: { criticalPositionId: positionId, employeeId }
+        }
+      }),
+    ])
+
+    console.timeEnd('[Nominate] Paso 2: eligibility + duplicate check')
+
     if (!eligibility.eligible) {
-      return { success: false, error: `No elegible: ${eligibility.reasons.join(', ')}` }
+      console.timeEnd('[Nominate] TOTAL'); return { success: false, error: `No elegible: ${eligibility.reasons.join(', ')}` }
     }
-
-    // 4. Check not already nominated
-    const existing = await prisma.successionCandidate.findUnique({
-      where: {
-        criticalPositionId_employeeId: { criticalPositionId: positionId, employeeId }
-      }
-    })
     if (existing) {
-      return { success: false, error: 'Ya nominado para esta posicion' }
+      console.timeEnd('[Nominate] TOTAL'); return { success: false, error: 'Ya nominado para esta posicion' }
     }
 
-    // 5. Calculate match + readiness
+    // 5. Calculate match + readiness (cycleId passed, no re-fetch)
+    console.time('[Nominate] Paso 3: calculateMatch')
     const match = await this.calculateMatch(
       employeeId,
       position.standardJobLevel,
@@ -700,24 +743,13 @@ export class SuccessionService {
       position.accountId
     )
     const readiness = this.calculateReadiness(match.gaps, match.matchPercent)
+    console.timeEnd('[Nominate] Paso 3: calculateMatch')
 
-    // 6. Get rating for snapshot data
-    const rating = await prisma.performanceRating.findUnique({
-      where: { cycleId_employeeId: { cycleId, employeeId } },
-      select: {
-        roleFitScore: true,
-        nineBoxPosition: true,
-        potentialAspiration: true,
-        potentialAbility: true,
-        potentialEngagement: true,
-        riskQuadrant: true,
-        riskAlertLevel: true,
-      }
-    })
-
-    const flightRisk = this.deriveFlightRisk(rating?.riskQuadrant ?? null, rating?.riskAlertLevel ?? null)
+    // 6. ELIMINATED — rating data now comes from expanded checkEligibility
+    const flightRisk = this.deriveFlightRisk(eligibility.riskQuadrant, eligibility.riskAlertLevel)
 
     // 7. Create candidate
+    console.time('[Nominate] Paso 4: create + benchStrength')
     const candidate = await prisma.successionCandidate.create({
       data: {
         accountId: position.accountId,
@@ -737,8 +769,8 @@ export class SuccessionService {
         readinessReasoning: JSON.parse(JSON.stringify(readiness.reasoning)),
         estimatedMonths: readiness.estimatedMonths,
         flightRisk,
-        ability: rating?.potentialAbility,
-        engagement: rating?.potentialEngagement,
+        ability: eligibility.potentialAbility,
+        engagement: eligibility.potentialEngagement,
         nominatedBy,
         status: 'ACTIVE',
       }
@@ -746,8 +778,10 @@ export class SuccessionService {
 
     // 8. Recalculate bench strength
     await this.updateBenchStrength(positionId)
+    console.timeEnd('[Nominate] Paso 4: create + benchStrength')
 
-    return { success: true, candidateId: candidate.id }
+    console.timeEnd('[Nominate] TOTAL')
+    return { success: true, candidateId: candidate.id, cycleId }
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -1065,6 +1099,7 @@ export class SuccessionService {
 
     try {
       // Q1: Fetch cycle for competency snapshot + question mapping (1 query)
+      console.time('[BatchScores] Q1: cycle + questions')
       const cycle = await prisma.performanceCycle.findUnique({
         where: { id: cycleId },
         select: {
@@ -1083,6 +1118,8 @@ export class SuccessionService {
         }
       })
 
+      console.timeEnd('[BatchScores] Q1: cycle + questions')
+
       if (!cycle) return result
 
       const competencies = (cycle.competencySnapshot as unknown as Array<{ code: string }>) || []
@@ -1095,7 +1132,10 @@ export class SuccessionService {
         if (q.competencyCode) questionToCompetency.set(q.id, q.competencyCode)
       }
 
+      console.log(`[BatchScores] Employees: ${employeeIds.length}, Competencies: ${competencyCodes.length}, Questions mapped: ${questionToCompetency.size}`)
+
       // Q2: Batch fetch ALL evaluation assignments for ALL employees (1 query)
+      console.time('[BatchScores] Q2: assignments findMany')
       const assignments = await prisma.evaluationAssignment.findMany({
         where: {
           cycleId,
@@ -1119,6 +1159,9 @@ export class SuccessionService {
         }
       })
 
+      console.timeEnd('[BatchScores] Q2: assignments findMany')
+      console.log(`[BatchScores] Total assignments loaded: ${assignments.length}, total responses: ${assignments.reduce((sum, a) => sum + (a.participant?.responses?.length || 0), 0)}`)
+
       // Group assignments by evaluateeId
       const assignmentsByEmployee = new Map<string, typeof assignments>()
       for (const a of assignments) {
@@ -1128,6 +1171,7 @@ export class SuccessionService {
       }
 
       // Compute competency scores per employee (in-memory, no queries)
+      console.time('[BatchScores] Computation loop')
       const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((s, v) => s + v, 0) / arr.length : null
 
       for (const empId of employeeIds) {
@@ -1169,6 +1213,7 @@ export class SuccessionService {
           }
         }
       }
+      console.timeEnd('[BatchScores] Computation loop')
     } catch (err) {
       console.error('[Succession] Error batch employee scores:', err)
     }
