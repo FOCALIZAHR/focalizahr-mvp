@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Crown, ChevronDown, ChevronUp, Filter, ArrowLeft } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { formatDisplayName } from '@/lib/utils/formatName'
 import SuccessionCandidateRow from '@/components/succession/cinema/SuccessionCandidateRow'
 import DominoEffect from '@/components/succession/DominoEffect'
 import SuccessionCandidatesCover from '@/components/succession/SuccessionCandidatesCover'
@@ -31,8 +32,7 @@ export interface SuccessionSpotlightCardProps {
   suggestions: any[]
   loadingSuggestions: boolean
   suggestionsFilter: 'all' | 'area'
-  recentNomination: { name: string } | null
-  promotingCandidate: { name: string; position: string; department?: string } | null
+  recentNomination: { name: string; pdiId?: string | null } | null
   nominating: string | null
   canManage: boolean
   filterStats: { totalEmployees: number; finalCandidates: number } | null
@@ -40,7 +40,6 @@ export interface SuccessionSpotlightCardProps {
   onLoadSuggestions: (filterByArea?: boolean) => void
   onFilterChange: (mode: 'all' | 'area') => void
   onCandidateClick: (candidate: any) => void
-  onPromotingCandidate: (c: { name: string; position: string; department?: string } | null) => void
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -71,23 +70,29 @@ export default function SuccessionSpotlightCard({
   loadingSuggestions,
   suggestionsFilter,
   recentNomination,
-  promotingCandidate,
   nominating,
   canManage,
   onBack,
   onLoadSuggestions,
   onFilterChange,
   onCandidateClick,
-  onPromotingCandidate,
   filterStats,
 }: SuccessionSpotlightCardProps) {
   const [tab, setTab] = useState<'candidates' | 'suggestions'>('candidates')
   const [showMethodology, setShowMethodology] = useState(false)
   const [showCover, setShowCover] = useState(true)
+  const [expandedDominoId, setExpandedDominoId] = useState<string | null>(null)
 
   // ── Briefing state — portada del CARGO, antes de las tabs ──
   // Independiente de showCover (que controla portada del tab SUGERIDOS)
   const [showBriefing, setShowBriefing] = useState(true)
+  // Auto-load suggestions when briefing finishes
+  useEffect(() => {
+    if (!showBriefing && canManage && suggestions.length === 0 && !loadingSuggestions) {
+      onLoadSuggestions(false)
+    }
+  }, [showBriefing])
+
   const rawCandidates = positionDetail?.candidates || []
 
   // Sort candidates: READY_NOW > READY_1_2 > READY_3_PLUS, then matchPercent DESC
@@ -283,7 +288,7 @@ export default function SuccessionSpotlightCard({
                 )}
                 onClick={() => {
                   setTab('suggestions')
-                  if (suggestions.length === 0 && !loadingSuggestions) onLoadSuggestions(suggestionsFilter === 'area')
+                  if (suggestions.length === 0 && !loadingSuggestions) onLoadSuggestions(false)
                 }}
               >
                 Sugerencias
@@ -298,78 +303,74 @@ export default function SuccessionSpotlightCard({
                 <div className="space-y-3">
                   {candidates.map((c: any, idx: number) => {
                     const effective = c.readinessOverride || c.readinessLevel
+                    const isExpanded = expandedDominoId === c.id
                     return (
-                      <SuccessionCandidateRow
-                        key={c.id}
-                        rank={idx + 1}
-                        index={idx}
-                        variant="nominated"
-                        candidate={{
-                          employeeId: c.employeeId || c.employee?.id,
-                          employeeName: c.employee?.fullName || c.employeeName,
-                          position: c.employee?.position || c.position,
-                          departmentName: c.employee?.department?.displayName || c.departmentName,
-                          roleFitScore: c.currentRoleFit ?? c.roleFitScore ?? 0,
-                          matchPercent: c.matchPercent ?? 0,
-                          readinessLevel: effective,
-                          readinessLabel: c.readinessLabel || '',
-                          nineBoxPosition: c.nineBoxPosition || null,
-                          flightRisk: c.flightRisk || null,
-                          riskQuadrant: c.riskQuadrant ?? null,
-                          mobilityQuadrant: c.mobilityQuadrant ?? null,
-                          gapsCriticalCount: c.gapsCriticalCount ?? 0,
-                          potentialAspiration: c.aspirationLevel ?? c.potentialAspiration,
-                          hireDate: c.employee?.hireDate ?? c.hireDate ?? null,
-                          gaps: (() => {
-                            const raw = c.gapsJson ?? c.gaps
-                            return typeof raw === 'string' ? JSON.parse(raw) : (raw ?? [])
-                          })(),
-                          isNominated: true,
-                          nominatedId: c.id,
-                          developmentPlan: c.developmentPlan ?? null,
-                          backfillResolution: c.backfillPlan?.resolution ?? null,
-                        }}
-                        onCandidateClick={onCandidateClick}
-                        onDominoClick={
-                          canManage && effective === 'READY_NOW'
-                            ? () => {
-                                onPromotingCandidate({
-                                  name: c.employee.fullName,
-                                  position: c.employee.position || 'Posicion actual',
-                                  department: c.employee.department?.displayName,
-                                })
-                              }
-                            : undefined
-                        }
-                        onViewPDI={
-                          c.developmentPlan
-                            ? () => window.open(`/dashboard/pdi/${c.developmentPlan.id}`, '_blank')
-                            : undefined
-                        }
-                      />
+                      <div key={c.id}>
+                        <SuccessionCandidateRow
+                          rank={idx + 1}
+                          index={idx}
+                          variant="nominated"
+                          candidate={{
+                            employeeId: c.employeeId || c.employee?.id,
+                            employeeName: c.employee?.fullName || c.employeeName,
+                            position: c.employee?.position || c.position,
+                            departmentName: c.employee?.department?.displayName || c.departmentName,
+                            roleFitScore: c.currentRoleFit ?? c.roleFitScore ?? 0,
+                            matchPercent: c.matchPercent ?? 0,
+                            readinessLevel: effective,
+                            readinessLabel: c.readinessLabel || '',
+                            nineBoxPosition: c.nineBoxPosition || null,
+                            flightRisk: c.flightRisk || null,
+                            riskQuadrant: c.riskQuadrant ?? null,
+                            mobilityQuadrant: c.mobilityQuadrant ?? null,
+                            gapsCriticalCount: c.gapsCriticalCount ?? 0,
+                            potentialAspiration: c.aspirationLevel ?? c.potentialAspiration,
+                            hireDate: c.employee?.hireDate ?? c.hireDate ?? null,
+                            gaps: (() => {
+                              const raw = c.gapsJson ?? c.gaps
+                              return typeof raw === 'string' ? JSON.parse(raw) : (raw ?? [])
+                            })(),
+                            isNominated: true,
+                            nominatedId: c.id,
+                            developmentPlan: c.developmentPlan ?? null,
+                            backfillResolution: c.backfillPlan?.resolution ?? null,
+                          }}
+                          onCandidateClick={onCandidateClick}
+                          onDominoClick={
+                            canManage && effective === 'READY_NOW'
+                              ? () => setExpandedDominoId(isExpanded ? null : c.id)
+                              : undefined
+                          }
+                          onViewPDI={
+                            c.developmentPlan
+                              ? () => window.open(`/dashboard/pdi/${c.developmentPlan.id}`, '_blank')
+                              : undefined
+                          }
+                        />
+                        {isExpanded && (
+                          <div className="mt-2 mb-1 ml-[52px]">
+                            <DominoEffect
+                              candidateName={formatDisplayName(c.employee?.fullName || '', 'short')}
+                              targetPosition={position.positionTitle}
+                              chain={[{
+                                positionTitle: c.employee?.position || 'Posicion actual',
+                                employeeName: c.backfillPlan?.backfillEmployeeName
+                                  ? formatDisplayName(c.backfillPlan.backfillEmployeeName, 'short')
+                                  : formatDisplayName(c.employee?.fullName || '', 'short'),
+                                department: c.employee?.department?.displayName,
+                                action: c.backfillPlan?.resolution === 'COVERED'
+                                  ? 'COVERED'
+                                  : c.backfillPlan?.resolution === 'EXTERNAL_SEARCH'
+                                  ? 'EXTERNAL_HIRE'
+                                  : 'VACANT',
+                              }]}
+                            />
+                          </div>
+                        )}
+                      </div>
                     )
                   })}
 
-                  {promotingCandidate && (
-                    <div className="mt-4 p-4 rounded-lg bg-black/20 border border-slate-800">
-                      <DominoEffect
-                        candidateName={promotingCandidate.name}
-                        targetPosition={position.positionTitle}
-                        chain={[{
-                          positionTitle: promotingCandidate.position,
-                          employeeName: promotingCandidate.name,
-                          department: promotingCandidate.department,
-                          action: 'VACANT',
-                        }]}
-                      />
-                      <button
-                        className="mt-3 text-[10px] text-slate-400 hover:text-slate-300"
-                        onClick={() => onPromotingCandidate(null)}
-                      >
-                        Cerrar
-                      </button>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-slate-500">
@@ -380,7 +381,7 @@ export default function SuccessionSpotlightCard({
                       className="mt-4 bg-cyan-400 hover:bg-cyan-300 text-slate-950 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all shadow-[0_2px_10px_rgba(34,211,238,0.3)]"
                       onClick={() => {
                         setTab('suggestions')
-                        if (suggestions.length === 0 && !loadingSuggestions) onLoadSuggestions(suggestionsFilter === 'area')
+                        if (suggestions.length === 0 && !loadingSuggestions) onLoadSuggestions(false)
                       }}
                     >
                       Buscar sugeridos
@@ -411,16 +412,31 @@ export default function SuccessionSpotlightCard({
 
                 {/* Recent nomination */}
                 {recentNomination && (
-                  <div className="mb-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between">
-                    <span className="text-xs text-emerald-300">
-                      Crear PDI para {recentNomination.name}
-                    </span>
-                    <button
-                      className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold uppercase tracking-wider"
-                      onClick={() => setTab('candidates')}
-                    >
-                      Ver candidatos
-                    </button>
+                  <div className="mb-4 p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-purple-400 text-xs">✦</span>
+                      <span className="text-xs text-purple-300 font-light">
+                        Sucesor nominado —{' '}
+                        <span className="font-medium">
+                          {formatDisplayName(recentNomination.name, 'short')}
+                        </span>
+                      </span>
+                    </div>
+                    {recentNomination.pdiId ? (
+                      <button
+                        className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold uppercase tracking-wider transition-colors"
+                        onClick={() => window.open(`/dashboard/pdi/${recentNomination.pdiId}`, '_blank')}
+                      >
+                        Ver PDI →
+                      </button>
+                    ) : (
+                      <span
+                        className="text-[10px] text-slate-500 uppercase tracking-wider cursor-default"
+                        title="Sin PDI creado"
+                      >
+                        Sin PDI
+                      </span>
+                    )}
                   </div>
                 )}
 

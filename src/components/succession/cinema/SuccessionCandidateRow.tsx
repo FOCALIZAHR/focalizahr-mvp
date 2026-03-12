@@ -164,13 +164,13 @@ export default function SuccessionCandidateRow({
                 candidate.backfillResolution === 'PENDING'
                   ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                   : candidate.backfillResolution === 'COVERED'
-                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                    ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
                     : 'bg-slate-700/30 text-slate-400 border-slate-600/30'
               }`}>
-                {candidate.backfillResolution === 'PENDING' ? 'Backfill pendiente' :
-                 candidate.backfillResolution === 'COVERED' ? 'Backfill cubierto' :
+                {candidate.backfillResolution === 'PENDING' ? 'Cobertura pendiente' :
+                 candidate.backfillResolution === 'COVERED' ? 'Cobertura resuelta' :
                  candidate.backfillResolution === 'EXTERNAL_SEARCH' ? 'Busqueda externa' :
-                 'Backfill'}
+                 'Cobertura'}
               </span>
             )}
           </div>

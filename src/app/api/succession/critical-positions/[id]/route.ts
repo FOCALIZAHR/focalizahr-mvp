@@ -50,7 +50,13 @@ export async function GET(
               }
             },
             developmentPlan: { select: { id: true, status: true } },
-            backfillPlan: { select: { resolution: true } },
+            backfillPlan: {
+              select: {
+                resolution: true,
+                backfillEmployeeName: true,
+                vacatedPositionTitle: true,
+              }
+            },
           }
         },
       },

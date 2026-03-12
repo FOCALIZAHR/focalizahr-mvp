@@ -100,9 +100,6 @@ export default function SuccessionOrchestrator({
   const [showCandidateModal, setShowCandidateModal] = useState(false)
   const [selectedCandidateMode, setSelectedCandidateMode] = useState<'suggestion' | 'nominated'>('suggestion')
   const [nominating, setNominating] = useState<string | null>(null)
-  const [promotingCandidate, setPromotingCandidate] = useState<{
-    name: string; position: string; department?: string
-  } | null>(null)
   const [recentNomination, setRecentNomination] = useState<{ name: string } | null>(null)
 
   // Domino states
@@ -134,7 +131,6 @@ export default function SuccessionOrchestrator({
     setView('SPOTLIGHT')
     setSuggestions([])
     setRecentNomination(null)
-    setPromotingCandidate(null)
     setSelectedCandidate(null)
     setShowCandidateModal(false)
   }, [initialPositions])
@@ -276,7 +272,6 @@ export default function SuccessionOrchestrator({
       toast.success('Candidato nominado. Plan de backfill guardado.')
       setShowDominoModal(false)
       setDominoData(null)
-      setPromotingCandidate(null)
       if (selectedPosition) {
         const posRes = await fetch(`/api/succession/critical-positions/${selectedPosition.id}`)
         const posData = await posRes.json()
@@ -302,7 +297,6 @@ export default function SuccessionOrchestrator({
     } catch { /* silent */ }
     setShowDominoModal(false)
     setDominoData(null)
-    setPromotingCandidate(null)
     onRefresh()
   }, [dominoData, toast, onRefresh])
 
@@ -356,7 +350,6 @@ export default function SuccessionOrchestrator({
                   loadingSuggestions={loadingSuggestions}
                   suggestionsFilter={suggestionsFilter}
                   recentNomination={recentNomination}
-                  promotingCandidate={promotingCandidate}
                   nominating={nominating}
                   canManage={canManage}
                   onBack={handleBack}
@@ -370,7 +363,6 @@ export default function SuccessionOrchestrator({
                     setSelectedCandidateMode(candidate.isNominated ? 'nominated' : 'suggestion')
                     setShowCandidateModal(true)
                   }}
-                  onPromotingCandidate={setPromotingCandidate}
                   filterStats={filterStats}
                 />
               )}
@@ -424,7 +416,6 @@ export default function SuccessionOrchestrator({
           onClose={() => {
             setShowDominoModal(false)
             setDominoData(null)
-            setPromotingCandidate(null)
           }}
           nivel1={dominoData.nivel1 ? {
             candidatoNombre: dominoData.nivel1.candidatoNombre,
