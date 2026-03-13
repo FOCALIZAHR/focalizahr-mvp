@@ -48,6 +48,7 @@ export async function GET(
           }
         },
         developmentPlan: { select: { id: true, status: true } },
+        successionPlan: { select: { id: true, status: true } },
         backfillPlan: {
           select: {
             resolution: true,

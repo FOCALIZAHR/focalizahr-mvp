@@ -5,8 +5,10 @@
 // src/components/evaluator/SubordinateEvaluationCard.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { User, CheckCircle, Clock, ArrowRight, Eye, Briefcase, Building2 } from 'lucide-react'
+import { User, CheckCircle, Clock, ArrowRight, Eye, Briefcase, Building2, Crown } from 'lucide-react'
+import SuccessionPlanDrawer from '@/components/succession/SuccessionPlanDrawer'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -32,6 +34,7 @@ export interface EvaluationAssignment {
 
 interface SubordinateEvaluationCardProps {
   assignment: EvaluationAssignment
+  hasSuccessionPlan?: boolean
   onEvaluate: () => void
   onViewSummary: () => void
 }
@@ -42,9 +45,11 @@ interface SubordinateEvaluationCardProps {
 
 export default function SubordinateEvaluationCard({
   assignment,
+  hasSuccessionPlan,
   onEvaluate,
   onViewSummary
 }: SubordinateEvaluationCardProps) {
+  const [showPlanDrawer, setShowPlanDrawer] = useState(false)
   const isCompleted = assignment.status === 'completed'
   const isPending = assignment.status === 'pending' || assignment.status === 'in_progress'
 
@@ -79,6 +84,7 @@ export default function SubordinateEvaluationCard({
   }
 
   return (
+    <>
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
@@ -126,6 +132,17 @@ export default function SubordinateEvaluationCard({
               <span className="fhr-badge bg-cyan-500/20 text-cyan-400 border-cyan-500/30 text-xs">
                 Pendiente
               </span>
+            )}
+            {/* Succession plan badge */}
+            {hasSuccessionPlan && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowPlanDrawer(true) }}
+                className="fhr-badge bg-purple-500/15 text-purple-400 border-purple-500/25 text-xs flex items-center gap-1 cursor-pointer hover:bg-purple-500/25 transition-colors"
+                title="Ver plan de sucesion"
+              >
+                <Crown className="w-3 h-3" />
+                Plan Sucesion
+              </button>
             )}
           </div>
 
@@ -180,5 +197,16 @@ export default function SubordinateEvaluationCard({
         </div>
       </div>
     </motion.div>
+
+    {/* Succession Plan Drawer */}
+    {hasSuccessionPlan && (
+      <SuccessionPlanDrawer
+        employeeId={assignment.evaluatee.id}
+        employeeName={assignment.evaluatee.fullName}
+        isOpen={showPlanDrawer}
+        onClose={() => setShowPlanDrawer(false)}
+      />
+    )}
+    </>
   )
 }

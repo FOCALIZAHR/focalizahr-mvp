@@ -1,4 +1,9 @@
 // ════════════════════════════════════════════════════════════════════════════
+// @deprecated — Use /api/succession/candidates/[id]/development-plan instead
+// This route creates a generic DevelopmentPlan (tied to performance cycle).
+// The new route creates a SuccessionDevelopmentPlan (independent, with visibility controls).
+// Kept for backward compatibility — will be removed in a future cleanup.
+// ════════════════════════════════════════════════════════════════════════════
 // API: /api/succession/candidates/[id]/create-pdi
 // POST - Crea DevelopmentPlan desde los gaps del candidato
 // ════════════════════════════════════════════════════════════════════════════

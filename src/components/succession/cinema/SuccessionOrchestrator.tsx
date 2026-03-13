@@ -429,6 +429,7 @@ export default function SuccessionOrchestrator({
               candidateRank: (suggestions.findIndex(s => s.employeeId === selectedCandidate.employeeId) + 1) || 1,
             } : undefined}
             mode={selectedCandidateMode}
+            canManage={canManage}
             isNominating={nominating === selectedCandidate.employeeId}
             onNominate={(overrideReadiness, justification) => {
               handleNominate(selectedCandidate.employeeId, overrideReadiness, justification)

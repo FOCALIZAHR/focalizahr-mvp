@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/toast-system'
 import { formatDisplayName, getInitials } from '@/lib/utils/formatName'
 import { getNineBoxPositionConfig, NineBoxPosition } from '@/config/performanceClassification'
 import { TalentNarrativeService } from '@/lib/services/TalentNarrativeService'
+import SuccessionStatementPanel from './SuccessionStatementPanel'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -52,11 +53,12 @@ interface CandidateProfile {
 }
 
 interface SuccessionCandidateModalProps {
-  candidate: CandidateProfile
+  candidate: CandidateProfile & { _openTab?: 'profile' | 'evidence' | 'plan' }
   targetPosition: string
   targetJobLevel?: string
   filterStats?: { totalEmployees: number; candidateRank: number } | null
   mode?: 'suggestion' | 'nominated'
+  canManage?: boolean
   onNominate: (overrideReadiness?: string, justification?: string) => void
   onWithdraw?: () => void
   onClose: () => void
@@ -116,13 +118,16 @@ export default function SuccessionCandidateModal({
   targetPosition,
   filterStats,
   mode = 'suggestion',
+  canManage = false,
   onNominate,
   onWithdraw,
   onClose,
   isNominating,
 }: SuccessionCandidateModalProps) {
   const { success, error } = useToast()
-  const [showEvidence, setShowEvidence] = useState(false)
+  const initialTab = candidate._openTab && candidate._openTab === 'plan' && mode === 'nominated' && candidate.nominatedId
+    ? 'plan' : 'profile'
+  const [activeTab, setActiveTab] = useState<'profile' | 'evidence' | 'plan'>(initialTab)
   const [showOverride, setShowOverride] = useState(false)
   const [showBrainTooltip, setShowBrainTooltip] = useState(false)
   const [brainTooltipPos, setBrainTooltipPos] = useState({ x: 0, y: 0 })
@@ -133,6 +138,13 @@ export default function SuccessionCandidateModal({
   const [overrideReadiness, setOverrideReadiness] = useState(candidate.readinessLevel)
 
   useEffect(() => { setMounted(true) }, [])
+
+  // Guard: if plan tab is active but nominatedId gone, fall back to profile
+  useEffect(() => {
+    if (activeTab === 'plan' && (!candidate.nominatedId || mode !== 'nominated')) {
+      setActiveTab('profile')
+    }
+  }, [activeTab, candidate.nominatedId, mode])
   const [justification, setJustification] = useState('')
 
   const rc = READINESS_CONFIG[candidate.readinessLevel] || READINESS_CONFIG.NOT_VIABLE
@@ -227,6 +239,17 @@ export default function SuccessionCandidateModal({
     }
   }
 
+  const [hasPlanChanges, setHasPlanChanges] = useState(false)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
+
+  function handleBackdropClick() {
+    if (hasPlanChanges) {
+      setShowDiscardConfirm(true)
+    } else {
+      onClose()
+    }
+  }
+
   const [withdrawing, setWithdrawing] = useState(false)
   async function handleWithdraw() {
     if (!candidate.nominatedId) return
@@ -274,7 +297,7 @@ export default function SuccessionCandidateModal({
   return (
     <div
       className="fixed inset-0 flex items-center justify-center z-[100] bg-black/60 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={handleBackdropClick}
     >
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
@@ -347,7 +370,7 @@ export default function SuccessionCandidateModal({
               </div>
             </div>
             <button
-              onClick={onClose}
+              onClick={handleBackdropClick}
               className="text-slate-500 hover:text-slate-300 transition-colors p-1"
             >
               <X className="w-4 h-4" />
@@ -426,7 +449,9 @@ export default function SuccessionCandidateModal({
             </div>
           </div>
 
-          {/* ═══════════ ZONA 3 — NARRATIVA ═══════════ */}
+          {/* ═══════════ ZONA 3 — NARRATIVA (profile tab only) ═══════════ */}
+          {activeTab === 'profile' && (<>
+          {/* ZONA 3 — NARRATIVA */}
           <p className="text-sm text-slate-300 italic leading-relaxed mb-5">
             {brechas.length === 0 && notEval.length === 0 && (
               <>{displayName} no presenta brechas bloqueantes para asumir como {formattedPosition}.{' '}</>
@@ -477,37 +502,62 @@ export default function SuccessionCandidateModal({
               )}
             </div>
           )}
+          </>)}
 
-          {/* ═══════════ ZONA 4 — EVIDENCIA ═══════════ */}
-          <div className="mb-5">
-            <button
-              onClick={() => setShowEvidence(!showEvidence)}
-              className="w-full flex items-center justify-center gap-2 py-2 text-xs text-slate-500 hover:text-slate-300 transition-colors border-t border-b border-slate-800/50"
-            >
-              <span className="h-px flex-1 bg-slate-800/50" />
-              <span className="flex items-center gap-1">
-                {showEvidence ? 'Ocultar analisis' : 'Ver analisis completo'}
-                {showEvidence ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              </span>
-              <span className="h-px flex-1 bg-slate-800/50" />
-            </button>
+          {/* ═══════════ ZONA 4 — TABS ═══════════ */}
+          <div className="mb-5 border-b border-slate-800/50">
+            <div className="flex gap-0">
+              {(['profile', 'evidence', ...(mode === 'nominated' && candidate.nominatedId ? ['plan'] : [])] as const).map(tab => {
+                const labels: Record<string, string> = { profile: 'Perfil', evidence: 'Analisis', plan: 'Plan' }
+                const isActive = activeTab === tab
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab as typeof activeTab)}
+                    className={cn(
+                      'px-4 py-2 text-xs font-medium transition-all relative',
+                      isActive
+                        ? 'text-cyan-400'
+                        : 'text-slate-500 hover:text-slate-300'
+                    )}
+                  >
+                    {labels[tab]}
+                    {isActive && (
+                      <motion.div
+                        layoutId="tab-underline"
+                        className="absolute bottom-0 inset-x-0 h-[2px] bg-cyan-400"
+                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                      />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
+          {/* ═══════════ TAB: PLAN (Succession Statement v3.0) ═══════════ */}
+          {activeTab === 'plan' && candidate.nominatedId && (
+            <div className="mb-5">
+              <SuccessionStatementPanel
+                candidateId={candidate.nominatedId}
+                canManage={canManage}
+                candidateName={displayName}
+                targetPosition={formattedPosition}
+                onDirtyChange={setHasPlanChanges}
+              />
+            </div>
+          )}
+
+          {/* ═══════════ TAB: EVIDENCE ═══════════ */}
           <AnimatePresence>
-            {showEvidence && (
+            {activeTab === 'evidence' && (
               <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="overflow-hidden"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.25 }}
+                className="space-y-4 pb-5"
               >
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.15 }}
-                  className="space-y-4 pb-5"
-                >
                   {/* Fortalezas / Brechas side by side */}
                   {gaps.length > 0 && (
                     <div className="grid grid-cols-2 gap-3">
@@ -633,7 +683,6 @@ export default function SuccessionCandidateModal({
                       </p>
                     </div>
                   )}
-                </motion.div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -678,6 +727,40 @@ export default function SuccessionCandidateModal({
             </button>
           )}
         </div>
+
+        {/* ═══════════ DISCARD CONFIRMATION ═══════════ */}
+        <AnimatePresence>
+          {showDiscardConfirm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-30 flex items-center justify-center rounded-[24px] bg-black/70 backdrop-blur-sm"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 mx-6 max-w-xs w-full shadow-2xl">
+                <p className="text-sm text-white font-medium mb-1">¿Descartar cambios?</p>
+                <p className="text-xs text-slate-400 mb-4">
+                  Tienes cambios sin guardar en el plan. Se perderan si cierras.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowDiscardConfirm(false)}
+                    className="flex-1 px-3 py-2 rounded-lg text-xs font-medium text-slate-300 border border-slate-700 hover:bg-slate-800 transition-colors"
+                  >
+                    Volver
+                  </button>
+                  <button
+                    onClick={() => { setShowDiscardConfirm(false); onClose() }}
+                    className="flex-1 px-3 py-2 rounded-lg text-xs font-medium text-rose-400 border border-rose-500/30 hover:bg-rose-500/10 transition-colors"
+                  >
+                    Descartar
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
 
       {/* Metric tooltip portal */}

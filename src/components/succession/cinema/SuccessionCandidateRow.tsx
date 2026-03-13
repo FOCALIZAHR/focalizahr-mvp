@@ -31,6 +31,7 @@ interface SuccessionCandidateRowProps {
     riskQuadrant?: string | null
     mobilityQuadrant?: string | null
     developmentPlan?: { id: string; status: string } | null
+    successionPlan?: { id: string; status: string } | null
     backfillResolution?: string | null
     backfillEmployeeName?: string | null
     vacatedPositionTitle?: string | null
@@ -196,7 +197,9 @@ export default function SuccessionCandidateRow({
                   onViewPDI()
                 }}
               >
-                Ver PDI
+                {candidate.successionPlan
+                  ? `Plan ${candidate.successionPlan.status === 'COMPLETED' ? '✓' : candidate.successionPlan.status === 'IN_PROGRESS' ? '▶' : '○'}`
+                  : candidate.developmentPlan ? 'Ver PDI' : 'Plan'}
               </GhostButton>
             )}
             {onDominoClick && (

@@ -216,6 +216,7 @@ model Account {
   criticalPositions        CriticalPosition[]
   successionCandidates     SuccessionCandidate[]
   successionBackfillPlans  SuccessionBackfillPlan[]
+  successionDevelopmentPlans SuccessionDevelopmentPlan[]
 
   @@index([adminEmail], map: "idx_accounts_email")
   @@index([subscriptionTier], map: "idx_accounts_tier")
@@ -1577,6 +1578,8 @@ model Employee {
   incumbentOfPositions   CriticalPosition[]      @relation("PositionIncumbent")
   successionCandidacies  SuccessionCandidate[]   @relation("SuccessionCandidateEmployee")
   backfillAssignments    SuccessionBackfillPlan[] @relation("BackfillEmployee")
+  successionPlans        SuccessionDevelopmentPlan[] @relation("SuccessionPlanEmployee")
+  sponsoredSuccessionPlans SuccessionDevelopmentPlan[] @relation("SuccessionPlanSponsor")
 
   // Índices
   @@unique([accountId, nationalId], map: "idx_employees_account_national")
@@ -2884,6 +2887,7 @@ model SuccessionCandidate {
   criticalPosition    CriticalPosition @relation(fields: [criticalPositionId], references: [id], onDelete: Cascade)
   employee            Employee         @relation("SuccessionCandidateEmployee", fields: [employeeId], references: [id])
   developmentPlan     DevelopmentPlan? @relation(fields: [developmentPlanId], references: [id])
+  successionPlan      SuccessionDevelopmentPlan?  // New: plan de desarrollo específico sucesión
   backfillPlan        SuccessionBackfillPlan?
 
   @@unique([criticalPositionId, employeeId], map: "unique_candidate_per_position")
@@ -2939,4 +2943,111 @@ model SuccessionBackfillPlan {
   @@index([vacatedDepartmentId])
   @@index([backfillEmployeeId], map: "idx_backfill_employee")
   @@map("succession_backfill_plans")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PLAN DE DESARROLLO SUCESIÓN (independiente del PDI genérico)
+// ════════════════════════════════════════════════════════════════════════════
+
+enum SuccessionPlanStatus {
+  DRAFT
+  ACTIVE
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model SuccessionDevelopmentPlan {
+  id                    String   @id @default(cuid())
+  accountId             String   @map("account_id")
+
+  // Relación 1:1 con candidato
+  candidateId           String   @unique @map("candidate_id")
+  employeeId            String   @map("employee_id")
+
+  // Sponsor (HR o manager que creó el plan)
+  sponsorId             String   @map("sponsor_id")
+  sponsor               Employee @relation("SuccessionPlanSponsor", fields: [sponsorId], references: [id])
+
+  // Estado
+  status                SuccessionPlanStatus @default(DRAFT)
+
+  // Controles de visibilidad
+  visibleToDirectManager  Boolean @default(false) @map("visible_to_direct_manager")
+  managerCanEditProgress  Boolean @default(false) @map("manager_can_edit_progress")
+  includeInEmployeeReport Boolean @default(false) @map("include_in_employee_report")
+
+  // Contexto del cargo objetivo (Pivote v3.0)
+  targetPositionTitle     String?  @map("target_position_title")
+  targetJobLevel          String?  @map("target_job_level")
+  estimatedReadinessMonths Int?   @map("estimated_readiness_months")
+
+  // ══ SUCCESSION STATEMENT (Pivote v3.0) ══
+  // ACTO 1: Diagnóstico generado por IA
+  aiDiagnostic            String?  @db.Text @map("ai_diagnostic")
+  // ACTO 2: Aprensión/Apuesta del gerente (texto libre)
+  managerBet              String?  @db.Text @map("manager_bet")
+  // ACTO 3: Acción inmediata (RETENTION_TALK | CRITICAL_PROJECT | BOARD_EXPOSURE | LATERAL_ROTATION)
+  immediateAction         String?  @map("immediate_action")
+
+  // AI metadata (legacy)
+  originGapAnalysis     Json?    @map("origin_gap_analysis")
+  aiSuggestionsUsed     Boolean  @default(false) @map("ai_suggestions_used")
+
+  // Timestamps
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  agreedAt              DateTime? @map("agreed_at")
+  completedAt           DateTime? @map("completed_at")
+
+  // Relaciones
+  account               Account              @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  candidate             SuccessionCandidate   @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  employee              Employee              @relation("SuccessionPlanEmployee", fields: [employeeId], references: [id])
+  goals                 SuccessionDevelopmentGoal[]
+
+  @@index([accountId], map: "idx_succ_dev_plan_account")
+  @@index([employeeId], map: "idx_succ_dev_plan_employee")
+  @@index([status], map: "idx_succ_dev_plan_status")
+  @@map("succession_development_plans")
+}
+
+model SuccessionDevelopmentGoal {
+  id                String   @id @default(cuid())
+  planId            String   @map("plan_id")
+
+  // Competencia
+  competencyCode    String   @map("competency_code")
+  title             String
+  description       String?  @db.Text
+  targetOutcome     String   @map("target_outcome")
+
+  // Acción y categoría
+  action            String?  @db.Text
+  category          DevelopmentCategory
+  priority          DevelopmentPriority
+
+  // Tracking
+  status            DevelopmentGoalStatus @default(NOT_STARTED)
+  progressPercent   Int                   @default(0) @map("progress_percent")
+
+  // Fechas
+  startDate         DateTime  @map("start_date")
+  targetDate        DateTime  @map("target_date")
+  completedAt       DateTime? @map("completed_at")
+
+  // AI
+  suggestedResources Json?    @map("suggested_resources")
+  aiGenerated        Boolean  @default(false) @map("ai_generated")
+
+  // Timestamps
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  plan              SuccessionDevelopmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId], map: "idx_succ_dev_goal_plan")
+  @@index([status], map: "idx_succ_dev_goal_status")
+  @@map("succession_development_goals")
 }

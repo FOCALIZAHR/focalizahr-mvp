@@ -333,6 +333,7 @@ export default function SuccessionSpotlightCard({
                             isNominated: true,
                             nominatedId: c.id,
                             developmentPlan: c.developmentPlan ?? null,
+                            successionPlan: c.successionPlan ?? null,
                             backfillResolution: c.backfillPlan?.resolution ?? null,
                             backfillEmployeeName: c.backfillPlan?.backfillEmployeeName ?? null,
                             vacatedPositionTitle: c.backfillPlan?.vacatedPositionTitle ?? null,
@@ -345,8 +346,21 @@ export default function SuccessionSpotlightCard({
                           }
                           onResumeDomino={onResumeDomino}
                           onViewPDI={
-                            c.developmentPlan
-                              ? () => window.open(`/dashboard/pdi/${c.developmentPlan.id}`, '_blank')
+                            c.successionPlan || c.developmentPlan
+                              ? () => {
+                                  if (c.developmentPlan && !c.successionPlan) {
+                                    window.open(`/dashboard/pdi/${c.developmentPlan.id}`, '_blank')
+                                  } else {
+                                    onCandidateClick({
+                                      ...(c as any),
+                                      employeeId: c.employee?.id ?? c.employeeId,
+                                      employeeName: c.employee?.fullName ?? '',
+                                      position: c.employee?.position ?? null,
+                                      departmentName: (c.employee as any)?.department?.displayName ?? null,
+                                      _openTab: 'plan',
+                                    })
+                                  }
+                                }
                               : undefined
                           }
                         />
