@@ -127,7 +127,7 @@ export default function DominoEffect({
           )}
         </div>
         {/* Row 2: Position transition + Fit + NineBox */}
-        <div className="flex items-center gap-2 mt-2 ml-12 flex-wrap">
+        <div className="flex items-center gap-2 mt-2 ml-4 sm:ml-12 flex-wrap">
           <span className="text-slate-400 text-xs">
             {candidatePosition} → {targetPosition}
           </span>

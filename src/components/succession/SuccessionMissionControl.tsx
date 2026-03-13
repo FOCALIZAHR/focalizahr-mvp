@@ -55,19 +55,19 @@ function SuccessionGauge({ coverage, coveredRoles, totalRoles }: {
   const uncovered = totalRoles - coveredRoles
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+    <div className="relative flex items-center justify-center w-[200px] h-[200px] sm:w-[280px] sm:h-[280px]">
       {/* Glow sutil */}
       <div
         className="absolute rounded-full blur-[60px]"
         style={{
-          width: size * 0.6,
-          height: size * 0.6,
+          width: '60%',
+          height: '60%',
           backgroundColor: color,
           opacity: 0.08
         }}
       />
 
-      <svg width={size} height={size} className="-rotate-90">
+      <svg viewBox={`0 0 ${size} ${size}`} className="-rotate-90 w-full h-full">
         {/* Background track */}
         <circle
           cx={size / 2}

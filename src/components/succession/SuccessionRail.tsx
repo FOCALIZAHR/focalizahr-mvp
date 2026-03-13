@@ -3,7 +3,7 @@
 
 import { memo, useMemo, useRef, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronUp, ChevronLeft, ChevronRight, Check, Clock, Plus, ArrowLeft } from 'lucide-react'
+import { ChevronUp, ChevronLeft, ChevronRight, Check, Clock, Plus, Home } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -35,13 +35,9 @@ interface SuccessionRailProps {
 // FILTER TABS (cloned from evaluator Rail TAB_STYLES)
 // ════════════════════════════════════════════════════════════════════════════
 
-type FilterKey = 'ALL' | 'NONE' | 'RISK' | 'COVERED'
+type FilterKey = 'NONE' | 'RISK' | 'COVERED'
 
 const TAB_STYLES: Record<FilterKey, { active: string; inactive: string }> = {
-  ALL: {
-    active: 'bg-cyan-400 text-slate-950 shadow-[0_2px_10px_rgba(34,211,238,0.3)]',
-    inactive: 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700'
-  },
   NONE: {
     active: 'bg-rose-400 text-slate-950 shadow-[0_2px_10px_rgba(251,113,133,0.3)]',
     inactive: 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700'
@@ -57,13 +53,18 @@ const TAB_STYLES: Record<FilterKey, { active: string; inactive: string }> = {
 }
 
 const TAB_LABELS: Record<FilterKey, string> = {
-  ALL: 'Todas',
   NONE: 'Sin Cobertura',
   RISK: 'En Riesgo',
   COVERED: 'Cubiertas',
 }
 
-const TAB_ORDER: FilterKey[] = ['ALL', 'NONE', 'RISK', 'COVERED']
+const TAB_ORDER: FilterKey[] = ['NONE', 'RISK', 'COVERED']
+
+export function getDefaultTab(positions: { benchStrength: string }[]): FilterKey {
+  if (positions.some(p => p.benchStrength === 'NONE')) return 'NONE'
+  if (positions.some(p => p.benchStrength === 'WEAK')) return 'RISK'
+  return 'COVERED'
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // POSITION RAIL CARD (cloned from EmployeeRailCard)
@@ -106,7 +107,7 @@ function PositionRailCard({ position, isSelected, onClick }: {
       onMouseLeave={() => setIsHovered(false)}
       whileHover={{ y: -5 }}
       className={cn(
-        'snap-start flex-shrink-0 w-[160px] h-[200px] rounded-xl cursor-pointer',
+        'snap-start flex-shrink-0 w-[140px] sm:w-[160px] h-[200px] rounded-xl cursor-pointer',
         'transition-all duration-300 relative group overflow-hidden border',
         isSelected
           ? 'bg-slate-800 border-cyan-500/50 shadow-[0_0_20px_-5px_rgba(34,211,238,0.15)]'
@@ -312,14 +313,12 @@ export const SuccessionRail = memo(function SuccessionRail({
         return positions.filter(p => p.benchStrength === 'WEAK' || p.benchStrength === 'NONE')
       case 'COVERED':
         return positions.filter(p => p.benchStrength === 'STRONG' || p.benchStrength === 'MODERATE')
-      case 'ALL':
       default:
         return positions
     }
   }, [positions, activeTab])
 
   const counts = useMemo(() => ({
-    ALL: positions.length,
     NONE: positions.filter(p => p.benchStrength === 'NONE').length,
     RISK: positions.filter(p => p.benchStrength === 'WEAK' || p.benchStrength === 'NONE').length,
     COVERED: positions.filter(p => p.benchStrength === 'STRONG' || p.benchStrength === 'MODERATE').length,
@@ -370,11 +369,11 @@ export const SuccessionRail = memo(function SuccessionRail({
         <div className="flex items-center gap-2">
           {/* Dashboard link */}
           <button
-            onClick={(e) => { e.stopPropagation(); router.push('/dashboard') }}
+            onClick={(e) => { e.stopPropagation(); router.push('/dashboard/succession') }}
             className="flex items-center gap-1 text-slate-500 hover:text-slate-300 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-colors"
           >
-            <ArrowLeft className="w-3 h-3" />
-            Dashboard
+            <Home className="w-3 h-3" />
+            Inicio
           </button>
 
           {/* Nueva Posicion */}

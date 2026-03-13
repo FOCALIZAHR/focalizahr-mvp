@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Crown, Shield, ArrowRight } from 'lucide-react'
 import { useToast } from '@/components/ui/toast-system'
 import { SuccessionMissionControl } from '@/components/succession/SuccessionMissionControl'
-import { SuccessionRail, type FilterKey } from '@/components/succession/SuccessionRail'
+import { SuccessionRail, type FilterKey, getDefaultTab } from '@/components/succession/SuccessionRail'
 import SuccessionWizard from '@/components/succession/SuccessionWizard'
 import SuccessionCandidateModal from './SuccessionCandidateModal'
 import SuccessionSpotlightCard from './SuccessionSpotlightCard'
@@ -116,7 +116,7 @@ export default function SuccessionOrchestrator({
 
   // Rail state
   const [isRailExpanded, setIsRailExpanded] = useState(false)
-  const [railTab, setRailTab] = useState<FilterKey>('ALL')
+  const [railTab, setRailTab] = useState<FilterKey>(() => getDefaultTab(initialPositions))
 
   const toast = useToast()
   const router = useRouter()

@@ -267,7 +267,7 @@ export default function SuccessionSpotlightCard({
         </div>
 
         {/* ── RIGHT COLUMN (cloned from StorytellingGuide area) ── */}
-        <div className="flex-1 flex flex-col min-h-[500px] pt-4 bg-gradient-to-br from-[#0F172A] to-[#162032]">
+        <div className="flex-1 flex flex-col min-h-[300px] md:min-h-[500px] pt-4 bg-gradient-to-br from-[#0F172A] to-[#162032]">
 
           {/* Tabs */}
           <div className="flex border-b border-slate-800 px-6">
@@ -428,7 +428,7 @@ export default function SuccessionSpotlightCard({
                     Buscando candidatos elegibles...
                   </div>
                 ) : showCover && suggestions.length > 0 && filterStats ? (
-                  <div className="h-[420px]">
+                  <div className="h-auto max-h-[420px]">
                     <SuccessionCandidatesCover
                       positionTitle={position.positionTitle}
                       totalEmployees={filterStats.totalEmployees}

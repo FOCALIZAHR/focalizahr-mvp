@@ -187,7 +187,7 @@ export default function SuccessionCandidateRow({
 
         {/* Row 2: Action buttons — only if applicable */}
         {hasActions && (
-          <div className="flex items-center gap-2 mt-3 pl-[52px]">
+          <div className="flex items-center gap-2 mt-3 pl-0 sm:pl-[52px]">
             {onViewPDI && (
               <GhostButton
                 size="sm"
