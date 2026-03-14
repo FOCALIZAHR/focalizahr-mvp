@@ -536,8 +536,8 @@ export default function SuccessionCandidateModal({
           </div>
 
           {/* ═══════════ TAB: PLAN (Succession Statement v3.0) ═══════════ */}
-          {activeTab === 'plan' && candidate.nominatedId && (
-            <div className="mb-5">
+          {mode === 'nominated' && candidate.nominatedId && (
+            <div className="mb-5" hidden={activeTab !== 'plan'}>
               <SuccessionStatementPanel
                 candidateId={candidate.nominatedId}
                 canManage={canManage}

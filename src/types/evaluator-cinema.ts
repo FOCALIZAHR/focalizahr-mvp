@@ -34,6 +34,7 @@ export interface EvaluatorAssignment {
   nineBoxPosition: string | null
   cycleId: string
   hasPDI: boolean
+  hasSuccessionPlan: boolean
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -69,6 +70,9 @@ export interface EmployeeCardData {
 
   // Indica si tiene PDI creado
   hasPDI: boolean
+
+  // Indica si tiene plan de sucesion visible
+  hasSuccessionPlan: boolean
 }
 
 export interface SelectedEmployee extends EmployeeCardData {

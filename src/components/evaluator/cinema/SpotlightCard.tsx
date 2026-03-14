@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Crown } from 'lucide-react'
 import { getInitials } from '@/lib/utils/formatName'
 import { StatusBadge } from './StatusBadge'
 import StorytellingGuide from './StorytellingGuide'
 import AvatarInfoModal from './AvatarInfoModal'
+import SuccessionPlanDrawer from '@/components/succession/SuccessionPlanDrawer'
 import type { SpotlightCardProps } from '@/types/evaluator-cinema'
 
 export default function SpotlightCard({
@@ -17,6 +18,7 @@ export default function SpotlightCard({
   onEvaluatePotential
 }: SpotlightCardProps) {
   const [showAvatarModal, setShowAvatarModal] = useState(false)
+  const [showPlanDrawer, setShowPlanDrawer] = useState(false)
 
   return (
     <motion.div
@@ -81,9 +83,18 @@ export default function SpotlightCard({
             <p className="text-sm text-slate-400 font-medium mb-1">
               {employee.position}
             </p>
-            <p className="text-xs text-slate-600 mb-6">
+            <p className="text-xs text-slate-600 mb-3">
               {employee.departmentName}
             </p>
+            {employee.hasSuccessionPlan && (
+              <button
+                onClick={() => setShowPlanDrawer(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-purple-400 bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 transition-colors mb-3"
+              >
+                <Crown className="w-3 h-3" />
+                Plan Sucesion
+              </button>
+            )}
           </div>
 
         </div>
@@ -124,6 +135,16 @@ export default function SpotlightCard({
           potentialLevel: employee.potentialLevel
         }}
       />
+
+      {/* Succession Plan Drawer */}
+      {employee.hasSuccessionPlan && (
+        <SuccessionPlanDrawer
+          employeeId={employee.id}
+          employeeName={employee.displayNameFull}
+          isOpen={showPlanDrawer}
+          onClose={() => setShowPlanDrawer(false)}
+        />
+      )}
     </motion.div>
   )
 }

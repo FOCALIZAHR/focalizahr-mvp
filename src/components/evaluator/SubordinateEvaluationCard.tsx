@@ -30,11 +30,11 @@ export interface EvaluationAssignment {
   }
   participantToken: string | null
   surveyUrl?: string | null
+  hasSuccessionPlan?: boolean
 }
 
 interface SubordinateEvaluationCardProps {
   assignment: EvaluationAssignment
-  hasSuccessionPlan?: boolean
   onEvaluate: () => void
   onViewSummary: () => void
 }
@@ -45,10 +45,10 @@ interface SubordinateEvaluationCardProps {
 
 export default function SubordinateEvaluationCard({
   assignment,
-  hasSuccessionPlan,
   onEvaluate,
   onViewSummary
 }: SubordinateEvaluationCardProps) {
+  const hasSuccessionPlan = assignment.hasSuccessionPlan
   const [showPlanDrawer, setShowPlanDrawer] = useState(false)
   const isCompleted = assignment.status === 'completed'
   const isPending = assignment.status === 'pending' || assignment.status === 'in_progress'

@@ -119,7 +119,8 @@ export function useEvaluatorCinemaMode() {
       potentialLevel: a.potentialLevel ?? null,
       nineBoxPosition: a.nineBoxPosition ?? null,
       cycleId: a.cycleId,
-      hasPDI: a.hasPDI ?? false
+      hasPDI: a.hasPDI ?? false,
+      hasSuccessionPlan: a.hasSuccessionPlan ?? false
     }))
   }, [rawAssignments])
 

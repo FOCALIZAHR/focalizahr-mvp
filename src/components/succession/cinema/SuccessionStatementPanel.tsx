@@ -6,6 +6,7 @@ import {
   Sparkles, MessageSquareText, Zap, ChevronDown, ChevronUp,
   Target, Loader2, Save, Brain,
   Shield, Crosshair, Landmark, RefreshCw,
+  Settings, AlertTriangle,
 } from 'lucide-react'
 import { useToast } from '@/components/ui/toast-system'
 
@@ -21,6 +22,8 @@ interface StatementData {
   targetJobLevel: string | null
   estimatedReadinessMonths: number | null
   status: string
+  visibleToDirectManager: boolean
+  includeInEmployeeReport: boolean
   originGapAnalysis: {
     diagnosisCaseId?: number
     diagnosisUrgency?: 'CRITICAL' | 'HIGH' | 'NORMAL'
@@ -87,6 +90,9 @@ export default function SuccessionStatementPanel({
   // Editable fields
   const [managerBet, setManagerBet] = useState('')
   const [selectedAction, setSelectedAction] = useState<string | null>(null)
+  const [visibleToManager, setVisibleToManager] = useState(false)
+  const [includeInReport, setIncludeInReport] = useState(false)
+  const [showVisibility, setShowVisibility] = useState(false)
   const [dirty, setDirty] = useState(false)
 
   // Notify parent of dirty state changes
@@ -103,6 +109,8 @@ export default function SuccessionStatementPanel({
         setData(json.data)
         setManagerBet(json.data.managerBet || '')
         setSelectedAction(json.data.immediateAction || null)
+        setVisibleToManager(json.data.visibleToDirectManager || false)
+        setIncludeInReport(json.data.includeInEmployeeReport || false)
       } else {
         setData(null)
       }
@@ -148,6 +156,8 @@ export default function SuccessionStatementPanel({
         body: JSON.stringify({
           managerBet: managerBet.trim() || null,
           immediateAction: selectedAction,
+          visibleToDirectManager: visibleToManager,
+          includeInEmployeeReport: includeInReport,
         }),
       })
       const json = await res.json()
@@ -177,9 +187,9 @@ export default function SuccessionStatementPanel({
   // ── Empty state: no plan yet ──
   if (!data) {
     return (
-      <div className="text-center py-10 space-y-4">
-        <div className="w-14 h-14 mx-auto rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-          <Target className="w-7 h-7 text-purple-400" />
+      <div className="text-center py-4 space-y-3">
+        <div className="w-11 h-11 mx-auto rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+          <Target className="w-5 h-5 text-purple-400" />
         </div>
         <div>
           <p className="text-sm text-slate-300 font-medium">Sin Plan de Sucesion</p>
@@ -390,6 +400,86 @@ export default function SuccessionStatementPanel({
           <p className="text-xs text-slate-500 italic">Sin accion definida aun</p>
         )}
       </ActAccordion>
+
+      {/* ── Visibility controls ── */}
+      {canManage && data.aiDiagnostic && (
+        <div className="mt-1">
+          <button
+            onClick={() => setShowVisibility(!showVisibility)}
+            className="flex items-center gap-1.5 text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            <Settings className="w-3 h-3" />
+            Control de Visibilidad
+            {showVisibility
+              ? <ChevronUp className="w-3 h-3" />
+              : <ChevronDown className="w-3 h-3" />
+            }
+          </button>
+          <AnimatePresence>
+            {showVisibility && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-2 space-y-2 p-3 rounded-xl bg-slate-800/40 border border-slate-700/30">
+                  {/* Toggle: Visible to direct manager */}
+                  <label className="flex items-center justify-between gap-3 cursor-pointer group">
+                    <span className="text-[11px] text-slate-300 group-hover:text-white transition-colors">
+                      Visible para el jefe directo
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={visibleToManager}
+                      onClick={() => { setVisibleToManager(!visibleToManager); markDirty(true) }}
+                      className={`relative w-8 h-[18px] rounded-full transition-colors flex-shrink-0 ${
+                        visibleToManager ? 'bg-cyan-500' : 'bg-slate-600'
+                      }`}
+                    >
+                      <span className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow transition-transform ${
+                        visibleToManager ? 'translate-x-[16px]' : 'translate-x-[2px]'
+                      }`} />
+                    </button>
+                  </label>
+
+                  {/* Warning when visible to manager */}
+                  {visibleToManager && (
+                    <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                      <p className="text-[10px] text-amber-400/80 leading-relaxed">
+                        Al activar esta opcion, el diagnostico y la accion seran visibles inmediatamente en el portal del jefe directo.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Toggle: Include in employee report */}
+                  <label className="flex items-center justify-between gap-3 cursor-pointer group">
+                    <span className="text-[11px] text-slate-300 group-hover:text-white transition-colors">
+                      Incluir en reporte del colaborador
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={includeInReport}
+                      onClick={() => { setIncludeInReport(!includeInReport); markDirty(true) }}
+                      className={`relative w-8 h-[18px] rounded-full transition-colors flex-shrink-0 ${
+                        includeInReport ? 'bg-cyan-500' : 'bg-slate-600'
+                      }`}
+                    >
+                      <span className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow transition-transform ${
+                        includeInReport ? 'translate-x-[16px]' : 'translate-x-[2px]'
+                      }`} />
+                    </button>
+                  </label>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
       {/* ── Save button ── */}
       {canManage && dirty && (

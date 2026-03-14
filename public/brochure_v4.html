@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FocalizaHR · Ciclo de Desempeño</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500&display=swap" rel="stylesheet">
+<style>
+
+/* ═══════════════════════════════════════════════
+   TOKENS OFICIALES FOCALIZAHR
+   Fuente real del producto: system sans-serif stack
+   Pesos: 200 (extralight) para display, 300 (light) para body
+═══════════════════════════════════════════════ */
+:root {
+  --cyan:   #22D3EE;
+  --purple: #A78BFA;
+  --green:  #10B981;
+  --amber:  #F59E0B;
+  --s900:   #0f172a;
+  --s800:   #1e293b;
+  --s700:   #334155;
+  --s600:   #475569;
+  --s400:   #94A3B8;
+  --s200:   #E2E8F0;
+  --font:   'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  /* Gradiente SOLO para el headline protagonista */
+  --grad-headline: linear-gradient(135deg, #22D3EE, #3B82F6, #A78BFA);
+  --grad-brand:    linear-gradient(135deg, #22D3EE, #A78BFA);
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: var(--font);
+  font-weight: 300;
+  background: #0f172a;
+  color: var(--s200);
+  -webkit-font-smoothing: antialiased;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* ═══════════════════════════════════════════════
+   PÁGINA A4
+═══════════════════════════════════════════════ */
+.page {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 52%, #0f172a 100%);
+  position: relative;
+  overflow: hidden;
+  page-break-after: always;
+}
+
+/* Orbes ambientales — sutiles, no protagonistas */
+.page::before {
+  content: '';
+  position: absolute;
+  top: -60mm; left: -40mm;
+  width: 130mm; height: 130mm;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(34,211,238,.04), transparent 70%);
+  pointer-events: none;
+}
+.page::after {
+  content: '';
+  position: absolute;
+  bottom: -40mm; right: -30mm;
+  width: 110mm; height: 110mm;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(167,139,250,.04), transparent 70%);
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════
+   TESLA LINE — Signature element
+   Máximo 2 por página. No decoración.
+═══════════════════════════════════════════════ */
+.tesla {
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #22D3EE, transparent);
+  box-shadow: 0 0 14px rgba(34,211,238,.65);
+}
+.tesla-purple {
+  background: linear-gradient(90deg, transparent, #A78BFA, transparent);
+  box-shadow: 0 0 14px rgba(167,139,250,.6);
+}
+/* Tesla Line corta — acento tipográfico */
+.tesla-accent {
+  display: block;
+  width: 24mm;
+  height: 1px;
+  background: linear-gradient(90deg, #22D3EE, transparent);
+  box-shadow: 0 0 8px rgba(34,211,238,.5);
+  margin: 6mm 0;
+}
+
+/* ═══════════════════════════════════════════════
+   GLASSMORPHISM CARDS
+   Tesla Line superior = siempre cyan por defecto
+═══════════════════════════════════════════════ */
+.card {
+  background: rgba(30, 41, 59, .82);
+  border: 1px solid rgba(71, 85, 105, .30);
+  border-radius: 14px;
+  padding: 6mm 5.5mm;
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(34,211,238,.5), transparent);
+}
+
+/* ═══════════════════════════════════════════════
+   TIPOGRAFÍA — Sistema real del producto
+   h1: extralight (200), h2: light (300)
+   letter-spacing: tight como SF Pro
+═══════════════════════════════════════════════ */
+
+/* Display — sans-serif muy grande y liviana */
+.disp { font-family: var(--font); line-height: 1.05; letter-spacing: -0.03em; }
+.disp-xl { font-size: 44pt; font-weight: 200; }
+.disp-lg { font-size: 30pt; font-weight: 200; }
+.disp-md { font-size: 20pt; font-weight: 300; letter-spacing: -0.025em; }
+
+/* Gradiente de texto — UNA SOLA VEZ en portada */
+.headline-grad {
+  background: var(--grad-headline);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Texto blanco para subtítulos importantes */
+.white  { color: #fff; }
+.cyan   { color: var(--cyan); }
+.muted  { color: var(--s400); }
+.dim    { color: var(--s600); }
+
+/* Eyebrow — orientación de sección */
+.eyebrow {
+  font-size: 6.5pt;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  font-weight: 400;
+}
+
+/* Body text */
+.body { font-size: 9pt; color: var(--s400); line-height: 1.7; }
+.small { font-size: 8pt; color: var(--s400); line-height: 1.55; }
+.micro { font-size: 7pt; color: var(--s600); }
+
+/* ═══════════════════════════════════════════════
+   BOTÓN CTA — Glassmorphism + glow (NO gradiente)
+═══════════════════════════════════════════════ */
+.cta {
+  display: inline-block;
+  background: rgba(34, 211, 238, .08);
+  color: var(--cyan);
+  border: 1px solid rgba(34, 211, 238, .40);
+  border-radius: 10px;
+  padding: 4mm 8mm;
+  font-family: var(--font);
+  font-size: 9.5pt;
+  font-weight: 400;
+  text-align: center;
+  text-decoration: none;
+  letter-spacing: .02em;
+  position: relative;
+  overflow: hidden;
+  /* Tesla Line superior en el botón */
+  box-shadow: 0 0 20px rgba(34,211,238,.15), inset 0 1px 0 rgba(34,211,238,.3);
+}
+
+/* ═══════════════════════════════════════════════
+   LAYOUT
+═══════════════════════════════════════════════ */
+.pad { padding: 13mm 15mm; }
+.g2  { display: grid; grid-template-columns: 1fr 1fr; gap: 4.5mm; }
+.g3  { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4mm; }
+.col { display: flex; flex-direction: column; }
+.divider { height: 1px; background: rgba(71,85,105,.25); }
+
+/* Márgenes verticales */
+.mt2 { margin-top: 2mm; }  .mb2 { margin-bottom: 2mm; }
+.mt3 { margin-top: 3mm; }  .mb3 { margin-bottom: 3mm; }
+.mt4 { margin-top: 4mm; }  .mb4 { margin-bottom: 4mm; }
+.mt6 { margin-top: 6mm; }  .mb6 { margin-bottom: 6mm; }
+.mt8 { margin-top: 8mm; }  .mb8 { margin-bottom: 8mm; }
+.mt10{ margin-top:10mm; }  .mb10{ margin-bottom:10mm; }
+.mt12{ margin-top:12mm; }
+
+/* Borde izquierdo semántico — solo para listas de beneficios */
+.bl-c { border-left: 2px solid rgba(34,211,238,.5);  padding: 2.5mm 4mm; }
+.bl-p { border-left: 2px solid rgba(167,139,250,.5); padding: 2.5mm 4mm; }
+.bl-g { border-left: 2px solid rgba(16,185,129,.5);  padding: 2.5mm 4mm; }
+
+/* Logo */
+.logo { font-family: var(--font); font-weight: 400; font-size: 12.5pt; color: #fff; letter-spacing: -0.02em; }
+.logo em { color: var(--cyan); font-style: normal; }
+
+/* Número protagonista — extralight, muy grande */
+.hero-num {
+  font-family: var(--font);
+  font-weight: 200;
+  font-size: 80pt;
+  line-height: .90;
+  color: var(--cyan);
+  letter-spacing: -0.04em;
+}
+
+@media print {
+  .page { margin: 0; page-break-after: always; }
+  * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+
+
+<!-- ╔════════════════════════════════════════════════════════╗
+     ║  PÁGINA 1 — PORTADA                                    ║
+     ║  Propuesta A: Briefing ejecutivo, UN protagonista      ║
+     ╚════════════════════════════════════════════════════════╝ -->
+<div class="page">
+<span class="tesla"></span>
+
+<div class="pad" style="display:grid; grid-template-columns:55% 45%; min-height:271mm; gap:0;">
+
+  <!-- IZQUIERDA: La pregunta y la promesa -->
+  <div class="col" style="padding-right:12mm; border-right:1px solid rgba(71,85,105,.18);">
+
+    <!-- LOGO desde proyecto local -->
+    <div class="mb10">
+      <img 
+        src="./images/focalizahr-logo_palabra.svg"
+        alt="FocalizaHR"
+        style="height:30px; width:auto;"
+      />
+    </div>
+
+    <!-- HEADLINE — patrón real del producto: blanco + gradiente en el golpe final -->
+    <div class="disp disp-xl mb4">
+      <span class="white">Tres meses en Excel<br>para saber cómo<br>rinde tu equipo.</span><br>
+      <span class="headline-grad">Ya no.</span>
+    </div>
+
+    <span class="tesla-accent"></span>
+
+    <!-- Subtítulo — blanco, sin gradiente -->
+    <p class="mb10" style="font-size:10.5pt; color:#fff; font-weight:300; line-height:1.5; max-width:76mm;">
+      Pasa de no tener datos, a tener Inteligencia de Talento en tiempo real.
+    </p>
+
+    <!-- Tagline de invitación — abajo, muted -->
+    <div style="margin-top:auto;">
+      <div class="divider mb4"></div>
+      <p class="small" style="color:var(--s400); font-style:italic; max-width:70mm; line-height:1.55;">
+        Te invitamos a vivir tu primer Ciclo de Desempeño con FocalizaHR.
+      </p>
+    </div>
+
+  </div>
+
+  <!-- DERECHA: El protagonista numérico absoluto -->
+  <div class="col" style="padding-left:12mm; justify-content:center; align-items:flex-start;">
+
+    <!-- El número que comunica solo -->
+    <div class="eyebrow mb4">El problema hoy</div>
+
+    <div class="hero-num mb3">3m</div>
+    <p class="mb2" style="font-size:11pt; color:#fff; font-weight:300; line-height:1.4; max-width:58mm;">
+      El tiempo promedio que toma<br>un ciclo de evaluación tradicional.
+    </p>
+    <p class="micro mb10">Con Excel o sistemas heredados.</p>
+
+    <div class="divider mb6" style="width:100%;"></div>
+
+    <!-- La promesa: solo texto, sin card — deja respirar -->
+    <div class="eyebrow mb3" style="color:var(--purple);">Con FocalizaHR</div>
+    <p style="font-family:var(--font); font-weight:200; font-size:22pt; color:#fff; line-height:1.1; letter-spacing:-0.03em; max-width:58mm;">
+      Cero días<br>de análisis.
+    </p>
+    <p class="small mt4" style="max-width:58mm; color:var(--s400); line-height:1.6;">
+      El mismo segundo en que se cierra el ciclo,<br>
+      tienes una radiografía completa<br>lista para la acción.
+    </p>
+
+  </div>
+
+</div>
+</div><!-- /page 1 -->
+
+
+<!-- ╔════════════════════════════════════════════════════════╗
+     ║  PÁGINA 2 — SOLUCIÓN + INVITACIÓN                     ║
+     ║  Propuesta B+C: Narrative 3 bloques, Tesla como ritmo ║
+     ╚════════════════════════════════════════════════════════╝ -->
+<div class="page">
+<span class="tesla"></span>
+
+<div class="pad">
+
+  <!-- ════════════════════════════════════════
+       ZONA SUPERIOR: EL DOLOR
+  ════════════════════════════════════════ -->
+  <div class="mb10">
+
+    <div class="eyebrow mb3">El status quo</div>
+
+    <!-- Headline de sección — blanco, sin gradiente. El gradiente ya se usó. -->
+    <div class="disp disp-lg white mb6">
+      Evaluar en Excel<br>es hacer una autopsia.
+    </div>
+
+    <div class="g2">
+      <p class="body" style="max-width:78mm;">
+        Cuando las empresas usan planillas o sistemas tradicionales, 
+        el proceso es un dolor administrativo. Meses para procesar datos.
+        Y cuando por fin hay un reporte, las decisiones ya se toman 
+        con información vieja.
+      </p>
+      <div class="col" style="gap:3.5mm; justify-content:center;">
+        <div class="bl-c">
+          <p class="small white">Obtienes un promedio.</p>
+          <p class="small">Pero sin saber quién está listo para<br>asumir un cargo crítico mañana.</p>
+        </div>
+        <div class="bl-p">
+          <p class="small white">Ves la nota.</p>
+          <p class="small">Pero no sabes quién está a punto<br>de irse antes de que ocurra.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TESLA LINE como separador de zonas — ritmo visual -->
+  <span class="tesla" style="display:block; margin-bottom:9mm;"></span>
+
+  <!-- ════════════════════════════════════════
+       ZONA MEDIA: LA SOLUCIÓN
+  ════════════════════════════════════════ -->
+  <div class="mb10">
+
+    <div class="eyebrow mb3">Lo que FocalizaHR entrega</div>
+    <div class="disp disp-md white mb6">
+      No una nota. Una radiografía<br>completa lista para la acción.
+    </div>
+
+    <div class="g2" style="margin-bottom:5mm;">
+
+      <div class="col" style="gap:3.5mm;">
+        <div class="card">
+          <div class="eyebrow mb2">Clasificación Automática</div>
+          <p class="small white mb2">Quién es tu talento estrella.<br>Quién necesita apoyo.</p>
+          <p class="small">Calculado en tiempo real, el mismo<br>segundo que cierra la evaluación.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow mb2">Mapa de Sucesión</div>
+          <p class="small white mb2">Quién está listo hoy para asumir<br>un cargo crítico en tu operación.</p>
+          <p class="small">No un listado. Un mapa vivo<br>que se actualiza solo.</p>
+        </div>
+      </div>
+
+      <div class="col" style="gap:3.5mm;">
+        <div class="card">
+          <div class="eyebrow mb2">Detección de Riesgos</div>
+          <p class="small white mb2">Talento de alto desempeño con<br>signos de desgaste o desconexión.</p>
+          <p class="small">Lo que antes tomaba meses<br>en descubrir — visible hoy.</p>
+        </div>
+        <div class="card">
+          <div class="eyebrow mb2">Listo para Calibrar</div>
+          <p class="small white mb2">Entornos visuales para que los<br>líderes ajusten y decidan.</p>
+          <p class="small">Sin tocar una sola<br>celda de Excel.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bloque de líderes — full width, minimalista -->
+    <div style="background:rgba(30,41,59,.5); border:1px solid rgba(71,85,105,.22); border-radius:12px; padding:5mm 6mm; display:grid; grid-template-columns:1fr 1fr 1fr; gap:5mm; align-items:start;">
+      <div>
+        <div class="eyebrow mb2">Tus líderes</div>
+        <p style="font-size:10pt; color:#fff; font-weight:300; line-height:1.3; margin-bottom:2mm;">No necesitan<br>un manual.</p>
+        <p class="small">Flujos guiados que llevan<br>al evaluador paso a paso.</p>
+      </div>
+      <div class="bl-c">
+        <p class="small white mb1">Privacidad absoluta por diseño</p>
+        <p class="small">Cada líder ve solo su equipo directo. Sin cruces. Sin ruido.</p>
+      </div>
+      <div class="bl-g">
+        <p class="small white mb1">Planes de Acción a un clic</p>
+        <p class="small">El sistema lee las brechas y sugiere misiones estratégicas. Sin redactar desde cero.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TESLA LINE PURPLE — segunda línea = zona de invitación -->
+  <span class="tesla-purple tesla" style="display:block; margin-bottom:9mm;"></span>
+
+  <!-- ════════════════════════════════════════
+       ZONA INFERIOR: LA INVITACIÓN
+       Checkout ejecutivo — próximo paso ineludible
+  ════════════════════════════════════════ -->
+  <div style="display:grid; grid-template-columns:58% 42%; gap:8mm; align-items:start;">
+
+    <div>
+      <div class="eyebrow mb3">La invitación</div>
+      <div class="disp disp-md white mb4">
+        Descubre el talento oculto<br>en tu empresa.
+      </div>
+      <p class="body mb3" style="max-width:78mm;">
+        Iniciar una cultura de evaluación no tiene que ser un trauma organizacional.
+        Te invitamos a ejecutar tu primer ciclo en nuestra plataforma, sin costo de implementación inicial.
+      </p>
+      <!-- Progressive disclosure: 3 pasos concretos -->
+      <div class="col" style="gap:2mm; margin-top:4mm;">
+        <div style="display:flex; gap:3mm; align-items:baseline;">
+          <span style="font-size:7.5pt; color:var(--cyan); min-width:12mm; font-weight:400; letter-spacing:.05em;">Nosotros</span>
+          <span class="small">Configuramos la arquitectura completa.</span>
+        </div>
+        <div style="display:flex; gap:3mm; align-items:baseline;">
+          <span style="font-size:7.5pt; color:var(--cyan); min-width:12mm; font-weight:400; letter-spacing:.05em;">Tus líderes</span>
+          <span class="small">Evalúan con fricción cero.</span>
+        </div>
+        <div style="display:flex; gap:3mm; align-items:baseline;">
+          <span style="font-size:7.5pt; color:var(--cyan); min-width:12mm; font-weight:400; letter-spacing:.05em;">Tú</span>
+          <span class="small">Obtienes el mapa de talento más avanzado del mercado en tiempo récord.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA — glassmorphism, no gradiente -->
+    <div class="col" style="gap:4mm; justify-content:flex-start; padding-top:10mm;">
+      <a class="cta" href="#" style="display:block; text-align:center;">
+        Agenda tu sesión de Setup
+      </a>
+      <p class="small" style="text-align:center; color:var(--s600);">
+        focalizahr.cl
+      </p>
+    </div>
+
+  </div>
+
+</div><!-- /pad -->
+
+<!-- Footer -->
+<div style="position:absolute; bottom:0; left:0; right:0;">
+  <span class="tesla" style="display:block; opacity:.5;"></span>
+  <div style="padding:3mm 15mm; display:flex; justify-content:space-between; background:rgba(15,23,42,.88);">
+    <span class="micro" style="letter-spacing:.08em; text-transform:uppercase;">FocalizaHR · focalizahr.cl · Chile 2026</span>
+    <span class="micro">Donde la inteligencia organizacional se convierte en acción.</span>
+  </div>
+</div>
+
+</div><!-- /page 2 -->
+
+</body>
+</html>

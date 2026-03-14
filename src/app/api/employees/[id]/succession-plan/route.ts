@@ -60,7 +60,20 @@ export async function GET(
 
     const plans = await prisma.successionDevelopmentPlan.findMany({
       where: whereClause,
-      include: {
+      select: {
+        id: true,
+        status: true,
+        managerCanEditProgress: true,
+        aiSuggestionsUsed: true,
+        createdAt: true,
+        // Statement v3.0 fields
+        aiDiagnostic: true,
+        managerBet: true,
+        immediateAction: true,
+        targetPositionTitle: true,
+        targetJobLevel: true,
+        estimatedReadinessMonths: true,
+        originGapAnalysis: true,
         goals: { orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }] },
         candidate: {
           select: {

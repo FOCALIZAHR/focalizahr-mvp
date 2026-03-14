@@ -209,6 +209,29 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // ════════════════════════════════════════════════════════════════════════════
+    // BATCH: Obtener hasSuccessionPlan desde SuccessionDevelopmentPlan
+    // Solo planes marcados como visibles para el jefe directo
+    // ════════════════════════════════════════════════════════════════════════════
+    let successionPlanMap = new Map<string, boolean>()
+
+    if (assignments.length > 0) {
+      const employeeIds = [...new Set(assignments.map(a => a.evaluateeId))]
+
+      const successionPlans = await prisma.successionDevelopmentPlan.findMany({
+        where: {
+          accountId: userContext.accountId,
+          employeeId: { in: employeeIds },
+          visibleToDirectManager: true,
+        },
+        select: { employeeId: true },
+      })
+
+      successionPlanMap = new Map(
+        successionPlans.map(p => [p.employeeId, true])
+      )
+    }
+
     // Mapear a formato de UI
     const mappedAssignments = assignments.map(a => {
       // Calculate avgScore (escala 1-5, como normalizedScore)
@@ -252,6 +275,7 @@ export async function GET(request: NextRequest) {
         potentialLevel: ratingData?.potentialLevel ?? null,
         nineBoxPosition: ratingData?.nineBoxPosition ?? null,
         hasPDI: pdiMap.get(a.evaluateeId) ?? false,
+        hasSuccessionPlan: successionPlanMap.get(a.evaluateeId) ?? false,
         cycleId: a.cycleId,
         evaluatee: {
           id: a.evaluateeId,

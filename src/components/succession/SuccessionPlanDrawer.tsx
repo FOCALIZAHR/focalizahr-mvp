@@ -2,37 +2,29 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Target, Sparkles } from 'lucide-react'
-import { useToast } from '@/components/ui/toast-system'
+import {
+  X, Target, Brain, MessageSquareText, Zap,
+  Shield, Crosshair, Landmark, RefreshCw,
+} from 'lucide-react'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
 // ════════════════════════════════════════════════════════════════════════════
 
-interface Goal {
-  id: string
-  competencyCode: string
-  title: string
-  description: string | null
-  targetOutcome: string
-  action: string | null
-  category: string
-  priority: string
-  status: string
-  progressPercent: number
-  startDate: string
-  targetDate: string
-  completedAt: string | null
-  aiGenerated: boolean
-}
-
 interface Plan {
   id: string
   status: string
-  managerCanEditProgress: boolean
-  aiSuggestionsUsed: boolean
+  aiDiagnostic: string | null
+  managerBet: string | null
+  immediateAction: string | null
+  targetPositionTitle: string | null
+  targetJobLevel: string | null
+  estimatedReadinessMonths: number | null
+  originGapAnalysis: {
+    diagnosisCaseId?: number
+    diagnosisUrgency?: 'CRITICAL' | 'HIGH' | 'NORMAL'
+  } | null
   createdAt: string
-  goals: Goal[]
   candidate?: {
     criticalPosition?: {
       positionTitle?: string
@@ -51,19 +43,17 @@ interface SuccessionPlanDrawerProps {
 // CONSTANTS
 // ════════════════════════════════════════════════════════════════════════════
 
-const PRIORITY_CONFIG: Record<string, { label: string; color: string }> = {
-  ALTA:  { label: 'Alta',  color: 'bg-rose-500/20 text-rose-400 border-rose-500/30' },
-  MEDIA: { label: 'Media', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
-  BAJA:  { label: 'Baja',  color: 'bg-slate-500/20 text-slate-400 border-slate-500/30' },
+const IMMEDIATE_ACTIONS: Record<string, { label: string; icon: typeof Shield; description: string }> = {
+  RETENTION_TALK:   { label: 'Conversacion de Retencion', icon: Shield,    description: 'Agendar 1:1 para comunicar interes y plan de carrera' },
+  CRITICAL_PROJECT: { label: 'Proyecto Estrategico',     icon: Crosshair, description: 'Asignar un proyecto de alto impacto como stretch assignment' },
+  BOARD_EXPOSURE:   { label: 'Exposicion a Directorio',  icon: Landmark,  description: 'Incluir en presentaciones ejecutivas para ganar visibilidad' },
+  LATERAL_ROTATION: { label: 'Rotacion Lateral',         icon: RefreshCw, description: 'Mover a otra area para ampliar perspectiva y experiencia' },
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  NOT_STARTED:  { label: 'Sin iniciar',  color: 'bg-slate-500/20 text-slate-400 border-slate-500/30' },
-  IN_PROGRESS:  { label: 'En progreso',  color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
-  ON_TRACK:     { label: 'En camino',    color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
-  AT_RISK:      { label: 'En riesgo',    color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
-  COMPLETED:    { label: 'Completado',   color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
-  CANCELLED:    { label: 'Cancelado',    color: 'bg-slate-500/20 text-slate-400 border-slate-500/30' },
+const URGENCY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  CRITICAL: { label: 'CRITICA', color: 'text-rose-400', bg: 'bg-rose-500/10 border-rose-500/30' },
+  HIGH:     { label: 'ALTA',    color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/30' },
+  NORMAL:   { label: 'NORMAL',  color: 'text-cyan-400',  bg: 'bg-cyan-500/10 border-cyan-500/30' },
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -76,11 +66,8 @@ export default function SuccessionPlanDrawer({
   isOpen,
   onClose,
 }: SuccessionPlanDrawerProps) {
-  const { error: toastError } = useToast()
   const [plans, setPlans] = useState<Plan[]>([])
-  const [canEditProgress, setCanEditProgress] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [savingGoal, setSavingGoal] = useState<string | null>(null)
 
   const fetchPlans = useCallback(async () => {
     setLoading(true)
@@ -89,7 +76,6 @@ export default function SuccessionPlanDrawer({
       const json = await res.json()
       if (json.success) {
         setPlans(json.data || [])
-        setCanEditProgress(json.canEditProgress || false)
       }
     } catch {
       // silent
@@ -101,26 +87,6 @@ export default function SuccessionPlanDrawer({
   useEffect(() => {
     if (isOpen) fetchPlans()
   }, [isOpen, fetchPlans])
-
-  async function handleUpdateProgress(goalId: string, progressPercent: number) {
-    setSavingGoal(goalId)
-    try {
-      const res = await fetch(`/api/employees/${employeeId}/succession-plan/progress`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goalId, progressPercent }),
-      })
-      if (!res.ok) {
-        toastError('Error al actualizar progreso', 'Error')
-        return
-      }
-      await fetchPlans()
-    } catch {
-      toastError('Error de conexion', 'Error')
-    } finally {
-      setSavingGoal(null)
-    }
-  }
 
   return (
     <AnimatePresence>
@@ -170,85 +136,121 @@ export default function SuccessionPlanDrawer({
                 </div>
               ) : plans.length === 0 ? (
                 <div className="text-center py-16">
-                  <p className="text-sm text-slate-500">Sin planes de desarrollo visibles</p>
+                  <p className="text-sm text-slate-500">Sin planes de sucesion visibles</p>
                 </div>
               ) : (
                 <div className="space-y-6">
                   {plans.map(plan => {
-                    const positionTitle = plan.candidate?.criticalPosition?.positionTitle
-                    const overallProgress = plan.goals.length > 0
-                      ? Math.round(plan.goals.reduce((s, g) => s + g.progressPercent, 0) / plan.goals.length)
-                      : 0
+                    const positionTitle = plan.targetPositionTitle || plan.candidate?.criticalPosition?.positionTitle
+                    const urgencyKey = (plan.originGapAnalysis as Plan['originGapAnalysis'])?.diagnosisUrgency || 'NORMAL'
+                    const urgency = URGENCY_CONFIG[urgencyKey] || URGENCY_CONFIG.NORMAL
+                    const actionCfg = plan.immediateAction ? IMMEDIATE_ACTIONS[plan.immediateAction] : null
+                    const ActionIcon = actionCfg?.icon || Zap
 
                     return (
-                      <div key={plan.id} className="space-y-3">
+                      <div key={plan.id} className="space-y-4">
+                        {/* Position target */}
                         {positionTitle && (
                           <p className="text-xs text-slate-400">
                             Preparacion para: <span className="text-white font-medium">{positionTitle}</span>
                           </p>
                         )}
 
-                        {/* Progress */}
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] text-slate-500 uppercase tracking-wider">Progreso</span>
-                            <span className="text-xs text-purple-400 font-mono">{overallProgress}%</span>
-                          </div>
-                          <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                        {/* ── Diagnostico Focaliza ── */}
+                        {plan.aiDiagnostic && (
+                          <div
+                            className="relative rounded-2xl overflow-hidden p-4"
+                            style={{
+                              background: 'rgba(30, 41, 59, 0.6)',
+                              backdropFilter: 'blur(20px)',
+                              WebkitBackdropFilter: 'blur(20px)',
+                              border: '1px solid rgba(167, 139, 250, 0.2)',
+                            }}
+                          >
+                            {/* Tesla line */}
                             <div
-                              className="h-full rounded-full transition-all duration-500"
-                              style={{ width: `${overallProgress}%`, background: 'linear-gradient(90deg, #A78BFA, #7C3AED)' }}
+                              className="absolute top-0 left-0 right-0 h-[1px]"
+                              style={{ background: 'linear-gradient(90deg, transparent, #A78BFA, transparent)' }}
                             />
-                          </div>
-                        </div>
-
-                        {/* Goals */}
-                        <div className="space-y-2">
-                          {plan.goals.map(goal => {
-                            const pCfg = PRIORITY_CONFIG[goal.priority] || PRIORITY_CONFIG.MEDIA
-                            const sCfg = STATUS_CONFIG[goal.status] || STATUS_CONFIG.NOT_STARTED
-                            return (
-                              <div key={goal.id} className="bg-slate-800/40 border border-slate-700/30 rounded-xl p-3 space-y-2">
-                                <div className="flex items-start justify-between gap-2">
-                                  <p className="text-sm text-white font-medium leading-snug flex-1">{goal.title}</p>
-                                  <div className="flex gap-1 flex-shrink-0">
-                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${pCfg.color}`}>{pCfg.label}</span>
-                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${sCfg.color}`}>{sCfg.label}</span>
-                                  </div>
-                                </div>
-
-                                <p className="text-xs text-slate-400 leading-relaxed">{goal.targetOutcome}</p>
-
-                                {/* Progress bar */}
-                                <div className="flex items-center gap-2">
-                                  <div className="flex-1 h-1 rounded-full bg-slate-800 overflow-hidden">
-                                    <div
-                                      className="h-full rounded-full bg-purple-500/60 transition-all duration-300"
-                                      style={{ width: `${goal.progressPercent}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-[10px] text-slate-400 font-mono">{goal.progressPercent}%</span>
-                                </div>
-
-                                {/* Manager progress editing */}
-                                {canEditProgress && goal.status !== 'COMPLETED' && goal.status !== 'CANCELLED' && (
-                                  <div className="flex items-center gap-2 pt-1">
-                                    <input
-                                      type="range"
-                                      min={0}
-                                      max={100}
-                                      step={5}
-                                      defaultValue={goal.progressPercent}
-                                      onMouseUp={(e) => handleUpdateProgress(goal.id, Number((e.target as HTMLInputElement).value))}
-                                      className="flex-1 accent-purple-500 h-1"
-                                      disabled={savingGoal === goal.id}
-                                    />
-                                  </div>
-                                )}
+                            <div className="flex items-center gap-2 mb-2">
+                              <Brain className="w-4 h-4 text-purple-400" />
+                              <span className="text-[11px] text-white font-medium">Diagnostico Focaliza</span>
+                              <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${urgency.bg} ${urgency.color}`}>
+                                {urgency.label}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-300 leading-relaxed italic">
+                              &ldquo;{plan.aiDiagnostic}&rdquo;
+                            </p>
+                            {plan.estimatedReadinessMonths != null && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <span className="text-[10px] text-slate-500">Horizonte estimado:</span>
+                                <span className="text-xs text-purple-400 font-mono font-semibold">
+                                  {plan.estimatedReadinessMonths === 0 ? 'Inmediato' : `${plan.estimatedReadinessMonths} meses`}
+                                </span>
                               </div>
-                            )
-                          })}
-                        </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* ── Accion Inmediata ── */}
+                        {plan.immediateAction && actionCfg && (
+                          <div
+                            className="relative rounded-2xl overflow-hidden p-4"
+                            style={{
+                              background: 'rgba(34, 211, 238, 0.04)',
+                              backdropFilter: 'blur(20px)',
+                              WebkitBackdropFilter: 'blur(20px)',
+                              border: '1px solid rgba(34, 211, 238, 0.15)',
+                            }}
+                          >
+                            <div
+                              className="absolute top-0 left-0 right-0 h-[1px]"
+                              style={{ background: 'linear-gradient(90deg, transparent, #22D3EE, transparent)' }}
+                            />
+                            <div className="flex items-center gap-2 mb-2">
+                              <Zap className="w-4 h-4 text-cyan-400" />
+                              <span className="text-[11px] text-white font-medium">Accion Inmediata</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <ActionIcon className="w-5 h-5 text-[#22D3EE] flex-shrink-0" />
+                              <div>
+                                <p className="text-sm text-[#22D3EE] font-medium">{actionCfg.label}</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">{actionCfg.description}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── Apuesta del Gerente ── */}
+                        {plan.managerBet && (
+                          <div
+                            className="relative rounded-2xl overflow-hidden p-4"
+                            style={{
+                              background: 'rgba(30, 41, 59, 0.6)',
+                              backdropFilter: 'blur(20px)',
+                              WebkitBackdropFilter: 'blur(20px)',
+                              border: '1px solid rgba(34, 211, 238, 0.15)',
+                            }}
+                          >
+                            <div
+                              className="absolute top-0 left-0 right-0 h-[1px]"
+                              style={{ background: 'linear-gradient(90deg, transparent, #22D3EE, transparent)' }}
+                            />
+                            <div className="flex items-center gap-2 mb-2">
+                              <MessageSquareText className="w-4 h-4 text-cyan-400" />
+                              <span className="text-[11px] text-white font-medium">Apuesta del Gerente</span>
+                            </div>
+                            <p className="text-xs text-slate-300 leading-relaxed italic">
+                              &ldquo;{plan.managerBet}&rdquo;
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Empty statement */}
+                        {!plan.aiDiagnostic && !plan.immediateAction && !plan.managerBet && (
+                          <p className="text-sm text-slate-500 text-center py-6">Plan en elaboracion</p>
+                        )}
                       </div>
                     )
                   })}
