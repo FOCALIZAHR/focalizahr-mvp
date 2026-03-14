@@ -105,7 +105,7 @@ export default function DominoEffect({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0, duration: 0.3 }}
-        className="relative bg-slate-800/60 border border-cyan-500/30 rounded-xl p-4 overflow-hidden"
+        className="relative bg-slate-800/60 border border-cyan-500/30 rounded-xl p-3 sm:p-4 overflow-hidden"
       >
         <div
           className="absolute top-0 inset-x-0 h-[1px]"
@@ -145,7 +145,7 @@ export default function DominoEffect({
         initial={{ scaleY: 0 }}
         animate={{ scaleY: 1 }}
         transition={{ delay: 0.15, duration: 0.2 }}
-        className="ml-8 w-px h-6 bg-gradient-to-b from-cyan-500/40 to-amber-500/40"
+        className="ml-4 sm:ml-8 w-px h-6 bg-gradient-to-b from-cyan-500/40 to-amber-500/40"
         style={{ originY: 0 }}
       />
 
@@ -154,17 +154,17 @@ export default function DominoEffect({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.3 }}
-        className={`relative ml-4 border rounded-xl p-4 overflow-hidden ${resConfig.borderColor} ${resConfig.bgColor}`}
+        className={`relative ml-2 sm:ml-4 border rounded-xl p-3 sm:p-4 overflow-hidden ${resConfig.borderColor} ${resConfig.bgColor}`}
       >
         <div
           className="absolute top-0 inset-x-0 h-[1px]"
           style={{ background: `linear-gradient(90deg, transparent, ${resConfig.tesla}, transparent)` }}
         />
-        <div className="flex items-center justify-between">
-          <p className="text-white font-medium text-sm">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-white font-medium text-sm truncate min-w-0 flex-1">
             {vacatedPosition || 'Sin cargo previo'} queda libre
           </p>
-          <span className={`text-[10px] font-medium ${resConfig.badgeColor}`}>
+          <span className={`text-[11px] font-medium flex-shrink-0 ${resConfig.badgeColor}`}>
             {resConfig.badge}
           </span>
         </div>
@@ -177,24 +177,24 @@ export default function DominoEffect({
             initial={{ scaleY: 0 }}
             animate={{ scaleY: 1 }}
             transition={{ delay: 0.4, duration: 0.2 }}
-            className="ml-12 w-px h-6 bg-amber-500/20"
+            className="ml-6 sm:ml-12 w-px h-6 bg-amber-500/20"
             style={{ originY: 0 }}
           />
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5, duration: 0.3 }}
-            className="relative ml-8 bg-slate-800/30 border border-slate-700/30 rounded-lg px-3 py-2 flex items-center gap-2 overflow-hidden"
+            className="relative ml-4 sm:ml-8 bg-slate-800/30 border border-slate-700/30 rounded-lg px-2 sm:px-3 py-2 flex items-center gap-2 overflow-hidden"
           >
             <div
               className="absolute top-0 inset-x-0 h-[1px]"
               style={{ background: 'linear-gradient(90deg, transparent, rgba(245,158,11,0.3), transparent)' }}
             />
             <div className="w-7 h-7 rounded-full bg-slate-700/80 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
-              <span className="text-amber-400 font-bold text-[10px]">{getInitialsHelper(formatDisplayName(backfillEmployeeName, 'short'))}</span>
+              <span className="text-amber-400 font-bold text-[11px]">{getInitialsHelper(formatDisplayName(backfillEmployeeName, 'short'))}</span>
             </div>
-            <span className="text-xs text-white font-medium">{formatDisplayName(backfillEmployeeName, 'short')}</span>
-            <span className="text-[10px] text-slate-400">cubre el cargo</span>
+            <span className="text-xs text-white font-medium truncate min-w-0">{formatDisplayName(backfillEmployeeName, 'short')}</span>
+            <span className="text-[10px] text-slate-400 flex-shrink-0">cubre</span>
           </motion.div>
         </>
       )}

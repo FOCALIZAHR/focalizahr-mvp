@@ -124,11 +124,11 @@ export default function SuccessionCandidateRow({
       />
 
       {/* Watermark rank */}
-      <div className={`absolute -bottom-4 -right-2 text-[120px] font-black leading-none select-none pointer-events-none z-0 opacity-[0.06] ${isSuggestion ? 'text-purple-400' : 'text-cyan-400'}`}>
+      <div className={`absolute -bottom-4 -right-2 text-[80px] sm:text-[120px] font-black leading-none select-none pointer-events-none z-0 opacity-[0.06] ${isSuggestion ? 'text-purple-400' : 'text-cyan-400'}`}>
         {rank}
       </div>
 
-      <div className="relative z-10 p-4">
+      <div className="relative z-10 p-3 sm:p-4">
         {/* Row 1: Avatar + Info + Readiness */}
         <div className="flex items-center gap-3">
           {/* Avatar */}
@@ -158,11 +158,11 @@ export default function SuccessionCandidateRow({
           </div>
 
           {/* Readiness + Fit + Match */}
-          <div className="flex-shrink-0 text-right">
-            <p className="text-slate-300 text-xs">
+          <div className="flex-shrink-0 sm:flex-shrink-0 text-right min-w-0">
+            <p className="text-slate-300 text-xs truncate">
               {readinessText}
             </p>
-            <p className="text-slate-500 text-[10px]">
+            <p className="text-slate-500 text-[11px]">
               Fit {Math.round(candidate.roleFitScore)}%
               {isSuggestion && candidate.matchPercent != null && (
                 <span> · Match {Math.round(candidate.matchPercent)}%</span>
@@ -170,7 +170,7 @@ export default function SuccessionCandidateRow({
             </p>
             {/* Backfill badge */}
             {candidate.backfillResolution && (
-              <span className={`inline-block mt-1 text-[9px] px-2 py-0.5 rounded-full border ${
+              <span className={`inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full border ${
                 candidate.backfillResolution === 'PENDING'
                   ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                   : candidate.backfillResolution === 'COVERED'
@@ -188,7 +188,7 @@ export default function SuccessionCandidateRow({
 
         {/* Row 2: Action buttons — only if applicable */}
         {hasActions && (
-          <div className="flex items-center gap-2 mt-3 pl-0 sm:pl-[52px]">
+          <div className="flex items-center gap-2 mt-3 pl-0 sm:pl-[52px] flex-wrap">
             {onViewPDI && (
               <GhostButton
                 size="sm"
@@ -226,8 +226,8 @@ export default function SuccessionCandidateRow({
                   </span>
                 </GhostButton>
                 {candidate.backfillResolution === 'PENDING' && (
-                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-800 text-amber-300 text-xs px-2 py-1 rounded border border-amber-500/30 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                    Clic para definir quién cubre este cargo
+                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 max-w-[200px] text-center bg-slate-800 text-amber-300 text-xs px-2 py-1 rounded border border-amber-500/30 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                    Clic para definir cobertura
                   </span>
                 )}
               </span>
@@ -237,7 +237,7 @@ export default function SuccessionCandidateRow({
 
         {/* Inline Domino Effect */}
         {showDomino && onDominoClick && (
-          <div className="mt-3 pl-[52px]">
+          <div className="mt-3 pl-0 sm:pl-[52px]">
             <DominoEffect
               candidateName={displayName}
               candidatePosition={candidate.position || 'Sin cargo'}

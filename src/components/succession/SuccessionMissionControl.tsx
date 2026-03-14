@@ -100,7 +100,7 @@ function SuccessionGauge({ coverage, coveredRoles, totalRoles }: {
       {/* Center content */}
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
         <motion.span
-          className="text-7xl font-black text-white tracking-tighter font-mono"
+          className="text-5xl sm:text-7xl font-black text-white tracking-tighter font-mono"
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3, duration: 0.5 }}
@@ -192,20 +192,20 @@ export const SuccessionMissionControl = memo(function SuccessionMissionControl({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ type: 'spring', stiffness: 220, damping: 30 }}
-      className="flex flex-col items-center gap-6 w-full max-w-4xl px-4"
+      className="flex flex-col items-center gap-4 sm:gap-6 w-full max-w-4xl px-4"
     >
       {/* Title */}
       <div className="text-center">
-        <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight mb-1">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight mb-1">
           Pipeline de Sucesion
         </h1>
-        <p className="text-xs text-slate-500 font-mono uppercase tracking-wider">
+        <p className="text-[10px] sm:text-xs text-slate-500 font-mono uppercase tracking-wider">
           Cobertura de posiciones criticas
         </p>
       </div>
 
       {/* Main row: Indicators | Gauge | CTA */}
-      <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-10 w-full">
+      <div className="flex flex-col md:flex-row items-center justify-center gap-4 sm:gap-6 md:gap-10 w-full">
 
         {/* LED Indicators — desktop left */}
         <div className="hidden md:block">
@@ -220,19 +220,19 @@ export const SuccessionMissionControl = memo(function SuccessionMissionControl({
           <div className="hidden md:block">
             <motion.button
               onClick={() => onPositionClick(urgent.id)}
-              className="group relative flex items-center rounded-xl transition-all transform hover:-translate-y-0.5 gap-4 pl-5 pr-2 py-2 bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-300 hover:to-cyan-400 text-slate-950 shadow-[0_8px_24px_-6px_rgba(34,211,238,0.35)]"
+              className="group relative flex items-center rounded-xl transition-all transform hover:-translate-y-0.5 gap-4 pl-5 pr-2 py-2 bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-300 hover:to-cyan-400 text-slate-950 shadow-[0_8px_24px_-6px_rgba(34,211,238,0.35)] max-w-[220px]"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              <div className="text-left">
+              <div className="text-left min-w-0 flex-1">
                 <span className="block text-[9px] uppercase tracking-wider font-semibold text-slate-700 opacity-70">
                   Ver Pipeline
                 </span>
-                <span className="block text-sm font-bold leading-tight">
+                <span className="block text-sm font-bold leading-tight truncate">
                   {urgent.positionTitle}
                 </span>
               </div>
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-slate-950/10">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-slate-950/10 flex-shrink-0">
                 <ArrowRight className="w-4 h-4" />
               </div>
             </motion.button>
@@ -247,34 +247,34 @@ export const SuccessionMissionControl = memo(function SuccessionMissionControl({
 
       {/* Insight text */}
       {urgent && (
-        <p className="text-sm text-slate-400 text-center max-w-xs">
+        <p className="text-sm text-slate-400 text-center max-w-xs px-4">
           {urgent.positionTitle} necesita sucesores urgentes
         </p>
       )}
       {!urgent && totalRoles > 0 && (
-        <p className="text-sm text-emerald-400 text-center max-w-xs font-medium">
+        <p className="text-sm text-emerald-400 text-center max-w-xs px-4 font-medium">
           Todos los roles criticos tienen cobertura
         </p>
       )}
 
       {/* CTA — mobile */}
       {urgent && (
-        <div className="md:hidden">
+        <div className="md:hidden w-full px-4">
           <motion.button
             onClick={() => onPositionClick(urgent.id)}
-            className="group relative flex items-center rounded-xl transition-all gap-4 pl-5 pr-2 py-2 bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-300 hover:to-cyan-400 text-slate-950 shadow-[0_8px_24px_-6px_rgba(34,211,238,0.35)]"
+            className="group relative flex items-center rounded-xl transition-all gap-4 pl-5 pr-2 py-2 bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-300 hover:to-cyan-400 text-slate-950 shadow-[0_8px_24px_-6px_rgba(34,211,238,0.35)] w-full max-w-xs mx-auto"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            <div className="text-left">
+            <div className="text-left min-w-0 flex-1">
               <span className="block text-[9px] uppercase tracking-wider font-semibold text-slate-700 opacity-70">
                 Ver Pipeline
               </span>
-              <span className="block text-sm font-bold leading-tight">
+              <span className="block text-sm font-bold leading-tight truncate">
                 {urgent.positionTitle}
               </span>
             </div>
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-slate-950/10">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-slate-950/10 flex-shrink-0">
               <ArrowRight className="w-4 h-4" />
             </div>
           </motion.button>

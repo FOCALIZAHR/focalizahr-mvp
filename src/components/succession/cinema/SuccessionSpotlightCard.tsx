@@ -132,7 +132,7 @@ export default function SuccessionSpotlightCard({
   // Si showBriefing está activo, mostrar portada ejecutiva antes de las tabs
   if (showBriefing) {
     return (
-      <div className="flex items-start justify-center p-6 min-h-[500px]">
+      <div className="flex items-start justify-center p-3 sm:p-6 min-h-[400px] sm:min-h-[500px]">
         <SuccessionPositionBriefing
           position={{
             ...position,
@@ -177,18 +177,18 @@ export default function SuccessionSpotlightCard({
         </button>
 
         {/* ── LEFT COLUMN: Identity (250px, cloned from SpotlightCard) ── */}
-        <div className="w-full md:w-[250px] md:flex-shrink-0 bg-slate-900/50 p-8 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-800">
+        <div className="w-full md:w-[250px] md:flex-shrink-0 bg-slate-900/50 p-4 sm:p-8 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-800">
 
           {/* Avatar */}
-          <div className="relative mb-6">
-            <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center text-2xl font-bold text-slate-400 border border-slate-700 shadow-2xl">
+          <div className="relative mb-4 sm:mb-6">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-full bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center text-xl sm:text-2xl font-bold text-slate-400 border border-slate-700 shadow-2xl">
               {initials}
             </div>
 
             {/* Bench strength badge below avatar */}
             <div className="absolute -bottom-3 left-1/2 -translate-x-1/2">
               <span className={cn(
-                'px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border',
+                'px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border',
                 position.benchStrength === 'STRONG' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' :
                 position.benchStrength === 'MODERATE' ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40' :
                 position.benchStrength === 'WEAK' ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' :
@@ -267,13 +267,13 @@ export default function SuccessionSpotlightCard({
         </div>
 
         {/* ── RIGHT COLUMN (cloned from StorytellingGuide area) ── */}
-        <div className="flex-1 flex flex-col min-h-[300px] md:min-h-[500px] pt-4 bg-gradient-to-br from-[#0F172A] to-[#162032]">
+        <div className="flex-1 flex flex-col min-h-[250px] md:min-h-[500px] pt-4 bg-gradient-to-br from-[#0F172A] to-[#162032]">
 
           {/* Tabs */}
-          <div className="flex border-b border-slate-800 px-6">
+          <div className="flex border-b border-slate-800 px-3 sm:px-6 overflow-x-auto [&::-webkit-scrollbar]:hidden">
             <button
               className={cn(
-                'px-5 py-3 text-[11px] font-bold uppercase tracking-wider transition-colors',
+                'px-3 sm:px-5 py-3 text-[11px] font-bold uppercase tracking-wider transition-colors flex-shrink-0',
                 tab === 'candidates' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-500 hover:text-slate-300'
               )}
               onClick={() => setTab('candidates')}
@@ -283,7 +283,7 @@ export default function SuccessionSpotlightCard({
             {canManage && (
               <button
                 className={cn(
-                  'px-5 py-3 text-[11px] font-bold uppercase tracking-wider transition-colors',
+                  'px-3 sm:px-5 py-3 text-[11px] font-bold uppercase tracking-wider transition-colors flex-shrink-0',
                   tab === 'suggestions' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-500 hover:text-slate-300'
                 )}
                 onClick={() => {
@@ -297,7 +297,7 @@ export default function SuccessionSpotlightCard({
           </div>
 
           {/* Tab Content */}
-          <div className="flex-1 px-6 py-4">
+          <div className="flex-1 px-3 sm:px-6 py-4">
             {tab === 'candidates' ? (
               candidates.length > 0 ? (
                 <div className="space-y-3">

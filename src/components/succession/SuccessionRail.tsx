@@ -107,7 +107,7 @@ function PositionRailCard({ position, isSelected, onClick }: {
       onMouseLeave={() => setIsHovered(false)}
       whileHover={{ y: -5 }}
       className={cn(
-        'snap-start flex-shrink-0 w-[140px] sm:w-[160px] h-[200px] rounded-xl cursor-pointer',
+        'snap-start flex-shrink-0 w-[130px] sm:w-[160px] h-[180px] sm:h-[200px] rounded-xl cursor-pointer',
         'transition-all duration-300 relative group overflow-hidden border',
         isSelected
           ? 'bg-slate-800 border-cyan-500/50 shadow-[0_0_20px_-5px_rgba(34,211,238,0.15)]'
@@ -122,11 +122,11 @@ function PositionRailCard({ position, isSelected, onClick }: {
         (isSelected || isHovered) && 'shadow-[0_0_10px_currentColor]'
       )} />
 
-      <div className="flex flex-col items-center justify-center h-full p-4">
+      <div className="flex flex-col items-center justify-center h-full p-3 sm:p-4">
         {/* Avatar */}
         <div className={cn(
-          'w-14 h-14 rounded-full flex items-center justify-center',
-          'text-sm font-bold border transition-all mb-3 shadow-lg',
+          'w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center',
+          'text-sm font-bold border transition-all mb-2 sm:mb-3 shadow-lg',
           isSelected
             ? 'bg-gradient-to-br from-slate-700 to-slate-800 border-cyan-500/30 text-white'
             : 'bg-slate-800 border-slate-700/50 text-slate-500 group-hover:text-slate-300'
@@ -142,7 +142,7 @@ function PositionRailCard({ position, isSelected, onClick }: {
           )}>
             {position.positionTitle}
           </h4>
-          <p className="text-[9px] text-slate-600 truncate font-medium">
+          <p className="text-[10px] text-slate-600 truncate font-medium">
             {position._count.candidates} candidato{position._count.candidates !== 1 ? 's' : ''}
           </p>
         </div>
@@ -324,15 +324,19 @@ export const SuccessionRail = memo(function SuccessionRail({
     COVERED: positions.filter(p => p.benchStrength === 'STRONG' || p.benchStrength === 'MODERATE').length,
   }), [positions])
 
+  // Responsive height: shorter on mobile
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+  const expandedHeight = isMobile ? 280 : 320
+
   const scrollLeft = () => carouselRef.current?.scrollBy({ left: -200, behavior: 'smooth' })
   const scrollRight = () => carouselRef.current?.scrollBy({ left: 200, behavior: 'smooth' })
 
   return (
     <motion.div
-      className="fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-[#0F172A] via-[#0F172A] to-transparent flex flex-col justify-end border-t border-white/5 backdrop-blur-xl"
+      className="fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-[#0F172A] via-[#0F172A] to-transparent flex flex-col justify-end border-t border-white/5 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]"
       initial={false}
       animate={{
-        height: isExpanded ? 320 : 50,
+        height: isExpanded ? expandedHeight : 50,
         backgroundColor: isExpanded ? 'rgba(15, 23, 42, 0.95)' : 'transparent',
         borderColor: isExpanded ? 'rgba(255,255,255,0.05)' : 'transparent'
       }}
@@ -340,14 +344,14 @@ export const SuccessionRail = memo(function SuccessionRail({
     >
       {/* Toggle Bar */}
       <div
-        className="px-8 h-[50px] flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors flex-shrink-0"
+        className="px-4 sm:px-8 h-[50px] flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors flex-shrink-0"
         onClick={onToggle}
       >
         <div className="flex items-center gap-3">
           <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">
             Roles Criticos ({positions.length})
           </h3>
-          <span className="text-[10px] text-slate-500 font-mono">
+          <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">
             {positions.length} posiciones · {totalCandidates ?? 0} candidatos
           </span>
           <ChevronUp className={cn(
@@ -366,31 +370,39 @@ export const SuccessionRail = memo(function SuccessionRail({
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           {/* Dashboard link */}
           <button
             onClick={(e) => { e.stopPropagation(); router.push('/dashboard/succession') }}
-            className="flex items-center gap-1 text-slate-500 hover:text-slate-300 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-colors"
+            className="flex items-center gap-1 text-slate-500 hover:text-slate-300 px-1.5 sm:px-2 py-1.5 rounded-lg text-[10px] font-medium transition-colors"
           >
             <Home className="w-3 h-3" />
-            Inicio
+            <span className="hidden sm:inline">Inicio</span>
           </button>
 
           {/* Nueva Posicion */}
           {onCreatePosition && (
             <button
               onClick={(e) => { e.stopPropagation(); onCreatePosition() }}
-              className="flex items-center gap-1 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all border border-slate-700 hover:border-slate-600"
+              className="hidden sm:flex items-center gap-1 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all border border-slate-700 hover:border-slate-600"
             >
               <Plus className="w-3 h-3" />
               Nueva Posicion
+            </button>
+          )}
+          {onCreatePosition && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onCreatePosition() }}
+              className="sm:hidden flex items-center justify-center w-8 h-8 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-full border border-slate-700"
+            >
+              <Plus className="w-3.5 h-3.5" />
             </button>
           )}
 
           {/* CTA Button */}
           <button
             onClick={(e) => { e.stopPropagation(); onToggle() }}
-            className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all shadow-[0_2px_10px_rgba(34,211,238,0.3)]"
+            className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 px-3 sm:px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all shadow-[0_2px_10px_rgba(34,211,238,0.3)]"
           >
             {isExpanded ? 'Ocultar' : 'Ver Roles'}
           </button>
@@ -403,7 +415,7 @@ export const SuccessionRail = memo(function SuccessionRail({
         isExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'
       )}>
         {/* Filter tabs */}
-        <div className="px-8 pb-4 flex gap-2 flex-shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+        <div className="px-4 sm:px-8 pb-4 flex gap-2 flex-shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden">
           {TAB_ORDER.map(tab => {
             const isActive = activeTab === tab
             const styles = TAB_STYLES[tab]
@@ -413,7 +425,7 @@ export const SuccessionRail = memo(function SuccessionRail({
                 key={tab}
                 onClick={(e) => { e.stopPropagation(); onTabChange(tab) }}
                 className={cn(
-                  'px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all whitespace-nowrap',
+                  'px-3 sm:px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all flex-shrink-0',
                   isActive ? styles.active : styles.inactive
                 )}
               >
@@ -427,14 +439,14 @@ export const SuccessionRail = memo(function SuccessionRail({
         <div className="relative group">
           <button
             onClick={scrollLeft}
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-slate-800/90 hover:bg-slate-700 rounded-full flex items-center justify-center border border-slate-700 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute left-1 sm:left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 sm:w-10 sm:h-10 bg-slate-800/90 hover:bg-slate-700 rounded-full flex items-center justify-center border border-slate-700 shadow-lg opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
           >
-            <ChevronLeft className="w-5 h-5 text-white" />
+            <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </button>
 
           <div
             ref={carouselRef}
-            className="flex overflow-x-auto gap-3 px-8 pb-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth"
+            className="flex overflow-x-auto gap-3 px-4 sm:px-8 pb-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth"
             style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
           >
             {filteredPositions.map(pos => (
@@ -449,9 +461,9 @@ export const SuccessionRail = memo(function SuccessionRail({
 
           <button
             onClick={scrollRight}
-            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-slate-800/90 hover:bg-slate-700 rounded-full flex items-center justify-center border border-slate-700 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 sm:w-10 sm:h-10 bg-slate-800/90 hover:bg-slate-700 rounded-full flex items-center justify-center border border-slate-700 shadow-lg opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
           >
-            <ChevronRight className="w-5 h-5 text-white" />
+            <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </button>
         </div>
       </div>

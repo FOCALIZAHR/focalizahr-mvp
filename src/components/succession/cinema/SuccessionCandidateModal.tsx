@@ -242,7 +242,7 @@ export default function SuccessionCandidateModal({
   const [hasPlanChanges, setHasPlanChanges] = useState(false)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
 
-  function handleBackdropClick() {
+  function handleCloseButton() {
     if (hasPlanChanges) {
       setShowDiscardConfirm(true)
     } else {
@@ -297,7 +297,6 @@ export default function SuccessionCandidateModal({
   return (
     <div
       className="fixed inset-0 flex items-center justify-center z-[100] bg-black/60 backdrop-blur-sm"
-      onClick={handleBackdropClick}
     >
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
@@ -370,7 +369,7 @@ export default function SuccessionCandidateModal({
               </div>
             </div>
             <button
-              onClick={handleBackdropClick}
+              onClick={handleCloseButton}
               className="text-slate-500 hover:text-slate-300 transition-colors p-1"
             >
               <X className="w-4 h-4" />
