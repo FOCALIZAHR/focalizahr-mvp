@@ -17,6 +17,7 @@ import { OnboardingAlertEngine } from '@/engines/OnboardingAlertEngine';
 interface AlertsMoneyWallProps {
   alerts: any[];
   metrics: any;
+  avgSalary?: number | null;  // Server-side via SalaryConfigService
   loading: boolean;
   isRefreshing: boolean;
   onRefresh: () => void;
@@ -36,12 +37,13 @@ const formatCurrency = (amount: number): string => {
   return `$${amount.toFixed(0)}`;
 };
 
-export default function AlertsMoneyWall({ 
-  alerts, 
+export default function AlertsMoneyWall({
+  alerts,
   metrics,
+  avgSalary,
   loading,
   isRefreshing,
-  onRefresh 
+  onRefresh
 }: AlertsMoneyWallProps) {
   
   // ========================================
@@ -86,8 +88,9 @@ export default function AlertsMoneyWall({
       // Inicializar persona si no existe
       if (!personMap.has(journeyId)) {
         const businessCase = OnboardingAlertEngine.generateBusinessCaseFromAlert(
-          alert as any, 
-          alert.journey
+          alert as any,
+          alert.journey,
+          avgSalary || undefined
         );
         const risk = businessCase?.financials?.potentialAnnualLoss || 0;
         

@@ -17,10 +17,8 @@ import {
 import { BusinessCaseSeverity } from '@/types/BusinessCase';
 import { ExitAlert } from '@prisma/client';
 import { formatCurrencyCLP } from '@/lib/financialCalculations';
-import { 
-  CHILE_ECONOMIC_ADJUSTMENTS, 
-  FinancialCalculator 
-} from '@/config/impactAssumptions';
+import { FinancialCalculator } from '@/config/impactAssumptions';
+import { CHILE_SALARY_DEFAULTS } from '@/config/SalaryConfig';
 import { EMBLEMATIC_CASES, MAIN_STATISTICS } from '@/config/emblamaticCases';
 
 /**
@@ -141,9 +139,8 @@ const FOCALIZA_PRODUCTS: Record<string, FocalizaProduct> = {
 // NO hardcodear - usar configuración centralizada
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function getAverageSalary(sector?: string): number {
-  const salaries = CHILE_ECONOMIC_ADJUSTMENTS.average_salaries_by_sector;
-  return salaries[sector as keyof typeof salaries] || salaries.default;
+function getAverageSalary(_sector?: string): number {
+  return CHILE_SALARY_DEFAULTS.promedio_general;
 }
 
 /**

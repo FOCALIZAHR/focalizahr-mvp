@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Crown, Shield, ArrowRight } from 'lucide-react'
@@ -45,6 +45,12 @@ interface CriticalPosition {
   incumbentRetirementDate: string | null
   department: { displayName: string } | null
   incumbent: { id: string; fullName: string; position: string } | null
+  candidates?: Array<{
+    readinessLevel: string
+    readinessOverride: string | null
+    matchPercent: number
+    employee: { fullName: string }
+  }>
   _count: { candidates: number }
 }
 
@@ -330,7 +336,19 @@ export default function SuccessionOrchestrator({
     setDominoLoading(false)
   }, [toast, dominoLoading, showDominoModal])
 
-  // ── Rail stats ──
+  // ── Rail data: map candidates[0] → topCandidate ──
+  const railPositions = useMemo(() => initialPositions.map(p => {
+    const top = p.candidates?.[0]
+    return {
+      ...p,
+      topCandidate: top ? {
+        employeeName: top.employee.fullName,
+        readinessLevel: top.readinessOverride || top.readinessLevel,
+        matchPercent: top.matchPercent,
+      } : null,
+    }
+  }), [initialPositions])
+
   const totalCandidates = initialPositions.reduce((sum, p) => sum + p._count.candidates, 0)
 
   return (
@@ -405,7 +423,7 @@ export default function SuccessionOrchestrator({
       {/* ── RAIL (fixed bottom, evaluator pattern) ── */}
       {initialPositions.length > 0 && (
         <SuccessionRail
-          positions={initialPositions}
+          positions={railPositions}
           selectedPositionId={selectedPosition?.id || null}
           isExpanded={isRailExpanded}
           activeTab={railTab}

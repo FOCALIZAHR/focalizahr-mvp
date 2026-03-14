@@ -36,11 +36,7 @@ import {
 } from '@/lib/services/AuthorizationService';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
-import {
-  FinancialCalculator,
-  CHILE_ECONOMIC_ADJUSTMENTS
-} from '@/config/impactAssumptions';
-import { formatCurrencyCLP } from '@/lib/financialCalculations';
+import { SalaryConfigService } from '@/lib/services/SalaryConfigService';
 import { EXIT_REASON_LABELS, ExitReason } from '@/types/exit';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -372,11 +368,10 @@ async function getROIData(
 
   const companySeverity = severityAgg._avg.exitFactorsAvg || 0;
 
-  // Calcular costo estimado (salario promedio Chile * factor SHRM)
-  const avgSalary = CHILE_ECONOMIC_ADJUSTMENTS.average_salaries_by_sector.default;
-  const annualSalary = avgSalary * 12;
-  const replacementCostPerPerson = FinancialCalculator.calculateTurnoverCost(annualSalary);
-  const estimatedCost = keyTalentCount * replacementCostPerPerson.cost_clp;
+  // Calcular costo estimado usando SalaryConfigService (jerarquía: empresa → default Chile)
+  const salaryResult = await SalaryConfigService.getSalaryForAccount(accountId);
+  const turnoverResult = SalaryConfigService.calculateTurnoverCost(salaryResult.monthlySalary);
+  const estimatedCost = keyTalentCount * turnoverResult.turnoverCost;
 
   // Benchmark de industria (placeholder - en producción vendría de /api/benchmarks)
   const benchmarkSeverity = 2.8; // Promedio industria típico

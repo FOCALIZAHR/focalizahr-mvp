@@ -7,6 +7,7 @@
  */
 
 import { FinancialCalculator, CHILE_ECONOMIC_ADJUSTMENTS } from '@/config/impactAssumptions';
+import { CHILE_SALARY_DEFAULTS } from '@/config/SalaryConfig';
 import { BusinessCaseFinancials } from '@/types/BusinessCase';
 
 export interface FinancialImpactCalculation {
@@ -340,12 +341,11 @@ export class FinancialCalculationsService {
   }
   
   /**
-   * Calcula salario promedio por sector Chile
-   * Basado en datos mercado local actualizados
+   * Calcula salario promedio Chile (sync fallback)
+   * @deprecated Usar SalaryConfigService.getSalaryForAccount() para salarios cuenta-específicos
    */
-  static getAverageSalaryCLP(sector: string = 'default'): number {
-    const salaries = CHILE_ECONOMIC_ADJUSTMENTS.average_salaries_by_sector;
-    return salaries[sector as keyof typeof salaries] || salaries.default;
+  static getAverageSalaryCLP(_sector: string = 'default'): number {
+    return CHILE_SALARY_DEFAULTS.promedio_general;
   }
   
   /**
@@ -492,12 +492,13 @@ export function convertToChileanPesos(amount_usd: number): number {
 // ============================================================================
 
 const ONBOARDING_FINANCIAL_CONFIG = {
-  // Salario promedio Chile (roles medios)
-  avgSalaryChile: 75000 * 12, // $900,000 CLP anual
+  // Salario promedio Chile — unificado con SalaryConfig defaults
+  avgSalaryChile: CHILE_SALARY_DEFAULTS.promedio_general * 12, // $14,400,000 CLP anual
   
   // Multiplicador costo rotación temprana (SHRM 2024)
+  // "6 sueldos" = 6 meses de salario = 0.5x salario anual
   // Incluye: reclutamiento + onboarding + productividad perdida + conocimiento perdido
-  turnoverMultiplier: 6.0,
+  turnoverMultiplier: 0.5,
   
   // Costos intervención (tiempo interno ya asignado)
   interventionCosts: {

@@ -35,6 +35,12 @@ interface CriticalPosition {
   incumbentRetirementDate: string | null
   department: { displayName: string } | null
   incumbent: { id: string; fullName: string; position: string } | null
+  candidates?: Array<{
+    readinessLevel: string
+    readinessOverride: string | null
+    matchPercent: number
+    employee: { fullName: string }
+  }>
   _count: { candidates: number }
 }
 

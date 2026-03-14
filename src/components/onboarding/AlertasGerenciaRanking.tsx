@@ -30,11 +30,8 @@ import {
   Activity
 } from 'lucide-react';
 import { useOnboardingAlerts } from '@/hooks/useOnboardingAlerts';
-import { 
-  calculateTurnoverCostSHRM2024,
-  getOnboardingFinancialConfig,
-  formatCurrencyCLP 
-} from '@/lib/financialCalculations';
+import { calculateTurnoverCostSHRM2024 } from '@/lib/financialCalculations';
+import { CHILE_SALARY_DEFAULTS } from '@/config/SalaryConfig';  // Fallback only
 
 // ====================================================================
 // INTERFACES
@@ -73,17 +70,17 @@ export default function AlertasGerenciaRanking({
 }: AlertasGerenciaRankingProps) {
   
   const router = useRouter();
-  const { alerts, metrics, loading } = useOnboardingAlerts(
+  const { alerts, metrics, avgSalary, loading } = useOnboardingAlerts(
     undefined,  // severity
     undefined,  // status
     undefined,  // slaStatus
     scope       // scope - dinámico según prop
   );
-  // ✅ CÁLCULO COSTO ROTACIÓN - SHRM 2024
+  // ✅ CÁLCULO COSTO ROTACIÓN - SHRM 2024 (salario cuenta-específico via backend, fallback Chile)
   const costoRotacionPorPersona = useMemo(() => {
-    const config = getOnboardingFinancialConfig();
-    return calculateTurnoverCostSHRM2024(config.avgSalaryChile);
-  }, []);
+    const salarioMensual = avgSalary || CHILE_SALARY_DEFAULTS.promedio_general;
+    return calculateTurnoverCostSHRM2024(salarioMensual * 12);
+  }, [avgSalary]);
 
   // ================================================================
   // HELPERS

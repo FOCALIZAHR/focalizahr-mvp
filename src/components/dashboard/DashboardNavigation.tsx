@@ -37,6 +37,7 @@ import {
   Plus,
   Building2,
   Zap,
+  DollarSign,
 } from 'lucide-react';
 
 // ============================================================================
@@ -111,6 +112,10 @@ export default function DashboardNavigation({
     'FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_MANAGER', 'HR_ADMIN', 'CEO', 'AREA_MANAGER', 'CLIENT'
   ];
   const canSeeExecutiveHub = user?.role && executiveHubRoles.includes(user.role);
+
+  // RBAC: Roles que pueden ver Config. Salarial
+  const salaryConfigRoles = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_ADMIN', 'HR_MANAGER', 'CLIENT'];
+  const canSeeSalaryConfig = user?.role && salaryConfigRoles.includes(user.role);
 
   // Navigation Config con Dropdowns
   const navigationItems: NavigationItem[] = [
@@ -189,6 +194,14 @@ export default function DashboardNavigation({
         { id: 'whatsapp', label: 'WhatsApp', href: '/dashboard/whatsapp', icon: MessageSquare, comingSoon: true },
       ],
     },
+    // Config. Salarial - Solo roles que configuran, no CEO/HR_OPERATOR
+    ...(canSeeSalaryConfig ? [{
+      id: 'config-salarial',
+      label: 'Config. Salarial',
+      href: '/dashboard/configuracion/empresa',
+      icon: DollarSign,
+      active: pathname.startsWith('/dashboard/configuracion/empresa'),
+    }] : []),
     {
       id: 'configuracion',
       label: 'Configuración',

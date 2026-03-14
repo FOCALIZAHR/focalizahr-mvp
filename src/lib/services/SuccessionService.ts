@@ -7,7 +7,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { prisma } from '@/lib/prisma'
-import { ReadinessLevel, BenchStrengthLevel } from '@prisma/client'
+import { ReadinessLevel, BenchStrengthLevel, NominationSource } from '@prisma/client'
 import { getChildDepartmentIds } from '@/lib/services/AuthorizationService'
 import {
   ROLEFIT_THRESHOLD,
@@ -727,9 +727,11 @@ export class SuccessionService {
 
     console.timeEnd('[Nominate] Paso 2: eligibility + duplicate check')
 
-    if (!eligibility.eligible) {
-      console.timeEnd('[Nominate] TOTAL'); return { success: false, error: `No elegible: ${eligibility.reasons.join(', ')}` }
-    }
+    // Determinar origen: SUGGESTED si cumple filtros, DISCRETIONARY si no
+    const nominationSource: NominationSource = eligibility.eligible
+      ? NominationSource.SUGGESTED
+      : NominationSource.DISCRETIONARY
+
     if (existing) {
       console.timeEnd('[Nominate] TOTAL'); return { success: false, error: 'Ya nominado para esta posicion' }
     }
@@ -756,7 +758,8 @@ export class SuccessionService {
         criticalPositionId: positionId,
         employeeId,
         currentRoleFit: eligibility.roleFitScore ?? 0,
-        passedThreshold: true,
+        passedThreshold: eligibility.eligible,
+        nominationSource,
         nineBoxPosition: eligibility.nineBoxPosition,
         aspirationLevel: eligibility.potentialAspiration,
         matchPercent: match.matchPercent,

@@ -1,12 +1,12 @@
 // src/components/succession/SuccessionRail.tsx
 'use client'
 
-import { memo, useMemo, useRef, useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
-import { ChevronUp, ChevronLeft, ChevronRight, Check, Clock, Plus, Home } from 'lucide-react'
+import { memo, useMemo, useRef, useState } from 'react'
+import { ChevronUp, ChevronLeft, ChevronRight, Plus, Home } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { formatDisplayName } from '@/lib/utils/formatName'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -16,6 +16,12 @@ interface RailPosition {
   id: string
   positionTitle: string
   benchStrength: string
+  incumbentFlightRisk?: string | null
+  topCandidate?: {
+    employeeName: string
+    readinessLevel: string
+    matchPercent: number
+  } | null
   _count: { candidates: number }
 }
 
@@ -80,17 +86,14 @@ function getTeslaColor(benchStrength: string): string {
   }
 }
 
-function PositionRailCard({ position, isSelected, onClick }: {
+function PositionRailCard({ position, isSelected, onClick, activeTab }: {
   position: RailPosition
   isSelected: boolean
   onClick: () => void
+  activeTab: FilterKey
 }) {
   const [isHovered, setIsHovered] = useState(false)
   const teslaColor = getTeslaColor(position.benchStrength)
-
-  const hasCandidates = position._count.candidates > 0
-  const hasReadyNow = position.benchStrength === 'STRONG'
-  const isCovered = position.benchStrength === 'STRONG' || position.benchStrength === 'MODERATE'
 
   // Initials from position title
   const initials = position.positionTitle
@@ -99,6 +102,9 @@ function PositionRailCard({ position, isSelected, onClick }: {
     .map(w => w[0])
     .join('')
     .toUpperCase()
+
+  // Contextual footer based on activeTab
+  const footer = getCardFooter(position, activeTab)
 
   return (
     <motion.div
@@ -147,141 +153,87 @@ function PositionRailCard({ position, isSelected, onClick }: {
           </p>
         </div>
 
-        {/* Progress Dots (3 dots like evaluator) */}
-        <PositionProgressDots
-          hasCandidates={hasCandidates}
-          hasReadyNow={hasReadyNow}
-          isCovered={isCovered}
-        />
+        {/* Contextual footer: 1 line + 1 smart LED */}
+        <div className="flex items-center gap-1.5 mt-3">
+          <div
+            className={cn('w-2 h-2 rounded-full flex-shrink-0', footer.dotColor)}
+            title={footer.dotTitle}
+          />
+          <span className={cn('text-[10px] truncate', footer.textColor)}>
+            {footer.text}
+          </span>
+        </div>
       </div>
     </motion.div>
   )
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// PROGRESS DOTS (cloned from evaluator ProgressDots)
+// CONTEXTUAL FOOTER (replaces 3-dot ProgressDots)
 // ════════════════════════════════════════════════════════════════════════════
 
-function PositionProgressDots({ hasCandidates, hasReadyNow, isCovered }: {
-  hasCandidates: boolean
-  hasReadyNow: boolean
-  isCovered: boolean
-}) {
-  const [showTooltip, setShowTooltip] = useState(false)
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
-  const [mounted, setMounted] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+function getCardFooter(position: RailPosition, activeTab: FilterKey): {
+  text: string
+  textColor: string
+  dotColor: string
+  dotTitle: string
+} {
+  const risk = position.incumbentFlightRisk
+  const top = position.topCandidate
 
-  useEffect(() => { setMounted(true) }, [])
+  switch (activeTab) {
+    case 'NONE':
+      if (risk === 'HIGH' || risk === 'CRITICAL') {
+        return {
+          text: 'Titular en riesgo',
+          textColor: 'text-slate-400',
+          dotColor: 'bg-purple-400 ring-1 ring-purple-400/30',
+          dotTitle: 'Titular en riesgo — requiere acción',
+        }
+      }
+      return {
+        text: 'Titular estable',
+        textColor: 'text-slate-500',
+        dotColor: 'bg-cyan-400 ring-1 ring-cyan-400/30',
+        dotTitle: 'Titular estable',
+      }
 
-  const handleMouseEnter = () => {
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect()
-      setTooltipPos({
-        x: rect.left + rect.width / 2,
-        y: rect.top - 12
-      })
-    }
-    setShowTooltip(true)
+    case 'RISK':
+      return {
+        text: 'Listo en 1-2 años',
+        textColor: 'text-slate-400',
+        dotColor: 'bg-purple-400 ring-1 ring-purple-400/30',
+        dotTitle: 'Sin sucesor disponible hoy',
+      }
+
+    case 'COVERED':
+      if (top) {
+        return {
+          text: `${formatDisplayName(top.employeeName, 'short')} · ${Math.round(top.matchPercent)}%`,
+          textColor: 'text-slate-300',
+          dotColor: position.benchStrength === 'STRONG'
+            ? 'bg-cyan-400 ring-1 ring-cyan-400/30'
+            : 'bg-purple-400 ring-1 ring-purple-400/30',
+          dotTitle: position.benchStrength === 'STRONG'
+            ? 'Sucesor listo y cobertura resuelta'
+            : 'Sucesor en desarrollo',
+        }
+      }
+      return {
+        text: 'Cobertura confirmada',
+        textColor: 'text-slate-400',
+        dotColor: 'bg-cyan-400 ring-1 ring-cyan-400/30',
+        dotTitle: 'Cobertura confirmada',
+      }
+
+    default:
+      return {
+        text: '',
+        textColor: 'text-slate-500',
+        dotColor: 'bg-slate-600',
+        dotTitle: '',
+      }
   }
-
-  const dots = [
-    {
-      key: 'CAND',
-      label: 'Candidatos',
-      done: hasCandidates,
-      color: hasCandidates ? 'bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.6)]' : 'bg-slate-700',
-      value: hasCandidates ? 'Tiene candidatos' : 'Sin candidatos',
-    },
-    {
-      key: 'READY',
-      label: 'Ready Now',
-      done: hasReadyNow,
-      color: hasReadyNow ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-slate-700',
-      value: hasReadyNow ? 'Tiene READY_NOW' : 'Sin READY_NOW',
-    },
-    {
-      key: 'COV',
-      label: 'Cobertura',
-      done: isCovered,
-      color: isCovered ? 'bg-purple-400 shadow-[0_0_8px_rgba(167,139,250,0.6)]' : 'bg-slate-700',
-      value: isCovered ? 'Cubierta' : 'Sin cobertura',
-    },
-  ]
-
-  return (
-    <>
-      <div
-        ref={containerRef}
-        className="relative cursor-pointer select-none mt-3"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={() => setShowTooltip(false)}
-      >
-        <div className="flex items-center justify-center gap-1.5">
-          {dots.map(dot => (
-            <div key={dot.key} className={cn('w-2 h-2 rounded-full transition-all duration-300', dot.color)} />
-          ))}
-        </div>
-        <div className="flex items-center justify-center gap-2 mt-1">
-          {dots.map(dot => (
-            <span key={dot.key} className="text-[8px] text-slate-600 font-medium">{dot.key}</span>
-          ))}
-        </div>
-      </div>
-
-      {/* Tooltip with portal */}
-      {mounted && createPortal(
-        <div
-          style={{
-            position: 'fixed',
-            left: tooltipPos.x,
-            top: tooltipPos.y,
-            transform: 'translate(-50%, -100%)',
-            zIndex: 99999,
-            pointerEvents: 'none',
-            opacity: showTooltip ? 1 : 0,
-            transition: 'opacity 0.2s ease-out',
-          }}
-        >
-          <div className="relative bg-slate-950 border border-slate-800 rounded-xl p-3 shadow-2xl w-56">
-            <div className="absolute inset-x-0 top-0 h-[2px] rounded-t-xl bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent" />
-            <div className="flex items-center gap-2 mb-1 border-b border-slate-800 pb-1">
-              <span className="text-[10px] font-bold text-slate-300 uppercase">
-                Estado de Posicion
-              </span>
-            </div>
-            <div className="space-y-2 mt-2">
-              {dots.map(dot => (
-                <div key={dot.key} className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-2">
-                    {dot.done ? (
-                      <Check className="w-3.5 h-3.5 text-cyan-400" />
-                    ) : (
-                      <Clock className="w-3.5 h-3.5 text-slate-500" />
-                    )}
-                    <span className={cn(
-                      'text-[10px] text-slate-400 leading-relaxed',
-                      dot.done && 'text-slate-300'
-                    )}>
-                      {dot.label}
-                    </span>
-                  </div>
-                  <span className={cn(
-                    'text-[10px] font-medium',
-                    dot.done ? 'text-cyan-400' : 'text-slate-600'
-                  )}>
-                    {dot.value}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-950" />
-          </div>
-        </div>,
-        document.body
-      )}
-    </>
-  )
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -455,6 +407,7 @@ export const SuccessionRail = memo(function SuccessionRail({
                 position={pos}
                 isSelected={selectedPositionId === pos.id}
                 onClick={() => onPositionClick(pos.id)}
+                activeTab={activeTab}
               />
             ))}
           </div>

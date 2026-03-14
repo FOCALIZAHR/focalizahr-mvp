@@ -69,6 +69,7 @@ interface AlertMetrics {
 interface UseOnboardingAlertsReturn {
   alerts: JourneyAlert[];
   metrics: AlertMetrics | null;
+  avgSalary: number | null;  // Server-side via SalaryConfigService (3-tier fallback)
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
@@ -90,6 +91,7 @@ export function useOnboardingAlerts(
   
   const [alerts, setAlerts] = useState<JourneyAlert[]>([]);
   const [metrics, setMetrics] = useState<AlertMetrics | null>(null);
+  const [avgSalary, setAvgSalary] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -132,6 +134,7 @@ export function useOnboardingAlerts(
       
       setAlerts(result.data.alerts);
       setMetrics(result.data.metrics);
+      setAvgSalary(result.data.avgSalary || null);
       
     } catch (err: any) {
       console.error('[useOnboardingAlerts] Error:', err);
@@ -225,6 +228,7 @@ export function useOnboardingAlerts(
   return {
     alerts,
     metrics,
+    avgSalary,
     loading,
     error,
     refetch: fetchAlerts,

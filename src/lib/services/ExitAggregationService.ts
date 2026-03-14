@@ -28,10 +28,10 @@ import {
   EIS_CLASSIFICATIONS 
 } from '@/types/exit';
 import { ExitAlertService } from './ExitAlertService';
-// Al inicio del archivo agregar:
-import type { 
-  DepartmentExitMetrics, 
-  ExitMetricsSummary 
+import { SalaryConfigService } from './SalaryConfigService';
+import type {
+  DepartmentExitMetrics,
+  ExitMetricsSummary
 } from '@/types/exit';
 
 
@@ -1013,6 +1013,10 @@ export class ExitAggregationService {
       .sort((a, b) => b.priority - a.priority)
       .slice(0, 5);
 
+    // Costo rotación server-side (3-tier fallback: empresa → promedio → Chile)
+    const salaryResult = await SalaryConfigService.getSalaryForAccount(accountId);
+    const turnoverResult = SalaryConfigService.calculateTurnoverCost(salaryResult.monthlySalary);
+
     return {
       totalDepartments: depts.length,
       totalExits: total,
@@ -1022,7 +1026,10 @@ export class ExitAggregationService {
         pending,
         critical,
         leyKarin
-      }
+      },
+      turnoverCostPerExit: turnoverResult.turnoverCost,
+      totalTurnoverCost: total * turnoverResult.turnoverCost,
+      salarySource: salaryResult.source
     };
   }
 }

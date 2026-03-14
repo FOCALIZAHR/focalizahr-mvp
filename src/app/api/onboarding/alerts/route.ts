@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { extractUserContext, buildParticipantAccessFilter } from '@/lib/services/AuthorizationService';
 import { OnboardingAlertService } from '@/lib/services/OnboardingAlertService';
+import { SalaryConfigService } from '@/lib/services/SalaryConfigService';
 import { AlertTrend, AlertHistoryPoint } from '@/types/onboarding';
 
 /**
@@ -177,7 +178,12 @@ export async function GET(request: NextRequest) {
     const historyData: AlertHistoryPoint[] = statistics.history || [];
     
     // ========================================
-    // 7. RESPONSE CON INTELIGENCIA
+    // 7. SALARIO CUENTA-ESPECÍFICO (3-tier fallback)
+    // ========================================
+    const salaryResult = await SalaryConfigService.getSalaryForAccount(userContext.accountId);
+
+    // ========================================
+    // 8. RESPONSE CON INTELIGENCIA
     // ========================================
     return NextResponse.json({
       data: {
@@ -192,7 +198,10 @@ export async function GET(request: NextRequest) {
           slaDistribution: slaCounts,
           trend: trendData,
           history: historyData
-        }
+        },
+        // Salario calculado server-side para cálculos financieros en cliente
+        avgSalary: salaryResult.monthlySalary,
+        salarySource: salaryResult.source
       },
       success: true
     });

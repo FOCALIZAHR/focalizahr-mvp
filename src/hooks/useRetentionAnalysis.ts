@@ -2,7 +2,7 @@
 // 🧠 FASE 2: AISLAR LA LÓGICA DE NEGOCIO - HOOK DEDICADO ARQUITECTURA V3.0
 // SEPARACIÓN LÓGICA Y PRESENTACIÓN (Anexo A)
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { RetentionEngine } from '@/engines/RetentionEngine';
 import type { CampaignResultsData } from '@/types';
 import { RetentionAnalysisResult } from '@/types/BusinessCase';
@@ -13,12 +13,14 @@ import { RetentionAnalysisResult } from '@/types/BusinessCase';
  * EVOLUCIÓN: Lógica inline → Hook reutilizable
  */
 export function useRetentionAnalysis(data: CampaignResultsData | null): RetentionAnalysisResult | null {
-  
-  const analysisResult = useMemo(() => {
+  const [analysisResult, setAnalysisResult] = useState<RetentionAnalysisResult | null>(null);
+
+  useEffect(() => {
     // ✅ VALIDACIÓN DATOS Y TIPO CAMPAÑA
     if (!data || !data.campaign || !data.analytics) {
       console.log('🔍 useRetentionAnalysis: No hay datos válidos');
-      return null;
+      setAnalysisResult(null);
+      return;
     }
 
     // ✅ VERIFICACIÓN DE TIPO DE CAMPAÑA ROBUSTA
@@ -34,7 +36,6 @@ export function useRetentionAnalysis(data: CampaignResultsData | null): Retentio
 
     const isRetentionCampaign = campaignTypeIdentifier.includes('retencion') || campaignTypeIdentifier.includes('retención');
 
-  
     console.log('🔍 useRetentionAnalysis: Verificación tipo campaña:', {
       campaignType,
       campaignTypeIdentifier,
@@ -43,7 +44,8 @@ export function useRetentionAnalysis(data: CampaignResultsData | null): Retentio
 
     if (!isRetentionCampaign) {
       console.log('🔍 useRetentionAnalysis: No es campaña de retención, saltando análisis');
-      return null;
+      setAnalysisResult(null);
+      return;
     }
 
     // ✅ CONSTRUCCIÓN OBJETO PARA RETENTIONENGINE
@@ -67,28 +69,27 @@ export function useRetentionAnalysis(data: CampaignResultsData | null): Retentio
 
     console.log('🔍 useRetentionAnalysis: Llamando RetentionEngine.analyze con:', engineInput);
 
-    // ✅ EJECUTAR ANÁLISIS CON RETENTIONENGINE
-    try {
-      const result = RetentionEngine.analyze(engineInput);
-      console.log('✅ useRetentionAnalysis: Análisis completado:', {
-        businessCasesCount: result.businessCases?.length || 0,
-        globalRisk: result.globalRetentionRisk,
-        urgency: result.interventionUrgency
+    // ✅ EJECUTAR ANÁLISIS CON RETENTIONENGINE (ahora async)
+    let cancelled = false;
+
+    RetentionEngine.analyze(engineInput)
+      .then(result => {
+        if (cancelled) return;
+        console.log('✅ useRetentionAnalysis: Análisis completado:', {
+          businessCasesCount: result.businessCases?.length || 0,
+          globalRisk: result.globalRetentionRisk,
+          urgency: result.interventionUrgency
+        });
+        setAnalysisResult(result);
+      })
+      .catch(error => {
+        if (cancelled) return;
+        console.error('❌ useRetentionAnalysis: Error en análisis:', error);
+        setAnalysisResult(null);
       });
-      return result;
-    } catch (error) {
-      console.error('❌ useRetentionAnalysis: Error en análisis:', error);
-      return null;
-    }
 
+    return () => { cancelled = true; };
   }, [data]);
-
-  // ✅ LOGS DE DEBUG PARA DESARROLLO
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔄 useRetentionAnalysis: Resultado actualizado:', analysisResult);
-    }
-  }, [analysisResult]);
 
   return analysisResult;
 }

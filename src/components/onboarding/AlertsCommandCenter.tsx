@@ -14,7 +14,7 @@ export const AlertsCommandCenter: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'active' | 'managed' | 'all'>('active');
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  const { alerts, metrics, loading, error, refetch, acknowledgeAlert } = useOnboardingAlerts();
+  const { alerts, metrics, avgSalary, loading, error, refetch, acknowledgeAlert } = useOnboardingAlerts();
 
   // ========================================
   // HANDLERS
@@ -56,9 +56,10 @@ export const AlertsCommandCenter: React.FC = () => {
       {/* ==================================================================
           COMPONENTE 1: THE MONEY WALL (Hero Financiero)
           ================================================================== */}
-      <AlertsMoneyWall 
+      <AlertsMoneyWall
         alerts={alerts}
         metrics={metrics}
+        avgSalary={avgSalary}
         loading={loading}
         isRefreshing={isRefreshing}
         onRefresh={handleRefresh}
@@ -72,6 +73,7 @@ export const AlertsCommandCenter: React.FC = () => {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onAcknowledgeAlert={acknowledgeAlert}
+        avgSalary={avgSalary}
         loading={loading}
       />
       

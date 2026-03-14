@@ -10,11 +10,10 @@ import {
   RetentionAnalysisResult 
 } from '@/types/BusinessCase';
 import { CampaignResults } from '@/lib/services/AnalyticsService';
-import { 
-  FinancialCalculationsService, 
-  calculateFinancialImpactForBusinessCase 
-} from '@/lib/financialCalculations';
+import { calculateFinancialImpactForBusinessCase } from '@/lib/financialCalculations';
 import { FinancialCalculator } from '@/config/impactAssumptions';
+import { SalaryConfigService } from '@/lib/services/SalaryConfigService';
+import { CHILE_SALARY_DEFAULTS } from '@/config/SalaryConfig';
 
 /**
  * RetentionEngine - Motor especialista con transparencia financiera enterprise
@@ -39,7 +38,7 @@ export class RetentionEngine {
    * Analiza campaignResults y genera casos negocio ejecutivos con transparencia financiera
    * EVOLUCIÓN: Cálculos internos → FinancialCalculationsService enterprise
    */
-  static analyze(campaignResults: CampaignResults): RetentionAnalysisResult {
+  static async analyze(campaignResults: CampaignResults, accountId?: string): Promise<RetentionAnalysisResult> {
     console.log('🔍 RetentionEngine.analyze() con transparencia financiera:', {
       company: campaignResults.company_name,
       overall_score: campaignResults.overall_score,
@@ -47,16 +46,21 @@ export class RetentionEngine {
       participation: campaignResults.participation_rate
     });
 
+    // Pre-fetch salary for account (or use default)
+    const monthlySalary = accountId
+      ? (await SalaryConfigService.getSalaryForAccount(accountId)).monthlySalary
+      : CHILE_SALARY_DEFAULTS.promedio_general;
+
     const businessCases: BusinessCase[] = [];
     const criticalDepartments: string[] = [];
-    
+
     // ✅ CASO NEGOCIO #1: AMBIENTE CRÍTICO con transparencia financiera
     if (campaignResults.category_scores.ambiente < 2.5) {
       console.log('🚨 Ambiente crítico detectado con cálculo enterprise:', campaignResults.category_scores.ambiente);
-      
+
       const ambientCase = this.generateAmbienteCriticoCase(campaignResults);
       businessCases.push(ambientCase);
-      
+
       // Identificar departamentos afectados
       if (campaignResults.department_scores) {
         Object.entries(campaignResults.department_scores).forEach(([dept, score]: [string, number]) => {
@@ -66,20 +70,20 @@ export class RetentionEngine {
         });
       }
     }
-    
+
     // ✅ CASO NEGOCIO #2: RETENCIÓN RIESGO con metodología auditable
     if (campaignResults.overall_score < 3.0) {
       console.log('📊 Riesgo retención detectado con cálculo SHRM:', campaignResults.overall_score);
-      
-      const retentionCase = this.generateRetentionRiskCase(campaignResults);
+
+      const retentionCase = this.generateRetentionRiskCase(campaignResults, monthlySalary);
       businessCases.push(retentionCase);
     }
-    
+
     // ✅ NUEVO: CASO NEGOCIO #3: LIDERAZGO GAP (si aplica)
     if (campaignResults.category_scores.liderazgo < 3.0) {
       console.log('👨‍💼 Gap liderazgo detectado con cálculo McKinsey:', campaignResults.category_scores.liderazgo);
-      
-      const leadershipCase = this.generateLiderazgoGapCase(campaignResults);
+
+      const leadershipCase = this.generateLiderazgoGapCase(campaignResults, monthlySalary);
       businessCases.push(leadershipCase);
     }
     
@@ -207,15 +211,15 @@ export class RetentionEngine {
    * Genera caso negocio retención con transparencia financiera SHRM
    * EVOLUCIÓN: Estimaciones → Cálculos auditables paso a paso
    */
-  private static generateRetentionRiskCase(results: CampaignResults): BusinessCase {
+  private static generateRetentionRiskCase(results: CampaignResults, monthlySalary: number): BusinessCase {
     const overallScore = results.overall_score;
     const participantsAffected = results.total_responses;
-    
+
     console.log('📊 Generando caso retención con metodología SHRM...');
-    
+
     // 🏢 CÁLCULO ENTERPRISE con fuentes documentadas
     const turnoverCalculation = FinancialCalculator.calculateTurnoverCost(
-      FinancialCalculationsService.getAverageSalaryCLP() * 12 // Salario anual
+      monthlySalary * 12 // Salario anual desde SalaryConfigService
     );
     
     const turnoverRisk = this.calculateTurnoverRisk(overallScore);
@@ -300,16 +304,15 @@ export class RetentionEngine {
    * NUEVO: Genera caso negocio gap liderazgo con metodología McKinsey
    * ADICIÓN: Tercer tipo caso negocio con transparencia financiera
    */
-  private static generateLiderazgoGapCase(results: CampaignResults): BusinessCase {
+  private static generateLiderazgoGapCase(results: CampaignResults, monthlySalary: number): BusinessCase {
     const liderazgoScore = results.category_scores.liderazgo;
     const participantsAffected = results.total_responses;
-    
+
     console.log('👨‍💼 Generando caso liderazgo con metodología McKinsey...');
-    
+
     // 🎯 CÁLCULO McKinsey: Liderazgo efectivo mejora performance 15-25%
     const performanceGap = Math.min((4.0 - liderazgoScore) * 12.5, 25); // Max 25% según McKinsey
-    const avgSalaryCLP = FinancialCalculationsService.getAverageSalaryCLP();
-    const annualPayroll = participantsAffected * avgSalaryCLP * 12;
+    const annualPayroll = participantsAffected * monthlySalary * 12;
     const productivityValue = annualPayroll * 1.5; // 1.5x payroll valor productividad
     const currentLoss = productivityValue * (performanceGap / 100);
     

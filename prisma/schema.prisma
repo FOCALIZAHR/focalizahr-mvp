@@ -218,6 +218,16 @@ model Account {
   successionBackfillPlans  SuccessionBackfillPlan[]
   successionDevelopmentPlans SuccessionDevelopmentPlan[]
 
+  // ═══════════════════════════════════════════════════
+  // CONFIGURACIÓN SALARIAL (SalaryConfig v1.2)
+  // ═══════════════════════════════════════════════════
+  averageMonthlySalary    Int?    @map("average_monthly_salary")
+  salaryByJobLevel        Json?   @map("salary_by_job_level")
+  headcountDistribution   Json?   @map("headcount_distribution")
+  turnoverBaselineRate    Float?  @map("turnover_baseline_rate")
+  headcount               Int?    @map("headcount")
+  newHiresPerYear         Int?    @map("new_hires_per_year")
+
   @@index([adminEmail], map: "idx_accounts_email")
   @@index([subscriptionTier], map: "idx_accounts_tier")
   // 🌍 AGREGAR ESTOS 3 ÍNDICES:
@@ -2776,6 +2786,11 @@ enum ReadinessLevel {
   NOT_VIABLE
 }
 
+enum NominationSource {
+  SUGGESTED      // Elegido de lista pre-filtrada (cumple filtros)
+  DISCRETIONARY  // No cumple filtros pero gerente decidio nominarlo
+}
+
 enum CandidateStatus {
   ACTIVE        // Candidato vigente
   PROMOTED      // Fue promovido a este rol
@@ -2876,9 +2891,10 @@ model SuccessionCandidate {
   developmentPlanId   String?  @unique @map("development_plan_id")
 
   // Estado y auditoria
-  status              CandidateStatus @default(ACTIVE)
-  nominatedBy         String          @map("nominated_by")
-  nominatedAt         DateTime        @default(now()) @map("nominated_at")
+  status              CandidateStatus  @default(ACTIVE)
+  nominatedBy         String           @map("nominated_by")
+  nominationSource    NominationSource @default(SUGGESTED) @map("nomination_source")
+  nominatedAt         DateTime         @default(now()) @map("nominated_at")
   lastCalculatedAt    DateTime        @default(now()) @map("last_calculated_at")
   updatedAt           DateTime        @updatedAt @map("updated_at")
 

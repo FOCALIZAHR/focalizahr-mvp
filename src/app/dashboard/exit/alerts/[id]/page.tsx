@@ -94,7 +94,7 @@ export default function ExitAlertDetailPage() {
           {
             name: data.department?.displayName,
             employeeCount: data.departmentMetrics?.headcount || 15,
-            avgSalary: 2_500_000,
+            avgSalary: data.avgSalary,  // Server-side via SalaryConfigService (3-tier fallback)
             companyName: data.account?.companyName
           }
         );

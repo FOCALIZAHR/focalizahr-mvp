@@ -42,10 +42,7 @@ import {
   extractUserContext,
   getChildDepartmentIds
 } from '@/lib/services/AuthorizationService';
-import {
-  FinancialCalculator,
-  CHILE_ECONOMIC_ADJUSTMENTS
-} from '@/config/impactAssumptions';
+import { SalaryConfigService } from '@/lib/services/SalaryConfigService';
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -243,10 +240,9 @@ export async function GET(request: NextRequest) {
     // PASO 7: CALCULAR COSTO EVITABLE (NO HARDCODEAR)
     // ════════════════════════════════════════════════════════════════════════
 
-    const avgSalary = CHILE_ECONOMIC_ADJUSTMENTS.average_salaries_by_sector.default;
-    const annualSalary = avgSalary * 12;
-    const turnoverCostResult = FinancialCalculator.calculateTurnoverCost(annualSalary);
-    const costPerExit = turnoverCostResult.cost_clp;
+    const salaryResult = await SalaryConfigService.getSalaryForAccount(userContext.accountId);
+    const turnoverResult = SalaryConfigService.calculateTurnoverCost(salaryResult.monthlySalary);
+    const costPerExit = turnoverResult.turnoverCost;
 
     // Costo evitable = salidas con alertas ignoradas * costo por salida
     const avoidableCost = exitsWithIgnoredAlerts * costPerExit;
@@ -328,8 +324,9 @@ export async function GET(request: NextRequest) {
       data,
       period,
       metadata: {
-        avgSalaryUsed: avgSalary,
+        avgSalaryUsed: salaryResult.monthlySalary,
         costPerExitUsed: costPerExit,
+        salarySource: salaryResult.source,
         source: 'SHRM/Deloitte methodology'
       },
       responseTime: Date.now() - startTime

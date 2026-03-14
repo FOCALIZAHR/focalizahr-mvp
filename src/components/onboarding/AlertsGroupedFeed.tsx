@@ -25,6 +25,7 @@ interface AlertsGroupedFeedProps {
   activeTab: 'active' | 'managed' | 'all';
   onTabChange: (tab: 'active' | 'managed' | 'all') => void;
   onAcknowledgeAlert: (id: string, notes: string) => Promise<void>;
+  avgSalary?: number | null;  // Server-side via SalaryConfigService
   loading: boolean;
 }
 
@@ -70,6 +71,7 @@ export default function AlertsGroupedFeed({
   activeTab,
   onTabChange,
   onAcknowledgeAlert,
+  avgSalary,
   loading
 }: AlertsGroupedFeedProps) {
   
@@ -236,7 +238,7 @@ export default function AlertsGroupedFeed({
       
       const directReports = Array.from(data.directReportsMap.values()).map((person) => {
         const firstAlert = person.alerts[0];
-        const businessCase = OnboardingAlertEngine.generateBusinessCaseFromAlert(firstAlert as any, firstAlert.journey);
+        const businessCase = OnboardingAlertEngine.generateBusinessCaseFromAlert(firstAlert as any, firstAlert.journey, avgSalary || undefined);
         const risk = businessCase?.financials?.potentialAnnualLoss || 0;
         
         return {
@@ -248,7 +250,7 @@ export default function AlertsGroupedFeed({
       const departments = Array.from(data.departmentsMap.values()).map(dept => {
         const people = Array.from(dept.peopleMap.values()).map((person) => {
           const firstAlert = person.alerts[0];
-          const businessCase = OnboardingAlertEngine.generateBusinessCaseFromAlert(firstAlert as any, firstAlert.journey);
+          const businessCase = OnboardingAlertEngine.generateBusinessCaseFromAlert(firstAlert as any, firstAlert.journey, avgSalary || undefined);
           const risk = businessCase?.financials?.potentialAnnualLoss || 0;
           
           return {

@@ -85,10 +85,24 @@ export async function GET(
       ...(position.incumbentId ? [position.incumbentId] : []),
       ...sortedCandidates.map(c => c.employeeId),
     ]
+    // DEBUG: getCurrentCycleId para ver qué ciclo usa
+    const debugCycleId = await SuccessionService.getCurrentCycleId(userContext.accountId)
+    console.log('[DEBUG Narrative] incumbentId:', position.incumbentId)
+    console.log('[DEBUG Narrative] cycleId encontrado:', debugCycleId)
+
     const quadrantsMap = await SuccessionService.enrichWithTalentQuadrants(
       allEmployeeIds,
       userContext.accountId
     )
+
+    // DEBUG: resultado completo del enrichment para el incumbent
+    if (position.incumbentId) {
+      const incumbentQuadrants = quadrantsMap.get(position.incumbentId)
+      console.log('[DEBUG Narrative] enrichWithTalentQuadrants para incumbent:', JSON.stringify(incumbentQuadrants, null, 2))
+      console.log('[DEBUG Narrative] riskQuadrant:', incumbentQuadrants?.riskQuadrant ?? 'NULL/UNDEFINED')
+      console.log('[DEBUG Narrative] riskAlertLevel:', incumbentQuadrants?.riskAlertLevel ?? 'NULL/UNDEFINED')
+      console.log('[DEBUG Narrative] mobilityQuadrant:', incumbentQuadrants?.mobilityQuadrant ?? 'NULL/UNDEFINED')
+    }
 
     const enrichedIncumbent = position.incumbent
       ? { ...position.incumbent, ...(quadrantsMap.get(position.incumbentId!) ?? { riskQuadrant: null, mobilityQuadrant: null, riskAlertLevel: null }) }

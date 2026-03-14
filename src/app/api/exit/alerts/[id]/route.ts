@@ -26,11 +26,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { 
-  extractUserContext, 
-  getChildDepartmentIds 
+import {
+  extractUserContext,
+  getChildDepartmentIds
 } from '@/lib/services/AuthorizationService';
 import { ExitAlertService } from '@/lib/services/ExitAlertService';
+import { SalaryConfigService } from '@/lib/services/SalaryConfigService';
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -310,11 +311,19 @@ export async function GET(
       }
     }
     
+    // Calcular salario cuenta-específico (3-tier fallback)
+    const salaryResult = await SalaryConfigService.getSalaryForAccount(userContext.accountId);
+
     console.log('[Exit Alert GET] ✅ Alerta encontrada:', alertId);
-    
+
     return NextResponse.json({
       success: true,
-      data: alert,
+      data: {
+        ...alert,
+        // Salario calculado server-side para que el cliente lo pase al ExitAlertEngine
+        avgSalary: salaryResult.monthlySalary,
+        salarySource: salaryResult.source
+      },
       responseTime: Date.now() - startTime
     });
     

@@ -896,6 +896,10 @@ export interface ExitMetricsSummary {
     critical: number;
     leyKarin: number;
   };
+  // Costo rotación calculado server-side con SalaryConfigService (3-tier fallback)
+  turnoverCostPerExit: number;
+  totalTurnoverCost: number;
+  salarySource: 'empresa_nivel' | 'empresa_promedio' | 'default_chile';
 }
 
 /**

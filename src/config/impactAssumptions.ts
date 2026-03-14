@@ -177,7 +177,8 @@ export const CHILE_ECONOMIC_ADJUSTMENTS = {
   pib_per_capita_adjustment: 0.85, // Chile vs USA PIB per cápita
   salary_inflation_annual: 0.08, // 8% inflación salarios Chile 2024-2025
   
-  // Salarios promedio por sector (CLP mensual)
+  /** @deprecated Usar SalaryConfigService para salarios cuenta-específicos.
+   *  Valores mantenidos como fallback de última instancia. */
   average_salaries_by_sector: {
     technology: 2500000,
     finance: 2200000,

@@ -32,6 +32,7 @@ import {
   FileText
 } from 'lucide-react';
 import Link from 'next/link';
+import SalaryConfigSettings from '@/components/settings/SalaryConfigSettings';
 
 interface AccountData {
   id: string;
@@ -488,6 +489,9 @@ const handleSubmit = async (e: React.FormEvent) => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Configuración Salarial */}
+          <SalaryConfigSettings accountId={accountId} />
 
           {/* Información de Auditoría */}
           {(formData.createdAt || formData.updatedAt) && (

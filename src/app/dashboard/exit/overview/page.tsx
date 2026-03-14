@@ -20,8 +20,6 @@ import { ArrowRight, BrainCircuit, Loader2 } from 'lucide-react';
 import DashboardNavigation from '@/components/dashboard/DashboardNavigation';
 import { useSidebar } from '@/hooks/useSidebar';
 import { useExitMetrics } from '@/hooks/useExitMetrics';
-import { FinancialCalculator } from '@/config/impactAssumptions';
-import { FinancialCalculationsService } from '@/lib/financialCalculations';
 import { PrimaryButton } from '@/components/ui/PremiumButton';
 
 // ====================================================================
@@ -45,14 +43,10 @@ export default function ExitOverviewPage() {
   const { summary, departments, loading } = useExitMetrics();
 
   // ════════════════════════════════════════════════════════════════
-  // CÁLCULO FINANCIERO - Costo Total Rotación (DATOS REALES)
+  // CÁLCULO FINANCIERO - Costo Total Rotación (BACKEND con SalaryConfigService)
+  // El backend calcula con 3-tier fallback: empresa_nivel → empresa_promedio → default_chile
   // ════════════════════════════════════════════════════════════════
-  const { totalCost, turnoverCalc } = useMemo(() => {
-    const avgSalary = FinancialCalculationsService.getAverageSalaryCLP();
-    const calc = FinancialCalculator.calculateTurnoverCost(avgSalary * 12);
-    const cost = (summary?.totalExits || 0) * calc.cost_clp;
-    return { totalCost: cost, turnoverCalc: calc };
-  }, [summary]);
+  const totalCost = summary?.totalTurnoverCost || 0;
 
   // ════════════════════════════════════════════════════════════════
   // TOP FACTOR - Causa Principal (agregado desde departments[].topFactors)

@@ -20,6 +20,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { calculateTurnoverCostSHRM2024 } from '@/lib/financialCalculations';
+import { SalaryConfigService } from '@/lib/services/SalaryConfigService';
 
 // ============================================================================
 // INTERFACES
@@ -148,8 +149,9 @@ export class OnboardingEffectivenessAnalyzer {
     
     const retentionDelta = managedRetentionRate - ignoredRetentionRate;
     
-    // 5. Calcular ROI estimado
-    const avgTurnoverCost = calculateTurnoverCostSHRM2024(900000); // $900K anual promedio
+    // 5. Calcular ROI estimado (usando SalaryConfigService para salario cuenta)
+    const salaryResult = await SalaryConfigService.getSalaryForAccount(accountId);
+    const avgTurnoverCost = calculateTurnoverCostSHRM2024(salaryResult.annualSalary);
     const employeesSaved = Math.round(managed.length * retentionDelta);
     const estimatedROI = employeesSaved * avgTurnoverCost;
     

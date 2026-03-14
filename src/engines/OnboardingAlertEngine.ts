@@ -61,12 +61,14 @@ export class OnboardingAlertEngine {
   
   /**
    * MÉTODO PRINCIPAL: Genera BusinessCase desde alerta
+   * @param currentSalary - Salario mensual cuenta-específico (server-side via SalaryConfigService)
    */
   static generateBusinessCaseFromAlert(
     alert: JourneyAlert,
-    journey: AlertJourney
+    journey: AlertJourney,
+    currentSalary?: number
   ): BusinessCase {
-    
+
     // Mapeo tipo alerta → generador específico
     // ✅ VALORES CORRECTOS: Coinciden con validación Zod y backend
     const generators = {
@@ -77,18 +79,24 @@ export class OnboardingAlertEngine {
       'DESAJUSTE_ROL': this.generateDesajusteRolCase,
       'DESAJUSTE_CULTURAL': this.generateDesajusteRolCase, // Alias
       'DETRACTOR_CULTURAL': this.generateDetractorCase,
-      
+
     };
-    
+
+    // Guardar salario en contexto para que los generadores lo usen
+    this._currentSalary = currentSalary;
+
     const generator = generators[alert.alertType as keyof typeof generators];
-    
+
     if (!generator) {
       console.warn(`[OnboardingAlertEngine] Tipo alerta no reconocido: ${alert.alertType}`);
       return this.generateGenericCase(alert, journey);
     }
-    
+
     return generator.call(this, alert, journey);
   }
+
+  // Salario temporal para la generación actual
+  private static _currentSalary?: number;
   
   // ========================================
   // CASO 1: RIESGO FUGA (MÁS CRÍTICO)
@@ -103,7 +111,8 @@ export class OnboardingAlertEngine {
     const financials = calculateOnboardingFinancialImpact({
       employeeName: journey.fullName,
       role: journey.department?.displayName || 'Sin Depto',
-      alertType: 'riesgo_fuga'
+      alertType: 'riesgo_fuga',
+      currentSalary: this._currentSalary
     });
     
     const actionPlan: ActionStep[] = [
@@ -186,7 +195,8 @@ export class OnboardingAlertEngine {
     const financials = calculateOnboardingFinancialImpact({
       employeeName: journey.fullName,
       role: journey.department?.displayName || 'Sin Depto',
-      alertType: 'abandono_dia_1'
+      alertType: 'abandono_dia_1',
+      currentSalary: this._currentSalary
     });
     
     const actionPlan: ActionStep[] = [
@@ -269,7 +279,8 @@ export class OnboardingAlertEngine {
     const financials = calculateOnboardingFinancialImpact({
       employeeName: journey.fullName,
       role: journey.department?.displayName || 'Sin Depto',
-      alertType: 'bienvenida_fallida'
+      alertType: 'bienvenida_fallida',
+      currentSalary: this._currentSalary
     });
     
     const actionPlan: ActionStep[] = [
@@ -352,7 +363,8 @@ export class OnboardingAlertEngine {
     const financials = calculateOnboardingFinancialImpact({
       employeeName: journey.fullName,
       role: journey.department?.displayName || 'Sin Depto',
-      alertType: 'confusion_rol'
+      alertType: 'confusion_rol',
+      currentSalary: this._currentSalary
     });
     
     const actionPlan: ActionStep[] = [
@@ -434,7 +446,8 @@ export class OnboardingAlertEngine {
     const financials = calculateOnboardingFinancialImpact({
       employeeName: journey.fullName,
       role: journey.department?.displayName || 'Sin Depto',
-      alertType: 'desajuste_rol'
+      alertType: 'desajuste_rol',
+      currentSalary: this._currentSalary
     });
     
     const actionPlan: ActionStep[] = [
@@ -517,7 +530,8 @@ export class OnboardingAlertEngine {
     const financials = calculateOnboardingFinancialImpact({
       employeeName: journey.fullName,
       role: journey.department?.displayName || 'Sin Depto',
-      alertType: 'detractor_cultural'
+      alertType: 'detractor_cultural',
+      currentSalary: this._currentSalary
     });
     
     const actionPlan: ActionStep[] = [
@@ -603,7 +617,8 @@ export class OnboardingAlertEngine {
     const financials = calculateOnboardingFinancialImpact({
       employeeName: journey.fullName,
       role: journey.department?.displayName || 'Sin Depto',
-      alertType: 'generic'
+      alertType: 'generic',
+      currentSalary: this._currentSalary
     });
     
     return {

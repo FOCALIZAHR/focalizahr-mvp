@@ -534,6 +534,18 @@ export const PERMISSIONS = {
     'HR_ADMIN',
     'CEO'
   ],
+  'salary-config:view': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'CEO'
+  ],
+  'salary-config:edit': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN'
+  ],
 } as const;
 
 // =============================================================================

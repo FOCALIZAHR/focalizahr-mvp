@@ -50,6 +50,22 @@ export async function GET(request: NextRequest) {
         department: { select: { displayName: true } },
         incumbent: { select: { id: true, fullName: true, position: true } },
         _count: { select: { candidates: { where: { status: 'ACTIVE' } } } },
+        candidates: {
+          where: { status: 'ACTIVE' },
+          take: 1,
+          orderBy: [
+            { readinessLevel: 'asc' },
+            { matchPercent: 'desc' },
+          ],
+          select: {
+            readinessLevel: true,
+            readinessOverride: true,
+            matchPercent: true,
+            employee: {
+              select: { fullName: true },
+            },
+          },
+        },
       },
       orderBy: [{ benchStrength: 'asc' }, { createdAt: 'desc' }],
     })
