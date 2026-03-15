@@ -546,6 +546,29 @@ export const PERMISSIONS = {
     'ACCOUNT_OWNER',
     'HR_ADMIN'
   ],
+  'talent-actions:view': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'HR_OPERATOR',
+    'CEO',
+    'AREA_MANAGER'
+  ],
+  'talent-actions:pl-view': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'CEO'
+  ],
+  'talent-actions:exit-cross': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'CEO'
+  ],
 } as const;
 
 // =============================================================================

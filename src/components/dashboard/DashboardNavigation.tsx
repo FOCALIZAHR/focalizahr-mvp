@@ -146,6 +146,14 @@ export default function DashboardNavigation({
       icon: Crown,
       active: pathname.startsWith('/dashboard/succession'),
     }] : []),
+    // Talent Action Center - Mismos roles que Executive Hub
+    ...(canSeeExecutiveHub ? [{
+      id: 'talent-actions',
+      label: 'Talent Actions',
+      href: '/dashboard/talent-actions',
+      icon: Activity,
+      active: pathname.startsWith('/dashboard/talent-actions'),
+    }] : []),
     // ✅ CAMBIO 6: NUEVO ITEM "SEGUIMIENTO"
     {
       id: 'seguimiento',

@@ -2917,6 +2917,24 @@ model SuccessionCandidate {
   @@map("succession_candidates")
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// TALENT ACTION CENTER - Log de acciones ejecutivas
+// ═══════════════════════════════════════════════════════════════════════════
+
+model TACActionLog {
+  id            String   @id @default(cuid())
+  accountId     String   @map("account_id")
+  gerenciaId    String   @map("gerencia_id")
+  pattern       String   // FRAGIL, QUEMADA, ESTANCADA, RIESGO_OCULTO, EN_TRANSICION
+  action        String   // NOTIFY_HRBP, SCHEDULE_COMMITTEE, FLAG_FOR_REVIEW
+  initiatedBy   String   @map("initiated_by") // email del usuario
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([accountId], map: "idx_tac_log_account")
+  @@index([gerenciaId], map: "idx_tac_log_gerencia")
+  @@map("tac_action_logs")
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // PLAN DE BACKFILL (Efecto Dominó — planificación de cobertura post-nominación)
 // ════════════════════════════════════════════════════════════════════════════

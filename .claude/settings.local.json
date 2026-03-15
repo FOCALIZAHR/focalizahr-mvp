@@ -17,7 +17,13 @@
       "Bash(grep:*)",
       "Bash(node:*)",
       "Bash(done)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(git log:*)",
+      "Bash(tasklist:*)",
+      "Bash(find:*)",
+      "Bash(npm run:*)",
+      "Bash(git status:*)",
+      "Bash(git add:*)"
     ]
   }
 }
