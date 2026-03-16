@@ -9,15 +9,15 @@ import type { TenureSegment } from '@/lib/services/TalentActionService'
 
 const TENURE_CONFIG: Record<TenureSegment, { label: string; className: string }> = {
   onboarding: {
-    label: 'Onboarding',
+    label: 'Nuevo ingreso',
     className: 'bg-blue-500/10 text-blue-400 border-blue-500/20'
   },
   real: {
-    label: 'Consolidado',
+    label: 'En desarrollo-Pleno',
     className: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
   },
   cronico: {
-    label: 'Veterano',
+    label: 'Senior',
     className: 'bg-purple-500/10 text-purple-400 border-purple-500/20'
   }
 }

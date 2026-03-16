@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Loader2, Shield, ChevronDown } from 'lucide-react'
 import TenureSegmentBadge from './TenureSegmentBadge'
+import { getTalentMapNarrative } from '@/config/TalentMapNarratives'
 import type { QuadrantPerson, TenureSegment } from '@/lib/services/TalentActionService'
 
 interface QuadrantDrilldownProps {
@@ -19,8 +20,8 @@ interface QuadrantDrilldownProps {
   count: number
 }
 
-const ALERT_COLORS: Record<string, string> = {
-  RED: 'bg-amber-500/20 text-amber-400',
+const ALERT_BADGE_COLORS: Record<string, string> = {
+  RED: 'bg-red-500/20 text-red-400',
   ORANGE: 'bg-orange-500/20 text-orange-400',
   YELLOW: 'bg-yellow-500/20 text-yellow-400',
   GREEN: 'bg-emerald-500/20 text-emerald-400'
@@ -157,47 +158,13 @@ export default function QuadrantDrilldown({
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// COACHING TIP — Micro-copy ejecutivo por cuadrante + tenure
-// ════════════════════════════════════════════════════════════════════════════
-
-function getCoachingTip(person: QuadrantPerson): string | null {
-  const { riskQuadrant, tenureMonths } = person
-
-  switch (riskQuadrant) {
-    case 'FUGA_CEREBROS':
-      if (tenureMonths >= 36) return 'Riesgo de perdida inminente. Agendar conversacion de retencion esta semana.'
-      if (tenureMonths >= 12) return 'Talento valioso en ventana de fuga. Validar expectativas de crecimiento.'
-      return 'Alto potencial temprano insatisfecho. Revisar promesa de valor del onboarding.'
-
-    case 'BURNOUT_RISK':
-      if (tenureMonths < 6) return 'Onboarding fallido. Revisar asignacion de carga inmediata.'
-      if (tenureMonths >= 36) return 'Desgaste cronico. Evaluar rotacion lateral o reduccion de scope urgente.'
-      return 'Sobrecarga sostenida. Redistribuir carga y agendar check-in de bienestar.'
-
-    case 'BAJO_RENDIMIENTO':
-      if (tenureMonths < 6) return 'Desajuste temprano. Validar fit de rol antes de invertir en desarrollo.'
-      if (tenureMonths >= 24) return 'Bajo rendimiento cronico. Requiere plan de mejora formal con plazo definido.'
-      return 'Rendimiento bajo expectativa. Diagnosticar causa raiz: competencia, motivacion o contexto.'
-
-    case 'MOTOR_EQUIPO':
-      if (tenureMonths >= 36) return 'Pilar del equipo. Proteger de sobrecarga y preparar como mentor formal.'
-      return 'Motor productivo. Monitorear carga para prevenir transicion a burnout.'
-
-    default:
-      return null
-  }
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// PERSON ROW — Fila compacta por persona + coaching tip ejecutivo
+// PERSON ROW — Fila compacta por persona + badge narrativo + coaching tip
+// Usa talentMapNarratives.ts como fuente unica de verdad
 // ════════════════════════════════════════════════════════════════════════════
 
 function PersonRow({ person }: { person: QuadrantPerson }) {
-  const alertClass = person.riskAlertLevel
-    ? ALERT_COLORS[person.riskAlertLevel] || ''
-    : ''
-
-  const coachingTip = getCoachingTip(person)
+  const narrative = getTalentMapNarrative(person.riskQuadrant, person.tenureSegment)
+  const badgeColor = ALERT_BADGE_COLORS[narrative.alertLevel] || ''
 
   return (
     <div className="py-2 px-2 rounded-lg hover:bg-slate-800/30 transition-colors">
@@ -218,12 +185,10 @@ function PersonRow({ person }: { person: QuadrantPerson }) {
         {/* Tenure */}
         <TenureSegmentBadge segment={person.tenureSegment} months={person.tenureMonths} />
 
-        {/* Alert level */}
-        {person.riskAlertLevel && (
-          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${alertClass}`}>
-            {person.riskAlertLevel}
-          </span>
-        )}
+        {/* Badge narrativo */}
+        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${badgeColor}`}>
+          {narrative.badge}
+        </span>
 
         {/* RoleFit */}
         {person.roleFitScore !== null && (
@@ -234,13 +199,11 @@ function PersonRow({ person }: { person: QuadrantPerson }) {
       </div>
 
       {/* Coaching Tip */}
-      {coachingTip && (
-        <div className="mt-1.5 ml-0 px-2 py-1 rounded bg-slate-800/50 border-l-2 border-amber-500/40">
-          <span className="text-[10px] text-slate-400 leading-relaxed">
-            Accion sugerida: {coachingTip}
-          </span>
-        </div>
-      )}
+      <div className="mt-1.5 ml-0 px-2 py-1 rounded bg-slate-800/50 border-l-2 border-amber-500/40">
+        <span className="text-[10px] text-slate-400 leading-relaxed">
+          {narrative.coachingTip}
+        </span>
+      </div>
     </div>
   )
 }

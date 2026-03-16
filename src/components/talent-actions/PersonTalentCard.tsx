@@ -11,6 +11,7 @@
 import { useMemo } from 'react'
 import { Shield, Check } from 'lucide-react'
 import { TalentNarrativeService } from '@/lib/services/TalentNarrativeService'
+import { getTalentMapNarrative } from '@/config/TalentMapNarratives'
 import TenureSegmentBadge from './TenureSegmentBadge'
 import type { QuadrantPerson } from '@/lib/services/TalentActionService'
 
@@ -21,7 +22,7 @@ interface PersonTalentCardProps {
   onToggleSelect?: (employeeId: string) => void
 }
 
-const ALERT_COLORS: Record<string, string> = {
+const ALERT_BADGE_COLORS: Record<string, string> = {
   RED: 'bg-red-500/20 text-red-400',
   ORANGE: 'bg-orange-500/20 text-orange-400',
   YELLOW: 'bg-yellow-500/20 text-yellow-400',
@@ -46,7 +47,8 @@ export default function PersonTalentCard({ person, selectable, selected, onToggl
     )
   }, [person.riskQuadrant, person.mobilityQuadrant, person.roleFitScore, person.fullName])
 
-  const alertClass = person.riskAlertLevel ? ALERT_COLORS[person.riskAlertLevel] || '' : ''
+  const mapNarrative = getTalentMapNarrative(person.riskQuadrant, person.tenureSegment)
+  const badgeColor = ALERT_BADGE_COLORS[mapNarrative.alertLevel] || ''
 
   return (
     <div
@@ -90,11 +92,9 @@ export default function PersonTalentCard({ person, selectable, selected, onToggl
 
         <div className="flex items-center gap-2 ml-2 shrink-0">
           <TenureSegmentBadge segment={person.tenureSegment} months={person.tenureMonths} />
-          {person.riskAlertLevel && (
-            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${alertClass}`}>
-              {person.riskAlertLevel}
-            </span>
-          )}
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${badgeColor}`}>
+            {mapNarrative.badge}
+          </span>
           {person.tenureMonths > 60 && (
             <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-purple-500/20 text-purple-400">
               Veterano

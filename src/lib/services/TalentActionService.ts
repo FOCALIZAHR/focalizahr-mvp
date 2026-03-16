@@ -54,6 +54,7 @@ export interface GerenciaMapItem {
     total: number
     enPlanFormal: number
     potencialNoActivado: number
+    posicionesCriticas: number
   }
   financialImpact: {
     iccRiskCLP: number
@@ -139,7 +140,7 @@ export class TalentActionService {
     // 3 BULK QUERIES en paralelo — elimina N+1
     // ═══════════════════════════════════════════════════════════════════════
 
-    const [allDepartments, allRatings, allCandidates, salaryResult] = await Promise.all([
+    const [allDepartments, allRatings, allCandidates, allCriticalPositions, salaryResult] = await Promise.all([
       // 1. Todos los departamentos activos de la cuenta
       prisma.department.findMany({
         where: { accountId, isActive: true },
@@ -168,7 +169,12 @@ export class TalentActionService {
         where: { accountId, status: 'ACTIVE' },
         select: { employeeId: true, developmentPlanId: true }
       }),
-      // 4. Salario para P&L
+      // 4. Posiciones criticas por departamento
+      prisma.criticalPosition.findMany({
+        where: { accountId },
+        select: { id: true, departmentId: true }
+      }),
+      // 5. Salario para P&L
       SalaryConfigService.getSalaryForAccount(accountId)
     ])
 
@@ -238,6 +244,13 @@ export class TalentActionService {
       else candidatesByEmployee.set(c.employeeId, [c])
     }
 
+    // Indexar posiciones criticas por departmentId
+    const criticalPositionsByDept = new Map<string, number>()
+    for (const cp of allCriticalPositions) {
+      if (!cp.departmentId) continue
+      criticalPositionsByDept.set(cp.departmentId, (criticalPositionsByDept.get(cp.departmentId) || 0) + 1)
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // Procesar cada gerencia con datos en memoria — 0 queries adicionales
     // ═══════════════════════════════════════════════════════════════════════
@@ -254,9 +267,16 @@ export class TalentActionService {
         if (deptRatings) gerRatings.push(...deptRatings)
       }
 
+      // Contar posiciones criticas en toda la jerarquia de esta gerencia
+      let posicionesCriticas = 0
+      for (const deptId of deptSet) {
+        posicionesCriticas += criticalPositionsByDept.get(deptId) || 0
+      }
+
       const item = this.buildGerenciaItemFromMemory(
         ger.id, ger.displayName, gerRatings,
-        candidatesByEmployee, salaryResult.monthlySalary
+        candidatesByEmployee, salaryResult.monthlySalary,
+        posicionesCriticas
       )
       gerenciaItems.push(item)
     }
@@ -468,7 +488,8 @@ export class TalentActionService {
       employee: { hireDate: Date; position: string | null; departmentId: string | null }
     }[],
     candidatesByEmployee: Map<string, { employeeId: string; developmentPlanId: string | null }[]>,
-    monthlySalary: number
+    monthlySalary: number,
+    posicionesCriticas: number = 0
   ): GerenciaMapItem {
     const now = new Date()
     const totalPersonas = ratings.length
@@ -550,7 +571,8 @@ export class TalentActionService {
     const sucesores = {
       total: activeCandidates.length,
       enPlanFormal: activeCandidates.filter(c => c.developmentPlanId !== null).length,
-      potencialNoActivado: Math.max(0, mobilityDist.SUCESOR_NATURAL - activeCandidates.length)
+      potencialNoActivado: Math.max(0, mobilityDist.SUCESOR_NATURAL - activeCandidates.length),
+      posicionesCriticas
     }
 
     // Patrón — denominador = clasificadas (con riskQuadrant), NO totalPersonas
