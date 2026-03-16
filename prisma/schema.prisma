@@ -219,6 +219,11 @@ model Account {
   successionDevelopmentPlans SuccessionDevelopmentPlan[]
 
   // ═══════════════════════════════════════════════════
+  // INTELLIGENCE INSIGHT (Auditor de Intervenciones)
+  // ═══════════════════════════════════════════════════
+  intelligenceInsights     IntelligenceInsight[]
+
+  // ═══════════════════════════════════════════════════
   // CONFIGURACIÓN SALARIAL (SalaryConfig v1.2)
   // ═══════════════════════════════════════════════════
   averageMonthlySalary    Int?    @map("average_monthly_salary")
@@ -2933,6 +2938,72 @@ model TACActionLog {
   @@index([accountId], map: "idx_tac_log_account")
   @@index([gerenciaId], map: "idx_tac_log_gerencia")
   @@map("tac_action_logs")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INTELLIGENCE INSIGHT - Auditor de Intervenciones FocalizaHR
+// ═══════════════════════════════════════════════════════════════════════════
+// Filosofia: Detecto → Te aviso → Tu decides → Yo mido → Te muestro ROI
+// NO SOY: Task manager, recordatorios, % avance, responsables, subtareas
+// ═══════════════════════════════════════════════════════════════════════════
+
+model IntelligenceInsight {
+  id              String   @id @default(cuid())
+  accountId       String   @map("account_id")
+
+  // 1. CLASIFICACION
+  category        String   // PREDICTIVE | REACTIVE | HYBRID
+  resolutionMode  String   @map("resolution_mode") // AUTO | MANUAL
+
+  // 2. ORIGEN (Trazabilidad completa)
+  sourceModule    String   @map("source_module")    // TAC | CLIMA | EXIT | ONBOARDING | SUCESION
+  sourceEntityId  String?  @map("source_entity_id") // ID del analisis/alerta que lo genero
+  sourceType      String?  @map("source_type")      // RISK_QUADRANT | ALERT | PATTERN | INSIGHT
+
+  // 3. TARGET (Strings genericos - SIN FK)
+  targetType      String   @map("target_type")      // EMPLOYEE | DEPARTMENT | POSITION
+  targetId        String   @map("target_id")        // ID del target
+
+  // 4. LA RECOMENDACION
+  actionCode      String   @map("action_code")      // NOTIFY_HRBP | SCHEDULE_COMMITTEE | FLAG_FOR_REVIEW | ...
+  title           String                            // "Agendar Comite de Riesgo - Gerencia Tecnologia"
+  description     String?  @db.Text                 // Contexto adicional
+
+  // 5. MAQUINA DE ESTADOS (Embudo unidireccional, solo 3)
+  status          String   @default("OPEN")         // OPEN → ACKNOWLEDGED → RESOLVED
+  outcome         String?                           // SUCCESS | FAILED | INCONCLUSIVE | DOCUMENTED
+
+  // 6. AUDITORIA HUMANA (El clic de "Me hago cargo")
+  acknowledgedAt  DateTime? @map("acknowledged_at")
+  acknowledgedBy  String?   @map("acknowledged_by") // userId
+  actionTaken     String?   @map("action_taken")    // Quick pick seleccionado
+
+  // 7. AUDITORIA DEL SISTEMA (Resolucion automatica o manual)
+  resolvedAt      DateTime? @map("resolved_at")
+  resolvedBy      String?   @map("resolved_by")     // "SYSTEM" | userId
+  resolutionNotes String?   @map("resolution_notes") @db.Text
+
+  // 8. AUTO-RESOLVE (Para resolutionMode = AUTO)
+  metricCode      String?   @map("metric_code")      // RETENTION_STATUS | RISK_QUADRANT | TURNOVER_RATE
+  baselineValue   Float?    @map("baseline_value")   // Valor al crear insight
+  finalValue      Float?    @map("final_value")      // Valor al evaluar
+  resolutionDelta Float?    @map("resolution_delta") // finalValue - baselineValue
+
+  // 9. TEMPORALIDAD
+  createdAt         DateTime  @default(now()) @map("created_at")
+  nextEvaluationAt  DateTime? @map("next_evaluation_at") // Cuando el CRON debe evaluar
+  evaluatedAt       DateTime? @map("evaluated_at")       // Cuando se evaluo realmente
+
+  // RELACIONES (Solo Account para multi-tenancy)
+  account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // INDICES (Performance para queries frecuentes)
+  @@index([accountId, status], map: "idx_insights_account_status")
+  @@index([accountId, sourceModule], map: "idx_insights_module")
+  @@index([targetType, targetId], map: "idx_insights_target")
+  @@index([status, nextEvaluationAt], map: "idx_insights_pending_eval")
+  @@index([outcome], map: "idx_insights_outcome")
+  @@map("intelligence_insights")
 }
 
 // ════════════════════════════════════════════════════════════════════════════

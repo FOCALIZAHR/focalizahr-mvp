@@ -1,31 +1,51 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// TAC ORCHESTRATOR - Hub → Cover → Content
+// TAC ORCHESTRATOR - Landing → Gerencias/Personas → Cover → Content
 // src/components/talent-actions/TACOrchestrator.tsx
-// Patrón: GuidedSummaryOrchestrator (split 25/75)
+//
+// Revelacion progresiva:
+// Landing: Solo headline + mision + CTA (sin sidebar, sin grid)
+// Gerencias: OrgHealthMap (Pilar 1) con sidebar
+// Personas: TalentTreemap (Pilar 2) con sidebar
+// Cover/Content: Drill-down de gerencia individual
 // ════════════════════════════════════════════════════════════════════════════
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useTalentActions } from '@/hooks/useTalentActions'
 import TACLeftColumn from './TACLeftColumn'
+import TACLanding from './TACLanding'
 import OrgHealthMap from './OrgHealthMap'
+import TalentTreemap from './TalentTreemap'
 import GerenciaCover from './GerenciaCover'
 import GerenciaDetail from './GerenciaDetail'
 
-type ViewLevel = 'hub' | 'cover' | 'content'
+type ViewLevel = 'landing' | 'gerencias' | 'personas' | 'cover' | 'content'
 
 const springTransition = { type: 'spring' as const, stiffness: 220, damping: 30 }
 
 export default function TACOrchestrator() {
-  const { orgMap, selectedGerencia, flaggedGerencias, loading, error, selectGerencia, clearSelection } = useTalentActions()
-  const [viewLevel, setViewLevel] = useState<ViewLevel>('hub')
+  const { orgMap, selectedGerencia, flaggedGerencias, userRole, loading, error, selectGerencia, clearSelection } = useTalentActions()
+  const [viewLevel, setViewLevel] = useState<ViewLevel>('landing')
+
+  // RBAC: AREA_MANAGER salta landing, va directo a Pilar 2
+  const isAreaManager = userRole === 'AREA_MANAGER'
+
+  useEffect(() => {
+    if (isAreaManager && viewLevel === 'landing') {
+      setViewLevel('personas')
+    }
+  }, [isAreaManager, viewLevel])
 
   // ═══════════════════════════════════════════════════════════════════════
   // HANDLERS
   // ═══════════════════════════════════════════════════════════════════════
+
+  const handleNavigateFromLanding = useCallback((view: 'gerencias' | 'personas') => {
+    setViewLevel(view)
+  }, [])
 
   const handleSelectGerencia = useCallback((id: string) => {
     selectGerencia(id)
@@ -40,15 +60,21 @@ export default function TACOrchestrator() {
     if (viewLevel === 'content') {
       setViewLevel('cover')
     } else if (viewLevel === 'cover') {
-      setViewLevel('hub')
+      setViewLevel(isAreaManager ? 'personas' : 'gerencias')
       clearSelection()
+    } else if (viewLevel === 'gerencias' || viewLevel === 'personas') {
+      if (!isAreaManager) {
+        setViewLevel('landing')
+        clearSelection()
+      }
     }
-  }, [viewLevel, clearSelection])
+  }, [viewLevel, clearSelection, isAreaManager])
 
-  const handleBackToHub = useCallback(() => {
-    setViewLevel('hub')
+  const handleBackToLanding = useCallback(() => {
+    if (isAreaManager) return
+    setViewLevel('landing')
     clearSelection()
-  }, [clearSelection])
+  }, [clearSelection, isAreaManager])
 
   // ═══════════════════════════════════════════════════════════════════════
   // LOADING
@@ -73,6 +99,9 @@ export default function TACOrchestrator() {
     )
   }
 
+  // Landing: sin sidebar, sin chrome — solo la decision
+  const showSidebar = viewLevel !== 'landing'
+
   // ═══════════════════════════════════════════════════════════════════════
   // RENDER
   // ═══════════════════════════════════════════════════════════════════════
@@ -96,20 +125,22 @@ export default function TACOrchestrator() {
             }}
           />
 
-          {/* COLUMNA IZQUIERDA (25%) — Contexto fijo */}
-          <TACLeftColumn
-            orgStats={orgMap.orgStats}
-            salarySource={orgMap.salarySource}
-            viewLevel={viewLevel}
-            selectedGerencia={selectedGerencia}
-            onBackToHub={handleBackToHub}
-          />
+          {/* COLUMNA IZQUIERDA (25%) — Solo cuando NO es landing */}
+          {showSidebar && (
+            <TACLeftColumn
+              orgStats={orgMap.orgStats}
+              salarySource={orgMap.salarySource}
+              viewLevel={viewLevel === 'gerencias' || viewLevel === 'personas' ? 'hub' : viewLevel as 'cover' | 'content'}
+              selectedGerencia={selectedGerencia}
+              onBackToHub={handleBackToLanding}
+            />
+          )}
 
-          {/* COLUMNA DERECHA (75%) — Navegación animada */}
-          <div className="w-full lg:w-[75%] min-h-[500px] flex flex-col">
+          {/* COLUMNA DERECHA — Navegacion animada */}
+          <div className={`${showSidebar ? 'w-full lg:w-[75%]' : 'w-full'} min-h-[500px] flex flex-col`}>
 
-            {/* Back button */}
-            {viewLevel !== 'hub' && (
+            {/* Back button (no en landing, no para AREA_MANAGER en personas) */}
+            {viewLevel !== 'landing' && !(isAreaManager && viewLevel === 'personas') && (
               <motion.button
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -117,16 +148,39 @@ export default function TACOrchestrator() {
                 className="flex items-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors p-4 pb-0 text-sm"
               >
                 <ArrowLeft className="w-4 h-4" />
-                {viewLevel === 'content' ? 'Volver a portada' : 'Volver al mapa'}
+                {viewLevel === 'content'
+                  ? 'Volver a portada'
+                  : viewLevel === 'cover'
+                    ? 'Volver a gerencias'
+                    : 'Volver'
+                }
               </motion.button>
             )}
 
             <AnimatePresence mode="wait">
 
-              {/* NIVEL 1: HUB */}
-              {viewLevel === 'hub' && (
+              {/* LANDING — Solo headline + mision + CTA */}
+              {viewLevel === 'landing' && (
                 <motion.div
-                  key="hub"
+                  key="landing"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={springTransition}
+                  className="flex-1"
+                >
+                  <TACLanding
+                    orgMap={orgMap}
+                    onNavigate={handleNavigateFromLanding}
+                    userRole={userRole}
+                  />
+                </motion.div>
+              )}
+
+              {/* PILAR 1: Vision por Gerencias */}
+              {viewLevel === 'gerencias' && (
+                <motion.div
+                  key="gerencias"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
@@ -142,7 +196,21 @@ export default function TACOrchestrator() {
                 </motion.div>
               )}
 
-              {/* NIVEL 2: COVER */}
+              {/* PILAR 2: Mapa de Talento por Personas */}
+              {viewLevel === 'personas' && (
+                <motion.div
+                  key="personas"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={springTransition}
+                  className="flex-1 p-4 md:p-8"
+                >
+                  <TalentTreemap />
+                </motion.div>
+              )}
+
+              {/* COVER */}
               {viewLevel === 'cover' && selectedGerencia && (
                 <motion.div
                   key="cover"
@@ -159,7 +227,7 @@ export default function TACOrchestrator() {
                 </motion.div>
               )}
 
-              {/* NIVEL 3: CONTENT */}
+              {/* CONTENT */}
               {viewLevel === 'content' && selectedGerencia && (
                 <motion.div
                   key="content"

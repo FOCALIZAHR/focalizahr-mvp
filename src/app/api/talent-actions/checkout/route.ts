@@ -1,25 +1,30 @@
 /**
  * POST /api/talent-actions/checkout
  *
- * Registra accion ejecutiva del Checkout (Acto 4)
- * Escribe TACActionLog: quien vio el riesgo, cuando, que accion tomo
+ * Registra accion ejecutiva del Checkout (Acto 4) via IntelligenceInsight.
+ * Crea insight en ACKNOWLEDGED directamente (CEO ya esta actuando).
  *
  * Body:
  * {
  *   gerenciaId: string
+ *   gerenciaName: string
  *   pattern: string (FRAGIL, QUEMADA, etc.)
  *   action: 'NOTIFY_HRBP' | 'SCHEDULE_COMMITTEE' | 'FLAG_FOR_REVIEW'
  * }
  *
- * Acciones:
- * - NOTIFY_HRBP → crea log + email simple al HR_MANAGER
- * - SCHEDULE_COMMITTEE → crea log (link calendario en futuro)
- * - FLAG_FOR_REVIEW → crea log (badge visible en Hub)
+ * Response (LEY 2 Manifiesto UX - micro-copy estrategico):
+ * {
+ *   success: true,
+ *   data: {
+ *     insightId: "...",
+ *     status: "ACKNOWLEDGED",
+ *     actionTitle: "Comite de Riesgo programado",
+ *     message: "FocalizaHR medira si esta intervencion..."
+ *   }
+ * }
  *
- * Permiso: talent-actions:view (cualquiera que vea puede actuar)
- *
- * GET /api/talent-actions/checkout?gerenciaId=xxx
- * → Devuelve acciones previas para esa gerencia (para badge FLAG_FOR_REVIEW)
+ * GET /api/talent-actions/checkout
+ * → Devuelve gerencias con FLAG_FOR_REVIEW activo (para badge en Hub)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -28,11 +33,12 @@ import {
   extractUserContext,
   hasPermission
 } from '@/lib/services/AuthorizationService'
+import { IntelligenceInsightService } from '@/lib/services/IntelligenceInsightService'
 
 const VALID_ACTIONS = ['NOTIFY_HRBP', 'SCHEDULE_COMMITTEE', 'FLAG_FOR_REVIEW']
 
 // ═══════════════════════════════════════════════════════════════════════════
-// POST: Registrar accion
+// POST: Registrar accion → IntelligenceInsight
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function POST(request: NextRequest) {
@@ -48,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { gerenciaId, pattern, action } = body
+    const { gerenciaId, gerenciaName, pattern, action } = body
 
     if (!gerenciaId || !pattern || !action) {
       return NextResponse.json(
@@ -65,21 +71,21 @@ export async function POST(request: NextRequest) {
     }
 
     const userEmail = request.headers.get('x-user-email') || 'unknown'
+    const userId = request.headers.get('x-user-id') || userEmail
 
-    // Crear log
-    const log = await prisma.tACActionLog.create({
-      data: {
-        accountId: userContext.accountId,
-        gerenciaId,
-        pattern,
-        action,
-        initiatedBy: userEmail
-      }
+    // Crear IntelligenceInsight
+    const result = await IntelligenceInsightService.createFromTAC({
+      accountId: userContext.accountId,
+      departmentId: gerenciaId,
+      departmentName: gerenciaName || 'Gerencia',
+      actionCode: action,
+      actionTaken: action,
+      acknowledgedBy: userId,
+      pattern
     })
 
-    // Acciones especificas
+    // Acciones adicionales (email, etc.)
     if (action === 'NOTIFY_HRBP') {
-      // Buscar HR_MANAGER de la cuenta para notificar
       const hrManagers = await prisma.user.findMany({
         where: {
           accountId: userContext.accountId,
@@ -90,35 +96,19 @@ export async function POST(request: NextRequest) {
         take: 3
       })
 
-      // Email simple (si Resend esta configurado, se enviaria aqui)
-      // Por ahora solo log — la integracion con Resend se activa en produccion
       console.log('[TAC Checkout] NOTIFY_HRBP:', {
         from: userEmail,
         to: hrManagers.map(h => h.email),
         gerenciaId,
-        pattern
-      })
-    }
-
-    if (action === 'FLAG_FOR_REVIEW') {
-      console.log('[TAC Checkout] FLAG_FOR_REVIEW:', {
-        gerenciaId,
         pattern,
-        by: userEmail
+        insightId: result.insightId
       })
     }
 
+    // LEY 2: Response con micro-copy estrategico
     return NextResponse.json({
       success: true,
-      data: {
-        logId: log.id,
-        action,
-        message: action === 'NOTIFY_HRBP'
-          ? 'HR Business Partner notificado'
-          : action === 'SCHEDULE_COMMITTEE'
-            ? 'Comite agendado'
-            : 'Marcado para revision trimestral'
-      }
+      data: result
     })
 
   } catch (error: any) {
@@ -131,7 +121,7 @@ export async function POST(request: NextRequest) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// GET: Consultar acciones previas (para badge FLAG_FOR_REVIEW en Hub)
+// GET: Consultar gerencias flagged (para badge en Hub)
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function GET(request: NextRequest) {
@@ -146,32 +136,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Sin permisos' }, { status: 403 })
     }
 
-    const { searchParams } = new URL(request.url)
-    const gerenciaId = searchParams.get('gerenciaId')
-
-    const where: any = { accountId: userContext.accountId }
-    if (gerenciaId) {
-      where.gerenciaId = gerenciaId
-    }
-
-    const logs = await prisma.tACActionLog.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 50
-    })
-
-    // Gerencias con FLAG_FOR_REVIEW activo
-    const flaggedGerencias = new Set(
-      logs
-        .filter(l => l.action === 'FLAG_FOR_REVIEW')
-        .map(l => l.gerenciaId)
+    const flaggedGerencias = await IntelligenceInsightService.getFlaggedGerencias(
+      userContext.accountId
     )
 
     return NextResponse.json({
       success: true,
       data: {
-        logs,
-        flaggedGerencias: Array.from(flaggedGerencias)
+        flaggedGerencias
       }
     })
 

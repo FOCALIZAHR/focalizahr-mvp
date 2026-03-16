@@ -7,6 +7,7 @@ interface UseTalentActionsReturn {
   orgMap: OrgMapResult | null
   selectedGerencia: GerenciaMapItem | null
   flaggedGerencias: Set<string>
+  userRole: string | null
   loading: boolean
   error: string | null
   selectGerencia: (id: string) => void
@@ -18,6 +19,7 @@ export function useTalentActions(): UseTalentActionsReturn {
   const [orgMap, setOrgMap] = useState<OrgMapResult | null>(null)
   const [selectedGerencia, setSelectedGerencia] = useState<GerenciaMapItem | null>(null)
   const [flaggedGerencias, setFlaggedGerencias] = useState<Set<string>>(new Set())
+  const [userRole, setUserRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -41,6 +43,7 @@ export function useTalentActions(): UseTalentActionsReturn {
       if (!orgResult.success) throw new Error(orgResult.error || 'Error desconocido')
 
       setOrgMap(orgResult.data)
+      setUserRole(orgResult.userRole || null)
 
       // Flags (no critico si falla)
       if (flagsRes.ok) {
@@ -75,6 +78,7 @@ export function useTalentActions(): UseTalentActionsReturn {
     orgMap,
     selectedGerencia,
     flaggedGerencias,
+    userRole,
     loading,
     error,
     selectGerencia,

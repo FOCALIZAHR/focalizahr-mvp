@@ -553,13 +553,14 @@ export class TalentActionService {
       potencialNoActivado: Math.max(0, mobilityDist.SUCESOR_NATURAL - activeCandidates.length)
     }
 
-    // Patrón
+    // Patrón — denominador = clasificadas (con riskQuadrant), NO totalPersonas
+    const safeClasificadas = clasificadas > 0 ? clasificadas : 1
     const pattern = dataInsufficient ? null : this.detectPattern({
       totalPersonas,
-      fugaCerebrosPercent: totalPersonas > 0 ? (fugaCerebrosCount / totalPersonas) * 100 : 0,
-      burnoutPercent: totalPersonas > 0 ? (burnoutCount / totalPersonas) * 100 : 0,
-      enDesarrolloPercent: totalPersonas > 0 ? (enDesarrolloCount / totalPersonas) * 100 : 0,
-      ambiciosoPremPercent: totalPersonas > 0 ? (ambiciosoPremCount / totalPersonas) * 100 : 0,
+      fugaCerebrosPercent: (fugaCerebrosCount / safeClasificadas) * 100,
+      burnoutPercent: (burnoutCount / safeClasificadas) * 100,
+      enDesarrolloPercent: (enDesarrolloCount / safeClasificadas) * 100,
+      ambiciosoPremPercent: (ambiciosoPremCount / safeClasificadas) * 100,
       icc: icc || 0,
       roleFitPromedio: roleFitPromedio || 0,
       sucesoresEnPlan: sucesores.enPlanFormal,
