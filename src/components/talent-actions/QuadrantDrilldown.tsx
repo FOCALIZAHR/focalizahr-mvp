@@ -1,13 +1,13 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// QUADRANT DRILLDOWN — Lista personas por cuadrante, segmentada por tenure
-// Badge sucesor si aplica
+// QUADRANT DRILLDOWN — Acordeon por cuadrante, segmentado por tenure
+// Usa clases .fhr-* de focalizahr-unified.css
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useCallback } from 'react'
-import { motion } from 'framer-motion'
-import { Loader2, Shield, ChevronDown } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Loader2, Shield, ChevronRight } from 'lucide-react'
 import TenureSegmentBadge from './TenureSegmentBadge'
 import { getTalentMapNarrative } from '@/config/TalentMapNarratives'
 import type { QuadrantPerson, TenureSegment } from '@/lib/services/TalentActionService'
@@ -18,13 +18,6 @@ interface QuadrantDrilldownProps {
   quadrantColor: string
   gerenciaId: string
   count: number
-}
-
-const ALERT_BADGE_COLORS: Record<string, string> = {
-  RED: 'bg-red-500/20 text-red-400',
-  ORANGE: 'bg-orange-500/20 text-orange-400',
-  YELLOW: 'bg-yellow-500/20 text-yellow-400',
-  GREEN: 'bg-emerald-500/20 text-emerald-400'
 }
 
 export default function QuadrantDrilldown({
@@ -68,7 +61,6 @@ export default function QuadrantDrilldown({
     }
   }, [quadrant, gerenciaId])
 
-  // Fetch on expand
   useEffect(() => {
     if (expanded && persons.length === 0) {
       fetchPersons()
@@ -77,7 +69,6 @@ export default function QuadrantDrilldown({
 
   if (count === 0) return null
 
-  // Agrupar por tenure
   const grouped: Record<TenureSegment, QuadrantPerson[]> = {
     onboarding: [],
     real: [],
@@ -88,119 +79,136 @@ export default function QuadrantDrilldown({
   }
 
   return (
-    <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+    <div style={{ borderBottom: '1px solid var(--fhr-border-default)' }} className="last:border-b-0">
       {/* Header colapsable */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-4 hover:bg-slate-800/30 transition-colors"
+        className="w-full px-4 py-4 flex items-center justify-between text-left transition-colors min-h-[44px]"
+        style={{ color: 'var(--fhr-text-secondary)' }}
+        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
       >
         <div className="flex items-center gap-3">
-          <span className={`text-sm font-medium ${quadrantColor}`}>{quadrantLabel}</span>
-          <span className="text-xs text-slate-500">{count} personas</span>
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: quadrantColor }} />
+          <span className="text-sm font-medium" style={{ color: 'var(--fhr-text-secondary)' }}>
+            {quadrantLabel}
+          </span>
+          <span className="text-xs" style={{ color: 'var(--fhr-text-muted)' }}>
+            {count} personas
+          </span>
         </div>
-        <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        <ChevronRight
+          className="w-4 h-4 transition-transform duration-200"
+          style={{ color: 'var(--fhr-text-muted)', transform: expanded ? 'rotate(90deg)' : 'none' }}
+        />
       </button>
 
       {/* Contenido expandido */}
-      {expanded && (
-        <motion.div
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          transition={{ duration: 0.2 }}
-          className="border-t border-slate-800"
-        >
-          {loading && persons.length === 0 ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-5 h-5 text-cyan-400 animate-spin" />
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-800/50">
-              {/* Render por segmento de tenure */}
-              {(['onboarding', 'real', 'cronico'] as TenureSegment[]).map(segment => {
-                const segPersons = grouped[segment]
-                if (segPersons.length === 0) return null
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-5">
+              {loading && persons.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--fhr-cyan)' }} />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {(['onboarding', 'real', 'cronico'] as TenureSegment[]).map(segment => {
+                    const segPersons = grouped[segment]
+                    if (segPersons.length === 0) return null
 
-                return (
-                  <div key={segment} className="p-3">
-                    <div className="mb-2">
-                      <TenureSegmentBadge segment={segment} />
-                      <span className="text-[10px] text-slate-600 ml-2">
-                        {segPersons.length} {segPersons.length === 1 ? 'persona' : 'personas'}
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      {segPersons.map(person => (
-                        <PersonRow key={person.employeeId} person={person} />
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
+                    return (
+                      <div key={segment}>
+                        <div className="mb-2">
+                          <TenureSegmentBadge segment={segment} />
+                          <span className="text-[10px] ml-2" style={{ color: 'var(--fhr-text-muted)' }}>
+                            {segPersons.length} {segPersons.length === 1 ? 'persona' : 'personas'}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          {segPersons.map(person => (
+                            <PersonRow key={person.employeeId} person={person} />
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
 
-              {/* Load more */}
-              {hasMore && (
-                <div className="p-3 text-center">
-                  <button
-                    onClick={() => fetchPersons(persons.length)}
-                    disabled={loading}
-                    className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
-                  >
-                    {loading ? 'Cargando...' : `Ver mas (${total - persons.length} restantes)`}
-                  </button>
+                  {hasMore && (
+                    <div className="text-center pt-2">
+                      <button
+                        onClick={() => fetchPersons(persons.length)}
+                        disabled={loading}
+                        className="text-xs transition-colors"
+                        style={{ color: 'var(--fhr-cyan)' }}
+                      >
+                        {loading ? 'Cargando...' : `Ver mas (${total - persons.length} restantes)`}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </motion.div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// PERSON ROW — Fila compacta por persona + badge narrativo + coaching tip
-// Usa talentMapNarratives.ts como fuente unica de verdad
+// PERSON ROW
 // ════════════════════════════════════════════════════════════════════════════
 
 function PersonRow({ person }: { person: QuadrantPerson }) {
   const narrative = getTalentMapNarrative(person.riskQuadrant, person.tenureSegment)
-  const badgeColor = ALERT_BADGE_COLORS[narrative.alertLevel] || ''
 
   return (
-    <div className="py-2 px-2 rounded-lg hover:bg-slate-800/30 transition-colors">
+    <div
+      className="py-2 px-2 rounded-lg transition-colors"
+      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+    >
       <div className="flex items-center gap-3">
-        {/* Nombre + cargo */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-white truncate">{person.fullName}</span>
+            <span className="text-sm truncate" style={{ color: 'var(--fhr-text-primary)' }}>
+              {person.fullName}
+            </span>
             {person.isSuccessor && (
-              <Shield className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <Shield className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--fhr-cyan)' }} />
             )}
           </div>
-          <div className="text-[10px] text-slate-500 truncate">
+          <div className="text-[10px] truncate" style={{ color: 'var(--fhr-text-muted)' }}>
             {person.position || 'Sin cargo'} · {person.departmentName}
           </div>
         </div>
 
-        {/* Tenure */}
         <TenureSegmentBadge segment={person.tenureSegment} months={person.tenureMonths} />
 
-        {/* Badge narrativo */}
-        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${badgeColor}`}>
-          {narrative.badge}
-        </span>
-
-        {/* RoleFit */}
         {person.roleFitScore !== null && (
-          <span className="text-[10px] text-slate-500 tabular-nums w-10 text-right">
+          <span className="text-[10px] tabular-nums w-10 text-right" style={{ color: 'var(--fhr-text-muted)' }}>
             {Math.round(person.roleFitScore)}%
           </span>
         )}
       </div>
 
       {/* Coaching Tip */}
-      <div className="mt-1.5 ml-0 px-2 py-1 rounded bg-slate-800/50 border-l-2 border-amber-500/40">
-        <span className="text-[10px] text-slate-400 leading-relaxed">
+      <div
+        className="mt-1.5 px-2 py-1 rounded"
+        style={{
+          background: 'var(--fhr-bg-subtle)',
+          borderLeft: '2px solid var(--fhr-border-default)'
+        }}
+      >
+        <span className="text-[10px] leading-relaxed" style={{ color: 'var(--fhr-text-tertiary)' }}>
           {narrative.coachingTip}
         </span>
       </div>

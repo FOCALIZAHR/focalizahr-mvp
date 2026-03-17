@@ -1,15 +1,14 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// GERENCIA COVER — Portada narrativa 2 pasos
-// Paso 1: ICC + patron detectado + narrativa
-// Paso 2: Metodologia + como se detecto + que significa
-// Patron clonado de SuccessionCandidatesCover.tsx
+// GERENCIA COVER — Portada vertical con insight + metricas + acciones
+// Rediseño: layout vertical claro, sin 2 columnas, sin pasos
+// Datos: mismos que antes (GerenciaMapItem + pattern narratives)
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowRight, HelpCircle, X, Activity } from 'lucide-react'
+import { ArrowLeft, ArrowRight, HelpCircle, X } from 'lucide-react'
 import CheckoutPanel from './CheckoutPanel'
 import type { GerenciaMapItem } from '@/lib/services/TalentActionService'
 
@@ -22,93 +21,72 @@ interface GerenciaCoverProps {
 // NARRATIVAS POR PATRON
 // ════════════════════════════════════════════════════════════════════════════
 
-const PATTERN_NARRATIVES: Record<string, {
+const PATTERN_CONFIG: Record<string, {
   label: string
-  color: string
+  badgeClass: string
+  coachingTip: string
   narrative: (name: string, icc: number | null) => string
-  subtext: string
-  methodology: string[]
 }> = {
   FRAGIL: {
     label: 'Fragil',
-    color: 'text-amber-400',
+    badgeClass: 'bg-red-500/15 text-red-400 border border-red-500/20',
+    coachingTip: 'Priorizar retención del conocimiento crítico antes de cualquier movimiento. La próxima salida no tiene reemplazo.',
     narrative: (name, icc) =>
-      `${name} tiene el talento para ejecutar, pero esta a punto de perderlo. Alto ajuste al rol, fuga activa y sin sucesores preparados.`,
-    subtext: 'La proxima salida no tiene reemplazo.',
-    methodology: [
-      'RoleFit promedio del equipo superior al 75%',
-      'Mas del 30% del equipo clasificado como Fuga de Cerebros',
-      'Menos de 2 sucesores en plan formal de desarrollo',
-    ]
+      `Equipo con alto ajuste al rol pero fuga activa y sin sucesores preparados. ${icc ? `${icc}% del conocimiento crítico concentrado en personas con alerta.` : ''}`,
   },
   QUEMADA: {
     label: 'Quemada',
-    color: 'text-orange-400',
+    badgeClass: 'bg-orange-500/15 text-orange-400 border border-orange-500/20',
+    coachingTip: 'El burnout no es un problema individual. Revisar carga de trabajo estructural antes de intervenciones individuales.',
     narrative: (name) =>
-      `${name} esta agotando a su equipo. El burnout no es un problema individual, es un patron que se detecta cuando persiste mas de 6 meses.`,
-    subtext: 'La productividad cae antes de que la gente se vaya.',
-    methodology: [
-      'Mas del 35% del equipo clasificado como Riesgo de Burnout',
-      'Mediana de antiguedad superior a 6 meses (no es desgaste de nuevos)',
-      'Patron persistente que indica sobrecarga estructural',
-    ]
+      `Equipo sobrecargado con señales de burnout activo. El patrón persiste más de 6 meses, indicando sobrecarga estructural.`,
   },
   ESTANCADA: {
     label: 'Estancada',
-    color: 'text-yellow-400',
-    narrative: (name) =>
-      `${name} tiene gente que lleva anos sin moverse. No son nuevos. Llevan mas de 18 meses en desarrollo sin avance.`,
-    subtext: 'Senal de gestion que no desarrolla ni rota.',
-    methodology: [
-      'Mas del 50% del equipo clasificado como En Desarrollo',
-      'Mediana de antiguedad superior a 18 meses',
-      'Combinacion que indica estancamiento, no crecimiento',
-    ]
+    badgeClass: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20',
+    coachingTip: 'Gente que lleva años sin moverse no es estabilidad, es estancamiento. Revisar planes de desarrollo y rotación.',
+    narrative: () =>
+      `Más del 50% del equipo lleva +18 meses en desarrollo sin avance. Señal de gestión que no desarrolla ni rota.`,
   },
   RIESGO_OCULTO: {
     label: 'Riesgo Oculto',
-    color: 'text-purple-400',
+    badgeClass: 'bg-purple-500/15 text-purple-400 border border-purple-500/20',
+    coachingTip: 'El riesgo no es visible hasta que alguien se va. Distribuir conocimiento crítico es la prioridad.',
     narrative: (name, icc) =>
-      `${name} parece estable por fuera, pero concentra el ${icc ?? '--'}% de su conocimiento critico en pocas personas con alerta activa.`,
-    subtext: 'El riesgo no es visible hasta que alguien se va.',
-    methodology: [
-      'Distribucion general de cuadrantes aparentemente sana',
-      'ICC (Indice de Conocimiento Critico) superior al 25%',
-      'Personas con alerta RED/ORANGE que ademas son Experto Ancla',
-    ]
+      `Parece estable por fuera, pero concentra el ${icc ?? '--'}% de su conocimiento crítico en pocas personas con alerta activa.`,
   },
   EN_TRANSICION: {
     label: 'En Transicion',
-    color: 'text-blue-400',
-    narrative: (name) =>
-      `${name} tiene gente que quiere crecer pero todavia no esta lista. Ambicion sin preparacion genera frustacion y fuga prematura.`,
-    subtext: 'Necesitan planes de desarrollo antes de que busquen afuera.',
-    methodology: [
-      'Mas del 35% del equipo clasificado como Ambicioso Prematuro',
-      'Alta aspiracion de crecimiento con bajo ajuste al nivel siguiente',
-      'Oportunidad si se canaliza, riesgo si se ignora',
-    ]
+    badgeClass: 'bg-blue-500/15 text-blue-400 border border-blue-500/20',
+    coachingTip: 'Ambición sin preparación genera frustración y fuga prematura. Canalizar con planes de desarrollo.',
+    narrative: () =>
+      `Equipo con alta aspiración de crecimiento pero bajo ajuste al nivel siguiente. Oportunidad si se canaliza, riesgo si se ignora.`,
   },
   SALUDABLE: {
     label: 'Fabrica de Talento',
-    color: 'text-emerald-400',
-    narrative: (name) =>
-      `${name} es el modelo a replicar. Alto rendimiento sostenido, conocimiento distribuido y retencion activa del talento critico.`,
-    subtext: 'Esta gerencia esta construyendo la organizacion del futuro.',
-    methodology: [
-      'Ningun patron de riesgo detectado',
-      'Distribucion equilibrada de cuadrantes',
-      'Conocimiento critico no concentrado en pocas personas',
-    ]
+    badgeClass: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20',
+    coachingTip: 'Esta gerencia es el modelo a replicar. Documentar sus prácticas para transferir a otras áreas.',
+    narrative: () =>
+      `Alto rendimiento sostenido, conocimiento distribuido y retención activa del talento crítico. Modelo a replicar.`,
   }
 }
 
-const DEFAULT_NARRATIVE = {
+const DEFAULT_CONFIG = {
   label: 'Sin clasificar',
-  color: 'text-slate-400',
-  narrative: () => 'No hay suficientes datos para determinar el patron de esta gerencia.',
-  subtext: 'Completa la calibracion para activar el diagnostico.',
-  methodology: ['Requiere al menos 50% del equipo con matrices calculadas']
+  badgeClass: 'bg-slate-500/15 text-slate-400 border border-slate-500/20',
+  coachingTip: 'Completa la calibración para activar el diagnóstico automático.',
+  narrative: () => 'No hay suficientes datos para determinar el patrón de esta gerencia.',
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// COLORES METRICAS
+// ════════════════════════════════════════════════════════════════════════════
+
+const METRIC_COLORS = {
+  FUGA_CEREBROS: 'text-amber-400',
+  BURNOUT_RISK: 'text-red-400',
+  MOTOR_EQUIPO: 'text-emerald-400',
+  BAJO_RENDIMIENTO: 'text-slate-400',
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -116,191 +94,165 @@ const DEFAULT_NARRATIVE = {
 // ════════════════════════════════════════════════════════════════════════════
 
 export default function GerenciaCover({ gerencia, onEnterContent }: GerenciaCoverProps) {
-  const [step, setStep] = useState<1 | 2>(1)
   const [showHelp, setShowHelp] = useState(false)
 
   const config = gerencia.pattern
-    ? (PATTERN_NARRATIVES[gerencia.pattern] || DEFAULT_NARRATIVE)
-    : DEFAULT_NARRATIVE
+    ? (PATTERN_CONFIG[gerencia.pattern] || DEFAULT_CONFIG)
+    : DEFAULT_CONFIG
+
+  const narrativeText = config.narrative(gerencia.gerenciaName, gerencia.icc)
 
   return (
-    <div className="flex flex-col min-h-[400px]">
-      <AnimatePresence mode="wait">
-
-        {/* ═══════════════════════════════════════════════════════════════
-            PASO 1: Narrativa + ICC + patron
-           ═══════════════════════════════════════════════════════════════ */}
-        {step === 1 ? (
-          <motion.div
-            key="step1"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, x: -40 }}
-            transition={{ duration: 0.3 }}
-            className="flex-1 flex flex-col items-center justify-center text-center px-4 md:px-6 relative"
-          >
-            {/* Watermark icon */}
-            <Activity className="w-6 h-6 text-slate-700 absolute top-4 right-4" />
-
-            {/* Narrativa principal */}
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              className="text-xl md:text-2xl font-light text-white leading-relaxed max-w-lg mb-4"
-            >
-              <span className="text-cyan-400 font-medium">{gerencia.gerenciaName}</span>
-              {' '}
-              {config.narrative(gerencia.gerenciaName, gerencia.icc).replace(gerencia.gerenciaName + ' ', '')}
-            </motion.p>
-
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 }}
-              className="text-sm text-slate-400 font-light max-w-md mb-3"
-            >
-              {config.subtext}
-            </motion.p>
-
-            {/* Metricas contextuales */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="flex items-center gap-4 text-xs text-slate-500 mb-8"
-            >
-              {gerencia.icc !== null && (
-                <span>
-                  ICC: <span className="text-cyan-400 font-medium">{gerencia.icc}%</span>
-                </span>
-              )}
-              <span>
-                {gerencia.clasificadas} de {gerencia.totalPersonas} clasificados
-              </span>
-              {gerencia.sucesores.total > 0 && (
-                <span>
-                  {gerencia.sucesores.enPlanFormal} de {gerencia.sucesores.total} sucesores con plan
-                </span>
-              )}
-            </motion.div>
-
-            {/* CTA: Siguiente */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <motion.button
-                onClick={() => setStep(2)}
-                className="flex items-center gap-3 px-8 py-3 rounded-xl font-medium text-base transition-all shadow-lg"
-                style={{
-                  background: 'linear-gradient(135deg, #22D3EE, #22D3EEDD)',
-                  color: '#0F172A',
-                  boxShadow: '0 8px 24px -6px rgba(34,211,238,0.4)',
-                }}
-                whileHover={{ scale: 1.02, y: -2 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <span>Como lo detectamos</span>
-                <ArrowRight className="w-4 h-4" />
-              </motion.button>
-            </motion.div>
-          </motion.div>
-        ) : (
-
-          /* ═══════════════════════════════════════════════════════════════
-             PASO 2: Metodologia + CTA entrar al detalle
-            ═══════════════════════════════════════════════════════════════ */
-          <motion.div
-            key="step2"
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="flex-1 flex flex-col items-center justify-center text-center px-4 md:px-6"
-          >
-            {/* Titulo */}
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              className="text-xl md:text-2xl font-light text-white leading-relaxed max-w-lg mb-8"
-            >
-              Tipologia{' '}
-              <span className={`font-medium ${config.color}`}>{config.label}</span>
-              {' '}detectada automaticamente
-            </motion.p>
-
-            {/* Pasos metodologicos */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 }}
-              className="flex flex-col gap-2 text-left max-w-sm w-full mb-8"
-            >
-              {config.methodology.map((text, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <span className="text-cyan-400 text-sm font-medium flex-shrink-0 w-5">
-                    {'①②③④⑤'[i] || '·'}
-                  </span>
-                  <span className="text-sm text-slate-300 leading-relaxed">{text}</span>
-                </div>
-              ))}
-            </motion.div>
-
-            {/* Help + CTA */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-              className="flex flex-col items-center gap-4"
-            >
-              <button
-                onClick={() => setShowHelp(true)}
-                className="flex items-center gap-1.5 text-slate-500 hover:text-cyan-400 transition-colors text-xs"
-              >
-                <HelpCircle className="w-3.5 h-3.5" />
-                <span>Que es el ICC</span>
-              </button>
-
-              <motion.button
-                onClick={onEnterContent}
-                className="flex items-center gap-3 px-8 py-3 rounded-xl font-medium text-base transition-all shadow-lg"
-                style={{
-                  background: 'linear-gradient(135deg, #22D3EE, #22D3EEDD)',
-                  color: '#0F172A',
-                  boxShadow: '0 8px 24px -6px rgba(34,211,238,0.4)',
-                }}
-                whileHover={{ scale: 1.02, y: -2 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <span>Ver personas de {gerencia.gerenciaName}</span>
-                <ArrowRight className="w-4 h-4" />
-              </motion.button>
-            </motion.div>
-
-            {/* Checkout ejecutivo — 3 acciones */}
-            {gerencia.pattern && gerencia.pattern !== 'SALUDABLE' && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.45 }}
-                className="mt-8 max-w-lg w-full"
-              >
-                <CheckoutPanel
-                  gerenciaId={gerencia.gerenciaId}
-                  gerenciaName={gerencia.gerenciaName}
-                  pattern={gerencia.pattern}
-                />
-              </motion.div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className="flex flex-col items-center">
 
       {/* ═══════════════════════════════════════════════════════════════
-          HELP MODAL — Que es el ICC
+          1. CARD PRINCIPAL — Insight + Metricas
+         ═══════════════════════════════════════════════════════════════ */}
+      <div className="w-full max-w-3xl rounded-2xl bg-[#0F172A] border border-slate-800 p-8 relative overflow-hidden">
+
+        {/* Esferas difusas */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
+          <div className="absolute top-0 left-1/4 w-[300px] h-[300px] bg-cyan-500/5 rounded-full blur-[80px]" />
+          <div className="absolute bottom-0 right-1/4 w-[300px] h-[300px] bg-purple-500/5 rounded-full blur-[80px]" />
+        </div>
+
+        <div className="relative z-10 flex flex-col items-center text-center">
+
+          {/* a) Badge patron */}
+          {gerencia.pattern && (
+            <motion.span
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className={`inline-flex px-4 py-1.5 rounded-full text-sm font-medium ${config.badgeClass}`}
+            >
+              {config.label}
+            </motion.span>
+          )}
+
+          {/* b) Nombre gerencia */}
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="text-3xl font-light text-white mt-4"
+          >
+            {gerencia.gerenciaName}
+          </motion.h1>
+
+          {/* c) Linea Tesla */}
+          <div className="flex items-center justify-center gap-3 my-6">
+            <div className="h-px w-16 bg-white/20" />
+            <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+            <div className="h-px w-16 bg-white/20" />
+          </div>
+
+          {/* d) Narrativa insight */}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="text-lg text-slate-300 text-center max-w-2xl mx-auto leading-relaxed"
+          >
+            {narrativeText}
+          </motion.p>
+
+          {/* Contexto secundario */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="flex items-center gap-4 text-xs text-slate-500 mt-4"
+          >
+            {gerencia.icc !== null && (
+              <span>ICC: <span className="text-cyan-400 font-medium">{gerencia.icc}%</span></span>
+            )}
+            <span>{gerencia.clasificadas} de {gerencia.totalPersonas} clasificados</span>
+            {gerencia.sucesores.total > 0 && (
+              <button
+                onClick={() => setShowHelp(true)}
+                className="flex items-center gap-1 text-slate-500 hover:text-cyan-400 transition-colors"
+              >
+                <HelpCircle className="w-3 h-3" />
+                ICC
+              </button>
+            )}
+          </motion.div>
+
+          {/* e) Metricas — grid 4 */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="grid grid-cols-4 gap-4 mt-8 max-w-xl mx-auto w-full"
+          >
+            <MetricCard
+              value={gerencia.riskDistribution.FUGA_CEREBROS}
+              label="Talento en riesgo"
+              color={METRIC_COLORS.FUGA_CEREBROS}
+            />
+            <MetricCard
+              value={gerencia.riskDistribution.BURNOUT_RISK}
+              label="Sobrecargado"
+              color={METRIC_COLORS.BURNOUT_RISK}
+            />
+            <MetricCard
+              value={gerencia.riskDistribution.MOTOR_EQUIPO}
+              label="Pilar"
+              color={METRIC_COLORS.MOTOR_EQUIPO}
+            />
+            <MetricCard
+              value={gerencia.riskDistribution.BAJO_RENDIMIENTO}
+              label="Bajo rendimiento"
+              color={METRIC_COLORS.BAJO_RENDIMIENTO}
+            />
+          </motion.div>
+
+          {/* f) Link ver detalle */}
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45 }}
+            onClick={onEnterContent}
+            className="text-cyan-400 hover:text-cyan-300 text-sm mt-6 inline-flex items-center gap-1 transition-colors"
+          >
+            Ver distribucion de talento completa
+            <ArrowRight className="w-3.5 h-3.5" />
+          </motion.button>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════
+          2. COACHING TIP
+         ═══════════════════════════════════════════════════════════════ */}
+      <div className="w-full max-w-3xl">
+        <div className="h-px bg-slate-700/50 my-8" />
+        <div className="text-center">
+          <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-2">
+            Coaching Tip
+          </p>
+          <p className="text-slate-400 text-sm italic max-w-xl mx-auto">
+            {config.coachingTip}
+          </p>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════
+          3. ACCIONES
+         ═══════════════════════════════════════════════════════════════ */}
+      {gerencia.pattern && gerencia.pattern !== 'SALUDABLE' && (
+        <div className="w-full max-w-3xl">
+          <div className="h-px bg-slate-700/50 my-8" />
+          <CheckoutPanel
+            gerenciaId={gerencia.gerenciaId}
+            gerenciaName={gerencia.gerenciaName}
+            pattern={gerencia.pattern}
+          />
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════
+          HELP MODAL — ICC
          ═══════════════════════════════════════════════════════════════ */}
       <AnimatePresence>
         {showHelp && (
@@ -316,7 +268,7 @@ export default function GerenciaCover({ gerencia, onEnterContent }: GerenciaCove
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={e => e.stopPropagation()}
-              className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl"
+              className="bg-[#0F172A] border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl"
             >
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-base font-medium text-white">Indice de Conocimiento Critico</h4>
@@ -341,6 +293,19 @@ export default function GerenciaCover({ gerencia, onEnterContent }: GerenciaCove
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// METRIC CARD — Cinema Mode style
+// ════════════════════════════════════════════════════════════════════════════
+
+function MetricCard({ value, label, color }: { value: number; label: string; color: string }) {
+  return (
+    <div className="bg-[#0F172A]/90 backdrop-blur-xl border border-slate-800 rounded-[16px] p-4 text-center">
+      <div className={`text-2xl font-semibold ${color}`}>{value}</div>
+      <div className="text-xs text-slate-400 mt-1">{label}</div>
     </div>
   )
 }

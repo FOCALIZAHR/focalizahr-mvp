@@ -1,13 +1,13 @@
 'use client'
 
-// Clonado de src/components/evaluator/cinema/AvatarInfoModal.tsx
-// Misma estructura modal: fixed z-50, backdrop, Tesla line, avatar header
-// Contenido adaptado: GerenciaDetail en vez de InfoRow/StatusRow
+// ============================================================================
+// TAC DETAIL MODAL — Detalle gerencia con Design System FocalizaHR
+// Usa clases .fhr-* de focalizahr-unified.css
+// ============================================================================
 
 import { memo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Users, Shield } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { HelpCircle } from 'lucide-react'
 import { formatCurrencyCLP } from '@/lib/financialCalculations'
 import GerenciaDetail from '../GerenciaDetail'
 import type { TACDetailModalProps } from '@/types/tac-cinema'
@@ -17,149 +17,142 @@ export default memo(function TACDetailModal({
   onClose,
   gerencia
 }: TACDetailModalProps) {
+  const [showPlTooltip, setShowPlTooltip] = useState(false)
 
   if (!gerencia) return null
 
-  const initials = gerencia.displayName
-    .split(' ')
-    .map(n => n[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
+  const pos = gerencia.full.sucesores.posicionesCriticas
+  const suc = gerencia.full.sucesores.total
+  const successionText = pos === 0
+    ? `${suc} sucesores activos`
+    : `${(suc / pos).toFixed(1)}x cobertura · ${pos} pos · ${suc} suc`
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
-          {/* Backdrop — copia exacta del AvatarInfoModal */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center"
+        >
+          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
+            className="absolute inset-0 bg-slate-950/90 backdrop-blur-md"
           />
 
-          {/* Modal — misma estructura pero mas ancho para GerenciaDetail */}
+          {/* Modal container */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            initial={{ opacity: 0, scale: 0.96, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            exit={{ opacity: 0, scale: 0.96, y: 20 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative z-10 w-full max-w-2xl mx-4 bg-[#0F172A] border border-slate-700/50 rounded-2xl shadow-2xl shadow-black/50 max-h-[85vh] overflow-y-auto"
           >
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+            {/* Esferas difusas de fondo */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
+              <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-cyan-500/5 rounded-full blur-[100px]" />
+              <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[100px]" />
+            </div>
 
-              {/* Tesla line — copia exacta */}
-              <div className="h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
+            {/* Tesla line */}
+            <div className="fhr-top-line" />
 
-              {/* Header — copia exacta layout del AvatarInfoModal */}
-              <div className="relative pt-8 pb-6 px-6 text-center bg-gradient-to-b from-slate-800/50 to-transparent">
-                <button
-                  onClick={onClose}
-                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-colors"
-                >
-                  <X className="w-4 h-4 text-slate-400" />
-                </button>
+            {/* Header */}
+            <div className="text-center pt-8 pb-4 px-6">
+              <p className="fhr-text-sm uppercase tracking-wider mb-2"
+                 style={{ color: 'var(--fhr-text-muted)', fontWeight: 600, fontSize: '0.625rem' }}>
+                Distribucion de Talento
+              </p>
 
-                {/* Avatar — copia exacta CSS */}
-                <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-2xl font-bold text-slate-300 border-2 border-slate-600 mb-4">
-                  {initials}
+              <h1 className="fhr-hero-title" style={{ fontSize: '1.75rem' }}>
+                {gerencia.displayName}
+              </h1>
+              <p className="fhr-subtitle mt-1">
+                {gerencia.clasificadas} de {gerencia.totalPersonas} personas evaluadas
+              </p>
+
+              {/* Divider Tesla ── • ── */}
+              <div className="fhr-divider">
+                <span className="fhr-divider-line" />
+                <span className="fhr-divider-dot" />
+                <span className="fhr-divider-line" />
+              </div>
+
+              <p className="fhr-subtitle">
+                {successionText}
+              </p>
+            </div>
+
+            {/* P&L Detection card */}
+            {gerencia.plTotal > 0 && (
+              <div
+                className="mx-6 mb-5 fhr-card-glass relative"
+                onMouseEnter={() => setShowPlTooltip(true)}
+                onMouseLeave={() => setShowPlTooltip(false)}
+              >
+                <div className="fhr-top-line" />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-2xl font-light" style={{ color: 'var(--fhr-cyan)' }}>
+                      {formatCurrencyCLP(gerencia.plTotal)}
+                    </span>
+                    <span className="ml-2" style={{ color: 'var(--fhr-text-tertiary)' }}>en riesgo</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-lg text-white font-medium">
+                      {gerencia.full.riskDistribution.BURNOUT_RISK}
+                    </span>
+                    <span className="block text-xs" style={{ color: 'var(--fhr-text-muted)' }}>sobrecargadas</span>
+                  </div>
+                </div>
+                <div className="mt-2 text-xs flex items-center gap-1" style={{ color: 'var(--fhr-text-muted)' }}>
+                  <HelpCircle className="w-3 h-3" />
+                  Fuente: SHRM 2024 · Costo reemplazo × factor riesgo
                 </div>
 
-                <h2 className="text-xl font-bold text-white mb-1">
-                  {gerencia.displayName}
-                </h2>
-                <p className="text-sm text-slate-400">
-                  {gerencia.totalPersonas} personas · {gerencia.clasificadas} clasificadas
-                </p>
-              </div>
-
-              {/* Info rows — adaptado al dominio gerencia */}
-              <div className="px-6 pb-4 space-y-1">
-                <InfoRow icon={Users} label="Personas evaluadas" value={`${gerencia.clasificadas} de ${gerencia.totalPersonas}`} />
-                <InfoRow icon={Shield} label="Sucesion" value={formatSuccessionIndex(gerencia)} />
-                {gerencia.plTotal > 0 && (
-                  <InfoRow
-                    icon={Users}
-                    label="P&L en riesgo"
-                    value={formatCurrencyCLP(gerencia.plTotal)}
-                    tooltip={`Estimacion del costo si el talento en riesgo sale de la organizacion.\n\nIncluye:\n· Talento en riesgo de irse × sueldo anual × 1.25\n· Conocimiento critico en riesgo × sueldo anual × 1.25 × 1.5\n\nFuente salarial: configuracion de la empresa o promedio de mercado Chile.\nMetodologia: SHRM 2024.`}
-                  />
+                {/* Tooltip */}
+                {showPlTooltip && (
+                  <div className="absolute bottom-full left-0 right-0 mb-2 z-[80] pointer-events-none">
+                    <div className="relative p-4 shadow-2xl rounded-xl bg-slate-900/95 backdrop-blur-sm border border-slate-700/30">
+                      <div className="fhr-top-line" />
+                      <p className="text-xs leading-relaxed whitespace-pre-line" style={{ color: 'var(--fhr-text-secondary)' }}>
+                        {`Estimacion del costo si el talento en riesgo sale de la organizacion.\n\nIncluye:\n· Talento en riesgo de irse × sueldo anual × 1.25\n· Conocimiento critico en riesgo × sueldo anual × 1.25 × 1.5\n\nFuente salarial: configuracion de la empresa o promedio de mercado Chile.\nMetodologia: SHRM 2024.`}
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
+            )}
 
-              {/* Separador — copia exacta */}
-              <div className="mx-6 h-px bg-slate-800" />
-
-              {/* Distribucion de talento — usa GerenciaDetail existente */}
-              <div className="px-6 py-4">
-                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-4">
-                  Distribucion de Talento
-                </p>
+            {/* Contenido */}
+            <div style={{ borderTop: '1px solid var(--fhr-border-default)' }}>
+              <div className="px-6 py-5">
                 <GerenciaDetail gerencia={gerencia.full} />
               </div>
-
             </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4" style={{ borderTop: '1px solid var(--fhr-border-default)' }}>
+              <button
+                onClick={onClose}
+                className="w-full text-center text-sm transition-colors min-h-[44px]"
+                style={{ color: 'var(--fhr-text-muted)' }}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--fhr-text-secondary)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--fhr-text-muted)'}
+              >
+                Cerrar
+              </button>
+            </div>
+
           </motion.div>
-        </>
+        </motion.div>
       )}
     </AnimatePresence>
   )
 })
-
-// Indice de cobertura de sucesion
-function formatSuccessionIndex(gerencia: { sucesoresTotal: number; full: { sucesores: { posicionesCriticas: number; total: number; enPlanFormal: number } } }): string {
-  const pos = gerencia.full.sucesores.posicionesCriticas
-  const suc = gerencia.full.sucesores.total
-  if (pos === 0) return `${suc} sucesores`
-  const indice = (suc / pos).toFixed(1)
-  return `${indice}x cobertura · ${pos} pos · ${suc} suc`
-}
-
-// InfoRow — con tooltip Cinema Mode style
-function InfoRow({
-  icon: Icon,
-  label,
-  value,
-  tooltip
-}: {
-  icon: typeof Users
-  label: string
-  value: string
-  tooltip?: string
-}) {
-  const [showTip, setShowTip] = useState(false)
-
-  return (
-    <div
-      className="flex items-center gap-3 py-2 relative"
-      onMouseEnter={() => tooltip && setShowTip(true)}
-      onMouseLeave={() => setShowTip(false)}
-    >
-      <div className="w-8 h-8 rounded-lg bg-slate-800/80 flex items-center justify-center flex-shrink-0">
-        <Icon className="w-4 h-4 text-slate-500" />
-      </div>
-      <div className="flex-1 flex justify-between items-center">
-        <span className="text-xs text-slate-500">{label}</span>
-        <span className="text-sm text-white font-medium">{value}</span>
-      </div>
-
-      {/* Tooltip Cinema Mode style */}
-      {showTip && tooltip && (
-        <div
-          className="absolute bottom-full left-0 right-0 mb-2 z-[80] pointer-events-none"
-          style={{ opacity: showTip ? 1 : 0, transition: 'opacity 0.15s ease-out' }}
-        >
-          <div className="relative bg-slate-950 border border-slate-800 rounded-xl p-4 shadow-2xl">
-            {/* Tesla line */}
-            <div className="absolute top-0 left-0 right-0 h-[1px] rounded-t-xl bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
-            <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-line">
-              {tooltip}
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
