@@ -1,912 +1,734 @@
-'use client'
+"use client";
 
-import { useState, useMemo, memo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useMemo, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Copy, Check, ChevronDown, ChevronRight, Eye, EyeOff } from "lucide-react";
 
-// ════════════════════════════════════════════════════════════════════════════
-// TYPES
-// ════════════════════════════════════════════════════════════════════════════
+// ─── Design System FocalizaHR ────────────────────────────────────────────────
+import "@/styles/focalizahr-design-system.css";
+import "./dd-prev.css"; // Clases auxiliares específicas de esta demo
+import { 
+  PrimaryButton, 
+  SecondaryButton, 
+  GhostButton 
+} from "@/components/ui/PremiumButton";
 
-interface Pregunta {
-  q: string
-  a: string
+import {
+  PERSONAS,
+  BANDA_COLORS,
+  ACCION_CONFIG,
+  calcularCR,
+  calcularTargetUSD,
+  calcularSalarioNuevo,
+  type Persona,
+  type Banda,
+} from "./personas";
+import { NARRATIVAS, getNarrativa, type Narrativa } from "./narrativas";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TIPOS LOCALES
+// ─────────────────────────────────────────────────────────────────────────────
+type Vista = "lider" | "colaborador";
+type TabConversacion = "guia" | "mensaje" | "preguntas";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+function formatUSD(n: number): string {
+  return `$${Math.round(n).toLocaleString("es-CL")}`;
 }
 
-interface Persona {
-  id: string
-  nombre: string
-  cargo: string
-  pais: string
-  banda: 'B1' | 'B2' | 'B3' | 'B4'
-  nivel: 'Junior' | 'Pleno' | 'Senior'
-  ant: number
-  sal: number
-  mid: number
-  min: number
-  max: number
-  tcr: number
-  base: number
-  merit: number
-  accion: 'bajo_minimo' | 'bajo_target' | 'en_posicion' | 'circulo_rojo'
-  nota: string | null
-  nl: string
-  nc: string
-  preg: Pregunta[]
+function pctPosition(value: number, min: number, max: number): number {
+  return Math.max(2, Math.min(98, ((value - min) / (max - min)) * 100));
 }
 
-type ViewMode = 'lider' | 'colab'
-type BandaFilter = 'all' | 'B1' | 'B2' | 'B3' | 'B4'
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPONENTES
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ════════════════════════════════════════════════════════════════════════════
-// CONSTANTS - Colores FocalizaHR
-// ════════════════════════════════════════════════════════════════════════════
+// Header
+function Header({ vista, setVista }: { vista: Vista; setVista: (v: Vista) => void }) {
+  return (
+    <header className="fhr-header sticky top-0 z-50">
+      {/* Línea Tesla */}
+      <div className="fhr-tesla-line" />
+      
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        {/* Logo */}
+        <div className="flex items-center gap-3">
+          <div className="fhr-logo-mark">F</div>
+          <div>
+            <div className="fhr-subtitle text-sm">FocalizaHR · Derechos Digitales</div>
+            <div className="fhr-text-muted text-xs">Sistema de Compensaciones 2026 · Fichas 1:1</div>
+          </div>
+        </div>
 
-const BANDA_COLORS: Record<string, string> = {
-  B1: '#F59E0B', // Amber
-  B2: '#A78BFA', // Purple FocalizaHR
-  B3: '#22D3EE', // Cyan FocalizaHR
-  B4: '#10B981', // Emerald
+        {/* Toggle Vista */}
+        <div className="flex items-center gap-3">
+          <span className="fhr-text-muted mr-2 text-xs font-medium uppercase tracking-wider">Vista:</span>
+          <div className="flex gap-2">
+            <GhostButton
+              size="sm"
+              icon={Eye}
+              onClick={() => setVista("lider")}
+              glow={vista === "lider"}
+            >
+              Líder
+            </GhostButton>
+            <GhostButton
+              size="sm"
+              icon={EyeOff}
+              onClick={() => setVista("colaborador")}
+              glow={vista === "colaborador"}
+            >
+              Colaborador/a
+            </GhostButton>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
 }
 
-const ACCION_CONFIG = {
-  bajo_minimo: {
-    color: '#EF4444',
-    bgClass: 'bg-red-500/10 border-red-500/30',
-    textClass: 'text-red-400',
-    icon: '🔴',
-    label: 'Bajo mínimo de banda',
-    sub: 'Prioridad alta — requiere plan de convergencia explícito',
-  },
-  bajo_target: {
-    color: '#F59E0B',
-    bgClass: 'bg-amber-500/10 border-amber-500/30',
-    textClass: 'text-amber-400',
-    icon: '🟡',
-    label: 'Bajo target — convergencia activa',
-    sub: 'Ajuste base + mérito aplicado este año',
-  },
-  en_posicion: {
-    color: '#10B981',
-    bgClass: 'bg-emerald-500/10 border-emerald-500/30',
-    textClass: 'text-emerald-400',
-    icon: '🟢',
-    label: 'En posición — bien ubicado/a',
-    sub: 'Solo ajuste base — CR saludable',
-  },
-  circulo_rojo: {
-    color: '#6366F1',
-    bgClass: 'bg-indigo-500/10 border-indigo-500/30',
-    textClass: 'text-indigo-400',
-    icon: '🔵',
-    label: 'Círculo rojo — sobre midpoint',
-    sub: 'No se reduce · Solo ajuste base preservación',
-  },
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// DATA
-// ════════════════════════════════════════════════════════════════════════════
-
-const PERSONAS: Persona[] = [
-  {
-    id: 'jc',
-    nombre: 'Juan Carlos Lara',
-    cargo: 'Co-Director Ejecutivo',
-    pais: 'Chile',
-    banda: 'B1',
-    nivel: 'Senior',
-    ant: 13.0,
-    sal: 3492,
-    mid: 5725,
-    min: 4580,
-    max: 7100,
-    tcr: 1.0,
-    base: 2.5,
-    merit: 7.0,
-    accion: 'bajo_minimo',
-    nota: 'B1 PRELIMINAR — objetivo de mercado a 2-3 años. Requiere aprobación del Directorio para ajuste completo.',
-    nl: 'Juan Carlos está significativamente bajo el mínimo de su banda, con CR 0.61. Es la brecha más importante del equipo y requiere una conversación honesta sobre el horizonte de convergencia.\n\nEl ajuste de hoy (2.5% base + 7% mérito = 9.5%) es una señal de dirección, no una corrección completa. La conversación debe establecer que el objetivo B1 es un horizonte de 2-3 años, condicionado al financiamiento y a la aprobación del Directorio.\n\nRecomendación: idealmente tener esta conversación después de la reunión de Directorio donde se presente el memo técnico B1.',
-    nc: 'Juan Carlos, quiero mostrarte dónde estás en la nueva estructura de compensaciones y ser muy transparente sobre lo que esto implica.\n\nTu rol está en la Banda 1 — Dirección Ejecutiva. El punto de referencia de mercado para este nivel en organizaciones comparables es $5,725 mensuales. Tu remuneración actual está por debajo del mínimo de esta banda.\n\nEsto no es una crítica — es el resultado de años de ajustes sin un sistema formal. La buena noticia es que ahora tenemos un marco claro y una dirección definida. El ajuste de este año es un primer paso concreto en ese camino.',
-    preg: [
-      { q: '¿Por qué no se corrige todo ahora?', a: 'El ajuste completo de B1 requiere aprobación del Directorio y está condicionado al financiamiento. No es una decisión operativa — es de gobernanza. Estamos preparando el memo técnico para presentárselo al Directorio.' },
-      { q: '¿Cuándo llegaré al midpoint?', a: 'Con el modelo actual el horizonte estimado es 2-3 años: Año 1 CR ~0.67, Año 2 ~0.78, Año 3 ~0.89. El objetivo completo depende de aprobación anual.' },
-      { q: '¿Los demás están en la misma situación?', a: 'B1 tiene una situación particular que se trata con el Directorio de forma separada. Los datos individuales son confidenciales.' },
-    ],
-  },
-  {
-    id: 'jamila',
-    nombre: 'Jamila Venturini',
-    cargo: 'Co-Directora Ejecutiva',
-    pais: 'Brasil',
-    banda: 'B1',
-    nivel: 'Senior',
-    ant: 6.75,
-    sal: 4471,
-    mid: 5725,
-    min: 4580,
-    max: 7100,
-    tcr: 1.0,
-    base: 2.5,
-    merit: 7.0,
-    accion: 'bajo_minimo',
-    nota: 'B1 PRELIMINAR — objetivo de mercado a 2-3 años. Requiere aprobación del Directorio.',
-    nl: 'Jamila está bajo el mínimo con CR 0.78 — la situación más cercana al mínimo dentro de B1, lo que facilita la conversación de convergencia.\n\nEl ajuste 9.5% total es una señal, no una corrección completa. Enmarcar dentro del proceso de aprobación del Directorio.',
-    nc: 'Jamila, en la nueva estructura tu rol está en la Banda 1 — Dirección Ejecutiva. El punto de referencia de mercado es $5,725. Hoy estás en $4,471, que es el punto de partida de una convergencia planificada.\n\nEste año aplicamos un ajuste de 9.5% que te acerca al mínimo de la banda. El camino completo requiere que el Directorio apruebe el plan de convergencia B1, que presentaremos en las próximas semanas.',
-    preg: [
-      { q: '¿Por qué el ajuste es parcial?', a: 'La corrección completa de B1 es una decisión del Directorio, no operativa. Estamos preparando el memo técnico con el fundamento completo.' },
-      { q: '¿Cuándo converjo al midpoint?', a: 'Con el modelo actual el horizonte estimado es Año 3 — CR ~1.02.' },
-    ],
-  },
-  {
-    id: 'camila',
-    nombre: 'Camila Lobato',
-    cargo: 'Dir. Operaciones/Finanzas',
-    pais: 'Chile',
-    banda: 'B2',
-    nivel: 'Senior',
-    ant: 6.0,
-    sal: 2811,
-    mid: 3470,
-    min: 2670,
-    max: 4270,
-    tcr: 0.9,
-    base: 2.5,
-    merit: 6.0,
-    accion: 'bajo_target',
-    nota: null,
-    nl: 'Camila tiene perfil Operativo-Interno. Target CR 0.90 → $3,123. CR actual 0.81. El ajuste 8.5% la mueve a ~$3,050, acercándola al target.\n\nLa conversación debe explicar el concepto de perfil funcional con claridad — sin que suene a que su rol vale menos.',
-    nc: 'Camila, en el nuevo sistema tu rol está en la Banda 2 con perfil de gestión operativa-interna. Dentro de B2, el sistema diferencia entre roles de alta exposición externa y roles de gestión interna como el tuyo. Eso no implica menor importancia — refleja cómo el mercado valora estas funciones de forma diferente.\n\nTu punto de referencia objetivo es $3,123. El ajuste de este año (8.5%) te acerca de forma sustantiva a ese target.',
-    preg: [
-      { q: '¿Por qué mi target es menor que otros en B2?', a: 'El sistema reconoce dos perfiles: estratégico-externo y operativo-interno. El tuyo es operativo — los roles de gestión interna en ONG comparables se ubican en ese rango de mercado. No es jerarquía de importancia, es calibración de mercado.' },
-      { q: '¿Puedo cambiar de perfil?', a: 'Los perfiles se revisan en Fase B cuando se completen los descriptores de cargo formales.' },
-    ],
-  },
-  {
-    id: 'catalia',
-    nombre: 'Catalia Balla',
-    cargo: 'Dir. Comunicaciones',
-    pais: 'Chile',
-    banda: 'B2',
-    nivel: 'Pleno',
-    ant: 2.0,
-    sal: 2709,
-    mid: 3470,
-    min: 2670,
-    max: 4270,
-    tcr: 1.1,
-    base: 2.5,
-    merit: 6.0,
-    accion: 'bajo_target',
-    nota: 'Brecha significativa — plan de convergencia a 3 años.',
-    nl: 'Catalia tiene la brecha más importante de B2 estratégico: CR 0.78 con target 1.10. El ajuste 8.5% la mueve a ~$2,939 — sigue significativamente bajo el target.\n\nLa conversación debe reconocer la brecha honestamente y enmarcarla en el plan de convergencia a 3 años.',
-    nc: 'Catalia, tu rol de Comunicaciones está en Banda 2 con perfil estratégico-externo — uno de los roles donde el mercado paga más dentro de B2, porque hay alta demanda y poca oferta de perfiles con expertise en derechos digitales.\n\nQuiero ser honesto contigo: hay una brecha entre donde estás hoy y donde debería estar tu remuneración. El plan de convergencia lleva 3 años, y el ajuste de este año es el primero de ese camino.',
-    preg: [
-      { q: '¿Por qué la brecha es tan grande?', a: 'Refleja que DD no tuvo un sistema formal de compensaciones y que el mercado de comunicaciones estratégicas digitales creció más rápido que los ajustes internos. El sistema ahora lo visibiliza y tiene un plan para corregirlo.' },
-      { q: '¿3 años es mucho tiempo?', a: 'La convergencia progresiva es la única opción financieramente sostenible para una ONG. Un ajuste completo de golpe comprometería otros proyectos. El modelo garantiza avance cada año condicionado al financiamiento.' },
-    ],
-  },
-  {
-    id: 'miguel',
-    nombre: 'Miguel Flores',
-    cargo: 'Dir. Tecnologías',
-    pais: 'Chile',
-    banda: 'B2',
-    nivel: 'Senior',
-    ant: 6.5,
-    sal: 2811,
-    mid: 3470,
-    min: 2670,
-    max: 4270,
-    tcr: 0.9,
-    base: 2.5,
-    merit: 6.0,
-    accion: 'bajo_target',
-    nota: null,
-    nl: 'Misma situación que Camila Lobato — perfil Operativo, target 0.90, ajuste 8.5%. Importante ser consistente en el mensaje de perfil funcional.',
-    nc: 'Miguel, tu rol en Tecnologías está en Banda 2 con perfil operativo-interno. El punto de referencia objetivo es $3,123. El ajuste de este año (8.5%) te mueve de $2,811 a aproximadamente $3,050 — acercándote sustantivamente al target.',
-    preg: [
-      { q: '¿Por qué tecnología es operativo y no estratégico?', a: 'El criterio es el grado de representación externa sistemática. El rol de tecnologías en DD es de gestión interna de sistemas. Si el rol evoluciona hacia advisory externo, se revisaría en Fase B.' },
-    ],
-  },
-  {
-    id: 'paloma',
-    nombre: 'Paloma Lara Castro',
-    cargo: 'Dir. Políticas Públicas',
-    pais: 'Paraguay',
-    banda: 'B2',
-    nivel: 'Pleno',
-    ant: 3.0,
-    sal: 3599,
-    mid: 3470,
-    min: 2670,
-    max: 4270,
-    tcr: 1.1,
-    base: 2.5,
-    merit: 0,
-    accion: 'en_posicion',
-    nota: null,
-    nl: 'Paloma está prácticamente en posición — CR 1.04 con target 1.10. Solo recibe base 2.5% porque CR > 1.0.\n\nImportante explicar que no recibir mérito no es negativo — significa que ya está bien posicionada.',
-    nc: 'Paloma, tu situación en el nuevo sistema es una de las más sólidas del equipo. Tu remuneración actual está prácticamente en el target para tu rol — un compa-ratio de 1.04 significa que estás 4% sobre el punto de referencia de mercado.\n\nEl ajuste de este año es el 2.5% base que aplica a todo el equipo. No hay ajuste de mérito adicional porque ya estás bien posicionada — eso es una señal positiva, no negativa.',
-    preg: [
-      { q: '¿Por qué no recibo ajuste de mérito?', a: 'El ajuste de mérito está diseñado para acelerar la convergencia de quienes están más lejos de su target. Tú ya estás en posición, así que el sistema funciona correctamente — te mantiene ahí con el ajuste base.' },
-    ],
-  },
-  {
-    id: 'rafael',
-    nombre: 'Rafael Bonifaz',
-    cargo: 'Liderazgo LARRED',
-    pais: 'Ecuador',
-    banda: 'B2',
-    nivel: 'Senior',
-    ant: 4.75,
-    sal: 3382,
-    mid: 3470,
-    min: 2670,
-    max: 4270,
-    tcr: 1.1,
-    base: 2.5,
-    merit: 5.0,
-    accion: 'bajo_target',
-    nota: null,
-    nl: 'Rafael está cerca del midpoint (CR 0.97) pero su target es 1.10 por perfil estratégico. El ajuste 7.5% lo lleva a ~$3,636, cruzando el midpoint. Conversación positiva.',
-    nc: 'Rafael, en el nuevo sistema tu rol de liderazgo LARRED está en Banda 2 con perfil estratégico-externo. Tu CR actual de 0.97 está muy cerca del midpoint, y el ajuste de este año (7.5%) te lleva a $3,636 — cruzando el midpoint y acercándote al target de $3,817.',
-    preg: [
-      { q: '¿Cuándo alcanzo el target completo?', a: 'Con el ajuste de este año cruzas el midpoint. El target completo (CR 1.10 = $3,817) se estima alcanzar en el Año 2 con continuidad del modelo.' },
-    ],
-  },
-  {
-    id: 'debora',
-    nombre: 'Débora Calderón',
-    cargo: 'Coord. Incidencia Regional',
-    pais: 'Argentina',
-    banda: 'B3',
-    nivel: 'Senior',
-    ant: 4.25,
-    sal: 2730,
-    mid: 2240,
-    min: 1830,
-    max: 2650,
-    tcr: 1.0,
-    base: 2.5,
-    merit: 0,
-    accion: 'circulo_rojo',
-    nota: 'Círculo rojo — CR 1.22. No se reduce. Solo ajuste base 2.5%.',
-    nl: 'Débora es el círculo rojo más significativo de B3 con CR 1.22. Política clara: no se reduce, solo base 2.5%.\n\nLa conversación debe ser honesta — no es penalización, sino que su remuneración superó históricamente el punto de referencia. El camino es que la escala crezca hacia ella.',
-    nc: 'Débora, en el nuevo sistema tu remuneración de $2,730 está por sobre el punto de referencia de tu banda — el midpoint de B3 es $2,240. Eso se llama círculo rojo: significa que históricamente tu compensación creció más rápido que el mercado de referencia.\n\nLa política es clara: no hay reducción. Tu sueldo se mantiene y recibe el ajuste base de 2.5%. Con el tiempo, la escala irá convergiendo hacia tu nivel actual.',
-    preg: [
-      { q: '¿Significa que gano demasiado?', a: 'No. Significa que en relación al mercado ONG LATAM tu remuneración está sobre el punto medio. Puede ser completamente justificado por tu experiencia. El sistema no reduce — solo establece un techo para futuros incrementos hasta que la banda alcance tu nivel.' },
-      { q: '¿Cuándo vuelvo a la zona verde?', a: 'Con ajustes de 2-3% anuales a la escala, en 3-4 años el midpoint podría alcanzar tu nivel actual.' },
-    ],
-  },
-  {
-    id: 'marina',
-    nombre: 'Marina Meira',
-    cargo: 'Coordinadora PP',
-    pais: 'Brasil',
-    banda: 'B3',
-    nivel: 'Junior',
-    ant: 1.0,
-    sal: 2530,
-    mid: 2240,
-    min: 1830,
-    max: 2650,
-    tcr: 1.0,
-    base: 2.5,
-    merit: 0,
-    accion: 'circulo_rojo',
-    nota: 'Círculo rojo — CR 1.13 con nivel Junior. Situación a monitorear en Fase B.',
-    nl: 'Marina es Junior con CR 1.13 — la combinación más llamativa del equipo. Solo 1 año y ya sobre el midpoint. Sugiere que entró con salario negociado por sobre la referencia.\n\nSin acción correctiva ahora. En Fase B vale revisar política de ingreso para roles nuevos.',
-    nc: 'Marina, llevas un año en el equipo y tu remuneración está por sobre el punto de referencia de la banda. Eso es positivo — significa que entraste bien compensada. El sistema reconoce eso con el círculo rojo: no hay reducción, solo el ajuste base que aplica a todos.',
-    preg: [
-      { q: '¿Afecta esto a mis posibilidades de crecimiento?', a: 'No afecta tu desarrollo de carrera. Sí significa que los ajustes salariales futuros serán más graduales hasta que la banda alcance tu nivel actual.' },
-    ],
-  },
-  {
-    id: 'lucia',
-    nombre: 'Lucía Camacho',
-    cargo: 'Coordinadora PP',
-    pais: 'Colombia',
-    banda: 'B3',
-    nivel: 'Pleno',
-    ant: 3.0,
-    sal: 2625,
-    mid: 2240,
-    min: 1830,
-    max: 2650,
-    tcr: 1.0,
-    base: 2.5,
-    merit: 0,
-    accion: 'circulo_rojo',
-    nota: 'Círculo rojo — CR 1.17.',
-    nl: 'Lucía tiene CR 1.17 con nivel Pleno. Conversación similar a Débora — círculo rojo, sin reducción, solo base.',
-    nc: 'Lucía, tu remuneración de $2,625 está sobre el midpoint de referencia de B3. Eres círculo rojo: el sistema no reduce, recibes el 2.5% base junto a todos, y la escala irá acercándose a tu nivel con los ajustes anuales.',
-    preg: [
-      { q: '¿Gano más que mis pares en B3?', a: 'Los datos individuales son confidenciales. Tu posición en la banda es sólida y está protegida por la política de círculo rojo.' },
-    ],
-  },
-  {
-    id: 'paula',
-    nombre: 'Paula Jaramillo',
-    cargo: 'Coordinadora Legal',
-    pais: 'Chile',
-    banda: 'B3',
-    nivel: 'Senior',
-    ant: 12.0,
-    sal: 2132,
-    mid: 2240,
-    min: 1830,
-    max: 2650,
-    tcr: 1.15,
-    base: 2.5,
-    merit: 5.0,
-    accion: 'bajo_target',
-    nota: '⭐ Staff directivo — target CR 1.15 (Q4 de banda). 12 años de antigüedad. Caso especial.',
-    nl: 'Paula es el caso más especial de B3. Con 12 años y rol de apoyo directo a co-directores, tiene target CR 1.15 (Q4), no el midpoint. CR actual 0.95 — bajo target pero sobre midpoint.\n\nEl ajuste 7.5% la lleva a ~$2,292, cruzando el midpoint. La conversación debe reconocer explícitamente su trayectoria y posición única.',
-    nc: 'Paula, quiero tener una conversación especial contigo porque tu situación refleja algo que es importante reconocer: 12 años de trayectoria en DD, con un rol que va mucho más allá de la coordinación estándar.\n\nTu target en el sistema no es el midpoint de B3 — es el cuartil 4, un 15% sobre el punto de referencia, reconociendo tu posición de staff directivo. El ajuste de este año (7.5%) te lleva a $2,292, cruzando el midpoint. El objetivo completo de $2,576 se alcanza en el plan de convergencia a 3 años.',
-    preg: [
-      { q: '¿Por qué sigo en B3 si apoyo directamente a los co-directores?', a: 'Tu clasificación en B3 refleja la naturaleza de coordinación de tu rol. Lo que reconocemos con el target CR 1.15 es que dentro de B3 tu posición es la más senior, justificando estar en el cuartil 4. Si el rol evoluciona formalmente hacia funciones de dirección, se revisaría en Fase B.' },
-      { q: '¿12 años no merecen más reconocimiento?', a: 'La antigüedad es exactamente lo que justifica el target Q4. Dentro de B3, tu posición objetivo es la más alta del grupo. El sistema reconoce la trayectoria a través del positioning en la banda.' },
-    ],
-  },
-  {
-    id: 'gaston',
-    nombre: 'Gastón Wahnish',
-    cargo: 'Enc. Comunicaciones',
-    pais: 'Argentina',
-    banda: 'B4',
-    nivel: 'Pleno',
-    ant: 2.5,
-    sal: 1800,
-    mid: 1600,
-    min: 1330,
-    max: 1870,
-    tcr: 1.0,
-    base: 2.5,
-    merit: 0,
-    accion: 'circulo_rojo',
-    nota: 'Círculo rojo — CR 1.13.',
-    nl: 'Gastón, Nicole y Laura tienen exactamente la misma situación — B4 Pleno CR 1.13. Todos reciben solo 2.5% base. La conversación es idéntica en estructura.',
-    nc: 'Gastón, tu remuneración de $1,800 está sobre el midpoint de referencia de B4 ($1,600). Eres círculo rojo: el sistema protege tu sueldo actual sin reducción. Recibes el ajuste base del 2.5% como todos.',
-    preg: [
-      { q: '¿Puedo crecer a B3 en el futuro?', a: 'La progresión entre bandas se diseña en Fase B, con criterios claros. El camino existe y se formalizará en los próximos meses.' },
-    ],
-  },
-  {
-    id: 'nicole',
-    nombre: 'Nicole Solano',
-    cargo: 'Enc. Comunicaciones',
-    pais: 'Costa Rica',
-    banda: 'B4',
-    nivel: 'Pleno',
-    ant: 2.5,
-    sal: 1800,
-    mid: 1600,
-    min: 1330,
-    max: 1870,
-    tcr: 1.0,
-    base: 2.5,
-    merit: 0,
-    accion: 'circulo_rojo',
-    nota: 'Círculo rojo — CR 1.13.',
-    nl: 'Misma situación que Gastón y Laura. Solo base 2.5%.',
-    nc: 'Nicole, tu remuneración está sobre el midpoint de referencia de B4. Eres círculo rojo: el sistema mantiene tu sueldo sin reducción y aplica el ajuste base del 2.5%.',
-    preg: [
-      { q: '¿Hay diferencia entre Costa Rica y Argentina en el sistema?', a: 'El sistema usa USD como moneda base y aplica escala única por nivel. En Fase B se evaluará si se justifica algún ajuste por costo de vida local.' },
-    ],
-  },
-  {
-    id: 'laura',
-    nombre: 'Laura Mantilla',
-    cargo: 'Analista PP',
-    pais: 'Colombia',
-    banda: 'B4',
-    nivel: 'Pleno',
-    ant: 2.5,
-    sal: 1800,
-    mid: 1600,
-    min: 1330,
-    max: 1870,
-    tcr: 1.0,
-    base: 2.5,
-    merit: 0,
-    accion: 'circulo_rojo',
-    nota: 'Círculo rojo — CR 1.13.',
-    nl: 'Misma situación que Gastón y Nicole.',
-    nc: 'Laura, tu remuneración está sobre el midpoint de referencia de B4. Eres círculo rojo: el sistema mantiene tu sueldo sin reducción y aplica el ajuste base del 2.5%.',
-    preg: [
-      { q: '¿Analista PP puede llegar a B3?', a: 'La progresión entre bandas se define en Fase B. El camino natural de Analista hacia Coordinadora existe y se formalizará con criterios claros.' },
-    ],
-  },
-  {
-    id: 'maria',
-    nombre: 'María Encalada',
-    cargo: 'Analista Tecnologías',
-    pais: 'Ecuador',
-    banda: 'B4',
-    nivel: 'Senior',
-    ant: 4.25,
-    sal: 1973,
-    mid: 1600,
-    min: 1330,
-    max: 1870,
-    tcr: 1.0,
-    base: 2.5,
-    merit: 0,
-    accion: 'circulo_rojo',
-    nota: 'Círculo rojo — CR 1.23. Está sobre el máximo de la banda. Senior en B4.',
-    nl: 'María tiene CR 1.23 y está sobre el máximo de B4 ($1,870). Con 4.25 años es la más senior de B4.\n\nConversación especialmente cuidadosa. No hay reducción. Vale reconocer que es la persona con más trayectoria en B4 y que la progresión a B3 es el camino natural.',
-    nc: 'María, llevas 4 años en el equipo y eres la persona con más trayectoria dentro de B4. Tu remuneración refleja eso — estás en el tramo alto de la banda, lo que el sistema reconoce como círculo rojo.\n\nNo hay reducción. Recibes el ajuste base del 2.5% como todos. Tu expertise y antigüedad son reconocidos — y la progresión hacia B3 es el camino natural que definiremos en Fase B.',
-    preg: [
-      { q: '¿Estoy atrapada en B4?', a: 'No. Significa que dentro de B4 ya estás en el techo. El camino natural es la progresión a B3 cuando se formalicen los criterios en Fase B. Tu caso es prioritario en esa conversación.' },
-      { q: '¿Cuándo se define la progresión a B3?', a: 'En Fase B (abril-mayo) se diseñan los criterios de promoción entre bandas. Tu antigüedad y nivel Senior son los insumos principales.' },
-    ],
-  },
-]
-
-// ════════════════════════════════════════════════════════════════════════════
-// UTILITY FUNCTIONS
-// ════════════════════════════════════════════════════════════════════════════
-
-const pctPos = (v: number, mn: number, mx: number): number => {
-  return Math.max(2, Math.min(97, ((v - mn) / (mx - mn)) * 100))
-}
-
-const getCRColor = (cr: number, tcr: number): string => {
-  if (cr >= 1.0) return 'text-indigo-400'
-  if (cr < 0.8) return 'text-red-400'
-  if (cr < tcr) return 'text-amber-400'
-  return 'text-emerald-400'
-}
-
-const formatUSD = (n: number): string => {
-  return n.toLocaleString('en-US')
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// SUB-COMPONENTS
-// ════════════════════════════════════════════════════════════════════════════
-
-const PersonCard = memo(function PersonCard({
+// Card de persona en el rail
+function PersonaCard({
   persona,
   isActive,
   onClick,
 }: {
-  persona: Persona
-  isActive: boolean
-  onClick: () => void
+  persona: Persona;
+  isActive: boolean;
+  onClick: () => void;
 }) {
-  const cr = (persona.sal / persona.mid).toFixed(2)
-  const accion = ACCION_CONFIG[persona.accion]
-  const bandaColor = BANDA_COLORS[persona.banda]
+  const accion = ACCION_CONFIG[persona.accion];
+  const bandaColor = BANDA_COLORS[persona.banda];
+  const cr = calcularCR(persona);
 
   return (
-    <motion.div
+    <motion.button
       onClick={onClick}
-      whileHover={{ y: -2 }}
-      className={`
-        relative p-3.5 rounded-xl border cursor-pointer transition-all duration-200
-        ${isActive
-          ? 'border-cyan-400/60 bg-cyan-500/5'
-          : 'border-slate-700/50 bg-slate-800/50 hover:border-cyan-400/30'
-        }
-      `}
+      whileHover={{ y: -4 }}
+      whileTap={{ scale: 0.98 }}
+      className={`fhr-card relative min-w-[170px] p-4 text-left ${
+        isActive ? "fhr-card-active" : ""
+      }`}
     >
-      {/* Action dot */}
+      {/* Línea Tesla dinámica */}
+      {isActive && (
+        <div 
+          className="fhr-tesla-line-dynamic"
+          style={{ "--dynamic-color": "var(--focalizahr-cyan)" } as React.CSSProperties}
+        />
+      )}
+
+      {/* Indicador de acción */}
       <div
-        className="absolute top-3 right-3 w-2 h-2 rounded-full"
-        style={{ backgroundColor: accion.color }}
+        className="fhr-status-dot absolute right-3 top-3"
+        style={{ backgroundColor: accion.color, boxShadow: `0 0 8px ${accion.color}60` }}
       />
 
-      <div className="text-sm font-semibold text-slate-100 mb-1">{persona.nombre}</div>
-      <div className="text-xs text-slate-400 leading-relaxed">
+      {/* Nombre */}
+      <div className="fhr-subtitle mb-1 pr-6 text-sm">{persona.nombre}</div>
+
+      {/* Cargo */}
+      <div className="fhr-text-muted mb-3 text-[11px] leading-snug">
         {persona.cargo} · {persona.pais}
       </div>
 
-      <div className="flex gap-1.5 mt-2">
+      {/* Badges */}
+      <div className="flex flex-wrap gap-1.5">
         <span
-          className="text-[10px] font-bold px-2 py-0.5 rounded"
-          style={{ backgroundColor: `${bandaColor}22`, color: bandaColor }}
+          className="fhr-badge"
+          style={{ backgroundColor: `${bandaColor}20`, color: bandaColor, borderColor: `${bandaColor}40` }}
         >
           {persona.banda}
         </span>
-        <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-white/5 text-slate-400">
+        <span className="fhr-badge-draft">
           {persona.nivel}
         </span>
       </div>
 
-      <div className="text-xs text-slate-500 mt-2">CR {cr}x</div>
-    </motion.div>
-  )
-})
+      {/* CR */}
+      <div className="fhr-text-muted mt-2 text-[11px]">
+        CR {cr.toFixed(2)}x
+      </div>
+    </motion.button>
+  );
+}
 
-const FichaDetalle = memo(function FichaDetalle({
-  persona,
-  viewMode,
+// Rail de personas
+function PersonasRail({
+  bandaFiltro,
+  setBandaFiltro,
+  personaActiva,
+  setPersonaActiva,
 }: {
-  persona: Persona
-  viewMode: ViewMode
+  bandaFiltro: Banda | "all";
+  setBandaFiltro: (b: Banda | "all") => void;
+  personaActiva: string | null;
+  setPersonaActiva: (id: string) => void;
 }) {
-  const cr = persona.sal / persona.mid
-  const pctTotal = persona.base + persona.merit
-  const salNuevo = persona.sal * (1 + pctTotal / 100)
-  const crNuevo = salNuevo / persona.mid
-  const tgtUsd = persona.mid * persona.tcr
-  const bandaColor = BANDA_COLORS[persona.banda]
-  const accion = ACCION_CONFIG[persona.accion]
+  const personasFiltradas = useMemo(() => {
+    if (bandaFiltro === "all") return PERSONAS;
+    return PERSONAS.filter((p) => p.banda === bandaFiltro);
+  }, [bandaFiltro]);
 
-  const midPct = pctPos(persona.mid, persona.min, persona.max)
-  const actPct = pctPos(persona.sal, persona.min, persona.max)
-  const newPct = pctPos(salNuevo, persona.min, persona.max)
+  const bandas: Array<{ key: Banda | "all"; label: string }> = [
+    { key: "all", label: "Todos" },
+    { key: "B1", label: "B1 · Dirección" },
+    { key: "B2", label: "B2 · Direcciones" },
+    { key: "B3", label: "B3 · Coord." },
+    { key: "B4", label: "B4 · Analistas" },
+  ];
 
-  const isLider = viewMode === 'lider'
+  return (
+    <div className="fhr-section-bg px-6 py-5">
+      <div className="mx-auto max-w-7xl">
+        {/* Título */}
+        <h2 className="fhr-title-gradient mb-1 text-xl">
+          Fichas de Conversación Individual
+        </h2>
+        <div className="fhr-text-muted mb-4 text-sm">
+          Selecciona una persona ·{" "}
+          <span className="fhr-text-accent">15 colaboradores · 4 bandas</span>
+        </div>
+
+        {/* Tabs de banda */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          {bandas.map((b) => (
+            <button
+              key={b.key}
+              onClick={() => setBandaFiltro(b.key)}
+              className={`fhr-tab ${bandaFiltro === b.key ? "fhr-tab-active" : ""}`}
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Grid de personas */}
+        <div className="fhr-scroll-container flex gap-3 overflow-x-auto pb-2">
+          {personasFiltradas.map((p) => (
+            <PersonaCard
+              key={p.id}
+              persona={p}
+              isActive={personaActiva === p.id}
+              onClick={() => setPersonaActiva(p.id)}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Journey salarial tipo "estaciones de metro"
+function JourneySalarial({ persona, vista }: { persona: Persona; vista: Vista }) {
+  const salarioNuevo = calcularSalarioNuevo(persona);
+  const targetUSD = calcularTargetUSD(persona);
+  const cr = calcularCR(persona);
+  const crNuevo = salarioNuevo / targetUSD; // ✅ Corregido: vs target propio, no vs midpoint
+  const pctTotal = persona.pctBase + persona.pctMerito;
+  const bandaColor = BANDA_COLORS[persona.banda];
+  const accion = ACCION_CONFIG[persona.accion];
+
+  // Posiciones en la línea (0-100%)
+  const posHoy = pctPosition(persona.salario, persona.minBanda, persona.maxBanda);
+  const posNuevo = pctPosition(salarioNuevo, persona.minBanda, persona.maxBanda);
+  const posTarget = pctPosition(targetUSD, persona.minBanda, persona.maxBanda);
+
+  // Estaciones del journey — exactamente 4 puntos
+  const estaciones = [
+    {
+      id: "hoy",
+      label: "Hoy",
+      valor: persona.salario,
+      sub: `CR ${cr.toFixed(2)}x`,
+      pos: posHoy,
+      alcanzado: true,
+      color: "slate",
+    },
+    {
+      id: "nuevo",
+      label: "Después del ajuste",
+      valor: salarioNuevo,
+      sub: pctTotal > 0 ? `+${pctTotal.toFixed(1)}%` : "Sin ajuste",
+      pos: posNuevo,
+      alcanzado: pctTotal > 0,
+      color: "cyan",
+      soloLider: true,
+    },
+    {
+      id: "target",
+      label: "Tu objetivo",
+      valor: targetUSD,
+      sub: `CR ${persona.targetCR.toFixed(2)}x`,
+      pos: posTarget,
+      alcanzado: salarioNuevo >= targetUSD,
+      color: "amber",
+      destacado: true,
+    },
+    {
+      id: "max",
+      label: "Techo de banda",
+      valor: persona.maxBanda,
+      sub: `Máximo ${persona.banda}`,
+      pos: 98,
+      alcanzado: salarioNuevo >= persona.maxBanda,
+      color: "slate",
+    },
+  ].filter((e) => !(e.soloLider && vista === "colaborador"));
+
+  // Calcular insight
+  const pctDeReferencia = (salarioNuevo / targetUSD) * 100;
+  const faltaUSD = Math.max(0, targetUSD - salarioNuevo);
+
+  return (
+    <div className="fhr-card relative p-6">
+      {/* Línea Tesla */}
+      <div className="fhr-tesla-line" />
+      
+      {/* Header */}
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <div className="fhr-label mb-1">
+            Journey Salarial · Banda {persona.banda}
+          </div>
+          <div className="fhr-text-muted text-sm">
+            Midpoint de referencia = {formatUSD(persona.midpoint)} USD
+          </div>
+        </div>
+        {/* Status badge */}
+        <div
+          className="fhr-badge-status flex items-center gap-2"
+          style={{
+            borderColor: `${accion.color}40`,
+            backgroundColor: `${accion.color}10`,
+          }}
+        >
+          <span className="text-lg">{accion.icon}</span>
+          <div>
+            <div className="text-xs font-semibold" style={{ color: accion.color }}>
+              {accion.label}
+            </div>
+            <div className="text-[10px] opacity-70" style={{ color: accion.color }}>
+              {accion.sub}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Línea de metro - ALTURA AUMENTADA para etiquetas arriba Y abajo */}
+      <div className="relative mb-20 mt-24">
+        {/* Línea base */}
+        <div className="fhr-progress-track absolute left-0 right-0 top-1/2 -translate-y-1/2" />
+
+        {/* Línea de progreso (hasta el nuevo salario) */}
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${posNuevo}%` }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="fhr-progress-fill absolute left-0 top-1/2 -translate-y-1/2"
+        />
+
+        {/* Estaciones */}
+        {estaciones.map((est, idx) => {
+          const colors: Record<string, { bg: string; border: string; text: string; glow: string }> = {
+            slate: { bg: "fhr-station-inactive", border: "fhr-station-border", text: "fhr-text-muted", glow: "" },
+            cyan: { bg: "fhr-station-cyan", border: "fhr-station-cyan-border", text: "fhr-text-accent", glow: "fhr-glow-cyan" },
+            amber: { bg: "fhr-station-amber", border: "fhr-station-amber-border", text: "fhr-text-warning", glow: "fhr-glow-amber" },
+            purple: { bg: "fhr-station-purple", border: "fhr-station-purple-border", text: "fhr-text-purple", glow: "fhr-glow-purple" },
+          };
+          const c = colors[est.color] || colors.slate;
+
+          // Colores inline como fallback (las clases fhr-station-* pueden no existir)
+          const colorMap: Record<string, { bg: string; border: string; textColor: string; shadow: string }> = {
+            slate: { bg: "#334155", border: "#475569", textColor: "#94a3b8", shadow: "" },
+            cyan: { bg: "#22d3ee", border: "#06b6d4", textColor: "#22d3ee", shadow: "0 0 12px rgba(34,211,238,0.5)" },
+            amber: { bg: "#f59e0b", border: "#d97706", textColor: "#f59e0b", shadow: "0 0 12px rgba(245,158,11,0.5)" },
+            purple: { bg: "#a78bfa", border: "#8b5cf6", textColor: "#a78bfa", shadow: "0 0 12px rgba(167,139,250,0.5)" },
+          };
+          const cm = colorMap[est.color] || colorMap.slate;
+
+          // ═══ ALTERNANCIA: ARRIBA = salarios persona (hoy/nuevo), ABAJO = benchmarks (target/max) ═══
+          const etiquetaArriba = est.id === "hoy" || est.id === "nuevo";
+
+          return (
+            <motion.div
+              key={est.id}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: idx * 0.1, duration: 0.4 }}
+              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${est.pos}%` }}
+            >
+              {/* Etiqueta ARRIBA (hoy / después del ajuste) */}
+              {etiquetaArriba && (
+                <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-center">
+                  <div 
+                    className="text-[10px] font-semibold uppercase tracking-wider"
+                    style={{ color: cm.textColor }}
+                  >
+                    {est.label}
+                  </div>
+                  <div className="fhr-subtitle text-sm font-bold">
+                    {formatUSD(est.valor)}
+                  </div>
+                  <div className="fhr-text-muted text-[10px]">{est.sub}</div>
+                </div>
+              )}
+
+              {/* Punto de estación */}
+              <div
+                className="fhr-station-dot relative flex h-7 w-7 items-center justify-center rounded-full border-[3px]"
+                style={{
+                  backgroundColor: est.alcanzado ? cm.bg : "#0f172a",
+                  borderColor: cm.border,
+                  boxShadow: est.alcanzado && est.destacado ? cm.shadow : undefined,
+                }}
+              >
+                {est.alcanzado && (
+                  <div className="h-2 w-2 rounded-full bg-white" />
+                )}
+              </div>
+
+              {/* Etiqueta ABAJO (tu objetivo / techo de banda) */}
+              {!etiquetaArriba && (
+                <div className="absolute top-full mt-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-center">
+                  <div 
+                    className="text-[10px] font-semibold uppercase tracking-wider"
+                    style={{ color: cm.textColor }}
+                  >
+                    {est.label}
+                  </div>
+                  <div className="fhr-subtitle text-sm font-bold">
+                    {formatUSD(est.valor)}
+                  </div>
+                  <div className="fhr-text-muted text-[10px]">{est.sub}</div>
+                </div>
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Insight resumen */}
+      <div className="fhr-card-inner px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="fhr-icon-box">
+              <span className="text-lg">💡</span>
+            </div>
+            <div>
+              <div className="fhr-subtitle text-sm">
+                Después del ajuste estarás al <span className="fhr-text-accent">{pctDeReferencia.toFixed(0)}%</span> de tu objetivo
+              </div>
+              <div className="fhr-text-muted text-xs">
+                {faltaUSD > 0 ? (
+                  <>Faltarán <span className="fhr-text-warning">{formatUSD(faltaUSD)}</span> para llegar a tu objetivo de <span className="fhr-text-accent">{formatUSD(targetUSD)}</span></>
+                ) : (
+                  <span className="fhr-text-success">¡Ya alcanzaste tu objetivo de {formatUSD(targetUSD)}!</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {vista === "lider" && pctTotal > 0 && (
+            <div className="fhr-kpi-group flex items-center gap-6 text-sm">
+              <div className="text-center">
+                <div className="fhr-label">Base</div>
+                <div className="fhr-subtitle font-semibold">{persona.pctBase.toFixed(1)}%</div>
+              </div>
+              <div className="text-center">
+                <div className="fhr-label">Mérito</div>
+                <div className="fhr-text-purple font-semibold">{persona.pctMerito.toFixed(1)}%</div>
+              </div>
+              <div className="text-center">
+                <div className="fhr-label">Total</div>
+                <div className="fhr-text-accent font-bold">{pctTotal.toFixed(1)}%</div>
+              </div>
+              <div className="text-center">
+                <div className="fhr-label">Δ Anual</div>
+                <div className="fhr-text-success font-semibold">
+                  +{formatUSD((salarioNuevo - persona.salario) * 12)}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Simulador de conversación con tabs
+function SimuladorConversacion({
+  persona,
+  narrativa,
+  vista,
+}: {
+  persona: Persona;
+  narrativa: Narrativa;
+  vista: Vista;
+}) {
+  const [tabActivo, setTabActivo] = useState<TabConversacion>("mensaje");
+  const [preguntaAbierta, setPreguntaAbierta] = useState<number | null>(0);
+  const [copiado, setCopiado] = useState(false);
+
+  const copiarTexto = useCallback(async (texto: string) => {
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch (err) {
+      console.error("Error al copiar:", err);
+    }
+  }, []);
+
+  // Tabs disponibles según vista
+  const tabs: Array<{ key: TabConversacion; label: string; icon: string; soloLider?: boolean }> = [
+    { key: "guia", label: "Guía Líder", icon: "📋", soloLider: true },
+    { key: "mensaje", label: "Mensaje 1:1", icon: "💬" },
+    { key: "preguntas", label: "Preguntas Difíciles", icon: "⚠️", soloLider: true },
+  ];
+
+  const tabsVisibles = tabs.filter((t) => !(t.soloLider && vista === "colaborador"));
+
+  // Contenido según tab
+  const renderContenido = () => {
+    switch (tabActivo) {
+      case "guia":
+        if (vista === "colaborador") return null;
+        return (
+          <div className="space-y-4">
+            <div className="fhr-label flex items-center gap-2 fhr-text-purple">
+              <span>◈</span> Guía para el Líder — No mostrar al colaborador/a
+            </div>
+            <div className="fhr-body whitespace-pre-wrap text-sm leading-relaxed">
+              {narrativa.guiaLider}
+            </div>
+          </div>
+        );
+
+      case "mensaje":
+        return (
+          <div className="space-y-4">
+            <div className="fhr-label flex items-center gap-2 fhr-text-accent">
+              <span>◇</span> Mensaje para {persona.nombre.split(" ")[0]}
+            </div>
+            <div className="fhr-body whitespace-pre-wrap text-sm leading-relaxed">
+              {narrativa.mensajeColaborador}
+            </div>
+          </div>
+        );
+
+      case "preguntas":
+        if (vista === "colaborador") return null;
+        return (
+          <div className="space-y-3">
+            <div className="fhr-label flex items-center gap-2 fhr-text-warning">
+              <span>⚠</span> Preguntas difíciles anticipadas
+            </div>
+            {narrativa.preguntas.map((p, idx) => (
+              <div key={idx} className="fhr-accordion overflow-hidden">
+                <button
+                  onClick={() => setPreguntaAbierta(preguntaAbierta === idx ? null : idx)}
+                  className="fhr-accordion-header flex w-full items-center gap-3 px-4 py-3 text-left"
+                >
+                  <ChevronRight 
+                    className={`fhr-accordion-icon h-4 w-4 transition-transform ${
+                      preguntaAbierta === idx ? "rotate-90" : ""
+                    }`}
+                  />
+                  <span className="fhr-subtitle text-sm">{p.q}</span>
+                </button>
+                <AnimatePresence>
+                  {preguntaAbierta === idx && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="fhr-accordion-content px-4 py-3 pl-10">
+                        <div className="fhr-body text-sm leading-relaxed">{p.a}</div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ))}
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  const textoActual = tabActivo === "guia" ? narrativa.guiaLider : narrativa.mensajeColaborador;
+
+  return (
+    <div className="fhr-card relative">
+      {/* Línea Tesla */}
+      <div className="fhr-tesla-line" />
+
+      {/* Tabs */}
+      <div className="fhr-tabs-container flex border-b">
+        {tabsVisibles.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setTabActivo(tab.key)}
+            className={`fhr-tab-button flex items-center gap-2 px-5 py-4 text-sm font-medium ${
+              tabActivo === tab.key ? "fhr-tab-button-active" : ""
+            }`}
+          >
+            <span>{tab.icon}</span>
+            {tab.label}
+            {tab.soloLider && (
+              <span className="fhr-badge-active text-[9px] font-bold">
+                LÍDER
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Contenido */}
+      <div className="relative p-6">
+        {renderContenido()}
+
+        {/* Botón copiar con Premium Button */}
+        {(tabActivo === "guia" || tabActivo === "mensaje") && (
+          <div className="absolute right-6 top-6">
+            <GhostButton
+              size="sm"
+              icon={copiado ? Check : Copy}
+              onClick={() => copiarTexto(textoActual)}
+              glow={copiado}
+            >
+              {copiado ? "Copiado" : "Copiar"}
+            </GhostButton>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Nota de alerta
+function NotaAlerta({ nota }: { nota: string }) {
+  return (
+    <div className="fhr-alert-warning flex items-center gap-3 px-4 py-3">
+      <span className="text-lg">⚡</span>
+      <span className="fhr-text-warning text-sm">{nota}</span>
+    </div>
+  );
+}
+
+// Estado vacío
+function EstadoVacio() {
+  return (
+    <div className="fhr-empty-state flex flex-col items-center justify-center py-20 text-center">
+      <div className="fhr-empty-icon mb-4 text-5xl opacity-30">◎</div>
+      <div className="fhr-text-muted text-lg">Selecciona una persona para ver su ficha de conversación</div>
+    </div>
+  );
+}
+
+// Ficha completa de una persona
+function FichaPersona({ persona, vista }: { persona: Persona; vista: Vista }) {
+  const narrativa = getNarrativa(persona.id);
+  const bandaColor = BANDA_COLORS[persona.banda];
+
+  if (!narrativa) {
+    return <div className="fhr-text-muted text-center">No se encontró narrativa para esta persona.</div>;
+  }
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
-      className="space-y-4"
+      transition={{ duration: 0.3 }}
+      className="space-y-5"
     >
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div
-          className="w-11 h-11 rounded-xl flex items-center justify-center text-base font-serif"
-          style={{
-            backgroundColor: `${bandaColor}15`,
-            border: `1px solid ${bandaColor}40`,
-            color: bandaColor,
-          }}
-        >
-          {persona.banda}
-        </div>
-        <div>
-          <h2 className="text-xl font-serif text-slate-100">{persona.nombre}</h2>
-          <p className="text-xs text-slate-400">
-            {persona.cargo} · {persona.pais} · Nivel {persona.nivel} · {persona.ant} años
-          </p>
-        </div>
-      </div>
-
-      {/* Nota especial */}
-      {persona.nota && (
-        <div className="bg-amber-500/10 border border-amber-500/25 rounded-lg px-4 py-2.5 text-sm text-amber-400">
-          ⚑ {persona.nota}
-        </div>
-      )}
-
-      {/* Accion bar */}
-      <div className={`flex items-center gap-3 p-3.5 rounded-xl border ${accion.bgClass}`}>
-        <span className="text-xl">{accion.icon}</span>
-        <div>
-          <div className={`text-sm font-semibold ${accion.textClass}`}>{accion.label}</div>
-          <div className={`text-xs opacity-75 ${accion.textClass}`}>{accion.sub}</div>
-        </div>
-      </div>
-
-      {/* KPIs */}
-      <div className={`grid gap-3 ${isLider ? 'grid-cols-4' : 'grid-cols-2'}`}>
-        <div className="fhr-card p-4">
-          <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Salario Actual</div>
-          <div className="text-2xl font-serif text-slate-400">${formatUSD(persona.sal)}</div>
-          <div className="text-xs text-slate-500 mt-1">USD mensuales</div>
-        </div>
-
-        {isLider && (
-          <>
-            <div className="fhr-card p-4">
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Salario Propuesto</div>
-              <div className="text-2xl font-serif text-cyan-400">${formatUSD(Math.round(salNuevo))}</div>
-              <div className="text-xs text-slate-500 mt-1">+{pctTotal.toFixed(1)}% total</div>
-            </div>
-
-            <div className="fhr-card p-4">
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Target USD</div>
-              <div className="text-2xl font-serif" style={{ color: bandaColor }}>
-                ${formatUSD(Math.round(tgtUsd))}
-              </div>
-              <div className="text-xs text-slate-500 mt-1">
-                CR target {persona.tcr.toFixed(2)}x · Mid ${formatUSD(persona.mid)}
-              </div>
-            </div>
-          </>
-        )}
-
-        <div className="fhr-card p-4">
-          <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Compa-Ratio</div>
-          <div className={`text-2xl font-serif ${getCRColor(cr, persona.tcr)}`}>{cr.toFixed(2)}x</div>
-          <div className="text-xs text-slate-500 mt-1">Posición vs midpoint</div>
-        </div>
-      </div>
-
-      {/* Band visualization */}
-      <div className="fhr-card p-5">
-        <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-4">
-          Posición en Banda {persona.banda} — {formatUSD(persona.min)} · {formatUSD(persona.mid)} · {formatUSD(persona.max)} USD
-        </div>
-
-        <div className="relative mb-2">
-          <div className="h-3.5 rounded-lg bg-gradient-to-r from-cyan-500/10 to-purple-500/20 relative">
-            {/* Midpoint line */}
-            <div
-              className="absolute -top-1.5 -bottom-1.5 w-px bg-white/15"
-              style={{ left: `${midPct}%` }}
-            >
-              <span className="absolute -top-5 text-[9px] text-slate-500 -translate-x-1/2 whitespace-nowrap">
-                Midpoint
-              </span>
-            </div>
-
-            {/* Current marker */}
-            <div
-              className="absolute -top-1 w-6 h-6 rounded-full bg-slate-500 border-[3px] border-slate-900 -translate-x-1/2 shadow-lg cursor-help"
-              style={{ left: `${actPct}%` }}
-              title={`Actual: $${formatUSD(persona.sal)}`}
-            />
-
-            {/* New marker (only for lider) */}
-            {isLider && (
-              <div
-                className="absolute -top-1 w-6 h-6 rounded-full bg-cyan-400 border-[3px] border-slate-900 -translate-x-1/2 shadow-lg cursor-help"
-                style={{ left: `${newPct}%` }}
-                title={`Propuesto: $${formatUSD(Math.round(salNuevo))}`}
-              />
-            )}
-          </div>
-
-          <div className="flex justify-between text-[10px] text-slate-500 mt-2">
-            <span>Mín ${formatUSD(persona.min)}</span>
-            <span>Máx ${formatUSD(persona.max)}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 mt-4">
-          <span
-            className={`text-base font-bold px-3 py-1 rounded-lg ${getCRColor(cr, persona.tcr)} bg-current/10`}
-          >
-            CR {cr.toFixed(2)}x actual
-          </span>
-
-          {isLider && (
-            <>
-              <span className="text-cyan-400">→</span>
-              <span className="text-sm font-semibold px-3 py-1 rounded-lg bg-cyan-400/10 text-cyan-400">
-                CR {crNuevo.toFixed(2)}x año 1
-              </span>
-              <span className="text-xs text-slate-500">después del ajuste propuesto</span>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Ajustes (lider only) */}
-      {isLider && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="fhr-card p-4">
-            <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Ajuste Base</div>
-            <div className="text-3xl font-serif text-slate-400">{persona.base.toFixed(1)}%</div>
-            <div className="text-sm font-semibold text-slate-300 mt-1">
-              + ${formatUSD(Math.round(persona.sal * persona.base / 100))} / mes
-            </div>
-            <div className="text-xs text-slate-500 mt-2 leading-relaxed">
-              CPI USA 2025 · Aplica a todos · Sobre salario actual
-            </div>
-          </div>
-
-          <div className="fhr-card p-4">
-            <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Ajuste Mérito</div>
-            <div className={`text-3xl font-serif ${persona.merit > 0 ? 'text-purple-400' : 'text-slate-500'}`}>
-              {persona.merit.toFixed(1)}%
-            </div>
-            <div className="text-sm font-semibold text-slate-300 mt-1">
-              + ${formatUSD(Math.round(persona.sal * persona.merit / 100))} / mes
-            </div>
-            <div className="text-xs text-slate-500 mt-2 leading-relaxed">
-              {persona.merit > 0 ? `Matriz J/P/S × CR · Nivel ${persona.nivel}` : 'CR ≥ 1.0 · Solo ajuste base'}
-            </div>
-          </div>
-
-          <div className="fhr-card p-4 border-cyan-400/30 bg-cyan-500/5">
-            <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Total</div>
-            <div className="text-3xl font-serif text-cyan-400">{pctTotal.toFixed(1)}%</div>
-            <div className="text-base font-semibold text-slate-200 mt-1">
-              ${formatUSD(Math.round(salNuevo))} / mes
-            </div>
-            <div className="text-xs text-slate-500 mt-2 leading-relaxed">
-              Incremento anual: ${formatUSD(Math.round((salNuevo - persona.sal) * 12))} USD
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Narrativas */}
-      <div className={`grid gap-3 ${isLider ? 'grid-cols-2' : 'grid-cols-1'}`}>
-        {isLider && (
-          <div className="fhr-card p-5 border-t-[3px] border-purple-400">
-            <div className="text-[10px] uppercase tracking-wider text-purple-400 mb-3">
-              ◈ Guía para el Líder — No mostrar al colaborador/a
-            </div>
-            <div
-              className="text-sm text-slate-400 leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: persona.nl.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>') }}
-            />
-          </div>
-        )}
-
-        <div className="fhr-card p-5 border-t-[3px] border-cyan-400">
-          <div className="text-[10px] uppercase tracking-wider text-cyan-400 mb-3">
-            ◇ Mensaje para {persona.nombre.split(' ')[0]}
-          </div>
+      {/* Header de persona */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          {/* Avatar */}
           <div
-            className="text-sm text-slate-400 leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: persona.nc.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>') }}
-          />
+            className="fhr-avatar flex h-14 w-14 items-center justify-center rounded-2xl border text-xl"
+            style={{
+              backgroundColor: `${bandaColor}15`,
+              borderColor: `${bandaColor}40`,
+              color: bandaColor,
+            }}
+          >
+            {persona.banda}
+          </div>
+          <div>
+            <h1 className="fhr-title-gradient text-2xl">{persona.nombre}</h1>
+            <div className="fhr-text-muted text-sm">
+              {persona.cargo} · {persona.pais} · Nivel {persona.nivel} · {persona.antiguedad} años
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Preguntas difíciles (lider only) */}
-      {isLider && persona.preg.length > 0 && (
-        <div className="fhr-card p-5">
-          <div className="text-[10px] uppercase tracking-wider text-amber-400 mb-4">
-            ⚠ Preguntas difíciles anticipadas — respuestas sugeridas
-          </div>
+      {/* Nota si existe */}
+      {persona.nota && <NotaAlerta nota={persona.nota} />}
 
-          <div className="space-y-4">
-            {persona.preg.map((p, i) => (
-              <div key={i}>
-                <div className="flex items-start gap-2 text-sm font-semibold text-slate-200 mb-1.5">
-                  <span className="text-amber-400 flex-shrink-0">?</span>
-                  {p.q}
-                </div>
-                <div className="text-sm text-slate-400 leading-relaxed pl-5">{p.a}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Journey salarial */}
+      <JourneySalarial persona={persona} vista={vista} />
+
+      {/* Simulador de conversación */}
+      <SimuladorConversacion persona={persona} narrativa={narrativa} vista={vista} />
     </motion.div>
-  )
-})
+  );
+}
 
-// ════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
+// PÁGINA PRINCIPAL
+// ─────────────────────────────────────────────────────────────────────────────
+export default function DDPrevPage() {
+  const [vista, setVista] = useState<Vista>("lider");
+  const [bandaFiltro, setBandaFiltro] = useState<Banda | "all">("all");
+  const [personaActiva, setPersonaActiva] = useState<string | null>(null);
 
-export default function FichasCompensacionesPage() {
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [bandaFilter, setBandaFilter] = useState<BandaFilter>('all')
-  const [viewMode, setViewMode] = useState<ViewMode>('lider')
-
-  const filteredPersonas = useMemo(() => {
-    if (bandaFilter === 'all') return PERSONAS
-    return PERSONAS.filter((p) => p.banda === bandaFilter)
-  }, [bandaFilter])
-
-  const selectedPersona = useMemo(() => {
-    return PERSONAS.find((p) => p.id === selectedId)
-  }, [selectedId])
-
-  const bandaTabs: { key: BandaFilter; label: string }[] = [
-    { key: 'all', label: 'Todos' },
-    { key: 'B1', label: 'B1 · Dir. Ejecutiva' },
-    { key: 'B2', label: 'B2 · Direcciones' },
-    { key: 'B3', label: 'B3 · Coordinaciones' },
-    { key: 'B4', label: 'B4 · Analistas/Enc.' },
-  ]
+  const personaSeleccionada = useMemo(() => {
+    if (!personaActiva) return null;
+    return PERSONAS.find((p) => p.id === personaActiva) || null;
+  }, [personaActiva]);
 
   return (
-    <div className="min-h-screen bg-slate-900">
-      {/* Header */}
-      <header className="sticky top-0 z-50 px-6 py-5 border-b border-slate-700/50 bg-slate-900/95 backdrop-blur-md">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-400 to-purple-400 flex items-center justify-center text-white font-serif text-base">
-              F
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-slate-100">FocalizaHR · Derechos Digitales</div>
-              <div className="text-xs text-slate-500">Sistema de Compensaciones 2026 · Fichas 1:1</div>
-            </div>
-          </div>
+    <div className="fhr-bg-main min-h-screen">
+      {/* Patrón de fondo sutil */}
+      <div className="fhr-bg-pattern" />
 
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-cyan-400 border border-cyan-400/30 px-3 py-1.5 rounded-full">
-            Fase A · Uso Interno
-          </span>
-        </div>
-      </header>
+      <div className="relative">
+        {/* Header con toggle de vista */}
+        <Header vista={vista} setVista={setVista} />
 
-      {/* Selector section */}
-      <div className="px-6 pt-7 max-w-6xl mx-auto">
-        <h1 className="fhr-title-gradient text-2xl font-serif mb-1">Fichas de Conversación Individual</h1>
-        <p className="text-sm text-slate-400 mb-5">
-          Selecciona una persona para ver su ficha ·{' '}
-          <span className="text-cyan-400">15 colaboradores · 4 bandas</span>
-        </p>
+        {/* Rail de personas */}
+        <PersonasRail
+          bandaFiltro={bandaFiltro}
+          setBandaFiltro={setBandaFiltro}
+          personaActiva={personaActiva}
+          setPersonaActiva={setPersonaActiva}
+        />
 
-        {/* Band tabs */}
-        <div className="flex gap-2 flex-wrap mb-4">
-          {bandaTabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setBandaFilter(tab.key)}
-              className={`
-                px-4 py-1.5 rounded-lg border text-xs font-semibold tracking-wide transition-all
-                ${bandaFilter === tab.key
-                  ? 'bg-cyan-400 border-cyan-400 text-slate-900'
-                  : 'border-slate-700 text-slate-400 hover:border-cyan-400/50 hover:text-cyan-400'
-                }
-              `}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Person grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 mb-7">
-          {filteredPersonas.map((p) => (
-            <PersonCard
-              key={p.id}
-              persona={p}
-              isActive={selectedId === p.id}
-              onClick={() => setSelectedId(p.id)}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div className="px-6 pb-16 max-w-6xl mx-auto">
-        <AnimatePresence mode="wait">
-          {selectedPersona ? (
-            <div key={selectedPersona.id}>
-              {/* View controls */}
-              <div className="flex items-center gap-2 mb-5">
-                <button
-                  onClick={() => setViewMode('lider')}
-                  className={`
-                    px-4 py-2 rounded-lg border text-xs font-semibold tracking-wide transition-all
-                    ${viewMode === 'lider'
-                      ? 'bg-slate-800 border-cyan-400 text-cyan-400'
-                      : 'border-slate-700 text-slate-400 hover:border-cyan-400/50'
-                    }
-                  `}
-                >
-                  Vista Líder
-                </button>
-                <button
-                  onClick={() => setViewMode('colab')}
-                  className={`
-                    px-4 py-2 rounded-lg border text-xs font-semibold tracking-wide transition-all
-                    ${viewMode === 'colab'
-                      ? 'bg-slate-800 border-cyan-400 text-cyan-400'
-                      : 'border-slate-700 text-slate-400 hover:border-cyan-400/50'
-                    }
-                  `}
-                >
-                  Vista Colaborador/a
-                </button>
-                <button
-                  onClick={() => window.print()}
-                  className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:border-cyan-400/50 hover:text-cyan-400 transition-all"
-                >
-                  ⎙
-                </button>
-              </div>
-
-              <FichaDetalle persona={selectedPersona} viewMode={viewMode} />
-            </div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center py-20 text-slate-500"
-            >
-              <div className="text-5xl mb-4 opacity-30">◎</div>
-              Selecciona una persona para ver su ficha de conversación
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Contenido principal */}
+        <main className="mx-auto max-w-7xl px-6 py-8">
+          <AnimatePresence mode="wait">
+            {personaSeleccionada ? (
+              <FichaPersona key={personaSeleccionada.id} persona={personaSeleccionada} vista={vista} />
+            ) : (
+              <EstadoVacio />
+            )}
+          </AnimatePresence>
+        </main>
       </div>
     </div>
-  )
+  );
 }

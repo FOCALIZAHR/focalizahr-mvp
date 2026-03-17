@@ -1,0 +1,253 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DD_PREV - Clases auxiliares específicas
+   Complementa @/styles/focalizahr-design-system.css
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Línea Tesla Signature ─────────────────────────────────────────────────── */
+.fhr-tesla-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--focalizahr-cyan, #22D3EE), transparent);
+  box-shadow: 0 0 15px var(--focalizahr-cyan, #22D3EE);
+}
+
+.fhr-tesla-line-dynamic {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--dynamic-color, #22D3EE), transparent);
+  box-shadow: 0 0 15px var(--dynamic-color, #22D3EE);
+}
+
+/* ─── Header FocalizaHR ─────────────────────────────────────────────────────── */
+.fhr-header {
+  position: relative;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.fhr-logo-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, var(--focalizahr-cyan, #22D3EE), var(--focalizahr-purple, #A78BFA));
+  font-family: serif;
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: white;
+  box-shadow: 0 4px 12px rgba(34, 211, 238, 0.3);
+}
+
+/* ─── Section Background ────────────────────────────────────────────────────── */
+.fhr-section-bg {
+  background: rgba(15, 23, 42, 0.5);
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+/* ─── Typography Utilities ──────────────────────────────────────────────────── */
+.fhr-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.fhr-body {
+  color: #cbd5e1;
+}
+
+.fhr-text-purple {
+  color: var(--focalizahr-purple, #A78BFA);
+}
+
+.fhr-text-warning {
+  color: #f59e0b;
+}
+
+.fhr-text-success {
+  color: #10b981;
+}
+
+/* ─── Tabs FocalizaHR ───────────────────────────────────────────────────────── */
+.fhr-tab {
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(71, 85, 105, 0.5);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  color: #94a3b8;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.fhr-tab:hover {
+  border-color: rgba(34, 211, 238, 0.5);
+  color: var(--focalizahr-cyan, #22D3EE);
+}
+
+.fhr-tab-active,
+.fhr-tab.fhr-tab-active {
+  background: var(--focalizahr-cyan, #22D3EE);
+  border-color: var(--focalizahr-cyan, #22D3EE);
+  color: #0f172a;
+}
+
+/* ─── Tab Buttons (Conversación) ────────────────────────────────────────────── */
+.fhr-tabs-container {
+  border-color: rgba(51, 65, 85, 0.5);
+}
+
+.fhr-tab-button {
+  color: #64748b;
+  transition: all 0.2s ease;
+}
+
+.fhr-tab-button:hover {
+  color: #cbd5e1;
+}
+
+.fhr-tab-button-active {
+  color: var(--focalizahr-cyan, #22D3EE);
+  border-bottom: 2px solid var(--focalizahr-cyan, #22D3EE);
+}
+
+/* ─── Card Activa ───────────────────────────────────────────────────────────── */
+.fhr-card-active {
+  border-color: rgba(34, 211, 238, 0.6) !important;
+  background: rgba(34, 211, 238, 0.1) !important;
+  box-shadow: 0 10px 25px rgba(34, 211, 238, 0.15);
+}
+
+/* ─── Status Dot ────────────────────────────────────────────────────────────── */
+.fhr-status-dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 9999px;
+}
+
+/* ─── Badge Status (large) ──────────────────────────────────────────────────── */
+.fhr-badge-status {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid;
+}
+
+/* ─── Card Inner (for insights) ─────────────────────────────────────────────── */
+.fhr-card-inner {
+  background: rgba(30, 41, 59, 0.4);
+  border: 1px solid rgba(71, 85, 105, 0.5);
+  border-radius: 0.75rem;
+}
+
+/* ─── Icon Box ──────────────────────────────────────────────────────────────── */
+.fhr-icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.5rem;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.2), rgba(139, 92, 246, 0.2));
+}
+
+/* ─── Progress Track & Fill ─────────────────────────────────────────────────── */
+.fhr-progress-track {
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: #1e293b;
+}
+
+.fhr-progress-fill {
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, var(--focalizahr-cyan, #22D3EE), var(--focalizahr-purple, #A78BFA));
+}
+
+/* ─── Accordion ─────────────────────────────────────────────────────────────── */
+.fhr-accordion {
+  border-radius: 0.5rem;
+  border: 1px solid rgba(71, 85, 105, 0.5);
+  overflow: hidden;
+}
+
+.fhr-accordion-header {
+  transition: background 0.2s ease;
+}
+
+.fhr-accordion-header:hover {
+  background: rgba(30, 41, 59, 0.5);
+}
+
+.fhr-accordion-icon {
+  color: #f59e0b;
+}
+
+.fhr-accordion-content {
+  background: rgba(30, 41, 59, 0.3);
+  border-top: 1px solid rgba(71, 85, 105, 0.5);
+}
+
+/* ─── Alert Warning ─────────────────────────────────────────────────────────── */
+.fhr-alert-warning {
+  border-radius: 0.75rem;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+/* ─── Empty State ───────────────────────────────────────────────────────────── */
+.fhr-empty-state {
+  opacity: 0.7;
+}
+
+.fhr-empty-icon {
+  color: #475569;
+}
+
+/* ─── Avatar ────────────────────────────────────────────────────────────────── */
+.fhr-avatar {
+  font-family: serif;
+  font-weight: 600;
+}
+
+/* ─── Scroll Container ──────────────────────────────────────────────────────── */
+.fhr-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 #0f172a;
+}
+
+.fhr-scroll-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.fhr-scroll-container::-webkit-scrollbar-track {
+  background: #0f172a;
+  border-radius: 3px;
+}
+
+.fhr-scroll-container::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+
+.fhr-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* ─── KPI Group ─────────────────────────────────────────────────────────────── */
+.fhr-kpi-group {
+  padding: 0.5rem 1rem;
+  background: rgba(15, 23, 42, 0.4);
+  border-radius: 0.5rem;
+  border: 1px solid rgba(71, 85, 105, 0.3);
+}

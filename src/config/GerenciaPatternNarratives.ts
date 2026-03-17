@@ -48,6 +48,9 @@ export interface PatternActionTooltip {
 }
 
 export interface GerenciaPatternNarrative {
+  // Label human-readable del patrón (para emails, reportes, UI)
+  label: string
+
   // Coaching tip contextual — aparece en el card de diagnóstico
   coachingTip: string
 
@@ -70,6 +73,7 @@ export const GERENCIA_PATTERN_NARRATIVES: Record<
   // El equipo ejecuta bien — el riesgo es quedarse sin quién lo sostenga.
   // ──────────────────────────────────────────────────────────────────────────
   FRAGIL: {
+    label: 'Equipo Frágil',
     coachingTip:
       'El equipo ejecuta bien, pero más de un tercio tiene compromiso crítico y hay menos de 2 sucesores formalizados. ' +
       'El riesgo no es el desempeño de hoy — es la continuidad.',
@@ -101,6 +105,7 @@ export const GERENCIA_PATTERN_NARRATIVES: Record<
   // No es rotación de onboarding — es sobrecarga en personas con tiempo en el cargo.
   // ──────────────────────────────────────────────────────────────────────────
   QUEMADA: {
+    label: 'Sobrecarga Estructural',
     coachingTip:
       'Más de un tercio del equipo tiene compromiso alto pero dominio bajo el umbral, ' +
       'y la mayoría lleva más de 6 meses en el cargo. ' +
@@ -135,6 +140,7 @@ export const GERENCIA_PATTERN_NARRATIVES: Record<
   // No es problema de capacidad — es problema de gestión del desarrollo.
   // ──────────────────────────────────────────────────────────────────────────
   ESTANCADA: {
+    label: 'Equipo Estancado',
     coachingTip:
       'Más de la mitad del equipo lleva sobre 18 meses en el cargo ' +
       'sin consolidar dominio. ' +
@@ -169,6 +175,7 @@ export const GERENCIA_PATTERN_NARRATIVES: Record<
   // El equipo parece sano — el riesgo no aparece en los indicadores habituales.
   // ──────────────────────────────────────────────────────────────────────────
   RIESGO_OCULTO: {
+    label: 'Riesgo Oculto',
     coachingTip:
       'La distribución general del equipo parece estable, ' +
       'pero más del 25% del conocimiento crítico está concentrado ' +

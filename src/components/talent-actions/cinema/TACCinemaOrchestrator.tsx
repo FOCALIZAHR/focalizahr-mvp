@@ -122,9 +122,9 @@ export default function TACCinemaOrchestrator() {
       {/* Header — misma posicion que evaluator */}
       <TACCinemaHeader stats={stats} />
 
-      {/* Stage */}
+      {/* Stage — overflow-y-auto permite scroll cuando el contenido es alto */}
       <div className={cn(
-        'flex-1 relative flex flex-col items-center justify-center p-4 md:p-8',
+        'flex-1 relative flex flex-col items-center p-4 md:p-8 overflow-y-auto',
         'transition-all duration-500 ease-in-out',
         isRailExpanded ? 'mb-[320px]' : 'mb-[50px]'
       )}>
@@ -148,7 +148,7 @@ export default function TACCinemaOrchestrator() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 30 }}
               transition={{ type: 'spring', stiffness: 220, damping: 30 }}
-              className="w-full max-w-3xl h-full"
+              className="w-full max-w-3xl h-full my-auto"
             >
               <div className="bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[24px] shadow-2xl relative overflow-hidden h-full">
                 {/* Tesla line */}
