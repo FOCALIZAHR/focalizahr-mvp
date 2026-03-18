@@ -10,7 +10,7 @@
 // Referencia: dashboard/onboarding/inicio (Panel 1)
 // ════════════════════════════════════════════════════════════════════════════
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Home, Info, Calendar, Mail, Flag, ChevronRight, Loader2, ShieldCheck, Brain, X } from 'lucide-react'
 import { formatCurrencyCLP } from '@/lib/financialCalculations'
@@ -31,9 +31,22 @@ const PATTERN_TITLE: Record<string, [string, string]> = {
 export default function TACSpotlightCard({
   gerencia,
   onBack,
-  onOpenDetail
+  onOpenDetail,
+  onCloseDetail,
+  activeQuadrant
 }: TACSpotlightCardProps) {
   const [showDetailModal, setShowDetailModal] = useState(false)
+  const [detailQuadrant, setDetailQuadrant] = useState<string | undefined>(undefined)
+
+  // Sincronizar con apertura desde Rail (click en card de personas)
+  const prevQuadrantRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (activeQuadrant && activeQuadrant !== prevQuadrantRef.current) {
+      prevQuadrantRef.current = activeQuadrant
+      setDetailQuadrant(activeQuadrant)
+      setShowDetailModal(true)
+    }
+  }, [activeQuadrant])
   const [visibleTooltip, setVisibleTooltip] = useState<string | null>(null)
   const [executing, setExecuting] = useState(false)
   const [completedActions, setCompletedActions] = useState<Set<string>>(new Set())
@@ -312,8 +325,14 @@ export default function TACSpotlightCard({
       {/* Detail Modal */}
       <TACDetailModal
         isOpen={showDetailModal}
-        onClose={() => setShowDetailModal(false)}
+        onClose={() => {
+          setShowDetailModal(false)
+          setDetailQuadrant(undefined)
+          prevQuadrantRef.current = undefined
+          onCloseDetail?.()
+        }}
         gerencia={gerencia}
+        expandedQuadrant={detailQuadrant}
       />
 
       {/* Modal de confirmación post-acción */}

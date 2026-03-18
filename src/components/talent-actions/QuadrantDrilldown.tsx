@@ -18,6 +18,7 @@ interface QuadrantDrilldownProps {
   quadrantColor: string
   gerenciaId: string
   count: number
+  defaultExpanded?: boolean
 }
 
 export default function QuadrantDrilldown({
@@ -25,13 +26,19 @@ export default function QuadrantDrilldown({
   quadrantLabel,
   quadrantColor,
   gerenciaId,
-  count
+  count,
+  defaultExpanded
 }: QuadrantDrilldownProps) {
   const [persons, setPersons] = useState<QuadrantPerson[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(defaultExpanded ?? false)
   const [hasMore, setHasMore] = useState(false)
+
+  // Sincronizar con cambios externos (click en MetricMini)
+  useEffect(() => {
+    setExpanded(defaultExpanded ?? false)
+  }, [defaultExpanded])
 
   const fetchPersons = useCallback(async (skip = 0) => {
     setLoading(true)

@@ -12,6 +12,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Loader2 } from 'lucide-react'
 import QuadrantBlock from './QuadrantBlock'
+import { getQuadrantLabel } from '@/config/tacLabels'
 
 interface OrgStats {
   totalPersonas: number
@@ -22,9 +23,8 @@ interface OrgStats {
   alertasAltas: number
 }
 
-// Config de cuadrantes
+// Config de cuadrantes — labels de tacLabels.ts, descripciones propias de este componente
 const QUADRANT_CONFIG: Record<string, {
-  label: string
   description: string
   actionTypical: string
   color: string
@@ -32,31 +32,27 @@ const QUADRANT_CONFIG: Record<string, {
   bgColor: string
 }> = {
   FUGA_CEREBROS: {
-    label: 'Fuga de Cerebros',
     description: 'Alto dominio + bajo engagement',
-    actionTypical: 'Conversacion de retencion esta semana',
+    actionTypical: 'Incluir en proxima revision de personas',
     color: 'text-red-400',
     borderColor: 'border-red-500/30',
     bgColor: 'bg-red-500/5'
   },
   BURNOUT_RISK: {
-    label: 'Riesgo Burnout',
     description: 'Bajo dominio + alto engagement',
-    actionTypical: 'Revisar carga de trabajo',
+    actionTypical: 'Revisar carga y adecuacion al rol',
     color: 'text-orange-400',
     borderColor: 'border-orange-500/30',
     bgColor: 'bg-orange-500/5'
   },
   BAJO_RENDIMIENTO: {
-    label: 'Bajo Rendimiento',
-    description: 'Requiere definicion',
-    actionTypical: 'Conversacion directa sobre continuidad',
+    description: 'Bajo dominio + bajo engagement',
+    actionTypical: 'Definir continuidad o reubicacion',
     color: 'text-amber-400',
     borderColor: 'border-amber-500/30',
     bgColor: 'bg-amber-500/5'
   },
   MOTOR_EQUIPO: {
-    label: 'Motor del Equipo',
     description: 'Alto dominio + alto engagement',
     actionTypical: 'Mantener desafio y visibilidad',
     color: 'text-emerald-400',
@@ -89,11 +85,15 @@ const ZONES = [
   }
 ]
 
-export default function TalentTreemap() {
+interface TalentTreemapProps {
+  initialQuadrant?: string
+}
+
+export default function TalentTreemap({ initialQuadrant }: TalentTreemapProps = {}) {
   const [stats, setStats] = useState<OrgStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [expandedQuadrant, setExpandedQuadrant] = useState<string | null>(null)
+  const [expandedQuadrant, setExpandedQuadrant] = useState<string | null>(initialQuadrant ?? null)
 
   useEffect(() => {
     async function fetchStats() {
@@ -192,7 +192,7 @@ export default function TalentTreemap() {
                   <QuadrantBlock
                     key={q}
                     quadrant={q}
-                    label={config.label}
+                    label={getQuadrantLabel(q)}
                     description={config.description}
                     actionTypical={config.actionTypical}
                     color={config.color}

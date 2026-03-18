@@ -16,6 +16,7 @@ import TACMissionControl from './TACMissionControl'
 import TACGerenciaCover from './TACGerenciaCover'
 import TACSpotlightCard from './TACSpotlightCard'
 import TACRail from './TACRail'
+import TACTreemapModal from './TACTreemapModal'
 
 // ═══════════════════════════════════════════════════════════════════════
 // SKELETON — copia exacta del evaluator
@@ -105,6 +106,11 @@ export default function TACCinemaOrchestrator() {
     setActivePill,
     handleOpenDetail,
     handleCloseDetail,
+    activeQuadrant,
+    handleOpenTreemap,
+    handleCloseTreemap,
+    showTreemapModal,
+    treemapQuadrant,
     reload
   } = useTACCinemaMode()
 
@@ -174,6 +180,8 @@ export default function TACCinemaOrchestrator() {
               gerencia={selectedGerencia}
               onBack={handleBack}
               onOpenDetail={handleOpenDetail}
+              onCloseDetail={handleCloseDetail}
+              activeQuadrant={activeQuadrant}
             />
           )}
 
@@ -203,7 +211,14 @@ export default function TACCinemaOrchestrator() {
         onToggle={handleToggleRail}
         onSelect={handleSelect}
         onPillChange={setActivePill}
-        onOpenQuadrantDetail={handleOpenDetail}
+        onOpenQuadrantDetail={handleOpenTreemap}
+      />
+
+      {/* Treemap Modal — Pilar 2: Vista org-wide por cuadrante */}
+      <TACTreemapModal
+        isOpen={showTreemapModal}
+        onClose={handleCloseTreemap}
+        expandedQuadrant={treemapQuadrant}
       />
     </div>
   )

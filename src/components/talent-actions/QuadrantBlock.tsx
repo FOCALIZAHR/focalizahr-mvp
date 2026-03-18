@@ -106,9 +106,11 @@ export default function QuadrantBlock({
 
   if (count === 0) return null
 
-  // Conteos para resumen
-  const redCount = persons.filter(p => p.riskAlertLevel === 'RED').length
-  const veteranosCount = persons.filter(p => p.tenureMonths > 60).length
+  // Conteos para resumen contextual
+  const alertCount = quadrant === 'BURNOUT_RISK'
+    ? persons.filter(p => p.riskAlertLevel === 'ORANGE').length
+    : persons.filter(p => p.riskAlertLevel === 'RED').length
+  const seniorCount = persons.filter(p => p.tenureMonths > 36).length
 
   return (
     <motion.div
@@ -149,20 +151,31 @@ export default function QuadrantBlock({
               </div>
             ) : (
               <div className="p-4 space-y-4">
-                {/* Resumen agregado */}
+                {/* Resumen contextual por cuadrante */}
                 {persons.length > 0 && (
                   <div className="p-3 rounded-lg bg-slate-800/50 text-sm text-slate-300">
-                    <span className="text-red-400 font-medium">{redCount}</span> RED
-                    <span className="mx-2 text-slate-600">·</span>
-                    <span className="text-purple-400 font-medium">{veteranosCount}</span> Veteranos
-                    <span className="mx-2 text-slate-600">·</span>
-                    <span className="text-slate-400">{total} total</span>
+                    {quadrant === 'MOTOR_EQUIPO' ? (
+                      <>
+                        <span className="text-purple-400 font-medium">{seniorCount}</span> senior
+                        <span className="mx-2 text-slate-600">·</span>
+                        <span className="text-slate-400">{total} total</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className={`font-medium ${quadrant === 'BURNOUT_RISK' ? 'text-orange-400' : 'text-red-400'}`}>
+                          {alertCount}
+                        </span>
+                        {' '}{quadrant === 'BURNOUT_RISK' ? 'en alerta' : 'en alerta crítica'}
+                        <span className="mx-2 text-slate-600">·</span>
+                        <span className="text-purple-400 font-medium">{seniorCount}</span> senior
+                      </>
+                    )}
                   </div>
                 )}
 
-                {/* Accion tipica */}
+                {/* Recomendación */}
                 <div className="text-xs text-cyan-400/70">
-                  Accion tipica: {actionTypical}
+                  Recomendacion: {actionTypical}
                 </div>
 
                 {/* Seleccionar todos */}

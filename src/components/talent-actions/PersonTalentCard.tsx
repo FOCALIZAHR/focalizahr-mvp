@@ -8,6 +8,7 @@
 import { useMemo } from 'react'
 import { Shield, Check } from 'lucide-react'
 import { TalentNarrativeService } from '@/lib/services/TalentNarrativeService'
+import { formatDisplayName } from '@/lib/utils/formatName'
 import { getTalentMapNarrative } from '@/config/TalentMapNarratives'
 import TenureSegmentBadge from './TenureSegmentBadge'
 import type { QuadrantPerson } from '@/lib/services/TalentActionService'
@@ -65,7 +66,7 @@ export default function PersonTalentCard({ person, selectable, selected, onToggl
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <p className="text-sm font-medium truncate" style={{ color: 'var(--fhr-text-primary)' }}>
-                {person.fullName}
+                {formatDisplayName(person.fullName, 'full')}
               </p>
               {person.isSuccessor && (
                 <Shield className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--fhr-cyan)' }} />
@@ -73,7 +74,11 @@ export default function PersonTalentCard({ person, selectable, selected, onToggl
             </div>
             <div className="flex items-center gap-2 mt-0.5">
               <p className="text-[11px] truncate" style={{ color: 'var(--fhr-text-muted)' }}>
-                {person.position || 'Sin cargo'} · {person.departmentName}
+                {person.position
+                  ?.replace(/_/g, ' ')
+                  .toLowerCase()
+                  .replace(/\b\w/g, c => c.toUpperCase())
+                  || 'Sin cargo'} · {person.departmentName}
               </p>
             </div>
           </div>

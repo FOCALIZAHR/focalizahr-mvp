@@ -58,6 +58,9 @@ export function useTACCinemaMode() {
   const [isRailExpanded, setRailExpanded] = useState(true)
   const [activePill, setActivePill] = useState<TACRailPill>('gerencias')
   const [showDetailModal, setShowDetailModal] = useState(false)
+  const [activeQuadrant, setActiveQuadrant] = useState<string | undefined>(undefined)
+  const [showTreemapModal, setShowTreemapModal] = useState(false)
+  const [treemapQuadrant, setTreemapQuadrant] = useState<string | undefined>(undefined)
   // Cover → Spotlight flow (patron GuidedSummaryOrchestrator)
   const [viewPhase, setViewPhase] = useState<'cover' | 'spotlight'>('cover')
 
@@ -153,12 +156,24 @@ export function useTACCinemaMode() {
     setRailExpanded(prev => !prev)
   }, [])
 
-  const handleOpenDetail = useCallback(() => {
+  const handleOpenDetail = useCallback((quadrant?: string) => {
+    setActiveQuadrant(quadrant)
     setShowDetailModal(true)
   }, [])
 
   const handleCloseDetail = useCallback(() => {
     setShowDetailModal(false)
+    setActiveQuadrant(undefined)
+  }, [])
+
+  const handleOpenTreemap = useCallback((quadrant?: string) => {
+    setTreemapQuadrant(quadrant)
+    setShowTreemapModal(true)
+  }, [])
+
+  const handleCloseTreemap = useCallback(() => {
+    setShowTreemapModal(false)
+    setTreemapQuadrant(undefined)
   }, [])
 
   return {
@@ -176,6 +191,9 @@ export function useTACCinemaMode() {
     isRailExpanded,
     activePill,
     showDetailModal,
+    activeQuadrant,
+    showTreemapModal,
+    treemapQuadrant,
     isLoading,
     error,
     isAreaManager,
@@ -188,6 +206,8 @@ export function useTACCinemaMode() {
     setActivePill,
     handleOpenDetail,
     handleCloseDetail,
+    handleOpenTreemap,
+    handleCloseTreemap,
     reload: refetch
   }
 }

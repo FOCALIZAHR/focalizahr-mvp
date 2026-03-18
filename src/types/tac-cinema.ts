@@ -67,7 +67,9 @@ export interface TACMissionControlProps {
 export interface TACSpotlightCardProps {
   gerencia: SelectedGerencia
   onBack: () => void
-  onOpenDetail: () => void
+  onOpenDetail: (quadrant?: string) => void
+  onCloseDetail?: () => void
+  activeQuadrant?: string
 }
 
 export interface TACRailProps {
@@ -92,4 +94,5 @@ export interface TACDetailModalProps {
   isOpen: boolean
   onClose: () => void
   gerencia: SelectedGerencia | null
+  expandedQuadrant?: string
 }

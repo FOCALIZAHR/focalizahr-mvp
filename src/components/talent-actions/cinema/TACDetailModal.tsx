@@ -15,7 +15,8 @@ import type { TACDetailModalProps } from '@/types/tac-cinema'
 export default memo(function TACDetailModal({
   isOpen,
   onClose,
-  gerencia
+  gerencia,
+  expandedQuadrant
 }: TACDetailModalProps) {
   const [showPlTooltip, setShowPlTooltip] = useState(false)
 
@@ -34,7 +35,7 @@ export default memo(function TACDetailModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center"
+          className="fixed inset-0 z-[70] flex items-center justify-center"
         >
           {/* Backdrop */}
           <motion.div
@@ -133,7 +134,7 @@ export default memo(function TACDetailModal({
             {/* Contenido */}
             <div style={{ borderTop: '1px solid var(--fhr-border-default)' }}>
               <div className="px-6 py-5">
-                <GerenciaDetail gerencia={gerencia.full} />
+                <GerenciaDetail gerencia={gerencia.full} expandedQuadrant={expandedQuadrant} />
               </div>
             </div>
 
