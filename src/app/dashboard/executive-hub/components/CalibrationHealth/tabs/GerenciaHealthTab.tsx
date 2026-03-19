@@ -9,6 +9,8 @@
 
 import { memo, useState, useCallback } from 'react'
 import { AlertTriangle, Info } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { toTitleCase } from '@/lib/utils/formatName'
 import { TableCell } from '../shared/TableCell'
 import { getTooltipForCell, getTeslaLineColor } from '../CalibrationHealth.utils'
 import { BiasDetailModal } from '../BiasDetailModal'
@@ -75,18 +77,20 @@ export const GerenciaHealthTab = memo(function GerenciaHealthTab({ data }: Geren
       </div>
 
       {/* Tabla */}
-      <div className="rounded-xl overflow-x-auto border border-slate-800/60" style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
-        <table className="w-full border-collapse min-w-[600px] md:min-w-0">
+      <div className="rounded-xl overflow-hidden border border-slate-800/60" style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
+        <table className="w-full border-collapse table-fixed">
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(51, 65, 85, 0.5)' }}>
-              <TH align="left" style={{ width: '32%', paddingLeft: '20px' }}>Gerencia</TH>
-              <TH style={{ width: '12%' }}>Salud</TH>
-              <TH className="hidden md:table-cell" style={{ width: '10%', color: '#94a3b8' }}>σ</TH>
-              <TH className="hidden md:table-cell" style={{ width: '12%', color: '#10b981' }}>Óptima</TH>
-              <TH className="hidden md:table-cell" style={{ width: '12%', color: '#22d3ee' }}>Central</TH>
-              <TH className="hidden md:table-cell" style={{ width: '12%', color: '#f59e0b' }}>Severa</TH>
-              <TH className="hidden md:table-cell" style={{ width: '12%', color: '#f59e0b' }}>Indulg</TH>
-              <th className="px-4 py-3 w-8" />
+              {/* Mobile: Gerencia ocupa ~70%, Salud ~22%, Alert ~8% */}
+              {/* Desktop: redistribuye con las 5 columnas extra */}
+              <TH align="left" className="w-[70%] md:w-[26%]" style={{ paddingLeft: '20px' }}>Gerencia</TH>
+              <TH className="w-[22%] md:w-[11%]">Salud</TH>
+              <TH className="hidden md:table-cell md:w-[9%]" style={{ color: '#94a3b8' }}>σ</TH>
+              <TH className="hidden md:table-cell md:w-[11%]" style={{ color: '#10b981' }}>Óptima</TH>
+              <TH className="hidden md:table-cell md:w-[11%]" style={{ color: '#22d3ee' }}>Central</TH>
+              <TH className="hidden md:table-cell md:w-[11%]" style={{ color: '#f59e0b' }}>Severa</TH>
+              <TH className="hidden md:table-cell md:w-[11%]" style={{ color: '#f59e0b' }}>Indulg</TH>
+              <th className="py-3 w-[8%] md:w-[10%]" />
             </tr>
           </thead>
           <tbody>
@@ -120,8 +124,8 @@ export const GerenciaHealthTab = memo(function GerenciaHealthTab({ data }: Geren
                         className={`flex-shrink-0 self-stretch w-0.5 rounded-full ${teslaColor}`}
                         style={{ minHeight: '42px', marginLeft: '6px', opacity: isEmpty ? 0.35 : 0.85 }}
                       />
-                      <span className="text-sm font-medium truncate" style={{ color: isEmpty ? '#475569' : '#e2e8f0', maxWidth: '200px' }}>
-                        {g.gerenciaName}
+                      <span className="text-sm font-medium truncate" style={{ color: isEmpty ? '#475569' : '#e2e8f0' }}>
+                        {toTitleCase(g.gerenciaName)}
                       </span>
                     </div>
                   </td>
@@ -190,11 +194,14 @@ export const GerenciaHealthTab = memo(function GerenciaHealthTab({ data }: Geren
 
 // Header cell helper
 function TH({ children, align, className, style }: {
-  children: React.ReactNode; align?: string; className?: string; style?: React.CSSProperties
+  children?: React.ReactNode; align?: string; className?: string; style?: React.CSSProperties
 }) {
   return (
     <th
-      className={`px-4 py-3 text-xs font-semibold tracking-widest uppercase ${className || ''}`}
+      className={cn(
+        "px-3 py-3 text-xs font-semibold tracking-widest uppercase",
+        className
+      )}
       style={{ color: '#475569', textAlign: (align as any) || 'center', ...style }}
     >
       {children}

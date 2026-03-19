@@ -6,6 +6,7 @@
 // LOBBY (gauge ICC) ↔ SPOTLIGHT (gerencia) + RAIL (colapsable 320px → 50px)
 // ════════════════════════════════════════════════════════════════════════════
 
+import { useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { RefreshCw, AlertTriangle, ClipboardList, ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -107,12 +108,24 @@ export default function TACCinemaOrchestrator() {
     handleOpenDetail,
     handleCloseDetail,
     activeQuadrant,
+    flaggedGerencias,
     handleOpenTreemap,
     handleCloseTreemap,
     showTreemapModal,
     treemapQuadrant,
     reload
   } = useTACCinemaMode()
+
+  // Counts org-wide para TACOrgCover
+  const orgQuadrantCounts = useMemo(() => {
+    let fuga = 0, burnout = 0, bajo = 0
+    for (const g of gerencias) {
+      fuga += g.fugaCount
+      burnout += g.burnoutCount
+      bajo += g.bajoRendimientoCount
+    }
+    return { fuga, burnout, bajo }
+  }, [gerencias])
 
   const isLobby = selectedId === null
   const isCover = selectedId !== null && viewPhase === 'cover' && selectedGerencia !== null
@@ -212,6 +225,7 @@ export default function TACCinemaOrchestrator() {
         onSelect={handleSelect}
         onPillChange={setActivePill}
         onOpenQuadrantDetail={handleOpenTreemap}
+        flaggedGerencias={flaggedGerencias}
       />
 
       {/* Treemap Modal — Pilar 2: Vista org-wide por cuadrante */}
@@ -219,6 +233,9 @@ export default function TACCinemaOrchestrator() {
         isOpen={showTreemapModal}
         onClose={handleCloseTreemap}
         expandedQuadrant={treemapQuadrant}
+        fugaCount={orgQuadrantCounts.fuga}
+        burnoutCount={orgQuadrantCounts.burnout}
+        bajoRendimientoCount={orgQuadrantCounts.bajo}
       />
     </div>
   )

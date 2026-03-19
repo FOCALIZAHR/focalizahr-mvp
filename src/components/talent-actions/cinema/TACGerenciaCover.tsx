@@ -12,6 +12,8 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Activity, HelpCircle, ArrowRight, X } from 'lucide-react'
 import { getPatternLabel } from '@/config/tacLabels'
+import { getGerenciaPatternNarrative } from '@/config/GerenciaPatternNarratives'
+import type { GerenciaPattern } from '@/config/GerenciaPatternNarratives'
 import type { GerenciaMapItem } from '@/lib/services/TalentActionService'
 
 interface TACGerenciaCoverProps {
@@ -23,17 +25,18 @@ interface TACGerenciaCoverProps {
 // NARRATIVAS POR PATRON (de GerenciaCover.tsx)
 // ════════════════════════════════════════════════════════════════════════════
 
-const PATTERN_NARRATIVES: Record<string, {
-  label: string
+// Cinema-specific fields (color, narrative functions, subtext, methodology) stay local.
+// label and coachingTip sourced from centralized GerenciaPatternNarratives where available.
+
+const CINEMA_PATTERN_DATA: Record<string, {
   color: string
   narrative: (name: string, icc: number | null) => string
   subtext: string
   methodology: string[]
 }> = {
   FRAGIL: {
-    label: 'Fragil',
     color: 'text-amber-400',
-    narrative: (name, icc) =>
+    narrative: (name) =>
       `${name} tiene el talento para ejecutar, pero esta a punto de perderlo. Alto ajuste al rol, fuga activa y sin sucesores preparados.`,
     subtext: 'La proxima salida no tiene reemplazo.',
     methodology: [
@@ -43,7 +46,6 @@ const PATTERN_NARRATIVES: Record<string, {
     ]
   },
   QUEMADA: {
-    label: 'Quemada',
     color: 'text-orange-400',
     narrative: (name) =>
       `${name} esta agotando a su equipo. El burnout no es un problema individual, es un patron que se detecta cuando persiste mas de 6 meses.`,
@@ -55,7 +57,6 @@ const PATTERN_NARRATIVES: Record<string, {
     ]
   },
   ESTANCADA: {
-    label: 'Estancada',
     color: 'text-yellow-400',
     narrative: (name) =>
       `${name} tiene gente que lleva anos sin moverse. No son nuevos. Llevan mas de 18 meses en desarrollo sin avance.`,
@@ -67,10 +68,9 @@ const PATTERN_NARRATIVES: Record<string, {
     ]
   },
   RIESGO_OCULTO: {
-    label: 'Riesgo Oculto',
     color: 'text-purple-400',
-    narrative: (name, icc) =>
-      `${name} parece estable por fuera, pero concentra el ${icc ?? '--'}% de su conocimiento critico en pocas personas con alerta activa.`,
+    narrative: (_name, icc) =>
+      `parece estable por fuera, pero concentra el ${icc ?? '--'}% de su conocimiento critico en pocas personas con alerta activa.`,
     subtext: 'El riesgo no es visible hasta que alguien se va.',
     methodology: [
       'Distribucion general de cuadrantes aparentemente sana',
@@ -79,7 +79,6 @@ const PATTERN_NARRATIVES: Record<string, {
     ]
   },
   EN_TRANSICION: {
-    label: 'En Transicion',
     color: 'text-blue-400',
     narrative: (name) =>
       `${name} tiene gente que quiere crecer pero todavia no esta lista. Ambicion sin preparacion genera frustacion y fuga prematura.`,
@@ -91,7 +90,6 @@ const PATTERN_NARRATIVES: Record<string, {
     ]
   },
   SALUDABLE: {
-    label: 'Fabrica de Talento',
     color: 'text-emerald-400',
     narrative: (name) =>
       `${name} es el modelo a replicar. Alto rendimiento sostenido, conocimiento distribuido y retencion activa del talento critico.`,
@@ -104,12 +102,29 @@ const PATTERN_NARRATIVES: Record<string, {
   }
 }
 
-const DEFAULT_NARRATIVE = {
-  label: 'Sin clasificar',
-  color: 'text-slate-400',
-  narrative: () => 'No hay suficientes datos para determinar el patron de esta gerencia.',
-  subtext: 'Completa la calibracion para activar el diagnostico.',
-  methodology: ['Requiere al menos 50% del equipo con matrices calculadas']
+const RISK_PATTERNS: GerenciaPattern[] = ['FRAGIL', 'QUEMADA', 'ESTANCADA', 'RIESGO_OCULTO']
+
+function getCinemaConfig(pattern: string | null) {
+  if (!pattern || !CINEMA_PATTERN_DATA[pattern]) {
+    return {
+      label: 'Sin clasificar',
+      color: 'text-slate-400',
+      narrative: () => 'No hay suficientes datos para determinar el patron de esta gerencia.',
+      subtext: 'Completa la calibracion para activar el diagnostico.',
+      methodology: ['Requiere al menos 50% del equipo con matrices calculadas'],
+    }
+  }
+
+  const cinema = CINEMA_PATTERN_DATA[pattern]
+
+  // Use centralized label for risk patterns, fallback for non-risk
+  const centralized = RISK_PATTERNS.includes(pattern as GerenciaPattern)
+    ? getGerenciaPatternNarrative(pattern as GerenciaPattern)
+    : null
+
+  const label = centralized?.label ?? (pattern === 'EN_TRANSICION' ? 'En Transicion' : pattern === 'SALUDABLE' ? 'Fabrica de Talento' : 'Sin clasificar')
+
+  return { label, ...cinema }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -150,9 +165,7 @@ export default function TACGerenciaCover({
   const [step, setStep] = useState<1 | 2>(1)
   const [showHelp, setShowHelp] = useState(false)
 
-  const config = gerencia.pattern
-    ? (PATTERN_NARRATIVES[gerencia.pattern] || DEFAULT_NARRATIVE)
-    : DEFAULT_NARRATIVE
+  const config = getCinemaConfig(gerencia.pattern)
 
   return (
     <div className="flex flex-col h-full">

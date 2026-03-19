@@ -5,7 +5,7 @@
 
 import { useMemo, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronUp, ChevronLeft, ChevronRight, Flag } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getPatternLabel, getQuadrantLabel } from '@/config/tacLabels'
 import type { TACRailProps, TACRailPill, GerenciaCardData } from '@/types/tac-cinema'
@@ -44,7 +44,8 @@ export default function TACRail({
   onToggle,
   onSelect,
   onPillChange,
-  onOpenQuadrantDetail
+  onOpenQuadrantDetail,
+  flaggedGerencias
 }: TACRailProps) {
   const selectedGerencia = gerencias.find(g => g.id === selectedId)
   const carouselRef = useRef<HTMLDivElement>(null)
@@ -175,43 +176,79 @@ export default function TACRail({
                 key={g.id}
                 gerencia={g}
                 isSelected={selectedId === g.id}
+                isFlagged={flaggedGerencias?.has(g.id) || false}
                 onClick={() => onSelect(g.id)}
               />
             ))}
 
-            {/* Pill Personas: cards por cuadrante */}
-            {activePill === 'personas' && QUADRANT_CONFIG.map((q) => {
-              const count = quadrantCounts[q.key as keyof typeof quadrantCounts] || 0
-              if (count === 0) return null
-              return (
+            {/* Pill Personas: 2 cards */}
+            {activePill === 'personas' && (
+              <>
+                {/* Card 1: Mapa de Talento */}
                 <motion.div
-                  key={q.key}
-                  onClick={() => onOpenQuadrantDetail(q.key)}
+                  onClick={() => onOpenQuadrantDetail('')}
                   whileHover={{ y: -5 }}
                   className={cn(
                     'snap-start flex-shrink-0 w-[160px] h-[200px] rounded-xl cursor-pointer',
                     'transition-all duration-300 relative group/card overflow-hidden border',
-                    'bg-slate-900/40 hover:bg-slate-800',
-                    q.border
+                    'bg-slate-900/40 border-white/5 hover:bg-slate-800 hover:border-white/10'
                   )}
                 >
-                  {/* Tesla line top */}
                   <div className="absolute top-0 left-0 right-0 h-[2px] bg-slate-700 opacity-30 group-hover/card:opacity-80 transition-all" />
 
-                  <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-                    <span className={cn("text-4xl font-black font-mono", q.color)}>
-                      {count}
-                    </span>
-                    <h4 className="font-bold text-xs text-slate-400 mt-2">
-                      {getQuadrantLabel(q.key)}
-                    </h4>
-                    <p className="text-[9px] text-slate-600 mt-1">
-                      personas
-                    </p>
+                  <div className="flex flex-col items-center justify-center h-full p-4">
+                    <div className="w-14 h-14 rounded-full flex items-center justify-center text-sm font-bold border transition-all mb-3 shadow-lg bg-slate-800 border-slate-700/50 text-slate-500 group-hover/card:text-slate-300">
+                      <span className="text-lg">◎</span>
+                    </div>
+                    <div className="text-center w-full space-y-1">
+                      <h4 className="font-bold text-xs text-slate-400 group-hover/card:text-slate-200 transition-colors">
+                        Mapa de Talento
+                      </h4>
+                      <p className="text-[9px] text-slate-600 font-medium">
+                        {quadrantCounts.FUGA_CEREBROS + quadrantCounts.BURNOUT_RISK} en acción inmediata
+                      </p>
+                    </div>
+                    {(quadrantCounts.FUGA_CEREBROS + quadrantCounts.BURNOUT_RISK) > 0 && (
+                      <div className="mt-3 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+                        <span className="text-[9px] text-slate-600">
+                          {quadrantCounts.FUGA_CEREBROS + quadrantCounts.BURNOUT_RISK + quadrantCounts.BAJO_RENDIMIENTO + quadrantCounts.MOTOR_EQUIPO} total
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
-              )
-            })}
+
+                {/* Card 2: Mejor Talento — Próximamente */}
+                <motion.div
+                  whileHover={{ y: -5 }}
+                  className={cn(
+                    'snap-start flex-shrink-0 w-[160px] h-[200px] rounded-xl',
+                    'transition-all duration-300 relative group/card overflow-hidden border',
+                    'bg-slate-900/40 border-purple-500/10 hover:border-purple-500/30 cursor-default'
+                  )}
+                >
+                  <div
+                    className="absolute top-0 left-0 right-0 h-[2px] opacity-30 group-hover/card:opacity-60 transition-all"
+                    style={{ background: 'linear-gradient(90deg, transparent, #A78BFA80, transparent)' }}
+                  />
+
+                  <div className="flex flex-col items-center justify-center h-full p-4">
+                    <div className="w-14 h-14 rounded-full flex items-center justify-center text-sm font-bold border transition-all mb-3 shadow-lg bg-slate-800 border-purple-500/20 text-purple-400/50 group-hover/card:text-purple-400/80">
+                      <span className="text-lg">★</span>
+                    </div>
+                    <div className="text-center w-full space-y-1">
+                      <h4 className="font-bold text-xs text-slate-500 group-hover/card:text-slate-400 transition-colors">
+                        Mejor Talento
+                      </h4>
+                      <p className="text-[9px] text-purple-400/50 font-medium">
+                        Próximamente
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              </>
+            )}
           </div>
 
           {/* Right arrow — copia exacta */}
@@ -228,7 +265,7 @@ export default function TACRail({
 }
 
 // GerenciaRailCard — clon de EmployeeRailCard, misma estructura visual
-function GerenciaRailCard({ gerencia, isSelected, onClick }: { gerencia: GerenciaCardData; isSelected: boolean; onClick: () => void }) {
+function GerenciaRailCard({ gerencia, isSelected, isFlagged, onClick }: { gerencia: GerenciaCardData; isSelected: boolean; isFlagged?: boolean; onClick: () => void }) {
   return (
     <motion.div
       onClick={onClick}
@@ -273,13 +310,23 @@ function GerenciaRailCard({ gerencia, isSelected, onClick }: { gerencia: Gerenci
         </div>
 
         {/* Status indicator */}
-        <div className="mt-3 flex items-center gap-1.5">
-          {gerencia.requiresAction && (
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+        <div className="mt-3 flex flex-col items-center gap-1">
+          <div className="flex items-center gap-1.5">
+            {gerencia.requiresAction && (
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            )}
+            <span className="text-[9px] text-slate-600">
+              {getPatternLabel(gerencia.pattern)}
+            </span>
+          </div>
+
+          {/* Badge "En revisión" si fue flaggeada */}
+          {isFlagged && (
+            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-700/50">
+              <Flag className="w-2.5 h-2.5 text-amber-400" />
+              <span className="text-[8px] text-slate-400 font-medium">En revisión</span>
+            </span>
           )}
-          <span className="text-[9px] text-slate-600">
-            {getPatternLabel(gerencia.pattern)}
-          </span>
         </div>
       </div>
     </motion.div>

@@ -49,7 +49,7 @@ const ACTION_TITLES: Record<string, string> = {
 }
 
 // Micro-copy Manifiesto UX LEY 2: valor futuro, no confirmacion vacia
-const TAC_MESSAGE = 'FocalizaHR medira si esta intervencion mejora la retencion de esta gerencia en 6 meses. No tienes que hacer nada mas.'
+const TAC_MESSAGE = 'FocalizaHR evaluara el impacto de esta intervencion en el proximo ciclo de evaluacion. No tienes que hacer nada mas.'
 
 function addDays(date: Date, days: number): Date {
   const result = new Date(date)
@@ -126,7 +126,8 @@ export class IntelligenceInsightService {
         metricCode: isFlag ? null : 'DEPARTMENT_RISK_STATUS',
         baselineValue,
 
-        // Proxima evaluacion: 180 dias (6 meses) para PREDICTIVE
+        // Proxima evaluacion: se recalculará al cierre del próximo PerformanceCycle
+        // Por ahora 180 días como placeholder — el CRON usará el ciclo real
         nextEvaluationAt: isFlag ? null : addDays(new Date(), 180)
       }
     })

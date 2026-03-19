@@ -82,6 +82,7 @@ export interface TACRailProps {
   onSelect: (id: string) => void
   onPillChange: (pill: TACRailPill) => void
   onOpenQuadrantDetail: (quadrant: string) => void
+  flaggedGerencias?: Set<string>
 }
 
 export interface GerenciaRailCardProps {

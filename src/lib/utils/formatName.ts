@@ -1,7 +1,7 @@
 // src/lib/utils/formatName.ts
 // Transforma nombres raw del backend a formato legible
 
-function toTitleCase(str: string): string {
+export function toTitleCase(str: string): string {
   return str
     .toLowerCase()
     .split(' ')

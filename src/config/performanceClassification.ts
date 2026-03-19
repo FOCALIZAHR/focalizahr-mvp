@@ -122,23 +122,25 @@ export interface EvaluatorWeights {
 
 /**
  * Nivel 0: Default FocalizaHR (codigo)
- * Todos los tipos de evaluador tienen el mismo peso
+ * Estándar industria: Self NO aporta al cálculo (reduce sesgo positivo).
+ * La autoevaluación se usa para detectar brechas de percepción, no para la nota.
+ * Manager 60% + Peer 25% + Upward 15% = 100%
  */
 export const FOCALIZAHR_DEFAULT_WEIGHTS: EvaluatorWeights = {
-  self: 25,
-  manager: 25,
+  self: 0,
+  manager: 60,
   peer: 25,
-  upward: 25
+  upward: 15
 }
 
 /**
- * Ejemplo: Ponderacion tipica Enterprise
- * Manager tiene mas peso, self menos (reduce sesgo)
+ * Alternativa: Incluye self con peso mínimo
+ * Para empresas que quieren que la autoevaluación aporte algo al cálculo
  */
-export const ENTERPRISE_TYPICAL_WEIGHTS: EvaluatorWeights = {
-  self: 15,
-  manager: 40,
-  peer: 30,
+export const WEIGHTS_WITH_SELF: EvaluatorWeights = {
+  self: 10,
+  manager: 50,
+  peer: 25,
   upward: 15
 }
 
@@ -995,7 +997,7 @@ export default {
   ROLE_FIT_DEFAULT_CONFIG,
 
   FOCALIZAHR_DEFAULT_WEIGHTS,
-  ENTERPRISE_TYPICAL_WEIGHTS,
+  WEIGHTS_WITH_SELF,
 
   getPerformanceClassification,
   getPerformanceLevel,

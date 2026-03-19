@@ -124,7 +124,7 @@ export function BiasDetailModal({ isOpen, onClose, byGerencia, integrityScore, i
         className="relative w-full max-w-2xl mx-4 bg-slate-900/95 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl overflow-hidden"
       >
         {/* Tesla line */}
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
+        <div className="fhr-top-line absolute inset-x-0 top-0 z-10" />
 
         {/* Header */}
         <div className="p-6 border-b border-slate-700/50">

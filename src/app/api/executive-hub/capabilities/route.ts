@@ -12,6 +12,7 @@ import { RoleFitAnalyzer } from '@/lib/services/RoleFitAnalyzer'
 import { StrategicFocusService, type StrategicFocus } from '@/lib/services/StrategicFocusService'
 import { TALENT_INTELLIGENCE_THRESHOLDS } from '@/config/performanceClassification'
 import { prisma } from '@/lib/prisma'
+import { getOrgCompetencyGaps } from '@/lib/services/CompetencyScoreService'
 
 const GLOBAL_ROLES = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_MANAGER', 'HR_ADMIN', 'CEO']
 
@@ -111,10 +112,13 @@ export async function GET(request: NextRequest) {
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════════
 
+// numAvg moved to CompetencyScoreService
 function numAvg(nums: number[]): number {
   if (nums.length === 0) return 0
   return nums.reduce((a, b) => a + b, 0) / nums.length
 }
+// NOTE: bulkCompetencyScores and getOrgCompetencyGaps now imported from CompetencyScoreService
+// Local copies below kept for getCellDrillDown which uses bulkCompetencyScores locally
 
 /**
  * Bulk-fetch competency scores for multiple employees in 2 queries.
@@ -394,10 +398,11 @@ async function getCellDrillDown(
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// ORG-WIDE COMPETENCY GAPS (for strategic focus classification)
+// ORG-WIDE COMPETENCY GAPS — ahora importado de CompetencyScoreService
+// Esta función local se mantiene como _legacy por si se necesita referencia
 // ═══════════════════════════════════════════════════════════════════════
 
-async function getOrgCompetencyGaps(
+async function _localGetOrgCompetencyGaps_unused(
   cycleId: string,
   accountId: string,
   departmentIds?: string[]

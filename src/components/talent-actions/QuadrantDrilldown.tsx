@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, Shield, ChevronRight } from 'lucide-react'
 import TenureSegmentBadge from './TenureSegmentBadge'
 import { getTalentMapNarrative } from '@/config/TalentMapNarratives'
+import { formatDisplayName } from '@/lib/utils/formatName'
 import type { QuadrantPerson, TenureSegment } from '@/lib/services/TalentActionService'
 
 interface QuadrantDrilldownProps {
@@ -187,14 +188,16 @@ function PersonRow({ person }: { person: QuadrantPerson }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm truncate" style={{ color: 'var(--fhr-text-primary)' }}>
-              {person.fullName}
+              {formatDisplayName(person.fullName, 'full')}
             </span>
             {person.isSuccessor && (
               <Shield className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--fhr-cyan)' }} />
             )}
           </div>
           <div className="text-[10px] truncate" style={{ color: 'var(--fhr-text-muted)' }}>
-            {person.position || 'Sin cargo'} · {person.departmentName}
+            {person.position
+              ? person.position.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())
+              : 'Sin cargo'} · {person.departmentName}
           </div>
         </div>
 

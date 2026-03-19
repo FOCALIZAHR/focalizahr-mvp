@@ -149,21 +149,27 @@ export function useCalibrationFeed({
   const feedItems = useMemo(() => {
     if (!adjustments?.length) return []
 
-    // Deduplicar por ratingId: solo el más reciente por empleado
-    const latestByRating = new Map<string, any>()
-    adjustments
+    const valid = adjustments
       .filter((adj: any) => adj.status === 'PENDING' || adj.status === 'APPLIED')
-      .forEach((adj: any) => {
-        const existing = latestByRating.get(adj.ratingId)
-        if (!existing || new Date(adj.adjustedAt) > new Date(existing.adjustedAt)) {
-          latestByRating.set(adj.ratingId, adj)
-        }
-      })
+      .sort((a: any, b: any) => new Date(a.adjustedAt).getTime() - new Date(b.adjustedAt).getTime())
 
-    return Array.from(latestByRating.values())
+    // Rastrear última posición conocida por rating para encadenar movimientos
+    // Primer movimiento: from = rating.nineBoxPosition (original)
+    // Segundo movimiento: from = newNineBox del primer movimiento
+    const lastKnownPosition = new Map<string, string | null>()
+
+    return valid
       .map((adj: any): FeedItem => {
         const employee = adj.rating?.employee
-        const previousNineBox = adj.rating?.nineBoxPosition
+        const originalNineBox = adj.rating?.nineBoxPosition ?? null
+
+        // El "from" es la última posición conocida, no siempre el original
+        const fromNineBox = lastKnownPosition.has(adj.ratingId)
+          ? lastKnownPosition.get(adj.ratingId)!
+          : originalNineBox
+
+        // Actualizar última posición conocida para el siguiente movimiento
+        lastKnownPosition.set(adj.ratingId, adj.newNineBox)
 
         return {
           id: adj.id,
@@ -172,14 +178,15 @@ export function useCalibrationFeed({
           actorRole: getActorRole(adj.adjustedBy, participants),
           employeeName: employee?.fullName || 'Empleado',
           employeePosition: employee?.position || '',
-          fromQuadrant: getQuadrantName(previousNineBox),
+          fromQuadrant: getQuadrantName(fromNineBox),
           toQuadrant: getQuadrantName(adj.newNineBox),
-          direction: getDirection(previousNineBox, adj.newNineBox),
+          direction: getDirection(fromNineBox, adj.newNineBox),
           justification: cleanJustification(adj.justification),
           timestamp: new Date(adj.adjustedAt),
           isNew: newIds.has(adj.id),
         }
       })
+      // Mostrar más reciente primero
       .sort((a: FeedItem, b: FeedItem) => b.timestamp.getTime() - a.timestamp.getTime())
   }, [adjustments, participants, newIds])
 

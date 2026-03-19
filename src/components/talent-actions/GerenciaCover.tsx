@@ -9,7 +9,8 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, ArrowRight, HelpCircle, X } from 'lucide-react'
-import CheckoutPanel from './CheckoutPanel'
+import { getGerenciaPatternNarrative } from '@/config/GerenciaPatternNarratives'
+import type { GerenciaPattern } from '@/config/GerenciaPatternNarratives'
 import type { GerenciaMapItem } from '@/lib/services/TalentActionService'
 
 interface GerenciaCoverProps {
@@ -21,61 +22,66 @@ interface GerenciaCoverProps {
 // NARRATIVAS POR PATRON
 // ════════════════════════════════════════════════════════════════════════════
 
-const PATTERN_CONFIG: Record<string, {
-  label: string
-  badgeClass: string
-  coachingTip: string
-  narrative: (name: string, icc: number | null) => string
-}> = {
-  FRAGIL: {
-    label: 'Fragil',
-    badgeClass: 'bg-red-500/15 text-red-400 border border-red-500/20',
-    coachingTip: 'Priorizar retención del conocimiento crítico antes de cualquier movimiento. La próxima salida no tiene reemplazo.',
-    narrative: (name, icc) =>
-      `Equipo con alto ajuste al rol pero fuga activa y sin sucesores preparados. ${icc ? `${icc}% del conocimiento crítico concentrado en personas con alerta.` : ''}`,
-  },
-  QUEMADA: {
-    label: 'Quemada',
-    badgeClass: 'bg-orange-500/15 text-orange-400 border border-orange-500/20',
-    coachingTip: 'El burnout no es un problema individual. Revisar carga de trabajo estructural antes de intervenciones individuales.',
-    narrative: (name) =>
-      `Equipo sobrecargado con señales de burnout activo. El patrón persiste más de 6 meses, indicando sobrecarga estructural.`,
-  },
-  ESTANCADA: {
-    label: 'Estancada',
-    badgeClass: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20',
-    coachingTip: 'Gente que lleva años sin moverse no es estabilidad, es estancamiento. Revisar planes de desarrollo y rotación.',
-    narrative: () =>
-      `Más del 50% del equipo lleva +18 meses en desarrollo sin avance. Señal de gestión que no desarrolla ni rota.`,
-  },
-  RIESGO_OCULTO: {
-    label: 'Riesgo Oculto',
-    badgeClass: 'bg-purple-500/15 text-purple-400 border border-purple-500/20',
-    coachingTip: 'El riesgo no es visible hasta que alguien se va. Distribuir conocimiento crítico es la prioridad.',
-    narrative: (name, icc) =>
-      `Parece estable por fuera, pero concentra el ${icc ?? '--'}% de su conocimiento crítico en pocas personas con alerta activa.`,
-  },
+// Badge classes kept here because they are UI-specific (not in centralized narratives)
+const BADGE_CLASSES: Record<string, string> = {
+  FRAGIL: 'bg-red-500/15 text-red-400 border border-red-500/20',
+  QUEMADA: 'bg-orange-500/15 text-orange-400 border border-orange-500/20',
+  ESTANCADA: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20',
+  RIESGO_OCULTO: 'bg-purple-500/15 text-purple-400 border border-purple-500/20',
+  EN_TRANSICION: 'bg-blue-500/15 text-blue-400 border border-blue-500/20',
+  SALUDABLE: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20',
+}
+
+// Narrative functions kept here because centralized config doesn't have dynamic narrative(name, icc)
+const PATTERN_NARRATIVES: Record<string, (name: string, icc: number | null) => string> = {
+  FRAGIL: (_name, icc) =>
+    `Equipo con alto ajuste al rol pero fuga activa y sin sucesores preparados. ${icc ? `${icc}% del conocimiento crítico concentrado en personas con alerta.` : ''}`,
+  QUEMADA: () =>
+    `Equipo sobrecargado con señales de burnout activo. El patrón persiste más de 6 meses, indicando sobrecarga estructural.`,
+  ESTANCADA: () =>
+    `Más del 50% del equipo lleva +18 meses en desarrollo sin avance. Señal de gestión que no desarrolla ni rota.`,
+  RIESGO_OCULTO: (_name, icc) =>
+    `Parece estable por fuera, pero concentra el ${icc ?? '--'}% de su conocimiento crítico en pocas personas con alerta activa.`,
+  EN_TRANSICION: () =>
+    `Equipo con alta aspiración de crecimiento pero bajo ajuste al nivel siguiente. Oportunidad si se canaliza, riesgo si se ignora.`,
+  SALUDABLE: () =>
+    `Alto rendimiento sostenido, conocimiento distribuido y retención activa del talento crítico. Modelo a replicar.`,
+}
+
+// Centralized patterns (FRAGIL, QUEMADA, ESTANCADA, RIESGO_OCULTO) have label + coachingTip
+// EN_TRANSICION and SALUDABLE are not risk patterns — fallback defaults kept here
+const EXTRA_LABELS: Record<string, { label: string; coachingTip: string }> = {
   EN_TRANSICION: {
     label: 'En Transicion',
-    badgeClass: 'bg-blue-500/15 text-blue-400 border border-blue-500/20',
     coachingTip: 'Ambición sin preparación genera frustración y fuga prematura. Canalizar con planes de desarrollo.',
-    narrative: () =>
-      `Equipo con alta aspiración de crecimiento pero bajo ajuste al nivel siguiente. Oportunidad si se canaliza, riesgo si se ignora.`,
   },
   SALUDABLE: {
     label: 'Fabrica de Talento',
-    badgeClass: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20',
     coachingTip: 'Esta gerencia es el modelo a replicar. Documentar sus prácticas para transferir a otras áreas.',
-    narrative: () =>
-      `Alto rendimiento sostenido, conocimiento distribuido y retención activa del talento crítico. Modelo a replicar.`,
-  }
+  },
 }
 
-const DEFAULT_CONFIG = {
-  label: 'Sin clasificar',
-  badgeClass: 'bg-slate-500/15 text-slate-400 border border-slate-500/20',
-  coachingTip: 'Completa la calibración para activar el diagnóstico automático.',
-  narrative: () => 'No hay suficientes datos para determinar el patrón de esta gerencia.',
+function getPatternConfig(pattern: string | null) {
+  if (!pattern) {
+    return {
+      label: 'Sin clasificar',
+      badgeClass: 'bg-slate-500/15 text-slate-400 border border-slate-500/20',
+      coachingTip: 'Completa la calibración para activar el diagnóstico automático.',
+      narrative: () => 'No hay suficientes datos para determinar el patrón de esta gerencia.',
+    }
+  }
+
+  // Try centralized narratives first (risk patterns)
+  const centralized = (['FRAGIL', 'QUEMADA', 'ESTANCADA', 'RIESGO_OCULTO'] as GerenciaPattern[]).includes(pattern as GerenciaPattern)
+    ? getGerenciaPatternNarrative(pattern as GerenciaPattern)
+    : null
+
+  const label = centralized?.label ?? EXTRA_LABELS[pattern]?.label ?? 'Sin clasificar'
+  const coachingTip = centralized?.coachingTip ?? EXTRA_LABELS[pattern]?.coachingTip ?? 'Completa la calibración para activar el diagnóstico automático.'
+  const badgeClass = BADGE_CLASSES[pattern] ?? 'bg-slate-500/15 text-slate-400 border border-slate-500/20'
+  const narrative = PATTERN_NARRATIVES[pattern] ?? (() => 'No hay suficientes datos para determinar el patrón de esta gerencia.')
+
+  return { label, badgeClass, coachingTip, narrative }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -96,9 +102,7 @@ const METRIC_COLORS = {
 export default function GerenciaCover({ gerencia, onEnterContent }: GerenciaCoverProps) {
   const [showHelp, setShowHelp] = useState(false)
 
-  const config = gerencia.pattern
-    ? (PATTERN_CONFIG[gerencia.pattern] || DEFAULT_CONFIG)
-    : DEFAULT_CONFIG
+  const config = getPatternConfig(gerencia.pattern)
 
   const narrativeText = config.narrative(gerencia.gerenciaName, gerencia.icc)
 
@@ -236,20 +240,6 @@ export default function GerenciaCover({ gerencia, onEnterContent }: GerenciaCove
           </p>
         </div>
       </div>
-
-      {/* ═══════════════════════════════════════════════════════════════
-          3. ACCIONES
-         ═══════════════════════════════════════════════════════════════ */}
-      {gerencia.pattern && gerencia.pattern !== 'SALUDABLE' && (
-        <div className="w-full max-w-3xl">
-          <div className="h-px bg-slate-700/50 my-8" />
-          <CheckoutPanel
-            gerenciaId={gerencia.gerenciaId}
-            gerenciaName={gerencia.gerenciaName}
-            pattern={gerencia.pattern}
-          />
-        </div>
-      )}
 
       {/* ═══════════════════════════════════════════════════════════════
           HELP MODAL — ICC

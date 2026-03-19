@@ -139,10 +139,14 @@ export async function GET(request: NextRequest) {
         },
         calibracion: {
           confidence: integrityScore.score,
-          biasType: orgBias.type,
-          biasLabel: orgBias.type === 'LENIENCY' ? 'INDULGENTE'
-            : orgBias.type === 'SEVERITY' ? 'SEVERA'
-            : orgBias.type === 'CENTRAL_TENDENCY' ? 'TENDENCIA CENTRAL'
+          // biasLabel derivado de clasificación por evaluador (misma fuente que CalibrationHealth)
+          biasType: calibrationData.byStatus.SEVERA > 0 ? 'SEVERITY'
+            : calibrationData.byStatus.INDULGENTE > 0 ? 'LENIENCY'
+            : calibrationData.byStatus.CENTRAL > 0 ? 'CENTRAL_TENDENCY'
+            : null,
+          biasLabel: calibrationData.byStatus.SEVERA > 0 ? 'SEVERA'
+            : calibrationData.byStatus.INDULGENTE > 0 ? 'INDULGENTE'
+            : calibrationData.byStatus.CENTRAL > 0 ? 'CENTRAL'
             : null,
           integrityLevel: integrityScore.level,
           // Backward compat
@@ -245,7 +249,7 @@ const IDEAL_BELL_CURVE = [
 ]
 
 async function getOrgDistribution(cycleId: string, accountId: string, departmentIds?: string[]) {
-  const where: any = { cycleId, accountId, calculatedScore: { gte: 0 } }
+  const where: any = { cycleId, accountId, calculatedScore: { gt: 0 } }
   if (departmentIds?.length) {
     where.employee = { departmentId: { in: departmentIds } }
   }
@@ -259,8 +263,7 @@ async function getOrgDistribution(cycleId: string, accountId: string, department
   }
   const counts = [0, 0, 0, 0, 0]
   for (const r of ratings) {
-    if (!r.calculatedScore) continue
-    counts[Math.max(0, Math.min(4, Math.round(r.calculatedScore) - 1))]++
+    counts[Math.max(0, Math.min(4, Math.round(r.calculatedScore!) - 1))]++
   }
   return {
     total,

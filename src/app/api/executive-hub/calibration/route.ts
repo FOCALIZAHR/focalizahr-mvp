@@ -137,7 +137,7 @@ async function getOrgDistribution(
   const where: any = {
     cycleId,
     accountId,
-    calculatedScore: { gte: 0 }
+    calculatedScore: { gt: 0 }
   }
 
   if (departmentIds?.length) {
@@ -165,8 +165,7 @@ async function getOrgDistribution(
   // Contar por bucket (1-5)
   const counts = [0, 0, 0, 0, 0]
   for (const r of ratings) {
-    if (!r.calculatedScore) continue
-    const bucket = Math.max(0, Math.min(4, Math.round(r.calculatedScore) - 1))
+    const bucket = Math.max(0, Math.min(4, Math.round(r.calculatedScore!) - 1))
     counts[bucket]++
   }
 

@@ -12,11 +12,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Home, Info, Calendar, Mail, Flag, ChevronRight, Loader2, ShieldCheck, Brain, X } from 'lucide-react'
+import { Home, Info, Calendar, Mail, Flag, ChevronRight, Loader2, ShieldCheck } from 'lucide-react'
 import { formatCurrencyCLP } from '@/lib/financialCalculations'
 import { getGerenciaPatternNarrative, getActionTooltip } from '@/config/GerenciaPatternNarratives'
 import type { GerenciaPattern } from '@/config/GerenciaPatternNarratives'
 import TACDetailModal from './TACDetailModal'
+import FocalizaIntelligenceModal from '@/components/ui/FocalizaIntelligenceModal'
 import type { TACSpotlightCardProps } from '@/types/tac-cinema'
 
 const REQUIRES_ACTION = new Set(['FRAGIL', 'QUEMADA', 'ESTANCADA', 'RIESGO_OCULTO'])
@@ -336,43 +337,21 @@ export default function TACSpotlightCard({
       />
 
       {/* Modal de confirmación post-acción */}
-      {confirmModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          {/* Backdrop glassmorphism */}
-          <div
-            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
-            onClick={() => setConfirmModal(null)}
-          />
-
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
-            className="relative bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 max-w-sm w-full text-center"
-          >
-            {/* Ícono Brain */}
-            <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 rounded-full bg-purple-500/10 flex items-center justify-center">
-                <Brain className="w-8 h-8 text-purple-400" />
-              </div>
-            </div>
-
-            {/* Mensaje contextual */}
-            <p className="text-slate-300 text-base leading-relaxed mb-8">
-              {confirmModal}
-            </p>
-
-            {/* Botón Entendido */}
-            <button
-              onClick={() => setConfirmModal(null)}
-              className="px-8 py-2.5 rounded-full bg-transparent border border-cyan-500/40 text-cyan-400 text-sm font-medium hover:bg-cyan-500/10 hover:border-cyan-500/60 transition-all duration-300"
-            >
-              Entendido
-            </button>
-          </motion.div>
-        </div>
-      )}
+      <FocalizaIntelligenceModal
+        isOpen={!!confirmModal}
+        onClose={() => setConfirmModal(null)}
+        entityName={gerencia.displayName}
+        entityType="gerencia"
+        customMessage={{
+          before: 'registró una intervención en',
+          after: confirmModal || ''
+        }}
+        cta={{
+          label: 'Entendido',
+          onClick: () => {}
+        }}
+        source="Talent Action Center"
+      />
     </motion.div>
   )
 }

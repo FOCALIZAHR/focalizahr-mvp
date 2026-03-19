@@ -1,18 +1,24 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// TALENT TREEMAP — Pilar 2: Vista org-wide por zonas de urgencia
+// TALENT TREEMAP — Pilar 2: Vista org-wide proporcional
 // src/components/talent-actions/TalentTreemap.tsx
 //
-// 3 zonas: ACCION_INMEDIATA (rojo), MONITOREAR (ambar), PROTEGER (verde)
-// Cada zona contiene QuadrantBlocks expandibles
+// Filosofía FocalizaHR:
+// — El tamaño del bloque comunica proporción (no colores semáforo)
+// — Cyan protagonista, purple acento
+// — Progressive disclosure: número → narrativa → personas (click)
+// — "Inteligencia sin agresividad"
+//
+// Bloques flex proporcionales al count, ordenados por urgencia.
+// Sin agrupación por zonas — el tamaño + la narrativa hacen el trabajo.
 // ════════════════════════════════════════════════════════════════════════════
 
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useEffect, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2 } from 'lucide-react'
 import QuadrantBlock from './QuadrantBlock'
-import { getQuadrantLabel } from '@/config/tacLabels'
+import { getQuadrantLabel, getQuadrantNarrative } from '@/config/tacLabels'
 
 interface OrgStats {
   totalPersonas: number
@@ -23,66 +29,28 @@ interface OrgStats {
   alertasAltas: number
 }
 
-// Config de cuadrantes — labels de tacLabels.ts, descripciones propias de este componente
-const QUADRANT_CONFIG: Record<string, {
-  description: string
-  actionTypical: string
-  color: string
-  borderColor: string
-  bgColor: string
-}> = {
-  FUGA_CEREBROS: {
-    description: 'Alto dominio + bajo engagement',
+// Orden por urgencia (más crítico primero) + narrativa contextual
+const QUADRANTS_ORDERED = [
+  {
+    key: 'FUGA_CEREBROS',
     actionTypical: 'Incluir en proxima revision de personas',
-    color: 'text-red-400',
-    borderColor: 'border-red-500/30',
-    bgColor: 'bg-red-500/5'
+    accentColor: '#EF4444',
   },
-  BURNOUT_RISK: {
-    description: 'Bajo dominio + alto engagement',
+  {
+    key: 'BURNOUT_RISK',
     actionTypical: 'Revisar carga y adecuacion al rol',
-    color: 'text-orange-400',
-    borderColor: 'border-orange-500/30',
-    bgColor: 'bg-orange-500/5'
+    accentColor: '#F59E0B',
   },
-  BAJO_RENDIMIENTO: {
-    description: 'Bajo dominio + bajo engagement',
+  {
+    key: 'BAJO_RENDIMIENTO',
     actionTypical: 'Definir continuidad o reubicacion',
-    color: 'text-amber-400',
-    borderColor: 'border-amber-500/30',
-    bgColor: 'bg-amber-500/5'
+    accentColor: '#64748B',
   },
-  MOTOR_EQUIPO: {
-    description: 'Alto dominio + alto engagement',
+  {
+    key: 'MOTOR_EQUIPO',
     actionTypical: 'Mantener desafio y visibilidad',
-    color: 'text-emerald-400',
-    borderColor: 'border-emerald-500/30',
-    bgColor: 'bg-emerald-500/5'
-  }
-}
-
-const ZONES = [
-  {
-    key: 'ACCION_INMEDIATA',
-    label: 'Accion Inmediata',
-    color: 'text-red-400',
-    borderColor: 'border-red-500/20',
-    quadrants: ['FUGA_CEREBROS', 'BURNOUT_RISK']
+    accentColor: '#22D3EE',
   },
-  {
-    key: 'MONITOREAR',
-    label: 'Monitorear',
-    color: 'text-amber-400',
-    borderColor: 'border-amber-500/20',
-    quadrants: ['BAJO_RENDIMIENTO']
-  },
-  {
-    key: 'PROTEGER',
-    label: 'Proteger',
-    color: 'text-emerald-400',
-    borderColor: 'border-emerald-500/20',
-    quadrants: ['MOTOR_EQUIPO']
-  }
 ]
 
 interface TalentTreemapProps {
@@ -114,6 +82,23 @@ export default function TalentTreemap({ initialQuadrant }: TalentTreemapProps = 
     fetchStats()
   }, [])
 
+  // Bloques con count > 0, ordenados por urgencia
+  const blocks = useMemo(() => {
+    if (!stats) return []
+    return QUADRANTS_ORDERED
+      .map(q => ({
+        ...q,
+        count: stats.riskDistribution[q.key] || 0,
+        label: getQuadrantLabel(q.key),
+      }))
+      .filter(q => q.count > 0)
+  }, [stats])
+
+  const totalEnMapa = useMemo(() =>
+    blocks.reduce((sum, b) => sum + b.count, 0),
+    [blocks]
+  )
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -130,93 +115,157 @@ export default function TalentTreemap({ initialQuadrant }: TalentTreemapProps = 
     )
   }
 
-  const totalPersonas = stats.totalPersonas
+  if (blocks.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <p className="text-slate-500 text-sm">
+          No hay personas con matrices de talento calculadas.
+        </p>
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
 
-      {/* Header */}
+      {/* Header — estilo onboarding/inicio */}
       <div>
-        <h3 className="text-xl font-light text-white">
-          Mapa de Talento
+        <h3 className="text-2xl font-light text-white tracking-tight">
+          Mapa de{' '}
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400">
+            Talento
+          </span>
         </h3>
-        <p className="text-sm text-slate-400 mt-1">
-          {totalPersonas} personas clasificadas
-          {stats.alertasCriticas > 0 && (
-            <>
-              <span className="mx-2 text-slate-600">·</span>
-              <span className="text-red-400">{stats.alertasCriticas} alertas criticas</span>
-            </>
-          )}
-          {stats.alertasAltas > 0 && (
-            <>
-              <span className="mx-2 text-slate-600">·</span>
-              <span className="text-orange-400">{stats.alertasAltas} alertas altas</span>
-            </>
-          )}
+        <p className="text-sm text-slate-500 mt-2">
+          {totalEnMapa} personas clasificadas en {blocks.length} cuadrantes
         </p>
       </div>
 
-      {/* Zonas */}
-      {ZONES.map((zone, zi) => {
-        // Contar personas en esta zona
-        const zoneCount = zone.quadrants.reduce(
-          (sum, q) => sum + (stats.riskDistribution[q] || 0), 0
-        )
-        if (zoneCount === 0) return null
+      {/* Divider */}
+      <div className="flex items-center gap-3">
+        <div className="h-px w-12 bg-white/10" />
+        <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+        <div className="h-px flex-1 bg-white/10" />
+      </div>
 
-        return (
+      {/* Treemap proporcional — mosaico 2 filas, expansión in-place */}
+      <AnimatePresence mode="wait">
+        {expandedQuadrant ? (
+          /* EXPANDIDO: 1 bloque ocupa todo */
           <motion.div
-            key={zone.key}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: zi * 0.1 }}
+            key={`expanded-${expandedQuadrant}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
           >
-            {/* Zone label */}
-            <div className="flex items-center gap-3 mb-3">
-              <span className={`text-xs font-medium uppercase tracking-wider ${zone.color}`}>
-                {zone.label}
-              </span>
-              <div className={`flex-1 h-px ${zone.borderColor} border-t`} />
-              <span className="text-xs text-slate-500">{zoneCount} personas</span>
-            </div>
-
-            {/* Quadrant blocks */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {zone.quadrants.map(q => {
-                const config = QUADRANT_CONFIG[q]
-                if (!config) return null
-                const count = stats.riskDistribution[q] || 0
-
-                return (
-                  <QuadrantBlock
-                    key={q}
-                    quadrant={q}
-                    label={getQuadrantLabel(q)}
-                    description={config.description}
-                    actionTypical={config.actionTypical}
-                    color={config.color}
-                    borderColor={config.borderColor}
-                    bgColor={config.bgColor}
-                    count={count}
-                    isExpanded={expandedQuadrant === q}
-                    onToggle={() => setExpandedQuadrant(expandedQuadrant === q ? null : q)}
-                  />
-                )
-              })}
-            </div>
+            {(() => {
+              const block = blocks.find(b => b.key === expandedQuadrant)
+              if (!block) return null
+              return (
+                <QuadrantBlock
+                  quadrant={block.key}
+                  label={block.label}
+                  description={getQuadrantNarrative(block.key)}
+                  actionTypical={block.actionTypical}
+                  color="text-white"
+                  borderColor="border-slate-800/60"
+                  bgColor="bg-slate-900/40"
+                  accentColor={block.accentColor}
+                  count={block.count}
+                  totalInMap={totalEnMapa}
+                  isExpanded={true}
+                  onToggle={() => setExpandedQuadrant(null)}
+                />
+              )
+            })()}
           </motion.div>
-        )
-      })}
+        ) : (
+          /* COLAPSADO: mosaico proporcional de 2 filas */
+          <motion.div
+            key="treemap-grid"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="flex flex-col gap-3"
+          >
+            {(() => {
+              // Ordenar por count desc para layout de mosaico
+              const sorted = [...blocks].sort((a, b) => b.count - a.count)
+              // Fila 1: el más grande solo (domina)
+              const row1 = sorted[0] ? [sorted[0]] : []
+              // Fila 2: el resto, proporcional entre sí
+              const row2 = sorted.slice(1)
 
-      {/* Empty state */}
-      {totalPersonas === 0 && (
-        <div className="text-center py-16">
-          <p className="text-slate-500 text-sm">
-            No hay personas con matrices de talento calculadas.
-          </p>
-        </div>
-      )}
+              return (
+                <>
+                  {/* Fila 1: bloque dominante, ancho completo */}
+                  {row1.map((block, i) => (
+                    <motion.div
+                      key={block.key}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0 }}
+                    >
+                      <QuadrantBlock
+                        quadrant={block.key}
+                        label={block.label}
+                        description={getQuadrantNarrative(block.key)}
+                        actionTypical={block.actionTypical}
+                        color="text-white"
+                        borderColor="border-slate-800/60"
+                        bgColor="bg-slate-900/40"
+                        accentColor={block.accentColor}
+                        count={block.count}
+                        totalInMap={totalEnMapa}
+                        isExpanded={false}
+                        onToggle={() => setExpandedQuadrant(block.key)}
+                      />
+                    </motion.div>
+                  ))}
+
+                  {/* Fila 2: resto, flex proporcional, altura fija igual */}
+                  {row2.length > 0 && (
+                    <div className="flex gap-3 items-stretch overflow-hidden">
+                      {row2.map((block, i) => {
+                        // Compacto si ocupa menos del 10% del total
+                        const isCompact = block.count / totalEnMapa < 0.1
+                        return (
+                          <motion.div
+                            key={block.key}
+                            initial={{ opacity: 0, y: 15 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: (i + 1) * 0.06 }}
+                            style={{ flex: Math.max(block.count, 1) }}
+                            className="min-w-0"
+                          >
+                            <QuadrantBlock
+                              quadrant={block.key}
+                              label={block.label}
+                              description={getQuadrantNarrative(block.key)}
+                              actionTypical={block.actionTypical}
+                              color="text-white"
+                              borderColor="border-slate-800/60"
+                              bgColor="bg-slate-900/40"
+                              accentColor={block.accentColor}
+                              count={block.count}
+                              totalInMap={totalEnMapa}
+                              compact={isCompact}
+                              isExpanded={false}
+                              onToggle={() => setExpandedQuadrant(block.key)}
+                            />
+                          </motion.div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

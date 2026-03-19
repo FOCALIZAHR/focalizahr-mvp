@@ -22,7 +22,7 @@ export function getPortadaNarrative(data: CalibrationData): PortadaNarrative {
       highlight: diagnostic.short,
       suffix: ` en ${alert.entityName}.`,
       ctaLabel: 'Revisar Evaluadores',
-      ctaVariant: alert.biasType === 'SEVERA' ? 'red' : 'amber',
+      ctaVariant: 'cyan',
       coachingTip: diagnostic.body
     }
   }
@@ -34,7 +34,7 @@ export function getPortadaNarrative(data: CalibrationData): PortadaNarrative {
       highlight: `${integrity.score}% de integridad`,
       suffix: '. ' + integrity.narrative,
       ctaLabel: 'Ver Detalles',
-      ctaVariant: 'red',
+      ctaVariant: 'cyan',
       coachingTip: integrity.penalties.variance?.reason || integrity.penalties.bias?.reason
         || 'Integridad < 50% indica que los datos no son aptos para decisiones de promoción o bono.'
     }
@@ -47,7 +47,7 @@ export function getPortadaNarrative(data: CalibrationData): PortadaNarrative {
       highlight: `${integrity.score}% de integridad`,
       suffix: '. ' + integrity.narrative,
       ctaLabel: 'Revisar Sesgos',
-      ctaVariant: 'amber',
+      ctaVariant: 'cyan',
       coachingTip: integrity.penalties.bias?.reason || integrity.penalties.variance?.reason
         || 'Revisa los sesgos detectados antes de ejecutar presupuesto.'
     }

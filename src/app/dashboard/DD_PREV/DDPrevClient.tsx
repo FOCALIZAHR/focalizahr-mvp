@@ -608,7 +608,7 @@ function SimuladorConversacion({
                 >
                   <div className="flex items-center gap-3">
                     <span className="fhr-accordion-icon text-lg">⚠️</span>
-                    <span className="fhr-subtitle text-sm">{p.pregunta}</span>
+                    <span className="fhr-subtitle text-sm">{p.q}</span>
                   </div>
                   <motion.div
                     animate={{ rotate: preguntaAbierta === idx ? 180 : 0 }}
@@ -628,7 +628,7 @@ function SimuladorConversacion({
                     >
                       <div className="fhr-accordion-content p-4">
                         <div className="fhr-body text-sm leading-relaxed">
-                          {p.respuesta}
+                          {p.a}
                         </div>
                       </div>
                     </motion.div>

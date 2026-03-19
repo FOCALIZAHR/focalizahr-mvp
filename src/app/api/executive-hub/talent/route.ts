@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { extractUserContext, getChildDepartmentIds } from '@/lib/services/AuthorizationService'
 import { PerformanceRatingService } from '@/lib/services/PerformanceRatingService'
 import { prisma } from '@/lib/prisma'
+import { getOrgCompetencyGaps } from '@/lib/services/CompetencyScoreService'
 
 const GLOBAL_ROLES = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_MANAGER', 'HR_ADMIN', 'CEO']
 
@@ -151,99 +152,37 @@ async function getOrgDNA(
   accountId: string,
   departmentIds?: string[]
 ) {
-  // Query: ratings con roleFitScore, para luego agregar competency gaps
-  const where: any = {
-    cycleId,
-    accountId,
-    roleFitScore: { not: null },
-    employee: {
-      status: 'ACTIVE',
-      standardJobLevel: { not: null }
-    }
-  }
+  // Gaps REALES: score_real - target_esperado via CompetencyScoreService
+  const orgGaps = await getOrgCompetencyGaps(cycleId, accountId, departmentIds)
 
-  if (departmentIds?.length) {
-    where.employee.departmentId = { in: departmentIds }
-  }
-
-  // Obtener empleados con sus competency targets
-  const ratings = await prisma.performanceRating.findMany({
-    where,
-    select: {
-      employeeId: true,
-      employee: {
-        select: { standardJobLevel: true }
-      }
-    },
-    take: 200 // Limitar para performance
-  })
-
-  if (ratings.length === 0) {
+  if (orgGaps.length === 0) {
     return { topStrength: null, topDevelopment: null, insight: null }
   }
 
-  // Obtener los standardJobLevels únicos
-  const levels = [...new Set(ratings.map((r: typeof ratings[number]) => r.employee.standardJobLevel).filter(Boolean))] as string[]
+  // Fortaleza = gap positivo más alto (gente SUPERA lo que se les pide)
+  // Oportunidad = gap negativo más severo (gente FALLA respecto al target)
+  const sorted = [...orgGaps].sort((a, b) => b.gap - a.gap)
+  const best = sorted[0]
+  const worst = sorted[sorted.length - 1]
 
-  // Obtener targets para esos niveles
-  const targets = await prisma.competencyTarget.findMany({
-    where: {
-      accountId,
-      standardJobLevel: { in: levels },
-      targetScore: { not: null }
-    },
-    select: {
-      competencyCode: true,
-      standardJobLevel: true,
-      targetScore: true
-    }
-  })
+  // avgTarget ahora es el SCORE REAL (actual), no el target
+  // Solo es fortaleza real si gap > 0 (la gente SUPERA el target, no solo iguala)
+  const topStrength = best && best.gap > 0
+    ? { competency: best.competencyName, avgTarget: best.actual, expected: best.expected, gap: best.gap }
+    : null
 
-  // Obtener competencias para nombres
-  const competencyCodes = [...new Set(targets.map((t: { competencyCode: string }) => t.competencyCode))]
-  const competencies = await prisma.competency.findMany({
-    where: {
-      accountId,
-      code: { in: competencyCodes },
-      isActive: true
-    },
-    select: { code: true, name: true }
-  })
-  const compNameMap = new Map(competencies.map((c: { code: string; name: string }) => [c.code, c.name]))
+  const topDevelopment = worst && worst.gap < 0
+    ? { competency: worst.competencyName, avgTarget: worst.actual, expected: worst.expected, gap: worst.gap }
+    : null
 
-  // Agregar targets por competency (promedio de todos los levels)
-  const targetByComp = new Map<string, { totalTarget: number; count: number }>()
-  for (const t of targets) {
-    if (!t.targetScore) continue
-    const existing = targetByComp.get(t.competencyCode) || { totalTarget: 0, count: 0 }
-    existing.totalTarget += t.targetScore
-    existing.count++
-    targetByComp.set(t.competencyCode, existing)
+  let insight: string | null = null
+  if (topStrength && topDevelopment) {
+    insight = `Fortaleza en "${topStrength.competency}" (${best.actual} vs ${best.expected} esperado). Oportunidad: "${topDevelopment.competency}" (${worst.actual} vs ${worst.expected} esperado).`
+  } else if (!topStrength && topDevelopment) {
+    insight = `Ninguna competencia supera el estandar aun. La brecha mas urgente: "${topDevelopment.competency}" (${worst.actual} vs ${worst.expected} esperado).`
+  } else if (topStrength && !topDevelopment) {
+    insight = `Tu organizacion supera lo esperado en "${topStrength.competency}" (${best.actual} vs ${best.expected} esperado). Sin brechas criticas.`
   }
-
-  // Calcular promedio target por competencia
-  const avgTargets = Array.from(targetByComp.entries()).map(([code, data]) => ({
-    code,
-    name: compNameMap.get(code) || code,
-    avgTarget: data.totalTarget / data.count
-  }))
-
-  // Retornar top fortaleza (mayor target = más exigido y cumplido)
-  // y top desarrollo (menor target promedio relativo a lo esperado)
-  // Simplificación: ordenar por avgTarget desc/asc
-  const sorted = avgTargets.sort((a, b) => b.avgTarget - a.avgTarget)
-
-  const topStrength = sorted.length > 0
-    ? { competency: sorted[0].name, avgTarget: Math.round(sorted[0].avgTarget * 10) / 10 }
-    : null
-
-  const topDevelopment = sorted.length > 1
-    ? { competency: sorted[sorted.length - 1].name, avgTarget: Math.round(sorted[sorted.length - 1].avgTarget * 10) / 10 }
-    : null
-
-  const insight = topStrength && topDevelopment
-    ? `Fortaleza en "${topStrength.competency}". Area de desarrollo: "${topDevelopment.competency}"`
-    : null
 
   return { topStrength, topDevelopment, insight }
 }

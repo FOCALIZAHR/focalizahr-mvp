@@ -90,16 +90,10 @@ export const InsightSpotlightCard = memo(function InsightSpotlightCard({
       transition={{ type: 'spring', stiffness: 220, damping: 30 }}
       className="w-full max-w-5xl"
     >
-      <div className="bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[24px] shadow-2xl flex flex-col md:flex-row relative overflow-hidden">
+      <div className="bg-slate-950/90 backdrop-blur-2xl border border-slate-800/50 rounded-[24px] shadow-2xl flex flex-col md:flex-row relative overflow-hidden">
 
         {/* Tesla line */}
-        <div
-          className="absolute top-0 left-0 right-0 h-[1px] z-20"
-          style={{
-            background: 'linear-gradient(90deg, transparent, #22D3EE, transparent)',
-            boxShadow: '0 0 15px #22D3EE'
-          }}
-        />
+        <div className="fhr-top-line absolute top-0 left-0 right-0 z-20" />
 
         {/* Back button */}
         <button
@@ -109,21 +103,21 @@ export const InsightSpotlightCard = memo(function InsightSpotlightCard({
           <ArrowLeft className="w-3 h-3" /> Dashboard
         </button>
 
-        {/* LEFT COLUMN: Summary (30%) */}
-        <div className="w-full md:w-[260px] md:flex-shrink-0 bg-slate-900/50 p-8 pt-14 flex flex-col items-center border-b md:border-b-0 md:border-r border-slate-800">
-          <div className={cn('w-14 h-14 rounded-2xl flex items-center justify-center mb-4', 'bg-slate-800/80')}>
+        {/* LEFT COLUMN: Summary (30%) — Apple breathing room */}
+        <div className="w-full md:w-[260px] md:flex-shrink-0 bg-slate-900/30 p-8 pt-14 flex flex-col items-center border-b md:border-b-0 md:border-r border-slate-800/40">
+          <div className={cn('w-14 h-14 rounded-2xl flex items-center justify-center mb-4', 'bg-slate-800/50 backdrop-blur-sm')}>
             <Icon className={cn('w-7 h-7', meta.color)} />
           </div>
 
-          <h2 className="text-lg font-bold text-white text-center mb-1">{meta.title}</h2>
+          <h2 className="text-lg font-light text-white text-center mb-1 tracking-tight">{meta.title}</h2>
           <p className="text-xs text-slate-500 text-center mb-6">{meta.description}</p>
 
           {/* Quick stats */}
           <QuickStats type={type} summary={summary} />
         </div>
 
-        {/* RIGHT COLUMN: Detail (70%) */}
-        <div className="flex-1 p-5 pt-14 md:pt-6">
+        {/* RIGHT COLUMN: Detail (70%) — generous padding */}
+        <div className="flex-1 p-6 md:p-8 pt-14 md:pt-8 overflow-y-auto">
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="w-8 h-8 text-slate-600 animate-spin" />
@@ -150,16 +144,16 @@ function QuickStats({ type, summary }: { type: InsightType; summary: SummaryData
     case 'alertas':
       return (
         <div className="space-y-3 w-full">
-          <StatRow label="Total" value={`${summary.alertas.total}`} />
-          <StatRow label="Críticas (RED)" value={`${summary.alertas.critical}`} color="text-red-400" />
-          <StatRow label="Altas (ORANGE)" value={`${summary.alertas.high}`} color="text-amber-400" />
+          <StatRow label="Total" value={`${summary.alertas.total}`} tooltip="Situaciones activas que requieren intervención en tu organización." />
+          <StatRow label="Críticas" value={`${summary.alertas.critical}`} color="text-red-400" tooltip="Alertas RED: riesgo de fuga inminente o bajo rendimiento severo. Actuar en 24-48h." />
+          <StatRow label="Altas" value={`${summary.alertas.high}`} color="text-amber-400" tooltip="Alertas ORANGE: señales de alerta que requieren seguimiento en 3-5 días." />
         </div>
       )
     case 'talento':
       return (
         <div className="space-y-3 w-full">
-          <StatRow label="Estrellas" value={`${summary.talento.starsPercent}%`} color="text-cyan-400" />
-          <StatRow label="Total evaluados" value={`${summary.talento.totalEmployees}`} />
+          <StatRow label="Estrellas" value={`${summary.talento.starsPercent}%`} color="text-cyan-400" tooltip="Porcentaje con alto desempeño + alto potencial. Sobre 10% es saludable." />
+          <StatRow label="Total evaluados" value={`${summary.talento.totalEmployees}`} tooltip="Personas con matrices de talento calculadas en este ciclo." />
         </div>
       )
     case 'calibracion':
@@ -208,7 +202,7 @@ function QuickStats({ type, summary }: { type: InsightType; summary: SummaryData
 
           {/* Sesgo organizacional - desde integrityScore */}
           {summary.calibracion.biasLabel && (
-            <div className="pt-3 border-t border-slate-700/30">
+            <div className="pt-3 border-t border-slate-700/30 group relative">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] text-slate-500 uppercase tracking-wider">
                   Sesgo detectado
@@ -221,6 +215,20 @@ function QuickStats({ type, summary }: { type: InsightType; summary: SummaryData
                   {summary.calibracion.biasLabel}
                 </span>
               </div>
+
+              {/* Tooltip */}
+              <div className="absolute bottom-full left-0 right-0 mb-2 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 translate-y-1 group-hover:translate-y-0">
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                  {summary.calibracion.biasLabel === 'SEVERA'
+                    ? 'Los evaluadores califican muy bajo. El talento puede estar subvalorado y en riesgo de fuga.'
+                    : summary.calibracion.biasLabel === 'INDULGENTE'
+                      ? 'Los evaluadores califican muy alto. No se distingue quién realmente destaca, comprometiendo promociones y bonos.'
+                      : summary.calibracion.biasLabel === 'CENTRAL'
+                        ? 'Los evaluadores evitan extremos. Se ocultan estrellas y underperformers.'
+                        : 'Evaluaciones calibradas correctamente.'
+                  }
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -229,26 +237,33 @@ function QuickStats({ type, summary }: { type: InsightType; summary: SummaryData
       return (
         <div className="space-y-3 w-full">
           <StatRow label="Role Fit Org" value={`${summary.capacidades.roleFit}%`}
-            color={summary.capacidades.roleFit >= TALENT_INTELLIGENCE_THRESHOLDS.ROLE_FIT_HIGH ? 'text-cyan-400' : 'text-amber-400'} />
-          <StatRow label="Peor capa" value={summary.capacidades.worstLayer || '-'} />
-          <StatRow label="Peor gerencia" value={summary.capacidades.worstGerencia || '-'} />
+            color={summary.capacidades.roleFit >= TALENT_INTELLIGENCE_THRESHOLDS.ROLE_FIT_HIGH ? 'text-cyan-400' : 'text-amber-400'}
+            tooltip={`Que tan alineadas estan las personas con lo que exige su cargo. Sobre ${TALENT_INTELLIGENCE_THRESHOLDS.ROLE_FIT_HIGH}% es saludable.`} />
+          <StatRow label="Peor capa" value={summary.capacidades.worstLayer || '-'} tooltip="La capa organizacional con mayor brecha de capacidades. Prioridad de inversión en desarrollo." />
+          <StatRow label="Peor gerencia" value={summary.capacidades.worstGerencia || '-'} tooltip="La gerencia con menor Role Fit promedio. Revisar brechas de competencias." />
         </div>
       )
     case 'sucesion':
       return (
         <div className="space-y-3 w-full">
-          <StatRow label="Cobertura" value={`${summary.sucesion.coverage}%`} />
-          <StatRow label="Sin cobertura" value={`${summary.sucesion.uncoveredCount}`} />
+          <StatRow label="Cobertura" value={`${summary.sucesion.coverage}%`} tooltip="Porcentaje de roles criticos con al menos un sucesor viable. Sobre 80% es saludable." />
+          <StatRow label="Sin cobertura" value={`${summary.sucesion.uncoveredCount}`} tooltip="Roles criticos sin ningun sucesor preparado. Si el titular sale, no hay reemplazo." />
         </div>
       )
   }
 }
 
-function StatRow({ label, value, color }: { label: string; value: string; color?: string }) {
+function StatRow({ label, value, color, tooltip }: { label: string; value: string; color?: string; tooltip?: string }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="group relative flex items-center justify-between">
       <span className="text-[10px] text-slate-500 uppercase tracking-wider">{label}</span>
-      <span className={cn('text-sm font-bold font-mono', color || 'text-white')}>{value}</span>
+      <span className={cn('text-sm font-medium font-mono', color || 'text-white')}>{value}</span>
+
+      {tooltip && (
+        <div className="absolute bottom-full left-0 right-0 mb-2 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 translate-y-1 group-hover:translate-y-0">
+          <p className="text-[10px] text-slate-400 leading-relaxed">{tooltip}</p>
+        </div>
+      )}
     </div>
   )
 }

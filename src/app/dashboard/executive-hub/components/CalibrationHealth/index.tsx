@@ -41,7 +41,7 @@ export const CalibrationHealth = memo(function CalibrationHealth({
   return (
     <div className="relative">
       {/* Tesla line */}
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent z-10" />
+      <div className="fhr-top-line absolute inset-x-0 top-0 z-10" />
 
       <AnimatePresence mode="wait">
         {view === 'portada' ? (
@@ -72,19 +72,24 @@ export const CalibrationHealth = memo(function CalibrationHealth({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="space-y-3 p-2"
+            className="space-y-4 p-6 md:p-8"
           >
             {/* Header */}
             <div className="flex items-center justify-between">
               <button
                 onClick={() => setView('portada')}
-                className="flex items-center gap-2 text-slate-500 hover:text-white transition-colors text-xs font-medium"
+                className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Volver</span>
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Portada
               </button>
-
-              <div className="flex items-center gap-2">
+              <a
+                href="/dashboard/performance/calibration"
+                className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+              >
+                Gestionar Calibración →
+              </a>
+              <div className="group relative flex items-center gap-2">
                 <div className={cn(
                   'w-2 h-2 rounded-full',
                   (data.integrityScore?.score ?? data.overallConfidence) >= 75 ? 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.6)]' :
@@ -94,6 +99,14 @@ export const CalibrationHealth = memo(function CalibrationHealth({
                 <span className="text-xs text-slate-400">
                   {data.integrityScore?.score ?? data.overallConfidence}% Integridad
                 </span>
+
+                {/* Tooltip */}
+                <div className="absolute bottom-full right-0 mb-2 w-56 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 translate-y-1 group-hover:translate-y-0">
+                  <p className="text-[10px] text-white font-medium mb-1">Integridad de Calibración</p>
+                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                    Mide qué tan confiables son las evaluaciones. Combina completitud, ausencia de sesgos y consistencia entre evaluadores. Sobre 75% es confiable para decisiones de compensación.
+                  </p>
+                </div>
               </div>
             </div>
 
