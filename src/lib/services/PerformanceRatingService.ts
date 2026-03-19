@@ -22,6 +22,7 @@ import {
   AdjustmentType
 } from '@/config/performanceClassification'
 import { TalentIntelligenceService } from './TalentIntelligenceService'
+import { SuccessionService } from './SuccessionService'
 import { getEvaluationClassification, STATUS_CONFIG, type EvaluationStatus } from '@/lib/utils/evaluatorStatsEngine'
 import { RoleFitAnalyzer } from './RoleFitAnalyzer'
 import { GoalsService } from './GoalsService'
@@ -454,6 +455,16 @@ export class PerformanceRatingService {
       }
     }
 
+    // ═══ Sync incumbentFlightRisk en CriticalPositions (datos históricos) ═══
+    try {
+      const synced = await SuccessionService.syncAllIncumbentFlightRisks(accountId)
+      if (synced > 0) {
+        console.log(`[generateRatingsForCycle] Synced incumbentFlightRisk for ${synced} critical positions`)
+      }
+    } catch (err) {
+      console.warn('[generateRatingsForCycle] Flight risk sync failed (non-blocking):', err)
+    }
+
     return result
   }
 
@@ -736,7 +747,7 @@ export class PerformanceRatingService {
 
     console.log('[ratePotential] PERSISTING:', { mobilityQuadrant, riskQuadrant, riskAlertLevel })
 
-    return prisma.performanceRating.update({
+    const result = await prisma.performanceRating.update({
       where: { id: ratingId },
       data: {
         potentialScore: finalScore,
@@ -757,6 +768,23 @@ export class PerformanceRatingService {
         updatedAt: new Date()
       }
     })
+
+    // ═══ Sync incumbentFlightRisk en CriticalPosition ═══
+    if (riskQuadrant || riskAlertLevel) {
+      const flightRisk = SuccessionService.deriveFlightRisk(riskQuadrant, riskAlertLevel)
+      const positions = await prisma.criticalPosition.findMany({
+        where: { incumbentId: rating.employeeId, accountId: rating.accountId, isActive: true },
+        select: { id: true },
+      })
+      if (positions.length > 0) {
+        await prisma.criticalPosition.updateMany({
+          where: { id: { in: positions.map(p => p.id) } },
+          data: { incumbentFlightRisk: flightRisk },
+        })
+      }
+    }
+
+    return result
   }
 
   /**
@@ -1479,6 +1507,8 @@ export class PerformanceRatingService {
     const rating = await prisma.performanceRating.findUnique({
       where: { id: ratingId },
       select: {
+        employeeId: true,
+        accountId: true,
         roleFitScore: true,
         potentialAspiration: true,
         potentialEngagement: true
@@ -1504,6 +1534,23 @@ export class PerformanceRatingService {
         talentAnalyzedAt: new Date()
       }
     })
+
+    // ═══ Sync incumbentFlightRisk en CriticalPosition ═══
+    const rq = talentResult.risk.quadrant
+    const ral = talentResult.risk.alertLevel
+    if (rq || ral) {
+      const flightRisk = SuccessionService.deriveFlightRisk(rq, ral)
+      const positions = await prisma.criticalPosition.findMany({
+        where: { incumbentId: rating.employeeId, accountId: rating.accountId, isActive: true },
+        select: { id: true },
+      })
+      if (positions.length > 0) {
+        await prisma.criticalPosition.updateMany({
+          where: { id: { in: positions.map(p => p.id) } },
+          data: { incumbentFlightRisk: flightRisk },
+        })
+      }
+    }
 
     return {
       mobilityQuadrant: talentResult.mobility.quadrant,

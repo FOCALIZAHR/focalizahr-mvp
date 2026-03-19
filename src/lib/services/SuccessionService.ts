@@ -109,10 +109,48 @@ export interface SuggestedCandidate {
 
 export class SuccessionService {
 
-  private static deriveFlightRisk(riskQuadrant: string | null | undefined, riskAlertLevel: string | null | undefined): string | null {
+  static deriveFlightRisk(riskQuadrant: string | null | undefined, riskAlertLevel: string | null | undefined): 'HIGH' | 'MEDIUM' | 'LOW' | null {
     if (riskQuadrant === 'FUGA_CEREBROS') return 'HIGH'
     if (riskAlertLevel === 'RED' || riskAlertLevel === 'ORANGE') return 'MEDIUM'
+    if (riskAlertLevel) return 'LOW'
     return null
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // syncAllIncumbentFlightRisks: Sync masivo para datos históricos con null
+  // ──────────────────────────────────────────────────────────────────────────
+
+  static async syncAllIncumbentFlightRisks(accountId: string): Promise<number> {
+    const positions = await prisma.criticalPosition.findMany({
+      where: { accountId, isActive: true, incumbentId: { not: null } }
+    })
+
+    let updated = 0
+    for (const pos of positions) {
+      const rating = await prisma.performanceRating.findFirst({
+        where: {
+          employeeId: pos.incumbentId!,
+          accountId,
+          riskAlertLevel: { not: null },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { riskQuadrant: true, riskAlertLevel: true },
+      })
+
+      const flightRisk = this.deriveFlightRisk(
+        rating?.riskQuadrant ?? null,
+        rating?.riskAlertLevel ?? null
+      )
+
+      if (flightRisk !== pos.incumbentFlightRisk) {
+        await prisma.criticalPosition.update({
+          where: { id: pos.id },
+          data: { incumbentFlightRisk: flightRisk },
+        })
+        updated++
+      }
+    }
+    return updated
   }
 
   // ──────────────────────────────────────────────────────────────────────────
