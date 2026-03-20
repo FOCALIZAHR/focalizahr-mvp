@@ -18,6 +18,7 @@ import {
   Link2, UserX, Target, Sparkles, ArrowLeft, X, Users, Loader2,
 } from 'lucide-react'
 import FocalizaIntelligenceModal from '@/components/ui/FocalizaIntelligenceModal'
+import { PanelPortada } from '@/app/dashboard/executive-hub/components/PanelPortada'
 import type { VulnerabilityRow } from '@/config/successionNarratives'
 import { formatDisplayName, toTitleCase } from '@/lib/utils/formatName'
 
@@ -231,48 +232,51 @@ export default function SuccessionDemoPage() {
   const noBench = useMemo(() => DATA.filter(p => p.bench === 'NONE' || p.bench === 'WEAK'), [DATA])
   const selectedPos = DATA.find(p => p.id === selectedId) || null
 
-  // Portada: pick the most actionable insight
+  // Portada: patrón PanelPortada — highlight + suffix + ctaVariant + coachingTip
   const portada = useMemo(() => {
     if (criticals.length > 0) {
       return {
-        highlight: `${criticals.length} posición${criticals.length > 1 ? 'es' : ''}`,
-        highlightColor: 'text-red-400',
-        subtitle: 'en emergencia',
-        narrative: criticals.length >= 2
-          ? `${criticals[0].title} y ${criticals[1].title} tienen titular en riesgo de fuga y banco vacío.`
-          : `${criticals[0].title} tiene titular en riesgo de fuga y banco vacío. Si sale, no hay reemplazo.`,
+        highlight: `${criticals.length} cargo${criticals.length > 1 ? 's' : ''} crítico${criticals.length > 1 ? 's' : ''}`,
+        suffix: ` sin red de seguridad. Si ${criticals.length > 1 ? 'algún titular sale' : `${criticals[0].incumbent} sale`}, no hay reemplazo.`,
+        ctaLabel: 'Ver exposición',
+        ctaVariant: 'red' as const,
+        coachingTip: 'Emergencia = titular con señales de fuga + banco vacío. Cada semana sin actuar reduce la ventana de retención.',
       }
     }
     if (dominoOpen.length > 0) {
       return {
-        highlight: `${dominoOpen.length} dominó${dominoOpen.length > 1 ? 's' : ''}`,
-        highlightColor: 'text-amber-400',
-        subtitle: dominoOpen.length > 1 ? 'abiertos' : 'abierto',
-        narrative: `Promover un sucesor deja ${dominoOpen.length > 1 ? 'otros cargos' : 'otro cargo'} sin cobertura confirmada. Resolver antes de mover piezas.`,
+        highlight: `${dominoOpen.length} cargo${dominoOpen.length > 1 ? 's' : ''} crítico${dominoOpen.length > 1 ? 's' : ''}`,
+        suffix: ` quedaría${dominoOpen.length > 1 ? 'n' : ''} expuesto${dominoOpen.length > 1 ? 's' : ''} si promueves a tus mejores candidatos hoy.`,
+        ctaLabel: 'Ver exposición',
+        ctaVariant: 'amber' as const,
+        coachingTip: 'El efecto dominó ocurre cuando promover un sucesor deja su cargo actual sin cobertura confirmada.',
       }
     }
     if (urgents.length > 0) {
       return {
-        highlight: `${urgents.length} posición${urgents.length > 1 ? 'es' : ''}`,
-        highlightColor: 'text-amber-400',
-        subtitle: urgents.length > 1 ? 'requieren acción' : 'requiere acción',
-        narrative: `Titulares con señales de riesgo. El banco existe pero la ventana de acción se reduce.`,
+        highlight: `${urgents.length} cargo${urgents.length > 1 ? 's' : ''}`,
+        suffix: ` con titulares en riesgo. El banco existe pero la ventana de acción se reduce cada semana.`,
+        ctaLabel: 'Ver mapa de riesgo',
+        ctaVariant: 'amber' as const,
+        coachingTip: 'Titulares con señales de riesgo medio o alto. Prioriza las posiciones donde el banco es más débil.',
       }
     }
     if (needsAttention.length > 0 || noBench.length > 0) {
       const count = needsAttention.length || noBench.length
       return {
-        highlight: `${count} posición${count > 1 ? 'es' : ''}`,
-        highlightColor: 'text-blue-400',
-        subtitle: 'sin candidatos',
-        narrative: `Posiciones críticas sin sucesores identificados. Búsqueda activa necesaria.`,
+        highlight: `${count} posición${count > 1 ? 'es' : ''} crítica${count > 1 ? 's' : ''}`,
+        suffix: ` sin sucesores identificados. Necesitan búsqueda activa.`,
+        ctaLabel: 'Ver posiciones',
+        ctaVariant: 'cyan' as const,
+        coachingTip: 'Posiciones sin candidatos en el pipeline. Iniciar búsqueda interna o externa.',
       }
     }
     return {
-      highlight: 'Pipeline protegido',
-      highlightColor: 'text-emerald-400',
-      subtitle: '',
-      narrative: `${DATA.length} posiciones críticas cubiertas. Tu organización puede absorber movimientos sin impacto operativo.`,
+      highlight: `${DATA.length} posiciones cubiertas`,
+      suffix: `. Tu organización puede absorber movimientos sin impacto operativo.`,
+      ctaLabel: 'Ver continuidad',
+      ctaVariant: 'cyan' as const,
+      coachingTip: 'Pipeline saludable. Mantén el monitoreo activo — los pipelines se degradan si no se alimentan.',
     }
   }, [criticals, urgents, needsAttention, dominoOpen, noBench, DATA.length])
 
@@ -319,78 +323,26 @@ export default function SuccessionDemoPage() {
         <AnimatePresence mode="wait">
 
           {/* ══════════════════════════════════════════════ */}
-          {/* PORTADA — menciona las 2 posiciones críticas  */}
+          {/* PORTADA — patrón PanelPortada (CalibrationHealth) */}
           {/* ══════════════════════════════════════════════ */}
           {view === 'portada' && (
             <motion.div
               key="portada"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="min-h-screen flex flex-col items-center justify-center text-center py-16"
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
             >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.85 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.08, type: 'spring', stiffness: 180 }}
-                className="w-14 h-14 rounded-2xl bg-slate-900/50 backdrop-blur-sm border border-slate-700/30 flex items-center justify-center mb-10"
-              >
-                <Crown className="w-6 h-6 text-amber-400/70" />
-              </motion.div>
-
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 0.5 }} transition={{ delay: 0.12 }}
-                className="text-[10px] uppercase tracking-[0.3em] text-slate-500 mb-8">
-                Inteligencia de sucesión
-              </motion.p>
-
-              <motion.h1
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.18, type: 'spring', stiffness: 80 }}
-                className="text-[2.5rem] sm:text-5xl font-light leading-[1.15] tracking-tight max-w-md mb-6"
-              >
-                <span className={portada.highlightColor}>{portada.highlight}</span>
-                {portada.subtitle && (
-                  <>
-                    <br />
-                    <span className="text-slate-300/80">{portada.subtitle}</span>
-                  </>
-                )}
-              </motion.h1>
-
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
-                className="text-[13px] text-slate-400 max-w-sm leading-relaxed font-light mb-4">
-                {portada.narrative}
-              </motion.p>
-
-              {dominoOpen.length > 0 && portada.highlightColor !== 'text-amber-400' && (
-                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
-                  className="text-[12px] text-amber-400/70 font-light mb-12">
-                  Además, {dominoOpen.length} cadena{dominoOpen.length > 1 ? 's' : ''} de dominó: mover una pieza deja otra descubierta.
-                </motion.p>
-              )}
-
-              {(dominoOpen.length === 0 || portada.highlightColor === 'text-amber-400') && <div className="mb-12" />}
-
-              <motion.button
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.35 }}
-                whileHover={{ scale: 1.03, y: -2 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => setView('matrix')}
-                className="flex items-center gap-3 px-8 py-3.5 rounded-xl bg-gradient-to-r from-cyan-400 to-cyan-500 text-slate-900 font-medium text-[15px] shadow-[0_10px_30px_-8px_rgba(34,211,238,0.45)]"
-              >
-                Ver mapa de defensa <ChevronRight className="w-4 h-4" />
-              </motion.button>
-
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.6 }} transition={{ delay: 0.5 }}
-                className="mt-14 flex items-start gap-2 max-w-xs text-left">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400/40 flex-shrink-0 mt-0.5" />
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  {DATA.length} posiciones críticas monitoreadas. La matriz cruza riesgo de fuga con cobertura de banco para priorizar acción.
-                </p>
-              </motion.div>
+              <PanelPortada
+                narrative={{
+                  highlight: portada.highlight,
+                  suffix: portada.suffix,
+                }}
+                ctaLabel={portada.ctaLabel}
+                ctaVariant={portada.ctaVariant}
+                onCtaClick={() => setView('matrix')}
+                coachingTip={portada.coachingTip}
+              />
             </motion.div>
           )}
 

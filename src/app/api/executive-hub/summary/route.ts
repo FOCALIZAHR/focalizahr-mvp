@@ -14,6 +14,7 @@ import { TalentIntelligenceService } from '@/lib/services/TalentIntelligenceServ
 import { ExecutiveNarrativeService } from '@/lib/services/ExecutiveNarrativeService'
 import { ManagerVarianceService } from '@/lib/services/ManagerVarianceService'
 import { SuccessionService } from '@/lib/services/SuccessionService'
+import { PLTalentService } from '@/lib/services/PLTalentService'
 import { ACOTADO_LABELS } from '@/lib/services/PositionAdapter'
 import { prisma } from '@/lib/prisma'
 
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch paralelo de todos los datos + star concentration + variance + succession + orgDistribution
-    const [alertsData, nineBoxData, calibrationData, roleFitData, starConcentration, varianceData, successionData, orgDistribution] = await Promise.all([
+    const [alertsData, nineBoxData, calibrationData, roleFitData, starConcentration, varianceData, successionData, orgDistribution, brechaData, semaforoData] = await Promise.all([
       TalentIntelligenceService.getActiveAlerts(cycleId, userContext.accountId, departmentIds),
       PerformanceRatingService.get9BoxData(cycleId, userContext.accountId, departmentIds),
       PerformanceRatingService.getCalibrationStatsByDepartment(cycleId, userContext.accountId, departmentIds),
@@ -64,7 +65,9 @@ export async function GET(request: NextRequest) {
       getStarConcentrationTop(cycleId, userContext.accountId, departmentIds),
       ManagerVarianceService.getVarianceByGerencia(cycleId, userContext.accountId, departmentIds),
       SuccessionService.getSuccessionCoverage(cycleId, userContext.accountId, departmentIds),
-      getOrgDistribution(cycleId, userContext.accountId, departmentIds)
+      getOrgDistribution(cycleId, userContext.accountId, departmentIds),
+      PLTalentService.getBrechaProductiva(cycleId, userContext.accountId, departmentIds),
+      PLTalentService.getSemaforoLegal(cycleId, userContext.accountId, departmentIds),
     ])
 
     // Calcular integrityScore + bias (misma fórmula que /calibration)
@@ -161,6 +164,11 @@ export async function GET(request: NextRequest) {
         sucesion: {
           coverage: successionData.coverage,
           uncoveredCount: successionData.uncoveredCount
+        },
+        plTalento: {
+          totalGapMonthly: brechaData.totalGapMonthly,
+          underperformerCount: semaforoData.totalPeople,
+          totalLiability: semaforoData.totalLiability
         }
       }
     })

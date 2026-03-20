@@ -11,7 +11,7 @@ import { useState, useEffect, useCallback } from 'react'
 // TYPES
 // ════════════════════════════════════════════════════════════════════════════
 
-export type InsightType = 'alertas' | 'talento' | 'calibracion' | 'capacidades' | 'sucesion'
+export type InsightType = 'alertas' | 'talento' | 'calibracion' | 'capacidades' | 'sucesion' | 'pl-talento'
 
 export interface ExecutiveNarrative {
   headline: string
@@ -28,6 +28,7 @@ export interface SummaryData {
   calibracion: { confidence: number; biasType: string | null; biasLabel: string | null; integrityLevel: string; worstStatus: string | null; worstStatusLabel: string | null }
   capacidades: { roleFit: number; worstLayer: string; worstGerencia: string }
   sucesion: { coverage: number; uncoveredCount: number }
+  plTalento: { totalGapMonthly: number; underperformerCount: number; totalLiability: number }
 }
 
 export interface ExecutiveHubState {
@@ -165,7 +166,8 @@ export function useExecutiveHubData(): ExecutiveHubState {
       talento: 'talent',
       calibracion: 'calibration',
       capacidades: 'capabilities',
-      sucesion: 'succession'
+      sucesion: 'succession',
+      'pl-talento': 'pl-talent'
     }
 
     try {

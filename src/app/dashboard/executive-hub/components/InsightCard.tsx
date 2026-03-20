@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { TALENT_INTELLIGENCE_THRESHOLDS } from '@/config/performanceClassification'
 
 const ROLE_FIT_HIGH = TALENT_INTELLIGENCE_THRESHOLDS.ROLE_FIT_HIGH
-import { AlertTriangle, Users, BarChart3, Zap, Target } from 'lucide-react'
+import { AlertTriangle, Users, BarChart3, Zap, Target, DollarSign } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { InsightType, SummaryData } from '@/hooks/useExecutiveHubData'
 
@@ -24,7 +24,8 @@ const INSIGHT_ICONS: Record<InsightType, typeof AlertTriangle> = {
   talento: Users,
   calibracion: BarChart3,
   capacidades: Zap,
-  sucesion: Target
+  sucesion: Target,
+  'pl-talento': DollarSign
 }
 
 const INSIGHT_LABELS: Record<InsightType, string> = {
@@ -32,7 +33,8 @@ const INSIGHT_LABELS: Record<InsightType, string> = {
   talento: 'Talento',
   calibracion: 'Calibracion',
   capacidades: 'Capacidades',
-  sucesion: 'Sucesion'
+  sucesion: 'Sucesion',
+  'pl-talento': 'P&L Talento'
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -61,6 +63,10 @@ function getDotStatus(type: InsightType, summary: SummaryData): DotStatus {
     case 'sucesion':
       if (summary.sucesion.coverage < 50) return 'red'
       if (summary.sucesion.uncoveredCount > 0) return 'cyan'
+      return 'none'
+    case 'pl-talento':
+      if (summary.plTalento?.underperformerCount > 0) return 'red'
+      if (summary.plTalento?.totalGapMonthly > 0) return 'purple'
       return 'none'
   }
 }
@@ -154,6 +160,22 @@ function getInsightNarrative(type: InsightType, summary: SummaryData): { text: s
       return {
         text: 'Disponible proximamente',
         tooltip: 'Modulo de sucesion en preparacion'
+      }
+    }
+    case 'pl-talento': {
+      const pl = summary.plTalento
+      if (!pl) return { text: 'Sin datos', tooltip: 'Datos de P&L no disponibles' }
+      if (pl.underperformerCount > 0) return {
+        text: `${pl.underperformerCount} en zona legal`,
+        tooltip: `Exposicion acumulada de $${Math.round(pl.totalLiability / 1000)}K`
+      }
+      if (pl.totalGapMonthly > 0) return {
+        text: 'Brecha productiva activa',
+        tooltip: `$${Math.round(pl.totalGapMonthly / 1000)}K/mes en brecha`
+      }
+      return {
+        text: 'Sin alertas financieras',
+        tooltip: 'Todos los colaboradores dentro del estandar'
       }
     }
   }

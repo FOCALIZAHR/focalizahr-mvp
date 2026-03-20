@@ -2,7 +2,7 @@
 
 import { memo } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, AlertTriangle, Users, BarChart3, Zap, Target, Loader2 } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, Users, BarChart3, Zap, Target, DollarSign, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TALENT_INTELLIGENCE_THRESHOLDS } from '@/config/performanceClassification'
 import { AlertsPanel } from './AlertsPanel'
@@ -10,6 +10,7 @@ import { TalentMini9Box } from './TalentMini9Box'
 import { CalibrationHealth } from './CalibrationHealth'
 import { RoleFitMatrix } from './RoleFitMatrix'
 import { SuccessionPanel } from './SuccessionPanel'
+import { PLTalent } from './PLTalent'
 import type { InsightType, SummaryData } from '@/hooks/useExecutiveHubData'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -51,6 +52,12 @@ const INSIGHT_META: Record<InsightType, {
     title: 'Pipeline de Sucesión',
     color: 'text-amber-400',
     description: 'Cobertura de roles críticos'
+  },
+  'pl-talento': {
+    icon: DollarSign,
+    title: 'P&L del Talento',
+    color: 'text-purple-400',
+    description: 'Impacto financiero del talento'
   }
 }
 
@@ -250,6 +257,18 @@ function QuickStats({ type, summary }: { type: InsightType; summary: SummaryData
           <StatRow label="Sin cobertura" value={`${summary.sucesion.uncoveredCount}`} tooltip="Roles criticos sin ningun sucesor preparado. Si el titular sale, no hay reemplazo." />
         </div>
       )
+    case 'pl-talento': {
+      const pl = summary.plTalento
+      if (!pl) return null
+      const fmtK = (n: number) => n >= 1_000_000 ? `$${Math.round(n / 100_000) / 10}M` : `$${Math.round(n / 1_000)}K`
+      return (
+        <div className="space-y-3 w-full">
+          <StatRow label="Brecha/mes" value={fmtK(pl.totalGapMonthly)} color={pl.totalGapMonthly > 0 ? 'text-purple-400' : 'text-slate-400'} tooltip="Costo mensual de la brecha productiva (personas con Role Fit < 75%)." />
+          <StatRow label="Zona legal" value={`${pl.underperformerCount}`} color={pl.underperformerCount > 0 ? 'text-red-400' : 'text-slate-400'} tooltip="Personas con bajo rendimiento clasificado. Exposicion legal creciente." />
+          <StatRow label="Exposicion" value={fmtK(pl.totalLiability)} tooltip="Total acumulado en finiquitos si se desvinculan hoy." />
+        </div>
+      )
+    }
   }
 }
 
@@ -287,5 +306,7 @@ function DetailContent({ type, data, cycleId, userRole, onSelectGerencia }: {
       return <RoleFitMatrix data={data} cycleId={cycleId || undefined} />
     case 'sucesion':
       return <SuccessionPanel data={data} />
+    case 'pl-talento':
+      return <PLTalent data={data} />
   }
 }
