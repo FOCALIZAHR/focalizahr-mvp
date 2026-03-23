@@ -636,8 +636,9 @@ export class TalentActionService {
     if (data.roleFitPromedio >= 75 && data.fugaCerebrosPercent > 30 && data.sucesoresEnPlan < 2) {
       return 'FRAGIL'
     }
-    // 2. QUEMADA
-    if (data.burnoutPercent > 35 && data.tenureMediana > 6) {
+    // 2. QUEMADA — tenureMediana alineada con tramo A1 (<12 meses = onboarding)
+    // Antes: > 6. Actualizado 2026-03-22 para coherencia con classifyTenure().
+    if (data.burnoutPercent > 35 && data.tenureMediana > 12) {
       return 'QUEMADA'
     }
     // 3. ESTANCADA
@@ -678,8 +679,12 @@ export class TalentActionService {
     return Math.max(0, months)
   }
 
+  // NOTE: Primer tramo actualizado de <6 a <12 meses (2026-03-22).
+  // El tramo superior (>36) se mantiene para proteger patrones QUEMADA/ESTANCADA.
+  // Pendiente: evaluar bajar >36 a >24 cuando se construyan los motores v2.
+  // RESUELTO: patrón QUEMADA ya usa tenureMediana > 12 (línea ~641), alineado con classifyTenure().
   static classifyTenure(months: number): TenureSegment {
-    if (months < 6) return 'onboarding'
+    if (months < 12) return 'onboarding'
     if (months <= 36) return 'real'
     return 'cronico'
   }

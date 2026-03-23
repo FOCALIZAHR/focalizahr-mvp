@@ -307,6 +307,6 @@ function DetailContent({ type, data, cycleId, userRole, onSelectGerencia }: {
     case 'sucesion':
       return <SuccessionPanel data={data} />
     case 'pl-talento':
-      return <PLTalent data={data} />
+      return <PLTalent data={data} cycleId={cycleId || undefined} />
   }
 }

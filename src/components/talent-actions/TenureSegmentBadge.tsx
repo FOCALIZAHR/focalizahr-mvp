@@ -1,7 +1,8 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// TENURE SEGMENT BADGE — onboarding < 6m / real 6m-3a / cronico > 3a
+// TENURE SEGMENT BADGE — onboarding < 12m / real 12m-3a / cronico > 3a
+// NOTE: Primer tramo actualizado de <6 a <12 meses (2026-03-22).
 // ════════════════════════════════════════════════════════════════════════════
 
 import { memo, useState } from 'react'

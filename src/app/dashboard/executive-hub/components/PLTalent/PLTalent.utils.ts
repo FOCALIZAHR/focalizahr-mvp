@@ -15,25 +15,30 @@ import type { PLTalentData, PLTalentPortadaNarrative } from './PLTalent.types'
 export function getPortadaNarrative(data: PLTalentData): PLTalentPortadaNarrative {
   const { brecha, semaforo } = data
 
-  // PRIORIDAD 1: Personas en zona legal
-  if (semaforo.totalPeople > 0) {
+  // PRIORIDAD 1: Hay brecha (con o sin zona legal)
+  if (brecha.totalPeople > 0) {
+    const legalSuffix = semaforo.totalPeople > 0
+      ? ` ${semaforo.totalPeople} llevan tanto tiempo bajo el estándar que mantenerlos ya cuesta más que actuar.`
+      : ''
+
     return {
-      highlight: `${semaforo.totalPeople} persona${semaforo.totalPeople > 1 ? 's' : ''}`,
-      suffix: ` en zona legal con ${formatCurrency(semaforo.totalLiability)} acumulado en exposición. La inacción tiene un costo que crece cada mes.`,
-      ctaLabel: 'Ver impacto financiero',
+      prefix: `Evaluamos a ${brecha.totalEvaluated} personas contra las expectativas reales de sus cargos. `,
+      highlight: `${brecha.totalPeople} no cumplen con el mínimo.`,
+      suffix: ` Eso tiene un costo: ${formatCurrency(brecha.totalGapMonthly)}/mes en productividad que pagas pero no recibes.${legalSuffix}`,
+      ctaLabel: 'Ver dónde está el problema',
       ctaVariant: 'cyan',
-      coachingTip: `Cada mes sin actuar suma ${formatCurrency(semaforo.monthlyGrowth)} a la exposición. No es una decisión de RRHH — es una decisión financiera.`,
+      coachingTip: `Equivalente a ${brecha.fteLoss} personas a tiempo completo cobrando sin retorno productivo.`,
     }
   }
 
-  // PRIORIDAD 2: Brecha productiva
-  if (brecha.totalPeople > 0) {
+  // PRIORIDAD 2: Solo zona legal (sin brecha)
+  if (semaforo.totalPeople > 0) {
     return {
-      highlight: formatCurrency(brecha.totalGapMonthly) + '/mes',
-      suffix: ` en brecha productiva. ${brecha.totalPeople} de ${brecha.totalEvaluated} personas no alcanzan el estándar de su cargo.`,
-      ctaLabel: 'Ver brecha por área',
+      highlight: `${semaforo.totalPeople} persona${semaforo.totalPeople > 1 ? 's' : ''} en zona crítica.`,
+      suffix: ` ${formatCurrency(semaforo.totalLiability)} acumulado en exposición legal. Cada mes sin actuar suma ${formatCurrency(semaforo.monthlyGrowth)}.`,
+      ctaLabel: 'Ver dónde está el problema',
       ctaVariant: 'cyan',
-      coachingTip: `La brecha mide cuánto deja de producir cada persona respecto al estándar mínimo del cargo (75% de Role Fit).`,
+      coachingTip: 'No es una decisión de RRHH — es una decisión financiera.',
     }
   }
 

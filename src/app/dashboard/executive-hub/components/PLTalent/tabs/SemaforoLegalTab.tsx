@@ -117,6 +117,13 @@ export default memo(function SemaforoLegalTab({ data }: Props) {
                   </div>
                 </div>
 
+                {/* Breakeven insight */}
+                {person.breakevenMonths && (
+                  <p className="text-[10px] text-amber-400/70 font-light italic">
+                    En {person.breakevenMonths} meses, mantener cuesta más que desvincular.
+                  </p>
+                )}
+
                 {/* Row 2: Financial pills */}
                 <div className="grid grid-cols-3 gap-2">
                   <FinancialPill

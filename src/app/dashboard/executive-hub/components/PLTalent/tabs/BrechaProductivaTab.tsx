@@ -1,26 +1,29 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// TAB 1: BRECHA PRODUCTIVA
+// TAB 1: MAPA DE LOCALIZACIÓN
 // src/app/dashboard/executive-hub/components/PLTalent/tabs/BrechaProductivaTab.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// Barras horizontales con divs + Flexbox (SIN recharts)
-// Paleta Tesla: cyan→purple→indigo (sin rojo sólido)
+// "¿A quién llamo a mi oficina primero?"
+// Lista única por gerencia, ordenada por impacto.
+// Cada card cuenta una micro-historia, no muestra un número.
 // ════════════════════════════════════════════════════════════════════════════
 
 import { memo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { ChevronDown, AlertTriangle } from 'lucide-react'
-import type { BrechaProductivaData, BrechaGerencia } from '../PLTalent.types'
-import { formatCurrency, getRoleFitBarColor } from '../PLTalent.utils'
+import type { BrechaProductivaData, BrechaGerencia, BrechaByCargoFamily, SemaforoLegalData } from '../PLTalent.types'
+import { formatCurrency } from '../PLTalent.utils'
 
 interface Props {
   data: BrechaProductivaData
+  semaforoData: SemaforoLegalData
+  onSelectGerencia: (gerenciaId: string, gerenciaName: string) => void
 }
 
-export default memo(function BrechaProductivaTab({ data }: Props) {
-  const [expandedGerencia, setExpandedGerencia] = useState<string | null>(null)
+export default memo(function BrechaProductivaTab({ data, semaforoData, onSelectGerencia }: Props) {
+  const [showCargo, setShowCargo] = useState(false)
 
   if (data.totalPeople === 0) {
     return (
@@ -31,21 +34,13 @@ export default memo(function BrechaProductivaTab({ data }: Props) {
     )
   }
 
-  const maxGap = Math.max(...data.byGerencia.map(g => g.gapMonthly), 1)
-
   return (
     <div className="space-y-6">
 
-      {/* ═══ HERO ═══ */}
-      <div className="text-center space-y-1">
-        <p className="text-3xl sm:text-4xl font-light text-white">
-          {formatCurrency(data.totalGapMonthly)}
-          <span className="text-lg text-slate-500 font-light">/mes</span>
-        </p>
-        <p className="text-xs text-slate-500">
-          {data.totalPeople} de {data.totalEvaluated} personas con brecha
-        </p>
-      </div>
+      {/* ═══ SECTION TITLE ═══ */}
+      <p className="text-[10px] uppercase tracking-widest text-slate-500 text-center">
+        ¿Dónde está el problema?
+      </p>
 
       {/* ═══ SALARY SOURCE WARNING ═══ */}
       {data.salarySource === 'default_chile' && (
@@ -55,99 +50,110 @@ export default memo(function BrechaProductivaTab({ data }: Props) {
         </div>
       )}
 
-      {/* ═══ BARS BY GERENCIA ═══ */}
-      <div className="space-y-2">
+      {/* ═══ GERENCIA CARDS — lista única ═══ */}
+      <div className="space-y-3">
         {data.byGerencia.map((ger, idx) => {
-          const isExpanded = expandedGerencia === ger.gerenciaId
-          const isRisk = ger.avgRoleFit < 45
-          const barWidth = Math.max((ger.gapMonthly / maxGap) * 100, 3)
+          // Cross with semaforo to check if there are legal zone people
+          const legalPeople = semaforoData.people.filter(p =>
+            p.departmentName.toLowerCase().includes(ger.gerenciaName.toLowerCase().split(' ')[0])
+          )
+          const hasLegalRisk = legalPeople.length > 0
+          const groupFiniquito = legalPeople.reduce((s, p) => s + p.finiquitoToday, 0)
+          const breakevenMonths = ger.gapMonthly > 0 && groupFiniquito > 0
+            ? Math.round(groupFiniquito / ger.gapMonthly)
+            : null
 
           return (
-            <div key={ger.gerenciaId}>
-              {/* Gerencia row */}
-              <button
-                onClick={() => setExpandedGerencia(isExpanded ? null : ger.gerenciaId)}
-                className="w-full text-left group"
-              >
-                <div className="flex items-center gap-3 mb-1">
-                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    {isRisk && (
-                      <span className="relative flex h-2 w-2 flex-shrink-0">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-                      </span>
-                    )}
-                    <p className="text-xs text-slate-300 truncate group-hover:text-white transition-colors">
-                      {ger.gerenciaName}
-                    </p>
-                  </div>
-                  <p className="text-xs text-slate-400 font-mono flex-shrink-0">
-                    {formatCurrency(ger.gapMonthly)}
-                  </p>
-                  <p className="text-[9px] text-slate-600 flex-shrink-0">
-                    {ger.headcount}p
-                  </p>
-                  <ChevronDown className={cn(
-                    'w-3 h-3 text-slate-600 transition-transform flex-shrink-0',
-                    isExpanded && 'rotate-180'
-                  )} />
-                </div>
-
-                {/* Bar */}
-                <div className="h-2 rounded-full bg-slate-800/50 overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${barWidth}%` }}
-                    transition={{ duration: 0.4, delay: idx * 0.05 }}
-                    className={cn('h-full rounded-full', getRoleFitBarColor(ger.avgRoleFit))}
-                  />
-                </div>
-              </button>
-
-              {/* Expanded departments */}
-              <AnimatePresence>
-                {isExpanded && ger.departments.length > 0 && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="pl-4 pt-2 pb-1 space-y-1.5 border-l border-slate-700/30 ml-2 mt-1">
-                      {ger.departments.map(dept => {
-                        const deptBarWidth = Math.max((dept.gapMonthly / ger.gapMonthly) * 100, 3)
-                        const deptIsRisk = dept.avgRoleFit < 45
-                        return (
-                          <div key={dept.departmentId}>
-                            <div className="flex items-center gap-2 mb-0.5">
-                              {deptIsRisk && (
-                                <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
-                                </span>
-                              )}
-                              <p className="text-[10px] text-slate-500 truncate flex-1">{dept.departmentName}</p>
-                              <p className="text-[10px] text-slate-500 font-mono flex-shrink-0">{formatCurrency(dept.gapMonthly)}</p>
-                              <p className="text-[8px] text-slate-600 flex-shrink-0">{dept.headcount}p</p>
-                            </div>
-                            <div className="h-1 rounded-full bg-slate-800/30 overflow-hidden">
-                              <div
-                                className={cn('h-full rounded-full', getRoleFitBarColor(dept.avgRoleFit))}
-                                style={{ width: `${deptBarWidth}%` }}
-                              />
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </motion.div>
+            <motion.button
+              key={ger.gerenciaId}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, delay: idx * 0.06 }}
+              onClick={() => onSelectGerencia(ger.gerenciaId, ger.gerenciaName)}
+              className="w-full text-left rounded-xl border border-slate-800/60 bg-slate-900/40 backdrop-blur p-5 hover:border-slate-700/60 hover:bg-slate-800/40 transition-all duration-200 group"
+            >
+              {/* Row 1: Name + risk dot */}
+              <div className="flex items-center gap-2 mb-3">
+                {ger.avgRoleFit < 45 && (
+                  <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+                  </span>
                 )}
-              </AnimatePresence>
-            </div>
+                <p className="text-base text-white font-medium group-hover:text-cyan-400 transition-colors">
+                  {ger.gerenciaName}
+                </p>
+              </div>
+
+              {/* Row 2: The story — not just numbers */}
+              <p className="text-sm text-slate-300 font-light leading-relaxed mb-1">
+                <span className="text-purple-400 font-medium">{formatCurrency(ger.gapMonthly)}/mes</span>
+                {' '}en pérdida de productividad
+              </p>
+              <p className="text-xs text-slate-500 mb-3">
+                {ger.headcount} persona{ger.headcount !== 1 ? 's' : ''} bajo el estándar de su cargo
+              </p>
+
+              {/* Row 3: Breakeven narrative (only if legal data exists) */}
+              {breakevenMonths && (
+                <p className="text-[11px] text-amber-400/70 font-light italic leading-relaxed">
+                  Si no se interviene, en {breakevenMonths} meses esta pérdida superará el costo de resolver el problema hoy.
+                </p>
+              )}
+
+              {/* Row 4: CTA hint */}
+              <p className="text-[10px] text-cyan-400/60 mt-3 group-hover:text-cyan-400 transition-colors">
+                Ver detalle →
+              </p>
+            </motion.button>
           )
         })}
       </div>
+
+      {/* ═══ FAMILIA DE CARGO — colapsable ═══ */}
+      {data.byCargoFamily.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowCargo(!showCargo)}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-slate-800/40 hover:border-slate-700/40 bg-slate-900/20 transition-colors"
+          >
+            <span className="text-xs text-slate-500">Ver por familia de cargo</span>
+            <ChevronDown className={cn(
+              'w-3.5 h-3.5 text-slate-600 transition-transform',
+              showCargo && 'rotate-180'
+            )} />
+          </button>
+
+          <AnimatePresence>
+            {showCargo && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-3 space-y-2">
+                  {data.byCargoFamily.map((cargo, idx) => (
+                    <div
+                      key={cargo.acotadoGroup}
+                      className="flex items-center justify-between px-4 py-3 rounded-lg bg-slate-900/30 border border-slate-800/30"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-white truncate">{cargo.label}</p>
+                        <p className="text-[10px] text-slate-500">{cargo.headcount} persona{cargo.headcount !== 1 ? 's' : ''} · Fit {cargo.avgRoleFit}%</p>
+                      </div>
+                      <p className="text-sm text-purple-400 font-light flex-shrink-0 ml-3">
+                        {formatCurrency(cargo.gapMonthly)}/mes
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
     </div>
   )
 })

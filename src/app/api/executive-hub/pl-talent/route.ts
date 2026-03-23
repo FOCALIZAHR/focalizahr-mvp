@@ -82,9 +82,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { employeeId, employeeName, yearsOfService } = body
+    const { employeeId, employeeName, yearsOfService, targetType, actionCode, gapMonthly } = body
 
-    if (!employeeId || !employeeName) {
+    const resolvedActionCode = actionCode || 'LEGAL_REVIEW'
+    const resolvedTargetType = targetType || 'EMPLOYEE'
+    const resolvedTargetId = employeeId
+
+    if (!resolvedTargetId || !employeeName) {
       return NextResponse.json({ error: 'employeeId y employeeName requeridos' }, { status: 400 })
     }
 
@@ -93,19 +97,28 @@ export async function POST(request: NextRequest) {
       where: {
         accountId: userContext.accountId,
         sourceModule: 'EXECUTIVE_HUB',
-        targetType: 'EMPLOYEE',
-        targetId: employeeId,
-        actionCode: 'LEGAL_REVIEW',
+        targetType: resolvedTargetType,
+        targetId: resolvedTargetId,
+        actionCode: resolvedActionCode,
         status: { in: ['OPEN', 'ACKNOWLEDGED'] },
       },
     })
 
     if (existing) {
       return NextResponse.json(
-        { success: false, error: 'Ya existe una consulta activa para esta persona', insightId: existing.id },
+        { success: false, error: 'Ya existe una acción activa', insightId: existing.id },
         { status: 409 }
       )
     }
+
+    // Build action text based on action code
+    const actionTaken = resolvedActionCode === 'BRECHA_PRODUCTIVA'
+      ? `Revisión ejecutiva solicitada para ${employeeName}. Brecha mensual: ${gapMonthly ? `$${Math.round(gapMonthly / 1000)}K` : 'N/A'}.`
+      : `Consulta ejecutiva: ¿Tiene un plan de mejora activo o se está evaluando otra decisión? Hoy tiene ${yearsOfService} años en la empresa.`
+
+    const title = resolvedActionCode === 'BRECHA_PRODUCTIVA'
+      ? `Brecha Productiva — ${employeeName}`
+      : `Revisión Legal — ${employeeName}`
 
     // Create IntelligenceInsight
     const insight = await prisma.intelligenceInsight.create({
@@ -115,14 +128,14 @@ export async function POST(request: NextRequest) {
         resolutionMode: 'MANUAL',
         sourceModule: 'EXECUTIVE_HUB',
         sourceType: 'INSIGHT',
-        targetType: 'EMPLOYEE',
-        targetId: employeeId,
-        actionCode: 'LEGAL_REVIEW',
-        title: `Revisión Legal — ${employeeName}`,
+        targetType: resolvedTargetType,
+        targetId: resolvedTargetId,
+        actionCode: resolvedActionCode,
+        title,
         status: 'ACKNOWLEDGED',
         acknowledgedAt: new Date(),
         acknowledgedBy: userContext.userId || 'unknown',
-        actionTaken: `Consulta ejecutiva: ¿Tiene un plan de mejora activo o se está evaluando otra decisión? Hoy tiene ${yearsOfService} años en la empresa.`,
+        actionTaken,
       },
     })
 

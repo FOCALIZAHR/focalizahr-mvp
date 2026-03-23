@@ -2,14 +2,23 @@
 // P&L TALENT SERVICE
 // src/lib/services/PLTalentService.ts
 // ════════════════════════════════════════════════════════════════════════════
-// Calcula impacto financiero del talento:
+// Calcula impacto financiero del talento (vistas AGREGADAS):
 // - Brecha Productiva: roleFit < 75% → gap en pesos
 // - Semáforo Legal: riskQuadrant BAJO_RENDIMIENTO → exposición legal
+//
+// Fórmulas financieras: TalentFinancialFormulas.ts (Single Source of Truth)
+// Salary cache: Pre-fetch por acotadoGroup, O(1) lookups en loop
 // ════════════════════════════════════════════════════════════════════════════
 
 import { prisma } from '@/lib/prisma'
-import { SalaryConfigService } from './SalaryConfigService'
-import { PositionAdapter } from './PositionAdapter'
+import { SalaryConfigService, type SalaryResult } from './SalaryConfigService'
+import { PositionAdapter, ACOTADO_LABELS } from './PositionAdapter'
+import {
+  calculateTenureMonths,
+  calculateMonthlyGap,
+  calculateFiniquito,
+  calculateBreakevenMonths,
+} from '@/lib/utils/TalentFinancialFormulas'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -29,14 +38,36 @@ export interface BrechaGerencia {
   gapMonthly: number
   headcount: number
   avgRoleFit: number
+  breakevenMonths: number | null
   departments: BrechaDepartment[]
+}
+
+export interface BrechaByCargoFamily {
+  acotadoGroup: string
+  label: string
+  gapMonthly: number
+  headcount: number
+  avgRoleFit: number
+  breakevenMonths: number | null
 }
 
 export interface BrechaProductivaData {
   totalGapMonthly: number
   totalPeople: number
   totalEvaluated: number
+  avgSalary: number
+  fteLoss: number
   byGerencia: BrechaGerencia[]
+  byCargoFamily: BrechaByCargoFamily[]
+  salarySource: string
+}
+
+export interface SemaforoLegalData {
+  totalPeople: number
+  totalLiability: number
+  monthlyGrowth: number
+  breakevenMonthsGlobal: number | null
+  people: SemaforoPersona[]
   salarySource: string
 }
 
@@ -53,14 +84,56 @@ export interface SemaforoPersona {
   finiquitoIn3Months: number
   monthlyImproductivity: number
   roleFitScore: number
+  breakevenMonths: number | null
 }
 
-export interface SemaforoLegalData {
-  totalPeople: number
-  totalLiability: number
-  monthlyGrowth: number
-  people: SemaforoPersona[]
-  salarySource: string
+// ════════════════════════════════════════════════════════════════════════════
+// SALARY CACHE — Pre-fetch por acotadoGroup, O(1) en loop
+// ════════════════════════════════════════════════════════════════════════════
+
+const CACHE_KEY_BASE = '__base__'
+
+async function buildSalaryCache(
+  accountId: string,
+  positions: (string | null)[]
+): Promise<{ cache: Map<string, SalaryResult>; source: string }> {
+  const cache = new Map<string, SalaryResult>()
+
+  // 1. Base salary (fallback)
+  const baseSalary = await SalaryConfigService.getSalaryForAccount(accountId)
+  cache.set(CACHE_KEY_BASE, baseSalary)
+  let source = baseSalary.source
+
+  // 2. Collect unique acotado groups
+  const uniqueGroups = new Set<string>()
+  for (const pos of positions) {
+    if (pos) {
+      const group = PositionAdapter.classifyPosition(pos).acotadoGroup
+      if (group && !cache.has(group)) uniqueGroups.add(group)
+    }
+  }
+
+  // 3. Pre-fetch all groups in parallel (max 4 queries)
+  await Promise.all(
+    Array.from(uniqueGroups).map(async group => {
+      const result = await SalaryConfigService.getSalaryForAccount(accountId, group)
+      cache.set(group, result)
+      if (result.source !== 'default_chile') source = result.source
+    })
+  )
+
+  return { cache, source }
+}
+
+function lookupSalary(
+  cache: Map<string, SalaryResult>,
+  position: string | null
+): SalaryResult {
+  if (position) {
+    const group = PositionAdapter.classifyPosition(position).acotadoGroup
+    if (group && cache.has(group)) return cache.get(group)!
+  }
+  return cache.get(CACHE_KEY_BASE)!
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -72,7 +145,7 @@ export class PLTalentService {
   // ──────────────────────────────────────────────────────────────────────────
   // BRECHA PRODUCTIVA
   // Solo roleFitScore < 75% genera brecha
-  // Fórmula: brecha = salario × ((75 - roleFitScore) / 100)
+  // Fórmulas: TalentFinancialFormulas.ts
   // ──────────────────────────────────────────────────────────────────────────
 
   static async getBrechaProductiva(
@@ -114,21 +187,29 @@ export class PLTalentService {
       },
     })
 
-    // Get base salary for fallback
-    const baseSalary = await SalaryConfigService.getSalaryForAccount(accountId)
-    let salarySource = baseSalary.source
+    // Salary cache — max 5 queries instead of N
+    const { cache: salaryCache, source: salarySource } = await buildSalaryCache(
+      accountId,
+      ratings.map(r => r.employee.position)
+    )
 
-    // Aggregate by gerencia → department
+    // Aggregate by gerencia → department + by cargo family
     const gerenciaMap = new Map<string, {
       id: string; name: string
       departments: Map<string, { id: string; name: string; gaps: number[]; roleFits: number[] }>
     }>()
+    const cargoMap = new Map<string, { gaps: number[]; roleFits: number[] }>()
 
     let totalGapMonthly = 0
     let totalPeople = 0
+    let totalSalaries = 0
 
     for (const r of ratings) {
       const roleFit = r.roleFitScore as number
+      const salaryResult = lookupSalary(salaryCache, r.employee.position)
+
+      totalSalaries += salaryResult.monthlySalary
+
       if (roleFit >= 75) continue // No gap
 
       const dept = r.employee.department
@@ -140,16 +221,7 @@ export class PLTalentService {
       const deptId = dept.id
       const deptName = dept.displayName
 
-      // Calculate salary
-      const acotado = r.employee.position
-        ? PositionAdapter.classifyPosition(r.employee.position).acotadoGroup
-        : null
-      const salaryResult = acotado
-        ? await SalaryConfigService.getSalaryForAccount(accountId, acotado)
-        : baseSalary
-      if (salaryResult.source !== 'default_chile') salarySource = salaryResult.source
-
-      const gap = Math.round(salaryResult.monthlySalary * ((75 - roleFit) / 100))
+      const gap = calculateMonthlyGap(salaryResult.monthlySalary, roleFit)
       totalGapMonthly += gap
       totalPeople++
 
@@ -164,6 +236,18 @@ export class PLTalentService {
       const d = ger.departments.get(deptId)!
       d.gaps.push(gap)
       d.roleFits.push(roleFit)
+
+      // Accumulate by cargo family
+      const acotado = r.employee.position
+        ? PositionAdapter.classifyPosition(r.employee.position).acotadoGroup
+        : null
+      const cargoKey = acotado || 'sin_clasificar'
+      if (!cargoMap.has(cargoKey)) {
+        cargoMap.set(cargoKey, { gaps: [], roleFits: [] })
+      }
+      const c = cargoMap.get(cargoKey)!
+      c.gaps.push(gap)
+      c.roleFits.push(roleFit)
     }
 
     // Build result
@@ -190,16 +274,36 @@ export class PLTalentService {
           gapMonthly: allGaps,
           headcount: allCount,
           avgRoleFit,
+          breakevenMonths: null, // calculated in frontend with semaforo cross-data
           departments: departments.sort((a, b) => b.gapMonthly - a.gapMonthly),
         }
       })
       .sort((a, b) => b.gapMonthly - a.gapMonthly)
 
+    // Build cargo family aggregation
+    const byCargoFamily = Array.from(cargoMap.entries())
+      .map(([key, c]) => ({
+        acotadoGroup: key,
+        label: ACOTADO_LABELS[key] || key,
+        gapMonthly: c.gaps.reduce((s, v) => s + v, 0),
+        headcount: c.gaps.length,
+        avgRoleFit: Math.round(c.roleFits.reduce((s, v) => s + v, 0) / c.roleFits.length),
+        breakevenMonths: null, // calculated in frontend with semaforo cross-data
+      }))
+      .sort((a, b) => b.gapMonthly - a.gapMonthly)
+
+    // FTE loss calculation
+    const avgSalary = ratings.length > 0 ? Math.round(totalSalaries / ratings.length) : 0
+    const fteLoss = avgSalary > 0 ? Math.round((totalGapMonthly / avgSalary) * 10) / 10 : 0
+
     return {
       totalGapMonthly,
       totalPeople,
       totalEvaluated: ratings.length,
+      avgSalary,
+      fteLoss,
       byGerencia,
+      byCargoFamily,
       salarySource,
     }
   }
@@ -207,7 +311,7 @@ export class PLTalentService {
   // ──────────────────────────────────────────────────────────────────────────
   // SEMÁFORO LEGAL
   // Solo riskQuadrant = 'BAJO_RENDIMIENTO'
-  // Finiquito = salario × (min(años, 11) + 1)
+  // Fórmulas: TalentFinancialFormulas.ts
   // Semáforo: ≤3mo yellow, ≤6mo orange, >6mo red
   // ──────────────────────────────────────────────────────────────────────────
 
@@ -246,8 +350,11 @@ export class PLTalentService {
       },
     })
 
-    const baseSalary = await SalaryConfigService.getSalaryForAccount(accountId)
-    let salarySource = baseSalary.source
+    // Salary cache — max 5 queries instead of N
+    const { cache: salaryCache, source: salarySource } = await buildSalaryCache(
+      accountId,
+      ratings.map(r => r.employee.position)
+    )
 
     const people: SemaforoPersona[] = []
     let totalLiability = 0
@@ -256,11 +363,9 @@ export class PLTalentService {
       const emp = r.employee
       if (!emp.hireDate) continue
 
-      // Years of service (capped at 11 per Chilean labor law)
-      const msService = Date.now() - new Date(emp.hireDate).getTime()
-      const yearsRaw = msService / (1000 * 60 * 60 * 24 * 365.25)
-      const yearsOfService = Math.round(yearsRaw * 10) / 10
-      const yearsCapped = Math.min(yearsRaw, 11)
+      // Tenure — Single Source of Truth (TalentFinancialFormulas)
+      const tenureMonths = calculateTenureMonths(new Date(emp.hireDate))
+      const yearsOfService = Math.round((tenureMonths / 12) * 10) / 10
 
       // Semaphore: months with BAJO_RENDIMIENTO status
       const monthsInStatus = r.talentAnalyzedAt
@@ -268,25 +373,17 @@ export class PLTalentService {
         : 0
       const semaphore: SemaphoreLevel = monthsInStatus <= 3 ? 'yellow' : monthsInStatus <= 6 ? 'orange' : 'red'
 
-      // Salary
-      const acotado = emp.position
-        ? PositionAdapter.classifyPosition(emp.position).acotadoGroup
-        : null
-      const salaryResult = acotado
-        ? await SalaryConfigService.getSalaryForAccount(accountId, acotado)
-        : baseSalary
-      if (salaryResult.source !== 'default_chile') salarySource = salaryResult.source
+      // Salary — O(1) lookup from cache
+      const salaryResult = lookupSalary(salaryCache, emp.position)
       const salary = salaryResult.monthlySalary
 
-      // Finiquito: salary × (min(years, 11) + 1 mes preaviso)
-      const finiquitoToday = Math.round(salary * (yearsCapped + 1))
-      const finiquitoIn3Months = Math.round(salary * (Math.min(yearsRaw + 0.25, 11) + 1))
+      // Financial — Single Source of Truth (TalentFinancialFormulas)
+      const finiquitoToday = calculateFiniquito(salary, tenureMonths)
+      const finiquitoIn3Months = calculateFiniquito(salary, tenureMonths + 3)
 
-      // Monthly improductivity (same brecha formula)
       const roleFit = r.roleFitScore ?? 0
-      const monthlyImproductivity = roleFit < 75
-        ? Math.round(salary * ((75 - roleFit) / 100))
-        : 0
+      const monthlyImproductivity = calculateMonthlyGap(salary, roleFit)
+      const breakevenMonths = calculateBreakevenMonths(finiquitoToday, monthlyImproductivity)
 
       totalLiability += finiquitoToday
 
@@ -301,6 +398,7 @@ export class PLTalentService {
         finiquitoIn3Months,
         monthlyImproductivity,
         roleFitScore: roleFit,
+        breakevenMonths,
       })
     }
 
@@ -311,10 +409,15 @@ export class PLTalentService {
     // Monthly growth: sum of monthly salary for all people (liability grows by ~1 salary/month per person)
     const monthlyGrowth = people.reduce((sum, p) => sum + Math.round(p.finiquitoIn3Months - p.finiquitoToday) / 3, 0)
 
+    // Global breakeven: total finiquitos / total brecha mensual
+    const totalMonthlyImprod = people.reduce((s, p) => s + p.monthlyImproductivity, 0)
+    const breakevenMonthsGlobal = calculateBreakevenMonths(totalLiability, totalMonthlyImprod)
+
     return {
       totalPeople: people.length,
       totalLiability,
       monthlyGrowth: Math.round(monthlyGrowth),
+      breakevenMonthsGlobal,
       people,
       salarySource,
     }

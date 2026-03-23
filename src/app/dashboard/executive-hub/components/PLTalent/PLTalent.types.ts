@@ -17,14 +17,27 @@ export interface BrechaGerencia {
   gapMonthly: number
   headcount: number
   avgRoleFit: number
+  breakevenMonths: number | null
   departments: BrechaDepartment[]
+}
+
+export interface BrechaByCargoFamily {
+  acotadoGroup: string
+  label: string
+  gapMonthly: number
+  headcount: number
+  avgRoleFit: number
+  breakevenMonths: number | null
 }
 
 export interface BrechaProductivaData {
   totalGapMonthly: number
   totalPeople: number
   totalEvaluated: number
+  avgSalary: number
+  fteLoss: number
   byGerencia: BrechaGerencia[]
+  byCargoFamily: BrechaByCargoFamily[]
   salarySource: string
 }
 
@@ -41,12 +54,14 @@ export interface SemaforoPersona {
   finiquitoIn3Months: number
   monthlyImproductivity: number
   roleFitScore: number
+  breakevenMonths: number | null // meses hasta que mantener cuesta más que desvincular
 }
 
 export interface SemaforoLegalData {
   totalPeople: number
   totalLiability: number
   monthlyGrowth: number
+  breakevenMonthsGlobal: number | null
   people: SemaforoPersona[]
   salarySource: string
 }

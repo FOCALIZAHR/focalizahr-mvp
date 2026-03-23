@@ -20,9 +20,9 @@
 // BURNOUT_RISK     → RoleFit LOW  + Engagement HIGH → ORANGE
 // BAJO_RENDIMIENTO → RoleFit LOW  + Engagement LOW  → RED
 //
-// SEGMENTOS DE TENURE:
-// onboarding → < 6 meses
-// real       → 6 a 36 meses
+// SEGMENTOS DE TENURE (actualizado 2026-03-22):
+// onboarding → < 12 meses (antes <6 — ampliado para alinear con curva real de integración)
+// real       → 12 a 36 meses
 // cronico    → > 36 meses
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -44,8 +44,10 @@ export interface TalentMapNarrative {
 // HELPER — Calcular segmento de tenure
 // ════════════════════════════════════════════════════════════════════════════
 
+// NOTE: Primer tramo actualizado de <6 a <12 meses (2026-03-22).
+// Debe estar sincronizado con TalentActionService.classifyTenure().
 export function getTenureSegment(tenureMonths: number): TenureSegment {
-  if (tenureMonths < 6) return 'onboarding'
+  if (tenureMonths < 12) return 'onboarding'
   if (tenureMonths <= 36) return 'real'
   return 'cronico'
 }
@@ -161,7 +163,7 @@ const TALENT_MAP_NARRATIVES_BY_TENURE: Record<
     cronico: {
       badge: 'Requiere atención',
       coachingTip:
-        'Anos en la empresa con esta combinacion — definir continuidad o reubicacion.',
+        'Años en la empresa con esta combinación — definir continuidad o reubicación.',
       alertLevel: 'RED',
     },
   },
