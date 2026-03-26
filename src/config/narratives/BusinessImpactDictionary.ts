@@ -104,7 +104,7 @@ export const BUSINESS_IMPACT_DICTIONARY: Record<string, GerenciaImpact> = {
     category: 'tecnologia',
     meta: 'HABILITAR EL NEGOCIO',
     metaDescription: 'Sistemas que funcionan, respuesta rápida a cambios, seguridad',
-    introNarrative: 'Operar con esta brecha de capacidades podría convertir a Tecnología en un freno en vez de un habilitador:',
+    introNarrative: 'Con esta brecha de capacidades, Tecnología ya no está habilitando el negocio, lo está frenando:',
     risks: [
       {
         icon: '🐌',

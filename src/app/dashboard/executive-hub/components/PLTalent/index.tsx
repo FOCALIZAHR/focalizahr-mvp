@@ -28,6 +28,7 @@ import PLTalentSplitBrain from './components/PLTalentSplitBrain'
 import PLTalentLeadershipAlert from './components/PLTalentLeadershipAlert'
 import PLTalentIndividualDrawer from './components/PLTalentIndividualDrawer'
 import PLTalentSemaforoDrawer from './components/PLTalentSemaforoDrawer'
+import PLTalentExecutiveBriefing from './components/PLTalentExecutiveBriefing'
 
 import { BUSINESS_IMPACT_DICTIONARY } from '@/config/narratives/BusinessImpactDictionary'
 import { LEADERSHIP_RISK_DICTIONARY } from '@/config/narratives/LeadershipRiskDictionary'
@@ -46,70 +47,56 @@ interface RiskProfilesSummary {
   withoutSuccessor: number
   byTenureTrend: { A1: number; A2: number; A3: number }
   byFitLevel: { low: number; high: number }
+  successionNarrative: string
+  successionCombination: 'A' | 'B' | 'C' | 'D'
+  tenureNarrative: { narrative: string; tone: 'positive' | 'negative' } | null
+  gerenciaImpact: Record<string, any>
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
-export const PLTalent = memo(function PLTalent({ data, cycleId }: PLTalentProps & { cycleId?: string }) {
+export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, roleFit }: PLTalentProps & { cycleId?: string; companyName?: string; roleFit?: number }) {
   const [view, setView] = useState<View>('portada')
   const [selectedGerencia, setSelectedGerencia] = useState<{ id: string; name: string } | null>(null)
 
-  // Split-Brain state
+  // Split-Brain state — risk data comes pre-fetched via Promise.all in useExecutiveHubData
   const [activeLens, setActiveLens] = useState<LensType>('gerencia')
   const [selectedGerenciaName, setSelectedGerenciaName] = useState<string | null>(null)
-  const [riskProfiles, setRiskProfiles] = useState<ExecutiveRiskPayload[]>([])
-  const [riskSummary, setRiskSummary] = useState<RiskProfilesSummary | null>(null)
-  const [riskLoading, setRiskLoading] = useState(false)
   const [selectedProfile, setSelectedProfile] = useState<ExecutiveRiskPayload | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
+  // Read risk data from pre-fetched spotlight data (null if /risk-profiles failed — graceful)
+  const riskData = (data as any).riskProfiles as { profiles: ExecutiveRiskPayload[]; summary: RiskProfilesSummary } | null
+  const riskProfiles = riskData?.profiles ?? []
+  const riskSummary = riskData?.summary ?? null
+  const riskLoading = false // Data arrives with spotlight, no separate loading
+
   const narrative = useMemo(() => getPortadaNarrative(data), [data])
 
-  // Fetch risk profiles when entering split-brain view
+  // Auto-select gerencia con mayor severidad cuando llegan los datos
   useEffect(() => {
-    if (view !== 'split-brain' || !cycleId || riskProfiles.length > 0) return
-
-    const fetchRiskProfiles = async () => {
-      setRiskLoading(true)
-      try {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('focalizahr_token') : null
-        const headers: Record<string, string> = {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        }
-        const res = await fetch(`/api/executive-hub/pl-talent/risk-profiles?cycleId=${cycleId}`, { headers })
-        if (res.ok) {
-          const json = await res.json()
-          if (json.success) {
-            setRiskProfiles(json.data.profiles)
-            setRiskSummary(json.data.summary)
-          }
-        }
-      } catch (err) {
-        console.error('[PLTalent] Error fetching risk profiles:', err)
-      } finally {
-        setRiskLoading(false)
-      }
+    if (!selectedGerenciaName && data.brecha.byGerencia.length > 0) {
+      const top = data.brecha.byGerencia.find(g => g.gapMonthly > 0)
+      if (top) setSelectedGerenciaName(top.gerenciaName)
     }
+  }, [data.brecha.byGerencia, selectedGerenciaName])
 
-    fetchRiskProfiles()
-  }, [view, cycleId, riskProfiles.length])
-
-  // Gerencia impact lookup for Split-Brain oráculo
+  // Gerencia impact lookup — directo desde standardCategory (no fuzzy matching)
   const gerenciaImpact = useMemo(() => {
     if (!selectedGerenciaName) return null
-    // Find standardCategory from brecha data or risk profiles
     const ger = data.brecha.byGerencia.find(g => g.gerenciaName === selectedGerenciaName)
-    if (!ger) return null
-    // Try to find category from risk profiles
-    const profileInGerencia = riskProfiles.find(p =>
-      p.data.departmentName.toLowerCase().includes(selectedGerenciaName.toLowerCase().split(' ')[0])
-    )
-    const category = profileInGerencia?.data.gerenciaCategory
-    if (!category) return null
-    return BUSINESS_IMPACT_DICTIONARY[category] || null
-  }, [selectedGerenciaName, data.brecha.byGerencia, riskProfiles])
+    // DEBUG — remove after confirming fix
+    console.log('[PLTalent] gerenciaImpact lookup:', {
+      selectedGerenciaName,
+      found: !!ger,
+      standardCategory: ger?.standardCategory,
+      dictMatch: ger?.standardCategory ? !!BUSINESS_IMPACT_DICTIONARY[ger.standardCategory] : false,
+    })
+    if (!ger?.standardCategory) return null
+    return BUSINESS_IMPACT_DICTIONARY[ger.standardCategory] || null
+  }, [selectedGerenciaName, data.brecha.byGerencia])
 
   // Leadership alert data
   const leadershipData = useMemo(() => {
@@ -119,6 +106,19 @@ export const PLTalent = memo(function PLTalent({ data, cycleId }: PLTalentProps 
       totalDirectReports: leaders.reduce((sum, p) => sum + p.data.directReportsCount, 0),
     }
   }, [riskProfiles])
+
+  // DEBUG — remove after confirming leadershipData
+  console.log('[leadershipData debug]', {
+    totalProfiles: riskProfiles.length,
+    profilesWithIsLeader: riskProfiles.filter(p => p.data.isLeader).length,
+    leadersWithLowFit: riskProfiles.filter(p => p.data.isLeader && p.data.roleFitScore < 75).length,
+    leadersWithLeadershipRisk: riskProfiles.filter(p => p.narratives.leadershipRisk !== null).length,
+    leadershipDataResult: leadershipData,
+  })
+
+  const totalManagers = useMemo(() =>
+    riskProfiles.filter(p => p.data.isLeader).length
+  , [riskProfiles])
 
   // Lens counts
   const lensCounts = useMemo(() => ({
@@ -215,6 +215,21 @@ export const PLTalent = memo(function PLTalent({ data, cycleId }: PLTalentProps 
               onLensChange={setActiveLens}
               counts={lensCounts}
               disabled={riskLoading}
+            />
+
+            {/* Executive Briefing — La Cascada de la Verdad */}
+            <PLTalentExecutiveBriefing
+              brecha={data.brecha}
+              semaforo={data.semaforo}
+              riskSummary={riskSummary}
+              riskProfiles={riskProfiles}
+              leadersAtRisk={leadershipData.leadersAtRisk}
+              totalDirectReports={leadershipData.totalDirectReports}
+              totalManagers={totalManagers}
+              roleFit={roleFit ?? 0}
+              companyName={companyName || 'tu organización'}
+              onNavigateToLens={(lens) => setActiveLens(lens as LensType)}
+              onNavigateToCargoFamily={() => { setView('mapa') }}
             />
 
             {/* Leadership Alert (Motor 3) */}

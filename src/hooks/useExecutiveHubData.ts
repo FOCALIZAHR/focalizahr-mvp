@@ -23,6 +23,7 @@ export interface ExecutiveNarrative {
 
 export interface SummaryData {
   mission: ExecutiveNarrative
+  companyName: string
   alertas: { total: number; critical: number; high: number }
   talento: { starsPercent: number; totalEmployees: number }
   calibracion: { confidence: number; biasType: string | null; biasLabel: string | null; integrityLevel: string; worstStatus: string | null; worstStatusLabel: string | null }
@@ -173,13 +174,39 @@ export function useExecutiveHubData(): ExecutiveHubState {
     try {
       const endpoint = endpointMap[type]
       const qs = buildParams(cycleId, drillGerencia, endpoint)
-      const res = await fetch(`/api/executive-hub/${endpoint}?${qs}`, {
-        headers: getAuthHeaders()
-      })
-      if (!res.ok) throw new Error('Error cargando detalle')
-      const json = await res.json()
-      if (json.success) {
-        setSpotlightData(json.data)
+
+      if (type === 'pl-talento') {
+        // Fetch pl-talent + risk-profiles en paralelo
+        const [plRes, rpRes] = await Promise.all([
+          fetch(`/api/executive-hub/pl-talent?${qs}`, { headers: getAuthHeaders() }),
+          fetch(`/api/executive-hub/pl-talent/risk-profiles?${qs}`, { headers: getAuthHeaders() })
+            .catch((err) => {
+              console.error('[risk-profiles] fetch failed:', err)
+              return null
+            }),
+        ])
+        if (!plRes.ok) throw new Error('Error cargando detalle')
+        const plJson = await plRes.json()
+        let riskData = null
+        if (!rpRes?.ok) {
+          console.error('[risk-profiles] response not ok:', rpRes?.status, rpRes?.statusText)
+        }
+        if (rpRes?.ok) {
+          const rpJson = await rpRes.json()
+          if (rpJson.success) riskData = rpJson.data
+        }
+        if (plJson.success) {
+          setSpotlightData({ ...plJson.data, riskProfiles: riskData })
+        }
+      } else {
+        const res = await fetch(`/api/executive-hub/${endpoint}?${qs}`, {
+          headers: getAuthHeaders()
+        })
+        if (!res.ok) throw new Error('Error cargando detalle')
+        const json = await res.json()
+        if (json.success) {
+          setSpotlightData(json.data)
+        }
       }
     } catch (err) {
       console.error(`[ExecutiveHub] Error loading ${type}:`, err)

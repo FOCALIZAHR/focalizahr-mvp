@@ -14,6 +14,7 @@ export interface BrechaDepartment {
 export interface BrechaGerencia {
   gerenciaId: string
   gerenciaName: string
+  standardCategory: string | null
   gapMonthly: number
   headcount: number
   avgRoleFit: number

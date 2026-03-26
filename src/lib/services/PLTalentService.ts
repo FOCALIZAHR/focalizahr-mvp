@@ -35,6 +35,7 @@ export interface BrechaDepartment {
 export interface BrechaGerencia {
   gerenciaId: string
   gerenciaName: string
+  standardCategory: string | null
   gapMonthly: number
   headcount: number
   avgRoleFit: number
@@ -178,8 +179,9 @@ export class PLTalentService {
               select: {
                 id: true,
                 displayName: true,
+                standardCategory: true,
                 parentId: true,
-                parent: { select: { id: true, displayName: true } },
+                parent: { select: { id: true, displayName: true, standardCategory: true } },
               },
             },
           },
@@ -195,7 +197,7 @@ export class PLTalentService {
 
     // Aggregate by gerencia → department + by cargo family
     const gerenciaMap = new Map<string, {
-      id: string; name: string
+      id: string; name: string; standardCategory: string | null
       departments: Map<string, { id: string; name: string; gaps: number[]; roleFits: number[] }>
     }>()
     const cargoMap = new Map<string, { gaps: number[]; roleFits: number[] }>()
@@ -218,6 +220,7 @@ export class PLTalentService {
       // Resolve gerencia (parent) and department
       const gerenciaId = dept.parent?.id || dept.id
       const gerenciaName = dept.parent?.displayName || dept.displayName
+      const standardCategory = dept.parent?.standardCategory || dept.standardCategory || null
       const deptId = dept.id
       const deptName = dept.displayName
 
@@ -227,7 +230,7 @@ export class PLTalentService {
 
       // Accumulate in gerencia → department
       if (!gerenciaMap.has(gerenciaId)) {
-        gerenciaMap.set(gerenciaId, { id: gerenciaId, name: gerenciaName, departments: new Map() })
+        gerenciaMap.set(gerenciaId, { id: gerenciaId, name: gerenciaName, standardCategory, departments: new Map() })
       }
       const ger = gerenciaMap.get(gerenciaId)!
       if (!ger.departments.has(deptId)) {
@@ -250,6 +253,10 @@ export class PLTalentService {
       c.roleFits.push(roleFit)
     }
 
+    // DEBUG — remove after confirming fix
+    console.log(`[PLTalentService] gerenciaMap.size = ${gerenciaMap.size}`,
+      Array.from(gerenciaMap.values()).map(g => `${g.name} (${g.id.slice(-6)}, cat=${g.standardCategory})`))
+
     // Build result
     const byGerencia: BrechaGerencia[] = Array.from(gerenciaMap.values())
       .map(g => {
@@ -271,6 +278,7 @@ export class PLTalentService {
         return {
           gerenciaId: g.id,
           gerenciaName: g.name,
+          standardCategory: g.standardCategory,
           gapMonthly: allGaps,
           headcount: allCount,
           avgRoleFit,

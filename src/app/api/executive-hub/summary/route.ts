@@ -56,6 +56,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Fetch company name
+    const account = await prisma.account.findUnique({
+      where: { id: userContext.accountId },
+      select: { companyName: true },
+    })
+
     // Fetch paralelo de todos los datos + star concentration + variance + succession + orgDistribution
     const [alertsData, nineBoxData, calibrationData, roleFitData, starConcentration, varianceData, successionData, orgDistribution, brechaData, semaforoData] = await Promise.all([
       TalentIntelligenceService.getActiveAlerts(cycleId, userContext.accountId, departmentIds),
@@ -126,6 +132,9 @@ export async function GET(request: NextRequest) {
       data: {
         // Mission Control
         mission: missionNarrative,
+
+        // Company name for personalized narratives
+        companyName: account?.companyName || 'tu organización',
 
         // User role for client-side UI differentiation
         userRole: userContext.role || 'VIEWER',

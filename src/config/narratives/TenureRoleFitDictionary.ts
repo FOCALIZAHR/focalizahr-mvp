@@ -37,6 +37,74 @@ export function getFitLevel(roleFitScore: number): FitLevel {
 // DICCIONARIO
 // ════════════════════════════════════════════════════════════════════════════
 
+// ════════════════════════════════════════════════════════════════════════════
+// NARRATIVAS AGREGADAS — Templates para briefing CEO (variables: {pct})
+// Usadas por el endpoint /risk-profiles para generar summary.tenureNarrative
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface TenureAggregateNarrative {
+  template: string       // Template con {pct} como variable
+  narrativeShort: string // Conclusión corta del diccionario
+  tone: 'positive' | 'negative'
+}
+
+export const TENURE_AGGREGATE_NARRATIVES: Record<TenureTrend, Record<FitLevel, TenureAggregateNarrative>> = {
+  A1: {
+    low: {
+      template: 'El {pct}% de los ingresos recientes no alcanza el estándar de su cargo. Se les paga a precio de mercado desde el primer día y el retorno mínimo aún no llega — lo que agrava la situación actual.',
+      narrativeShort: 'Aún en integración. Si el patrón se repite, ajustar perfil o proceso antes de la próxima contratación.',
+      tone: 'negative',
+    },
+    high: {
+      template: 'El {pct}% de los ingresos recientes ya alcanza el estándar de su cargo. El proceso de selección está trayendo los perfiles correctos y el liderazgo directo está eligiendo bien.',
+      narrativeShort: 'Integración exitosa. Mantener estándar de selección.',
+      tone: 'positive',
+    },
+  },
+  A2: {
+    low: {
+      template: 'El {pct}% de las personas con 1 a 3 años en la empresa no alcanza el estándar de su cargo. Ya pasaron la curva de aprendizaje. Si no rinden ahora, las capacitaciones, los planes de desarrollo y el coaching aplicados hasta hoy no funcionaron, no existieron, o el liderazgo directo no se involucró lo suficiente. La pregunta no es qué más hacer con ellos. Es por qué lo que se hizo no sirvió.',
+      narrativeShort: 'Plan de desarrollo probablemente falló, no existió nunca, o no es foco y lo ven como un trámite.',
+      tone: 'negative',
+    },
+    high: {
+      template: 'El {pct}% de las personas con 1 a 3 años alcanza el estándar de su cargo. La organización está desarrollando a su gente. Es la señal más concreta de que el liderazgo directo está haciendo su trabajo.',
+      narrativeShort: 'Productividad confirmada. Validar aspiración y documentación de conocimiento.',
+      tone: 'positive',
+    },
+  },
+  A3: {
+    low: {
+      template: 'El {pct}% del personal senior no alcanza el estándar de su cargo. Cada uno representa años de oportunidades perdidas, planes de mejora que no cambiaron nada, y un finiquito que crece cada mes. También representa un mensaje silencioso a toda la organización: que es posible permanecer años sin rendir.',
+      narrativeShort: 'Decisión postergada. Definir salida. Establecer corte de 24 meses para futuros casos — no dejar acumular.',
+      tone: 'negative',
+    },
+    high: {
+      template: 'El {pct}% del personal senior alcanza el estándar de su cargo. Son el piso que sostiene la operación hoy. El riesgo no es su rendimiento. Es si los cuidas con la misma atención que a los nuevos talentos, que a veces son apuestas de rendimiento futuro. Cuando salgan, se van con años de conocimiento que nadie más tiene. ¿Están formando a sus reemplazos o concentrando ese saber en una sola persona?',
+      narrativeShort: 'Veterano valioso. Verificar sucesor y transferencia de conocimiento.',
+      tone: 'positive',
+    },
+  },
+}
+
+/**
+ * Genera narrativa agregada inyectando el porcentaje real.
+ * Usado por /risk-profiles endpoint.
+ */
+export function buildAggregateNarrative(
+  trend: TenureTrend,
+  fitLevel: FitLevel,
+  pct: number
+): { narrative: string; tone: 'positive' | 'negative' } {
+  const entry = TENURE_AGGREGATE_NARRATIVES[trend][fitLevel]
+  const narrative = entry.template.replace('{pct}', String(pct))
+  return { narrative, tone: entry.tone }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// DICCIONARIO INDIVIDUAL (por persona)
+// ════════════════════════════════════════════════════════════════════════════
+
 export const TENURE_ROLEFIT_DICTIONARY: Record<TenureTrend, Record<FitLevel, TenureRoleFitNarrative>> = {
 
   // ──────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FocalizaHR · Gestión de Talento e Inteligencia Organizacional</title>
+<style>
+
+:root {
+  --cyan:   #22D3EE;
+  --purple: #A78BFA;
+  --green:  #10B981;
+  --amber:  #F59E0B;
+  --s900:   #0f172a;
+  --s800:   #1e293b;
+  --s700:   #334155;
+  --s600:   #475569;
+  --s400:   #94A3B8;
+  --s300:   #CBD5E1;
+  --s200:   #E2E8F0;
+  --font:   -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --grad:   linear-gradient(135deg, #22D3EE, #3B82F6, #A78BFA);
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: var(--font);
+  font-weight: 300;
+  background: #080f1e;
+  color: var(--s200);
+  -webkit-font-smoothing: antialiased;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+/* ── PÁGINA A4 ── */
+.page {
+  width: 210mm;
+  min-height: auto;
+  margin: 0 auto;
+  background: linear-gradient(160deg, #0a1628 0%, #0d1e3a 45%, #0a1220 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Orbe ambient — decoración, no protagonista */
+.page::before {
+  content: '';
+  position: absolute;
+  top: -30mm; right: -30mm;
+  width: 100mm; height: 100mm;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(34,211,238,.04), transparent 65%);
+  pointer-events: none;
+}
+.page::after {
+  content: '';
+  position: absolute;
+  bottom: -40mm; left: -20mm;
+  width: 90mm; height: 90mm;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(167,139,250,.03), transparent 65%);
+  pointer-events: none;
+}
+
+/* ── TESLA LINE — UNA por página ── */
+.tesla {
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 5%, #22D3EE 50%, transparent 95%);
+  box-shadow: 0 0 18px rgba(34,211,238,.65);
+}
+.tesla-p {
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 5%, #A78BFA 50%, transparent 95%);
+  box-shadow: 0 0 18px rgba(167,139,250,.6);
+}
+/* Separador tipográfico — sin glow */
+.sep-short {
+  display: block;
+  width: 18mm;
+  height: 1px;
+  background: rgba(34,211,238,.35);
+  margin: 4.5mm 0;
+}
+/* Divider de sección — sin firma */
+.divider {
+  height: 1px;
+  background: rgba(71,85,105,.22);
+}
+
+/* ── TIPOGRAFÍA ── */
+.disp    { font-family: var(--font); line-height: 1.05; letter-spacing: -0.03em; }
+.d-xl    { font-size: 38pt; font-weight: 200; }
+.d-lg    { font-size: 26pt; font-weight: 200; }
+.d-md    { font-size: 16pt; font-weight: 300; letter-spacing: -0.025em; }
+.d-sm    { font-size: 12pt; font-weight: 300; }
+
+/* GRADIENTE — solo el golpe final de portada */
+.grad {
+  background: var(--grad);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.white  { color: #fff; }
+.cyan   { color: var(--cyan); }
+.purple { color: var(--purple); }
+.muted  { color: var(--s400); }
+.dim    { color: var(--s600); }
+
+.eyebrow {
+  font-size: 6pt;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  font-weight: 500;
+}
+.eyebrow-dim { color: var(--s600); }
+
+.body  { font-size: 8.5pt; color: var(--s400); line-height: 1.7; }
+.small { font-size: 8pt;   color: var(--s400); line-height: 1.55; }
+.micro { font-size: 6.5pt; color: var(--s600); }
+
+/* ── GAUGE Cinema Mode ── */
+.gauge-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gauge-glow {
+  position: absolute;
+  width: 38mm; height: 38mm;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(34,211,238,.09), transparent 68%);
+  pointer-events: none;
+}
+
+/* ── GLASSMORPHISM CARD ── */
+.card {
+  background: rgba(10, 22, 40, .80);
+  border: 1px solid rgba(71, 85, 105, .28);
+  border-radius: 10px;
+  padding: 4.5mm 5mm;
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(34,211,238,.35), transparent);
+}
+.card.p-card::before {
+  background: linear-gradient(90deg, transparent, rgba(167,139,250,.35), transparent);
+}
+
+/* ── CTA ── */
+.cta {
+  display: block;
+  background: #22D3EE;
+  color: #0a1628;
+  border: none;
+  border-radius: 9px;
+  padding: 4.5mm 8mm;
+  font-size: 9.5pt;
+  font-weight: 500;
+  text-align: center;
+  text-decoration: none;
+  letter-spacing: .02em;
+  box-shadow: 0 4px 24px rgba(34,211,238,.35), 0 1px 0 rgba(255,255,255,.15) inset;
+}
+.cta::after { content: '  →'; opacity:.8; }
+
+/* ── CICLO NODO ── */
+.nodo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5mm;
+}
+.nodo-dot {
+  width: 8mm; height: 8mm;
+  border-radius: 50%;
+  border: 1.5px solid rgba(34,211,238,.5);
+  background: rgba(34,211,238,.06);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 6pt; font-weight: 500; color: var(--cyan);
+}
+.nodo-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(34,211,238,.4), rgba(167,139,250,.25));
+  align-self: center;
+}
+.nodo-label { font-size: 5.5pt; color: var(--s400); text-align: center; letter-spacing: .06em; }
+.nodo-sub   { font-size: 5pt; color: var(--s600); text-align: center; }
+
+/* ── BORDE IZQ SEMÁNTICO ── */
+.bl-c { border-left: 2px solid rgba(34,211,238,.4);  padding: 2.5mm 4mm; }
+.bl-p { border-left: 2px solid rgba(167,139,250,.4); padding: 2.5mm 4mm; }
+
+/* ── PILAR ── */
+.pilar-num {
+  font-size: 18pt; font-weight: 200;
+  color: rgba(34,211,238,.2);
+  line-height: 1; letter-spacing: -0.04em;
+  min-width: 7mm; flex-shrink: 0;
+}
+
+/* ── LAYOUT ── */
+.pad    { padding: 11mm 13mm; }
+.g2     { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+.g3     { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3.5mm; }
+.col    { display: flex; flex-direction: column; }
+.row    { display: flex; align-items: flex-start; }
+
+.mb1{margin-bottom:1mm;} .mb2{margin-bottom:2mm;} .mb3{margin-bottom:3mm;}
+.mb4{margin-bottom:4mm;} .mb5{margin-bottom:5mm;} .mb6{margin-bottom:6mm;}
+.mb8{margin-bottom:8mm;} .mb10{margin-bottom:10mm;} .mb12{margin-bottom:12mm;}
+
+@media print {
+  body { background: #0a1628 !important; }
+  .page { margin:0; width:100%; }
+  * { print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+  @page { margin: 0; size: A4 portrait; }
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════
+     PÁGINA 1 — PORTADA
+     Protagonista izq: El problema financiero
+     Protagonista der: Gauge Cinema Mode + ciclo
+     UN gradiente: solo en pregunta que duele
+     UNA Tesla Line: solo en top
+════════════════════════════════════════════════ -->
+<div class="page">
+<span class="tesla"></span>
+
+<div class="pad" style="display:grid; grid-template-columns:50% 50%; gap:0;">
+
+  <!-- IZQUIERDA -->
+  <div class="col" style="padding-right:10mm; border-right:1px solid rgba(71,85,105,.15);">
+
+    <!-- Logo -->
+    <div class="mb6">
+      <img src="./images/focalizahr-logo_palabra.svg" alt="FocalizaHR"
+           style="height:24px; width:auto;" />
+    </div>
+
+    <!-- Título estilo portada app -->
+    <div class="mb6">
+      <div style="font-size:30pt; font-weight:200; letter-spacing:-0.03em; line-height:1.0; color:#ffffff;">Talent</div>
+      <div style="font-size:30pt; font-weight:200; letter-spacing:-0.03em; line-height:1.0; color:var(--purple);">Intelligence</div>
+    </div>
+
+    <!-- Separador dot — igual que la app -->
+    <div style="display:flex; align-items:center; gap:3mm; margin-bottom:6mm;">
+      <div style="width:8mm; height:1px; background:rgba(71,85,105,.4);"></div>
+      <div style="width:3px; height:3px; border-radius:50%; background:var(--purple);"></div>
+      <div style="width:8mm; height:1px; background:rgba(71,85,105,.4);"></div>
+    </div>
+
+    <!-- Headline — blanco puro, sin gradiente -->
+    <div class="disp d-xl white mb3" style="line-height:1.06;">
+      Pagas el 100%<br>
+      de la nómina.<br>
+      Recibes el 68%<br>
+      de la capacidad.
+    </div>
+
+    <span class="sep-short"></span>
+
+    <!-- GOLPE FINAL — cyan sólido, no gradiente multicolor -->
+    <div class="disp d-md mb8" style="color:var(--cyan);">
+      ¿Cuánto te cuesta ese 32%<br>cada mes — en pesos?
+    </div>
+
+    <!-- Cuerpo -->
+    <p class="mb8" style="font-size:8.5pt; color:var(--s300); font-weight:300; line-height:1.65; max-width:70mm;">
+      FocalizaHR es el único sistema que cubre el ciclo
+      completo de gestión de talento — continuo, automático,
+      sin fragmentos — y cuando termina,
+      <span class="white" style="font-weight:400;">no entrega datos.
+      Entrega la decisión.</span>
+    </p>
+
+    <!-- 4 Pilares -->
+    <div class="col mb8" style="gap:2.5mm;">
+      <div class="row" style="gap:3mm; align-items:baseline;">
+        <span class="pilar-num">1</span>
+        <div>
+          <p style="font-size:8pt; color:#fff; font-weight:400; margin-bottom:.5mm;">Conectado</p>
+          <p class="small">Un solo ciclo. Sin saltar entre sistemas.</p>
+        </div>
+      </div>
+      <div class="row" style="gap:3mm; align-items:baseline;">
+        <span class="pilar-num">2</span>
+        <div>
+          <p style="font-size:8pt; color:#fff; font-weight:400; margin-bottom:.5mm;">Continuo</p>
+          <p class="small">El proceso corre solo, de inicio a fin.</p>
+        </div>
+      </div>
+      <div class="row" style="gap:3mm; align-items:baseline;">
+        <span class="pilar-num">3</span>
+        <div>
+          <p style="font-size:8pt; color:#fff; font-weight:400; margin-bottom:.5mm;">Automático</p>
+          <p class="small">Notifica, hace seguimiento, cierra el ciclo.</p>
+        </div>
+      </div>
+      <div class="row" style="gap:3mm; align-items:baseline;">
+        <span class="pilar-num">4</span>
+        <div>
+          <p style="font-size:8pt; color:#fff; font-weight:400; margin-bottom:.5mm;">Inteligente</p>
+          <p class="small">No entrega datos. Entrega la decisión.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom tagline -->
+    <div style="margin-top:auto;">
+      <div class="divider mb3"></div>
+      <p class="small dim" style="font-style:italic; line-height:1.5;">
+        Sin meses de implementación —<br>
+        sin cursos ni manuales para los líderes.
+      </p>
+    </div>
+
+  </div>
+
+  <!-- DERECHA — Gauge + Ciclo -->
+  <div class="col" style="padding-left:10mm; align-items:center; justify-content:center;">
+
+    <div class="eyebrow mb5" style="text-align:center;">Capacidad organizacional real</div>
+
+    <!-- GAUGE SVG Cinema Mode — arco cyan puro, sin gradiente -->
+    <div class="gauge-wrap mb4" style="width:58mm; height:58mm;">
+      <div class="gauge-glow"></div>
+      <svg width="100%" height="100%" viewBox="0 0 200 200">
+        <defs>
+          <filter id="glow" x="-25%" y="-25%" width="150%" height="150%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="4.5" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <!-- Track — el 32% vacío que duele -->
+        <circle cx="100" cy="100" r="82" fill="none"
+          stroke="rgba(51,65,85,0.55)" stroke-width="10" stroke-linecap="round"/>
+        <!-- Progreso — cyan puro, sin gradiente (68% = dashoffset 164.9) -->
+        <circle cx="100" cy="100" r="82" fill="none"
+          stroke="#22D3EE" stroke-width="10" stroke-linecap="round"
+          stroke-dasharray="515.2" stroke-dashoffset="164.9"
+          transform="rotate(-90 100 100)" filter="url(#glow)"/>
+        <!-- Número — blanco extralight -->
+        <text x="100" y="90" text-anchor="middle" dominant-baseline="middle"
+          font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="50" font-weight="200"
+          fill="#ffffff" letter-spacing="-2">68%</text>
+        <!-- Label — cyan eyebrow -->
+        <text x="100" y="120" text-anchor="middle" dominant-baseline="middle"
+          font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="9" font-weight="500"
+          fill="#22D3EE" letter-spacing="3">CAPACIDAD REAL</text>
+      </svg>
+    </div>
+
+    <!-- La pérdida -->
+    <div class="mb6" style="text-align:center;">
+      <p style="font-size:9.5pt; color:#fff; font-weight:300; line-height:1.4; margin-bottom:1.5mm;">
+        El 32% restante lo pagas igual.
+      </p>
+      <p class="micro" style="font-style:italic; color:var(--s600);">Promedio dotaciones evaluadas · FocalizaHR Chile</p>
+    </div>
+
+    <div class="divider mb6" style="width:100%;"></div>
+
+    <!-- EL CICLO — 5 nodos conectados -->
+    <div class="eyebrow mb3" style="text-align:center;">El ciclo completo</div>
+
+    <div style="display:flex; align-items:center; width:100%; gap:0; margin-bottom:3mm;">
+      <div class="nodo">
+        <div class="nodo-dot">M</div>
+        <p class="nodo-label white">Metas</p>
+        <p class="nodo-sub">Cascada</p>
+      </div>
+      <div class="nodo-line"></div>
+      <div class="nodo">
+        <div class="nodo-dot">3</div>
+        <p class="nodo-label white">360°</p>
+        <p class="nodo-sub">Desempeño</p>
+      </div>
+      <div class="nodo-line"></div>
+      <div class="nodo">
+        <div class="nodo-dot" style="border-color:rgba(167,139,250,.5); color:var(--purple);">9</div>
+        <p class="nodo-label white">Nine-Box</p>
+        <p class="nodo-sub">Automático</p>
+      </div>
+      <div class="nodo-line"></div>
+      <div class="nodo">
+        <div class="nodo-dot">C</div>
+        <p class="nodo-label white">Calibración</p>
+        <p class="nodo-sub">Auditada</p>
+      </div>
+      <div class="nodo-line"></div>
+      <div class="nodo">
+        <div class="nodo-dot" style="border-color:rgba(167,139,250,.5); color:var(--purple);">S</div>
+        <p class="nodo-label white">Sucesión</p>
+        <p class="nodo-sub">Continua</p>
+      </div>
+    </div>
+
+    <!-- 3 implicancias del gauge -->
+    <div class="col" style="gap:2.5mm; width:100%;">
+      <div class="bl-c">
+        <p class="small white mb1">Cada gerencia tiene un costo oculto.</p>
+        <p class="small">Calculado en pesos, el primer día.</p>
+      </div>
+      <div class="bl-p">
+        <p class="small white mb1">Algunos líderes amplifican el problema.</p>
+        <p class="small">El sistema identifica cuál y cuánto cuesta.</p>
+      </div>
+      <div class="bl-c">
+        <p class="small white mb1">Tus planes del año pasado, ¿funcionaron?</p>
+        <p class="small">Por primera vez, tienes la respuesta.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div><!-- /page 1 -->
+
+
+<!-- ════════════════════════════════════════════════
+     PÁGINA 2 — LO QUE NADIE MÁS HACE
+     Protagonista: diferenciadores verificados en código
+     UNA Tesla Line: solo en top (purple, por contraste)
+     Sin gradiente de texto en esta página
+════════════════════════════════════════════════ -->
+<div class="page">
+<span class="tesla-p tesla"></span>
+
+<div class="pad">
+
+  <!-- ═══ ZONA 1 — Protagonista: los diferenciadores ═══ -->
+  <div class="mb10">
+
+    <div class="eyebrow mb3">Lo que solo FocalizaHR hace</div>
+
+    <div class="disp d-lg white mb3">
+      Siete capacidades que no<br>
+      existen juntas en ningún<br>
+      otro sistema del mercado.
+    </div>
+    <p class="body mb8" style="max-width:130mm;">
+      Verificadas en código. No promesas de marketing.
+      Cada una es un diferenciador estructural — no una funcionalidad extra.
+    </p>
+
+    <!-- 6 diferenciadores — 2 columnas, sin cards pesadas -->
+    <div class="g2" style="gap:3mm 8mm;">
+
+      <div>
+        <div style="display:flex; gap:2.5mm; align-items:flex-start; padding:3mm 0; border-bottom:1px solid rgba(71,85,105,.15);">
+          <span style="font-size:7pt; color:var(--cyan); font-weight:500; min-width:5mm; padding-top:.5mm;">01</span>
+          <div>
+            <p style="font-size:8.5pt; color:#fff; font-weight:400; margin-bottom:1mm;">Navegación inteligente</p>
+            <p class="small">El jefe abre el sistema y ve un botón con el nombre de la siguiente persona. No necesita saber nada más.</p>
+          </div>
+        </div>
+        <div style="display:flex; gap:2.5mm; align-items:flex-start; padding:3mm 0; border-bottom:1px solid rgba(71,85,105,.15);">
+          <span style="font-size:7pt; color:var(--cyan); font-weight:500; min-width:5mm; padding-top:.5mm;">02</span>
+          <div>
+            <p style="font-size:8.5pt; color:#fff; font-weight:400; margin-bottom:1mm;">El jefe llega a la conversación preparado</p>
+            <p class="small">Antes de cada reunión de feedback, el sistema ya analizó el perfil, identificó el patrón y le dice cómo abrir la conversación, qué preguntar y qué proponer. Actúa con inteligencia — no con intuición.</p>
+          </div>
+        </div>
+        <div style="display:flex; gap:2.5mm; align-items:flex-start; padding:3mm 0; border-bottom:1px solid rgba(71,85,105,.15);">
+          <span style="font-size:7pt; color:var(--cyan); font-weight:500; min-width:5mm; padding-top:.5mm;">03</span>
+          <div>
+            <p style="font-size:8.5pt; color:#fff; font-weight:400; margin-bottom:1mm;">Nine-Box que nace del proceso</p>
+            <p class="small">No es un proceso digitalizado y fragmentado. Es el resultado automático del ciclo: desempeño objetivo, potencial evaluado por el jefe y calibración colectiva.</p>
+          </div>
+        </div>
+        <div style="display:flex; gap:2.5mm; align-items:flex-start; padding:3mm 0;">
+          <span style="font-size:7pt; color:var(--cyan); font-weight:500; min-width:5mm; padding-top:.5mm;">04</span>
+          <div>
+            <p style="font-size:8.5pt; color:#fff; font-weight:400; margin-bottom:1mm;">Calibración auditada en tiempo real</p>
+            <p class="small">Sesión colaborativa remota. Chat en vivo. Justificación obligatoria por ajuste. PDF con QR para bonos y Ley Karin.</p>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div style="display:flex; gap:2.5mm; align-items:flex-start; padding:3mm 0; border-bottom:1px solid rgba(71,85,105,.15);">
+          <span style="font-size:7pt; color:var(--purple); font-weight:500; min-width:5mm; padding-top:.5mm;">05</span>
+          <div>
+            <p style="font-size:8.5pt; color:#fff; font-weight:400; margin-bottom:1mm;">Sucesión con cadena completa obligatoria</p>
+            <p class="small">Al activar un sucesor, el sistema requiere definir quién asume el cargo que esa persona deja. La cadena nunca queda incompleta.</p>
+          </div>
+        </div>
+        <div style="display:flex; gap:2.5mm; align-items:flex-start; padding:3mm 0; border-bottom:1px solid rgba(71,85,105,.15);">
+          <span style="font-size:7pt; color:var(--purple); font-weight:500; min-width:5mm; padding-top:.5mm;">06</span>
+          <div>
+            <p style="font-size:8.5pt; color:#fff; font-weight:400; margin-bottom:1mm;">Mide si tus planes del año pasado funcionaron</p>
+            <p class="small">El primer sistema del mundo que mide si los planes de desarrollo del ciclo anterior realmente mejoraron el rendimiento de tu gente.</p>
+          </div>
+        </div>
+        <div style="display:flex; gap:2.5mm; align-items:flex-start; padding:3mm 0;">
+          <span style="font-size:7pt; color:var(--purple); font-weight:500; min-width:5mm; padding-top:.5mm;">07</span>
+          <div>
+            <p style="font-size:8.5pt; color:#fff; font-weight:400; margin-bottom:1mm;">Costo financiero real de tu dotación</p>
+            <p class="small">No un porcentaje abstracto. La brecha de capacidad calculada en CLP por gerencia y nivel de cargo — el primer día.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Callout — el diagnóstico de equipo -->
+    <div style="margin-top:4mm; padding:3mm 5mm; border-left:2px solid rgba(34,211,238,.3); background:rgba(34,211,238,.03); border-radius:0 8px 8px 0;">
+      <p style="font-size:8pt; color:var(--s200); line-height:1.5; font-style:italic;">
+        Cuando el ciclo cierra, el sistema diagnostica el patrón de tu equipo completo —
+        <span class="white" style="font-style:normal; font-weight:400;">
+        si un área entera está perdiendo talento clave, operando al límite por liderazgo deficiente, o estancada por decisiones del año pasado.
+        </span> No datos. El nombre del problema y la acción.
+      </p>
+    </div>
+
+  </div>
+
+  <div class="divider mb6"></div>
+
+  <!-- ═══ ZONA 2 — Para quién ═══ -->
+  <div class="g2 mb6" style="gap:5mm;">
+
+    <div class="card">
+      <div class="eyebrow mb3">Para Gestión de Personas</div>
+      <p class="small white mb3" style="font-weight:400;">El proceso que siempre quisiste — sin perseguir a nadie.</p>
+      <div class="col" style="gap:1.5mm;">
+        <p class="small">El sistema notifica, hace seguimiento y lleva el proceso de inicio a fin de forma automática.</p>
+        <p class="small">El proceso es completamente intuitivo para los líderes — la navegación inteligente los guía en cada paso sin instrucción previa.</p>
+        <p class="small">Calibración auditada con PDF legal para compliance y bonos.</p>
+      </div>
+    </div>
+
+    <div class="card p-card">
+      <div class="eyebrow mb3" style="color:var(--purple);">Para el CEO</div>
+      <p class="small white mb3" style="font-weight:400;">La inteligencia que faltaba para tomar decisiones sobre personas.</p>
+      <div class="col" style="gap:1.5mm;">
+        <p class="small">¿Cuánto cuesta la ineficiencia de tu equipo — en pesos, por gerencia?</p>
+        <p class="small">¿Quién asume si tu talento crítico renuncia mañana? ¿La cadena está completa?</p>
+        <p class="small">¿Los planes de desarrollo del año pasado funcionaron — o fue dinero desperdiciado?</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="divider mb6"></div>
+
+  <!-- ═══ ZONA ARQUITECTURA — Garantías de negocio ═══ -->
+  <div class="mb6">
+    <div class="eyebrow mb2">Arquitectura enterprise</div>
+    <p style="font-size:8pt; color:var(--s400); line-height:1.5; margin-bottom:4mm;">
+      Infraestructura blindada para la información más sensible de tu empresa.
+    </p>
+
+    <div class="g3" style="gap:3mm;">
+
+      <div style="display:flex; gap:3mm; align-items:flex-start;">
+        <div style="width:1px; background:rgba(34,211,238,.3); flex-shrink:0; margin-top:1mm; align-self:stretch;"></div>
+        <div>
+          <p style="font-size:7.5pt; color:#fff; font-weight:400; margin-bottom:1.5mm;">Criptografía y aislamiento de datos</p>
+          <p class="small">La información de tu empresa no convive en una base de datos abierta. Salarios, bonos y evaluaciones son matemáticamente inaccesibles para cualquier otra organización — por diseño arquitectónico, no por configuración.</p>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:3mm; align-items:flex-start;">
+        <div style="width:1px; background:rgba(34,211,238,.3); flex-shrink:0; margin-top:1mm; align-self:stretch;"></div>
+        <div>
+          <p style="font-size:7.5pt; color:#fff; font-weight:400; margin-bottom:1.5mm;">Control de acceso por niveles jerárquicos</p>
+          <p class="small">El sistema valida cada permiso en cada interacción. El CEO tiene visión panorámica. Un líder de área jamás accede fuera de su equipo. Un muro jerárquico inviolable — sin que TI configure nada manualmente.</p>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:3mm; align-items:flex-start;">
+        <div style="width:1px; background:rgba(34,211,238,.3); flex-shrink:0; margin-top:1mm; align-self:stretch;"></div>
+        <div>
+          <p style="font-size:7.5pt; color:#fff; font-weight:400; margin-bottom:1.5mm;">Trazabilidad legal inmutable</p>
+          <p class="small">Cada evaluación, ajuste y feedback queda grabado con sello de tiempo y autoría que no se puede alterar. Un historial blindado válido para auditorías, compliance y normativas legales.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="divider mb6"></div>
+
+  <!-- ═══ ZONA TALENT ACTION CENTER ═══ -->
+  <div class="mb6">
+
+    <div style="background:rgba(10,22,40,.85); border:1px solid rgba(167,139,250,.2); border-radius:12px; overflow:hidden;">
+
+      <div style="padding:5mm 6mm;">
+
+        <!-- Sobre-título -->
+        <div class="eyebrow mb3">Talent Action Center</div>
+
+        <!-- Headline -->
+        <div class="disp d-md white mb4" style="line-height:1.2;">
+          El top talent tiene plan.<br>
+          ¿Y el resto?
+        </div>
+
+        <!-- Body -->
+        <p class="small mb4" style="line-height:1.7; max-width:150mm; color:var(--s300);">
+          FocalizaHR identifica a tus estrellas. Pero el día después del comité de talento,
+          queda una pregunta que nadie responde:
+          <span class="white" style="font-weight:400;">¿qué hago con el 60% que no va a ser promovido?</span>
+        </p>
+
+        <!-- Statement protagonista -->
+        <div style="margin-bottom:5mm;">
+          <p style="font-size:13pt; font-weight:200; letter-spacing:-0.02em; line-height:1.2; color:var(--purple);">
+            Una acción para cada persona.<br>
+            No solo para los elegidos.
+          </p>
+        </div>
+
+        <!-- Dos bloques -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:3mm; margin-bottom:4mm;">
+
+          <div class="bl-p">
+            <p class="small white mb1" style="font-weight:400;">Cuatro perfiles. Cero limbos.</p>
+            <p class="small">Retener. Intervenir. Desarrollar. Definir.<br>
+            Cada persona sabe qué sigue.<br>
+            Cada gerente sabe qué hacer.</p>
+          </div>
+
+          <div class="bl-c">
+            <p class="small white mb1" style="font-weight:400;">El plan que el sistema genera.</p>
+            <p class="small">No una lista de tareas para Gestión de Personas.
+            Una guía para el líder — con el contexto, la acción y el momento exacto.</p>
+          </div>
+
+        </div>
+
+        <!-- Cierre -->
+        <p class="micro" style="color:var(--s600); font-style:italic;">
+          El talento no gestionado es talento perdido.
+        </p>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="divider mb6"></div>
+
+  <!-- ═══ ZONA 3 — CTA ═══ -->
+  <div style="display:grid; grid-template-columns:60% 40%; gap:8mm; align-items:center;">
+
+    <div>
+      <div class="eyebrow mb3">La propuesta</div>
+      <div class="disp d-sm white mb4" style="line-height:1.4;">
+        Un sistema — todo el ciclo —<br>
+        la decisión al final.
+      </div>
+      <div class="col" style="gap:1.5mm;">
+        <div style="display:flex; gap:3mm; align-items:baseline;">
+          <span style="font-size:7pt; color:var(--cyan); min-width:16mm; font-weight:400;">Gestión de Personas</span>
+          <span class="small">opera sin perseguir a nadie.</span>
+        </div>
+        <div style="display:flex; gap:3mm; align-items:baseline;">
+          <span style="font-size:7pt; color:var(--cyan); min-width:16mm; font-weight:400;">FocalizaHR</span>
+          <span class="small">orquesta todo el ciclo automáticamente.</span>
+        </div>
+        <div style="display:flex; gap:3mm; align-items:baseline;">
+          <span style="font-size:7pt; color:var(--cyan); min-width:16mm; font-weight:400;">El CEO</span>
+          <span class="small">recibe la decisión — no un reporte.</span>
+        </div>
+      </div>
+
+      <!-- Mención productos complementarios -->
+      <div class="mt4" style="margin-top:4mm; padding:3mm 4mm; background:rgba(71,85,105,.12); border-radius:6px;">
+        <p class="micro" style="color:var(--s300); line-height:1.9; margin-bottom:2mm;">
+          <span style="color:#fff; font-weight:400;">El 71% de la rotación no es por sueldo.</span>
+          FocalizaHR lo detecta antes de que cueste.*<br>
+          El ciclo empieza desde el primer día — y cierra cuando alguien se va.
+          Lo que esa persona dijo 30 días después de salir
+          ya estaba predicho 8 meses antes.**
+        </p>
+        <p class="micro" style="color:var(--s600); line-height:1.7; margin-bottom:2mm;">
+          * <span style="color:var(--s500,#64748b);">Retención Predictiva + Onboarding Journey Intelligence</span> ·
+          ** <span style="color:var(--s500,#64748b);">Exit Intelligence</span>
+        </p>
+        <div class="divider" style="margin-bottom:2mm;"></div>
+        <p class="micro" style="color:var(--s600); line-height:1.8;">
+          FocalizaHR también incluye —
+          <span style="color:var(--s400);">Onboarding Journey Intelligence</span> ·
+          <span style="color:var(--s400);">Exit Intelligence</span> ·
+          <span style="color:var(--s400);">Retención Predictiva</span> ·
+          <span style="color:var(--s400);">Pulso Express</span> ·
+          <span style="color:var(--s400);">Ambiente Sano · Ley Karin</span>
+        </p>
+      </div>
+    </div>
+
+    <div class="col" style="gap:4mm;">
+
+      <!-- Frase de impacto -->
+      <div style="padding:3mm 4mm; background:rgba(34,211,238,.04); border-left:2px solid rgba(34,211,238,.3); border-radius:0 7px 7px 0; margin-bottom:1mm;">
+        <p class="small" style="color:var(--s200); line-height:1.65; font-style:italic;">
+          "El 40% de los nuevos talentos se va en 6 meses.
+          ¿Sabes cuánto te costó ese número el año pasado,
+          dónde se concentró y cuáles fueron los motivos reales?"
+        </p>
+      </div>
+
+      <a class="cta" href="#" style="font-size:9.5pt;">Agendar Demo Ejecutiva</a>
+      <div style="text-align:center;">
+        <p class="small dim" style="line-height:1.9;">
+          Sin costo de implementación<br>
+          Sin cambiar tus procesos<br>
+          Resultados desde el primer ciclo
+        </p>
+        <p class="micro" style="margin-top:3mm;">focalizahr.cl · ventas@focalizahr.com</p>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /pad -->
+
+<!-- Footer -->
+<div style="margin-top:6mm; height:1px; background:rgba(71,85,105,.18);"></div>
+<div style="padding:2.5mm 13mm; display:flex; justify-content:space-between; align-items:center; background:rgba(8,15,30,.92);">
+  <span class="micro" style="letter-spacing:.08em; text-transform:uppercase;">

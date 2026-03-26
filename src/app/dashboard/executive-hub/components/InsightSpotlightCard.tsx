@@ -130,7 +130,7 @@ export const InsightSpotlightCard = memo(function InsightSpotlightCard({
               <Loader2 className="w-8 h-8 text-slate-600 animate-spin" />
             </div>
           ) : spotlightData ? (
-            <DetailContent type={type} data={spotlightData} cycleId={cycleId} userRole={userRole} onSelectGerencia={onSelectGerencia} />
+            <DetailContent type={type} data={spotlightData} cycleId={cycleId} userRole={userRole} companyName={summary.companyName} roleFit={summary.capacidades.roleFit} onSelectGerencia={onSelectGerencia} />
           ) : (
             <div className="flex items-center justify-center h-full">
               <p className="text-slate-600">Sin datos disponibles</p>
@@ -291,8 +291,8 @@ function StatRow({ label, value, color, tooltip }: { label: string; value: strin
 // DETAIL CONTENT (Right panel)
 // ════════════════════════════════════════════════════════════════════════════
 
-function DetailContent({ type, data, cycleId, userRole, onSelectGerencia }: {
-  type: InsightType; data: any; cycleId?: string | null; userRole?: string | null; onSelectGerencia?: (g: string) => void
+function DetailContent({ type, data, cycleId, userRole, companyName, roleFit, onSelectGerencia }: {
+  type: InsightType; data: any; cycleId?: string | null; userRole?: string | null; companyName?: string; roleFit?: number; onSelectGerencia?: (g: string) => void
 }) {
   const isAdmin = userRole === 'FOCALIZAHR_ADMIN'
   switch (type) {
@@ -307,6 +307,6 @@ function DetailContent({ type, data, cycleId, userRole, onSelectGerencia }: {
     case 'sucesion':
       return <SuccessionPanel data={data} />
     case 'pl-talento':
-      return <PLTalent data={data} cycleId={cycleId || undefined} />
+      return <PLTalent data={data} cycleId={cycleId || undefined} companyName={companyName} roleFit={roleFit} />
   }
 }

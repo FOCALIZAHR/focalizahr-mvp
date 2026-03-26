@@ -8,6 +8,7 @@
 // Motor 1: Role Fit × Antigüedad (TenureRoleFitDictionary)
 // Motor 2: Impacto por Gerencia (BusinessImpactDictionary)
 // Motor 3: Riesgo de Liderazgo (LeadershipRiskDictionary) — condicional
+// Motor 4: Riesgo de Sucesión (SuccessionRiskDictionary) — a nivel summary
 // + Sucesión + Financiero
 //
 // Arquitectura Enterprise:
@@ -39,6 +40,12 @@ import {
   LEADERSHIP_RISK_DICTIONARY,
   type LeadershipImpact,
 } from '@/config/narratives/LeadershipRiskDictionary'
+import {
+  SUCCESSION_RISK_DICTIONARY,
+  type SuccessionMetrics,
+} from '@/config/narratives/SuccessionRiskDictionary'
+
+export type { SuccessionMetrics }
 
 // ════════════════════════════════════════════════════════════════════════════
 // OUTPUT TYPES — Separation of Concerns
@@ -132,7 +139,7 @@ export class TalentRiskOrchestrator {
             parent: { select: { standardCategory: true } },
           },
         },
-        _count: { select: { directReports: { where: { status: 'ACTIVE' } } } },
+        _count: { select: { directReports: { where: { status: 'ACTIVE', accountId } } } },
       },
     })
     if (!employee || !employee.hireDate) return null
@@ -149,7 +156,7 @@ export class TalentRiskOrchestrator {
       select: {
         positionTitle: true,
         benchStrength: true,
-        candidates: { where: { status: 'ACTIVE' }, select: { id: true }, take: 1 },
+        candidates: { where: { status: 'ACTIVE' }, select: { id: true, readinessLevel: true } },
       },
     })
 
@@ -202,13 +209,13 @@ export class TalentRiskOrchestrator {
                 parent: { select: { standardCategory: true } },
               },
             },
-            _count: { select: { directReports: { where: { status: 'ACTIVE' } } } },
+            _count: { select: { directReports: { where: { status: 'ACTIVE', accountId } } } },
           },
         },
       },
     })
 
-    // 2. Batch fetch: critical positions
+    // 2. Batch fetch: critical positions (with readinessLevel for Motor 4)
     const employeeIds = ratings.map(r => r.employeeId)
     const criticalPositions = await prisma.criticalPosition.findMany({
       where: { accountId, isActive: true, incumbentId: { in: employeeIds } },
@@ -216,7 +223,10 @@ export class TalentRiskOrchestrator {
         incumbentId: true,
         positionTitle: true,
         benchStrength: true,
-        candidates: { where: { status: 'ACTIVE' }, select: { id: true }, take: 1 },
+        candidates: {
+          where: { status: 'ACTIVE' },
+          select: { id: true, readinessLevel: true },
+        },
       },
     })
     const criticalByIncumbent = new Map(
@@ -271,6 +281,37 @@ export class TalentRiskOrchestrator {
 
     return payloads
   }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // MOTOR 4: Succession Metrics (calculated from payloads)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  static buildSuccessionMetrics(payloads: ExecutiveRiskPayload[]): SuccessionMetrics {
+    const critical = payloads.filter(p => p.data.isIncumbentOfCriticalPosition)
+    const totalCriticalPositions = critical.length
+
+    if (totalCriticalPositions === 0) {
+      return {
+        totalCriticalPositions: 0,
+        avgFitCriticos: 0,
+        withImmediateSuccessor: 0,
+        withoutImmediateSuccessor: 0,
+      }
+    }
+
+    const avgFitCriticos = Math.round(
+      critical.reduce((sum, p) => sum + p.data.roleFitScore, 0) / totalCriticalPositions
+    )
+    const withImmediateSuccessor = critical.filter(p => p.data.hasSuccessor).length
+    const withoutImmediateSuccessor = totalCriticalPositions - withImmediateSuccessor
+
+    return {
+      totalCriticalPositions,
+      avgFitCriticos,
+      withImmediateSuccessor,
+      withoutImmediateSuccessor,
+    }
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -296,7 +337,7 @@ function buildPayloadFromRow(
   criticalPos: {
     positionTitle: string
     benchStrength: string
-    candidates: { id: string }[]
+    candidates: { id: string; readinessLevel: string }[]
   } | null,
 ): ExecutiveRiskPayload | null {
   if (!employee.hireDate) return null
@@ -323,6 +364,16 @@ function buildPayloadFromRow(
   const directReportsCount = employee._count.directReports
   const isLeader = directReportsCount > 0
 
+  // DEBUG — remove after confirming isLeader fix
+  if (directReportsCount > 0 || ['cmlh3t0u0002y1134wt9yr5ck', 'cmlh3t0u1003211347hojzg52', 'cmlh3t0u100301134576cqqi6', 'cmkrlxw8i0003c6q5amursr0o'].includes(employee.id)) {
+    console.log('[isLeader debug]', {
+      employeeId: employee.id,
+      fullName: employee.fullName,
+      directReportsCount: employee._count?.directReports,
+      isLeader,
+    })
+  }
+
   return {
     data: {
       employeeId: employee.id,
@@ -340,7 +391,7 @@ function buildPayloadFromRow(
       isIncumbentOfCriticalPosition: !!criticalPos,
       criticalPositionTitle: criticalPos?.positionTitle || null,
       benchStrength: criticalPos?.benchStrength || null,
-      hasSuccessor: (criticalPos?.candidates.length ?? 0) > 0,
+      hasSuccessor: criticalPos?.candidates.some(c => c.readinessLevel === 'READY_NOW') ?? false,
       monthlyGap,
       finiquitoToday,
       breakevenMonths,
