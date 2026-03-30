@@ -364,15 +364,6 @@ function buildPayloadFromRow(
   const directReportsCount = employee._count.directReports
   const isLeader = directReportsCount > 0
 
-  // DEBUG — remove after confirming isLeader fix
-  if (directReportsCount > 0 || ['cmlh3t0u0002y1134wt9yr5ck', 'cmlh3t0u1003211347hojzg52', 'cmlh3t0u100301134576cqqi6', 'cmkrlxw8i0003c6q5amursr0o'].includes(employee.id)) {
-    console.log('[isLeader debug]', {
-      employeeId: employee.id,
-      fullName: employee.fullName,
-      directReportsCount: employee._count?.directReports,
-      isLeader,
-    })
-  }
 
   return {
     data: {

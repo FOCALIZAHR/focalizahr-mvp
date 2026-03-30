@@ -52,7 +52,7 @@ export interface RoleFitMatrix {
   overall: number
   byLayer: Record<string, number>
   matrix: Record<string, Record<string, LayerGerenciaFit>>
-  worstCell: { layer: string; gerencia: string; score: number }
+  worstCell: { layer: string; gerencia: string; score: number; count: number }
   investmentPriorities: Array<{
     layer: string
     layerLabel: string
@@ -323,7 +323,7 @@ export class RoleFitAnalyzer {
 
     // 3. Calcular promedios y encontrar peor celda
     let worstScore = 100
-    let worstCell = { layer: '', gerencia: '', score: 100 }
+    let worstCell = { layer: '', gerencia: '', score: 100, count: 0 }
     let overallSum = 0
     let overallCount = 0
     const byLayer: Record<string, number> = {}
@@ -346,7 +346,7 @@ export class RoleFitAnalyzer {
 
         if (avg < worstScore) {
           worstScore = avg
-          worstCell = { layer, gerencia, score: avg }
+          worstCell = { layer, gerencia, score: avg, count: data.count }
         }
 
         if (avg < 75) {

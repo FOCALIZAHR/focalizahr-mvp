@@ -253,9 +253,7 @@ export class PLTalentService {
       c.roleFits.push(roleFit)
     }
 
-    // DEBUG — remove after confirming fix
-    console.log(`[PLTalentService] gerenciaMap.size = ${gerenciaMap.size}`,
-      Array.from(gerenciaMap.values()).map(g => `${g.name} (${g.id.slice(-6)}, cat=${g.standardCategory})`))
+
 
     // Build result
     const byGerencia: BrechaGerencia[] = Array.from(gerenciaMap.values())

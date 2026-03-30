@@ -57,7 +57,7 @@ interface RiskProfilesSummary {
 // COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
-export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, roleFit }: PLTalentProps & { cycleId?: string; companyName?: string; roleFit?: number }) {
+export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, roleFit, worstLayer, worstGerencia, worstCellCount, worstCellScore }: PLTalentProps & { cycleId?: string; companyName?: string; roleFit?: number; worstLayer?: string; worstGerencia?: string; worstCellCount?: number; worstCellScore?: number }) {
   const [view, setView] = useState<View>('portada')
   const [selectedGerencia, setSelectedGerencia] = useState<{ id: string; name: string } | null>(null)
 
@@ -87,13 +87,6 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
   const gerenciaImpact = useMemo(() => {
     if (!selectedGerenciaName) return null
     const ger = data.brecha.byGerencia.find(g => g.gerenciaName === selectedGerenciaName)
-    // DEBUG — remove after confirming fix
-    console.log('[PLTalent] gerenciaImpact lookup:', {
-      selectedGerenciaName,
-      found: !!ger,
-      standardCategory: ger?.standardCategory,
-      dictMatch: ger?.standardCategory ? !!BUSINESS_IMPACT_DICTIONARY[ger.standardCategory] : false,
-    })
     if (!ger?.standardCategory) return null
     return BUSINESS_IMPACT_DICTIONARY[ger.standardCategory] || null
   }, [selectedGerenciaName, data.brecha.byGerencia])
@@ -106,15 +99,6 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
       totalDirectReports: leaders.reduce((sum, p) => sum + p.data.directReportsCount, 0),
     }
   }, [riskProfiles])
-
-  // DEBUG — remove after confirming leadershipData
-  console.log('[leadershipData debug]', {
-    totalProfiles: riskProfiles.length,
-    profilesWithIsLeader: riskProfiles.filter(p => p.data.isLeader).length,
-    leadersWithLowFit: riskProfiles.filter(p => p.data.isLeader && p.data.roleFitScore < 75).length,
-    leadersWithLeadershipRisk: riskProfiles.filter(p => p.narratives.leadershipRisk !== null).length,
-    leadershipDataResult: leadershipData,
-  })
 
   const totalManagers = useMemo(() =>
     riskProfiles.filter(p => p.data.isLeader).length
@@ -227,42 +211,18 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
               totalDirectReports={leadershipData.totalDirectReports}
               totalManagers={totalManagers}
               roleFit={roleFit ?? 0}
+              worstLayer={worstLayer}
+              worstGerencia={worstGerencia}
+              worstCellCount={worstCellCount}
+              worstCellScore={worstCellScore}
               companyName={companyName || 'tu organización'}
               onNavigateToLens={(lens) => setActiveLens(lens as LensType)}
               onNavigateToCargoFamily={() => { setView('mapa') }}
             />
 
-            {/* Leadership Alert (Motor 3) */}
-            {leadershipData.leadersAtRisk > 0 && (
-              <PLTalentLeadershipAlert
-                leadersAtRisk={leadershipData.leadersAtRisk}
-                totalDirectReports={leadershipData.totalDirectReports}
-                leadershipRisk={LEADERSHIP_RISK_DICTIONARY}
-              />
-            )}
-
-            {/* Split-Brain Main */}
-            <PLTalentSplitBrain
-              heroNumber={data.brecha.totalGapMonthly * 12}
-              monthlyGap={data.brecha.totalGapMonthly}
-              totalPeople={data.brecha.totalPeople}
-              fteLoss={data.brecha.fteLoss}
-              ranking={data.brecha.byGerencia}
-              salarySource={data.brecha.salarySource}
-              selectedGerencia={selectedGerenciaName}
-              gerenciaImpact={gerenciaImpact}
-              onGerenciaSelect={setSelectedGerenciaName}
-            />
-
-            {/* Semáforo Drawer (bottom bar) */}
-            <PLTalentSemaforoDrawer
-              summary={{
-                totalPeople: data.semaforo.totalPeople,
-                totalLiability: data.semaforo.totalLiability,
-                monthlyGrowth: data.semaforo.monthlyGrowth,
-              }}
-              people={data.semaforo.people}
-            />
+            {/* La Cascada de la Verdad ES la vista principal —
+                LeadershipAlert, SplitBrain y SemaforoDrawer eliminados
+                porque duplicaban información que el briefing ya contiene */}
           </motion.div>
         )}
 

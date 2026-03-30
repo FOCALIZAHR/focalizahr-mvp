@@ -4,16 +4,19 @@
 // EXECUTIVE BRIEFING — "La Cascada de la Verdad"
 // src/app/dashboard/executive-hub/components/PLTalent/components/PLTalentExecutiveBriefing.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// 6 párrafos condicionales que traducen datos duros en narrativa ejecutiva.
+// Dossier Ejecutivo — 4 actos con número ancla por acto.
+// Arquitectura: Flujo tipográfico libre, whileInView, space-y-24.
 // Motores: 1 (Tenure), 2 (Gerencia), 3 (Liderazgo), 4 (Sucesión)
 // ════════════════════════════════════════════════════════════════════════════
 
 import { memo, useMemo, useState } from 'react'
-import { HelpCircle, X, Target } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { HelpCircle, X, Target, ArrowRight, Clock, Zap, Shield, UserMinus, Users } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { formatCurrency } from '../PLTalent.utils'
 import type { BrechaProductivaData, SemaforoLegalData } from '../PLTalent.types'
+import { ACOTADO_LABELS } from '@/lib/services/PositionAdapter'
+import { getFamiliaVolumenNarrative, getWorstCellNarrative } from '@/config/narratives/FamiliaVolumenDictionary'
 import { BUSINESS_IMPACT_DICTIONARY } from '@/config/narratives/BusinessImpactDictionary'
 import { LEADERSHIP_RISK_DICTIONARY } from '@/config/narratives/LeadershipRiskDictionary'
 import { TENURE_ROLEFIT_DICTIONARY, type TenureTrend } from '@/config/narratives/TenureRoleFitDictionary'
@@ -44,13 +47,17 @@ interface PLTalentExecutiveBriefingProps {
   totalDirectReports: number
   totalManagers: number
   roleFit: number
+  worstLayer?: string
+  worstGerencia?: string
+  worstCellCount?: number
+  worstCellScore?: number
   companyName: string
   onNavigateToLens?: (lens: string) => void
   onNavigateToCargoFamily?: () => void
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// TOOLTIP CONTENT
+// CONSTANTS
 // ════════════════════════════════════════════════════════════════════════════
 
 const TOOLTIP_ITEMS = [
@@ -59,6 +66,33 @@ const TOOLTIP_ITEMS = [
   { label: 'Calibración', desc: 'si los criterios de evaluación son justos' },
   { label: 'Sucesión', desc: 'quién está listo para el siguiente nivel' },
 ]
+
+const RISK_ICON_MAP: Record<string, typeof Clock> = {
+  'Riesgo de Velocidad': Clock,
+  'Vulnerabilidad de Continuidad': Zap,
+  'Riesgo de Seguridad': Shield,
+  'Fuga de Talento Técnico': UserMinus,
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ANIMATION — whileInView (scroll-triggered, once)
+// ════════════════════════════════════════════════════════════════════════════
+
+const viewport = { once: true, margin: '-80px' }
+
+const fadeIn = {
+  initial: { opacity: 0, y: 30 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport,
+  transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] as const },
+}
+
+const fadeInDelay = {
+  initial: { opacity: 0, y: 30 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport,
+  transition: { duration: 0.4, delay: 0.15, ease: [0.16, 1, 0.3, 1] as const },
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENT
@@ -73,6 +107,10 @@ export default memo(function PLTalentExecutiveBriefing({
   totalDirectReports,
   totalManagers,
   roleFit,
+  worstLayer,
+  worstGerencia,
+  worstCellCount,
+  worstCellScore,
   companyName,
   onNavigateToLens,
   onNavigateToCargoFamily,
@@ -81,30 +119,32 @@ export default memo(function PLTalentExecutiveBriefing({
   const [leadershipModalOpen, setLeadershipModalOpen] = useState(false)
   const [tooltipOpen, setTooltipOpen] = useState(false)
 
-  // ── Derived data ──────────────────────────────────────────────────────
+  // ── Derived data (NO TOCAR) ─────────────────────────────────────────
 
   const totalGapAnnual = brecha.totalGapMonthly * 12
   const pctBajoEstandar = brecha.totalEvaluated > 0
     ? Math.round((brecha.totalPeople / brecha.totalEvaluated) * 100) : 0
   const pctLideres = totalManagers > 0
     ? Math.round((leadersAtRisk / totalManagers) * 100) : 0
+
   const nCriticosBajoEstandar = useMemo(() =>
     riskProfiles.filter(p => p.data.isIncumbentOfCriticalPosition && p.data.roleFitScore < 75).length
   , [riskProfiles])
 
-  // Párrafo 2: familia con más PERSONAS (volumen)
   const familiaVolumen = useMemo(() => {
     if (brecha.byCargoFamily.length === 0) return null
     return [...brecha.byCargoFamily].sort((a, b) => b.headcount - a.headcount)[0]
   }, [brecha.byCargoFamily])
 
-  // Párrafo 2 línea 2 + Párrafo 3: gerencia con mayor COSTO (impacto)
+  const pctFamilia = familiaVolumen && brecha.totalPeople > 0
+    ? Math.round((familiaVolumen.headcount / brecha.totalPeople) * 100)
+    : 0
+
   const gerenciaTopCosto = useMemo(() => {
     if (brecha.byGerencia.length === 0) return null
     return [...brecha.byGerencia].sort((a, b) => b.gapMonthly - a.gapMonthly)[0]
   }, [brecha.byGerencia])
 
-  // Párrafo 3: Motor 2 de esa gerencia
   const motor2Impact = useMemo((): GerenciaImpact | null => {
     if (!gerenciaTopCosto?.standardCategory) return null
     if (riskSummary?.gerenciaImpact?.[gerenciaTopCosto.standardCategory]) {
@@ -113,27 +153,13 @@ export default memo(function PLTalentExecutiveBriefing({
     return BUSINESS_IMPACT_DICTIONARY[gerenciaTopCosto.standardCategory] || null
   }, [gerenciaTopCosto, riskSummary])
 
-  // Párrafo 3: risks inline como lista de labels
-  const motor2RisksInline = useMemo(() => {
-    if (!motor2Impact) return ''
-    const labels = motor2Impact.risks.map(r => r.label.toLowerCase())
-    if (labels.length <= 1) return labels[0] || ''
-    return labels.slice(0, -1).join(', ') + ' y ' + labels[labels.length - 1]
-  }, [motor2Impact])
-
-  // Párrafo 3: distribución por tramo de la gerencia top (Motor 1 × Motor 2 cruzado)
-  // Base total (sin filtro prematuro) — separa fit alto y bajo por tramo
   const gerenciaTramoData = useMemo(() => {
     if (!gerenciaTopCosto || riskProfiles.length === 0) return null
-
-    // TODOS los profiles de esta gerencia (fit alto Y bajo)
     const gerName = gerenciaTopCosto.gerenciaName.toLowerCase().split(' ').pop() || ''
     const gerProfiles = riskProfiles.filter(p =>
       p.data.departmentName.toLowerCase().includes(gerName)
     )
     if (gerProfiles.length === 0) return null
-
-    // Conteo por tramo: total, bajo fit, alto fit
     const count = (trend: TenureTrend) => {
       const all = gerProfiles.filter(p => p.data.tenureTrend === trend)
       return {
@@ -142,32 +168,18 @@ export default memo(function PLTalentExecutiveBriefing({
         high: all.filter(p => p.data.roleFitScore >= 75).length,
       }
     }
-    const a1 = count('A1')
-    const a2 = count('A2')
-    const a3 = count('A3')
-
-    // Tramo dominante (por cantidad de bajo fit)
+    const a1 = count('A1'), a2 = count('A2'), a3 = count('A3')
     const lowCounts = [
       { trend: 'A1' as TenureTrend, count: a1.low },
       { trend: 'A2' as TenureTrend, count: a2.low },
       { trend: 'A3' as TenureTrend, count: a3.low },
     ].sort((a, b) => b.count - a.count)
-
     const dominant = lowCounts[0].count > 0 ? lowCounts[0].trend : 'A2' as TenureTrend
     const dominantCount = lowCounts[0].count
     const narrative = TENURE_ROLEFIT_DICTIONARY[dominant].low
-
-    return {
-      a1, a2, a3,
-      dominant, dominantCount,
-      total: gerProfiles.length,
-      totalLow: a1.low + a2.low + a3.low,
-      totalHigh: a1.high + a2.high + a3.high,
-      narrative,
-    }
+    return { a1, a2, a3, dominant, dominantCount, total: gerProfiles.length, totalLow: a1.low + a2.low + a3.low, totalHigh: a1.high + a2.high + a3.high, narrative }
   }, [gerenciaTopCosto, riskProfiles])
 
-  // Párrafo 3: breakeven por gerencia (cruce brecha × semáforo)
   const gerenciaBreakevenMonths = useMemo(() => {
     if (!gerenciaTopCosto || gerenciaTopCosto.gapMonthly <= 0) return null
     const legalPeople = semaforo.people.filter(p =>
@@ -180,335 +192,450 @@ export default memo(function PLTalentExecutiveBriefing({
     return totalFiniquito > 0 ? Math.round(totalFiniquito / gerenciaTopCosto.gapMonthly) : null
   }, [gerenciaTopCosto, semaforo.people])
 
-  // Párrafo 5: narrativa de tenure viene pre-calculada del backend (summary.tenureNarrative)
+  const pctCriticos = nCriticosBajoEstandar > 0 && riskSummary?.successionMetrics
+    ? Math.round((nCriticosBajoEstandar / riskSummary.successionMetrics.totalCriticalPositions) * 100)
+    : 0
 
   // ── Guards ────────────────────────────────────────────────────────────
 
   if (brecha.totalPeople === 0) return null
 
-  // ── Render ────────────────────────────────────────────────────────────
+  // ── Render — Dossier Ejecutivo ────────────────────────────────────────
 
   return (
     <>
-      <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/30 rounded-2xl p-6 md:p-8">
+      <div className="space-y-24">
 
-        {/* ═══ TOOLTIP — Proceso de gestión de talento ═══ */}
-        <div className="relative inline-block mb-8">
-          <button
-            onClick={() => setTooltipOpen(!tooltipOpen)}
-            onMouseEnter={() => setTooltipOpen(true)}
-            onMouseLeave={() => setTooltipOpen(false)}
-            className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-400 transition-colors"
-          >
-            <HelpCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
-            <span>Proceso de gestión de talento</span>
-          </button>
+        {/* ═══ SEPARADOR INICIAL ═══ */}
+        <ActSeparator label="Productividad" color="cyan" />
 
-          {tooltipOpen && (
-            <div className="absolute top-full left-0 mt-2 w-80 px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 shadow-xl z-50">
-              <p className="text-xs text-slate-300 mb-2.5">
-                El proceso de gestión de talento en {companyName} midió:
-              </p>
-              <div className="space-y-1.5">
-                {TOOLTIP_ITEMS.map(item => (
-                  <div key={item.label} className="flex items-baseline gap-2">
-                    <span className="text-slate-600 text-xs">·</span>
-                    <span className="text-xs">
-                      <span className="text-cyan-400 font-medium">{item.label}</span>
-                      <span className="text-slate-500"> — {item.desc}</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* ═══════════════════════════════════════════════════════════════
+            ACTO 1 — EL DIAGNÓSTICO
+            Ancla: {roleFit}% en cyan
+        ═══════════════════════════════════════════════════════════════ */}
+        <div>
+          {/* Ancla — PICO 1 */}
+          <motion.div {...fadeInDelay} className="text-center mb-10">
+            <p className="text-7xl md:text-8xl font-extralight text-cyan-400 tracking-tight">
+              {roleFit}%
+            </p>
+          </motion.div>
 
-        <div className="space-y-6">
+          {/* Narrativa P1 */}
+          <motion.div {...fadeIn} className="space-y-4 max-w-2xl mx-auto">
+            <p className="text-xl font-light text-slate-300 text-center">
+              Tu organización opera al {roleFit}% de las competencias que sus cargos exigen.
+            </p>
 
-          {/* ═══ P1 — Capacidad organizacional + hallazgo ═══ */}
-          <p className="text-base font-light text-slate-300 leading-relaxed">
-            Tu organización opera al{' '}
-            <span className="text-cyan-400 font-medium">{roleFit}%</span>{' '}
-            de las competencias que sus cargos exigen.
-          </p>
-          <p className="text-base font-light text-slate-300 leading-relaxed">
-            Al completar el proceso de gestión de talento en {companyName}, los algoritmos de FocalizaHR analizaron cada cargo contra las competencias que ese rol específicamente exige.
-          </p>
-          <p className="text-base font-light text-slate-300 leading-relaxed">
-            <span className="text-cyan-400 font-medium">{pctBajoEstandar}%</span> de{' '}
-            <span className="text-cyan-400 font-medium">{brecha.totalEvaluated}</span>{' '}
-            personas evaluadas no alcanzan el estándar mínimo de su cargo, y se les paga igual que si lo cumplieran.
-          </p>
-
-          {/* ═══ P2 — Concentración + costo ═══ */}
-          {familiaVolumen && gerenciaTopCosto && (
-            <div>
-              <p className="text-base font-light text-slate-300 leading-relaxed">
-                <span className="text-cyan-400 font-medium">{familiaVolumen.headcount}</span>{' '}
-                de esas personas están en{' '}
-                <span className="text-cyan-400 font-medium">{familiaVolumen.label}</span>,{' '}
-                la mayor concentración del problema.
-              </p>
-              <p className="text-base font-light text-slate-300 leading-relaxed mt-4">
-                El mayor costo financiero está en{' '}
-                <span className="text-cyan-400 font-medium">{gerenciaTopCosto.gerenciaName}</span>:{' '}
-                <span className="text-cyan-400 font-medium">{formatCurrency(gerenciaTopCosto.gapMonthly)}/mes</span>.
-              </p>
-              <button
-                onClick={onNavigateToCargoFamily}
-                className="mt-2 text-cyan-400 hover:text-cyan-300 text-sm transition-colors"
-              >
-                Ver por familia de cargo →
-              </button>
-            </div>
-          )}
-
-          {/* ═══ P3 — Motor 3: Liderazgo (condicional) ═══ */}
-          {leadersAtRisk > 0 && (
-            <div>
-              <p className="text-base font-light text-slate-300 leading-relaxed">
-                El dato más delicado está en la línea de mando:{' '}
-                <span className="text-cyan-400 font-medium">{pctLideres}%</span> de los{' '}
-                <span className="text-cyan-400 font-medium">{leadersAtRisk}</span>{' '}
-                líderes operan bajo el estándar de su cargo.
-              </p>
-              <p className="text-base font-light text-slate-300 leading-relaxed">
-                Un líder que no domina su rol no solo compromete su propio resultado, arrastra el rendimiento de las{' '}
-                <span className="text-cyan-400 font-medium">{totalDirectReports}</span>{' '}
-                personas que dependen de su dirección.
-              </p>
-              <button
-                onClick={() => setLeadershipModalOpen(true)}
-                className="mt-2 text-cyan-400 hover:text-cyan-300 text-sm transition-colors"
-              >
-                Ver detalle →
-              </button>
-            </div>
-          )}
-
-          {/* ═══ P4 — Motor 2 × Motor 1: Revelación de Negocio ═══ */}
-          {motor2Impact && gerenciaTopCosto && (
-            <div className="bg-slate-800/30 backdrop-blur-xl border border-slate-700/30 rounded-2xl overflow-hidden">
-              <div className="fhr-top-line" />
-
-              {/* ── ZONA 1: Hero financiero + badge meta ── */}
-              <div className="px-6 pt-8 pb-6 text-center">
-                <span className="inline-block px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[10px] font-medium text-cyan-400 uppercase tracking-widest mb-4">
-                  Meta: {motor2Impact.meta}
-                </span>
-                <p className="text-sm text-slate-400 font-light mb-2">{gerenciaTopCosto.gerenciaName}</p>
-                <p className="text-4xl md:text-5xl font-light text-purple-400 tracking-tight">
-                  {formatCurrency(gerenciaTopCosto.gapMonthly)}
-                  <span className="text-lg text-slate-500 font-light">/mes</span>
-                </p>
-                <p className="text-xs text-slate-500 mt-2">
-                  {gerenciaTopCosto.headcount} personas bajo el estándar · Fit promedio {gerenciaTopCosto.avgRoleFit}%
-                </p>
-                {gerenciaBreakevenMonths && (
-                  <p className="text-xs text-amber-400/70 mt-2 font-light italic">
-                    En {gerenciaBreakevenMonths} meses, mantener esta brecha costará más que resolverla.
-                  </p>
-                )}
-              </div>
-
-              {/* ── ZONA 1.5: Diagnóstico temporal (Motor 1 cruzado) ── */}
-              {gerenciaTramoData && (
-                <div className="px-6 pb-5">
-                  <div className="flex items-center justify-center gap-5 text-xs">
-                    {gerenciaTramoData.a1.low > 0 && (
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                        <span className="text-slate-400">{gerenciaTramoData.a1.low} nuevos bajo estándar</span>
-                      </span>
-                    )}
-                    {gerenciaTramoData.a2.low > 0 && (
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                        <span className="text-slate-400">{gerenciaTramoData.a2.low} en zona de verdad</span>
-                      </span>
-                    )}
-                    {gerenciaTramoData.a3.low > 0 && (
-                      <span className="flex items-center gap-1.5">
-                        <span className={cn('w-1.5 h-1.5 rounded-full', gerenciaTramoData.dominant === 'A3' ? 'bg-red-400 animate-pulse' : 'bg-red-400')} />
-                        <span className="text-slate-400">{gerenciaTramoData.a3.low} con decisión pendiente</span>
-                      </span>
-                    )}
-                  </div>
-                  {gerenciaTramoData.dominantCount > 1 && (
-                    <p className="text-xs text-slate-500 text-center mt-2 font-light italic">
-                      {gerenciaTramoData.narrative.narrativeShort}
+            <p className="text-base font-light text-slate-400 leading-relaxed">
+              Al completar el proceso de gestión de talento en{' '}
+              <span className="font-medium text-slate-200">{companyName}</span>,{' '}
+              los algoritmos de FocalizaHR analizaron cada cargo contra las competencias que ese rol específicamente exige.{' '}
+              <span className="relative inline-block align-middle">
+                <button
+                  onClick={() => setTooltipOpen(!tooltipOpen)}
+                  onMouseEnter={() => setTooltipOpen(true)}
+                  onMouseLeave={() => setTooltipOpen(false)}
+                  className="text-slate-500 hover:text-slate-400 transition-colors"
+                >
+                  <HelpCircle className="w-3.5 h-3.5 inline" strokeWidth={1.5} />
+                </button>
+                {tooltipOpen && (
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-80 px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 shadow-xl z-50">
+                    <p className="text-xs text-slate-300 mb-2.5">
+                      El proceso de gestión de talento en {companyName} midió:
                     </p>
-                  )}
-                </div>
+                    <div className="space-y-1.5">
+                      {TOOLTIP_ITEMS.map(item => (
+                        <div key={item.label} className="flex items-baseline gap-2">
+                          <span className="text-slate-600 text-xs">·</span>
+                          <span className="text-xs">
+                            <span className="text-cyan-400 font-medium">{item.label}</span>
+                            <span className="text-slate-500"> — {item.desc}</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </span>
+            </p>
+
+            <p className="text-base font-light text-slate-400 leading-relaxed">
+              De ese análisis, el <span className="font-medium text-slate-200">{pctBajoEstandar}%</span> de{' '}
+              <span className="font-medium text-slate-200">{brecha.totalEvaluated}</span>{' '}
+              personas evaluadas no alcanzan el estándar mínimo de su cargo, y se les paga igual que si lo cumplieran.
+            </p>
+
+            <p className="text-sm text-slate-500 mt-6">
+              El análisis revela tres dimensiones del problema:
+            </p>
+          </motion.div>
+
+          {/* P2 — Las tres dimensiones del problema */}
+          {familiaVolumen && gerenciaTopCosto && (
+            <motion.div {...fadeIn} className="max-w-2xl mx-auto mt-8">
+              {/* ── LA CONCENTRACIÓN ── */}
+              <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">La concentración</p>
+
+              <p className="text-base font-light text-slate-400 leading-relaxed mb-2">
+                El <span className="font-medium text-slate-200">{pctFamilia}%</span> de esas personas,{' '}
+                <span className="font-medium text-slate-200">{familiaVolumen.headcount}</span> de{' '}
+                <span className="font-medium text-slate-200">{brecha.totalPeople}</span>, están en{' '}
+                <span className="font-medium text-slate-200">{familiaVolumen.label}</span>.
+              </p>
+
+              {familiaVolumen.acotadoGroup && getFamiliaVolumenNarrative(familiaVolumen.acotadoGroup) && (
+                <p className="text-base italic font-light text-slate-300 leading-relaxed mb-8">
+                  {getFamiliaVolumenNarrative(familiaVolumen.acotadoGroup)}
+                </p>
               )}
 
-              {/* ── ZONA 2: Consecuencia de negocio ── */}
-              <div className="px-6 pb-6 space-y-4">
-                <p className="text-base font-light text-slate-300 leading-relaxed">
-                  Operar bajo el estándar en{' '}
-                  <span className="text-cyan-400 font-medium">{gerenciaTopCosto.gerenciaName}</span>{' '}
-                  no es un problema de personas, es un problema de resultados.
-                </p>
-                <p className="text-sm font-light text-slate-400 leading-relaxed">
-                  {motor2Impact.introNarrative}
-                </p>
+              {/* ── LA MAYOR EXPOSICIÓN AL RIESGO ── */}
+              <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">La mayor exposición al riesgo</p>
 
-                {/* Risks con accordion */}
-                <div className="space-y-1 pl-1">
-                  {motor2Impact.risks.map((risk, idx) => (
-                    <RiskAccordionItem key={idx} label={risk.label} narrative={risk.narrative} />
-                  ))}
-                </div>
+              <p className="text-base font-light text-slate-400 leading-relaxed mb-8">
+                <span className="font-medium text-slate-200">{gerenciaTopCosto.gerenciaName}</span>{' '}
+                concentra el mayor riesgo de no alcanzar los objetivos del negocio.
+                Adicional a este riesgo, su brecha de capacidades representa{' '}
+                <span className="font-medium text-purple-400">{formatCurrency(gerenciaTopCosto.gapMonthly)}/mes</span>{' '}
+                en gasto en salarios por productividad no entregada.
+              </p>
 
-                {/* Respaldo científico */}
-                <ScientificBackingTooltip
-                  backing={SCIENTIFIC_BACKING.brecha_productiva}
-                  position="bottom"
-                />
-              </div>
-
-              {/* ── ZONA 3: Ownership ── */}
-              <div className="px-6 pb-6">
-                <div className="bg-slate-800/40 backdrop-blur border border-slate-700/20 rounded-xl p-4 flex items-start gap-3">
-                  <Target className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" strokeWidth={1.5} />
-                  <div>
-                    <p className="text-sm font-light text-slate-200 leading-relaxed">
-                      Eso lo gestiona el liderazgo de {gerenciaTopCosto.gerenciaName}, no la Gerencia de Personas.
-                    </p>
-                    <button
-                      onClick={() => onNavigateToLens?.('gerencia')}
-                      className="mt-2 text-xs text-cyan-400/70 hover:text-cyan-400 transition-colors"
-                    >
-                      Ver qué pasa en {gerenciaTopCosto.gerenciaName} →
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ═══ P5 — Ineficiencia financiera directa ═══ */}
-          <div>
-            <p className="text-base font-light text-slate-300 leading-relaxed">
-              Operar bajo el estándar no solo expone al negocio a los riesgos que ya vimos por gerencia.
-            </p>
-            <p className="text-base font-light text-slate-300 leading-relaxed">
-              También genera una ineficiencia directa en el gasto:{' '}
-              <span className="text-cyan-400 font-medium">{formatCurrency(totalGapAnnual)}</span>{' '}
-              anuales en salarios pagados sobre el rendimiento real entregado.
-            </p>
-          </div>
-
-          {/* ═══ P6 — Motor 4: Cargos Críticos (condicional) ═══ */}
-          {riskSummary && riskSummary.successionNarrative && (
-            <div>
-              {nCriticosBajoEstandar > 0 && riskSummary.successionMetrics && (
+              {/* ── EL PUNTO MÁS CRÍTICO ── */}
+              {worstLayer && worstGerencia && worstCellScore !== undefined && (
                 <>
-                  <p className="text-base font-light text-slate-300 leading-relaxed">
-                    El negocio exige rendimiento en sus posiciones críticas sobre todo. Cuando algunas operan bajo el mínimo, toda la cadena pierde efectividad — la organización es tan fuerte como su eslabón más débil, y hoy, parte de ese eslabón opera bajo su capacidad real.
-                  </p>
-                  <p className="text-base font-light text-slate-300 leading-relaxed mb-4">
-                    El{' '}
-                    <span className="text-cyan-400 font-medium">
-                      {Math.round((nCriticosBajoEstandar / riskSummary.successionMetrics.totalCriticalPositions) * 100)}%
-                    </span>{' '}
-                    de los cargos críticos (
-                    <span className="text-cyan-400 font-medium">{nCriticosBajoEstandar}</span> de{' '}
-                    <span className="text-cyan-400 font-medium">{riskSummary.successionMetrics.totalCriticalPositions}</span>)
-                    {' '}no rinde al nivel que la operación exige.
+                  <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">El punto más crítico</p>
+
+                  <p className="text-base italic font-light text-slate-300 leading-relaxed mb-6">
+                    {getWorstCellNarrative(worstLayer, worstGerencia, worstCellScore)}
                   </p>
                 </>
               )}
-              <p className="text-base font-light text-slate-300 leading-relaxed">
+
+              <SubtleLink onClick={onNavigateToCargoFamily}>
+                Ver por familia de cargo
+              </SubtleLink>
+            </motion.div>
+          )}
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            SEPARADOR ACTO 1 → ACTO 2
+        ═══════════════════════════════════════════════════════════════ */}
+        {leadersAtRisk > 0 && (
+          <ActSeparator label="Liderazgo" color="amber" />
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            ACTO 2 — EL FRENO (condicional: leadersAtRisk > 0)
+            Ancla: {pctLideres}% en amber
+        ═══════════════════════════════════════════════════════════════ */}
+        {leadersAtRisk > 0 && (
+          <div>
+            {/* Ancla */}
+            <motion.div {...fadeInDelay} className="text-center mb-10">
+              <p className="text-7xl md:text-8xl font-extralight text-amber-400 tracking-tight">
+                {pctLideres}%
+              </p>
+            </motion.div>
+
+            <motion.div {...fadeIn} className="space-y-4 max-w-2xl mx-auto">
+              <p className="text-base font-light text-slate-400 leading-relaxed">
+                De ese análisis, el <span className="font-medium text-amber-400">{pctLideres}%</span> de los{' '}
+                <span className="font-medium text-amber-400">{leadersAtRisk}</span>{' '}
+                líderes no alcanzan el estándar mínimo de su cargo, y se les paga igual que si lo cumplieran. Este dato es delicado porque amplifica el problema.
+              </p>
+
+              {/* ── EL AMPLIFICADOR ── */}
+              <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">El amplificador</p>
+
+              <p className="text-base font-light text-slate-400 leading-relaxed">
+                Estos <span className="font-medium text-amber-400">{leadersAtRisk}</span> líderes operan bajo el estándar y afectan directamente a{' '}
+                <span className="font-medium text-white">{totalDirectReports}</span> personas.
+              </p>
+
+              <p className="text-base italic font-light text-slate-300 leading-relaxed">
+                Un líder que no domina su rol no solo compromete su propio resultado, arrastra el rendimiento de cada persona que depende de su dirección.
+              </p>
+
+              {/* CEO Message inline (no modal) */}
+              <div className="border-l-2 border-cyan-500/30 pl-4 mt-6 mb-6">
+                <p className="text-base italic text-slate-300 leading-relaxed">
+                  &ldquo;{LEADERSHIP_RISK_DICTIONARY.ceoMessage}&rdquo;
+                </p>
+              </div>
+
+              <ScientificBackingTooltip
+                backing={SCIENTIFIC_BACKING.leadership_impact}
+                position="bottom"
+              />
+
+              {/* Tax Items */}
+              <div className="mt-4 mb-6">
+                <p className="text-sm font-light text-slate-400 leading-relaxed mb-2">
+                  {LEADERSHIP_RISK_DICTIONARY.taxNarrative}
+                </p>
+                <div className="space-y-2">
+                  {LEADERSHIP_RISK_DICTIONARY.taxItems.map((item, idx) => (
+                    <div key={idx} className="flex items-start gap-3">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400/60 mt-2 flex-shrink-0" />
+                      <p className="text-sm font-light text-slate-400 leading-relaxed">{item}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <SubtleLink onClick={() => setLeadershipModalOpen(true)}>
+                Ver los {leadersAtRisk} líderes y sus equipos
+              </SubtleLink>
+            </motion.div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            SEPARADOR ACTO 2 → ACTO 3: IMPACTO EN EL NEGOCIO
+        ═══════════════════════════════════════════════════════════════ */}
+        {motor2Impact && gerenciaTopCosto && (
+          <ActSeparator label="Impacto en el Negocio" color="cyan" />
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            ACTO 3 — DONDE EL LIDERAZGO FRENA AL NEGOCIO
+        ═══════════════════════════════════════════════════════════════ */}
+        {motor2Impact && gerenciaTopCosto && (
+          <div>
+            {/* Ancla */}
+            <motion.div {...fadeInDelay} className="text-center mb-10">
+              <p className="text-7xl md:text-8xl font-extralight text-amber-400 tracking-tight">
+                -{100 - Math.round(gerenciaTopCosto.avgRoleFit)}%
+              </p>
+            </motion.div>
+
+            <motion.div {...fadeIn} className="max-w-2xl mx-auto">
+              <p className="text-xl font-light text-slate-300 text-center mb-10">
+                Déficit de capacidad en {gerenciaTopCosto.gerenciaName}
+              </p>
+
+              {/* Narrativa de transición */}
+              <div className="space-y-4 mb-10">
+                <p className="text-base font-light text-slate-400 leading-relaxed">
+                  La meta estructural de esta unidad es{' '}
+                  <span className="font-medium text-slate-200">{motor2Impact.meta}</span>.
+                  Sin embargo, operar con este déficit no solo representa{' '}
+                  <span className="font-medium text-purple-400">{formatCurrency(gerenciaTopCosto.gapMonthly)}/mes</span>{' '}
+                  en salarios sin retorno completo. Ese es el mal menor.
+                </p>
+                <p className="text-base font-light text-slate-400 leading-relaxed">
+                  El verdadero impacto es el costo de oportunidad. Cuando esta área opera bajo el mínimo, frena los resultados de toda la organización y expone la operación a riesgos concretos:
+                </p>
+              </div>
+
+              {/* Riesgos — cada uno como momento de revelación */}
+              <div className="space-y-12 mb-10">
+                {motor2Impact.risks.map((risk, idx) => {
+                  const icons = [Clock, Zap, Shield, UserMinus]
+                  const Icon = icons[idx] || Clock
+                  return (
+                    <div key={idx}>
+                      <div className="flex items-center gap-2.5 mb-3">
+                        <Icon size={16} className="text-amber-400 flex-shrink-0" />
+                        <h4 className="text-lg font-medium text-amber-400">{risk.label}</h4>
+                      </div>
+                      <p className="text-base font-light text-slate-300 leading-relaxed">{risk.narrative}</p>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <ScientificBackingTooltip
+                backing={SCIENTIFIC_BACKING.brecha_productiva}
+                position="bottom"
+              />
+
+              {/* Ownership */}
+              <p className="mt-10 text-base italic font-light text-slate-300 leading-relaxed">
+                Eso lo gestiona el liderazgo de {gerenciaTopCosto.gerenciaName}, no la Gerencia de Personas.
+              </p>
+
+              <div className="mt-3">
+                <SubtleLink onClick={() => onNavigateToLens?.('gerencia')}>
+                  Ver qué pasa en {gerenciaTopCosto.gerenciaName}
+                </SubtleLink>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            SEPARADOR ACTO 2 → ACTO 3
+        ═══════════════════════════════════════════════════════════════ */}
+        <ActSeparator label="Impacto Financiero" color="purple" />
+
+        {/* ═══════════════════════════════════════════════════════════════
+            ACTO 3 — EL COSTO
+            Ancla: {totalGapAnnual} en purple
+        ═══════════════════════════════════════════════════════════════ */}
+        <div>
+          <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-4 mb-10">
+            <p className="text-base font-light text-slate-400 leading-relaxed">
+              Operar bajo el estándar no solo expone al negocio a los riesgos que ya vimos por gerencia.
+            </p>
+            <p className="text-base font-light text-slate-300 leading-relaxed">
+              También genera una ineficiencia directa en el gasto:
+            </p>
+          </motion.div>
+
+          {/* Ancla — PICO 2 */}
+          <motion.div {...fadeInDelay} className="text-center mb-10">
+            <p className="text-7xl md:text-8xl font-extralight text-purple-400 tracking-tight">
+              {formatCurrency(totalGapAnnual)}
+            </p>
+            <p className="text-xl text-purple-300 mt-3">
+              anuales
+            </p>
+          </motion.div>
+
+          <motion.div {...fadeIn} className="max-w-2xl mx-auto">
+            <p className="text-base font-light text-slate-500 text-center">
+              en salarios pagados sobre el rendimiento real entregado.
+            </p>
+          </motion.div>
+
+          {/* P7 — Antigüedad (fluye desde P5) */}
+          {riskSummary?.tenureNarrative && (
+            <motion.div {...fadeIn} className="mt-10 max-w-2xl mx-auto">
+              <div>
+                <p className="text-sm font-light text-slate-400 mb-3">
+                  {riskSummary.tenureNarrative.tone === 'negative'
+                    ? 'A esto se suma una señal que viene desde la composición misma de la dotación:'
+                    : 'Hay una señal que matiza el escenario:'}
+                </p>
+                <p className="text-sm font-light text-slate-300 mb-3">
+                  {riskSummary.tenureNarrative.narrative}
+                </p>
+                <SubtleLink onClick={() => onNavigateToLens?.('tenure')}>
+                  Ver análisis por antigüedad
+                </SubtleLink>
+              </div>
+            </motion.div>
+          )}
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            SEPARADOR ACTO 3 → ACTO 4
+        ═══════════════════════════════════════════════════════════════ */}
+        {riskSummary && riskSummary.successionNarrative && nCriticosBajoEstandar > 0 && (
+          <ActSeparator label="Riesgo Futuro" color="amber" />
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            ACTO 4 — EL RIESGO FUTURO (condicional: cargos críticos)
+            Ancla: {pctCriticos}% en amber
+        ═══════════════════════════════════════════════════════════════ */}
+        {riskSummary && riskSummary.successionNarrative && nCriticosBajoEstandar > 0 && riskSummary.successionMetrics && (
+          <div>
+            {/* Ancla */}
+            <motion.div {...fadeInDelay} className="text-center mb-10">
+              <p className="text-7xl md:text-8xl font-extralight text-amber-400 tracking-tight">
+                {pctCriticos}%
+              </p>
+            </motion.div>
+
+            <motion.div {...fadeIn} className="space-y-4 max-w-2xl mx-auto">
+              <p className="text-sm font-light text-slate-400">
+                El negocio exige rendimiento en sus posiciones críticas sobre todo. Cuando algunas operan bajo el mínimo, toda la cadena pierde efectividad — la organización es tan fuerte como su eslabón más débil, y hoy, parte de ese eslabón opera bajo su capacidad real.
+              </p>
+
+              <p className="text-base text-slate-300">
+                El <span className="text-2xl font-semibold text-amber-400">{pctCriticos}%</span> de los cargos críticos (
+                <span className="font-medium text-white">{nCriticosBajoEstandar}</span> de{' '}
+                <span className="font-medium text-white">{riskSummary.successionMetrics.totalCriticalPositions}</span>)
+                {' '}no rinde al nivel que la operación exige.
+              </p>
+
+              <p className="text-sm font-light text-slate-400">
                 {riskSummary.successionNarrative}
               </p>
-              <button
-                onClick={() => onNavigateToLens?.('critical')}
-                className="mt-2 text-cyan-400 hover:text-cyan-300 text-sm transition-colors inline-flex items-center gap-1.5"
-              >
-                {(riskSummary.successionCombination === 'B' || riskSummary.successionCombination === 'D') && (
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block" />
-                )}
-                Ver Matriz Predictiva de Continuidad →
-              </button>
-            </div>
-          )}
 
-          {/* ═══ P7 — Motor 1: Antigüedad (backend-driven) ═══ */}
-          {riskSummary?.tenureNarrative && (
-            <div>
-              <p className="text-sm font-light text-slate-400 leading-relaxed mb-2">
-                {riskSummary.tenureNarrative.tone === 'negative'
-                  ? 'A esto se suma una señal que viene desde la composición misma de la dotación:'
-                  : 'Hay una señal que matiza el escenario:'}
+              <SubtleLink onClick={() => onNavigateToLens?.('critical')}>
+                {(riskSummary.successionCombination === 'B' || riskSummary.successionCombination === 'D') && (
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block mr-1.5" />
+                )}
+                Ver Matriz Predictiva de Continuidad
+              </SubtleLink>
+            </motion.div>
+          </div>
+        )}
+
+        {/* ═══ SEPARADOR → SÍNTESIS ═══ */}
+        <ActSeparator label="Síntesis" color="cyan" />
+
+        {/* ═══════════════════════════════════════════════════════════════
+            CIERRE — SÍNTESIS EJECUTIVA
+        ═══════════════════════════════════════════════════════════════ */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={viewport}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] as const }}
+        >
+          <div className="relative max-w-2xl mx-auto overflow-hidden rounded-2xl p-8 md:p-12">
+            {/* Línea gradiente top */}
+            <div
+              className="absolute top-0 left-0 right-0 h-px"
+              style={{ background: 'linear-gradient(90deg, #22D3EE, #A78BFA)' }}
+            />
+            <div className="space-y-3 mb-10">
+              <p className="text-base font-light text-slate-300 leading-relaxed">
+                <span className="text-2xl font-semibold text-cyan-400">{roleFit}%</span>{' '}
+                de capacidad organizacional real.
               </p>
               <p className="text-base font-light text-slate-300 leading-relaxed">
-                {riskSummary.tenureNarrative.narrative}
+                <span className="text-2xl font-semibold text-purple-400">{formatCurrency(totalGapAnnual)}</span>{' '}
+                en productividad pagada y no entregada.
               </p>
-              <button
-                onClick={() => onNavigateToLens?.('tenure')}
-                className="mt-2 text-cyan-400 hover:text-cyan-300 text-sm transition-colors"
-              >
-                Ver análisis por antigüedad →
-              </button>
-            </div>
-          )}
-
-          {/* ═══ P8 — Síntesis ejecutiva ═══ */}
-          <div className="border-l-2 border-cyan-500/30 pl-4 mt-4">
-            <p className="text-base font-light text-slate-200 leading-relaxed">
-              <span className="text-cyan-400 font-medium">{roleFit}%</span> de capacidad organizacional real.{' '}
-              <span className="text-cyan-400 font-medium">{formatCurrency(totalGapAnnual)}</span> en productividad pagada y no entregada.
               {leadersAtRisk > 0 && (
-                <>{' '}<span className="text-cyan-400 font-medium">{leadersAtRisk}</span> líderes que amplifican el problema.</>
+                <p className="text-base font-light text-slate-300 leading-relaxed">
+                  <span className="text-2xl font-semibold text-amber-400">{leadersAtRisk}</span>{' '}
+                  líderes que amplifican el problema.
+                </p>
               )}
-            </p>
-            <p className="text-base font-light text-slate-200 leading-relaxed mt-4">
-              La conversación que exigen estos números no la lidera la Gerencia de Personas. La dan los líderes de cada área sobre la eficiencia de su propia máquina.
-            </p>
-          </div>
+            </div>
 
-        </div>
+            <div className="text-center">
+              <p className="text-lg font-medium text-white mb-2">
+                La conversación que exigen estos números no la lidera la Gerencia de Personas.
+              </p>
+              <p className="text-base font-light text-slate-400 leading-relaxed">
+                La dan los líderes de cada área sobre la eficiencia de su propia máquina.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
       </div>
 
       {/* ═══ LEADERSHIP MODAL ═══ */}
       {leadershipModalOpen && (
         <>
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
-            onClick={() => setLeadershipModalOpen(false)}
-          />
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={() => setLeadershipModalOpen(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto">
               <div className="fhr-top-line" />
-
-              {/* Header */}
               <div className="flex items-center justify-between p-6 pb-0">
                 <h3 className="text-lg font-light text-white">Multiplicador de Liderazgo</h3>
-                <button
-                  onClick={() => setLeadershipModalOpen(false)}
-                  className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
-                >
+                <button onClick={() => setLeadershipModalOpen(false)} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
                   <X className="w-4 h-4 text-slate-400" />
                 </button>
               </div>
-
               <div className="p-6 space-y-6">
-                {/* CEO Quote */}
                 <div className="border-l-2 border-cyan-500/30 pl-4">
                   <p className="text-sm italic text-slate-300 leading-relaxed">
                     &ldquo;{LEADERSHIP_RISK_DICTIONARY.ceoMessage}&rdquo;
                   </p>
                 </div>
-
-                {/* Scientific Backing */}
-                <ScientificBackingTooltip
-                  backing={SCIENTIFIC_BACKING.leadership_impact}
-                  position="bottom"
-                />
-
-                {/* Tax Items — las 4 consecuencias */}
+                <ScientificBackingTooltip backing={SCIENTIFIC_BACKING.leadership_impact} position="bottom" />
                 <div>
                   <p className="text-xs text-slate-500 mb-3">{LEADERSHIP_RISK_DICTIONARY.taxNarrative}</p>
                   <div className="space-y-2">
@@ -520,8 +647,6 @@ export default memo(function PLTalentExecutiveBriefing({
                     ))}
                   </div>
                 </div>
-
-                {/* Context */}
                 <p className="text-xs text-slate-600 text-center">
                   {leadersAtRisk} líderes afectan a {totalDirectReports} personas
                 </p>
@@ -535,33 +660,55 @@ export default memo(function PLTalentExecutiveBriefing({
 })
 
 // ════════════════════════════════════════════════════════════════════════════
-// RISK ACCORDION ITEM — Expand inline para Motor 2 risks
+// ACT SEPARATOR — Badge entre actos
 // ════════════════════════════════════════════════════════════════════════════
 
-function RiskAccordionItem({ label, narrative }: { label: string; narrative: string }) {
-  const [open, setOpen] = useState(false)
+function ActSeparator({ label, color }: { label: string; color: 'amber' | 'purple' | 'cyan' }) {
+  const colors = {
+    amber: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+    purple: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
+    cyan: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
+  }
+  const lineColor = {
+    amber: 'via-amber-700/30',
+    purple: 'via-purple-700/30',
+    cyan: 'via-cyan-700/30',
+  }
   return (
-    <div>
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 w-full text-left py-1.5 group"
-      >
-        <span className={cn(
-          'w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors',
-          open ? 'bg-cyan-400' : 'bg-slate-600 group-hover:bg-slate-400'
-        )} />
-        <span className={cn(
-          'text-sm transition-colors',
-          open ? 'text-cyan-400 font-medium' : 'text-slate-400 group-hover:text-slate-300 font-light'
-        )}>
-          {label}
-        </span>
-      </button>
-      {open && (
-        <p className="text-sm font-light text-slate-400 leading-relaxed pl-[22px] pb-2">
-          {narrative}
-        </p>
-      )}
-    </div>
+    <motion.div
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.3 }}
+      className="flex items-center justify-center gap-4"
+    >
+      <div className={cn('flex-1 h-px bg-gradient-to-r from-transparent to-transparent', lineColor[color])} />
+      <span className={cn('px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest border rounded-full', colors[color])}>
+        {label}
+      </span>
+      <div className={cn('flex-1 h-px bg-gradient-to-r from-transparent to-transparent', lineColor[color])} />
+    </motion.div>
   )
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// SUBTLE LINK — Reutilizable con flecha animada
+// ════════════════════════════════════════════════════════════════════════════
+
+const SubtleLink = memo(function SubtleLink({
+  children,
+  onClick,
+}: {
+  children: React.ReactNode
+  onClick?: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="group inline-flex items-center gap-1.5 text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
+    >
+      {children}
+      <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+    </button>
+  )
+})

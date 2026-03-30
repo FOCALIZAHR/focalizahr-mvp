@@ -168,7 +168,9 @@ export async function GET(request: NextRequest) {
         capacidades: {
           roleFit: roleFitData.overall,
           worstLayer: ACOTADO_LABELS[roleFitData.worstCell.layer] || roleFitData.worstCell.layer,
-          worstGerencia: roleFitData.worstCell.gerencia
+          worstGerencia: roleFitData.worstCell.gerencia,
+          worstCellCount: roleFitData.worstCell.count,
+          worstCellScore: roleFitData.worstCell.score
         },
         sucesion: {
           coverage: successionData.coverage,

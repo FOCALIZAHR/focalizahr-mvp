@@ -24,7 +24,7 @@ export interface LeadershipImpact {
 export const LEADERSHIP_RISK_DICTIONARY: LeadershipImpact = {
   activationRule: 'roleFit < 75% AND tienePersonalACargo = true',
 
-  ceoMessage: 'Ese líder no te cuesta solo su sueldo. El 57% de las renuncias tienen un manager como causa principal — y los mejores se van primero porque tienen opciones.',
+  ceoMessage: 'Ese líder no te cuesta solo su sueldo. El 57% de las renuncias tienen un manager como causa principal, y los mejores se van primero porque tienen opciones.',
 
   risks: [
     {

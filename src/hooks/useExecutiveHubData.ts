@@ -27,7 +27,7 @@ export interface SummaryData {
   alertas: { total: number; critical: number; high: number }
   talento: { starsPercent: number; totalEmployees: number }
   calibracion: { confidence: number; biasType: string | null; biasLabel: string | null; integrityLevel: string; worstStatus: string | null; worstStatusLabel: string | null }
-  capacidades: { roleFit: number; worstLayer: string; worstGerencia: string }
+  capacidades: { roleFit: number; worstLayer: string; worstGerencia: string; worstCellCount: number; worstCellScore: number }
   sucesion: { coverage: number; uncoveredCount: number }
   plTalento: { totalGapMonthly: number; underperformerCount: number; totalLiability: number }
 }
