@@ -51,7 +51,7 @@ export interface TenureAggregateNarrative {
 export const TENURE_AGGREGATE_NARRATIVES: Record<TenureTrend, Record<FitLevel, TenureAggregateNarrative>> = {
   A1: {
     low: {
-      template: 'El {pct}% de los ingresos recientes no alcanza el estándar de su cargo. Se les paga a precio de mercado desde el primer día y el retorno mínimo aún no llega — lo que agrava la situación actual.',
+      template: 'El {pct}% de los ingresos recientes no alcanza el estándar de su cargo. Se les paga a precio de mercado desde el primer día y el retorno mínimo aún no llega, lo que agrava la situación actual.',
       narrativeShort: 'Aún en integración. Si el patrón se repite, ajustar perfil o proceso antes de la próxima contratación.',
       tone: 'negative',
     },
@@ -76,12 +76,12 @@ export const TENURE_AGGREGATE_NARRATIVES: Record<TenureTrend, Record<FitLevel, T
   A3: {
     low: {
       template: 'El {pct}% del personal senior no alcanza el estándar de su cargo. Cada uno representa años de oportunidades perdidas, planes de mejora que no cambiaron nada, y un finiquito que crece cada mes. También representa un mensaje silencioso a toda la organización: que es posible permanecer años sin rendir.',
-      narrativeShort: 'Decisión postergada. Definir salida. Establecer corte de 24 meses para futuros casos — no dejar acumular.',
+      narrativeShort: 'Decisión postergada. Definir salida. Establecer corte de 24 meses para futuros casos, no dejar acumular.',
       tone: 'negative',
     },
     high: {
       template: 'El {pct}% del personal senior alcanza el estándar de su cargo. Son el piso que sostiene la operación hoy. El riesgo no es su rendimiento. Es si los cuidas con la misma atención que a los nuevos talentos, que a veces son apuestas de rendimiento futuro. Cuando salgan, se van con años de conocimiento que nadie más tiene. ¿Están formando a sus reemplazos o concentrando ese saber en una sola persona?',
-      narrativeShort: 'Veterano valioso. Verificar sucesor y transferencia de conocimiento.',
+      narrativeShort: 'Senior valioso. Verificar sucesor y transferencia de conocimiento.',
       tone: 'positive',
     },
   },
@@ -95,10 +95,10 @@ export function buildAggregateNarrative(
   trend: TenureTrend,
   fitLevel: FitLevel,
   pct: number
-): { narrative: string; tone: 'positive' | 'negative' } {
+): { narrative: string; tone: 'positive' | 'negative'; tramo: TenureTrend } {
   const entry = TENURE_AGGREGATE_NARRATIVES[trend][fitLevel]
   const narrative = entry.template.replace('{pct}', String(pct))
-  return { narrative, tone: entry.tone }
+  return { narrative, tone: entry.tone, tramo: trend }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -115,7 +115,7 @@ export const TENURE_ROLEFIT_DICTIONARY: Record<TenureTrend, Record<FitLevel, Ten
       diagnosis: 'SEÑAL TEMPRANA',
       narrativeNormal: 'Señal temprana, no sentencia. Los nuevos ingresos no estarían cerrando brechas existentes. Esto podría indicar una falla de perfil (se definió mal lo que el rol necesita), una falla de selección (el proceso no identifica el talento correcto), o una falla de integración (el jefe directo no está acompañando bien). Si el patrón se concentra en una gerencia específica, probablemente el problema esté en el jefe directo, no en las personas.',
       narrativeShort: 'Aún en integración. Si el patrón se repite, ajustar perfil o proceso antes de la próxima contratación.',
-      prevention: 'Revisar si el perfil definido corresponde a lo que el rol realmente necesita. Validar que el proceso de selección identifica las competencias críticas. Confirmar que el jefe directo tiene un plan de integración estructurado.',
+      prevention: 'El perfil no corresponde al rol. O el líder y la selección identificaron mal las competencias. O el jefe no tiene un plan de integración real (revisar EXO Score departamental en FocalizaHR).\n\nUna de las tres. Saber cuál cambia completamente la acción siguiente.',
     },
     high: {
       diagnosis: 'SELECCIÓN VALIDADA',
@@ -133,11 +133,11 @@ export const TENURE_ROLEFIT_DICTIONARY: Record<TenureTrend, Record<FitLevel, Ten
       diagnosis: 'INVERSIÓN SIN RETORNO',
       narrativeNormal: 'Inversión sin retorno. Esta persona ya pasó la curva de aprendizaje. Si no alcanza el estándar, probablemente el problema sea estructural: selección errada, promoción prematura, o planes de desarrollo que fallaron — ya sea porque no se generaron, no respondían a un diagnóstico claro, no hubo involucramiento del líder, no se dio seguimiento, o simplemente no fueron útiles. Cada mes adicional podría representar recurso desperdiciado. Postergar la conversación tiene costo.',
       narrativeShort: 'Plan de desarrollo probablemente falló, no existió nunca, o no es foco y lo ven como un trámite.',
-      prevention: 'Los próximos planes de acción deben tener: diagnóstico específico de la brecha, acciones concretas (no genéricas), responsable asignado, y seguimiento trimestral documentado. Si el líder no se involucra, el plan no existe.',
+      prevention: 'Antes de generar un plan nuevo: ¿los anteriores existieron? ¿O fueron documentos que nadie ejecutó porque el líder no se involucró?\n\nSi la respuesta es no, un plan más no es la solución. Si la respuesta es sí, el problema es de seguimiento y accountability, no de diseño. ¿Qué otros indicadores están bajos en este departamento?',
     },
     high: {
       diagnosis: 'MADUREZ OPERACIONAL',
-      narrativeNormal: 'Tu activo más valioso hoy. Personas que ya pasaron la curva de aprendizaje, conocen la cultura, y entregan. Aseguran continuidad operacional y son tu cantera natural de sucesores. ¿Cuántos tienen aspiración alta? Esos son tus sucesores naturales — dales ruta. ¿Cuántos tienen aspiración baja? Son expertos ancla — documenta su conocimiento antes que sea tarde.',
+      narrativeNormal: 'Tu activo más valioso hoy. Personas que ya pasaron la curva de aprendizaje, conocen la cultura, y entregan. Aseguran continuidad operacional y son tu cantera natural de sucesores. ¿Cuántos tienen aspiración alta? Esos son tus sucesores naturales, dales ruta. ¿Cuántos tienen aspiración baja? Son expertos ancla, documenta su conocimiento antes que sea tarde.',
       narrativeShort: 'Productividad confirmada. Validar aspiración y documentación de conocimiento.',
       prevention: null,
     },
@@ -150,13 +150,13 @@ export const TENURE_ROLEFIT_DICTIONARY: Record<TenureTrend, Record<FitLevel, Ten
     low: {
       diagnosis: 'DEUDA ORGANIZACIONAL',
       narrativeNormal: 'Deuda organizacional acumulada. Cada persona aquí probablemente representa años de decisiones postergadas. El costo real no es solo su salario — podría incluir sobrepago acumulado vs. mercado, días de vacaciones que no consumen y acumulan como pasivo, finiquito que crece cada mes, y un mensaje cultural a los nuevos: \'aquí se puede estar años sin rendir y no pasa nada\'. Muchos construyen un escudo de indispensabilidad — procesos que solo ellos conocen y no traspasan. Eso no es conocimiento especializado, es dependencia no gestionada. Cada mes sin decisión es un mes más de finiquito que acumulas. La pregunta no es si actuar, es cuánto te está costando no hacerlo.',
-      narrativeShort: 'Decisión postergada. Definir salida. Establecer corte de 24 meses para futuros casos — no dejar acumular.',
-      prevention: 'Establecer revisión obligatoria a los 24 meses de bajo desempeño. Si a los 24 meses no hay mejora demostrable, activar proceso de salida. No permitir que lleguen a 36+ meses sin decisión. El costo de postergar siempre supera el costo de actuar.',
+      narrativeShort: 'Decisión postergada. Definir salida. Establecer corte de 24 meses para futuros casos, no dejar acumular.',
+      prevention: 'Establecer corte obligatorio: 24 meses de bajo desempeño sin mejora demostrable activa proceso de recambio. Sin excepciones.\n\nEl costo de postergar siempre supera el costo de actuar. Siempre.',
     },
     high: {
       diagnosis: 'ACTIVO ESTRATÉGICO',
-      narrativeNormal: 'Gran activo, pero frágil. ¿Tienen sucesores identificados y en desarrollo? Si no, son bomba de tiempo — el día que se vayan (renuncia, enfermedad, retiro) la empresa pierde años de conocimiento. ¿Están documentando? ¿Están formando a otros? Los que tienen alto fit y forman = multiplicadores del conocimiento. Los que tienen alto fit y no forman = concentradores de conocimiento. Ambos son valiosos hoy, pero solo los primeros reducen tu riesgo a futuro.',
-      narrativeShort: 'Veterano valioso. Verificar sucesor y transferencia de conocimiento.',
+      narrativeNormal: 'Gran activo, pero frágil. ¿Tienen sucesores identificados y en desarrollo? Si no, son bomba de tiempo, el día que se vayan (renuncia, enfermedad, retiro) la empresa pierde años de conocimiento. ¿Están documentando? ¿Están formando a otros? Los que tienen alto fit y forman = multiplicadores del conocimiento. Los que tienen alto fit y no forman = concentradores de conocimiento. Ambos son valiosos hoy, pero solo los primeros reducen tu riesgo a futuro.',
+      narrativeShort: 'Senior valioso. Verificar sucesor y transferencia de conocimiento.',
       prevention: null,
     },
   },

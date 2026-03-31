@@ -22,16 +22,12 @@ import BrechaProductivaTab from './tabs/BrechaProductivaTab'
 import SemaforoLegalTab from './tabs/SemaforoLegalTab'
 import { GerenciaDetailView } from './shared/GerenciaDetailView'
 
-// New Split-Brain components
+// Components
 import PLTalentLensSelector, { type LensType } from './components/PLTalentLensSelector'
-import PLTalentSplitBrain from './components/PLTalentSplitBrain'
-import PLTalentLeadershipAlert from './components/PLTalentLeadershipAlert'
-import PLTalentIndividualDrawer from './components/PLTalentIndividualDrawer'
-import PLTalentSemaforoDrawer from './components/PLTalentSemaforoDrawer'
 import PLTalentExecutiveBriefing from './components/PLTalentExecutiveBriefing'
 
 import { BUSINESS_IMPACT_DICTIONARY } from '@/config/narratives/BusinessImpactDictionary'
-import { LEADERSHIP_RISK_DICTIONARY } from '@/config/narratives/LeadershipRiskDictionary'
+
 import type { ExecutiveRiskPayload } from '@/lib/services/TalentRiskOrchestrator'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -49,8 +45,9 @@ interface RiskProfilesSummary {
   byFitLevel: { low: number; high: number }
   successionNarrative: string
   successionCombination: 'A' | 'B' | 'C' | 'D'
-  tenureNarrative: { narrative: string; tone: 'positive' | 'negative' } | null
+  tenureNarrative: { narrative: string; tone: 'positive' | 'negative'; tramo: 'A1' | 'A2' | 'A3' } | null
   gerenciaImpact: Record<string, any>
+  executiveSynthesis?: { classification: string; implication: string; risks?: { label: string; narrative: string }[]; financialNote?: string; path: string; accountability: string } | null
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -61,11 +58,9 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
   const [view, setView] = useState<View>('portada')
   const [selectedGerencia, setSelectedGerencia] = useState<{ id: string; name: string } | null>(null)
 
-  // Split-Brain state — risk data comes pre-fetched via Promise.all in useExecutiveHubData
+  // Split-Brain state
   const [activeLens, setActiveLens] = useState<LensType>('gerencia')
   const [selectedGerenciaName, setSelectedGerenciaName] = useState<string | null>(null)
-  const [selectedProfile, setSelectedProfile] = useState<ExecutiveRiskPayload | null>(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
 
   // Read risk data from pre-fetched spotlight data (null if /risk-profiles failed — graceful)
   const riskData = (data as any).riskProfiles as { profiles: ExecutiveRiskPayload[]; summary: RiskProfilesSummary } | null
@@ -126,11 +121,6 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
       setView('mapa')
     }
     setSelectedGerencia(null)
-  }, [])
-
-  const handleOpenProfile = useCallback((profile: ExecutiveRiskPayload) => {
-    setSelectedProfile(profile)
-    setDrawerOpen(true)
   }, [])
 
   return (
@@ -308,12 +298,6 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
 
       </AnimatePresence>
 
-      {/* Individual Drawer (overlay, fuera de AnimatePresence) */}
-      <PLTalentIndividualDrawer
-        isOpen={drawerOpen}
-        onClose={() => { setDrawerOpen(false); setSelectedProfile(null) }}
-        profile={selectedProfile}
-      />
     </div>
   )
 })

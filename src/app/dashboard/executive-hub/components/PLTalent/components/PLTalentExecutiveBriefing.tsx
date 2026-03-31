@@ -24,6 +24,10 @@ import ScientificBackingTooltip from '@/components/shared/ScientificBackingToolt
 import { SCIENTIFIC_BACKING } from '@/config/narratives/ScientificBackingDictionary'
 import type { GerenciaImpact } from '@/config/narratives/BusinessImpactDictionary'
 import type { ExecutiveRiskPayload } from '@/lib/services/TalentRiskOrchestrator'
+import PLTalentRadarModal from './PLTalentRadarModal'
+import PLTalentLeadersModal from './PLTalentLeadersModal'
+import PLTalentTenureModal from './PLTalentTenureModal'
+import PLTalentCriticalRolesModal from './PLTalentCriticalRolesModal'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -33,9 +37,10 @@ interface RiskSummary {
   successionNarrative: string
   successionCombination: 'A' | 'B' | 'C' | 'D'
   successionMetrics?: { totalCriticalPositions: number; avgFitCriticos: number }
-  tenureNarrative: { narrative: string; tone: 'positive' | 'negative' } | null
+  tenureNarrative: { narrative: string; tone: 'positive' | 'negative'; tramo: 'A1' | 'A2' | 'A3' } | null
   byTenureTrend: { A1: number; A2: number; A3: number }
   gerenciaImpact: Record<string, GerenciaImpact>
+  executiveSynthesis?: { classification: string; implication: string; risks?: { label: string; narrative: string }[]; financialNote?: string; path: string; accountability: string; supportingData?: { primaryMetric: string; primaryValue: string | number; secondaryMetrics?: { label: string; value: string | number }[] } } | null
 }
 
 interface PLTalentExecutiveBriefingProps {
@@ -72,6 +77,19 @@ const RISK_ICON_MAP: Record<string, typeof Clock> = {
   'Vulnerabilidad de Continuidad': Zap,
   'Riesgo de Seguridad': Shield,
   'Fuga de Talento Técnico': UserMinus,
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// TENURE CONNECTORS — Frase de transición por tramo × tone
+// ════════════════════════════════════════════════════════════════════════════
+
+const TENURE_CONNECTORS: Record<string, string> = {
+  A3_negative: 'Para entender por qué este problema persiste, hay que mirar la composición de la dotación:',
+  A2_negative: 'La inversión en desarrollo tampoco está dando los resultados esperados:',
+  A1_negative: 'La señal más temprana viene de los ingresos recientes:',
+  A1_positive: 'Los ingresos recientes muestran una señal alentadora:',
+  A2_positive: 'La inversión en desarrollo está mostrando resultados:',
+  A3_positive: 'El talento senior es una fortaleza de la organización:',
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -117,6 +135,9 @@ export default memo(function PLTalentExecutiveBriefing({
 }: PLTalentExecutiveBriefingProps) {
 
   const [leadershipModalOpen, setLeadershipModalOpen] = useState(false)
+  const [radarModalOpen, setRadarModalOpen] = useState(false)
+  const [tenureModalOpen, setTenureModalOpen] = useState(false)
+  const [criticalRolesModalOpen, setCriticalRolesModalOpen] = useState(false)
   const [tooltipOpen, setTooltipOpen] = useState(false)
 
   // ── Derived data (NO TOCAR) ─────────────────────────────────────────
@@ -313,7 +334,7 @@ export default memo(function PLTalentExecutiveBriefing({
                 </>
               )}
 
-              <SubtleLink onClick={onNavigateToCargoFamily}>
+              <SubtleLink onClick={() => setRadarModalOpen(true)}>
                 Ver por familia de cargo
               </SubtleLink>
             </motion.div>
@@ -431,18 +452,18 @@ export default memo(function PLTalentExecutiveBriefing({
                 </p>
               </div>
 
-              {/* Riesgos — cada uno como momento de revelación */}
-              <div className="space-y-12 mb-10">
+              {/* Riesgos — contexto que sostiene la afirmación */}
+              <div className="space-y-6 mb-10">
                 {motor2Impact.risks.map((risk, idx) => {
                   const icons = [Clock, Zap, Shield, UserMinus]
                   const Icon = icons[idx] || Clock
                   return (
                     <div key={idx}>
-                      <div className="flex items-center gap-2.5 mb-3">
-                        <Icon size={16} className="text-amber-400 flex-shrink-0" />
-                        <h4 className="text-lg font-medium text-amber-400">{risk.label}</h4>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <Icon size={14} className="text-slate-500 flex-shrink-0" strokeWidth={1.5} />
+                        <p className="text-sm font-medium text-slate-200">{risk.label}</p>
                       </div>
-                      <p className="text-base font-light text-slate-300 leading-relaxed">{risk.narrative}</p>
+                      <p className="text-sm font-light text-slate-400 leading-relaxed">{risk.narrative}</p>
                     </div>
                   )
                 })}
@@ -455,14 +476,9 @@ export default memo(function PLTalentExecutiveBriefing({
 
               {/* Ownership */}
               <p className="mt-10 text-base italic font-light text-slate-300 leading-relaxed">
-                Eso lo gestiona el liderazgo de {gerenciaTopCosto.gerenciaName}, no la Gerencia de Personas.
+                La mitigación de estos riesgos no es delegable. Es responsabilidad del liderazgo de {gerenciaTopCosto.gerenciaName}.
               </p>
 
-              <div className="mt-3">
-                <SubtleLink onClick={() => onNavigateToLens?.('gerencia')}>
-                  Ver qué pasa en {gerenciaTopCosto.gerenciaName}
-                </SubtleLink>
-              </div>
             </motion.div>
           </div>
         )}
@@ -477,28 +493,26 @@ export default memo(function PLTalentExecutiveBriefing({
             Ancla: {totalGapAnnual} en purple
         ═══════════════════════════════════════════════════════════════ */}
         <div>
-          <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-4 mb-10">
-            <p className="text-base font-light text-slate-400 leading-relaxed">
-              Operar bajo el estándar no solo expone al negocio a los riesgos que ya vimos por gerencia.
-            </p>
-            <p className="text-base font-light text-slate-300 leading-relaxed">
-              También genera una ineficiencia directa en el gasto:
-            </p>
-          </motion.div>
-
           {/* Ancla — PICO 2 */}
           <motion.div {...fadeInDelay} className="text-center mb-10">
             <p className="text-7xl md:text-8xl font-extralight text-purple-400 tracking-tight">
               {formatCurrency(totalGapAnnual)}
             </p>
-            <p className="text-xl text-purple-300 mt-3">
+            <p className="text-xl text-purple-400 mt-3">
               anuales
+            </p>
+            <p className="text-xl font-light text-slate-300 mt-4">
+              en productividad no entregada
             </p>
           </motion.div>
 
-          <motion.div {...fadeIn} className="max-w-2xl mx-auto">
-            <p className="text-base font-light text-slate-500 text-center">
-              en salarios pagados sobre el rendimiento real entregado.
+          <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-4 mb-10">
+            <p className="text-base font-light text-slate-400 leading-relaxed">
+              Los riesgos que vimos por gerencia tienen un costo concreto: salarios pagados sobre el rendimiento real entregado.
+            </p>
+            <p className="text-base font-light text-slate-400 leading-relaxed">
+              Operar al <span className="font-medium text-cyan-400">{roleFit}%</span> de las competencias requeridas genera{' '}
+              <span className="font-medium text-purple-400">{formatCurrency(totalGapAnnual)}</span> anuales en productividad no entregada. No es una proyección, es lo que la organización ya está pagando hoy.
             </p>
           </motion.div>
 
@@ -507,14 +521,12 @@ export default memo(function PLTalentExecutiveBriefing({
             <motion.div {...fadeIn} className="mt-10 max-w-2xl mx-auto">
               <div>
                 <p className="text-sm font-light text-slate-400 mb-3">
-                  {riskSummary.tenureNarrative.tone === 'negative'
-                    ? 'A esto se suma una señal que viene desde la composición misma de la dotación:'
-                    : 'Hay una señal que matiza el escenario:'}
+                  {TENURE_CONNECTORS[`${riskSummary.tenureNarrative.tramo}_${riskSummary.tenureNarrative.tone}`]}
                 </p>
-                <p className="text-sm font-light text-slate-300 mb-3">
+                <p className="text-sm italic font-light text-slate-300 mb-3">
                   {riskSummary.tenureNarrative.narrative}
                 </p>
-                <SubtleLink onClick={() => onNavigateToLens?.('tenure')}>
+                <SubtleLink onClick={() => setTenureModalOpen(true)}>
                   Ver análisis por antigüedad
                 </SubtleLink>
               </div>
@@ -526,7 +538,7 @@ export default memo(function PLTalentExecutiveBriefing({
             SEPARADOR ACTO 3 → ACTO 4
         ═══════════════════════════════════════════════════════════════ */}
         {riskSummary && riskSummary.successionNarrative && nCriticosBajoEstandar > 0 && (
-          <ActSeparator label="Riesgo Futuro" color="amber" />
+          <ActSeparator label="Cargos Críticos" color="amber" />
         )}
 
         {/* ═══════════════════════════════════════════════════════════════
@@ -540,25 +552,36 @@ export default memo(function PLTalentExecutiveBriefing({
               <p className="text-7xl md:text-8xl font-extralight text-amber-400 tracking-tight">
                 {pctCriticos}%
               </p>
+              <p className="text-xl font-light text-slate-300 mt-4">
+                de cargos críticos bajo el estándar
+              </p>
             </motion.div>
 
             <motion.div {...fadeIn} className="space-y-4 max-w-2xl mx-auto">
-              <p className="text-sm font-light text-slate-400">
-                El negocio exige rendimiento en sus posiciones críticas sobre todo. Cuando algunas operan bajo el mínimo, toda la cadena pierde efectividad — la organización es tan fuerte como su eslabón más débil, y hoy, parte de ese eslabón opera bajo su capacidad real.
+              <p className="text-base font-light text-slate-400 leading-relaxed">
+                Los cargos críticos son el motor del negocio. No el complemento. El motor.
+              </p>
+
+              <p className="text-base font-light text-slate-400 leading-relaxed">
+                Cuando ese motor opera bajo el mínimo, no falla solo. Arrastra a toda la cadena que depende de sus resultados.
+              </p>
+
+              <p className="text-base italic font-light text-slate-300 leading-relaxed">
+                Una organización es tan fuerte como su eslabón más débil. Hoy, ese eslabón son sus posiciones críticas.
               </p>
 
               <p className="text-base text-slate-300">
-                El <span className="text-2xl font-semibold text-amber-400">{pctCriticos}%</span> de los cargos críticos (
+                El <span className="font-medium text-amber-400">{pctCriticos}%</span> de los cargos críticos (
                 <span className="font-medium text-white">{nCriticosBajoEstandar}</span> de{' '}
                 <span className="font-medium text-white">{riskSummary.successionMetrics.totalCriticalPositions}</span>)
                 {' '}no rinde al nivel que la operación exige.
               </p>
 
-              <p className="text-sm font-light text-slate-400">
+              <p className="text-sm italic font-light text-slate-300">
                 {riskSummary.successionNarrative}
               </p>
 
-              <SubtleLink onClick={() => onNavigateToLens?.('critical')}>
+              <SubtleLink onClick={() => setCriticalRolesModalOpen(true)}>
                 {(riskSummary.successionCombination === 'B' || riskSummary.successionCombination === 'D') && (
                   <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block mr-1.5" />
                 )}
@@ -568,93 +591,149 @@ export default memo(function PLTalentExecutiveBriefing({
           </div>
         )}
 
-        {/* ═══ SEPARADOR → SÍNTESIS ═══ */}
-        <ActSeparator label="Síntesis" color="cyan" />
-
-        {/* ═══════════════════════════════════════════════════════════════
-            CIERRE — SÍNTESIS EJECUTIVA
-        ═══════════════════════════════════════════════════════════════ */}
+        {/* ═══ SEPARADOR → SÍNTESIS (prominente) ═══ */}
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
-          viewport={viewport}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] as const }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.3 }}
+          className="flex items-center justify-center gap-4"
         >
-          <div className="relative max-w-2xl mx-auto overflow-hidden rounded-2xl p-8 md:p-12">
-            {/* Línea gradiente top */}
-            <div
-              className="absolute top-0 left-0 right-0 h-px"
-              style={{ background: 'linear-gradient(90deg, #22D3EE, #A78BFA)' }}
-            />
-            <div className="space-y-3 mb-10">
-              <p className="text-base font-light text-slate-300 leading-relaxed">
-                <span className="text-2xl font-semibold text-cyan-400">{roleFit}%</span>{' '}
-                de capacidad organizacional real.
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-cyan-700/40 to-transparent" />
+          <span className="px-5 py-2 text-[11px] font-semibold uppercase tracking-widest border rounded-full bg-cyan-500/10 border-cyan-500/20 bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+            Síntesis Ejecutiva
+          </span>
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-cyan-700/40 to-transparent" />
+        </motion.div>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            CIERRE — SÍNTESIS EJECUTIVA (El Veredicto)
+            Ancla: supportingData.primaryValue en cyan
+        ═══════════════════════════════════════════════════════════════ */}
+        {riskSummary?.executiveSynthesis && (
+          <div>
+            {/* Ancla — Primary Metric del diagnóstico */}
+            {riskSummary.executiveSynthesis.supportingData && (
+              <motion.div {...fadeInDelay} className="text-center mb-10">
+                <p className="text-7xl md:text-8xl font-extralight text-cyan-400 tracking-tight">
+                  {riskSummary.executiveSynthesis.supportingData.primaryValue}
+                </p>
+                <p className="text-sm text-slate-500 mt-3">
+                  {riskSummary.executiveSynthesis.supportingData.primaryMetric}
+                </p>
+              </motion.div>
+            )}
+
+            <motion.div {...fadeIn} className="max-w-2xl mx-auto">
+              {/* Classification — La frase asesina */}
+              <p className="text-xl font-light text-slate-200 leading-relaxed mb-6">
+                {riskSummary.executiveSynthesis.classification}
               </p>
-              <p className="text-base font-light text-slate-300 leading-relaxed">
-                <span className="text-2xl font-semibold text-purple-400">{formatCurrency(totalGapAnnual)}</span>{' '}
-                en productividad pagada y no entregada.
+
+              {/* Implication — La evidencia */}
+              <p className="text-base italic font-light text-slate-300 leading-relaxed mb-8">
+                {riskSummary.executiveSynthesis.implication}
               </p>
-              {leadersAtRisk > 0 && (
-                <p className="text-base font-light text-slate-300 leading-relaxed">
-                  <span className="text-2xl font-semibold text-amber-400">{leadersAtRisk}</span>{' '}
-                  líderes que amplifican el problema.
+
+              {/* Riesgos estructurados (solo CONCENTRACION) */}
+              {riskSummary.executiveSynthesis.risks && riskSummary.executiveSynthesis.risks.length > 0 && (
+                <div className="space-y-6 mb-8">
+                  {riskSummary.executiveSynthesis.risks.map((risk, idx) => {
+                    const icons = [Clock, Zap, Shield, UserMinus]
+                    const Icon = icons[idx] || Clock
+                    return (
+                      <div key={idx}>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <Icon size={14} className="text-slate-500 flex-shrink-0" strokeWidth={1.5} />
+                          <p className="text-sm font-medium text-slate-200">{risk.label}</p>
+                        </div>
+                        <p className="text-sm font-light text-slate-400 leading-relaxed">{risk.narrative}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Nota financiera (solo CONCENTRACION) */}
+              {riskSummary.executiveSynthesis.financialNote && (
+                <p className="text-base font-light text-slate-400 leading-relaxed mb-8">
+                  {riskSummary.executiveSynthesis.financialNote}
                 </p>
               )}
-            </div>
 
-            <div className="text-center">
-              <p className="text-lg font-medium text-white mb-2">
-                La conversación que exigen estos números no la lidera la Gerencia de Personas.
+              {/* Separador Tesla — "El Camino" */}
+              <div className="flex items-center gap-3 mb-6 mt-10">
+                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600/50 to-transparent" />
+                <span className="text-xs uppercase tracking-widest text-cyan-400">El Camino</span>
+                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600/50 to-transparent" />
+              </div>
+
+              {/* Path — La dirección */}
+              <p className="text-base font-light text-slate-300 leading-relaxed mb-10">
+                {riskSummary.executiveSynthesis.path}
               </p>
-              <p className="text-base font-light text-slate-400 leading-relaxed">
-                La dan los líderes de cada área sobre la eficiencia de su propia máquina.
-              </p>
-            </div>
+
+              {/* Accountability — Footer institucional */}
+              <div className="border-t border-slate-800/50 pt-6">
+                <p className="text-sm font-light text-slate-500 italic text-center">
+                  {riskSummary.executiveSynthesis.accountability}
+                </p>
+              </div>
+            </motion.div>
           </div>
+        )}
+
+        {/* ═══ CIERRE — FIN DEL ANÁLISIS ═══ */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          className="flex items-center justify-center gap-4 pt-8"
+        >
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600/30 to-transparent" />
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-1 rounded-full bg-slate-600" />
+            <span className="text-[10px] uppercase tracking-[0.2em] text-slate-600 font-light">
+              Fin del Análisis
+            </span>
+            <div className="w-1 h-1 rounded-full bg-slate-600" />
+          </div>
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-600/30 to-transparent" />
         </motion.div>
 
       </div>
 
-      {/* ═══ LEADERSHIP MODAL ═══ */}
-      {leadershipModalOpen && (
-        <>
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={() => setLeadershipModalOpen(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto">
-              <div className="fhr-top-line" />
-              <div className="flex items-center justify-between p-6 pb-0">
-                <h3 className="text-lg font-light text-white">Multiplicador de Liderazgo</h3>
-                <button onClick={() => setLeadershipModalOpen(false)} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
-                  <X className="w-4 h-4 text-slate-400" />
-                </button>
-              </div>
-              <div className="p-6 space-y-6">
-                <div className="border-l-2 border-cyan-500/30 pl-4">
-                  <p className="text-sm italic text-slate-300 leading-relaxed">
-                    &ldquo;{LEADERSHIP_RISK_DICTIONARY.ceoMessage}&rdquo;
-                  </p>
-                </div>
-                <ScientificBackingTooltip backing={SCIENTIFIC_BACKING.leadership_impact} position="bottom" />
-                <div>
-                  <p className="text-xs text-slate-500 mb-3">{LEADERSHIP_RISK_DICTIONARY.taxNarrative}</p>
-                  <div className="space-y-2">
-                    {LEADERSHIP_RISK_DICTIONARY.taxItems.map((item, idx) => (
-                      <div key={idx} className="flex items-start gap-2.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400/60 mt-1.5 flex-shrink-0" />
-                        <p className="text-sm font-light text-slate-300 leading-relaxed">{item}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <p className="text-xs text-slate-600 text-center">
-                  {leadersAtRisk} líderes afectan a {totalDirectReports} personas
-                </p>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      {/* ═══ LEADERS MODAL ═══ */}
+      <PLTalentLeadersModal
+        isOpen={leadershipModalOpen}
+        onClose={() => setLeadershipModalOpen(false)}
+        riskProfiles={riskProfiles}
+      />
+
+      {/* ═══ RADAR MODAL ═══ */}
+      <PLTalentRadarModal
+        isOpen={radarModalOpen}
+        onClose={() => setRadarModalOpen(false)}
+        byCargoFamily={brecha.byCargoFamily}
+        totalPeople={brecha.totalPeople}
+      />
+
+      {/* ═══ TENURE MODAL ═══ */}
+      <PLTalentTenureModal
+        isOpen={tenureModalOpen}
+        onClose={() => setTenureModalOpen(false)}
+        riskProfiles={riskProfiles}
+      />
+
+      {/* ═══ CRITICAL ROLES MODAL ═══ */}
+      <PLTalentCriticalRolesModal
+        isOpen={criticalRolesModalOpen}
+        onClose={() => setCriticalRolesModalOpen(false)}
+        riskProfiles={riskProfiles}
+        pctCriticos={pctCriticos}
+        avgFitCriticos={riskSummary?.successionMetrics?.avgFitCriticos ?? 0}
+      />
     </>
   )
 })
