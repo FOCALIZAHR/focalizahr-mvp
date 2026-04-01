@@ -16,6 +16,7 @@ import type { CorrelationPoint } from '../GoalsCorrelation.types'
 import type { CorrelationQuadrant } from '@/lib/services/GoalsDiagnosticService'
 import { QUADRANT_CONFIG } from '../GoalsCorrelation.constants'
 import { GOALS_THRESHOLDS } from '@/lib/services/GoalsDiagnosticService'
+import { getQuadrantNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
 
 interface AnalisisTabProps {
   correlation: CorrelationPoint[]
@@ -97,12 +98,14 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
           const count = quadrantCounts[countKey]
           const isActive = activeFilter === key
 
+          const quadNarr = getQuadrantNarrative(key)
+
           return (
             <button
               key={key}
               onClick={() => setActiveFilter(isActive ? null : key)}
               className={cn(
-                'rounded-xl border p-3 text-center transition-all',
+                'rounded-xl border p-3 text-center transition-all relative group',
                 'bg-slate-800/30 backdrop-blur-xl',
                 isActive
                   ? 'border-slate-600 ring-1 ring-slate-600'
@@ -113,6 +116,14 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
                 {count}
               </p>
               <p className="text-[9px] text-slate-500 mt-0.5">{config.label}</p>
+
+              {/* Tooltip — explains quadrant */}
+              {quadNarr && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 w-56 text-left">
+                  <p className="text-[10px] text-slate-300 leading-relaxed">{quadNarr.explanation}</p>
+                  <p className="text-[9px] text-slate-500 mt-1 leading-relaxed">{quadNarr.implication}</p>
+                </div>
+              )}
             </button>
           )
         })}
@@ -125,8 +136,16 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
         </p>
       )}
 
-      {/* Scatter Plot SVG */}
-      <div className="relative rounded-xl border border-slate-800/40 bg-slate-900/30 backdrop-blur-xl p-2 overflow-hidden">
+      {/* Scatter Plot SVG — glassmorphism */}
+      <div className="fhr-card relative p-3 overflow-hidden">
+        {/* Tesla line */}
+        <div
+          className="absolute top-0 left-0 right-0 h-[2px] z-10"
+          style={{
+            background: 'linear-gradient(90deg, transparent, #22D3EE, #A78BFA, transparent)',
+            boxShadow: '0 0 15px #22D3EE',
+          }}
+        />
         <svg
           viewBox={`0 0 ${CHART.width} ${CHART.height}`}
           className="w-full h-auto"
@@ -219,6 +238,17 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
             Score 360°
           </text>
 
+          {/* Glow filter for dots */}
+          <defs>
+            <filter id="dotGlow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
           {/* Data dots */}
           {visibleDots.map((point, idx) => {
             if (point.goalsPercent === null) return null
@@ -236,6 +266,7 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
                 opacity={isHovered ? 1 : 0.7}
                 stroke={isHovered ? '#fff' : 'none'}
                 strokeWidth={isHovered ? 1.5 : 0}
+                filter={isHovered ? 'url(#dotGlow)' : undefined}
                 onMouseEnter={() => setHoveredDot(point)}
                 onMouseLeave={() => setHoveredDot(null)}
               />

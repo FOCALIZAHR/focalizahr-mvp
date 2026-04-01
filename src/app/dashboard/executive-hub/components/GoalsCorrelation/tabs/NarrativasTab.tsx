@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import type { GoalsNarratives, NarrativeEmployee } from '../GoalsCorrelation.types'
 import { NARRATIVE_CARDS } from '../GoalsCorrelation.constants'
 import { formatCurrency, getConcentrationText } from '../GoalsCorrelation.utils'
+import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
 
 interface NarrativasTabProps {
   narratives: GoalsNarratives
@@ -69,6 +70,8 @@ export default memo(function NarrativasTab({ narratives }: NarrativasTabProps) {
         const concentration = getConcentrationText(employees)
         const isNoSabeNoQuiere = card.key === 'noSabeVsNoQuiere'
 
+        const dictNarrative = getNarrative(card.key)
+
         return (
           <motion.div
             key={card.key}
@@ -76,11 +79,22 @@ export default memo(function NarrativasTab({ narratives }: NarrativasTabProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.15, delay: idx * 0.04 }}
             className={cn(
-              'rounded-xl border overflow-hidden',
+              'rounded-xl border overflow-hidden relative',
               'bg-slate-800/30 backdrop-blur-xl',
               card.borderColor
             )}
           >
+            {/* Tesla line — color by severity */}
+            {dictNarrative && (
+              <div
+                className="absolute top-0 left-0 right-0 h-[2px] z-10"
+                style={{
+                  background: `linear-gradient(90deg, transparent, ${dictNarrative.teslaColor}, transparent)`,
+                  boxShadow: `0 0 15px ${dictNarrative.teslaColor}`,
+                }}
+              />
+            )}
+
             {/* Header — clickable */}
             <button
               onClick={() => toggle(card.key)}
@@ -90,11 +104,17 @@ export default memo(function NarrativasTab({ narratives }: NarrativasTabProps) {
                 <div className={cn('w-2 h-2 rounded-full flex-shrink-0', card.dotColor)} />
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-medium text-slate-200">{card.title}</p>
+                    <p className="text-sm font-light text-slate-200">{card.title}</p>
                     <span className={cn('text-xs font-mono font-medium', card.textColor)}>
                       {count}
                     </span>
                   </div>
+                  {/* Headline from dictionary */}
+                  {dictNarrative && (
+                    <p className="text-[11px] font-light text-slate-400 mt-0.5">
+                      {dictNarrative.headline}
+                    </p>
+                  )}
                   {card.showCost && cost && cost > 0 && (
                     <p className={cn('text-xs font-mono mt-0.5', card.textColor)}>
                       {formatCurrency(cost)} en riesgo
@@ -119,10 +139,20 @@ export default memo(function NarrativasTab({ narratives }: NarrativasTabProps) {
                   className="overflow-hidden"
                 >
                   <div className="px-4 pb-4 space-y-3">
-                    {/* Descripción */}
+                    {/* Narrative description from dictionary */}
                     <p className="text-[11px] font-light text-slate-400 leading-relaxed">
-                      {card.description}
+                      {dictNarrative?.description ?? card.description}
                     </p>
+
+                    {/* Coaching tip */}
+                    {dictNarrative?.coachingTip && (
+                      <div className="flex gap-2 items-start rounded-lg bg-slate-900/50 px-3 py-2 border border-slate-800/30">
+                        <span className="text-[10px] text-cyan-500 font-medium flex-shrink-0 mt-px">TIP</span>
+                        <p className="text-[10px] font-light text-slate-500 leading-relaxed">
+                          {dictNarrative.coachingTip}
+                        </p>
+                      </div>
+                    )}
 
                     {/* No Sabe vs No Quiere — split view */}
                     {isNoSabeNoQuiere ? (

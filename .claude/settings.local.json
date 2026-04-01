@@ -24,7 +24,8 @@
       "Bash(npm run:*)",
       "Bash(git status:*)",
       "Bash(git add:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
