@@ -1,20 +1,15 @@
 // ════════════════════════════════════════════════════════════════════════════
-// GOALS CORRELATION — Types
+// GOALS CORRELATION — Types V2
 // src/app/dashboard/executive-hub/components/GoalsCorrelation/GoalsCorrelation.types.ts
 // ════════════════════════════════════════════════════════════════════════════
 
 import type {
-  // V1 (deprecated — kept for compilation during migration)
-  GoalsCorrelationData,
-  GoalsNarratives,
-  // V2
   GoalsCorrelationDataV2,
   GoalsSegment,
   SubFinding,
   GerenciaGoalsStatsV2,
   CalibrationCross,
   SegmentId,
-  // Shared
   CorrelationPoint,
   GerenciaGoalsStats,
   NarrativeEmployee,
@@ -24,17 +19,12 @@ import type {
 
 // Re-export for convenience
 export type {
-  // V1 deprecated
-  GoalsCorrelationData,
-  GoalsNarratives,
-  // V2
   GoalsCorrelationDataV2,
   GoalsSegment,
   SubFinding,
   GerenciaGoalsStatsV2,
   CalibrationCross,
   SegmentId,
-  // Shared
   CorrelationPoint,
   GerenciaGoalsStats,
   NarrativeEmployee,
@@ -42,19 +32,11 @@ export type {
   NarrativeBadges,
 }
 
-/** @deprecated Use GoalsCorrelationPropsV2 */
-export interface GoalsCorrelationProps {
-  data: GoalsCorrelationData
-}
-
 export interface GoalsCorrelationPropsV2 {
   data: GoalsCorrelationDataV2
 }
 
 export type TabKeyV2 = 'entregaron' | 'no_entregaron' | 'organizacional' | 'analisis'
-
-/** @deprecated */
-export type TabKey = 'narrativas' | 'analisis' | 'gerencias'
 
 export interface PortadaNarrative {
   statusBadge?: { label: string; showCheck?: boolean }

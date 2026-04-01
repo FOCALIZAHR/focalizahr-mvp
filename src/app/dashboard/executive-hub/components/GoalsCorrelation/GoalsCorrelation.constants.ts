@@ -85,60 +85,7 @@ export const TABS_V2: { key: TabKeyV2; label: string; icon?: string }[] = [
 ]
 
 // ════════════════════════════════════════════════════════════════════════════
-// V1 NARRATIVE CARD CONFIG (deprecated — kept for compilation)
-// ════════════════════════════════════════════════════════════════════════════
-
-/** @deprecated Use SUBFINDING_CARDS */
-export const NARRATIVE_CARDS = [
-  {
-    key: 'fugaProductiva' as const,
-    title: 'Fuga de Talento Productivo',
-    description: 'En riesgo de fuga con metas sobre 80%. Costo de reemplazo cuantificado.',
-    dotColor: 'bg-red-400',
-    textColor: 'text-red-400',
-    borderColor: 'border-red-500/20',
-    showCost: true,
-  },
-  {
-    key: 'bonosSinRespaldo' as const,
-    title: 'Bonos Sin Respaldo',
-    description: 'Evaluación 360° alta pero metas bajo 40%. Compensación sin justificación.',
-    dotColor: 'bg-amber-400',
-    textColor: 'text-amber-400',
-    borderColor: 'border-amber-500/20',
-    showCost: true,
-  },
-  {
-    key: 'talentoInvisible' as const,
-    title: 'Talento Invisible',
-    description: 'Metas sobre 80% pero evaluación baja. Entregando resultados sin reconocimiento.',
-    dotColor: 'bg-purple-400',
-    textColor: 'text-purple-400',
-    borderColor: 'border-purple-500/20',
-    showCost: false,
-  },
-  {
-    key: 'ejecutoresDesconectados' as const,
-    title: 'Ejecutores Desconectados',
-    description: 'Metas altas pero engagement crítico. Ejecutan por inercia, la fuga llega sin aviso.',
-    dotColor: 'bg-cyan-400',
-    textColor: 'text-cyan-400',
-    borderColor: 'border-cyan-500/20',
-    showCost: false,
-  },
-  {
-    key: 'noSabeVsNoQuiere' as const,
-    title: 'No Sabe vs No Quiere',
-    description: 'Metas bajo 40%. Diagnóstico: brecha de competencias o problema motivacional.',
-    dotColor: 'bg-slate-400',
-    textColor: 'text-slate-400',
-    borderColor: 'border-slate-500/20',
-    showCost: false,
-  },
-] as const
-
-// ════════════════════════════════════════════════════════════════════════════
-// QUADRANT CONFIG (for scatter plot — shared V1/V2)
+// QUADRANT CONFIG (for scatter plot)
 // ════════════════════════════════════════════════════════════════════════════
 
 export const QUADRANT_CONFIG: Record<CorrelationQuadrant, {
@@ -179,13 +126,3 @@ export const QUADRANT_CONFIG: Record<CorrelationQuadrant, {
   },
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// V1 TAB CONFIG (deprecated)
-// ════════════════════════════════════════════════════════════════════════════
-
-/** @deprecated Use TABS_V2 */
-export const TABS = [
-  { key: 'narrativas' as const, label: 'Narrativas' },
-  { key: 'analisis' as const, label: 'Análisis' },
-  { key: 'gerencias' as const, label: 'Gerencias' },
-] as const

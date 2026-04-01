@@ -123,31 +123,6 @@ export interface NarrativeEmployee {
   badges: NarrativeBadges
 }
 
-export interface GoalsNarratives {
-  fugaProductiva: {
-    employees: NarrativeEmployee[]
-    totalCost: number
-    count: number
-  }
-  bonosSinRespaldo: {
-    employees: NarrativeEmployee[]
-    estimatedBonusRisk: number
-    count: number
-  }
-  talentoInvisible: {
-    employees: NarrativeEmployee[]
-    count: number
-  }
-  ejecutoresDesconectados: {
-    employees: NarrativeEmployee[]
-    count: number
-  }
-  noSabeVsNoQuiere: {
-    noSabe: NarrativeEmployee[]
-    noQuiere: NarrativeEmployee[]
-  }
-}
-
 export interface CorrelationPoint {
   employeeId: string
   employeeName: string
@@ -167,24 +142,6 @@ export interface GerenciaGoalsStats {
   employeeCount: number
   evaluatorClassification: string | null
   confidenceLevel: 'green' | 'amber' | 'red'
-}
-
-export interface GoalsCorrelationData {
-  narratives: GoalsNarratives
-  correlation: CorrelationPoint[]
-  quadrantCounts: {
-    consistent: number
-    perceptionBias: number
-    hiddenPerformer: number
-    doubleRisk: number
-    noGoals: number
-  }
-  byGerencia: GerenciaGoalsStats[]
-  cycleConfig: {
-    includeGoals: boolean
-    competenciesWeight: number
-    goalsWeight: number
-  }
 }
 
 // Internal type for query results
@@ -326,95 +283,6 @@ export class GoalsDiagnosticService {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // CORRELATION DETAIL — Para /api/executive-hub/goals-correlation (full)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  static async getCorrelationDetail(
-    cycleId: string,
-    accountId: string,
-    departmentIds?: string[]
-  ): Promise<GoalsCorrelationData> {
-
-    const where: any = {
-      cycleId,
-      accountId,
-      employee: { status: 'ACTIVE', isActive: true },
-    }
-    if (departmentIds?.length) {
-      where.employee.departmentId = { in: departmentIds }
-    }
-
-    // Single query with all needed data
-    const ratings = await prisma.performanceRating.findMany({
-      where,
-      select: {
-        calculatedScore: true,
-        goalsRawPercent: true,
-        goalsCount: true,
-        potentialEngagement: true,
-        roleFitScore: true,
-        riskQuadrant: true,
-        mobilityQuadrant: true,
-        calibrated: true,
-        adjustmentType: true,
-        employee: {
-          select: {
-            id: true,
-            fullName: true,
-            acotadoGroup: true,
-            managerId: true,
-            department: {
-              select: {
-                displayName: true,
-                parent: { select: { displayName: true } },
-              },
-            },
-          },
-        },
-      },
-    }) as RatingRow[]
-
-    // Get cycle config for includeGoals/weights
-    const cycle = await prisma.performanceCycle.findFirst({
-      where: { id: cycleId, accountId },
-      select: { includeGoals: true, competenciesWeight: true, goalsWeight: true },
-    })
-
-    // Build enriched employees for narratives
-    const enriched = await this.enrichWithCosts(ratings, accountId)
-
-    // Detect narratives
-    const narratives = this.detectNarratives(enriched)
-
-    // Build correlation points
-    const correlation = this.buildCorrelationPoints(ratings)
-
-    // Count quadrants
-    const quadrantCounts = {
-      consistent: correlation.filter(c => c.quadrant === 'CONSISTENT').length,
-      perceptionBias: correlation.filter(c => c.quadrant === 'PERCEPTION_BIAS').length,
-      hiddenPerformer: correlation.filter(c => c.quadrant === 'HIDDEN_PERFORMER').length,
-      doubleRisk: correlation.filter(c => c.quadrant === 'DOUBLE_RISK').length,
-      noGoals: correlation.filter(c => c.quadrant === 'NO_GOALS').length,
-    }
-
-    // Group by gerencia
-    const byGerencia = this.aggregateByGerencia(ratings)
-
-    return {
-      narratives,
-      correlation,
-      quadrantCounts,
-      byGerencia,
-      cycleConfig: {
-        includeGoals: cycle?.includeGoals ?? true,
-        competenciesWeight: cycle?.competenciesWeight ?? 70,
-        goalsWeight: cycle?.goalsWeight ?? 30,
-      },
-    }
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
   // CLASSIFY QUADRANT — Lógica pura (sin DB)
   // ══════════════════════════════════════════════════════════════════════════
 
@@ -426,66 +294,6 @@ export class GoalsDiagnosticService {
     if (score360 >= T.LOW_SCORE && goalsPercent < T.SCATTER_GOALS_LINE) return 'PERCEPTION_BIAS'
     if (score360 < T.LOW_SCORE && goalsPercent >= T.SCATTER_GOALS_LINE) return 'HIDDEN_PERFORMER'
     return 'DOUBLE_RISK'
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // DETECT NARRATIVES — Lógica pura (sin DB)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  static detectNarratives(employees: NarrativeEmployee[]): GoalsNarratives {
-    const T = GOALS_THRESHOLDS
-
-    // 1. Fuga Productiva: rinde en metas + riesgo de fuga
-    const fugaProductiva = employees.filter(e =>
-      e.riskQuadrant === 'FUGA_CEREBROS' && (e.goalsPercent ?? 0) > T.HIGH_GOALS
-    )
-
-    // 2. Bonos Sin Respaldo: 360° alto + metas bajo
-    const bonosSinRespaldo = employees.filter(e =>
-      e.score360 > T.HIGH_SCORE && (e.goalsPercent ?? 0) < T.LOW_GOALS && e.goalsPercent !== null
-    )
-
-    // 3. Talento Invisible: metas alto + 360° bajo
-    const talentoInvisible = employees.filter(e =>
-      e.score360 < T.LOW_SCORE && (e.goalsPercent ?? 0) > T.HIGH_GOALS
-    )
-
-    // 4. Ejecutores Desconectados: metas alto + engagement bajo
-    const ejecutoresDesconectados = employees.filter(e =>
-      (e.goalsPercent ?? 0) > T.HIGH_GOALS && e.engagement === 1
-    )
-
-    // 5. No Sabe vs No Quiere: metas bajo, split por roleFit
-    const lowGoals = employees.filter(e =>
-      (e.goalsPercent ?? 0) < T.LOW_GOALS && e.goalsPercent !== null
-    )
-    const noSabe = lowGoals.filter(e => (e.roleFitScore ?? 100) < T.LOW_ROLEFIT)
-    const noQuiere = lowGoals.filter(e => (e.roleFitScore ?? 0) > T.HIGH_ROLEFIT)
-
-    return {
-      fugaProductiva: {
-        employees: fugaProductiva,
-        totalCost: fugaProductiva.reduce((s, e) => s + (e.turnoverCost ?? 0), 0),
-        count: fugaProductiva.length,
-      },
-      bonosSinRespaldo: {
-        employees: bonosSinRespaldo,
-        estimatedBonusRisk: 0, // Bonus calculation requires separate config
-        count: bonosSinRespaldo.length,
-      },
-      talentoInvisible: {
-        employees: talentoInvisible,
-        count: talentoInvisible.length,
-      },
-      ejecutoresDesconectados: {
-        employees: ejecutoresDesconectados,
-        count: ejecutoresDesconectados.length,
-      },
-      noSabeVsNoQuiere: {
-        noSabe,
-        noQuiere,
-      },
-    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════

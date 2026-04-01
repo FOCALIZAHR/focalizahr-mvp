@@ -113,6 +113,3 @@ export function getConcentrationText(employees: { gerencia: string }[]): string 
   return null
 }
 
-// Keep V1 for backward compat during migration
-/** @deprecated Use getPortadaNarrativeV2 */
-export { getPortadaNarrativeV2 as getPortadaNarrative }
