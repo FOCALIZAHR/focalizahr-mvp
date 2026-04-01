@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import { InsightCard } from './InsightCard'
 import type { InsightType, SummaryData } from '@/hooks/useExecutiveHubData'
 
-const INSIGHT_ORDER: InsightType[] = ['alertas', 'talento', 'calibracion', 'capacidades', 'sucesion', 'pl-talento']
+const INSIGHT_ORDER: InsightType[] = ['alertas', 'talento', 'calibracion', 'capacidades', 'sucesion', 'pl-talento', 'metas']
 
 interface InsightsRailProps {
   summary: SummaryData
@@ -67,7 +67,7 @@ export const InsightsRail = memo(function InsightsRail({
       >
         <div className="flex items-center gap-3">
           <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">
-            Tu Inteligencia Ejecutiva (5)
+            Tu Inteligencia Ejecutiva
           </h3>
           <ChevronUp className={cn(
             'w-3 h-3 text-slate-600 transition-transform duration-300',

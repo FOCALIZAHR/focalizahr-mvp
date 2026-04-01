@@ -2,7 +2,7 @@
 
 import { memo } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, AlertTriangle, Users, BarChart3, Zap, Target, DollarSign, Loader2 } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, Users, BarChart3, Zap, Target, DollarSign, Crosshair, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TALENT_INTELLIGENCE_THRESHOLDS } from '@/config/performanceClassification'
 import { AlertsPanel } from './AlertsPanel'
@@ -11,6 +11,7 @@ import { CalibrationHealth } from './CalibrationHealth'
 import { RoleFitMatrix } from './RoleFitMatrix'
 import { SuccessionPanel } from './SuccessionPanel'
 import { PLTalent } from './PLTalent'
+import { GoalsCorrelation } from './GoalsCorrelation'
 import type { InsightType, SummaryData } from '@/hooks/useExecutiveHubData'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -58,6 +59,12 @@ const INSIGHT_META: Record<InsightType, {
     title: 'P&L del Talento',
     color: 'text-purple-400',
     description: 'Impacto financiero del talento'
+  },
+  'metas': {
+    icon: Crosshair,
+    title: 'Metas × Performance',
+    color: 'text-amber-400',
+    description: 'Checkpoint pre-compensación'
   }
 }
 
@@ -269,6 +276,17 @@ function QuickStats({ type, summary }: { type: InsightType; summary: SummaryData
         </div>
       )
     }
+    case 'metas': {
+      const m = summary.metas
+      if (!m) return null
+      return (
+        <div className="space-y-3 w-full">
+          <StatRow label="Cobertura" value={`${m.coverage}%`} color={m.coverage >= 70 ? 'text-cyan-400' : 'text-amber-400'} tooltip="Porcentaje de empleados con metas asignadas y medidas." />
+          <StatRow label="Desconexion" value={`${m.disconnectionRate}%`} color={m.disconnectionRate > 25 ? 'text-red-400' : m.disconnectionRate > 15 ? 'text-amber-400' : 'text-slate-400'} tooltip="Porcentaje con diferencia significativa entre evaluacion 360° y cumplimiento de metas." />
+          <StatRow label="Casos urgentes" value={`${m.urgentCases}`} color={m.urgentCases > 0 ? 'text-red-400' : 'text-slate-400'} tooltip="Casos que requieren revision antes de aprobar compensacion." />
+        </div>
+      )
+    }
   }
 }
 
@@ -308,5 +326,7 @@ function DetailContent({ type, data, cycleId, userRole, companyName, roleFit, wo
       return <SuccessionPanel data={data} />
     case 'pl-talento':
       return <PLTalent data={data} cycleId={cycleId || undefined} companyName={companyName} roleFit={roleFit} worstLayer={worstLayer} worstGerencia={worstGerencia} worstCellCount={worstCellCount} worstCellScore={worstCellScore} />
+    case 'metas':
+      return <GoalsCorrelation data={data} />
   }
 }

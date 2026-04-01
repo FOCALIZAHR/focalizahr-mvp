@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { TALENT_INTELLIGENCE_THRESHOLDS } from '@/config/performanceClassification'
 
 const ROLE_FIT_HIGH = TALENT_INTELLIGENCE_THRESHOLDS.ROLE_FIT_HIGH
-import { AlertTriangle, Users, BarChart3, Zap, Target, DollarSign } from 'lucide-react'
+import { AlertTriangle, Users, BarChart3, Zap, Target, DollarSign, Crosshair } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { InsightType, SummaryData } from '@/hooks/useExecutiveHubData'
 
@@ -25,7 +25,8 @@ const INSIGHT_ICONS: Record<InsightType, typeof AlertTriangle> = {
   calibracion: BarChart3,
   capacidades: Zap,
   sucesion: Target,
-  'pl-talento': DollarSign
+  'pl-talento': DollarSign,
+  'metas': Crosshair
 }
 
 const INSIGHT_LABELS: Record<InsightType, string> = {
@@ -34,7 +35,8 @@ const INSIGHT_LABELS: Record<InsightType, string> = {
   calibracion: 'Calibracion',
   capacidades: 'Capacidades',
   sucesion: 'Sucesion',
-  'pl-talento': 'P&L Talento'
+  'pl-talento': 'P&L Talento',
+  'metas': 'Metas'
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -67,6 +69,11 @@ function getDotStatus(type: InsightType, summary: SummaryData): DotStatus {
     case 'pl-talento':
       if (summary.plTalento?.underperformerCount > 0) return 'red'
       if (summary.plTalento?.totalGapMonthly > 0) return 'purple'
+      return 'none'
+    case 'metas':
+      if (summary.metas?.disconnectionRate > 25 && summary.metas?.coverage > 50) return 'red'
+      if (summary.metas?.disconnectionRate > 15) return 'purple'
+      if (summary.metas?.coverage < 70) return 'cyan'
       return 'none'
   }
 }
@@ -176,6 +183,22 @@ function getInsightNarrative(type: InsightType, summary: SummaryData): { text: s
       return {
         text: 'Sin alertas financieras',
         tooltip: 'Todos los colaboradores dentro del estandar'
+      }
+    }
+    case 'metas': {
+      const m = summary.metas
+      if (!m || m.totalEmployees === 0) return { text: 'Sin datos', tooltip: 'Datos de metas no disponibles' }
+      if (m.coverage < 50) return {
+        text: `Solo ${m.coverage}% con metas`,
+        tooltip: `${m.totalWithGoals} de ${m.totalEmployees} tienen metas asignadas`
+      }
+      if (m.urgentCases > 0) return {
+        text: `${m.urgentCases} caso${m.urgentCases > 1 ? 's' : ''} pre-compensacion`,
+        tooltip: `Desconexion ${m.disconnectionRate}% entre metas y evaluacion 360°`
+      }
+      return {
+        text: 'Metas alineadas',
+        tooltip: `${m.coverage}% cobertura, ${m.avgProgress}% progreso promedio`
       }
     }
   }

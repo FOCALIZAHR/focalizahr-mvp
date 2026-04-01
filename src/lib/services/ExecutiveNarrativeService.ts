@@ -38,6 +38,7 @@ export interface ExecutiveHubData {
     concentration?: string
   }
   sucesion: { cobertura: number; sinCobertura: string[] }
+  metas?: { disconnectionRate: number; coverage: number; urgentCases: number }
 }
 
 type NarrativeRole = 'CEO' | 'AREA_MANAGER'
@@ -351,7 +352,12 @@ export class ExecutiveNarrativeService {
       )
     }
 
-    // PRIORIDAD 4: Role Fit bajo (< SOLID threshold)
+    // PRIORIDAD 4: Desconexión metas × evaluación alta
+    if (data.metas && data.metas.disconnectionRate > 25 && data.metas.coverage > 50) {
+      return this.getGoalsNarrative(data.metas.disconnectionRate, data.metas.coverage, data.metas.urgentCases, role)
+    }
+
+    // PRIORIDAD 5: Role Fit bajo (< SOLID threshold)
     if (data.capacidades.roleFit < TALENT_INTELLIGENCE_THRESHOLDS.ROLE_FIT_HIGH) {
       return this.getRoleFitNarrative(data.capacidades.roleFit, role, {
         worstLayer: data.capacidades.worstLayer,
@@ -368,6 +374,29 @@ export class ExecutiveNarrativeService {
 
     // DEFAULT: Organización saludable (include talent context if available)
     return this.getRoleFitNarrative(data.capacidades.roleFit, role)
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // GOALS NARRATIVE
+  // ══════════════════════════════════════════════════════════════════════════
+
+  static getGoalsNarrative(
+    disconnectionRate: number,
+    coverage: number,
+    urgentCases: number,
+    role: NarrativeRole
+  ): ExecutiveNarrative {
+    const headline = role === 'CEO'
+      ? `${disconnectionRate}% de desconexión metas vs evaluación`
+      : `${urgentCases} caso${urgentCases > 1 ? 's' : ''} requiere${urgentCases === 1 ? '' : 'n'} revisión pre-compensación`
+
+    return {
+      headline,
+      subheadline: `Revisar antes de aprobar bonos o promociones. Cobertura de metas: ${coverage}%.`,
+      level: null,
+      severity: disconnectionRate > 25 ? 'critical' : 'warning',
+      cta: { label: 'Ver Desconexiones', destination: 'metas' }
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════

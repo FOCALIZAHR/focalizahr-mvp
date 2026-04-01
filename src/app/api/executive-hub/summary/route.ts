@@ -15,6 +15,7 @@ import { ExecutiveNarrativeService } from '@/lib/services/ExecutiveNarrativeServ
 import { ManagerVarianceService } from '@/lib/services/ManagerVarianceService'
 import { SuccessionService } from '@/lib/services/SuccessionService'
 import { PLTalentService } from '@/lib/services/PLTalentService'
+import { GoalsDiagnosticService } from '@/lib/services/GoalsDiagnosticService'
 import { ACOTADO_LABELS } from '@/lib/services/PositionAdapter'
 import { prisma } from '@/lib/prisma'
 
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Fetch paralelo de todos los datos + star concentration + variance + succession + orgDistribution
-    const [alertsData, nineBoxData, calibrationData, roleFitData, starConcentration, varianceData, successionData, orgDistribution, brechaData, semaforoData] = await Promise.all([
+    const [alertsData, nineBoxData, calibrationData, roleFitData, starConcentration, varianceData, successionData, orgDistribution, brechaData, semaforoData, goalsCorrelation] = await Promise.all([
       TalentIntelligenceService.getActiveAlerts(cycleId, userContext.accountId, departmentIds),
       PerformanceRatingService.get9BoxData(cycleId, userContext.accountId, departmentIds),
       PerformanceRatingService.getCalibrationStatsByDepartment(cycleId, userContext.accountId, departmentIds),
@@ -74,6 +75,7 @@ export async function GET(request: NextRequest) {
       getOrgDistribution(cycleId, userContext.accountId, departmentIds),
       PLTalentService.getBrechaProductiva(cycleId, userContext.accountId, departmentIds),
       PLTalentService.getSemaforoLegal(cycleId, userContext.accountId, departmentIds),
+      GoalsDiagnosticService.getSummary(cycleId, userContext.accountId, departmentIds),
     ])
 
     // Calcular integrityScore + bias (misma fórmula que /calibration)
@@ -124,6 +126,11 @@ export async function GET(request: NextRequest) {
         sinCobertura: successionData.uncoveredCount > 0
           ? [`${successionData.uncoveredCount} roles`]
           : []
+      },
+      metas: {
+        disconnectionRate: goalsCorrelation.disconnectionRate,
+        coverage: goalsCorrelation.coverage,
+        urgentCases: goalsCorrelation.urgentCases,
       }
     }, narrativeRole)
 
@@ -180,6 +187,16 @@ export async function GET(request: NextRequest) {
           totalGapMonthly: brechaData.totalGapMonthly,
           underperformerCount: semaforoData.totalPeople,
           totalLiability: semaforoData.totalLiability
+        },
+        metas: {
+          coverage: goalsCorrelation.coverage,
+          avgProgress: goalsCorrelation.avgProgress,
+          disconnectionRate: goalsCorrelation.disconnectionRate,
+          totalWithGoals: goalsCorrelation.totalWithGoals,
+          totalEmployees: goalsCorrelation.totalEmployees,
+          urgentCases: goalsCorrelation.urgentCases,
+          topNarrativeType: goalsCorrelation.topNarrativeType,
+          estimatedRisk: goalsCorrelation.estimatedRisk,
         }
       }
     })
