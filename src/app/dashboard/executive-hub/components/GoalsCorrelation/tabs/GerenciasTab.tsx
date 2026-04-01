@@ -1,22 +1,21 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// GOALS CORRELATION — Tab Gerencias (Cards Narrativas + Semáforo Confianza)
+// GOALS CORRELATION — Tab Organizacional V2 (Gerencias + Pearson + Calibración)
 // src/app/dashboard/executive-hub/components/GoalsCorrelation/tabs/GerenciasTab.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// Cards por gerencia con narrativa del diccionario, Tesla line por confianza,
-// y métricas inline. Reemplaza tabla plana (anti-patrón).
+// Cards por gerencia: narrativa, Pearson RoleFit×Metas (3A), calibración (3D)
 // ════════════════════════════════════════════════════════════════════════════
 
 import { memo, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { GerenciaGoalsStats } from '../GoalsCorrelation.types'
+import type { GerenciaGoalsStatsV2 } from '../GoalsCorrelation.types'
 import { buildGerenciaNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
 
 interface GerenciasTabProps {
-  byGerencia: GerenciaGoalsStats[]
+  byGerencia: GerenciaGoalsStatsV2[]
 }
 
 const CONFIDENCE_VISUAL = {
@@ -41,6 +40,14 @@ const CONFIDENCE_VISUAL = {
     text: 'text-red-400',
     border: 'border-red-500/20',
   },
+}
+
+function getPearsonLabel(r: number | null): { label: string; color: string } | null {
+  if (r === null) return null
+  if (r > 0.7) return { label: `r=${r.toFixed(2)} — Competencias predicen`, color: 'text-emerald-400' }
+  if (r > 0.4) return { label: `r=${r.toFixed(2)} — Correlación moderada`, color: 'text-cyan-400' }
+  if (r > 0.0) return { label: `r=${r.toFixed(2)} — Correlación débil`, color: 'text-amber-400' }
+  return { label: `r=${r.toFixed(2)} — Sin correlación`, color: 'text-red-400' }
 }
 
 export default memo(function GerenciasTab({ byGerencia }: GerenciasTabProps) {
@@ -91,6 +98,13 @@ export default memo(function GerenciasTab({ byGerencia }: GerenciasTabProps) {
         {byGerencia.map((ger, idx) => {
           const conf = CONFIDENCE_VISUAL[ger.confidenceLevel]
           const isExpanded = expanded === ger.gerenciaName
+
+          // V2: compute calibration cross counts for narrative
+          const calUpLowGoals = ger.calibrationCross && ger.calibrationCross.avgGoalsAdjustedUp !== null && ger.calibrationCross.avgGoalsAdjustedUp < 40
+            ? ger.calibrationCross.adjustedUpCount : 0
+          const calDownHighGoals = ger.calibrationCross && ger.calibrationCross.avgGoalsAdjustedDown !== null && ger.calibrationCross.avgGoalsAdjustedDown > 80
+            ? ger.calibrationCross.adjustedDownCount : 0
+
           const narrative = buildGerenciaNarrative({
             gerenciaName: ger.gerenciaName,
             disconnectionRate: ger.disconnectionRate,
@@ -100,7 +114,12 @@ export default memo(function GerenciasTab({ byGerencia }: GerenciasTabProps) {
             evaluatorClassification: ger.evaluatorClassification,
             confidenceLevel: ger.confidenceLevel,
             employeeCount: ger.employeeCount,
+            pearsonR: ger.pearsonRoleFitGoals,
+            calibrationUpWithLowGoals: calUpLowGoals,
+            calibrationDownWithHighGoals: calDownHighGoals,
           })
+
+          const pearsonInfo = getPearsonLabel(ger.pearsonRoleFitGoals)
 
           return (
             <motion.div
@@ -137,6 +156,11 @@ export default memo(function GerenciasTab({ byGerencia }: GerenciasTabProps) {
                     </div>
                     <p className="text-[10px] text-slate-500 mt-0.5">
                       {ger.employeeCount} personas
+                      {pearsonInfo && (
+                        <span className={cn('ml-2', pearsonInfo.color)}>
+                          {pearsonInfo.label}
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -172,7 +196,7 @@ export default memo(function GerenciasTab({ byGerencia }: GerenciasTabProps) {
                 )} />
               </button>
 
-              {/* Expandible — narrative */}
+              {/* Expandible — narrative + Pearson + calibration */}
               <AnimatePresence>
                 {isExpanded && (
                   <motion.div
@@ -194,6 +218,53 @@ export default memo(function GerenciasTab({ byGerencia }: GerenciasTabProps) {
                         <MetricPill label="Progreso" value={`${ger.avgProgress}%`} />
                         <MetricPill label="Desconexión" value={`${ger.disconnectionRate}%`} warn={ger.disconnectionRate > 25} />
                       </div>
+
+                      {/* 3A: Pearson detail */}
+                      {pearsonInfo && (
+                        <div className="flex gap-2 items-start rounded-lg bg-slate-900/50 px-3 py-2 border border-slate-800/30">
+                          <span className={cn('text-[10px] font-medium flex-shrink-0 mt-px', pearsonInfo.color)}>r</span>
+                          <p className="text-[10px] font-light text-slate-500 leading-relaxed">
+                            Correlación RoleFit × Metas: {pearsonInfo.label}.
+                            {ger.pearsonRoleFitGoals !== null && ger.pearsonRoleFitGoals < 0.3 &&
+                              ' Las competencias definidas no predicen ejecución — revisar framework.'}
+                            {ger.pearsonRoleFitGoals !== null && ger.pearsonRoleFitGoals > 0.7 &&
+                              ' Las competencias que exiges predicen resultados. Framework bien calibrado.'}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* 3D: Calibration cross */}
+                      {ger.calibrationCross && (ger.calibrationCross.adjustedUpCount > 0 || ger.calibrationCross.adjustedDownCount > 0) && (
+                        <div className="flex gap-2 items-start rounded-lg bg-slate-900/50 px-3 py-2 border border-slate-800/30">
+                          <span className="text-[10px] text-purple-400 font-medium flex-shrink-0 mt-px">CAL</span>
+                          <div className="text-[10px] font-light text-slate-500 leading-relaxed">
+                            {ger.calibrationCross.adjustedUpCount > 0 && (
+                              <p>
+                                ⬆ {ger.calibrationCross.adjustedUpCount} calibrados arriba
+                                {ger.calibrationCross.avgGoalsAdjustedUp !== null && (
+                                  <> — metas prom. {ger.calibrationCross.avgGoalsAdjustedUp}%
+                                    {ger.calibrationCross.avgGoalsAdjustedUp < 40 && (
+                                      <span className="text-red-400"> (inflación política)</span>
+                                    )}
+                                  </>
+                                )}
+                              </p>
+                            )}
+                            {ger.calibrationCross.adjustedDownCount > 0 && (
+                              <p>
+                                ⬇ {ger.calibrationCross.adjustedDownCount} calibrados abajo
+                                {ger.calibrationCross.avgGoalsAdjustedDown !== null && (
+                                  <> — metas prom. {ger.calibrationCross.avgGoalsAdjustedDown}%
+                                    {ger.calibrationCross.avgGoalsAdjustedDown > 80 && (
+                                      <span className="text-amber-400"> (sesgo contra resultados)</span>
+                                    )}
+                                  </>
+                                )}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Evaluator classification */}
                       {ger.evaluatorClassification && (
@@ -221,6 +292,7 @@ export default memo(function GerenciasTab({ byGerencia }: GerenciasTabProps) {
         <span>Cob. = Cobertura de metas</span>
         <span>Prog. = Progreso promedio</span>
         <span>Desc. = Desconexión 360° vs metas</span>
+        <span>r = Pearson RoleFit × Metas</span>
       </div>
     </div>
   )

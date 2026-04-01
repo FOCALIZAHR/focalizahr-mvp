@@ -1,12 +1,11 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// GOALS CORRELATION — Insight #7 Executive Hub
+// GOALS CORRELATION V2 — Insight #7 Executive Hub
 // src/app/dashboard/executive-hub/components/GoalsCorrelation/index.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// Checkpoint pre-compensación: Metas × Performance
-// ARQUITECTURA: Portada (PanelPortada) → Content (3 tabs)
-// FILOSOFÍA: "El CEO nunca aterriza en datos crudos"
+// CEO-first: 2 segmentos (Entregaron / No Entregaron) + Vista Organizacional
+// PORTADA: Progressive Disclosure — top 3 alerts ranked by $$$
 // ════════════════════════════════════════════════════════════════════════════
 
 import { memo, useState, useMemo } from 'react'
@@ -14,11 +13,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Crosshair } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-import type { GoalsCorrelationProps, TabKey } from './GoalsCorrelation.types'
-import { getPortadaNarrative } from './GoalsCorrelation.utils'
-import { TABS } from './GoalsCorrelation.constants'
+import type { GoalsCorrelationPropsV2, TabKeyV2 } from './GoalsCorrelation.types'
+import { getPortadaNarrativeV2 } from './GoalsCorrelation.utils'
+import { TABS_V2 } from './GoalsCorrelation.constants'
 import { PanelPortada } from '../PanelPortada'
-import NarrativasTab from './tabs/NarrativasTab'
+import SegmentTab from './tabs/NarrativasTab'
 import AnalisisTab from './tabs/AnalisisTab'
 import GerenciasTab from './tabs/GerenciasTab'
 
@@ -26,11 +25,11 @@ import GerenciasTab from './tabs/GerenciasTab'
 // MAIN COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
-export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCorrelationProps) {
+export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCorrelationPropsV2) {
   const [view, setView] = useState<'portada' | 'content'>('portada')
-  const [activeTab, setActiveTab] = useState<TabKey>('narrativas')
+  const [activeTab, setActiveTab] = useState<TabKeyV2>('entregaron')
 
-  const narrative = useMemo(() => getPortadaNarrative(data), [data])
+  const narrative = useMemo(() => getPortadaNarrativeV2(data), [data])
 
   // Empty state
   if (!data || data.correlation.length === 0) {
@@ -42,6 +41,10 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
       </div>
     )
   }
+
+  // Find segments
+  const segEntregaron = data.segments.find(s => s.id === '1_ENTREGARON')
+  const segNoEntregaron = data.segments.find(s => s.id === '2_NO_ENTREGARON')
 
   return (
     <div className="relative">
@@ -101,17 +104,20 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
             <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
             {/* Tab Content */}
-            {activeTab === 'narrativas' && (
-              <NarrativasTab narratives={data.narratives} />
+            {activeTab === 'entregaron' && segEntregaron && (
+              <SegmentTab segment={segEntregaron} />
+            )}
+            {activeTab === 'no_entregaron' && segNoEntregaron && (
+              <SegmentTab segment={segNoEntregaron} />
+            )}
+            {activeTab === 'organizacional' && (
+              <GerenciasTab byGerencia={data.byGerencia} />
             )}
             {activeTab === 'analisis' && (
               <AnalisisTab
                 correlation={data.correlation}
                 quadrantCounts={data.quadrantCounts}
               />
-            )}
-            {activeTab === 'gerencias' && (
-              <GerenciasTab byGerencia={data.byGerencia} />
             )}
           </motion.div>
         )}
@@ -126,10 +132,10 @@ export default GoalsCorrelation
 // TAB BAR — Pills compactos
 // ════════════════════════════════════════════════════════════════════════════
 
-function TabBar({ activeTab, onTabChange }: { activeTab: TabKey; onTabChange: (t: TabKey) => void }) {
+function TabBar({ activeTab, onTabChange }: { activeTab: TabKeyV2; onTabChange: (t: TabKeyV2) => void }) {
   return (
     <div className="flex gap-0.5 bg-slate-900/50 backdrop-blur-sm border border-slate-700/30 rounded-full p-[3px] w-fit mx-auto">
-      {TABS.map(t => (
+      {TABS_V2.map(t => (
         <button
           key={t.key}
           onClick={() => onTabChange(t.key)}

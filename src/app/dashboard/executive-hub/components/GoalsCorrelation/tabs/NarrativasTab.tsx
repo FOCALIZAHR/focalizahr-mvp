@@ -1,29 +1,29 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// GOALS CORRELATION — Tab Narrativas
+// GOALS CORRELATION — Segment Tab (V2)
 // src/app/dashboard/executive-hub/components/GoalsCorrelation/tabs/NarrativasTab.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// 5 cards expandibles — el valor central del Insight #7
-// Cada card: Tesla line + headline → expandible con badge pairs + concentración
-// Badge pair = la anomalía visual (dos clasificaciones que no deberían estar juntas)
+// Renders sub-findings for a single segment (Entregaron / No Entregaron)
+// Reusable: receives GoalsSegment, renders each SubFinding as expandable card
+// Badge pair = the visual anomaly (two classifications that shouldn't be together)
 // ════════════════════════════════════════════════════════════════════════════
 
 import { memo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { GoalsNarratives, NarrativeEmployee, ResolvedBadge } from '../GoalsCorrelation.types'
-import { NARRATIVE_CARDS } from '../GoalsCorrelation.constants'
+import type { GoalsSegment, NarrativeEmployee, ResolvedBadge, SubFinding } from '../GoalsCorrelation.types'
+import { SUBFINDING_CARDS, SUBFINDING_TO_NARRATIVE } from '../GoalsCorrelation.constants'
 import { formatCurrency, getConcentrationText } from '../GoalsCorrelation.utils'
 import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
 
-interface NarrativasTabProps {
-  narratives: GoalsNarratives
+interface SegmentTabProps {
+  segment: GoalsSegment
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// BADGE PAIR CONFIG — qué par de clasificaciones muestra cada narrativa
+// BADGE PAIR CONFIG — qué par de clasificaciones muestra cada sub-finding
 // ════════════════════════════════════════════════════════════════════════════
 
 type BadgePairKey = 'goals' | 'score360' | 'roleFit' | 'engagement' | 'risk'
@@ -36,23 +36,23 @@ interface BadgePairConfig {
 }
 
 const BADGE_PAIRS: Record<string, BadgePairConfig> = {
-  fugaProductiva: {
+  '1B_fugaProductiva': {
     left: 'risk', leftLabel: 'Riesgo',
     right: 'goals', rightLabel: 'Metas',
   },
-  bonosSinRespaldo: {
+  '1D_sostenibilidad': {
+    left: 'roleFit', leftLabel: 'RoleFit',
+    right: 'goals', rightLabel: 'Metas',
+  },
+  '2B_bonosInjustificados': {
     left: 'score360', leftLabel: '360°',
     right: 'goals', rightLabel: 'Metas',
   },
-  talentoInvisible: {
+  '2C_evaluadorProtege': {
     left: 'score360', leftLabel: '360°',
     right: 'goals', rightLabel: 'Metas',
   },
-  ejecutoresDesconectados: {
-    left: 'engagement', leftLabel: 'Engagement',
-    right: 'goals', rightLabel: 'Metas',
-  },
-  noSabeVsNoQuiere: {
+  '2A_noPuedeVsNoQuiere': {
     left: 'roleFit', leftLabel: 'RoleFit',
     right: 'goals', rightLabel: 'Metas',
   },
@@ -62,67 +62,57 @@ const BADGE_PAIRS: Record<string, BadgePairConfig> = {
 // MAIN COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
-export default memo(function NarrativasTab({ narratives }: NarrativasTabProps) {
+export default memo(function SegmentTab({ segment }: SegmentTabProps) {
   const [expanded, setExpanded] = useState<string | null>(null)
 
   const toggle = (key: string) => {
     setExpanded(expanded === key ? null : key)
   }
 
-  // Get count and employees for each narrative
-  const getCardData = (key: string): { count: number; employees: NarrativeEmployee[]; cost?: number } => {
-    switch (key) {
-      case 'fugaProductiva':
-        return { count: narratives.fugaProductiva.count, employees: narratives.fugaProductiva.employees, cost: narratives.fugaProductiva.totalCost }
-      case 'bonosSinRespaldo':
-        return { count: narratives.bonosSinRespaldo.count, employees: narratives.bonosSinRespaldo.employees, cost: narratives.bonosSinRespaldo.estimatedBonusRisk }
-      case 'talentoInvisible':
-        return { count: narratives.talentoInvisible.count, employees: narratives.talentoInvisible.employees }
-      case 'ejecutoresDesconectados':
-        return { count: narratives.ejecutoresDesconectados.count, employees: narratives.ejecutoresDesconectados.employees }
-      case 'noSabeVsNoQuiere':
-        return {
-          count: narratives.noSabeVsNoQuiere.noSabe.length + narratives.noSabeVsNoQuiere.noQuiere.length,
-          employees: [...narratives.noSabeVsNoQuiere.noSabe, ...narratives.noSabeVsNoQuiere.noQuiere],
-        }
-      default:
-        return { count: 0, employees: [] }
-    }
-  }
-
-  const hasAnyData = NARRATIVE_CARDS.some(card => getCardData(card.key).count > 0)
-
-  if (!hasAnyData) {
+  if (segment.subFindings.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-        <p className="text-sm font-light">Sin desconexiones detectadas.</p>
-        <p className="text-xs text-slate-600 mt-1">Las evaluaciones 360° están alineadas con el cumplimiento de metas.</p>
+        <p className="text-sm font-light">Sin hallazgos en este segmento.</p>
+        <p className="text-xs text-slate-600 mt-1">
+          {segment.totalEmployees} personas en este grupo, sin anomalías detectadas.
+        </p>
       </div>
     )
   }
 
   return (
     <div className="space-y-3">
-      {NARRATIVE_CARDS.map((card, idx) => {
-        const { count, employees, cost } = getCardData(card.key)
-        if (count === 0) return null
+      {/* Segment header */}
+      <div className="flex items-center justify-between px-1">
+        <p className="text-[10px] uppercase tracking-widest text-slate-500">
+          {segment.label} — {segment.threshold}
+        </p>
+        <span className="text-xs font-mono text-slate-400">
+          {segment.totalEmployees} personas
+        </span>
+      </div>
 
-        const isExpanded = expanded === card.key
-        const concentration = getConcentrationText(employees)
-        const isNoSabeNoQuiere = card.key === 'noSabeVsNoQuiere'
-        const dictNarrative = getNarrative(card.key)
-        const badgePair = BADGE_PAIRS[card.key]
+      {segment.subFindings.map((finding, idx) => {
+        const cardConfig = SUBFINDING_CARDS[finding.key]
+        if (!cardConfig) return null
+
+        const narrativeKey = SUBFINDING_TO_NARRATIVE[finding.key]
+        const dictNarrative = narrativeKey ? getNarrative(narrativeKey) : null
+        const badgePair = BADGE_PAIRS[finding.key]
+        const isExpanded = expanded === finding.key
+        const concentration = getConcentrationText(finding.employees)
+        const isNoPuedeNoQuiere = finding.key === '2A_noPuedeVsNoQuiere'
 
         return (
           <motion.div
-            key={card.key}
+            key={finding.key}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.15, delay: idx * 0.04 }}
             className={cn(
               'rounded-xl border overflow-hidden relative',
               'bg-slate-800/30 backdrop-blur-xl',
-              card.borderColor
+              cardConfig.borderColor
             )}
           >
             {/* Tesla line — color by severity */}
@@ -138,16 +128,16 @@ export default memo(function NarrativasTab({ narratives }: NarrativasTabProps) {
 
             {/* Header — clickable */}
             <button
-              onClick={() => toggle(card.key)}
+              onClick={() => toggle(finding.key)}
               className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-800/40 transition-colors"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <div className={cn('w-2 h-2 rounded-full flex-shrink-0', card.dotColor)} />
+                <div className={cn('w-2 h-2 rounded-full flex-shrink-0', cardConfig.dotColor)} />
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-light text-slate-200">{card.title}</p>
-                    <span className={cn('text-xs font-mono font-medium', card.textColor)}>
-                      {count}
+                    <p className="text-sm font-light text-slate-200">{cardConfig.title}</p>
+                    <span className={cn('text-xs font-mono font-medium', cardConfig.textColor)}>
+                      {finding.count}
                     </span>
                   </div>
                   {/* Headline from dictionary */}
@@ -156,9 +146,9 @@ export default memo(function NarrativasTab({ narratives }: NarrativasTabProps) {
                       {dictNarrative.headline}
                     </p>
                   )}
-                  {card.showCost && cost && cost > 0 && (
-                    <p className={cn('text-xs font-mono mt-0.5', card.textColor)}>
-                      {formatCurrency(cost)} en riesgo
+                  {cardConfig.showCost && finding.financialImpact > 0 && (
+                    <p className={cn('text-xs font-mono mt-0.5', cardConfig.textColor)}>
+                      {formatCurrency(finding.financialImpact)} en riesgo
                     </p>
                   )}
                 </div>
@@ -182,7 +172,7 @@ export default memo(function NarrativasTab({ narratives }: NarrativasTabProps) {
                   <div className="px-4 pb-4 space-y-3">
                     {/* Narrative description from dictionary */}
                     <p className="text-[11px] font-light text-slate-400 leading-relaxed">
-                      {dictNarrative?.description ?? card.description}
+                      {dictNarrative?.description ?? ''}
                     </p>
 
                     {/* Coaching tip */}
@@ -195,28 +185,11 @@ export default memo(function NarrativasTab({ narratives }: NarrativasTabProps) {
                       </div>
                     )}
 
-                    {/* No Sabe vs No Quiere — split view */}
-                    {isNoSabeNoQuiere ? (
-                      <div className="space-y-4">
-                        {narratives.noSabeVsNoQuiere.noSabe.length > 0 && (
-                          <div>
-                            <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
-                              No sabe — brecha de competencias ({narratives.noSabeVsNoQuiere.noSabe.length})
-                            </p>
-                            <PersonList employees={narratives.noSabeVsNoQuiere.noSabe} badgePair={badgePair} showCost={false} />
-                          </div>
-                        )}
-                        {narratives.noSabeVsNoQuiere.noQuiere.length > 0 && (
-                          <div>
-                            <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
-                              No quiere — problema motivacional ({narratives.noSabeVsNoQuiere.noQuiere.length})
-                            </p>
-                            <PersonList employees={narratives.noSabeVsNoQuiere.noQuiere} badgePair={badgePair} showCost={false} />
-                          </div>
-                        )}
-                      </div>
+                    {/* No Puede vs No Quiere — split view */}
+                    {isNoPuedeNoQuiere ? (
+                      <NoPuedeNoQuiereSplit finding={finding} badgePair={badgePair} />
                     ) : (
-                      <PersonList employees={employees} badgePair={badgePair} showCost={card.showCost} />
+                      <PersonList employees={finding.employees} badgePair={badgePair} showCost={cardConfig.showCost} />
                     )}
 
                     {/* Concentración */}
@@ -235,6 +208,38 @@ export default memo(function NarrativasTab({ narratives }: NarrativasTabProps) {
     </div>
   )
 })
+
+// ════════════════════════════════════════════════════════════════════════════
+// NO PUEDE VS NO QUIERE — Split view using meta
+// ════════════════════════════════════════════════════════════════════════════
+
+function NoPuedeNoQuiereSplit({ finding, badgePair }: { finding: SubFinding; badgePair?: BadgePairConfig }) {
+  const noSabeIds = new Set((finding.meta?.noSabe as string[]) ?? [])
+  const noQuiereIds = new Set((finding.meta?.noQuiere as string[]) ?? [])
+  const noSabe = finding.employees.filter(e => noSabeIds.has(e.id))
+  const noQuiere = finding.employees.filter(e => noQuiereIds.has(e.id))
+
+  return (
+    <div className="space-y-4">
+      {noSabe.length > 0 && (
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
+            No puede — brecha de competencias ({noSabe.length})
+          </p>
+          <PersonList employees={noSabe} badgePair={badgePair} showCost={false} />
+        </div>
+      )}
+      {noQuiere.length > 0 && (
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
+            No quiere — problema motivacional ({noQuiere.length})
+          </p>
+          <PersonList employees={noQuiere} badgePair={badgePair} showCost={false} />
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // BADGE — Mini classification pill

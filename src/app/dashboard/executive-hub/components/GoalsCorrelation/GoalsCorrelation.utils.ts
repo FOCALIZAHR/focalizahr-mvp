@@ -1,20 +1,18 @@
 // ════════════════════════════════════════════════════════════════════════════
-// GOALS CORRELATION — Utils
+// GOALS CORRELATION — Utils V2
 // src/app/dashboard/executive-hub/components/GoalsCorrelation/GoalsCorrelation.utils.ts
 // ════════════════════════════════════════════════════════════════════════════
 
-import type { GoalsCorrelationData } from './GoalsCorrelation.types'
+import type { GoalsCorrelationDataV2, SubFinding } from './GoalsCorrelation.types'
 import type { PortadaNarrative } from './GoalsCorrelation.types'
 
 // ════════════════════════════════════════════════════════════════════════════
-// PORTADA NARRATIVE ENGINE
-// Prioridad: (1) Fuga productiva > (2) Bonos sin respaldo > (3) Cobertura baja > (4) Saludable
+// V2 PORTADA NARRATIVE — Progressive Disclosure from top alerts
 // ════════════════════════════════════════════════════════════════════════════
 
-export function getPortadaNarrative(data: GoalsCorrelationData): PortadaNarrative {
-  const { narratives, quadrantCounts, correlation } = data
+export function getPortadaNarrativeV2(data: GoalsCorrelationDataV2): PortadaNarrative {
+  const { topAlerts, totals, correlation } = data
   const totalWithGoals = correlation.filter(c => c.quadrant !== 'NO_GOALS').length
-  const totalEmployees = correlation.length
 
   // Sin datos de metas
   if (totalWithGoals === 0) {
@@ -27,65 +25,54 @@ export function getPortadaNarrative(data: GoalsCorrelationData): PortadaNarrativ
     }
   }
 
-  const coverage = Math.round((totalWithGoals / totalEmployees) * 100)
-  const totalUrgent = narratives.fugaProductiva.count
-    + narratives.bonosSinRespaldo.count
-    + narratives.talentoInvisible.count
-    + narratives.ejecutoresDesconectados.count
-    + narratives.noSabeVsNoQuiere.noSabe.length
-    + narratives.noSabeVsNoQuiere.noQuiere.length
-
-  // PRIORIDAD 1: Fuga productiva (rinde + riesgo de irse)
-  if (narratives.fugaProductiva.count > 0) {
-    const cost = narratives.fugaProductiva.totalCost
-    const costLabel = cost >= 1_000_000
-      ? `$${Math.round(cost / 1_000_000)}M`
-      : `$${Math.round(cost / 1_000)}K`
+  // Has financial risk? Lead with $$$
+  if (totals.totalFinancialRisk > 0 && topAlerts.length > 0) {
+    const riskLabel = formatCurrency(totals.totalFinancialRisk)
     return {
       statusBadge: { label: 'Requiere revisión' },
-      prefix: `${narratives.fugaProductiva.count} colaborador${narratives.fugaProductiva.count > 1 ? 'es' : ''} en riesgo de fuga cumple${narratives.fugaProductiva.count === 1 ? '' : 'n'} metas sobre 80%. `,
-      highlight: `${costLabel} en costo de reemplazo.`,
-      suffix: ` Revisión pre-bonos: ${totalUrgent} casos requieren atención antes de aprobar compensación.`,
-      ctaLabel: 'Ver desconexiones',
+      prefix: `De ${totals.totalEvaluados} evaluados, ${totals.totalEntregaron} entregaron y ${totals.totalNoEntregaron} no. `,
+      highlight: `${riskLabel} en riesgo.`,
+      suffix: ` ${totals.totalAnomalias} anomalías estructurales detectadas.`,
+      ctaLabel: 'Ver análisis',
       ctaVariant: 'red',
-      coachingTip: 'Fuga productiva: personas que rinden Y están en riesgo de irse. El costo de no actuar es cuantificable.',
+      coachingTip: topAlerts[0] ? getAlertTip(topAlerts[0]) : 'Revisa las desconexiones entre resultados y cómo la organización responde.',
     }
   }
 
-  // PRIORIDAD 2: Bonos sin respaldo
-  if (narratives.bonosSinRespaldo.count > 0) {
+  // Has anomalies but no financial data
+  if (totals.totalAnomalias > 0) {
     return {
-      statusBadge: { label: 'Checkpoint compensación' },
-      prefix: `${narratives.bonosSinRespaldo.count} persona${narratives.bonosSinRespaldo.count > 1 ? 's' : ''} califica${narratives.bonosSinRespaldo.count === 1 ? '' : 'n'} para bono por su 360° pero `,
-      highlight: `tiene${narratives.bonosSinRespaldo.count === 1 ? '' : 'n'} metas bajo 40%.`,
-      suffix: ' La evaluación no se respalda con resultados.',
-      ctaLabel: 'Ver desconexiones',
+      statusBadge: { label: 'Checkpoint' },
+      prefix: `De ${totals.totalEvaluados} evaluados, ${totals.totalEntregaron} entregaron y ${totals.totalNoEntregaron} no. `,
+      highlight: `${totals.totalAnomalias} anomalías detectadas.`,
+      suffix: ' Desconexiones entre resultados y cómo la organización los trata.',
+      ctaLabel: 'Ver análisis',
       ctaVariant: 'amber',
-      coachingTip: 'Bonos sin respaldo: la percepción de pares no coincide con la ejecución real.',
+      coachingTip: topAlerts[0] ? getAlertTip(topAlerts[0]) : 'Revisa las desconexiones.',
     }
   }
 
-  // PRIORIDAD 3: Cobertura baja
-  if (coverage < 70) {
-    return {
-      prefix: `Solo el `,
-      highlight: `${coverage}% tiene metas asignadas.`,
-      suffix: ` Sin metas medidas, la evaluación 360° no se puede validar contra resultados.`,
-      ctaLabel: 'Ver cobertura',
-      ctaVariant: 'cyan',
-      coachingTip: 'Cobertura de metas: porcentaje de la organización con objetivos medibles asignados.',
-    }
-  }
-
-  // DEFAULT: Saludable
+  // Healthy
   return {
     statusBadge: { label: 'Alineado', showCheck: true },
-    highlight: `${quadrantCounts.consistent} de ${totalWithGoals} consistentes.`,
-    suffix: ` La evaluación 360° está respaldada por cumplimiento de metas en la mayoría de los casos.`,
+    prefix: `De ${totals.totalEvaluados} evaluados, `,
+    highlight: `${totals.totalEntregaron} entregaron resultados.`,
+    suffix: ' La organización está respondiendo de forma coherente.',
     ctaLabel: 'Ver detalle',
     ctaVariant: 'cyan',
-    coachingTip: 'Consistencia: evaluación 360° y metas apuntan en la misma dirección.',
+    coachingTip: 'Sin anomalías críticas entre resultados y respuesta organizacional.',
   }
+}
+
+function getAlertTip(alert: SubFinding): string {
+  const tips: Record<string, string> = {
+    '1B_fugaProductiva': 'Fuga productiva: personas que rinden Y están en riesgo de irse. El costo es cuantificable.',
+    '1D_sostenibilidad': 'Resultados insostenibles: entregan a pesar de no dominar su cargo. Riesgo de burnout.',
+    '2B_bonosInjustificados': 'Bonos sin respaldo: la percepción no coincide con la ejecución real.',
+    '2C_evaluadorProtege': 'Evaluador protege: el gerente no exige y los datos lo confirman.',
+    '2A_noPuedeVsNoQuiere': 'Diagnóstico diferenciado: distingue quién necesita capacitación de quién necesita conversación.',
+  }
+  return tips[alert.key] ?? 'Revisa las desconexiones entre resultados y respuesta organizacional.'
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -125,3 +112,7 @@ export function getConcentrationText(employees: { gerencia: string }[]): string 
   }
   return null
 }
+
+// Keep V1 for backward compat during migration
+/** @deprecated Use getPortadaNarrativeV2 */
+export { getPortadaNarrativeV2 as getPortadaNarrative }

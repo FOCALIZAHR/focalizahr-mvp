@@ -4,11 +4,91 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import type { CorrelationQuadrant } from '@/lib/services/GoalsDiagnosticService'
+import type { TabKeyV2 } from './GoalsCorrelation.types'
 
 // ════════════════════════════════════════════════════════════════════════════
-// NARRATIVE CARD CONFIG
+// V2 SUB-FINDING CARDS — keyed by SubFinding.key
 // ════════════════════════════════════════════════════════════════════════════
 
+export interface SubFindingCardConfig {
+  title: string
+  segmentId: '1_ENTREGARON' | '2_NO_ENTREGARON' | '3_ORGANIZACIONAL'
+  dotColor: string
+  textColor: string
+  borderColor: string
+  showCost: boolean
+}
+
+export const SUBFINDING_CARDS: Record<string, SubFindingCardConfig> = {
+  // Segment 1: ENTREGARON
+  '1B_fugaProductiva': {
+    title: 'Fuga de Talento Productivo',
+    segmentId: '1_ENTREGARON',
+    dotColor: 'bg-red-400',
+    textColor: 'text-red-400',
+    borderColor: 'border-red-500/20',
+    showCost: true,
+  },
+  '1D_sostenibilidad': {
+    title: 'Resultados Insostenibles',
+    segmentId: '1_ENTREGARON',
+    dotColor: 'bg-orange-400',
+    textColor: 'text-orange-400',
+    borderColor: 'border-orange-500/20',
+    showCost: false,
+  },
+  // Segment 2: NO ENTREGARON
+  '2B_bonosInjustificados': {
+    title: 'Bonos Sin Respaldo',
+    segmentId: '2_NO_ENTREGARON',
+    dotColor: 'bg-amber-400',
+    textColor: 'text-amber-400',
+    borderColor: 'border-amber-500/20',
+    showCost: true,
+  },
+  '2C_evaluadorProtege': {
+    title: 'Evaluador Protege',
+    segmentId: '2_NO_ENTREGARON',
+    dotColor: 'bg-red-500',
+    textColor: 'text-red-400',
+    borderColor: 'border-red-500/20',
+    showCost: false,
+  },
+  '2A_noPuedeVsNoQuiere': {
+    title: 'No Puede vs No Quiere',
+    segmentId: '2_NO_ENTREGARON',
+    dotColor: 'bg-slate-400',
+    textColor: 'text-slate-400',
+    borderColor: 'border-slate-500/20',
+    showCost: false,
+  },
+}
+
+// Map SubFinding key → narrative dictionary key
+export const SUBFINDING_TO_NARRATIVE: Record<string, string> = {
+  '1B_fugaProductiva': 'fugaProductiva',
+  '1D_sostenibilidad': 'sostenibilidad',
+  '2B_bonosInjustificados': 'bonosSinRespaldo',
+  '2C_evaluadorProtege': 'evaluadorProtege',
+  '2A_noPuedeVsNoQuiere': 'noSabeVsNoQuiere',
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// V2 TAB CONFIG
+// ════════════════════════════════════════════════════════════════════════════
+
+export const TABS_V2: { key: TabKeyV2; label: string; icon?: string }[] = [
+  { key: 'entregaron', label: 'Entregaron' },
+  { key: 'no_entregaron', label: 'No Entregaron' },
+  { key: 'organizacional', label: 'Organizacional' },
+  { key: 'analisis', label: 'Análisis' },
+]
+
+// ════════════════════════════════════════════════════════════════════════════
+// V1 NARRATIVE CARD CONFIG (deprecated — kept for compilation)
+// ════════════════════════════════════════════════════════════════════════════
+
+/** @deprecated Use SUBFINDING_CARDS */
 export const NARRATIVE_CARDS = [
   {
     key: 'fugaProductiva' as const,
@@ -58,7 +138,7 @@ export const NARRATIVE_CARDS = [
 ] as const
 
 // ════════════════════════════════════════════════════════════════════════════
-// QUADRANT CONFIG (for scatter plot)
+// QUADRANT CONFIG (for scatter plot — shared V1/V2)
 // ════════════════════════════════════════════════════════════════════════════
 
 export const QUADRANT_CONFIG: Record<CorrelationQuadrant, {
@@ -100,9 +180,10 @@ export const QUADRANT_CONFIG: Record<CorrelationQuadrant, {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// TAB CONFIG
+// V1 TAB CONFIG (deprecated)
 // ════════════════════════════════════════════════════════════════════════════
 
+/** @deprecated Use TABS_V2 */
 export const TABS = [
   { key: 'narrativas' as const, label: 'Narrativas' },
   { key: 'analisis' as const, label: 'Análisis' },
