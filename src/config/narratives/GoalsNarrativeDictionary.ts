@@ -49,50 +49,51 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   fugaProductiva: {
     headline: 'Talento que rinde y que se va.',
     description:
-      'Estos colaboradores superan sus metas y simultáneamente presentan indicadores de riesgo de fuga. ' +
-      'La organización invirtió en su desarrollo y hoy genera retorno — perderlos implica costear reemplazo, curva de aprendizaje y oportunidades perdidas durante la vacante. ' +
+      'El 9-box ya clasificó a estas personas como riesgo de fuga. Las metas confirman que perderlos duele: cumplen sobre 80%. ' +
+      'Son dos fuentes independientes diciendo lo mismo — no es una opinión, es evidencia cruzada. ' +
       'Cada día sin intervención de retención erosiona la inversión acumulada.',
-    coachingTip: 'Prioriza conversaciones de retención individuales. El costo de actuar es mínimo comparado con el costo de reemplazar.',
+    coachingTip: 'Presenta estos nombres al comité de retención esta semana. El costo de reemplazo ya está calculado — úsalo como argumento.',
     teslaColor: '#EF4444', // red
   },
 
   bonosSinRespaldo: {
     headline: 'Compensación desconectada de resultados.',
     description:
-      'La evaluación 360° posiciona a estas personas como high performers, pero su cumplimiento de metas no lo respalda. ' +
-      'Aprobar bonos sobre esta base expone a la organización a premiar percepción en lugar de ejecución. ' +
-      'El directorio necesita saber si la compensación variable refleja valor generado o sesgo del evaluador.',
-    coachingTip: 'Cruza evaluación 360° con datos duros de metas antes de aprobar compensación variable.',
+      'Sus pares los evalúan sobre 4.0 en el 360°, pero sus metas están bajo 40%. ' +
+      'Dos fuentes de datos cuentan historias opuestas. ' +
+      'Si la compensación variable depende del 360°, estos pagos no tienen respaldo en resultados medibles.',
+    coachingTip: 'Revisa estos casos antes del comité de compensación. Los badges muestran la contradicción: evaluación alta, ejecución baja.',
     teslaColor: '#F59E0B', // amber
   },
 
   talentoInvisible: {
     headline: 'Resultados sin reconocimiento.',
     description:
-      'Colaboradores que cumplen metas sobre 80% pero reciben evaluaciones 360° bajas. ' +
-      'El sistema de evaluación no detecta a quien genera valor real. ' +
+      'Cumplen metas sobre 80% pero el 360° los posiciona bajo 3.0. ' +
+      'El sistema de evaluación no detecta a quien genera valor real — posible sesgo de proximidad o falta de visibilidad. ' +
       'Sin intervención, estos ejecutores silenciosos pierden motivación o se van a donde los vean.',
-    coachingTip: 'Revisa si el evaluador 360° tiene visibilidad real del trabajo de estas personas. Posible sesgo de proximidad.',
+    coachingTip: 'Pregunta al evaluador si tiene visibilidad directa del trabajo de estas personas. Si no la tiene, el 360° es ruido.',
     teslaColor: '#A78BFA', // purple
   },
 
   ejecutoresDesconectados: {
     headline: 'Ejecutan hoy, se van mañana.',
     description:
-      'Metas altas con engagement crítico. Cumplen por inercia, disciplina o miedo — no por compromiso. ' +
-      'La fuga de este perfil llega sin aviso porque los indicadores de rendimiento no lo anticipan. ' +
-      'Son los que renuncian "de la nada" según el líder directo.',
-    coachingTip: 'Agenda conversaciones de propósito, no de rendimiento. El problema no es capacidad — es conexión.',
+      'Metas sobre 80% pero engagement en nivel crítico. Cumplen por inercia o disciplina, no por compromiso. ' +
+      'Los indicadores de rendimiento no anticipan esta fuga — son los que renuncian "de la nada" según el líder directo. ' +
+      'El badge rojo de engagement junto al verde de metas es la alerta.',
+    coachingTip: 'Agenda conversaciones de propósito con su líder directo, no de rendimiento. El problema no es capacidad — es conexión.',
     teslaColor: '#22D3EE', // cyan
   },
 
   noSabeVsNoQuiere: {
     headline: 'El diagnóstico determina la intervención.',
     description:
-      'Metas bajo 40% con dos causas radicalmente distintas: brecha de competencias (no sabe) versus problema motivacional (no quiere). ' +
-      'Capacitar a quien no quiere es tirar dinero. Presionar a quien no sabe es acelerar la fuga. ' +
-      'Sin este diagnóstico diferencial, la intervención de HR es genérica e ineficaz.',
-    coachingTip: 'Segmenta antes de intervenir. Capacitación para "no sabe", conversación de expectativas para "no quiere".',
+      'Metas bajo 40% con dos causas que el sistema separó por RoleFit: ' +
+      'RoleFit bajo 60% = no domina las competencias del cargo (capacitar). ' +
+      'RoleFit sobre 75% = tiene la capacidad pero no la aplica (conversar expectativas). ' +
+      'Capacitar a quien no quiere es tirar dinero. Presionar a quien no sabe es acelerar la fuga.',
+    coachingTip: 'Mira el badge de RoleFit en cada persona. Ese dato define si es formación o conversación de expectativas.',
     teslaColor: '#64748B', // slate
   },
 }

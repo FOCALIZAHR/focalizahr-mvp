@@ -18,6 +18,16 @@
 
 import { prisma } from '@/lib/prisma'
 import { SalaryConfigService } from '@/lib/services/SalaryConfigService'
+import {
+  getPerformanceClassification,
+  getRoleFitClassification,
+  getGoalsClassification,
+  getEngagementClassification,
+  RISK_QUADRANT_CONFIG,
+  RiskQuadrant,
+  type GoalsLevelConfig,
+  FOCALIZAHR_GOALS_DEFAULT_CONFIG,
+} from '@/config/performanceClassification'
 
 // ════════════════════════════════════════════════════════════════════════════
 // CONSTANTS — Umbrales exportados (no hardcoded)
@@ -74,6 +84,25 @@ export interface GoalsSummary {
   estimatedRisk: number         // CLP total en riesgo
 }
 
+/** Resolved badge — label + color classes ready for frontend rendering */
+export interface ResolvedBadge {
+  label: string
+  labelShort: string
+  textClass: string
+  bgClass: string
+  borderClass: string
+  color: string
+}
+
+/** Badge pair per narrative type — the two classifications that form the anomaly */
+export interface NarrativeBadges {
+  goals: ResolvedBadge | null
+  score360: ResolvedBadge | null
+  roleFit: ResolvedBadge | null
+  engagement: ResolvedBadge | null
+  risk: ResolvedBadge | null
+}
+
 export interface NarrativeEmployee {
   id: string
   name: string
@@ -87,6 +116,8 @@ export interface NarrativeEmployee {
   riskQuadrant: string | null
   turnoverCost?: number
   acotadoGroup: string | null
+  /** Resolved classification badges — ready for rendering */
+  badges: NarrativeBadges
 }
 
 export interface GoalsNarratives {
@@ -456,7 +487,19 @@ export class GoalsDiagnosticService {
   // PRIVATE HELPERS
   // ══════════════════════════════════════════════════════════════════════════
 
-  /** Enrich ratings with salary/turnover costs */
+  /** Resolve a classification config into a ResolvedBadge */
+  private static toBadge(config: { label: string; labelShort: string; textClass: string; bgClass: string; borderClass: string; color: string }): ResolvedBadge {
+    return {
+      label: config.label,
+      labelShort: config.labelShort,
+      textClass: config.textClass,
+      bgClass: config.bgClass,
+      borderClass: config.borderClass,
+      color: config.color,
+    }
+  }
+
+  /** Enrich ratings with salary/turnover costs + resolved classification badges */
   private static async enrichWithCosts(
     ratings: RatingRow[],
     accountId: string
@@ -476,12 +519,41 @@ export class GoalsDiagnosticService {
     const defaultSalary = await SalaryConfigService.getSalaryForAccount(accountId)
     salaryCache.set('__default__', defaultSalary.monthlySalary)
 
+    // Load goals classification config (parametrizable per account)
+    const ratingConfig = await prisma.performanceRatingConfig.findUnique({
+      where: { accountId },
+      select: { goalsClassificationLevels: true },
+    })
+    const rawGoalsLevels = ratingConfig?.goalsClassificationLevels
+    const goalsConfig: GoalsLevelConfig[] = (
+      rawGoalsLevels &&
+      Array.isArray(rawGoalsLevels) &&
+      (rawGoalsLevels as unknown as GoalsLevelConfig[]).length > 0
+    )
+      ? rawGoalsLevels as unknown as GoalsLevelConfig[]
+      : FOCALIZAHR_GOALS_DEFAULT_CONFIG
+
     return ratings.map(r => {
       const salary = salaryCache.get(r.employee.acotadoGroup ?? '__default__') ?? salaryCache.get('__default__')!
       const turnoverResult = SalaryConfigService.calculateTurnoverCost(
         salary,
         r.employee.acotadoGroup as any
       )
+
+      // Resolve classification badges
+      const score360Badge = this.toBadge(getPerformanceClassification(r.calculatedScore))
+      const goalsBadge = r.goalsRawPercent !== null
+        ? this.toBadge(getGoalsClassification(r.goalsRawPercent, goalsConfig))
+        : null
+      const roleFitBadge = r.roleFitScore !== null
+        ? this.toBadge(getRoleFitClassification(r.roleFitScore))
+        : null
+      const engagementConfig = getEngagementClassification(r.potentialEngagement)
+      const engagementBadge = engagementConfig ? this.toBadge(engagementConfig) : null
+      const riskConfig = r.riskQuadrant
+        ? RISK_QUADRANT_CONFIG[r.riskQuadrant as RiskQuadrant]
+        : null
+      const riskBadge = riskConfig ? this.toBadge(riskConfig) : null
 
       return {
         id: r.employee.id,
@@ -496,6 +568,13 @@ export class GoalsDiagnosticService {
         riskQuadrant: r.riskQuadrant,
         turnoverCost: turnoverResult.turnoverCost,
         acotadoGroup: r.employee.acotadoGroup,
+        badges: {
+          goals: goalsBadge,
+          score360: score360Badge,
+          roleFit: roleFitBadge,
+          engagement: engagementBadge,
+          risk: riskBadge,
+        },
       }
     })
   }

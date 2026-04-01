@@ -305,6 +305,157 @@ export const ROLE_FIT_DEFAULT_CONFIG: RoleFitLevelConfig[] = [
 ]
 
 // ════════════════════════════════════════════════════════════════════════════
+// GOALS CLASSIFICATION — Clasificación de cumplimiento de metas (%)
+// Parametrizable por empresa via PerformanceRatingConfig.goalsClassificationLevels
+// ════════════════════════════════════════════════════════════════════════════
+
+export enum GoalsLevel {
+  EXCEEDS = 'exceeds_goals',
+  ON_TRACK = 'on_track',
+  BELOW = 'below_goals',
+  CRITICAL = 'critical_goals'
+}
+
+export interface GoalsLevelConfig {
+  level: string
+  label: string
+  labelShort: string
+  minPercent: number
+  maxPercent: number
+  color: string
+  bgClass: string
+  textClass: string
+  borderClass: string
+}
+
+export const FOCALIZAHR_GOALS_DEFAULT_CONFIG: GoalsLevelConfig[] = [
+  {
+    level: GoalsLevel.EXCEEDS,
+    label: 'Sobrecumple',
+    labelShort: 'Sobre',
+    minPercent: 80,
+    maxPercent: 100,
+    color: '#10B981',
+    bgClass: 'bg-emerald-500/10',
+    textClass: 'text-emerald-400',
+    borderClass: 'border-emerald-500/30',
+  },
+  {
+    level: GoalsLevel.ON_TRACK,
+    label: 'En Progreso',
+    labelShort: 'Prog',
+    minPercent: 50,
+    maxPercent: 79.99,
+    color: '#A78BFA',
+    bgClass: 'bg-purple-500/10',
+    textClass: 'text-purple-400',
+    borderClass: 'border-purple-500/30',
+  },
+  {
+    level: GoalsLevel.BELOW,
+    label: 'Bajo',
+    labelShort: 'Bajo',
+    minPercent: 30,
+    maxPercent: 49.99,
+    color: '#F59E0B',
+    bgClass: 'bg-amber-500/10',
+    textClass: 'text-amber-400',
+    borderClass: 'border-amber-500/30',
+  },
+  {
+    level: GoalsLevel.CRITICAL,
+    label: 'Crítico',
+    labelShort: 'Crít',
+    minPercent: 0,
+    maxPercent: 29.99,
+    color: '#EF4444',
+    bgClass: 'bg-red-500/10',
+    textClass: 'text-red-400',
+    borderClass: 'border-red-500/30',
+  },
+]
+
+/**
+ * Clasifica % de cumplimiento de metas en un nivel con label + colores.
+ * Patrón idéntico a getPerformanceClassification().
+ * Config: lee de PerformanceRatingConfig.goalsClassificationLevels o usa defaults.
+ */
+export function getGoalsClassification(
+  goalsPercent: number,
+  config: GoalsLevelConfig[] = FOCALIZAHR_GOALS_DEFAULT_CONFIG
+): GoalsLevelConfig {
+  const sorted = [...config].sort((a, b) => b.minPercent - a.minPercent)
+  for (const level of sorted) {
+    if (goalsPercent >= level.minPercent) {
+      return level
+    }
+  }
+  return sorted[sorted.length - 1]
+}
+
+/**
+ * Obtiene solo el nivel (enum) de Goals
+ */
+export function getGoalsLevel(
+  goalsPercent: number,
+  config: GoalsLevelConfig[] = FOCALIZAHR_GOALS_DEFAULT_CONFIG
+): string {
+  return getGoalsClassification(goalsPercent, config).level
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ENGAGEMENT CLASSIFICATION — Nivel visual para engagement AAE (1/2/3)
+// No parametrizable — escala fija del instrumento AAE
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface EngagementLevelConfig {
+  level: number
+  label: string
+  labelShort: string
+  color: string
+  bgClass: string
+  textClass: string
+  borderClass: string
+}
+
+export const ENGAGEMENT_LEVEL_CONFIG: Record<number, EngagementLevelConfig> = {
+  3: {
+    level: 3,
+    label: 'Comprometido',
+    labelShort: 'Alto',
+    color: '#10B981',
+    bgClass: 'bg-emerald-500/10',
+    textClass: 'text-emerald-400',
+    borderClass: 'border-emerald-500/30',
+  },
+  2: {
+    level: 2,
+    label: 'Neutral',
+    labelShort: 'Neutro',
+    color: '#F59E0B',
+    bgClass: 'bg-amber-500/10',
+    textClass: 'text-amber-400',
+    borderClass: 'border-amber-500/30',
+  },
+  1: {
+    level: 1,
+    label: 'Desconectado',
+    labelShort: 'Desc',
+    color: '#EF4444',
+    bgClass: 'bg-red-500/10',
+    textClass: 'text-red-400',
+    borderClass: 'border-red-500/30',
+  },
+}
+
+export function getEngagementClassification(
+  engagement: number | null
+): EngagementLevelConfig | null {
+  if (engagement === null || engagement === undefined) return null
+  return ENGAGEMENT_LEVEL_CONFIG[engagement] ?? null
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // CONFIGURACION ALTERNATIVA - 3 NIVELES
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -1021,5 +1172,15 @@ export default {
   getRiskQuadrantConfig,
   MobilityQuadrant,
   RiskQuadrant,
-  RiskAlertLevel
+  RiskAlertLevel,
+
+  // Goals Classification
+  FOCALIZAHR_GOALS_DEFAULT_CONFIG,
+  getGoalsClassification,
+  getGoalsLevel,
+  GoalsLevel,
+
+  // Engagement Classification
+  ENGAGEMENT_LEVEL_CONFIG,
+  getEngagementClassification,
 }

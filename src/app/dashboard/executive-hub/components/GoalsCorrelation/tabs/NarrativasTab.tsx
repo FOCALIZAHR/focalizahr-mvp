@@ -4,15 +4,16 @@
 // GOALS CORRELATION — Tab Narrativas
 // src/app/dashboard/executive-hub/components/GoalsCorrelation/tabs/NarrativasTab.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// 5 cards expandibles con $$$ — el valor central del Insight #7
-// Cada card: header con count + costo → expandible con personas + concentración
+// 5 cards expandibles — el valor central del Insight #7
+// Cada card: Tesla line + headline → expandible con badge pairs + concentración
+// Badge pair = la anomalía visual (dos clasificaciones que no deberían estar juntas)
 // ════════════════════════════════════════════════════════════════════════════
 
 import { memo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { GoalsNarratives, NarrativeEmployee } from '../GoalsCorrelation.types'
+import type { GoalsNarratives, NarrativeEmployee, ResolvedBadge } from '../GoalsCorrelation.types'
 import { NARRATIVE_CARDS } from '../GoalsCorrelation.constants'
 import { formatCurrency, getConcentrationText } from '../GoalsCorrelation.utils'
 import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
@@ -20,6 +21,46 @@ import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
 interface NarrativasTabProps {
   narratives: GoalsNarratives
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// BADGE PAIR CONFIG — qué par de clasificaciones muestra cada narrativa
+// ════════════════════════════════════════════════════════════════════════════
+
+type BadgePairKey = 'goals' | 'score360' | 'roleFit' | 'engagement' | 'risk'
+
+interface BadgePairConfig {
+  left: BadgePairKey
+  leftLabel: string
+  right: BadgePairKey
+  rightLabel: string
+}
+
+const BADGE_PAIRS: Record<string, BadgePairConfig> = {
+  fugaProductiva: {
+    left: 'risk', leftLabel: 'Riesgo',
+    right: 'goals', rightLabel: 'Metas',
+  },
+  bonosSinRespaldo: {
+    left: 'score360', leftLabel: '360°',
+    right: 'goals', rightLabel: 'Metas',
+  },
+  talentoInvisible: {
+    left: 'score360', leftLabel: '360°',
+    right: 'goals', rightLabel: 'Metas',
+  },
+  ejecutoresDesconectados: {
+    left: 'engagement', leftLabel: 'Engagement',
+    right: 'goals', rightLabel: 'Metas',
+  },
+  noSabeVsNoQuiere: {
+    left: 'roleFit', leftLabel: 'RoleFit',
+    right: 'goals', rightLabel: 'Metas',
+  },
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ════════════════════════════════════════════════════════════════════════════
 
 export default memo(function NarrativasTab({ narratives }: NarrativasTabProps) {
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -69,8 +110,8 @@ export default memo(function NarrativasTab({ narratives }: NarrativasTabProps) {
         const isExpanded = expanded === card.key
         const concentration = getConcentrationText(employees)
         const isNoSabeNoQuiere = card.key === 'noSabeVsNoQuiere'
-
         const dictNarrative = getNarrative(card.key)
+        const badgePair = BADGE_PAIRS[card.key]
 
         return (
           <motion.div
@@ -128,7 +169,7 @@ export default memo(function NarrativasTab({ narratives }: NarrativasTabProps) {
               )} />
             </button>
 
-            {/* Expandible — lista de personas */}
+            {/* Expandible — lista de personas con badge pairs */}
             <AnimatePresence>
               {isExpanded && (
                 <motion.div
@@ -162,7 +203,7 @@ export default memo(function NarrativasTab({ narratives }: NarrativasTabProps) {
                             <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
                               No sabe — brecha de competencias ({narratives.noSabeVsNoQuiere.noSabe.length})
                             </p>
-                            <PersonList employees={narratives.noSabeVsNoQuiere.noSabe} showRoleFit />
+                            <PersonList employees={narratives.noSabeVsNoQuiere.noSabe} badgePair={badgePair} showCost={false} />
                           </div>
                         )}
                         {narratives.noSabeVsNoQuiere.noQuiere.length > 0 && (
@@ -170,12 +211,12 @@ export default memo(function NarrativasTab({ narratives }: NarrativasTabProps) {
                             <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
                               No quiere — problema motivacional ({narratives.noSabeVsNoQuiere.noQuiere.length})
                             </p>
-                            <PersonList employees={narratives.noSabeVsNoQuiere.noQuiere} showRoleFit />
+                            <PersonList employees={narratives.noSabeVsNoQuiere.noQuiere} badgePair={badgePair} showCost={false} />
                           </div>
                         )}
                       </div>
                     ) : (
-                      <PersonList employees={employees} showCost={card.showCost} />
+                      <PersonList employees={employees} badgePair={badgePair} showCost={card.showCost} />
                     )}
 
                     {/* Concentración */}
@@ -196,41 +237,64 @@ export default memo(function NarrativasTab({ narratives }: NarrativasTabProps) {
 })
 
 // ════════════════════════════════════════════════════════════════════════════
-// PERSON LIST — Reutilizable dentro de cada card
+// BADGE — Mini classification pill
+// ════════════════════════════════════════════════════════════════════════════
+
+function Badge({ badge, label }: { badge: ResolvedBadge; label: string }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium border',
+        badge.bgClass,
+        badge.textClass,
+        badge.borderClass
+      )}
+    >
+      <span className="text-[8px] text-slate-500 font-normal">{label}</span>
+      {badge.labelShort}
+    </span>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PERSON LIST — Badge pairs make the anomaly obvious
 // ════════════════════════════════════════════════════════════════════════════
 
 function PersonList({
   employees,
+  badgePair,
   showCost = false,
-  showRoleFit = false,
 }: {
   employees: NarrativeEmployee[]
+  badgePair?: BadgePairConfig
   showCost?: boolean
-  showRoleFit?: boolean
 }) {
   return (
     <div className="space-y-1">
-      {employees.map(emp => (
-        <div key={emp.id} className="flex items-center justify-between py-2 border-b border-slate-800/20 last:border-0">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-light text-slate-200 truncate">{emp.name}</p>
-            <p className="text-[10px] text-slate-500 truncate">
-              {emp.department} · Metas {emp.goalsPercent !== null ? `${Math.round(emp.goalsPercent)}%` : '—'}
-              {showRoleFit && emp.roleFitScore !== null ? ` · RoleFit ${Math.round(emp.roleFitScore)}%` : ''}
-            </p>
+      {employees.map(emp => {
+        const leftBadge = badgePair ? emp.badges[badgePair.left] : null
+        const rightBadge = badgePair ? emp.badges[badgePair.right] : null
+
+        return (
+          <div key={emp.id} className="flex items-center justify-between py-2 border-b border-slate-800/20 last:border-0">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-light text-slate-200 truncate">{emp.name}</p>
+              <p className="text-[10px] text-slate-500 truncate">{emp.department}</p>
+            </div>
+
+            {/* Badge pair — the visual anomaly */}
+            <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
+              {leftBadge && <Badge badge={leftBadge} label={badgePair!.leftLabel} />}
+              {rightBadge && <Badge badge={rightBadge} label={badgePair!.rightLabel} />}
+              {showCost && emp.turnoverCost && emp.turnoverCost > 0 && (
+                <span className="text-[10px] font-mono text-purple-400 ml-1">
+                  {formatCurrency(emp.turnoverCost)}
+                </span>
+              )}
+            </div>
           </div>
-          {showCost && emp.turnoverCost && (
-            <p className="text-xs font-mono text-purple-400 flex-shrink-0 ml-3">
-              {formatCurrency(emp.turnoverCost)}
-            </p>
-          )}
-          {!showCost && (
-            <p className="text-xs font-mono text-slate-500 flex-shrink-0 ml-3">
-              360°: {emp.score360.toFixed(1)}
-            </p>
-          )}
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

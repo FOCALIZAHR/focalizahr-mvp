@@ -9,6 +9,8 @@ import type {
   CorrelationPoint,
   GerenciaGoalsStats,
   NarrativeEmployee,
+  ResolvedBadge,
+  NarrativeBadges,
 } from '@/lib/services/GoalsDiagnosticService'
 
 // Re-export for convenience
@@ -18,6 +20,8 @@ export type {
   CorrelationPoint,
   GerenciaGoalsStats,
   NarrativeEmployee,
+  ResolvedBadge,
+  NarrativeBadges,
 }
 
 export interface GoalsCorrelationProps {

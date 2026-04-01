@@ -1995,6 +1995,13 @@ model PerformanceRatingConfig {
   // Si null, usa default FocalizaHR (25/25/25/25)
   evaluatorWeights        Json?   @map("evaluator_weights")
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // CLASIFICACIÓN DE METAS (Nivel Account)
+  // ═══════════════════════════════════════════════════════════════════════
+  // JSON Array: [{ level, label, labelShort, minPercent, maxPercent, color, bgClass, textClass }]
+  // Si null, usa FOCALIZAHR_GOALS_DEFAULT_CONFIG (SOBRECUMPLE >80, EN_PROGRESO 50-80, BAJO 30-50, CRITICO <30)
+  goalsClassificationLevels Json?  @map("goals_classification_levels")
+
   // Metadata
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
