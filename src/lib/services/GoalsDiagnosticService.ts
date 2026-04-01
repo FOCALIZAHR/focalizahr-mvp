@@ -17,6 +17,8 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { prisma } from '@/lib/prisma'
+import type { EvaluationStatus } from '@/lib/utils/evaluatorStatsEngine'
+import { PerformanceRatingService } from '@/lib/services/PerformanceRatingService'
 import { SalaryConfigService } from '@/lib/services/SalaryConfigService'
 import {
   getPerformanceClassification,
@@ -116,6 +118,7 @@ export interface NarrativeEmployee {
   riskQuadrant: string | null
   turnoverCost?: number
   acotadoGroup: string | null
+  managerId: string | null
   /** Resolved classification badges — ready for rendering */
   badges: NarrativeBadges
 }
@@ -199,6 +202,7 @@ interface RatingRow {
     id: string
     fullName: string
     acotadoGroup: string | null
+    managerId: string | null
     department: {
       displayName: string
       parent: { displayName: string } | null
@@ -358,6 +362,7 @@ export class GoalsDiagnosticService {
             id: true,
             fullName: true,
             acotadoGroup: true,
+            managerId: true,
             department: {
               select: {
                 displayName: true,
@@ -568,6 +573,7 @@ export class GoalsDiagnosticService {
         riskQuadrant: r.riskQuadrant,
         turnoverCost: turnoverResult.turnoverCost,
         acotadoGroup: r.employee.acotadoGroup,
+        managerId: r.employee.managerId ?? null,
         badges: {
           goals: goalsBadge,
           score360: score360Badge,
@@ -670,5 +676,442 @@ export class GoalsDiagnosticService {
 
     // Sort by disconnection rate desc
     return result.sort((a, b) => b.disconnectionRate - a.disconnectionRate)
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // V2 DETECTION — CEO-first: 2 segmentos + vista organizacional
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /** Pearson correlation coefficient. Returns null if < 5 valid pairs. */
+  static calculatePearsonR(pairs: { x: number; y: number }[]): number | null {
+    const valid = pairs.filter(p => p.x != null && p.y != null)
+    const n = valid.length
+    if (n < 5) return null
+
+    const sumX = valid.reduce((s, p) => s + p.x, 0)
+    const sumY = valid.reduce((s, p) => s + p.y, 0)
+    const sumXY = valid.reduce((s, p) => s + p.x * p.y, 0)
+    const sumX2 = valid.reduce((s, p) => s + p.x * p.x, 0)
+    const sumY2 = valid.reduce((s, p) => s + p.y * p.y, 0)
+
+    const numerator = n * sumXY - sumX * sumY
+    const denominator = Math.sqrt(
+      (n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY)
+    )
+
+    return denominator === 0 ? 0 : Math.round((numerator / denominator) * 100) / 100
+  }
+
+  /**
+   * Detect V2 sub-findings organized by CEO question.
+   * Pure logic — no DB calls.
+   */
+  static detectSubFindings(
+    employees: NarrativeEmployee[],
+    managerClassifications: Map<string, EvaluationStatus>
+  ): SubFinding[] {
+    const T = GOALS_THRESHOLDS
+    const ROLEFIT_THRESHOLD = 75 // Consistent with TalentFinancialFormulas
+    const findings: SubFinding[] = []
+
+    // ── SEGMENT 1: ENTREGARON (goals > 80%) ──────────────────────────────
+
+    const entregaron = employees.filter(e => (e.goalsPercent ?? 0) > T.HIGH_GOALS)
+
+    // 1B — ¿Los estamos perdiendo?
+    const fugaProductiva = entregaron.filter(e => e.riskQuadrant === 'FUGA_CEREBROS')
+    if (fugaProductiva.length > 0) {
+      findings.push({
+        key: '1B_fugaProductiva',
+        segmentId: '1_ENTREGARON',
+        employees: fugaProductiva,
+        count: fugaProductiva.length,
+        financialImpact: fugaProductiva.reduce((s, e) => s + (e.turnoverCost ?? 0), 0),
+      })
+    }
+
+    // 1D — ¿Es sostenible?
+    const sostenibilidad = entregaron.filter(e =>
+      (e.roleFitScore ?? 100) < ROLEFIT_THRESHOLD
+    )
+    if (sostenibilidad.length > 0) {
+      findings.push({
+        key: '1D_sostenibilidad',
+        segmentId: '1_ENTREGARON',
+        employees: sostenibilidad,
+        count: sostenibilidad.length,
+        financialImpact: 0, // No direct $ — risk is burnout/unsustainability
+      })
+    }
+
+    // ── SEGMENT 2: NO ENTREGARON (goals < 40%) ──────────────────────────
+
+    const noEntregaron = employees.filter(e =>
+      e.goalsPercent !== null && (e.goalsPercent ?? 0) < T.LOW_GOALS
+    )
+
+    // 2B — ¿Los vamos a premiar igual?
+    const bonosInjustificados = noEntregaron.filter(e => e.score360 > T.HIGH_SCORE)
+    if (bonosInjustificados.length > 0) {
+      findings.push({
+        key: '2B_bonosInjustificados',
+        segmentId: '2_NO_ENTREGARON',
+        employees: bonosInjustificados,
+        count: bonosInjustificados.length,
+        financialImpact: 0, // TODO: salary × bonus % when bonus model exists
+      })
+    }
+
+    // 2C — ¿El evaluador los protege?
+    const evaluadorProtege = noEntregaron.filter(e => {
+      if (!e.managerId) return false
+      const mgrStatus = managerClassifications.get(e.managerId)
+      return mgrStatus === 'INDULGENTE'
+    })
+    if (evaluadorProtege.length > 0) {
+      // Group by manager for narrative
+      const byManager = new Map<string, NarrativeEmployee[]>()
+      for (const e of evaluadorProtege) {
+        const mId = e.managerId!
+        if (!byManager.has(mId)) byManager.set(mId, [])
+        byManager.get(mId)!.push(e)
+      }
+      findings.push({
+        key: '2C_evaluadorProtege',
+        segmentId: '2_NO_ENTREGARON',
+        employees: evaluadorProtege,
+        count: evaluadorProtege.length,
+        financialImpact: 0,
+        meta: {
+          byManager: Array.from(byManager.entries()).map(([mId, emps]) => ({
+            managerId: mId,
+            count: emps.length,
+          })),
+        },
+      })
+    }
+
+    // 2A — ¿No pueden o no quieren?
+    const noSabe = noEntregaron.filter(e => (e.roleFitScore ?? 100) < T.LOW_ROLEFIT)
+    const noQuiere = noEntregaron.filter(e => (e.roleFitScore ?? 0) > T.HIGH_ROLEFIT)
+    if (noSabe.length > 0 || noQuiere.length > 0) {
+      findings.push({
+        key: '2A_noPuedeVsNoQuiere',
+        segmentId: '2_NO_ENTREGARON',
+        employees: [...noSabe, ...noQuiere],
+        count: noSabe.length + noQuiere.length,
+        financialImpact: 0,
+        meta: {
+          noSabe: noSabe.map(e => e.id),
+          noQuiere: noQuiere.map(e => e.id),
+          noSabeCount: noSabe.length,
+          noQuiereCount: noQuiere.length,
+        },
+      })
+    }
+
+    return findings
+  }
+
+  /** Group sub-findings into 3 CEO segments */
+  static buildSegments(
+    subFindings: SubFinding[],
+    employees: NarrativeEmployee[]
+  ): GoalsSegment[] {
+    const T = GOALS_THRESHOLDS
+    const entregaron = employees.filter(e => (e.goalsPercent ?? 0) > T.HIGH_GOALS)
+    const noEntregaron = employees.filter(e =>
+      e.goalsPercent !== null && (e.goalsPercent ?? 0) < T.LOW_GOALS
+    )
+
+    return [
+      {
+        id: '1_ENTREGARON',
+        label: 'Entregaron Resultados',
+        threshold: `Metas > ${T.HIGH_GOALS}%`,
+        subFindings: subFindings.filter(f => f.segmentId === '1_ENTREGARON'),
+        totalEmployees: entregaron.length,
+      },
+      {
+        id: '2_NO_ENTREGARON',
+        label: 'No Entregaron',
+        threshold: `Metas < ${T.LOW_GOALS}%`,
+        subFindings: subFindings.filter(f => f.segmentId === '2_NO_ENTREGARON'),
+        totalEmployees: noEntregaron.length,
+      },
+      {
+        id: '3_ORGANIZACIONAL',
+        label: 'Vista Organizacional',
+        threshold: 'Por gerencia',
+        subFindings: subFindings.filter(f => f.segmentId === '3_ORGANIZACIONAL'),
+        totalEmployees: employees.length,
+      },
+    ]
+  }
+
+  /** Rank sub-findings by financial impact, return top N */
+  static rankTopAlerts(subFindings: SubFinding[], limit: number = 3): SubFinding[] {
+    return [...subFindings]
+      .sort((a, b) => b.financialImpact - a.financialImpact || b.count - a.count)
+      .slice(0, limit)
+  }
+
+  /** V2 gerencia aggregation — adds Pearson (3A) + calibration cross (3D) */
+  static aggregateByGerenciaV2(ratings: RatingRow[]): GerenciaGoalsStatsV2[] {
+    // Get V1 base stats
+    const v1Stats = this.aggregateByGerencia(ratings)
+
+    // Build gerencia → ratings map for V2 calculations
+    const gerenciaMap = new Map<string, RatingRow[]>()
+    for (const r of ratings) {
+      const gerencia = r.employee.department?.parent?.displayName
+        ?? r.employee.department?.displayName
+        ?? 'Sin gerencia'
+      if (!gerenciaMap.has(gerencia)) gerenciaMap.set(gerencia, [])
+      gerenciaMap.get(gerencia)!.push(r)
+    }
+
+    return v1Stats.map(g => {
+      const rows = gerenciaMap.get(g.gerenciaName) ?? []
+
+      // 3A: Pearson roleFitScore × goalsRawPercent
+      const pairsForPearson = rows
+        .filter(r => r.roleFitScore !== null && r.goalsRawPercent !== null)
+        .map(r => ({ x: r.roleFitScore!, y: r.goalsRawPercent! }))
+      const pearsonRoleFitGoals = this.calculatePearsonR(pairsForPearson)
+
+      // 3D: Calibration cross — adjustmentType vs goalsRawPercent
+      let calibrationCross: CalibrationCross | null = null
+      const calibrated = rows.filter(r => r.calibrated && r.adjustmentType)
+      if (calibrated.length > 0) {
+        const upgraded = calibrated.filter(r => r.adjustmentType === 'upgrade')
+        const downgraded = calibrated.filter(r => r.adjustmentType === 'downgrade')
+
+        const avgGoals = (arr: RatingRow[]) => {
+          const withGoals = arr.filter(r => r.goalsRawPercent !== null)
+          if (withGoals.length === 0) return null
+          return Math.round(withGoals.reduce((s, r) => s + r.goalsRawPercent!, 0) / withGoals.length)
+        }
+
+        calibrationCross = {
+          adjustedUpCount: upgraded.length,
+          adjustedDownCount: downgraded.length,
+          avgGoalsAdjustedUp: avgGoals(upgraded),
+          avgGoalsAdjustedDown: avgGoals(downgraded),
+        }
+      }
+
+      return {
+        ...g,
+        pearsonRoleFitGoals,
+        calibrationCross,
+      }
+    })
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // V2 ORCHESTRATOR — CEO-first entry point
+  // ══════════════════════════════════════════════════════════════════════════
+
+  static async getCorrelationDetailV2(
+    cycleId: string,
+    accountId: string,
+    departmentIds?: string[]
+  ): Promise<GoalsCorrelationDataV2> {
+
+    const where: any = {
+      cycleId,
+      accountId,
+      employee: { status: 'ACTIVE', isActive: true },
+    }
+    if (departmentIds?.length) {
+      where.employee.departmentId = { in: departmentIds }
+    }
+
+    // Single query — same as V1 but with managerId
+    const ratings = await prisma.performanceRating.findMany({
+      where,
+      select: {
+        calculatedScore: true,
+        goalsRawPercent: true,
+        goalsCount: true,
+        potentialEngagement: true,
+        roleFitScore: true,
+        riskQuadrant: true,
+        mobilityQuadrant: true,
+        calibrated: true,
+        adjustmentType: true,
+        employee: {
+          select: {
+            id: true,
+            fullName: true,
+            acotadoGroup: true,
+            managerId: true,
+            department: {
+              select: {
+                displayName: true,
+                parent: { select: { displayName: true } },
+              },
+            },
+          },
+        },
+      },
+    }) as RatingRow[]
+
+    // Cycle config
+    const cycle = await prisma.performanceCycle.findFirst({
+      where: { id: cycleId, accountId },
+      select: { includeGoals: true, competenciesWeight: true, goalsWeight: true },
+    })
+
+    // Enrich with costs + resolved badges
+    const enriched = await this.enrichWithCosts(ratings, accountId)
+
+    // Manager classifications (for 2C evaluadorProtege)
+    const calibration = await PerformanceRatingService.getCalibrationStatsByDepartment(
+      cycleId, accountId, departmentIds
+    )
+    const managerClassifications = new Map<string, EvaluationStatus>()
+    for (const dept of calibration.byDepartment) {
+      managerClassifications.set(dept.managerId, dept.status)
+    }
+
+    // Detect V2 sub-findings
+    const subFindings = this.detectSubFindings(enriched, managerClassifications)
+
+    // Build segments
+    const segments = this.buildSegments(subFindings, enriched)
+
+    // Top 3 alerts for portada
+    const topAlerts = this.rankTopAlerts(subFindings, 3)
+
+    // Scatter + quadrants (reuse V1 logic)
+    const correlation = this.buildCorrelationPoints(ratings)
+    const quadrantCounts = {
+      consistent: correlation.filter(c => c.quadrant === 'CONSISTENT').length,
+      perceptionBias: correlation.filter(c => c.quadrant === 'PERCEPTION_BIAS').length,
+      hiddenPerformer: correlation.filter(c => c.quadrant === 'HIDDEN_PERFORMER').length,
+      doubleRisk: correlation.filter(c => c.quadrant === 'DOUBLE_RISK').length,
+      noGoals: correlation.filter(c => c.quadrant === 'NO_GOALS').length,
+    }
+
+    // Gerencia V2 (with Pearson + calibration cross)
+    const byGerencia = this.aggregateByGerenciaV2(ratings)
+
+    // Totals for portada headline
+    const T = GOALS_THRESHOLDS
+    const totalEntregaron = enriched.filter(e => (e.goalsPercent ?? 0) > T.HIGH_GOALS).length
+    const totalNoEntregaron = enriched.filter(e =>
+      e.goalsPercent !== null && (e.goalsPercent ?? 0) < T.LOW_GOALS
+    ).length
+    const totalAnomalias = subFindings.reduce((s, f) => s + f.count, 0)
+    const totalFinancialRisk = subFindings.reduce((s, f) => s + f.financialImpact, 0)
+
+    return {
+      segments,
+      topAlerts,
+      correlation,
+      quadrantCounts,
+      byGerencia,
+      cycleConfig: {
+        includeGoals: cycle?.includeGoals ?? true,
+        competenciesWeight: cycle?.competenciesWeight ?? 70,
+        goalsWeight: cycle?.goalsWeight ?? 30,
+      },
+      totals: {
+        totalEvaluados: enriched.length,
+        totalEntregaron,
+        totalNoEntregaron,
+        totalAnomalias,
+        totalFinancialRisk,
+      },
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// V2 TYPES — CEO-First: 2 segmentos + vista organizacional
+// ════════════════════════════════════════════════════════════════════════════
+
+export type SegmentId = '1_ENTREGARON' | '2_NO_ENTREGARON' | '3_ORGANIZACIONAL'
+
+/** Individual sub-finding within a segment */
+export interface SubFinding {
+  /** Unique key e.g. '1B_fugaProductiva' */
+  key: string
+  /** Parent segment */
+  segmentId: SegmentId
+  /** Affected employees with resolved badges */
+  employees: NarrativeEmployee[]
+  /** Count of affected employees */
+  count: number
+  /** CLP total in risk — used for ranking top alerts */
+  financialImpact: number
+  /** Extra data per finding (e.g. noSabe/noQuiere split, managerName) */
+  meta?: Record<string, unknown>
+}
+
+/** A segment groups related sub-findings */
+export interface GoalsSegment {
+  id: SegmentId
+  label: string
+  /** Human-readable threshold description */
+  threshold: string
+  subFindings: SubFinding[]
+  /** Total employees in this segment (not sum of sub-findings — one person can appear in multiple) */
+  totalEmployees: number
+}
+
+/** Calibration cross-analysis per gerencia (3D) */
+export interface CalibrationCross {
+  /** Count calibrated UP (upgrade) */
+  adjustedUpCount: number
+  /** Count calibrated DOWN (downgrade) */
+  adjustedDownCount: number
+  /** Average goalsRawPercent of those calibrated UP */
+  avgGoalsAdjustedUp: number | null
+  /** Average goalsRawPercent of those calibrated DOWN */
+  avgGoalsAdjustedDown: number | null
+}
+
+/** V2 gerencia stats — extends V1 with Pearson + calibration */
+export interface GerenciaGoalsStatsV2 extends GerenciaGoalsStats {
+  /** 3A: Pearson correlation RoleFit × Metas (null if < 5 data points) */
+  pearsonRoleFitGoals: number | null
+  /** 3D: Calibration cross-analysis */
+  calibrationCross: CalibrationCross | null
+}
+
+/** V2 response — CEO-first segmented structure */
+export interface GoalsCorrelationDataV2 {
+  /** 2 employee segments + 1 organizational */
+  segments: GoalsSegment[]
+  /** Top 3 alerts ranked by financial impact (portada) */
+  topAlerts: SubFinding[]
+  /** Scatter plot data (reuses V1) */
+  correlation: CorrelationPoint[]
+  /** Quadrant counts (reuses V1) */
+  quadrantCounts: {
+    consistent: number
+    perceptionBias: number
+    hiddenPerformer: number
+    doubleRisk: number
+    noGoals: number
+  }
+  /** Per-gerencia stats with Pearson + calibration */
+  byGerencia: GerenciaGoalsStatsV2[]
+  /** Cycle config */
+  cycleConfig: {
+    includeGoals: boolean
+    competenciesWeight: number
+    goalsWeight: number
+  }
+  /** Global counts for portada headline */
+  totals: {
+    totalEvaluados: number
+    totalEntregaron: number
+    totalNoEntregaron: number
+    totalAnomalias: number
+    totalFinancialRisk: number
   }
 }

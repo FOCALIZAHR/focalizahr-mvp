@@ -38,6 +38,11 @@ export interface GerenciaNarrativeInput {
   evaluatorClassification?: string | null
   confidenceLevel: 'green' | 'amber' | 'red'
   employeeCount: number
+  /** V2: Pearson RoleFit × Metas (null if insufficient data) */
+  pearsonR?: number | null
+  /** V2: Calibration cross counts */
+  calibrationUpWithLowGoals?: number
+  calibrationDownWithHighGoals?: number
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -95,6 +100,48 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
       'Capacitar a quien no quiere es tirar dinero. Presionar a quien no sabe es acelerar la fuga.',
     coachingTip: 'Mira el badge de RoleFit en cada persona. Ese dato define si es formación o conversación de expectativas.',
     teslaColor: '#64748B', // slate
+  },
+
+  // ── V2: Nuevos sub-hallazgos ──────────────────────────────────────────
+
+  sostenibilidad: {
+    headline: 'Entregan resultados a costa de quemarse.',
+    description:
+      'Metas sobre 80% pero RoleFit bajo 75% — no dominan las competencias que su cargo exige. ' +
+      'Entregan por esfuerzo insostenible, no por dominio. ' +
+      'O las metas eran fáciles para el cargo, o estas personas se están quemando para compensar brechas.',
+    coachingTip: 'Valida la dificultad de las metas vs. el nivel del cargo. Si las metas son reales, protege a estas personas antes de que colapsen.',
+    teslaColor: '#F97316', // orange
+  },
+
+  evaluadorProtege: {
+    headline: 'El gerente no exige y los datos lo confirman.',
+    description:
+      'Metas bajo 40% y su evaluador directo está clasificado como INDULGENTE. ' +
+      'No es solo que la persona no entregó — el gerente asignó evaluaciones altas a todo su equipo. ' +
+      'Doble inflación: evaluación alta + metas bajas. El problema no es individual, es de liderazgo.',
+    coachingTip: 'La conversación es con el gerente, no con el colaborador. Presenta los datos de su equipo completo.',
+    teslaColor: '#DC2626', // red-600
+  },
+
+  pearsonRoleFitMetas: {
+    headline: 'Las competencias predicen resultados — o no.',
+    description:
+      'La correlación Pearson entre RoleFit y cumplimiento de metas mide si el framework de competencias sirve. ' +
+      'Correlación alta (r > 0.7): las competencias que exiges predicen ejecución. ' +
+      'Correlación baja (r < 0.3): las competencias definidas no se relacionan con los resultados reales.',
+    coachingTip: 'Gerencias con r bajo necesitan revisión del framework de competencias. HR debe validar si los CompetencyTargets están alineados con la operación real.',
+    teslaColor: '#8B5CF6', // violet
+  },
+
+  calibracionJusta: {
+    headline: 'La calibración corrigió — pero ¿en la dirección correcta?',
+    description:
+      'Personas calibradas hacia arriba con metas bajo 40%: la calibración legitimó, no corrigió. ' +
+      'Personas calibradas hacia abajo con metas sobre 80%: se penalizó a quien entregó resultados. ' +
+      'Ambos patrones erosionan la meritocracia y la credibilidad del proceso.',
+    coachingTip: 'Presenta estos cruces al comité de calibración como evidencia. La próxima sesión debe tener las metas sobre la mesa.',
+    teslaColor: '#0EA5E9', // sky
   },
 }
 
@@ -172,6 +219,23 @@ export function buildGerenciaNarrative(g: GerenciaNarrativeInput): string {
   // Evaluator classification
   if (g.evaluatorClassification && g.confidenceLevel !== 'green') {
     parts.push(`Evaluador clasificado como "${g.evaluatorClassification}".`)
+  }
+
+  // V2: Pearson RoleFit × Metas
+  if (g.pearsonR !== undefined && g.pearsonR !== null) {
+    if (g.pearsonR > 0.7) {
+      parts.push(`Correlación RoleFit-Metas de ${g.pearsonR.toFixed(2)} — las competencias predicen resultados.`)
+    } else if (g.pearsonR < 0.3) {
+      parts.push(`Correlación RoleFit-Metas de solo ${g.pearsonR.toFixed(2)} — las competencias definidas no predicen ejecución. Revisar framework.`)
+    }
+  }
+
+  // V2: Calibration justice
+  if (g.calibrationUpWithLowGoals && g.calibrationUpWithLowGoals > 0) {
+    parts.push(`${g.calibrationUpWithLowGoals} persona(s) calibrada(s) hacia arriba con metas bajo 40% — inflación política.`)
+  }
+  if (g.calibrationDownWithHighGoals && g.calibrationDownWithHighGoals > 0) {
+    parts.push(`${g.calibrationDownWithHighGoals} persona(s) calibrada(s) hacia abajo con metas sobre 80% — sesgo contra resultados.`)
   }
 
   return parts.join(' ')

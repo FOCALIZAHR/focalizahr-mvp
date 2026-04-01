@@ -62,8 +62,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 6. LLAMAR SERVICIO (toda la lógica en GoalsDiagnosticService)
-    const data = await GoalsDiagnosticService.getCorrelationDetail(
+    // 6. LLAMAR SERVICIO V2 — CEO-first: 2 segmentos + vista organizacional
+    const data = await GoalsDiagnosticService.getCorrelationDetailV2(
       cycleId,
       userContext.accountId,
       departmentIds
