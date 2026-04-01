@@ -4,15 +4,14 @@
 // P&L TALENT - Executive Hub Panel
 // src/app/dashboard/executive-hub/components/PLTalent/index.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// Split-Brain: Datos Duros (35%) + Oráculo Condicional (65%)
-// Integra: LensSelector, SplitBrain, LeadershipAlert, IndividualDrawer,
-//          SemaforoDrawer, BrechaProductivaTab, SemaforoLegalTab,
+// Navegación: Portada → 3 tabs (Análisis Profundo | Localización | Zona Legal)
+// Integra: ExecutiveBriefing, BrechaProductivaTab, SemaforoLegalTab,
 //          GerenciaDetailView
 // ════════════════════════════════════════════════════════════════════════════
 
-import { memo, useState, useEffect, useMemo, useCallback } from 'react'
+import { memo, useState, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, MapPin, Scale } from 'lucide-react'
+import { ArrowLeft, Brain, MapPin, Scale } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import type { PLTalentProps } from './PLTalent.types'
@@ -21,12 +20,7 @@ import { PanelPortada } from '../PanelPortada'
 import BrechaProductivaTab from './tabs/BrechaProductivaTab'
 import SemaforoLegalTab from './tabs/SemaforoLegalTab'
 import { GerenciaDetailView } from './shared/GerenciaDetailView'
-
-// Components
-import PLTalentLensSelector, { type LensType } from './components/PLTalentLensSelector'
 import PLTalentExecutiveBriefing from './components/PLTalentExecutiveBriefing'
-
-import { BUSINESS_IMPACT_DICTIONARY } from '@/config/narratives/BusinessImpactDictionary'
 
 import type { ExecutiveRiskPayload } from '@/lib/services/TalentRiskOrchestrator'
 
@@ -58,33 +52,12 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
   const [view, setView] = useState<View>('portada')
   const [selectedGerencia, setSelectedGerencia] = useState<{ id: string; name: string } | null>(null)
 
-  // Split-Brain state
-  const [activeLens, setActiveLens] = useState<LensType>('gerencia')
-  const [selectedGerenciaName, setSelectedGerenciaName] = useState<string | null>(null)
-
   // Read risk data from pre-fetched spotlight data (null if /risk-profiles failed — graceful)
   const riskData = (data as any).riskProfiles as { profiles: ExecutiveRiskPayload[]; summary: RiskProfilesSummary } | null
   const riskProfiles = riskData?.profiles ?? []
   const riskSummary = riskData?.summary ?? null
-  const riskLoading = false // Data arrives with spotlight, no separate loading
 
   const narrative = useMemo(() => getPortadaNarrative(data), [data])
-
-  // Auto-select gerencia con mayor severidad cuando llegan los datos
-  useEffect(() => {
-    if (!selectedGerenciaName && data.brecha.byGerencia.length > 0) {
-      const top = data.brecha.byGerencia.find(g => g.gapMonthly > 0)
-      if (top) setSelectedGerenciaName(top.gerenciaName)
-    }
-  }, [data.brecha.byGerencia, selectedGerenciaName])
-
-  // Gerencia impact lookup — directo desde standardCategory (no fuzzy matching)
-  const gerenciaImpact = useMemo(() => {
-    if (!selectedGerenciaName) return null
-    const ger = data.brecha.byGerencia.find(g => g.gerenciaName === selectedGerenciaName)
-    if (!ger?.standardCategory) return null
-    return BUSINESS_IMPACT_DICTIONARY[ger.standardCategory] || null
-  }, [selectedGerenciaName, data.brecha.byGerencia])
 
   // Leadership alert data
   const leadershipData = useMemo(() => {
@@ -99,15 +72,8 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
     riskProfiles.filter(p => p.data.isLeader).length
   , [riskProfiles])
 
-  // Lens counts
-  const lensCounts = useMemo(() => ({
-    gerencias: data.brecha.byGerencia.length,
-    critical: riskSummary?.criticalPositions ?? 0,
-    tenureRisk: riskSummary ? (riskSummary.byTenureTrend.A1 + riskSummary.byTenureTrend.A2) : 0,
-  }), [data.brecha.byGerencia.length, riskSummary])
-
   // Which "tab" is active for NavPill highlight
-  const activeSection = view === 'semaforo' ? 'semaforo' : 'mapa'
+  const activeSection = view === 'semaforo' ? 'semaforo' : view === 'mapa' ? 'mapa' : 'analisis'
 
   const handleSelectGerencia = useCallback((id: string, name: string) => {
     setSelectedGerencia({ id, name })
@@ -115,11 +81,9 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
   }, [])
 
   const handleNavChange = useCallback((section: string) => {
-    if (section === 'semaforo') {
-      setView('semaforo')
-    } else {
-      setView('mapa')
-    }
+    if (section === 'semaforo') setView('semaforo')
+    else if (section === 'mapa') setView('mapa')
+    else setView('split-brain')
     setSelectedGerencia(null)
   }, [])
 
@@ -177,19 +141,8 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
                 <ArrowLeft className="w-3.5 h-3.5" />
                 Portada
               </button>
-              <NavPill active={activeSection} onChange={(section) => {
-                if (section === 'semaforo') setView('semaforo')
-                else setView('mapa')
-              }} />
+              <NavPill active={activeSection} onChange={handleNavChange} />
             </div>
-
-            {/* Lens Selector */}
-            <PLTalentLensSelector
-              activeLens={activeLens}
-              onLensChange={setActiveLens}
-              counts={lensCounts}
-              disabled={riskLoading}
-            />
 
             {/* Executive Briefing — La Cascada de la Verdad */}
             <PLTalentExecutiveBriefing
@@ -206,13 +159,8 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
               worstCellCount={worstCellCount}
               worstCellScore={worstCellScore}
               companyName={companyName || 'tu organización'}
-              onNavigateToLens={(lens) => setActiveLens(lens as LensType)}
               onNavigateToCargoFamily={() => { setView('mapa') }}
             />
-
-            {/* La Cascada de la Verdad ES la vista principal —
-                LeadershipAlert, SplitBrain y SemaforoDrawer eliminados
-                porque duplicaban información que el briefing ya contiene */}
           </motion.div>
         )}
 
@@ -234,7 +182,7 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
                 className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                Dashboard
+                Análisis
               </button>
               <NavPill active={activeSection} onChange={handleNavChange} />
             </div>
@@ -287,7 +235,7 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
                 className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                Dashboard
+                Análisis
               </button>
               <NavPill active={activeSection} onChange={handleNavChange} />
             </div>
@@ -310,6 +258,7 @@ export default PLTalent
 
 function NavPill({ active, onChange }: { active: string; onChange: (v: string) => void }) {
   const tabs = [
+    { key: 'analisis', icon: Brain, label: 'Análisis' },
     { key: 'mapa', icon: MapPin, label: 'Localización' },
     { key: 'semaforo', icon: Scale, label: 'Zona Legal' },
   ]

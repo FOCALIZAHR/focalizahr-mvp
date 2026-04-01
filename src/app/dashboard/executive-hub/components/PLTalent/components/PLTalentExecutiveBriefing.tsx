@@ -57,7 +57,6 @@ interface PLTalentExecutiveBriefingProps {
   worstCellCount?: number
   worstCellScore?: number
   companyName: string
-  onNavigateToLens?: (lens: string) => void
   onNavigateToCargoFamily?: () => void
 }
 
@@ -130,7 +129,6 @@ export default memo(function PLTalentExecutiveBriefing({
   worstCellCount,
   worstCellScore,
   companyName,
-  onNavigateToLens,
   onNavigateToCargoFamily,
 }: PLTalentExecutiveBriefingProps) {
 

@@ -17,6 +17,9 @@ import {
   calculateTenureMonths,
   calculateMonthlyGap,
   calculateFiniquito,
+  calculateFiniquitoConTope,
+  calculateMonthsUntilNextYear,
+  didRecentlyAddYear,
   calculateBreakevenMonths,
 } from '@/lib/utils/TalentFinancialFormulas'
 
@@ -80,12 +83,17 @@ export interface SemaforoPersona {
   position: string
   departmentName: string
   yearsOfService: number
+  tenureMonths: number
   semaphore: SemaphoreLevel
   finiquitoToday: number
+  finiquitoTodayConTope: number
   finiquitoIn3Months: number
   monthlyImproductivity: number
   roleFitScore: number
+  estimatedSalary: number            // Salario estimado (familia de cargo)
   breakevenMonths: number | null
+  monthsUntilNextYear: number | null
+  recentlyAddedYear: boolean
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -385,11 +393,14 @@ export class PLTalentService {
 
       // Financial — Single Source of Truth (TalentFinancialFormulas)
       const finiquitoToday = calculateFiniquito(salary, tenureMonths)
+      const finiquitoTodayConTope = calculateFiniquitoConTope(salary, tenureMonths)
       const finiquitoIn3Months = calculateFiniquito(salary, tenureMonths + 3)
 
       const roleFit = r.roleFitScore ?? 0
       const monthlyImproductivity = calculateMonthlyGap(salary, roleFit)
       const breakevenMonths = calculateBreakevenMonths(finiquitoToday, monthlyImproductivity)
+      const monthsUntilNextYear = calculateMonthsUntilNextYear(tenureMonths)
+      const recentlyAddedYear = didRecentlyAddYear(tenureMonths)
 
       totalLiability += finiquitoToday
 
@@ -399,12 +410,17 @@ export class PLTalentService {
         position: emp.position || 'Sin cargo',
         departmentName: emp.department?.displayName || 'Sin departamento',
         yearsOfService,
+        tenureMonths,
         semaphore,
         finiquitoToday,
+        finiquitoTodayConTope,
         finiquitoIn3Months,
         monthlyImproductivity,
         roleFitScore: roleFit,
+        estimatedSalary: salary,
         breakevenMonths,
+        monthsUntilNextYear,
+        recentlyAddedYear,
       })
     }
 

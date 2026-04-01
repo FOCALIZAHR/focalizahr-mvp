@@ -50,12 +50,17 @@ export interface SemaforoPersona {
   position: string
   departmentName: string
   yearsOfService: number
+  tenureMonths: number          // Para Motor 1 (TenureRoleFitDictionary)
   semaphore: SemaphoreLevel
   finiquitoToday: number
+  finiquitoTodayConTope: number   // Con tope 90 UF (Art. 172)
   finiquitoIn3Months: number
   monthlyImproductivity: number
   roleFitScore: number
-  breakevenMonths: number | null // meses hasta que mantener cuesta más que desvincular
+  estimatedSalary: number             // salario estimado (familia de cargo)
+  breakevenMonths: number | null      // meses hasta que mantener cuesta más que desvincular
+  monthsUntilNextYear: number | null  // meses hasta que suba el finiquito (próxima anualidad)
+  recentlyAddedYear: boolean          // acaba de sumar un año de servicio (últimos 2 meses)
 }
 
 export interface SemaforoLegalData {

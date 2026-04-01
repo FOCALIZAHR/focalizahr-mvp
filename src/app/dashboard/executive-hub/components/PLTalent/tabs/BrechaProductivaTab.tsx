@@ -9,12 +9,22 @@
 // Cada card cuenta una micro-historia, no muestra un número.
 // ════════════════════════════════════════════════════════════════════════════
 
-import { memo, useState } from 'react'
+import { memo, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { ChevronDown, AlertTriangle } from 'lucide-react'
+import {
+  ResponsiveContainer,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar as RechartsRadar,
+  Tooltip,
+} from 'recharts'
 import type { BrechaProductivaData, BrechaGerencia, BrechaByCargoFamily, SemaforoLegalData } from '../PLTalent.types'
 import { formatCurrency } from '../PLTalent.utils'
+import { BUSINESS_IMPACT_DICTIONARY } from '@/config/narratives/BusinessImpactDictionary'
 
 interface Props {
   data: BrechaProductivaData
@@ -22,8 +32,36 @@ interface Props {
   onSelectGerencia: (gerenciaId: string, gerenciaName: string) => void
 }
 
+const SHORT_LABELS: Record<string, string> = {
+  alta_gerencia: 'Alta Gerencia',
+  mandos_medios: 'Mandos Medios',
+  profesionales: 'Profesionales',
+  base_operativa: 'Base Operativa',
+}
+
+function RadarTooltipContent({ active, payload }: any) {
+  if (!active || !payload?.length) return null
+  const d = payload[0]?.payload
+  if (!d) return null
+  return (
+    <div className="bg-slate-950/90 backdrop-blur-xl border border-slate-700/50 px-3 py-2 rounded-lg shadow-xl text-xs">
+      <p className="text-white font-medium mb-1">{d.familia}</p>
+      <p className="text-slate-400">Fit: <span className="text-cyan-400 font-mono">{d.roleFit}%</span> · {d.headcount} personas</p>
+    </div>
+  )
+}
+
 export default memo(function BrechaProductivaTab({ data, semaforoData, onSelectGerencia }: Props) {
   const [showCargo, setShowCargo] = useState(false)
+
+  const radarData = useMemo(() =>
+    data.byCargoFamily.map(f => ({
+      familia: SHORT_LABELS[f.acotadoGroup] || f.label,
+      roleFit: f.avgRoleFit,
+      benchmark: 75,
+      headcount: f.headcount,
+    }))
+  , [data.byCargoFamily])
 
   if (data.totalPeople === 0) {
     return (
@@ -47,6 +85,37 @@ export default memo(function BrechaProductivaTab({ data, semaforoData, onSelectG
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
           <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
           <p className="text-[10px] text-amber-400/80">Salarios estimados. Configura tus datos reales para mayor precisión.</p>
+        </div>
+      )}
+
+      {/* ═══ RADAR INLINE — Overview por familia de cargo ═══ */}
+      {radarData.length > 0 && (
+        <div className="w-full h-[200px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <RadarChart cx="50%" cy="50%" outerRadius="65%" data={radarData}>
+              <PolarGrid stroke="#334155" strokeDasharray="4 4" />
+              <PolarAngleAxis dataKey="familia" tick={{ fill: '#94a3b8', fontSize: 10 }} />
+              <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+              <RechartsRadar
+                dataKey="benchmark"
+                stroke="#475569"
+                fill="transparent"
+                strokeWidth={1}
+                strokeDasharray="6 4"
+                isAnimationActive={false}
+              />
+              <RechartsRadar
+                dataKey="roleFit"
+                stroke="#22D3EE"
+                fill="rgba(34, 211, 238, 0.12)"
+                fillOpacity={1}
+                strokeWidth={2}
+                isAnimationActive={false}
+                dot={{ r: 3, fill: '#22D3EE', strokeWidth: 0 }}
+              />
+              <Tooltip content={<RadarTooltipContent />} />
+            </RadarChart>
+          </ResponsiveContainer>
         </div>
       )}
 
@@ -90,9 +159,16 @@ export default memo(function BrechaProductivaTab({ data, semaforoData, onSelectG
                 <span className="text-purple-400 font-medium">{formatCurrency(ger.gapMonthly)}/mes</span>
                 {' '}en pérdida de productividad
               </p>
-              <p className="text-xs text-slate-500 mb-3">
+              <p className="text-xs text-slate-500 mb-2">
                 {ger.headcount} persona{ger.headcount !== 1 ? 's' : ''} bajo el estándar de su cargo
               </p>
+
+              {/* Motor 2 — Narrativa de impacto por categoría */}
+              {ger.standardCategory && BUSINESS_IMPACT_DICTIONARY[ger.standardCategory] && (
+                <p className="text-[11px] font-light text-slate-400 leading-relaxed mb-3">
+                  Su meta estructural es {BUSINESS_IMPACT_DICTIONARY[ger.standardCategory].meta.toLowerCase()}.
+                </p>
+              )}
 
               {/* Row 3: Breakeven narrative (only if legal data exists) */}
               {breakevenMonths && (

@@ -400,7 +400,7 @@ export class ExecutiveSynthesisEngine {
       implication: `${gerencia} concentra el ${concentration.toFixed(0)}% ` +
         `del déficit. Su rol es ${impact?.meta}. ` +
         `Cuando ese rol falla, no falla solo, arrastra a quienes ` +
-        `dependen de su output y a quienes le entregan input. ` +
+        `dependen de sus resultados y a quienes le entregan trabajo. ` +
         `El déficit se propaga.`,
 
       path: `Una conversación directa con el liderazgo ` +
