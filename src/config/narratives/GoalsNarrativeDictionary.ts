@@ -64,9 +64,10 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   bonosSinRespaldo: {
     headline: 'Compensación desconectada de resultados.',
     description:
-      'Su evaluación 360° consolidada los clasifica como "Supera Expectativas", pero sus metas están en nivel crítico. ' +
-      'Dos fuentes de datos cuentan historias opuestas. ' +
-      'Si la compensación variable depende del 360°, estos pagos no tienen respaldo en resultados medibles.',
+      'Dos fuentes independientes se contradicen. La organización los percibe como alto desempeño — su evaluación integral los clasifica en el nivel superior. ' +
+      'Pero sus metas están bajo el 40% de cumplimiento. ' +
+      'Si la compensación variable considera la evaluación, estos pagos no tienen respaldo en resultados medibles. ' +
+      'No es una opinión — es la contradicción que el sistema detectó.',
     coachingTip: 'Revisa estos casos antes del comité de compensación. El badge verde de evaluación junto al rojo de metas es la contradicción.',
     teslaColor: '#F59E0B', // amber
   },
@@ -107,9 +108,10 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   sostenibilidad: {
     headline: 'Entregan resultados a costa de quemarse.',
     description:
-      'Metas en nivel "Sobrecumple" pero RoleFit los clasifica bajo el estándar de su cargo. ' +
-      'Entregan por esfuerzo insostenible, no por dominio de competencias. ' +
-      'O las metas eran fáciles para lo que el cargo exige, o estas personas se están quemando para compensar brechas.',
+      'Cumplen metas sobre el 80% pero no dominan las competencias que su cargo exige. ' +
+      'Dos explicaciones posibles — y ninguna es sostenible: O las metas no están calibradas al nivel del cargo. ' +
+      'O estas personas compensan con esfuerzo lo que les falta en dominio. ' +
+      'En ambos casos, el rendimiento actual no se puede mantener.',
     coachingTip: 'Valida la dificultad de las metas vs. el nivel del cargo. Si las metas son reales, protege a estas personas antes de que colapsen.',
     teslaColor: '#F97316', // orange
   },
@@ -117,9 +119,9 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   evaluadorProtege: {
     headline: 'El gerente no exige y los datos lo confirman.',
     description:
-      'Metas bajo 40% y su evaluador directo está clasificado como INDULGENTE. ' +
-      'No es solo que la persona no entregó — el gerente asignó evaluaciones altas a todo su equipo. ' +
-      'Doble inflación: evaluación alta + metas bajas. El problema no es individual, es de liderazgo.',
+      'No entregaron metas. Y su evaluador directo está clasificado como indulgente — asignó evaluaciones altas a todo su equipo. ' +
+      'La contradicción no es de la persona: es del liderazgo. ' +
+      'Evaluación alta más metas bajas en el mismo equipo es una firma de gestión, no de talento.',
     coachingTip: 'La conversación es con el gerente, no con el colaborador. Presenta los datos de su equipo completo.',
     teslaColor: '#DC2626', // red-600
   },
@@ -164,23 +166,23 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
 export const QUADRANT_NARRATIVE_DICTIONARY: Record<string, QuadrantNarrative> = {
 
   CONSISTENT: {
-    explanation: 'RoleFit alto y cumplimiento de metas alto. Domina las competencias de su cargo y entrega resultados.',
-    implication: 'Base sólida. El color del punto indica si el 360° confirma o contradice.',
+    explanation: 'RoleFit alto y metas cumplidas. Domina su cargo y entrega resultados — las dos fuentes se alinean.',
+    implication: 'Base confiable para decisiones de compensación y desarrollo.',
   },
 
   PERCEPTION_BIAS: {
-    explanation: 'RoleFit alto pero metas bajas. Domina las competencias pero no las traduce en resultados.',
-    implication: 'Sabe pero no entrega. Problema de motivación, dirección o metas mal definidas.',
+    explanation: 'Domina su cargo pero no entrega resultados. La capacidad existe — la ejecución no.',
+    implication: 'Problema de dirección o compromiso. No de capacidad.',
   },
 
   HIDDEN_PERFORMER: {
-    explanation: 'RoleFit bajo pero metas altas. Entrega resultados sin dominar las competencias esperadas.',
-    implication: 'Sobreviviente. Riesgo de burnout o metas fáciles. Validar dificultad y proteger.',
+    explanation: 'Entrega resultados pero no domina las competencias del cargo. Rinde por esfuerzo, no por dominio.',
+    implication: 'Sostenibilidad en riesgo. Validar si las metas están calibradas al nivel del cargo.',
   },
 
   DOUBLE_RISK: {
-    explanation: 'RoleFit bajo y metas bajas. No domina su cargo y no entrega resultados.',
-    implication: 'Candidato a plan de mejora con timeline definido. Evaluar costo de inacción.',
+    explanation: 'RoleFit bajo y metas bajas. Dos fuentes independientes confirman el mismo diagnóstico.',
+    implication: 'Plan de mejora con timeline definido. El costo de inacción ya está calculado.',
   },
 
   NO_GOALS: {
