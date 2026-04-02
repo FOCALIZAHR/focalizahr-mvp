@@ -55,10 +55,11 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
     headline: 'Talento que rinde y que se va.',
     description:
       'Dos señales independientes confirman el mismo riesgo. ' +
-      'Ya están clasificados como riesgo de fuga — alto dominio del cargo, compromiso crítico. ' +
-      'Y sus metas sobre 80% confirman que no estás perdiendo peso muerto: estás perdiendo a quienes ejecutan. ' +
-      'El costo de reemplazo ya está calculado. Cada día sin intervención lo incrementa.',
-    coachingTip: 'Presenta estos nombres al comité de retención esta semana. El costo de reemplazo ya está calculado — úsalo como argumento.',
+      'Domina su cargo y entrega resultados — pero su compromiso emocional es crítico. ' +
+      'El líder directo probablemente no lo sabe: ve las metas cumplidas y asume que todo está bien. ' +
+      'El engagement bajo es exactamente la señal que los resultados ocultan. ' +
+      'El costo de reemplazo ya está calculado. Cuando el rendimiento finalmente caiga, ya será tarde.',
+    coachingTip: 'La señal que el líder no ve es la más importante. ¿Perdió conexión con el propósito del rol? ¿Con el equipo? ¿Con su líder directo? Esa conversación debe ocurrir antes de que los resultados empiecen a bajar — porque cuando bajan, la decisión ya está tomada.',
     teslaColor: '#EF4444', // red
   },
 
