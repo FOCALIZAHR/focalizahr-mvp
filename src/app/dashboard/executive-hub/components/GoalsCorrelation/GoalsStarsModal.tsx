@@ -259,7 +259,9 @@ function PersonCard({
         <div className="min-w-0">
           <p className="text-sm font-light text-slate-200">{displayName}</p>
           <p className="text-[10px] text-slate-500 font-light">
-            {employee.department}
+            {employee.gerencia !== employee.department
+              ? `${employee.gerencia} · ${employee.department}`
+              : employee.department}
             {positionTitle && <> · <span className="text-purple-400/70">{positionTitle}</span></>}
           </p>
         </div>
