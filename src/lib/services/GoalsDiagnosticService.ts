@@ -103,6 +103,7 @@ export interface NarrativeBadges {
   roleFit: ResolvedBadge | null
   engagement: ResolvedBadge | null
   risk: ResolvedBadge | null
+  evaluatorStatus: ResolvedBadge | null
 }
 
 export interface NarrativeEmployee {
@@ -318,6 +319,17 @@ export class GoalsDiagnosticService {
     }
   }
 
+  /** Map EvaluationStatus to a ResolvedBadge */
+  private static evaluatorStatusToBadge(status: EvaluationStatus): ResolvedBadge {
+    const configs: Record<EvaluationStatus, ResolvedBadge> = {
+      INDULGENTE: { label: 'Indulgente', labelShort: 'Indul', textClass: 'text-red-400', bgClass: 'bg-red-500/10', borderClass: 'border-red-500/30', color: '#EF4444' },
+      SEVERA: { label: 'Severa', labelShort: 'Sever', textClass: 'text-amber-400', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-500/30', color: '#F59E0B' },
+      CENTRAL: { label: 'Central', labelShort: 'Centr', textClass: 'text-cyan-400', bgClass: 'bg-cyan-500/10', borderClass: 'border-cyan-500/30', color: '#22D3EE' },
+      OPTIMA: { label: 'Óptima', labelShort: 'Óptim', textClass: 'text-emerald-400', bgClass: 'bg-emerald-500/10', borderClass: 'border-emerald-500/30', color: '#10B981' },
+    }
+    return configs[status]
+  }
+
   /** Enrich ratings with salary/turnover costs + resolved classification badges */
   private static async enrichWithCosts(
     ratings: RatingRow[],
@@ -394,6 +406,7 @@ export class GoalsDiagnosticService {
           roleFit: roleFitBadge,
           engagement: engagementBadge,
           risk: riskBadge,
+          evaluatorStatus: null, // Resolved by orchestrator after manager classification lookup
         },
       }
     })
@@ -523,7 +536,8 @@ export class GoalsDiagnosticService {
    */
   static detectSubFindings(
     employees: NarrativeEmployee[],
-    managerClassifications: Map<string, EvaluationStatus>
+    managerClassifications: Map<string, EvaluationStatus>,
+    managerNames: Map<string, string> = new Map()
   ): SubFinding[] {
     const T = GOALS_THRESHOLDS
     const ROLEFIT_THRESHOLD = 75 // Consistent with TalentFinancialFormulas
@@ -608,6 +622,7 @@ export class GoalsDiagnosticService {
         meta: {
           byManager: Array.from(byManager.entries()).map(([mId, emps]) => ({
             managerId: mId,
+            managerName: managerNames.get(mId) ?? 'Evaluador sin nombre',
             count: emps.length,
           })),
         },
@@ -888,17 +903,29 @@ export class GoalsDiagnosticService {
     // Enrich with costs + resolved badges
     const enriched = await this.enrichWithCosts(ratings, accountId)
 
-    // Manager classifications (for 2C evaluadorProtege)
+    // Manager classifications (for 2C evaluadorProtege + badge)
     const calibration = await PerformanceRatingService.getCalibrationStatsByDepartment(
       cycleId, accountId, departmentIds
     )
     const managerClassifications = new Map<string, EvaluationStatus>()
+    const managerNames = new Map<string, string>()
     for (const dept of calibration.byDepartment) {
       managerClassifications.set(dept.managerId, dept.status)
+      managerNames.set(dept.managerId, dept.managerName)
+    }
+
+    // Resolve evaluatorStatus badge on each employee
+    for (const emp of enriched) {
+      if (emp.managerId) {
+        const mgrStatus = managerClassifications.get(emp.managerId)
+        if (mgrStatus) {
+          emp.badges.evaluatorStatus = this.evaluatorStatusToBadge(mgrStatus)
+        }
+      }
     }
 
     // Detect V2 sub-findings (person-level: segments 1 + 2)
-    const personFindings = this.detectSubFindings(enriched, managerClassifications)
+    const personFindings = this.detectSubFindings(enriched, managerClassifications, managerNames)
 
     // Gerencia V2 (with Pearson + calibration cross)
     const byGerencia = this.aggregateByGerenciaV2(ratings)

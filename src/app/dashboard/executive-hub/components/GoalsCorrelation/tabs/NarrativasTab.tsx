@@ -26,7 +26,7 @@ interface SegmentTabProps {
 // BADGE PAIR CONFIG — qué par de clasificaciones muestra cada sub-finding
 // ════════════════════════════════════════════════════════════════════════════
 
-type BadgePairKey = 'goals' | 'score360' | 'roleFit' | 'engagement' | 'risk'
+type BadgePairKey = 'goals' | 'score360' | 'roleFit' | 'engagement' | 'risk' | 'evaluatorStatus'
 
 interface BadgePairConfig {
   left: BadgePairKey
@@ -49,7 +49,7 @@ const BADGE_PAIRS: Record<string, BadgePairConfig> = {
     right: 'goals', rightLabel: 'Metas',
   },
   '2C_evaluadorProtege': {
-    left: 'score360', leftLabel: 'Eval 360°',
+    left: 'evaluatorStatus', leftLabel: 'Evaluador',
     right: 'goals', rightLabel: 'Metas',
   },
   '2A_noPuedeVsNoQuiere': {
@@ -214,9 +214,9 @@ export default memo(function SegmentTab({ segment }: SegmentTabProps) {
                     {finding.key === '2C_evaluadorProtege' && Array.isArray(finding.meta?.byManager) && (
                       <div className="pt-2 border-t border-slate-800/30">
                         <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Por evaluador</p>
-                        {(finding.meta!.byManager as { managerId: string; count: number }[]).map((mg) => (
+                        {(finding.meta!.byManager as { managerId: string; managerName: string; count: number }[]).map((mg) => (
                           <p key={mg.managerId} className="text-[10px] font-light text-red-400/80">
-                            {mg.count} de {finding.count} reportan al mismo evaluador
+                            {mg.count} de {finding.count} reportan a <span className="text-slate-300 font-medium">{mg.managerName}</span>
                           </p>
                         ))}
                       </div>
