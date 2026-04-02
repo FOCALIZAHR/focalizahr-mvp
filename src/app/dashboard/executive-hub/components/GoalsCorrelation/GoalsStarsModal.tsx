@@ -47,6 +47,8 @@ interface GoalsStarsModalProps {
   title: string
   subtitle: string
   teslaColor: string
+  type: 'stars' | 'critical'
+  percentage: number
   persons: PersonEntry[]
   /** Set of employee IDs that occupy critical positions (for amplifier in stars modal) */
   criticalPositionIds?: Set<string>
@@ -57,14 +59,34 @@ interface GoalsStarsModalProps {
 // COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
+// ════════════════════════════════════════════════════════════════════════════
+// DYNAMIC HEADLINES — Narrativa condicional por tipo × porcentaje
+// ════════════════════════════════════════════════════════════════════════════
+
+const DYNAMIC_HEADLINES: Record<'stars' | 'critical', { under: string; over: string }> = {
+  stars: {
+    under: 'Tus estrellas deberían ser quienes más resultados traen. Si no cumplen metas, hay tres posibilidades: las metas están mal definidas para su nivel, el proceso de evaluación tiene sesgos, o la clasificación se construyó sobre percepción, no sobre ejecución.',
+    over: 'Tus estrellas tienen respaldo real en resultados. La clasificación y la ejecución se alinean — ese es el estándar que debería replicarse en toda la organización.',
+  },
+  critical: {
+    under: 'Los cargos críticos son los que no pueden fallar. Si quien los ocupa no cumple metas, el riesgo no es individual — es de continuidad operacional. ¿Están bien clasificados? ¿Son nuevos en el cargo? ¿Qué pasó?',
+    over: 'Tus cargos críticos tienen respaldo en resultados. La operación tiene cobertura real donde más importa.',
+  },
+}
+
 export default memo(function GoalsStarsModal({
   title,
   subtitle,
   teslaColor,
+  type,
+  percentage,
   persons,
   criticalPositionIds = new Set(),
   onClose,
 }: GoalsStarsModalProps) {
+
+  const isUnderStandard = percentage < 80
+  const headline = isUnderStandard ? DYNAMIC_HEADLINES[type].under : DYNAMIC_HEADLINES[type].over
 
   // Escape key
   useEffect(() => {
@@ -102,17 +124,27 @@ export default memo(function GoalsStarsModal({
         />
 
         {/* Header */}
-        <div className="flex items-start justify-between p-6 pb-4">
-          <div>
-            <p className="text-lg font-light text-slate-200">{title}</p>
-            <p className="text-xs text-slate-500 mt-1">{subtitle}</p>
+        <div className="p-6 pb-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-lg font-light text-slate-200">{title}</p>
+              <p className="text-xs text-slate-500 mt-1">{subtitle}</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-slate-600 hover:text-slate-400 transition-colors p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-600 hover:text-slate-400 transition-colors p-1"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          {/* Dynamic headline — narrativa condicional */}
+          <p className={cn(
+            'text-sm font-light italic leading-relaxed mt-4',
+            isUnderStandard ? 'text-amber-400' : 'text-cyan-400'
+          )}>
+            {headline}
+          </p>
         </div>
 
         {/* Person cards — scrollable */}

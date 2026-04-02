@@ -423,6 +423,8 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
         <GoalsStarsModal
           title="Estrellas del 9-Box"
           subtitle={`${stars.total} estrella${stars.total !== 1 ? 's' : ''} · ${stars.percentage}% cumplen metas`}
+          type="stars"
+          percentage={stars.percentage}
           teslaColor="#F59E0B"
           persons={stars.employees.map(e => ({ employee: e }))}
           criticalPositionIds={criticalPositionIds}
@@ -435,6 +437,8 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
         <GoalsStarsModal
           title="Cargos Críticos"
           subtitle={`${criticalPositions.total} posicion${criticalPositions.total !== 1 ? 'es' : ''} · ${criticalPositions.percentage}% cumplen metas`}
+          type="critical"
+          percentage={criticalPositions.percentage}
           teslaColor="#A78BFA"
           persons={criticalPositions.positions.map(p => ({
             employee: p.employee,
