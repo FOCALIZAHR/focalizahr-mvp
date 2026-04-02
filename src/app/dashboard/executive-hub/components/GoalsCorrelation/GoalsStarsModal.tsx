@@ -9,13 +9,15 @@
 // Colores: cyan + purple only. LED dot por cuadrante.
 // ════════════════════════════════════════════════════════════════════════════
 
-import { memo, useEffect } from 'react'
+import { memo, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import type { NarrativeEmployee } from './GoalsCorrelation.types'
 import { GoalsDiagnosticService } from '@/lib/services/GoalsDiagnosticService'
+import { getCompensacionNarrative } from '@/config/narratives/CompensacionNarrativeDictionary'
 
 // ════════════════════════════════════════════════════════════════════════════
 // QUADRANT MICRO-NARRATIVES
@@ -218,10 +220,10 @@ export default memo(function GoalsStarsModal({
 })
 
 // ════════════════════════════════════════════════════════════════════════════
-// PERSON CARD
+// PERSON CARD — Stateful component (toggle compensación independiente)
 // ════════════════════════════════════════════════════════════════════════════
 
-function PersonCard({
+const PersonCard = memo(function PersonCard({
   entry,
   index,
   isCriticalPosition,
@@ -230,6 +232,8 @@ function PersonCard({
   index: number
   isCriticalPosition: boolean
 }) {
+  const [compExpanded, setCompExpanded] = useState(false)
+
   const { employee, positionTitle, benchStrength } = entry
   const goalsPercent = employee.goalsPercent ?? 0
   const roleFitScore = employee.roleFitScore ?? 0
@@ -240,6 +244,7 @@ function PersonCard({
   )
   const micro = QUADRANT_MICRO[quadrant] ?? QUADRANT_MICRO.NO_GOALS
   const isFuga = employee.riskQuadrant === 'FUGA_CEREBROS'
+  const compEntry = getCompensacionNarrative(quadrant)
 
   const displayName = employee.name
     .toLowerCase()
@@ -287,6 +292,53 @@ function PersonCard({
         {micro.text}
       </p>
 
+      {/* Compensación link + expandible */}
+      {compEntry && (
+        <>
+          <button
+            onClick={() => setCompExpanded(!compExpanded)}
+            className="group inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 transition-colors mt-1"
+          >
+            Ver perspectiva de compensaciones
+            <ArrowRight className={cn(
+              'w-3 h-3 transition-transform',
+              compExpanded ? 'rotate-90' : 'group-hover:translate-x-0.5'
+            )} />
+          </button>
+
+          <AnimatePresence>
+            {compExpanded && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="border-t border-slate-800/30 pt-3 mt-1 space-y-3">
+                  <div>
+                    <p className="text-[9px] font-medium text-slate-500 uppercase tracking-widest mb-1.5">
+                      La Observación
+                    </p>
+                    <p className="text-[11px] font-light text-slate-400 leading-relaxed">
+                      {compEntry.observacion}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-medium text-slate-500 uppercase tracking-widest mb-1.5">
+                      La Decisión de Valor
+                    </p>
+                    <p className="text-[11px] font-light text-slate-300 leading-relaxed">
+                      {compEntry.decisionValor}
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
+
       {/* Amplifiers — subtle monochrome badges */}
       {(isFuga || isCriticalPosition || benchStrength) && (
         <div className="flex flex-wrap gap-1.5">
@@ -309,7 +361,7 @@ function PersonCard({
       )}
     </motion.div>
   )
-}
+})
 
 // ════════════════════════════════════════════════════════════════════════════
 // METRIC BAR — Thin, cyan or purple, with threshold marker
