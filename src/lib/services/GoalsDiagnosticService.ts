@@ -287,13 +287,18 @@ export class GoalsDiagnosticService {
   // CLASSIFY QUADRANT — Lógica pura (sin DB)
   // ══════════════════════════════════════════════════════════════════════════
 
-  static classifyQuadrant(score360: number, goalsPercent: number | null): CorrelationQuadrant {
-    if (goalsPercent === null) return 'NO_GOALS'
+  /**
+   * Classify into quadrant using RoleFit × Metas (both objective measures).
+   * Score360 is NOT an axis — it's the color (perception validator).
+   */
+  static classifyQuadrant(roleFitScore: number | null, goalsPercent: number | null): CorrelationQuadrant {
+    if (goalsPercent === null || roleFitScore === null) return 'NO_GOALS'
 
-    const T = GOALS_THRESHOLDS
-    if (score360 >= T.LOW_SCORE && goalsPercent >= T.SCATTER_GOALS_LINE) return 'CONSISTENT'
-    if (score360 >= T.LOW_SCORE && goalsPercent < T.SCATTER_GOALS_LINE) return 'PERCEPTION_BIAS'
-    if (score360 < T.LOW_SCORE && goalsPercent >= T.SCATTER_GOALS_LINE) return 'HIDDEN_PERFORMER'
+    const ROLEFIT_CUT = GOALS_THRESHOLDS.HIGH_ROLEFIT // 75
+    const GOALS_CUT = GOALS_THRESHOLDS.SCATTER_GOALS_LINE // 50
+    if (roleFitScore >= ROLEFIT_CUT && goalsPercent >= GOALS_CUT) return 'CONSISTENT'
+    if (roleFitScore >= ROLEFIT_CUT && goalsPercent < GOALS_CUT) return 'PERCEPTION_BIAS'
+    if (roleFitScore < ROLEFIT_CUT && goalsPercent >= GOALS_CUT) return 'HIDDEN_PERFORMER'
     return 'DOUBLE_RISK'
   }
 
@@ -404,7 +409,7 @@ export class GoalsDiagnosticService {
       score360: r.calculatedScore,
       goalsPercent: r.goalsRawPercent,
       roleFitScore: r.roleFitScore,
-      quadrant: this.classifyQuadrant(r.calculatedScore, r.goalsRawPercent),
+      quadrant: this.classifyQuadrant(r.roleFitScore, r.goalsRawPercent),
     }))
   }
 
