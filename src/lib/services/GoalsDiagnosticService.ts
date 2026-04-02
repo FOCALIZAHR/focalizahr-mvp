@@ -120,6 +120,7 @@ export interface NarrativeEmployee {
   turnoverCost?: number
   acotadoGroup: string | null
   managerId: string | null
+  nineBoxPosition: string | null
   /** Resolved classification badges — ready for rendering */
   badges: NarrativeBadges
 }
@@ -155,6 +156,7 @@ interface RatingRow {
   roleFitScore: number | null
   riskQuadrant: string | null
   mobilityQuadrant: string | null
+  nineBoxPosition: string | null
   calibrated: boolean
   adjustmentType: string | null
   employee: {
@@ -400,6 +402,7 @@ export class GoalsDiagnosticService {
         turnoverCost: turnoverResult.turnoverCost,
         acotadoGroup: r.employee.acotadoGroup,
         managerId: r.employee.managerId ?? null,
+        nineBoxPosition: r.nineBoxPosition,
         badges: {
           goals: goalsBadge,
           score360: score360Badge,
@@ -941,6 +944,7 @@ export class GoalsDiagnosticService {
         roleFitScore: true,
         riskQuadrant: true,
         mobilityQuadrant: true,
+        nineBoxPosition: true,
         calibrated: true,
         adjustmentType: true,
         employee: {
@@ -1027,6 +1031,38 @@ export class GoalsDiagnosticService {
     const totalAnomalias = allFindings.reduce((s, f) => s + f.count, 0)
     const totalFinancialRisk = allFindings.reduce((s, f) => s + f.financialImpact, 0)
 
+    // Stars from 9-Box
+    const starEmployees = enriched.filter(e => e.nineBoxPosition === 'star')
+    const starsWithHighGoals = starEmployees.filter(e => (e.goalsPercent ?? 0) > T.HIGH_GOALS)
+
+    // Critical positions — query incumbents that are in our ratings
+    const employeeIds = enriched.map(e => e.id)
+    const criticalPositionRows = await prisma.criticalPosition.findMany({
+      where: {
+        accountId,
+        isActive: true,
+        incumbentId: { not: null, in: employeeIds },
+      },
+      select: {
+        incumbentId: true,
+        positionTitle: true,
+        benchStrength: true,
+      },
+    })
+
+    // Map incumbent → enriched employee
+    const enrichedMap = new Map(enriched.map(e => [e.id, e]))
+    const criticalWithEmployee = criticalPositionRows
+      .filter(cp => cp.incumbentId && enrichedMap.has(cp.incumbentId))
+      .map(cp => ({
+        positionTitle: cp.positionTitle,
+        benchStrength: cp.benchStrength,
+        employee: enrichedMap.get(cp.incumbentId!)!,
+      }))
+    const criticalWithHighGoals = criticalWithEmployee.filter(
+      cp => (cp.employee.goalsPercent ?? 0) > T.HIGH_GOALS
+    )
+
     return {
       segments,
       topAlerts,
@@ -1044,6 +1080,22 @@ export class GoalsDiagnosticService {
         totalNoEntregaron,
         totalAnomalias,
         totalFinancialRisk,
+      },
+      stars: {
+        total: starEmployees.length,
+        withHighGoals: starsWithHighGoals.length,
+        percentage: starEmployees.length > 0
+          ? Math.round((starsWithHighGoals.length / starEmployees.length) * 100)
+          : 0,
+        employees: starEmployees,
+      },
+      criticalPositions: {
+        total: criticalWithEmployee.length,
+        withHighGoals: criticalWithHighGoals.length,
+        percentage: criticalWithEmployee.length > 0
+          ? Math.round((criticalWithHighGoals.length / criticalWithEmployee.length) * 100)
+          : 0,
+        positions: criticalWithEmployee,
       },
     }
   }
@@ -1133,5 +1185,23 @@ export interface GoalsCorrelationDataV2 {
     totalNoEntregaron: number
     totalAnomalias: number
     totalFinancialRisk: number
+  }
+  /** Stars from 9-Box crossed with goals */
+  stars: {
+    total: number
+    withHighGoals: number
+    percentage: number
+    employees: NarrativeEmployee[]
+  }
+  /** Critical positions crossed with goals */
+  criticalPositions: {
+    total: number
+    withHighGoals: number
+    percentage: number
+    positions: {
+      positionTitle: string
+      benchStrength: string
+      employee: NarrativeEmployee
+    }[]
   }
 }
