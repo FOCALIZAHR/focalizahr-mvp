@@ -12,12 +12,13 @@
 import { memo, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, HelpCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import type { NarrativeEmployee } from './GoalsCorrelation.types'
 import { GoalsDiagnosticService } from '@/lib/services/GoalsDiagnosticService'
 import { getCompensacionNarrative } from '@/config/narratives/CompensacionNarrativeDictionary'
+import { getQuadrantNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
 
 // ════════════════════════════════════════════════════════════════════════════
 // QUADRANT MICRO-NARRATIVES
@@ -245,6 +246,7 @@ const PersonCard = memo(function PersonCard({
   const micro = QUADRANT_MICRO[quadrant] ?? QUADRANT_MICRO.NO_GOALS
   const isFuga = employee.riskQuadrant === 'FUGA_CEREBROS'
   const compEntry = getCompensacionNarrative(quadrant)
+  const quadrantNarr = getQuadrantNarrative(quadrant)
 
   const displayName = employee.name
     .toLowerCase()
@@ -287,10 +289,25 @@ const PersonCard = memo(function PersonCard({
         <MetricBar label="RoleFit" value={roleFitScore} threshold={75} color="purple" />
       </div>
 
-      {/* Micro-narrative — plain slate text */}
-      <p className="text-[10px] font-light text-slate-500 leading-relaxed">
-        {micro.text}
-      </p>
+      {/* Micro-narrative + tooltip */}
+      <div className="flex items-start gap-1.5">
+        <p className="text-[10px] font-light text-slate-500 leading-relaxed">
+          {micro.text}
+        </p>
+        <div className="relative group flex-shrink-0 mt-px">
+          <HelpCircle className="w-3 h-3 text-slate-600 hover:text-slate-400 cursor-help transition-colors" />
+          {quadrantNarr && (
+            <div className="absolute bottom-full right-0 mb-2 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 w-56 text-left">
+              <p className="text-[10px] text-slate-300 leading-relaxed">
+                {quadrantNarr.explanation}
+              </p>
+              <p className="text-[9px] text-slate-500 mt-1.5 leading-relaxed">
+                {quadrantNarr.implication}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Compensación link + expandible */}
       {compEntry && (
