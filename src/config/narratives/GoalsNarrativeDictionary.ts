@@ -64,10 +64,10 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   bonosSinRespaldo: {
     headline: 'Compensación desconectada de resultados.',
     description:
-      'Sus pares los evalúan sobre 4.0 en el 360°, pero sus metas están bajo 40%. ' +
+      'Su evaluación 360° consolidada los clasifica como "Supera Expectativas", pero sus metas están en nivel crítico. ' +
       'Dos fuentes de datos cuentan historias opuestas. ' +
       'Si la compensación variable depende del 360°, estos pagos no tienen respaldo en resultados medibles.',
-    coachingTip: 'Revisa estos casos antes del comité de compensación. Los badges muestran la contradicción: evaluación alta, ejecución baja.',
+    coachingTip: 'Revisa estos casos antes del comité de compensación. El badge verde de evaluación junto al rojo de metas es la contradicción.',
     teslaColor: '#F59E0B', // amber
   },
 
@@ -107,9 +107,9 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   sostenibilidad: {
     headline: 'Entregan resultados a costa de quemarse.',
     description:
-      'Metas sobre 80% pero RoleFit bajo 75% — no dominan las competencias que su cargo exige. ' +
-      'Entregan por esfuerzo insostenible, no por dominio. ' +
-      'O las metas eran fáciles para el cargo, o estas personas se están quemando para compensar brechas.',
+      'Metas en nivel "Sobrecumple" pero RoleFit los clasifica bajo el estándar de su cargo. ' +
+      'Entregan por esfuerzo insostenible, no por dominio de competencias. ' +
+      'O las metas eran fáciles para lo que el cargo exige, o estas personas se están quemando para compensar brechas.',
     coachingTip: 'Valida la dificultad de las metas vs. el nivel del cargo. Si las metas son reales, protege a estas personas antes de que colapsen.',
     teslaColor: '#F97316', // orange
   },
@@ -164,27 +164,27 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
 export const QUADRANT_NARRATIVE_DICTIONARY: Record<string, QuadrantNarrative> = {
 
   CONSISTENT: {
-    explanation: 'Evaluación 360° alta y cumplimiento de metas alto. La percepción de pares coincide con resultados medibles.',
-    implication: 'Base confiable para decisiones de compensación y promoción.',
+    explanation: 'RoleFit alto y cumplimiento de metas alto. Domina las competencias de su cargo y entrega resultados.',
+    implication: 'Base sólida. El color del punto indica si el 360° confirma o contradice.',
   },
 
   PERCEPTION_BIAS: {
-    explanation: 'Metas altas pero evaluación 360° baja. El equipo no percibe el valor que esta persona genera.',
-    implication: 'Posible sesgo de proximidad o falta de visibilidad. Revisar criterios del evaluador.',
+    explanation: 'RoleFit alto pero metas bajas. Domina las competencias pero no las traduce en resultados.',
+    implication: 'Sabe pero no entrega. Problema de motivación, dirección o metas mal definidas.',
   },
 
   HIDDEN_PERFORMER: {
-    explanation: 'Evaluación 360° alta pero metas bajas. La percepción supera la ejecución demostrable.',
-    implication: 'Riesgo de premiar percepción sobre resultados. Validar antes de aprobar bonos.',
+    explanation: 'RoleFit bajo pero metas altas. Entrega resultados sin dominar las competencias esperadas.',
+    implication: 'Sobreviviente. Riesgo de burnout o metas fáciles. Validar dificultad y proteger.',
   },
 
   DOUBLE_RISK: {
-    explanation: 'Evaluación 360° baja y metas bajas. Doble señal de alerta — ni pares ni resultados respaldan el rendimiento.',
+    explanation: 'RoleFit bajo y metas bajas. No domina su cargo y no entrega resultados.',
     implication: 'Candidato a plan de mejora con timeline definido. Evaluar costo de inacción.',
   },
 
   NO_GOALS: {
-    explanation: 'Sin metas asignadas. No se puede validar la evaluación 360° contra resultados reales.',
+    explanation: 'Sin metas asignadas. No se puede validar el RoleFit contra resultados reales.',
     implication: 'Punto ciego en la medición. Asignar metas antes del próximo ciclo.',
   },
 }

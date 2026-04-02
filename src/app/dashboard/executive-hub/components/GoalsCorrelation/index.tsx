@@ -5,18 +5,20 @@
 // src/app/dashboard/executive-hub/components/GoalsCorrelation/index.tsx
 // ════════════════════════════════════════════════════════════════════════════
 // CEO-first: 2 segmentos (Entregaron / No Entregaron) + Vista Organizacional
-// PORTADA: Progressive Disclosure — titular $$$ + top 3 alertas tipo Cascada
+// PORTADA: PanelPortada estándar (consistente con los otros 6 insights)
+// CONTENT: AlertCards resumen + Tabs con detalle
 // ════════════════════════════════════════════════════════════════════════════
 
 import { memo, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Crosshair, ChevronRight, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Crosshair } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import type { GoalsCorrelationPropsV2, TabKeyV2, SubFinding } from './GoalsCorrelation.types'
 import { getPortadaNarrativeV2, formatCurrency } from './GoalsCorrelation.utils'
 import { TABS_V2, SUBFINDING_CARDS, SUBFINDING_TO_NARRATIVE } from './GoalsCorrelation.constants'
 import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
+import { PanelPortada } from '../PanelPortada'
 import SegmentTab from './tabs/NarrativasTab'
 import AnalisisTab from './tabs/AnalisisTab'
 import GerenciasTab from './tabs/GerenciasTab'
@@ -61,10 +63,17 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.2 }}
           >
-            <GoalsPortada
-              data={data}
-              narrative={narrative}
-              onEnter={() => setView('content')}
+            <PanelPortada
+              statusBadge={narrative.statusBadge}
+              narrative={{
+                prefix: narrative.prefix,
+                highlight: narrative.highlight,
+                suffix: narrative.suffix,
+              }}
+              ctaLabel={narrative.ctaLabel}
+              ctaVariant={narrative.ctaVariant}
+              onCtaClick={() => setView('content')}
+              coachingTip={narrative.coachingTip}
             />
           </motion.div>
         ) : (
@@ -86,13 +95,31 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
                 Portada
               </button>
 
-              {/* Cycle config badge */}
               {!data.cycleConfig.includeGoals && (
                 <span className="text-[9px] text-amber-400/70 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
                   Score Híbrido desactivado
                 </span>
               )}
             </div>
+
+            {/* Top alerts summary — moved from portada to content */}
+            {data.topAlerts.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] uppercase tracking-widest text-slate-600">
+                    Hallazgos prioritarios
+                  </p>
+                  <div className="flex items-center gap-4 text-center">
+                    <span className="text-xs font-mono text-emerald-400">{data.totals.totalEntregaron} <span className="text-[9px] text-slate-600">entregaron</span></span>
+                    <span className="text-xs font-mono text-red-400">{data.totals.totalNoEntregaron} <span className="text-[9px] text-slate-600">no</span></span>
+                    <span className="text-xs font-mono text-amber-400">{data.totals.totalAnomalias} <span className="text-[9px] text-slate-600">anomalías</span></span>
+                  </div>
+                </div>
+                {data.topAlerts.slice(0, 3).map((alert, i) => (
+                  <AlertCard key={alert.key} alert={alert} index={i} />
+                ))}
+              </div>
+            )}
 
             {/* Tab Bar */}
             <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
@@ -126,130 +153,7 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
 export default GoalsCorrelation
 
 // ════════════════════════════════════════════════════════════════════════════
-// PORTADA — Titular $$$ + Top 3 alertas tipo Cascada
-// ════════════════════════════════════════════════════════════════════════════
-
-interface PortadaNarrativeShape {
-  statusBadge?: { label: string; showCheck?: boolean }
-  prefix?: string
-  highlight: string
-  suffix: string
-  ctaLabel: string
-  ctaVariant: 'cyan' | 'purple' | 'amber' | 'red'
-  coachingTip: string
-}
-
-const CTA_VARIANTS: Record<string, string> = {
-  cyan: 'bg-gradient-to-r from-cyan-400 to-cyan-500 text-slate-900 shadow-[0_8px_20px_-6px_rgba(34,211,238,0.4)]',
-  purple: 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-[0_8px_20px_-6px_rgba(167,139,250,0.4)]',
-  amber: 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-[0_8px_20px_-6px_rgba(245,158,11,0.4)]',
-  red: 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-[0_8px_20px_-6px_rgba(239,68,68,0.4)]',
-}
-
-function GoalsPortada({
-  data,
-  narrative,
-  onEnter,
-}: {
-  data: GoalsCorrelationPropsV2['data']
-  narrative: PortadaNarrativeShape
-  onEnter: () => void
-}) {
-  const { topAlerts, totals } = data
-
-  return (
-    <div className="flex flex-col items-center px-6 py-10 md:px-8 md:py-12">
-
-      {/* Status badge */}
-      {narrative.statusBadge && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          className="flex items-center gap-2 mb-5"
-        >
-          {narrative.statusBadge.showCheck ? (
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          ) : (
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-400/80" />
-          )}
-          <span className="text-xs text-cyan-400/90 font-medium tracking-wide">
-            {narrative.statusBadge.label}
-          </span>
-        </motion.div>
-      )}
-
-      {/* Titular narrativo */}
-      <motion.p
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="text-xl md:text-2xl font-light text-center leading-relaxed max-w-lg mb-8"
-      >
-        {narrative.prefix && <span className="text-slate-400">{narrative.prefix}</span>}
-        <span className="text-cyan-400 font-medium">{narrative.highlight}</span>
-        <span className="text-slate-300">{narrative.suffix}</span>
-      </motion.p>
-
-      {/* ═══ TOP 3 ALERTAS — Mini Cascada ═══ */}
-      {topAlerts.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="w-full max-w-md space-y-2.5 mb-8"
-        >
-          {topAlerts.slice(0, 3).map((alert, i) => (
-            <AlertCard key={alert.key} alert={alert} index={i} />
-          ))}
-        </motion.div>
-      )}
-
-      {/* Contadores rápidos */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.25 }}
-        className="flex items-center gap-6 mb-8 text-center"
-      >
-        <div>
-          <p className="text-lg font-mono text-emerald-400">{totals.totalEntregaron}</p>
-          <p className="text-[9px] text-slate-600 uppercase tracking-wider">Entregaron</p>
-        </div>
-        <div className="w-px h-8 bg-slate-800" />
-        <div>
-          <p className="text-lg font-mono text-red-400">{totals.totalNoEntregaron}</p>
-          <p className="text-[9px] text-slate-600 uppercase tracking-wider">No entregaron</p>
-        </div>
-        <div className="w-px h-8 bg-slate-800" />
-        <div>
-          <p className="text-lg font-mono text-amber-400">{totals.totalAnomalias}</p>
-          <p className="text-[9px] text-slate-600 uppercase tracking-wider">Anomalías</p>
-        </div>
-      </motion.div>
-
-      {/* CTA */}
-      <motion.button
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        onClick={onEnter}
-        className={cn(
-          'flex items-center gap-3 py-3 px-7 rounded-xl font-medium text-base transition-all',
-          CTA_VARIANTS[narrative.ctaVariant]
-        )}
-        whileHover={{ scale: 1.02, y: -2 }}
-        whileTap={{ scale: 0.98 }}
-      >
-        <span>{narrative.ctaLabel}</span>
-        <ChevronRight className="w-4 h-4" />
-      </motion.button>
-    </div>
-  )
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// ALERT CARD — Mini card por alerta, tipo acto de la Cascada
+// ALERT CARD — Mini card por hallazgo prioritario
 // ════════════════════════════════════════════════════════════════════════════
 
 function AlertCard({ alert, index }: { alert: SubFinding; index: number }) {
@@ -263,14 +167,13 @@ function AlertCard({ alert, index }: { alert: SubFinding; index: number }) {
     <motion.div
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: 0.2 + index * 0.08 }}
+      transition={{ delay: index * 0.06 }}
       className={cn(
         'relative rounded-xl border overflow-hidden',
         'bg-slate-800/30 backdrop-blur-xl px-4 py-3',
         cardConfig.borderColor
       )}
     >
-      {/* Tesla line */}
       {dictNarrative && (
         <div
           className="absolute top-0 left-0 right-0 h-[1.5px]"
@@ -294,7 +197,6 @@ function AlertCard({ alert, index }: { alert: SubFinding; index: number }) {
           </div>
         </div>
 
-        {/* Financial impact or count badge */}
         <div className="flex-shrink-0">
           {alert.financialImpact > 0 ? (
             <span className={cn('text-xs font-mono font-medium', cardConfig.textColor)}>
