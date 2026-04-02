@@ -64,13 +64,12 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   },
 
   bonosSinRespaldo: {
-    headline: 'Compensación desconectada de resultados.',
+    headline: 'Percepción alta, resultados bajos.',
     description:
-      'Dos fuentes independientes se contradicen. La organización los percibe como alto desempeño — su evaluación integral los clasifica en el nivel superior. ' +
-      'Pero sus metas están bajo el 40% de cumplimiento. ' +
-      'Si la compensación variable considera la evaluación, estos pagos no tienen respaldo en resultados medibles. ' +
-      'No es una opinión — es la contradicción que el sistema detectó.',
-    coachingTip: 'Revisa estos casos antes del comité de compensación. El badge verde de evaluación junto al rojo de metas es la contradicción.',
+      'Dos fuentes independientes se contradicen. Su evaluación integral los clasifica en el nivel superior — pero sus metas están bajo el 40%. ' +
+      'O el sistema de evaluación no está midiendo lo que el cargo realmente exige. O las metas están calibradas a la baja y no representan un desafío real. ' +
+      'En ambos casos, la organización está tomando decisiones — de desarrollo, de promoción, de compensación — basadas en una señal que no coincide con los resultados.',
+    coachingTip: 'Antes del cierre de compensación: estos casos tienen evaluación alta y ejecución baja. Si el bono considera la evaluación, estás pagando por percepción, no por resultados. La contradicción está documentada — y el monto estimado también.',
     teslaColor: '#F59E0B', // amber
   },
 
@@ -124,17 +123,17 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
       'No entregaron metas. Y su evaluador directo está clasificado como indulgente — asignó evaluaciones altas a todo su equipo. ' +
       'La contradicción no es de la persona: es del liderazgo. ' +
       'Evaluación alta más metas bajas en el mismo equipo es una firma de gestión, no de talento.',
-    coachingTip: 'La conversación es con el gerente, no con el colaborador. Presenta los datos de su equipo completo.',
+    coachingTip: 'La conversación es con el liderazgo de esa gerencia — con los datos del equipo completo sobre la mesa, no solo de esta persona.',
     teslaColor: '#DC2626', // red-600
   },
 
   pearsonRoleFitMetas: {
     headline: 'Las competencias predicen resultados — o no.',
     description:
-      'La correlación Pearson entre RoleFit y cumplimiento de metas mide si el framework de competencias sirve. ' +
-      'Correlación alta (r > 0.7): las competencias que exiges predicen ejecución. ' +
-      'Correlación baja (r < 0.3): las competencias definidas no se relacionan con los resultados reales.',
-    coachingTip: 'Gerencias con r bajo necesitan revisión del framework de competencias. HR debe validar si los CompetencyTargets están alineados con la operación real.',
+      'En esta gerencia, quienes más dominan su cargo no son quienes más cumplen metas — y viceversa. ' +
+      'Dos explicaciones posibles: Las competencias que se evalúan no corresponden al trabajo real. ' +
+      'O las metas no están definidas en función de lo que el cargo exige.',
+    coachingTip: 'La pregunta no es de personas — es de diseño. ¿Las competencias que se evalúan corresponden a lo que el negocio realmente necesita de ese rol?',
     teslaColor: '#8B5CF6', // violet
   },
 
