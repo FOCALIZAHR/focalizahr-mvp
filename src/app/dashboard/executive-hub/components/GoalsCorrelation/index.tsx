@@ -45,6 +45,7 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
   // Find segments
   const segEntregaron = data.segments.find(s => s.id === '1_ENTREGARON')
   const segNoEntregaron = data.segments.find(s => s.id === '2_NO_ENTREGARON')
+  const segOrganizacional = data.segments.find(s => s.id === '3_ORGANIZACIONAL')
 
   return (
     <div className="relative">
@@ -104,7 +105,10 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
               <SegmentTab segment={segNoEntregaron} />
             )}
             {activeTab === 'organizacional' && (
-              <GerenciasTab byGerencia={data.byGerencia} />
+              <GerenciasTab
+                byGerencia={data.byGerencia}
+                orgFindings={segOrganizacional?.subFindings ?? []}
+              />
             )}
             {activeTab === 'analisis' && (
               <AnalisisTab

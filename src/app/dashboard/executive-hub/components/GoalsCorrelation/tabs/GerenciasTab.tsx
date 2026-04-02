@@ -11,11 +11,13 @@ import { memo, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { GerenciaGoalsStatsV2 } from '../GoalsCorrelation.types'
-import { buildGerenciaNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
+import type { GerenciaGoalsStatsV2, SubFinding } from '../GoalsCorrelation.types'
+import { SUBFINDING_CARDS, SUBFINDING_TO_NARRATIVE } from '../GoalsCorrelation.constants'
+import { buildGerenciaNarrative, getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
 
 interface GerenciasTabProps {
   byGerencia: GerenciaGoalsStatsV2[]
+  orgFindings?: SubFinding[]
 }
 
 const CONFIDENCE_VISUAL = {
@@ -50,7 +52,7 @@ function getPearsonLabel(r: number | null): { label: string; color: string } | n
   return { label: `r=${r.toFixed(2)} — Sin correlación`, color: 'text-red-400' }
 }
 
-export default memo(function GerenciasTab({ byGerencia }: GerenciasTabProps) {
+export default memo(function GerenciasTab({ byGerencia, orgFindings = [] }: GerenciasTabProps) {
   const [expanded, setExpanded] = useState<string | null>(null)
 
   // Worst gerencia for hero narrative
@@ -93,7 +95,95 @@ export default memo(function GerenciasTab({ byGerencia }: GerenciasTabProps) {
         </div>
       )}
 
-      {/* Gerencia cards */}
+      {/* ═══ Organizational Findings (3B, 3A, 3D) ═══ */}
+      {orgFindings.length > 0 && (
+        <div className="space-y-2.5">
+          <p className="text-[10px] uppercase tracking-widest text-slate-600 px-1">
+            Alertas sistémicas
+          </p>
+          {orgFindings.map((finding, idx) => {
+            const cardConfig = SUBFINDING_CARDS[finding.key]
+            if (!cardConfig) return null
+            const narrativeKey = SUBFINDING_TO_NARRATIVE[finding.key]
+            const dictNarrative = narrativeKey ? getNarrative(narrativeKey) : null
+            const gerencias = (finding.meta?.gerencias as { name: string; [k: string]: unknown }[]) ?? []
+            const totalAffected = (finding.meta?.totalAffectedEmployees as number) ?? finding.employees.length
+
+            return (
+              <motion.div
+                key={finding.key}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.15, delay: idx * 0.04 }}
+                className={cn(
+                  'rounded-xl border overflow-hidden relative',
+                  'bg-slate-800/30 backdrop-blur-xl',
+                  cardConfig.borderColor
+                )}
+              >
+                {dictNarrative && (
+                  <div
+                    className="absolute top-0 left-0 right-0 h-[2px] z-10"
+                    style={{
+                      background: `linear-gradient(90deg, transparent, ${dictNarrative.teslaColor}, transparent)`,
+                      boxShadow: `0 0 12px ${dictNarrative.teslaColor}`,
+                    }}
+                  />
+                )}
+                <div className="p-4 space-y-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className={cn('w-2 h-2 rounded-full flex-shrink-0', cardConfig.dotColor)} />
+                    <p className="text-sm font-light text-slate-200">
+                      {dictNarrative?.headline ?? cardConfig.title}
+                    </p>
+                    <span className={cn('text-xs font-mono font-medium', cardConfig.textColor)}>
+                      {finding.count} gerencia{finding.count !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] font-light text-slate-400 leading-relaxed pl-[18px]">
+                    {dictNarrative?.description ?? ''}
+                  </p>
+
+                  {/* Gerencias affected */}
+                  {gerencias.length > 0 && (
+                    <div className="pl-[18px] flex flex-wrap gap-1.5">
+                      {gerencias.map((g) => (
+                        <span
+                          key={g.name as string}
+                          className={cn(
+                            'text-[9px] px-2 py-0.5 rounded-full border',
+                            cardConfig.borderColor, cardConfig.textColor,
+                            'bg-slate-900/50'
+                          )}
+                        >
+                          {g.name as string} ({(g as { employeeCount?: number }).employeeCount ?? '?'} pers.)
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Coaching tip */}
+                  {dictNarrative?.coachingTip && (
+                    <div className="flex gap-2 items-start rounded-lg bg-slate-900/50 px-3 py-2 border border-slate-800/30 ml-[18px]">
+                      <span className="text-[10px] text-cyan-500 font-medium flex-shrink-0 mt-px">TIP</span>
+                      <p className="text-[10px] font-light text-slate-500 leading-relaxed">
+                        {dictNarrative.coachingTip}
+                      </p>
+                    </div>
+                  )}
+
+                  <p className="text-[9px] text-slate-600 pl-[18px]">
+                    {totalAffected} personas afectadas en total
+                  </p>
+                </div>
+              </motion.div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Gerencia cards — detail by gerencia */}
       <div className="space-y-3">
         {byGerencia.map((ger, idx) => {
           const conf = CONFIDENCE_VISUAL[ger.confidenceLevel]

@@ -62,6 +62,31 @@ export const SUBFINDING_CARDS: Record<string, SubFindingCardConfig> = {
     borderColor: 'border-slate-500/20',
     showCost: false,
   },
+  // Segment 3: ORGANIZACIONAL
+  '3B_sesgoSistematico': {
+    title: 'Sesgo Sistemático',
+    segmentId: '3_ORGANIZACIONAL',
+    dotColor: 'bg-red-500',
+    textColor: 'text-red-400',
+    borderColor: 'border-red-500/20',
+    showCost: false,
+  },
+  '3A_pearsonBajo': {
+    title: 'Competencias No Predicen',
+    segmentId: '3_ORGANIZACIONAL',
+    dotColor: 'bg-violet-400',
+    textColor: 'text-violet-400',
+    borderColor: 'border-violet-500/20',
+    showCost: false,
+  },
+  '3D_calibracionInjusta': {
+    title: 'Calibración Injusta',
+    segmentId: '3_ORGANIZACIONAL',
+    dotColor: 'bg-sky-400',
+    textColor: 'text-sky-400',
+    borderColor: 'border-sky-500/20',
+    showCost: false,
+  },
 }
 
 // Map SubFinding key → narrative dictionary key
@@ -71,6 +96,9 @@ export const SUBFINDING_TO_NARRATIVE: Record<string, string> = {
   '2B_bonosInjustificados': 'bonosSinRespaldo',
   '2C_evaluadorProtege': 'evaluadorProtege',
   '2A_noPuedeVsNoQuiere': 'noSabeVsNoQuiere',
+  '3B_sesgoSistematico': 'sesgoSistematico',
+  '3A_pearsonBajo': 'pearsonRoleFitMetas',
+  '3D_calibracionInjusta': 'calibracionJusta',
 }
 
 // ════════════════════════════════════════════════════════════════════════════

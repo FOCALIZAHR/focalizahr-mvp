@@ -102,7 +102,7 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
     teslaColor: '#64748B', // slate
   },
 
-  // ── V2: Nuevos sub-hallazgos ──────────────────────────────────────────
+  // ── V2: Nuevos sub-hallazgos persona ─────────────────────────────────
 
   sostenibilidad: {
     headline: 'Entregan resultados a costa de quemarse.',
@@ -142,6 +142,18 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
       'Ambos patrones erosionan la meritocracia y la credibilidad del proceso.',
     coachingTip: 'Presenta estos cruces al comité de calibración como evidencia. La próxima sesión debe tener las metas sobre la mesa.',
     teslaColor: '#0EA5E9', // sky
+  },
+
+  // ── V2: Sub-hallazgos organizacionales (por gerencia) ──────────────
+
+  sesgoSistematico: {
+    headline: 'El problema no es individual — es de liderazgo.',
+    description:
+      'Gerencias con evaluador clasificado como indulgente y metas promedio bajo 40%. ' +
+      'Doble señal: quien evalúa no exige, y los resultados lo confirman. ' +
+      'Cuando toda una gerencia tiene evaluaciones altas y resultados bajos, la conversación es con el gerente.',
+    coachingTip: 'Presenta al gerente los datos de su equipo completo. No es una persona — es un patrón bajo su liderazgo.',
+    teslaColor: '#DC2626', // red-600
   },
 }
 

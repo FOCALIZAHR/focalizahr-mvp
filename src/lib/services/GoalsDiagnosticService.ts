@@ -674,6 +674,104 @@ export class GoalsDiagnosticService {
       .slice(0, limit)
   }
 
+  /**
+   * Detect organizational-level sub-findings (3B, 3A, 3D).
+   * Analyzes gerencia stats to find systemic patterns.
+   * Returns SubFindings for the ORGANIZACIONAL segment.
+   */
+  static detectOrganizationalFindings(
+    gerenciaStats: GerenciaGoalsStatsV2[],
+    employees: NarrativeEmployee[]
+  ): SubFinding[] {
+    const findings: SubFinding[] = []
+
+    // Helper: get employees in a gerencia
+    const employeesInGerencia = (gerenciaName: string) =>
+      employees.filter(e => e.gerencia === gerenciaName)
+
+    // 3B — Sesgo sistemático: gerencias con confidenceLevel='red'
+    const sesgadas = gerenciaStats.filter(g => g.confidenceLevel === 'red')
+    if (sesgadas.length > 0) {
+      const affectedEmployees = sesgadas.flatMap(g => employeesInGerencia(g.gerenciaName))
+      findings.push({
+        key: '3B_sesgoSistematico',
+        segmentId: '3_ORGANIZACIONAL',
+        employees: affectedEmployees,
+        count: sesgadas.length, // count = gerencias, not employees
+        financialImpact: 0,
+        meta: {
+          type: 'gerencia',
+          gerencias: sesgadas.map(g => ({
+            name: g.gerenciaName,
+            avgProgress: g.avgProgress,
+            evaluatorClassification: g.evaluatorClassification,
+            employeeCount: g.employeeCount,
+          })),
+          totalAffectedEmployees: affectedEmployees.length,
+        },
+      })
+    }
+
+    // 3A — Pearson bajo: gerencias donde competencias no predicen resultados (r < 0.3)
+    const lowPearson = gerenciaStats.filter(g =>
+      g.pearsonRoleFitGoals !== null && g.pearsonRoleFitGoals < 0.3
+    )
+    if (lowPearson.length > 0) {
+      const affectedEmployees = lowPearson.flatMap(g => employeesInGerencia(g.gerenciaName))
+      findings.push({
+        key: '3A_pearsonBajo',
+        segmentId: '3_ORGANIZACIONAL',
+        employees: affectedEmployees,
+        count: lowPearson.length,
+        financialImpact: 0,
+        meta: {
+          type: 'gerencia',
+          gerencias: lowPearson.map(g => ({
+            name: g.gerenciaName,
+            pearsonR: g.pearsonRoleFitGoals,
+            employeeCount: g.employeeCount,
+          })),
+          totalAffectedEmployees: affectedEmployees.length,
+        },
+      })
+    }
+
+    // 3D — Calibración injusta: gerencias con inflación o sesgo
+    const calibrationIssues = gerenciaStats.filter(g => {
+      if (!g.calibrationCross) return false
+      const upInflation = g.calibrationCross.adjustedUpCount > 0 &&
+        g.calibrationCross.avgGoalsAdjustedUp !== null &&
+        g.calibrationCross.avgGoalsAdjustedUp < 40
+      const downBias = g.calibrationCross.adjustedDownCount > 0 &&
+        g.calibrationCross.avgGoalsAdjustedDown !== null &&
+        g.calibrationCross.avgGoalsAdjustedDown > 80
+      return upInflation || downBias
+    })
+    if (calibrationIssues.length > 0) {
+      const affectedEmployees = calibrationIssues.flatMap(g => employeesInGerencia(g.gerenciaName))
+      findings.push({
+        key: '3D_calibracionInjusta',
+        segmentId: '3_ORGANIZACIONAL',
+        employees: affectedEmployees,
+        count: calibrationIssues.length,
+        financialImpact: 0,
+        meta: {
+          type: 'gerencia',
+          gerencias: calibrationIssues.map(g => ({
+            name: g.gerenciaName,
+            adjustedUpCount: g.calibrationCross!.adjustedUpCount,
+            adjustedDownCount: g.calibrationCross!.adjustedDownCount,
+            avgGoalsUp: g.calibrationCross!.avgGoalsAdjustedUp,
+            avgGoalsDown: g.calibrationCross!.avgGoalsAdjustedDown,
+          })),
+          totalAffectedEmployees: affectedEmployees.length,
+        },
+      })
+    }
+
+    return findings
+  }
+
   /** V2 gerencia aggregation — adds Pearson (3A) + calibration cross (3D) */
   static aggregateByGerenciaV2(ratings: RatingRow[]): GerenciaGoalsStatsV2[] {
     // Get V1 base stats
@@ -794,14 +892,23 @@ export class GoalsDiagnosticService {
       managerClassifications.set(dept.managerId, dept.status)
     }
 
-    // Detect V2 sub-findings
-    const subFindings = this.detectSubFindings(enriched, managerClassifications)
+    // Detect V2 sub-findings (person-level: segments 1 + 2)
+    const personFindings = this.detectSubFindings(enriched, managerClassifications)
+
+    // Gerencia V2 (with Pearson + calibration cross)
+    const byGerencia = this.aggregateByGerenciaV2(ratings)
+
+    // Detect organizational findings (gerencia-level: segment 3)
+    const orgFindings = this.detectOrganizationalFindings(byGerencia, enriched)
+
+    // Combine all findings
+    const allFindings = [...personFindings, ...orgFindings]
 
     // Build segments
-    const segments = this.buildSegments(subFindings, enriched)
+    const segments = this.buildSegments(allFindings, enriched)
 
     // Top 3 alerts for portada
-    const topAlerts = this.rankTopAlerts(subFindings, 3)
+    const topAlerts = this.rankTopAlerts(allFindings, 3)
 
     // Scatter + quadrants (reuse V1 logic)
     const correlation = this.buildCorrelationPoints(ratings)
@@ -813,17 +920,14 @@ export class GoalsDiagnosticService {
       noGoals: correlation.filter(c => c.quadrant === 'NO_GOALS').length,
     }
 
-    // Gerencia V2 (with Pearson + calibration cross)
-    const byGerencia = this.aggregateByGerenciaV2(ratings)
-
     // Totals for portada headline
     const T = GOALS_THRESHOLDS
     const totalEntregaron = enriched.filter(e => (e.goalsPercent ?? 0) > T.HIGH_GOALS).length
     const totalNoEntregaron = enriched.filter(e =>
       e.goalsPercent !== null && (e.goalsPercent ?? 0) < T.LOW_GOALS
     ).length
-    const totalAnomalias = subFindings.reduce((s, f) => s + f.count, 0)
-    const totalFinancialRisk = subFindings.reduce((s, f) => s + f.financialImpact, 0)
+    const totalAnomalias = allFindings.reduce((s, f) => s + f.count, 0)
+    const totalFinancialRisk = allFindings.reduce((s, f) => s + f.financialImpact, 0)
 
     return {
       segments,
