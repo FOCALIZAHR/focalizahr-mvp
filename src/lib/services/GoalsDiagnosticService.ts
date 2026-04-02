@@ -130,6 +130,7 @@ export interface CorrelationPoint {
   gerenciaName: string
   score360: number
   goalsPercent: number | null
+  roleFitScore: number | null
   quadrant: CorrelationQuadrant
 }
 
@@ -402,6 +403,7 @@ export class GoalsDiagnosticService {
       gerenciaName: r.employee.department?.parent?.displayName ?? r.employee.department?.displayName ?? 'Sin gerencia',
       score360: r.calculatedScore,
       goalsPercent: r.goalsRawPercent,
+      roleFitScore: r.roleFitScore,
       quadrant: this.classifyQuadrant(r.calculatedScore, r.goalsRawPercent),
     }))
   }

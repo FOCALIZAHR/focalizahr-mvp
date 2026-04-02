@@ -1,16 +1,15 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// GOALS CORRELATION — Tab Análisis (Scatter Plot SVG)
+// GOALS CORRELATION — Tab Análisis V2 (Scatter RoleFit × Metas)
 // src/app/dashboard/executive-hub/components/GoalsCorrelation/tabs/AnalisisTab.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// Eje X: goalsPercent (0-100) | Eje Y: score360 (1-5)
-// 4 zonas de color + líneas guía + dots interactivos
-// SVG directo para control total (no recharts)
+// Eje X: goalsPercent (0-100) | Eje Y: roleFitScore (0-100)
+// Color del dot: score360 (verde=alto, rojo=bajo)
+// 4 zonas + líneas guía + dots interactivos + glow
 // ════════════════════════════════════════════════════════════════════════════
 
 import { memo, useState, useMemo } from 'react'
-import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import type { CorrelationPoint } from '../GoalsCorrelation.types'
 import type { CorrelationQuadrant } from '@/lib/services/GoalsDiagnosticService'
@@ -42,17 +41,21 @@ const CHART = {
 const plotW = CHART.width - CHART.padding.left - CHART.padding.right
 const plotH = CHART.height - CHART.padding.top - CHART.padding.bottom
 
-// Scale functions
+// Scales — V2: X=Metas (0-100), Y=RoleFit (0-100)
 const scaleX = (goalsPercent: number) => CHART.padding.left + (goalsPercent / 100) * plotW
-const scaleY = (score360: number) => CHART.padding.top + plotH - ((score360 - 1) / 4) * plotH // 1-5 range
+const scaleY = (roleFit: number) => CHART.padding.top + plotH - (roleFit / 100) * plotH
 
-// Guide lines
+// Guide lines: Metas=50%, RoleFit=75 (ROLEFIT_THRESHOLD)
 const guideX = scaleX(GOALS_THRESHOLDS.SCATTER_GOALS_LINE) // 50%
-const guideY = scaleY(GOALS_THRESHOLDS.SCATTER_SCORE_LINE)  // 3.0
+const guideY = scaleY(75) // RoleFit threshold
 
-// ════════════════════════════════════════════════════════════════════════════
-// QUADRANT CARD
-// ════════════════════════════════════════════════════════════════════════════
+// 360° score → dot color (gradient green to red)
+function score360ToColor(score: number): string {
+  if (score >= 4.0) return '#10B981' // emerald — alto
+  if (score >= 3.0) return '#22D3EE' // cyan — medio-alto
+  if (score >= 2.0) return '#F59E0B' // amber — medio-bajo
+  return '#EF4444'                    // red — bajo
+}
 
 const QUADRANT_ORDER: { key: CorrelationQuadrant; countKey: keyof AnalisisTabProps['quadrantCounts'] }[] = [
   { key: 'CONSISTENT', countKey: 'consistent' },
@@ -69,17 +72,14 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
   const [activeFilter, setActiveFilter] = useState<CorrelationQuadrant | null>(null)
   const [hoveredDot, setHoveredDot] = useState<CorrelationPoint | null>(null)
 
-  // Filter out NO_GOALS for scatter
   const withGoals = useMemo(() =>
     correlation.filter(c => c.quadrant !== 'NO_GOALS')
   , [correlation])
 
-  // Apply filter
   const visibleDots = useMemo(() =>
     activeFilter ? withGoals.filter(c => c.quadrant === activeFilter) : withGoals
   , [withGoals, activeFilter])
 
-  // Not enough data
   if (withGoals.length < GOALS_THRESHOLDS.MIN_FOR_SCATTER) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-slate-500">
@@ -97,7 +97,6 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
           const config = QUADRANT_CONFIG[key]
           const count = quadrantCounts[countKey]
           const isActive = activeFilter === key
-
           const quadNarr = getQuadrantNarrative(key)
 
           return (
@@ -117,7 +116,6 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
               </p>
               <p className="text-[9px] text-slate-500 mt-0.5">{config.label}</p>
 
-              {/* Tooltip — explains quadrant */}
               {quadNarr && (
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 w-56 text-left">
                   <p className="text-[10px] text-slate-300 leading-relaxed">{quadNarr.explanation}</p>
@@ -129,16 +127,14 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
         })}
       </div>
 
-      {/* NO_GOALS count */}
       {quadrantCounts.noGoals > 0 && (
         <p className="text-[10px] text-slate-600 text-center">
-          {quadrantCounts.noGoals} persona{quadrantCounts.noGoals > 1 ? 's' : ''} sin metas asignadas (no incluidas en el gráfico)
+          {quadrantCounts.noGoals} persona{quadrantCounts.noGoals > 1 ? 's' : ''} sin metas asignadas (no incluidas)
         </p>
       )}
 
-      {/* Scatter Plot SVG — glassmorphism */}
+      {/* Scatter Plot — RoleFit × Metas, color = 360° */}
       <div className="fhr-card relative p-3 overflow-hidden">
-        {/* Tesla line */}
         <div
           className="absolute top-0 left-0 right-0 h-[2px] z-10"
           style={{
@@ -151,30 +147,30 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
           className="w-full h-auto"
           style={{ maxHeight: '400px' }}
         >
-          {/* Background zones */}
-          {/* Top-left: HIDDEN_PERFORMER */}
+          {/* Background zones — adapted for RoleFit Y axis */}
+          {/* Top-left: High RoleFit + Low Goals → "Sabe pero no entrega" */}
           <rect
             x={CHART.padding.left} y={CHART.padding.top}
             width={guideX - CHART.padding.left} height={guideY - CHART.padding.top}
-            fill={QUADRANT_CONFIG.HIDDEN_PERFORMER.bgColor}
+            fill="rgba(245, 158, 11, 0.06)"
           />
-          {/* Top-right: CONSISTENT */}
+          {/* Top-right: High RoleFit + High Goals → "Consistente" */}
           <rect
             x={guideX} y={CHART.padding.top}
             width={CHART.padding.left + plotW - guideX} height={guideY - CHART.padding.top}
-            fill={QUADRANT_CONFIG.CONSISTENT.bgColor}
+            fill="rgba(16, 185, 129, 0.06)"
           />
-          {/* Bottom-left: DOUBLE_RISK */}
+          {/* Bottom-left: Low RoleFit + Low Goals → "Doble Riesgo" */}
           <rect
             x={CHART.padding.left} y={guideY}
             width={guideX - CHART.padding.left} height={CHART.padding.top + plotH - guideY}
-            fill={QUADRANT_CONFIG.DOUBLE_RISK.bgColor}
+            fill="rgba(239, 68, 68, 0.06)"
           />
-          {/* Bottom-right: PERCEPTION_BIAS */}
+          {/* Bottom-right: Low RoleFit + High Goals → "Sobrevivientes" */}
           <rect
             x={guideX} y={guideY}
             width={CHART.padding.left + plotW - guideX} height={CHART.padding.top + plotH - guideY}
-            fill={QUADRANT_CONFIG.PERCEPTION_BIAS.bgColor}
+            fill="rgba(167, 139, 250, 0.06)"
           />
 
           {/* Grid lines */}
@@ -185,7 +181,7 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
               stroke="#1e293b" strokeWidth={1}
             />
           ))}
-          {[1, 2, 3, 4, 5].map(v => (
+          {[0, 25, 50, 75, 100].map(v => (
             <line key={`gy-${v}`}
               x1={CHART.padding.left} y1={scaleY(v)}
               x2={CHART.padding.left + plotW} y2={scaleY(v)}
@@ -205,7 +201,7 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
             stroke="#475569" strokeWidth={1} strokeDasharray="6 4"
           />
 
-          {/* Axis labels — X */}
+          {/* Axis labels — X (Metas) */}
           {[0, 25, 50, 75, 100].map(v => (
             <text key={`lx-${v}`}
               x={scaleX(v)} y={CHART.height - 8}
@@ -221,13 +217,13 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
             Cumplimiento Metas
           </text>
 
-          {/* Axis labels — Y */}
-          {[1, 2, 3, 4, 5].map(v => (
+          {/* Axis labels — Y (RoleFit) */}
+          {[0, 25, 50, 75, 100].map(v => (
             <text key={`ly-${v}`}
               x={CHART.padding.left - 8} y={scaleY(v) + 3}
               fill="#64748b" fontSize={10} textAnchor="end"
             >
-              {v}.0
+              {v}
             </text>
           ))}
           <text
@@ -235,10 +231,10 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
             fill="#94a3b8" fontSize={10} textAnchor="middle"
             transform={`rotate(-90, 12, ${CHART.padding.top + plotH / 2})`}
           >
-            Score 360°
+            RoleFit Score
           </text>
 
-          {/* Glow filter for dots */}
+          {/* Glow filter */}
           <defs>
             <filter id="dotGlow" x="-50%" y="-50%" width="200%" height="200%">
               <feGaussianBlur stdDeviation="2.5" result="blur" />
@@ -249,12 +245,12 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
             </filter>
           </defs>
 
-          {/* Data dots */}
-          {visibleDots.map((point, idx) => {
-            if (point.goalsPercent === null) return null
+          {/* Data dots — color = 360° score */}
+          {visibleDots.map((point) => {
+            if (point.goalsPercent === null || point.roleFitScore === null) return null
             const cx = scaleX(Math.min(100, Math.max(0, point.goalsPercent)))
-            const cy = scaleY(Math.min(5, Math.max(1, point.score360)))
-            const config = QUADRANT_CONFIG[point.quadrant]
+            const cy = scaleY(Math.min(100, Math.max(0, point.roleFitScore)))
+            const dotColor = score360ToColor(point.score360)
             const isHovered = hoveredDot?.employeeId === point.employeeId
 
             return (
@@ -262,8 +258,9 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
                 key={point.employeeId}
                 cx={cx} cy={cy}
                 r={isHovered ? 6 : 4}
-                className={cn(config.dotColor, 'transition-all duration-150 cursor-pointer')}
-                opacity={isHovered ? 1 : 0.7}
+                fill={dotColor}
+                className="transition-all duration-150 cursor-pointer"
+                opacity={isHovered ? 1 : 0.75}
                 stroke={isHovered ? '#fff' : 'none'}
                 strokeWidth={isHovered ? 1.5 : 0}
                 filter={isHovered ? 'url(#dotGlow)' : undefined}
@@ -275,36 +272,45 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
         </svg>
 
         {/* Tooltip */}
-        {hoveredDot && hoveredDot.goalsPercent !== null && (
+        {hoveredDot && hoveredDot.goalsPercent !== null && hoveredDot.roleFitScore !== null && (
           <div
             className="absolute z-10 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 shadow-xl pointer-events-none"
             style={{
               left: `${(scaleX(hoveredDot.goalsPercent) / CHART.width) * 100}%`,
-              top: `${(scaleY(hoveredDot.score360) / CHART.height) * 100 - 12}%`,
+              top: `${(scaleY(hoveredDot.roleFitScore) / CHART.height) * 100 - 12}%`,
               transform: 'translate(-50%, -100%)',
             }}
           >
             <p className="text-xs text-white font-medium truncate max-w-[200px]">{hoveredDot.employeeName}</p>
             <p className="text-[10px] text-slate-400">
               Metas: <span className="text-cyan-400 font-mono">{Math.round(hoveredDot.goalsPercent)}%</span>
-              {' · '}360°: <span className="text-amber-400 font-mono">{hoveredDot.score360.toFixed(1)}</span>
+              {' · '}RoleFit: <span className="text-purple-400 font-mono">{Math.round(hoveredDot.roleFitScore)}</span>
+              {' · '}360°: <span style={{ color: score360ToColor(hoveredDot.score360) }} className="font-mono">{hoveredDot.score360.toFixed(1)}</span>
             </p>
             <p className="text-[9px] text-slate-500">{hoveredDot.departmentName}</p>
           </div>
         )}
       </div>
 
-      {/* Legend */}
+      {/* Legend — 360° color scale */}
       <div className="flex flex-wrap items-center justify-center gap-4 text-[9px] text-slate-500">
-        {QUADRANT_ORDER.map(({ key }) => {
-          const config = QUADRANT_CONFIG[key]
-          return (
-            <span key={key} className="flex items-center gap-1.5">
-              <span className={cn('w-2 h-2 rounded-full', config.dotColor.replace('fill-', 'bg-'))} />
-              {config.label}
-            </span>
-          )
-        })}
+        <span className="text-slate-600 mr-1">Color = Score 360°:</span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+          ≥4.0
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-cyan-400" />
+          3.0-3.9
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-amber-400" />
+          2.0-2.9
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-red-400" />
+          &lt;2.0
+        </span>
       </div>
     </div>
   )
