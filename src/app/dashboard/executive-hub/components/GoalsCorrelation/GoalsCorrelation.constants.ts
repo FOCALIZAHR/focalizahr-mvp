@@ -62,7 +62,23 @@ export const SUBFINDING_CARDS: Record<string, SubFindingCardConfig> = {
     borderColor: 'border-slate-500/20',
     showCost: false,
   },
+  '2E_sucesionRota': {
+    title: 'Sucesión Sin Resultados',
+    segmentId: '2_NO_ENTREGARON',
+    dotColor: 'bg-violet-400',
+    textColor: 'text-violet-400',
+    borderColor: 'border-violet-500/20',
+    showCost: false,
+  },
   // Segment 3: ORGANIZACIONAL
+  '4_blastRadius': {
+    title: 'Líder con Equipo Desconectado',
+    segmentId: '3_ORGANIZACIONAL',
+    dotColor: 'bg-rose-400',
+    textColor: 'text-rose-400',
+    borderColor: 'border-rose-500/20',
+    showCost: false,
+  },
   '3B_sesgoSistematico': {
     title: 'Sesgo Sistemático',
     segmentId: '3_ORGANIZACIONAL',
@@ -96,6 +112,8 @@ export const SUBFINDING_TO_NARRATIVE: Record<string, string> = {
   '2B_bonosInjustificados': 'bonosSinRespaldo',
   '2C_evaluadorProtege': 'evaluadorProtege',
   '2A_noPuedeVsNoQuiere': 'noSabeVsNoQuiere',
+  '2E_sucesionRota': 'sucesionRota',
+  '4_blastRadius': 'blastRadius',
   '3B_sesgoSistematico': 'sesgoSistematico',
   '3A_pearsonBajo': 'pearsonRoleFitMetas',
   '3D_calibracionInjusta': 'calibracionJusta',

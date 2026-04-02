@@ -148,6 +148,26 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
     teslaColor: '#0EA5E9', // sky
   },
 
+  sucesionRota: {
+    headline: 'El plan de sucesión no tiene respaldo en resultados.',
+    description:
+      'El comité los identificó como sucesores naturales — alto dominio del cargo y alta aspiración. ' +
+      'Pero sus metas están bajo el 40%. El plan de sucesión se construyó sobre percepción, no sobre ejecución. ' +
+      'Promover sin evidencia de resultados es promover la incompetencia.',
+    coachingTip: 'Pausa el plan de sucesión para estos nombres hasta que demuestren ejecución. Si las metas eran inadecuadas, recalibra primero.',
+    teslaColor: '#8B5CF6', // violet
+  },
+
+  blastRadius: {
+    headline: 'Un líder, un equipo entero desconectado.',
+    description:
+      'Más del 40% del equipo de este evaluador tiene engagement crítico. ' +
+      'No es un problema de personas — es un patrón bajo un mismo liderazgo. ' +
+      'Cuando el compromiso cae en bloque, la causa no está en quienes lo pierden sino en quien debería generarlo.',
+    coachingTip: 'La conversación no es con el equipo. Es con el líder. Y debe incluir estos datos como evidencia — no como acusación.',
+    teslaColor: '#F43F5E', // rose
+  },
+
   // ── V2: Sub-hallazgos organizacionales (por gerencia) ──────────────
 
   sesgoSistematico: {

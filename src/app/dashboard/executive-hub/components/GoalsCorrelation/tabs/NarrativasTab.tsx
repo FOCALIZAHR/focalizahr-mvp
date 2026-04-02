@@ -56,6 +56,10 @@ const BADGE_PAIRS: Record<string, BadgePairConfig> = {
     left: 'roleFit', leftLabel: 'RoleFit',
     right: 'goals', rightLabel: 'Metas',
   },
+  '2E_sucesionRota': {
+    left: 'roleFit', leftLabel: 'RoleFit',
+    right: 'goals', rightLabel: 'Metas',
+  },
 }
 
 // ════════════════════════════════════════════════════════════════════════════

@@ -648,6 +648,72 @@ export class GoalsDiagnosticService {
       })
     }
 
+    // 2E — ¿El sucesor está fallando?
+    const sucesionRota = noEntregaron.filter(e => e.mobilityQuadrant === 'SUCESOR_NATURAL')
+    if (sucesionRota.length > 0) {
+      findings.push({
+        key: '2E_sucesionRota',
+        segmentId: '2_NO_ENTREGARON',
+        employees: sucesionRota,
+        count: sucesionRota.length,
+        financialImpact: 0,
+      })
+    }
+
+    // ── CROSS-SEGMENT: BLAST RADIUS (manager con equipo desconectado) ────
+
+    // Group all employees by managerId
+    const byMgr = new Map<string, NarrativeEmployee[]>()
+    for (const e of employees) {
+      if (e.managerId) {
+        if (!byMgr.has(e.managerId)) byMgr.set(e.managerId, [])
+        byMgr.get(e.managerId)!.push(e)
+      }
+    }
+
+    const blastRadiusManagers: { managerId: string; managerName: string; teamSize: number; avgEngagement: number; lowEngagementPct: number; employees: NarrativeEmployee[] }[] = []
+    for (const [mgrId, team] of byMgr) {
+      if (team.length < 3) continue // Need minimum team size
+      const withEngagement = team.filter(e => e.engagement !== null)
+      if (withEngagement.length < 3) continue
+      const avgEng = withEngagement.reduce((s, e) => s + (e.engagement ?? 0), 0) / withEngagement.length
+      const lowCount = withEngagement.filter(e => e.engagement === 1).length
+      const lowPct = Math.round((lowCount / withEngagement.length) * 100)
+      // Trigger: >40% del equipo desconectado
+      if (lowPct >= 40) {
+        blastRadiusManagers.push({
+          managerId: mgrId,
+          managerName: managerNames.get(mgrId) ?? 'Sin nombre',
+          teamSize: team.length,
+          avgEngagement: Math.round(avgEng * 10) / 10,
+          lowEngagementPct: lowPct,
+          employees: team,
+        })
+      }
+    }
+
+    if (blastRadiusManagers.length > 0) {
+      const allAffected = blastRadiusManagers.flatMap(m => m.employees)
+      findings.push({
+        key: '4_blastRadius',
+        segmentId: '3_ORGANIZACIONAL',
+        employees: allAffected,
+        count: blastRadiusManagers.length, // count = managers, not employees
+        financialImpact: 0,
+        meta: {
+          type: 'manager',
+          managers: blastRadiusManagers.map(m => ({
+            managerId: m.managerId,
+            managerName: m.managerName,
+            teamSize: m.teamSize,
+            avgEngagement: m.avgEngagement,
+            lowEngagementPct: m.lowEngagementPct,
+          })),
+          totalAffectedEmployees: allAffected.length,
+        },
+      })
+    }
+
     return findings
   }
 
