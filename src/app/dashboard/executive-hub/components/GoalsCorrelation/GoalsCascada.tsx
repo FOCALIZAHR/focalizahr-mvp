@@ -1,0 +1,454 @@
+'use client'
+
+// ════════════════════════════════════════════════════════════════════════════
+// GOALS CASCADA — "La Auditoría" (Cascada de la Verdad pattern)
+// src/app/dashboard/executive-hub/components/GoalsCorrelation/GoalsCascada.tsx
+// ════════════════════════════════════════════════════════════════════════════
+// Dossier Ejecutivo — 3 actos condicionales + síntesis.
+// Arquitectura: Flujo tipográfico libre, whileInView, space-y-24.
+// Patrón clonado de PLTalentExecutiveBriefing.tsx.
+// ════════════════════════════════════════════════════════════════════════════
+
+import { memo, useState } from 'react'
+import { motion } from 'framer-motion'
+import { ArrowRight, BarChart3 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+import type { GoalsCorrelationDataV2, SubFinding } from './GoalsCorrelation.types'
+import { SUBFINDING_CARDS, SUBFINDING_TO_NARRATIVE } from './GoalsCorrelation.constants'
+import { formatCurrency } from './GoalsCorrelation.utils'
+import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
+import GoalsFindingModal from './GoalsFindingModal'
+
+// ════════════════════════════════════════════════════════════════════════════
+// ANIMATION — whileInView (scroll-triggered, once)
+// ════════════════════════════════════════════════════════════════════════════
+
+const viewport = { once: true, margin: '-80px' }
+
+const fadeIn = {
+  initial: { opacity: 0, y: 30 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport,
+  transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] as const },
+}
+
+const fadeInDelay = {
+  initial: { opacity: 0, y: 30 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport,
+  transition: { duration: 0.4, delay: 0.15, ease: [0.16, 1, 0.3, 1] as const },
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// TYPES
+// ════════════════════════════════════════════════════════════════════════════
+
+interface GoalsCascadaProps {
+  data: GoalsCorrelationDataV2
+  onOpenScatter: () => void
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENT
+// ════════════════════════════════════════════════════════════════════════════
+
+export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaProps) {
+  const [modalFinding, setModalFinding] = useState<SubFinding | null>(null)
+  const [showRemainingFindings, setShowRemainingFindings] = useState(false)
+
+  const { topAlerts, totals, segments, byGerencia } = data
+  const allFindings = segments.flatMap(s => s.subFindings)
+  const remainingFindings = allFindings.filter(f => !topAlerts.some(a => a.key === f.key))
+
+  // Org findings for Acto 3
+  const orgSegment = segments.find(s => s.id === '3_ORGANIZACIONAL')
+  const orgFindings = orgSegment?.subFindings ?? []
+
+  // Pearson: worst gerencia (lowest r with enough data)
+  const worstPearson = byGerencia
+    .filter(g => g.pearsonRoleFitGoals !== null)
+    .sort((a, b) => (a.pearsonRoleFitGoals ?? 1) - (b.pearsonRoleFitGoals ?? 1))[0] ?? null
+
+  const bestPearson = byGerencia
+    .filter(g => g.pearsonRoleFitGoals !== null && g.pearsonRoleFitGoals > 0.6)
+    .sort((a, b) => (b.pearsonRoleFitGoals ?? 0) - (a.pearsonRoleFitGoals ?? 0))[0] ?? null
+
+  return (
+    <>
+      <div className="space-y-24 pb-12">
+
+        {/* ═══════════════════════════════════════════════════════════════
+            ACTO 1 — EL PANORAMA
+            Ancla: entregaron / no entregaron
+        ═══════════════════════════════════════════════════════════════ */}
+        <ActSeparator label="Resultados" color="cyan" />
+
+        <div>
+          {/* Ancla — dos números lado a lado */}
+          <motion.div {...fadeInDelay} className="flex items-center justify-center gap-12 md:gap-20 mb-10">
+            <div className="text-center">
+              <p className="text-6xl md:text-7xl font-extralight text-emerald-400 tracking-tight">
+                {totals.totalEntregaron}
+              </p>
+              <p className="text-xs text-slate-500 mt-2 uppercase tracking-wider">entregaron</p>
+            </div>
+            <div className="w-px h-16 bg-slate-800" />
+            <div className="text-center">
+              <p className="text-6xl md:text-7xl font-extralight text-red-400 tracking-tight">
+                {totals.totalNoEntregaron}
+              </p>
+              <p className="text-xs text-slate-500 mt-2 uppercase tracking-wider">no entregaron</p>
+            </div>
+          </motion.div>
+
+          {/* Narrativa contextual */}
+          <motion.div {...fadeIn} className="max-w-2xl mx-auto">
+            <p className="text-xl font-light text-slate-300 text-center leading-relaxed">
+              De <span className="font-medium text-slate-200">{totals.totalEvaluados}</span> personas evaluadas,{' '}
+              <span className="font-medium text-emerald-400">{totals.totalEntregaron}</span> entregaron resultados sobre el 80%
+              {' '}y <span className="font-medium text-red-400">{totals.totalNoEntregaron}</span> quedaron bajo el 40%.
+            </p>
+
+            <p className="text-base font-light text-slate-400 leading-relaxed mt-6 text-center">
+              La pregunta no es el número. Es si tu organización responde correctamente a cada grupo.
+            </p>
+          </motion.div>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            ACTO 2 — LO QUE ENCONTRAMOS (condicional: hay anomalías)
+            Ancla: $$$ o conteo de anomalías
+        ═══════════════════════════════════════════════════════════════ */}
+        {topAlerts.length > 0 && (
+          <>
+            <ActSeparator label="Anomalías" color="amber" />
+
+            <div>
+              {/* Ancla */}
+              <motion.div {...fadeInDelay} className="text-center mb-10">
+                {totals.totalFinancialRisk > 0 ? (
+                  <p className="text-7xl md:text-8xl font-extralight text-amber-400 tracking-tight">
+                    {formatCurrency(totals.totalFinancialRisk)}
+                  </p>
+                ) : (
+                  <p className="text-7xl md:text-8xl font-extralight text-amber-400 tracking-tight">
+                    {totals.totalAnomalias}
+                  </p>
+                )}
+                <p className="text-xs text-slate-500 mt-3 uppercase tracking-wider">
+                  {totals.totalFinancialRisk > 0 ? 'en riesgo' : 'anomalías detectadas'}
+                </p>
+              </motion.div>
+
+              {/* Top hallazgos — cada uno como bloque narrativo completo */}
+              <div className="space-y-16 max-w-2xl mx-auto">
+                {topAlerts.slice(0, 3).map((alert, idx) => (
+                  <FindingBlock
+                    key={alert.key}
+                    finding={alert}
+                    index={idx}
+                    onViewPersons={() => setModalFinding(alert)}
+                  />
+                ))}
+              </div>
+
+              {/* Hallazgos restantes */}
+              {remainingFindings.length > 0 && (
+                <motion.div {...fadeIn} className="max-w-2xl mx-auto mt-12">
+                  {!showRemainingFindings ? (
+                    <SubtleLink onClick={() => setShowRemainingFindings(true)}>
+                      Ver {remainingFindings.length} hallazgo{remainingFindings.length !== 1 ? 's' : ''} adicional{remainingFindings.length !== 1 ? 'es' : ''}
+                    </SubtleLink>
+                  ) : (
+                    <div className="space-y-16">
+                      <p className="text-xs uppercase tracking-widest text-slate-600">
+                        Hallazgos adicionales
+                      </p>
+                      {remainingFindings.map((f, idx) => (
+                        <FindingBlock
+                          key={f.key}
+                          finding={f}
+                          index={idx}
+                          onViewPersons={() => setModalFinding(f)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            ACTO 3 — DÓNDE ACTUAR (condicional: hay datos organizacionales)
+            Vista por gerencia: Pearson + sesgo + calibración
+        ═══════════════════════════════════════════════════════════════ */}
+        {byGerencia.length > 0 && (
+          <>
+            <ActSeparator label="Organización" color="purple" />
+
+            <div>
+              {/* Narrativa Pearson — sin número r, solo conclusión */}
+              <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-6">
+
+                {worstPearson && worstPearson.pearsonRoleFitGoals !== null && worstPearson.pearsonRoleFitGoals < 0.3 && (
+                  <div>
+                    <p className="text-xs uppercase tracking-widest text-red-400/60 mb-3">Framework desalineado</p>
+                    <p className="text-base font-light text-slate-400 leading-relaxed">
+                      En <span className="font-medium text-slate-200">{worstPearson.gerenciaName}</span>,
+                      las competencias que se exigen no predicen los resultados que se entregan.
+                      El framework de competencias de esta gerencia necesita revisión —
+                      está midiendo cosas que no se relacionan con la ejecución real.
+                    </p>
+                  </div>
+                )}
+
+                {bestPearson && bestPearson.pearsonRoleFitGoals !== null && (
+                  <div>
+                    <p className="text-xs uppercase tracking-widest text-emerald-400/60 mb-3">Framework calibrado</p>
+                    <p className="text-base font-light text-slate-400 leading-relaxed">
+                      En <span className="font-medium text-slate-200">{bestPearson.gerenciaName}</span>,
+                      las competencias que se exigen predicen resultados.
+                      Lo que se mide es lo que se entrega — base confiable para decisiones de compensación.
+                    </p>
+                  </div>
+                )}
+
+                {/* Org findings narrativos */}
+                {orgFindings.map((finding, idx) => (
+                  <FindingBlock
+                    key={finding.key}
+                    finding={finding}
+                    index={idx}
+                    onViewPersons={() => setModalFinding(finding)}
+                    isOrgLevel
+                  />
+                ))}
+
+                {/* Resumen gerencias */}
+                <div className="mt-8">
+                  <p className="text-xs uppercase tracking-widest text-slate-600 mb-4">Por gerencia</p>
+                  <div className="space-y-2">
+                    {byGerencia.slice(0, 5).map(g => {
+                      const pearsonOk = g.pearsonRoleFitGoals !== null && g.pearsonRoleFitGoals > 0.5
+                      const pearsonBad = g.pearsonRoleFitGoals !== null && g.pearsonRoleFitGoals < 0.3
+                      return (
+                        <div key={g.gerenciaName} className="flex items-center justify-between py-2 border-b border-slate-800/20 last:border-0">
+                          <div className="flex items-center gap-2.5">
+                            <div className={cn(
+                              'w-1.5 h-1.5 rounded-full',
+                              g.confidenceLevel === 'red' ? 'bg-red-400' :
+                              g.confidenceLevel === 'amber' ? 'bg-amber-400' :
+                              'bg-emerald-400'
+                            )} />
+                            <span className="text-sm font-light text-slate-300">{g.gerenciaName}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-[10px]">
+                            {pearsonOk && <span className="text-emerald-400">Competencias predicen</span>}
+                            {pearsonBad && <span className="text-red-400">Framework desalineado</span>}
+                            {!pearsonOk && !pearsonBad && g.pearsonRoleFitGoals !== null && (
+                              <span className="text-slate-500">Correlación moderada</span>
+                            )}
+                            <span className="text-slate-600 font-mono">{g.employeeCount} pers.</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            SÍNTESIS — Cierre + acceso a scatter
+        ═══════════════════════════════════════════════════════════════ */}
+        <motion.div {...fadeIn} className="max-w-2xl mx-auto text-center pt-8">
+          <div className="w-12 h-px bg-gradient-to-r from-transparent via-slate-700 to-transparent mx-auto mb-8" />
+
+          <p className="text-base font-light text-slate-400 leading-relaxed">
+            {totals.totalAnomalias > 0
+              ? `${totals.totalAnomalias} anomalías estructurales entre lo que las personas entregan y cómo tu organización responde. Cada una tiene nombre, gerencia y acción sugerida.`
+              : 'La organización está respondiendo de forma coherente a los resultados que las personas entregan.'
+            }
+          </p>
+
+          <button
+            onClick={onOpenScatter}
+            className="mt-8 inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-400 transition-colors"
+          >
+            <BarChart3 className="w-4 h-4" />
+            Explorar datos en scatter
+          </button>
+        </motion.div>
+
+      </div>
+
+      {/* ═══ MODAL — Drill-down a personas ═══ */}
+      {modalFinding && (
+        <GoalsFindingModal
+          finding={modalFinding}
+          onClose={() => setModalFinding(null)}
+        />
+      )}
+    </>
+  )
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// FINDING BLOCK — Hallazgo narrativo completo
+// ════════════════════════════════════════════════════════════════════════════
+
+function FindingBlock({
+  finding,
+  index,
+  onViewPersons,
+  isOrgLevel = false,
+}: {
+  finding: SubFinding
+  index: number
+  onViewPersons: () => void
+  isOrgLevel?: boolean
+}) {
+  const cardConfig = SUBFINDING_CARDS[finding.key]
+  const narrativeKey = SUBFINDING_TO_NARRATIVE[finding.key]
+  const dictNarrative = narrativeKey ? getNarrative(narrativeKey) : null
+
+  if (!cardConfig || !dictNarrative) return null
+
+  const gerencias = isOrgLevel
+    ? (finding.meta?.gerencias as { name: string; employeeCount?: number }[]) ?? []
+    : []
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-60px' }}
+      transition={{ duration: 0.4, delay: index * 0.1, ease: [0.16, 1, 0.3, 1] }}
+    >
+      {/* Tesla line accent */}
+      <div
+        className="w-12 h-[2px] mb-6"
+        style={{
+          background: dictNarrative.teslaColor,
+          boxShadow: `0 0 12px ${dictNarrative.teslaColor}40`,
+        }}
+      />
+
+      {/* Headline */}
+      <p className="text-xl font-light text-slate-200 mb-4">
+        {dictNarrative.headline}
+      </p>
+
+      {/* Description */}
+      <p className="text-base font-light text-slate-400 leading-relaxed mb-4">
+        {dictNarrative.description}
+      </p>
+
+      {/* Count + financial */}
+      <div className="flex items-center gap-4 mb-4">
+        <span className={cn('text-sm font-mono', cardConfig.textColor)}>
+          {finding.count} {isOrgLevel ? 'gerencia' : 'persona'}{finding.count !== 1 ? 's' : ''}
+        </span>
+        {finding.financialImpact > 0 && (
+          <>
+            <span className="text-slate-700">·</span>
+            <span className={cn('text-sm font-mono font-medium', cardConfig.textColor)}>
+              {formatCurrency(finding.financialImpact)}
+            </span>
+          </>
+        )}
+      </div>
+
+      {/* Org-level: gerencias affected */}
+      {gerencias.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {gerencias.map(g => (
+            <span
+              key={g.name}
+              className={cn(
+                'text-[9px] px-2 py-0.5 rounded-full border',
+                cardConfig.borderColor, cardConfig.textColor,
+                'bg-slate-900/50'
+              )}
+            >
+              {g.name}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Coaching tip as blockquote */}
+      <div className="border-l-2 border-cyan-500/30 pl-4 mb-4">
+        <p className="text-sm italic font-light text-slate-300 leading-relaxed">
+          {dictNarrative.coachingTip}
+        </p>
+      </div>
+
+      {/* Drill-down link */}
+      <SubtleLink onClick={onViewPersons}>
+        Ver {isOrgLevel ? 'detalle' : `${finding.employees.length} persona${finding.employees.length !== 1 ? 's' : ''}`}
+      </SubtleLink>
+    </motion.div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ACT SEPARATOR — Línea divisoria entre actos (cloned from PLTalent)
+// ════════════════════════════════════════════════════════════════════════════
+
+function ActSeparator({ label, color }: { label: string; color: 'amber' | 'purple' | 'cyan' | 'red' }) {
+  const colors = {
+    amber: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+    purple: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
+    cyan: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
+    red: 'text-red-400 bg-red-500/10 border-red-500/20',
+  }
+  const lineColor = {
+    amber: 'via-amber-700/30',
+    purple: 'via-purple-700/30',
+    cyan: 'via-cyan-700/30',
+    red: 'via-red-700/30',
+  }
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.3 }}
+      className="flex items-center justify-center gap-4"
+    >
+      <div className={cn('flex-1 h-px bg-gradient-to-r from-transparent to-transparent', lineColor[color])} />
+      <span className={cn('px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest border rounded-full', colors[color])}>
+        {label}
+      </span>
+      <div className={cn('flex-1 h-px bg-gradient-to-r from-transparent to-transparent', lineColor[color])} />
+    </motion.div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SUBTLE LINK — Reutilizable con flecha animada (cloned from PLTalent)
+// ════════════════════════════════════════════════════════════════════════════
+
+const SubtleLink = memo(function SubtleLink({
+  children,
+  onClick,
+}: {
+  children: React.ReactNode
+  onClick?: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="group inline-flex items-center gap-1.5 text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
+    >
+      {children}
+      <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+    </button>
+  )
+})
