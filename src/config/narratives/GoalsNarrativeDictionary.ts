@@ -54,9 +54,10 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   fugaProductiva: {
     headline: 'Talento que rinde y que se va.',
     description:
-      'El 9-box ya clasificó a estas personas como riesgo de fuga. Las metas confirman que perderlos duele: cumplen sobre 80%. ' +
-      'Son dos fuentes independientes diciendo lo mismo — no es una opinión, es evidencia cruzada. ' +
-      'Cada día sin intervención de retención erosiona la inversión acumulada.',
+      'Dos señales independientes confirman el mismo riesgo. ' +
+      'Ya están clasificados como riesgo de fuga — alto dominio del cargo, compromiso crítico. ' +
+      'Y sus metas sobre 80% confirman que no estás perdiendo peso muerto: estás perdiendo a quienes ejecutan. ' +
+      'El costo de reemplazo ya está calculado. Cada día sin intervención lo incrementa.',
     coachingTip: 'Presenta estos nombres al comité de retención esta semana. El costo de reemplazo ya está calculado — úsalo como argumento.',
     teslaColor: '#EF4444', // red
   },
