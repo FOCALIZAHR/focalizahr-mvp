@@ -49,7 +49,7 @@ const BADGE_PAIRS: Record<string, BadgePairConfig> = {
     right: 'goals', rightLabel: 'Metas',
   },
   '2C_evaluadorProtege': {
-    left: 'score360', leftLabel: '360°',
+    left: 'score360', leftLabel: 'Eval 360°',
     right: 'goals', rightLabel: 'Metas',
   },
   '2A_noPuedeVsNoQuiere': {
@@ -70,12 +70,30 @@ export default memo(function SegmentTab({ segment }: SegmentTabProps) {
   }
 
   if (segment.subFindings.length === 0) {
+    const healthyMessages: Record<string, { title: string; detail: string }> = {
+      '1_ENTREGARON': {
+        title: 'Quienes entregaron están correctamente gestionados.',
+        detail: `${segment.totalEmployees} personas cumplieron metas sobre 80%. No se detectaron brechas de reconocimiento, riesgo de fuga ni sostenibilidad comprometida.`,
+      },
+      '2_NO_ENTREGARON': {
+        title: 'Sin anomalías en quienes no entregaron.',
+        detail: `${segment.totalEmployees} personas con metas bajo 40%. No se detectaron evaluaciones infladas, evaluadores indulgentes ni brechas de competencia significativas.`,
+      },
+      '3_ORGANIZACIONAL': {
+        title: 'Vista organizacional sin alertas sistémicas.',
+        detail: 'Las evaluaciones están alineadas con resultados a nivel de gerencia. Sin sesgo sistemático detectado.',
+      },
+    }
+    const msg = healthyMessages[segment.id] ?? { title: 'Sin anomalías detectadas.', detail: '' }
+
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-        <p className="text-sm font-light">Sin hallazgos en este segmento.</p>
-        <p className="text-xs text-slate-600 mt-1">
-          {segment.totalEmployees} personas en este grupo, sin anomalías detectadas.
-        </p>
+      <div className="fhr-card relative overflow-hidden p-6">
+        <div
+          className="absolute top-0 left-0 right-0 h-[2px]"
+          style={{ background: 'linear-gradient(90deg, transparent, #10B981, transparent)', boxShadow: '0 0 12px #10B981' }}
+        />
+        <p className="text-sm font-light text-emerald-400">{msg.title}</p>
+        <p className="text-[11px] font-light text-slate-500 mt-2 leading-relaxed">{msg.detail}</p>
       </div>
     )
   }
@@ -192,7 +210,19 @@ export default memo(function SegmentTab({ segment }: SegmentTabProps) {
                       <PersonList employees={finding.employees} badgePair={badgePair} showCost={cardConfig.showCost} />
                     )}
 
-                    {/* Concentración */}
+                    {/* Manager grouping for 2C */}
+                    {finding.key === '2C_evaluadorProtege' && Array.isArray(finding.meta?.byManager) && (
+                      <div className="pt-2 border-t border-slate-800/30">
+                        <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Por evaluador</p>
+                        {(finding.meta!.byManager as { managerId: string; count: number }[]).map((mg) => (
+                          <p key={mg.managerId} className="text-[10px] font-light text-red-400/80">
+                            {mg.count} de {finding.count} reportan al mismo evaluador
+                          </p>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Concentración por gerencia */}
                     {concentration && (
                       <p className="text-[10px] text-slate-500 italic pt-2 border-t border-slate-800/30">
                         Concentración: {concentration}
