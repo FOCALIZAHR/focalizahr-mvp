@@ -19,6 +19,7 @@ import { SUBFINDING_CARDS, SUBFINDING_TO_NARRATIVE } from './GoalsCorrelation.co
 import { formatCurrency } from './GoalsCorrelation.utils'
 import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
 import GoalsFindingModal from './GoalsFindingModal'
+import GoalsStarsModal from './GoalsStarsModal'
 
 // ════════════════════════════════════════════════════════════════════════════
 // ANIMATION — whileInView (scroll-triggered, once)
@@ -56,8 +57,13 @@ interface GoalsCascadaProps {
 export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaProps) {
   const [modalFinding, setModalFinding] = useState<SubFinding | null>(null)
   const [showRemainingFindings, setShowRemainingFindings] = useState(false)
+  const [showStarsModal, setShowStarsModal] = useState(false)
+  const [showCriticalModal, setShowCriticalModal] = useState(false)
 
-  const { topAlerts, totals, segments, byGerencia } = data
+  const { topAlerts, totals, segments, byGerencia, stars, criticalPositions } = data
+
+  // Set of employee IDs occupying critical positions (for amplifier in stars modal)
+  const criticalPositionIds = new Set(criticalPositions.positions.map(p => p.employee.id))
   const allFindings = segments.flatMap(s => s.subFindings)
   const remainingFindings = allFindings.filter(f => !topAlerts.some(a => a.key === f.key))
 
@@ -182,6 +188,123 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
         )}
 
         {/* ═══════════════════════════════════════════════════════════════
+            ACTO ESTRELLAS (condicional: hay stars en 9-Box)
+            Ancla: % de estrellas que cumplen metas
+        ═══════════════════════════════════════════════════════════════ */}
+        {stars.total > 0 && (
+          <>
+            <ActSeparator label="Estrellas" color="amber" />
+
+            <div>
+              <motion.div {...fadeInDelay} className="text-center mb-10">
+                <p className="text-7xl md:text-8xl font-extralight text-amber-400 tracking-tight">
+                  {stars.percentage}%
+                </p>
+                <p className="text-xs text-slate-500 mt-3 uppercase tracking-wider">
+                  de tus estrellas cumplen metas
+                </p>
+              </motion.div>
+
+              <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-6">
+                {/* Narrativa condicional */}
+                {stars.percentage >= 80 ? (
+                  <p className="text-base font-light text-slate-400 leading-relaxed">
+                    <span className="font-medium text-emerald-400">{stars.withHighGoals}</span> de{' '}
+                    <span className="font-medium text-slate-200">{stars.total}</span> estrellas del 9-Box
+                    entregan resultados sobre el 80%. La clasificación está respaldada por ejecución —
+                    estas personas son lo que el sistema dice que son.
+                  </p>
+                ) : stars.percentage >= 60 ? (
+                  <p className="text-base font-light text-slate-400 leading-relaxed">
+                    <span className="font-medium text-amber-400">{stars.total - stars.withHighGoals}</span> de{' '}
+                    <span className="font-medium text-slate-200">{stars.total}</span> estrellas
+                    no respaldan su clasificación con resultados.
+                    El 9-Box las posiciona arriba — las metas no lo confirman.
+                    Antes de tomar decisiones de promoción o compensación, valida con evidencia.
+                  </p>
+                ) : (
+                  <p className="text-base font-light text-slate-400 leading-relaxed">
+                    Solo <span className="font-medium text-red-400">{stars.withHighGoals}</span> de{' '}
+                    <span className="font-medium text-slate-200">{stars.total}</span> estrellas
+                    cumplen metas sobre el 80%. La mayoría de tus &ldquo;mejores talentos&rdquo; no
+                    entrega resultados que respalden esa clasificación.
+                    El 9-Box está midiendo percepción, no ejecución.
+                  </p>
+                )}
+
+                {/* Blockquote coaching */}
+                <div className="border-l-2 border-amber-500/30 pl-4">
+                  <p className="text-sm italic font-light text-slate-300 leading-relaxed">
+                    Las estrellas definen tus decisiones de sucesión, compensación y retención.
+                    Si la clasificación no coincide con los resultados, esas decisiones se construyen sobre arena.
+                  </p>
+                </div>
+
+                <SubtleLink onClick={() => setShowStarsModal(true)}>
+                  Ver {stars.total} estrella{stars.total !== 1 ? 's' : ''} en detalle
+                </SubtleLink>
+              </motion.div>
+            </div>
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            ACTO CARGOS CRÍTICOS (condicional: hay incumbentes evaluados)
+            Ancla: % de cargos críticos que cumplen metas
+        ═══════════════════════════════════════════════════════════════ */}
+        {criticalPositions.total > 0 && (
+          <>
+            <ActSeparator label="Cargos Críticos" color="purple" />
+
+            <div>
+              <motion.div {...fadeInDelay} className="text-center mb-10">
+                <p className="text-7xl md:text-8xl font-extralight text-purple-400 tracking-tight">
+                  {criticalPositions.percentage}%
+                </p>
+                <p className="text-xs text-slate-500 mt-3 uppercase tracking-wider">
+                  de tus cargos críticos cumplen metas
+                </p>
+              </motion.div>
+
+              <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-6">
+                {/* Narrativa condicional */}
+                {criticalPositions.percentage >= 80 ? (
+                  <p className="text-base font-light text-slate-400 leading-relaxed">
+                    <span className="font-medium text-emerald-400">{criticalPositions.withHighGoals}</span> de{' '}
+                    <span className="font-medium text-slate-200">{criticalPositions.total}</span> personas
+                    en cargos críticos entregan resultados. La continuidad operacional está respaldada por ejecución.
+                  </p>
+                ) : criticalPositions.percentage >= 60 ? (
+                  <p className="text-base font-light text-slate-400 leading-relaxed">
+                    <span className="font-medium text-amber-400">{criticalPositions.total - criticalPositions.withHighGoals}</span> persona{(criticalPositions.total - criticalPositions.withHighGoals) !== 1 ? 's' : ''} en
+                    cargos críticos no cumple{(criticalPositions.total - criticalPositions.withHighGoals) !== 1 ? 'n' : ''} metas sobre el 80%.
+                    Si alguno de estos cargos queda vacante, el plan de sucesión se activa sobre alguien que no está entregando.
+                  </p>
+                ) : (
+                  <p className="text-base font-light text-slate-400 leading-relaxed">
+                    La mayoría de los cargos críticos no entrega resultados sobre el 80%.
+                    La continuidad operacional depende de personas que no están cumpliendo.
+                    Cada día sin plan de acción incrementa la exposición.
+                  </p>
+                )}
+
+                {/* Blockquote coaching */}
+                <div className="border-l-2 border-purple-500/30 pl-4">
+                  <p className="text-sm italic font-light text-slate-300 leading-relaxed">
+                    Los cargos críticos son los que no pueden quedar vacantes sin consecuencias inmediatas.
+                    Si quien los ocupa no entrega resultados, la pregunta no es si tiene sucesor — es si necesita uno ahora.
+                  </p>
+                </div>
+
+                <SubtleLink onClick={() => setShowCriticalModal(true)}>
+                  Ver {criticalPositions.total} cargo{criticalPositions.total !== 1 ? 's' : ''} crítico{criticalPositions.total !== 1 ? 's' : ''}
+                </SubtleLink>
+              </motion.div>
+            </div>
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
             ACTO 3 — DÓNDE ACTUAR (condicional: hay datos organizacionales)
             Vista por gerencia: Pearson + sesgo + calibración
         ═══════════════════════════════════════════════════════════════ */}
@@ -292,6 +415,33 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
         <GoalsFindingModal
           finding={modalFinding}
           onClose={() => setModalFinding(null)}
+        />
+      )}
+
+      {/* ═══ MODAL — Estrellas ═══ */}
+      {showStarsModal && (
+        <GoalsStarsModal
+          title="Estrellas del 9-Box"
+          subtitle={`${stars.total} estrella${stars.total !== 1 ? 's' : ''} · ${stars.percentage}% cumplen metas`}
+          teslaColor="#F59E0B"
+          persons={stars.employees.map(e => ({ employee: e }))}
+          criticalPositionIds={criticalPositionIds}
+          onClose={() => setShowStarsModal(false)}
+        />
+      )}
+
+      {/* ═══ MODAL — Cargos Críticos ═══ */}
+      {showCriticalModal && (
+        <GoalsStarsModal
+          title="Cargos Críticos"
+          subtitle={`${criticalPositions.total} posicion${criticalPositions.total !== 1 ? 'es' : ''} · ${criticalPositions.percentage}% cumplen metas`}
+          teslaColor="#A78BFA"
+          persons={criticalPositions.positions.map(p => ({
+            employee: p.employee,
+            positionTitle: p.positionTitle,
+            benchStrength: p.benchStrength,
+          }))}
+          onClose={() => setShowCriticalModal(false)}
         />
       )}
     </>
