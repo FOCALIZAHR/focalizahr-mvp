@@ -871,6 +871,45 @@ export const PREMIUM_EMAIL_TEMPLATES: Record<string, EmailTemplate> = {
     variables: ['participant_name', 'company_name', 'survey_url'],
     tone: 'Universal, adaptable',
     estimatedTime: '5 minutos'
+  },
+  // ========================================
+  // CEO → RRHH: Caso de compensación
+  // ========================================
+  'ceo-compensation-case': {
+    id: 'ceo_compensation_case',
+    campaignTypeSlug: 'ceo-compensation-case',
+    subject: 'Caso compensación — {employee_name}',
+    previewText: 'Caso de revisión pre-compensación enviado por {ceo_name}',
+    htmlContent: createEmailHTML(`
+      <div style="text-align:center; margin-bottom:28px;">
+        <h1 style="color:#f8fafc; font-size:22px; font-weight:300; margin:0 0 6px;">
+          Caso de Compensación
+        </h1>
+        <p style="color:#64748b; font-size:13px; font-weight:300; margin:0;">
+          Enviado por <span style="color:#22D3EE;">{ceo_name}</span> desde FocalizaHR
+        </p>
+      </div>
+      <div style="background:rgba(30,41,59,0.5); border:1px solid rgba(51,65,85,0.3); border-radius:12px; padding:20px; margin-bottom:20px;">
+        <p style="color:#94a3b8; font-size:11px; text-transform:uppercase; letter-spacing:1.5px; margin:0 0 8px;">Colaborador</p>
+        <p style="color:#e2e8f0; font-size:16px; font-weight:400; margin:0 0 4px;">{employee_name}</p>
+        <p style="color:#64748b; font-size:12px; margin:0;">{department}</p>
+      </div>
+      <div style="background:rgba(30,41,59,0.5); border:1px solid rgba(51,65,85,0.3); border-radius:12px; padding:20px; margin-bottom:20px;">
+        <p style="color:#94a3b8; font-size:11px; text-transform:uppercase; letter-spacing:1.5px; margin:0 0 8px;">Hallazgo</p>
+        <p style="color:#f59e0b; font-size:13px; font-weight:400; margin:0 0 8px;">{category}</p>
+        <p style="color:#94a3b8; font-size:13px; font-weight:300; line-height:1.6; margin:0;">{observation}</p>
+      </div>
+      <div style="background:rgba(30,41,59,0.5); border:1px solid rgba(51,65,85,0.3); border-radius:12px; padding:20px; margin-bottom:20px;">
+        <p style="color:#94a3b8; font-size:11px; text-transform:uppercase; letter-spacing:1.5px; margin:0 0 8px;">Comentario del CEO</p>
+        <p style="color:#e2e8f0; font-size:13px; font-weight:300; line-height:1.6; font-style:italic; margin:0;">"{ceo_comment}"</p>
+      </div>
+      <p style="color:#475569; font-size:11px; text-align:center; margin-top:24px;">
+        Este caso fue generado por el sistema de inteligencia pre-compensación de FocalizaHR.
+      </p>
+    `),
+    variables: ['ceo_name', 'employee_name', 'department', 'category', 'observation', 'ceo_comment'],
+    tone: 'Ejecutivo, directo',
+    estimatedTime: '1 minuto'
   }
 };
 

@@ -48,24 +48,24 @@ function getActs(
       {
         title: 'Lo que no cuadra',
         dotColor: '#f59e0b40',
-        body: `Estas <b>${topMerit.length} personas</b> reciben la evaluación más alta. Son las primeras en la lista para incremento por mérito. Pero al cruzar con metas, <b>${withLowGoals.length} no cumplieron</b> los resultados que el negocio necesitaba.`,
+        body: `Estas <b>${topMerit.length} personas</b> reciben la evaluación más alta. Son las primeras en la lista para incremento por mérito. Pero al cruzar con metas, <b>${withLowGoals.length} no cumplieron</b> los resultados que el negocio necesitaba. Aprobar sin revisar es normalizar la desconexión.`,
         cta: 'Descubrir más',
       },
       ...(hasSecondVar ? [{
         title: 'El hallazgo Focaliza',
         dotColor: '#22D3EE60',
         isFocaliza: true,
-        body: `Al cruzar con el motor de calibración, detectamos que en varios casos <b>el evaluador muestra patrón de indulgencia</b>.`,
+        body: 'La discrepancia tiene una explicación más profunda. Al cruzar evaluación con resultados, detectamos que en varios casos <b>el jefe que evalúa muestra un patrón sistemático de indulgencia</b>.',
         findingCard: {
           title: 'Tipo de evaluador detectado',
-          body: `En <b>${indulgentManagers.length} caso${indulgentManagers.length !== 1 ? 's' : ''}</b>, el jefe fue clasificado como evaluador indulgente. Sus evaluaciones tienden a estar sobre 4.0 de forma sistemática. La evaluación alta no refleja desempeño real — refleja criterio laxo.`,
+          body: `En <b>${indulgentManagers.length} caso${indulgentManagers.length !== 1 ? 's' : ''}</b>, el jefe que evalúa muestra un patrón de calificaciones consistentemente altas. La evaluación no refleja el desempeño real de su equipo — refleja su criterio al evaluar.`,
         },
         cta: 'Entender la decisión',
       }] : []),
       {
         title: 'La decisión de valor',
         dotColor: '#a78bfa40',
-        body: 'El problema no es la política. Es entender si la discrepancia tiene explicación: <b>¿se informaron las metas? ¿Eran inalcanzables?</b> ¿El liderazgo prioriza la relación sobre la exigencia de resultados?',
+        body: 'El problema no es la política. Es entender si la discrepancia tiene explicación. <b>¿Se informaron las metas? ¿Eran inalcanzables?</b> ¿El liderazgo prioriza la relación sobre la exigencia de resultados? Cada incremento aprobado sin esta respuesta normaliza la desconexión entre evaluación y negocio.',
         cta: 'Ver las personas',
       },
     ]
@@ -81,24 +81,24 @@ function getActs(
       {
         title: 'Lo que no cuadra',
         dotColor: '#f59e0b40',
-        body: `Estas <b>${topGoals.length} personas</b> cumplen metas y califican para bono. Pero al cruzar con evaluación 360°, <b>${withLow360.length} tienen discrepancias</b> que ponen en duda si el reconocimiento es justo.`,
+        body: `Estas <b>${topGoals.length} personas</b> cumplen metas y califican para bono. Pero al cruzar con la evaluación, <b>${withLow360.length} muestran una discrepancia</b> que pone en duda si el reconocimiento es completo. El bono premia lo de hoy — pero ¿el sistema ve lo que falta?`,
         cta: 'Descubrir más',
       },
       ...(hasTalentVar ? [{
         title: 'El hallazgo Focaliza',
         dotColor: '#22D3EE60',
         isFocaliza: true,
-        body: 'Al cruzar con el motor de talento, detectamos perfiles que el sistema no reconoce.',
+        body: 'La discrepancia tiene una explicación más profunda. Al cruzar con inteligencia de talento, detectamos perfiles que el sistema no reconoce.',
         findingCard: {
           title: 'Tipo de talento detectado',
-          body: `De las personas con discrepancia, el sistema identificó perfiles de riesgo: talento que entrega resultados pero cuyo compromiso emocional es crítico, o que sostiene resultados siendo invisible para las evaluaciones.`,
+          body: 'Talento que trae resultados pero que el sistema no reconoce. En unos casos, el compromiso con la organización es crítico — entregan pero están desconectados. En otros, sostienen los números del equipo siendo invisibles para las evaluaciones.',
         },
         cta: 'Entender la decisión',
       }] : []),
       {
         title: 'La decisión de valor',
         dotColor: '#a78bfa40',
-        body: 'El bono premia resultados. Pero si la evaluación no reconoce a quien trae los números, <b>desmotivas al motor del negocio</b>.',
+        body: 'El bono premia resultados — pero si la evaluación no reconoce a quien trae los números, <b>el motor del negocio recibe el mensaje equivocado</b>. La desmotivación del talento real es silenciosa. Cuando se nota, ya es tarde.',
         cta: 'Ver las personas',
       },
     ]
@@ -110,7 +110,7 @@ function getActs(
     {
       title: 'Lo que no cuadra',
       dotColor: '#f59e0b40',
-      body: `La combinación de bono y mérito que recibe cada persona <b>envía un mensaje implícito</b>. Estas <b>${contradictory.length} personas</b> reciben señales contradictorias que afectan retención y motivación.`,
+      body: `La combinación de bono y mérito que recibe cada persona <b>envía un mensaje implícito</b>. Estas <b>${contradictory.length} personas</b> reciben señales contradictorias. El talento real lee esas señales mejor que cualquier comunicado.`,
       cta: 'Descubrir más',
     },
     {
