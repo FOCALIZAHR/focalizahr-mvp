@@ -118,8 +118,14 @@ export const SUBFINDING_TO_NARRATIVE: Record<string, string> = {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// V2 TAB CONFIG
+// COMPENSATION QUADRANT MAP — SSoT (used by GoalsCascada + AnomalíasView)
 // ════════════════════════════════════════════════════════════════════════════
+
+export const COMP_QUADRANT_MAP: Record<string, string> = {
+  '1D_sostenibilidad': 'HIDDEN_PERFORMER',
+  '2B_bonosInjustificados': 'PERCEPTION_BIAS',
+  '2A_noPuedeVsNoQuiere': 'DOUBLE_RISK',
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // QUADRANT CONFIG (for scatter plot)

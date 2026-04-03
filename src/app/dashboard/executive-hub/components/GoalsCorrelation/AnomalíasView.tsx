@@ -16,7 +16,7 @@ import { ArrowLeft, ArrowRight, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import type { GoalsCorrelationDataV2, SubFinding } from './GoalsCorrelation.types'
-import { SUBFINDING_CARDS, SUBFINDING_TO_NARRATIVE } from './GoalsCorrelation.constants'
+import { SUBFINDING_CARDS, SUBFINDING_TO_NARRATIVE, COMP_QUADRANT_MAP } from './GoalsCorrelation.constants'
 import ScientificBackingTooltip from '@/components/shared/ScientificBackingTooltip'
 import { SCIENTIFIC_BACKING } from '@/config/narratives/ScientificBackingDictionary'
 import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
@@ -32,12 +32,6 @@ const SEVERITY_ORDER = [
   '2C_evaluadorProtege', '2A_noPuedeVsNoQuiere', '2E_sucesionRota',
   '3B_sesgoSistematico', '3A_pearsonBajo', '3D_calibracionInjusta', '4_blastRadius',
 ]
-
-const COMP_QUADRANT_MAP: Record<string, string> = {
-  '1D_sostenibilidad': 'HIDDEN_PERFORMER',
-  '2B_bonosInjustificados': 'PERCEPTION_BIAS',
-  '2A_noPuedeVsNoQuiere': 'DOUBLE_RISK',
-}
 
 const MIN_PCT_FOR_BLOCK = 5 // Below this → grouped in "otros"
 
