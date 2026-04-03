@@ -123,10 +123,11 @@ export default memo(function CompensacionModal({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35, duration: 0.4 }}
-            className="px-6 py-6 space-y-6"
+            className="px-6 py-6 space-y-8"
           >
-            <div>
-              <p className="text-[9px] font-medium text-slate-500 uppercase tracking-widest mb-2">
+            {/* La Observación — border cyan */}
+            <div className="border-l-2 border-cyan-500/30 pl-4">
+              <p className="text-xs font-medium text-white/80 uppercase tracking-widest mb-3">
                 La Observación
               </p>
               <p className="text-sm font-light text-slate-400 leading-relaxed">
@@ -134,8 +135,9 @@ export default memo(function CompensacionModal({
               </p>
             </div>
 
-            <div>
-              <p className="text-[9px] font-medium text-slate-500 uppercase tracking-widest mb-2">
+            {/* La Decisión de Valor — border purple, texto más brillante */}
+            <div className="border-l-2 border-purple-500/30 pl-4">
+              <p className="text-xs font-medium text-white/80 uppercase tracking-widest mb-3">
                 La Decisión de Valor
               </p>
               <p className="text-sm font-light text-slate-300 leading-relaxed">

@@ -332,17 +332,17 @@ const PersonCard = memo(function PersonCard({
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <div className="border-t border-slate-800/30 pt-3 mt-1 space-y-3">
-                  <div>
-                    <p className="text-[9px] font-medium text-slate-500 uppercase tracking-widest mb-1.5">
+                <div className="border-t border-slate-800/30 pt-3 mt-1 space-y-4">
+                  <div className="border-l-2 border-cyan-500/30 pl-3">
+                    <p className="text-[10px] font-medium text-white/80 uppercase tracking-widest mb-1.5">
                       La Observación
                     </p>
                     <p className="text-[11px] font-light text-slate-400 leading-relaxed">
                       {compEntry.observacion}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-[9px] font-medium text-slate-500 uppercase tracking-widest mb-1.5">
+                  <div className="border-l-2 border-purple-500/30 pl-3">
+                    <p className="text-[10px] font-medium text-white/80 uppercase tracking-widest mb-1.5">
                       La Decisión de Valor
                     </p>
                     <p className="text-[11px] font-light text-slate-300 leading-relaxed">
