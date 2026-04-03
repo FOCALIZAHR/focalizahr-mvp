@@ -143,6 +143,13 @@ export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias
                     En ambos casos, las decisiones de compensación, promoción y sucesión
                     se construyen sobre una base inconsistente.
                   </p>
+
+                  {/* Blockquote coaching */}
+                  <div className="border-l-2 border-cyan-500/30 pl-4 mt-6">
+                    <p className="text-sm italic font-light text-slate-300 leading-relaxed">
+                      El desalineamiento no es un dato más. Es la señal de que el sistema no está midiendo lo que el negocio necesita.
+                    </p>
+                  </div>
                 </motion.div>
               </>
             )
@@ -245,7 +252,7 @@ export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias
             <div>
               {/* Frase puente con Acto 2 */}
               <motion.div {...fadeIn} className="max-w-2xl mx-auto mb-12">
-                <p className="text-base font-light text-slate-500 text-center leading-relaxed">
+                <p className="text-base italic font-light text-slate-400 text-center leading-relaxed">
                   Las contradicciones anteriores también alcanzan a quienes la organización considera su mejor talento.
                 </p>
               </motion.div>
@@ -264,7 +271,7 @@ export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias
                 {stars.percentage >= 80 ? (
                   <p className="text-base font-light text-slate-400 leading-relaxed">
                     <span className="font-medium text-cyan-400">{stars.withHighGoals}</span> de{' '}
-                    <span className="font-medium text-slate-200">{stars.total}</span> estrellas del 9-Box
+                    <span className="font-medium text-slate-200">{stars.total}</span> estrellas
                     entregan resultados sobre el 80%. La clasificación está respaldada por ejecución —
                     estas personas son lo que el sistema dice que son.
                   </p>
@@ -372,19 +379,18 @@ export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias
 
                 {worstPearson && worstPearson.pearsonRoleFitGoals !== null && worstPearson.pearsonRoleFitGoals < 0.3 && (
                   <div>
-                    <p className="text-xs uppercase tracking-widest text-amber-400/60 mb-3">Framework desalineado</p>
+                    <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">Señal de desalineamiento</p>
                     <p className="text-base font-light text-slate-400 leading-relaxed">
                       En <span className="font-medium text-slate-200">{worstPearson.gerenciaName}</span>,
                       las competencias que se exigen no predicen los resultados que se entregan.
-                      El framework de competencias de esta gerencia necesita revisión —
-                      está midiendo cosas que no se relacionan con la ejecución real.
+                      Lo que se mide como competencia en esta gerencia no se relaciona con la ejecución real.
                     </p>
                   </div>
                 )}
 
                 {bestPearson && bestPearson.pearsonRoleFitGoals !== null && (
                   <div>
-                    <p className="text-xs uppercase tracking-widest text-cyan-400/60 mb-3">Framework calibrado</p>
+                    <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">Alineamiento confirmado</p>
                     <p className="text-base font-light text-slate-400 leading-relaxed">
                       En <span className="font-medium text-slate-200">{bestPearson.gerenciaName}</span>,
                       las competencias que se exigen predicen resultados.
@@ -466,7 +472,7 @@ export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias
             <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-6">
 
               {/* Classification */}
-              <p className="text-base font-light text-slate-300 text-center leading-relaxed">
+              <p className="text-lg font-light text-slate-200 text-center leading-relaxed">
                 {synthesis.classification}
               </p>
 
@@ -476,9 +482,11 @@ export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias
               </p>
 
               {/* Path */}
-              <p className="text-base font-light text-slate-400 leading-relaxed text-center">
-                {synthesis.path}
-              </p>
+              <div className="border-l-2 border-cyan-500/30 pl-4">
+                <p className="text-base font-light text-slate-400 leading-relaxed">
+                  {synthesis.path}
+                </p>
+              </div>
 
               {/* Accountability */}
               <p className="text-sm italic font-light text-slate-500 text-center">
