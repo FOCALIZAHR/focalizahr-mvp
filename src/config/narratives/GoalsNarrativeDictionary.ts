@@ -119,10 +119,11 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   evaluadorProtege: {
     headline: 'El gerente no exige y los datos lo confirman.',
     description:
-      'No entregaron metas. Y su evaluador directo está clasificado como indulgente — asignó evaluaciones altas a todo su equipo. ' +
-      'La contradicción no es de la persona: es del liderazgo. ' +
-      'Evaluación alta más metas bajas en el mismo equipo es una firma de gestión, no de talento.',
-    coachingTip: 'La conversación es con el liderazgo de esa gerencia — con los datos del equipo completo sobre la mesa, no solo de esta persona.',
+      'No cumplieron metas. Pero su evaluación de desempeño es alta. ' +
+      'Dos fuentes se contradicen — y apuntan al mismo evaluador. ' +
+      'O el líder no diferencia entre quienes cumplen y quienes no. O el sistema de evaluación no le exige hacerlo. ' +
+      'Cuando la evaluación no refleja los resultados, las decisiones que se toman sobre esa persona tampoco.',
+    coachingTip: 'No es una persona. Es un patrón completo bajo el mismo liderazgo. ¿Los datos del equipo respaldan la evaluación que su líder les dio?',
     teslaColor: '#DC2626', // red-600
   },
 
@@ -151,20 +152,20 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   sucesionRota: {
     headline: 'El plan de sucesión no tiene respaldo en resultados.',
     description:
-      'El comité los identificó como sucesores naturales — alto dominio del cargo y alta aspiración. ' +
-      'Pero sus metas están bajo el 40%. El plan de sucesión se construyó sobre percepción, no sobre ejecución. ' +
-      'Promover sin evidencia de resultados es promover la incompetencia.',
-    coachingTip: 'Pausa el plan de sucesión para estos nombres hasta que demuestren ejecución. Si las metas eran inadecuadas, recalibra primero.',
+      'Dos señales se contradicen. La organización los posicionó como los próximos líderes — pero sus metas están bajo el 40%. ' +
+      'O el plan de sucesión se construyó sobre percepción, no sobre ejecución. O las metas no estaban calibradas para su nivel. ' +
+      'Un plan de sucesión sin respaldo en resultados es una apuesta que el negocio paga si falla.',
+    coachingTip: '¿El plan de sucesión consideró los resultados, o solo la percepción del comité? La respuesta define si es un plan o una esperanza.',
     teslaColor: '#8B5CF6', // violet
   },
 
   blastRadius: {
     headline: 'Un líder, un equipo entero desconectado.',
     description:
-      'Más del 40% del equipo de este evaluador tiene engagement crítico. ' +
-      'No es un problema de personas — es un patrón bajo un mismo liderazgo. ' +
-      'Cuando el compromiso cae en bloque, la causa no está en quienes lo pierden sino en quien debería generarlo.',
-    coachingTip: 'La conversación no es con el equipo. Es con el líder. Y debe incluir estos datos como evidencia — no como acusación.',
+      'Más del 40% de este equipo muestra compromiso en nivel crítico. No es una coincidencia — es un patrón bajo el mismo líder. ' +
+      'O el liderazgo no genera conexión. O hay un problema estructural que el equipo absorbe en silencio. ' +
+      'Cuando un equipo entero se desconecta, la señal no viene de abajo.',
+    coachingTip: 'No es el equipo. Es lo que el equipo tiene en común. ¿Qué pasó bajo ese liderazgo para que el compromiso cayera en bloque?',
     teslaColor: '#F43F5E', // rose
   },
 
