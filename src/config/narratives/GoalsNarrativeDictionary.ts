@@ -52,7 +52,7 @@ export interface GerenciaNarrativeInput {
 export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
 
   fugaProductiva: {
-    headline: 'Talento que rinde y que se va.',
+    headline: 'Cumplen metas y están en riesgo de irse.',
     description:
       'Dos señales independientes confirman el mismo riesgo. ' +
       'Domina su cargo y entrega resultados — pero su compromiso emocional es crítico. ' +
@@ -94,7 +94,7 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   },
 
   noSabeVsNoQuiere: {
-    headline: 'El diagnóstico determina la intervención.',
+    headline: 'No cumplen metas: unos no pueden, otros no quieren.',
     description:
       'Metas bajo 40% con dos causas que el sistema separó por RoleFit: ' +
       'RoleFit bajo 60% = no domina las competencias del cargo (capacitar). ' +
@@ -107,7 +107,7 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   // ── V2: Nuevos sub-hallazgos persona ─────────────────────────────────
 
   sostenibilidad: {
-    headline: 'Entregan resultados a costa de quemarse.',
+    headline: 'Cumplen metas sin dominar su cargo.',
     description:
       'Cumplen metas sobre el 80% pero no dominan las competencias que su cargo exige. ' +
       'Dos explicaciones posibles — y ninguna es sostenible: O las metas no están calibradas al nivel del cargo. ' +
@@ -128,7 +128,7 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   },
 
   pearsonRoleFitMetas: {
-    headline: 'Las competencias predicen resultados — o no.',
+    headline: 'Las competencias evaluadas no predicen resultados.',
     description:
       'En esta gerencia, quienes más dominan su cargo no son quienes más cumplen metas — y viceversa. ' +
       'Dos explicaciones posibles: Las competencias que se evalúan no corresponden al trabajo real. ' +
@@ -138,7 +138,7 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   },
 
   calibracionJusta: {
-    headline: 'La calibración corrigió — pero ¿en la dirección correcta?',
+    headline: 'La calibración contradice los resultados.',
     description:
       'Personas calibradas hacia arriba con metas bajo 40%: la calibración legitimó, no corrigió. ' +
       'Personas calibradas hacia abajo con metas sobre 80%: se penalizó a quien entregó resultados. ' +
@@ -170,7 +170,7 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   // ── V2: Sub-hallazgos organizacionales (por gerencia) ──────────────
 
   sesgoSistematico: {
-    headline: 'El problema no es individual — es de liderazgo.',
+    headline: 'Evaluación alta y metas bajas en la misma gerencia.',
     description:
       'Gerencias con evaluador clasificado como indulgente y metas promedio bajo 40%. ' +
       'Doble señal: quien evalúa no exige, y los resultados lo confirman. ' +
