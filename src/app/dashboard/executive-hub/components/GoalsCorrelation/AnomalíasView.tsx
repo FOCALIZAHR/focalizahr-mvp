@@ -4,10 +4,10 @@
 // ANOMALÍAS VIEW — Treemap visual proporcional
 // src/app/dashboard/executive-hub/components/GoalsCorrelation/AnomalíasView.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// Patrón: TalentTreemap (Pilar 2 TAC) — mosaico proporcional al count.
+// Patrón: TalentTreemap — mosaico proporcional al count.
 // "El tamaño comunica proporción, la narrativa comunica urgencia."
-// Colapsado: número + headline + barra. Expandido: narrativa + links.
-// Design: FocalizaHR — cyan + amber + purple + slate. Sin semáforo.
+// Design: cyan protagonista, sin colores semáforo. Hover glow cyan.
+// Bloques <5% se agrupan en "otros".
 // ════════════════════════════════════════════════════════════════════════════
 
 import { memo, useState } from 'react'
@@ -37,6 +37,8 @@ const COMP_QUADRANT_MAP: Record<string, string> = {
   '2A_noPuedeVsNoQuiere': 'DOUBLE_RISK',
 }
 
+const MIN_PCT_FOR_BLOCK = 5 // Below this → grouped in "otros"
+
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
 // ════════════════════════════════════════════════════════════════════════════
@@ -59,7 +61,7 @@ export default memo(function AnomalíasView({
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [compModal, setCompModal] = useState<{ entry: { observacion: string; decisionValor: string }; headline: string; color: string } | null>(null)
 
-  // All findings sorted by severity
+  // All findings sorted by severity, count > 0
   const allFindings = data.segments.flatMap(s => s.subFindings)
   const sorted = [...allFindings]
     .sort((a, b) => {
@@ -71,8 +73,13 @@ export default memo(function AnomalíasView({
 
   const totalCount = sorted.reduce((s, f) => s + f.count, 0)
 
-  // Layout: row 1 = top 2 (biggest by count), row 2 = rest
-  const bySize = [...sorted].sort((a, b) => b.count - a.count)
+  // Split: visible blocks (≥5%) vs grouped "otros"
+  const visible = sorted.filter(f => totalCount > 0 && (f.count / totalCount) * 100 >= MIN_PCT_FOR_BLOCK)
+  const otros = sorted.filter(f => totalCount > 0 && (f.count / totalCount) * 100 < MIN_PCT_FOR_BLOCK)
+  const otrosCount = otros.reduce((s, f) => s + f.count, 0)
+
+  // Layout: row 1 = top 2 by count, row 2 = rest
+  const bySize = [...visible].sort((a, b) => b.count - a.count)
   const row1 = bySize.slice(0, 2)
   const row2 = bySize.slice(2)
 
@@ -130,7 +137,6 @@ export default memo(function AnomalíasView({
         {/* Treemap */}
         <AnimatePresence mode="wait">
           {expandedKey ? (
-            /* EXPANDED: full width detail */
             <ExpandedBlock
               key={`exp-${expandedKey}`}
               finding={sorted.find(f => f.key === expandedKey)!}
@@ -143,38 +149,39 @@ export default memo(function AnomalíasView({
               onViewCompensacion={COMP_QUADRANT_MAP[expandedKey] ? () => openCompModal(expandedKey) : undefined}
             />
           ) : (
-            /* MOSAIC: proportional blocks */
             <motion.div
               key="mosaic"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="flex flex-col gap-2.5"
+              className="flex flex-col gap-2"
             >
               {/* Row 1: top 2 by count */}
-              <div className="flex gap-2.5 items-stretch">
-                {row1.map((f, i) => (
-                  <motion.div
-                    key={f.key}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.06 }}
-                    style={{ flex: Math.max(f.count, 1) }}
-                    className="min-w-0"
-                  >
-                    <MosaicBlock
-                      finding={f}
-                      totalCount={totalCount}
-                      onClick={() => setExpandedKey(f.key)}
-                    />
-                  </motion.div>
-                ))}
-              </div>
+              {row1.length > 0 && (
+                <div className="flex gap-2 items-stretch">
+                  {row1.map((f, i) => (
+                    <motion.div
+                      key={f.key}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.06 }}
+                      style={{ flex: Math.max(f.count, 1) }}
+                      className="min-w-0"
+                    >
+                      <MosaicBlock
+                        finding={f}
+                        totalCount={totalCount}
+                        onClick={() => setExpandedKey(f.key)}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+              )}
 
-              {/* Row 2: rest, proportional */}
-              {row2.length > 0 && (
-                <div className="flex gap-2.5 items-stretch">
+              {/* Row 2: rest + otros */}
+              {(row2.length > 0 || otrosCount > 0) && (
+                <div className="flex gap-2 items-stretch">
                   {row2.map((f, i) => (
                     <motion.div
                       key={f.key}
@@ -187,11 +194,28 @@ export default memo(function AnomalíasView({
                       <MosaicBlock
                         finding={f}
                         totalCount={totalCount}
-                        compact={f.count / totalCount < 0.1}
                         onClick={() => setExpandedKey(f.key)}
                       />
                     </motion.div>
                   ))}
+
+                  {/* "Otros" grouped block */}
+                  {otrosCount > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: (row1.length + row2.length) * 0.06 }}
+                      style={{ flex: Math.max(otrosCount, 1) }}
+                      className="min-w-0"
+                    >
+                      <div className="w-full h-full rounded-xl bg-slate-900/40 border border-slate-800/20 p-3 flex flex-col justify-center">
+                        <p className="text-lg font-extralight text-slate-500">{otrosCount}</p>
+                        <p className="text-[9px] text-slate-600 font-light mt-0.5">
+                          {otros.length} tipo{otros.length !== 1 ? 's' : ''} menores
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
               )}
             </motion.div>
@@ -222,61 +246,58 @@ export default memo(function AnomalíasView({
 // ════════════════════════════════════════════════════════════════════════════
 // MOSAIC BLOCK — Collapsed proportional tile
 // ════════════════════════════════════════════════════════════════════════════
+// Design: ALL blocks use cyan left border (no semáforo).
+// Hover: cyan glow border. Click: expand.
+// ════════════════════════════════════════════════════════════════════════════
 
 function MosaicBlock({
   finding,
   totalCount,
-  compact = false,
   onClick,
 }: {
   finding: SubFinding
   totalCount: number
-  compact?: boolean
   onClick: () => void
 }) {
-  const cardConfig = SUBFINDING_CARDS[finding.key]
   const narrativeKey = SUBFINDING_TO_NARRATIVE[finding.key]
   const dictNarrative = narrativeKey ? getNarrative(narrativeKey) : null
 
-  if (!cardConfig || !dictNarrative) return null
+  if (!dictNarrative) return null
 
   const pct = totalCount > 0 ? Math.round((finding.count / totalCount) * 100) : 0
 
   return (
     <button
       onClick={onClick}
-      className="w-full h-full text-left rounded-xl relative overflow-hidden bg-slate-900/60 backdrop-blur-sm border border-slate-800/30 hover:border-slate-700/50 transition-all group"
+      className={cn(
+        'w-full h-full text-left rounded-xl relative overflow-hidden transition-all cursor-pointer',
+        'bg-slate-900/60 backdrop-blur-sm',
+        'border border-slate-800/30',
+        'hover:border-cyan-500/30 hover:shadow-[0_0_20px_rgba(34,211,238,0.08)]',
+      )}
     >
-      {/* Tesla left border */}
-      <div
-        className="absolute left-0 top-0 bottom-0 w-[3px]"
-        style={{ backgroundColor: dictNarrative.teslaColor }}
-      />
+      {/* Left border — CYAN only (no semáforo) */}
+      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-cyan-500/40" />
 
-      <div className={cn('pl-5 pr-4', compact ? 'py-3' : 'py-4')}>
-        {/* Count large */}
-        <p className={cn(
-          'font-extralight text-cyan-400 tracking-tight',
-          compact ? 'text-2xl' : 'text-3xl md:text-4xl'
-        )}>
+      <div className="pl-5 pr-4 py-4">
+        {/* Count */}
+        <p className="text-3xl md:text-4xl font-extralight text-cyan-400 tracking-tight">
           {finding.count}
         </p>
 
-        {/* Headline */}
-        {!compact && (
-          <p className="text-sm font-light text-slate-300 mt-1 leading-snug line-clamp-2">
-            {dictNarrative.headline}
-          </p>
-        )}
+        {/* Headline — always show, truncate if needed */}
+        <p className="text-sm font-light text-slate-300 mt-1.5 leading-snug line-clamp-2">
+          {dictNarrative.headline}
+        </p>
 
-        {/* Proportion bar */}
-        <div className="mt-2.5 flex items-center gap-2">
+        {/* Proportion bar — thin, cyan */}
+        <div className="mt-3 flex items-center gap-2">
           <div className="flex-1 h-[2px] bg-slate-800 rounded-full overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${pct}%` }}
               transition={{ duration: 0.5, ease: 'easeOut' }}
-              className="h-full rounded-full bg-gradient-to-r from-cyan-500/60 to-cyan-400/40"
+              className="h-full rounded-full bg-cyan-500/50"
             />
           </div>
           <span className="text-[9px] font-mono text-slate-600 flex-shrink-0">{pct}%</span>
@@ -303,11 +324,10 @@ function ExpandedBlock({
   onViewPersons: () => void
   onViewCompensacion?: () => void
 }) {
-  const cardConfig = SUBFINDING_CARDS[finding.key]
   const narrativeKey = SUBFINDING_TO_NARRATIVE[finding.key]
   const dictNarrative = narrativeKey ? getNarrative(narrativeKey) : null
 
-  if (!cardConfig || !dictNarrative) return null
+  if (!dictNarrative) return null
 
   const pct = totalCount > 0 ? Math.round((finding.count / totalCount) * 100) : 0
   const isOrgLevel = finding.segmentId === '3_ORGANIZACIONAL'
@@ -321,13 +341,10 @@ function ExpandedBlock({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.25 }}
-      className="relative rounded-xl overflow-hidden bg-slate-900/60 backdrop-blur-sm border border-slate-800/30"
+      className="relative rounded-xl overflow-hidden bg-slate-900/60 backdrop-blur-sm border border-cyan-500/20"
     >
-      {/* Tesla left border */}
-      <div
-        className="absolute left-0 top-0 bottom-0 w-[3px]"
-        style={{ backgroundColor: dictNarrative.teslaColor }}
-      />
+      {/* Left border — cyan */}
+      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-cyan-400" />
 
       <div className="pl-6 pr-5 py-6 space-y-5">
         {/* Header */}
