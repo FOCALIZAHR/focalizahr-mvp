@@ -131,8 +131,9 @@ export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias
 
                 <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-4">
                   <p className="text-xl font-light text-slate-300 text-center leading-relaxed">
-                    El <span className="font-medium text-amber-400">{pctDesalineamiento}%</span> de
-                    tus evaluados muestra una contradicción entre su capacidad y sus resultados de negocio.
+                    De <span className="font-medium text-slate-200">{totals.totalEvaluados}</span> personas evaluadas,
+                    el <span className="font-medium text-amber-400">{pctDesalineamiento}%</span> muestra
+                    una contradicción entre su capacidad y sus resultados de negocio.
                   </p>
                   <p className="text-base font-light text-slate-400 leading-relaxed text-center">
                     O tus mejores evaluados no están entregando resultados.
@@ -225,7 +226,7 @@ export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias
               {allFindings.length > 2 && (
                 <motion.div {...fadeIn} className="max-w-2xl mx-auto mt-12">
                   <SubtleLink onClick={onOpenAnomalias}>
-                    Ver análisis completo · {allFindings.length} hallazgo{allFindings.length !== 1 ? 's' : ''}
+                    Ver los {allFindings.length} hallazgo{allFindings.length !== 1 ? 's' : ''} detectado{allFindings.length !== 1 ? 's' : ''}
                   </SubtleLink>
                 </motion.div>
               )}
