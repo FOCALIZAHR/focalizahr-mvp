@@ -275,6 +275,56 @@ export const SCIENTIFIC_BACKING: Record<string, ScientificBacking> = {
     variant: 'pattern',
   },
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // CORRELACIÓN COMPETENCIAS × METAS — Insight #7 Metas × Performance
+  // ──────────────────────────────────────────────────────────────────────────
+  goals_pearson_correlation: {
+    citations: [
+      {
+        claim:
+          'Las organizaciones con competencias alineadas a resultados ' +
+          'de negocio tienen mayor efectividad operativa',
+        stat:
+          'Las empresas en el cuartil superior de salud organizacional ' +
+          'tienen 3x más probabilidad de superar la mediana de rendimiento financiero',
+        source: 'McKinsey Organizational Health Index · 2024',
+        url: 'https://www.mckinsey.com/solutions/orgsolutions/overview/organizational-health-index',
+      },
+    ],
+    bridge:
+      'FocalizaHR calcula la correlación estadística entre el dominio del cargo ' +
+      '(medido por la brecha entre competencias reales y las que el cargo exige) ' +
+      'y el cumplimiento de metas, por cada gerencia. ' +
+      'Cuando la correlación es baja, significa que lo que se evalúa como "competencia" ' +
+      'no se traduce en los resultados que el negocio necesita de ese rol.',
+    variant: 'pattern',
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // SESGO DEL EVALUADOR — Insight #7 Metas × Performance
+  // ──────────────────────────────────────────────────────────────────────────
+  goals_evaluator_bias: {
+    citations: [
+      {
+        claim:
+          'La mayoría de los sistemas de evaluación tienen sesgos ' +
+          'que distorsionan las decisiones de talento',
+        stat:
+          '64% de los trabajadores considera inútiles ' +
+          'sus sistemas de evaluación de desempeño',
+        source: 'Deloitte Human Capital Trends · 2025',
+        url: 'https://www2.deloitte.com/us/en/insights/focus/human-capital-trends.html',
+      },
+    ],
+    bridge:
+      'FocalizaHR clasifica a cada evaluador analizando el promedio y la dispersión ' +
+      'de las evaluaciones que asignó a su equipo. ' +
+      'Si el promedio es inusualmente alto (sobre 4.2 en escala de 5), el sistema lo clasifica como indulgente. ' +
+      'Si la dispersión es muy baja (todos reciben notas similares), lo clasifica como tendencia central. ' +
+      'Cuando esa clasificación coincide con metas bajas en el mismo equipo, la señal se amplifica.',
+    variant: 'risk',
+  },
+
 }
 
 // ════════════════════════════════════════════════════════════════════════════

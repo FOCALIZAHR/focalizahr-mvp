@@ -17,6 +17,8 @@ import { cn } from '@/lib/utils'
 
 import type { GoalsCorrelationDataV2, SubFinding } from './GoalsCorrelation.types'
 import { SUBFINDING_CARDS, SUBFINDING_TO_NARRATIVE } from './GoalsCorrelation.constants'
+import ScientificBackingTooltip from '@/components/shared/ScientificBackingTooltip'
+import { SCIENTIFIC_BACKING } from '@/config/narratives/ScientificBackingDictionary'
 import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
 import { getCompensacionNarrative } from '@/config/narratives/CompensacionNarrativeDictionary'
 import CompensacionModal from './CompensacionModal'
@@ -38,6 +40,12 @@ const COMP_QUADRANT_MAP: Record<string, string> = {
 }
 
 const MIN_PCT_FOR_BLOCK = 5 // Below this → grouped in "otros"
+
+// Findings with scientific backing tooltips
+const SCIENTIFIC_MAP: Record<string, string> = {
+  '3A_pearsonBajo': 'goals_pearson_correlation',
+  '3B_sesgoSistematico': 'goals_evaluator_bias',
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -466,6 +474,14 @@ function ExpandedBlock({
             {dictNarrative.coachingTip}
           </p>
         </div>
+
+        {/* Scientific backing tooltip */}
+        {SCIENTIFIC_MAP[finding.key] && SCIENTIFIC_BACKING[SCIENTIFIC_MAP[finding.key]] && (
+          <ScientificBackingTooltip
+            backing={SCIENTIFIC_BACKING[SCIENTIFIC_MAP[finding.key]]}
+            position="bottom"
+          />
+        )}
 
         {/* Links */}
         <div className="flex flex-wrap gap-x-6 gap-y-2">
