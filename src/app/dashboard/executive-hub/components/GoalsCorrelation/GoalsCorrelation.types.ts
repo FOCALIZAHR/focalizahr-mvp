@@ -36,8 +36,6 @@ export interface GoalsCorrelationPropsV2 {
   data: GoalsCorrelationDataV2
 }
 
-export type TabKeyV2 = 'entregaron' | 'no_entregaron' | 'organizacional' | 'analisis'
-
 export interface PortadaNarrative {
   statusBadge?: { label: string; showCheck?: boolean }
   prefix?: string

@@ -623,13 +623,13 @@ const FindingBlock = memo(function FindingBlock({
 
       {/* Count + financial */}
       <div className="flex items-center gap-4 mb-4">
-        <span className={cn('text-sm font-mono', cardConfig.textColor)}>
+        <span className="text-sm font-mono font-medium text-slate-200">
           {finding.count} {isOrgLevel ? 'gerencia' : 'persona'}{finding.count !== 1 ? 's' : ''}
         </span>
         {finding.financialImpact > 0 && (
           <>
             <span className="text-slate-700">·</span>
-            <span className={cn('text-sm font-mono font-medium', cardConfig.textColor)}>
+            <span className="text-sm font-mono font-medium text-purple-400">
               {formatCurrency(finding.financialImpact)}
             </span>
           </>

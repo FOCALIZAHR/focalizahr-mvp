@@ -4,8 +4,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import type { CorrelationQuadrant } from '@/lib/services/GoalsDiagnosticService'
-import type { TabKeyV2 } from './GoalsCorrelation.types'
-
 // ════════════════════════════════════════════════════════════════════════════
 // V2 SUB-FINDING CARDS — keyed by SubFinding.key
 // ════════════════════════════════════════════════════════════════════════════
@@ -122,13 +120,6 @@ export const SUBFINDING_TO_NARRATIVE: Record<string, string> = {
 // ════════════════════════════════════════════════════════════════════════════
 // V2 TAB CONFIG
 // ════════════════════════════════════════════════════════════════════════════
-
-export const TABS_V2: { key: TabKeyV2; label: string; icon?: string }[] = [
-  { key: 'entregaron', label: 'Cumplieron' },
-  { key: 'no_entregaron', label: 'No Cumplieron' },
-  { key: 'organizacional', label: 'Organizacional' },
-  { key: 'analisis', label: 'Análisis' },
-]
 
 // ════════════════════════════════════════════════════════════════════════════
 // QUADRANT CONFIG (for scatter plot)
