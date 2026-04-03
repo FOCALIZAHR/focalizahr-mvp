@@ -1055,12 +1055,53 @@ export class GoalsDiagnosticService {
       cp => (cp.employee.goalsPercent ?? 0) > T.HIGH_GOALS
     )
 
+    // Aggregate by manager for Evaluator Accountability view
+    const byManagerMap = new Map<string, NarrativeEmployee[]>()
+    for (const emp of enriched) {
+      if (!emp.managerId) continue
+      if (!byManagerMap.has(emp.managerId)) byManagerMap.set(emp.managerId, [])
+      byManagerMap.get(emp.managerId)!.push(emp)
+    }
+    const byManager: ManagerGoalsStats[] = Array.from(byManagerMap.entries())
+      .filter(([, emps]) => emps.length >= 2) // need at least 2 reports
+      .map(([mgrId, emps]) => {
+        const mgrStatus = managerClassifications.get(mgrId) ?? null
+        const mgrName = managerNames.get(mgrId) ?? 'Evaluador'
+        const gerName = emps[0]?.gerencia ?? ''
+        const avg360 = emps.reduce((s, e) => s + e.score360, 0) / emps.length
+        const withGoals = emps.filter(e => e.goalsPercent !== null)
+        const avgGoals = withGoals.length > 0
+          ? withGoals.reduce((s, e) => s + (e.goalsPercent ?? 0), 0) / withGoals.length
+          : 0
+        // Coherence gap: normalize 360 to 0-100 scale (score is 1-5)
+        const normalized360 = ((avg360 - 1) / 4) * 100
+        const gap = Math.abs(normalized360 - avgGoals)
+        return {
+          managerId: mgrId,
+          managerName: mgrName,
+          gerenciaName: gerName,
+          evaluatorStatus: mgrStatus,
+          evaluatedCount: emps.length,
+          avgScore360Given: Math.round(avg360 * 100) / 100,
+          avgGoalsOfReports: Math.round(avgGoals),
+          coherenceGap: Math.round(gap),
+          employees: emps.map(e => ({
+            id: e.id,
+            name: e.name,
+            score360: e.score360,
+            goalsPercent: e.goalsPercent,
+          })),
+        }
+      })
+      .sort((a, b) => b.coherenceGap - a.coherenceGap)
+
     return {
       segments,
       topAlerts,
       correlation,
       quadrantCounts,
       byGerencia,
+      byManager,
       cycleConfig: {
         includeGoals: cycle?.includeGoals ?? true,
         competenciesWeight: cycle?.competenciesWeight ?? 70,
@@ -1146,6 +1187,20 @@ export interface GerenciaGoalsStatsV2 extends GerenciaGoalsStats {
   calibrationCross: CalibrationCross | null
 }
 
+/** V2 manager-level aggregation for Evaluator Accountability */
+export interface ManagerGoalsStats {
+  managerId: string
+  managerName: string
+  gerenciaName: string
+  evaluatorStatus: string | null
+  evaluatedCount: number
+  avgScore360Given: number
+  avgGoalsOfReports: number
+  /** abs(normalized360 - goalsAvg) — higher = less coherent */
+  coherenceGap: number
+  employees: { id: string; name: string; score360: number; goalsPercent: number | null }[]
+}
+
 /** V2 response — CEO-first segmented structure */
 export interface GoalsCorrelationDataV2 {
   /** 2 employee segments + 1 organizational */
@@ -1164,6 +1219,8 @@ export interface GoalsCorrelationDataV2 {
   }
   /** Per-gerencia stats with Pearson + calibration */
   byGerencia: GerenciaGoalsStatsV2[]
+  /** Per-manager coherence stats for Evaluator Accountability */
+  byManager: ManagerGoalsStats[]
   /** Cycle config */
   cycleConfig: {
     includeGoals: boolean

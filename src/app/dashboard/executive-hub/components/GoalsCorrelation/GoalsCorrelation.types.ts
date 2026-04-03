@@ -15,6 +15,7 @@ import type {
   NarrativeEmployee,
   ResolvedBadge,
   NarrativeBadges,
+  ManagerGoalsStats,
 } from '@/lib/services/GoalsDiagnosticService'
 
 // Re-export for convenience
@@ -30,6 +31,7 @@ export type {
   NarrativeEmployee,
   ResolvedBadge,
   NarrativeBadges,
+  ManagerGoalsStats,
 }
 
 export interface GoalsCorrelationPropsV2 {
