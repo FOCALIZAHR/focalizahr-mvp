@@ -113,35 +113,38 @@ export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias
         <ActSeparator label="Resultados" color="cyan" />
 
         <div>
-          {/* Ancla — dos números lado a lado */}
-          <motion.div {...fadeInDelay} className="flex items-center justify-center gap-12 md:gap-20 mb-10">
-            <div className="text-center">
-              <p className="text-6xl md:text-7xl font-extralight text-cyan-400 tracking-tight">
-                {totals.totalEntregaron}
-              </p>
-              <p className="text-xs text-slate-500 mt-2 uppercase tracking-wider">cumplieron metas</p>
-            </div>
-            <div className="w-px h-16 bg-slate-800" />
-            <div className="text-center">
-              <p className="text-6xl md:text-7xl font-extralight text-amber-400 tracking-tight">
-                {totals.totalNoEntregaron}
-              </p>
-              <p className="text-xs text-slate-500 mt-2 uppercase tracking-wider">no cumplieron metas</p>
-            </div>
-          </motion.div>
+          {(() => {
+            const pctDesalineamiento = totals.totalEvaluados > 0
+              ? Math.round(((data.quadrantCounts.perceptionBias + data.quadrantCounts.hiddenPerformer) / totals.totalEvaluados) * 100)
+              : 0
+            return (
+              <>
+                <motion.div {...fadeInDelay} className="text-center mb-10">
+                  <p className="text-7xl md:text-8xl font-extralight text-amber-400 tracking-tight">
+                    {pctDesalineamiento}%
+                  </p>
+                  <p className="text-xs text-slate-500 mt-3 uppercase tracking-wider">
+                    de desalineamiento organizacional
+                  </p>
+                </motion.div>
 
-          {/* Narrativa contextual */}
-          <motion.div {...fadeIn} className="max-w-2xl mx-auto">
-            <p className="text-xl font-light text-slate-300 text-center leading-relaxed">
-              De <span className="font-medium text-slate-200">{totals.totalEvaluados}</span> personas evaluadas,{' '}
-              <span className="font-medium text-cyan-400">{totals.totalEntregaron}</span> cumplieron metas sobre el 80%
-              {' '}y <span className="font-medium text-amber-400">{totals.totalNoEntregaron}</span> quedaron bajo el 40%.
-            </p>
-
-            <p className="text-base font-light text-slate-400 leading-relaxed mt-6 text-center">
-              La pregunta no es el número. Es si tu organización responde correctamente a cada grupo.
-            </p>
-          </motion.div>
+                <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-4">
+                  <p className="text-xl font-light text-slate-300 text-center leading-relaxed">
+                    El <span className="font-medium text-amber-400">{pctDesalineamiento}%</span> de
+                    tus evaluados muestra una contradicción entre su capacidad y sus resultados de negocio.
+                  </p>
+                  <p className="text-base font-light text-slate-400 leading-relaxed text-center">
+                    O tus mejores evaluados no están entregando resultados.
+                    O quienes sí entregan no están siendo reconocidos por el sistema.
+                  </p>
+                  <p className="text-base font-light text-slate-400 leading-relaxed text-center">
+                    En ambos casos, las decisiones de compensación, promoción y sucesión
+                    se construyen sobre una base inconsistente.
+                  </p>
+                </motion.div>
+              </>
+            )
+          })()}
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════
