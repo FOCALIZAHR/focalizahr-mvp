@@ -96,11 +96,10 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   noSabeVsNoQuiere: {
     headline: 'No cumplen metas: unos no pueden, otros no quieren.',
     description:
-      'Metas bajo 40% con dos causas que el sistema separó por RoleFit: ' +
-      'RoleFit bajo 60% = no domina las competencias del cargo (capacitar). ' +
-      'RoleFit sobre 75% = tiene la capacidad pero no la aplica (conversar expectativas). ' +
-      'Capacitar a quien no quiere es tirar dinero. Presionar a quien no sabe es acelerar la fuga.',
-    coachingTip: 'Mira el badge de RoleFit en cada persona. Ese dato define si es formación o conversación de expectativas.',
+      'No cumplieron metas. Pero la causa importa más que el resultado. ' +
+      'El sistema separó dos grupos: quienes no dominan las competencias que su cargo exige — y quienes las dominan pero no las aplican. ' +
+      'Tratarlos igual es el error más caro. Capacitar a quien no quiere es tirar dinero. Presionar a quien no sabe es acelerar la fuga.',
+    coachingTip: 'La pregunta frente a cada nombre: ¿no puede o no quiere? La respuesta cambia completamente la intervención.',
     teslaColor: '#64748B', // slate
   },
 
@@ -131,8 +130,9 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
     headline: 'Las competencias evaluadas no predicen resultados.',
     description:
       'En esta gerencia, quienes más dominan su cargo no son quienes más cumplen metas — y viceversa. ' +
-      'Dos explicaciones posibles: Las competencias que se evalúan no corresponden al trabajo real. ' +
-      'O las metas no están definidas en función de lo que el cargo exige.',
+      'O las competencias que se evalúan no corresponden al trabajo real. ' +
+      'O las metas no están definidas en función de lo que el cargo exige. ' +
+      'Si la medición no predice el resultado, las decisiones basadas en esa medición tampoco.',
     coachingTip: 'La pregunta no es de personas — es de diseño. ¿Las competencias que se evalúan corresponden a lo que el negocio realmente necesita de ese rol?',
     teslaColor: '#8B5CF6', // violet
   },
@@ -140,10 +140,11 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   calibracionJusta: {
     headline: 'La calibración contradice los resultados.',
     description:
-      'Personas calibradas hacia arriba con metas bajo 40%: la calibración legitimó, no corrigió. ' +
-      'Personas calibradas hacia abajo con metas sobre 80%: se penalizó a quien entregó resultados. ' +
-      'Ambos patrones erosionan la meritocracia y la credibilidad del proceso.',
-    coachingTip: 'Presenta estos cruces al comité de calibración como evidencia. La próxima sesión debe tener las metas sobre la mesa.',
+      'La calibración ajustó evaluaciones — pero en dirección opuesta a los resultados. ' +
+      'Quienes no cumplieron metas fueron calibrados hacia arriba. Quienes sí cumplieron fueron calibrados hacia abajo. ' +
+      'O la calibración se usó para corregir percepción, no rendimiento. O hubo factores interpersonales que pesaron más que los datos. ' +
+      'Cuando el proceso de calibración contradice los resultados, pierde credibilidad ante quienes sí entregan.',
+    coachingTip: 'Si la calibración no consideró las metas, ¿qué consideró? La próxima sesión lo dirá.',
     teslaColor: '#0EA5E9', // sky
   },
 
@@ -172,10 +173,10 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
   sesgoSistematico: {
     headline: 'Evaluación alta y metas bajas en la misma gerencia.',
     description:
-      'Gerencias con evaluador clasificado como indulgente y metas promedio bajo 40%. ' +
-      'Doble señal: quien evalúa no exige, y los resultados lo confirman. ' +
-      'Cuando toda una gerencia tiene evaluaciones altas y resultados bajos, la conversación es con el gerente.',
-    coachingTip: 'Presenta al gerente los datos de su equipo completo. No es una persona — es un patrón bajo su liderazgo.',
+      'Dos señales apuntan al mismo lugar. La evaluación de desempeño es alta en toda la gerencia — pero las metas están bajo el 40%. ' +
+      'O el líder no diferencia entre quienes rinden y quienes no. O las metas no se están usando como medida de exigencia. ' +
+      'En ambos casos, el problema no es de las personas — es de quién las evalúa. Un patrón así no cambia solo.',
+    coachingTip: 'No es una persona. Es un patrón completo bajo el mismo liderazgo. ¿Los datos del equipo respaldan la evaluación que su líder les dio?',
     teslaColor: '#DC2626', // red-600
   },
 }
