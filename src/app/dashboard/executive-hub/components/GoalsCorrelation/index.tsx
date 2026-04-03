@@ -1,21 +1,25 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// GOALS CORRELATION V2 — Insight #7 Executive Hub
+// GOALS CORRELATION V3 — Insight #7 Executive Hub
 // src/app/dashboard/executive-hub/components/GoalsCorrelation/index.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// CEO-first: Portada → Cascada → Anomalías → Scatter
-// 4 vistas, progressive disclosure, modales para drill-down
+// CEO-first: Portada → NavPill (3 tabs)
+//   Diagnóstico: Cascada + Anomalías (sub-nav interna)
+//   Localización: GerenciaHeatmap + Scatter
+//   Compensación: CompensationBoard + EvaluadorAccountability
 // ════════════════════════════════════════════════════════════════════════════
 
-import { memo, useState, useMemo } from 'react'
+import { memo, useState, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Crosshair } from 'lucide-react'
+import { ArrowLeft, Crosshair, Brain, MapPin, DollarSign } from 'lucide-react'
 
 import type { GoalsCorrelationPropsV2, SubFinding } from './GoalsCorrelation.types'
 import { getPortadaNarrativeV2, computeCoherenceIndex } from './GoalsCorrelation.utils'
 import { cn } from '@/lib/utils'
 import { PanelPortada } from '../PanelPortada'
+import { NavPill } from '../shared/NavPill'
+import type { NavPillTab } from '../shared/NavPill'
 import GoalsCascada from './GoalsCascada'
 import AnomalíasView from './AnomalíasView'
 import AnalisisTab from './tabs/AnalisisTab'
@@ -25,15 +29,34 @@ import CompensationBoard from './cascada/CompensationBoard'
 import EvaluadorAccountability from './cascada/EvaluadorAccountability'
 
 // ════════════════════════════════════════════════════════════════════════════
+// TABS CONFIG
+// ════════════════════════════════════════════════════════════════════════════
+
+const GOALS_TABS: NavPillTab[] = [
+  { key: 'diagnostico', icon: Brain, label: 'Diagnóstico' },
+  { key: 'localizacion', icon: MapPin, label: 'Localización' },
+  { key: 'compensacion', icon: DollarSign, label: 'Compensación' },
+]
+
+type View = 'portada' | 'diagnostico' | 'localizacion' | 'compensacion'
+type SubView = 'cascada' | 'anomalias'
+
+// ════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
 export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCorrelationPropsV2) {
-  const [view, setView] = useState<'portada' | 'cascada' | 'anomalias' | 'scatter' | 'heatmap' | 'compensacion' | 'evaluadores'>('portada')
+  const [view, setView] = useState<View>('portada')
+  const [subView, setSubView] = useState<SubView>('cascada')
   const [modalFinding, setModalFinding] = useState<SubFinding | null>(null)
 
   const narrative = useMemo(() => getPortadaNarrativeV2(data), [data])
   const coherence = useMemo(() => data ? computeCoherenceIndex(data) : null, [data])
+
+  const handleNavChange = useCallback((key: string) => {
+    setView(key as View)
+    setSubView('cascada') // reset sub-view when switching tabs
+  }, [])
 
   // Empty state
   if (!data || data.correlation.length === 0) {
@@ -52,6 +75,7 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
       <div className="fhr-top-line absolute inset-x-0 top-0 z-10" />
 
       <AnimatePresence mode="wait">
+        {/* ═══ PORTADA ═══ */}
         {view === 'portada' && (
           <motion.div
             key="portada"
@@ -69,7 +93,7 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
               }}
               ctaLabel={narrative.ctaLabel}
               ctaVariant={narrative.ctaVariant}
-              onCtaClick={() => setView('cascada')}
+              onCtaClick={() => setView('diagnostico')}
               coachingTip={narrative.coachingTip}
             />
 
@@ -87,7 +111,6 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
                   {coherence.score}% Coherencia
                 </span>
 
-                {/* Tooltip with component breakdown */}
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 px-3 py-2.5 rounded-lg bg-slate-950 border border-slate-800 shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 translate-y-1 group-hover:translate-y-0">
                   <p className="text-[10px] text-white font-medium mb-2">Índice de Coherencia</p>
                   <div className="space-y-1.5 text-[10px] text-slate-400">
@@ -117,131 +140,77 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
           </motion.div>
         )}
 
-        {view === 'cascada' && (
+        {/* ═══ CONTENT TABS ═══ */}
+        {view !== 'portada' && (
           <motion.div
-            key="cascada"
+            key={view}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="p-4 md:p-6"
           >
-            <button
-              onClick={() => setView('portada')}
-              className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs mb-6"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Portada
-            </button>
+            {/* Header: Back + NavPill */}
+            <div className="flex items-center justify-between mb-6">
+              <button
+                onClick={() => { setView('portada'); setSubView('cascada') }}
+                className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Portada
+              </button>
+              <NavPill
+                tabs={GOALS_TABS}
+                active={view}
+                onChange={handleNavChange}
+                layoutId="goals-nav"
+              />
+            </div>
 
-            <GoalsCascada
-              data={data}
-              onOpenScatter={() => setView('scatter')}
-              onOpenAnomalias={() => setView('anomalias')}
-            />
-          </motion.div>
-        )}
+            {/* ─── Tab: Diagnóstico ─── */}
+            {view === 'diagnostico' && (
+              <>
+                {subView === 'cascada' && (
+                  <GoalsCascada
+                    data={data}
+                    onOpenScatter={() => setView('localizacion')}
+                    onOpenAnomalias={() => setSubView('anomalias')}
+                  />
+                )}
+                {subView === 'anomalias' && (
+                  <AnomalíasView
+                    data={data}
+                    onBack={() => setSubView('cascada')}
+                    onOpenFinding={(f) => setModalFinding(f)}
+                  />
+                )}
+              </>
+            )}
 
-        {view === 'anomalias' && (
-          <motion.div
-            key="anomalias"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="p-4 md:p-6"
-          >
-            <AnomalíasView
-              data={data}
-              onBack={() => setView('cascada')}
-              onOpenFinding={(f) => setModalFinding(f)}
-            />
-          </motion.div>
-        )}
+            {/* ─── Tab: Localización ─── */}
+            {view === 'localizacion' && (
+              <div className="space-y-12">
+                <GerenciaHeatmap byGerencia={data.byGerencia} />
 
-        {view === 'scatter' && (
-          <motion.div
-            key="scatter"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="p-4 md:p-6"
-          >
-            <button
-              onClick={() => setView('cascada')}
-              className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs mb-6"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Diagnóstico
-            </button>
+                <div className="w-8 h-px bg-slate-800" />
 
-            <AnalisisTab
-              correlation={data.correlation}
-              quadrantCounts={data.quadrantCounts}
-            />
-          </motion.div>
-        )}
-        {view === 'heatmap' && (
-          <motion.div
-            key="heatmap"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="p-4 md:p-6"
-          >
-            <button
-              onClick={() => setView('cascada')}
-              className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs mb-6"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Diagnóstico
-            </button>
+                <AnalisisTab
+                  correlation={data.correlation}
+                  quadrantCounts={data.quadrantCounts}
+                />
+              </div>
+            )}
 
-            <GerenciaHeatmap byGerencia={data.byGerencia} />
-          </motion.div>
-        )}
+            {/* ─── Tab: Compensación ─── */}
+            {view === 'compensacion' && (
+              <div className="space-y-12">
+                <CompensationBoard correlation={data.correlation} />
 
-        {view === 'compensacion' && (
-          <motion.div
-            key="compensacion"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="p-4 md:p-6"
-          >
-            <button
-              onClick={() => setView('cascada')}
-              className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs mb-6"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Diagnóstico
-            </button>
+                <div className="w-8 h-px bg-slate-800" />
 
-            <CompensationBoard correlation={data.correlation} />
-          </motion.div>
-        )}
-
-        {view === 'evaluadores' && (
-          <motion.div
-            key="evaluadores"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="p-4 md:p-6"
-          >
-            <button
-              onClick={() => setView('cascada')}
-              className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs mb-6"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Diagnóstico
-            </button>
-
-            <EvaluadorAccountability byManager={data.byManager} />
+                <EvaluadorAccountability byManager={data.byManager} />
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
