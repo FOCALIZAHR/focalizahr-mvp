@@ -693,12 +693,6 @@ function ActSeparator({ label, color }: { label: string; color: 'amber' | 'purpl
     cyan: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
     red: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
   }
-  const lineColor = {
-    amber: 'via-amber-700/30',
-    purple: 'via-purple-700/30',
-    cyan: 'via-cyan-700/30',
-    red: 'via-red-700/30',
-  }
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -707,11 +701,11 @@ function ActSeparator({ label, color }: { label: string; color: 'amber' | 'purpl
       transition={{ duration: 0.3 }}
       className="flex items-center justify-center gap-4"
     >
-      <div className={cn('flex-1 h-px bg-gradient-to-r from-transparent to-transparent', lineColor[color])} />
+      <div className="flex-1 h-px bg-slate-800" />
       <span className={cn('px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest border rounded-full', colors[color])}>
         {label}
       </span>
-      <div className={cn('flex-1 h-px bg-gradient-to-r from-transparent to-transparent', lineColor[color])} />
+      <div className="flex-1 h-px bg-slate-800" />
     </motion.div>
   )
 }
