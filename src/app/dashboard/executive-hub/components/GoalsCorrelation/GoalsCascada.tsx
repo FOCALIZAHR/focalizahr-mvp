@@ -10,7 +10,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { memo, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowRight, BarChart3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -18,6 +18,7 @@ import type { GoalsCorrelationDataV2, SubFinding } from './GoalsCorrelation.type
 import { SUBFINDING_CARDS, SUBFINDING_TO_NARRATIVE } from './GoalsCorrelation.constants'
 import { formatCurrency } from './GoalsCorrelation.utils'
 import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
+import { getCompensacionNarrative } from '@/config/narratives/CompensacionNarrativeDictionary'
 import GoalsFindingModal from './GoalsFindingModal'
 import GoalsStarsModal from './GoalsStarsModal'
 
@@ -456,7 +457,13 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
 // FINDING BLOCK — Hallazgo narrativo completo
 // ════════════════════════════════════════════════════════════════════════════
 
-function FindingBlock({
+const COMP_QUADRANT_MAP: Record<string, string> = {
+  '1D_sostenibilidad': 'HIDDEN_PERFORMER',
+  '2B_bonosInjustificados': 'PERCEPTION_BIAS',
+  '2A_noPuedeVsNoQuiere': 'DOUBLE_RISK',
+}
+
+const FindingBlock = memo(function FindingBlock({
   finding,
   index,
   onViewPersons,
@@ -467,9 +474,14 @@ function FindingBlock({
   onViewPersons: () => void
   isOrgLevel?: boolean
 }) {
+  const [compExpanded, setCompExpanded] = useState(false)
+
   const cardConfig = SUBFINDING_CARDS[finding.key]
   const narrativeKey = SUBFINDING_TO_NARRATIVE[finding.key]
   const dictNarrative = narrativeKey ? getNarrative(narrativeKey) : null
+  const compEntry = COMP_QUADRANT_MAP[finding.key]
+    ? getCompensacionNarrative(COMP_QUADRANT_MAP[finding.key])
+    : null
 
   if (!cardConfig || !dictNarrative) return null
 
@@ -547,9 +559,58 @@ function FindingBlock({
       <SubtleLink onClick={onViewPersons}>
         Ver {isOrgLevel ? 'detalle' : `${finding.employees.length} persona${finding.employees.length !== 1 ? 's' : ''}`}
       </SubtleLink>
+
+      {/* Compensaciones expandible */}
+      {compEntry && (
+        <>
+          <div className="mt-2">
+            <button
+              onClick={() => setCompExpanded(!compExpanded)}
+              className="group inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+            >
+              Ver perspectiva de compensaciones
+              <ArrowRight className={cn(
+                'w-3 h-3 transition-transform',
+                compExpanded ? 'rotate-90' : 'group-hover:translate-x-0.5'
+              )} />
+            </button>
+          </div>
+
+          <AnimatePresence>
+            {compExpanded && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="border-t border-slate-800/30 pt-3 mt-2 space-y-3">
+                  <div>
+                    <p className="text-[9px] font-medium text-slate-500 uppercase tracking-widest mb-1.5">
+                      La Observación
+                    </p>
+                    <p className="text-[11px] font-light text-slate-400 leading-relaxed">
+                      {compEntry.observacion}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-medium text-slate-500 uppercase tracking-widest mb-1.5">
+                      La Decisión de Valor
+                    </p>
+                    <p className="text-[11px] font-light text-slate-300 leading-relaxed">
+                      {compEntry.decisionValor}
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
     </motion.div>
   )
-}
+})
 
 // ════════════════════════════════════════════════════════════════════════════
 // ACT SEPARATOR — Línea divisoria entre actos (cloned from PLTalent)
