@@ -173,7 +173,7 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
             {/* ─── Tab: Compensación ─── */}
             {view === 'compensacion' && (
               <div className="space-y-12">
-                <CompensationBoard correlation={data.correlation} />
+                <CompensationBoard correlation={data.correlation} byManager={data.byManager} />
 
                 <div className="w-8 h-px bg-slate-800" />
 
