@@ -13,7 +13,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Crosshair } from 'lucide-react'
 
 import type { GoalsCorrelationPropsV2, SubFinding } from './GoalsCorrelation.types'
-import { getPortadaNarrativeV2 } from './GoalsCorrelation.utils'
+import { getPortadaNarrativeV2, computeCoherenceIndex } from './GoalsCorrelation.utils'
+import { cn } from '@/lib/utils'
 import { PanelPortada } from '../PanelPortada'
 import GoalsCascada from './GoalsCascada'
 import AnomalíasView from './AnomalíasView'
@@ -29,6 +30,7 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
   const [modalFinding, setModalFinding] = useState<SubFinding | null>(null)
 
   const narrative = useMemo(() => getPortadaNarrativeV2(data), [data])
+  const coherence = useMemo(() => data ? computeCoherenceIndex(data) : null, [data])
 
   // Empty state
   if (!data || data.correlation.length === 0) {
@@ -67,6 +69,48 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
               onCtaClick={() => setView('cascada')}
               coachingTip={narrative.coachingTip}
             />
+
+            {/* Coherence Index — dot + score + tooltip */}
+            {coherence && (
+              <div className="group relative flex items-center justify-center gap-2 -mt-2">
+                <div className={cn(
+                  'w-2 h-2 rounded-full',
+                  coherence.level === 'high' && 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.6)]',
+                  coherence.level === 'medium' && 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.6)]',
+                  coherence.level === 'low' && 'bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.6)]',
+                  coherence.level === 'critical' && 'bg-red-400 shadow-[0_0_6px_rgba(239,68,68,0.6)]',
+                )} />
+                <span className="text-xs text-slate-400">
+                  {coherence.score}% Coherencia
+                </span>
+
+                {/* Tooltip with component breakdown */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 px-3 py-2.5 rounded-lg bg-slate-950 border border-slate-800 shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 translate-y-1 group-hover:translate-y-0">
+                  <p className="text-[10px] text-white font-medium mb-2">Índice de Coherencia</p>
+                  <div className="space-y-1.5 text-[10px] text-slate-400">
+                    <div className="flex justify-between">
+                      <span>Alineamiento metas × evaluación</span>
+                      <span className="font-mono text-slate-300">{coherence.components.alignment}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Correlación Pearson (promedio)</span>
+                      <span className="font-mono text-slate-300">{coherence.components.pearson}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Estrellas que cumplen metas</span>
+                      <span className="font-mono text-slate-300">{coherence.components.stars}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Gerencias con confianza verde</span>
+                      <span className="font-mono text-slate-300">{coherence.components.confidence}%</span>
+                    </div>
+                  </div>
+                  <p className="text-[9px] text-slate-600 mt-2 leading-relaxed">
+                    Sobre 75% es confiable para decisiones de compensación.
+                  </p>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
 

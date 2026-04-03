@@ -74,6 +74,73 @@ export function getPortadaNarrativeV2(data: GoalsCorrelationDataV2): PortadaNarr
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// COHERENCE INDEX — Índice de coherencia organizacional (0-100)
+// Combina: disconnection, Pearson, stars, confidence gerencias
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface CoherenceIndex {
+  score: number
+  level: 'high' | 'medium' | 'low' | 'critical'
+  components: {
+    alignment: number   // 100 - disconnection%
+    pearson: number     // avg Pearson normalized 0-100
+    stars: number       // % stars with high goals
+    confidence: number  // % gerencias with green confidence
+  }
+}
+
+export function computeCoherenceIndex(data: GoalsCorrelationDataV2): CoherenceIndex {
+  const { quadrantCounts, totals, byGerencia, stars } = data
+
+  // Component 1: Alignment (inverse of disconnection)
+  const totalRiesgo = quadrantCounts.perceptionBias + quadrantCounts.hiddenPerformer
+  const disconnectionPct = totals.totalEvaluados > 0
+    ? (totalRiesgo / totals.totalEvaluados) * 100
+    : 0
+  const alignment = Math.max(0, 100 - disconnectionPct)
+
+  // Component 2: Pearson average (normalized 0-100)
+  const pearsons = byGerencia
+    .map(g => g.pearsonRoleFitGoals)
+    .filter((p): p is number => p !== null)
+  const pearson = pearsons.length > 0
+    ? Math.max(0, Math.min(100, (pearsons.reduce((a, b) => a + b, 0) / pearsons.length) * 100))
+    : 50 // neutral if no data
+
+  // Component 3: Stars with high goals
+  const starsScore = stars.total > 0 ? stars.percentage : 50
+
+  // Component 4: Green confidence gerencias
+  const confidence = byGerencia.length > 0
+    ? (byGerencia.filter(g => g.confidenceLevel === 'green').length / byGerencia.length) * 100
+    : 50
+
+  // Weighted score
+  const score = Math.round(
+    alignment * 0.30 +
+    pearson * 0.25 +
+    starsScore * 0.25 +
+    confidence * 0.20
+  )
+
+  const level: CoherenceIndex['level'] =
+    score >= 75 ? 'high' :
+    score >= 50 ? 'medium' :
+    score >= 30 ? 'low' : 'critical'
+
+  return {
+    score,
+    level,
+    components: {
+      alignment: Math.round(alignment),
+      pearson: Math.round(pearson),
+      stars: Math.round(starsScore),
+      confidence: Math.round(confidence),
+    },
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // FORMAT CURRENCY (reutiliza patrón PLTalent)
 // ════════════════════════════════════════════════════════════════════════════
 
