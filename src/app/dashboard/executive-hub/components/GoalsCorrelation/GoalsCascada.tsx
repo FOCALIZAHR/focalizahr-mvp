@@ -229,9 +229,10 @@ export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias
                 ))}
               </div>
 
-              {/* CTA a vista completa de anomalías */}
+              {/* CTA a vista completa de anomalías — separado con divider */}
               {allFindings.length > 2 && (
-                <motion.div {...fadeIn} className="max-w-2xl mx-auto mt-12">
+                <motion.div {...fadeIn} className="max-w-2xl mx-auto mt-16">
+                  <div className="w-8 h-px bg-slate-800 mb-6" />
                   <SubtleLink onClick={onOpenAnomalias}>
                     Ver los {allFindings.length} hallazgo{allFindings.length !== 1 ? 's' : ''} detectado{allFindings.length !== 1 ? 's' : ''}
                   </SubtleLink>
@@ -660,19 +661,23 @@ const FindingBlock = memo(function FindingBlock({
         </p>
       </div>
 
-      {/* Drill-down link */}
-      <SubtleLink onClick={onViewPersons}>
-        Ver {isOrgLevel ? 'detalle' : `${finding.employees.length} persona${finding.employees.length !== 1 ? 's' : ''}`}
-      </SubtleLink>
+      {/* Links — primario cyan, secundario discreto */}
+      <div className="space-y-1.5">
+        <SubtleLink onClick={onViewPersons}>
+          Ver {isOrgLevel ? 'detalle' : `${finding.employees.length} persona${finding.employees.length !== 1 ? 's' : ''}`}
+        </SubtleLink>
 
-      {/* Compensaciones — abre modal */}
-      {onViewCompensacion && (
-        <div className="mt-2">
-          <SubtleLink onClick={onViewCompensacion}>
-            Ver perspectiva de compensaciones
-          </SubtleLink>
-        </div>
-      )}
+        {onViewCompensacion && (
+          <div>
+            <button
+              onClick={onViewCompensacion}
+              className="text-xs text-slate-500 hover:text-slate-400 transition-colors"
+            >
+              Perspectiva de compensaciones
+            </button>
+          </div>
+        )}
+      </div>
     </motion.div>
   )
 })
