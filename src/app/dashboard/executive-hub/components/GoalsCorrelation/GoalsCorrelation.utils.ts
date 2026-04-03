@@ -30,7 +30,7 @@ export function getPortadaNarrativeV2(data: GoalsCorrelationDataV2): PortadaNarr
     const riskLabel = formatCurrency(totals.totalFinancialRisk)
     return {
       statusBadge: { label: 'Requiere revisión' },
-      prefix: `De ${totals.totalEvaluados} evaluados, ${totals.totalEntregaron} entregaron y ${totals.totalNoEntregaron} no. `,
+      prefix: `De ${totals.totalEvaluados} evaluados, ${totals.totalEntregaron} cumplieron metas y ${totals.totalNoEntregaron} no. `,
       highlight: `${riskLabel} en riesgo.`,
       suffix: ` ${totals.totalAnomalias} anomalías estructurales detectadas.`,
       ctaLabel: 'Ver análisis',
@@ -43,7 +43,7 @@ export function getPortadaNarrativeV2(data: GoalsCorrelationDataV2): PortadaNarr
   if (totals.totalAnomalias > 0) {
     return {
       statusBadge: { label: 'Checkpoint' },
-      prefix: `De ${totals.totalEvaluados} evaluados, ${totals.totalEntregaron} entregaron y ${totals.totalNoEntregaron} no. `,
+      prefix: `De ${totals.totalEvaluados} evaluados, ${totals.totalEntregaron} cumplieron metas y ${totals.totalNoEntregaron} no. `,
       highlight: `${totals.totalAnomalias} anomalías detectadas.`,
       suffix: ' Desconexiones entre resultados y cómo la organización los trata.',
       ctaLabel: 'Ver análisis',
@@ -56,7 +56,7 @@ export function getPortadaNarrativeV2(data: GoalsCorrelationDataV2): PortadaNarr
   return {
     statusBadge: { label: 'Alineado', showCheck: true },
     prefix: `De ${totals.totalEvaluados} evaluados, `,
-    highlight: `${totals.totalEntregaron} entregaron resultados.`,
+    highlight: `${totals.totalEntregaron} cumplieron metas.`,
     suffix: ' La organización está respondiendo de forma coherente.',
     ctaLabel: 'Ver detalle',
     ctaVariant: 'cyan',

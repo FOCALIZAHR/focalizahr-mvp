@@ -118,14 +118,14 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
               <p className="text-6xl md:text-7xl font-extralight text-cyan-400 tracking-tight">
                 {totals.totalEntregaron}
               </p>
-              <p className="text-xs text-slate-500 mt-2 uppercase tracking-wider">entregaron</p>
+              <p className="text-xs text-slate-500 mt-2 uppercase tracking-wider">cumplieron metas</p>
             </div>
             <div className="w-px h-16 bg-slate-800" />
             <div className="text-center">
               <p className="text-6xl md:text-7xl font-extralight text-amber-400 tracking-tight">
                 {totals.totalNoEntregaron}
               </p>
-              <p className="text-xs text-slate-500 mt-2 uppercase tracking-wider">no entregaron</p>
+              <p className="text-xs text-slate-500 mt-2 uppercase tracking-wider">no cumplieron metas</p>
             </div>
           </motion.div>
 
@@ -133,7 +133,7 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
           <motion.div {...fadeIn} className="max-w-2xl mx-auto">
             <p className="text-xl font-light text-slate-300 text-center leading-relaxed">
               De <span className="font-medium text-slate-200">{totals.totalEvaluados}</span> personas evaluadas,{' '}
-              <span className="font-medium text-cyan-400">{totals.totalEntregaron}</span> entregaron resultados sobre el 80%
+              <span className="font-medium text-cyan-400">{totals.totalEntregaron}</span> cumplieron metas sobre el 80%
               {' '}y <span className="font-medium text-amber-400">{totals.totalNoEntregaron}</span> quedaron bajo el 40%.
             </p>
 

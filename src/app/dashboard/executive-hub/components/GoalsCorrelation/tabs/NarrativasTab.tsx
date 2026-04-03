@@ -4,7 +4,7 @@
 // GOALS CORRELATION — Segment Tab (V2)
 // src/app/dashboard/executive-hub/components/GoalsCorrelation/tabs/NarrativasTab.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// Renders sub-findings for a single segment (Entregaron / No Entregaron)
+// Renders sub-findings for a single segment (Cumplieron / No Cumplieron)
 // Reusable: receives GoalsSegment, renders each SubFinding as expandable card
 // Badge pair = the visual anomaly (two classifications that shouldn't be together)
 // ════════════════════════════════════════════════════════════════════════════
@@ -76,11 +76,11 @@ export default memo(function SegmentTab({ segment }: SegmentTabProps) {
   if (segment.subFindings.length === 0) {
     const healthyMessages: Record<string, { title: string; detail: string }> = {
       '1_ENTREGARON': {
-        title: 'Quienes entregaron están correctamente gestionados.',
+        title: 'Quienes cumplieron metas están correctamente gestionados.',
         detail: `${segment.totalEmployees} personas cumplieron metas sobre 80%. No se detectaron brechas de reconocimiento, riesgo de fuga ni sostenibilidad comprometida.`,
       },
       '2_NO_ENTREGARON': {
-        title: 'Sin anomalías en quienes no entregaron.',
+        title: 'Sin anomalías en quienes no cumplieron metas.',
         detail: `${segment.totalEmployees} personas con metas bajo 40%. No se detectaron evaluaciones infladas, evaluadores indulgentes ni brechas de competencia significativas.`,
       },
       '3_ORGANIZACIONAL': {

@@ -124,8 +124,8 @@ export const SUBFINDING_TO_NARRATIVE: Record<string, string> = {
 // ════════════════════════════════════════════════════════════════════════════
 
 export const TABS_V2: { key: TabKeyV2; label: string; icon?: string }[] = [
-  { key: 'entregaron', label: 'Entregaron' },
-  { key: 'no_entregaron', label: 'No Entregaron' },
+  { key: 'entregaron', label: 'Cumplieron' },
+  { key: 'no_entregaron', label: 'No Cumplieron' },
   { key: 'organizacional', label: 'Organizacional' },
   { key: 'analisis', label: 'Análisis' },
 ]

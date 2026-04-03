@@ -726,14 +726,14 @@ export class GoalsDiagnosticService {
     return [
       {
         id: '1_ENTREGARON',
-        label: 'Entregaron Resultados',
+        label: 'Cumplieron Metas',
         threshold: `Metas > ${T.HIGH_GOALS}%`,
         subFindings: subFindings.filter(f => f.segmentId === '1_ENTREGARON'),
         totalEmployees: entregaron.length,
       },
       {
         id: '2_NO_ENTREGARON',
-        label: 'No Entregaron',
+        label: 'No Cumplieron Metas',
         threshold: `Metas < ${T.LOW_GOALS}%`,
         subFindings: subFindings.filter(f => f.segmentId === '2_NO_ENTREGARON'),
         totalEmployees: noEntregaron.length,
