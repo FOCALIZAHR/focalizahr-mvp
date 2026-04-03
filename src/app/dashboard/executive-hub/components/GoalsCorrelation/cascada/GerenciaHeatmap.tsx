@@ -4,55 +4,39 @@
 // GERENCIA HEATMAP — Tabla de confianza por gerencia
 // src/app/dashboard/executive-hub/components/GoalsCorrelation/cascada/GerenciaHeatmap.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// Patrón clonado de CalibrationHealth/GerenciaHealthTab.tsx
-// Tesla line por fila + dots de confianza + responsive
+// Patrón: Executive Dashboard (split narrativa + datos)
+// Tesla line dinámica por fila, glassmorphism, fhr-* classes
 // ════════════════════════════════════════════════════════════════════════════
 
 import { memo } from 'react'
+import { motion } from 'framer-motion'
 import { AlertTriangle, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { GerenciaGoalsStatsV2 } from '@/lib/services/GoalsDiagnosticService'
 
 // ════════════════════════════════════════════════════════════════════════════
-// HELPERS
+// TESLA LINE COLORS (per confidence level)
 // ════════════════════════════════════════════════════════════════════════════
 
-const CONFIDENCE_STYLES = {
+const CONFIDENCE = {
   green: {
     dot: 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.6)]',
-    tesla: 'bg-emerald-500',
+    tesla: '#10B981',
     label: 'Confiable',
+    labelClass: 'text-emerald-400',
   },
   amber: {
     dot: 'bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.6)]',
-    tesla: 'bg-amber-500',
+    tesla: '#F59E0B',
     label: 'Revisar',
+    labelClass: 'text-amber-400',
   },
   red: {
     dot: 'bg-red-400 shadow-[0_0_6px_rgba(239,68,68,0.6)]',
-    tesla: 'bg-red-500',
+    tesla: '#EF4444',
     label: 'Crítico',
+    labelClass: 'text-red-400',
   },
-}
-
-const EVALUATOR_BADGE: Record<string, { text: string; color: string }> = {
-  INDULGENTE: { text: 'Indulgente', color: 'text-red-400 bg-red-500/10 border-red-500/20' },
-  SEVERA: { text: 'Severa', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
-  CENTRAL: { text: 'Central', color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20' },
-  OPTIMA: { text: 'Óptima', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
-}
-
-function pearsonColor(p: number | null): string {
-  if (p === null) return 'text-slate-600'
-  if (p >= 0.5) return 'text-cyan-400'
-  if (p >= 0.3) return 'text-slate-400'
-  return 'text-amber-400'
-}
-
-function disconnectionColor(rate: number): string {
-  if (rate >= 25) return 'text-red-400'
-  if (rate >= 15) return 'text-amber-400'
-  return 'text-slate-400'
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -66,14 +50,13 @@ interface GerenciaHeatmapProps {
 export default memo(function GerenciaHeatmap({ byGerencia }: GerenciaHeatmapProps) {
   if (byGerencia.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-slate-500">
-        <Info className="w-8 h-8 mb-3 opacity-40" />
-        <p className="text-sm font-light">Sin datos de gerencias disponibles.</p>
+      <div className="fhr-card p-8 text-center">
+        <Info className="w-8 h-8 mx-auto mb-3 text-slate-600" />
+        <p className="text-sm font-light text-slate-400">Sin datos de gerencias disponibles.</p>
       </div>
     )
   }
 
-  // Sort: red first, then amber, then green; within same level, by disconnectionRate desc
   const sorted = [...byGerencia].sort((a, b) => {
     const order = { red: 0, amber: 1, green: 2 }
     const diff = order[a.confidenceLevel] - order[b.confidenceLevel]
@@ -81,147 +64,141 @@ export default memo(function GerenciaHeatmap({ byGerencia }: GerenciaHeatmapProp
     return b.disconnectionRate - a.disconnectionRate
   })
 
+  const redCount = sorted.filter(g => g.confidenceLevel === 'red').length
+
   return (
-    <div className="space-y-4">
-      {/* Header */}
+    <div className="space-y-5">
+      {/* Header — narrativa primero */}
       <div>
-        <h3 className="text-lg font-extralight text-white tracking-tight">
+        <h3 className="text-xl font-extralight text-white tracking-tight">
           Confianza{' '}
-          <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-            por gerencia
-          </span>
+          <span className="fhr-title-gradient">por gerencia</span>
         </h3>
-        <p className="text-xs font-light text-slate-500 mt-1">
-          {sorted.length} gerencia{sorted.length !== 1 ? 's' : ''} evaluada{sorted.length !== 1 ? 's' : ''}
+        <p className="text-sm font-light text-slate-500 mt-1.5">
+          {redCount > 0 ? (
+            <>
+              <span className="text-amber-400">{redCount}</span> de {sorted.length} gerencia{sorted.length !== 1 ? 's' : ''} requiere{redCount === 1 ? '' : 'n'} intervención.
+              La evaluación no coincide con los resultados.
+            </>
+          ) : (
+            <>{sorted.length} gerencia{sorted.length !== 1 ? 's' : ''} evaluada{sorted.length !== 1 ? 's' : ''}. Base confiable para compensar.</>
+          )}
         </p>
       </div>
 
-      {/* Table */}
-      <div className="rounded-xl overflow-hidden border border-slate-800/60" style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
-        <table className="w-full border-collapse table-fixed">
-          <thead>
-            <tr style={{ borderBottom: '1px solid rgba(51, 65, 85, 0.5)' }}>
-              <TH align="left" className="w-[55%] md:w-[28%]" style={{ paddingLeft: '20px' }}>Gerencia</TH>
-              <TH className="hidden md:table-cell md:w-[12%]">Cobertura</TH>
-              <TH className="hidden md:table-cell md:w-[14%]">Desconexión</TH>
-              <TH className="hidden md:table-cell md:w-[14%]">Evaluador</TH>
-              <TH className="hidden md:table-cell md:w-[12%]">Pearson</TH>
-              <TH className="w-[30%] md:w-[12%]">Confianza</TH>
-              <th className="py-3 w-[15%] md:w-[8%]" />
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((g, idx) => {
-              const conf = CONFIDENCE_STYLES[g.confidenceLevel]
-              const evalBadge = g.evaluatorClassification ? EVALUATOR_BADGE[g.evaluatorClassification] : null
-              const hasAlert = g.confidenceLevel === 'red' || g.disconnectionRate >= 25
-              const isLast = idx === sorted.length - 1
+      {/* Cards — una por gerencia (mobile-first, no tabla) */}
+      <div className="space-y-2">
+        {sorted.map((g, idx) => {
+          const conf = CONFIDENCE[g.confidenceLevel]
 
-              return (
-                <tr
-                  key={g.gerenciaName}
-                  className="group transition-colors duration-150 hover:bg-slate-700/15"
-                  style={{ borderBottom: isLast ? 'none' : '1px solid rgba(51, 65, 85, 0.3)' }}
-                >
-                  {/* Gerencia + Tesla line */}
-                  <td className="py-3.5" style={{ paddingLeft: 0 }}>
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={cn('flex-shrink-0 self-stretch w-0.5 rounded-full', conf.tesla)}
-                        style={{ minHeight: '42px', marginLeft: '6px', opacity: 0.85 }}
-                      />
-                      <div className="min-w-0">
-                        <span className="text-sm font-medium text-slate-200 truncate block">
-                          {g.gerenciaName}
-                        </span>
-                        <span className="text-[10px] text-slate-600 md:hidden">
-                          {Math.round(g.coverage)}% cob · {Math.round(g.disconnectionRate)}% desc
-                        </span>
-                      </div>
-                    </div>
-                  </td>
+          return (
+            <motion.div
+              key={g.gerenciaName}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.04, duration: 0.25 }}
+              className="fhr-card relative overflow-hidden p-0"
+            >
+              {/* Tesla line — color by confidence */}
+              <div
+                className="absolute top-0 left-0 right-0 h-[2px]"
+                style={{
+                  background: `linear-gradient(90deg, transparent, ${conf.tesla}, transparent)`,
+                  boxShadow: `0 0 12px ${conf.tesla}40`,
+                }}
+              />
 
-                  {/* Cobertura */}
-                  <td className="hidden md:table-cell px-3 py-3.5 text-center">
-                    <span className={cn(
-                      'text-sm font-mono',
-                      g.coverage >= 70 ? 'text-slate-400' : 'text-amber-400'
-                    )}>
-                      {Math.round(g.coverage)}%
+              <div className="flex items-center gap-4 px-4 py-3.5">
+                {/* Confidence dot + name */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2.5">
+                    <div className={cn('w-2 h-2 rounded-full flex-shrink-0', conf.dot)} />
+                    <span className="text-sm font-medium text-slate-200 truncate">
+                      {g.gerenciaName}
                     </span>
-                  </td>
-
-                  {/* Desconexión */}
-                  <td className="hidden md:table-cell px-3 py-3.5 text-center">
-                    <span className={cn('text-sm font-mono', disconnectionColor(g.disconnectionRate))}>
-                      {Math.round(g.disconnectionRate)}%
+                  </div>
+                  {/* Mobile: inline metrics */}
+                  <div className="flex items-center gap-3 mt-1.5 md:hidden">
+                    <span className="text-[10px] text-slate-500">
+                      Cob <span className={cn('font-mono', g.coverage >= 70 ? 'text-slate-400' : 'text-amber-400')}>{Math.round(g.coverage)}%</span>
                     </span>
-                  </td>
-
-                  {/* Evaluador */}
-                  <td className="hidden md:table-cell px-3 py-3.5 text-center">
-                    {evalBadge ? (
-                      <span className={cn(
-                        'text-[9px] px-2 py-0.5 rounded-full border font-semibold uppercase',
-                        evalBadge.color
+                    <span className="text-[10px] text-slate-500">
+                      Desc <span className={cn('font-mono', g.disconnectionRate >= 25 ? 'text-red-400' : g.disconnectionRate >= 15 ? 'text-amber-400' : 'text-slate-400')}>{Math.round(g.disconnectionRate)}%</span>
+                    </span>
+                    {g.evaluatorClassification && (
+                      <span className={cn('fhr-badge text-[8px]',
+                        g.evaluatorClassification === 'INDULGENTE' ? 'fhr-badge-error' :
+                        g.evaluatorClassification === 'SEVERA' ? 'fhr-badge-warning' :
+                        g.evaluatorClassification === 'OPTIMA' ? 'fhr-badge-success' : 'fhr-badge-active'
                       )}>
-                        {evalBadge.text}
+                        {g.evaluatorClassification === 'OPTIMA' ? 'Óptima' : g.evaluatorClassification === 'INDULGENTE' ? 'Indul.' : g.evaluatorClassification === 'SEVERA' ? 'Severa' : 'Central'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Desktop metrics */}
+                <div className="hidden md:flex items-center gap-5 flex-shrink-0">
+                  <div className="text-center w-16">
+                    <p className="text-[9px] text-slate-600 uppercase tracking-wider">Cobertura</p>
+                    <p className={cn('text-sm font-mono', g.coverage >= 70 ? 'text-slate-400' : 'text-amber-400')}>
+                      {Math.round(g.coverage)}%
+                    </p>
+                  </div>
+                  <div className="text-center w-16">
+                    <p className="text-[9px] text-slate-600 uppercase tracking-wider">Desconexión</p>
+                    <p className={cn('text-sm font-mono',
+                      g.disconnectionRate >= 25 ? 'text-red-400' :
+                      g.disconnectionRate >= 15 ? 'text-amber-400' : 'text-slate-400'
+                    )}>
+                      {Math.round(g.disconnectionRate)}%
+                    </p>
+                  </div>
+                  <div className="text-center w-16">
+                    <p className="text-[9px] text-slate-600 uppercase tracking-wider">Pearson</p>
+                    <p className={cn('text-sm font-mono',
+                      g.pearsonRoleFitGoals === null ? 'text-slate-700' :
+                      g.pearsonRoleFitGoals >= 0.5 ? 'text-cyan-400' :
+                      g.pearsonRoleFitGoals >= 0.3 ? 'text-slate-400' : 'text-amber-400'
+                    )}>
+                      {g.pearsonRoleFitGoals !== null ? g.pearsonRoleFitGoals.toFixed(2) : '—'}
+                    </p>
+                  </div>
+                  <div className="text-center w-20">
+                    <p className="text-[9px] text-slate-600 uppercase tracking-wider">Evaluador</p>
+                    {g.evaluatorClassification ? (
+                      <span className={cn('fhr-badge text-[8px] mt-0.5 inline-block',
+                        g.evaluatorClassification === 'INDULGENTE' ? 'fhr-badge-error' :
+                        g.evaluatorClassification === 'SEVERA' ? 'fhr-badge-warning' :
+                        g.evaluatorClassification === 'OPTIMA' ? 'fhr-badge-success' : 'fhr-badge-active'
+                      )}>
+                        {g.evaluatorClassification === 'OPTIMA' ? 'Óptima' : g.evaluatorClassification === 'INDULGENTE' ? 'Indulgente' : g.evaluatorClassification === 'SEVERA' ? 'Severa' : 'Central'}
                       </span>
                     ) : (
-                      <span className="text-[10px] text-slate-700">—</span>
+                      <p className="text-[10px] text-slate-700">—</p>
                     )}
-                  </td>
+                  </div>
+                </div>
 
-                  {/* Pearson */}
-                  <td className="hidden md:table-cell px-3 py-3.5 text-center">
-                    <span className={cn('text-sm font-mono', pearsonColor(g.pearsonRoleFitGoals))}>
-                      {g.pearsonRoleFitGoals !== null ? g.pearsonRoleFitGoals.toFixed(2) : '—'}
-                    </span>
-                  </td>
-
-                  {/* Confianza */}
-                  <td className="px-3 py-3.5">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className={cn('w-2 h-2 rounded-full flex-shrink-0', conf.dot)} />
-                      <span className="text-[10px] text-slate-500 hidden sm:inline">{conf.label}</span>
-                    </div>
-                  </td>
-
-                  {/* Alert */}
-                  <td className="px-2 py-3.5 text-center">
-                    {hasAlert && <AlertTriangle className="w-4 h-4 inline-block text-amber-500 opacity-85" />}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                {/* Confidence label + alert */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={cn('text-[10px] font-medium hidden sm:inline', conf.labelClass)}>
+                    {conf.label}
+                  </span>
+                  {(g.confidenceLevel === 'red' || g.disconnectionRate >= 25) && (
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )
+        })}
       </div>
 
       {/* Footer */}
-      <p className="px-1 text-[10px] text-slate-700">
-        Pearson mide correlación competencias × metas. Sobre 0.5 = las competencias predicen resultados.
+      <p className="text-[10px] font-light text-slate-600 px-1">
+        Pearson mide correlación competencias × metas. Sobre 0.5 las competencias predicen resultados.
       </p>
     </div>
   )
 })
-
-// ════════════════════════════════════════════════════════════════════════════
-// TH HELPER — Styled header cell
-// ════════════════════════════════════════════════════════════════════════════
-
-function TH({ children, align, className, style }: {
-  children?: React.ReactNode; align?: string; className?: string; style?: React.CSSProperties
-}) {
-  return (
-    <th
-      className={cn(
-        'px-3 py-3 text-[10px] font-semibold tracking-widest uppercase',
-        className
-      )}
-      style={{ color: '#475569', textAlign: (align as 'left' | 'center' | 'right') || 'center', ...style }}
-    >
-      {children}
-    </th>
-  )
-}

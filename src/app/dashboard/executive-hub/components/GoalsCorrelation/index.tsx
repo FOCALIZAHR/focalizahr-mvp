@@ -111,7 +111,7 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
                   {coherence.score}% Coherencia
                 </span>
 
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 px-3 py-2.5 rounded-lg bg-slate-950 border border-slate-800 shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 translate-y-1 group-hover:translate-y-0">
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 px-3 py-2.5 rounded-xl bg-slate-950/95 backdrop-blur-xl border border-slate-700/30 shadow-2xl shadow-black/30 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 translate-y-1 group-hover:translate-y-0">
                   <p className="text-[10px] text-white font-medium mb-2">Índice de Coherencia</p>
                   <div className="space-y-1.5 text-[10px] text-slate-400">
                     <div className="flex justify-between">

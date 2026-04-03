@@ -6,21 +6,28 @@
 // ════════════════════════════════════════════════════════════════════════════
 // "Según evaluación 360°" vs "Según resultados reales"
 // Highlight: PERCEPTION_BIAS = recibiría bono pero no entregó resultados
-// Patrón clonado de SemaforoLegalTab.tsx (card structure + stagger)
+// Design: fhr-card + fhr-badge + NavPill mobile + Tesla lines
 // ════════════════════════════════════════════════════════════════════════════
 
 import { memo, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { AlertTriangle, ArrowUpDown } from 'lucide-react'
+import { AlertTriangle, ArrowUpDown, BarChart3, Target } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import type { CorrelationPoint } from '../GoalsCorrelation.types'
+import { NavPill } from '../../shared/NavPill'
+import type { NavPillTab } from '../../shared/NavPill'
 
 // ════════════════════════════════════════════════════════════════════════════
-// HELPERS
+// CONFIG
 // ════════════════════════════════════════════════════════════════════════════
 
 const MAX_SHOWN = 15
+
+const MOBILE_TABS: NavPillTab[] = [
+  { key: '360', icon: BarChart3, label: 'Evaluación 360°' },
+  { key: 'goals', icon: Target, label: 'Resultados' },
+]
 
 function scoreColor(score360: number): string {
   if (score360 >= 4.0) return 'text-cyan-400'
@@ -43,7 +50,7 @@ interface CompensationBoardProps {
 }
 
 export default memo(function CompensationBoard({ correlation }: CompensationBoardProps) {
-  const [mobileView, setMobileView] = useState<'360' | 'goals'>('360')
+  const [mobileView, setMobileView] = useState('360')
 
   const { withGoals, by360, byGoals, biasCount } = useMemo(() => {
     const wg = correlation.filter(c => c.quadrant !== 'NO_GOALS' && c.goalsPercent !== null)
@@ -55,96 +62,118 @@ export default memo(function CompensationBoard({ correlation }: CompensationBoar
 
   if (withGoals.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-        <p className="text-sm font-light">Sin datos suficientes para comparar.</p>
+      <div className="fhr-card p-8 text-center">
+        <p className="text-sm font-light text-slate-400">Sin datos suficientes para comparar.</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
+    <div className="space-y-5">
+      {/* Header — narrativa ejecutiva */}
       <div>
-        <h3 className="text-lg font-extralight text-white tracking-tight">
+        <h3 className="text-xl font-extralight text-white tracking-tight">
           Checkpoint{' '}
-          <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-            pre-compensación
-          </span>
+          <span className="fhr-title-gradient">pre-compensación</span>
         </h3>
-        {biasCount > 0 && (
-          <p className="text-sm font-light text-amber-400/80 mt-1.5 flex items-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-            {biasCount} persona{biasCount !== 1 ? 's' : ''} recibiría{biasCount !== 1 ? 'n' : ''} bono alto pero no entregó resultados
+        {biasCount > 0 ? (
+          <p className="text-sm font-light text-slate-400 mt-1.5">
+            <span className="text-amber-400 font-medium">{biasCount} persona{biasCount !== 1 ? 's' : ''}</span> recibiría{biasCount !== 1 ? 'n' : ''} bono alto según su evaluación 360° pero no entregó resultados que lo respalden.
           </p>
-        )}
-        {biasCount === 0 && (
-          <p className="text-xs font-light text-slate-500 mt-1">
+        ) : (
+          <p className="text-sm font-light text-slate-500 mt-1.5">
             Evaluación y resultados coinciden. Base confiable para compensar.
           </p>
         )}
       </div>
 
-      {/* Mobile toggle */}
-      <div className="flex md:hidden gap-0.5 bg-slate-900/50 border border-slate-700/30 rounded-full p-[3px]">
-        {(['360', 'goals'] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setMobileView(tab)}
-            className={cn(
-              'flex-1 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-[0.1em] transition-colors',
-              mobileView === tab ? 'bg-slate-700/50 text-white' : 'text-slate-500'
-            )}
-          >
-            {tab === '360' ? 'Evaluación 360°' : 'Resultados'}
-          </button>
-        ))}
+      {/* Mobile: NavPill toggle */}
+      <div className="flex justify-center md:hidden">
+        <NavPill
+          tabs={MOBILE_TABS}
+          active={mobileView}
+          onChange={setMobileView}
+          layoutId="comp-board-nav"
+        />
       </div>
 
-      {/* Dual columns (desktop) / single column (mobile) */}
+      {/* Dual columns */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Column 1: By 360° */}
-        <div className={cn('space-y-1', mobileView !== '360' && 'hidden md:block')}>
-          <div className="flex items-center gap-2 mb-3">
-            <ArrowUpDown className="w-3.5 h-3.5 text-slate-600" />
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
-              Según evaluación 360°
-            </span>
-          </div>
-          {by360.map((p, idx) => (
-            <PersonRow
-              key={p.employeeId}
-              point={p}
-              rank={idx + 1}
-              metric="360"
-              index={idx}
-            />
-          ))}
+        <div className={cn(mobileView !== '360' && 'hidden md:block')}>
+          <ColumnCard
+            icon={<BarChart3 className="w-3.5 h-3.5 text-cyan-400" />}
+            title="Según evaluación 360°"
+            subtitle="Quiénes recibirían mayor bono"
+            teslaColor="#22D3EE"
+            items={by360}
+            metric="360"
+          />
         </div>
 
         {/* Column 2: By Goals */}
-        <div className={cn('space-y-1', mobileView !== 'goals' && 'hidden md:block')}>
-          <div className="flex items-center gap-2 mb-3">
-            <ArrowUpDown className="w-3.5 h-3.5 text-slate-600" />
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
-              Según resultados reales
-            </span>
-          </div>
-          {byGoals.map((p, idx) => (
-            <PersonRow
-              key={p.employeeId}
-              point={p}
-              rank={idx + 1}
-              metric="goals"
-              index={idx}
-            />
-          ))}
+        <div className={cn(mobileView !== 'goals' && 'hidden md:block')}>
+          <ColumnCard
+            icon={<Target className="w-3.5 h-3.5 text-purple-400" />}
+            title="Según resultados reales"
+            subtitle="Quiénes entregaron más"
+            teslaColor="#A78BFA"
+            items={byGoals}
+            metric="goals"
+          />
         </div>
       </div>
+    </div>
+  )
+})
 
-      {/* Footer */}
-      <p className="text-[10px] text-slate-700 px-1">
-        Top {MAX_SHOWN} por cada criterio. Filas amber = evaluación alta pero resultados bajos.
-      </p>
+// ════════════════════════════════════════════════════════════════════════════
+// COLUMN CARD — fhr-card + Tesla line + ranked list
+// ════════════════════════════════════════════════════════════════════════════
+
+const ColumnCard = memo(function ColumnCard({
+  icon,
+  title,
+  subtitle,
+  teslaColor,
+  items,
+  metric,
+}: {
+  icon: React.ReactNode
+  title: string
+  subtitle: string
+  teslaColor: string
+  items: CorrelationPoint[]
+  metric: '360' | 'goals'
+}) {
+  return (
+    <div className="fhr-card relative overflow-hidden p-0">
+      {/* Tesla line */}
+      <div
+        className="absolute top-0 left-0 right-0 h-[2px]"
+        style={{
+          background: `linear-gradient(90deg, transparent, ${teslaColor}, transparent)`,
+          boxShadow: `0 0 15px ${teslaColor}40`,
+        }}
+      />
+
+      {/* Header */}
+      <div className="px-4 pt-5 pb-3">
+        <div className="flex items-center gap-2 mb-0.5">
+          {icon}
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+            {title}
+          </span>
+        </div>
+        <p className="text-[10px] font-light text-slate-600">{subtitle}</p>
+      </div>
+
+      {/* List */}
+      <div className="px-3 pb-4 space-y-0.5">
+        {items.map((p, idx) => (
+          <PersonRow key={p.employeeId} point={p} rank={idx + 1} metric={metric} index={idx} />
+        ))}
+      </div>
     </div>
   )
 })
@@ -172,9 +201,9 @@ const PersonRow = memo(function PersonRow({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.03, duration: 0.2 }}
       className={cn(
-        'flex items-center gap-3 py-2 px-3 rounded-lg transition-colors',
+        'flex items-center gap-3 py-2 px-2 rounded-lg transition-all duration-200',
         isBias
-          ? 'bg-amber-500/5 border border-amber-500/15'
+          ? 'bg-amber-500/[0.04] border border-amber-500/15 hover:bg-amber-500/[0.08]'
           : 'border border-transparent hover:bg-slate-800/30'
       )}
     >
@@ -189,8 +218,8 @@ const PersonRow = memo(function PersonRow({
         <p className="text-[10px] text-slate-600 truncate">{point.departmentName}</p>
       </div>
 
-      {/* Metric value */}
-      <div className="flex items-center gap-2 flex-shrink-0">
+      {/* Metric */}
+      <div className="flex-shrink-0">
         {metric === '360' ? (
           <span className={cn('text-sm font-mono', scoreColor(point.score360))}>
             {point.score360.toFixed(1)}
@@ -204,7 +233,7 @@ const PersonRow = memo(function PersonRow({
 
       {/* Bias badge */}
       {isBias && (
-        <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-semibold uppercase flex-shrink-0">
+        <span className="fhr-badge fhr-badge-warning text-[8px] flex-shrink-0">
           Sesgo
         </span>
       )}
