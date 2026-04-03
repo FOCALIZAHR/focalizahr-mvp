@@ -51,10 +51,10 @@ const guideY = scaleY(75) // RoleFit threshold
 
 // 360° score → dot color (gradient green to red)
 function score360ToColor(score: number): string {
-  if (score >= 4.0) return '#10B981' // emerald — alto
-  if (score >= 3.0) return '#22D3EE' // cyan — medio-alto
+  if (score >= 4.0) return '#22D3EE' // cyan — alto
+  if (score >= 3.0) return '#A78BFA' // purple — medio-alto
   if (score >= 2.0) return '#F59E0B' // amber — medio-bajo
-  return '#EF4444'                    // red — bajo
+  return '#F59E0B'                    // amber — bajo (mismo que medio-bajo, sin rojo)
 }
 
 const QUADRANT_ORDER: { key: CorrelationQuadrant; countKey: keyof AnalisisTabProps['quadrantCounts'] }[] = [
@@ -296,11 +296,11 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
       <div className="flex flex-wrap items-center justify-center gap-4 text-[9px] text-slate-500">
         <span className="text-slate-600 mr-1">Color = Score 360°:</span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+          <span className="w-2 h-2 rounded-full bg-cyan-400" />
           ≥4.0
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-cyan-400" />
+          <span className="w-2 h-2 rounded-full bg-purple-400" />
           3.0-3.9
         </span>
         <span className="flex items-center gap-1.5">
@@ -308,7 +308,7 @@ export default memo(function AnalisisTab({ correlation, quadrantCounts }: Analis
           2.0-2.9
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-red-400" />
+          <span className="w-2 h-2 rounded-full bg-amber-400" />
           &lt;2.0
         </span>
       </div>

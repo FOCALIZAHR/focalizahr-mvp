@@ -22,11 +22,11 @@ interface GerenciasTabProps {
 
 const CONFIDENCE_VISUAL = {
   green: {
-    teslaColor: '#10B981',
-    dot: 'bg-emerald-400',
+    teslaColor: '#22D3EE',
+    dot: 'bg-cyan-400',
     label: 'Confiable',
-    text: 'text-emerald-400',
-    border: 'border-emerald-500/20',
+    text: 'text-cyan-400',
+    border: 'border-cyan-500/20',
   },
   amber: {
     teslaColor: '#F59E0B',
@@ -36,20 +36,20 @@ const CONFIDENCE_VISUAL = {
     border: 'border-amber-500/20',
   },
   red: {
-    teslaColor: '#EF4444',
-    dot: 'bg-red-400',
+    teslaColor: '#F59E0B',
+    dot: 'bg-amber-400',
     label: 'Alerta',
-    text: 'text-red-400',
+    text: 'text-amber-400',
     border: 'border-red-500/20',
   },
 }
 
 function getPearsonLabel(r: number | null): { label: string; color: string } | null {
   if (r === null) return null
-  if (r > 0.7) return { label: `r=${r.toFixed(2)} — Competencias predicen`, color: 'text-emerald-400' }
+  if (r > 0.7) return { label: `r=${r.toFixed(2)} — Competencias predicen`, color: 'text-cyan-400' }
   if (r > 0.4) return { label: `r=${r.toFixed(2)} — Correlación moderada`, color: 'text-cyan-400' }
   if (r > 0.0) return { label: `r=${r.toFixed(2)} — Correlación débil`, color: 'text-amber-400' }
-  return { label: `r=${r.toFixed(2)} — Sin correlación`, color: 'text-red-400' }
+  return { label: `r=${r.toFixed(2)} — Sin correlación`, color: 'text-amber-400' }
 }
 
 export default memo(function GerenciasTab({ byGerencia, orgFindings = [] }: GerenciasTabProps) {
@@ -271,7 +271,7 @@ export default memo(function GerenciasTab({ byGerencia, orgFindings = [] }: Gere
                     <p className="text-[9px] text-slate-600">Desc.</p>
                     <p className={cn(
                       'text-xs font-mono',
-                      ger.disconnectionRate > 25 ? 'text-red-400' :
+                      ger.disconnectionRate > 25 ? 'text-amber-400' :
                       ger.disconnectionRate > 15 ? 'text-amber-400' :
                       'text-slate-500'
                     )}>
@@ -334,7 +334,7 @@ export default memo(function GerenciasTab({ byGerencia, orgFindings = [] }: Gere
                                 {ger.calibrationCross.avgGoalsAdjustedUp !== null && (
                                   <> — metas prom. {ger.calibrationCross.avgGoalsAdjustedUp}%
                                     {ger.calibrationCross.avgGoalsAdjustedUp < 40 && (
-                                      <span className="text-red-400"> (inflación política)</span>
+                                      <span className="text-amber-400"> (inflación política)</span>
                                     )}
                                   </>
                                 )}

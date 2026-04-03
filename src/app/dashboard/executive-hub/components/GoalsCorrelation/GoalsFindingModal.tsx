@@ -120,7 +120,7 @@ export default memo(function GoalsFindingModal({ finding, onClose }: GoalsFindin
           {byManager && byManager.length > 0 && (
             <div className="mb-4 pb-4 border-b border-slate-800/30">
               {byManager.map(mg => (
-                <p key={mg.managerId} className="text-[11px] font-light text-red-400/80">
+                <p key={mg.managerId} className="text-[11px] font-light text-amber-400/80">
                   {mg.count} de {finding.count} reportan a <span className="font-medium text-slate-300">{mg.managerName}</span>
                 </p>
               ))}

@@ -24,8 +24,8 @@ export const SUBFINDING_CARDS: Record<string, SubFindingCardConfig> = {
   '1B_fugaProductiva': {
     title: 'Fuga de Talento Productivo',
     segmentId: '1_ENTREGARON',
-    dotColor: 'bg-red-400',
-    textColor: 'text-red-400',
+    dotColor: 'bg-amber-400',
+    textColor: 'text-amber-400',
     borderColor: 'border-red-500/20',
     showCost: true,
   },
@@ -49,8 +49,8 @@ export const SUBFINDING_CARDS: Record<string, SubFindingCardConfig> = {
   '2C_evaluadorProtege': {
     title: 'Evaluador Protege',
     segmentId: '2_NO_ENTREGARON',
-    dotColor: 'bg-red-500',
-    textColor: 'text-red-400',
+    dotColor: 'bg-amber-500',
+    textColor: 'text-amber-400',
     borderColor: 'border-red-500/20',
     showCost: false,
   },
@@ -82,8 +82,8 @@ export const SUBFINDING_CARDS: Record<string, SubFindingCardConfig> = {
   '3B_sesgoSistematico': {
     title: 'Sesgo Sistemático',
     segmentId: '3_ORGANIZACIONAL',
-    dotColor: 'bg-red-500',
-    textColor: 'text-red-400',
+    dotColor: 'bg-amber-500',
+    textColor: 'text-amber-400',
     borderColor: 'border-red-500/20',
     showCost: false,
   },
@@ -142,8 +142,8 @@ export const QUADRANT_CONFIG: Record<CorrelationQuadrant, {
 }> = {
   CONSISTENT: {
     label: 'Consistente',
-    color: 'text-emerald-400',
-    dotColor: 'fill-emerald-400',
+    color: 'text-cyan-400',
+    dotColor: 'fill-cyan-400',
     bgColor: 'rgba(16, 185, 129, 0.08)',
   },
   PERCEPTION_BIAS: {
@@ -160,8 +160,8 @@ export const QUADRANT_CONFIG: Record<CorrelationQuadrant, {
   },
   DOUBLE_RISK: {
     label: 'Doble Riesgo',
-    color: 'text-red-400',
-    dotColor: 'fill-red-400',
+    color: 'text-amber-400',
+    dotColor: 'fill-amber-400',
     bgColor: 'rgba(239, 68, 68, 0.08)',
   },
   NO_GOALS: {

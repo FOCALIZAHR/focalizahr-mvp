@@ -94,9 +94,9 @@ export default memo(function SegmentTab({ segment }: SegmentTabProps) {
       <div className="fhr-card relative overflow-hidden p-6">
         <div
           className="absolute top-0 left-0 right-0 h-[2px]"
-          style={{ background: 'linear-gradient(90deg, transparent, #10B981, transparent)', boxShadow: '0 0 12px #10B981' }}
+          style={{ background: 'linear-gradient(90deg, transparent, #22D3EE, transparent)', boxShadow: '0 0 12px #22D3EE' }}
         />
-        <p className="text-sm font-light text-emerald-400">{msg.title}</p>
+        <p className="text-sm font-light text-cyan-400">{msg.title}</p>
         <p className="text-[11px] font-light text-slate-500 mt-2 leading-relaxed">{msg.detail}</p>
       </div>
     )
@@ -219,7 +219,7 @@ export default memo(function SegmentTab({ segment }: SegmentTabProps) {
                       <div className="pt-2 border-t border-slate-800/30">
                         <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">Por evaluador</p>
                         {(finding.meta!.byManager as { managerId: string; managerName: string; count: number }[]).map((mg) => (
-                          <p key={mg.managerId} className="text-[10px] font-light text-red-400/80">
+                          <p key={mg.managerId} className="text-[10px] font-light text-amber-400/80">
                             {mg.count} de {finding.count} reportan a <span className="text-slate-300 font-medium">{mg.managerName}</span>
                           </p>
                         ))}

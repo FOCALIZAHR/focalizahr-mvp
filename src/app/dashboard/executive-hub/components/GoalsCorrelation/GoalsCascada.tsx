@@ -608,7 +608,7 @@ function ActSeparator({ label, color }: { label: string; color: 'amber' | 'purpl
     amber: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
     purple: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
     cyan: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
-    red: 'text-amber-400 bg-red-500/10 border-red-500/20',
+    red: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
   }
   const lineColor = {
     amber: 'via-amber-700/30',
