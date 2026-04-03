@@ -113,14 +113,14 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
           {/* Ancla — dos números lado a lado */}
           <motion.div {...fadeInDelay} className="flex items-center justify-center gap-12 md:gap-20 mb-10">
             <div className="text-center">
-              <p className="text-6xl md:text-7xl font-extralight text-emerald-400 tracking-tight">
+              <p className="text-6xl md:text-7xl font-extralight text-cyan-400 tracking-tight">
                 {totals.totalEntregaron}
               </p>
               <p className="text-xs text-slate-500 mt-2 uppercase tracking-wider">entregaron</p>
             </div>
             <div className="w-px h-16 bg-slate-800" />
             <div className="text-center">
-              <p className="text-6xl md:text-7xl font-extralight text-red-400 tracking-tight">
+              <p className="text-6xl md:text-7xl font-extralight text-amber-400 tracking-tight">
                 {totals.totalNoEntregaron}
               </p>
               <p className="text-xs text-slate-500 mt-2 uppercase tracking-wider">no entregaron</p>
@@ -131,8 +131,8 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
           <motion.div {...fadeIn} className="max-w-2xl mx-auto">
             <p className="text-xl font-light text-slate-300 text-center leading-relaxed">
               De <span className="font-medium text-slate-200">{totals.totalEvaluados}</span> personas evaluadas,{' '}
-              <span className="font-medium text-emerald-400">{totals.totalEntregaron}</span> entregaron resultados sobre el 80%
-              {' '}y <span className="font-medium text-red-400">{totals.totalNoEntregaron}</span> quedaron bajo el 40%.
+              <span className="font-medium text-cyan-400">{totals.totalEntregaron}</span> entregaron resultados sobre el 80%
+              {' '}y <span className="font-medium text-amber-400">{totals.totalNoEntregaron}</span> quedaron bajo el 40%.
             </p>
 
             <p className="text-base font-light text-slate-400 leading-relaxed mt-6 text-center">
@@ -230,7 +230,7 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
                 {/* Narrativa condicional */}
                 {stars.percentage >= 80 ? (
                   <p className="text-base font-light text-slate-400 leading-relaxed">
-                    <span className="font-medium text-emerald-400">{stars.withHighGoals}</span> de{' '}
+                    <span className="font-medium text-cyan-400">{stars.withHighGoals}</span> de{' '}
                     <span className="font-medium text-slate-200">{stars.total}</span> estrellas del 9-Box
                     entregan resultados sobre el 80%. La clasificación está respaldada por ejecución —
                     estas personas son lo que el sistema dice que son.
@@ -245,7 +245,7 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
                   </p>
                 ) : (
                   <p className="text-base font-light text-slate-400 leading-relaxed">
-                    Solo <span className="font-medium text-red-400">{stars.withHighGoals}</span> de{' '}
+                    Solo <span className="font-medium text-amber-400">{stars.withHighGoals}</span> de{' '}
                     <span className="font-medium text-slate-200">{stars.total}</span> estrellas
                     cumplen metas sobre el 80%. La mayoría de tus &ldquo;mejores talentos&rdquo; no
                     entrega resultados que respalden esa clasificación.
@@ -291,7 +291,7 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
                 {/* Narrativa condicional */}
                 {criticalPositions.percentage >= 80 ? (
                   <p className="text-base font-light text-slate-400 leading-relaxed">
-                    <span className="font-medium text-emerald-400">{criticalPositions.withHighGoals}</span> de{' '}
+                    <span className="font-medium text-cyan-400">{criticalPositions.withHighGoals}</span> de{' '}
                     <span className="font-medium text-slate-200">{criticalPositions.total}</span> personas
                     en cargos críticos entregan resultados. La continuidad operacional está respaldada por ejecución.
                   </p>
@@ -339,7 +339,7 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
 
                 {worstPearson && worstPearson.pearsonRoleFitGoals !== null && worstPearson.pearsonRoleFitGoals < 0.3 && (
                   <div>
-                    <p className="text-xs uppercase tracking-widest text-red-400/60 mb-3">Framework desalineado</p>
+                    <p className="text-xs uppercase tracking-widest text-amber-400/60 mb-3">Framework desalineado</p>
                     <p className="text-base font-light text-slate-400 leading-relaxed">
                       En <span className="font-medium text-slate-200">{worstPearson.gerenciaName}</span>,
                       las competencias que se exigen no predicen los resultados que se entregan.
@@ -351,7 +351,7 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
 
                 {bestPearson && bestPearson.pearsonRoleFitGoals !== null && (
                   <div>
-                    <p className="text-xs uppercase tracking-widest text-emerald-400/60 mb-3">Framework calibrado</p>
+                    <p className="text-xs uppercase tracking-widest text-cyan-400/60 mb-3">Framework calibrado</p>
                     <p className="text-base font-light text-slate-400 leading-relaxed">
                       En <span className="font-medium text-slate-200">{bestPearson.gerenciaName}</span>,
                       las competencias que se exigen predicen resultados.
@@ -383,15 +383,15 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
                           <div className="flex items-center gap-2.5">
                             <div className={cn(
                               'w-1.5 h-1.5 rounded-full',
-                              g.confidenceLevel === 'red' ? 'bg-red-400' :
+                              g.confidenceLevel === 'red' ? 'bg-amber-400' :
                               g.confidenceLevel === 'amber' ? 'bg-amber-400' :
-                              'bg-emerald-400'
+                              'bg-cyan-400'
                             )} />
                             <span className="text-sm font-light text-slate-300">{g.gerenciaName}</span>
                           </div>
                           <div className="flex items-center gap-3 text-[10px]">
-                            {pearsonOk && <span className="text-emerald-400">Competencias predicen</span>}
-                            {pearsonBad && <span className="text-red-400">Framework desalineado</span>}
+                            {pearsonOk && <span className="text-cyan-400">Competencias predicen</span>}
+                            {pearsonBad && <span className="text-amber-400">Framework desalineado</span>}
                             {!pearsonOk && !pearsonBad && g.pearsonRoleFitGoals !== null && (
                               <span className="text-slate-500">Correlación moderada</span>
                             )}
@@ -608,7 +608,7 @@ function ActSeparator({ label, color }: { label: string; color: 'amber' | 'purpl
     amber: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
     purple: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
     cyan: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
-    red: 'text-red-400 bg-red-500/10 border-red-500/20',
+    red: 'text-amber-400 bg-red-500/10 border-red-500/20',
   }
   const lineColor = {
     amber: 'via-amber-700/30',
