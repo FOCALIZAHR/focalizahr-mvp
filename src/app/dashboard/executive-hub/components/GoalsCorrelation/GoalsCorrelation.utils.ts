@@ -3,76 +3,74 @@
 // src/app/dashboard/executive-hub/components/GoalsCorrelation/GoalsCorrelation.utils.ts
 // ════════════════════════════════════════════════════════════════════════════
 
-import type { GoalsCorrelationDataV2, SubFinding } from './GoalsCorrelation.types'
+import type { GoalsCorrelationDataV2 } from './GoalsCorrelation.types'
 import type { PortadaNarrative } from './GoalsCorrelation.types'
+import { SUBFINDING_TO_NARRATIVE } from './GoalsCorrelation.constants'
+import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
 
 // ════════════════════════════════════════════════════════════════════════════
-// V2 PORTADA NARRATIVE — Progressive Disclosure from top alerts
+// V2 PORTADA NARRATIVE — Alineada con patrón P&L Talent
+// CTA siempre cyan. Highlight = dato ancla. Sin instrucciones.
 // ════════════════════════════════════════════════════════════════════════════
 
 export function getPortadaNarrativeV2(data: GoalsCorrelationDataV2): PortadaNarrative {
-  const { topAlerts, totals, correlation } = data
+  const { topAlerts, totals, correlation, quadrantCounts } = data
   const totalWithGoals = correlation.filter(c => c.quadrant !== 'NO_GOALS').length
+
+  // % desalineamiento (dato ancla principal)
+  const totalRiesgo = quadrantCounts.perceptionBias + quadrantCounts.hiddenPerformer
+  const pctDesalineamiento = totals.totalEvaluados > 0
+    ? Math.round((totalRiesgo / totals.totalEvaluados) * 100)
+    : 0
 
   // Sin datos de metas
   if (totalWithGoals === 0) {
     return {
       highlight: 'Sin datos de metas',
-      suffix: ' para este ciclo. Asigna metas antes de evaluar correlación.',
+      suffix: ' para este ciclo. Sin metas medidas, la evaluación no se puede validar contra resultados.',
       ctaLabel: 'Ver detalle',
       ctaVariant: 'cyan',
-      coachingTip: 'Las metas permiten validar si la evaluación 360° refleja resultados reales.',
+      coachingTip: 'Las metas permiten validar si la evaluación refleja resultados reales.',
     }
   }
 
-  // Has financial risk? Lead with $$$
-  if (totals.totalFinancialRisk > 0 && topAlerts.length > 0) {
-    const riskLabel = formatCurrency(totals.totalFinancialRisk)
+  // Hay desalineamiento con costo financiero
+  if (pctDesalineamiento > 0 && totals.totalFinancialRisk > 0) {
     return {
-      statusBadge: { label: 'Requiere revisión' },
-      prefix: `De ${totals.totalEvaluados} evaluados, ${totals.totalEntregaron} cumplieron metas y ${totals.totalNoEntregaron} no. `,
-      highlight: `${riskLabel} en riesgo.`,
-      suffix: ` ${totals.totalAnomalias} anomalías estructurales detectadas.`,
-      ctaLabel: 'Ver análisis',
-      ctaVariant: 'red',
-      coachingTip: topAlerts[0] ? getAlertTip(topAlerts[0]) : 'Revisa las desconexiones entre resultados y cómo la organización responde.',
+      highlight: `${pctDesalineamiento}% de desalineamiento.`,
+      suffix: ` La capacidad y los resultados no coinciden en ${totalRiesgo} de tus ${totals.totalEvaluados} evaluados.`,
+      ctaLabel: 'Ver dónde está el problema',
+      ctaVariant: 'cyan',
+      coachingTip: `De esas contradicciones, ${formatCurrency(totals.totalFinancialRisk)} en costo de reemplazo si se materializan.`,
     }
   }
 
-  // Has anomalies but no financial data
-  if (totals.totalAnomalias > 0) {
+  // Hay desalineamiento sin costo financiero
+  if (pctDesalineamiento > 0) {
+    const topAlert = topAlerts[0]
+    const topNarrKey = topAlert ? SUBFINDING_TO_NARRATIVE[topAlert.key] : null
+    const topNarr = topNarrKey ? getNarrative(topNarrKey) : null
+
     return {
-      statusBadge: { label: 'Checkpoint' },
-      prefix: `De ${totals.totalEvaluados} evaluados, ${totals.totalEntregaron} cumplieron metas y ${totals.totalNoEntregaron} no. `,
-      highlight: `${totals.totalAnomalias} anomalías detectadas.`,
-      suffix: ' Desconexiones entre resultados y cómo la organización los trata.',
-      ctaLabel: 'Ver análisis',
-      ctaVariant: 'amber',
-      coachingTip: topAlerts[0] ? getAlertTip(topAlerts[0]) : 'Revisa las desconexiones.',
+      highlight: `${pctDesalineamiento}% de desalineamiento.`,
+      suffix: ` En ${totalRiesgo} de ${totals.totalEvaluados} evaluados, la capacidad y los resultados no coinciden.`,
+      ctaLabel: 'Ver dónde está el problema',
+      ctaVariant: 'cyan',
+      coachingTip: topAlert && topNarr
+        ? `${topAlert.count} personas en el hallazgo más severo: ${topNarr.headline.replace(/\.$/, '')}.`
+        : 'Contradicciones detectadas entre capacidad y resultados.',
     }
   }
 
-  // Healthy
+  // Saludable
   return {
     statusBadge: { label: 'Alineado', showCheck: true },
-    prefix: `De ${totals.totalEvaluados} evaluados, `,
-    highlight: `${totals.totalEntregaron} cumplieron metas.`,
-    suffix: ' La organización está respondiendo de forma coherente.',
+    highlight: 'Capacidad y resultados alineados.',
+    suffix: ` Las evaluaciones coinciden con los resultados de metas en la mayoría de tus ${totals.totalEvaluados} evaluados.`,
     ctaLabel: 'Ver detalle',
     ctaVariant: 'cyan',
-    coachingTip: 'Sin anomalías críticas entre resultados y respuesta organizacional.',
+    coachingTip: 'Base confiable para decisiones de compensación y desarrollo.',
   }
-}
-
-function getAlertTip(alert: SubFinding): string {
-  const tips: Record<string, string> = {
-    '1B_fugaProductiva': 'Fuga productiva: personas que rinden Y están en riesgo de irse. El costo es cuantificable.',
-    '1D_sostenibilidad': 'Resultados insostenibles: entregan a pesar de no dominar su cargo. Riesgo de burnout.',
-    '2B_bonosInjustificados': 'Bonos sin respaldo: la percepción no coincide con la ejecución real.',
-    '2C_evaluadorProtege': 'Evaluador protege: el gerente no exige y los datos lo confirman.',
-    '2A_noPuedeVsNoQuiere': 'Diagnóstico diferenciado: distingue quién necesita capacitación de quién necesita conversación.',
-  }
-  return tips[alert.key] ?? 'Revisa las desconexiones entre resultados y respuesta organizacional.'
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -112,4 +110,3 @@ export function getConcentrationText(employees: { gerencia: string }[]): string 
   }
   return null
 }
-
