@@ -11,7 +11,7 @@
 
 import { memo, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { AlertTriangle, ArrowUpDown, BarChart3, Target } from 'lucide-react'
+import { AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown, Minus, BarChart3, Target } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 import type { CorrelationPoint } from '../GoalsCorrelation.types'
@@ -52,12 +52,17 @@ interface CompensationBoardProps {
 export default memo(function CompensationBoard({ correlation }: CompensationBoardProps) {
   const [mobileView, setMobileView] = useState('360')
 
-  const { withGoals, by360, byGoals, biasCount } = useMemo(() => {
+  const { withGoals, by360, byGoals, biasCount, rank360, rankGoals } = useMemo(() => {
     const wg = correlation.filter(c => c.quadrant !== 'NO_GOALS' && c.goalsPercent !== null)
-    const sorted360 = [...wg].sort((a, b) => b.score360 - a.score360).slice(0, MAX_SHOWN)
-    const sortedGoals = [...wg].sort((a, b) => (b.goalsPercent ?? 0) - (a.goalsPercent ?? 0)).slice(0, MAX_SHOWN)
+    const all360 = [...wg].sort((a, b) => b.score360 - a.score360)
+    const allGoals = [...wg].sort((a, b) => (b.goalsPercent ?? 0) - (a.goalsPercent ?? 0))
+    const sorted360 = all360.slice(0, MAX_SHOWN)
+    const sortedGoals = allGoals.slice(0, MAX_SHOWN)
     const bias = wg.filter(c => c.quadrant === 'PERCEPTION_BIAS').length
-    return { withGoals: wg, by360: sorted360, byGoals: sortedGoals, biasCount: bias }
+    // Rank maps: position of each person in BOTH lists (full, not sliced)
+    const rank360 = new Map(all360.map((p, i) => [p.employeeId, i + 1]))
+    const rankGoals = new Map(allGoals.map((p, i) => [p.employeeId, i + 1]))
+    return { withGoals: wg, by360: sorted360, byGoals: sortedGoals, biasCount: bias, rank360, rankGoals }
   }, [correlation])
 
   if (withGoals.length === 0) {
@@ -108,6 +113,8 @@ export default memo(function CompensationBoard({ correlation }: CompensationBoar
             teslaColor="#22D3EE"
             items={by360}
             metric="360"
+            otherRankMap={rankGoals}
+            otherLabel="Metas"
           />
         </div>
 
@@ -120,6 +127,8 @@ export default memo(function CompensationBoard({ correlation }: CompensationBoar
             teslaColor="#A78BFA"
             items={byGoals}
             metric="goals"
+            otherRankMap={rank360}
+            otherLabel="360°"
           />
         </div>
       </div>
@@ -138,6 +147,8 @@ const ColumnCard = memo(function ColumnCard({
   teslaColor,
   items,
   metric,
+  otherRankMap,
+  otherLabel,
 }: {
   icon: React.ReactNode
   title: string
@@ -145,6 +156,8 @@ const ColumnCard = memo(function ColumnCard({
   teslaColor: string
   items: CorrelationPoint[]
   metric: '360' | 'goals'
+  otherRankMap: Map<string, number>
+  otherLabel: string
 }) {
   return (
     <div className="fhr-card relative overflow-hidden p-0">
@@ -171,7 +184,15 @@ const ColumnCard = memo(function ColumnCard({
       {/* List */}
       <div className="px-3 pb-4 space-y-0.5">
         {items.map((p, idx) => (
-          <PersonRow key={p.employeeId} point={p} rank={idx + 1} metric={metric} index={idx} />
+          <PersonRow
+            key={p.employeeId}
+            point={p}
+            rank={idx + 1}
+            metric={metric}
+            index={idx}
+            otherRank={otherRankMap.get(p.employeeId)}
+            otherLabel={otherLabel}
+          />
         ))}
       </div>
     </div>
@@ -187,13 +208,20 @@ const PersonRow = memo(function PersonRow({
   rank,
   metric,
   index,
+  otherRank,
+  otherLabel,
 }: {
   point: CorrelationPoint
   rank: number
   metric: '360' | 'goals'
   index: number
+  otherRank?: number
+  otherLabel?: string
 }) {
   const isBias = point.quadrant === 'PERCEPTION_BIAS'
+  const delta = otherRank ? otherRank - rank : 0
+  const absDelta = Math.abs(delta)
+  const bigDelta = absDelta > 5
 
   return (
     <motion.div
@@ -201,10 +229,12 @@ const PersonRow = memo(function PersonRow({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.03, duration: 0.2 }}
       className={cn(
-        'flex items-center gap-3 py-2 px-2 rounded-lg transition-all duration-200',
-        isBias
-          ? 'bg-amber-500/[0.04] border border-amber-500/15 hover:bg-amber-500/[0.08]'
-          : 'border border-transparent hover:bg-slate-800/30'
+        'flex items-center gap-2 py-2 px-2 rounded-lg transition-all duration-200',
+        isBias && bigDelta
+          ? 'bg-amber-500/[0.06] border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.05)]'
+          : isBias
+            ? 'bg-amber-500/[0.04] border border-amber-500/15'
+            : 'border border-transparent hover:bg-slate-800/30'
       )}
     >
       {/* Rank */}
@@ -230,6 +260,19 @@ const PersonRow = memo(function PersonRow({
           </span>
         )}
       </div>
+
+      {/* Other rank delta — the key insight */}
+      {otherRank && otherLabel && (
+        <div className={cn(
+          'flex items-center gap-0.5 flex-shrink-0 text-[9px] font-mono',
+          delta > 3 ? 'text-amber-400' : delta < -3 ? 'text-cyan-400' : 'text-slate-600'
+        )}>
+          {delta > 3 ? <ArrowDown className="w-3 h-3" /> :
+           delta < -3 ? <ArrowUp className="w-3 h-3" /> :
+           <Minus className="w-3 h-3" />}
+          <span>#{otherRank}</span>
+        </div>
+      )}
 
       {/* Bias badge */}
       {isBias && (

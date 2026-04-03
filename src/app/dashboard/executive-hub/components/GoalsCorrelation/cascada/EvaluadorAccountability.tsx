@@ -59,6 +59,7 @@ export default memo(function EvaluadorAccountability({ byManager }: EvaluadorAcc
 
   const withIssues = byManager.filter(m => m.coherenceGap >= 20)
   const aligned = byManager.filter(m => m.coherenceGap < 20)
+  const totalAffected = withIssues.reduce((sum, m) => sum + m.evaluatedCount, 0)
 
   return (
     <div className="space-y-5">
@@ -78,6 +79,23 @@ export default memo(function EvaluadorAccountability({ byManager }: EvaluadorAcc
           )}
         </p>
       </div>
+
+      {/* Hero anchor stat — magnitude at a glance */}
+      {withIssues.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="text-center py-4"
+        >
+          <p className="text-5xl font-extralight text-amber-400 tracking-tight">
+            {totalAffected}
+          </p>
+          <p className="text-xs text-slate-500 mt-1.5 uppercase tracking-wider">
+            personas evaluadas por managers con desconexión
+          </p>
+        </motion.div>
+      )}
 
       {/* Cards — issues first, then aligned */}
       <div className="space-y-2">
