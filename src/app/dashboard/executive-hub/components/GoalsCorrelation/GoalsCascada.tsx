@@ -175,8 +175,11 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
                     <motion.div {...fadeIn} className="max-w-2xl mx-auto text-center mb-12">
                       <p className="text-base font-light text-slate-400 leading-relaxed">
                         De <span className="font-medium text-slate-200">{totals.totalEvaluados}</span> evaluados,{' '}
-                        <span className="font-medium text-amber-400">{totalRiesgo}</span> tienen una discrepancia
-                        entre lo que entregan y lo que el sistema mide.
+                        <span className="font-medium text-amber-400">{totalRiesgo}</span> muestran una contradicción
+                        entre sus metas y su evaluación de desempeño.
+                      </p>
+                      <p className="text-sm font-light text-slate-500 mt-2">
+                        El sistema identificó el tipo de contradicción. Así se pueden gestionar.
                       </p>
                       {totals.totalFinancialRisk > 0 && (
                         <p className="text-sm font-light text-slate-500 mt-3">
