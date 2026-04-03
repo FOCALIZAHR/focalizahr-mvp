@@ -266,14 +266,12 @@ export const SCIENTIFIC_BACKING: Record<string, ScientificBacking> = {
       },
     ],
     bridge:
-      'FocalizaHR calcula el costo de riesgo sumando tres componentes: ' +
-      '(1) Costo de reemplazo para personas en riesgo de fuga que cumplen metas ' +
-      '(dato real de SalaryConfigService × factor por familia de cargo). ' +
-      '(2) Estimación de bono en riesgo para personas con evaluación alta pero metas bajas ' +
-      '(proxy: salario mensual × personas afectadas). ' +
-      '(3) Riesgo de burnout para personas que entregan sin dominar su cargo ' +
-      '(costo de reemplazo × 30% como factor de probabilidad). ' +
-      'El monto es una estimación conservadora del costo de no intervenir.',
+      'El monto que FocalizaHR muestra es exclusivamente el costo de reemplazo ' +
+      'de personas clasificadas en riesgo de fuga que además cumplen metas sobre 80%. ' +
+      'Se calcula usando el salario real por familia de cargo de tu empresa ' +
+      '(configurado en SalaryConfig) multiplicado por un factor de reemplazo ' +
+      'según el nivel del cargo. No incluye estimaciones de bonos ni probabilidades — ' +
+      'solo el costo directo de perder a quienes entregan resultados.',
     variant: 'pattern',
   },
 

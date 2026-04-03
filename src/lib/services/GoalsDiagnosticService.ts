@@ -567,14 +567,12 @@ export class GoalsDiagnosticService {
       (e.roleFitScore ?? 100) < ROLEFIT_THRESHOLD
     )
     if (sostenibilidad.length > 0) {
-      // Burnout risk: if they leave, replacement cost applies
-      const burnoutRisk = sostenibilidad.reduce((s, e) => s + (e.turnoverCost ?? 0), 0)
       findings.push({
         key: '1D_sostenibilidad',
         segmentId: '1_ENTREGARON',
         employees: sostenibilidad,
         count: sostenibilidad.length,
-        financialImpact: Math.round(burnoutRisk * 0.3), // 30% probability weight
+        financialImpact: 0, // No es fuga — hallazgo cualitativo de sostenibilidad
       })
     }
 
@@ -587,18 +585,12 @@ export class GoalsDiagnosticService {
     // 2B — ¿Los vamos a premiar igual?
     const bonosInjustificados = noEntregaron.filter(e => e.score360 > T.HIGH_SCORE)
     if (bonosInjustificados.length > 0) {
-      // Estimate: bonus risk ≈ 1 month salary per person (conservative)
-      // Uses turnoverCost as salary proxy (turnoverCost ≈ 3-6x monthly salary)
-      const bonusRisk = bonosInjustificados.reduce((s, e) => {
-        const monthlySalaryEstimate = (e.turnoverCost ?? 0) / 4 // Conservative: turnover ≈ 4 months
-        return s + monthlySalaryEstimate
-      }, 0)
       findings.push({
         key: '2B_bonosInjustificados',
         segmentId: '2_NO_ENTREGARON',
         employees: bonosInjustificados,
         count: bonosInjustificados.length,
-        financialImpact: Math.round(bonusRisk),
+        financialImpact: 0, // No hay modelo de bonos — hallazgo cualitativo
       })
     }
 
