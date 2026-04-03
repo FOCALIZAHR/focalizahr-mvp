@@ -21,6 +21,7 @@ import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
 import ScientificBackingTooltip from '@/components/shared/ScientificBackingTooltip'
 import { SCIENTIFIC_BACKING } from '@/config/narratives/ScientificBackingDictionary'
 import { getCompensacionNarrative } from '@/config/narratives/CompensacionNarrativeDictionary'
+import { GoalsSynthesisEngine } from '@/lib/services/GoalsSynthesisEngine'
 import GoalsFindingModal from './GoalsFindingModal'
 import GoalsStarsModal from './GoalsStarsModal'
 import CompensacionModal from './CompensacionModal'
@@ -434,24 +435,45 @@ export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias
         {/* ═══════════════════════════════════════════════════════════════
             SÍNTESIS — Cierre + acceso a scatter
         ═══════════════════════════════════════════════════════════════ */}
-        <motion.div {...fadeIn} className="max-w-2xl mx-auto text-center pt-8">
-          <div className="w-12 h-px bg-gradient-to-r from-transparent via-slate-700 to-transparent mx-auto mb-8" />
+        {(() => {
+          const synthesis = GoalsSynthesisEngine.generate(data)
+          return (
+            <motion.div {...fadeIn} className="max-w-2xl mx-auto pt-8 space-y-6">
+              <div className="w-12 h-px bg-gradient-to-r from-transparent via-slate-700 to-transparent mx-auto" />
 
-          <p className="text-base font-light text-slate-400 leading-relaxed">
-            {totals.totalAnomalias > 0
-              ? `${totals.totalAnomalias} anomalías estructurales entre lo que las personas entregan y cómo tu organización responde. Cada una tiene nombre, gerencia y acción sugerida.`
-              : 'La organización está respondiendo de forma coherente a los resultados que las personas entregan.'
-            }
-          </p>
+              {/* Classification */}
+              <p className="text-base font-light text-slate-300 text-center leading-relaxed">
+                {synthesis.classification}
+              </p>
 
-          <button
-            onClick={onOpenScatter}
-            className="mt-8 inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-400 transition-colors"
-          >
-            <BarChart3 className="w-4 h-4" />
-            Explorar datos en scatter
-          </button>
-        </motion.div>
+              {/* Implication */}
+              <p className="text-base italic font-light text-slate-300 leading-relaxed text-center">
+                {synthesis.implication}
+              </p>
+
+              {/* Path */}
+              <p className="text-base font-light text-slate-400 leading-relaxed text-center">
+                {synthesis.path}
+              </p>
+
+              {/* Accountability */}
+              <p className="text-sm italic font-light text-slate-500 text-center">
+                {synthesis.accountability}
+              </p>
+
+              {/* Scatter link */}
+              <div className="text-center pt-4">
+                <button
+                  onClick={onOpenScatter}
+                  className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-400 transition-colors"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  Explorar datos en scatter
+                </button>
+              </div>
+            </motion.div>
+          )
+        })()}
 
       </div>
 
