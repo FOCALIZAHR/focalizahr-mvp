@@ -189,16 +189,32 @@ function getInsightNarrative(type: InsightType, summary: SummaryData): { text: s
       const m = summary.metas
       if (!m || m.totalEmployees === 0) return { text: 'Sin datos', tooltip: 'Datos de metas no disponibles' }
       if (m.coverage < 50) return {
-        text: `Solo ${m.coverage}% con metas`,
-        tooltip: `${m.totalWithGoals} de ${m.totalEmployees} tienen metas asignadas`
+        text: `Solo ${m.coverage}% con metas asignadas`,
+        tooltip: `${m.totalWithGoals} de ${m.totalEmployees} tienen metas — sin masa critica para diagnosticar`
+      }
+      // Critical: high disconnection = headline for CEO
+      if (m.disconnectionRate > 25) {
+        const riskStr = m.estimatedRisk > 1_000_000
+          ? ` — $${Math.round(m.estimatedRisk / 1_000_000)}M en riesgo`
+          : m.estimatedRisk > 0
+            ? ` — $${Math.round(m.estimatedRisk / 1_000)}K en riesgo`
+            : ''
+        return {
+          text: `${m.disconnectionRate}% desalineados${riskStr}`,
+          tooltip: `${m.urgentCases} anomalias entre metas y evaluacion — revisar antes de compensar`
+        }
+      }
+      if (m.disconnectionRate > 15) return {
+        text: `${m.disconnectionRate}% desconexion metas vs evaluacion`,
+        tooltip: `${m.urgentCases} caso${m.urgentCases !== 1 ? 's' : ''} requieren revision pre-compensacion`
       }
       if (m.urgentCases > 0) return {
-        text: `${m.urgentCases} caso${m.urgentCases > 1 ? 's' : ''} pre-compensacion`,
-        tooltip: `Desconexion ${m.disconnectionRate}% entre metas y evaluacion 360°`
+        text: `${m.urgentCases} anomalia${m.urgentCases !== 1 ? 's' : ''} pre-compensacion`,
+        tooltip: `Desconexion ${m.disconnectionRate}% — ${m.totalWithGoals} evaluados con metas activas`
       }
       return {
         text: 'Metas alineadas',
-        tooltip: `${m.coverage}% cobertura, ${m.avgProgress}% progreso promedio`
+        tooltip: `${m.coverage}% cobertura, ${Math.round(m.avgProgress)}% progreso promedio`
       }
     }
   }
