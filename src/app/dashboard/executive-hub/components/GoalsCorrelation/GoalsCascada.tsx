@@ -242,6 +242,13 @@ export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias
             <ActSeparator label="Estrellas" color="amber" />
 
             <div>
+              {/* Frase puente con Acto 2 */}
+              <motion.div {...fadeIn} className="max-w-2xl mx-auto mb-12">
+                <p className="text-base font-light text-slate-500 text-center leading-relaxed">
+                  Las contradicciones anteriores también alcanzan a quienes la organización considera su mejor talento.
+                </p>
+              </motion.div>
+
               <motion.div {...fadeInDelay} className="text-center mb-10">
                 <p className="text-7xl md:text-8xl font-extralight text-amber-400 tracking-tight">
                   {stars.percentage}%
@@ -435,11 +442,12 @@ export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias
         {/* ═══════════════════════════════════════════════════════════════
             SÍNTESIS — Cierre + acceso a scatter
         ═══════════════════════════════════════════════════════════════ */}
+        <ActSeparator label="Síntesis" color="cyan" />
+
         {(() => {
           const synthesis = GoalsSynthesisEngine.generate(data)
           return (
-            <motion.div {...fadeIn} className="max-w-2xl mx-auto pt-8 space-y-6">
-              <div className="w-12 h-px bg-gradient-to-r from-transparent via-slate-700 to-transparent mx-auto" />
+            <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-6">
 
               {/* Classification */}
               <p className="text-base font-light text-slate-300 text-center leading-relaxed">
