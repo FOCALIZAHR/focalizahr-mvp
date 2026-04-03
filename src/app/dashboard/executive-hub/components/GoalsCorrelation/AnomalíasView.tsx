@@ -136,7 +136,56 @@ export default memo(function AnomalíasView({
 
         {/* Treemap */}
         <AnimatePresence mode="wait">
-          {expandedKey ? (
+          {expandedKey === '__otros__' ? (
+            /* EXPANDED: otros (findings menores) */
+            <motion.div
+              key="exp-otros"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.25 }}
+              className="relative rounded-xl overflow-hidden bg-slate-900/60 backdrop-blur-sm border border-slate-800/30"
+            >
+              <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-cyan-500/40" />
+              <div className="pl-6 pr-5 py-5 space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-lg font-light text-slate-200">Hallazgos menores</p>
+                    <p className="text-xs text-slate-500 font-light mt-1">
+                      {otrosCount} persona{otrosCount !== 1 ? 's' : ''} en {otros.length} tipo{otros.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setExpandedKey(null)}
+                    className="text-slate-600 hover:text-slate-400 transition-colors p-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {otros.map(f => {
+                    const nKey = SUBFINDING_TO_NARRATIVE[f.key]
+                    const narr = nKey ? getNarrative(nKey) : null
+                    if (!narr) return null
+                    return (
+                      <button
+                        key={f.key}
+                        onClick={() => setExpandedKey(f.key)}
+                        className="w-full flex items-center justify-between py-2.5 px-3 rounded-lg text-left hover:bg-slate-800/30 transition-colors"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-light text-slate-300 truncate">{narr.headline}</p>
+                        </div>
+                        <span className="text-xs font-mono text-cyan-400/70 flex-shrink-0 ml-3">
+                          {f.count}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          ) : expandedKey ? (
             <ExpandedBlock
               key={`exp-${expandedKey}`}
               finding={sorted.find(f => f.key === expandedKey)!}
@@ -199,7 +248,7 @@ export default memo(function AnomalíasView({
                     </motion.div>
                   ))}
 
-                  {/* "Otros" grouped block */}
+                  {/* "Otros" grouped block — clickeable, expande lista */}
                   {otrosCount > 0 && (
                     <motion.div
                       initial={{ opacity: 0, y: 12 }}
@@ -208,12 +257,19 @@ export default memo(function AnomalíasView({
                       style={{ flex: Math.max(otrosCount, 1) }}
                       className="min-w-0"
                     >
-                      <div className="w-full h-full rounded-xl bg-slate-900/40 border border-slate-800/20 p-3 flex flex-col justify-center">
+                      <button
+                        onClick={() => setExpandedKey('__otros__')}
+                        className={cn(
+                          'w-full h-full rounded-xl p-3 flex flex-col justify-center text-left transition-all group',
+                          'bg-slate-900/40 border border-slate-800/20',
+                          'hover:border-cyan-500/30 hover:shadow-[0_0_20px_rgba(34,211,238,0.08)]',
+                        )}
+                      >
                         <p className="text-lg font-extralight text-slate-500">{otrosCount}</p>
                         <p className="text-[9px] text-slate-600 font-light mt-0.5">
                           {otros.length} tipo{otros.length !== 1 ? 's' : ''} menores
                         </p>
-                      </div>
+                      </button>
                     </motion.div>
                   )}
                 </div>
@@ -270,29 +326,32 @@ function MosaicBlock({
     <button
       onClick={onClick}
       className={cn(
-        'w-full h-full text-left rounded-xl relative overflow-hidden transition-all cursor-pointer',
+        'w-full h-full text-left rounded-xl relative overflow-hidden transition-all cursor-pointer group',
         'bg-slate-900/60 backdrop-blur-sm',
         'border border-slate-800/30',
         'hover:border-cyan-500/30 hover:shadow-[0_0_20px_rgba(34,211,238,0.08)]',
       )}
     >
-      {/* Left border — CYAN only (no semáforo) */}
+      {/* Left border — CYAN only */}
       <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-cyan-500/40" />
 
       <div className="pl-5 pr-4 py-4">
-        {/* Count */}
+        {/* Count — número grande, el dato principal */}
         <p className="text-3xl md:text-4xl font-extralight text-cyan-400 tracking-tight">
           {finding.count}
         </p>
+        <p className="text-[10px] text-slate-600 font-light mt-0.5">
+          persona{finding.count !== 1 ? 's' : ''}
+        </p>
 
         {/* Headline — always show, truncate if needed */}
-        <p className="text-sm font-light text-slate-300 mt-1.5 leading-snug line-clamp-2">
+        <p className="text-sm font-light text-slate-300 mt-2 leading-snug line-clamp-2">
           {dictNarrative.headline}
         </p>
 
-        {/* Proportion bar — thin, cyan */}
-        <div className="mt-3 flex items-center gap-2">
-          <div className="flex-1 h-[2px] bg-slate-800 rounded-full overflow-hidden">
+        {/* Proportion bar — thin, cyan, sin % visible */}
+        <div className="mt-3">
+          <div className="h-[2px] bg-slate-800 rounded-full overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${pct}%` }}
@@ -300,8 +359,20 @@ function MosaicBlock({
               className="h-full rounded-full bg-cyan-500/50"
             />
           </div>
-          <span className="text-[9px] font-mono text-slate-600 flex-shrink-0">{pct}%</span>
         </div>
+      </div>
+
+      {/* Tooltip on hover — % + coaching tip preview */}
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 w-56 text-left">
+        <p className="text-[10px] text-slate-300 leading-relaxed">
+          {dictNarrative.headline}
+        </p>
+        <p className="text-[9px] text-slate-500 mt-1">
+          {finding.count} persona{finding.count !== 1 ? 's' : ''} · {pct}% de las anomalías
+        </p>
+        <p className="text-[9px] text-slate-600 mt-1.5 leading-relaxed line-clamp-2">
+          {dictNarrative.coachingTip}
+        </p>
       </div>
     </button>
   )
