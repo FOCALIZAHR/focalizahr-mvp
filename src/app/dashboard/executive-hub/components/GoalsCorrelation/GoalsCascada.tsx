@@ -21,6 +21,8 @@ import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
 import { getCompensacionNarrative } from '@/config/narratives/CompensacionNarrativeDictionary'
 import GoalsFindingModal from './GoalsFindingModal'
 import GoalsStarsModal from './GoalsStarsModal'
+import CompensacionModal from './CompensacionModal'
+import type { CompensacionNarrativeEntry } from '@/config/narratives/CompensacionNarrativeDictionary'
 
 // ════════════════════════════════════════════════════════════════════════════
 // ANIMATION — whileInView (scroll-triggered, once)
@@ -60,11 +62,27 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
   const [showRemainingFindings, setShowRemainingFindings] = useState(false)
   const [showStarsModal, setShowStarsModal] = useState(false)
   const [showCriticalModal, setShowCriticalModal] = useState(false)
+  const [compModal, setCompModal] = useState<{ entry: CompensacionNarrativeEntry; headline: string; color: string } | null>(null)
 
   const { topAlerts, totals, segments, byGerencia, stars, criticalPositions } = data
 
   // Set of employee IDs occupying critical positions (for amplifier in stars modal)
   const criticalPositionIds = new Set(criticalPositions.positions.map(p => p.employee.id))
+
+  // Helper: open compensacion modal for a finding
+  const openCompModal = (findingKey: string) => {
+    const quadrantKey = COMP_QUADRANT_MAP[findingKey]
+    if (!quadrantKey) return
+    const entry = getCompensacionNarrative(quadrantKey)
+    if (!entry) return
+    const narrativeKey = SUBFINDING_TO_NARRATIVE[findingKey]
+    const dictNarr = narrativeKey ? getNarrative(narrativeKey) : null
+    setCompModal({
+      entry,
+      headline: dictNarr?.headline ?? '',
+      color: dictNarr?.teslaColor ?? '#22D3EE',
+    })
+  }
   const allFindings = segments.flatMap(s => s.subFindings)
   const remainingFindings = allFindings.filter(f => !topAlerts.some(a => a.key === f.key))
 
@@ -156,6 +174,7 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
                     finding={alert}
                     index={idx}
                     onViewPersons={() => setModalFinding(alert)}
+                    onViewCompensacion={COMP_QUADRANT_MAP[alert.key] ? () => openCompModal(alert.key) : undefined}
                   />
                 ))}
               </div>
@@ -178,6 +197,7 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
                           finding={f}
                           index={idx}
                           onViewPersons={() => setModalFinding(f)}
+                          onViewCompensacion={COMP_QUADRANT_MAP[f.key] ? () => openCompModal(f.key) : undefined}
                         />
                       ))}
                     </div>
@@ -433,6 +453,16 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
         />
       )}
 
+      {/* ═══ MODAL — Compensaciones ═══ */}
+      {compModal && (
+        <CompensacionModal
+          entry={compModal.entry}
+          findingHeadline={compModal.headline}
+          teslaColor={compModal.color}
+          onClose={() => setCompModal(null)}
+        />
+      )}
+
       {/* ═══ MODAL — Cargos Críticos ═══ */}
       {showCriticalModal && (
         <GoalsStarsModal
@@ -467,21 +497,18 @@ const FindingBlock = memo(function FindingBlock({
   finding,
   index,
   onViewPersons,
+  onViewCompensacion,
   isOrgLevel = false,
 }: {
   finding: SubFinding
   index: number
   onViewPersons: () => void
+  onViewCompensacion?: () => void
   isOrgLevel?: boolean
 }) {
-  const [compExpanded, setCompExpanded] = useState(false)
-
   const cardConfig = SUBFINDING_CARDS[finding.key]
   const narrativeKey = SUBFINDING_TO_NARRATIVE[finding.key]
   const dictNarrative = narrativeKey ? getNarrative(narrativeKey) : null
-  const compEntry = COMP_QUADRANT_MAP[finding.key]
-    ? getCompensacionNarrative(COMP_QUADRANT_MAP[finding.key])
-    : null
 
   if (!cardConfig || !dictNarrative) return null
 
@@ -560,53 +587,13 @@ const FindingBlock = memo(function FindingBlock({
         Ver {isOrgLevel ? 'detalle' : `${finding.employees.length} persona${finding.employees.length !== 1 ? 's' : ''}`}
       </SubtleLink>
 
-      {/* Compensaciones expandible */}
-      {compEntry && (
-        <>
-          <div className="mt-2">
-            <button
-              onClick={() => setCompExpanded(!compExpanded)}
-              className="group inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
-            >
-              Ver perspectiva de compensaciones
-              <ArrowRight className={cn(
-                'w-3 h-3 transition-transform',
-                compExpanded ? 'rotate-90' : 'group-hover:translate-x-0.5'
-              )} />
-            </button>
-          </div>
-
-          <AnimatePresence>
-            {compExpanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="border-t border-slate-800/30 pt-3 mt-2 space-y-3">
-                  <div>
-                    <p className="text-[9px] font-medium text-slate-500 uppercase tracking-widest mb-1.5">
-                      La Observación
-                    </p>
-                    <p className="text-[11px] font-light text-slate-400 leading-relaxed">
-                      {compEntry.observacion}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-medium text-slate-500 uppercase tracking-widest mb-1.5">
-                      La Decisión de Valor
-                    </p>
-                    <p className="text-[11px] font-light text-slate-300 leading-relaxed">
-                      {compEntry.decisionValor}
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </>
+      {/* Compensaciones — abre modal */}
+      {onViewCompensacion && (
+        <div className="mt-2">
+          <SubtleLink onClick={onViewCompensacion}>
+            Ver perspectiva de compensaciones
+          </SubtleLink>
+        </div>
       )}
     </motion.div>
   )
