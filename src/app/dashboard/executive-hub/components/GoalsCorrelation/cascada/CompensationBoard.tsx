@@ -200,7 +200,7 @@ const ColumnCard = memo(function ColumnCard({
   otherLabel: string
 }) {
   return (
-    <div className="fhr-card relative overflow-hidden p-0">
+    <div className="relative overflow-hidden rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm">
       {/* Tesla line */}
       <div
         className="absolute top-0 left-0 right-0 h-[2px]"
@@ -222,7 +222,7 @@ const ColumnCard = memo(function ColumnCard({
       </div>
 
       {/* List */}
-      <div className="px-3 pb-4 space-y-0.5">
+      <div className="px-3 pb-4 space-y-1">
         {items.map((p, idx) => (
           <PersonRow
             key={p.employeeId}
@@ -240,7 +240,18 @@ const ColumnCard = memo(function ColumnCard({
 })
 
 // ════════════════════════════════════════════════════════════════════════════
-// PERSON ROW — badge por cuadrante + tooltip narrativo
+// MICRO NARRATIVES — visible inline, not just tooltip
+// ════════════════════════════════════════════════════════════════════════════
+
+const QUADRANT_MICRO: Record<string, string> = {
+  PERCEPTION_BIAS: 'Evaluación alta — metas no respaldan',
+  HIDDEN_PERFORMER: 'Entrega resultados — evaluación no lo reconoce',
+  DOUBLE_RISK: 'Sin respaldo para bono ni mérito',
+  CONSISTENT: '',
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PERSON ROW — 2 líneas: nombre + métricas, micro-narrativa visible
 // ════════════════════════════════════════════════════════════════════════════
 
 const PersonRow = memo(function PersonRow({
@@ -260,9 +271,9 @@ const PersonRow = memo(function PersonRow({
 }) {
   const quadrantBadge = QUADRANT_BADGE[point.quadrant]
   const tooltip = QUADRANT_TOOLTIP[point.quadrant]
+  const microNarr = QUADRANT_MICRO[point.quadrant] ?? ''
   const isRisk = point.quadrant === 'PERCEPTION_BIAS' || point.quadrant === 'DOUBLE_RISK'
   const delta = otherRank ? otherRank - rank : 0
-  const bigDelta = Math.abs(delta) > 5
 
   return (
     <motion.div
@@ -270,67 +281,71 @@ const PersonRow = memo(function PersonRow({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.03, duration: 0.2 }}
       className={cn(
-        'group/row relative flex items-center gap-2 py-2 px-2 rounded-lg transition-all duration-200',
-        isRisk && bigDelta
-          ? 'bg-amber-500/[0.06] border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.05)]'
-          : isRisk
-            ? 'bg-amber-500/[0.04] border border-amber-500/15'
-            : 'border border-transparent hover:bg-slate-800/30'
+        'group/row relative rounded-lg px-3 py-2.5 transition-all duration-200',
+        isRisk
+          ? 'bg-amber-500/[0.04] border border-amber-500/15'
+          : 'border border-transparent hover:bg-white/[0.02]'
       )}
     >
-      {/* Rank */}
-      <span className="text-[10px] font-mono text-slate-600 w-5 text-right flex-shrink-0">
-        {rank}
-      </span>
-
-      {/* Name + dept */}
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-light text-slate-200 truncate">{point.employeeName}</p>
-        <p className="text-[10px] text-slate-600 truncate">{point.departmentName}</p>
-      </div>
-
-      {/* Metric */}
-      <div className="flex-shrink-0">
-        {metric === '360' ? (
-          <span className={cn('text-sm font-mono', scoreColor(point.score360))}>
-            {point.score360.toFixed(1)}
-          </span>
-        ) : (
-          <span className={cn('text-sm font-mono', goalsColor(point.goalsPercent ?? 0))}>
-            {Math.round(point.goalsPercent ?? 0)}%
-          </span>
+      {/* Line 1: Rank + Name + Badge */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-mono text-slate-600 w-5 text-right flex-shrink-0">
+          {rank}
+        </span>
+        <span className="text-sm font-light text-slate-200 truncate flex-1">
+          {point.employeeName}
+        </span>
+        {quadrantBadge && point.quadrant !== 'CONSISTENT' && (
+          <div className="group/badge relative flex-shrink-0">
+            <span className={cn('fhr-badge text-[7px]', quadrantBadge.badge)}>
+              {quadrantBadge.label}
+            </span>
+            {tooltip && (
+              <div className="absolute bottom-full right-0 mb-2 w-64 px-3 py-2.5 rounded-xl bg-slate-950/95 backdrop-blur-xl border border-slate-700/30 shadow-2xl shadow-black/30 opacity-0 group-hover/badge:opacity-100 transition-all duration-200 pointer-events-none z-50 translate-y-1 group-hover/badge:translate-y-0">
+                <p className="text-[10px] text-slate-300 leading-relaxed">{tooltip}</p>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Other rank delta */}
-      {otherRank && otherLabel && (
-        <div className={cn(
-          'flex items-center gap-0.5 flex-shrink-0 text-[9px] font-mono',
-          delta > 3 ? 'text-amber-400' : delta < -3 ? 'text-cyan-400' : 'text-slate-600'
-        )}>
-          {delta > 3 ? <ArrowDown className="w-3 h-3" /> :
-           delta < -3 ? <ArrowUp className="w-3 h-3" /> :
-           <Minus className="w-3 h-3" />}
-          <span>#{otherRank}</span>
-        </div>
-      )}
-
-      {/* Quadrant badge with narrative tooltip */}
-      {quadrantBadge && (
-        <div className="group/badge relative flex-shrink-0">
-          <span className={cn('fhr-badge text-[8px] cursor-default', quadrantBadge.badge)}>
-            {quadrantBadge.label}
+      {/* Line 2: Dept · Score · Delta */}
+      <div className="flex items-center gap-2 mt-0.5 pl-7">
+        <span className="text-[10px] text-slate-600 truncate">
+          {point.departmentName}
+        </span>
+        <span className="text-slate-800">·</span>
+        {metric === '360' ? (
+          <span className={cn('text-[11px] font-mono', scoreColor(point.score360))}>
+            {point.score360.toFixed(1)}
           </span>
+        ) : (
+          <span className={cn('text-[11px] font-mono', goalsColor(point.goalsPercent ?? 0))}>
+            {Math.round(point.goalsPercent ?? 0)}%
+          </span>
+        )}
+        {otherRank && otherLabel && (
+          <>
+            <span className="text-slate-800">·</span>
+            <span className={cn(
+              'text-[10px] font-mono flex items-center gap-0.5',
+              delta > 3 ? 'text-amber-400' : delta < -3 ? 'text-cyan-400' : 'text-slate-600'
+            )}>
+              {otherLabel}
+              {delta > 3 ? <ArrowDown className="w-2.5 h-2.5 inline" /> :
+               delta < -3 ? <ArrowUp className="w-2.5 h-2.5 inline" /> :
+               <Minus className="w-2.5 h-2.5 inline" />}
+              #{otherRank}
+            </span>
+          </>
+        )}
+      </div>
 
-          {/* Tooltip — narrativa de compensación */}
-          {tooltip && (
-            <div className="absolute bottom-full right-0 mb-2 w-64 px-3 py-2.5 rounded-xl bg-slate-950/95 backdrop-blur-xl border border-slate-700/30 shadow-2xl shadow-black/30 opacity-0 group-hover/badge:opacity-100 transition-all duration-200 pointer-events-none z-50 translate-y-1 group-hover/badge:translate-y-0">
-              <p className="text-[10px] text-slate-300 leading-relaxed">
-                {tooltip}
-              </p>
-            </div>
-          )}
-        </div>
+      {/* Line 3: Micro-narrative — visible for risk rows (not just tooltip) */}
+      {microNarr && (
+        <p className="text-[9px] font-light text-amber-400/60 mt-1 pl-7">
+          {microNarr}
+        </p>
       )}
     </motion.div>
   )
