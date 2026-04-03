@@ -18,6 +18,7 @@ import type { SubFinding, NarrativeEmployee, ResolvedBadge } from './GoalsCorrel
 import { SUBFINDING_CARDS, SUBFINDING_TO_NARRATIVE } from './GoalsCorrelation.constants'
 import { formatCurrency, getConcentrationText } from './GoalsCorrelation.utils'
 import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
+import { MetricBar } from './shared/MetricBar'
 
 // Badge pair config (same as NarrativasTab)
 type BadgePairKey = 'goals' | 'score360' | 'roleFit' | 'engagement' | 'risk' | 'evaluatorStatus'
@@ -212,6 +213,15 @@ function PersonList({
               <p className="text-sm font-light text-slate-200 truncate">{emp.name}</p>
               <p className="text-[10px] text-slate-500 truncate">{emp.department}</p>
             </div>
+            {/* Mini gauges — goals + roleFit */}
+            {emp.goalsPercent !== null && (
+              <div className="w-24 flex-shrink-0 space-y-1 mx-2">
+                <MetricBar label="Metas" value={emp.goalsPercent} threshold={80} color="cyan" />
+                {emp.roleFitScore !== null && (
+                  <MetricBar label="RoleFit" value={emp.roleFitScore} threshold={75} color="purple" />
+                )}
+              </div>
+            )}
             <div className="flex items-center gap-1.5 flex-shrink-0 ml-3">
               {leftBadge && <Badge badge={leftBadge} label={badgePair!.leftLabel} />}
               {rightBadge && <Badge badge={rightBadge} label={badgePair!.rightLabel} />}
