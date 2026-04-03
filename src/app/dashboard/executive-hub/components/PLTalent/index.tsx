@@ -13,6 +13,8 @@ import { memo, useState, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Brain, MapPin, Scale } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { NavPill } from '../shared/NavPill'
+import type { NavPillTab } from '../shared/NavPill'
 
 import type { PLTalentProps } from './PLTalent.types'
 import { getPortadaNarrative } from './PLTalent.utils'
@@ -80,6 +82,12 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
     setView('detalle-gerencia')
   }, [])
 
+  const PL_TABS: NavPillTab[] = useMemo(() => [
+    { key: 'analisis', icon: Brain, label: 'Análisis' },
+    { key: 'mapa', icon: MapPin, label: 'Localización' },
+    { key: 'semaforo', icon: Scale, label: 'Zona Legal' },
+  ], [])
+
   const handleNavChange = useCallback((section: string) => {
     if (section === 'semaforo') setView('semaforo')
     else if (section === 'mapa') setView('mapa')
@@ -141,7 +149,7 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
                 <ArrowLeft className="w-3.5 h-3.5" />
                 Portada
               </button>
-              <NavPill active={activeSection} onChange={handleNavChange} />
+              <NavPill tabs={PL_TABS} active={activeSection} onChange={handleNavChange} layoutId="pl-talent-nav" />
             </div>
 
             {/* Executive Briefing — La Cascada de la Verdad */}
@@ -184,7 +192,7 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
                 <ArrowLeft className="w-3.5 h-3.5" />
                 Análisis
               </button>
-              <NavPill active={activeSection} onChange={handleNavChange} />
+              <NavPill tabs={PL_TABS} active={activeSection} onChange={handleNavChange} layoutId="pl-talent-nav" />
             </div>
 
             <BrechaProductivaTab
@@ -237,7 +245,7 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
                 <ArrowLeft className="w-3.5 h-3.5" />
                 Análisis
               </button>
-              <NavPill active={activeSection} onChange={handleNavChange} />
+              <NavPill tabs={PL_TABS} active={activeSection} onChange={handleNavChange} layoutId="pl-talent-nav" />
             </div>
 
             <SemaforoLegalTab data={data.semaforo} />
@@ -252,31 +260,4 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
 
 export default PLTalent
 
-// ════════════════════════════════════════════════════════════════════════════
-// NAV PILL — Localización | Zona Legal
-// ════════════════════════════════════════════════════════════════════════════
-
-function NavPill({ active, onChange }: { active: string; onChange: (v: string) => void }) {
-  const tabs = [
-    { key: 'analisis', icon: Brain, label: 'Análisis' },
-    { key: 'mapa', icon: MapPin, label: 'Localización' },
-    { key: 'semaforo', icon: Scale, label: 'Zona Legal' },
-  ]
-  return (
-    <div className="flex gap-0.5 bg-slate-900/50 backdrop-blur-sm border border-slate-700/30 rounded-full p-[3px]">
-      {tabs.map(t => (
-        <button key={t.key} onClick={() => onChange(t.key)}
-          className={cn(
-            'relative px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-[0.1em] transition-colors duration-200',
-            active === t.key ? 'text-white' : 'text-slate-500 hover:text-slate-400'
-          )}>
-          {active === t.key && (
-            <motion.div layoutId="pl-talent-nav" className="absolute inset-0 bg-slate-700/50 rounded-full"
-              transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
-          )}
-          <span className="relative z-10 flex items-center gap-1.5"><t.icon size={10} />{t.label}</span>
-        </button>
-      ))}
-    </div>
-  )
-}
+// NavPill imported from ../shared/NavPill
