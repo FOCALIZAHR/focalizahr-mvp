@@ -57,9 +57,9 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
       'Dos señales independientes confirman el mismo riesgo. ' +
       'Domina su cargo y entrega resultados — pero su compromiso emocional es crítico. ' +
       'El líder directo probablemente no lo sabe: ve las metas cumplidas y asume que todo está bien. ' +
-      'El engagement bajo es exactamente la señal que los resultados ocultan. ' +
+      'El compromiso bajo es exactamente la señal que los resultados ocultan. ' +
       'El costo de reemplazo ya está calculado. Cuando el rendimiento finalmente caiga, ya será tarde.',
-    coachingTip: 'La señal que el líder no ve es la más importante. ¿Perdió conexión con el propósito del rol? ¿Con el equipo? ¿Con su líder directo? Esa conversación debe ocurrir antes de que los resultados empiecen a bajar — porque cuando bajan, la decisión ya está tomada.',
+    coachingTip: 'La señal que el líder no ve es la más importante. ¿Perdió conexión con el propósito del rol? ¿Con el equipo? ¿Con su líder directo? Esa conversación no puede esperar a que los resultados bajen — porque cuando bajan, la decisión ya está tomada.',
     teslaColor: '#EF4444', // red
   },
 
@@ -68,8 +68,9 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
     description:
       'Dos fuentes independientes se contradicen. Su evaluación integral los clasifica en el nivel superior — pero sus metas están bajo el 40%. ' +
       'O el sistema de evaluación no está midiendo lo que el cargo realmente exige. O las metas están calibradas a la baja y no representan un desafío real. ' +
-      'En ambos casos, la organización está tomando decisiones — de desarrollo, de promoción, de compensación — basadas en una señal que no coincide con los resultados.',
-    coachingTip: 'Antes del cierre de compensación: estos casos tienen evaluación alta y ejecución baja. Si el bono considera la evaluación, estás pagando por percepción, no por resultados. La contradicción está documentada — y el monto estimado también.',
+      'En ambos casos, la organización está tomando decisiones — de desarrollo, de promoción, de compensación — basadas en una señal que no coincide con los resultados. ' +
+      'Cada decisión basada en esa señal refuerza el patrón.',
+    coachingTip: 'Si la compensación variable considera la evaluación, estos casos la ponen a prueba. La contradicción está documentada.',
     teslaColor: '#F59E0B', // amber
   },
 
@@ -112,7 +113,7 @@ export const GOALS_NARRATIVE_DICTIONARY: Record<string, GoalsNarrative> = {
       'Dos explicaciones posibles — y ninguna es sostenible: O las metas no están calibradas al nivel del cargo. ' +
       'O estas personas compensan con esfuerzo lo que les falta en dominio. ' +
       'En ambos casos, el rendimiento actual no se puede mantener.',
-    coachingTip: 'Valida la dificultad de las metas vs. el nivel del cargo. Si las metas son reales, protege a estas personas antes de que colapsen.',
+    coachingTip: '¿Las metas están calibradas al nivel del cargo? Si lo están, el esfuerzo que sostiene estos resultados tiene fecha de vencimiento.',
     teslaColor: '#F97316', // orange
   },
 
