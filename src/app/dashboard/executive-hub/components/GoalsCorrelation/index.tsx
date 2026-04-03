@@ -22,13 +22,14 @@ import AnalisisTab from './tabs/AnalisisTab'
 import GoalsFindingModal from './GoalsFindingModal'
 import GerenciaHeatmap from './cascada/GerenciaHeatmap'
 import CompensationBoard from './cascada/CompensationBoard'
+import EvaluadorAccountability from './cascada/EvaluadorAccountability'
 
 // ════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
 export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCorrelationPropsV2) {
-  const [view, setView] = useState<'portada' | 'cascada' | 'anomalias' | 'scatter' | 'heatmap' | 'compensacion'>('portada')
+  const [view, setView] = useState<'portada' | 'cascada' | 'anomalias' | 'scatter' | 'heatmap' | 'compensacion' | 'evaluadores'>('portada')
   const [modalFinding, setModalFinding] = useState<SubFinding | null>(null)
 
   const narrative = useMemo(() => getPortadaNarrativeV2(data), [data])
@@ -220,6 +221,27 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
             </button>
 
             <CompensationBoard correlation={data.correlation} />
+          </motion.div>
+        )}
+
+        {view === 'evaluadores' && (
+          <motion.div
+            key="evaluadores"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="p-4 md:p-6"
+          >
+            <button
+              onClick={() => setView('cascada')}
+              className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs mb-6"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Diagnóstico
+            </button>
+
+            <EvaluadorAccountability byManager={data.byManager} />
           </motion.div>
         )}
       </AnimatePresence>
