@@ -403,37 +403,52 @@ export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias
                   />
                 ))}
 
-                {/* Resumen gerencias */}
-                <div className="mt-8">
-                  <p className="text-xs uppercase tracking-widest text-slate-600 mb-4">Por gerencia</p>
-                  <div className="space-y-2">
-                    {byGerencia.slice(0, 5).map(g => {
-                      const pearsonOk = g.pearsonRoleFitGoals !== null && g.pearsonRoleFitGoals > 0.5
-                      const pearsonBad = g.pearsonRoleFitGoals !== null && g.pearsonRoleFitGoals < 0.3
-                      return (
-                        <div key={g.gerenciaName} className="flex items-center justify-between py-2 border-b border-slate-800/20 last:border-0">
-                          <div className="flex items-center gap-2.5">
-                            <div className={cn(
-                              'w-1.5 h-1.5 rounded-full',
-                              g.confidenceLevel === 'red' ? 'bg-amber-400' :
-                              g.confidenceLevel === 'amber' ? 'bg-amber-400' :
-                              'bg-cyan-400'
-                            )} />
-                            <span className="text-sm font-light text-slate-300">{g.gerenciaName}</span>
-                          </div>
-                          <div className="flex items-center gap-3 text-[10px]">
-                            {pearsonOk && <span className="text-cyan-400">Competencias predicen</span>}
-                            {pearsonBad && <span className="text-amber-400">Framework desalineado</span>}
-                            {!pearsonOk && !pearsonBad && g.pearsonRoleFitGoals !== null && (
-                              <span className="text-slate-500">Correlación moderada</span>
-                            )}
-                            <span className="text-slate-600 font-mono">{g.employeeCount} pers.</span>
-                          </div>
+                {/* Resumen gerencias — narrativo, no tabla */}
+                {(() => {
+                  const confiables = byGerencia.filter(g => g.confidenceLevel === 'green')
+                  const enRevision = byGerencia.filter(g => g.confidenceLevel !== 'green')
+                  const totalGerencias = byGerencia.length
+
+                  if (totalGerencias === 0) return null
+
+                  return (
+                    <div className="mt-8 space-y-4">
+                      {confiables.length > 0 && (
+                        <p className="text-base font-light text-slate-400 leading-relaxed">
+                          De {totalGerencias} gerencia{totalGerencias !== 1 ? 's' : ''} evaluada{totalGerencias !== 1 ? 's' : ''},{' '}
+                          <span className="font-medium text-cyan-400">{confiables.length}</span>{' '}
+                          muestra{confiables.length === 1 ? '' : 'n'} alineación entre evaluación y resultados
+                          {confiables.length <= 3 && (
+                            <>: {confiables.map(g => g.gerenciaName).join(', ')}.</>
+                          )}
+                          {confiables.length > 3 && '.'}
+                        </p>
+                      )}
+
+                      {enRevision.length > 0 && (
+                        <p className="text-base font-light text-slate-400 leading-relaxed">
+                          <span className="font-medium text-amber-400">{enRevision.length}</span>{' '}
+                          gerencia{enRevision.length !== 1 ? 's' : ''} requiere{enRevision.length === 1 ? '' : 'n'} revisión
+                          {enRevision.length <= 3 && (
+                            <>: {enRevision.map(g => g.gerenciaName).join(', ')}.</>
+                          )}
+                          {enRevision.length > 3 && '.'}
+                          {' '}La evaluación de desempeño en {enRevision.length === 1 ? 'esa unidad' : 'esas unidades'} no
+                          coincide con los resultados que entrega{enRevision.length === 1 ? '' : 'n'}.
+                        </p>
+                      )}
+
+                      {confiables.length === totalGerencias && (
+                        <div className="border-l-2 border-cyan-500/30 pl-4">
+                          <p className="text-sm italic font-light text-slate-300 leading-relaxed">
+                            Las evaluaciones están alineadas con los resultados a nivel de gerencia.
+                            Base confiable para decisiones de compensación.
+                          </p>
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
+                      )}
+                    </div>
+                  )
+                })()}
               </motion.div>
             </div>
           </>
