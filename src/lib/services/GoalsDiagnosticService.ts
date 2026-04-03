@@ -134,6 +134,12 @@ export interface CorrelationPoint {
   goalsPercent: number | null
   roleFitScore: number | null
   quadrant: CorrelationQuadrant
+  /** Segunda variable: riesgo de fuga, burnout, etc. */
+  riskQuadrant: string | null
+  /** Segunda variable: sucesor natural, experto ancla, etc. */
+  mobilityQuadrant: string | null
+  /** Segunda variable: tipo evaluador (INDULGENTE, SEVERA, etc.) */
+  evaluatorStatus: string | null
 }
 
 export interface GerenciaGoalsStats {
@@ -415,8 +421,11 @@ export class GoalsDiagnosticService {
     })
   }
 
-  /** Build scatter plot points */
-  private static buildCorrelationPoints(ratings: RatingRow[]): CorrelationPoint[] {
+  /** Build scatter plot points (enriched with second variable fields) */
+  private static buildCorrelationPoints(
+    ratings: RatingRow[],
+    managerClassifications?: Map<string, EvaluationStatus>
+  ): CorrelationPoint[] {
     return ratings.map(r => ({
       employeeId: r.employee.id,
       employeeName: r.employee.fullName,
@@ -426,6 +435,9 @@ export class GoalsDiagnosticService {
       goalsPercent: r.goalsRawPercent,
       roleFitScore: r.roleFitScore,
       quadrant: this.classifyQuadrant(r.roleFitScore, r.goalsRawPercent),
+      riskQuadrant: r.riskQuadrant ?? null,
+      mobilityQuadrant: r.mobilityQuadrant ?? null,
+      evaluatorStatus: (r.employee.managerId && managerClassifications?.get(r.employee.managerId)) ?? null,
     }))
   }
 
@@ -1005,7 +1017,7 @@ export class GoalsDiagnosticService {
     const topAlerts = this.rankTopAlerts(allFindings, 3)
 
     // Scatter + quadrants (reuse V1 logic)
-    const correlation = this.buildCorrelationPoints(ratings)
+    const correlation = this.buildCorrelationPoints(ratings, managerClassifications)
     const quadrantCounts = {
       consistent: correlation.filter(c => c.quadrant === 'CONSISTENT').length,
       perceptionBias: correlation.filter(c => c.quadrant === 'PERCEPTION_BIAS').length,
