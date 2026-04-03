@@ -240,6 +240,43 @@ export const SCIENTIFIC_BACKING: Record<string, ScientificBacking> = {
     variant: 'momentum',
   },
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // RIESGO FINANCIERO METAS — Insight #7 Metas × Performance
+  // ──────────────────────────────────────────────────────────────────────────
+  goals_financial_risk: {
+    citations: [
+      {
+        claim:
+          'El costo de reemplazar un empleado calificado ' +
+          'supera significativamente su salario mensual',
+        stat:
+          'El costo de reemplazo oscila entre 50-200% del salario anual ' +
+          'según el nivel del cargo y la especialización',
+        source: 'SHRM Human Capital Benchmarking Report · 2024',
+        url: 'https://www.shrm.org/topics-tools/research',
+      },
+      {
+        claim:
+          'Las discrepancias entre evaluación y resultados ' +
+          'afectan la equidad percibida y la retención',
+        stat:
+          '20-30% de contribuyentes valiosos son invisibles ' +
+          'en sistemas de evaluación tradicionales',
+        source: 'Confirm / McKinsey Organizational Health Index · 2024',
+      },
+    ],
+    bridge:
+      'FocalizaHR calcula el costo de riesgo sumando tres componentes: ' +
+      '(1) Costo de reemplazo para personas en riesgo de fuga que cumplen metas ' +
+      '(dato real de SalaryConfigService × factor por familia de cargo). ' +
+      '(2) Estimación de bono en riesgo para personas con evaluación alta pero metas bajas ' +
+      '(proxy: salario mensual × personas afectadas). ' +
+      '(3) Riesgo de burnout para personas que entregan sin dominar su cargo ' +
+      '(costo de reemplazo × 30% como factor de probabilidad). ' +
+      'El monto es una estimación conservadora del costo de no intervenir.',
+    variant: 'pattern',
+  },
+
 }
 
 // ════════════════════════════════════════════════════════════════════════════

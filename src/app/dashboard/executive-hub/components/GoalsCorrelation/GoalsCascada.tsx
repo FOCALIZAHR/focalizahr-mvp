@@ -18,6 +18,8 @@ import type { GoalsCorrelationDataV2, SubFinding } from './GoalsCorrelation.type
 import { SUBFINDING_CARDS, SUBFINDING_TO_NARRATIVE } from './GoalsCorrelation.constants'
 import { formatCurrency } from './GoalsCorrelation.utils'
 import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
+import ScientificBackingTooltip from '@/components/shared/ScientificBackingTooltip'
+import { SCIENTIFIC_BACKING } from '@/config/narratives/ScientificBackingDictionary'
 import { getCompensacionNarrative } from '@/config/narratives/CompensacionNarrativeDictionary'
 import GoalsFindingModal from './GoalsFindingModal'
 import GoalsStarsModal from './GoalsStarsModal'
@@ -150,21 +152,53 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
             <ActSeparator label="Anomalías" color="amber" />
 
             <div>
-              {/* Ancla */}
-              <motion.div {...fadeInDelay} className="text-center mb-10">
-                {totals.totalFinancialRisk > 0 ? (
-                  <p className="text-7xl md:text-8xl font-extralight text-amber-400 tracking-tight">
-                    {formatCurrency(totals.totalFinancialRisk)}
-                  </p>
-                ) : (
-                  <p className="text-7xl md:text-8xl font-extralight text-amber-400 tracking-tight">
-                    {totals.totalAnomalias}
-                  </p>
-                )}
-                <p className="text-xs text-slate-500 mt-3 uppercase tracking-wider">
-                  {totals.totalFinancialRisk > 0 ? 'en riesgo' : 'anomalías detectadas'}
-                </p>
-              </motion.div>
+              {/* Ancla — % en cuadrantes de riesgo (dato real, no estimación) */}
+              {(() => {
+                const totalRiesgo =
+                  data.quadrantCounts.perceptionBias +
+                  data.quadrantCounts.hiddenPerformer +
+                  data.quadrantCounts.doubleRisk
+                const pctRiesgo = totals.totalEvaluados > 0
+                  ? Math.round((totalRiesgo / totals.totalEvaluados) * 100)
+                  : 0
+                return (
+                  <>
+                    <motion.div {...fadeInDelay} className="text-center mb-10">
+                      <p className="text-7xl md:text-8xl font-extralight text-amber-400 tracking-tight">
+                        {pctRiesgo}%
+                      </p>
+                      <p className="text-xs text-slate-500 mt-3 uppercase tracking-wider">
+                        en cuadrantes de riesgo
+                      </p>
+                    </motion.div>
+
+                    <motion.div {...fadeIn} className="max-w-2xl mx-auto text-center mb-12">
+                      <p className="text-base font-light text-slate-400 leading-relaxed">
+                        De <span className="font-medium text-slate-200">{totals.totalEvaluados}</span> evaluados,{' '}
+                        <span className="font-medium text-amber-400">{totalRiesgo}</span> tienen una discrepancia
+                        entre lo que entregan y lo que el sistema mide.
+                      </p>
+                      {totals.totalFinancialRisk > 0 && (
+                        <p className="text-sm font-light text-slate-500 mt-3">
+                          Costo estimado de riesgo asociado:{' '}
+                          <span className="font-mono text-purple-400">
+                            {formatCurrency(totals.totalFinancialRisk)}
+                          </span>
+                        </p>
+                      )}
+                      {totals.totalFinancialRisk > 0 && SCIENTIFIC_BACKING.goals_financial_risk && (
+                        <div className="mt-3">
+                          <ScientificBackingTooltip
+                            backing={SCIENTIFIC_BACKING.goals_financial_risk}
+                            triggerLabel="¿Cómo se calcula este monto?"
+                            position="bottom"
+                          />
+                        </div>
+                      )}
+                    </motion.div>
+                  </>
+                )
+              })()}
 
               {/* Top hallazgos — cada uno como bloque narrativo completo */}
               <div className="space-y-16 max-w-2xl mx-auto">
