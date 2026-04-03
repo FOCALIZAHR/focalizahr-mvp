@@ -53,13 +53,14 @@ const fadeInDelay = {
 interface GoalsCascadaProps {
   data: GoalsCorrelationDataV2
   onOpenScatter: () => void
+  onOpenAnomalias: () => void
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
-export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaProps) {
+export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias }: GoalsCascadaProps) {
   const [modalFinding, setModalFinding] = useState<SubFinding | null>(null)
   const [showRemainingFindings, setShowRemainingFindings] = useState(false)
   const [showStarsModal, setShowStarsModal] = useState(false)
@@ -203,9 +204,9 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
                 )
               })()}
 
-              {/* Top hallazgos — cada uno como bloque narrativo completo */}
+              {/* Top 2 hallazgos más severos */}
               <div className="space-y-16 max-w-2xl mx-auto">
-                {topAlerts.slice(0, 3).map((alert, idx) => (
+                {topAlerts.slice(0, 2).map((alert, idx) => (
                   <FindingBlock
                     key={alert.key}
                     finding={alert}
@@ -216,29 +217,12 @@ export default memo(function GoalsCascada({ data, onOpenScatter }: GoalsCascadaP
                 ))}
               </div>
 
-              {/* Hallazgos restantes */}
-              {remainingFindings.length > 0 && (
+              {/* CTA a vista completa de anomalías */}
+              {allFindings.length > 2 && (
                 <motion.div {...fadeIn} className="max-w-2xl mx-auto mt-12">
-                  {!showRemainingFindings ? (
-                    <SubtleLink onClick={() => setShowRemainingFindings(true)}>
-                      Ver {remainingFindings.length} hallazgo{remainingFindings.length !== 1 ? 's' : ''} adicional{remainingFindings.length !== 1 ? 'es' : ''}
-                    </SubtleLink>
-                  ) : (
-                    <div className="space-y-16">
-                      <p className="text-xs uppercase tracking-widest text-slate-600">
-                        Hallazgos adicionales
-                      </p>
-                      {remainingFindings.map((f, idx) => (
-                        <FindingBlock
-                          key={f.key}
-                          finding={f}
-                          index={idx}
-                          onViewPersons={() => setModalFinding(f)}
-                          onViewCompensacion={COMP_QUADRANT_MAP[f.key] ? () => openCompModal(f.key) : undefined}
-                        />
-                      ))}
-                    </div>
-                  )}
+                  <SubtleLink onClick={onOpenAnomalias}>
+                    Ver análisis completo · {allFindings.length} hallazgo{allFindings.length !== 1 ? 's' : ''}
+                  </SubtleLink>
                 </motion.div>
               )}
             </div>

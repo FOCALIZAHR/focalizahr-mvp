@@ -4,26 +4,29 @@
 // GOALS CORRELATION V2 — Insight #7 Executive Hub
 // src/app/dashboard/executive-hub/components/GoalsCorrelation/index.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// CEO-first: Portada → Cascada narrativa → Drill-down modals → Scatter
-// Patrón: PanelPortada estándar + GoalsCascada (whileInView)
+// CEO-first: Portada → Cascada → Anomalías → Scatter
+// 4 vistas, progressive disclosure, modales para drill-down
 // ════════════════════════════════════════════════════════════════════════════
 
 import { memo, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Crosshair } from 'lucide-react'
 
-import type { GoalsCorrelationPropsV2 } from './GoalsCorrelation.types'
+import type { GoalsCorrelationPropsV2, SubFinding } from './GoalsCorrelation.types'
 import { getPortadaNarrativeV2 } from './GoalsCorrelation.utils'
 import { PanelPortada } from '../PanelPortada'
 import GoalsCascada from './GoalsCascada'
+import AnomalíasView from './AnomalíasView'
 import AnalisisTab from './tabs/AnalisisTab'
+import GoalsFindingModal from './GoalsFindingModal'
 
 // ════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
 export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCorrelationPropsV2) {
-  const [view, setView] = useState<'portada' | 'cascada' | 'scatter'>('portada')
+  const [view, setView] = useState<'portada' | 'cascada' | 'anomalias' | 'scatter'>('portada')
+  const [modalFinding, setModalFinding] = useState<SubFinding | null>(null)
 
   const narrative = useMemo(() => getPortadaNarrativeV2(data), [data])
 
@@ -76,7 +79,6 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
             transition={{ duration: 0.2 }}
             className="p-4 md:p-6"
           >
-            {/* Back to portada */}
             <button
               onClick={() => setView('portada')}
               className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs mb-6"
@@ -88,6 +90,24 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
             <GoalsCascada
               data={data}
               onOpenScatter={() => setView('scatter')}
+              onOpenAnomalias={() => setView('anomalias')}
+            />
+          </motion.div>
+        )}
+
+        {view === 'anomalias' && (
+          <motion.div
+            key="anomalias"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="p-4 md:p-6"
+          >
+            <AnomalíasView
+              data={data}
+              onBack={() => setView('cascada')}
+              onOpenFinding={(f) => setModalFinding(f)}
             />
           </motion.div>
         )}
@@ -101,7 +121,6 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
             transition={{ duration: 0.2 }}
             className="p-4 md:p-6"
           >
-            {/* Back to cascada */}
             <button
               onClick={() => setView('cascada')}
               className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs mb-6"
@@ -117,6 +136,14 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Modal — drill-down a personas (shared across views) */}
+      {modalFinding && (
+        <GoalsFindingModal
+          finding={modalFinding}
+          onClose={() => setModalFinding(null)}
+        />
+      )}
     </div>
   )
 })
