@@ -343,9 +343,9 @@ const PersonRow = memo(function PersonRow({
       transition={{ delay: idx * 0.03 }}
       className="relative"
     >
-      {/* Acento cyan si tiene señal */}
+      {/* Acento purple si tiene señal — "merece atención" sin juicio */}
       {hasSignal && (
-        <div className="absolute top-0 left-0 right-0 h-px bg-cyan-400/25" />
+        <div className="absolute top-0 left-0 right-0 h-px bg-purple-400/25" />
       )}
 
       {/* Main row */}
