@@ -293,7 +293,6 @@ export default memo(function CompensationSplit({
                 point={p}
                 index={idx}
                 path={path}
-                isRiskCategory={cat.key === 'DR' || cat.key === 'BL' || cat.key === 'PB'}
               />
             ))}
           </div>
@@ -317,15 +316,14 @@ const PersonRow = memo(function PersonRow({
   point: p,
   index: idx,
   path,
-  isRiskCategory,
 }: {
   point: CorrelationPoint
   index: number
   path: CompensationPath
-  isRiskCategory: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const tag = getSecondVarTag(p, path)
+  const hasSignal = p.riskQuadrant !== null || p.evaluatorStatus !== null || p.quadrant === 'DOUBLE_RISK'
 
   // FIX 8: narrativa individual on expand
   const narrative = useMemo(() => {
@@ -343,8 +341,19 @@ const PersonRow = memo(function PersonRow({
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: idx * 0.03 }}
+      className="relative"
     >
-      {/* Main row — FIX 14: nombre L1, datos L2 */}
+      {/* Tesla line sutil si tiene señal */}
+      {hasSignal && (
+        <div
+          className="absolute top-0 left-0 right-0 h-px"
+          style={{
+            background: 'linear-gradient(90deg, transparent, #22D3EE40, #A78BFA30, transparent)',
+          }}
+        />
+      )}
+
+      {/* Main row */}
       <button
         onClick={() => setExpanded(!expanded)}
         className={cn(
