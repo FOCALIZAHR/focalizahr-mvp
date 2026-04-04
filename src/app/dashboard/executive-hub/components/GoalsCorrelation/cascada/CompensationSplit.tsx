@@ -9,9 +9,10 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { memo, useState, useMemo } from 'react'
-import { motion } from 'framer-motion'
-import { ArrowLeft, Home, Lightbulb } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ArrowLeft, Home, Lightbulb, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { TalentNarrativeService } from '@/lib/services/TalentNarrativeService'
 
 import type { CompensationPath } from './CompensationHub'
 import type { CorrelationPoint, ManagerGoalsStats } from '../GoalsCorrelation.types'
@@ -71,18 +72,26 @@ function autoSelectIndex(categories: CategoryDef[], counts: number[]): number {
 // EVALUATOR TAG — segunda variable para mérito
 // ════════════════════════════════════════════════════════════════════════════
 
-function getSecondVarTag(point: CorrelationPoint, path: CompensationPath): { label: string; colorClass: string } | null {
+// FIX 10: Tags diferenciados por urgencia/tipo
+const TAG_STYLES: Record<string, { text: string; border: string }> = {
+  red:     { text: 'text-red-400/70',     border: 'border-red-500/15' },
+  amber:   { text: 'text-amber-400/70',   border: 'border-amber-500/15' },
+  emerald: { text: 'text-emerald-400/70', border: 'border-emerald-500/15' },
+  purple:  { text: 'text-purple-400/70',  border: 'border-purple-500/15' },
+  cyan:    { text: 'text-cyan-400/70',    border: 'border-cyan-500/15' },
+}
+
+function getSecondVarTag(point: CorrelationPoint, path: CompensationPath): { label: string; color: keyof typeof TAG_STYLES } | null {
   if (path === 'merito' && point.evaluatorStatus) {
-    if (point.evaluatorStatus === 'INDULGENTE') return { label: 'Jefe indulgente', colorClass: 'tg-warning' }
-    if (point.evaluatorStatus === 'SEVERA') return { label: 'Jefe severo', colorClass: 'tg-amber' }
+    if (point.evaluatorStatus === 'INDULGENTE') return { label: 'Jefe indulgente', color: 'amber' }
+    if (point.evaluatorStatus === 'SEVERA') return { label: 'Jefe severo', color: 'cyan' }
   }
-  if (path === 'bonos' && point.riskQuadrant) {
-    if (point.riskQuadrant === 'FUGA_CEREBROS') return { label: 'Riesgo de fuga', colorClass: 'tg-purple' }
-    if (point.riskQuadrant === 'BURNOUT_RISK') return { label: 'Riesgo burnout', colorClass: 'tg-amber' }
-  }
-  if (path === 'bonos' && point.mobilityQuadrant) {
-    if (point.mobilityQuadrant === 'SUCESOR_NATURAL') return { label: 'Sucesor natural', colorClass: 'tg-purple' }
-    if (point.mobilityQuadrant === 'MOTOR_EQUIPO') return { label: 'Motor equipo', colorClass: 'tg-purple' }
+  if (path === 'bonos' || path === 'senales') {
+    if (point.riskQuadrant === 'FUGA_CEREBROS') return { label: 'Riesgo de fuga', color: 'red' }
+    if (point.riskQuadrant === 'BURNOUT_RISK') return { label: 'Riesgo burnout', color: 'amber' }
+    if (point.riskQuadrant === 'BAJO_RENDIMIENTO') return { label: 'Bajo rendimiento', color: 'red' }
+    if (point.mobilityQuadrant === 'SUCESOR_NATURAL') return { label: 'Sucesor natural', color: 'purple' }
+    if (point.mobilityQuadrant === 'MOTOR_EQUIPO') return { label: 'Motor equipo', color: 'emerald' }
   }
   return null
 }
@@ -129,7 +138,7 @@ export default memo(function CompensationSplit({
     ? getSignalNarrative(cat.narrativeKey as SignalType)
     : null
 
-  // Second variable summary — from centralized dictionary
+  // FIX 9: Second variable desglosado por tipo concreto
   const secondVarSummary = useMemo(() => {
     if (path === 'merito') {
       const indulgent = people.filter(p => p.evaluatorStatus === 'INDULGENTE')
@@ -137,10 +146,17 @@ export default memo(function CompensationSplit({
       return secondVar
     }
     if (path === 'bonos') {
-      const countRisk = people.filter(p => p.riskQuadrant === 'FUGA_CEREBROS' || p.riskQuadrant === 'BURNOUT_RISK').length
-      const countInvisible = people.filter(p => !p.riskQuadrant && p.quadrant === 'HIDDEN_PERFORMER').length
-      const { secondVar } = getBonosNarratives(0, 0, countRisk > 0 || countInvisible > 0, countRisk, countInvisible)
-      return secondVar
+      const fuga = people.filter(p => p.riskQuadrant === 'FUGA_CEREBROS').length
+      const burnout = people.filter(p => p.riskQuadrant === 'BURNOUT_RISK').length
+      const motor = people.filter(p => p.mobilityQuadrant === 'MOTOR_EQUIPO').length
+      const sucesor = people.filter(p => p.mobilityQuadrant === 'SUCESOR_NATURAL').length
+      const parts: string[] = []
+      if (fuga > 0) parts.push(`<b>${fuga}</b> con riesgo de fuga`)
+      if (burnout > 0) parts.push(`<b>${burnout}</b> en riesgo de burnout`)
+      if (motor > 0) parts.push(`<b>${motor}</b> motor del equipo`)
+      if (sucesor > 0) parts.push(`<b>${sucesor}</b> sucesor natural`)
+      if (parts.length === 0) return null
+      return parts.join(', ') + ' — invisibles para quien los evalúa.'
     }
     return null
   }, [path, people])
@@ -269,52 +285,15 @@ export default memo(function CompensationSplit({
           </p>
 
           <div className="space-y-0.5">
-            {people.map((p, idx) => {
-              const tag = getSecondVarTag(p, path)
-              const isRisk = cat.key === 'DR' || cat.key === 'BL' || cat.key === 'PB'
-              return (
-                <motion.div
-                  key={p.employeeId}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.03 }}
-                  className={cn(
-                    'flex items-center gap-2 py-2 px-1.5 rounded-lg',
-                    isRisk && 'border-l-2 border-amber-500/15 pl-1 rounded-l-none bg-amber-500/[0.02]'
-                  )}
-                >
-                  <span className="text-[10px] font-mono text-slate-700 w-4 text-right flex-shrink-0">
-                    {idx + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[13px] text-slate-300 font-light truncate block">
-                      {p.employeeName}
-                    </span>
-                    <span className="text-[10px] text-slate-700 font-light block">
-                      {p.departmentName}
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-mono text-slate-500 flex-shrink-0">
-                    {path === 'senales'
-                      ? `${p.score360.toFixed(1)}/${Math.round(p.goalsPercent ?? 0)}%`
-                      : path === 'merito'
-                        ? p.score360.toFixed(1)
-                        : `${Math.round(p.goalsPercent ?? 0)}%`
-                    }
-                  </span>
-                  {tag && (
-                    <span className={cn(
-                      'text-[9px] px-2 py-0.5 rounded-full border flex-shrink-0 font-light',
-                      tag.colorClass === 'tg-warning' && 'text-amber-500/60 border-amber-500/10',
-                      tag.colorClass === 'tg-purple' && 'text-purple-400/60 border-purple-500/10',
-                      tag.colorClass === 'tg-amber' && 'text-amber-400/60 border-amber-400/10',
-                    )}>
-                      {tag.label}
-                    </span>
-                  )}
-                </motion.div>
-              )
-            })}
+            {people.map((p, idx) => (
+              <PersonRow
+                key={p.employeeId}
+                point={p}
+                index={idx}
+                path={path}
+                isRiskCategory={cat.key === 'DR' || cat.key === 'BL' || cat.key === 'PB'}
+              />
+            ))}
           </div>
 
           {/* Action button */}
@@ -325,5 +304,113 @@ export default memo(function CompensationSplit({
       </div>
       </div>{/* close p-7 */}
     </div>
+  )
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// PERSON ROW — FIX 8: expandible con narrativa individual
+// ════════════════════════════════════════════════════════════════════════════
+
+const PersonRow = memo(function PersonRow({
+  point: p,
+  index: idx,
+  path,
+  isRiskCategory,
+}: {
+  point: CorrelationPoint
+  index: number
+  path: CompensationPath
+  isRiskCategory: boolean
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const tag = getSecondVarTag(p, path)
+  const tagStyle = tag ? TAG_STYLES[tag.color] : null
+
+  // FIX 8: narrativa individual on expand
+  const narrative = useMemo(() => {
+    if (!expanded) return null
+    return TalentNarrativeService.getIndividualNarrative(
+      p.riskQuadrant ?? null,
+      p.mobilityQuadrant ?? null,
+      p.roleFitScore ?? null,
+      p.employeeName.split(' ')[0]
+    )
+  }, [expanded, p])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: idx * 0.03 }}
+    >
+      {/* Main row — clickable */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className={cn(
+          'w-full flex items-center gap-2 py-2 px-1.5 rounded-lg text-left transition-all',
+          isRiskCategory && 'border-l-2 border-amber-500/15 pl-1 rounded-l-none bg-amber-500/[0.02]',
+          expanded && 'bg-white/[0.02]'
+        )}
+      >
+        <span className="text-[10px] font-mono text-slate-700 w-4 text-right flex-shrink-0">
+          {idx + 1}
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="text-[13px] text-slate-300 font-light truncate block">
+            {p.employeeName}
+          </span>
+          <span className="text-[10px] text-slate-700 font-light block">
+            {p.departmentName}
+          </span>
+        </div>
+        <span className="text-[11px] font-mono text-slate-500 flex-shrink-0">
+          {path === 'senales'
+            ? `${p.score360.toFixed(1)}/${Math.round(p.goalsPercent ?? 0)}%`
+            : path === 'merito'
+              ? p.score360.toFixed(1)
+              : `${Math.round(p.goalsPercent ?? 0)}%`
+          }
+        </span>
+        {tag && tagStyle && (
+          <span className={cn(
+            'text-[9px] px-2 py-0.5 rounded-full border flex-shrink-0 font-light',
+            tagStyle.text, tagStyle.border
+          )}>
+            {tag.label}
+          </span>
+        )}
+        <ChevronDown className={cn(
+          'w-3 h-3 text-slate-700 transition-transform flex-shrink-0',
+          expanded && 'rotate-180'
+        )} />
+      </button>
+
+      {/* FIX 8: Expanded narrative */}
+      <AnimatePresence>
+        {expanded && narrative && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="pl-7 pr-2 pb-3 pt-1 space-y-1.5">
+              <p className="text-xs font-normal text-slate-300">
+                {narrative.headline}
+              </p>
+              <p className="text-[11px] font-light text-slate-500 leading-relaxed">
+                {narrative.context}
+              </p>
+              {narrative.urgencySignal && (
+                <p className="text-[10px] font-light text-amber-400/60 italic">
+                  {narrative.urgencySignal}
+                </p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   )
 })
