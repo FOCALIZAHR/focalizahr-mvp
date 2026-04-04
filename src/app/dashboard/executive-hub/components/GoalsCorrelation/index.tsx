@@ -133,7 +133,7 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
             <p className="text-sm font-light text-slate-500 mt-3 mb-6">
               {view === 'diagnostico' && 'Dossier ejecutivo: qué encontramos y qué significa.'}
               {view === 'localizacion' && 'Dónde está el problema — por gerencia y por persona.'}
-              {view === 'compensacion' && 'Revisa antes de aprobar bonos.'}
+              {view === 'compensacion' && ''}
             </p>
 
             {/* ─── Tab: Diagnóstico ─── */}

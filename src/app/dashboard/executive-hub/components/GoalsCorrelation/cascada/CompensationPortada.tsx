@@ -82,7 +82,7 @@ export default memo(function CompensationPortada({
             className="flex items-center gap-1.5 mb-6"
           >
             <p className="text-sm font-light text-slate-400">
-              <span className="text-amber-400 font-medium">{stats.sinConfianza}</span> de {stats.totalGerencias} gerencias no tienen base confiable para compensar.
+              <span className="text-amber-400 font-medium">{stats.sinConfianza}</span> de {stats.totalGerencias} gerencia{stats.totalGerencias !== 1 ? 's' : ''} no {stats.sinConfianza === 1 ? 'tiene' : 'tienen'} base confiable para compensar.
             </p>
             <button
               onClick={onOpenGerenciaModal}
