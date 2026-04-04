@@ -383,7 +383,33 @@ const PersonRow = memo(function PersonRow({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="pl-7 pr-2 pb-3 pt-1 space-y-1.5">
+            <div className="pl-7 pr-2 pb-3 pt-1 space-y-2.5">
+              {/* Métricas clave con tooltips */}
+              <div className="flex items-center gap-4">
+                {p.goalsPercent !== null && (
+                  <div className="group/tip relative">
+                    <span className="text-xs text-slate-500">Metas</span>
+                    <span className="text-sm font-mono text-cyan-400/70 ml-1">{Math.round(p.goalsPercent)}%</span>
+                    <div className="absolute bottom-full left-0 mb-1.5 w-44 px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-slate-700/30 opacity-0 group-hover/tip:opacity-100 transition-all pointer-events-none z-50">
+                      <p className="text-[10px] text-slate-300">Porcentaje de cumplimiento de metas del negocio asignadas</p>
+                    </div>
+                  </div>
+                )}
+                {p.goalsPercent !== null && p.roleFitScore !== null && (
+                  <span className="text-slate-800">·</span>
+                )}
+                {p.roleFitScore !== null && (
+                  <div className="group/tip relative">
+                    <span className="text-xs text-slate-500">RoleFit</span>
+                    <span className="text-sm font-mono text-purple-400/70 ml-1">{Math.round(p.roleFitScore)}%</span>
+                    <div className="absolute bottom-full left-0 mb-1.5 w-44 px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-slate-700/30 opacity-0 group-hover/tip:opacity-100 transition-all pointer-events-none z-50">
+                      <p className="text-[10px] text-slate-300">Nivel de dominio del cargo según evaluación 360° de competencias</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Narrativa individual */}
               <p className="text-xs font-normal text-slate-300">
                 {narrative.headline}
               </p>
