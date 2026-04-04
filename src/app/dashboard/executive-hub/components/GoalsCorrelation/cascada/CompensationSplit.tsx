@@ -343,14 +343,9 @@ const PersonRow = memo(function PersonRow({
       transition={{ delay: idx * 0.03 }}
       className="relative"
     >
-      {/* Tesla line sutil si tiene señal */}
+      {/* Acento cyan si tiene señal */}
       {hasSignal && (
-        <div
-          className="absolute top-0 left-0 right-0 h-px"
-          style={{
-            background: 'linear-gradient(90deg, transparent, #22D3EE40, #A78BFA30, transparent)',
-          }}
-        />
+        <div className="absolute top-0 left-0 right-0 h-px bg-cyan-400/25" />
       )}
 
       {/* Main row */}
