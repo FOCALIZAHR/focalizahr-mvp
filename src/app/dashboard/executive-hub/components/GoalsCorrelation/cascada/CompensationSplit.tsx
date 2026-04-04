@@ -228,10 +228,10 @@ export default memo(function CompensationSplit({
         <div className="rounded-2xl border border-slate-800/30 bg-slate-900/30 p-5 relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/15 to-transparent" />
 
-          {/* La observación */}
+          {/* La observación — bold en ideas fuerza (<b> del diccionario) */}
           <div className="mb-4">
             <p className="text-xs text-slate-300 font-medium tracking-wide mb-1.5">La observación</p>
-            <p className="text-[13px] text-slate-400 font-light leading-[1.7] [&>b]:text-slate-200 [&>b]:font-normal"
+            <p className="text-[13px] text-slate-400 font-light leading-[1.7] [&>b]:font-medium [&>b]:text-slate-200"
               dangerouslySetInnerHTML={{ __html:
                 narrative?.observacion ??
                 signalNarr?.observation ?? ''
@@ -239,23 +239,24 @@ export default memo(function CompensationSplit({
             />
           </div>
 
-          {/* La decisión de valor */}
+          {/* La decisión de valor — preguntas cada una en su línea */}
           <div className="mb-4">
             <p className="text-xs text-slate-300 font-medium tracking-wide mb-1.5">La decisión de valor</p>
-            <div
-              className="text-xs text-slate-500 font-light leading-relaxed pl-3 [&>b]:text-slate-400 [&>b]:font-normal"
-              style={{ borderLeft: '1.5px solid', borderImage: 'linear-gradient(180deg, #22D3EE30, #A78BFA20) 1' }}
-              dangerouslySetInnerHTML={{ __html:
-                narrative?.decisionValor ??
-                signalNarr?.decisionOfValue ?? ''
-              }}
-            />
+            <DecisionBlock text={narrative?.decisionValor ?? signalNarr?.decisionOfValue ?? ''} />
           </div>
 
-          {/* Segunda variable (conditional) */}
+          {/* Segunda variable → nombre categoría + ancla descriptiva */}
           {secondVarSummary && (
             <div className="mb-4">
-              <p className="text-xs text-slate-300 font-medium tracking-wide mb-1.5">Segunda variable</p>
+              <div className="mb-1.5 flex items-baseline gap-2">
+                <span className="text-xs font-medium text-slate-200">{cat.label}</span>
+                <span className="text-[10px] text-slate-500">
+                  {cat.narrativeKey === 'HIDDEN_PERFORMER' && 'Cumple metas · evaluación baja'}
+                  {cat.narrativeKey === 'PERCEPTION_BIAS' && 'Evaluación alta · metas incumplidas'}
+                  {cat.narrativeKey === 'DOUBLE_RISK' && 'Sin respaldo en ambas fuentes'}
+                  {cat.narrativeKey === 'CONSISTENT' && 'Cumple metas · evaluación alta'}
+                </span>
+              </div>
               <div className="text-xs text-slate-500 font-light leading-relaxed p-3 rounded-xl bg-[#0B1120]/80 border border-slate-800/40 [&>b]:text-cyan-400 [&>b]:font-normal"
                 dangerouslySetInnerHTML={{ __html: secondVarSummary }}
               />
@@ -309,7 +310,50 @@ export default memo(function CompensationSplit({
 })
 
 // ════════════════════════════════════════════════════════════════════════════
-// PERSON ROW — FIX 8: expandible con narrativa individual
+// DECISION BLOCK — separa intro de preguntas (cada ? en su línea)
+// ════════════════════════════════════════════════════════════════════════════
+
+function DecisionBlock({ text }: { text: string }) {
+  // Strip HTML tags for splitting, but keep original for intro
+  const plain = text.replace(/<[^>]+>/g, '')
+  const parts = plain.split('?').map(s => s.trim()).filter(Boolean)
+
+  // First part without ? is the intro, rest are questions
+  const hasQuestions = parts.length > 1
+  const intro = hasQuestions ? parts[0] : null
+  const questions = hasQuestions ? parts.slice(1) : []
+
+  if (!hasQuestions) {
+    return (
+      <div
+        className="text-xs text-slate-500 font-light leading-relaxed pl-3 [&>b]:text-slate-400 [&>b]:font-normal"
+        style={{ borderLeft: '1.5px solid', borderImage: 'linear-gradient(180deg, #22D3EE30, #A78BFA20) 1' }}
+        dangerouslySetInnerHTML={{ __html: text }}
+      />
+    )
+  }
+
+  return (
+    <div
+      className="pl-3 space-y-2"
+      style={{ borderLeft: '1.5px solid', borderImage: 'linear-gradient(180deg, #22D3EE30, #A78BFA20) 1' }}
+    >
+      {intro && (
+        <p className="text-xs text-slate-500 font-light leading-relaxed">
+          {intro}.
+        </p>
+      )}
+      {questions.map((q, i) => (
+        <p key={i} className="text-xs text-slate-400 font-light leading-relaxed">
+          {q.trim()}?
+        </p>
+      ))}
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PERSON ROW — expandible con narrativa individual
 // ════════════════════════════════════════════════════════════════════════════
 
 const PersonRow = memo(function PersonRow({
