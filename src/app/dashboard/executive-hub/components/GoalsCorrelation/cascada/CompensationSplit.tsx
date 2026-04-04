@@ -18,6 +18,7 @@ import type { CorrelationPoint, ManagerGoalsStats } from '../GoalsCorrelation.ty
 import { getCompensacionNarrative } from '@/config/narratives/CompensacionNarrativeDictionary'
 import { getSignalNarrative, classifySignal } from '@/config/narratives/CompensationSignalsDictionary'
 import type { SignalType } from '@/config/narratives/CompensationSignalsDictionary'
+import { getMeritoNarratives, getBonosNarratives } from '@/config/narratives/CompensationActsDictionary'
 
 // ════════════════════════════════════════════════════════════════════════════
 // CATEGORY CONFIG
@@ -128,15 +129,18 @@ export default memo(function CompensationSplit({
     ? getSignalNarrative(cat.narrativeKey as SignalType)
     : null
 
-  // Second variable summary for narrative panel
+  // Second variable summary — from centralized dictionary
   const secondVarSummary = useMemo(() => {
     if (path === 'merito') {
       const indulgent = people.filter(p => p.evaluatorStatus === 'INDULGENTE')
-      if (indulgent.length > 0) return `En <b>${indulgent.length} caso${indulgent.length !== 1 ? 's' : ''}</b>, el evaluador fue clasificado como indulgente.`
+      const { secondVar } = getMeritoNarratives(0, 0, indulgent.length, indulgent.length > 0)
+      return secondVar
     }
     if (path === 'bonos') {
-      const withRisk = people.filter(p => p.riskQuadrant || p.mobilityQuadrant)
-      if (withRisk.length > 0) return `<b>${withRisk.length}</b> con señal de riesgo o talento especial detectado.`
+      const countRisk = people.filter(p => p.riskQuadrant === 'FUGA_CEREBROS' || p.riskQuadrant === 'BURNOUT_RISK').length
+      const countInvisible = people.filter(p => !p.riskQuadrant && p.quadrant === 'HIDDEN_PERFORMER').length
+      const { secondVar } = getBonosNarratives(0, 0, countRisk > 0 || countInvisible > 0, countRisk, countInvisible)
+      return secondVar
     }
     return null
   }, [path, people])

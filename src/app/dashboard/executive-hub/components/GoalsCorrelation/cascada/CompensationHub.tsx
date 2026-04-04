@@ -15,6 +15,7 @@ import { memo, useMemo } from 'react'
 import { motion } from 'framer-motion'
 
 import type { CorrelationPoint } from '../GoalsCorrelation.types'
+import { HUB_NARRATIVE } from '@/config/narratives/CompensationActsDictionary'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -105,10 +106,10 @@ export default memo(function CompensationHub({ correlation, onSelectPath }: Comp
         >
           {stats.total}
         </motion.p>
-        <p className="text-sm font-light text-slate-400 leading-relaxed max-w-[460px] mb-7">
-          personas reciben compensación donde <span className="text-slate-300 font-normal">evaluación y resultados no coinciden</span>.
-          Cruzamos tres motores de inteligencia para mostrarte por qué.
-        </p>
+        <p
+          className="text-sm font-light text-slate-400 leading-relaxed max-w-[460px] mb-7 [&>b]:text-slate-300 [&>b]:font-normal"
+          dangerouslySetInnerHTML={{ __html: HUB_NARRATIVE.body }}
+        />
 
         {/* 3 Path cards — FIX 3: números visibles + hover premium */}
         <div className="flex flex-col sm:flex-row gap-3">

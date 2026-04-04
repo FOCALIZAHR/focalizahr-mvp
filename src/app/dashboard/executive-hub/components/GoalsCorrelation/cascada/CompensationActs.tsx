@@ -4,72 +4,47 @@
 // COMPENSATION ACTS — Capa 2: Stepper Narrativo (2 o 3 actos)
 // src/app/dashboard/executive-hub/components/GoalsCorrelation/cascada/CompensationActs.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// Mérito/Bonos: 3 actos (Lo que no cuadra → Hallazgo Focaliza → La decisión)
-// Señales: 2 actos (Lo que no cuadra → La decisión)
-// Watermark + step dots + Brain icon hallazgo + CTA visible sin scroll
+// Narrativas centralizadas en CompensationActsDictionary.ts
+// Zero narrativas hardcodeadas en este archivo.
 // ════════════════════════════════════════════════════════════════════════════
 
-import { memo, useState } from 'react'
+import { memo, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Home, Brain, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PrimaryButton, SecondaryButton, GhostButton } from '@/components/ui/PremiumButton'
 
 import type { CompensationPath } from './CompensationHub'
-import type { CorrelationPoint } from '../GoalsCorrelation.types'
-import type { ManagerGoalsStats } from '../GoalsCorrelation.types'
+import type { CorrelationPoint, ManagerGoalsStats } from '../GoalsCorrelation.types'
+import {
+  getMeritoNarratives,
+  getBonosNarratives,
+  getSenalesNarratives,
+  type ActNarrative,
+} from '@/config/narratives/CompensationActsDictionary'
 
 // ════════════════════════════════════════════════════════════════════════════
-// ACT DEFINITIONS — dynamic content per path
+// BUILD ACTS FROM DICTIONARY
 // ════════════════════════════════════════════════════════════════════════════
-
-interface ActDef {
-  title: string
-  dotColor: string
-  isFocaliza?: boolean
-  body: string
-  findingCard?: { title: string; body: string }
-  cta: string
-}
 
 function getActs(
   path: CompensationPath,
   correlation: CorrelationPoint[],
   byManager: ManagerGoalsStats[]
-): ActDef[] {
+): ActNarrative[] {
   const withGoals = correlation.filter(c => c.quadrant !== 'NO_GOALS' && c.goalsPercent !== null)
 
   if (path === 'merito') {
     const topMerit = withGoals.filter(c => c.score360 >= 4.0)
     const withLowGoals = topMerit.filter(c => (c.goalsPercent ?? 0) < 80)
     const indulgentManagers = byManager.filter(m => m.evaluatorStatus === 'INDULGENTE')
-    const hasSecondVar = indulgentManagers.length > 0
-
-    return [
-      {
-        title: 'Lo que no cuadra',
-        dotColor: '#f59e0b40',
-        body: `Estas <b>${topMerit.length} personas</b> reciben la evaluación más alta. Son las primeras en la lista para incremento por mérito. Pero al cruzar con metas, <b>${withLowGoals.length} no cumplieron</b> los resultados que el negocio necesitaba. Aprobar sin revisar es normalizar la desconexión.`,
-        cta: 'Descubrir más',
-      },
-      ...(hasSecondVar ? [{
-        title: 'El hallazgo Focaliza',
-        dotColor: '#22D3EE60',
-        isFocaliza: true,
-        body: 'La discrepancia tiene una explicación más profunda. Al cruzar evaluación con resultados, detectamos que en varios casos <b>el jefe que evalúa muestra un patrón sistemático de indulgencia</b>.',
-        findingCard: {
-          title: 'Tipo de evaluador detectado',
-          body: `En <b>${indulgentManagers.length} caso${indulgentManagers.length !== 1 ? 's' : ''}</b>, el jefe que evalúa muestra un patrón de calificaciones consistentemente altas. La evaluación no refleja el desempeño real de su equipo — refleja su criterio al evaluar.`,
-        },
-        cta: 'Entender la decisión',
-      }] : []),
-      {
-        title: 'La decisión de valor',
-        dotColor: '#a78bfa40',
-        body: 'El problema no es la política. Es entender si la discrepancia tiene explicación. <b>¿Se informaron las metas? ¿Eran inalcanzables?</b> ¿El liderazgo prioriza la relación sobre la exigencia de resultados? Cada incremento aprobado sin esta respuesta normaliza la desconexión entre evaluación y negocio.',
-        cta: 'Ver las personas',
-      },
-    ]
+    const { acts } = getMeritoNarratives(
+      topMerit.length,
+      withLowGoals.length,
+      indulgentManagers.length,
+      indulgentManagers.length > 0,
+    )
+    return acts
   }
 
   if (path === 'bonos') {
@@ -77,50 +52,22 @@ function getActs(
     const withLow360 = topGoals.filter(c => c.score360 < 4.0)
     const hiddenPerformers = withGoals.filter(c => c.quadrant === 'HIDDEN_PERFORMER')
     const hasTalentVar = hiddenPerformers.some(c => c.riskQuadrant)
-
-    return [
-      {
-        title: 'Lo que no cuadra',
-        dotColor: '#f59e0b40',
-        body: `Estas <b>${topGoals.length} personas</b> cumplen metas y califican para bono. Pero al cruzar con la evaluación, <b>${withLow360.length} muestran una discrepancia</b> que pone en duda si el reconocimiento es completo. El bono premia lo de hoy — pero ¿el sistema ve lo que falta?`,
-        cta: 'Descubrir más',
-      },
-      ...(hasTalentVar ? [{
-        title: 'El hallazgo Focaliza',
-        dotColor: '#22D3EE60',
-        isFocaliza: true,
-        body: 'La discrepancia tiene una explicación más profunda. Al cruzar con inteligencia de talento, detectamos perfiles que el sistema no reconoce.',
-        findingCard: {
-          title: 'Tipo de talento detectado',
-          body: 'Talento que trae resultados pero que el sistema no reconoce. En unos casos, el compromiso con la organización es crítico — entregan pero están desconectados. En otros, sostienen los números del equipo siendo invisibles para las evaluaciones.',
-        },
-        cta: 'Entender la decisión',
-      }] : []),
-      {
-        title: 'La decisión de valor',
-        dotColor: '#a78bfa40',
-        body: 'El bono premia resultados — pero si la evaluación no reconoce a quien trae los números, <b>el motor del negocio recibe el mensaje equivocado</b>. La desmotivación del talento real es silenciosa. Cuando se nota, ya es tarde.',
-        cta: 'Ver las personas',
-      },
-    ]
+    const countRisk = hiddenPerformers.filter(c => c.riskQuadrant === 'FUGA_CEREBROS' || c.riskQuadrant === 'BURNOUT_RISK').length
+    const countInvisible = hiddenPerformers.filter(c => !c.riskQuadrant).length
+    const { acts } = getBonosNarratives(
+      topGoals.length,
+      withLow360.length,
+      hasTalentVar,
+      countRisk,
+      countInvisible,
+    )
+    return acts
   }
 
-  // Señales: 2 actos (sin Hallazgo Focaliza)
+  // Señales
   const contradictory = withGoals.filter(c => c.quadrant !== 'CONSISTENT')
-  return [
-    {
-      title: 'Lo que no cuadra',
-      dotColor: '#f59e0b40',
-      body: `La combinación de bono y mérito que recibe cada persona <b>envía un mensaje implícito</b>. Estas <b>${contradictory.length} personas</b> reciben señales contradictorias. El talento real lee esas señales mejor que cualquier comunicado.`,
-      cta: 'Descubrir más',
-    },
-    {
-      title: 'La decisión de valor',
-      dotColor: '#a78bfa40',
-      body: 'El desafío no es qué pagar. Es entender <b>qué le estás diciendo a cada persona</b> con tus decisiones. Alto bono + bajo mérito = "te premio hoy pero no invierto en tu futuro."',
-      cta: 'Ver las personas',
-    },
-  ]
+  const { acts } = getSenalesNarratives(contradictory.length)
+  return acts
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -145,7 +92,7 @@ export default memo(function CompensationActs({
   onHome,
 }: CompensationActsProps) {
   const [step, setStep] = useState(0)
-  const acts = getActs(path, correlation, byManager)
+  const acts = useMemo(() => getActs(path, correlation, byManager), [path, correlation, byManager])
   const current = acts[step]
   const total = acts.length
   const isLast = step === total - 1
@@ -174,7 +121,7 @@ export default memo(function CompensationActs({
       />
 
       <div className="p-7">
-        {/* Top bar: back + home — FIX 5: GhostButton */}
+        {/* Top bar */}
         <div className="flex items-center justify-between mb-5">
           <GhostButton icon={ArrowLeft} onClick={handleBack} size="sm">
             {step === 0 ? 'Checkpoint' : 'Paso anterior'}
@@ -225,7 +172,7 @@ export default memo(function CompensationActs({
             <div className="flex items-center gap-3 relative z-10">
               <span
                 className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{ background: current.dotColor }}
+                style={{ background: current.isFocaliza ? '#22D3EE60' : step === 0 ? '#f59e0b40' : '#a78bfa40' }}
               />
               <h3 className="text-lg font-normal text-slate-200 tracking-tight">
                 {current.title}
@@ -235,7 +182,7 @@ export default memo(function CompensationActs({
                   <Brain className="w-3.5 h-3.5 text-purple-400/40 cursor-help" />
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 px-3 py-2 rounded-xl bg-slate-950/95 backdrop-blur-xl border border-slate-700/30 shadow-2xl opacity-0 group-hover/fz:opacity-100 transition-all duration-200 pointer-events-none z-50">
                     <p className="text-[10px] text-slate-300 leading-relaxed">
-                      Los algoritmos de inteligencia FocalizaHR detectaron esta inconsistencia al cruzar múltiples motores de datos.
+                      Los algoritmos de inteligencia FocalizaHR detectaron esta inconsistencia al cruzar múltiples fuentes de datos.
                     </p>
                   </div>
                 </div>
@@ -248,7 +195,7 @@ export default memo(function CompensationActs({
               dangerouslySetInnerHTML={{ __html: current.body }}
             />
 
-            {/* Finding card (Hallazgo Focaliza) */}
+            {/* Finding card */}
             {current.findingCard && (
               <div className="relative z-10 p-4 rounded-xl bg-[#0B1120]/80 border border-slate-800/50">
                 <p className="text-xs text-cyan-400/60 font-normal mb-1.5">
@@ -261,7 +208,7 @@ export default memo(function CompensationActs({
               </div>
             )}
 
-            {/* CTA — FIX 5: PremiumButtons */}
+            {/* CTA — PremiumButtons */}
             <div className="relative z-10 mt-1">
               {isLast ? (
                 <PrimaryButton icon={Users} iconPosition="right" onClick={handleNext}>
