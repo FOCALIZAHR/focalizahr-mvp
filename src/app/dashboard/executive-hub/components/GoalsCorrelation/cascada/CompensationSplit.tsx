@@ -72,26 +72,17 @@ function autoSelectIndex(categories: CategoryDef[], counts: number[]): number {
 // EVALUATOR TAG — segunda variable para mérito
 // ════════════════════════════════════════════════════════════════════════════
 
-// FIX 10: Tags diferenciados por urgencia/tipo
-const TAG_STYLES: Record<string, { text: string; border: string }> = {
-  red:     { text: 'text-red-400/70',     border: 'border-red-500/15' },
-  amber:   { text: 'text-amber-400/70',   border: 'border-amber-500/15' },
-  emerald: { text: 'text-emerald-400/70', border: 'border-emerald-500/15' },
-  purple:  { text: 'text-purple-400/70',  border: 'border-purple-500/15' },
-  cyan:    { text: 'text-cyan-400/70',    border: 'border-cyan-500/15' },
-}
-
-function getSecondVarTag(point: CorrelationPoint, path: CompensationPath): { label: string; color: keyof typeof TAG_STYLES } | null {
+function getSecondVarTag(point: CorrelationPoint, path: CompensationPath): { label: string } | null {
   if (path === 'merito' && point.evaluatorStatus) {
-    if (point.evaluatorStatus === 'INDULGENTE') return { label: 'Jefe indulgente', color: 'amber' }
-    if (point.evaluatorStatus === 'SEVERA') return { label: 'Jefe severo', color: 'cyan' }
+    if (point.evaluatorStatus === 'INDULGENTE') return { label: 'Jefe indulgente' }
+    if (point.evaluatorStatus === 'SEVERA') return { label: 'Jefe severo' }
   }
   if (path === 'bonos' || path === 'senales') {
-    if (point.riskQuadrant === 'FUGA_CEREBROS') return { label: 'Riesgo de fuga', color: 'red' }
-    if (point.riskQuadrant === 'BURNOUT_RISK') return { label: 'Riesgo burnout', color: 'amber' }
-    if (point.riskQuadrant === 'BAJO_RENDIMIENTO') return { label: 'Bajo rendimiento', color: 'red' }
-    if (point.mobilityQuadrant === 'SUCESOR_NATURAL') return { label: 'Sucesor natural', color: 'purple' }
-    if (point.mobilityQuadrant === 'MOTOR_EQUIPO') return { label: 'Motor equipo', color: 'emerald' }
+    if (point.riskQuadrant === 'FUGA_CEREBROS') return { label: 'Riesgo de fuga' }
+    if (point.riskQuadrant === 'BURNOUT_RISK') return { label: 'Riesgo burnout' }
+    if (point.riskQuadrant === 'BAJO_RENDIMIENTO') return { label: 'Bajo rendimiento' }
+    if (point.mobilityQuadrant === 'SUCESOR_NATURAL') return { label: 'Sucesor natural' }
+    if (point.mobilityQuadrant === 'MOTOR_EQUIPO') return { label: 'Motor equipo' }
   }
   return null
 }
@@ -324,7 +315,6 @@ const PersonRow = memo(function PersonRow({
 }) {
   const [expanded, setExpanded] = useState(false)
   const tag = getSecondVarTag(p, path)
-  const tagStyle = tag ? TAG_STYLES[tag.color] : null
 
   // FIX 8: narrativa individual on expand
   const narrative = useMemo(() => {
@@ -371,11 +361,8 @@ const PersonRow = memo(function PersonRow({
               : `${Math.round(p.goalsPercent ?? 0)}%`
           }
         </span>
-        {tag && tagStyle && (
-          <span className={cn(
-            'text-[9px] px-2 py-0.5 rounded-full border flex-shrink-0 font-light',
-            tagStyle.text, tagStyle.border
-          )}>
+        {tag && (
+          <span className="text-[9px] px-2 py-0.5 rounded-full text-slate-400/60 border border-slate-700/30 flex-shrink-0 font-light">
             {tag.label}
           </span>
         )}
