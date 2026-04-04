@@ -165,20 +165,27 @@ export default memo(function CompensationSplit({
       />
 
       <div className="p-7">
-      {/* Top bar */}
-      <div className="flex items-center justify-between mb-4">
-        <button onClick={onBack} className="flex items-center gap-1.5 text-slate-600 hover:text-slate-400 transition-colors text-[11px] font-light">
-          <ArrowLeft className="w-3.5 h-3.5" /> Volver a narrativa
-        </button>
+      {/* Top bar — FIX 20: breadcrumb persistente */}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-2">
+          <button onClick={onBack} className="flex items-center gap-1.5 text-slate-600 hover:text-slate-400 transition-colors text-[11px] font-light">
+            <ArrowLeft className="w-3.5 h-3.5" /> Volver a narrativa
+          </button>
+          <span className="text-slate-700">·</span>
+          <span className="text-[10px] text-cyan-400/60 font-mono uppercase tracking-wider">
+            {path === 'merito' ? 'Mérito' : path === 'bonos' ? 'Bonos' : 'Señales'}
+          </span>
+        </div>
         <button onClick={onHome} className="flex items-center gap-1.5 border border-slate-800/50 text-slate-600 hover:border-cyan-500/20 hover:text-slate-400 text-[10px] px-3 py-1.5 rounded-md transition-all">
           <Home className="w-3 h-3" /> Inicio
         </button>
       </div>
 
-      {/* Category selectors — FIX 16 */}
-      <p className="text-[10px] uppercase tracking-[2px] text-slate-500 mb-3 font-medium">
-        Clasificación del hallazgo
-      </p>
+      {/* FIX 17: Título patrón FocalizaHR */}
+      <h3 className="text-xl font-extralight text-white tracking-tight mb-4">
+        Clasificación del{' '}
+        <span className="fhr-title-gradient">hallazgo</span>
+      </h3>
       <div className="flex gap-2 mb-4">
         {categories.map((c, i) => (
           <button
@@ -223,7 +230,7 @@ export default memo(function CompensationSplit({
 
           {/* La observación */}
           <div className="mb-4">
-            <p className="text-xs text-slate-300 font-medium tracking-wide mb-1.5">— La observación</p>
+            <p className="text-xs text-slate-300 font-medium tracking-wide mb-1.5">La observación</p>
             <p className="text-[13px] text-slate-400 font-light leading-[1.7] [&>b]:text-slate-200 [&>b]:font-normal"
               dangerouslySetInnerHTML={{ __html:
                 narrative?.observacion ??
@@ -234,7 +241,7 @@ export default memo(function CompensationSplit({
 
           {/* La decisión de valor */}
           <div className="mb-4">
-            <p className="text-xs text-slate-300 font-medium tracking-wide mb-1.5">— La decisión de valor</p>
+            <p className="text-xs text-slate-300 font-medium tracking-wide mb-1.5">La decisión de valor</p>
             <div
               className="text-xs text-slate-500 font-light leading-relaxed pl-3 [&>b]:text-slate-400 [&>b]:font-normal"
               style={{ borderLeft: '1.5px solid', borderImage: 'linear-gradient(180deg, #22D3EE30, #A78BFA20) 1' }}
@@ -248,7 +255,7 @@ export default memo(function CompensationSplit({
           {/* Segunda variable (conditional) */}
           {secondVarSummary && (
             <div className="mb-4">
-              <p className="text-xs text-slate-300 font-medium tracking-wide mb-1.5">— Segunda variable</p>
+              <p className="text-xs text-slate-300 font-medium tracking-wide mb-1.5">Segunda variable</p>
               <div className="text-xs text-slate-500 font-light leading-relaxed p-3 rounded-xl bg-[#0B1120]/80 border border-slate-800/40 [&>b]:text-cyan-400 [&>b]:font-normal"
                 dangerouslySetInnerHTML={{ __html: secondVarSummary }}
               />
@@ -341,9 +348,9 @@ const PersonRow = memo(function PersonRow({
       <button
         onClick={() => setExpanded(!expanded)}
         className={cn(
-          'w-full text-left py-2.5 px-1.5 rounded-lg transition-all',
-          isRiskCategory && 'border-l-2 border-amber-500/15 pl-1 rounded-l-none bg-amber-500/[0.02]',
-          expanded && 'bg-white/[0.02]'
+          'w-full text-left py-2.5 px-1.5 rounded-lg transition-colors',
+          'hover:bg-slate-800/20',
+          expanded && 'bg-slate-800/20'
         )}
       >
         {/* Línea 1: rank + nombre completo */}
