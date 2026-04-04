@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Home, Lightbulb, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TalentNarrativeService } from '@/lib/services/TalentNarrativeService'
+import { formatDisplayName } from '@/lib/utils/formatName'
 
 import type { CompensationPath } from './CompensationHub'
 import type { CorrelationPoint, ManagerGoalsStats } from '../GoalsCorrelation.types'
@@ -323,7 +324,7 @@ const PersonRow = memo(function PersonRow({
       p.riskQuadrant ?? null,
       p.mobilityQuadrant ?? null,
       p.roleFitScore ?? null,
-      p.employeeName.split(' ')[0]
+      formatDisplayName(p.employeeName)
     )
   }, [expanded, p])
 
@@ -347,7 +348,7 @@ const PersonRow = memo(function PersonRow({
         </span>
         <div className="min-w-0 flex-1">
           <span className="text-[13px] text-slate-300 font-light truncate block">
-            {p.employeeName}
+            {formatDisplayName(p.employeeName)}
           </span>
           <span className="text-[10px] text-slate-700 font-light block">
             {p.departmentName}
