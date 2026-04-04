@@ -323,7 +323,7 @@ const PersonRow = memo(function PersonRow({
 }) {
   const [expanded, setExpanded] = useState(false)
   const tag = getSecondVarTag(p, path)
-  const hasSignal = p.riskQuadrant !== null || p.evaluatorStatus !== null || p.quadrant === 'DOUBLE_RISK'
+  const needsAttention = p.quadrant === 'DOUBLE_RISK' || p.quadrant === 'PERCEPTION_BIAS'
 
   // FIX 8: narrativa individual on expand
   const narrative = useMemo(() => {
@@ -343,13 +343,13 @@ const PersonRow = memo(function PersonRow({
       transition={{ delay: idx * 0.03 }}
       className="relative"
     >
-      {/* Tesla line purple si tiene señal — "merece atención" */}
-      {hasSignal && (
+      {/* Tesla line purple — solo doble riesgo y sesgo evaluador */}
+      {needsAttention && (
         <div
           className="absolute top-0 left-0 right-0 h-[1px]"
           style={{
             background: 'linear-gradient(90deg, transparent, #A78BFA, transparent)',
-            boxShadow: '0 0 8px #A78BFA30',
+            boxShadow: '0 0 12px #A78BFA50',
           }}
         />
       )}
