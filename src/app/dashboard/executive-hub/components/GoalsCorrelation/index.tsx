@@ -156,29 +156,27 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
               </>
             )}
 
-            {/* ─── Tab: Localización ─── */}
+            {/* ─── Tab: Localización (zoom progresivo: personas → áreas → responsables) ─── */}
             {view === 'localizacion' && (
               <div className="space-y-12">
-                <GerenciaHeatmap byGerencia={data.byGerencia} />
-
-                <div className="w-8 h-px bg-slate-800" />
-
                 <AnalisisTab
                   correlation={data.correlation}
                   quadrantCounts={data.quadrantCounts}
                 />
-              </div>
-            )}
 
-            {/* ─── Tab: Compensación ─── */}
-            {view === 'compensacion' && (
-              <div className="space-y-12">
-                <CompensationBoard correlation={data.correlation} byManager={data.byManager} />
+                <div className="w-8 h-px bg-slate-800" />
+
+                <GerenciaHeatmap byGerencia={data.byGerencia} />
 
                 <div className="w-8 h-px bg-slate-800" />
 
                 <EvaluadorAccountability byManager={data.byManager} />
               </div>
+            )}
+
+            {/* ─── Tab: Compensación (limpio — solo CompensationBoard) ─── */}
+            {view === 'compensacion' && (
+              <CompensationBoard correlation={data.correlation} byManager={data.byManager} />
             )}
           </motion.div>
         )}
