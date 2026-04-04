@@ -252,9 +252,9 @@ export default memo(function CompensationSplit({
                 <span className="text-xs font-medium text-slate-200">{cat.label}</span>
                 <span className="text-[10px] text-slate-500">
                   {cat.narrativeKey === 'HIDDEN_PERFORMER' && 'Cumple metas · no domina el cargo'}
-                  {cat.narrativeKey === 'PERCEPTION_BIAS' && 'Domina el cargo · metas bajo 50%'}
-                  {cat.narrativeKey === 'DOUBLE_RISK' && 'No domina · no cumple metas'}
-                  {cat.narrativeKey === 'CONSISTENT' && 'Domina el cargo · cumple metas'}
+                  {cat.narrativeKey === 'PERCEPTION_BIAS' && 'No cumple metas · domina el cargo'}
+                  {cat.narrativeKey === 'DOUBLE_RISK' && 'No cumple metas · no domina el cargo'}
+                  {cat.narrativeKey === 'CONSISTENT' && 'Cumple metas · domina el cargo'}
                 </span>
               </div>
               <div className="text-xs text-slate-500 font-light leading-relaxed p-3 rounded-xl bg-[#0B1120]/80 border border-slate-800/40 [&>b]:text-cyan-400 [&>b]:font-normal"
