@@ -142,7 +142,17 @@ export default memo(function CompensationSplit({
   }, [path, people])
 
   return (
-    <div>
+    <div className="relative rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
+      {/* Tesla line */}
+      <div
+        className="absolute top-0 left-0 right-0 h-[2px]"
+        style={{
+          background: 'linear-gradient(90deg, transparent 5%, #22D3EE 35%, #A78BFA 65%, transparent 95%)',
+          opacity: 0.7,
+        }}
+      />
+
+      <div className="p-7">
       {/* Top bar */}
       <div className="flex items-center justify-between mb-4">
         <button onClick={onBack} className="flex items-center gap-1.5 text-slate-600 hover:text-slate-400 transition-colors text-[11px] font-light">
@@ -309,6 +319,7 @@ export default memo(function CompensationSplit({
           </button>
         </div>
       </div>
+      </div>{/* close p-7 */}
     </div>
   )
 })
