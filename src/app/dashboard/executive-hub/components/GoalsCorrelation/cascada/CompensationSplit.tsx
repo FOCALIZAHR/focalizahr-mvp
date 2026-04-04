@@ -21,7 +21,6 @@ import { getCompensacionNarrative } from '@/config/narratives/CompensacionNarrat
 import { getSignalNarrative, classifySignal } from '@/config/narratives/CompensationSignalsDictionary'
 import type { SignalType } from '@/config/narratives/CompensationSignalsDictionary'
 import { getMeritoNarratives } from '@/config/narratives/CompensationActsDictionary'
-import { QUADRANT_NARRATIVES } from '@/config/tacLabels'
 
 // ════════════════════════════════════════════════════════════════════════════
 // CATEGORY CONFIG
@@ -141,8 +140,7 @@ export default memo(function CompensationSplit({
     if (path === 'bonos') {
       const burnout = people.filter(p => p.riskQuadrant === 'BURNOUT_RISK').length
       if (burnout === 0) return null
-      const narrBurnout = QUADRANT_NARRATIVES['BURNOUT_RISK'] ?? 'Alta energía que no se convierte en resultado.'
-      return `<b>${burnout}</b> con señal de burnout. ${narrBurnout}`
+      return `<b>${burnout}</b> muestran alto compromiso con la organización. No es falta de voluntad — es que el esfuerzo no se traduce en lo que la evaluación mide. El riesgo: el sobre-esfuerzo sin reconocimiento tiene fecha de vencimiento.`
     }
     return null
   }, [path, people])
