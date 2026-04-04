@@ -221,17 +221,7 @@ export default memo(function CompensationActs({
               </div>
             </div>
 
-            {/* Focaliza badge (acto 2 when exists) */}
-            {current.isFocaliza && (
-              <div className="flex items-center gap-2 relative z-10">
-                <Brain className="w-[18px] h-[18px] text-purple-400" />
-                <span className="font-mono text-[10px] tracking-[2px] uppercase text-cyan-400/70">
-                  Inteligencia Focaliza
-                </span>
-              </div>
-            )}
-
-            {/* Act title — FIX 4: protagonista */}
+            {/* Act title — protagonista. Brain sutil si es Focaliza */}
             <div className="flex items-center gap-3 relative z-10">
               <span
                 className="w-2 h-2 rounded-full flex-shrink-0"
@@ -240,6 +230,16 @@ export default memo(function CompensationActs({
               <h3 className="text-lg font-normal text-slate-200 tracking-tight">
                 {current.title}
               </h3>
+              {current.isFocaliza && (
+                <div className="group/fz relative">
+                  <Brain className="w-3.5 h-3.5 text-purple-400/40 cursor-help" />
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 px-3 py-2 rounded-xl bg-slate-950/95 backdrop-blur-xl border border-slate-700/30 shadow-2xl opacity-0 group-hover/fz:opacity-100 transition-all duration-200 pointer-events-none z-50">
+                    <p className="text-[10px] text-slate-300 leading-relaxed">
+                      Los algoritmos de inteligencia FocalizaHR detectaron esta inconsistencia al cruzar múltiples motores de datos.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Body */}
