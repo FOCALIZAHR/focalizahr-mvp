@@ -175,36 +175,39 @@ export default memo(function CompensationSplit({
         </button>
       </div>
 
-      {/* Category selectors */}
+      {/* Category selectors — FIX 16 */}
+      <p className="text-[10px] uppercase tracking-[2px] text-slate-500 mb-3 font-medium">
+        Clasificación del hallazgo
+      </p>
       <div className="flex gap-2 mb-4">
         {categories.map((c, i) => (
           <button
             key={c.key}
             onClick={() => setSelected(i)}
             className={cn(
-              'flex-1 text-left px-3 py-3 rounded-xl border transition-all duration-300 relative overflow-hidden',
+              'flex-1 text-left p-4 rounded-xl border transition-all duration-300 relative overflow-hidden cursor-pointer',
               selected === i
-                ? 'border-cyan-500/15 bg-slate-900/40'
-                : 'border-slate-800/20 bg-transparent hover:border-slate-700/40 hover:bg-slate-900/15'
+                ? 'border-cyan-500/20 bg-slate-900/80'
+                : 'border-slate-800/50 hover:border-slate-700 hover:bg-slate-800/20'
             )}
           >
-            {/* Mini Tesla line on active */}
+            {/* Tesla line solo en activa */}
             {selected === i && (
-              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/25 to-transparent" />
+              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent" />
             )}
             {/* Dot indicator */}
             {selected === i && (
-              <span className="absolute top-2 right-2 w-[3px] h-[3px] rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.4)]" />
+              <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-cyan-400" style={{ boxShadow: '0 0 6px #22D3EE40' }} />
             )}
             <span className={cn(
               'text-2xl font-extralight block leading-none transition-colors',
-              selected === i ? 'text-white' : 'text-slate-800'
+              selected === i ? 'text-white' : 'text-slate-600'
             )}>
               {counts[i]}
             </span>
             <span className={cn(
-              'text-[11px] block mt-1 font-light transition-colors',
-              selected === i ? 'text-slate-500' : 'text-slate-700'
+              'text-xs block mt-1 transition-colors',
+              selected === i ? 'text-slate-400' : 'text-slate-600'
             )}>
               {c.label}
             </span>
@@ -220,7 +223,7 @@ export default memo(function CompensationSplit({
 
           {/* La observación */}
           <div className="mb-4">
-            <p className="text-[11px] text-slate-500 font-normal mb-1.5">— La observación</p>
+            <p className="text-xs text-slate-300 font-medium tracking-wide mb-1.5">— La observación</p>
             <p className="text-[13px] text-slate-400 font-light leading-[1.7] [&>b]:text-slate-200 [&>b]:font-normal"
               dangerouslySetInnerHTML={{ __html:
                 narrative?.observacion ??
@@ -231,7 +234,7 @@ export default memo(function CompensationSplit({
 
           {/* La decisión de valor */}
           <div className="mb-4">
-            <p className="text-[11px] text-slate-500 font-normal mb-1.5">— La decisión de valor</p>
+            <p className="text-xs text-slate-300 font-medium tracking-wide mb-1.5">— La decisión de valor</p>
             <div
               className="text-xs text-slate-500 font-light leading-relaxed pl-3 [&>b]:text-slate-400 [&>b]:font-normal"
               style={{ borderLeft: '1.5px solid', borderImage: 'linear-gradient(180deg, #22D3EE30, #A78BFA20) 1' }}
@@ -245,7 +248,7 @@ export default memo(function CompensationSplit({
           {/* Segunda variable (conditional) */}
           {secondVarSummary && (
             <div className="mb-4">
-              <p className="text-[11px] text-slate-500 font-normal mb-1.5">— Segunda variable</p>
+              <p className="text-xs text-slate-300 font-medium tracking-wide mb-1.5">— Segunda variable</p>
               <div className="text-xs text-slate-500 font-light leading-relaxed p-3 rounded-xl bg-[#0B1120]/80 border border-slate-800/40 [&>b]:text-cyan-400 [&>b]:font-normal"
                 dangerouslySetInnerHTML={{ __html: secondVarSummary }}
               />
@@ -334,43 +337,46 @@ const PersonRow = memo(function PersonRow({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: idx * 0.03 }}
     >
-      {/* Main row — clickable */}
+      {/* Main row — FIX 14: nombre L1, datos L2 */}
       <button
         onClick={() => setExpanded(!expanded)}
         className={cn(
-          'w-full flex items-center gap-2 py-2 px-1.5 rounded-lg text-left transition-all',
+          'w-full text-left py-2.5 px-1.5 rounded-lg transition-all',
           isRiskCategory && 'border-l-2 border-amber-500/15 pl-1 rounded-l-none bg-amber-500/[0.02]',
           expanded && 'bg-white/[0.02]'
         )}
       >
-        <span className="text-[10px] font-mono text-slate-700 w-4 text-right flex-shrink-0">
-          {idx + 1}
-        </span>
-        <div className="min-w-0 flex-1">
-          <span className="text-[13px] text-slate-300 font-light truncate block">
-            {formatDisplayName(p.employeeName)}
+        {/* Línea 1: rank + nombre completo */}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono text-slate-600 w-4 text-right flex-shrink-0">
+            {idx + 1}
           </span>
-          <span className="text-[10px] text-slate-700 font-light block">
-            {p.departmentName}
+          <span className="text-sm font-light text-slate-200 truncate flex-1">
+            {formatDisplayName(p.employeeName, 'full')}
           </span>
+          <ChevronDown className={cn(
+            'w-3 h-3 text-slate-700 transition-transform flex-shrink-0',
+            expanded && 'rotate-180'
+          )} />
         </div>
-        <span className="text-[11px] font-mono text-slate-500 flex-shrink-0">
-          {path === 'senales'
-            ? `${p.score360.toFixed(1)}/${Math.round(p.goalsPercent ?? 0)}%`
-            : path === 'merito'
-              ? p.score360.toFixed(1)
-              : `${Math.round(p.goalsPercent ?? 0)}%`
-          }
-        </span>
-        {tag && (
-          <span className="text-[9px] px-2 py-0.5 rounded-full text-slate-400/60 border border-slate-700/30 flex-shrink-0 font-light">
-            {tag.label}
+        {/* Línea 2: depto · métrica · tag */}
+        <div className="flex items-center gap-2 mt-1 pl-6">
+          <span className="text-[10px] text-slate-600 truncate">{p.departmentName}</span>
+          <span className="text-slate-800">·</span>
+          <span className="text-[11px] font-mono text-slate-400">
+            {path === 'senales'
+              ? `${p.score360.toFixed(1)}/${Math.round(p.goalsPercent ?? 0)}%`
+              : path === 'merito'
+                ? p.score360.toFixed(1)
+                : `${Math.round(p.goalsPercent ?? 0)}%`
+            }
           </span>
-        )}
-        <ChevronDown className={cn(
-          'w-3 h-3 text-slate-700 transition-transform flex-shrink-0',
-          expanded && 'rotate-180'
-        )} />
+          {tag && (
+            <span className="text-[9px] px-2 py-0.5 rounded-full text-slate-400/60 border border-slate-700/30 font-light">
+              {tag.label}
+            </span>
+          )}
+        </div>
       </button>
 
       {/* FIX 8: Expanded narrative */}
