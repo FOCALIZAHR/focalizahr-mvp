@@ -210,6 +210,15 @@ export default memo(function CompensationSplit({
             )}>
               {c.label}
             </span>
+            <span className={cn(
+              'text-[10px] font-light block mt-1 transition-colors',
+              selected === i ? 'text-slate-500' : 'text-slate-700'
+            )}>
+              {c.narrativeKey === 'HIDDEN_PERFORMER' && 'Metas sobre 80% · no domina el cargo'}
+              {c.narrativeKey === 'PERCEPTION_BIAS' && 'Metas bajo 80% · domina el cargo'}
+              {c.narrativeKey === 'DOUBLE_RISK' && 'Metas bajo 80% · no domina el cargo'}
+              {c.narrativeKey === 'CONSISTENT' && 'Metas sobre 80% · domina el cargo'}
+            </span>
           </button>
         ))}
       </div>
@@ -240,15 +249,7 @@ export default memo(function CompensationSplit({
           {/* Segunda variable → nombre categoría + ancla descriptiva */}
           {secondVarSummary && (
             <div className="mb-4">
-              <div className="mb-1.5 flex items-baseline gap-2">
-                <span className="text-xs font-medium text-slate-200">{cat.label}</span>
-                <span className="text-[10px] text-slate-500">
-                  {cat.narrativeKey === 'HIDDEN_PERFORMER' && 'Metas sobre 80% · no domina el cargo'}
-                  {cat.narrativeKey === 'PERCEPTION_BIAS' && 'Metas bajo 80% · domina el cargo'}
-                  {cat.narrativeKey === 'DOUBLE_RISK' && 'Metas bajo 80% · no domina el cargo'}
-                  {cat.narrativeKey === 'CONSISTENT' && 'Metas sobre 80% · domina el cargo'}
-                </span>
-              </div>
+              <p className="text-xs text-slate-300 font-medium tracking-wide mb-1.5">{cat.label}</p>
               <div className="text-xs text-slate-500 font-light leading-relaxed p-3 rounded-xl bg-[#0B1120]/80 border border-slate-800/40 [&>b]:text-cyan-400 [&>b]:font-normal"
                 dangerouslySetInnerHTML={{ __html: secondVarSummary }}
               />
