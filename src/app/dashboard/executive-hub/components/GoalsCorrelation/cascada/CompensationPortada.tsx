@@ -34,7 +34,12 @@ export default memo(function CompensationPortada({
     const withGoals = correlation.filter(c => c.quadrant !== 'NO_GOALS' && c.goalsPercent !== null)
     const discrepancy = withGoals.filter(c => c.quadrant !== 'CONSISTENT').length
     const totalGerencias = byGerencia.length
-    const sinConfianza = byGerencia.filter(g => g.confidenceLevel === 'red').length
+    // Lógica propia de portada — no depende de confidenceLevel del motor
+    const sinConfianza = byGerencia.filter(g =>
+      g.confidenceLevel === 'red' ||
+      (g.pearsonRoleFitGoals !== null && g.pearsonRoleFitGoals < 0.3) ||
+      g.disconnectionRate > 40
+    ).length
     return { discrepancy, totalGerencias, sinConfianza }
   }, [correlation, byGerencia])
 
@@ -73,8 +78,8 @@ export default memo(function CompensationPortada({
           personas con discrepancia entre evaluación y resultados.
         </p>
 
-        {/* Confianza por gerencia */}
-        {stats.sinConfianza > 0 && (
+        {/* Confianza por gerencia — (i) siempre visible */}
+        {stats.totalGerencias > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -82,21 +87,21 @@ export default memo(function CompensationPortada({
             className="flex items-center gap-1.5 mb-6"
           >
             <p className="text-sm font-light text-slate-400">
-              <span className="text-amber-400 font-medium">{stats.sinConfianza}</span> de {stats.totalGerencias} gerencia{stats.totalGerencias !== 1 ? 's' : ''} no {stats.sinConfianza === 1 ? 'tiene' : 'tienen'} base confiable para compensar.
+              {stats.sinConfianza > 0 ? (
+                <>
+                  <span className="text-amber-400 font-medium">{stats.sinConfianza}</span> de {stats.totalGerencias} gerencia{stats.totalGerencias !== 1 ? 's' : ''} no {stats.sinConfianza === 1 ? 'tiene' : 'tienen'} base confiable para compensar.
+                </>
+              ) : (
+                <>{stats.totalGerencias} gerencia{stats.totalGerencias !== 1 ? 's' : ''} con base confiable para compensar.</>
+              )}
             </p>
             <button
               onClick={onOpenGerenciaModal}
-              className="group/info relative flex-shrink-0"
+              className="flex-shrink-0"
             >
               <HelpCircle className="w-4 h-4 text-slate-600 hover:text-cyan-400 transition-colors cursor-pointer" />
             </button>
           </motion.div>
-        )}
-
-        {stats.sinConfianza === 0 && stats.totalGerencias > 0 && (
-          <p className="text-sm font-light text-slate-500 mb-6">
-            {stats.totalGerencias} gerencias con base confiable para compensar.
-          </p>
         )}
 
         {/* CTA */}
