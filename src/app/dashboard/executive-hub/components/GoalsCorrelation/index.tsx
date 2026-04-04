@@ -26,7 +26,7 @@ import AnalisisTab from './tabs/AnalisisTab'
 import GoalsFindingModal from './GoalsFindingModal'
 import GerenciaHeatmap from './cascada/GerenciaHeatmap'
 import CompensationBoard from './cascada/CompensationBoard'
-import EvaluadorAccountability from './cascada/EvaluadorAccountability'
+import EvaluadorHeatmap from './cascada/EvaluadorHeatmap'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TABS CONFIG
@@ -170,7 +170,7 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
 
                 <div className="w-8 h-px bg-slate-800" />
 
-                <EvaluadorAccountability byManager={data.byManager} />
+                <EvaluadorHeatmap byManager={data.byManager} correlation={data.correlation} />
               </div>
             )}
 
