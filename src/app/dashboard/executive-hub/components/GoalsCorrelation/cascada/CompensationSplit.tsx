@@ -130,17 +130,21 @@ export default memo(function CompensationSplit({
     ? getSignalNarrative(cat.narrativeKey as SignalType)
     : null
 
-  // Second variable: mérito → jefe indulgente, bonos → solo burnout
-  const secondVarSummary = useMemo(() => {
+  // Second variable: split into dominantRiskLabel + narrative body
+  const secondVar = useMemo(() => {
     if (path === 'merito') {
       const indulgent = people.filter(p => p.evaluatorStatus === 'INDULGENTE')
-      const { secondVar } = getMeritoNarratives(0, 0, indulgent.length, indulgent.length > 0)
-      return secondVar
+      if (indulgent.length === 0) return null
+      const { secondVar: narr } = getMeritoNarratives(0, 0, indulgent.length, true)
+      return { dominantLabel: 'Evaluador indulgente', narrative: narr }
     }
     if (path === 'bonos') {
       const burnout = people.filter(p => p.riskQuadrant === 'BURNOUT_RISK').length
       if (burnout === 0) return null
-      return `<b>${burnout}</b> muestran alto compromiso con la organización. No es falta de voluntad — es que el esfuerzo no se traduce en lo que la evaluación mide. El riesgo: el sobre-esfuerzo sin reconocimiento tiene fecha de vencimiento.`
+      return {
+        dominantLabel: 'Riesgo burnout',
+        narrative: `<b>${burnout}</b> muestran alto compromiso con la organización. No es falta de voluntad — es que el esfuerzo no se traduce en lo que la evaluación mide. El riesgo: el sobre-esfuerzo sin reconocimiento tiene fecha de vencimiento.`,
+      }
     }
     return null
   }, [path, people])
@@ -246,12 +250,16 @@ export default memo(function CompensationSplit({
             <DecisionBlock text={narrative?.decisionValor ?? signalNarr?.decisionOfValue ?? ''} />
           </div>
 
-          {/* Segunda variable → nombre categoría + ancla descriptiva */}
-          {secondVarSummary && (
+          {/* Segunda variable → categoría · tipo riesgo dominante + narrativa */}
+          {secondVar && (
             <div className="mb-4">
-              <p className="text-xs text-slate-300 font-medium tracking-wide mb-1.5">{cat.label}</p>
-              <div className="text-xs text-slate-500 font-light leading-relaxed p-3 rounded-xl bg-[#0B1120]/80 border border-slate-800/40 [&>b]:text-cyan-400 [&>b]:font-normal"
-                dangerouslySetInnerHTML={{ __html: secondVarSummary }}
+              <div className="mb-2">
+                <span className="text-xs font-medium text-slate-200">{cat.label}</span>
+                <span className="text-slate-600 mx-1.5">·</span>
+                <span className="text-xs font-light text-cyan-400/70">{secondVar.dominantLabel}</span>
+              </div>
+              <div className="text-xs text-slate-400 font-light leading-relaxed p-3 rounded-xl bg-[#0B1120]/80 border border-slate-800/40 [&>b]:text-cyan-400 [&>b]:font-normal"
+                dangerouslySetInnerHTML={{ __html: secondVar.narrative ?? '' }}
               />
             </div>
           )}
