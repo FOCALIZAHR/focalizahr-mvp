@@ -20,7 +20,8 @@ import type { CorrelationPoint, ManagerGoalsStats } from '../GoalsCorrelation.ty
 import { getCompensacionNarrative } from '@/config/narratives/CompensacionNarrativeDictionary'
 import { getSignalNarrative, classifySignal } from '@/config/narratives/CompensationSignalsDictionary'
 import type { SignalType } from '@/config/narratives/CompensationSignalsDictionary'
-import { getMeritoNarratives, getBonosNarratives } from '@/config/narratives/CompensationActsDictionary'
+import { getMeritoNarratives } from '@/config/narratives/CompensationActsDictionary'
+import { QUADRANT_NARRATIVES } from '@/config/tacLabels'
 
 // ════════════════════════════════════════════════════════════════════════════
 // CATEGORY CONFIG
@@ -130,7 +131,7 @@ export default memo(function CompensationSplit({
     ? getSignalNarrative(cat.narrativeKey as SignalType)
     : null
 
-  // FIX 9: Second variable desglosado por tipo concreto
+  // Second variable: mérito → jefe indulgente, bonos → solo burnout
   const secondVarSummary = useMemo(() => {
     if (path === 'merito') {
       const indulgent = people.filter(p => p.evaluatorStatus === 'INDULGENTE')
@@ -138,17 +139,10 @@ export default memo(function CompensationSplit({
       return secondVar
     }
     if (path === 'bonos') {
-      const fuga = people.filter(p => p.riskQuadrant === 'FUGA_CEREBROS').length
       const burnout = people.filter(p => p.riskQuadrant === 'BURNOUT_RISK').length
-      const motor = people.filter(p => p.mobilityQuadrant === 'MOTOR_EQUIPO').length
-      const sucesor = people.filter(p => p.mobilityQuadrant === 'SUCESOR_NATURAL').length
-      const parts: string[] = []
-      if (fuga > 0) parts.push(`<b>${fuga}</b> con riesgo de fuga`)
-      if (burnout > 0) parts.push(`<b>${burnout}</b> en riesgo de burnout`)
-      if (motor > 0) parts.push(`<b>${motor}</b> motor del equipo`)
-      if (sucesor > 0) parts.push(`<b>${sucesor}</b> sucesor natural`)
-      if (parts.length === 0) return null
-      return parts.join(', ') + ' — invisibles para quien los evalúa.'
+      if (burnout === 0) return null
+      const narrBurnout = QUADRANT_NARRATIVES['BURNOUT_RISK'] ?? 'Alta energía que no se convierte en resultado.'
+      return `<b>${burnout}</b> con señal de burnout. ${narrBurnout}`
     }
     return null
   }, [path, people])
@@ -251,10 +245,10 @@ export default memo(function CompensationSplit({
               <div className="mb-1.5 flex items-baseline gap-2">
                 <span className="text-xs font-medium text-slate-200">{cat.label}</span>
                 <span className="text-[10px] text-slate-500">
-                  {cat.narrativeKey === 'HIDDEN_PERFORMER' && 'Cumple metas · no domina el cargo'}
-                  {cat.narrativeKey === 'PERCEPTION_BIAS' && 'No cumple metas · domina el cargo'}
-                  {cat.narrativeKey === 'DOUBLE_RISK' && 'No cumple metas · no domina el cargo'}
-                  {cat.narrativeKey === 'CONSISTENT' && 'Cumple metas · domina el cargo'}
+                  {cat.narrativeKey === 'HIDDEN_PERFORMER' && 'Metas sobre 80% · no domina el cargo'}
+                  {cat.narrativeKey === 'PERCEPTION_BIAS' && 'Metas bajo 80% · domina el cargo'}
+                  {cat.narrativeKey === 'DOUBLE_RISK' && 'Metas bajo 80% · no domina el cargo'}
+                  {cat.narrativeKey === 'CONSISTENT' && 'Metas sobre 80% · domina el cargo'}
                 </span>
               </div>
               <div className="text-xs text-slate-500 font-light leading-relaxed p-3 rounded-xl bg-[#0B1120]/80 border border-slate-800/40 [&>b]:text-cyan-400 [&>b]:font-normal"

@@ -300,11 +300,14 @@ export class GoalsDiagnosticService {
    * Classify into quadrant using RoleFit × Metas (both objective measures).
    * Score360 is NOT an axis — it's the color (perception validator).
    */
+  // TODO: GOALS_CUT debería persistir por empresa en el futuro.
+  // Cada organización define su propio umbral de "cumplir metas".
+  // Hoy se usa HIGH_GOALS (80%) como corte universal.
   static classifyQuadrant(roleFitScore: number | null, goalsPercent: number | null): CorrelationQuadrant {
     if (goalsPercent === null || roleFitScore === null) return 'NO_GOALS'
 
     const ROLEFIT_CUT = GOALS_THRESHOLDS.HIGH_ROLEFIT // 75
-    const GOALS_CUT = GOALS_THRESHOLDS.SCATTER_GOALS_LINE // 50
+    const GOALS_CUT = GOALS_THRESHOLDS.HIGH_GOALS // 80 — cumplir metas = 80%+
     if (roleFitScore >= ROLEFIT_CUT && goalsPercent >= GOALS_CUT) return 'CONSISTENT'
     if (roleFitScore >= ROLEFIT_CUT && goalsPercent < GOALS_CUT) return 'PERCEPTION_BIAS'
     if (roleFitScore < ROLEFIT_CUT && goalsPercent >= GOALS_CUT) return 'HIDDEN_PERFORMER'
