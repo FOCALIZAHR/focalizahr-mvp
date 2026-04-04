@@ -218,10 +218,10 @@ export default memo(function CompensationSplit({
               'text-[10px] font-light block mt-1 transition-colors',
               selected === i ? 'text-slate-500' : 'text-slate-700'
             )}>
-              {c.narrativeKey === 'HIDDEN_PERFORMER' && 'Metas sobre 80% · no domina el cargo'}
-              {c.narrativeKey === 'PERCEPTION_BIAS' && 'Metas bajo 80% · domina el cargo'}
-              {c.narrativeKey === 'DOUBLE_RISK' && 'Metas bajo 80% · no domina el cargo'}
-              {c.narrativeKey === 'CONSISTENT' && 'Metas sobre 80% · domina el cargo'}
+              {c.narrativeKey === 'HIDDEN_PERFORMER' && 'Cumple metas · no domina el cargo'}
+              {c.narrativeKey === 'PERCEPTION_BIAS' && 'Domina el cargo · no cumple metas'}
+              {c.narrativeKey === 'DOUBLE_RISK' && 'No domina · no cumple metas'}
+              {c.narrativeKey === 'CONSISTENT' && 'Domina el cargo · cumple metas'}
             </span>
           </button>
         ))}
