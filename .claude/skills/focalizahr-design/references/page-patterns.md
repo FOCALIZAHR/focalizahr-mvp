@@ -19,7 +19,7 @@ Usuario → Ve SU misión → UN botón → Clic → Acción completada → Sigu
 
 ---
 
-## 📋 LOS 7 PATRONES UX
+## 📋 LOS 7+1 PATRONES UX
 
 | # | Patrón | Fase | Propósito |
 |---|--------|------|-----------|
@@ -30,6 +30,7 @@ Usuario → Ve SU misión → UN botón → Clic → Acción completada → Sigu
 | 5 | **Micro-Copy Ejecutivo** | Todas | Textos humanizados + tips |
 | 6 | **Executive Dashboard** | Seguimiento | Split 30/70 con acción mutable |
 | 7 | **Pantallas de Guía** | Transiciones | Confirmaciones limpias |
+| G | **Guided Intelligence** | Inteligencia | Narrativa guiada para hallazgos complejos |
 
 ---
 
@@ -388,3 +389,64 @@ Todo wizard debe seguir esta estructura narrativa:
 ```
 
 **Principio:** El software TERMINA cuando el usuario hace clic en 'Guardar'. FocalizaHR COMIENZA ahí.
+
+---
+
+## PATRÓN G: GUIDED INTELLIGENCE
+
+**Propósito:** Comunicar hallazgos de alto valor intelectual donde la complejidad ES el valor.
+
+> "La competencia muestra datos en tablas. FocalizaHR muestra inteligencia en narrativa."
+
+### Cuándo Usar
+
+```yaml
+✅ USAR para:
+  - Correlaciones cross-dimensionales (metas vs desempeño vs sesgo)
+  - Discrepancias con múltiples variables explicativas
+  - Hallazgos que contradicen la intuición del ejecutivo
+  - Cualquier cruce de 2+ motores de inteligencia
+
+❌ NO USAR para:
+  - Métricas simples → Patrón 1 (Smart Router)
+  - Listas operativas → Patrón 2 (Rail)
+  - Procesos secuenciales → Cinema Mode
+```
+
+### Estructura: 6 Capas
+
+```
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃  ═══ LÍNEA TESLA ═══════════════════════════════════   ┃
+┃                                                        ┃
+┃  CAPA 1: CONTEXTO (header split)                      ┃
+┃  CAPA 2: PERSPECTIVAS (tabs underline)                ┃
+┃  CAPA 3: CATEGORÍAS (cards selectoras con número)     ┃
+┃  CAPA 4: NARRATIVA (La observación + La decisión)     ┃
+┃  CAPA 5: EVIDENCIA (personas + tags + segunda var)    ┃
+┃  CAPA 6: ACCIÓN (Enviar a RRHH)                       ┃
+┃                                                        ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+```
+
+### Reglas Críticas
+
+```yaml
+AUTO-SELECCIÓN:
+  - NUNCA aterrizar vacío
+  - Categoría más crítica se auto-selecciona
+  - Al cambiar tab, auto-seleccionar la más urgente
+
+NARRATIVA:
+  - "La observación" → Qué está pasando (negocio, no RRHH)
+  - "La decisión de valor" → Preguntas que el CEO debe hacerse
+  - "Segunda variable" → Motor que explica la discrepancia
+  - Coaching tip al cierre con urgencia temporal
+
+LABELS VISIBLES:
+  - 11px mínimo (no 9px invisible)
+  - slate-400 mínimo (no slate-600+)
+  - El label GUÍA la lectura, no se esconde
+```
+
+📖 **Documentación completa:** Ver `references/guided-intelligence.md`

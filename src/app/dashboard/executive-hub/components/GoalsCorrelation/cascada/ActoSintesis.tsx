@@ -18,6 +18,12 @@ interface ActoSintesisProps {
 export default memo(function ActoSintesis({ data, onOpenScatter }: ActoSintesisProps) {
   const synthesis = useMemo(() => GoalsSynthesisEngine.generate(data), [data])
 
+  // Personas con discrepancia que entran al checkpoint de compensaciones
+  const discrepancyInComp =
+    data.quadrantCounts.perceptionBias +
+    data.quadrantCounts.hiddenPerformer +
+    data.quadrantCounts.doubleRisk
+
   return (
     <>
       <ActSeparator label="Síntesis" color="cyan" />
@@ -45,8 +51,22 @@ export default memo(function ActoSintesis({ data, onOpenScatter }: ActoSintesisP
           {synthesis.accountability}
         </p>
 
+        {/* Dato del checkpoint de compensaciones */}
+        {discrepancyInComp > 0 && (
+          <p className="text-sm font-light text-slate-400 text-center border-t border-slate-800/40 pt-4">
+            <span className="text-white font-normal">{discrepancyInComp}</span>{' '}
+            {discrepancyInComp === 1 ? 'persona' : 'personas'} con discrepancia{' '}
+            {discrepancyInComp === 1 ? 'está' : 'están'} en la lista de compensaciones de este ciclo.
+          </p>
+        )}
+
+        {/* Compensation bridge */}
+        <p className="text-[11px] font-light text-slate-600 text-center">
+          Antes de aprobar compensaciones, valida estos datos en la pestaña Compensación.
+        </p>
+
         {/* Scatter link */}
-        <div className="text-center pt-4">
+        <div className="text-center pt-2">
           <button
             onClick={onOpenScatter}
             className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-400 transition-colors"

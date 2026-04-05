@@ -1,0 +1,346 @@
+'use client'
+
+// ════════════════════════════════════════════════════════════════════════════
+// ANCLA INTELIGENTE — Acto Ancla (Pre-Cascada)
+// src/components/executive/AnclaInteligente.tsx
+// ════════════════════════════════════════════════════════════════════════════
+// Pantalla premisa entre la portada y la cascada diagnóstica.
+// Gauge central + líneas SVG curvas + 3-5 nodos con narrativa por componente.
+// Animación térmica: el gauge irradia hacia los nodos secuencialmente.
+//
+// Patrón documentado en:
+//   .claude/skills/focalizahr-design/references/cascada-ejecutiva.md
+//
+// Principios:
+//   - Número del gauge en BLANCO (no rojo/cyan/purple)
+//   - Arco del gauge en color de gravedad
+//   - Zero jerga en narrativas (skill focalizahr-narrativas)
+//   - Una sola pantalla, sin scroll
+//   - Componente agnóstico — el dominio construye las narrativas
+// ════════════════════════════════════════════════════════════════════════════
+
+import { memo, useMemo } from 'react'
+import { motion } from 'framer-motion'
+import { ArrowLeft, ArrowRight, Info } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { PrimaryButton } from '@/components/ui/PremiumButton'
+
+// ════════════════════════════════════════════════════════════════════════════
+// TYPES
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface AnclaComponent {
+  /** Valor 0-100 del componente */
+  value: number
+  /** Label corto en uppercase (ej: "Evaluación vs resultados") */
+  label: string
+  /** Narrativa de UNA línea — traducción ejecutiva del valor */
+  narrative: string
+  /** Tooltip opcional con sustento científico (se muestra con icono (i) junto al label) */
+  tooltip?: string
+}
+
+export interface AnclaInteligenteProps {
+  /** Score principal 0-100 que vive dentro del gauge */
+  score: number
+  /** Label del score (ej: "Confiabilidad") */
+  scoreLabel: string
+  /** 3 a 5 componentes que explican la composición del score */
+  components: AnclaComponent[]
+  /** Handler del CTA "Ver diagnóstico completo" */
+  onContinue: () => void
+  /** Handler del back button (opcional) */
+  onBack?: () => void
+  /** Texto del CTA — default "Ver diagnóstico completo" */
+  ctaLabel?: string
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// COLOR LOGIC — gravedad del score y de cada componente
+// ════════════════════════════════════════════════════════════════════════════
+
+type TierColor = 'cyan' | 'amber' | 'purple'
+
+function getTier(value: number): TierColor {
+  if (value >= 50) return 'cyan'
+  if (value >= 20) return 'amber'
+  return 'purple'
+}
+
+const TIER_HEX: Record<TierColor, string> = {
+  cyan: '#22D3EE',
+  amber: '#F59E0B',
+  purple: '#A78BFA',
+}
+
+const TIER_TEXT: Record<TierColor, string> = {
+  cyan: 'text-cyan-400',
+  amber: 'text-amber-400',
+  purple: 'text-purple-400',
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// GAUGE GEOMETRY — constantes del SVG principal
+// Tamaño 272 (15% más chico que antes) para que gauge + inicio de líneas
+// entren en una sola pantalla sin scroll.
+// ════════════════════════════════════════════════════════════════════════════
+
+const GAUGE_SIZE = 272
+const GAUGE_STROKE = 10
+const GAUGE_RADIUS = (GAUGE_SIZE / 2) - GAUGE_STROKE - 8
+const GAUGE_CIRC = 2 * Math.PI * GAUGE_RADIUS
+
+// ════════════════════════════════════════════════════════════════════════════
+// COMPONENT
+// ════════════════════════════════════════════════════════════════════════════
+
+export default memo(function AnclaInteligente({
+  score,
+  scoreLabel,
+  components,
+  onContinue,
+  onBack,
+  ctaLabel = 'Ver diagnóstico completo',
+}: AnclaInteligenteProps) {
+  const scoreTier = getTier(score)
+  const scoreColor = TIER_HEX[scoreTier]
+  const strokeDashoffset = GAUGE_CIRC - (score / 100) * GAUGE_CIRC
+
+  // Precomputar tiers de cada nodo
+  const nodes = useMemo(
+    () => components.map(c => ({ ...c, tier: getTier(c.value) })),
+    [components]
+  )
+
+  return (
+    <div className="relative rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
+      {/* Tesla line top */}
+      <div
+        className="absolute top-0 left-0 right-0 h-[2px]"
+        style={{
+          background:
+            'linear-gradient(90deg, transparent 5%, #22D3EE 35%, #A78BFA 65%, transparent 95%)',
+          opacity: 0.7,
+        }}
+      />
+
+      <div className="px-6 py-10 md:px-10 md:py-14">
+        {/* Back button */}
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs mb-6"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Portada
+          </button>
+        )}
+
+        {/* ═══ GAUGE CENTRAL ═══ */}
+        <div className="flex flex-col items-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            className="relative"
+            style={{ width: GAUGE_SIZE, height: GAUGE_SIZE }}
+          >
+            {/* Glow background */}
+            <div
+              className="absolute inset-0 rounded-full blur-[60px] opacity-20"
+              style={{ backgroundColor: scoreColor }}
+            />
+
+            {/* SVG gauge */}
+            <svg
+              className="absolute inset-0 -rotate-90"
+              viewBox={`0 0 ${GAUGE_SIZE} ${GAUGE_SIZE}`}
+            >
+              {/* Track */}
+              <circle
+                cx={GAUGE_SIZE / 2}
+                cy={GAUGE_SIZE / 2}
+                r={GAUGE_RADIUS}
+                fill="none"
+                stroke="rgba(51, 65, 85, 0.4)"
+                strokeWidth={GAUGE_STROKE}
+              />
+              {/* Progress arc — color de gravedad */}
+              <motion.circle
+                cx={GAUGE_SIZE / 2}
+                cy={GAUGE_SIZE / 2}
+                r={GAUGE_RADIUS}
+                fill="none"
+                stroke={scoreColor}
+                strokeWidth={GAUGE_STROKE}
+                strokeLinecap="round"
+                strokeDasharray={GAUGE_CIRC}
+                initial={{ strokeDashoffset: GAUGE_CIRC }}
+                animate={{ strokeDashoffset }}
+                transition={{ duration: 1.2, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                style={{ filter: `drop-shadow(0 0 12px ${scoreColor}80)` }}
+              />
+            </svg>
+
+            {/* Score (blanco con peso fuerte) + label dentro del gauge */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <motion.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+                className="text-[96px] font-semibold text-white leading-none tabular-nums tracking-tight"
+              >
+                {score}
+                <span className="text-3xl text-slate-500 font-light">%</span>
+              </motion.span>
+              <motion.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.6 }}
+                className="text-[10px] uppercase tracking-[3px] text-slate-500 font-medium mt-1"
+              >
+                {scoreLabel}
+              </motion.span>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* ═══ LÍNEAS SVG + NODOS ═══ */}
+        <div className="relative mt-2">
+          {/* SVG overlay con líneas curvas que irradian del gauge hacia los nodos */}
+          <svg
+            className="absolute inset-x-0 top-0 w-full pointer-events-none"
+            style={{ height: 80 }}
+            viewBox="0 0 1000 80"
+            preserveAspectRatio="none"
+          >
+            <defs>
+              <linearGradient id="ancla-line-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#22D3EE" stopOpacity="0.5" />
+                <stop offset="100%" stopColor="#A78BFA" stopOpacity="0.25" />
+              </linearGradient>
+            </defs>
+            {nodes.map((_, idx) => {
+              // Punto de origen: centro superior del contenedor SVG (debajo del gauge)
+              const originX = 500
+              const originY = 0
+              // Punto destino: posición horizontal del nodo idx de N nodos
+              const nodeX = 1000 * ((idx + 0.5) / nodes.length)
+              const nodeY = 75
+              // Control point para curva suave
+              const ctrlX = (originX + nodeX) / 2
+              const ctrlY = 40
+              const path = `M ${originX} ${originY} Q ${ctrlX} ${ctrlY}, ${nodeX} ${nodeY}`
+
+              return (
+                <motion.path
+                  key={`line-${idx}`}
+                  d={path}
+                  stroke="url(#ancla-line-gradient)"
+                  strokeWidth="1.5"
+                  fill="none"
+                  strokeLinecap="round"
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{ pathLength: 1, opacity: 1 }}
+                  transition={{
+                    duration: 0.6,
+                    delay: 1.2 + idx * 0.15,
+                    ease: [0.16, 1, 0.3, 1],
+                  }}
+                />
+              )
+            })}
+          </svg>
+
+          {/* Nodos */}
+          <div
+            className={cn(
+              'grid gap-4 pt-20',
+              nodes.length === 3 && 'grid-cols-3',
+              nodes.length === 4 && 'grid-cols-2 md:grid-cols-4',
+              nodes.length === 5 && 'grid-cols-2 md:grid-cols-5'
+            )}
+          >
+            {nodes.map((node, idx) => {
+              const nodeColor = TIER_HEX[node.tier]
+              const nodeTextClass = TIER_TEXT[node.tier]
+              const isGhost = node.value === 0
+              const barWidth = Math.max(0, Math.min(100, node.value))
+
+              return (
+                <motion.div
+                  key={`node-${idx}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: 1.4 + idx * 0.15 }}
+                  className="text-center"
+                >
+                  {/* Número grande */}
+                  <p
+                    className={cn(
+                      'text-3xl md:text-4xl font-extralight font-mono tabular-nums leading-none',
+                      isGhost ? 'text-slate-500' : nodeTextClass
+                    )}
+                  >
+                    {node.value}
+                    <span className="text-lg text-slate-600">%</span>
+                  </p>
+
+                  {/* Micro-barra 2px */}
+                  <div className="h-[2px] bg-slate-800/60 rounded-full mt-2.5 overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${barWidth}%` }}
+                      transition={{
+                        duration: 0.8,
+                        delay: 1.6 + idx * 0.15,
+                        ease: [0.16, 1, 0.3, 1],
+                      }}
+                      className="h-full rounded-full"
+                      style={{
+                        backgroundColor: isGhost ? '#475569' : nodeColor,
+                        opacity: isGhost ? 0.3 : 1,
+                      }}
+                    />
+                  </div>
+
+                  {/* Label + tooltip opcional (i) con sustento científico */}
+                  <div className="flex items-center justify-center gap-1 mt-3">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">
+                      {node.label}
+                    </p>
+                    {node.tooltip && (
+                      <span className="group/tip relative inline-flex">
+                        <Info className="w-3 h-3 text-slate-600 hover:text-slate-400 cursor-help transition-colors" />
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 px-3 py-2.5 rounded-lg bg-slate-950 border border-slate-700/40 text-[10px] text-slate-300 leading-relaxed opacity-0 group-hover/tip:opacity-100 transition-opacity pointer-events-none z-50 shadow-2xl shadow-black/50 text-left normal-case tracking-normal font-light">
+                          {node.tooltip}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Narrativa (una línea) */}
+                  <p className="text-[11px] font-light text-slate-500 leading-snug mt-1.5 max-w-[180px] mx-auto">
+                    {node.narrative}
+                  </p>
+                </motion.div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* ═══ CTA ÚNICO ═══ */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 1.4 + nodes.length * 0.15 + 0.3 }}
+          className="flex justify-center mt-10"
+        >
+          <PrimaryButton icon={ArrowRight} iconPosition="right" onClick={onContinue}>
+            {ctaLabel}
+          </PrimaryButton>
+        </motion.div>
+      </div>
+    </div>
+  )
+})

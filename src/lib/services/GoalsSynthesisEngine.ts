@@ -18,6 +18,7 @@ export type GoalsDiagnosticType =
   | 'EVALUADOR'
   | 'ESTRELLAS_EN_RIESGO'
   | 'FRAMEWORK'
+  | 'ALINEADO'
   | 'DESALINEAMIENTO_GENERALIZADO'
 
 export interface GoalsSynthesis {
@@ -55,7 +56,13 @@ export class GoalsSynthesisEngine {
     const { byGerencia, stars, totals, quadrantCounts } = data
 
     const pctDesalineamiento = totals.totalEvaluados > 0
-      ? Math.round(((quadrantCounts.perceptionBias + quadrantCounts.hiddenPerformer) / totals.totalEvaluados) * 100)
+      ? Math.round(
+          ((quadrantCounts.perceptionBias +
+            quadrantCounts.hiddenPerformer +
+            quadrantCounts.doubleRisk) /
+            totals.totalEvaluados) *
+            100
+        )
       : 0
 
     // ── EVALUADOR (prioridad 1) ──
@@ -142,6 +149,24 @@ export class GoalsSynthesisEngine {
           'Antes de intervenir personas, la pregunta es si lo que se mide corresponde a lo que el negocio necesita de ese rol.',
         accountability:
           'El próximo ciclo confirmará si estas decisiones fueron efectivas.',
+      }
+    }
+
+    // ── ALINEADO — cuando la organización está saludable ──
+    if (pctDesalineamiento <= 15 && gerenciasRed.length === 0) {
+      return {
+        diagnosticType: 'ALINEADO',
+        trigger: `${100 - pctDesalineamiento}% de coherencia entre evaluación y resultados`,
+        classification:
+          'La evaluación y los resultados cuentan la misma historia.',
+        implication:
+          `El ${100 - pctDesalineamiento}% de la organización muestra coherencia entre lo que se evalúa y lo que se entrega. ` +
+          `Eso no es casualidad — refleja un sistema de gestión que funciona y evaluadores que conocen a su gente.`,
+        path:
+          'La base es confiable para tomar decisiones de compensación. El desafío ahora es proteger a quienes sostienen este resultado — ' +
+          'y no asumir que el paquete estándar alcanza para retenerlos.',
+        accountability:
+          'El próximo ciclo confirmará si esta coherencia se mantiene o se erosiona.',
       }
     }
 

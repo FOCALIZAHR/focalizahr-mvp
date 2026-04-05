@@ -222,9 +222,10 @@ export const QUADRANT_NARRATIVE_DICTIONARY: Record<string, QuadrantNarrative> = 
 export function buildGerenciaNarrative(g: GerenciaNarrativeInput): string {
   const parts: string[] = []
 
-  // Confidence
+  // Confidence — el motor ya cruza evaluador × avgProgress × disconnection × Pearson.
+  // Aquí solo leemos el flag limpio.
   if (g.confidenceLevel === 'red') {
-    if (g.avgProgress < 40) {
+    if (g.avgProgress < 40 && g.evaluatorClassification === 'INDULGENTE') {
       parts.push(
         `${g.gerenciaName} presenta un patrón de evaluador indulgente con metas incumplidas. ` +
         `La evaluación 360° promedio de ${g.avgScore360.toFixed(1)} no se respalda con el progreso real de ${g.avgProgress}%.`
@@ -254,21 +255,17 @@ export function buildGerenciaNarrative(g: GerenciaNarrativeInput): string {
     parts.push(`Cobertura de metas en ${g.coverage}% — ampliar antes de tomar decisiones.`)
   }
 
-  // Evaluator classification
+  // Evaluator classification (contexto extra cuando no está verde)
   if (g.evaluatorClassification && g.confidenceLevel !== 'green') {
     parts.push(`Evaluador clasificado como "${g.evaluatorClassification}".`)
   }
 
-  // V2: Pearson RoleFit × Metas
-  if (g.pearsonR !== undefined && g.pearsonR !== null) {
-    if (g.pearsonR > 0.7) {
-      parts.push(`Correlación RoleFit-Metas de ${g.pearsonR.toFixed(2)} — las competencias predicen resultados.`)
-    } else if (g.pearsonR < 0.3) {
-      parts.push(`Correlación RoleFit-Metas de solo ${g.pearsonR.toFixed(2)} — las competencias definidas no predicen ejecución. Revisar framework.`)
-    }
+  // Pearson positivo fuerte (detalle informativo cuando > 0.7)
+  if (g.pearsonR !== undefined && g.pearsonR !== null && g.pearsonR > 0.7) {
+    parts.push(`Correlación RoleFit-Metas de ${g.pearsonR.toFixed(2)} — las competencias predicen resultados.`)
   }
 
-  // V2: Calibration justice
+  // Calibration justice
   if (g.calibrationUpWithLowGoals && g.calibrationUpWithLowGoals > 0) {
     parts.push(`${g.calibrationUpWithLowGoals} persona(s) calibrada(s) hacia arriba con metas bajo 40% — inflación política.`)
   }
@@ -277,6 +274,90 @@ export function buildGerenciaNarrative(g: GerenciaNarrativeInput): string {
   }
 
   return parts.join(' ')
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// INTEGRITY VERDICT — Sentencia de Integridad para modal gerencia
+// ────────────────────────────────────────────────────────────────────────────
+
+export type IntegrityStatus = 'AUDITABLE' | 'CON_RESERVAS' | 'NO_AUDITABLE'
+
+export interface IntegrityVerdict {
+  status: IntegrityStatus
+  title: string
+  narrative: string
+}
+
+/**
+ * Emite un veredicto sobre la integridad de medición de una gerencia.
+ * Narrativas auditadas contra 6 Reglas de Oro (skill focalizahr-narrativas):
+ * contradicción protagonista, "O" McKinsey, consecuencia no instrucción,
+ * sin jerga, una idea por oración, cierre ancla urgencia.
+ */
+export function buildIntegrityVerdict(g: GerenciaNarrativeInput): IntegrityVerdict {
+  // NO AUDITABLE — el motor ya integra evaluador × avgProgress × disconnection × Pearson.
+  // Aquí solo sub-routeamos la narrativa según la causa dominante.
+  if (g.confidenceLevel === 'red') {
+    const pearsonLow = g.pearsonR !== undefined && g.pearsonR !== null && g.pearsonR < 0.3
+    const disconnectionHigh = g.disconnectionRate > 40
+
+    // Caso 1: Pearson bajo sin disconnection alta — el juicio es azar
+    if (pearsonLow && !disconnectionHigh) {
+      return {
+        status: 'NO_AUDITABLE',
+        title: 'Integridad de medición: no auditable',
+        narrative:
+          `Lo que se evalúa en ${g.gerenciaName} no predice lo que se entrega. ` +
+          `El juicio del líder sobre su equipo y los resultados reales son dos historias distintas. ` +
+          `Aprobar compensaciones basadas en estos datos es financiar decisiones sin base.`,
+      }
+    }
+
+    // Caso 2: Evaluador indulgente con metas incumplidas
+    if (g.avgProgress < 40 && g.evaluatorClassification === 'INDULGENTE') {
+      return {
+        status: 'NO_AUDITABLE',
+        title: 'Integridad de medición: no auditable',
+        narrative:
+          `${g.gerenciaName} recibe evaluaciones altas mientras entrega metas bajas. ` +
+          `O el líder no distingue entre quien rinde y quien no. ` +
+          `O el sistema no le exige hacerlo. ` +
+          `Cualquier compensación basada en estos datos premia la subjetividad y castiga al resto de la organización.`,
+      }
+    }
+
+    // Caso 3: Desconexión severa — narrativa por defecto
+    return {
+      status: 'NO_AUDITABLE',
+      title: 'Integridad de medición: no auditable',
+      narrative:
+        `La evaluación y los resultados de ${g.gerenciaName} cuentan historias distintas. ` +
+        `El líder dice una cosa sobre su equipo, el negocio dice otra. ` +
+        `Aprobar compensaciones basadas en estos datos es financiar la ineficiencia operativa.`,
+    }
+  }
+
+  // CON RESERVAS — tendencia central, difícil distinguir
+  if (g.confidenceLevel === 'amber') {
+    return {
+      status: 'CON_RESERVAS',
+      title: 'Integridad de medición: auditable con reservas',
+      narrative:
+        `${g.gerenciaName} opera con tendencia central en sus evaluaciones. ` +
+        `Es difícil distinguir a quien rinde de quien no cuando todos reciben notas parecidas. ` +
+        `Los datos sirven como punto de partida — pero cada decisión de compensación exige confirmación caso por caso.`,
+    }
+  }
+
+  // AUDITABLE — coherencia confirmada
+  return {
+    status: 'AUDITABLE',
+    title: 'Integridad de medición: auditable',
+    narrative:
+      `Las evaluaciones de ${g.gerenciaName} predicen los resultados. ` +
+      `Lo que el líder dice sobre su equipo se confirma con lo que entregan. ` +
+      `Base confiable para decisiones de compensación en esta unidad.`,
+  }
 }
 
 // ────────────────────────────────────────────────────────────────────────────

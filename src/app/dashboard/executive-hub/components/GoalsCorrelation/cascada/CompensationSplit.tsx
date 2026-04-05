@@ -73,6 +73,28 @@ function autoSelectIndex(categories: CategoryDef[], counts: number[]): number {
 // EVALUATOR TAG — segunda variable para mérito
 // ════════════════════════════════════════════════════════════════════════════
 
+// ════════════════════════════════════════════════════════════════════════════
+// PERSON METRICS — fuente única para las métricas mostradas en fila y card
+// Decisión canónica: goalsPercent + roleFitScore (nunca score360 crudo en UI).
+// Ambas vistas (colapsada y expandida) deben usar este helper.
+// ════════════════════════════════════════════════════════════════════════════
+
+interface PersonMetrics {
+  goals: number          // 0-100, cumplimiento de metas del negocio
+  evaluation: number     // 0-100, RoleFit (dominio del cargo)
+  hasGoals: boolean
+  hasEvaluation: boolean
+}
+
+function getPersonMetrics(p: CorrelationPoint): PersonMetrics {
+  return {
+    goals: Math.round(p.goalsPercent ?? 0),
+    evaluation: Math.round(p.roleFitScore ?? 0),
+    hasGoals: p.goalsPercent !== null,
+    hasEvaluation: p.roleFitScore !== null,
+  }
+}
+
 function getSecondVarTag(point: CorrelationPoint, path: CompensationPath): { label: string } | null {
   if (path === 'merito' && point.evaluatorStatus) {
     if (point.evaluatorStatus === 'INDULGENTE') return { label: 'Jefe indulgente' }
@@ -368,6 +390,7 @@ const PersonRow = memo(function PersonRow({
 }) {
   const [expanded, setExpanded] = useState(false)
   const tag = getSecondVarTag(p, path)
+  const metrics = getPersonMetrics(p)
   const needsAttention = p.quadrant === 'DOUBLE_RISK' || p.quadrant === 'PERCEPTION_BIAS'
 
   // FIX 8: narrativa individual on expand
@@ -427,10 +450,10 @@ const PersonRow = memo(function PersonRow({
           <span className="text-slate-800">·</span>
           <span className="text-[11px] font-mono text-slate-400">
             {path === 'senales'
-              ? `${p.score360.toFixed(1)}/${Math.round(p.goalsPercent ?? 0)}%`
+              ? `${metrics.goals}% · ${metrics.evaluation}%`
               : path === 'merito'
-                ? p.score360.toFixed(1)
-                : `${Math.round(p.goalsPercent ?? 0)}%`
+                ? `${metrics.evaluation}%`
+                : `${metrics.goals}%`
             }
           </span>
           {tag && (
@@ -452,24 +475,24 @@ const PersonRow = memo(function PersonRow({
             className="overflow-hidden"
           >
             <div className="pl-7 pr-2 pb-3 pt-1 space-y-2.5">
-              {/* Métricas clave con tooltips */}
+              {/* Métricas clave con tooltips — misma fuente que la fila colapsada */}
               <div className="flex items-center gap-4">
-                {p.goalsPercent !== null && (
+                {metrics.hasGoals && (
                   <div className="group/tip relative">
                     <span className="text-xs text-slate-500">Metas</span>
-                    <span className="text-sm font-mono text-cyan-400/70 ml-1">{Math.round(p.goalsPercent)}%</span>
+                    <span className="text-sm font-mono text-cyan-400/70 ml-1">{metrics.goals}%</span>
                     <div className="absolute bottom-full left-0 mb-1.5 w-44 px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-slate-700/30 opacity-0 group-hover/tip:opacity-100 transition-all pointer-events-none z-50">
                       <p className="text-[10px] text-slate-300">Porcentaje de cumplimiento de metas del negocio asignadas</p>
                     </div>
                   </div>
                 )}
-                {p.goalsPercent !== null && p.roleFitScore !== null && (
+                {metrics.hasGoals && metrics.hasEvaluation && (
                   <span className="text-slate-800">·</span>
                 )}
-                {p.roleFitScore !== null && (
+                {metrics.hasEvaluation && (
                   <div className="group/tip relative">
                     <span className="text-xs text-slate-500">RoleFit</span>
-                    <span className="text-sm font-mono text-purple-400/70 ml-1">{Math.round(p.roleFitScore)}%</span>
+                    <span className="text-sm font-mono text-purple-400/70 ml-1">{metrics.evaluation}%</span>
                     <div className="absolute bottom-full left-0 mb-1.5 w-44 px-2.5 py-1.5 rounded-lg bg-slate-950/95 border border-slate-700/30 opacity-0 group-hover/tip:opacity-100 transition-all pointer-events-none z-50">
                       <p className="text-[10px] text-slate-300">Nivel de dominio del cargo según evaluación 360° de competencias</p>
                     </div>

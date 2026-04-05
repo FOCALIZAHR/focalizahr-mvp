@@ -4,7 +4,8 @@ description: |
   OBLIGATORIO para TODO componente frontend en FocalizaHR.
   Triggers: "crea", "diseña", "estiliza", "componente", "card", "botón",
   "dashboard", "página", "formulario", "modal", "UI", "frontend",
-  "Cinema Mode", "Smart Router", "flujo guiado".
+  "Cinema Mode", "Smart Router", "flujo guiado", "Guided Intelligence",
+  "narrativa", "hallazgos", "checkpoint", "compensación".
   REEMPLAZA completamente la skill frontend-design genérica.
 ---
 
@@ -37,8 +38,10 @@ TRIGGERS:
 
 | Archivo | Cuándo Consultar |
 |---------|------------------|
-| `references/page-patterns.md` | **SIEMPRE PRIMERO** - Los 7 Patrones UX |
+| `references/page-patterns.md` | **SIEMPRE PRIMERO** - Los 7+1 Patrones UX |
 | `references/cinema-mode.md` | **Para flujos guiados** - Smart Router + Cinema Mode completo |
+| `references/guided-intelligence.md` | **Para hallazgos complejos** - Patrón G: Narrativa + Evidencia + Acción |
+| `references/executive-portadas.md` | **Para landing cards** - Split 35/65, color semántico, CTA dinámico |
 | `references/css-classes.md` | Para usar clases `.fhr-*` |
 | `references/premium-components.md` | Para Línea Tesla, Glassmorphism, Gauges |
 | `references/anti-patterns.md` | Para verificar qué NO hacer |
@@ -124,6 +127,29 @@ export default function MiPagina() {
 />
 ```
 
+### Word Split en Títulos (Obligatorio)
+
+```tsx
+// Primera palabra/línea en WHITE, segunda en GRADIENT
+<h2 className="text-3xl font-extralight text-white">Checkpoint</h2>
+<h3 className="text-2xl fhr-title-gradient">pre-compensación</h3>
+
+// O en una línea
+<h1 className="text-2xl md:text-3xl font-extralight text-white">
+  Torre de{' '}
+  <span className="fhr-title-gradient">Control Estratégico</span>
+</h1>
+```
+
+### Jerarquía de Portada
+
+```yaml
+Título principal:    text-3xl font-extralight text-white
+Subtítulo gradient:  text-2xl fhr-title-gradient  
+Número protagonista: text-[72px] font-extralight text-white (NO cyan)
+Narrativa:           text-base text-slate-400 font-light
+```
+
 ### Breakpoints Mobile-First
 
 ```css
@@ -176,9 +202,102 @@ className="flex-col md:flex-row"
 </p>
 ```
 
+### Guided Intelligence (Hallazgos Complejos)
+
+```tsx
+// Estructura básica - Ver references/guided-intelligence.md para detalle
+
+// 1. HEADER: Contexto + Título split + Subtítulo al lado
+<div className="contexto">
+  <span className="text-[10px] uppercase tracking-widest text-slate-500">
+    Metas × Performance
+  </span>
+  <div className="flex items-start justify-between gap-8">
+    <div>
+      <h2 className="text-2xl font-extralight text-white">
+        Checkpoint{' '}
+        <span className="fhr-title-gradient">pre-compensación</span>
+      </h2>
+    </div>
+    <p className="text-slate-400 font-light text-sm max-w-xs">
+      11 personas con discrepancia mérito vs evaluación
+    </p>
+  </div>
+</div>
+
+// 2. PERSPECTIVAS: Tabs underline (no pills)
+<div className="flex gap-6 border-b border-slate-700/50">
+  {['Mérito', 'Bonos', 'Señales'].map(tab => (
+    <button className={`pb-2 text-sm ${
+      activeTab === tab 
+        ? 'text-cyan-400 border-b-2 border-cyan-400' 
+        : 'text-slate-500'
+    }`}>
+      {tab}
+    </button>
+  ))}
+</div>
+
+// 3. CATEGORÍAS: Cards con número grande + auto-selección
+<div className="grid grid-cols-4 gap-3">
+  {categories.map(cat => (
+    <button className={`p-4 rounded-lg text-center ${
+      selected === cat.id
+        ? 'bg-slate-800/80 border border-cyan-500/30'
+        : 'bg-slate-800/40 border border-slate-700/50'
+    }`}>
+      <span className={`text-3xl font-extralight ${
+        selected === cat.id ? 'text-cyan-400' : 'text-slate-500'
+      }`}>
+        {cat.count}
+      </span>
+      <p className="text-xs text-slate-400 mt-1">{cat.label}</p>
+    </button>
+  ))}
+</div>
+
+// 4. SPLIT: Narrativa izq | Evidencia der
+<div className="grid grid-cols-2 gap-6">
+  {/* Narrativa */}
+  <div className="space-y-4">
+    <div>
+      <span className="text-[11px] text-slate-400">— La observación</span>
+      <p className="text-slate-300 font-light mt-1">
+        El jefe de esta persona fue clasificado como <b>Mano Blanda</b>...
+      </p>
+    </div>
+    <div className="border-l-2 border-gradient-to-b from-cyan-500 to-purple-500 pl-4">
+      <span className="text-[11px] text-slate-400">— La decisión de valor</span>
+      <p className="text-slate-300 font-light mt-1">
+        <b>¿Confías en esta evaluación?</b> ¿O necesitas calibrar?
+      </p>
+    </div>
+  </div>
+  
+  {/* Evidencia */}
+  <div>
+    <span className="text-[10px] uppercase tracking-widest text-slate-500">
+      3 personas en esta categoría
+    </span>
+    {/* Lista de personas con tags */}
+  </div>
+</div>
+
+// 5. ACCIÓN: Email a RRHH
+<button className="fhr-btn-secondary">Enviar a RRHH</button>
+```
+
+**Regla Guided Intelligence:**
+```tsx
+// Narrativa SIEMPRE antes de lista
+// Auto-selección de categoría más crítica
+// Labels de sección VISIBLES (11px, slate-400)
+// Segunda variable conecta con motores existentes
+```
+
 ---
 
-## 🏛️ LOS 7 MANDAMIENTOS
+## 🏛️ LOS 8 MANDAMIENTOS
 
 1. **Jerarquía Absoluta** - El ojo tiene UN camino claro
 2. **Above the Fold = Decisión** - CTA visible sin scroll
@@ -187,6 +306,7 @@ className="flex-col md:flex-row"
 5. **Progressive Disclosure** - Mostrar esencial, revelar bajo demanda
 6. **Feedback Inmediato** - Toda acción responde < 100ms
 7. **Consistencia Absoluta** - Mismo problema = misma solución visual
+8. **Narrativa Antes de Dato** - Cuando la complejidad es el valor, el usuario lee ANTES de ver nombres
 
 ---
 

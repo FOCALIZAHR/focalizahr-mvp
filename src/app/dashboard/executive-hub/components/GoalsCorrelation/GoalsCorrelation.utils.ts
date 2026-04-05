@@ -5,25 +5,18 @@
 
 import type { GoalsCorrelationDataV2 } from './GoalsCorrelation.types'
 import type { PortadaNarrative } from './GoalsCorrelation.types'
-import { SUBFINDING_TO_NARRATIVE } from './GoalsCorrelation.constants'
-import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
 
 // ════════════════════════════════════════════════════════════════════════════
-// V2 PORTADA NARRATIVE — Alineada con patrón P&L Talent
-// CTA siempre cyan. Highlight = dato ancla. Sin instrucciones.
+// V2 PORTADA NARRATIVE — Dato ancla: coherenceScore (0-100)
+// El CEO cree primero en la confiabilidad del sistema, después explora.
+// CTA lleva al Acto Ancla (pre-cascada), no directo a la cascada.
 // ════════════════════════════════════════════════════════════════════════════
 
 export function getPortadaNarrativeV2(data: GoalsCorrelationDataV2): PortadaNarrative {
-  const { topAlerts, totals, correlation, quadrantCounts } = data
+  const { totals, correlation } = data
   const totalWithGoals = correlation.filter(c => c.quadrant !== 'NO_GOALS').length
 
-  // % desalineamiento (dato ancla principal)
-  const totalRiesgo = quadrantCounts.perceptionBias + quadrantCounts.hiddenPerformer
-  const pctDesalineamiento = totals.totalEvaluados > 0
-    ? Math.round((totalRiesgo / totals.totalEvaluados) * 100)
-    : 0
-
-  // Sin datos de metas
+  // Sin datos de metas — edge case temprano
   if (totalWithGoals === 0) {
     return {
       highlight: 'Sin datos de metas',
@@ -34,42 +27,37 @@ export function getPortadaNarrativeV2(data: GoalsCorrelationDataV2): PortadaNarr
     }
   }
 
-  // Hay desalineamiento con costo financiero
-  if (pctDesalineamiento > 0 && totals.totalFinancialRisk > 0) {
+  // Coherence score — dato ancla principal (alignment × pearson × stars × confidence)
+  const coherence = computeCoherenceIndex(data)
+  const confiabilidad = coherence.score
+  const ruido = 100 - confiabilidad
+
+  // Caso saludable (≥75% coherencia)
+  // Sin statusBadge: el dato vive en la narrativa, zero duplicación.
+  if (confiabilidad >= 75) {
     return {
-      highlight: `${pctDesalineamiento}% de desalineamiento.`,
-      suffix: ` La capacidad y los resultados no coinciden en ${totalRiesgo} de tus ${totals.totalEvaluados} evaluados.`,
-      ctaLabel: 'Ver dónde está el problema',
+      prefix: 'Tus datos de evaluación reflejan ',
+      highlight: 'resultados reales',
+      suffix: '. Base sólida para decisiones de compensación y desarrollo.',
+      ctaLabel: 'Ver evidencia',
       ctaVariant: 'cyan',
-      coachingTip: `De esas contradicciones, ${formatCurrency(totals.totalFinancialRisk)} en costo de reemplazo si se materializan.`,
+      coachingTip: 'El desafío ahora es proteger a quienes sostienen este resultado.',
     }
   }
 
-  // Hay desalineamiento sin costo financiero
-  if (pctDesalineamiento > 0) {
-    const topAlert = topAlerts[0]
-    const topNarrKey = topAlert ? SUBFINDING_TO_NARRATIVE[topAlert.key] : null
-    const topNarr = topNarrKey ? getNarrative(topNarrKey) : null
+  // Caso crítico / bajo / medio — narrativa de riesgo
+  // Foco en METAS primero (lenguaje de negocio), no en "datos de evaluación" (jerga RRHH).
+  // El highlight resalta el dato protagonista dentro de la frase completa.
+  const financialRiskStr = totals.totalFinancialRisk > 0
+    ? `${formatCurrency(totals.totalFinancialRisk)} en costo de reemplazo si las discrepancias se materializan.`
+    : 'El costo se acumula en decisiones de compensación, promoción y sucesión.'
 
-    return {
-      highlight: `${pctDesalineamiento}% de desalineamiento.`,
-      suffix: ` En ${totalRiesgo} de ${totals.totalEvaluados} evaluados, la capacidad y los resultados no coinciden.`,
-      ctaLabel: 'Ver dónde está el problema',
-      ctaVariant: 'cyan',
-      coachingTip: topAlert && topNarr
-        ? `${topAlert.count} personas en el hallazgo más severo: ${topNarr.headline.replace(/\.$/, '')}.`
-        : 'Contradicciones detectadas entre capacidad y resultados.',
-    }
-  }
-
-  // Saludable
   return {
-    statusBadge: { label: 'Alineado', showCheck: true },
-    highlight: 'Capacidad y resultados alineados.',
-    suffix: ` Las evaluaciones coinciden con los resultados de metas en la mayoría de tus ${totals.totalEvaluados} evaluados.`,
-    ctaLabel: 'Ver detalle',
+    highlight: `${confiabilidad}% de confiabilidad.`,
+    suffix: ` La relación entre el cumplimiento de metas y la evaluación de tu equipo coincide en un ${confiabilidad}%. Las decisiones de compensación, promoción y sucesión se construyen sobre esa base.`,
+    ctaLabel: 'Ver evidencia',
     ctaVariant: 'cyan',
-    coachingTip: 'Base confiable para decisiones de compensación y desarrollo.',
+    coachingTip: financialRiskStr,
   }
 }
 

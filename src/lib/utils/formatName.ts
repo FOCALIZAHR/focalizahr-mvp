@@ -71,6 +71,22 @@ export function formatDisplayNameFull(fullName: string): string {
 }
 
 /**
+ * Formatea clasificación de evaluador del motor a label legible.
+ * El motor usa uppercase (SEVERA, INDULGENTE, CENTRAL, OPTIMA).
+ * Nota: "OPTIMA" → "Óptima" (con tilde, no se obtiene con toTitleCase).
+ */
+export function formatEvaluatorStyle(status: string | null | undefined): string {
+  if (!status) return ''
+  switch (status) {
+    case 'OPTIMA': return 'Óptima'
+    case 'INDULGENTE': return 'Indulgente'
+    case 'SEVERA': return 'Severa'
+    case 'CENTRAL': return 'Central'
+    default: return toTitleCase(status)
+  }
+}
+
+/**
  * Extract initials from a name (already formatted or raw)
  */
 export function getInitials(name: string): string {

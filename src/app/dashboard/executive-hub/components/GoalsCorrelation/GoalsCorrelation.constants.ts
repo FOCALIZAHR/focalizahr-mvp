@@ -151,15 +151,15 @@ export const QUADRANT_CONFIG: Record<CorrelationQuadrant, {
   },
   HIDDEN_PERFORMER: {
     label: 'Talento Oculto',
-    color: 'text-purple-400',
-    dotColor: 'fill-purple-400',
-    bgColor: 'rgba(167, 139, 250, 0.08)',
+    color: 'text-slate-400',
+    dotColor: 'fill-slate-400',
+    bgColor: 'rgba(148, 163, 184, 0.08)',
   },
   DOUBLE_RISK: {
     label: 'Doble Riesgo',
-    color: 'text-amber-400',
-    dotColor: 'fill-amber-400',
-    bgColor: 'rgba(239, 68, 68, 0.08)',
+    color: 'text-violet-400',
+    dotColor: 'fill-violet-400',
+    bgColor: 'rgba(167, 139, 250, 0.08)',
   },
   NO_GOALS: {
     label: 'Sin Metas',

@@ -1,47 +1,36 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// COMPENSATION PORTADA — Sentencia de confianza antes de compensar
+// COMPENSATION PORTADA — Revisión de alineación antes de compensar
 // src/app/dashboard/executive-hub/components/GoalsCorrelation/cascada/CompensationPortada.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// El CEO ve primero si PUEDE confiar en los datos, después revisa los casos.
+// T1 del rediseño Tab 3: título → dato → consecuencia → acción única.
+// Zero (i), zero segundo CTA. La info de gerencias vive en el ranking.
 // ════════════════════════════════════════════════════════════════════════════
 
 import { memo, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowRight, HelpCircle } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { PrimaryButton } from '@/components/ui/PremiumButton'
 
 import type { CorrelationPoint } from '../GoalsCorrelation.types'
-import type { GerenciaGoalsStatsV2 } from '@/lib/services/GoalsDiagnosticService'
 
 // ════════════════════════════════════════════════════════════════════════════
 
 interface CompensationPortadaProps {
   correlation: CorrelationPoint[]
-  byGerencia: GerenciaGoalsStatsV2[]
   onContinue: () => void
-  onOpenGerenciaModal: () => void
 }
 
 export default memo(function CompensationPortada({
   correlation,
-  byGerencia,
   onContinue,
-  onOpenGerenciaModal,
 }: CompensationPortadaProps) {
-  const stats = useMemo(() => {
-    const withGoals = correlation.filter(c => c.quadrant !== 'NO_GOALS' && c.goalsPercent !== null)
-    const discrepancy = withGoals.filter(c => c.quadrant !== 'CONSISTENT').length
-    const totalGerencias = byGerencia.length
-    // Lógica propia de portada — no depende de confidenceLevel del motor
-    const sinConfianza = byGerencia.filter(g =>
-      g.confidenceLevel === 'red' ||
-      (g.pearsonRoleFitGoals !== null && g.pearsonRoleFitGoals < 0.3) ||
-      g.disconnectionRate > 40
+  const discrepancy = useMemo(() => {
+    return correlation.filter(
+      c => c.quadrant !== 'NO_GOALS' && c.quadrant !== 'CONSISTENT' && c.goalsPercent !== null
     ).length
-    return { discrepancy, totalGerencias, sinConfianza }
-  }, [correlation, byGerencia])
+  }, [correlation])
 
   return (
     <div className="relative rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
@@ -54,60 +43,48 @@ export default memo(function CompensationPortada({
         }}
       />
 
-      <div className="p-7">
-        {/* Title — word split */}
-        <div className="mb-6">
-          <span className="text-2xl font-extralight text-white tracking-tight block leading-tight">
-            Antes de
-          </span>
-          <span className="text-2xl font-light tracking-tight block leading-tight fhr-title-gradient">
-            aprobar
-          </span>
+      <div className="px-6 py-14 md:px-10 md:py-20 flex flex-col items-center text-center">
+        {/* ─── TÍTULO ─── */}
+        <div className="mb-12">
+          <h2 className="text-3xl font-extralight text-white tracking-tight leading-tight">
+            Revisión de alineación
+          </h2>
+          <p className="text-xl font-light tracking-tight leading-tight fhr-title-gradient mt-1">
+            Metas y Talento
+          </p>
         </div>
 
-        {/* Hero number */}
+        {/* ─── DATO HERO ─── */}
         <motion.p
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="text-[44px] font-extralight text-cyan-400 leading-none mb-1"
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="text-[72px] font-extralight text-white leading-[0.9] tabular-nums"
         >
-          {stats.discrepancy}
+          {discrepancy}
         </motion.p>
-        <p className="text-sm font-light text-slate-400 leading-relaxed max-w-[400px] mb-5">
-          personas con discrepancia entre evaluación y resultados.
-        </p>
 
-        {/* Confianza por gerencia — (i) siempre visible */}
-        {stats.totalGerencias > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="flex items-center gap-1.5 mb-6"
-          >
-            <p className="text-sm font-light text-slate-400">
-              {stats.sinConfianza > 0 ? (
-                <>
-                  <span className="text-amber-400 font-medium">{stats.sinConfianza}</span> de {stats.totalGerencias} gerencia{stats.totalGerencias !== 1 ? 's' : ''} no {stats.sinConfianza === 1 ? 'tiene' : 'tienen'} base confiable para compensar.
-                </>
-              ) : (
-                <>{stats.totalGerencias} gerencia{stats.totalGerencias !== 1 ? 's' : ''} con base confiable para compensar.</>
-              )}
-            </p>
-            <button
-              onClick={onOpenGerenciaModal}
-              className="flex-shrink-0"
-            >
-              <HelpCircle className="w-4 h-4 text-slate-600 hover:text-cyan-400 transition-colors cursor-pointer" />
-            </button>
-          </motion.div>
-        )}
+        {/* ─── CONSECUENCIA ─── */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="max-w-md mt-6"
+        >
+          <p className="text-base font-light text-slate-400 leading-relaxed mb-3">
+            Casos donde la evaluación del líder contradice el resultado del negocio.
+          </p>
+          <p className="text-sm font-light text-slate-500 leading-relaxed">
+            Aprobar estas compensaciones impacta directamente en la cultura de mérito.
+          </p>
+        </motion.div>
 
-        {/* CTA */}
-        <PrimaryButton icon={ArrowRight} iconPosition="right" onClick={onContinue}>
-          Revisar casos
-        </PrimaryButton>
+        {/* ─── ACCIÓN ÚNICA ─── */}
+        <div className="mt-14">
+          <PrimaryButton icon={ArrowRight} iconPosition="right" onClick={onContinue}>
+            Ver áreas
+          </PrimaryButton>
+        </div>
       </div>
     </div>
   )

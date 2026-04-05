@@ -498,12 +498,15 @@ export class GoalsDiagnosticService {
         }
       }
 
-      // Confidence level: cross calibration × goals
+      // Confidence level: cross calibration × goals × disconnection
+      // (Pearson cross se aplica en aggregateByGerenciaV2 cuando está disponible)
       let confidenceLevel: 'green' | 'amber' | 'red' = 'green'
       if (evaluatorClassification === 'INDULGENTE' && avgProgress < 40) {
         confidenceLevel = 'red' // Doble inflación
       } else if (evaluatorClassification === 'SEVERA' && avgProgress > 80) {
         confidenceLevel = 'red' // Sesgo contra resultados
+      } else if (disconnectionRate > 40) {
+        confidenceLevel = 'red' // Evaluación desconectada de resultados
       } else if (evaluatorClassification === 'CENTRAL') {
         confidenceLevel = 'amber'
       }
@@ -913,8 +916,17 @@ export class GoalsDiagnosticService {
         }
       }
 
+      // Escalar confidenceLevel a red si Pearson < 0.3
+      // (V1 ya considera evaluador, avgProgress y disconnectionRate;
+      // V2 agrega el cruce con Pearson ahora que está disponible)
+      let confidenceLevel = g.confidenceLevel
+      if (pearsonRoleFitGoals !== null && pearsonRoleFitGoals < 0.3) {
+        confidenceLevel = 'red'
+      }
+
       return {
         ...g,
+        confidenceLevel,
         pearsonRoleFitGoals,
         calibrationCross,
       }

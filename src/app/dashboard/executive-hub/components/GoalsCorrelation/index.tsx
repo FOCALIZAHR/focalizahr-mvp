@@ -14,12 +14,15 @@ import { memo, useState, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Crosshair, Brain, MapPin, DollarSign } from 'lucide-react'
 
-import type { GoalsCorrelationPropsV2, SubFinding } from './GoalsCorrelation.types'
+import type { GoalsCorrelationPropsV2, GoalsCorrelationDataV2, SubFinding } from './GoalsCorrelation.types'
 import { getPortadaNarrativeV2, computeCoherenceIndex, type CoherenceIndex } from './GoalsCorrelation.utils'
 import { cn } from '@/lib/utils'
 import { PanelPortada } from '../PanelPortada'
 import { NavPill } from '../shared/NavPill'
 import type { NavPillTab } from '../shared/NavPill'
+import { ActSeparator } from './cascada/shared'
+import AnclaInteligente from '@/components/executive/AnclaInteligente'
+import type { AnclaComponent } from '@/components/executive/AnclaInteligente'
 import GoalsCascada from './GoalsCascada'
 import AnomalíasView from './AnomalíasView'
 import AnalisisTab from './tabs/AnalisisTab'
@@ -38,8 +41,73 @@ const GOALS_TABS: NavPillTab[] = [
   { key: 'compensacion', icon: DollarSign, label: 'Compensación' },
 ]
 
-type View = 'portada' | 'diagnostico' | 'localizacion' | 'compensacion'
+type View = 'portada' | 'ancla' | 'diagnostico' | 'localizacion' | 'compensacion'
 type SubView = 'cascada' | 'anomalias'
+
+// ════════════════════════════════════════════════════════════════════════════
+// ANCLA — helpers de narrativa por componente
+// Cada helper traduce un valor 0-100 a UNA frase ejecutiva sin jerga.
+// ════════════════════════════════════════════════════════════════════════════
+
+function narrativeAlignment(value: number): string {
+  const outOf10 = Math.round(value / 10)
+  if (value === 0) return 'La evaluación no coincide con los resultados en ningún caso.'
+  if (outOf10 <= 2) return `De cada 10 personas, solo en ${outOf10} la evaluación coincide con lo que entregan.`
+  if (outOf10 <= 5) return `De cada 10 personas, en ${outOf10} la evaluación coincide con lo que entregan.`
+  if (outOf10 <= 7) return `De cada 10 personas, en ${outOf10} hay coincidencia entre evaluación y entrega.`
+  return `De cada 10 personas, en ${outOf10} la evaluación refleja lo que entregan.`
+}
+
+function narrativePearson(value: number): string {
+  if (value < 10) return 'Las competencias evaluadas no predicen resultados. Es azar.'
+  if (value < 30) return 'Las competencias evaluadas predicen débilmente los resultados.'
+  if (value < 60) return 'Las competencias predicen parcialmente los resultados.'
+  return 'Las competencias evaluadas predicen los resultados con fuerza.'
+}
+
+function narrativeStars(value: number): string {
+  if (value === 0) return 'Ninguna estrella respalda su clasificación con resultados.'
+  if (value < 20) return `Solo ${Math.round(value)}% de los mejores talentos respalda su clasificación con resultados.`
+  if (value < 60) return `${Math.round(value)}% de los mejores talentos respalda su clasificación.`
+  return `${Math.round(value)}% de los mejores talentos respalda su clasificación con resultados.`
+}
+
+function narrativeConfidence(value: number): string {
+  if (value === 0) return 'Ninguna gerencia tiene base confiable para compensar.'
+  if (value < 30) return 'Pocas gerencias tienen base confiable para compensar.'
+  if (value < 70) return 'Algunas gerencias tienen base confiable para compensar.'
+  return 'La mayoría de gerencias tiene base confiable para compensar.'
+}
+
+function buildAnclaComponents(coherence: CoherenceIndex): AnclaComponent[] {
+  const { alignment, pearson, stars, confidence } = coherence.components
+  return [
+    {
+      value: alignment,
+      label: 'Evaluación vs resultados',
+      narrative: narrativeAlignment(alignment),
+    },
+    {
+      value: pearson,
+      label: 'Poder predictivo',
+      narrative: narrativePearson(pearson),
+      tooltip:
+        'Calculado mediante Coeficiente de Correlación de Pearson (r). ' +
+        'Mide si las competencias evaluadas predicen quién cumple metas. ' +
+        'Sobre 0.5 hay predicción, debajo de 0.3 es azar.',
+    },
+    {
+      value: stars,
+      label: 'Estrellas reales',
+      narrative: narrativeStars(stars),
+    },
+    {
+      value: confidence,
+      label: 'Gerencias confiables',
+      narrative: narrativeConfidence(confidence),
+    },
+  ]
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -93,17 +161,35 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
               }}
               ctaLabel={narrative.ctaLabel}
               ctaVariant={narrative.ctaVariant}
-              onCtaClick={() => setView('diagnostico')}
+              onCtaClick={() => setView('ancla')}
               coachingTip={narrative.coachingTip}
             />
+          </motion.div>
+        )}
 
-            {/* Coherence Gauge — identity number of the insight */}
-            {coherence && <CoherenceGauge coherence={coherence} />}
+        {/* ═══ ACTO ANCLA (Pre-Cascada) ═══ */}
+        {view === 'ancla' && coherence && (
+          <motion.div
+            key="ancla"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+            className="p-4 md:p-6"
+          >
+            <AnclaInteligente
+              score={coherence.score}
+              scoreLabel="Confiabilidad"
+              components={buildAnclaComponents(coherence)}
+              onContinue={() => setView('diagnostico')}
+              onBack={() => setView('portada')}
+              ctaLabel="Ver diagnóstico completo"
+            />
           </motion.div>
         )}
 
         {/* ═══ CONTENT TABS ═══ */}
-        {view !== 'portada' && (
+        {view !== 'portada' && view !== 'ancla' && (
           <motion.div
             key={view}
             initial={{ opacity: 0, x: 20 }}
@@ -129,12 +215,15 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
               />
             </div>
 
-            {/* Tab context — 1-liner narrativo */}
-            <p className="text-sm font-light text-slate-500 mt-3 mb-6">
-              {view === 'diagnostico' && 'Dossier ejecutivo: qué encontramos y qué significa.'}
-              {view === 'localizacion' && 'Dónde está el problema — por gerencia y por persona.'}
-              {view === 'compensacion' && ''}
-            </p>
+            {/* Tab context — 1-liner narrativo (solo diagnóstico y compensación) */}
+            {view === 'diagnostico' && (
+              <p className="text-sm font-light text-slate-500 mt-3 mb-6">
+                Dossier ejecutivo: qué encontramos y qué significa.
+              </p>
+            )}
+            {view === 'compensacion' && (
+              <p className="text-sm font-light text-slate-500 mt-3 mb-6" />
+            )}
 
             {/* ─── Tab: Diagnóstico ─── */}
             {view === 'diagnostico' && (
@@ -158,20 +247,7 @@ export const GoalsCorrelation = memo(function GoalsCorrelation({ data }: GoalsCo
 
             {/* ─── Tab: Localización (zoom progresivo: personas → áreas → responsables) ─── */}
             {view === 'localizacion' && (
-              <div className="space-y-12">
-                <AnalisisTab
-                  correlation={data.correlation}
-                  quadrantCounts={data.quadrantCounts}
-                />
-
-                <div className="w-8 h-px bg-slate-800" />
-
-                <GerenciaHeatmap byGerencia={data.byGerencia} />
-
-                <div className="w-8 h-px bg-slate-800" />
-
-                <EvaluadorHeatmap byManager={data.byManager} correlation={data.correlation} />
-              </div>
+              <LocalizacionTab data={data} />
             )}
 
             {/* ─── Tab: Compensación (limpio — solo CompensationBoard) ─── */}
@@ -199,98 +275,81 @@ export default GoalsCorrelation
 // COHERENCE GAUGE — SVG circular gauge (premium-components.md pattern)
 // ════════════════════════════════════════════════════════════════════════════
 
-const GAUGE_COLORS = {
-  high: '#10B981',
-  medium: '#22D3EE',
-  low: '#F59E0B',
-  critical: '#EF4444',
-}
+// ════════════════════════════════════════════════════════════════════════════
+// LOCALIZACIÓN TAB — zoom progresivo con articulación narrativa
+// ════════════════════════════════════════════════════════════════════════════
 
-function CoherenceGauge({ coherence }: { coherence: CoherenceIndex }) {
-  const size = 112
-  const strokeWidth = 6
-  const radius = (size / 2) - strokeWidth - 8
-  const circumference = 2 * Math.PI * radius
-  const strokeDashoffset = circumference - (coherence.score / 100) * circumference
-  const color = GAUGE_COLORS[coherence.level]
+function LocalizacionTab({ data }: { data: GoalsCorrelationDataV2 }) {
+  const { correlation, quadrantCounts, byGerencia, byManager } = data
 
   return (
-    <div className="group relative flex flex-col items-center -mt-3 mb-1">
-      {/* Glow behind gauge */}
-      <div
-        className="absolute rounded-full blur-[30px] opacity-15"
-        style={{
-          width: size * 0.5,
-          height: size * 0.5,
-          backgroundColor: color,
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-        }}
-      />
+    <div>
+      {/* ════════ 01 · MAGNITUD DEL RIESGO ════════ */}
+      <ForensicChapter
+        label="01 · Magnitud del riesgo"
+        letter="M"
+        isFirst
+      >
+        <AnalisisTab correlation={correlation} quadrantCounts={quadrantCounts} />
+      </ForensicChapter>
 
-      {/* SVG Gauge */}
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg className="w-full h-full -rotate-90" viewBox={`0 0 ${size} ${size}`}>
-          {/* Track */}
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke="rgba(51, 65, 85, 0.4)"
-            strokeWidth={strokeWidth}
-          />
-          {/* Progress */}
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke={color}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
-            style={{
-              transition: 'stroke-dashoffset 1.2s ease-out',
-              filter: `drop-shadow(0 0 6px ${color}60)`,
-            }}
-          />
-        </svg>
+      {/* ════════ 02 · FOCO DEL PROBLEMA ════════ */}
+      <ForensicChapter
+        label="02 · Foco del problema"
+        letter="F"
+      >
+        <GerenciaHeatmap byGerencia={byGerencia} correlation={correlation} />
+      </ForensicChapter>
 
-        {/* Central value */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-light text-white">{coherence.score}%</span>
-          <span className="text-[9px] text-slate-500 uppercase tracking-wider">Coherencia</span>
-        </div>
-      </div>
-
-      {/* Tooltip — hover over gauge */}
-      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-60 px-3 py-2.5 rounded-xl bg-slate-950/95 backdrop-blur-xl border border-slate-700/30 shadow-2xl shadow-black/30 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 translate-y-1 group-hover:translate-y-0">
-        <p className="text-[10px] text-white font-medium mb-2">Desglose del Índice</p>
-        <div className="space-y-1.5 text-[10px] text-slate-400">
-          <div className="flex justify-between">
-            <span>Alineamiento metas × evaluación</span>
-            <span className="font-mono text-slate-300">{coherence.components.alignment}%</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Correlación Pearson (promedio)</span>
-            <span className="font-mono text-slate-300">{coherence.components.pearson}%</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Estrellas que cumplen metas</span>
-            <span className="font-mono text-slate-300">{coherence.components.stars}%</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Gerencias con confianza verde</span>
-            <span className="font-mono text-slate-300">{coherence.components.confidence}%</span>
-          </div>
-        </div>
-        <p className="text-[9px] text-slate-600 mt-2 leading-relaxed">
-          Sobre 75% es confiable para decisiones de compensación.
-        </p>
-      </div>
+      {/* ════════ 03 · ORIGEN DEL PROBLEMA ════════ */}
+      <ForensicChapter
+        label="03 · Origen del problema"
+        letter="O"
+      >
+        <EvaluadorHeatmap byManager={byManager} correlation={correlation} />
+      </ForensicChapter>
     </div>
   )
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// FORENSIC CHAPTER — ActSeparator (cascada) + marca de agua letra (skill)
+// ════════════════════════════════════════════════════════════════════════════
+
+function ForensicChapter({
+  label,
+  letter,
+  isFirst = false,
+  children,
+}: {
+  label: string
+  letter: string
+  isFirst?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <section
+      className={cn(
+        'relative overflow-hidden',
+        isFirst ? 'pb-20 md:pb-24' : 'py-20 md:py-24'
+      )}
+    >
+      {/* Separador estilo Tab Diagnóstico (cascada) */}
+      <div className="mb-10">
+        <ActSeparator label={label} color="cyan" />
+      </div>
+
+      {/* Marca de agua — letra única, serif, estilo skill */}
+      <span
+        aria-hidden="true"
+        className="absolute bottom-6 right-6 text-[140px] md:text-[200px] font-serif font-black text-white opacity-[0.04] pointer-events-none leading-none select-none z-0"
+      >
+        {letter}
+      </span>
+
+      {/* Contenido del capítulo */}
+      <div className="relative z-10">{children}</div>
+    </section>
+  )
+}
+

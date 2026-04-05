@@ -381,3 +381,83 @@ TEXTO:
   □ Mensajes técnicos al usuario
   □ Pantallas sin siguiente paso
 ```
+
+---
+
+## ❌ ANTI-PATRONES CONFIRMADOS (Patrón G)
+
+Validados en CompensationBoard v2 — **NUNCA hacer**:
+
+### Indicadores Visuales
+
+```yaml
+❌ Zero semáforos rojo/verde/amarillo como indicadores primarios
+❌ Zero badges de alarma gritando (NO AUDITABLE en uppercase amarillo)
+❌ Zero colores de fondo en filas de persona (bg-amber, bg-red)
+```
+
+### Nombres y Labels
+
+```yaml
+❌ Zero ALL CAPS en nombres de persona
+❌ Zero "—" (em dash) antes de títulos de sección
+❌ Zero labels inventados (usar solo los del motor: SEVERA, INDULGENTE, CENTRAL, ÓPTIMA)
+```
+
+### Métricas
+
+```yaml
+❌ Zero score360 visible al CEO (usar roleFitScore como canónico)
+❌ Zero "desconexión" como métrica visible (traducir a lenguaje ejecutivo)
+❌ Zero Pearson sin contexto (siempre con "azar puro" o equivalente)
+```
+
+### Estructura
+
+```yaml
+❌ Zero modales para contenido que se puede expandir inline
+```
+
+### Ejemplos Concretos
+
+```tsx
+// ❌ MAL - Badge gritando
+<span className="bg-amber-500 text-white uppercase font-bold px-3 py-1">
+  NO AUDITABLE
+</span>
+
+// ✅ BIEN - Veredicto narrativo sutil
+<p className="text-sm font-medium text-amber-400/70">
+  Integridad de medición: no auditable
+</p>
+```
+
+```tsx
+// ❌ MAL - Semáforo de colores
+<div className={`w-3 h-3 rounded-full ${
+  score > 80 ? 'bg-green-500' : score > 50 ? 'bg-yellow-500' : 'bg-red-500'
+}`} />
+
+// ✅ BIEN - Tags ghost uniformes
+<span className="text-[9px] px-2 py-0.5 rounded-full text-slate-400/60 
+                 border border-slate-700/30 font-light">
+  {label}
+</span>
+```
+
+```tsx
+// ❌ MAL - score360 al CEO
+<p>Score 360: {employee.score360}</p>
+
+// ✅ BIEN - RoleFit como métrica canónica
+<p>RoleFit: {employee.roleFitScore}%</p>
+```
+
+```tsx
+// ❌ MAL - Nombre en UPPERCASE
+<span>{employee.name.toUpperCase()}</span>
+
+// ✅ BIEN - formatDisplayName siempre
+import { formatDisplayName } from '@/lib/utils/formatName'
+<span>{formatDisplayName(employee.name)}</span>
+```
