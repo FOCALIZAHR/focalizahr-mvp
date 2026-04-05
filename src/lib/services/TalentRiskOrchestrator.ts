@@ -66,6 +66,9 @@ export interface ExecutiveRiskData {
   tenureTrend: TenureTrend
   salary: number
   salarySource: string
+  /** Cumplimiento de metas del negocio (0-100), null si no hay metas asignadas.
+   *  Cross-dominio con Goals × Performance — usado para síntesis cruzada. */
+  goalsPercent: number | null
 
   // Liderazgo
   isLeader: boolean
@@ -120,7 +123,7 @@ export class TalentRiskOrchestrator {
     // 1. Fetch rating
     const rating = await prisma.performanceRating.findUnique({
       where: { cycleId_employeeId: { cycleId, employeeId } },
-      select: { roleFitScore: true, riskQuadrant: true },
+      select: { roleFitScore: true, riskQuadrant: true, goalsRawPercent: true },
     })
     if (!rating || rating.roleFitScore === null) return null
 
@@ -164,6 +167,7 @@ export class TalentRiskOrchestrator {
     return buildPayloadFromRow(
       rating.roleFitScore,
       rating.riskQuadrant,
+      rating.goalsRawPercent,
       employee,
       salaryResult,
       criticalPos,
@@ -196,6 +200,7 @@ export class TalentRiskOrchestrator {
         employeeId: true,
         roleFitScore: true,
         riskQuadrant: true,
+        goalsRawPercent: true,
         employee: {
           select: {
             id: true,
@@ -269,6 +274,7 @@ export class TalentRiskOrchestrator {
       const payload = buildPayloadFromRow(
         r.roleFitScore,
         r.riskQuadrant,
+        r.goalsRawPercent,
         emp,
         salaryResult,
         criticalPos,
@@ -321,6 +327,7 @@ export class TalentRiskOrchestrator {
 function buildPayloadFromRow(
   roleFitScore: number,
   riskQuadrant: string | null,
+  goalsRawPercent: number | null,
   employee: {
     id: string
     fullName: string
@@ -377,6 +384,7 @@ function buildPayloadFromRow(
       tenureTrend,
       salary,
       salarySource: salaryResult.source,
+      goalsPercent: goalsRawPercent,
       isLeader,
       directReportsCount,
       isIncumbentOfCriticalPosition: !!criticalPos,

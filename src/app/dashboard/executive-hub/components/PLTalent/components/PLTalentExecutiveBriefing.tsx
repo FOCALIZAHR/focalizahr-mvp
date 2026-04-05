@@ -150,6 +150,19 @@ export default memo(function PLTalentExecutiveBriefing({
     riskProfiles.filter(p => p.data.isIncumbentOfCriticalPosition && p.data.roleFitScore < 75).length
   , [riskProfiles])
 
+  // Cross-metas: de las personas que no dominan el cargo, cuántas cumplen metas > 80%
+  // (dato puente con Goals × Performance — solo se muestra si tiene contenido)
+  const crossMetas = useMemo(() => {
+    const underperformers = riskProfiles.filter(p => p.data.roleFitScore < 75)
+    const withHighGoals = underperformers.filter(
+      p => p.data.goalsPercent !== null && p.data.goalsPercent > 80
+    ).length
+    return {
+      underperformersCount: underperformers.length,
+      withHighGoalsCount: withHighGoals,
+    }
+  }, [riskProfiles])
+
   const familiaVolumen = useMemo(() => {
     if (brecha.byCargoFamily.length === 0) return null
     return [...brecha.byCargoFamily].sort((a, b) => b.headcount - a.headcount)[0]
@@ -670,6 +683,18 @@ export default memo(function PLTalentExecutiveBriefing({
               <p className="text-base font-light text-slate-300 leading-relaxed mb-10">
                 {riskSummary.executiveSynthesis.path}
               </p>
+
+              {/* Dato cruzado con Goals × Performance — puente silencioso, sin interpretación */}
+              {crossMetas.underperformersCount > 0 && crossMetas.withHighGoalsCount > 0 && (
+                <p className="text-sm font-light text-slate-400 text-center border-t border-slate-800/40 pt-4 mb-6">
+                  De las{' '}
+                  <span className="text-white font-normal">{crossMetas.underperformersCount}</span>{' '}
+                  {crossMetas.underperformersCount === 1 ? 'persona' : 'personas'} que no{' '}
+                  {crossMetas.underperformersCount === 1 ? 'domina' : 'dominan'} su cargo,{' '}
+                  <span className="text-white font-normal">{crossMetas.withHighGoalsCount}</span>{' '}
+                  {crossMetas.withHighGoalsCount === 1 ? 'cumple' : 'cumplen'} metas sobre el 80%.
+                </p>
+              )}
 
               {/* Accountability — Footer institucional */}
               <div className="border-t border-slate-800/50 pt-6">
