@@ -189,6 +189,11 @@ model Account {
   jobMappingHistory     JobMappingHistory[]
 
   // ═══════════════════════════════════════════════════
+  // RELACIONES O*NET + AI EXPOSURE
+  // ═══════════════════════════════════════════════════
+  occupationMappings    OccupationMapping[]
+
+  // ═══════════════════════════════════════════════════
   // RELACIONES COMPETENCY LIBRARY
   // ═══════════════════════════════════════════════════
   competencies          Competency[]
@@ -3162,4 +3167,122 @@ model SuccessionDevelopmentGoal {
   @@index([planId], map: "idx_succ_dev_goal_plan")
   @@index([status], map: "idx_succ_dev_goal_status")
   @@map("succession_development_goals")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// O*NET + ANTHROPIC ECONOMIC INDEX — Datos de referencia y mapeo de ocupaciones
+// ════════════════════════════════════════════════════════════════════════════
+
+enum OccupationConfidence {
+  HIGH
+  MEDIUM
+  LOW
+  UNCLASSIFIED
+}
+
+enum OccupationMappingSource {
+  ALGORITHM
+  LLM
+  MANUAL
+}
+
+// ── Ocupación O*NET (~800 registros, datos de referencia globales) ──────
+model OnetOccupation {
+  socCode           String   @id @map("soc_code")            // "11-1011.00"
+  titleEn           String   @map("title_en")                 // "Chief Executives"
+  titleEs           String?  @map("title_es")                 // "Ejecutivos Principales"
+  jobZone           Int      @map("job_zone")                 // 1-5 (complejidad)
+  educationLevel    String?  @map("education_level")          // "Bachelor's degree"
+  medianSalaryUsd   Float?   @map("median_salary_usd")
+
+  // AI Exposure scores (Eloundou + Anthropic Economic Index)
+  betaScore         Float?   @map("beta_score")               // Eloundou 0.0-1.0
+  observedExposure  Float?   @map("observed_exposure")        // Anthropic 0.0-1.0
+  automationShare   Float?   @map("automation_share")         // 0.0-1.0
+  augmentationShare Float?   @map("augmentation_share")       // 0.0-1.0
+  taskCoverage      Float?   @map("task_coverage")            // 0.0-1.0
+
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relaciones
+  tasks              OnetTask[]
+  skills             OnetSkill[]
+  occupationMappings OccupationMapping[]
+
+  @@map("onet_occupations")
+}
+
+// ── Tarea O*NET (~20,000 registros, vinculadas a ocupación) ────────────
+model OnetTask {
+  id                String   @id @default(cuid())
+  socCode           String   @map("soc_code")
+  taskDescription   String   @map("task_description") @db.Text
+  taskDescriptionEs String?  @map("task_description_es") @db.Text  // Traducción ES (batch posterior)
+  importance        Float    @default(3.0)                          // 1.0-5.0 (Float para FTE calc)
+  betaScore         Float?   @map("beta_score")                    // Eloundou 0.0/0.5/1.0 (Float)
+  isAutomated       Boolean  @default(false) @map("is_automated")  // Anthropic: tarea observada como automatizada
+
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  occupation OnetOccupation @relation(fields: [socCode], references: [socCode], onDelete: Cascade)
+
+  @@index([socCode], map: "idx_onet_task_soc")
+  @@map("onet_tasks")
+}
+
+// ── Skill O*NET (~35 skills × ~800 ocupaciones) ───────────────────────
+model OnetSkill {
+  id             String   @id @default(cuid())
+  socCode        String   @map("soc_code")
+  skillName      String   @map("skill_name")
+  skillNameEs    String?  @map("skill_name_es")                    // Traducción ES (batch posterior)
+  levelRequired  Float    @default(3.0) @map("level_required")     // 1.0-7.0 (Float)
+  importance     Float    @default(3.0)                             // 1.0-5.0 (Float)
+
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Relaciones
+  occupation OnetOccupation @relation(fields: [socCode], references: [socCode], onDelete: Cascade)
+
+  @@index([socCode], map: "idx_onet_skill_soc")
+  @@map("onet_skills")
+}
+
+// ── Mapeo cargo→ocupación por empresa (multi-tenant, feedback loop) ───
+model OccupationMapping {
+  id                String                   @id @default(cuid())
+  accountId         String                   @map("account_id")
+
+  // Input
+  positionText      String                   @map("position_text")
+
+  // Clasificación resultado
+  socCode           String?                  @map("soc_code")
+  secondarySocCode  String?                  @map("secondary_soc_code")  // Cargo fraccional futuro
+  confidence        OccupationConfidence     @default(UNCLASSIFIED)
+  source            OccupationMappingSource  @default(ALGORITHM)
+
+  // Contexto usado durante clasificación (para debugging y re-clasificación)
+  contextCategory   String?                  @map("context_category")    // standardCategory de DepartmentAdapter
+  contextJobLevel   String?                  @map("context_job_level")   // standardJobLevel de PositionAdapter
+
+  // Auditoría
+  mappedAt          DateTime                 @default(now()) @map("mapped_at")
+  correctedBy       String?                  @map("corrected_by")        // Email del admin
+
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  updatedAt         DateTime                 @updatedAt @map("updated_at")
+
+  // Relaciones
+  account    Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  occupation OnetOccupation?  @relation(fields: [socCode], references: [socCode])
+
+  // Constraints (idéntico a JobMappingHistory)
+  @@unique([accountId, positionText])
+  @@index([accountId], map: "idx_occ_mapping_account")
+  @@index([socCode], map: "idx_occ_mapping_soc")
+  @@map("occupation_mappings")
 }

@@ -17,6 +17,7 @@
     "db:reset": "prisma migrate reset",
     "db:seed:departments": "tsx prisma/seedDepartments.ts",
     "db:seed:performance": "tsx prisma/seeds/performance-evaluation-seed.ts",
+    "db:seed:onet": "tsx prisma/seeds/onet-reference-seed.ts",
     "test:api": "node scripts/test-apis.js"
   },
   "prisma": {
