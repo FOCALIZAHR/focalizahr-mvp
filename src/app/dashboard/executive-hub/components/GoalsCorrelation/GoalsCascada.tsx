@@ -12,6 +12,7 @@
 import { memo, useState } from 'react'
 
 import type { GoalsCorrelationDataV2, SubFinding } from './GoalsCorrelation.types'
+import { computeCoherenceIndex } from './GoalsCorrelation.utils'
 import { COMP_QUADRANT_MAP, SUBFINDING_TO_NARRATIVE } from './GoalsCorrelation.constants'
 import { getNarrative } from '@/config/narratives/GoalsNarrativeDictionary'
 import { getCompensacionNarrative } from '@/config/narratives/CompensacionNarrativeDictionary'
@@ -51,6 +52,7 @@ export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias
 
   // ── Derived data ──
   const { topAlerts, totals, segments, byGerencia, stars, criticalPositions } = data
+  const coherence = computeCoherenceIndex(data)
   const criticalPositionIds = new Set(criticalPositions.positions.map(p => p.employee.id))
   const allFindings = segments.flatMap(s => s.subFindings)
   const orgFindings = segments.find(s => s.id === '3_ORGANIZACIONAL')?.subFindings ?? []
@@ -74,9 +76,8 @@ export default memo(function GoalsCascada({ data, onOpenScatter, onOpenAnomalias
     <>
       <div className="space-y-24 pb-12">
         <ActoPanorama
+          coherenceScore={coherence.score}
           totalEvaluados={totals.totalEvaluados}
-          perceptionBiasCount={data.quadrantCounts.perceptionBias}
-          hiddenPerformerCount={data.quadrantCounts.hiddenPerformer}
         />
 
         <ActoAnomalias

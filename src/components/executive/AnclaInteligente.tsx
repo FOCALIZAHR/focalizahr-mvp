@@ -30,7 +30,7 @@ import { PrimaryButton } from '@/components/ui/PremiumButton'
 // ════════════════════════════════════════════════════════════════════════════
 
 export interface AnclaComponent {
-  /** Valor 0-100 del componente */
+  /** Valor numérico del componente (0-100 para %, absoluto para conteos) */
   value: number
   /** Label corto en uppercase (ej: "Evaluación vs resultados") */
   label: string
@@ -38,6 +38,8 @@ export interface AnclaComponent {
   narrative: string
   /** Tooltip opcional con sustento científico (se muestra con icono (i) junto al label) */
   tooltip?: string
+  /** Sufijo del número — default "%" (pasar "" para conteos absolutos como FTE) */
+  suffix?: string
 }
 
 export interface AnclaInteligenteProps {
@@ -113,7 +115,7 @@ export default memo(function AnclaInteligente({
   )
 
   return (
-    <div className="relative rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
+    <div className="relative rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm">
       {/* Tesla line top */}
       <div
         className="absolute top-0 left-0 right-0 h-[2px]"
@@ -275,15 +277,18 @@ export default memo(function AnclaInteligente({
                   transition={{ duration: 0.4, delay: 1.4 + idx * 0.15 }}
                   className="text-center"
                 >
-                  {/* Número grande */}
+                  {/* Número grande — white por defecto, purple solo en crisis (<20) */}
                   <p
                     className={cn(
                       'text-3xl md:text-4xl font-extralight font-mono tabular-nums leading-none',
-                      isGhost ? 'text-slate-500' : nodeTextClass
+                      isGhost ? 'text-slate-500' :
+                      node.tier === 'purple' ? 'text-violet-400' : 'text-white'
                     )}
                   >
                     {node.value}
-                    <span className="text-lg text-slate-600">%</span>
+                    {(node.suffix ?? '%') && (
+                      <span className="text-lg text-slate-600">{node.suffix ?? '%'}</span>
+                    )}
                   </p>
 
                   {/* Micro-barra 2px */}
@@ -312,7 +317,7 @@ export default memo(function AnclaInteligente({
                     {node.tooltip && (
                       <span className="group/tip relative inline-flex">
                         <Info className="w-3 h-3 text-slate-600 hover:text-slate-400 cursor-help transition-colors" />
-                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 px-3 py-2.5 rounded-lg bg-slate-950 border border-slate-700/40 text-[10px] text-slate-300 leading-relaxed opacity-0 group-hover/tip:opacity-100 transition-opacity pointer-events-none z-50 shadow-2xl shadow-black/50 text-left normal-case tracking-normal font-light">
+                        <span className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 px-3 py-2.5 rounded-lg bg-slate-950 border border-slate-700/40 text-[10px] text-slate-300 leading-relaxed opacity-0 group-hover/tip:opacity-100 transition-opacity pointer-events-none z-50 shadow-2xl shadow-black/50 text-left normal-case tracking-normal font-light">
                           {node.tooltip}
                         </span>
                       </span>

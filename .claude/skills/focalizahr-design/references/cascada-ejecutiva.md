@@ -151,6 +151,125 @@ Cada nodo tiene UNA frase que traduce el número a lenguaje ejecutivo. La frase 
 - Sin instrucciones — solo hechos
 - Sin cifras crudas en la frase (el número ya vive arriba)
 
+### Principios rectores del Acto Ancla
+
+> **"El Ancla es la radiografía del Gancho, no un índice de la Cascada."**
+
+> **"El Ancla Científica va en el último nodo — es el sello que cierra antes del CTA."**
+
+### Dos tipos de Acto Ancla
+
+No todos los scores se descomponen igual. El tipo de Ancla depende de cómo se calcula el score principal:
+
+#### Tipo 1: Composición Ponderada
+
+**Cuándo aplica**: el score ES un cálculo compuesto (A×0.30 + B×0.25 + C×0.25 + D×0.20). Los nodos son los **factores matemáticos** que producen el número.
+
+**Ejemplo**: Goals × Performance → 17% coherencia = alignment(44%) + pearson(1%) + stars(13%) + confidence(0%). Los 4 nodos descomponen el score exacto.
+
+**Regla**: los nodos deben sumar (conceptualmente) al score del gauge. El CEO entiende "de qué está hecho ese número".
+
+#### Tipo 2: Masa y Gravedad
+
+**Cuándo aplica**: el score es un promedio directo (no tiene composición ponderada). Los nodos muestran **dónde vive el peso del problema** sin repetir lo que la cascada va a revelar.
+
+**Ejemplo**: P&L del Talento → 68% productividad = avgRoleFit. Nodos: FTE Fantasma (volumen), Donde se concentra (familia de cargo), Sobre el estándar (% que sí cumple), Umbral de referencia (75% fijo).
+
+**Regla**: los nodos NO deben adelantar actos de la cascada. Si el Acto 2 es "El Amplificador: Liderazgo", el Ancla NO puede mostrar "33% líderes calibrados" — le roba el trueno a la cascada. Los nodos deben ser **dimensiones exclusivas del Ancla** que la cascada no repite.
+
+#### Anti-patrón: robar el trueno de la cascada
+
+Si un nodo del Ancla preview un acto de la cascada, el CEO ya sabe lo que viene → pierde la escalada emocional del modelo de persuasión (curiosidad → preocupación → indignación → urgencia → miedo → acción).
+
+```
+❌ Ancla con "33% líderes calibrados" + Cascada Acto 2 "67% líderes bajo estándar"
+   → El CEO ya lo sabía. El Acto 2 no sorprende.
+
+✅ Ancla con "FTE Fantasma: 12" + Cascada Acto 2 "67% líderes bajo estándar"  
+   → El Ancla habla de volumen, la Cascada de quién lo amplifica. Son dimensiones distintas.
+```
+
+### Nodos con valores no-porcentuales
+
+El componente `<AnclaInteligente />` acepta `suffix?: string` (default `'%'`). Pasar `suffix: ''` para valores absolutos como FTE Fantasma (muestra "12" sin "%"). El valor sigue siendo numérico para la micro-barra.
+
+### Colores de los nodos
+
+Los números de los nodos son **text-white por defecto**, excepto en crisis:
+
+```
+value < 20  → text-violet-400 (purple crisis — alerta visual)
+value ≥ 20  → text-white (evidencia neutral, no compite con el gauge)
+value === 0 → text-slate-500 (ghost)
+```
+
+El gauge central es el ÚNICO elemento con color protagonista (cyan/amber/purple según su tier). Los nodos son evidencia de soporte — si compiten visualmente con el gauge, se pierde la jerarquía.
+
+Las **micro-barras** sí conservan color por tier (señal sutil sin competir con el número).
+
+### Regla del Río: un solo número fluye por toda la cascada
+
+**La cascada entera nace de UN número.** El Ancla lo descompone, el Acto 1 lo traduce al negocio, y todos los actos posteriores son consecuencias de ese número:
+
+```
+17% (Portada) → 17% composición (Ancla) → 17% qué significa (Acto 1)
+→ 86% en riesgo (Acto 2) → 13% estrellas (Acto 3) → cargos (Acto 4) → síntesis
+```
+
+**Regla**: el Acto 1 de la cascada usa el **MISMO número del Ancla**. No introduce un número nuevo (como el antiguo 56% que era un cálculo distinto). Ancla y Acto 1 son complementarios:
+- **Ancla** = DE QUÉ está hecho el número (estructura)
+- **Acto 1** = QUÉ SIGNIFICA ese número para el negocio (traducción)
+
+Si el Acto 1 introduce un segundo número, el río se bifurca y el CEO pierde el hilo narrativo.
+
+### Color dinámico del hero en los actos
+
+El número protagonista de cada acto usa color por gravedad del VALOR, no color fijo:
+
+```
+valor < 20  → text-violet-400 (crisis — ej: 17% confiabilidad)
+valor 20-49 → text-amber-400  (atención — ej: 43% cargos críticos)
+valor ≥ 50  → text-cyan-400   (normal — ej: 68% productividad)
+```
+
+Esto mantiene consistencia con el gauge del Ancla (que también usa tiers de gravedad). Si el gauge es purple para 17%, el Acto 1 también muestra 17% en purple — la tensión se mantiene del Ancla a la cascada.
+
+### Conexión con el modelo de persuasión
+
+El patrón cascada ejecutiva implementa los 6 pasos de persuasión documentados en `focalizahr-narrativas/references/patron-persuasion.md`:
+
+```
+PORTADA          = Paso 1 (GANCHO) — UN número, UNA frase, cero explicación
+ACTO ANCLA       = Composición del gancho (no es un paso, es la premisa)
+CASCADA Acto 1   = Paso 2 (EL PROBLEMA) — qué significa para el negocio
+CASCADA Acto 2   = Paso 3 (EL AMPLIFICADOR) — quién lo empeora (con nombre)
+CASCADA Acto 3   = Paso 4 (EL COSTO) — cuánto cuesta HOY (no futuro)
+CASCADA Acto 4   = Paso 5 (EL RIESGO FUTURO) — qué pasa si no actúa
+CASCADA Síntesis = Paso 6 (EL FRANCOTIRADOR) — dónde actuar (nombre + diagnóstico)
+```
+
+**Regla de la portada**: ZERO costo, ZERO amplificador. La portada es SOLO el gancho. El dinero es síntoma — es potente DESPUÉS de que el CEO entiende el problema, no antes.
+
+**Regla del Acto 1**: usa el MISMO número del Ancla pero traduce QUÉ SIGNIFICA para el negocio. No repite la composición (eso lo hizo el Ancla).
+
+### GAP: Caso positivo (Fase 2 — documentado, no implementado)
+
+Toda la cascada actual asume **crisis** (score bajo, datos malos, riesgos altos). Falta el caso donde los datos son **positivos** (RoleFit 90%, coherencia 82%, estrellas al 95%):
+
+**El tono cambia de intervención a blindaje:**
+- Crisis: "tu empresa es frágil — aquí está el problema"
+- Positivo: "tu empresa es fuerte — aquí es donde proteger y donde el próximo riesgo puede emerger"
+
+**Los 6 pasos de persuasión siguen aplicando** pero con gancho invertido:
+1. Gancho: "tienes algo valioso que perder" (no "algo roto que arreglar")
+2. Problema: "¿dónde está la exposición si las cosas cambian?"
+3. Amplificador: "¿quién sostiene esto y qué pasa si se va?"
+4. Costo: "¿cuánto cuesta reemplazar a los que hoy sostienen los resultados?"
+5. Riesgo: "¿qué pasa si el mercado se lleva a tus mejores?"
+6. Francotirador: "protege este cargo / esta persona / esta gerencia primero"
+
+**Estado**: pendiente de implementación. Requiere variantes narrativas en los diccionarios de cada módulo + lógica condicional en los actos (similar al `if (percentage >= 80)` que ActoEstrellas ya tiene). Los umbrales de "caso positivo" deben definirse por módulo.
+
 ### Regla del Ancla Científica (obligatoria)
 
 **Al menos UN componente del Acto Ancla debe mostrar sustento metodológico explícito mediante tooltip (i).** Este componente es el "ancla de confianza" del insight — la pieza que aguanta escrutinio técnico cuando un analista pregunta *"¿de dónde sale ese número?"*.

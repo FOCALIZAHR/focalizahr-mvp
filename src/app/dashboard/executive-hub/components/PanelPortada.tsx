@@ -25,10 +25,12 @@ export interface PanelPortadaNarrative {
 }
 
 export interface PanelPortadaProps {
-  /** Narrativa con highlight en cyan */
+  /** Narrativa con highlight */
   narrative: PanelPortadaNarrative
   /** Badge de estado opcional (ej: "100% Confianza") */
   statusBadge?: { label: string; showCheck?: boolean }
+  /** Color del highlight — default cyan */
+  highlightColor?: 'cyan' | 'purple'
   /** Texto del CTA */
   ctaLabel: string
   /** Ícono del CTA (opcional) */
@@ -56,9 +58,15 @@ const CTA_VARIANTS = {
 // COMPONENT
 // ════════════════════════════════════════════════════════════════════════════
 
+const HIGHLIGHT_COLORS = {
+  cyan: 'text-cyan-400',
+  purple: 'text-violet-400',
+} as const
+
 export const PanelPortada = memo(function PanelPortada({
   narrative,
   statusBadge,
+  highlightColor = 'cyan',
   ctaLabel,
   ctaIcon: CtaIcon = ChevronRight,
   ctaVariant = 'cyan',
@@ -95,7 +103,7 @@ export const PanelPortada = memo(function PanelPortada({
         {narrative.prefix && (
           <span className="text-slate-400">{narrative.prefix}</span>
         )}
-        <span className="text-cyan-400 font-medium">{narrative.highlight}</span>
+        <span className={cn(HIGHLIGHT_COLORS[highlightColor], 'font-medium')}>{narrative.highlight}</span>
         <span className="text-slate-300">{narrative.suffix}</span>
       </motion.p>
 

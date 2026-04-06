@@ -17,8 +17,9 @@ import { NavPill } from '../shared/NavPill'
 import type { NavPillTab } from '../shared/NavPill'
 
 import type { PLTalentProps } from './PLTalent.types'
-import { getPortadaNarrative } from './PLTalent.utils'
+import { getPortadaNarrative, computeGlobalRoleFit, buildPLTalentAnclaComponents } from './PLTalent.utils'
 import { PanelPortada } from '../PanelPortada'
+import AnclaInteligente from '@/components/executive/AnclaInteligente'
 import BrechaProductivaTab from './tabs/BrechaProductivaTab'
 import SemaforoLegalTab from './tabs/SemaforoLegalTab'
 import { GerenciaDetailView } from './shared/GerenciaDetailView'
@@ -30,7 +31,7 @@ import type { ExecutiveRiskPayload } from '@/lib/services/TalentRiskOrchestrator
 // TYPES
 // ════════════════════════════════════════════════════════════════════════════
 
-type View = 'portada' | 'split-brain' | 'mapa' | 'detalle-gerencia' | 'semaforo'
+type View = 'portada' | 'ancla' | 'split-brain' | 'mapa' | 'detalle-gerencia' | 'semaforo'
 
 interface RiskProfilesSummary {
   total: number
@@ -59,7 +60,9 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
   const riskProfiles = riskData?.profiles ?? []
   const riskSummary = riskData?.summary ?? null
 
-  const narrative = useMemo(() => getPortadaNarrative(data), [data])
+  const globalRoleFit = useMemo(() => computeGlobalRoleFit(riskProfiles), [riskProfiles])
+  const narrative = useMemo(() => getPortadaNarrative(data, globalRoleFit), [data, globalRoleFit])
+  const anclaComponents = useMemo(() => buildPLTalentAnclaComponents(data.brecha, riskProfiles), [data.brecha, riskProfiles])
 
   // Leadership alert data
   const leadershipData = useMemo(() => {
@@ -122,8 +125,31 @@ export const PLTalent = memo(function PLTalent({ data, cycleId, companyName, rol
               }}
               ctaLabel={narrative.ctaLabel}
               ctaVariant={narrative.ctaVariant}
-              onCtaClick={() => setView('split-brain')}
+              onCtaClick={() => setView('ancla')}
               coachingTip={narrative.coachingTip}
+            />
+          </motion.div>
+        )}
+
+        {/* ══════════════════════════════════════════════ */}
+        {/* ACTO ANCLA (Pre-Cascada)                       */}
+        {/* ══════════════════════════════════════════════ */}
+        {view === 'ancla' && (
+          <motion.div
+            key="ancla"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+            className="p-4 md:p-6"
+          >
+            <AnclaInteligente
+              score={globalRoleFit}
+              scoreLabel="Productividad"
+              components={anclaComponents}
+              onContinue={() => setView('split-brain')}
+              onBack={() => setView('portada')}
+              ctaLabel="Ver diagnóstico completo"
             />
           </motion.div>
         )}

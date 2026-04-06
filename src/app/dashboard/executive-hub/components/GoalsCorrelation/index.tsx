@@ -51,18 +51,18 @@ type SubView = 'cascada' | 'anomalias'
 
 function narrativeAlignment(value: number): string {
   const outOf10 = Math.round(value / 10)
-  if (value === 0) return 'La evaluación no coincide con los resultados en ningún caso.'
-  if (outOf10 <= 2) return `De cada 10 personas, solo en ${outOf10} la evaluación coincide con lo que entregan.`
-  if (outOf10 <= 5) return `De cada 10 personas, en ${outOf10} la evaluación coincide con lo que entregan.`
-  if (outOf10 <= 7) return `De cada 10 personas, en ${outOf10} hay coincidencia entre evaluación y entrega.`
-  return `De cada 10 personas, en ${outOf10} la evaluación refleja lo que entregan.`
+  if (value === 0) return 'La evaluación no coincide con el cumplimiento de metas en ningún caso.'
+  if (outOf10 <= 2) return `De cada 10 personas, solo en ${outOf10} la evaluación coincide con el cumplimiento de sus metas.`
+  if (outOf10 <= 5) return `De cada 10 personas, en ${outOf10} la evaluación coincide con el cumplimiento de sus metas.`
+  if (outOf10 <= 7) return `De cada 10 personas, en ${outOf10} hay coincidencia entre evaluación y metas.`
+  return `De cada 10 personas, en ${outOf10} la evaluación refleja el cumplimiento de metas.`
 }
 
 function narrativePearson(value: number): string {
-  if (value < 10) return 'Las competencias evaluadas no predicen resultados. Es azar.'
-  if (value < 30) return 'Las competencias evaluadas predicen débilmente los resultados.'
-  if (value < 60) return 'Las competencias predicen parcialmente los resultados.'
-  return 'Las competencias evaluadas predicen los resultados con fuerza.'
+  if (value < 10) return 'La evaluación del líder no predice quién cumple metas. Es azar.'
+  if (value < 30) return 'La evaluación del líder predice débilmente quién cumple metas.'
+  if (value < 60) return 'La evaluación predice parcialmente quién cumple metas.'
+  return 'La evaluación del líder predice con fuerza quién cumple metas.'
 }
 
 function narrativeStars(value: number): string {
@@ -84,17 +84,8 @@ function buildAnclaComponents(coherence: CoherenceIndex): AnclaComponent[] {
   return [
     {
       value: alignment,
-      label: 'Evaluación vs resultados',
+      label: 'Evaluación vs metas',
       narrative: narrativeAlignment(alignment),
-    },
-    {
-      value: pearson,
-      label: 'Poder predictivo',
-      narrative: narrativePearson(pearson),
-      tooltip:
-        'Calculado mediante Coeficiente de Correlación de Pearson (r). ' +
-        'Mide si las competencias evaluadas predicen quién cumple metas. ' +
-        'Sobre 0.5 hay predicción, debajo de 0.3 es azar.',
     },
     {
       value: stars,
@@ -105,6 +96,16 @@ function buildAnclaComponents(coherence: CoherenceIndex): AnclaComponent[] {
       value: confidence,
       label: 'Gerencias confiables',
       narrative: narrativeConfidence(confidence),
+    },
+    {
+      // Ancla Científica — último nodo (sello antes del CTA)
+      value: pearson,
+      label: 'Poder predictivo',
+      narrative: narrativePearson(pearson),
+      tooltip:
+        'Calculado mediante Coeficiente de Correlación de Pearson (r). ' +
+        'Mide si la evaluación del líder predice quién cumple metas en el negocio. ' +
+        'Sobre 0.5 hay predicción, debajo de 0.3 es azar.',
     },
   ]
 }
