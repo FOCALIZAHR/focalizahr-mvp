@@ -65,6 +65,28 @@ export interface OrganizationExposureResult {
   confidence: 'high' | 'medium' | 'low'
 }
 
+export interface DescriptorExposureResult {
+  // Ajustada: basada en tareas activas del descriptor editado por el cliente
+  adjustedExposure: number
+  adjustedAutomationShare: number
+  adjustedAugmentationShare: number
+  activeTasks: number
+  totalTasks: number
+
+  // Genérica: la de OnetOccupation (datos globales O*NET)
+  genericExposure: number
+  genericAutomationShare: number
+
+  // Delta: adjusted - generic
+  delta: number
+  deltaDirection: 'higher' | 'lower' | 'same'
+
+  // Metadata
+  socCode: string | null
+  occupationTitle: string
+  confidence: 'high' | 'medium' | 'low'
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ════════════════════════════════════════════════════════════════════════════
@@ -479,6 +501,133 @@ export class AIExposureService {
         topExposedOccupations: [],
         confidence: 'low',
       }
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // 4. DESCRIPTOR-BASED EXPOSURE — desde tareas editadas por el cliente
+  // Lee JobDescriptor.responsibilities (JSON snapshot) y calcula exposure
+  // como promedio ponderado de betaScore × importance de tareas ACTIVAS.
+  // Compara con el genérico de O*NET para mostrar el delta.
+  // ──────────────────────────────────────────────────────────────────────
+
+  static async getExposureFromDescriptor(
+    jobDescriptorId: string,
+    accountId: string
+  ): Promise<DescriptorExposureResult> {
+    const defaultResult: DescriptorExposureResult = {
+      adjustedExposure: 0,
+      adjustedAutomationShare: 0,
+      adjustedAugmentationShare: 0,
+      activeTasks: 0,
+      totalTasks: 0,
+      genericExposure: 0,
+      genericAutomationShare: 0,
+      delta: 0,
+      deltaDirection: 'same',
+      socCode: null,
+      occupationTitle: 'Sin clasificar',
+      confidence: 'low',
+    }
+
+    try {
+      // 1. Query descriptor con seguridad multi-tenant
+      const descriptor = await prisma.jobDescriptor.findFirst({
+        where: { id: jobDescriptorId, accountId },
+        select: {
+          socCode: true,
+          jobTitle: true,
+          responsibilities: true,
+          occupation: {
+            select: { titleEn: true, titleEs: true },
+          },
+        },
+      })
+
+      if (!descriptor) return defaultResult
+
+      const occupationTitle = descriptor.occupation?.titleEs
+        ?? descriptor.occupation?.titleEn
+        ?? descriptor.jobTitle
+
+      // 2. Parsear responsibilities JSON → filtrar activas
+      const responsibilities = (descriptor.responsibilities as any[]) ?? []
+      const allTasks = responsibilities.length
+      const activeTasks = responsibilities.filter((t: any) => t.isActive !== false)
+
+      if (activeTasks.length === 0) {
+        return { ...defaultResult, socCode: descriptor.socCode, occupationTitle, totalTasks: allTasks }
+      }
+
+      // 3. Promedio ponderado: Σ(importance × betaScore) / Σ(importance)
+      let sumExposure = 0
+      let sumAutomation = 0
+      let sumWeight = 0
+      let tasksWithBeta = 0
+
+      for (const task of activeTasks) {
+        const importance = (task.importance as number) ?? 3.0
+        const betaScore = task.betaScore as number | null
+        const isAutomated = task.isAutomated === true
+
+        if (betaScore !== null && betaScore !== undefined) {
+          sumExposure += importance * betaScore
+          tasksWithBeta++
+        }
+        if (isAutomated) {
+          sumAutomation += importance
+        }
+        sumWeight += importance
+      }
+
+      const adjustedExposure = sumWeight > 0 && tasksWithBeta > 0
+        ? Math.round((sumExposure / sumWeight) * 10000) / 10000
+        : 0
+
+      const adjustedAutomationShare = sumWeight > 0
+        ? Math.round((sumAutomation / sumWeight) * 10000) / 10000
+        : 0
+
+      const adjustedAugmentationShare = Math.max(0,
+        Math.round((adjustedExposure - adjustedAutomationShare) * 10000) / 10000
+      )
+
+      // 4. Obtener exposure genérica de O*NET via método existente
+      let genericExposure = 0
+      let genericAutomationShare = 0
+
+      if (descriptor.socCode) {
+        const generic = await this.getExposure(descriptor.socCode)
+        genericExposure = generic.observedExposure
+        genericAutomationShare = generic.automationShare
+      }
+
+      // 5. Calcular delta
+      const delta = Math.round((adjustedExposure - genericExposure) * 10000) / 10000
+      const deltaDirection: DescriptorExposureResult['deltaDirection'] =
+        delta > 0.01 ? 'higher' : delta < -0.01 ? 'lower' : 'same'
+
+      // 6. Confidence basada en cobertura de betaScore
+      const betaCoverage = activeTasks.length > 0 ? tasksWithBeta / activeTasks.length : 0
+      const confidence = betaCoverage >= 0.7 ? 'high' : betaCoverage >= 0.3 ? 'medium' : 'low'
+
+      return {
+        adjustedExposure,
+        adjustedAutomationShare,
+        adjustedAugmentationShare,
+        activeTasks: activeTasks.length,
+        totalTasks: allTasks,
+        genericExposure,
+        genericAutomationShare,
+        delta,
+        deltaDirection,
+        socCode: descriptor.socCode,
+        occupationTitle,
+        confidence,
+      }
+    } catch (error) {
+      console.error('[AIExposureService] getExposureFromDescriptor error:', error instanceof Error ? error.message : 'unknown')
+      return defaultResult
     }
   }
 }
