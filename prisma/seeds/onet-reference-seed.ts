@@ -414,6 +414,7 @@ async function upsertOccupations(
       where: { socCode },
       update: {
         titleEn: occ.titleEn,
+        description: occ.description || null,
         jobZone: occ.jobZone,
         observedExposure: rollup?.observedExposure ?? null,
         automationShare: rollup?.automationShare ?? null,
@@ -424,6 +425,7 @@ async function upsertOccupations(
       create: {
         socCode: occ.socCode,
         titleEn: occ.titleEn,
+        description: occ.description || null,
         jobZone: occ.jobZone,
         observedExposure: rollup?.observedExposure ?? null,
         automationShare: rollup?.automationShare ?? null,

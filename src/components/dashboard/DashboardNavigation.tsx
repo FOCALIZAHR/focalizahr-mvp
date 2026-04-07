@@ -38,6 +38,7 @@ import {
   Building2,
   Zap,
   DollarSign,
+  FileText,
 } from 'lucide-react';
 
 // ============================================================================
@@ -153,6 +154,14 @@ export default function DashboardNavigation({
       href: '/dashboard/talent-actions',
       icon: Activity,
       active: pathname.startsWith('/dashboard/talent-actions'),
+    }] : []),
+    // Descriptores de Cargo - Mismos roles que configuración
+    ...(canSeeExecutiveHub ? [{
+      id: 'descriptores',
+      label: 'Descriptores',
+      href: '/dashboard/descriptores',
+      icon: FileText,
+      active: pathname.startsWith('/dashboard/descriptores'),
     }] : []),
     // ✅ CAMBIO 6: NUEVO ITEM "SEGUIMIENTO"
     {
