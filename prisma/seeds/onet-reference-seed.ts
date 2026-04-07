@@ -476,24 +476,42 @@ async function upsertSkills(
   skillsBySoc: Map<string, SkillRow[]>
 ): Promise<number> {
   console.log('\n💾 PASO 7c: Guardando skills...')
-  let count = 0
+
+  // 1. Flatten all skills into a single array
+  const allSkills: { socCode: string; skillName: string; importance: number; levelRequired: number }[] = []
+  const socCodes = [...skillsBySoc.keys()]
 
   for (const [socCode, skills] of skillsBySoc) {
-    await prisma.onetSkill.deleteMany({ where: { socCode } })
-
-    const createData = skills.map(s => ({
-      socCode,
-      skillName: s.skillName,
-      importance: s.importance,
-      levelRequired: s.levelRequired,
-    }))
-
-    if (createData.length > 0) {
-      await prisma.onetSkill.createMany({ data: createData })
-      count += createData.length
+    for (const s of skills) {
+      allSkills.push({
+        socCode,
+        skillName: s.skillName,
+        importance: s.importance,
+        levelRequired: s.levelRequired,
+      })
     }
+  }
 
-    if (count % 2000 === 0 && count > 0) console.log(`  Skills: ${count}...`)
+  console.log(`  ${allSkills.length} skills para ${socCodes.length} ocupaciones`)
+
+  // 2. Delete existing skills for these SOC codes (in batches of 50 SOC codes)
+  const SOC_BATCH = 50
+  for (let i = 0; i < socCodes.length; i += SOC_BATCH) {
+    const batch = socCodes.slice(i, i + SOC_BATCH)
+    await prisma.onetSkill.deleteMany({ where: { socCode: { in: batch } } })
+  }
+  console.log(`  Borrados skills existentes.`)
+
+  // 3. Insert in batches of 500
+  const BATCH_SIZE = 500
+  let count = 0
+  for (let i = 0; i < allSkills.length; i += BATCH_SIZE) {
+    const batch = allSkills.slice(i, i + BATCH_SIZE)
+    await prisma.onetSkill.createMany({ data: batch })
+    count += batch.length
+    if (count % 2000 === 0 || i + BATCH_SIZE >= allSkills.length) {
+      console.log(`  Skills: ${count}/${allSkills.length}`)
+    }
   }
 
   console.log(`  ✅ ${count} skills guardados.`)

@@ -37,6 +37,10 @@ export interface ProposedSkill {
 export interface ProposedCompetency {
   code: string
   name: string
+  description: string | null
+  behaviors: string[]
+  category: string | null
+  audienceRule: { minTrack: string } | null
   expectedLevel: number | null
   source: string
 }
@@ -55,6 +59,8 @@ export interface DescriptorProposal {
   totalTasks: number
   jobZone: number | null
   educationLevel: string | null
+  dominantTrack: string | null // COLABORADOR | MANAGER | EJECUTIVO
+  topCandidates: Array<{ socCode: string; score: number; occupationTitle: string | null; taskCount: number }> | null
 }
 
 export interface TaskSearchResult {
@@ -175,18 +181,48 @@ export class JobDescriptorService {
       }
     }
 
-    // 5. Competencias del cliente (por performanceTrack si existe)
+    // 5. Determinar track dominante del cargo (para filtrar competencias)
+    let dominantTrack: string | null = null
+    try {
+      const trackCounts = await prisma.employee.groupBy({
+        by: ['performanceTrack'],
+        where: { accountId, position: jobTitle, isActive: true, performanceTrack: { not: null } },
+        _count: { performanceTrack: true },
+        orderBy: { _count: { performanceTrack: 'desc' } },
+      })
+      if (trackCounts.length > 0) {
+        dominantTrack = trackCounts[0].performanceTrack
+      }
+    } catch {
+      // degradación graceful — no filtra
+    }
+
+    // 6. Competencias del cliente filtradas por track del cargo
+    const TRACK_LEVEL: Record<string, number> = { COLABORADOR: 1, MANAGER: 2, EJECUTIVO: 3 }
+    const trackLevel = dominantTrack ? (TRACK_LEVEL[dominantTrack] ?? 1) : 3 // sin track → mostrar todas
+
     let competencies: ProposedCompetency[] = []
     try {
       const accountCompetencies = await CompetencyService.getByAccount(accountId, {
         activeOnly: true,
       })
-      competencies = accountCompetencies.map(c => ({
-        code: c.code,
-        name: c.name,
-        expectedLevel: null, // El nivel se define por cargo, no por competencia global
-        source: 'company_library',
-      }))
+      competencies = accountCompetencies
+        .filter(c => {
+          const rule = c.audienceRule as { minTrack?: string } | null
+          if (!rule?.minTrack) return true // null = CORE, todos la ven
+          const minLevel = TRACK_LEVEL[rule.minTrack] ?? 1
+          return trackLevel >= minLevel
+        })
+        .map(c => ({
+          code: c.code,
+          name: c.name,
+          description: c.description ?? null,
+          behaviors: Array.isArray(c.behaviors) ? (c.behaviors as string[]) : [],
+          category: c.category ?? null,
+          audienceRule: c.audienceRule as { minTrack: string } | null,
+          expectedLevel: null,
+          source: 'company_library',
+        }))
     } catch {
       // CompetencyService puede no estar inicializado — degradación graceful
     }
@@ -203,6 +239,138 @@ export class JobDescriptorService {
       totalTasks: tasks.length,
       jobZone,
       educationLevel,
+      dominantTrack,
+      topCandidates: !socCode
+        ? await this.findCandidatesByTaskSimilarity(jobTitle)
+        : null,
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // FIND CANDIDATES BY TASK SIMILARITY
+  // Busca SOC codes cuyas tareas contengan keywords del cargo input.
+  // % = (tareas que matchean / total tareas del SOC) × 100
+  // ──────────────────────────────────────────────────────────────────────
+
+  private static async findCandidatesByTaskSimilarity(
+    jobTitle: string
+  ): Promise<Array<{ socCode: string; score: number; occupationTitle: string | null; taskCount: number }> | null> {
+    try {
+      // Extract keywords from job title (min 3 chars, skip stopwords)
+      const STOPWORDS = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'en', 'con', 'para', 'por', 'una', 'uno', 'que', 'and', 'the', 'of'])
+      const keywords = jobTitle
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .split(/[\s\-_\/\(\)]+/)
+        .filter(w => w.length >= 3 && !STOPWORDS.has(w))
+
+      if (keywords.length === 0) return null
+
+      // Build OR condition: any task description (es or en) contains any keyword
+      const orConditions = keywords.flatMap(kw => [
+        { taskDescriptionEs: { contains: kw, mode: 'insensitive' as const } },
+        { taskDescription: { contains: kw, mode: 'insensitive' as const } },
+      ])
+
+      // Find tasks matching any keyword, grouped by socCode
+      const matchingTasks = await prisma.onetTask.findMany({
+        where: { OR: orConditions },
+        select: { socCode: true, id: true },
+      })
+
+      if (matchingTasks.length === 0) return null
+
+      // Count matches per SOC code
+      const matchCountBySoc: Record<string, Set<string>> = {}
+      for (const t of matchingTasks) {
+        if (!matchCountBySoc[t.socCode]) matchCountBySoc[t.socCode] = new Set()
+        matchCountBySoc[t.socCode].add(t.id)
+      }
+
+      // Get total task counts for each candidate SOC
+      const socCodes = Object.keys(matchCountBySoc)
+      const totalCounts = await prisma.onetTask.groupBy({
+        by: ['socCode'],
+        where: { socCode: { in: socCodes } },
+        _count: { id: true },
+      })
+
+      const totalMap: Record<string, number> = {}
+      for (const row of totalCounts) {
+        totalMap[row.socCode] = row._count.id
+      }
+
+      // Get occupation titles
+      const occupations = await prisma.onetOccupation.findMany({
+        where: { socCode: { in: socCodes } },
+        select: { socCode: true, titleEs: true, titleEn: true },
+      })
+      const titleMap: Record<string, string> = {}
+      for (const occ of occupations) {
+        titleMap[occ.socCode] = occ.titleEs ?? occ.titleEn ?? occ.socCode
+      }
+
+      // Calculate similarity score: (matching tasks / total tasks) × 100
+      const candidates = socCodes
+        .map(soc => {
+          const matchCount = matchCountBySoc[soc].size
+          const totalCount = totalMap[soc] ?? 1
+          const score = Math.round((matchCount / totalCount) * 100)
+          return {
+            socCode: soc,
+            score,
+            occupationTitle: titleMap[soc] ?? null,
+            taskCount: totalCount,
+          }
+        })
+        .filter(c => c.score > 0 && c.taskCount > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3)
+
+      return candidates.length > 0 ? candidates : null
+    } catch (e) {
+      console.warn('[JobDescriptorService] findCandidatesByTaskSimilarity error:', e)
+      return null
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // CARGAR TAREAS PARA UN SOC CODE (selección manual de candidato)
+  // ──────────────────────────────────────────────────────────────────────
+
+  static async loadTasksForSocCode(socCode: string): Promise<{
+    purpose: string | null
+    tasks: ProposedTask[]
+    occupationTitle: string | null
+  }> {
+    const occupation = await prisma.onetOccupation.findUnique({
+      where: { socCode },
+      include: {
+        tasks: { orderBy: { importance: 'desc' }, take: 25 },
+      },
+    })
+
+    if (!occupation) return { purpose: null, tasks: [], occupationTitle: null }
+
+    const purpose = occupation.description
+      ?? (occupation.titleEs
+        ? `Responsable de las funciones asociadas a ${occupation.titleEs.toLowerCase()} dentro de la organización.`
+        : null)
+
+    const tasks: ProposedTask[] = occupation.tasks.map(t => ({
+      taskId: t.id,
+      description: t.taskDescriptionEs ?? t.taskDescription,
+      importance: t.importance,
+      betaScore: t.betaScore,
+      isAutomated: t.isAutomated,
+      isActive: true,
+      isFromOnet: true,
+    }))
+
+    return {
+      purpose,
+      tasks,
+      occupationTitle: occupation.titleEs ?? occupation.titleEn ?? null,
     }
   }
 
@@ -283,49 +451,42 @@ export class JobDescriptorService {
       },
     })
 
-    return prisma.jobDescriptor.upsert({
-      where: {
-        accountId_jobTitle_departmentId: {
-          accountId,
-          jobTitle: data.jobTitle,
-          departmentId: data.departmentId ?? '',
-        },
-      },
-      update: {
-        socCode: data.socCode,
-        secondarySocCode,
-        standardJobLevel: data.standardJobLevel,
-        standardCategory: data.standardCategory,
-        purpose: data.purpose,
-        purposeSource: data.purposeSource ?? 'onet_generated',
-        responsibilities: data.responsibilities as any,
-        competencies: data.competencies as any,
-        requirements: data.requirements as any,
-        matchConfidence: data.matchConfidence,
-        onetTasksTotal: onetTasks.length,
-        onetTasksKept: activeTasks.filter((t: any) => t.isFromOnet).length,
-        clientTasksAdded: clientTasks.length,
-        employeeCount,
-        updatedAt: new Date(),
-      },
-      create: {
+    // findFirst to avoid composite key mismatch (departmentId '' vs null)
+    const existing = await prisma.jobDescriptor.findFirst({
+      where: { accountId, jobTitle: data.jobTitle },
+      select: { id: true },
+    })
+
+    const payload = {
+      socCode: data.socCode,
+      secondarySocCode,
+      standardJobLevel: data.standardJobLevel,
+      standardCategory: data.standardCategory,
+      purpose: data.purpose,
+      purposeSource: data.purposeSource ?? 'onet_generated',
+      responsibilities: data.responsibilities as any,
+      competencies: data.competencies as any,
+      requirements: data.requirements as any,
+      matchConfidence: data.matchConfidence,
+      onetTasksTotal: onetTasks.length,
+      onetTasksKept: activeTasks.filter((t: any) => t.isFromOnet).length,
+      clientTasksAdded: clientTasks.length,
+      employeeCount,
+    }
+
+    if (existing) {
+      return prisma.jobDescriptor.update({
+        where: { id: existing.id },
+        data: { ...payload, updatedAt: new Date() },
+      })
+    }
+
+    return prisma.jobDescriptor.create({
+      data: {
         accountId,
         jobTitle: data.jobTitle,
-        socCode: data.socCode,
-        secondarySocCode,
-        departmentId: data.departmentId,
-        standardJobLevel: data.standardJobLevel,
-        standardCategory: data.standardCategory,
-        purpose: data.purpose,
-        purposeSource: data.purposeSource ?? 'onet_generated',
-        responsibilities: data.responsibilities as any,
-        competencies: data.competencies as any,
-        requirements: data.requirements as any,
-        matchConfidence: data.matchConfidence,
-        onetTasksTotal: onetTasks.length,
-        onetTasksKept: activeTasks.filter((t: any) => t.isFromOnet).length,
-        clientTasksAdded: clientTasks.length,
-        employeeCount,
+        departmentId: data.departmentId ?? '',
+        ...payload,
         status: 'DRAFT',
       },
     })

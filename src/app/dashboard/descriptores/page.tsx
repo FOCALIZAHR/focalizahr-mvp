@@ -1,13 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import DashboardNavigation from '@/components/dashboard/DashboardNavigation'
-import { useSidebar } from '@/hooks/useSidebar'
 import DescriptoresPortada from '@/components/descriptores/DescriptoresPortada'
 import type { PositionWithStatus, DescriptorSummary } from '@/lib/services/JobDescriptorService'
 
 export default function DescriptoresPage() {
-  const { isCollapsed } = useSidebar()
   const [positions, setPositions] = useState<PositionWithStatus[]>([])
   const [summary, setSummary] = useState<DescriptorSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -31,29 +28,24 @@ export default function DescriptoresPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  return (
-    <>
-      <DashboardNavigation />
-      <main className={`min-h-screen fhr-bg-main transition-all duration-300 ${
-        isCollapsed ? 'lg:ml-20' : 'lg:ml-72'
-      }`}>
-        <div className="max-w-5xl mx-auto px-4 py-6 md:px-8 md:py-10">
-          {loading ? (
-            <div className="flex items-center justify-center min-h-[60vh]">
-              <div className="text-center space-y-4">
-                <div className="w-12 h-12 mx-auto border-2 border-slate-800 border-t-cyan-400 rounded-full animate-spin" />
-                <p className="text-slate-400 text-sm">Cargando descriptores...</p>
-              </div>
-            </div>
-          ) : summary ? (
-            <DescriptoresPortada
-              summary={summary}
-              positions={positions}
-              onRefresh={fetchData}
-            />
-          ) : null}
+  if (loading) {
+    return (
+      <div className="h-screen w-full bg-[#0F172A] flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 mx-auto border-2 border-slate-800 border-t-cyan-400 rounded-full animate-spin" />
+          <p className="text-slate-400 text-sm">Cargando descriptores...</p>
         </div>
-      </main>
-    </>
+      </div>
+    )
+  }
+
+  if (!summary) return null
+
+  return (
+    <DescriptoresPortada
+      summary={summary}
+      positions={positions}
+      onRefresh={fetchData}
+    />
   )
 }

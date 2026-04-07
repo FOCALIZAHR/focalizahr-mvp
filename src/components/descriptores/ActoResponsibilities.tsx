@@ -25,29 +25,42 @@ export default memo(function ActoResponsibilities({
   const inactiveTasks = tasks.length - activeTasks
 
   return (
-    <div className="relative space-y-8 min-h-[60vh] flex flex-col">
-      {/* Title split */}
-      <div>
-        <h2 className="text-2xl font-extralight text-white tracking-tight">Responsabilidades</h2>
-        <p className="text-xl font-light fhr-title-gradient mt-0.5">del Cargo</p>
+    <div className="fhr-card-glass relative overflow-hidden p-8 md:p-12">
+      {/* Watermark */}
+      <div className="absolute bottom-[-24px] right-[-6px] text-[180px] font-black text-white opacity-[0.06] pointer-events-none select-none leading-none">
+        2
       </div>
 
+      {/* Title split */}
+      <h2 className="text-2xl font-extralight text-white tracking-tight">Responsabilidades</h2>
+      <p className="text-xl font-light fhr-title-gradient mt-0.5">del Cargo</p>
+
       {/* Narrative guide */}
-      <p className="text-base text-slate-400 font-light leading-relaxed max-w-lg">
-        Desmarca las tareas que esta persona <span className="text-white font-medium">no hace</span> en tu empresa. Es más fácil quitar lo que sobra que escribir desde cero.
+      <p className="text-base text-slate-400 font-light leading-relaxed max-w-lg mt-6">
+        {tasks.length > 0
+          ? <>Desmarca las tareas que esta persona <span className="text-white font-medium">no hace</span> en tu empresa. Es más fácil quitar lo que sobra que escribir desde cero.</>
+          : 'No se encontraron tareas de referencia para este cargo. Puedes agregar responsabilidades manualmente en el siguiente paso.'}
       </p>
 
-      {/* Counter */}
-      <p className="text-xs text-slate-500 font-light">
-        {activeTasks} de {tasks.length} activas
-      </p>
+      {tasks.length > 0 && (
+        <>
+          {/* Counter */}
+          <p className="text-xs text-slate-500 font-light mt-4">
+            {activeTasks} de {tasks.length} activas
+          </p>
 
-      {/* Task list (neutral — no betaScore, no exposure) */}
-      <DescriptorTaskList tasks={tasks} onToggle={onToggle} />
+          {/* Task list (neutral — no betaScore, no exposure) */}
+          <div className="mt-4">
+            <DescriptorTaskList tasks={tasks} onToggle={onToggle} />
+          </div>
+        </>
+      )}
 
       {/* Dynamic narrative */}
-      <p className="text-xs text-slate-500 font-light">
-        {inactiveTasks === 0
+      <p className="text-xs text-slate-500 font-light mt-8">
+        {tasks.length === 0
+          ? '● Este cargo no tiene tareas de referencia en O*NET. Agrega responsabilidades en el paso Complementar.'
+          : inactiveTasks === 0
           ? '● Todas las tareas aplican. Puedes continuar.'
           : inactiveTasks <= 3
           ? `● Has ajustado ${inactiveTasks} tarea${inactiveTasks !== 1 ? 's' : ''}.`
@@ -55,15 +68,10 @@ export default memo(function ActoResponsibilities({
       </p>
 
       {/* CTA — always enabled */}
-      <div className="flex-1 flex items-end pt-4">
+      <div className="mt-6">
         <PrimaryButton onClick={onNext}>
           Siguiente →
         </PrimaryButton>
-      </div>
-
-      {/* Watermark */}
-      <div className="absolute bottom-[-24px] right-[-6px] text-[180px] font-black text-white opacity-[0.06] pointer-events-none select-none leading-none">
-        2
       </div>
     </div>
   )

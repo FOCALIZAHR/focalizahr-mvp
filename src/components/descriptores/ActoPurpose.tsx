@@ -49,15 +49,18 @@ export default memo(function ActoPurpose({
   }
 
   return (
-    <div className="relative space-y-8 min-h-[60vh] flex flex-col">
-      {/* Title split */}
-      <div>
-        <h2 className="text-2xl font-extralight text-white tracking-tight">Propósito</h2>
-        <p className="text-xl font-light fhr-title-gradient mt-0.5">del Cargo</p>
+    <div className="fhr-card-glass relative overflow-hidden p-8 md:p-12">
+      {/* Watermark */}
+      <div className="absolute bottom-[-24px] right-[-6px] text-[180px] font-black text-white opacity-[0.06] pointer-events-none select-none leading-none">
+        1
       </div>
 
+      {/* Title split */}
+      <h2 className="text-2xl font-extralight text-white tracking-tight">Propósito</h2>
+      <p className="text-xl font-light fhr-title-gradient mt-0.5">del Cargo</p>
+
       {/* Narrative guide */}
-      <p className="text-base text-slate-400 font-light leading-relaxed max-w-lg">
+      <p className="text-base text-slate-400 font-light leading-relaxed max-w-lg mt-6">
         {isHighConfidence
           ? 'Hemos identificado este cargo con alta coincidencia en bases de datos internacionales. Este propósito refleja lo que típicamente hace alguien en esta posición.'
           : hasPurpose
@@ -65,8 +68,8 @@ export default memo(function ActoPurpose({
           : 'No encontramos un propósito predefinido para este cargo. Escríbelo a continuación.'}
       </p>
 
-      {/* Purpose card */}
-      <div className="fhr-card p-5 space-y-3">
+      {/* Purpose content */}
+      <div className="mt-8 rounded-xl border border-slate-800/50 bg-slate-900/40 p-5 space-y-3">
         {hasPurpose && !editing && (
           <span className="text-[9px] text-cyan-400/60 border border-cyan-500/20 rounded-full px-2 py-0.5">
             Sugerido por FocalizaHR
@@ -125,24 +128,19 @@ export default memo(function ActoPurpose({
       </div>
 
       {/* Coaching tip */}
-      <p className="text-xs text-slate-500 font-light">
+      <p className="text-xs text-slate-500 font-light mt-8">
         ● {employeeCount} persona{employeeCount !== 1 ? 's' : ''} comparten este cargo.
         Lo que definas aquí aplica a toda{employeeCount !== 1 ? 's' : ''}.
       </p>
 
       {/* CTA */}
-      <div className="flex-1 flex items-end pt-4">
+      <div className="mt-6">
         <PrimaryButton
           onClick={onNext}
-          disabled={!approved && !(!hasPurpose && purpose.trim().length === 0)}
+          disabled={!approved}
         >
           {approved ? 'Siguiente →' : 'Aprueba el propósito para continuar'}
         </PrimaryButton>
-      </div>
-
-      {/* Watermark */}
-      <div className="absolute bottom-[-24px] right-[-6px] text-[180px] font-black text-white opacity-[0.06] pointer-events-none select-none leading-none">
-        1
       </div>
     </div>
   )

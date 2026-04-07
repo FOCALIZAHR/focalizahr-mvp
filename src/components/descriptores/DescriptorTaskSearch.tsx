@@ -13,6 +13,7 @@ interface DescriptorTaskSearchProps {
   excludeSocCode?: string
   onAdd: (task: ProposedTask) => void
   onClose: () => void
+  showClose?: boolean
 }
 
 interface SearchResult {
@@ -29,6 +30,7 @@ export default memo(function DescriptorTaskSearch({
   excludeSocCode,
   onAdd,
   onClose,
+  showClose = true,
 }: DescriptorTaskSearchProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
@@ -62,9 +64,11 @@ export default memo(function DescriptorTaskSearch({
     <div className="fhr-card p-4 space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-xs text-slate-400 font-light">Buscar tareas de otra área</p>
-        <button onClick={onClose} className="text-slate-600 hover:text-slate-400 transition-colors">
-          <X className="w-4 h-4" />
-        </button>
+        {showClose && (
+          <button onClick={onClose} className="text-slate-600 hover:text-slate-400 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Input de búsqueda */}

@@ -25,12 +25,19 @@ import type { OccupationConfidence, OccupationMappingSource } from '@prisma/clie
 // TYPES
 // ════════════════════════════════════════════════════════════════════════════
 
+export interface OccupationCandidate {
+  socCode: string
+  score: number
+  occupationTitle: string | null
+}
+
 export interface OccupationClassification {
   socCode: string | null
   confidence: OccupationConfidence
   occupationTitle: string | null
   mappingMethod: 'cache' | 'exact' | 'scored' | 'context' | 'llm' | 'failed'
   source: OccupationMappingSource
+  topCandidates?: OccupationCandidate[]
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -159,7 +166,7 @@ export class OccupationMapper {
       }
     }
 
-    // 5. Sin mapeo — persistir como UNCLASSIFIED
+    // 5. Sin mapeo — persistir como UNCLASSIFIED, keep top candidates
     await this.persistMapping(
       accountId,
       normalizedPosition,
@@ -176,6 +183,7 @@ export class OccupationMapper {
       occupationTitle: null,
       mappingMethod: 'failed',
       source: 'ALGORITHM',
+      topCandidates: algorithmResult.topCandidates,
     }
   }
 
@@ -301,7 +309,7 @@ export class OccupationMapper {
         }
       }
 
-      // Ambiguo sin contexto → usar el mejor pero con LOW confidence
+      // Ambiguo sin contexto → usar el mejor pero con LOW confidence + candidates
       if (bestScore >= 4) {
         return {
           socCode: bestSOC,
@@ -309,6 +317,7 @@ export class OccupationMapper {
           occupationTitle: SOC_TITLES_ES[bestSOC] ?? null,
           mappingMethod: 'scored',
           source: 'ALGORITHM',
+          topCandidates: this.extractTopCandidates(sortedScores),
         }
       }
     }
@@ -326,11 +335,16 @@ export class OccupationMapper {
           occupationTitle: SOC_TITLES_ES[hint] ?? null,
           mappingMethod: 'context',
           source: 'ALGORITHM',
+          topCandidates: this.extractTopCandidates(sortedScores),
         }
       }
     }
 
-    return baseResult
+    // UNCLASSIFIED — attach top candidates for manual selection
+    return {
+      ...baseResult,
+      topCandidates: this.extractTopCandidates(sortedScores),
+    }
   }
 
   // ──────────────────────────────────────────────────────────────────────
@@ -438,6 +452,23 @@ Responde SOLO con JSON: {"socCode": "XX-XXXX.XX", "confidence": "HIGH"|"MEDIUM"|
   // ──────────────────────────────────────────────────────────────────────
   // PRIVATE — persistir en OccupationMapping (como JobMappingHistory)
   // ──────────────────────────────────────────────────────────────────────
+
+  // ──────────────────────────────────────────────────────────────────────
+  // PRIVATE — Extract top 3 candidates from sorted scores
+  // ──────────────────────────────────────────────────────────────────────
+
+  private static extractTopCandidates(
+    sortedScores: [string, number][]
+  ): OccupationCandidate[] {
+    return sortedScores
+      .slice(0, 3)
+      .filter(([, score]) => score >= 2) // minimum 1 alias match
+      .map(([socCode, score]) => ({
+        socCode,
+        score,
+        occupationTitle: SOC_TITLES_ES[socCode] ?? null,
+      }))
+  }
 
   private static async persistMapping(
     accountId: string,
