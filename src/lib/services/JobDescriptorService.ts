@@ -384,16 +384,22 @@ export class JobDescriptorService {
    * JOIN Employee → GROUP BY position → LEFT JOIN JobDescriptor.
    */
   static async listPositionsWithStatus(
-    accountId: string
+    accountId: string,
+    departmentIds?: string[]
   ): Promise<PositionWithStatus[]> {
-    // 1. Obtener posiciones únicas con headcount
+    // 1. Obtener posiciones únicas con headcount (filtrado jerárquico)
+    const whereClause: any = {
+      accountId,
+      isActive: true,
+      status: 'ACTIVE',
+      position: { not: null },
+    }
+    if (departmentIds && departmentIds.length > 0) {
+      whereClause.departmentId = { in: departmentIds }
+    }
+
     const employees = await prisma.employee.findMany({
-      where: {
-        accountId,
-        isActive: true,
-        status: 'ACTIVE',
-        position: { not: null },
-      },
+      where: whereClause,
       select: {
         position: true,
         department: { select: { displayName: true } },
@@ -480,8 +486,8 @@ export class JobDescriptorService {
   /**
    * Resumen ejecutivo para portada.
    */
-  static async getSummary(accountId: string): Promise<DescriptorSummary> {
-    const positions = await this.listPositionsWithStatus(accountId)
+  static async getSummary(accountId: string, departmentIds?: string[]): Promise<DescriptorSummary> {
+    const positions = await this.listPositionsWithStatus(accountId, departmentIds)
 
     const totalPositions = positions.length
     const confirmed = positions.filter(p => p.descriptorStatus === 'CONFIRMED').length

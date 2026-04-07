@@ -51,3 +51,5 @@ Thumbs.dbnul
 # Claude & Temporal fixes
 .claude/tasks/
 *.diff
+
+data/onet/*.csv

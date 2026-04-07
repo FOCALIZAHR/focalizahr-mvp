@@ -4,14 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import DashboardNavigation from '@/components/dashboard/DashboardNavigation'
 import { useSidebar } from '@/hooks/useSidebar'
 import DescriptoresPortada from '@/components/descriptores/DescriptoresPortada'
-import DescriptoresRanking from '@/components/descriptores/DescriptoresRanking'
 import type { PositionWithStatus, DescriptorSummary } from '@/lib/services/JobDescriptorService'
-
-type View = 'portada' | 'ranking'
 
 export default function DescriptoresPage() {
   const { isCollapsed } = useSidebar()
-  const [view, setView] = useState<View>('portada')
   const [positions, setPositions] = useState<PositionWithStatus[]>([])
   const [summary, setSummary] = useState<DescriptorSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -49,20 +45,13 @@ export default function DescriptoresPage() {
                 <p className="text-slate-400 text-sm">Cargando descriptores...</p>
               </div>
             </div>
-          ) : view === 'portada' && summary ? (
+          ) : summary ? (
             <DescriptoresPortada
               summary={summary}
-              onStart={() => setView('ranking')}
-              onRefresh={fetchData}
-            />
-          ) : (
-            <DescriptoresRanking
               positions={positions}
-              summary={summary}
-              onHome={() => setView('portada')}
               onRefresh={fetchData}
             />
-          )}
+          ) : null}
         </div>
       </main>
     </>
