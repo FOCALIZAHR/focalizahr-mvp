@@ -554,6 +554,27 @@ export const PERMISSIONS = {
     'ACCOUNT_OWNER',
     'HR_ADMIN'
   ],
+  'descriptors:view': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'CEO'
+  ],
+  'descriptors:manage': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER'
+  ],
+  'workforce-intelligence:view': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'CEO',
+    'AREA_MANAGER'
+  ],
   'talent-actions:view': [
     'FOCALIZAHR_ADMIN',
     'ACCOUNT_OWNER',
