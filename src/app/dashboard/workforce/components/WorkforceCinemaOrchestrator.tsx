@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useWorkforceData } from '../hooks/useWorkforceData'
 import WorkforceMissionControl from './WorkforceMissionControl'
+import WorkforceCascadeOrchestrator from './cascada/WorkforceCascadeOrchestrator'
 
 // ═══════════════════════════════════════════════════════════════════════
 // SKELETON
@@ -175,37 +176,13 @@ export default function WorkforceCinemaOrchestrator() {
             />
           )}
 
-          {/* CASCADA — Sesion 3 implementara WorkforceCascadeOrchestrator */}
+          {/* CASCADA — 7 actos lineales */}
           {view === 'cascada' && (
-            <motion.div
+            <WorkforceCascadeOrchestrator
               key="cascada"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ type: 'spring', stiffness: 220, damping: 30 }}
-              className="flex flex-col items-center gap-6 w-full max-w-4xl px-4"
-            >
-              <div className="text-center">
-                <p className="text-xs text-slate-500 font-mono uppercase tracking-wider mb-4">
-                  Cascada de diagnostico
-                </p>
-                <p className="text-6xl font-extralight text-white">
-                  {Math.round(data.exposure.avgExposure * 100)}%
-                </p>
-                <p className="text-xs text-slate-500 uppercase tracking-widest mt-2">
-                  de exposicion a la automatizacion
-                </p>
-                <p className="text-sm text-slate-400 mt-6 max-w-md mx-auto">
-                  La cascada completa se implementa en Sesion 3. Los datos estan disponibles: {data.zombies.count} zombies, {data.flightRisk.count} en riesgo de fuga, {data.redundancy.pairs.length} redundancias detectadas.
-                </p>
-                <button
-                  onClick={handleBackToLobby}
-                  className="mt-8 text-cyan-400 hover:text-cyan-300 text-sm transition-colors"
-                >
-                  ← Volver al lobby
-                </button>
-              </div>
-            </motion.div>
+              data={data}
+              onBack={handleBackToLobby}
+            />
           )}
 
           {/* TABS — Sesion 4 */}
