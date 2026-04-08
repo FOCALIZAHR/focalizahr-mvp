@@ -27,6 +27,14 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    // Normalizar positionText para evitar duplicados por case/acentos
+    const normalizedPosition = positionText
+      .toLowerCase().trim()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[_]+/g, ' ')
+      .replace(/[^a-z0-9\s\-\/&.]/g, '')
+      .replace(/\s+/g, ' ').trim()
+
     // Validar que el SOC code existe
     const occupation = await prisma.onetOccupation.findUnique({
       where: { socCode },
@@ -46,7 +54,7 @@ export async function PUT(request: NextRequest) {
       where: {
         accountId_positionText: {
           accountId: userContext.accountId,
-          positionText,
+          positionText: normalizedPosition,
         },
       },
       update: {
@@ -58,7 +66,7 @@ export async function PUT(request: NextRequest) {
       },
       create: {
         accountId: userContext.accountId,
-        positionText,
+        positionText: normalizedPosition,
         socCode,
         confidence: 'HIGH',
         source: 'MANUAL',

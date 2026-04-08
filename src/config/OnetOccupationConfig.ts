@@ -117,6 +117,11 @@ export const SOC_ALIASES: Record<string, string[]> = {
     'gerente de clinica', 'hospital administrator',
     'director de hospital', 'jefe de servicio clinico',
     'gerente de servicios de salud',
+    'jefe calidad de vida', 'jefe de calidad de vida',
+    'coordinador de bienestar', 'jefe bienestar',
+    'jefe de estadistica y grs', 'jefe estadistica',
+    'coordinadora programas y acciones sociales',
+    'coordinadora programas sociales',
   ],
   '11-9198.00': [ // Personal Service Managers (Hotel, Travel, etc.)
     'gerente de hotel', 'hotel manager', 'gerente hotelero',
@@ -160,6 +165,7 @@ export const SOC_ALIASES: Record<string, string[]> = {
     'management consultant', 'business analyst', 'analista de negocios',
     'consultor empresarial', 'analista de procesos', 'process analyst',
     'consultor de procesos', 'analista de mejora continua',
+    'analista',
   ],
   '13-1151.00': [ // Training and Development Specialists
     'analista de capacitacion', 'training specialist',
@@ -382,6 +388,11 @@ export const SOC_ALIASES: Record<string, string[]> = {
   '29-1141.00': [ // Registered Nurses
     'enfermera', 'enfermero', 'nurse', 'registered nurse',
     'enfermera clinica', 'enfermera jefe', 'nurse practitioner',
+    'enfermera supervisora', 'enfermera coordinadora', 'enfermera supervisor',
+    'enfermero supervisor', 'enfermera universitaria', 'enfermera (o) supervisor',
+    'enfermera (o) supervisora', 'eu supervisor', 'eu supervisora',
+    'enfermera coord', 'enfermera o supervisor', 'enferm universitario',
+    'enferm', 'eu',
   ],
   '29-1171.00': [ // Nurse Practitioners
     'matrona', 'midwife', 'enfermera matrona',
@@ -418,6 +429,7 @@ export const SOC_ALIASES: Record<string, string[]> = {
     'guardia de seguridad', 'security guard', 'vigilante',
     'guardia', 'rondin', 'agente de seguridad',
     'jefe de seguridad fisica', 'security officer',
+    'jefe de seguridad', 'encargado de seguridad',
   ],
 
   // ══════════════════════════════════════════════════════════════════════
@@ -489,6 +501,7 @@ export const SOC_ALIASES: Record<string, string[]> = {
     'supervisor administrativo', 'office supervisor',
     'jefe administrativo', 'coordinador administrativo',
     'encargado administrativo', 'jefe de oficina',
+    'supervisora', 'supervisor de equipo', 'coordinadora',
   ],
   '43-3011.00': [ // Bill and Account Collectors
     'ejecutivo de cobranza', 'collector', 'cobrador',
@@ -627,6 +640,43 @@ export const SOC_ALIASES: Record<string, string[]> = {
     'operario de bodega', 'peoneta', 'cargador',
     'auxiliar de despacho', 'repartidor',
   ],
+  '29-1123.00': [ // Physical Therapists
+    'kinesiologo', 'kinesiologos', 'fisioterapeuta', 'physical therapist',
+    'kinesiologa', 'terapeuta fisico', 'rehabilitador',
+    'kinesiologoa coordinadora', 'kinesiologoa',
+  ],
+  '43-6013.00': [ // Medical Secretaries
+    'secretaria direccion medica', 'secretaria medica', 'medical secretary',
+    'secretaria clinica', 'asistente de direccion medica',
+    'secretaria direccion', 'secretaria dir medica',
+  ],
+  '41-1011.00': [ // First-Line Supervisors of Retail Sales Workers
+    'supervisor de cajas', 'supervisora de cajas', 'jefe de cajas',
+    'encargado de cajas', 'supervisor retail', 'supervisor de tienda',
+    'supervisor de ventas retail',
+    'supervisor a de cajas', 'supervisora cajas',
+  ],
+  '23-1022.00': [ // Mediators, Arbitrators
+    'conciliador', 'conciliadora', 'mediador', 'mediadora',
+    'arbitro laboral', 'mediator',
+  ],
+  '13-1141.00': [ // Compensation, Benefits, and Job Analysis Specialists
+    'evaluador', 'evaluadora', 'analista de compensaciones',
+    'analista de beneficios', 'compensation analyst',
+    'evaluador de cargos', 'analista de cargos',
+  ],
+  '27-2042.00': [ // Musicians and Singers
+    'musico', 'musica', 'musician', 'cantante',
+    'musicoterapeuta', 'alegrador',
+  ],
+  '17-3011.00': [ // Architectural and Civil Drafters
+    'dibujante tecnico', 'dibujante', 'drafter', 'delineante',
+    'dibujante arquitectonico', 'dibujante civil',
+  ],
+  '17-1011.00': [ // Architects
+    'arquitecto', 'arquitecta', 'architect',
+    'arquitecto de proyectos', 'arquitecto senior',
+  ],
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -651,7 +701,7 @@ export const STRONG_KEYWORDS: Record<string, string[]> = {
   '13-2051.00': ['fp&a', 'presupuesto', 'control gestion'],
 
   // SOC 15 — Computer
-  '15-1252.00': ['software', 'engineer', 'ingeniero', 'developer'],
+  '15-1252.00': ['software', 'developer', 'fullstack', 'backend'],
   '15-1253.00': ['qa', 'testing', 'quality assurance', 'tester'],
   '15-1254.00': ['frontend', 'web', 'react', 'angular', 'vue'],
   '15-1255.00': ['ux', 'ui', 'disenador', 'product design'],
@@ -671,6 +721,29 @@ export const STRONG_KEYWORDS: Record<string, string[]> = {
 
   // SOC 51 — Production
   '51-1011.00': ['supervisor produccion', 'jefe linea', 'jefe turno'],
+
+  // SOC 29 — Healthcare
+  '29-1123.00': ['kinesiologo', 'kinesiologa', 'fisioterapeuta'],
+  '29-1141.00': ['enfermera', 'enfermero', 'nurse'],
+
+  // SOC 17 — Architecture/Engineering
+  '17-3011.00': ['dibujante', 'delineante', 'drafter'],
+  '17-1011.00': ['arquitecto', 'arquitecta', 'architect'],
+
+  // SOC 43 — Medical Admin
+  '43-6013.00': ['secretaria medica', 'secretaria clinica'],
+
+  // SOC 41 — Retail Supervisors
+  '41-1011.00': ['supervisor cajas', 'supervisora cajas', 'encargado cajas'],
+
+  // SOC 23 — Mediators
+  '23-1022.00': ['conciliador', 'conciliadora', 'mediador'],
+
+  // SOC 13 — Compensation
+  '13-1141.00': ['evaluador', 'evaluadora', 'analista compensaciones'],
+
+  // SOC 27 — Musicians
+  '27-2042.00': ['musico', 'musica', 'musicoterapeuta'],
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -701,7 +774,7 @@ export const CONTEXT_HINTS: Record<string, Record<string, string>> = {
   },
   tecnologia: {
     alta_gerencia:   '11-3021.00', // IT Managers
-    mandos_medios:   '15-1252.00', // Software Developers (senior/lead)
+    mandos_medios:   '11-3021.00', // IT Managers (mandos medios TI gestionan equipos)
     profesionales:   '15-1251.00', // Programmers
     base_operativa:  '15-1232.00', // IT Support
   },
@@ -837,4 +910,12 @@ export const SOC_TITLES_ES: Record<string, string> = {
   '53-3032.00': 'Conductores',
   '53-7051.00': 'Operadores de Grúa Horquilla',
   '53-7062.00': 'Bodegueros',
+  '29-1123.00': 'Kinesiólogos',
+  '43-6013.00': 'Secretarias Médicas',
+  '41-1011.00': 'Supervisores de Cajas',
+  '23-1022.00': 'Conciliadores',
+  '13-1141.00': 'Analistas de Compensaciones',
+  '27-2042.00': 'Músicos',
+  '17-3011.00': 'Dibujantes Técnicos',
+  '17-1011.00': 'Arquitectos',
 }

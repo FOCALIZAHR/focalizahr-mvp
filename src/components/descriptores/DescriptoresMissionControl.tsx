@@ -6,7 +6,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { motion } from 'framer-motion'
-import { ArrowRight, Sparkles, Map } from 'lucide-react'
+import { ArrowRight, Sparkles, Map, Settings2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { formatDisplayName } from '@/lib/utils/formatName'
@@ -200,6 +200,21 @@ function ExplorarButton() {
   )
 }
 
+// ── Configurar Button (Pre-mapeo, solo HR) ──
+
+function ConfigurarButton() {
+  const router = useRouter()
+  return (
+    <button
+      onClick={() => router.push('/dashboard/descriptores/configuracion')}
+      className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-700/50 bg-slate-800/30 text-slate-400 hover:text-white hover:border-purple-500/30 transition-all text-xs font-medium"
+    >
+      <Settings2 className="w-3.5 h-3.5" />
+      Pre-mapeo
+    </button>
+  )
+}
+
 // ── Main Component ──
 
 interface DescriptoresMissionControlProps {
@@ -265,10 +280,11 @@ export default function DescriptoresMissionControl({
         <CTAButton nextJob={nextJob} allDone={allDone} onStart={onStart} />
       </div>
 
-      {/* Explorar organización — visible cuando hay confirmados */}
-      {summary.confirmed > 0 && (
-        <ExplorarButton />
-      )}
+      {/* Acciones secundarias */}
+      <div className="flex items-center gap-3">
+        {summary.confirmed > 0 && <ExplorarButton />}
+        <ConfigurarButton />
+      </div>
     </motion.div>
   )
 }

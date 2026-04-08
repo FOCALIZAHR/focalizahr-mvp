@@ -70,11 +70,20 @@ export class BenchmarkAggregationService {
       await this.calculateOnboardingBenchmarks(periodStart, periodEnd, period);
       
       // ═══════════════════════════════════════════════════════════
-      // FASE 2: OTROS PRODUCTOS (Agregar cuando estén listos)
+      // FASE 1B: ONBOARDING EXO POR JOB LEVEL (dimension="JOB_LEVEL")
+      // ═══════════════════════════════════════════════════════════
+      await this.calculateOnboardingBenchmarksByJobLevel(periodStart, periodEnd, period);
+
+      // ═══════════════════════════════════════════════════════════
+      // FASE 2: ROLEFIT (producto temporal — lee directo de PerformanceRating)
+      // ═══════════════════════════════════════════════════════════
+      await this.calculateRoleFitBenchmarks(periodStart, periodEnd, period);
+
+      // ═══════════════════════════════════════════════════════════
+      // FASE 3: OTROS PRODUCTOS (Agregar cuando estén listos)
       // ═══════════════════════════════════════════════════════════
       // await this.calculateExitRetentionBenchmarks(periodStart, periodEnd, period);
       // await this.calculatePulseClimateBenchmarks(periodStart, periodEnd, period);
-      // await this.calculateDepartmentMetricsBenchmarks(periodStart, periodEnd, period);
       
       console.log(`[Benchmark] ✅ Agregación completada exitosamente`);
       
@@ -374,6 +383,419 @@ export class BenchmarkAggregationService {
     console.log(`[Benchmark]   📊 Desglose: ${categoryCount} por categoría + ${allCount} cross-categoría (ALL)`);
   }
   
+  /**
+   * ═══════════════════════════════════════════════════════════════
+   * CÁLCULO ESPECÍFICO: ONBOARDING EXO POR JOB LEVEL
+   * ═══════════════════════════════════════════════════════════════
+   *
+   * Fuente: JourneyOrchestration.exoScore → Participant.acotadoGroup
+   * dimension='JOB_LEVEL', segment=acotadoGroup, standardCategory='ALL'
+   *
+   * NO reemplaza benchmarks GLOBAL — son registros ADICIONALES.
+   */
+  private static async calculateOnboardingBenchmarksByJobLevel(
+    periodStart: Date,
+    periodEnd: Date,
+    period: string
+  ): Promise<void> {
+
+    console.log(`[Benchmark] 📊 Calculando benchmarks Onboarding EXO por JOB_LEVEL...`)
+
+    // Query: journeys completos con EXO y participante con acotadoGroup
+    const journeys = await prisma.journeyOrchestration.findMany({
+      where: {
+        status: 'COMPLETED',
+        exoScore: { not: null },
+        stage1Participant: { acotadoGroup: { not: null } },
+      },
+      select: {
+        id: true,
+        exoScore: true,
+        department: {
+          select: {
+            accountId: true,
+            account: {
+              select: { id: true, country: true, industry: true, companySize: true },
+            },
+          },
+        },
+        stage1Participant: {
+          select: { acotadoGroup: true },
+        },
+      },
+    })
+
+    console.log(`[Benchmark]   → ${journeys.length} journeys completos con acotadoGroup encontrados`)
+
+    if (journeys.length === 0) {
+      console.log(`[Benchmark]   ⚠️ Sin datos para benchmarks JOB_LEVEL`)
+      return
+    }
+
+    // Paso 1: Agrupar por empresa × acotadoGroup → promedio ponderado por empresa
+    interface EmpresaJobLevel {
+      accountId: string
+      country: string
+      industry: string
+      companySize: string | null
+      acotadoGroup: string
+      avgExo: number
+      journeyCount: number
+    }
+
+    // Agrupar scores por (accountId, acotadoGroup)
+    const groupMap = new Map<string, { scores: number[]; account: any; acotadoGroup: string }>()
+
+    for (const j of journeys) {
+      const acotadoGroup = j.stage1Participant?.acotadoGroup
+      const account = j.department?.account
+      if (!acotadoGroup || !account?.country || j.exoScore == null) continue
+
+      const key = `${account.id}__${acotadoGroup}`
+      if (!groupMap.has(key)) {
+        groupMap.set(key, { scores: [], account, acotadoGroup })
+      }
+      groupMap.get(key)!.scores.push(j.exoScore)
+    }
+
+    // Calcular promedio por empresa × acotadoGroup
+    const empresaJobLevels: EmpresaJobLevel[] = []
+    for (const [, group] of groupMap) {
+      const avg = group.scores.reduce((s, v) => s + v, 0) / group.scores.length
+      empresaJobLevels.push({
+        accountId: group.account.id,
+        country: group.account.country,
+        industry: group.account.industry || 'ALL',
+        companySize: group.account.companySize,
+        acotadoGroup: group.acotadoGroup,
+        avgExo: avg,
+        journeyCount: group.scores.length,
+      })
+    }
+
+    console.log(`[Benchmark]   → ${empresaJobLevels.length} combinaciones empresa×jobLevel`)
+
+    // Paso 2: Crear buckets por acotadoGroup con cascada especificidad
+    const buckets = new Map<string, BenchmarkBucket & { acotadoGroup: string }>()
+
+    for (const ej of empresaJobLevels) {
+      const sizeRange = this.mapCompanySize(ej.companySize)
+
+      const bucketKeys = [
+        `${ej.country}|${ej.industry}|${sizeRange}|${ej.acotadoGroup}`,
+        `${ej.country}|${ej.industry}|ALL|${ej.acotadoGroup}`,
+        `${ej.country}|ALL|ALL|${ej.acotadoGroup}`,
+        `ALL|ALL|ALL|${ej.acotadoGroup}`,
+      ]
+
+      for (const key of bucketKeys) {
+        if (!buckets.has(key)) {
+          const [country, ind, size, group] = key.split('|')
+          buckets.set(key, {
+            country,
+            industry: ind,
+            companySizeRange: size,
+            standardCategory: 'ALL',
+            scores: [],
+            journeyCounts: [],
+            accountIds: new Set(),
+            acotadoGroup: group,
+          })
+        }
+
+        const bucket = buckets.get(key)!
+        bucket.scores.push(ej.avgExo)
+        bucket.journeyCounts.push(ej.journeyCount)
+        bucket.accountIds.add(ej.accountId)
+      }
+    }
+
+    console.log(`[Benchmark]   → ${buckets.size} buckets JOB_LEVEL generados`)
+
+    // Paso 3: Guardar
+    let savedCount = 0
+    let skippedPrivacy = 0
+
+    for (const [, bucket] of buckets) {
+      const companyCount = bucket.accountIds.size
+      const isPublic = companyCount >= 3
+
+      if (!isPublic) skippedPrivacy++
+
+      const stats = this.calculateStatistics(bucket.scores, bucket.journeyCounts)
+
+      await prisma.marketBenchmark.upsert({
+        where: {
+          unique_market_benchmark: {
+            country: bucket.country,
+            industry: bucket.industry,
+            companySizeRange: bucket.companySizeRange,
+            standardCategory: 'ALL',
+            dimension: 'JOB_LEVEL',
+            segment: bucket.acotadoGroup,
+            metricType: 'onboarding_exo',
+            period,
+          },
+        },
+        create: {
+          country: bucket.country,
+          industry: bucket.industry,
+          companySizeRange: bucket.companySizeRange,
+          standardCategory: 'ALL',
+          dimension: 'JOB_LEVEL',
+          segment: bucket.acotadoGroup,
+          metricType: 'onboarding_exo',
+          metricSource: 'journey_orchestration',
+          periodType: 'monthly',
+          periodStart,
+          periodEnd,
+          period,
+          ...stats,
+          sampleSize: bucket.scores.length,
+          companyCount,
+          isPublic,
+        },
+        update: {
+          ...stats,
+          sampleSize: bucket.scores.length,
+          companyCount,
+          isPublic,
+          updatedAt: new Date(),
+        },
+      })
+
+      savedCount++
+    }
+
+    console.log(`[Benchmark]   ✅ ${savedCount} benchmarks JOB_LEVEL guardados`)
+    console.log(`[Benchmark]   🔒 ${skippedPrivacy} privados (companyCount < 3)`)
+  }
+
+  /**
+   * ═══════════════════════════════════════════════════════════════
+   * CÁLCULO: ROLEFIT BENCHMARK (producto temporal)
+   * ═══════════════════════════════════════════════════════════════
+   *
+   * Lee DIRECTO de PerformanceRating.roleFitScore (ya persistido).
+   * NO necesita gold cache — el dato es final al calcularse.
+   *
+   * Genera 3 tipos de registros en una sola pasada:
+   *   1️⃣ GLOBAL: dimension='GLOBAL', segment='ALL', standardCategory=X
+   *   2️⃣ JOB_LEVEL: dimension='JOB_LEVEL', segment=acotadoGroup, standardCategory='ALL'
+   *   3️⃣ COMBINATORIA: dimension='JOB_LEVEL', segment=acotadoGroup, standardCategory=X
+   */
+  private static async calculateRoleFitBenchmarks(
+    periodStart: Date,
+    periodEnd: Date,
+    period: string
+  ): Promise<void> {
+
+    console.log(`[Benchmark] 📊 Calculando benchmarks RoleFit (3 combinatorias)...`)
+
+    // Una sola query — trae todo lo necesario
+    const ratings = await prisma.performanceRating.findMany({
+      where: {
+        roleFitScore: { not: null },
+        employee: {
+          isActive: true,
+          acotadoGroup: { not: null },
+          department: { standardCategory: { not: null } },
+        },
+      },
+      select: {
+        roleFitScore: true,
+        employee: {
+          select: {
+            acotadoGroup: true,
+            department: { select: { standardCategory: true } },
+            account: { select: { id: true, country: true, industry: true, companySize: true } },
+          },
+        },
+      },
+    })
+
+    console.log(`[Benchmark]   → ${ratings.length} ratings con roleFitScore encontrados`)
+
+    if (ratings.length === 0) {
+      console.log(`[Benchmark]   ⚠️ Sin datos para benchmarks RoleFit`)
+      return
+    }
+
+    // Agrupar por empresa primero (para ponderar igual por empresa)
+    // Clave: accountId → { byCategory, byJobLevel, byCombination }
+    interface EmpresaRoleFit {
+      accountId: string
+      country: string
+      industry: string
+      companySize: string | null
+      // Scores agrupados por dimensión
+      byCategory: Map<string, number[]>       // standardCategory → scores[]
+      byJobLevel: Map<string, number[]>       // acotadoGroup → scores[]
+      byCombination: Map<string, number[]>    // `category__group` → scores[]
+    }
+
+    const empresas = new Map<string, EmpresaRoleFit>()
+
+    for (const r of ratings) {
+      const emp = r.employee
+      if (!emp?.account?.country || !emp.acotadoGroup || !emp.department?.standardCategory) continue
+
+      const accountId = emp.account.id
+      if (!empresas.has(accountId)) {
+        empresas.set(accountId, {
+          accountId,
+          country: emp.account.country,
+          industry: emp.account.industry || 'ALL',
+          companySize: emp.account.companySize,
+          byCategory: new Map(),
+          byJobLevel: new Map(),
+          byCombination: new Map(),
+        })
+      }
+
+      const e = empresas.get(accountId)!
+      const cat = emp.department.standardCategory
+      const group = emp.acotadoGroup
+      const comboKey = `${cat}__${group}`
+
+      // Acumular en las 3 dimensiones
+      if (!e.byCategory.has(cat)) e.byCategory.set(cat, [])
+      e.byCategory.get(cat)!.push(r.roleFitScore!)
+
+      if (!e.byJobLevel.has(group)) e.byJobLevel.set(group, [])
+      e.byJobLevel.get(group)!.push(r.roleFitScore!)
+
+      if (!e.byCombination.has(comboKey)) e.byCombination.set(comboKey, [])
+      e.byCombination.get(comboKey)!.push(r.roleFitScore!)
+    }
+
+    console.log(`[Benchmark]   → ${empresas.size} empresas con datos RoleFit`)
+
+    // Función para calcular promedio de un array
+    const avg = (arr: number[]) => arr.reduce((s, v) => s + v, 0) / arr.length
+
+    // Crear todos los buckets
+    const allBuckets = new Map<string, BenchmarkBucket & { dimension: string; segment: string }>()
+
+    function addToBuckets(
+      empresa: EmpresaRoleFit,
+      score: number,
+      count: number,
+      dimension: string,
+      segment: string,
+      standardCategory: string
+    ) {
+      const sizeRange = BenchmarkAggregationService.mapCompanySize(empresa.companySize)
+
+      const keys = [
+        `${empresa.country}|${empresa.industry}|${sizeRange}|${standardCategory}|${dimension}|${segment}`,
+        `${empresa.country}|${empresa.industry}|ALL|${standardCategory}|${dimension}|${segment}`,
+        `${empresa.country}|ALL|ALL|${standardCategory}|${dimension}|${segment}`,
+        `ALL|ALL|ALL|${standardCategory}|${dimension}|${segment}`,
+      ]
+
+      for (const key of keys) {
+        if (!allBuckets.has(key)) {
+          const [country, ind, size, cat, dim, seg] = key.split('|')
+          allBuckets.set(key, {
+            country,
+            industry: ind,
+            companySizeRange: size,
+            standardCategory: cat,
+            dimension: dim,
+            segment: seg,
+            scores: [],
+            journeyCounts: [],
+            accountIds: new Set(),
+          })
+        }
+        const bucket = allBuckets.get(key)!
+        bucket.scores.push(score)
+        bucket.journeyCounts.push(count)
+        bucket.accountIds.add(empresa.accountId)
+      }
+    }
+
+    // Llenar buckets desde cada empresa
+    for (const [, empresa] of empresas) {
+      // 1️⃣ GLOBAL: por standardCategory
+      for (const [cat, scores] of empresa.byCategory) {
+        addToBuckets(empresa, avg(scores), scores.length, 'GLOBAL', 'ALL', cat)
+      }
+
+      // 2️⃣ JOB_LEVEL: por acotadoGroup
+      for (const [group, scores] of empresa.byJobLevel) {
+        addToBuckets(empresa, avg(scores), scores.length, 'JOB_LEVEL', group, 'ALL')
+      }
+
+      // 3️⃣ COMBINATORIA: standardCategory × acotadoGroup
+      for (const [comboKey, scores] of empresa.byCombination) {
+        const [cat, group] = comboKey.split('__')
+        addToBuckets(empresa, avg(scores), scores.length, 'JOB_LEVEL', group, cat)
+      }
+    }
+
+    console.log(`[Benchmark]   → ${allBuckets.size} buckets RoleFit generados (GLOBAL + JOB_LEVEL + COMBINATORIA)`)
+
+    // Guardar
+    let savedCount = 0
+    let skippedPrivacy = 0
+
+    for (const [, bucket] of allBuckets) {
+      const companyCount = bucket.accountIds.size
+      const isPublic = companyCount >= 3
+
+      if (!isPublic) skippedPrivacy++
+
+      const stats = this.calculateStatistics(bucket.scores, bucket.journeyCounts)
+
+      await prisma.marketBenchmark.upsert({
+        where: {
+          unique_market_benchmark: {
+            country: bucket.country,
+            industry: bucket.industry,
+            companySizeRange: bucket.companySizeRange,
+            standardCategory: bucket.standardCategory,
+            dimension: bucket.dimension,
+            segment: bucket.segment,
+            metricType: 'performance_rolefit',
+            period,
+          },
+        },
+        create: {
+          country: bucket.country,
+          industry: bucket.industry,
+          companySizeRange: bucket.companySizeRange,
+          standardCategory: bucket.standardCategory,
+          dimension: bucket.dimension,
+          segment: bucket.segment,
+          metricType: 'performance_rolefit',
+          metricSource: 'performance_rating',
+          periodType: 'monthly',
+          periodStart,
+          periodEnd,
+          period,
+          ...stats,
+          sampleSize: bucket.scores.length,
+          companyCount,
+          isPublic,
+        },
+        update: {
+          ...stats,
+          sampleSize: bucket.scores.length,
+          companyCount,
+          isPublic,
+          updatedAt: new Date(),
+        },
+      })
+
+      savedCount++
+    }
+
+    console.log(`[Benchmark]   ✅ ${savedCount} benchmarks RoleFit guardados`)
+    console.log(`[Benchmark]   🔒 ${skippedPrivacy} privados (companyCount < 3)`)
+  }
+
   /**
    * ═══════════════════════════════════════════════════════════════
    * CÁLCULO ESTADÍSTICAS - Algoritmo Robusto

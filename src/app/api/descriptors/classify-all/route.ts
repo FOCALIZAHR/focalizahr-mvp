@@ -1,10 +1,9 @@
-// POST /api/descriptors/classify-all — Clasificación masiva de cargos
-// Obtiene todos los Employee.position únicos, ejecuta OccupationMapper.classifyBatch,
-// persiste OccupationMapping para cada uno.
+// POST /api/descriptors/classify-all — Clasificación masiva con OccupationResolver v2
+// Pipeline: Filtrar → Match mejorado → LLM batch → Persistir
 
 import { NextRequest, NextResponse } from 'next/server'
 import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationService'
-import { OccupationMapper } from '@/lib/services/OccupationMapper'
+import { OccupationResolver } from '@/lib/services/OccupationResolver'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
@@ -21,12 +20,7 @@ export async function POST(request: NextRequest) {
 
     // 1. Obtener posiciones únicas con contexto
     const employees = await prisma.employee.findMany({
-      where: {
-        accountId,
-        isActive: true,
-        status: 'ACTIVE',
-        position: { not: null },
-      },
+      where: { accountId, isActive: true, status: 'ACTIVE', position: { not: null } },
       select: {
         position: true,
         standardJobLevel: true,
@@ -44,6 +38,8 @@ export async function POST(request: NextRequest) {
     for (const emp of employees) {
       if (!emp.position) continue
       const key = emp.position.toLowerCase().trim()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim()
       if (!positionMap.has(key)) {
         positionMap.set(key, {
           positionText: emp.position,
@@ -53,16 +49,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2. Verificar cuáles ya tienen mapping
+    // 2. Verificar cuáles ya tienen mapping (excluyendo los que vamos a re-clasificar)
     const existingMappings = await prisma.occupationMapping.findMany({
-      where: { accountId },
+      where: { accountId, source: 'MANUAL' }, // Solo preservar MANUAL
       select: { positionText: true },
     })
-    const alreadyMapped = new Set(existingMappings.map(m => m.positionText.toLowerCase().trim()))
+    const manualMapped = new Set(existingMappings.map(m => m.positionText.toLowerCase().trim()))
 
-    // 3. Filtrar solo los que NO tienen mapping
+    // 3. Filtrar: clasificar todo lo que NO sea MANUAL
     const toClassify = Array.from(positionMap.values()).filter(
-      p => !alreadyMapped.has(p.positionText.toLowerCase().trim())
+      p => !manualMapped.has(p.positionText.toLowerCase().trim()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim())
     )
 
     if (toClassify.length === 0) {
@@ -70,73 +68,28 @@ export async function POST(request: NextRequest) {
         success: true,
         data: {
           total: positionMap.size,
-          classified: positionMap.size - toClassify.length,
-          newlyClassified: 0,
-          unclassified: 0,
-          message: 'Todos los cargos ya están clasificados.',
+          stats: { total: 0, high: 0, medium: 0, low: 0, unclassified: 0 },
+          message: 'Todos los cargos ya están clasificados manualmente.',
         },
       })
     }
 
-    // 4. Clasificar en batch
-    const results = await OccupationMapper.classifyBatch(
-      toClassify.map(p => ({
-        positionText: p.positionText,
-        standardCategory: p.standardCategory,
-        standardJobLevel: p.standardJobLevel,
-      })),
-      accountId
-    )
+    // 4. OccupationResolver v2 — pipeline de 4 pasos
+    console.log(`[classify-all] Resolving ${toClassify.length} positions with OccupationResolver v2`)
 
-    // 5. Persistir mappings
-    let newlyClassified = 0
-    let unclassified = 0
+    const { results, stats } = await OccupationResolver.resolveBatch(toClassify, accountId)
 
-    for (let i = 0; i < results.length; i++) {
-      const classification = results[i]
-      const position = toClassify[i]
-
-      await prisma.occupationMapping.upsert({
-        where: {
-          accountId_positionText: {
-            accountId,
-            positionText: position.positionText,
-          },
-        },
-        update: {
-          socCode: classification.socCode,
-          confidence: classification.confidence as any,
-          source: classification.source as any,
-          contextCategory: position.standardCategory,
-          contextJobLevel: position.standardJobLevel,
-          mappedAt: new Date(),
-        },
-        create: {
-          accountId,
-          positionText: position.positionText,
-          socCode: classification.socCode,
-          confidence: classification.confidence as any,
-          source: classification.source as any,
-          contextCategory: position.standardCategory,
-          contextJobLevel: position.standardJobLevel,
-        },
-      })
-
-      if (classification.confidence !== 'UNCLASSIFIED') {
-        newlyClassified++
-      } else {
-        unclassified++
-      }
-    }
+    console.log(`[classify-all] Results: HIGH=${stats.high} MEDIUM=${stats.medium} LOW=${stats.low} UNCLASSIFIED=${stats.unclassified}`)
 
     return NextResponse.json({
       success: true,
       data: {
         total: positionMap.size,
-        classified: positionMap.size - unclassified,
-        newlyClassified,
-        unclassified,
-        message: `${newlyClassified} cargos clasificados. ${unclassified} requieren revisión manual.`,
+        stats,
+        classified: stats.high + stats.medium,
+        newlyClassified: stats.high + stats.medium + stats.low,
+        unclassified: stats.unclassified,
+        message: `${stats.high + stats.medium} cargos clasificados (${stats.high} HIGH, ${stats.medium} MEDIUM). ${stats.unclassified} requieren revisión manual.`,
       },
     })
   } catch (error: any) {

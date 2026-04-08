@@ -181,20 +181,28 @@ export class JobDescriptorService {
       }
     }
 
-    // 5. Determinar track dominante del cargo (para filtrar competencias)
+    // 5. Determinar track dominante + job level dominante del cargo
     let dominantTrack: string | null = null
+    let dominantJobLevel: string | null = null
     try {
-      const trackCounts = await prisma.employee.groupBy({
-        by: ['performanceTrack'],
-        where: { accountId, position: jobTitle, isActive: true, performanceTrack: { not: null } },
-        _count: { performanceTrack: true },
-        orderBy: { _count: { performanceTrack: 'desc' } },
-      })
-      if (trackCounts.length > 0) {
-        dominantTrack = trackCounts[0].performanceTrack
-      }
+      const [trackCounts, levelCounts] = await Promise.all([
+        prisma.employee.groupBy({
+          by: ['performanceTrack'],
+          where: { accountId, position: jobTitle, isActive: true, performanceTrack: { not: null } },
+          _count: { performanceTrack: true },
+          orderBy: { _count: { performanceTrack: 'desc' } },
+        }),
+        prisma.employee.groupBy({
+          by: ['standardJobLevel'],
+          where: { accountId, position: jobTitle, isActive: true, standardJobLevel: { not: null } },
+          _count: { standardJobLevel: true },
+          orderBy: { _count: { standardJobLevel: 'desc' } },
+        }),
+      ])
+      if (trackCounts.length > 0) dominantTrack = trackCounts[0].performanceTrack
+      if (levelCounts.length > 0) dominantJobLevel = levelCounts[0].standardJobLevel
     } catch {
-      // degradación graceful — no filtra
+      // degradación graceful
     }
 
     // 6. Competencias del cliente filtradas por track del cargo
@@ -206,10 +214,23 @@ export class JobDescriptorService {
       const accountCompetencies = await CompetencyService.getByAccount(accountId, {
         activeOnly: true,
       })
+
+      // Lookup real targets from CompetencyTarget table
+      let targetMap = new Map<string, number>()
+      if (dominantJobLevel) {
+        const targets = await prisma.competencyTarget.findMany({
+          where: { accountId, standardJobLevel: dominantJobLevel },
+          select: { competencyCode: true, targetScore: true },
+        })
+        for (const t of targets) {
+          if (t.targetScore != null) targetMap.set(t.competencyCode, t.targetScore)
+        }
+      }
+
       competencies = accountCompetencies
         .filter(c => {
           const rule = c.audienceRule as { minTrack?: string } | null
-          if (!rule?.minTrack) return true // null = CORE, todos la ven
+          if (!rule?.minTrack) return true
           const minLevel = TRACK_LEVEL[rule.minTrack] ?? 1
           return trackLevel >= minLevel
         })
@@ -220,7 +241,7 @@ export class JobDescriptorService {
           behaviors: Array.isArray(c.behaviors) ? (c.behaviors as string[]) : [],
           category: c.category ?? null,
           audienceRule: c.audienceRule as { minTrack: string } | null,
-          expectedLevel: null,
+          expectedLevel: targetMap.get(c.code) ?? null,
           source: 'company_library',
         }))
     } catch {

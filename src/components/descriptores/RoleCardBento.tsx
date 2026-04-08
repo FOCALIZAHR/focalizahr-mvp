@@ -1,14 +1,14 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// ROLE CARD BENTO — Side-sheet stack vertical full-width
-// Hero title → Propósito → Responsabilidades → Skills barras → Ocupantes
-// Tesla line + footer sutil
+// ROLE CARD BENTO — Réplica fiel de referencia.jpg
+// Panel sólido, secciones divididas por líneas finas, 2 columnas asimétricas
+// [Title|Propósito] [Responsabilidades|Skills+Barras] [Estado footer]
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, CheckCircle } from 'lucide-react'
+import { X, Check, ChevronRight } from 'lucide-react'
 import { formatDisplayName } from '@/lib/utils/formatName'
 
 interface BentoPosition {
@@ -48,13 +48,10 @@ export default function RoleCardBento({ position, onClose }: RoleCardBentoProps)
 
   useEffect(() => {
     if (!position) { setDescriptor(null); return }
-
     setLoading(true)
     fetch(`/api/descriptors/by-title?jobTitle=${encodeURIComponent(position.jobTitle)}`)
       .then(res => res.json())
-      .then(json => {
-        if (json.success && json.data) setDescriptor(json.data)
-      })
+      .then(json => { if (json.success && json.data) setDescriptor(json.data) })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [position])
@@ -64,162 +61,146 @@ export default function RoleCardBento({ position, onClose }: RoleCardBentoProps)
     ?.sort((a, b) => b.importance - a.importance)
     ?.slice(0, 5) ?? []
 
-  const competencies = descriptor?.competencies ?? []
-  const tasksKept = descriptor?.onetTasksKept ?? topTasks.length
-  const tasksTotal = descriptor?.onetTasksTotal ?? topTasks.length
+  const competenciesWithTarget = (descriptor?.competencies ?? [])
+    .filter(c => c.expectedLevel != null)
+    .slice(0, 5)
 
   return (
     <AnimatePresence>
       {position && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-black/30 z-40"
             onClick={onClose}
           />
 
-          {/* Side-sheet */}
           <motion.div
             initial={{ x: '100%', opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed top-0 right-0 w-full max-w-[420px] h-full z-50 bg-[#0F172A]/95 backdrop-blur-2xl border-l border-slate-800 flex flex-col"
+            className="fixed top-0 right-0 w-full max-w-[460px] h-full z-50 bg-[#131B2E] border-l border-[#1E293B] flex flex-col overflow-hidden"
           >
-            {/* Tesla line */}
-            <div
-              className="absolute top-0 left-0 right-0 h-px z-20"
-              style={{
-                background: 'linear-gradient(90deg, transparent, #22D3EE 30%, #A78BFA 70%, transparent)',
-                boxShadow: '0 0 12px rgba(34,211,238,0.15)',
-              }}
-            />
+            {/* Close */}
+            <button
+              onClick={onClose}
+              className="absolute top-3 right-3 z-10 text-slate-500 hover:text-white transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
 
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800/50 flex-shrink-0">
-              <p className="text-[10px] text-cyan-400 font-mono uppercase tracking-wider">
-                Centro de Inteligencia de Roles
-              </p>
-              <button onClick={onClose} className="text-slate-600 hover:text-slate-400 transition-colors">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+            {loading ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-slate-800 border-t-cyan-400 rounded-full animate-spin" />
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col overflow-y-auto">
 
-            {/* Content — scrollable */}
-            <div className="flex-1 overflow-y-auto">
-              {loading ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="w-8 h-8 border-2 border-slate-800 border-t-cyan-400 rounded-full animate-spin" />
-                </div>
-              ) : (
-                <div className="p-6 space-y-4">
-
-                  {/* ═══ HERO — Job Title full width ═══ */}
-                  <div className="rounded-xl border border-slate-800/50 bg-slate-900/40 p-5">
-                    <p className="text-[9px] uppercase tracking-widest text-slate-600 font-medium">Cargo</p>
-                    <h2 className="text-2xl font-bold text-white mt-1.5 leading-tight">
+                {/* ═══ ROW 1: Title (left 55%) | Propósito (right 45%) ═══ */}
+                <div className="flex border-b border-[#1E293B]">
+                  {/* Title */}
+                  <div className="w-[55%] p-5 border-r border-[#1E293B]">
+                    <p className="text-[10px] text-slate-500 mb-3">Job Title</p>
+                    <h2 className="text-[22px] font-bold text-white leading-tight">
                       {formatDisplayName(position.jobTitle, 'full')}
                     </h2>
-                    <p className="text-[11px] text-slate-500 mt-2.5">
-                      {position.departmentName} · {position.employeeCount} persona{position.employeeCount !== 1 ? 's' : ''}
-                    </p>
                   </div>
-
-                  {/* ═══ PROPÓSITO — full width ═══ */}
-                  <div className="rounded-xl border border-slate-800/50 bg-slate-900/40 p-5">
-                    <p className="text-[9px] uppercase tracking-widest text-slate-600 font-medium">Propósito</p>
-                    <p className="text-sm text-slate-300 font-light mt-2 leading-relaxed">
+                  {/* Propósito */}
+                  <div className="w-[45%] p-5">
+                    <p className="text-[10px] text-slate-500 mb-3">
+                      <span className="border-b border-purple-500/40 pb-0.5">Propósito</span>
+                    </p>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
                       {descriptor?.purpose || 'Sin propósito definido.'}
                     </p>
                   </div>
+                </div>
 
-                  {/* ═══ RESPONSABILIDADES — full width, checklist ═══ */}
-                  {topTasks.length > 0 && (
-                    <div className="rounded-xl border border-slate-800/50 bg-slate-900/40 p-5">
-                      <p className="text-[9px] uppercase tracking-widest text-slate-600 font-medium">
-                        Responsabilidades Clave
-                      </p>
-                      <div className="space-y-2.5 mt-3">
-                        {topTasks.map(t => (
-                          <div key={t.taskId} className="flex items-start gap-2.5">
-                            <CheckCircle className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                            <span className="text-[11px] text-slate-300 font-light leading-snug line-clamp-2">
-                              {t.description}
-                            </span>
-                          </div>
-                        ))}
+                {/* ═══ ROW 2: Responsabilidades (left 55%) | Skills (right 45%) ═══ */}
+                <div className="flex flex-1 border-b border-[#1E293B]">
+                  {/* Responsabilidades */}
+                  <div className="w-[55%] p-5 border-r border-[#1E293B]">
+                    <p className="text-[10px] text-slate-500 mb-3">Responsabilidades Clave</p>
+                    {topTasks.map((t, idx) => (
+                      <div
+                        key={t.taskId}
+                        className={`flex items-start gap-2 py-2 ${
+                          idx < topTasks.length - 1 ? 'border-b border-[#1E293B]/60' : ''
+                        }`}
+                      >
+                        <Check className="w-3.5 h-3.5 text-purple-400 mt-0.5 flex-shrink-0" />
+                        <span className="text-[11px] text-slate-300 leading-snug flex-1 line-clamp-2">
+                          {t.description}
+                        </span>
+                        <ChevronRight className="w-3 h-3 text-slate-700 flex-shrink-0 mt-0.5" />
                       </div>
-                    </div>
-                  )}
+                    ))}
+                    {topTasks.length === 0 && (
+                      <p className="text-[11px] text-slate-600 py-2">Sin responsabilidades</p>
+                    )}
+                  </div>
 
-                  {/* ═══ SKILLS — full width, barras gruesas ═══ */}
-                  {competencies.length > 0 && (
-                    <div className="rounded-xl border border-slate-800/50 bg-slate-900/40 p-5">
-                      <p className="text-[9px] uppercase tracking-widest text-slate-600 font-medium">
-                        Skills Críticos
-                      </p>
-                      <div className="space-y-3.5 mt-3">
-                        {competencies.slice(0, 5).map(c => {
-                          const level = c.expectedLevel ?? 4
-                          const pct = Math.round((level / 5) * 100)
-                          return (
-                            <div key={c.code}>
-                              <div className="flex justify-between items-baseline mb-1">
-                                <span className="text-[11px] text-slate-300 font-light">{c.name}</span>
-                                <span className="text-[10px] text-purple-400 tabular-nums font-medium ml-2">
-                                  {pct}%
-                                </span>
-                              </div>
-                              <div className="w-full h-2 bg-slate-800 rounded-full">
+                  {/* Skills con barras */}
+                  <div className="w-[45%] p-5 flex flex-col">
+                    <p className="text-[10px] text-slate-500 mb-3">
+                      <span className="border-b border-purple-500/40 pb-0.5">Skills Críticos</span>
+                    </p>
+
+                    {competenciesWithTarget.length > 0 ? (
+                      <>
+                        {/* Lista nombre + % */}
+                        <div className="space-y-2.5 flex-1">
+                          {competenciesWithTarget.map(c => (
+                            <div key={c.code} className="flex justify-between items-center">
+                              <span className="text-[11px] text-slate-300">{c.name}</span>
+                              <span className="text-[10px] text-slate-500 tabular-nums ml-2">
+                                {Math.round((c.expectedLevel! / 5) * 100)}%
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Barras apiladas debajo */}
+                        <div className="space-y-1.5 mt-4 pt-3 border-t border-[#1E293B]/60">
+                          {competenciesWithTarget.map(c => {
+                            const pct = Math.round((c.expectedLevel! / 5) * 100)
+                            return (
+                              <div key={`b-${c.code}`} className="w-full h-[6px] bg-[#1E293B] rounded-full">
                                 <div
-                                  className="h-2 rounded-full bg-gradient-to-r from-cyan-500 to-purple-500"
+                                  className="h-[6px] rounded-full bg-gradient-to-r from-cyan-500 to-purple-500"
                                   style={{ width: `${pct}%` }}
                                 />
                               </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
+                            )
+                          })}
+                        </div>
 
-                  {/* ═══ OCUPANTES — pills ═══ */}
-                  {position.employees.length > 0 && (
-                    <div className="rounded-xl border border-slate-800/50 bg-slate-900/40 p-5">
-                      <p className="text-[9px] uppercase tracking-widest text-slate-600 font-medium">
-                        Ocupantes ({position.employees.length})
-                      </p>
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {position.employees.slice(0, 6).map(emp => (
-                          <span key={emp.id} className="text-[10px] text-slate-300 bg-slate-800/50 px-2.5 py-1 rounded-full border border-slate-700/30 font-light">
-                            ● {formatDisplayName(emp.fullName, 'short')}
-                          </span>
-                        ))}
-                        {position.employees.length > 6 && (
-                          <span className="text-[10px] text-slate-500 px-2.5 py-1">
-                            + {position.employees.length - 6} más
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                        {/* Fila de % debajo de barras */}
+                        <div className="flex justify-between mt-1.5">
+                          {competenciesWithTarget.map(c => (
+                            <span key={`p-${c.code}`} className="text-[8px] text-slate-600 tabular-nums">
+                              {Math.round((c.expectedLevel! / 5) * 100)}%
+                            </span>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-slate-600">Sin nivel de exigencia definido</p>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
 
-            {/* ═══ FOOTER — sutil, fuera del scroll ═══ */}
-            {descriptor && (
-              <div className="flex-shrink-0 px-6 py-3 border-t border-slate-800/40 bg-[#0F172A]/80">
-                <p className="text-[10px] text-slate-600 font-light">
-                  v1.0
-                  {descriptor.confirmedAt && ` · Validado ${daysAgo(descriptor.confirmedAt)}`}
-                </p>
-                <p className="text-[9px] text-slate-700 mt-0.5">
-                  {tasksKept} de {tasksTotal} tareas · {competencies.length} competencia{competencies.length !== 1 ? 's' : ''}
-                </p>
+                {/* ═══ ROW 3: Estado footer ═══ */}
+                <div className="px-5 py-3 flex items-center justify-between flex-shrink-0 border-b border-[#1E293B]">
+                  <p className="text-[10px] text-slate-500 font-medium">Estado</p>
+                  <p className="text-[10px] text-slate-500">
+                    v1.0{descriptor?.confirmedAt && ` · Validado ${daysAgo(descriptor.confirmedAt)}`}
+                  </p>
+                </div>
+
               </div>
             )}
           </motion.div>

@@ -66,8 +66,10 @@ function normalize(text: string): string {
     .trim()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // quitar acentos
+    .replace(/[_]+/g, ' ')          // underscores → espacios ANTES de limpiar
     .replace(/[^a-z0-9\s\-\/&.]/g, '') // solo alfanumérico + separadores
     .replace(/\s+/g, ' ')
+    .trim()
 }
 
 // ════════════════════════════════════════════════════════════════════════════

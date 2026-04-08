@@ -421,6 +421,160 @@ const INSIGHT_RULES: InsightRule[] = [
       action: 'Ver desglose por dimensión de clima'
     }),
     priority: 76
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // ROLEFIT — Reglas por metricType 'performance_rolefit'
+  // ═══════════════════════════════════════════════════════════
+
+  {
+    id: 'rolefit_top_performer',
+    metricTypes: ['performance_rolefit'],
+    condition: (ctx) => ctx.percentileRank >= 90,
+    generate: (ctx) => ({
+      type: 'positive',
+      title: 'Ajuste al cargo excepcional',
+      description: `${ctx.entityName} está en el top 10% del mercado en ajuste cargo-competencias. Tus colaboradores dominan lo que su cargo exige.`,
+      priority: 9,
+      action: 'Documentar prácticas de desarrollo y selección como referencia interna'
+    }),
+    priority: 96
+  },
+  {
+    id: 'rolefit_above_market',
+    metricTypes: ['performance_rolefit'],
+    condition: (ctx) => ctx.status === 'above' && ctx.percentileRank < 90,
+    generate: (ctx) => ({
+      type: 'positive',
+      title: 'Sobre el estándar del mercado',
+      description: `${ctx.entityName} muestra un RoleFit ${Math.round(ctx.difference)} puntos sobre el promedio. Las competencias instaladas coinciden con lo que el cargo demanda.`,
+      priority: 7,
+      action: 'Mantener inversión en desarrollo y evaluar oportunidades de promoción'
+    }),
+    priority: 91
+  },
+  {
+    id: 'rolefit_below_market',
+    metricTypes: ['performance_rolefit'],
+    condition: (ctx) => ctx.status === 'below',
+    generate: (ctx) => ({
+      type: 'improvement',
+      title: 'Brecha de competencias vs mercado',
+      description: `${ctx.entityName} tiene un RoleFit ${Math.abs(Math.round(ctx.difference))} puntos bajo el mercado. Hay brechas entre lo que el cargo exige y lo que los ocupantes dominan.`,
+      priority: 8,
+      action: 'Priorizar PDI en las competencias con mayor gap — iniciar por las críticas para el negocio'
+    }),
+    priority: 89
+  },
+  {
+    id: 'rolefit_critical',
+    metricTypes: ['performance_rolefit'],
+    condition: (ctx) => ctx.status === 'critical',
+    generate: (ctx) => ({
+      type: 'critical',
+      title: 'Desajuste cargo-competencias crítico',
+      description: `${ctx.entityName} está en el percentil ${ctx.percentileRank} del mercado. El gap de competencias es estructural — las personas no tienen lo que su cargo requiere.`,
+      priority: 10,
+      action: 'Evaluar si el problema es de desarrollo (PDI) o de selección (perfil equivocado para el cargo)'
+    }),
+    priority: 94
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // JOB_LEVEL — Reglas por nivel de cargo (EXO)
+  // ═══════════════════════════════════════════════════════════
+
+  {
+    id: 'rolefit_joblevel_alta_gerencia',
+    metricTypes: ['performance_rolefit'],
+    condition: (ctx) => ctx.entityName === 'Alta Gerencia' && ctx.percentileRank <= 35,
+    generate: (ctx) => ({
+      type: 'critical',
+      title: 'Alta gerencia con brecha de competencias',
+      description: `Tus directivos tienen un RoleFit en el percentil ${ctx.percentileRank} del mercado. A este nivel, la brecha impacta directamente en decisiones estratégicas.`,
+      priority: 10,
+      action: 'Evaluar coaching ejecutivo o mentoring con directorio — el PDI tradicional no alcanza a este nivel'
+    }),
+    priority: 97
+  },
+  {
+    id: 'rolefit_joblevel_mandos_medios',
+    metricTypes: ['performance_rolefit'],
+    condition: (ctx) => ctx.entityName === 'Mandos Medios' && ctx.status === 'below',
+    generate: (ctx) => ({
+      type: 'improvement',
+      title: 'Mandos medios: eslabón de ejecución débil',
+      description: `Tus jefes y supervisores muestran un RoleFit ${Math.abs(Math.round(ctx.difference))} puntos bajo el mercado. Son quienes traducen la estrategia en operación — si no dominan su cargo, la cascada se rompe.`,
+      priority: 9,
+      action: 'Priorizar desarrollo de competencias de liderazgo operacional en jefaturas'
+    }),
+    priority: 93
+  },
+  {
+    id: 'rolefit_joblevel_base_operativa',
+    metricTypes: ['performance_rolefit'],
+    condition: (ctx) => ctx.entityName === 'Base Operativa' && ctx.percentileRank <= 25,
+    generate: (ctx) => ({
+      type: 'critical',
+      title: 'Base operativa desalineada con el cargo',
+      description: `Tu base operativa está en el cuartil inferior del mercado en ajuste al cargo. En roles operativos, la brecha de competencias se traduce en errores, reprocesos y rotación.`,
+      priority: 8,
+      action: 'Revisar perfiles de selección y programas de entrenamiento técnico en roles base'
+    }),
+    priority: 90
+  },
+
+  {
+    id: 'joblevel_alta_gerencia_gap',
+    metricTypes: ['onboarding_exo'],
+    condition: (ctx) => ctx.entityName === 'Alta Gerencia' && ctx.status === 'critical',
+    generate: (ctx) => ({
+      type: 'critical',
+      title: 'Integración ejecutiva en riesgo',
+      description: `La experiencia de onboarding de tu Alta Gerencia está en el percentil ${ctx.percentileRank} del mercado. A este nivel, cada salida temprana tiene impacto directo en la estrategia.`,
+      priority: 10,
+      action: 'Revisar programa de onboarding ejecutivo — los primeros 90 días definen retención a este nivel'
+    }),
+    priority: 95
+  },
+  {
+    id: 'joblevel_mandos_medios_gap',
+    metricTypes: ['onboarding_exo'],
+    condition: (ctx) => ctx.entityName === 'Mandos Medios' && ctx.percentileRank <= 35,
+    generate: (ctx) => ({
+      type: 'improvement',
+      title: 'Mandos medios: eslabón crítico',
+      description: `Tus jefes y supervisores tienen un EXO ${Math.abs(Math.round(ctx.difference))} puntos bajo el mercado. Son quienes replican la cultura al equipo — si su integración falla, la cascada se rompe.`,
+      priority: 9,
+      action: 'Fortalecer mentoring y claridad de rol en los primeros 60 días de jefaturas'
+    }),
+    priority: 90
+  },
+  {
+    id: 'joblevel_profesionales_below',
+    metricTypes: ['onboarding_exo'],
+    condition: (ctx) => ctx.entityName === 'Profesionales' && ctx.status === 'below',
+    generate: (ctx) => ({
+      type: 'improvement',
+      title: 'Profesionales bajo el estándar del mercado',
+      description: `El segmento más grande de tu nómina muestra una integración bajo promedio. Con ${ctx.sampleSize} empresas comparables, la brecha de ${Math.abs(Math.round(ctx.percentageGap))}% es significativa.`,
+      priority: 7,
+      action: 'Evaluar carga laboral temprana y acompañamiento del líder directo en primeros 30 días'
+    }),
+    priority: 85
+  },
+  {
+    id: 'joblevel_base_operativa_critical',
+    metricTypes: ['onboarding_exo'],
+    condition: (ctx) => ctx.entityName === 'Base Operativa' && ctx.percentileRank <= 25,
+    generate: (ctx) => ({
+      type: 'critical',
+      title: 'Base operativa: rotación temprana probable',
+      description: `La integración de tu base operativa está en el cuartil inferior del mercado. Este segmento es el de mayor rotación — un EXO bajo anticipa salidas en los primeros 6 meses.`,
+      priority: 8,
+      action: 'Implementar buddy system y reducir tiempo al primer logro en roles operativos'
+    }),
+    priority: 88
   }
 ];
 

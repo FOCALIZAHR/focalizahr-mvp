@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
     const metricType = searchParams.get('metricType');
     const standardCategory = searchParams.get('standardCategory');
     const dimension = searchParams.get('dimension') || 'GLOBAL';
+    const segment = searchParams.get('segment') || 'ALL';
     const departmentId = searchParams.get('departmentId') || undefined;
     const country = searchParams.get('country') || account.country;
     const includeInsights = searchParams.get('includeInsights') !== 'false';
@@ -86,7 +87,8 @@ export async function GET(request: NextRequest) {
       industry: account.industry,
       companySize: account.companySize,
       standardCategory,
-      dimension
+      dimension,
+      segment,
     });
     
     if (!benchmark) {
@@ -102,30 +104,75 @@ export async function GET(request: NextRequest) {
     }
     
     // ═══════════════════════════════════════════════════════════
-    // PASO 4: Calcular comparación (si viene departmentId)
+    // PASO 4: Calcular comparación
     // ═══════════════════════════════════════════════════════════
     let comparison = null;
-    
-    if (departmentId) {
-      const department = await prisma.department.findFirst({
+
+    const acotadoLabels: Record<string, string> = {
+      alta_gerencia: 'Alta Gerencia',
+      mandos_medios: 'Mandos Medios',
+      profesionales: 'Profesionales',
+      base_operativa: 'Base Operativa',
+    }
+
+    if (metricType === 'performance_rolefit') {
+      // RoleFit: leer directo de PerformanceRating
+      const where: any = {
+        accountId: account.id,
+        roleFitScore: { not: null },
+        employee: { isActive: true },
+      }
+
+      // Filtrar por acotadoGroup si es JOB_LEVEL
+      if (dimension === 'JOB_LEVEL' && segment !== 'ALL') {
+        where.employee.acotadoGroup = segment
+      }
+      // Filtrar por standardCategory si es GLOBAL o COMBINATORIA
+      if (standardCategory !== 'ALL') {
+        where.employee.department = { standardCategory }
+      }
+
+      const myRatings = await prisma.performanceRating.findMany({
+        where,
+        select: { roleFitScore: true },
+      })
+
+      if (myRatings.length > 0) {
+        const avgRoleFit = myRatings.reduce((s, r) => s + r.roleFitScore!, 0) / myRatings.length
+        const entityName = dimension === 'JOB_LEVEL' && segment !== 'ALL'
+          ? (acotadoLabels[segment] || segment)
+          : standardCategory !== 'ALL'
+          ? standardCategory
+          : 'Mi empresa'
+        comparison = calculateComparison(avgRoleFit, benchmark, entityName)
+      }
+
+    } else if (dimension === 'JOB_LEVEL' && segment !== 'ALL') {
+      // EXO por JOB_LEVEL: comparar journeys con acotadoGroup
+      const myJourneys = await prisma.journeyOrchestration.findMany({
         where: {
-          id: departmentId,
-          accountId: account.id // Security: Multi-tenant
+          department: { accountId: account.id },
+          status: 'COMPLETED',
+          exoScore: { not: null },
+          stage1Participant: { acotadoGroup: segment },
         },
-        select: { 
-          id: true,
-          displayName: true,
-          accumulatedExoScore: true,
-          accumulatedExoJourneys: true 
-        }
-      });
-      
+        select: { exoScore: true },
+      })
+
+      if (myJourneys.length > 0) {
+        const avgExo = myJourneys.reduce((s, j) => s + j.exoScore!, 0) / myJourneys.length
+        comparison = calculateComparison(avgExo, benchmark, acotadoLabels[segment] || segment)
+      }
+
+    } else if (departmentId) {
+      // GLOBAL EXO: comparar por departamento
+      const department = await prisma.department.findFirst({
+        where: { id: departmentId, accountId: account.id },
+        select: { id: true, displayName: true, accumulatedExoScore: true, accumulatedExoJourneys: true },
+      })
+
       if (department?.accumulatedExoScore) {
-        comparison = calculateComparison(
-          department.accumulatedExoScore,
-          benchmark,
-          department.displayName
-        );
+        comparison = calculateComparison(department.accumulatedExoScore, benchmark, department.displayName)
       }
     }
     
@@ -219,10 +266,11 @@ async function findBestBenchmark(criteria: {
   companySize: string | null;
   standardCategory: string;
   dimension: string;
+  segment: string;
 }): Promise<{ benchmark: any | null; specificityLevel: 1 | 2 | 3 | 4 }> {
-  
+
   const sizeRange = mapCompanySize(criteria.companySize);
-  
+
   const queries = [
     // 1. Específico completo
     {
@@ -233,6 +281,7 @@ async function findBestBenchmark(criteria: {
         companySizeRange: sizeRange,
         standardCategory: criteria.standardCategory,
         dimension: criteria.dimension,
+        segment: criteria.segment,
         metricType: criteria.metricType
       }
     },
@@ -245,6 +294,7 @@ async function findBestBenchmark(criteria: {
         companySizeRange: 'ALL',
         standardCategory: criteria.standardCategory,
         dimension: criteria.dimension,
+        segment: criteria.segment,
         metricType: criteria.metricType
       }
     },
@@ -257,6 +307,7 @@ async function findBestBenchmark(criteria: {
         companySizeRange: 'ALL',
         standardCategory: criteria.standardCategory,
         dimension: criteria.dimension,
+        segment: criteria.segment,
         metricType: criteria.metricType
       }
     },
@@ -269,6 +320,7 @@ async function findBestBenchmark(criteria: {
         companySizeRange: 'ALL',
         standardCategory: criteria.standardCategory,
         dimension: criteria.dimension,
+        segment: criteria.segment,
         metricType: criteria.metricType
       }
     }
