@@ -11,19 +11,21 @@ import { motion } from 'framer-motion'
 import { Target } from 'lucide-react'
 import { PrimaryButton } from '@/components/ui/PremiumButton'
 import { formatCurrency } from '../../utils/format'
-import type { WorkforceDiagnosticData } from '../../types/workforce.types'
+import type { WorkforceDiagnosticData, WorkforceView } from '../../types/workforce.types'
 import type { ComputedCascadeValues } from '../../hooks/useWorkforceCascade'
 
 interface CascadeSintesisProps {
   data: WorkforceDiagnosticData
   computed: ComputedCascadeValues
   onBackToLobby: () => void
+  onNavigateTab?: (view: WorkforceView) => void
 }
 
 export default function CascadeSintesis({
   data,
   computed,
   onBackToLobby,
+  onNavigateTab,
 }: CascadeSintesisProps) {
   const { francotirador, cantidadHallazgos } = computed
 
@@ -88,16 +90,16 @@ export default function CascadeSintesis({
         </PrimaryButton>
       </div>
 
-      {/* Acceso a tabs — Sesion 4 */}
+      {/* Acceso a tabs */}
       <div className="flex flex-col items-center gap-2 text-sm">
         <p className="text-xs text-slate-600 uppercase tracking-wider mb-1">Explorar mas</p>
-        <button onClick={onBackToLobby} className="text-slate-500 hover:text-slate-300 transition-colors">
+        <button onClick={() => onNavigateTab?.('simulador')} className="text-slate-500 hover:text-slate-300 transition-colors">
           ○ Explorar Simulador de Escenarios
         </button>
-        <button onClick={onBackToLobby} className="text-slate-500 hover:text-slate-300 transition-colors">
+        <button onClick={() => onNavigateTab?.('estructura')} className="text-slate-500 hover:text-slate-300 transition-colors">
           ○ Ver Estructura por Persona
         </button>
-        <button onClick={onBackToLobby} className="text-slate-500 hover:text-slate-300 transition-colors">
+        <button onClick={() => onNavigateTab?.('benchmarks')} className="text-slate-500 hover:text-slate-300 transition-colors">
           ○ Comparar con Benchmarks de Industria
         </button>
       </div>

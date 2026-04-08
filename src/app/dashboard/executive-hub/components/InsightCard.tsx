@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { TALENT_INTELLIGENCE_THRESHOLDS } from '@/config/performanceClassification'
 
 const ROLE_FIT_HIGH = TALENT_INTELLIGENCE_THRESHOLDS.ROLE_FIT_HIGH
-import { AlertTriangle, Users, BarChart3, Zap, Target, DollarSign, Crosshair } from 'lucide-react'
+import { AlertTriangle, Users, BarChart3, Zap, Target, DollarSign, Crosshair, Cpu } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { InsightType, SummaryData } from '@/hooks/useExecutiveHubData'
 
@@ -26,7 +26,8 @@ const INSIGHT_ICONS: Record<InsightType, typeof AlertTriangle> = {
   capacidades: Zap,
   sucesion: Target,
   'pl-talento': DollarSign,
-  'metas': Crosshair
+  'metas': Crosshair,
+  'exposicion-ia': Cpu
 }
 
 const INSIGHT_LABELS: Record<InsightType, string> = {
@@ -36,7 +37,8 @@ const INSIGHT_LABELS: Record<InsightType, string> = {
   capacidades: 'Capacidades',
   sucesion: 'Sucesion',
   'pl-talento': 'P&L Talento',
-  'metas': 'Metas'
+  'metas': 'Metas',
+  'exposicion-ia': 'Exposicion IA'
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -75,6 +77,14 @@ function getDotStatus(type: InsightType, summary: SummaryData): DotStatus {
       if (summary.metas?.disconnectionRate > 15) return 'purple'
       if (summary.metas?.coverage < 70) return 'cyan'
       return 'none'
+    case 'exposicion-ia': {
+      const exp = summary.exposicionIA
+      if (!exp || exp.mappedEmployees === 0) return 'none'
+      if (exp.avgExposure > 0.6) return 'red'
+      if (exp.avgExposure > 0.4) return 'purple'
+      if (exp.hallazgosCount > 0) return 'cyan'
+      return 'none'
+    }
   }
 }
 
@@ -183,6 +193,22 @@ function getInsightNarrative(type: InsightType, summary: SummaryData): { text: s
       return {
         text: 'Sin alertas financieras',
         tooltip: 'Todos los colaboradores dentro del estandar'
+      }
+    }
+    case 'exposicion-ia': {
+      const exp = summary.exposicionIA
+      if (!exp || exp.mappedEmployees === 0) return {
+        text: 'Clasifica cargos para activar',
+        tooltip: 'Mapea cargos a ocupaciones O*NET para calcular exposicion IA'
+      }
+      const pct = Math.round(exp.avgExposure * 100)
+      if (exp.hallazgosCount > 0) return {
+        text: `${pct}% exposicion — ${exp.hallazgosCount} hallazgos`,
+        tooltip: `${exp.highExposureCount} personas en alta exposicion de ${exp.totalEmployees} total`
+      }
+      return {
+        text: `${pct}% exposicion organizacional`,
+        tooltip: `${exp.mappedEmployees} de ${exp.totalEmployees} cargos mapeados`
       }
     }
     case 'metas': {

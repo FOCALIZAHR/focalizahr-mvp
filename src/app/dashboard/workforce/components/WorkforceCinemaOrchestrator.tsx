@@ -8,12 +8,16 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { AnimatePresence, motion } from 'framer-motion'
-import { RefreshCw, AlertTriangle, Cpu, ArrowLeft, ShieldCheck } from 'lucide-react'
+import { RefreshCw, AlertTriangle, Cpu, ArrowLeft, ShieldCheck, Users, TrendingUp, Sliders } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useWorkforceData } from '../hooks/useWorkforceData'
+import type { WorkforceView } from '../types/workforce.types'
 import WorkforceMissionControl from './WorkforceMissionControl'
 import WorkforceCascadeOrchestrator from './cascada/WorkforceCascadeOrchestrator'
+import TabEstructura from './tabs/TabEstructura'
+import TabBenchmarks from './tabs/TabBenchmarks'
+import TabSimulador from './tabs/TabSimulador'
 
 // ═══════════════════════════════════════════════════════════════════════
 // SKELETON
@@ -119,6 +123,42 @@ function DataConfidenceIndicator({ confidence }: { confidence: 'high' | 'medium'
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// NAV PILL — tab selector for support views
+// ═══════════════════════════════════════════════════════════════════════
+
+const TAB_OPTIONS: { key: WorkforceView; label: string; icon: typeof Users }[] = [
+  { key: 'estructura', label: 'Estructura', icon: Users },
+  { key: 'benchmarks', label: 'Benchmarks', icon: TrendingUp },
+  { key: 'simulador', label: 'Simulador', icon: Sliders },
+]
+
+function NavPill({ active, onSelect }: { active: WorkforceView; onSelect: (v: WorkforceView) => void }) {
+  return (
+    <div className="flex items-center gap-1 bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-full p-1">
+      {TAB_OPTIONS.map(tab => {
+        const Icon = tab.icon
+        const isActive = active === tab.key
+        return (
+          <button
+            key={tab.key}
+            onClick={() => onSelect(tab.key)}
+            className={cn(
+              'flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium transition-all',
+              isActive
+                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30'
+                : 'text-slate-500 hover:text-slate-300'
+            )}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{tab.label}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // MAIN ORCHESTRATOR
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -182,21 +222,26 @@ export default function WorkforceCinemaOrchestrator() {
               key="cascada"
               data={data}
               onBack={handleBackToLobby}
+              onNavigateTab={setView}
             />
           )}
 
-          {/* TABS — Sesion 4 */}
+          {/* TABS — support views */}
           {(view === 'estructura' || view === 'benchmarks' || view === 'simulador') && (
             <motion.div
               key={`tab-${view}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="text-center"
+              className="w-full flex flex-col items-center gap-6 pt-12"
             >
-              <p className="text-slate-500 text-sm">
-                Tab {view} — Sesion 4
-              </p>
+              {/* NavPill */}
+              <NavPill active={view} onSelect={setView} />
+
+              {/* Tab content */}
+              {view === 'estructura' && <TabEstructura data={data} />}
+              {view === 'benchmarks' && <TabBenchmarks />}
+              {view === 'simulador' && <TabSimulador />}
             </motion.div>
           )}
 

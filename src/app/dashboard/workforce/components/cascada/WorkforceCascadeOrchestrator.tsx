@@ -10,7 +10,7 @@
 import { AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { useWorkforceCascade } from '../../hooks/useWorkforceCascade'
-import type { WorkforceDiagnosticData } from '../../types/workforce.types'
+import type { WorkforceDiagnosticData, WorkforceView } from '../../types/workforce.types'
 
 import CascadePortada from './CascadePortada'
 import CascadeActoAncla from './CascadeActoAncla'
@@ -51,11 +51,13 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
 interface WorkforceCascadeOrchestratorProps {
   data: WorkforceDiagnosticData
   onBack: () => void
+  onNavigateTab?: (view: WorkforceView) => void
 }
 
 export default function WorkforceCascadeOrchestrator({
   data,
   onBack,
+  onNavigateTab,
 }: WorkforceCascadeOrchestratorProps) {
   const {
     currentStep,
@@ -139,6 +141,7 @@ export default function WorkforceCascadeOrchestrator({
               data={data}
               computed={computed}
               onBackToLobby={onBack}
+              onNavigateTab={onNavigateTab}
             />
           )}
 

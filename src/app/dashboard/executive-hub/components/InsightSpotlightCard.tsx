@@ -1,8 +1,8 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, AlertTriangle, Users, BarChart3, Zap, Target, DollarSign, Crosshair, Loader2 } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, Users, BarChart3, Zap, Target, DollarSign, Crosshair, Cpu, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TALENT_INTELLIGENCE_THRESHOLDS } from '@/config/performanceClassification'
 import { AlertsPanel } from './AlertsPanel'
@@ -65,6 +65,12 @@ const INSIGHT_META: Record<InsightType, {
     title: 'Metas × Performance',
     color: 'text-amber-400',
     description: 'Checkpoint pre-compensación'
+  },
+  'exposicion-ia': {
+    icon: Cpu,
+    title: 'Exposicion IA',
+    color: 'text-cyan-400',
+    description: 'Planificacion de fuerza de trabajo'
   }
 }
 
@@ -287,6 +293,18 @@ function QuickStats({ type, summary }: { type: InsightType; summary: SummaryData
         </div>
       )
     }
+    case 'exposicion-ia': {
+      const exp = summary.exposicionIA
+      if (!exp) return null
+      const pct = Math.round(exp.avgExposure * 100)
+      return (
+        <div className="space-y-3 w-full">
+          <StatRow label="Exposicion" value={`${pct}%`} color={pct > 60 ? 'text-red-400' : pct > 40 ? 'text-purple-400' : 'text-cyan-400'} tooltip="Porcentaje promedio de tareas expuestas a automatizacion IA (Anthropic Economic Index)." />
+          <StatRow label="Alta exposicion" value={`${exp.highExposureCount}`} color={exp.highExposureCount > 0 ? 'text-amber-400' : 'text-slate-400'} tooltip="Personas en cargos con mas de 60% de exposicion a IA." />
+          <StatRow label="Hallazgos" value={`${exp.hallazgosCount}`} color={exp.hallazgosCount > 0 ? 'text-red-400' : 'text-slate-400'} tooltip="Situaciones criticas detectadas cruzando exposicion IA con performance y estructura." />
+        </div>
+      )
+    }
   }
 }
 
@@ -328,5 +346,29 @@ function DetailContent({ type, data, cycleId, userRole, companyName, roleFit, wo
       return <PLTalent data={data} cycleId={cycleId || undefined} companyName={companyName} roleFit={roleFit} worstLayer={worstLayer} worstGerencia={worstGerencia} worstCellCount={worstCellCount} worstCellScore={worstCellScore} />
     case 'metas':
       return <GoalsCorrelation data={data} />
+    case 'exposicion-ia':
+      return <ExposureIARedirect />
   }
+}
+
+function ExposureIARedirect() {
+  const handleNavigate = useCallback(() => {
+    window.location.href = '/dashboard/workforce'
+  }, [])
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center gap-4">
+      <Cpu className="w-12 h-12 text-cyan-400/50" />
+      <h3 className="text-lg font-light text-white">Planificacion de Fuerza de Trabajo</h3>
+      <p className="text-sm text-slate-400 font-light max-w-sm">
+        Cascada ejecutiva completa con diagnostico IA, hallazgos con nombres reales, proyeccion de costos y plan de accion.
+      </p>
+      <button
+        onClick={handleNavigate}
+        className="mt-2 px-6 py-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-cyan-400 text-sm font-medium hover:bg-cyan-500/20 transition-all"
+      >
+        Abrir modulo completo →
+      </button>
+    </div>
+  )
 }

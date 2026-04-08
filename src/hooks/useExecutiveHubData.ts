@@ -11,7 +11,7 @@ import { useState, useEffect, useCallback } from 'react'
 // TYPES
 // ════════════════════════════════════════════════════════════════════════════
 
-export type InsightType = 'alertas' | 'talento' | 'calibracion' | 'capacidades' | 'sucesion' | 'pl-talento' | 'metas'
+export type InsightType = 'alertas' | 'talento' | 'calibracion' | 'capacidades' | 'sucesion' | 'pl-talento' | 'metas' | 'exposicion-ia'
 
 export interface ExecutiveNarrative {
   headline: string
@@ -31,6 +31,7 @@ export interface SummaryData {
   sucesion: { coverage: number; uncoveredCount: number }
   plTalento: { totalGapMonthly: number; underperformerCount: number; totalLiability: number }
   metas: { coverage: number; avgProgress: number; disconnectionRate: number; totalWithGoals: number; totalEmployees: number; urgentCases: number; topNarrativeType: string | null; estimatedRisk: number }
+  exposicionIA?: { avgExposure: number; highExposureCount: number; totalEmployees: number; mappedEmployees: number; hallazgosCount: number }
 }
 
 export interface ExecutiveHubState {
@@ -170,7 +171,8 @@ export function useExecutiveHubData(): ExecutiveHubState {
       capacidades: 'capabilities',
       sucesion: 'succession',
       'pl-talento': 'pl-talent',
-      'metas': 'goals-correlation'
+      'metas': 'goals-correlation',
+      'exposicion-ia': 'exposure-ia'
     }
 
     try {

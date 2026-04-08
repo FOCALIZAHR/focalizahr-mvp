@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import { InsightCard } from './InsightCard'
 import type { InsightType, SummaryData } from '@/hooks/useExecutiveHubData'
 
-const INSIGHT_ORDER: InsightType[] = ['alertas', 'talento', 'calibracion', 'capacidades', 'sucesion', 'pl-talento', 'metas']
+const INSIGHT_ORDER: InsightType[] = ['alertas', 'talento', 'calibracion', 'capacidades', 'sucesion', 'pl-talento', 'metas', 'exposicion-ia']
 
 interface InsightsRailProps {
   summary: SummaryData
