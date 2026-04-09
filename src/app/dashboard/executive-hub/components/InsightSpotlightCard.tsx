@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useCallback } from 'react'
+import { memo } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft, AlertTriangle, Users, BarChart3, Zap, Target, DollarSign, Crosshair, Cpu, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -347,28 +347,102 @@ function DetailContent({ type, data, cycleId, userRole, companyName, roleFit, wo
     case 'metas':
       return <GoalsCorrelation data={data} />
     case 'exposicion-ia':
-      return <ExposureIARedirect />
+      return <ExposureIAPanel data={data} />
   }
 }
 
-function ExposureIARedirect() {
-  const handleNavigate = useCallback(() => {
-    window.location.href = '/dashboard/workforce'
-  }, [])
+function ExposureIAPanel({ data }: { data: any }) {
+  if (!data) return null
+
+  const pct = Math.round((data.avgExposure ?? 0) * 100)
+  const topGerencias: Array<{ name: string; avgExposure: number; headcount: number }> = data.topGerencias ?? []
+  const topOccupations: Array<{ title: string; exposure: number; employeeCount: number }> = data.topExposedOccupations ?? []
+
+  const fmtCurrency = (n: number) => {
+    if (!n || n === 0) return '$0'
+    const abs = Math.abs(n)
+    if (abs >= 1_000_000) return `$${(abs / 1_000_000).toFixed(1)}M`
+    if (abs >= 1_000) return `$${Math.round(abs / 1_000)}K`
+    return `$${Math.round(abs)}`
+  }
 
   return (
-    <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center gap-4">
-      <Cpu className="w-12 h-12 text-cyan-400/50" />
-      <h3 className="text-lg font-light text-white">Planificacion de Fuerza de Trabajo</h3>
-      <p className="text-sm text-slate-400 font-light max-w-sm">
-        Cascada ejecutiva completa con diagnostico IA, hallazgos con nombres reales, proyeccion de costos y plan de accion.
-      </p>
+    <div className="space-y-6">
+      {/* Hero metric */}
+      <div className="flex items-baseline gap-3">
+        <span className="text-4xl font-extralight text-white">{pct}%</span>
+        <span className="text-xs text-slate-500 uppercase tracking-wider">exposicion organizacional</span>
+      </div>
+
+      {/* Key numbers row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <MiniStat label="Hallazgos" value={data.hallazgosCount ?? 0} color={data.hallazgosCount > 0 ? 'text-amber-400' : 'text-slate-400'} />
+        <MiniStat label="Alta exposicion" value={data.highExposureCount ?? 0} color={data.highExposureCount > 0 ? 'text-red-400' : 'text-slate-400'} />
+        <MiniStat label="FTE liberables" value={(data.liberatedFTEs ?? 0).toFixed(1)} color="text-purple-400" />
+        <MiniStat label="Costo inercia/mes" value={fmtCurrency(data.inertiaCostMonthly ?? 0)} color="text-purple-400" />
+      </div>
+
+      {/* Top gerencias */}
+      {topGerencias.length > 0 && (
+        <div>
+          <h4 className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-2">Gerencias mas expuestas</h4>
+          <div className="space-y-1.5">
+            {topGerencias.map(g => {
+              const gPct = Math.round(g.avgExposure * 100)
+              return (
+                <div key={g.name} className="flex items-center gap-3">
+                  <span className="text-xs text-slate-300 font-light w-28 truncate">{g.name}</span>
+                  <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className={cn('h-full rounded-full', gPct > 60 ? 'bg-red-500/70' : gPct > 40 ? 'bg-amber-500/70' : 'bg-emerald-500/70')}
+                      style={{ width: `${Math.min(gPct, 100)}%` }}
+                    />
+                  </div>
+                  <span className={cn('text-xs font-mono w-10 text-right', gPct > 60 ? 'text-red-400' : gPct > 40 ? 'text-amber-400' : 'text-emerald-400')}>
+                    {gPct}%
+                  </span>
+                  <span className="text-[10px] text-slate-600 w-8 text-right">{g.headcount}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Top occupations */}
+      {topOccupations.length > 0 && (
+        <div>
+          <h4 className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-2">Cargos mas expuestos</h4>
+          <div className="space-y-1">
+            {topOccupations.map((occ, i) => (
+              <div key={i} className="flex items-center justify-between py-1 border-b border-slate-800/30">
+                <span className="text-xs text-slate-400 font-light truncate max-w-[200px]">{occ.title}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-purple-400 font-mono">{Math.round(occ.exposure * 100)}%</span>
+                  <span className="text-[10px] text-slate-600">{occ.employeeCount} pers.</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* CTA to full module */}
       <button
-        onClick={handleNavigate}
-        className="mt-2 px-6 py-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-cyan-400 text-sm font-medium hover:bg-cyan-500/20 transition-all"
+        onClick={() => { window.location.href = '/dashboard/workforce' }}
+        className="w-full px-4 py-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-cyan-400 text-xs font-medium hover:bg-cyan-500/20 transition-all uppercase tracking-wider"
       >
-        Abrir modulo completo →
+        Abrir cascada completa →
       </button>
+    </div>
+  )
+}
+
+function MiniStat({ label, value, color }: { label: string; value: string | number; color: string }) {
+  return (
+    <div className="bg-slate-800/30 rounded-lg p-2.5 text-center">
+      <p className={cn('text-lg font-light', color)}>{value}</p>
+      <p className="text-[9px] text-slate-600 uppercase tracking-wider mt-0.5">{label}</p>
     </div>
   )
 }
