@@ -16,6 +16,8 @@ import { ManagerVarianceService } from '@/lib/services/ManagerVarianceService'
 import { SuccessionService } from '@/lib/services/SuccessionService'
 import { PLTalentService } from '@/lib/services/PLTalentService'
 import { GoalsDiagnosticService } from '@/lib/services/GoalsDiagnosticService'
+import { AIExposureService } from '@/lib/services/AIExposureService'
+import { WorkforceIntelligenceService } from '@/lib/services/WorkforceIntelligenceService'
 import { ACOTADO_LABELS } from '@/lib/services/PositionAdapter'
 import { prisma } from '@/lib/prisma'
 
@@ -64,7 +66,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Fetch paralelo de todos los datos + star concentration + variance + succession + orgDistribution
-    const [alertsData, nineBoxData, calibrationData, roleFitData, starConcentration, varianceData, successionData, orgDistribution, brechaData, semaforoData, goalsCorrelation] = await Promise.all([
+    const [alertsData, nineBoxData, calibrationData, roleFitData, starConcentration, varianceData, successionData, orgDistribution, brechaData, semaforoData, goalsCorrelation, exposureData, workforceDiagnostic] = await Promise.all([
       TalentIntelligenceService.getActiveAlerts(cycleId, userContext.accountId, departmentIds),
       PerformanceRatingService.get9BoxData(cycleId, userContext.accountId, departmentIds),
       PerformanceRatingService.getCalibrationStatsByDepartment(cycleId, userContext.accountId, departmentIds),
@@ -76,6 +78,8 @@ export async function GET(request: NextRequest) {
       PLTalentService.getBrechaProductiva(cycleId, userContext.accountId, departmentIds),
       PLTalentService.getSemaforoLegal(cycleId, userContext.accountId, departmentIds),
       GoalsDiagnosticService.getSummary(cycleId, userContext.accountId, departmentIds),
+      AIExposureService.getOrganizationExposure(userContext.accountId, departmentIds).catch(() => null),
+      WorkforceIntelligenceService.getOrganizationDiagnostic(userContext.accountId, departmentIds).catch(() => null),
     ])
 
     // Calcular integrityScore + bias (misma fórmula que /calibration)
@@ -197,7 +201,21 @@ export async function GET(request: NextRequest) {
           urgentCases: goalsCorrelation.urgentCases,
           topNarrativeType: goalsCorrelation.topNarrativeType,
           estimatedRisk: goalsCorrelation.estimatedRisk,
-        }
+        },
+        // Card #8 — Exposición IA (datos de AIExposureService + WorkforceIntelligenceService)
+        exposicionIA: exposureData ? {
+          avgExposure: exposureData.avgExposure,
+          highExposureCount: exposureData.highExposureCount,
+          totalEmployees: exposureData.totalEmployees,
+          mappedEmployees: exposureData.mappedEmployees,
+          hallazgosCount: workforceDiagnostic
+            ? (workforceDiagnostic.zombies.count +
+               workforceDiagnostic.flightRisk.count +
+               workforceDiagnostic.redundancy.pairs.length +
+               workforceDiagnostic.adoptionRisk.departments.length +
+               workforceDiagnostic.seniorityCompression.opportunities.length)
+            : 0,
+        } : undefined,
       }
     })
 
