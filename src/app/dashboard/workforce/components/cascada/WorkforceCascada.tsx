@@ -13,13 +13,17 @@ import type { WorkforceDiagnosticData } from '../../types/workforce.types'
 import type { WorkforceCardType } from '../WorkforceRailCard'
 import { computeCascadeValues } from '../../utils/workforce.utils'
 
-import CascadeActo1Exposicion from './CascadeActo1Exposicion'
+// v3.1 — actos nuevos (Fase 3+)
+import CascadeActo1Gancho from './CascadeActo1Gancho'
+// v3.0 — actos viejos (eliminar en Fase 5 cuando todos los nuevos esten listos)
 import CascadeActo2Inercia from './CascadeActo2Inercia'
 import CascadeActo3Hallazgos from './CascadeActo3Hallazgos'
 import CascadeActo4Proyeccion from './CascadeActo4Proyeccion'
 import CascadeSintesis from './CascadeSintesis'
 
-import HeatmapModal from './modals/HeatmapModal'
+// v3.1 — modales nuevos
+import TopSegmentosModal from './modals/TopSegmentosModal'
+// v3.0 — modales viejos (eliminar en Fase 5)
 import InerciaDesgloseModal from './modals/InerciaDesgloseModal'
 import HallazgosModal from './modals/HallazgosModal'
 import ProyeccionModal from './modals/ProyeccionModal'
@@ -40,7 +44,7 @@ export default function WorkforceCascada({
   // ── Modales del orquestador ───────────────────────────────────────────
   // Cada acto pide su detalle a traves de un callback que aqui setea el state.
   // Los modales son fixed inset-0 z-50 — viven fuera del flujo de la cascada.
-  const [modalHeatmap, setModalHeatmap] = useState(false)
+  const [modalTopSegmentos, setModalTopSegmentos] = useState(false)  // v3.1 Acto 1 Gancho
   const [modalInerciaDesglose, setModalInerciaDesglose] = useState(false)
   const [modalHallazgos, setModalHallazgos] = useState(false)
   const [modalProyeccion, setModalProyeccion] = useState(false)
@@ -48,10 +52,10 @@ export default function WorkforceCascada({
   return (
     <>
       <div className="w-full max-w-4xl mx-auto space-y-24 pb-12">
-        <CascadeActo1Exposicion
+        {/* v3.1 — Acto 1 Gancho (segmentos) */}
+        <CascadeActo1Gancho
           data={data}
-          computed={computed}
-          onOpenHeatmap={() => setModalHeatmap(true)}
+          onOpenTopSegmentos={() => setModalTopSegmentos(true)}
         />
         <CascadeActo2Inercia
           data={data}
@@ -76,8 +80,9 @@ export default function WorkforceCascada({
       </div>
 
       {/* ═══ MODALES ═══ */}
-      {modalHeatmap && (
-        <HeatmapModal data={data} onClose={() => setModalHeatmap(false)} />
+      {/* v3.1 — Acto 1 Gancho */}
+      {modalTopSegmentos && (
+        <TopSegmentosModal data={data} onClose={() => setModalTopSegmentos(false)} />
       )}
       {modalInerciaDesglose && (
         <InerciaDesgloseModal data={data} onClose={() => setModalInerciaDesglose(false)} />
