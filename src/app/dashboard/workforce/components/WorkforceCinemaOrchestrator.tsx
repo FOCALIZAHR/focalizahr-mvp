@@ -16,6 +16,7 @@ import { useWorkforceData } from '../hooks/useWorkforceData'
 import WorkforceMissionControl from './WorkforceMissionControl'
 import WorkforceRail from './WorkforceRail'
 import type { WorkforceCardType } from './WorkforceRailCard'
+import WorkforceSpotlightCard from './WorkforceSpotlightCard'
 import WorkforceDiagnosticoFlow from './cascada/WorkforceDiagnosticoFlow'
 import TabEstructura from './tabs/TabEstructura'
 import TabBenchmarks from './tabs/TabBenchmarks'
@@ -154,19 +155,6 @@ export default function WorkforceCinemaOrchestrator() {
       >
         <DataConfidenceIndicator confidence={data.confidence} />
 
-        {/* Back button when not in lobby */}
-        {!isLobby && (
-          <div className="absolute top-4 left-4 z-20">
-            <button
-              onClick={handleBackToLobby}
-              className="flex items-center gap-2 bg-slate-800/50 backdrop-blur-sm px-4 py-2 rounded-lg border border-slate-700/50 hover:border-slate-600 transition-colors"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-xs text-slate-400 uppercase tracking-wider">Volver al lobby</span>
-            </button>
-          </div>
-        )}
-
         <AnimatePresence mode="wait">
           {/* LOBBY: MissionControl (gauge + CTA) */}
           {isLobby && (
@@ -177,53 +165,25 @@ export default function WorkforceCinemaOrchestrator() {
             />
           )}
 
-          {/* DIAGNOSTICO: Portada → Ancla → Cascada */}
-          {view === 'diagnostico' && (
-            <WorkforceDiagnosticoFlow
-              key="diagnostico"
+          {/* SPOTLIGHT: Cinema Mode split 30/70 con contenido por card */}
+          {!isLobby && (
+            <WorkforceSpotlightCard
+              key={`spotlight-${view}`}
+              card={view as WorkforceCardType}
               data={data}
               onBack={handleBackToLobby}
-              onNavigateTab={handleSelectCard}
-            />
-          )}
-
-          {/* ESTRUCTURA: drill-down por persona */}
-          {view === 'estructura' && (
-            <motion.div
-              key="estructura"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="w-full pt-12"
             >
-              <TabEstructura data={data} />
-            </motion.div>
-          )}
-
-          {/* BENCHMARKS: placeholder */}
-          {view === 'benchmarks' && (
-            <motion.div
-              key="benchmarks"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="w-full pt-12"
-            >
-              <TabBenchmarks />
-            </motion.div>
-          )}
-
-          {/* SIMULADOR: placeholder */}
-          {view === 'simulador' && (
-            <motion.div
-              key="simulador"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="w-full pt-12"
-            >
-              <TabSimulador />
-            </motion.div>
+              {view === 'diagnostico' && (
+                <WorkforceDiagnosticoFlow
+                  data={data}
+                  onBack={handleBackToLobby}
+                  onNavigateTab={handleSelectCard}
+                />
+              )}
+              {view === 'estructura' && <TabEstructura data={data} />}
+              {view === 'benchmarks' && <TabBenchmarks />}
+              {view === 'simulador' && <TabSimulador />}
+            </WorkforceSpotlightCard>
           )}
         </AnimatePresence>
       </div>
