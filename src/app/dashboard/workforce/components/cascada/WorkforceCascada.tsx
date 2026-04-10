@@ -1,32 +1,34 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// WORKFORCE CASCADA — Scroll continuo de actos
+// WORKFORCE CASCADA — Scroll continuo de actos (v3.1)
 // Patron clonado de GoalsCascada.tsx
 // SIN AnimatePresence interno — los actos se revelan con whileInView
 // space-y-24 entre actos (breathing mandatory de cascada-ejecutiva.md)
+//
+// Orden v3.1: Gancho → Problema → Amplificador → Costo → Riesgo → Síntesis
+// Patron de persuasion: dolor → diagnostico → cruces → dinero → futuro → cierre
 // src/app/dashboard/workforce/components/cascada/WorkforceCascada.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import type { WorkforceDiagnosticData } from '../../types/workforce.types'
 import type { WorkforceCardType } from '../WorkforceRailCard'
-import { computeCascadeValues } from '../../utils/workforce.utils'
 
-// v3.1 — actos nuevos (Fase 3+)
+// v3.1 — actos
 import CascadeActo1Gancho from './CascadeActo1Gancho'
-// v3.0 — actos viejos (eliminar en Fase 5 cuando todos los nuevos esten listos)
-import CascadeActo2Inercia from './CascadeActo2Inercia'
-import CascadeActo3Hallazgos from './CascadeActo3Hallazgos'
-import CascadeActo4Proyeccion from './CascadeActo4Proyeccion'
-import CascadeSintesis from './CascadeSintesis'
+import CascadeActo2Problema from './CascadeActo2Problema'
+import CascadeActo3Amplificador from './CascadeActo3Amplificador'
+import CascadeActo4Costo from './CascadeActo4Costo'
+import CascadeActo5Riesgo from './CascadeActo5Riesgo'
+import CascadeActo6Sintesis from './CascadeActo6Sintesis'
 
-// v3.1 — modales nuevos
+// v3.1 — modales
 import TopSegmentosModal from './modals/TopSegmentosModal'
-// v3.0 — modales viejos (eliminar en Fase 5)
-import InerciaDesgloseModal from './modals/InerciaDesgloseModal'
-import HallazgosModal from './modals/HallazgosModal'
-import ProyeccionModal from './modals/ProyeccionModal'
+import ZombiesBySegmentModal from './modals/ZombiesBySegmentModal'
+import CrossIntelligenceModal from './modals/CrossIntelligenceModal'
+import InertiaCostModal from './modals/InertiaCostModal'
+import RetentionBySegmentModal from './modals/RetentionBySegmentModal'
 
 interface WorkforceCascadaProps {
   data: WorkforceDiagnosticData
@@ -36,70 +38,61 @@ interface WorkforceCascadaProps {
 
 export default function WorkforceCascada({
   data,
-  onBackToLobby,
-  onNavigateTab,
+  onBackToLobby: _onBackToLobby,
+  onNavigateTab: _onNavigateTab,
 }: WorkforceCascadaProps) {
-  const computed = useMemo(() => computeCascadeValues(data), [data])
-
-  // ── Modales del orquestador ───────────────────────────────────────────
+  // ── Modales del orquestador ─────────────────────────────────────────
   // Cada acto pide su detalle a traves de un callback que aqui setea el state.
-  // Los modales son fixed inset-0 z-50 — viven fuera del flujo de la cascada.
-  const [modalTopSegmentos, setModalTopSegmentos] = useState(false)  // v3.1 Acto 1 Gancho
-  const [modalInerciaDesglose, setModalInerciaDesglose] = useState(false)
-  const [modalHallazgos, setModalHallazgos] = useState(false)
-  const [modalProyeccion, setModalProyeccion] = useState(false)
+  // Los modales usan createPortal a document.body — viven fuera del flujo.
+  const [modalTopSegmentos, setModalTopSegmentos] = useState(false)         // Acto 1 Gancho
+  const [modalZombies, setModalZombies] = useState(false)                   // Acto 2 Problema
+  const [modalCross, setModalCross] = useState(false)                       // Acto 3 Amplificador
+  const [modalInertia, setModalInertia] = useState(false)                   // Acto 4 Costo
+  const [modalRetention, setModalRetention] = useState(false)               // Acto 5 Riesgo
 
   return (
     <>
       <div className="w-full max-w-4xl mx-auto space-y-24 pb-12">
-        {/* v3.1 — Acto 1 Gancho (segmentos) */}
         <CascadeActo1Gancho
           data={data}
           onOpenTopSegmentos={() => setModalTopSegmentos(true)}
         />
-        <CascadeActo2Inercia
+        <CascadeActo2Problema
           data={data}
-          onOpenDesglose={() => setModalInerciaDesglose(true)}
+          onOpenZombies={() => setModalZombies(true)}
         />
-        <CascadeActo3Hallazgos
+        <CascadeActo3Amplificador
           data={data}
-          computed={computed}
-          onOpenHallazgos={() => setModalHallazgos(true)}
+          onOpenCross={() => setModalCross(true)}
         />
-        <CascadeActo4Proyeccion
+        <CascadeActo4Costo
           data={data}
-          computed={computed}
-          onOpenProyeccion={() => setModalProyeccion(true)}
+          onOpenInertia={() => setModalInertia(true)}
         />
-        <CascadeSintesis
+        <CascadeActo5Riesgo
           data={data}
-          computed={computed}
-          onBackToLobby={onBackToLobby}
-          onNavigateTab={onNavigateTab}
+          onOpenRetention={() => setModalRetention(true)}
+        />
+        <CascadeActo6Sintesis
+          data={data}
         />
       </div>
 
       {/* ═══ MODALES ═══ */}
-      {/* v3.1 — Acto 1 Gancho */}
       {modalTopSegmentos && (
         <TopSegmentosModal data={data} onClose={() => setModalTopSegmentos(false)} />
       )}
-      {modalInerciaDesglose && (
-        <InerciaDesgloseModal data={data} onClose={() => setModalInerciaDesglose(false)} />
+      {modalZombies && (
+        <ZombiesBySegmentModal data={data} onClose={() => setModalZombies(false)} />
       )}
-      {modalHallazgos && (
-        <HallazgosModal
-          data={data}
-          cantidadHallazgos={computed.cantidadHallazgos}
-          onClose={() => setModalHallazgos(false)}
-        />
+      {modalCross && (
+        <CrossIntelligenceModal data={data} onClose={() => setModalCross(false)} />
       )}
-      {modalProyeccion && (
-        <ProyeccionModal
-          data={data}
-          costoNoActuar12M={computed.costoNoActuar12M}
-          onClose={() => setModalProyeccion(false)}
-        />
+      {modalInertia && (
+        <InertiaCostModal data={data} onClose={() => setModalInertia(false)} />
+      )}
+      {modalRetention && (
+        <RetentionBySegmentModal data={data} onClose={() => setModalRetention(false)} />
       )}
     </>
   )
