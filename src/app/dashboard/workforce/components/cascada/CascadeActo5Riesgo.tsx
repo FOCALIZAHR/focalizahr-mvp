@@ -1,11 +1,13 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// ACTO 5 — RIESGO FUTURO — "El Horizonte por Segmento" (v3.1)
+// ACTO 5 — HORIZONTE — "Lo que pasa en 12 meses" (v3.2)
 //
 // Unidad de analisis: SEGMENTO → Persona
 // Fuente: retentionPriority.ranking (con segment fields desde Fase 1)
-// Narrativa LITERAL del documento CASCADA_WORKFORCE_v3_1.md
+//
+// v3.2 — Conector del Rio + variante datos escasos
+// Narrativa del documento CASCADA_WORKFORCE_v3_2.md
 // src/app/dashboard/workforce/components/cascada/CascadeActo5Riesgo.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -22,11 +24,13 @@ import type { WorkforceDiagnosticData } from '../../types/workforce.types'
 
 interface CascadeActo5RiesgoProps {
   data: WorkforceDiagnosticData
+  exposurePct: number
   onOpenRetention: () => void
 }
 
 export default memo(function CascadeActo5Riesgo({
   data,
+  exposurePct,
   onOpenRetention,
 }: CascadeActo5RiesgoProps) {
   const segments = useMemo(() => {
@@ -52,15 +56,48 @@ export default memo(function CascadeActo5Riesgo({
       .sort((a, b) => b.total - a.total)
   }, [data.retentionPriority.ranking])
 
-  if (segments.length === 0) return null
+  // ── v3.2 Variante datos escasos ─────────────────────────────────────
+  if (segments.length === 0) {
+    return (
+      <>
+        <ActSeparator label="Horizonte" color="purple" />
+        <div>
+          <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-4">
+            <p className="text-base font-light text-slate-400 text-center leading-relaxed">
+              Ese <span className="font-medium text-cyan-400">{exposurePct}%</span>{' '}
+              no muestra riesgo de retención crítico.
+            </p>
+            <p className="text-base font-light text-slate-400 text-center leading-relaxed pt-4">
+              No hay segmentos con 100% de personas en evaluación.
+              Tu talento clave está identificado y protegido.
+            </p>
+            <div className="border-l-2 border-purple-500/30 pl-4 mt-6">
+              <p className="text-sm italic font-light text-slate-300 leading-relaxed">
+                &ldquo;Intocable&rdquo; no significa &ldquo;no se puede tocar&rdquo;.
+                Significa &ldquo;no puedes permitirte perderlo sin plan de sucesión&rdquo;.
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      </>
+    )
+  }
 
   const top2 = segments.slice(0, 2)
 
   return (
     <>
-      <ActSeparator label="Riesgo futuro" color="purple" />
+      <ActSeparator label="Horizonte" color="purple" />
 
       <div>
+        {/* v3.2 Conector del Rio */}
+        <motion.div {...fadeIn} className="max-w-2xl mx-auto mb-8">
+          <p className="text-base font-light text-slate-400 text-center leading-relaxed">
+            Ese <span className="font-medium text-cyan-400">{exposurePct}%</span>{' '}
+            y su costo se acumulan.
+          </p>
+        </motion.div>
+
         {/* Ancla — total de intocables */}
         <motion.div {...fadeInDelay} className="text-center mb-10">
           <p className="text-7xl md:text-8xl font-extralight tracking-tight text-violet-400">
@@ -93,14 +130,20 @@ export default memo(function CascadeActo5Riesgo({
             ))}
           </div>
 
-          {/* Coaching tips — del script literal */}
-          <div className="border-l-2 border-purple-500/30 pl-4 mt-6 space-y-2">
+          <p className="text-base font-light text-slate-400 text-center leading-relaxed pt-2">
+            El patrón importa más que los nombres. Si un segmento tiene 0 intocables
+            y muchos en evaluación, el problema no son las personas. Es el segmento.
+          </p>
+          <p className="text-base font-light text-slate-300 text-center leading-relaxed">
+            El mercado no espera.
+          </p>
+
+          {/* Coaching tip v3.2 */}
+          <div className="border-l-2 border-purple-500/30 pl-4 mt-6">
             <p className="text-sm italic font-light text-slate-300 leading-relaxed">
-              El patrón importa más que los nombres. Si un segmento tiene 0 intocables y muchos
-              en evaluación, el problema no son las personas. Es el segmento.
-            </p>
-            <p className="text-sm italic font-light text-slate-400 leading-relaxed">
-              El mercado no espera.
+              &ldquo;Intocable&rdquo; no significa &ldquo;no se puede tocar&rdquo;.
+              Significa &ldquo;no puedes permitirte perderlo sin plan de sucesión&rdquo;.
+              La clasificación es una señal de inversión, no de inmovilidad.
             </p>
           </div>
         </motion.div>

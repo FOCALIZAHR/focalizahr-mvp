@@ -1,16 +1,16 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// ACTO 6 — SÍNTESIS — "El Punto Ciego" (v3.1)
+// ACTO 6 — PUNTO CIEGO — "La Contradiccion que Nadie Te Va a Mostrar" (v3.2)
 //
 // Cierre de la cascada. SIN modal.
 // Unidad: SEGMENTO con mayor contradiccion (alta exposicion + alta intocables%)
-// Calculo simplificado V1: cruza segmentos de exposicion (zombies+flightRisk)
-// con segmentos de retencion (intocables/total). El segmento con max suma
-// es el "punto ciego": el mercado lo va a tomar pero la org lo cataloga
-// como intocable.
+// Calculo simplificado V1: cruza segmentos de exposicion con segmentos de
+// retencion (intocables/total). El segmento con max suma es el "punto ciego":
+// el mercado lo va a tomar pero la org lo cataloga como intocable.
 //
-// Narrativa LITERAL del documento CASCADA_WORKFORCE_v3_1.md
+// v3.2 — Conector del Rio + variante datos escasos
+// Narrativa del documento CASCADA_WORKFORCE_v3_2.md
 // src/app/dashboard/workforce/components/cascada/CascadeActo6Sintesis.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -26,6 +26,7 @@ import type { WorkforceDiagnosticData } from '../../types/workforce.types'
 
 interface CascadeActo6SintesisProps {
   data: WorkforceDiagnosticData
+  exposurePct: number
 }
 
 interface ContradictionResult {
@@ -36,7 +37,10 @@ interface ContradictionResult {
   contradictionScore: number
 }
 
-export default memo(function CascadeActo6Sintesis({ data }: CascadeActo6SintesisProps) {
+export default memo(function CascadeActo6Sintesis({
+  data,
+  exposurePct,
+}: CascadeActo6SintesisProps) {
   // ── Calcular el segmento con mayor contradiccion ────────────────────
   // FUENTE UNICA: retentionPriority.ranking — agrupar por segmento, computar
   // avgExposure + intocablePct, encontrar segmento con max contradictionScore.
@@ -74,14 +78,50 @@ export default memo(function CascadeActo6Sintesis({ data }: CascadeActo6Sintesis
     return matches[0] ?? null
   }, [data.retentionPriority.ranking])
 
-  // Acto condicional: si no hay contradiccion identificable, no renderizar
-  if (!contradiction) return null
+  // ── v3.2 Variante datos escasos ─────────────────────────────────────
+  if (!contradiction) {
+    return (
+      <>
+        <ActSeparator label="Punto ciego" color="cyan" />
+        <div>
+          <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-4">
+            <p className="text-base font-light text-slate-400 text-center leading-relaxed">
+              Ese <span className="font-medium text-cyan-400">{exposurePct}%</span>{' '}
+              no revela contradicciones evidentes.
+            </p>
+            <p className="text-base font-light text-slate-400 text-center leading-relaxed pt-4">
+              La exposición y la clasificación de talento están alineadas.
+              Los segmentos con alta exposición no tienen exceso de
+              &ldquo;intocables&rdquo;.
+            </p>
+            <p className="text-base font-light text-slate-300 text-center leading-relaxed pt-2">
+              Esto es coherencia organizacional.
+              Lo que ves es lo que hay.
+            </p>
+            <div className="border-l-2 border-cyan-500/30 pl-4 mt-6">
+              <p className="text-sm italic font-light text-slate-300 leading-relaxed">
+                El punto ciego no es una acusación. Es una invitación.
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      </>
+    )
+  }
 
   return (
     <>
-      <ActSeparator label="Síntesis" color="cyan" />
+      <ActSeparator label="Punto ciego" color="cyan" />
 
       <div>
+        {/* v3.2 Conector del Rio */}
+        <motion.div {...fadeIn} className="max-w-2xl mx-auto mb-8">
+          <p className="text-base font-light text-slate-400 text-center leading-relaxed">
+            Ese <span className="font-medium text-cyan-400">{exposurePct}%</span>{' '}
+            revela una contradicción.
+          </p>
+        </motion.div>
+
         {/* Hero — el segmento del punto ciego (en cyan, es entidad/nombre) */}
         <motion.div {...fadeInDelay} className="text-center mb-10">
           <p className="text-xs text-slate-500 uppercase tracking-widest mb-3">
@@ -126,14 +166,19 @@ export default memo(function CascadeActo6Sintesis({ data }: CascadeActo6Sintesis
             </p>
           </div>
 
-          {/* Coaching tip final — del script literal */}
-          <div className="border-l-2 border-cyan-500/30 pl-4 mt-8 space-y-2">
+          <p className="text-base font-light text-slate-300 text-center leading-relaxed pt-4">
+            Este diagnóstico no prescribe qué hacer.
+            Ilumina dónde está la discrepancia más costosa.
+          </p>
+          <p className="text-base font-light text-slate-300 text-center leading-relaxed">
+            La decisión es tuya.
+          </p>
+
+          {/* Coaching tip v3.2 */}
+          <div className="border-l-2 border-cyan-500/30 pl-4 mt-8">
             <p className="text-sm italic font-light text-slate-300 leading-relaxed">
-              Este diagnóstico no prescribe qué hacer. Ilumina dónde está la discrepancia
-              más costosa.
-            </p>
-            <p className="text-sm italic font-light text-slate-400 leading-relaxed">
-              La decisión es tuya.
+              El punto ciego no es una acusación. Es una invitación.
+              Si la contradicción te incomoda, es porque estás listo para verla.
             </p>
           </div>
         </motion.div>

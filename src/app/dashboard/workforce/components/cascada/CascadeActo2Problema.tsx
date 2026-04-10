@@ -1,7 +1,7 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// ACTO 2 — PROBLEMA — "El Talento Atrapado por Segmento" (v3.1)
+// ACTO 2 — TALENTO ATRAPADO — "Quienes ejecutan lo que deberian pensar" (v3.2)
 //
 // Unidad de analisis: SEGMENTO → Persona
 //
@@ -14,7 +14,8 @@
 // La deteccion estricta zombies[] (rolefit > 85 + ability ≤ 2 + engagement ≤ 2)
 // frecuentemente viene vacia. Esta version captura la espiritu del Acto.
 //
-// Narrativa LITERAL del documento CASCADA_WORKFORCE_v3_1.md
+// v3.2 — Conector del Rio + variante datos escasos
+// Narrativa del documento CASCADA_WORKFORCE_v3_2.md
 // src/app/dashboard/workforce/components/cascada/CascadeActo2Problema.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -31,11 +32,13 @@ import type { WorkforceDiagnosticData } from '../../types/workforce.types'
 
 interface CascadeActo2ProblemaProps {
   data: WorkforceDiagnosticData
+  exposurePct: number
   onOpenZombies: () => void
 }
 
 export default memo(function CascadeActo2Problema({
   data,
+  exposurePct,
   onOpenZombies,
 }: CascadeActo2ProblemaProps) {
   const computed = useMemo(() => {
@@ -73,15 +76,47 @@ export default memo(function CascadeActo2Problema({
     return { totalTrapped: trapped.length, segments }
   }, [data.retentionPriority.ranking])
 
-  if (computed.totalTrapped === 0) return null
+  // ── v3.2 Variante datos escasos ─────────────────────────────────────
+  if (computed.totalTrapped === 0) {
+    return (
+      <>
+        <ActSeparator label="Talento atrapado" color="amber" />
+        <div>
+          <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-4">
+            <p className="text-base font-light text-slate-400 text-center leading-relaxed">
+              En ese <span className="font-medium text-cyan-400">{exposurePct}%</span>{' '}
+              no hay personas con dominio &gt;75% de tareas automatizables.
+            </p>
+            <p className="text-base font-light text-slate-400 text-center leading-relaxed pt-4">
+              No hay talento atrapado en el sentido tradicional.
+              La oportunidad está en potenciar, no en reasignar.
+            </p>
+            <div className="border-l-2 border-amber-500/30 pl-4 mt-6">
+              <p className="text-sm italic font-light text-slate-300 leading-relaxed">
+                La conversación no es &ldquo;qué eliminar&rdquo; — es &ldquo;qué liberar&rdquo;.
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      </>
+    )
+  }
 
   const top2 = computed.segments.slice(0, 2)
 
   return (
     <>
-      <ActSeparator label="Problema" color="amber" />
+      <ActSeparator label="Talento atrapado" color="amber" />
 
       <div>
+        {/* v3.2 Conector del Rio */}
+        <motion.div {...fadeIn} className="max-w-2xl mx-auto mb-8">
+          <p className="text-base font-light text-slate-400 text-center leading-relaxed">
+            En ese <span className="font-medium text-cyan-400">{exposurePct}%</span>,
+            hay personas con dominio alto de tareas automatizables.
+          </p>
+        </motion.div>
+
         {/* Ancla — total de personas atrapadas */}
         <motion.div {...fadeInDelay} className="text-center mb-10">
           <p className="text-7xl md:text-8xl font-extralight tracking-tight text-amber-400">
@@ -119,10 +154,14 @@ export default memo(function CascadeActo2Problema({
             ))}
           </div>
 
-          {/* Coaching tip — del script literal */}
+          <p className="text-base font-light text-slate-400 text-center leading-relaxed pt-2">
+            El patrón no está en las personas. Está en el segmento.
+          </p>
+
+          {/* Coaching tip v3.2 */}
           <div className="border-l-2 border-amber-500/30 pl-4 mt-6">
             <p className="text-sm italic font-light text-slate-300 leading-relaxed">
-              El patrón no está en las personas. Está en el segmento.
+              La conversación no es &ldquo;qué eliminar&rdquo; — es &ldquo;qué liberar&rdquo;.
             </p>
           </div>
         </motion.div>

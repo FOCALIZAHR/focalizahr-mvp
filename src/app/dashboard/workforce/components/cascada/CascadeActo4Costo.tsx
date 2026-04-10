@@ -1,11 +1,13 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// ACTO 4 — COSTO — "El Precio de la Inercia" (v3.1)
+// ACTO 4 — COSTO — "El Precio de la Inercia" (v3.2)
 //
 // Unidad de analisis: TOTAL → SEGMENTO/AREA
 // Fuentes: productivityGap (NUEVO Fase 1), inertiaCost, severanceLiability
-// Narrativa LITERAL del documento CASCADA_WORKFORCE_v3_1.md
+//
+// v3.2 — Conector del Rio + variante datos escasos
+// Narrativa del documento CASCADA_WORKFORCE_v3_2.md
 // src/app/dashboard/workforce/components/cascada/CascadeActo4Costo.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -22,11 +24,13 @@ import type { WorkforceDiagnosticData } from '../../types/workforce.types'
 
 interface CascadeActo4CostoProps {
   data: WorkforceDiagnosticData
+  exposurePct: number
   onOpenInertia: () => void
 }
 
 export default memo(function CascadeActo4Costo({
   data,
+  exposurePct,
   onOpenInertia,
 }: CascadeActo4CostoProps) {
   const productivityTotal = data.productivityGap?.total ?? 0
@@ -43,14 +47,47 @@ export default memo(function CascadeActo4Costo({
       .slice(0, 2)
   }, [data.inertiaCost.byDepartment])
 
-  // Acto condicional: si todos los costos son cero, no renderizar
-  if (productivityTotal === 0 && inertiaTotal === 0 && severanceTotal === 0) return null
+  // ── v3.2 Variante datos escasos ─────────────────────────────────────
+  if (productivityTotal === 0 && inertiaTotal === 0 && severanceTotal === 0) {
+    return (
+      <>
+        <ActSeparator label="Costo" color="purple" />
+        <div>
+          <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-4">
+            <p className="text-base font-light text-slate-400 text-center leading-relaxed">
+              El costo de ese <span className="font-medium text-cyan-400">{exposurePct}%</span>{' '}
+              aún no es significativo.
+            </p>
+            <p className="text-base font-light text-slate-400 text-center leading-relaxed pt-4">
+              No hay urgencia financiera inmediata. Pero la exposición sigue ahí
+              — el costo es de oportunidad, no de gasto.
+            </p>
+            <div className="border-l-2 border-purple-500/30 pl-4 mt-6">
+              <p className="text-sm italic font-light text-slate-300 leading-relaxed">
+                El costo de inercia es lo que pagas HOY. El costo de oportunidad
+                es lo que dejas de ganar MAÑANA. Ambos son reales. Uno aparece
+                en el P&amp;L, el otro no.
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      </>
+    )
+  }
 
   return (
     <>
       <ActSeparator label="Costo" color="purple" />
 
       <div>
+        {/* v3.2 Conector del Rio */}
+        <motion.div {...fadeIn} className="max-w-2xl mx-auto mb-8">
+          <p className="text-base font-light text-slate-400 text-center leading-relaxed">
+            Ese <span className="font-medium text-cyan-400">{exposurePct}%</span>{' '}
+            tiene un precio.
+          </p>
+        </motion.div>
+
         {/* Ancla — productivity gap (golpe emocional inicial) */}
         <motion.div {...fadeInDelay} className="text-center mb-10">
           <p className="text-7xl md:text-8xl font-extralight tracking-tight text-violet-400">
@@ -117,10 +154,16 @@ export default memo(function CascadeActo4Costo({
             </div>
           )}
 
-          {/* Coaching tip — del script literal */}
+          <p className="text-base font-light text-slate-400 text-center leading-relaxed pt-2">
+            La inercia es una decisión. Solo que no se documenta.
+          </p>
+
+          {/* Coaching tip v3.2 */}
           <div className="border-l-2 border-purple-500/30 pl-4 mt-6">
             <p className="text-sm italic font-light text-slate-300 leading-relaxed">
-              La inercia es una decisión. Solo que no se documenta.
+              El costo de inercia es lo que pagas HOY. El costo de oportunidad
+              es lo que dejas de ganar MAÑANA. Ambos son reales. Uno aparece
+              en el P&amp;L, el otro no.
             </p>
           </div>
         </motion.div>

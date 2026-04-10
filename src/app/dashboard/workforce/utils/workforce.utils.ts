@@ -8,10 +8,36 @@
 
 import type { WorkforceDiagnosticData } from '../types/workforce.types'
 import type { AnclaComponent } from '@/components/executive/AnclaInteligente'
-import type { ComputedCascadeValues, GerenciaExposure, Francotirador } from '../hooks/useWorkforceCascade'
 
 // ════════════════════════════════════════════════════════════════════════════
-// COMPUTED VALUES — extraido del hook useWorkforceCascade
+// TYPES — inline (antes vivian en useWorkforceCascade.ts, ya borrado)
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface GerenciaExposure {
+  name: string
+  avgExposure: number
+  headcount: number
+}
+
+export interface Francotirador {
+  name: string
+  department: string
+  concentrationPct: number
+  costAtRisk: number
+  hallazgosCount: number
+}
+
+export interface ComputedCascadeValues {
+  cantidadHallazgos: number
+  costoNoActuar12M: number
+  gerenciaMas: GerenciaExposure
+  gerenciaMenos: GerenciaExposure
+  cantidadGerencias: number
+  francotirador: Francotirador
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// COMPUTED VALUES — funciones puras (sin estado)
 // ════════════════════════════════════════════════════════════════════════════
 
 export function computeHallazgosCount(data: WorkforceDiagnosticData): number {
@@ -113,18 +139,19 @@ export function getPortadaNarrative(data: WorkforceDiagnosticData): PortadaNarra
   const pct = Math.round(data.exposure.avgExposure * 100)
   const hallazgos = computeHallazgosCount(data)
 
+  // v3.2 — narrativa "La Sentencia". El golpe inicial. NO se suaviza.
   return {
     statusBadge:
       hallazgos > 0
         ? { label: `${hallazgos} situaciones requieren atencion` }
         : { label: 'Sin hallazgos criticos', showCheck: true },
-    prefix: 'Tu organizacion opera con ',
-    highlight: `${pct}% de exposicion a la automatizacion.`,
+    prefix: '',
+    highlight: `${pct}% de las tareas que tu organizacion paga hoy, la IA ya sabe ejecutar.`,
     suffix:
-      ' Eso compromete la estructura de costos y la continuidad operativa si no se gestiona antes que la competencia.',
+      ' No es prediccion. Es el cruce entre lo que la tecnologia domina — y lo que tu gente hace cada dia.',
     ctaVariant: pct > 60 ? 'red' : pct > 40 ? 'amber' : 'cyan',
     coachingTip:
-      'El porcentaje mide cuantas tareas de tu organizacion la IA ya puede ejecutar o potenciar, segun datos reales de uso (Anthropic Economic Index).',
+      'La pregunta no es "cuanto automatizar" — es "donde liberar capacidad".',
   }
 }
 

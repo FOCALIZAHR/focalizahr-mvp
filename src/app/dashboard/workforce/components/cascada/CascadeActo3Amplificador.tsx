@@ -1,7 +1,7 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// ACTO 3 — AMPLIFICADOR — "Los Cruces que Multiplican el Riesgo" (v3.1)
+// ACTO 3 — SENALES CRUZADAS — "Los Cruces que Amplifican el Riesgo" (v3.2)
 //
 // Unidad de analisis: MIXTA (segmento + area + cargo)
 //
@@ -11,8 +11,8 @@
 //   - Clima: adoptionRisk.departments (as-is, depto-level)
 //   - Compresion: seniorityCompression.opportunities (as-is, cargo-level)
 //
-// Cada sub-bloque es condicional. El acto renderiza si AL MENOS UNO tiene datos.
-// Narrativa LITERAL del documento CASCADA_WORKFORCE_v3_1.md
+// v3.2 — Conector del Rio + variante datos escasos
+// Narrativa del documento CASCADA_WORKFORCE_v3_2.md
 // src/app/dashboard/workforce/components/cascada/CascadeActo3Amplificador.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -29,11 +29,13 @@ import type { WorkforceDiagnosticData } from '../../types/workforce.types'
 
 interface CascadeActo3AmplificadorProps {
   data: WorkforceDiagnosticData
+  exposurePct: number
   onOpenCross: () => void
 }
 
 export default memo(function CascadeActo3Amplificador({
   data,
+  exposurePct,
   onOpenCross,
 }: CascadeActo3AmplificadorProps) {
   // ── Top segmento de fuga (derivado de retentionPriority) ──────────────
@@ -85,14 +87,50 @@ export default memo(function CascadeActo3Amplificador({
     topCompression !== null,
   ].filter(Boolean).length
 
-  // Acto condicional: si las 3 fuentes estan vacias, no renderizar
-  if (senalesActivas === 0) return null
+  // ── v3.2 Variante datos escasos ─────────────────────────────────────
+  if (senalesActivas === 0) {
+    return (
+      <>
+        <ActSeparator label="Señales cruzadas" color="amber" />
+        <div>
+          <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-4">
+            <p className="text-base font-light text-slate-400 text-center leading-relaxed">
+              Ese <span className="font-medium text-cyan-400">{exposurePct}%</span>{' '}
+              no muestra cruces de riesgo significativos.
+            </p>
+            <p className="text-base font-light text-slate-400 text-center leading-relaxed pt-4">
+              No hay concentración de fuga + exposición. No hay áreas con baja
+              adopción + alta exposición. No hay compresión salarial por nivel.
+            </p>
+            <p className="text-base font-light text-slate-300 text-center leading-relaxed pt-2">
+              Esto es un patrón saludable.
+            </p>
+            <div className="border-l-2 border-amber-500/30 pl-4 mt-6">
+              <p className="text-sm italic font-light text-slate-300 leading-relaxed">
+                Los cruces revelan dónde actuar primero. Que no aparezcan
+                significa que la exposición existe pero no está amplificada
+                por otros factores.
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      </>
+    )
+  }
 
   return (
     <>
-      <ActSeparator label="Amplificador" color="amber" />
+      <ActSeparator label="Señales cruzadas" color="amber" />
 
       <div>
+        {/* v3.2 Conector del Rio */}
+        <motion.div {...fadeIn} className="max-w-2xl mx-auto mb-8">
+          <p className="text-base font-light text-slate-400 text-center leading-relaxed">
+            Ese <span className="font-medium text-cyan-400">{exposurePct}%</span>{' '}
+            se cruza con otros riesgos.
+          </p>
+        </motion.div>
+
         {/* Ancla — cantidad de señales activas */}
         <motion.div {...fadeInDelay} className="text-center mb-10">
           <p className="text-7xl md:text-8xl font-extralight tracking-tight text-amber-400">
@@ -159,11 +197,11 @@ export default memo(function CascadeActo3Amplificador({
             </div>
           )}
 
-          {/* Coaching tip global */}
+          {/* Coaching tip v3.2 */}
           <div className="border-l-2 border-amber-500/30 pl-4 mt-6">
             <p className="text-sm italic font-light text-slate-300 leading-relaxed">
-              Cada señal por sí sola es manejable. Las tres juntas, en el mismo segmento,
-              son una sentencia.
+              Los cruces revelan dónde actuar primero. Alta exposición + alta fuga
+              = urgencia. Alta exposición + buen clima = oportunidad de pilotos.
             </p>
           </div>
         </motion.div>

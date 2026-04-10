@@ -29,8 +29,6 @@ import type {
 // VIEW & NAVIGATION
 // ════════════════════════════════════════════════════════════════════════════
 
-export type CascadeStep = 'portada' | 'ancla' | 'acto1' | 'acto2' | 'acto3' | 'acto4' | 'sintesis'
-
 export type WorkforceView = 'lobby' | 'cascada' | 'estructura' | 'benchmarks' | 'simulador'
 
 // ════════════════════════════════════════════════════════════════════════════
