@@ -75,6 +75,10 @@ export interface PersonAlert {
   roleFitScore: number
   salary: number
   financialImpact: number
+  // v3.1 — segment fields para agrupacion frontend
+  acotadoGroup: string | null
+  standardCategory: string | null
+  metasCompliance: number | null  // = goalsRawPercent (0-100)
 }
 
 export interface TalentZombieResult {
@@ -186,12 +190,33 @@ export interface RetentionEntry {
   roleFitScore: number
   isCriticalPosition: boolean
   tier: 'intocable' | 'valioso' | 'neutro' | 'prescindible'
+  // v3.1 — segment fields para agrupacion frontend
+  acotadoGroup: string | null
+  standardCategory: string | null
 }
 
 export interface RetentionPriorityResult {
   ranking: RetentionEntry[]
   intocablesCount: number
   prescindiblesCount: number
+  confidence: 'high' | 'medium' | 'low'
+}
+
+// v3.1 — Brecha de productividad
+// SUM(salary × (1 - roleFit/100)) donde roleFit < 70
+// Mide el costo mensual de salarios pagados por rendimiento no entregado
+export interface SegmentGap {
+  key: string                // "Profesionales de Finanzas"
+  acotadoGroup: string | null
+  standardCategory: string | null
+  total: number              // gap mensual en CLP
+  count: number              // personas afectadas
+}
+
+export interface ProductivityGapResult {
+  total: number              // gap mensual total CLP
+  affectedCount: number      // personas con roleFit < 70
+  bySegment: SegmentGap[]    // ordenado por total desc
   confidence: 'high' | 'medium' | 'low'
 }
 
@@ -213,6 +238,7 @@ export interface OrganizationDiagnostic {
   liberatedFTEs: LiberatedFTEsResult
   severanceLiability: SeveranceLiabilityResult
   retentionPriority: RetentionPriorityResult
+  productivityGap: ProductivityGapResult  // v3.1
   topAlerts: Alert[]
   netROI: number
   paybackMonths: number
@@ -373,6 +399,10 @@ export class WorkforceIntelligenceService {
       position: z.position, departmentName: z.departmentName,
       observedExposure: z.observedExposure, roleFitScore: z.roleFitScore,
       salary: z.salary, financialImpact: z.salary * 12,
+      // v3.1 — preservar segment fields
+      acotadoGroup: z.acotadoGroup,
+      standardCategory: z.standardCategory,
+      metasCompliance: z.goalsRawPercent,
     }))
 
     return {
@@ -401,6 +431,10 @@ export class WorkforceIntelligenceService {
         position: e.position, departmentName: e.departmentName,
         observedExposure: e.observedExposure, roleFitScore: e.roleFitScore,
         salary: e.salary, financialImpact: replacementCost, replacementCost,
+        // v3.1 — preservar segment fields
+        acotadoGroup: e.acotadoGroup,
+        standardCategory: e.standardCategory,
+        metasCompliance: e.goalsRawPercent,
       }
     })
 
@@ -756,6 +790,9 @@ export class WorkforceIntelligenceService {
           roleFitScore: e.roleFitScore,
           isCriticalPosition: e.isIncumbentOfCriticalPosition,
           tier,
+          // v3.1 — preservar segment fields
+          acotadoGroup: e.acotadoGroup,
+          standardCategory: e.standardCategory,
         }
       })
       .sort((a, b) => b.retentionScore - a.retentionScore)
@@ -765,6 +802,61 @@ export class WorkforceIntelligenceService {
       intocablesCount: ranking.filter(r => r.tier === 'intocable').length,
       prescindiblesCount: ranking.filter(r => r.tier === 'prescindible').length,
       confidence: enriched.some(e => e.goalsRawPercent !== null) ? 'high' : 'medium',
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // 9.5 PRODUCTIVITY GAP (v3.1)
+  // SUM(salary × (1 - roleFit/100)) donde roleFit < 70
+  // Mide el gap mensual de salario pagado vs rendimiento entregado
+  // ──────────────────────────────────────────────────────────────────────
+
+  static calculateProductivityGap(enriched: EnrichedEmployee[]): ProductivityGapResult {
+    const ROLEFIT_THRESHOLD = 70
+
+    const affected = enriched.filter(e => e.roleFitScore < ROLEFIT_THRESHOLD)
+
+    // Total org
+    const total = affected.reduce((sum, e) => {
+      const gapRatio = 1 - (e.roleFitScore / 100)
+      return sum + (e.salary * gapRatio)
+    }, 0)
+
+    // By segment (acotadoGroup × standardCategory)
+    const segmentMap = new Map<string, SegmentGap>()
+    for (const e of affected) {
+      if (!e.acotadoGroup || !e.standardCategory) continue
+      const key = `${e.acotadoGroup} de ${e.standardCategory}`
+      const gap = e.salary * (1 - e.roleFitScore / 100)
+      const existing = segmentMap.get(key)
+      if (existing) {
+        existing.total += gap
+        existing.count += 1
+      } else {
+        segmentMap.set(key, {
+          key,
+          acotadoGroup: e.acotadoGroup,
+          standardCategory: e.standardCategory,
+          total: gap,
+          count: 1,
+        })
+      }
+    }
+
+    const bySegment = Array.from(segmentMap.values()).sort((a, b) => b.total - a.total)
+
+    // Confidence: basado en cobertura de roleFit en el dataset
+    const withRoleFit = enriched.filter(e => e.roleFitScore > 0).length
+    const coverage = enriched.length > 0 ? withRoleFit / enriched.length : 0
+    const confidence: 'high' | 'medium' | 'low' =
+      coverage >= 0.7 ? 'high' :
+      coverage >= 0.3 ? 'medium' : 'low'
+
+    return {
+      total,
+      affectedCount: affected.length,
+      bySegment,
+      confidence,
     }
   }
 
@@ -789,6 +881,7 @@ export class WorkforceIntelligenceService {
         liberatedFTEs: { byDepartment: [], totalFTEs: 0, totalMonthlySavings: 0, confidence: 'low' },
         severanceLiability: { totalSeverance: 0, monthlyFTESavings: 0, paybackMonths: 0, affectedCount: 0, confidence: 'low' },
         retentionPriority: { ranking: [], intocablesCount: 0, prescindiblesCount: 0, confidence: 'low' },
+        productivityGap: { total: 0, affectedCount: 0, bySegment: [], confidence: 'low' },
         topAlerts: [],
         netROI: 0,
         paybackMonths: 0,
@@ -808,6 +901,7 @@ export class WorkforceIntelligenceService {
     const liberatedFTEs = await this.calculateLiberatedFTEs(enriched)
     const severanceLiability = this.calculateSeveranceLiability(enriched)
     const retentionPriority = this.calculateRetentionPriority(enriched)
+    const productivityGap = this.calculateProductivityGap(enriched)  // v3.1
 
     // Top 5 alertas por impacto financiero
     const alerts: Alert[] = [
@@ -836,6 +930,7 @@ export class WorkforceIntelligenceService {
     return {
       zombies, flightRisk, redundancy, adoptionRisk, seniorityCompression,
       inertiaCost, liberatedFTEs, severanceLiability, retentionPriority,
+      productivityGap,  // v3.1
       topAlerts: alerts, netROI, paybackMonths,
       totalEmployees: enriched.length,
       enrichedCount: enrichedWithExposure,

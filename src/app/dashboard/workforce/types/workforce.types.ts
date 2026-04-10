@@ -14,6 +14,10 @@ import type {
   LiberatedFTEsResult,
   SeveranceLiabilityResult,
   RetentionPriorityResult,
+  ProductivityGapResult,
+  SegmentGap,
+  PersonAlert,
+  RetentionEntry,
   Alert,
 } from '@/lib/services/WorkforceIntelligenceService'
 
@@ -44,6 +48,7 @@ export interface WorkforceDiagnosticData {
   liberatedFTEs: LiberatedFTEsResult
   severanceLiability: SeveranceLiabilityResult
   retentionPriority: RetentionPriorityResult
+  productivityGap: ProductivityGapResult  // v3.1
   topAlerts: Alert[]
   netROI: number
   paybackMonths: number
@@ -73,6 +78,10 @@ export type {
   LiberatedFTEsResult,
   SeveranceLiabilityResult,
   RetentionPriorityResult,
+  ProductivityGapResult,
+  SegmentGap,
+  PersonAlert,
+  RetentionEntry,
   Alert,
   OrganizationExposureResult,
 }
