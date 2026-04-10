@@ -139,13 +139,16 @@ export function buildAnclaComponents(data: WorkforceDiagnosticData): AnclaCompon
   const computed = computeCascadeValues(data)
   const gerenciaMasPct = Math.round(computed.gerenciaMas.avgExposure * 100)
 
+  // ── REGLA DEL ANCLA CIENTIFICA (cascada-ejecutiva.md:273-332) ──────
+  // Al menos UN componente debe llevar tooltip con sustento metodologico:
+  // 1) Como se calcula (metodo especifico)
+  // 2) Que mide (frase ejecutiva)
+  // 3) Umbrales de interpretacion
+  // El Ancla Cientifica va en el ULTIMO nodo (sello antes del CTA).
+  // El nodo cientifico aqui es "Automatizacion vs Augmentacion" porque deriva
+  // del Anthropic Economic Index — datos de uso real observado, no opiniones.
+
   return [
-    {
-      value: autoOrg,
-      label: 'Automatizacion vs Augmentacion',
-      narrative: `${autoOrg}% son tareas que la IA puede ejecutar sin intervencion. El ${augOrg}% restante son tareas donde la IA potencia la productividad.`,
-      suffix: '%',
-    },
     {
       value: gerenciaMasPct,
       label: computed.gerenciaMas.name,
@@ -163,8 +166,19 @@ export function buildAnclaComponents(data: WorkforceDiagnosticData): AnclaCompon
       label: 'Zona Critica',
       narrative: 'Personas con mas del 70% de exposicion y baja capacidad de adaptacion.',
       suffix: ' personas',
+    },
+    {
+      // Ancla Cientifica — ultimo nodo, sello metodologico antes del CTA
+      value: autoOrg,
+      label: 'Automatizacion vs Augmentacion',
+      narrative: `${autoOrg}% son tareas que la IA ejecuta sin intervencion. El ${augOrg}% restante son tareas donde la IA potencia la productividad.`,
+      suffix: '%',
       tooltip:
-        'Mide cuantas personas estan en cargos con >70% de exposicion a IA Y tienen baja capacidad de adaptacion segun el modelo de competencias.',
+        'Calculado a partir del Anthropic Economic Index — observaciones reales de millones ' +
+        'de conversaciones con Claude. Mide que porcentaje de las tareas del cargo la IA ' +
+        'puede ejecutar sin intervencion humana (automatizacion) versus que porcentaje las ' +
+        'potencia sin reemplazar (augmentacion). Sobre 50% de automatizacion implica ' +
+        'transformacion radical del rol; bajo 30% la IA opera como asistente.',
     },
   ]
 }

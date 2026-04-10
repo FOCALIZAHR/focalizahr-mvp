@@ -3,12 +3,13 @@
 // ════════════════════════════════════════════════════════════════════════════
 // PROYECCION MODAL — Detalle del Acto 4 (Costo de No Actuar 12 meses)
 // Tabla consolidada de 3 conceptos + total
-// fixed inset-0 z-50, Tesla line violet (crisis financiera)
+// Portal a document.body, z-[9999], Tesla line violet (crisis financiera)
 // src/app/dashboard/workforce/components/cascada/modals/ProyeccionModal.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { createPortal } from 'react-dom'
+import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { formatCurrency } from '../../../utils/format'
 import type { WorkforceDiagnosticData } from '../../../types/workforce.types'
@@ -46,36 +47,33 @@ export default function ProyeccionModal({ data, costoNoActuar12M, onClose }: Pro
     },
   ]
 
-  return (
-    <AnimatePresence>
+  const content = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8">
+      {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8"
-      >
-        {/* Backdrop */}
-        <div
-          className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm"
-          onClick={onClose}
-        />
+        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+        onClick={onClose}
+      />
 
-        {/* Card */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          transition={{ type: 'spring', stiffness: 220, damping: 30 }}
-          className="relative bg-[#0F172A]/95 backdrop-blur-2xl border border-slate-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden"
-        >
-          {/* Tesla line — violet (crisis financiera) */}
-          <div
-            className="absolute top-0 left-0 right-0 h-[1px] z-20"
-            style={{
-              background: 'linear-gradient(90deg, transparent, #A78BFA, transparent)',
-              boxShadow: '0 0 15px #A78BFA',
-            }}
-          />
+      {/* Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="relative bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden"
+      >
+        {/* Tesla line — violet (crisis financiera) */}
+        <div
+          className="absolute top-0 left-0 right-0 h-[2px] z-20"
+          style={{
+            background: 'linear-gradient(90deg, transparent, #A78BFA, transparent)',
+            boxShadow: '0 0 20px #A78BFA',
+          }}
+        />
 
           {/* Close button */}
           <button
@@ -141,8 +139,9 @@ export default function ProyeccionModal({ data, costoNoActuar12M, onClose }: Pro
               costo de reemplazo (SHRM 2024) + masa salarial expuesta a IA durante 12 meses.
             </p>
           </div>
-        </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </div>
   )
+
+  return createPortal(content, document.body)
 }

@@ -3,12 +3,13 @@
 // ════════════════════════════════════════════════════════════════════════════
 // INERCIA DESGLOSE MODAL — Detalle del Acto 2 (Inercia)
 // Tabla FTEs por gerencia con costo mensual y anual
-// fixed inset-0 z-50, Tesla line amber (cost = warning)
+// Portal a document.body, z-[9999], Tesla line amber (cost = warning)
 // src/app/dashboard/workforce/components/cascada/modals/InerciaDesgloseModal.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { createPortal } from 'react-dom'
+import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { formatCurrency } from '../../../utils/format'
 import type { WorkforceDiagnosticData } from '../../../types/workforce.types'
@@ -67,36 +68,33 @@ export default function InerciaDesgloseModal({ data, onClose }: InerciaDesgloseM
   const totalAnnual = data.inertiaCost.totalAnnual
   const totalFTEs = data.liberatedFTEs.totalFTEs
 
-  return (
-    <AnimatePresence>
+  const content = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8">
+      {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8"
-      >
-        {/* Backdrop */}
-        <div
-          className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm"
-          onClick={onClose}
-        />
+        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+        onClick={onClose}
+      />
 
-        {/* Card */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          transition={{ type: 'spring', stiffness: 220, damping: 30 }}
-          className="relative bg-[#0F172A]/95 backdrop-blur-2xl border border-slate-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden"
-        >
-          {/* Tesla line — amber para cost warning */}
-          <div
-            className="absolute top-0 left-0 right-0 h-[1px] z-20"
-            style={{
-              background: 'linear-gradient(90deg, transparent, #F59E0B, transparent)',
-              boxShadow: '0 0 15px #F59E0B',
-            }}
-          />
+      {/* Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="relative bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden"
+      >
+        {/* Tesla line — amber para cost warning */}
+        <div
+          className="absolute top-0 left-0 right-0 h-[2px] z-20"
+          style={{
+            background: 'linear-gradient(90deg, transparent, #F59E0B, transparent)',
+            boxShadow: '0 0 20px #F59E0B',
+          }}
+        />
 
           {/* Close button */}
           <button
@@ -169,8 +167,9 @@ export default function InerciaDesgloseModal({ data, onClose }: InerciaDesgloseM
               con la importancia de cada tarea ponderada por su betaScore (Eloundou et al. 2023).
             </p>
           </div>
-        </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </div>
   )
+
+  return createPortal(content, document.body)
 }

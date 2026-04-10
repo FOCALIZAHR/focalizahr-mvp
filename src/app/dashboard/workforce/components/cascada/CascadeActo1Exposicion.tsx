@@ -29,7 +29,7 @@ interface CascadeActo1Props {
 }
 
 export default memo(function CascadeActo1Exposicion({
-  data: _data,
+  data,
   computed,
   onOpenHeatmap,
 }: CascadeActo1Props) {
@@ -37,21 +37,31 @@ export default memo(function CascadeActo1Exposicion({
   const expGerenciaMenos = Math.round(computed.gerenciaMenos.avgExposure * 100)
   const cantidadGerencias = computed.cantidadGerencias
 
+  // Regla del Rio: el Acto 1 usa el MISMO numero del Ancla (avgExposure %)
+  // No introduce un numero nuevo — traduce el QUE SIGNIFICA del mismo indicador
+  const exposicionOrg = Math.round(data.exposure.avgExposure * 100)
+
   // Acto condicional: si no hay gerencias con datos, no renderizar
   if (cantidadGerencias === 0) return null
+
+  // Color tier por gravedad del valor (cascada-ejecutiva.md:226-235)
+  const heroColor =
+    exposicionOrg < 20 ? 'text-violet-400' :
+    exposicionOrg < 50 ? 'text-amber-400' :
+    'text-cyan-400'
 
   return (
     <>
       <ActSeparator label="Distribucion" color="cyan" />
 
       <div>
-        {/* Ancla — cantidad de gerencias con exposicion desigual */}
+        {/* Ancla — Regla del Rio: mismo numero del Ancla (avgExposure %) */}
         <motion.div {...fadeInDelay} className="text-center mb-10">
-          <p className="text-7xl md:text-8xl font-extralight tracking-tight text-cyan-400">
-            {cantidadGerencias}
+          <p className={`text-7xl md:text-8xl font-extralight tracking-tight ${heroColor}`}>
+            {exposicionOrg}%
           </p>
           <p className="text-xs text-slate-500 mt-3 uppercase tracking-wider">
-            gerencias con exposicion desigual
+            de exposicion organizacional
           </p>
         </motion.div>
 
