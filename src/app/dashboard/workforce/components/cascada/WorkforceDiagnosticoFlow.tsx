@@ -17,17 +17,20 @@ import AnclaInteligente from '@/components/executive/AnclaInteligente'
 import WorkforceCascada from './WorkforceCascada'
 import { getPortadaNarrative, buildAnclaComponents } from '../../utils/workforce.utils'
 import type { WorkforceDiagnosticData } from '../../types/workforce.types'
+import type { WorkforceCardType } from '../WorkforceRailCard'
 
 type DiagnosticoStep = 'portada' | 'ancla' | 'cascada'
 
 interface WorkforceDiagnosticoFlowProps {
   data: WorkforceDiagnosticData
   onBack: () => void
+  onNavigateTab?: (card: WorkforceCardType) => void
 }
 
 export default function WorkforceDiagnosticoFlow({
   data,
   onBack,
+  onNavigateTab,
 }: WorkforceDiagnosticoFlowProps) {
   const [step, setStep] = useState<DiagnosticoStep>('portada')
 
@@ -87,7 +90,7 @@ export default function WorkforceDiagnosticoFlow({
           exit={{ opacity: 0, x: -20 }}
           className="w-full"
         >
-          <WorkforceCascada data={data} onBackToLobby={onBack} />
+          <WorkforceCascada data={data} onBackToLobby={onBack} onNavigateTab={onNavigateTab} />
         </motion.div>
       )}
     </AnimatePresence>

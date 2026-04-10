@@ -179,7 +179,12 @@ export default function WorkforceCinemaOrchestrator() {
 
           {/* DIAGNOSTICO: Portada → Ancla → Cascada */}
           {view === 'diagnostico' && (
-            <WorkforceDiagnosticoFlow key="diagnostico" data={data} onBack={handleBackToLobby} />
+            <WorkforceDiagnosticoFlow
+              key="diagnostico"
+              data={data}
+              onBack={handleBackToLobby}
+              onNavigateTab={handleSelectCard}
+            />
           )}
 
           {/* ESTRUCTURA: drill-down por persona */}

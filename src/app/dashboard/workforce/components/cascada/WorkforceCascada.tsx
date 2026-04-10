@@ -10,6 +10,7 @@
 
 import { useMemo, useState } from 'react'
 import type { WorkforceDiagnosticData } from '../../types/workforce.types'
+import type { WorkforceCardType } from '../WorkforceRailCard'
 import { computeCascadeValues } from '../../utils/workforce.utils'
 
 import CascadeActo1Exposicion from './CascadeActo1Exposicion'
@@ -26,11 +27,14 @@ import ProyeccionModal from './modals/ProyeccionModal'
 interface WorkforceCascadaProps {
   data: WorkforceDiagnosticData
   onBackToLobby: () => void
+  onNavigateTab?: (card: WorkforceCardType) => void
 }
 
-const noop = () => {}
-
-export default function WorkforceCascada({ data, onBackToLobby }: WorkforceCascadaProps) {
+export default function WorkforceCascada({
+  data,
+  onBackToLobby,
+  onNavigateTab,
+}: WorkforceCascadaProps) {
   const computed = useMemo(() => computeCascadeValues(data), [data])
 
   // ── Modales del orquestador ───────────────────────────────────────────
@@ -40,9 +44,6 @@ export default function WorkforceCascada({ data, onBackToLobby }: WorkforceCasca
   const [modalInerciaDesglose, setModalInerciaDesglose] = useState(false)
   const [modalHallazgos, setModalHallazgos] = useState(false)
   const [modalProyeccion, setModalProyeccion] = useState(false)
-
-  // NOTA: Los actos 2-4 + sintesis aun tienen onContinue/onBack legacy.
-  // Se reescriben acto-por-acto en pasos siguientes (2.2, 2.3, 2.4, 2.5).
 
   return (
     <>
@@ -66,7 +67,12 @@ export default function WorkforceCascada({ data, onBackToLobby }: WorkforceCasca
           computed={computed}
           onOpenProyeccion={() => setModalProyeccion(true)}
         />
-        <CascadeSintesis data={data} computed={computed} onBackToLobby={onBackToLobby} />
+        <CascadeSintesis
+          data={data}
+          computed={computed}
+          onBackToLobby={onBackToLobby}
+          onNavigateTab={onNavigateTab}
+        />
       </div>
 
       {/* ═══ MODALES ═══ */}
