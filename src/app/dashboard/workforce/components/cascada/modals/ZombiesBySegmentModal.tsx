@@ -34,8 +34,15 @@ export default function ZombiesBySegmentModal({ data, onClose }: ZombiesBySegmen
   }, [onClose])
 
   const segments = useMemo(() => {
-    const classified = data.zombies.persons.filter(z => z.acotadoGroup && z.standardCategory)
-    const grouped = groupBySegment(classified)
+    // Mismo source que Acto 2 Problema: retentionPriority filtrado
+    const trapped = data.retentionPriority.ranking.filter(
+      r =>
+        r.roleFitScore > 75 &&
+        r.observedExposure > 0.5 &&
+        r.acotadoGroup &&
+        r.standardCategory
+    )
+    const grouped = groupBySegment(trapped)
     return Array.from(grouped.entries())
       .map(([key, members]) => {
         const cumple = members.filter(m => m.metasCompliance !== null && m.metasCompliance >= 80).length
@@ -44,7 +51,7 @@ export default function ZombiesBySegmentModal({ data, onClose }: ZombiesBySegmen
         return { key, members, cumple, noCumple, sinMedicion }
       })
       .sort((a, b) => b.members.length - a.members.length)
-  }, [data.zombies.persons])
+  }, [data.retentionPriority.ranking])
 
   const toggleExpand = (key: string) => setExpandedKey(prev => (prev === key ? null : key))
 
@@ -86,7 +93,7 @@ export default function ZombiesBySegmentModal({ data, onClose }: ZombiesBySegmen
             Talento atrapado por segmento
           </p>
           <h2 className="text-xl font-light text-white">
-            {data.zombies.count} personas con dominio &gt;70%
+            {segments.reduce((s, seg) => s + seg.members.length, 0)} personas con dominio &gt;75% en cargos expuestos
           </h2>
           <p className="text-xs text-slate-400 font-light mt-2">
             Click en un segmento para ver las personas. El cumplimiento de metas distingue
@@ -192,8 +199,8 @@ export default function ZombiesBySegmentModal({ data, onClose }: ZombiesBySegmen
 
         <div className="border-t border-slate-800/50 p-4 flex-shrink-0">
           <p className="text-[10px] text-slate-500 text-center leading-relaxed max-w-md mx-auto">
-            Talento Zombie = dominio &gt;85% del cargo + alta exposición a IA + baja capacidad
-            de adaptación. Las metas distinguen los dos sub-patrones del problema.
+            Talento atrapado = dominio &gt;75% del cargo + cargo con &gt;50% exposición a IA.
+            Las metas distinguen los dos sub-patrones del problema.
           </p>
         </div>
       </motion.div>

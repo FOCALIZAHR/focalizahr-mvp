@@ -21,8 +21,8 @@ import {
   fadeIn,
   fadeInDelay,
 } from '@/app/dashboard/executive-hub/components/GoalsCorrelation/cascada/shared'
-import { calculateSegmentMetrics, groupBySegment } from '@/lib/workforce/segmentUtils'
-import type { WorkforceDiagnosticData, PersonAlert } from '../../types/workforce.types'
+import { groupBySegment } from '@/lib/workforce/segmentUtils'
+import type { WorkforceDiagnosticData } from '../../types/workforce.types'
 
 interface CascadeActo6SintesisProps {
   data: WorkforceDiagnosticData
@@ -38,52 +38,41 @@ interface ContradictionResult {
 
 export default memo(function CascadeActo6Sintesis({ data }: CascadeActo6SintesisProps) {
   // ── Calcular el segmento con mayor contradiccion ────────────────────
+  // FUENTE UNICA: retentionPriority.ranking — agrupar por segmento, computar
+  // avgExposure + intocablePct, encontrar segmento con max contradictionScore.
   const contradiction = useMemo<ContradictionResult | null>(() => {
-    // 1) Segmentos con exposicion (de la union zombies + flightRisk)
-    const riskMap = new Map<string, PersonAlert>()
-    for (const z of data.zombies.persons) riskMap.set(z.employeeId, z)
-    for (const f of data.flightRisk.persons) {
-      if (!riskMap.has(f.employeeId)) riskMap.set(f.employeeId, f)
-    }
-    const classifiedRisk = Array.from(riskMap.values()).filter(
-      p => p.acotadoGroup && p.standardCategory
+    const classified = data.retentionPriority.ranking.filter(
+      r => r.observedExposure > 0 && r.acotadoGroup && r.standardCategory
     )
-    if (classifiedRisk.length === 0) return null
-    const expSegments = calculateSegmentMetrics(classifiedRisk, p => p.observedExposure)
+    if (classified.length === 0) return null
 
-    // 2) Segmentos con retencion (intocables / total)
-    const retClassified = data.retentionPriority.ranking.filter(
-      r => r.acotadoGroup && r.standardCategory
-    )
-    const retGrouped = groupBySegment(retClassified)
+    const grouped = groupBySegment(classified)
 
-    // 3) Cruzar: para cada segmento de exposicion, buscar su retencion
-    const matches = expSegments
-      .map(exp => {
-        const retMembers = retGrouped.get(exp.key) ?? []
-        const intocables = retMembers.filter(r => r.tier === 'intocable').length
-        const total = retMembers.length
-        const intocablesPct = total > 0 ? (intocables / total) * 100 : 0
-        const avgExposurePct = exp.avgExposure * 100
+    const matches = Array.from(grouped.entries())
+      .map(([key, members]) => {
+        const total = members.length
+        const intocables = members.filter(m => m.tier === 'intocable').length
+        const avgExposurePct =
+          (members.reduce((s, m) => s + m.observedExposure, 0) / total) * 100
+        const intocablesPct = (intocables / total) * 100
 
         // Contradiccion = ambas metricas altas
         // (alta exposicion = mercado los toma, alta intocables% = org los protege)
-        // Suma simple para V1 — V2 puede usar formula multiplicativa o ponderada
         const contradictionScore = avgExposurePct + intocablesPct
 
         return {
-          key: exp.key,
+          key,
           avgExposurePct,
           intocables,
           intocablesPct,
           contradictionScore,
         }
       })
-      .filter(m => m.intocables > 0)  // solo segmentos con al menos 1 intocable
+      .filter(m => m.intocables > 0)
       .sort((a, b) => b.contradictionScore - a.contradictionScore)
 
     return matches[0] ?? null
-  }, [data.zombies.persons, data.flightRisk.persons, data.retentionPriority.ranking])
+  }, [data.retentionPriority.ranking])
 
   // Acto condicional: si no hay contradiccion identificable, no renderizar
   if (!contradiction) return null

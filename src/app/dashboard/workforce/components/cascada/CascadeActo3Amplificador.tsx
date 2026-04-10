@@ -4,7 +4,14 @@
 // ACTO 3 — AMPLIFICADOR — "Los Cruces que Multiplican el Riesgo" (v3.1)
 //
 // Unidad de analisis: MIXTA (segmento + area + cargo)
-// Fuentes: flightRisk[] (segmento), adoptionRisk[] (area), seniorityCompression[]
+//
+// FUENTES (correctas):
+//   - Fuga: retentionPriority.ranking filtrado por (intocable+valioso) × exposicion alta
+//           — el espiritu es "talento que el mercado va a cazar", no zombies estrictos
+//   - Clima: adoptionRisk.departments (as-is, depto-level)
+//   - Compresion: seniorityCompression.opportunities (as-is, cargo-level)
+//
+// Cada sub-bloque es condicional. El acto renderiza si AL MENOS UNO tiene datos.
 // Narrativa LITERAL del documento CASCADA_WORKFORCE_v3_1.md
 // src/app/dashboard/workforce/components/cascada/CascadeActo3Amplificador.tsx
 // ════════════════════════════════════════════════════════════════════════════
@@ -29,48 +36,57 @@ export default memo(function CascadeActo3Amplificador({
   data,
   onOpenCross,
 }: CascadeActo3AmplificadorProps) {
-  // Top segmento de fuga (con metas para narrativa)
+  // ── Top segmento de fuga (derivado de retentionPriority) ──────────────
+  // Espiritu: "talento que el mercado va a cazar" = personas valiosas o
+  // intocables que ademas estan en cargos altamente expuestos a IA.
   const topFlight = useMemo(() => {
-    const classified = data.flightRisk.persons.filter(p => p.acotadoGroup && p.standardCategory)
-    if (classified.length === 0) return null
-    const grouped = groupBySegment(classified)
+    const fugaRisk = data.retentionPriority.ranking.filter(
+      r =>
+        (r.tier === 'intocable' || r.tier === 'valioso') &&
+        r.observedExposure > 0.5 &&
+        r.acotadoGroup &&
+        r.standardCategory
+    )
+    if (fugaRisk.length === 0) return null
+
+    const grouped = groupBySegment(fugaRisk)
     const sorted = Array.from(grouped.entries())
       .map(([key, members]) => ({
         key,
         enRiesgo: members.length,
-        cumpleMetas: members.filter(m => m.metasCompliance !== null && m.metasCompliance >= 80).length,
+        cumpleMetas: members.filter(
+          m => m.metasCompliance !== null && m.metasCompliance >= 80
+        ).length,
       }))
       .sort((a, b) => b.enRiesgo - a.enRiesgo)
     return sorted[0]
-  }, [data.flightRisk.persons])
+  }, [data.retentionPriority.ranking])
 
-  // Top 2 areas con peor clima (compromiso bajo)
+  // ── Top 2 areas con peor clima (engagement bajo) ──────────────────────
   const topAdoption = useMemo(() => {
     return [...data.adoptionRisk.departments]
       .sort((a, b) => a.avgEngagement - b.avgEngagement)
       .slice(0, 2)
   }, [data.adoptionRisk.departments])
 
-  // Top 1 oportunidad de compresion
+  // ── Top 1 oportunidad de compresion ───────────────────────────────────
   const topCompression = useMemo(() => {
-    return [...data.seniorityCompression.opportunities]
-      .sort((a, b) => b.annualSavings - a.annualSavings)[0] ?? null
+    return (
+      [...data.seniorityCompression.opportunities].sort(
+        (a, b) => b.annualSavings - a.annualSavings
+      )[0] ?? null
+    )
   }, [data.seniorityCompression.opportunities])
 
-  const totalSenales =
-    data.flightRisk.count +
-    data.adoptionRisk.departments.length +
-    data.seniorityCompression.opportunities.length
+  // Cuantas señales tienen al menos un item
+  const senalesActivas = [
+    topFlight !== null,
+    topAdoption.length > 0,
+    topCompression !== null,
+  ].filter(Boolean).length
 
   // Acto condicional: si las 3 fuentes estan vacias, no renderizar
-  if (totalSenales === 0) return null
-
-  // Cuantas de las 3 categorias tienen al menos un item
-  const senalesActivas = [
-    data.flightRisk.count > 0,
-    data.adoptionRisk.departments.length > 0,
-    data.seniorityCompression.opportunities.length > 0,
-  ].filter(Boolean).length
+  if (senalesActivas === 0) return null
 
   return (
     <>
@@ -83,7 +99,7 @@ export default memo(function CascadeActo3Amplificador({
             {senalesActivas}
           </p>
           <p className="text-xs text-slate-500 mt-3 uppercase tracking-wider">
-            señales que se amplifican
+            {senalesActivas === 1 ? 'señal que se amplifica' : 'señales que se amplifican'}
           </p>
         </motion.div>
 

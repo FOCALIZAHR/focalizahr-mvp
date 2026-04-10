@@ -15,7 +15,7 @@ import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { groupBySegment } from '@/lib/workforce/segmentUtils'
 import { formatCurrency } from '../../../utils/format'
-import type { WorkforceDiagnosticData } from '../../../types/workforce.types'
+import type { WorkforceDiagnosticData, RetentionEntry } from '../../../types/workforce.types'
 
 interface CrossIntelligenceModalProps {
   data: WorkforceDiagnosticData
@@ -36,12 +36,20 @@ export default function CrossIntelligenceModal({ data, onClose }: CrossIntellige
   }, [onClose])
 
   const fugaSegments = useMemo(() => {
-    const classified = data.flightRisk.persons.filter(p => p.acotadoGroup && p.standardCategory)
-    const grouped = groupBySegment(classified)
+    // Mismo source que el Acto 3 Amplificador: retentionPriority filtrado
+    // por (intocable+valioso) × alta exposicion
+    const fugaRisk = data.retentionPriority.ranking.filter(
+      r =>
+        (r.tier === 'intocable' || r.tier === 'valioso') &&
+        r.observedExposure > 0.5 &&
+        r.acotadoGroup &&
+        r.standardCategory
+    )
+    const grouped = groupBySegment(fugaRisk)
     return Array.from(grouped.entries())
       .map(([key, members]) => ({ key, members }))
       .sort((a, b) => b.members.length - a.members.length)
-  }, [data.flightRisk.persons])
+  }, [data.retentionPriority.ranking])
 
   const climaAreas = useMemo(() => {
     return [...data.adoptionRisk.departments].sort((a, b) => a.avgEngagement - b.avgEngagement)
@@ -51,8 +59,13 @@ export default function CrossIntelligenceModal({ data, onClose }: CrossIntellige
     return [...data.seniorityCompression.opportunities].sort((a, b) => b.annualSavings - a.annualSavings)
   }, [data.seniorityCompression.opportunities])
 
+  const fugaTotal = useMemo(
+    () => fugaSegments.reduce((s, seg) => s + seg.members.length, 0),
+    [fugaSegments]
+  )
+
   const TABS: { key: TabKey; label: string; count: number }[] = [
-    { key: 'fuga', label: 'Fuga', count: data.flightRisk.count },
+    { key: 'fuga', label: 'Fuga', count: fugaTotal },
     { key: 'clima', label: 'Clima', count: data.adoptionRisk.departments.length },
     { key: 'compresion', label: 'Compresión', count: data.seniorityCompression.opportunities.length },
   ]
@@ -142,7 +155,7 @@ export default function CrossIntelligenceModal({ data, onClose }: CrossIntellige
 // SUB-COMPONENTS
 // ════════════════════════════════════════════════════════════════════════════
 
-function FugaTab({ segments }: { segments: { key: string; members: WorkforceDiagnosticData['flightRisk']['persons'] }[] }) {
+function FugaTab({ segments }: { segments: { key: string; members: RetentionEntry[] }[] }) {
   if (segments.length === 0) {
     return <p className="text-sm text-slate-500 text-center py-8">Sin riesgos de fuga clasificados.</p>
   }
@@ -165,8 +178,16 @@ function FugaTab({ segments }: { segments: { key: string; members: WorkforceDiag
                   <span className="text-slate-500 ml-2">{p.position}</span>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  <span className="text-purple-400 font-mono">
-                    reemplazo {formatCurrency(p.replacementCost)}
+                  <span className="text-slate-400 font-mono text-[10px]">
+                    exp {Math.round(p.observedExposure * 100)}%
+                  </span>
+                  <span
+                    className={cn(
+                      'font-mono text-[10px] uppercase tracking-wider',
+                      p.tier === 'intocable' ? 'text-violet-400' : 'text-cyan-400'
+                    )}
+                  >
+                    {p.tier === 'intocable' ? 'Intocable' : 'Valioso'}
                   </span>
                 </div>
               </div>

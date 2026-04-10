@@ -17,7 +17,7 @@ import { motion } from 'framer-motion'
 import { X, ChevronDown, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { calculateSegmentMetrics, type SegmentMetrics } from '@/lib/workforce/segmentUtils'
-import type { WorkforceDiagnosticData, PersonAlert } from '../../../types/workforce.types'
+import type { WorkforceDiagnosticData, RetentionEntry } from '../../../types/workforce.types'
 
 interface TopSegmentosModalProps {
   data: WorkforceDiagnosticData
@@ -36,17 +36,13 @@ export default function TopSegmentosModal({ data, onClose }: TopSegmentosModalPr
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  // Computar segmentos desde la union zombies + flightRisk (mismo source que el Acto)
-  const segments = useMemo<SegmentMetrics<PersonAlert>[]>(() => {
-    const riskMap = new Map<string, PersonAlert>()
-    for (const z of data.zombies.persons) riskMap.set(z.employeeId, z)
-    for (const f of data.flightRisk.persons) {
-      if (!riskMap.has(f.employeeId)) riskMap.set(f.employeeId, f)
-    }
-    const allRisk = Array.from(riskMap.values())
-    const classified = allRisk.filter(p => p.acotadoGroup && p.standardCategory)
-    return calculateSegmentMetrics(classified, p => p.observedExposure)
-  }, [data.zombies.persons, data.flightRisk.persons])
+  // Mismo source que el Acto 1 Gancho: retentionPriority.ranking filtrado
+  const segments = useMemo<SegmentMetrics<RetentionEntry>[]>(() => {
+    const exposed = data.retentionPriority.ranking.filter(
+      r => r.observedExposure > 0 && r.acotadoGroup && r.standardCategory
+    )
+    return calculateSegmentMetrics(exposed, r => r.observedExposure)
+  }, [data.retentionPriority.ranking])
 
   const toggleExpand = (key: string) => {
     setExpandedKey(prev => (prev === key ? null : key))

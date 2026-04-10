@@ -4,9 +4,15 @@
 // ACTO 1 — GANCHO — "Los Segmentos que Concentran el Riesgo" (v3.1)
 //
 // Unidad de analisis: SEGMENTO (acotadoGroup × standardCategory)
-// Fuente de datos: zombies[] + flightRisk[] (union por employeeId)
+//
+// FUENTE CORRECTA: retentionPriority.ranking — la unica lista en el diagnostic
+// que contiene TODOS los empleados con SOC code mapeado + observedExposure +
+// segment fields. zombies/flightRisk son subsets demasiado restrictivos y
+// frecuentemente vienen vacios.
+//
+// Filtro: observedExposure > 0 (cualquier persona con exposicion no-cero)
 // Patron narrativo PURO: ActSeparator + ancla + narrativa literal + SubtleLink
-// El detalle (lista completa de segmentos) vive en TopSegmentosModal
+// El detalle vive en TopSegmentosModal
 // Narrativa exacta del documento CASCADA_WORKFORCE_v3_1.md
 // src/app/dashboard/workforce/components/cascada/CascadeActo1Gancho.tsx
 // ════════════════════════════════════════════════════════════════════════════
@@ -20,7 +26,7 @@ import {
   SubtleLink,
 } from '@/app/dashboard/executive-hub/components/GoalsCorrelation/cascada/shared'
 import { calculateSegmentMetrics } from '@/lib/workforce/segmentUtils'
-import type { WorkforceDiagnosticData, PersonAlert } from '../../types/workforce.types'
+import type { WorkforceDiagnosticData } from '../../types/workforce.types'
 
 interface CascadeActo1GanchoProps {
   data: WorkforceDiagnosticData
@@ -31,29 +37,19 @@ export default memo(function CascadeActo1Gancho({
   data,
   onOpenTopSegmentos,
 }: CascadeActo1GanchoProps) {
-  // ── Computar segmentos desde la union zombies + flightRisk ──────────
   const segmentData = useMemo(() => {
-    // Union por employeeId (un mismo empleado puede estar en ambas listas)
-    const riskMap = new Map<string, PersonAlert>()
-    for (const z of data.zombies.persons) {
-      riskMap.set(z.employeeId, z)
-    }
-    for (const f of data.flightRisk.persons) {
-      if (!riskMap.has(f.employeeId)) {
-        riskMap.set(f.employeeId, f)
-      }
-    }
-    const allRisk = Array.from(riskMap.values())
+    // FUENTE: retentionPriority.ranking (todos los empleados con SOC mapeado)
+    // Filtro: observedExposure > 0 + segment fields presentes
+    const exposed = data.retentionPriority.ranking.filter(
+      r => r.observedExposure > 0 && r.acotadoGroup && r.standardCategory
+    )
 
-    // Filtrar a solo segmentos clasificados (acotadoGroup + standardCategory presentes)
-    const classified = allRisk.filter(p => p.acotadoGroup && p.standardCategory)
-
-    if (classified.length === 0) {
-      return { allSegments: [], top3: [], concentration: 0, totalRisk: 0 }
+    if (exposed.length === 0) {
+      return { allSegments: [], top3: [], concentration: 0, totalExposed: 0 }
     }
 
-    // Calcular metricas por segmento (impactScore = headcount × avgExposure)
-    const allSegments = calculateSegmentMetrics(classified, p => p.observedExposure)
+    // Metricas por segmento (impactScore = headcount × avgExposure)
+    const allSegments = calculateSegmentMetrics(exposed, p => p.observedExposure)
     const top3 = allSegments.slice(0, 3)
 
     // Concentracion = % del impactScore total que vive en el top 3
@@ -65,11 +61,11 @@ export default memo(function CascadeActo1Gancho({
       allSegments,
       top3,
       concentration,
-      totalRisk: classified.length,
+      totalExposed: exposed.length,
     }
-  }, [data.zombies.persons, data.flightRisk.persons])
+  }, [data.retentionPriority.ranking])
 
-  // Acto condicional: si no hay segmentos clasificados, no renderizar
+  // Acto condicional: si no hay segmentos clasificados con exposicion, no renderizar
   if (segmentData.allSegments.length === 0) return null
 
   return (
@@ -83,11 +79,11 @@ export default memo(function CascadeActo1Gancho({
             {segmentData.allSegments.length}
           </p>
           <p className="text-xs text-slate-500 mt-3 uppercase tracking-wider">
-            segmentos con riesgo concentrado
+            segmentos con exposición a IA
           </p>
         </motion.div>
 
-        {/* Narrativa apertura — del script v3.1 (literal) */}
+        {/* Narrativa — del script v3.1 (literal) */}
         <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-4">
           <p className="text-xl font-light text-slate-300 text-center leading-relaxed">
             <span className="font-medium text-cyan-400">{segmentData.top3.length}</span>{' '}

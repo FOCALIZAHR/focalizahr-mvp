@@ -193,6 +193,7 @@ export interface RetentionEntry {
   // v3.1 — segment fields para agrupacion frontend
   acotadoGroup: string | null
   standardCategory: string | null
+  metasCompliance: number | null  // = goalsRawPercent (0-100)
 }
 
 export interface RetentionPriorityResult {
@@ -793,6 +794,7 @@ export class WorkforceIntelligenceService {
           // v3.1 — preservar segment fields
           acotadoGroup: e.acotadoGroup,
           standardCategory: e.standardCategory,
+          metasCompliance: e.goalsRawPercent,
         }
       })
       .sort((a, b) => b.retentionScore - a.retentionScore)
