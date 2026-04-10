@@ -21,6 +21,7 @@ import CascadeSintesis from './CascadeSintesis'
 import HeatmapModal from './modals/HeatmapModal'
 import InerciaDesgloseModal from './modals/InerciaDesgloseModal'
 import HallazgosModal from './modals/HallazgosModal'
+import ProyeccionModal from './modals/ProyeccionModal'
 
 interface WorkforceCascadaProps {
   data: WorkforceDiagnosticData
@@ -38,7 +39,7 @@ export default function WorkforceCascada({ data, onBackToLobby }: WorkforceCasca
   const [modalHeatmap, setModalHeatmap] = useState(false)
   const [modalInerciaDesglose, setModalInerciaDesglose] = useState(false)
   const [modalHallazgos, setModalHallazgos] = useState(false)
-  // futuras: modalProyeccion (Acto 4)
+  const [modalProyeccion, setModalProyeccion] = useState(false)
 
   // NOTA: Los actos 2-4 + sintesis aun tienen onContinue/onBack legacy.
   // Se reescriben acto-por-acto en pasos siguientes (2.2, 2.3, 2.4, 2.5).
@@ -60,7 +61,11 @@ export default function WorkforceCascada({ data, onBackToLobby }: WorkforceCasca
           computed={computed}
           onOpenHallazgos={() => setModalHallazgos(true)}
         />
-        <CascadeActo4Proyeccion data={data} computed={computed} onContinue={noop} onBack={noop} />
+        <CascadeActo4Proyeccion
+          data={data}
+          computed={computed}
+          onOpenProyeccion={() => setModalProyeccion(true)}
+        />
         <CascadeSintesis data={data} computed={computed} onBackToLobby={onBackToLobby} />
       </div>
 
@@ -76,6 +81,13 @@ export default function WorkforceCascada({ data, onBackToLobby }: WorkforceCasca
           data={data}
           cantidadHallazgos={computed.cantidadHallazgos}
           onClose={() => setModalHallazgos(false)}
+        />
+      )}
+      {modalProyeccion && (
+        <ProyeccionModal
+          data={data}
+          costoNoActuar12M={computed.costoNoActuar12M}
+          onClose={() => setModalProyeccion(false)}
         />
       )}
     </>
