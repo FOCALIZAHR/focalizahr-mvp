@@ -19,6 +19,7 @@ import CascadeActo4Proyeccion from './CascadeActo4Proyeccion'
 import CascadeSintesis from './CascadeSintesis'
 
 import HeatmapModal from './modals/HeatmapModal'
+import InerciaDesgloseModal from './modals/InerciaDesgloseModal'
 
 interface WorkforceCascadaProps {
   data: WorkforceDiagnosticData
@@ -34,7 +35,8 @@ export default function WorkforceCascada({ data, onBackToLobby }: WorkforceCasca
   // Cada acto pide su detalle a traves de un callback que aqui setea el state.
   // Los modales son fixed inset-0 z-50 — viven fuera del flujo de la cascada.
   const [modalHeatmap, setModalHeatmap] = useState(false)
-  // futuras: modalHallazgos, modalInerciaDesglose, modalProyeccion (sesiones siguientes)
+  const [modalInerciaDesglose, setModalInerciaDesglose] = useState(false)
+  // futuras: modalHallazgos, modalProyeccion (sesiones siguientes)
 
   // NOTA: Los actos 2-4 + sintesis aun tienen onContinue/onBack legacy.
   // Se reescriben acto-por-acto en pasos siguientes (2.2, 2.3, 2.4, 2.5).
@@ -47,7 +49,10 @@ export default function WorkforceCascada({ data, onBackToLobby }: WorkforceCasca
           computed={computed}
           onOpenHeatmap={() => setModalHeatmap(true)}
         />
-        <CascadeActo2Inercia data={data} onContinue={noop} onBack={noop} />
+        <CascadeActo2Inercia
+          data={data}
+          onOpenDesglose={() => setModalInerciaDesglose(true)}
+        />
         <CascadeActo3Hallazgos data={data} computed={computed} onContinue={noop} onBack={noop} />
         <CascadeActo4Proyeccion data={data} computed={computed} onContinue={noop} onBack={noop} />
         <CascadeSintesis data={data} computed={computed} onBackToLobby={onBackToLobby} />
@@ -56,6 +61,9 @@ export default function WorkforceCascada({ data, onBackToLobby }: WorkforceCasca
       {/* ═══ MODALES ═══ */}
       {modalHeatmap && (
         <HeatmapModal data={data} onClose={() => setModalHeatmap(false)} />
+      )}
+      {modalInerciaDesglose && (
+        <InerciaDesgloseModal data={data} onClose={() => setModalInerciaDesglose(false)} />
       )}
     </>
   )
