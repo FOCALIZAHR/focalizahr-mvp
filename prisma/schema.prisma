@@ -3200,12 +3200,24 @@ model OnetOccupation {
   educationLevel    String?  @map("education_level")          // "Bachelor's degree"
   medianSalaryUsd   Float?   @map("median_salary_usd")
 
-  // AI Exposure scores (Eloundou + Anthropic Economic Index)
-  betaScore         Float?   @map("beta_score")               // Eloundou 0.0-1.0
-  observedExposure  Float?   @map("observed_exposure")        // Anthropic 0.0-1.0
-  automationShare   Float?   @map("automation_share")         // 0.0-1.0
-  augmentationShare Float?   @map("augmentation_share")       // 0.0-1.0
-  taskCoverage      Float?   @map("task_coverage")            // 0.0-1.0
+  // AI Exposure scores (Anthropic Economic Index — rollup ponderado de tareas)
+  betaScore         Float?   @map("beta_score")               // Rollup promedio betaScore de tareas
+  observedExposure  Float?   @map("observed_exposure")        // Anthropic rollup 0.0-1.0 (5 dims)
+  automationShare   Float?   @map("automation_share")         // Anthropic rollup directive dim
+  augmentationShare Float?   @map("augmentation_share")       // Anthropic rollup 4 aug dims
+  taskCoverage      Float?   @map("task_coverage")            // % tareas con datos Anthropic
+
+  // Eloundou 2023 "GPTs are GPTs" — scores por ocupación (occ_level.csv)
+  exposureEloundou  Float?   @map("exposure_eloundou")        // dv_rating_beta (GPT-4, con herramientas) — INDICADOR PADRE
+  dvRatingAlpha     Float?   @map("dv_rating_alpha")          // GPT-4, sin herramientas
+  dvRatingGamma     Float?   @map("dv_rating_gamma")          // GPT-4, % tareas expuestas
+  humanRatingAlpha  Float?   @map("human_rating_alpha")       // Humanos, sin herramientas
+  humanRatingBeta   Float?   @map("human_rating_beta")        // Humanos, con herramientas
+  humanRatingGamma  Float?   @map("human_rating_gamma")       // Humanos, % tareas expuestas
+
+  // FocalizaScore — indicador canónico del producto (por ocupación)
+  focalizaScore       Float?   @map("focaliza_score")         // = exposureEloundou (dv_rating_beta)
+  focalizaScoreSource String?  @map("focaliza_score_source")  // 'eloundou'
 
   isActive          Boolean  @default(true) @map("is_active")
   createdAt         DateTime @default(now()) @map("created_at")
@@ -3227,8 +3239,20 @@ model OnetTask {
   taskDescription   String   @map("task_description") @db.Text
   taskDescriptionEs String?  @map("task_description_es") @db.Text  // Traducción ES (batch posterior)
   importance        Float    @default(3.0)                          // 1.0-5.0 (Float para FTE calc)
-  betaScore         Float?   @map("beta_score")                    // Eloundou 0.0/0.5/1.0 (Float)
+  betaScore         Float?   @map("beta_score")                    // Exposición IA combinada (Anthropic real o Haiku estimate)
+  betaSource        String?  @map("beta_source")                   // 'anthropic' | 'haiku_estimate' — fuente del betaScore
+  usageFrequency    Float?   @map("usage_frequency")               // Frecuencia uso Claude (task_pct_v2.csv)
   isAutomated       Boolean  @default(false) @map("is_automated")  // Anthropic: tarea observada como automatizada
+
+  // Eloundou 2023 "GPTs are GPTs" — scores por tarea (full_labelset.tsv)
+  betaEloundou       Float?   @map("beta_eloundou")                // 0/0.5/1 con herramientas — INDICADOR PADRE por tarea
+  alphaEloundou      Float?   @map("alpha_eloundou")               // 0/0.5/1 sin herramientas
+  gammaEloundou      Float?   @map("gamma_eloundou")               // 0/1 tarea expuesta
+  automationEloundou Float?   @map("automation_eloundou")          // 0-1 score automatización continuo
+
+  // FocalizaScore — indicador canónico del producto (por tarea)
+  focalizaScore       Float?   @map("focaliza_score")              // = betaEloundou (single source of truth, no Haiku)
+  focalizaScoreSource String?  @map("focaliza_score_source")       // 'eloundou' (futuro: podría agregarse otra fuente)
 
   createdAt         DateTime @default(now()) @map("created_at")
 

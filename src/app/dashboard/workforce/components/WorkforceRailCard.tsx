@@ -9,7 +9,7 @@
 
 import { memo, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Brain, Users, TrendingUp, Sliders } from 'lucide-react'
+import { Brain, Users, TrendingUp, Sliders, Grid3x3, Layers } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { WorkforceDiagnosticData } from '../types/workforce.types'
 import { computeHallazgosCount } from '../utils/workforce.utils'
@@ -18,10 +18,18 @@ import { computeHallazgosCount } from '../utils/workforce.utils'
 // TYPES
 // ════════════════════════════════════════════════════════════════════════════
 
-export type WorkforceCardType = 'diagnostico' | 'estructura' | 'benchmarks' | 'simulador'
+export type WorkforceCardType =
+  | 'diagnostico'
+  | 'nine-box-live'
+  | 'descriptor-simulator'
+  | 'estructura'
+  | 'benchmarks'
+  | 'simulador'
 
 const CARD_ICONS: Record<WorkforceCardType, typeof Brain> = {
   diagnostico: Brain,
+  'nine-box-live': Grid3x3,
+  'descriptor-simulator': Layers,
   estructura: Users,
   benchmarks: TrendingUp,
   simulador: Sliders,
@@ -29,6 +37,8 @@ const CARD_ICONS: Record<WorkforceCardType, typeof Brain> = {
 
 const CARD_LABELS: Record<WorkforceCardType, string> = {
   diagnostico: 'Diagnostico',
+  'nine-box-live': '9-Box × IA',
+  'descriptor-simulator': 'Rediseño cargos',
   estructura: 'Estructura',
   benchmarks: 'Benchmarks',
   simulador: 'Simulador',
@@ -49,6 +59,15 @@ function getDotStatus(card: WorkforceCardType, data: WorkforceDiagnosticData): D
       if (data.exposure.avgExposure > 0.5) return 'cyan'
       return 'none'
     }
+    case 'nine-box-live': {
+      const classified = data.retentionPriority.ranking.filter(
+        r => r.nineBoxPosition !== null && r.nineBoxPosition !== undefined,
+      ).length
+      return classified > 0 ? 'cyan' : 'none'
+    }
+    case 'descriptor-simulator':
+      // Status cyan siempre — el dropdown decidirá si hay descriptors
+      return 'cyan'
     case 'estructura':
       return data.totalEmployees > 0 ? 'cyan' : 'none'
     case 'benchmarks':
@@ -92,6 +111,27 @@ function getCardNarrative(card: WorkforceCardType, data: WorkforceDiagnosticData
         tooltip: `${pct}% exposicion organizacional · ${data.zombies.count} zombies, ${data.flightRisk.count} en riesgo de fuga`,
       }
     }
+    case 'nine-box-live': {
+      const classified = data.retentionPriority.ranking.filter(
+        r => r.nineBoxPosition !== null && r.nineBoxPosition !== undefined,
+      ).length
+      if (classified === 0) {
+        return {
+          text: 'Sin clasificacion 9-box',
+          tooltip: 'Activa Performance para desbloquear el triaje',
+        }
+      }
+      return {
+        text: `${classified} ${classified === 1 ? 'persona' : 'personas'} en triaje`,
+        tooltip: 'Matriz 3x3 con lasso libre · color = exposicion IA · tamano = salario',
+      }
+    }
+    case 'descriptor-simulator':
+      return {
+        text: 'Simula el rediseno por cargo',
+        tooltip:
+          'Edita las tareas de un descriptor y ve en vivo cuanto rescatas, cuantas horas liberas y como cae la exposicion a IA',
+      }
     case 'estructura': {
       if (data.totalEmployees === 0) {
         return { text: 'Sin datos', tooltip: 'No hay empleados clasificados' }

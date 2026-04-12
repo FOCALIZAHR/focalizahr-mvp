@@ -20,6 +20,8 @@ import WorkforceDiagnosticoFlow from './cascada/WorkforceDiagnosticoFlow'
 import TabEstructura from './tabs/TabEstructura'
 import TabBenchmarks from './tabs/TabBenchmarks'
 import TabSimulador from './tabs/TabSimulador'
+import NineBoxLive from './instruments/nine-box/NineBoxLive'
+import DescriptorSimulator from './instruments/descriptor-simulator/DescriptorSimulator'
 
 // ═══════════════════════════════════════════════════════════════════════
 // SKELETON
@@ -185,6 +187,32 @@ export default function WorkforceCinemaOrchestrator() {
               onBack={handleBackToLobby}
               onNavigateTab={handleSelectCard}
             />
+          )}
+
+          {/* NINE-BOX-LIVE: matriz 3x3 con lasso libre */}
+          {view === 'nine-box-live' && (
+            <motion.div
+              key="nine-box-live"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="w-full h-full pt-12"
+            >
+              <NineBoxLive data={data} />
+            </motion.div>
+          )}
+
+          {/* DESCRIPTOR-SIMULATOR: rediseño de cargos en vivo */}
+          {view === 'descriptor-simulator' && (
+            <motion.div
+              key="descriptor-simulator"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="w-full h-full pt-12"
+            >
+              <DescriptorSimulator />
+            </motion.div>
           )}
 
           {/* ESTRUCTURA: drill-down por persona */}

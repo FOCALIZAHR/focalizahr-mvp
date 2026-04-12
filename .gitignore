@@ -53,3 +53,5 @@ Thumbs.dbnul
 *.diff
 
 data/onet/*.csv
+data/onet/onet/*.csv
+data/onet/onet/*.tsv

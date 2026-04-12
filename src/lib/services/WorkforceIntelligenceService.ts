@@ -41,10 +41,11 @@ export interface EnrichedEmployee {
   directReportsCount: number
   // Exposure
   socCode: string | null
-  observedExposure: number
+  observedExposure: number      // Anthropic rollup (adopción observada, cobertura ~5%)
   automationShare: number
   augmentationShare: number
   jobZone: number
+  focalizaScore: number | null  // Eloundou por cargo — INDICADOR PADRE del producto
   // Performance
   roleFitScore: number
   riskQuadrant: string | null
@@ -194,6 +195,17 @@ export interface RetentionEntry {
   acotadoGroup: string | null
   standardCategory: string | null
   metasCompliance: number | null  // = goalsRawPercent (0-100)
+  // v3.2 — financial + 9-box (NineBoxLive + futuros instruments)
+  salary: number
+  finiquitoToday: number | null
+  tenureMonths: number
+  nineBoxPosition: string | null
+  // v3.2 — exposure breakdown + engagement (pattern detection en NineBoxLive)
+  automationShare: number
+  augmentationShare: number
+  potentialEngagement: number | null
+  // FocalizaScore — indicador canónico del cargo (Eloundou puro, no mezcla)
+  focalizaScore: number | null
 }
 
 export interface RetentionPriorityResult {
@@ -317,7 +329,7 @@ export class WorkforceIntelligenceService {
     const occupations = uniqueSocs.length > 0
       ? await prisma.onetOccupation.findMany({
           where: { socCode: { in: uniqueSocs } },
-          select: { socCode: true, observedExposure: true, automationShare: true, augmentationShare: true, jobZone: true, betaScore: true },
+          select: { socCode: true, observedExposure: true, automationShare: true, augmentationShare: true, jobZone: true, betaScore: true, focalizaScore: true },
         })
       : []
     const socToOcc = new Map(occupations.map(o => [o.socCode, o]))
@@ -367,6 +379,7 @@ export class WorkforceIntelligenceService {
         automationShare: occ?.automationShare ?? 0,
         augmentationShare: occ?.augmentationShare ?? 0,
         jobZone: occ?.jobZone ?? 3,
+        focalizaScore: occ?.focalizaScore ?? null,
         roleFitScore,
         riskQuadrant: rating?.riskQuadrant ?? null,
         mobilityQuadrant: rating?.mobilityQuadrant ?? null,
@@ -795,6 +808,17 @@ export class WorkforceIntelligenceService {
           acotadoGroup: e.acotadoGroup,
           standardCategory: e.standardCategory,
           metasCompliance: e.goalsRawPercent,
+          // v3.2 — financial + 9-box (NineBoxLive + futuros instruments)
+          salary: e.salary,
+          finiquitoToday: e.finiquitoToday,
+          tenureMonths: e.tenureMonths,
+          nineBoxPosition: e.nineBoxPosition,
+          // v3.2 — exposure breakdown + engagement (pattern detection)
+          automationShare: e.automationShare,
+          augmentationShare: e.augmentationShare,
+          potentialEngagement: e.potentialEngagement,
+          // FocalizaScore del cargo (Eloundou)
+          focalizaScore: e.focalizaScore,
         }
       })
       .sort((a, b) => b.retentionScore - a.retentionScore)

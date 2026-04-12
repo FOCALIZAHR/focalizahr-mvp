@@ -13,6 +13,7 @@
 import { prisma } from '@/lib/prisma'
 import { OccupationMapper } from './OccupationMapper'
 import { CompetencyService } from './CompetencyService'
+import { socCodeVariants } from '@/lib/utils/socCode'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -364,8 +365,15 @@ export class JobDescriptorService {
     tasks: ProposedTask[]
     occupationTitle: string | null
   }> {
-    const occupation = await prisma.onetOccupation.findUnique({
-      where: { socCode },
+    // Tolerar formatos "11-9021" y "11-9021.00" — el catálogo O*NET usa el
+    // sufijo .00, pero JobDescriptor/OccupationMapping persiste sin sufijo.
+    const variants = socCodeVariants(socCode)
+    if (variants.length === 0) {
+      return { purpose: null, tasks: [], occupationTitle: null }
+    }
+
+    const occupation = await prisma.onetOccupation.findFirst({
+      where: { socCode: { in: variants } },
       include: {
         tasks: { orderBy: { importance: 'desc' }, take: 25 },
       },

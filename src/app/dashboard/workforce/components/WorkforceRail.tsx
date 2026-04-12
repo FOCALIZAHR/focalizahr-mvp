@@ -16,7 +16,14 @@ import type { WorkforceCardType } from './WorkforceRailCard'
 import type { WorkforceDiagnosticData } from '../types/workforce.types'
 import { computeHallazgosCount } from '../utils/workforce.utils'
 
-const WORKFORCE_CARDS: WorkforceCardType[] = ['diagnostico', 'estructura', 'benchmarks', 'simulador']
+const WORKFORCE_CARDS: WorkforceCardType[] = [
+  'diagnostico',
+  'nine-box-live',
+  'descriptor-simulator',
+  'estructura',
+  'benchmarks',
+  'simulador',
+]
 
 interface WorkforceRailProps {
   data: WorkforceDiagnosticData
