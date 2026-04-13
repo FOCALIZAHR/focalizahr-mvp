@@ -143,10 +143,15 @@ export default function DescriptorSimulator() {
     return computeSimulation(tasks, monthlySalary)
   }, [tasks, payload?.baseSalary.monthlySalary])
 
-  const baselineExposurePct = useMemo(
-    () => (payload ? payload.baseline.adjustedExposure * 100 : 0),
-    [payload],
-  )
+  // Badge "Estado actual" + Contrast Bars usan el focalizaScore del cargo
+  // (Eloundou dv_rating_beta) como indicador PADRE. Fallback al rollup
+  // adjustedExposure del descriptor si el cargo no tiene datos Eloundou.
+  const baselineExposurePct = useMemo(() => {
+    if (!payload) return 0
+    const focaliza = payload.occupationFocalizaScore
+    if (focaliza !== null && focaliza !== undefined) return focaliza * 100
+    return payload.baseline.adjustedExposure * 100
+  }, [payload])
 
   // ── 4.b Audit baseline (narrativa del gancho) ────────────────────────
   // Snapshot inicial inmutable. Se recalcula solo cuando cambia el descriptor.
@@ -280,7 +285,7 @@ export default function DescriptorSimulator() {
                 Estado actual
               </span>
               <span className="text-base font-bold text-amber-400 tabular-nums font-mono">
-                {Math.round(payload.baseline.adjustedExposure * 100)}%
+                {Math.round(baselineExposurePct)}%
               </span>
               <span className="text-[9px] uppercase tracking-widest text-amber-400/70 font-bold">
                 exposición

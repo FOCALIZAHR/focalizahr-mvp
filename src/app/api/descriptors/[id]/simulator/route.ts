@@ -47,6 +47,8 @@ export interface SimulatorPayload {
   jobTitle: string
   socCode: string | null
   occupationTitle: string
+  /** focalizaScore del cargo (Eloundou dv_rating_beta) — indicador PADRE */
+  occupationFocalizaScore: number | null
   standardJobLevel: string | null
   standardCategory: string | null
   employeeCount: number
@@ -101,15 +103,18 @@ export async function GET(
       )
     }
 
-    // OnetOccupation title (cuando hay socCode)
+    // OnetOccupation title + focalizaScore del cargo (Eloundou)
     let occupationTitle = descriptor.jobTitle
+    let occupationFocalizaScore: number | null = null
     if (descriptor.socCode) {
-      const onet = await prisma.onetOccupation.findUnique({
-        where: { socCode: descriptor.socCode },
-        select: { titleEs: true, titleEn: true },
+      const variants = socCodeVariants(descriptor.socCode)
+      const onet = await prisma.onetOccupation.findFirst({
+        where: { socCode: { in: variants } },
+        select: { titleEs: true, titleEn: true, focalizaScore: true },
       })
       if (onet) {
         occupationTitle = onet.titleEs ?? onet.titleEn ?? descriptor.jobTitle
+        occupationFocalizaScore = onet.focalizaScore
       }
     }
 
@@ -250,6 +255,7 @@ export async function GET(
       jobTitle: descriptor.jobTitle,
       socCode: descriptor.socCode,
       occupationTitle,
+      occupationFocalizaScore,
       standardJobLevel: descriptor.standardJobLevel,
       standardCategory: descriptor.standardCategory,
       employeeCount: descriptor.employeeCount,
