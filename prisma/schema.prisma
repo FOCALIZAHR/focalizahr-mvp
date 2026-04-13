@@ -3250,6 +3250,14 @@ model OnetTask {
   gammaEloundou      Float?   @map("gamma_eloundou")               // 0/1 tarea expuesta
   automationEloundou Float?   @map("automation_eloundou")          // 0-1 score automatización continuo
 
+  // Anthropic Economic Index — 5 dimensiones crudas por tarea (anthropic-economic-index.csv)
+  // Dato premium: observación real de uso de Claude. Cobertura ~18% tareas.
+  anthropicDirective      Float?  @map("anthropic_directive")       // Reemplazo — IA toma la decisión sin humano
+  anthropicFeedbackLoop   Float?  @map("anthropic_feedback_loop")   // Adaptación — IA mejora con correcciones del usuario
+  anthropicTaskIteration  Float?  @map("anthropic_task_iteration")  // Iteración — IA repite y perfecciona sola
+  anthropicValidation     Float?  @map("anthropic_validation")      // Verificación — IA detecta errores antes de entregar
+  anthropicLearning       Float?  @map("anthropic_learning")        // Aprendizaje — IA se vuelve más experta con el uso
+
   // FocalizaScore — indicador canónico del producto (por tarea)
   focalizaScore       Float?   @map("focaliza_score")              // = betaEloundou (single source of truth, no Haiku)
   focalizaScoreSource String?  @map("focaliza_score_source")       // 'eloundou' (futuro: podría agregarse otra fuente)
