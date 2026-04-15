@@ -61,9 +61,14 @@ export async function GET(request: NextRequest) {
       orgAugmentationShare = totalAug / withExposure.length
     }
 
-    // Zona crítica: >70% exposición + baja capacidad de adaptación
+    // Zona crítica: alta exposición IA + baja capacidad de adaptación.
+    // Migrado Abril 2026:
+    //   - observedExposure > 0.7 (max real 0.165, inalcanzable) → focalizaScore
+    //     con threshold 0.5 (Test Ácido Eloundou) + fallback a observedExposure.
+    //   - potentialAbility < 40 (escala 1/2/3, max 3 → siempre true) → === 1
+    //     (Test Ácido AAE LOW canónico de TalentIntelligenceService).
     const zonaCriticaCount = enriched.filter(e =>
-      e.observedExposure > 0.7 && (e.potentialAbility ?? 0) < 40
+      (e.focalizaScore ?? e.observedExposure) > 0.5 && e.potentialAbility === 1
     ).length
 
     // ── Response combinado ───────────────────────────────────────────

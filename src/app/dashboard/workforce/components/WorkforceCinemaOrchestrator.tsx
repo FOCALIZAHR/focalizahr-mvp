@@ -9,7 +9,7 @@
 
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { RefreshCw, AlertTriangle, Cpu, ArrowLeft, ShieldCheck } from 'lucide-react'
+import { RefreshCw, AlertTriangle, Cpu, ArrowLeft, Home } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useWorkforceData } from '../hooks/useWorkforceData'
@@ -95,27 +95,6 @@ function EmptyState() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// DATA CONFIDENCE INDICATOR
-// ═══════════════════════════════════════════════════════════════════════
-
-function DataConfidenceIndicator({ confidence }: { confidence: 'high' | 'medium' | 'low' }) {
-  const pct = confidence === 'high' ? 90 : confidence === 'medium' ? 60 : 30
-  const color = confidence === 'high' ? 'bg-emerald-500' : confidence === 'medium' ? 'bg-amber-500' : 'bg-red-500'
-  const textColor =
-    confidence === 'high' ? 'text-emerald-400' : confidence === 'medium' ? 'text-amber-400' : 'text-red-400'
-
-  return (
-    <div className="absolute top-4 right-4 z-20 flex items-center gap-2 bg-black/30 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/5">
-      <ShieldCheck className={cn('w-3.5 h-3.5', textColor)} />
-      <div className={cn('w-2 h-2 rounded-full', color)} />
-      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-        Confianza: <span className={textColor}>{pct}%</span>
-      </span>
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════════════
 // MAIN ORCHESTRATOR
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -149,24 +128,21 @@ export default function WorkforceCinemaOrchestrator() {
       {/* Stage — main content with dynamic margin-bottom for rail */}
       <div
         className={cn(
-          'flex-1 relative flex items-center justify-center p-4 md:p-8',
+          'flex-1 relative flex items-center justify-center px-4 py-3 md:px-8 md:py-5',
           'transition-all duration-500 ease-in-out',
           isRailExpanded ? 'mb-[240px]' : 'mb-[50px]'
         )}
       >
-        <DataConfidenceIndicator confidence={data.confidence} />
-
-        {/* Back button when not in lobby */}
+        {/* Home icon — navega al lobby, solo cuando no estamos en lobby */}
         {!isLobby && (
-          <div className="absolute top-4 left-4 z-20">
-            <button
-              onClick={handleBackToLobby}
-              className="flex items-center gap-2 bg-slate-800/50 backdrop-blur-sm px-4 py-2 rounded-lg border border-slate-700/50 hover:border-slate-600 transition-colors"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-xs text-slate-400 uppercase tracking-wider">Volver al lobby</span>
-            </button>
-          </div>
+          <button
+            onClick={handleBackToLobby}
+            className="absolute top-3 left-3 z-20 p-2 rounded-lg bg-slate-800/40 backdrop-blur-sm border border-slate-700/40 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/30 transition-colors"
+            aria-label="Volver al lobby"
+            title="Volver al lobby"
+          >
+            <Home className="w-4 h-4" />
+          </button>
         )}
 
         <AnimatePresence mode="wait">
@@ -202,16 +178,18 @@ export default function WorkforceCinemaOrchestrator() {
             </motion.div>
           )}
 
-          {/* DESCRIPTOR-SIMULATOR: rediseño de cargos en vivo */}
+          {/* DESCRIPTOR-SIMULATOR: rediseño de cargos en vivo
+              NOTA: pt-2 (no pt-12) porque el contenedor app interno tiene su
+              propio sistema de espaciado — evita acumular paddings. */}
           {view === 'descriptor-simulator' && (
             <motion.div
               key="descriptor-simulator"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="w-full h-full pt-12"
+              className="w-full h-full pt-2"
             >
-              <DescriptorSimulator />
+              <DescriptorSimulator data={data} />
             </motion.div>
           )}
 

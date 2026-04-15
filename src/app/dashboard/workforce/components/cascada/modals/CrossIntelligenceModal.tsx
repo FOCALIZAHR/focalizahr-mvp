@@ -41,7 +41,7 @@ export default function CrossIntelligenceModal({ data, onClose }: CrossIntellige
     const fugaRisk = data.retentionPriority.ranking.filter(
       r =>
         (r.tier === 'intocable' || r.tier === 'valioso') &&
-        r.observedExposure > 0.5 &&
+        (r.focalizaScore ?? r.observedExposure) > 0.5 &&
         r.acotadoGroup &&
         r.standardCategory
     )

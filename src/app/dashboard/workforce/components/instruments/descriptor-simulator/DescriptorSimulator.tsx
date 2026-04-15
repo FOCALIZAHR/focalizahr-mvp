@@ -1,62 +1,94 @@
 'use client'
 
 // ════════════════════════════════════════════════════════════════════════════
-// DESCRIPTOR SIMULATOR — Instrumento #1 del Workforce Deck (Gemini)
-// src/app/dashboard/workforce/components/instruments/descriptor-simulator/DescriptorSimulator.tsx
+// SIMULADOR DE CARGOS IA — motor 6 estados (Patrón G)
+// DescriptorSimulator.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// Simulador de rediseño de cargos. El CEO selecciona un descriptor, edita
-// las horas y el estado de cada tarea (Humano / Aumentado / Automatizado),
-// y ve en vivo el costo rescatado, las horas liberadas y la nueva exposición.
+// CONTENEDOR APP (Patrón G — Single Viewport):
+//   max-w-4xl · h-[700px] · overflow-hidden · rounded-2xl · border · shadow-2xl
+//   Cero scroll de página. Cada paso REEMPLAZA al anterior (no scroll entre).
 //
-// 100% client-side después de la carga inicial. Cero round-trips al backend.
-// Estado mutable local con useState.
+// MOTOR 6 PASOS:
+//   1. Revelación   — gap exposición empresa (agregado fijo)
+//   2. Dolor        — inercia CLP empresa (agregado fijo)
+//   3. Transición   — puente narrativo
+//   4. Selección    — gerencia + cargo
+//   5. Dashboard    — vista del cargo elegido (30/70 con cascada de mensaje)
+//   6. Simulador    — operar tareas (30/70 con filtro por categoría)
+//
+// Pasos 1-2 son AGREGADO EMPRESA fijo (data prop). Los demás operan sobre
+// el cargo elegido (payload cargado al confirmar selección).
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Layers, AlertTriangle, Loader2 } from 'lucide-react'
-import TeslaLine from '../_shared/TeslaLine'
-import ConfidenceDot from '../_shared/ConfidenceDot'
-import { formatCLP } from '../_shared/format'
-import DescriptorTaskCard from './DescriptorTaskCard'
-import PnLLiveTracker from './PnLLiveTracker'
-import ContrastBars from './ContrastBars'
+import { AnimatePresence, motion } from 'framer-motion'
+import { AlertTriangle, Loader2 } from 'lucide-react'
+import Revelacion from './pasos/Revelacion'
+import Dolor from './pasos/Dolor'
+import Transicion, { type TransicionVariant } from './pasos/Transicion'
+import Seleccion from './pasos/Seleccion'
+import Dashboard from './pasos/Dashboard'
+import Workspace from './Workspace'
 import ScenarioExportModal from './ScenarioExportModal'
 import {
-  HORAS_MES,
-  buildEditableTasks,
-  computeAuditBaseline,
-  computeSimulation,
-  type EditableTask,
-  type TaskState,
+  computeLiveSimulation,
+  type BetaCategory,
+  type LiveSimulation,
 } from './descriptor-simulator-utils'
 import type { SimulatorPayload } from '@/app/api/descriptors/[id]/simulator/route'
-import type { SimulatorDescriptorListItem } from '@/app/api/descriptors/simulator-list/route'
+import type {
+  SimulatorDescriptorListItem,
+  SimulatorListCoverage,
+} from '@/app/api/descriptors/simulator-list/route'
+import type { WorkforceDiagnosticData } from '../../../types/workforce.types'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MAIN COMPONENT
-// ─────────────────────────────────────────────────────────────────────────────
+type Step = 1 | 2 | 3 | 4 | 5 | 6
 
-export default function DescriptorSimulator() {
-  // ── Listado para el dropdown ─────────────────────────────────────────
+interface DescriptorSimulatorProps {
+  /** Agregado empresa proveniente de useWorkforceData (Pasos 1-2). */
+  data: WorkforceDiagnosticData
+}
+
+function buildSimulatorUrl(item: SimulatorDescriptorListItem): string | null {
+  if (item.kind === 'verified' && item.descriptorId) {
+    return `/api/descriptors/${item.descriptorId}/simulator`
+  }
+  if (item.kind === 'proposed' && item.socCode) {
+    const params = new URLSearchParams({
+      soc: item.socCode,
+      position: item.jobTitle,
+    })
+    return `/api/descriptors/proposed/simulator?${params.toString()}`
+  }
+  return null
+}
+
+export default function DescriptorSimulator({ data }: DescriptorSimulatorProps) {
+  // ── Motor 6 estados ──────────────────────────────────────────────────
+  const [step, setStep] = useState<Step>(1)
+
+  // Lista de cargos
   const [descriptorList, setDescriptorList] = useState<SimulatorDescriptorListItem[]>([])
+  const [coverage, setCoverage] = useState<SimulatorListCoverage | null>(null)
   const [listLoading, setListLoading] = useState(true)
   const [listError, setListError] = useState<string | null>(null)
 
-  // ── Selección actual ─────────────────────────────────────────────────
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Selección de cargo (sólo se carga payload al confirmar en P4)
+  const [selectedKey, setSelectedKey] = useState<string | null>(null)
 
-  // ── Payload del descriptor cargado ───────────────────────────────────
+  // Payload del cargo seleccionado
   const [payload, setPayload] = useState<SimulatorPayload | null>(null)
   const [payloadLoading, setPayloadLoading] = useState(false)
   const [payloadError, setPayloadError] = useState<string | null>(null)
 
-  // ── Estado mutable de tareas (la simulación) ─────────────────────────
-  const [tasks, setTasks] = useState<EditableTask[]>([])
+  // Filtro inicial para P6 (auto-seleccionado en P5 según cascada)
+  const [initialFilter, setInitialFilter] = useState<BetaCategory>('rescate')
 
-  // ── Modal de export ──────────────────────────────────────────────────
+  // Export modal
   const [showExportModal, setShowExportModal] = useState(false)
+  const [exportSnapshot, setExportSnapshot] = useState<LiveSimulation | null>(null)
 
-  // ── 1. Cargar lista de descriptors al montar ─────────────────────────
+  // ── Cargar lista al montar ───────────────────────────────────────────
   useEffect(() => {
     let cancelled = false
     setListLoading(true)
@@ -66,15 +98,11 @@ export default function DescriptorSimulator() {
       .then(json => {
         if (cancelled) return
         if (!json.success) {
-          setListError(json.error || 'Error al cargar descriptors')
+          setListError(json.error || 'Error al cargar cargos')
           return
         }
-        const list: SimulatorDescriptorListItem[] = json.data
-        setDescriptorList(list)
-        // Seleccionar el primero por defecto
-        if (list.length > 0 && !selectedId) {
-          setSelectedId(list[0].id)
-        }
+        setDescriptorList(json.data as SimulatorDescriptorListItem[])
+        setCoverage(json.coverage ?? null)
       })
       .catch(e => {
         if (cancelled) return
@@ -87,29 +115,32 @@ export default function DescriptorSimulator() {
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── 2. Cargar payload al cambiar descriptor seleccionado ─────────────
+  // ── Cargar payload al cambiar selección ──────────────────────────────
   useEffect(() => {
-    if (!selectedId) return
+    if (!selectedKey) return
+    const item = descriptorList.find(d => d.key === selectedKey)
+    if (!item) return
+    const url = buildSimulatorUrl(item)
+    if (!url) {
+      setPayloadError('Cargo sin clasificación O*NET')
+      setPayload(null)
+      return
+    }
     let cancelled = false
     setPayloadLoading(true)
     setPayloadError(null)
     setPayload(null)
-    setTasks([])
-    setShowExportModal(false)
-    fetch(`/api/descriptors/${selectedId}/simulator`)
+    fetch(url)
       .then(r => r.json())
       .then(json => {
         if (cancelled) return
         if (!json.success) {
-          setPayloadError(json.error || 'Error al cargar el descriptor')
+          setPayloadError(json.error || 'Error al cargar el cargo')
           return
         }
-        const data: SimulatorPayload = json.data
-        setPayload(data)
-        setTasks(buildEditableTasks(data))
+        setPayload(json.data as SimulatorPayload)
       })
       .catch(e => {
         if (cancelled) return
@@ -122,408 +153,262 @@ export default function DescriptorSimulator() {
     return () => {
       cancelled = true
     }
-  }, [selectedId])
+  }, [selectedKey, descriptorList])
 
-  // ── 3. Handlers de mutación de tareas ────────────────────────────────
-  const handleChangeHours = useCallback((taskId: string, hours: number) => {
-    setTasks(prev =>
-      prev.map(t => (t.taskId === taskId ? { ...t, hours } : t)),
-    )
-  }, [])
+  // ─────────────────────────────────────────────────────────────────────
+  // AGREGADO EMPRESA — datos FIJOS para Pasos 1 y 2
+  // ─────────────────────────────────────────────────────────────────────
 
-  const handleChangeState = useCallback((taskId: string, state: TaskState) => {
-    setTasks(prev =>
-      prev.map(t => (t.taskId === taskId ? { ...t, state } : t)),
-    )
-  }, [])
+  const revelacionData = useMemo(() => {
+    let sumW = 0
+    let sumWX = 0
+    for (const item of descriptorList) {
+      if (item.occupationFocalizaScore !== null && item.employeeCount > 0) {
+        sumWX += item.employeeCount * item.occupationFocalizaScore
+        sumW += item.employeeCount
+      }
+    }
+    const benchmarkMercado = sumW > 0 ? (sumWX / sumW) * 100 : 0
+    const tuEmpresa = data.exposure.avgExposure * 100
+    const gap = Math.abs(benchmarkMercado - tuEmpresa)
+    return { benchmarkMercado, tuEmpresa, gap }
+  }, [descriptorList, data.exposure.avgExposure])
 
-  // ── 4. Cálculo en vivo de la simulación ──────────────────────────────
-  const simulation = useMemo(() => {
-    const monthlySalary = payload?.baseSalary.monthlySalary ?? 0
-    return computeSimulation(tasks, monthlySalary)
-  }, [tasks, payload?.baseSalary.monthlySalary])
-
-  // Badge "Estado actual" + Contrast Bars usan el focalizaScore del cargo
-  // (Eloundou dv_rating_beta) como indicador PADRE. Fallback al rollup
-  // adjustedExposure del descriptor si el cargo no tiene datos Eloundou.
-  const baselineExposurePct = useMemo(() => {
-    if (!payload) return 0
-    const focaliza = payload.occupationFocalizaScore
-    if (focaliza !== null && focaliza !== undefined) return focaliza * 100
-    return payload.baseline.adjustedExposure * 100
-  }, [payload])
-
-  // ── 4.b Audit baseline (narrativa del gancho) ────────────────────────
-  // Snapshot inicial inmutable. Se recalcula solo cuando cambia el descriptor.
-  const auditBaseline = useMemo(() => {
-    if (!payload) return null
-    const initial = buildEditableTasks(payload)
-    if (initial.length === 0) return null
-    return computeAuditBaseline(initial)
-  }, [payload])
-
-  // ── 4.c Total de horas asignadas (running total — sobre todas las tareas) ─
-  const totalAssignedHours = useMemo(
-    () => tasks.reduce((s, t) => s + t.hours, 0),
-    [tasks],
+  const dolorData = useMemo(
+    () => ({
+      inerciaMensual: data.inertiaCost.totalMonthly,
+      headcount: data.totalEmployees,
+      horasMensuales: Math.round(data.liberatedFTEs.totalFTEs * 160),
+    }),
+    [data.inertiaCost.totalMonthly, data.totalEmployees, data.liberatedFTEs.totalFTEs],
   )
 
   // ─────────────────────────────────────────────────────────────────────
-  // RENDER
+  // P3 — Variante de copy según exposición empresa + cargos clasificados
+  // CASO D (sin datos): no hay cargos clasificados (verified+proposed=0)
+  // CASO A (alta):  avgExposure >= 0.50 — hay zona de rescate dominante
+  // CASO B (media): 0.30 <= avgExposure < 0.50 — solo aumentado
+  // CASO C (baja):  avgExposure < 0.30 — mayoría soberanía humana
+  // ─────────────────────────────────────────────────────────────────────
+  const transicionVariant = useMemo<TransicionVariant>(() => {
+    const cargosClasificados = descriptorList.filter(
+      d => d.kind === 'verified' || d.kind === 'proposed',
+    ).length
+    if (cargosClasificados === 0) return 'D'
+    const avg = data.exposure.avgExposure
+    if (avg >= 0.5) return 'A'
+    if (avg >= 0.3) return 'B'
+    return 'C'
+  }, [descriptorList, data.exposure.avgExposure])
+
+  // ── Handlers ─────────────────────────────────────────────────────────
+  const goStep = useCallback((s: Step) => setStep(s), [])
+
+  const handleConfirmCargo = useCallback((key: string) => {
+    setSelectedKey(key)
+    setStep(5)
+  }, [])
+
+  const handleContinueToSimulador = useCallback((cat: BetaCategory) => {
+    setInitialFilter(cat)
+    setStep(6)
+  }, [])
+
+  const handleExport = useCallback((simulation: LiveSimulation) => {
+    setExportSnapshot(simulation)
+    setShowExportModal(true)
+  }, [])
+
+  const handleCloseModal = useCallback(() => setShowExportModal(false), [])
+
+  // ─────────────────────────────────────────────────────────────────────
+  // RENDER — Patrón G: container fijo h-[700px]
   // ─────────────────────────────────────────────────────────────────────
 
+  const showAggregateLoading = listLoading
+  const showAggregateError = !listLoading && listError
+  const aggregateReady = !showAggregateLoading && !showAggregateError && descriptorList.length > 0
+
+  // Pasos 5 y 6 requieren payload listo
+  const detailLoading = (step === 5 || step === 6) && payloadLoading
+  const detailError = (step === 5 || step === 6) && !!payloadError && !payloadLoading
+  const detailEmpty = (step === 5 || step === 6) && payload !== null && payload.tasks.length === 0
+  const detailReady = (step === 5 || step === 6) && payload !== null && !payloadError && !payloadLoading && payload.tasks.length > 0
+
   return (
-    <div className="w-full h-full flex flex-col gap-4 p-4 md:p-6 lg:p-8">
-      {/* ── Header ────────────────────────────────────────────────── */}
-      <header className="flex-shrink-0 flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">
-              Instrumento · Rediseño de puestos
-            </p>
-            <h1 className="text-2xl md:text-3xl font-extralight text-white mt-1.5 tracking-tight">
-              Rediseño de Cargos{' '}
-              <span className="fhr-title-gradient">× IA</span>
-            </h1>
-
-            {/* Narrativa de entrada — Patrón G, siempre visible */}
-            <p className="text-sm font-light text-slate-300 mt-3 max-w-3xl leading-relaxed">
-              Este simulador descompone las{' '}
-              <span className="text-white font-medium">160 horas mensuales</span>{' '}
-              de un cargo en sus tareas reales. Cada tarea tiene un{' '}
-              <span className="text-white font-medium">grado de dominio IA</span>{' '}
-              (la barra de color). Mueve las horas y cambia el estado para ver
-              cuánto tiempo y dinero puede rescatar tu estructura.
-            </p>
-
-            {/* Narrativa de auditoría — el gancho */}
-            {auditBaseline && (
-              <div className="mt-4 max-w-3xl">
-                {auditBaseline.M > 0 ? (
-                  <p className="text-sm font-light text-slate-400 leading-relaxed">
-                    De las{' '}
-                    <span className="text-white font-bold tabular-nums">
-                      {auditBaseline.N}
-                    </span>{' '}
-                    tareas de este cargo,{' '}
-                    <span className="text-cyan-400 font-bold tabular-nums">
-                      {auditBaseline.M}
-                    </span>{' '}
-                    tienen dominio IA superior al{' '}
-                    <span className="text-cyan-400 font-bold">70%</span>. Eso
-                    representa{' '}
-                    <span className="text-cyan-400 font-bold tabular-nums">
-                      {auditBaseline.X} horas/mes
-                    </span>{' '}
-                    en tareas que la IA ya sabe ejecutar
-                    <span className="text-amber-300 font-medium italic">
-                      {' '}— y que hoy se pagan como si fueran exclusivamente
-                      humanas.
-                    </span>
-                  </p>
-                ) : (
-                  <p className="text-sm font-light text-slate-400 leading-relaxed">
-                    De las{' '}
-                    <span className="text-white font-bold tabular-nums">
-                      {auditBaseline.N}
-                    </span>{' '}
-                    tareas de este cargo,{' '}
-                    <span className="text-cyan-400 font-bold">ninguna</span>{' '}
-                    cruza el umbral crítico de{' '}
-                    <span className="text-cyan-400 font-bold">70%</span> de
-                    dominio IA. La estructura de tareas es defendible bajo el
-                    estado actual.
-                  </p>
-                )}
-              </div>
-            )}
+    <div className="w-full min-h-screen px-4 md:px-6 lg:px-8 py-1 md:py-2 flex items-center justify-center">
+      {/* CONTENEDOR APP — Patrón G · altura responsive (-35% acumulado)
+          - h-[calc(100vh-160px)]: más headroom vertical
+          - min-h-[500px]: piso pantallas chicas
+          - max-h-[580px]: techo pantallas grandes */}
+      <div className="w-full max-w-4xl mx-auto h-[calc(100vh-160px)] min-h-[500px] max-h-[580px] bg-[#0F172A] rounded-2xl border border-slate-800/50 overflow-hidden relative shadow-2xl shadow-black/20">
+        {/* Loading bloqueante de la lista */}
+        {showAggregateLoading && (
+          <div className="absolute inset-0 flex items-center justify-center z-50">
+            <Loader2 className="w-5 h-5 text-cyan-400/60 animate-spin" />
           </div>
-          {payload && (
-            <ConfidenceDot confidence={payload.baseline.confidence} />
-          )}
-        </div>
+        )}
 
-        {/* Selector de descriptor + baseline badge */}
-        <div className="flex flex-col md:flex-row gap-4 md:gap-6 md:items-end">
-          {/* Dropdown */}
-          <div className="flex flex-col gap-1.5 flex-1 min-w-0 max-w-md">
-            <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
-              Selecciona cargo
-            </label>
-            <div className="relative">
-              <Layers className="w-3.5 h-3.5 text-cyan-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <select
-                value={selectedId ?? ''}
-                onChange={e => setSelectedId(e.target.value)}
-                disabled={listLoading || descriptorList.length === 0}
-                className="w-full pl-9 pr-3 py-2 bg-slate-900/60 border border-slate-700/50 rounded text-sm font-light text-slate-200 focus:outline-none focus:border-cyan-500/50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed appearance-none"
+        {/* Error bloqueante */}
+        {showAggregateError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6 z-50">
+            <AlertTriangle className="w-6 h-6 text-amber-400/60" />
+            <p className="text-sm font-light text-slate-300 max-w-sm">
+              {listError}
+            </p>
+          </div>
+        )}
+
+        {/* Motor 6 estados */}
+        {aggregateReady && (
+          <AnimatePresence mode="wait">
+            {step === 1 && (
+              <motion.div
+                key="p1"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.25 }}
+                className="absolute inset-0"
               >
-                {listLoading && <option>Cargando…</option>}
-                {!listLoading && descriptorList.length === 0 && (
-                  <option>Sin descriptors disponibles</option>
+                <Revelacion data={revelacionData} onNext={() => goStep(2)} />
+              </motion.div>
+            )}
+
+            {step === 2 && (
+              <motion.div
+                key="p2"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.25 }}
+                className="absolute inset-0"
+              >
+                <Dolor
+                  data={dolorData}
+                  onNext={() => goStep(3)}
+                  onBack={() => goStep(1)}
+                />
+              </motion.div>
+            )}
+
+            {step === 3 && (
+              <motion.div
+                key="p3"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.25 }}
+                className="absolute inset-0"
+              >
+                <Transicion
+                  variant={transicionVariant}
+                  onNext={() => goStep(4)}
+                  onBack={() => goStep(2)}
+                />
+              </motion.div>
+            )}
+
+            {step === 4 && (
+              <motion.div
+                key="p4"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.25 }}
+                className="absolute inset-0"
+              >
+                <Seleccion
+                  descriptors={descriptorList}
+                  onConfirm={handleConfirmCargo}
+                  onBack={() => goStep(3)}
+                />
+              </motion.div>
+            )}
+
+            {step === 5 && (
+              <motion.div
+                key="p5"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.25 }}
+                className="absolute inset-0"
+              >
+                {detailLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center z-40">
+                    <Loader2 className="w-5 h-5 text-cyan-400/60 animate-spin" />
+                  </div>
                 )}
-                {descriptorList.map(d => (
-                  <option key={d.id} value={d.id}>
-                    {d.jobTitle}
-                    {d.employeeCount > 0
-                      ? `  ·  ${d.employeeCount} ${d.employeeCount === 1 ? 'persona' : 'personas'}`
-                      : ''}
-                    {d.status === 'DRAFT' ? '  ·  draft' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Baseline badge — el ancla */}
-          {payload && (
-            <div
-              className="inline-flex items-center gap-2.5 px-3.5 py-2 rounded border border-amber-500/30 bg-amber-500/[0.06]"
-              style={{ boxShadow: '0 0 12px rgba(245, 158, 11, 0.08)' }}
-            >
-              <span className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">
-                Estado actual
-              </span>
-              <span className="text-base font-bold text-amber-400 tabular-nums font-mono">
-                {Math.round(baselineExposurePct)}%
-              </span>
-              <span className="text-[9px] uppercase tracking-widest text-amber-400/70 font-bold">
-                exposición
-              </span>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* ── Cuerpo: Tareas + Sidebar P&L ──────────────────────────── */}
-      <div className="flex-1 flex flex-col md:flex-row gap-4 min-h-0">
-        {/* COLUMNA IZQUIERDA — Tareas */}
-        <div className="flex-1 fhr-card relative overflow-hidden flex flex-col p-0 min-h-[400px] md:min-h-0">
-          <TeslaLine />
-
-          {listError && (
-            <ErrorState message={`Lista: ${listError}`} />
-          )}
-
-          {!listError && payloadLoading && (
-            <div className="flex-1 flex items-center justify-center">
-              <Loader2 className="w-5 h-5 text-cyan-400/60 animate-spin" />
-            </div>
-          )}
-
-          {!listError && !payloadLoading && payloadError && (
-            <ErrorState message={payloadError} />
-          )}
-
-          {!listError && !payloadLoading && payload && tasks.length === 0 && (
-            <EmptyState />
-          )}
-
-          {!listError && !payloadLoading && payload && tasks.length > 0 && (
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
-              {/* Subhead — occupation + valor hora */}
-              <div className="flex items-baseline justify-between text-[10px] uppercase tracking-wider mb-2">
-                <span className="text-slate-500 font-bold truncate">
-                  {payload.occupationTitle}
-                </span>
-                <span className="text-slate-500 font-mono whitespace-nowrap">
-                  Valor hora ·{' '}
-                  <span className="text-slate-300">
-                    {formatCLP(simulation.valorHora)}
-                  </span>
-                </span>
-              </div>
-
-              {/* Total asignado — running total con barra de progreso */}
-              <HoursBudget total={totalAssignedHours} max={HORAS_MES} />
-
-              {/* Leyenda de estados — una sola vez sobre la lista */}
-              <StatesLegend />
-
-              {tasks.map(task => (
-                <DescriptorTaskCard
-                  key={task.taskId}
-                  task={task}
-                  valorHora={simulation.valorHora}
-                  onChangeHours={handleChangeHours}
-                  onChangeState={handleChangeState}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* COLUMNA DERECHA — P&L Live + Contraste + Botón */}
-        <aside className="w-full md:w-[340px] flex-shrink-0 fhr-card relative overflow-hidden flex flex-col p-0">
-          <TeslaLine />
-          <div className="flex flex-col gap-6 p-6 overflow-y-auto flex-1">
-            {payload ? (
-              <>
-                <PnLLiveTracker
-                  simulation={simulation}
-                  baselineExposurePct={baselineExposurePct}
-                />
-                <div className="border-t border-white/5 pt-5">
-                  <ContrastBars
-                    baselineExposurePct={baselineExposurePct}
-                    newExposurePct={simulation.nuevaExposicionPct}
+                {detailError && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6 z-40">
+                    <AlertTriangle className="w-6 h-6 text-amber-400/60" />
+                    <p className="text-sm font-light text-slate-300 max-w-sm">
+                      {payloadError}
+                    </p>
+                  </div>
+                )}
+                {detailEmpty && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 z-40">
+                    <p className="text-sm font-light text-slate-400 max-w-sm">
+                      Este cargo no tiene tareas activas. Selecciona otro cargo.
+                    </p>
+                  </div>
+                )}
+                {detailReady && payload && (
+                  <Dashboard
+                    payload={payload}
+                    onContinue={handleContinueToSimulador}
+                    onBack={() => goStep(4)}
                   />
-                </div>
-              </>
-            ) : (
-              <div className="text-center text-xs font-light text-slate-500 py-10">
-                {listLoading || payloadLoading
-                  ? 'Cargando escenario…'
-                  : 'Selecciona un cargo para iniciar la simulación'}
-              </div>
+                )}
+              </motion.div>
             )}
-          </div>
 
-          {/* Botón Guardar Escenario */}
-          {payload && tasks.length > 0 && (
-            <div className="border-t border-white/5 p-4">
-              <button
-                type="button"
-                onClick={() => setShowExportModal(true)}
-                className="w-full py-2.5 rounded text-[10px] uppercase tracking-widest font-bold text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/10 hover:border-cyan-400 transition-all"
+            {step === 6 && (
+              <motion.div
+                key="p6"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="absolute inset-0"
               >
-                Guardar Escenario
-              </button>
-            </div>
-          )}
-        </aside>
+                {detailReady && payload && (
+                  <Workspace
+                    payload={payload}
+                    initialCategory={initialFilter}
+                    descriptors={descriptorList}
+                    selectedKey={selectedKey}
+                    onDescriptorChange={setSelectedKey}
+                    onBack={() => goStep(5)}
+                    onExport={handleExport}
+                  />
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
       </div>
 
-      {/* ── Modal Export ──────────────────────────────────────────── */}
-      {payload && (
+      {/* Modal export — fuera del contenedor app (portal) */}
+      {payload && exportSnapshot && (
         <ScenarioExportModal
           isOpen={showExportModal}
-          onClose={() => setShowExportModal(false)}
+          onClose={handleCloseModal}
           jobTitle={payload.jobTitle}
-          baselineExposurePct={baselineExposurePct}
-          simulation={simulation}
+          baselineExposurePct={(payload.rollupClientExposure ?? 0) * 100}
+          simulation={{
+            capacidadLiberada: exportSnapshot.hoursLiberated,
+            rescateMensual: exportSnapshot.rescateCLPTotal,
+            nuevaExposicionPct: exportSnapshot.newExposurePct,
+            totalAutomated: 0,
+            totalAugmented: 0,
+            totalHuman: payload.tasks.length,
+            valorHora: payload.costPerHour,
+          }}
         />
       )}
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SUB-STATES
-// ─────────────────────────────────────────────────────────────────────────────
-
-function ErrorState({ message }: { message: string }) {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-      <AlertTriangle className="w-6 h-6 text-amber-400/60 mb-3" />
-      <p className="text-sm font-light text-slate-300 max-w-xs">{message}</p>
-    </div>
-  )
-}
-
-function EmptyState() {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-      <p className="text-sm font-light text-slate-400 max-w-xs">
-        Este descriptor no tiene tareas activas. Confirma o edita el descriptor
-        en el módulo de Descriptors antes de simular.
-      </p>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// HOURS BUDGET — running total de horas asignadas con barra de progreso
-// El CEO ve cuánto del mes (160h) tiene asignado y cuánto le queda libre
-// ─────────────────────────────────────────────────────────────────────────────
-
-function HoursBudget({ total, max }: { total: number; max: number }) {
-  const filled = Math.min(100, (total / max) * 100)
-  const remaining = Math.max(0, max - total)
-  const isOver = total > max
-
-  return (
-    <div className="mb-3">
-      <div className="flex items-baseline justify-between text-[10px] uppercase tracking-wider mb-1">
-        <span className="text-slate-500 font-bold">Total asignado</span>
-        <span className="font-mono tabular-nums">
-          <span className={isOver ? 'text-amber-400 font-bold' : 'text-cyan-400 font-bold'}>
-            {Math.round(total)}
-          </span>
-          <span className="text-slate-600"> de </span>
-          <span className="text-slate-400">{max} horas</span>
-          {!isOver && remaining > 0 && (
-            <span className="text-slate-600 ml-2">
-              · {Math.round(remaining)}h libres
-            </span>
-          )}
-        </span>
-      </div>
-      <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-        <div
-          className={
-            isOver
-              ? 'h-full bg-amber-400 transition-all duration-300'
-              : 'h-full bg-cyan-400 transition-all duration-300'
-          }
-          style={{ width: `${filled}%` }}
-        />
-      </div>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LEYENDA DE ESTADOS — explicativa, una sola vez sobre la lista
-// ─────────────────────────────────────────────────────────────────────────────
-
-function StatesLegend() {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4 p-3 rounded border border-slate-800/60 bg-slate-900/30">
-      <LegendItem
-        dotClass="bg-slate-400"
-        labelClass="text-slate-300"
-        label="Humano"
-        description="La persona ejecuta · costo 100%"
-      />
-      <LegendItem
-        dotClass="bg-amber-400"
-        labelClass="text-amber-300"
-        label="Aumentado"
-        description="Ejecuta con IA · eficiencia mejorada"
-      />
-      <LegendItem
-        dotClass="bg-cyan-400"
-        labelClass="text-cyan-300"
-        label="Automatizado"
-        description="IA ejecuta sola · rescate de EBITDA"
-      />
-    </div>
-  )
-}
-
-function LegendItem({
-  dotClass,
-  labelClass,
-  label,
-  description,
-}: {
-  dotClass: string
-  labelClass: string
-  label: string
-  description: string
-}) {
-  return (
-    <div className="flex items-start gap-2">
-      <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${dotClass}`} />
-      <div className="min-w-0">
-        <span className={`text-[9px] uppercase tracking-widest font-bold ${labelClass}`}>
-          {label}
-        </span>
-        <p className="text-[10px] font-light text-slate-500 leading-snug">
-          {description}
-        </p>
-      </div>
     </div>
   )
 }

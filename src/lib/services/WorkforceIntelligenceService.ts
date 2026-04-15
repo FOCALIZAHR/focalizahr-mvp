@@ -206,6 +206,11 @@ export interface RetentionEntry {
   potentialEngagement: number | null
   // FocalizaScore — indicador canónico del cargo (Eloundou puro, no mezcla)
   focalizaScore: number | null
+  // v3.3 — cuadrantes de talento (habilita narrativa individual + integración
+  // con TalentNarrativeService.getIndividualNarrative + detectores per-persona)
+  riskQuadrant: string | null         // FUGA_CEREBROS | MOTOR_EQUIPO | BURNOUT_RISK | BAJO_RENDIMIENTO
+  mobilityQuadrant: string | null     // SUCESOR_NATURAL | EXPERTO_ANCLA | AMBICIOSO_PREMATURO | EN_DESARROLLO
+  potentialAbility: number | null     // 1-3 base — para detectTalentZombies per-persona
 }
 
 export interface RetentionPriorityResult {
@@ -266,6 +271,19 @@ export interface OrganizationDiagnostic {
 
 function normalizePosition(text: string): string {
   return text.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s\-\/&.]/g, '').replace(/\s+/g, ' ')
+}
+
+/**
+ * Exposición efectiva por persona — focalizaScore (Eloundou canónico) primario,
+ * observedExposure (Anthropic legacy) como fallback si el cargo no tiene
+ * mapeo Eloundou.
+ *
+ * Threshold canónico de "alta exposición" = 0.5 (validado contra distribución
+ * real demo Abril 2026: focalizaScore avg 0.444, p75 0.5, max 0.667).
+ * El threshold legacy 0.6 sobre observedExposure capturaba 0% (max real 0.165).
+ */
+function effExposure(e: { focalizaScore: number | null; observedExposure: number }): number {
+  return e.focalizaScore ?? e.observedExposure
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -401,8 +419,11 @@ export class WorkforceIntelligenceService {
   // ──────────────────────────────────────────────────────────────────────
 
   static detectTalentZombies(enriched: EnrichedEmployee[]): TalentZombieResult {
+    // Migrado a focalizaScore con threshold 0.5 (decisión Abril 2026).
+    // observedExposure mantiene como fallback en effExposure() para cargos
+    // sin clasificación Eloundou.
     const zombies = enriched.filter(e =>
-      e.observedExposure > 0.6 &&
+      effExposure(e) > 0.5 &&
       e.roleFitScore > 85 &&
       (e.potentialAbility !== null ? e.potentialAbility <= 2 : true) &&
       (e.potentialEngagement !== null ? e.potentialEngagement <= 2 : false)
@@ -545,7 +566,8 @@ export class WorkforceIntelligenceService {
       if (!e.departmentId) continue
       if (!deptAgg.has(e.departmentId)) deptAgg.set(e.departmentId, { id: e.departmentId, name: e.departmentName, totalExp: 0, totalEng: 0, count: 0, engCount: 0 })
       const d = deptAgg.get(e.departmentId)!
-      d.totalExp += e.observedExposure
+      // Migrado a focalizaScore (Eloundou canónico) con fallback
+      d.totalExp += effExposure(e)
       d.count++
       if (e.potentialEngagement !== null) {
         d.totalEng += e.potentialEngagement
@@ -629,12 +651,13 @@ export class WorkforceIntelligenceService {
     const deptAgg = new Map<string, { id: string; name: string; cost: number; count: number; totalExp: number }>()
 
     for (const e of enriched) {
-      if (!e.departmentId || e.observedExposure === 0) continue
+      const exp = effExposure(e)
+      if (!e.departmentId || exp === 0) continue
       if (!deptAgg.has(e.departmentId)) deptAgg.set(e.departmentId, { id: e.departmentId, name: e.departmentName, cost: 0, count: 0, totalExp: 0 })
       const d = deptAgg.get(e.departmentId)!
-      d.cost += e.salary * e.observedExposure
+      d.cost += e.salary * exp
       d.count++
-      d.totalExp += e.observedExposure
+      d.totalExp += exp
     }
 
     const byDepartment: DepartmentCost[] = [...deptAgg.values()]
@@ -651,7 +674,7 @@ export class WorkforceIntelligenceService {
       byDepartment,
       totalMonthly: byDepartment.reduce((s, d) => s + d.monthlyCost, 0),
       totalAnnual: byDepartment.reduce((s, d) => s + d.annualCost, 0),
-      confidence: enriched.some(e => e.observedExposure > 0) ? 'high' : 'low',
+      confidence: enriched.some(e => effExposure(e) > 0) ? 'high' : 'low',
     }
   }
 
@@ -740,8 +763,9 @@ export class WorkforceIntelligenceService {
     enriched: EnrichedEmployee[],
     roleFitThreshold: number = 75
   ): SeveranceLiabilityResult {
+    // Migrado a focalizaScore (Eloundou) con threshold 0.5 (mismo semántico)
     const candidates = enriched.filter(e =>
-      e.observedExposure > 0.5 && e.roleFitScore < roleFitThreshold
+      effExposure(e) > 0.5 && e.roleFitScore < roleFitThreshold
     )
 
     let totalSeverance = 0
@@ -749,7 +773,7 @@ export class WorkforceIntelligenceService {
 
     for (const c of candidates) {
       totalSeverance += calculateFiniquito(c.salary, c.tenureMonths)
-      monthlyFTESavings += c.salary * c.observedExposure
+      monthlyFTESavings += c.salary * effExposure(c)
     }
 
     const paybackMonths = monthlyFTESavings > 0 ? Math.ceil(totalSeverance / monthlyFTESavings) : 0
@@ -786,7 +810,8 @@ export class WorkforceIntelligenceService {
         if (e.mobilityQuadrant === 'SUCESOR_NATURAL') score *= 1.3
 
         // × exposure: mayor exposición + alto score = más valioso retener
-        score *= (1 + e.observedExposure)
+        // Migrado a focalizaScore (Eloundou) con fallback
+        score *= (1 + effExposure(e))
 
         // Tier
         const tier: RetentionEntry['tier'] =
@@ -819,6 +844,10 @@ export class WorkforceIntelligenceService {
           potentialEngagement: e.potentialEngagement,
           // FocalizaScore del cargo (Eloundou)
           focalizaScore: e.focalizaScore,
+          // v3.3 — cuadrantes para narrativa individual
+          riskQuadrant: e.riskQuadrant,
+          mobilityQuadrant: e.mobilityQuadrant,
+          potentialAbility: e.potentialAbility,
         }
       })
       .sort((a, b) => b.retentionScore - a.retentionScore)

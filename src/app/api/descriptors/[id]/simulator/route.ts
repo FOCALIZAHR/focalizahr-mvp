@@ -17,6 +17,7 @@ import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationS
 import { prisma } from '@/lib/prisma'
 import { AIExposureService } from '@/lib/services/AIExposureService'
 import { SalaryConfigService } from '@/lib/services/SalaryConfigService'
+import { AutomationClassificationService } from '@/lib/services/AutomationClassificationService'
 import { socCodeVariants } from '@/lib/utils/socCode'
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -33,13 +34,27 @@ interface ProposedTaskRaw {
   isFromOnet: boolean
 }
 
+export interface AnthropicDimensionData {
+  directive: number
+  feedbackLoop: number
+  taskIteration: number
+  validation: number
+  learning: number
+}
+
 export interface SimulatorTask {
   taskId: string
-  description: string         // taskDescriptionEs si existe, fallback a inglés
+  description: string                    // taskDescriptionEs si existe, fallback a inglés
+  descriptionEn: string                  // texto O*NET original (inglés) — para hover tooltip
   importance: number
-  betaScore: number | null
+  hoursPerMonth: number                  // calculado: proporcional a importance, capado en 40
+  betaScore: number | null               // = focalizaScore de OnetTask (Eloundou puro)
   isAutomatedHint: boolean
   isActive: boolean
+  anthropicData: AnthropicDimensionData | null  // 5 dims crudas (null si no hay)
+  /** Frase narrativa (2-3 oraciones) del cruce betaEloundou × dim dominante.
+   *  null si no hay anthropicData, señal débil, o combinación sin frase. */
+  classificationPhrase: string | null
 }
 
 export interface SimulatorPayload {
@@ -51,7 +66,16 @@ export interface SimulatorPayload {
   occupationFocalizaScore: number | null
   standardJobLevel: string | null
   standardCategory: string | null
-  employeeCount: number
+
+  // Rediseño Patrón G — campos canónicos
+  headcount: number                      // alias semántico de employeeCount
+  employeeCount: number                  // se mantiene por compatibilidad
+  costPerHour: number                    // baseSalary.monthlySalary / 160
+  badgeStatus: 'verified' | 'proposed'   // map DRAFT→proposed, CONFIRMED→verified
+  rollupClientExposure: number           // Σ(importance × focalizaScore) / Σ(importance) sobre tareas con dato
+  totalHoursPerMonth: number             // suma de hoursPerMonth de tasks
+  totalCostPerMonth: number              // totalHoursPerMonth × costPerHour
+
   tasks: SimulatorTask[]
   baseSalary: {
     monthlySalary: number
@@ -65,6 +89,53 @@ export interface SimulatorPayload {
     activeTasks: number
     totalTasks: number
     confidence: 'high' | 'medium' | 'low'
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ────────────────────────────────────────────────────────────────────────────
+
+interface OnetTaskAnthropicFields {
+  anthropicDirective: number | null
+  anthropicFeedbackLoop: number | null
+  anthropicTaskIteration: number | null
+  anthropicValidation: number | null
+  anthropicLearning: number | null
+}
+
+/**
+ * Construye `anthropicData` del SimulatorTask si la tarea tiene al menos
+ * una dimensión poblada. Si todas son null, retorna null (el Ecualizador
+ * no se renderizará en el frontend).
+ */
+function buildAnthropicData(
+  task: OnetTaskAnthropicFields | undefined,
+): AnthropicDimensionData | null {
+  if (!task) return null
+  const {
+    anthropicDirective,
+    anthropicFeedbackLoop,
+    anthropicTaskIteration,
+    anthropicValidation,
+    anthropicLearning,
+  } = task
+  // Si TODAS son null, no hay dato Anthropic para esta tarea
+  if (
+    anthropicDirective === null &&
+    anthropicFeedbackLoop === null &&
+    anthropicTaskIteration === null &&
+    anthropicValidation === null &&
+    anthropicLearning === null
+  ) {
+    return null
+  }
+  return {
+    directive: anthropicDirective ?? 0,
+    feedbackLoop: anthropicFeedbackLoop ?? 0,
+    taskIteration: anthropicTaskIteration ?? 0,
+    validation: anthropicValidation ?? 0,
+    learning: anthropicLearning ?? 0,
   }
 }
 
@@ -130,31 +201,55 @@ export async function GET(
     if (hasResponsibilities) {
       // ── Camino normal: responsibilities existen en BD ─────────────────
       // Estructura (description, importance, isActive) viene del snapshot.
-      // Datos enriquecibles (taskDescriptionEs, focalizaScore) se leen
-      // SIEMPRE de onet_tasks. El contrato del SimulatorTask mantiene
-      // `betaScore` como nombre de campo (no romper frontend) pero el VALOR
-      // es focalizaScore (Eloundou puro, sin mezcla con Haiku).
+      // Datos enriquecibles (taskDescriptionEs, focalizaScore, 5 dims
+      // Anthropic) se leen SIEMPRE de onet_tasks.
       const taskIds = rawTasks.map(t => t.taskId).filter(Boolean)
       const onetTasks = taskIds.length > 0
         ? await prisma.onetTask.findMany({
             where: { id: { in: taskIds } },
-            select: { id: true, taskDescriptionEs: true, focalizaScore: true },
+            select: {
+              id: true,
+              taskDescription: true,
+              taskDescriptionEs: true,
+              focalizaScore: true,
+              anthropicDirective: true,
+              anthropicFeedbackLoop: true,
+              anthropicTaskIteration: true,
+              anthropicValidation: true,
+              anthropicLearning: true,
+            },
           })
         : []
-      const onetMap = new Map(
-        onetTasks.map(t => [t.id, { descEs: t.taskDescriptionEs, focalizaScore: t.focalizaScore }]),
-      )
+      const onetMap = new Map(onetTasks.map(t => [t.id, t]))
+
+      // Calcular hoursPerMonth proporcional a importance (canónico en backend)
+      const activeTasks = rawTasks.filter(t => t.isActive !== false)
+      const sumImportance = activeTasks.reduce((s, t) => s + (t.importance ?? 3), 0)
 
       tasks = rawTasks.map(t => {
         const fresh = onetMap.get(t.taskId)
+        const importance = t.importance ?? 3
+        const hoursPerMonth = sumImportance > 0
+          ? Math.min(40, Math.round((160 * importance) / sumImportance))
+          : Math.min(40, Math.floor(160 / Math.max(activeTasks.length, 1)))
+
+        const anthropicData = buildAnthropicData(fresh)
+        const classificationPhrase = AutomationClassificationService.getPhrase(
+          fresh?.focalizaScore ?? null,
+          anthropicData,
+        )
+
         return {
           taskId: t.taskId,
-          description: fresh?.descEs ?? t.description,
-          importance: t.importance,
-          // betaScore en el contrato = focalizaScore de OnetTask (Eloundou)
+          description: fresh?.taskDescriptionEs ?? t.description,
+          descriptionEn: fresh?.taskDescription ?? t.description,
+          importance,
+          hoursPerMonth,
           betaScore: fresh?.focalizaScore ?? null,
           isAutomatedHint: t.isAutomated,
           isActive: t.isActive !== false,
+          anthropicData,
+          classificationPhrase,
         }
       })
     } else if (descriptor.socCode) {
@@ -173,18 +268,40 @@ export async function GET(
           importance: true,
           focalizaScore: true,
           isAutomated: true,
+          anthropicDirective: true,
+          anthropicFeedbackLoop: true,
+          anthropicTaskIteration: true,
+          anthropicValidation: true,
+          anthropicLearning: true,
         },
       })
 
-      tasks = onetTasks.map(t => ({
-        taskId: t.id,
-        description: t.taskDescriptionEs ?? t.taskDescription,
-        importance: t.importance,
-        // betaScore del contrato = focalizaScore de OnetTask (Eloundou puro)
-        betaScore: t.focalizaScore,
-        isAutomatedHint: t.isAutomated,
-        isActive: true,
-      }))
+      // Calcular hoursPerMonth proporcional a importance
+      const sumImportance = onetTasks.reduce((s, t) => s + (t.importance ?? 3), 0)
+
+      tasks = onetTasks.map(t => {
+        const importance = t.importance ?? 3
+        const hoursPerMonth = sumImportance > 0
+          ? Math.min(40, Math.round((160 * importance) / sumImportance))
+          : Math.min(40, Math.floor(160 / Math.max(onetTasks.length, 1)))
+
+        const anthropicData = buildAnthropicData(t)
+        return {
+          taskId: t.id,
+          description: t.taskDescriptionEs ?? t.taskDescription,
+          descriptionEn: t.taskDescription,
+          importance,
+          hoursPerMonth,
+          betaScore: t.focalizaScore,
+          isAutomatedHint: t.isAutomated,
+          isActive: true,
+          anthropicData,
+          classificationPhrase: AutomationClassificationService.getPhrase(
+            t.focalizaScore,
+            anthropicData,
+          ),
+        }
+      })
     }
 
     // ── 5. Salario base via SalaryConfigService ────────────────────────
@@ -249,7 +366,28 @@ export async function GET(
       }
     }
 
-    // ── 7. Payload final ────────────────────────────────────────────────
+    // ── 7. Cálculos derivados (Patrón G — canónicos en backend) ────────
+    const costPerHour = salaryResult.monthlySalary / 160
+    const badgeStatus: 'verified' | 'proposed' =
+      descriptor.status === 'CONFIRMED' ? 'verified' : 'proposed'
+
+    // rollupClientExposure: promedio ponderado por importance de focalizaScore
+    const activeScored = tasks.filter(
+      t => t.isActive && t.betaScore !== null && t.betaScore !== undefined,
+    )
+    let rollupClientExposure = 0
+    if (activeScored.length > 0) {
+      const sumW = activeScored.reduce((s, t) => s + t.importance, 0)
+      const sumWX = activeScored.reduce((s, t) => s + t.importance * (t.betaScore as number), 0)
+      rollupClientExposure = sumW > 0 ? Math.round((sumWX / sumW) * 10000) / 10000 : 0
+    }
+
+    const totalHoursPerMonth = tasks
+      .filter(t => t.isActive)
+      .reduce((s, t) => s + t.hoursPerMonth, 0)
+    const totalCostPerMonth = totalHoursPerMonth * costPerHour
+
+    // ── 8. Payload final ────────────────────────────────────────────────
     const payload: SimulatorPayload = {
       descriptorId: descriptor.id,
       jobTitle: descriptor.jobTitle,
@@ -258,7 +396,13 @@ export async function GET(
       occupationFocalizaScore,
       standardJobLevel: descriptor.standardJobLevel,
       standardCategory: descriptor.standardCategory,
+      headcount: descriptor.employeeCount,
       employeeCount: descriptor.employeeCount,
+      costPerHour,
+      badgeStatus,
+      rollupClientExposure,
+      totalHoursPerMonth,
+      totalCostPerMonth,
       tasks,
       baseSalary: {
         monthlySalary: salaryResult.monthlySalary,

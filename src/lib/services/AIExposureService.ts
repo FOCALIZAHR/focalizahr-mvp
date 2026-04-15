@@ -92,9 +92,27 @@ export interface DescriptorExposureResult {
 // CONSTANTS
 // ════════════════════════════════════════════════════════════════════════════
 
-const HIGH_EXPOSURE_THRESHOLD = 0.6 // >60% = alto riesgo de automatización
+// Threshold canónico de "alta exposición" — alineado con el resto del módulo.
+// Migrado Abril 2026:
+//   - Antes: 0.6 sobre observedExposure (max real Anthropic 0.165 → 0% siempre).
+//   - Ahora: 0.5 sobre focalizaScore (Eloundou) con fallback a observedExposure.
+// Mismo threshold que WorkforceIntelligenceService.detectTalentZombies y
+// PersonExposureNarrativeService — evita drift entre servicios.
+const HIGH_EXPOSURE_THRESHOLD = 0.5
 const TOP_TASKS_LIMIT = 5
 const TOP_OCCUPATIONS_LIMIT = 10
+
+/**
+ * Exposición efectiva de una ocupación. focalizaScore (Eloundou canónico)
+ * primario, observedExposure (Anthropic legacy) y betaScore como fallbacks.
+ */
+function effectiveOccupationExposure(o: {
+  focalizaScore: number | null
+  observedExposure: number | null
+  betaScore: number | null
+}): number {
+  return o.focalizaScore ?? o.observedExposure ?? o.betaScore ?? 0
+}
 
 const DEFAULT_EXPOSURE: ExposureResult = {
   socCode: '',
@@ -241,7 +259,7 @@ export class AIExposureService {
         mappings.map(m => [m.positionText, m.socCode!])
       )
 
-      // 3. Obtener exposiciones por SOC code único
+      // 3. Obtener exposiciones por SOC code único — focalizaScore primario
       const uniqueSocCodes = [...new Set(mappings.map(m => m.socCode!).filter(Boolean))]
       const occupations = await prisma.onetOccupation.findMany({
         where: { socCode: { in: uniqueSocCodes } },
@@ -249,6 +267,7 @@ export class AIExposureService {
           socCode: true,
           titleEn: true,
           titleEs: true,
+          focalizaScore: true,
           observedExposure: true,
           betaScore: true,
         },
@@ -257,7 +276,7 @@ export class AIExposureService {
       const socToExposure = new Map(
         occupations.map(o => [o.socCode, {
           title: o.titleEs ?? o.titleEn,
-          exposure: o.observedExposure ?? o.betaScore ?? 0,
+          exposure: effectiveOccupationExposure(o),
         }])
       )
 
@@ -383,7 +402,7 @@ export class AIExposureService {
       })
       const positionToSoc = new Map(allMappings.map(m => [m.positionText, m.socCode!]))
 
-      // 3. Obtener todas las ocupaciones con exposición
+      // 3. Obtener todas las ocupaciones con exposición — focalizaScore primario
       const uniqueSocCodes = [...new Set(allMappings.map(m => m.socCode!).filter(Boolean))]
       const occupations = await prisma.onetOccupation.findMany({
         where: { socCode: { in: uniqueSocCodes } },
@@ -391,6 +410,7 @@ export class AIExposureService {
           socCode: true,
           titleEn: true,
           titleEs: true,
+          focalizaScore: true,
           observedExposure: true,
           betaScore: true,
         },
@@ -398,7 +418,7 @@ export class AIExposureService {
       const socToData = new Map(
         occupations.map(o => [o.socCode, {
           title: o.titleEs ?? o.titleEn,
-          exposure: o.observedExposure ?? o.betaScore ?? 0,
+          exposure: effectiveOccupationExposure(o),
         }])
       )
 

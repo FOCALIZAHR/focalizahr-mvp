@@ -486,11 +486,24 @@ export class JobDescriptorService {
       select: { id: true },
     })
 
+    // Derivación automática de standardCategory:
+    // 1. Usa el explícito del input si viene
+    // 2. Si no, hereda de Department.standardCategory (cuando hay departmentId válido)
+    // 3. Si tampoco, queda null
+    let derivedStandardCategory: string | null | undefined = data.standardCategory
+    if (!derivedStandardCategory && data.departmentId && data.departmentId !== '') {
+      const dept = await prisma.department.findUnique({
+        where: { id: data.departmentId },
+        select: { standardCategory: true },
+      })
+      derivedStandardCategory = dept?.standardCategory ?? null
+    }
+
     const payload = {
       socCode: data.socCode,
       secondarySocCode,
       standardJobLevel: data.standardJobLevel,
-      standardCategory: data.standardCategory,
+      standardCategory: derivedStandardCategory,
       purpose: data.purpose,
       purposeSource: data.purposeSource ?? 'onet_generated',
       responsibilities: data.responsibilities as any,

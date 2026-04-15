@@ -27,3 +27,25 @@ export function formatTenureMonths(months: number): string {
 export function formatHours(hours: number): string {
   return `${Math.round(hours)} h`
 }
+
+/**
+ * Variante de formatCLP SIN signo `$` — para usarse en composiciones donde
+ * el componente agrega el `$` por separado (ej: `<p>${formatCLPCompact(v)}</p>`).
+ */
+export function formatCLPCompact(amount: number): string {
+  if (amount >= 1_000_000_000) {
+    return `${(amount / 1_000_000_000).toFixed(1)}B`
+  }
+  if (amount >= 1_000_000) {
+    return `${(amount / 1_000_000).toFixed(1)}M`
+  }
+  if (amount >= 1_000) {
+    return `${(amount / 1_000).toFixed(0)}K`
+  }
+  return `${Math.round(amount)}`
+}
+
+/** Formato número con separadores chilenos (1.234.567) */
+export function formatNumber(value: number): string {
+  return Math.round(value).toLocaleString('es-CL')
+}

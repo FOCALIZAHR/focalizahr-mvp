@@ -47,7 +47,7 @@ export default memo(function CascadeActo2Problema({
     const trapped = data.retentionPriority.ranking.filter(
       r =>
         r.roleFitScore > 75 &&
-        r.observedExposure > 0.5 &&
+        (r.focalizaScore ?? r.observedExposure) > 0.5 &&
         r.acotadoGroup &&
         r.standardCategory
     )
