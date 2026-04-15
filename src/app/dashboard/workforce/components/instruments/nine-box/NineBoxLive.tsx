@@ -11,13 +11,24 @@
 // el resultado financiero (La Decision de Valor) sin prescribir accion.
 // ════════════════════════════════════════════════════════════════════════════
 
-import { memo, useCallback, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import type { WorkforceDiagnosticData } from '../../../types/workforce.types'
 import type { RetentionEntry } from '@/lib/services/WorkforceIntelligenceService'
 import NineBoxMatrix from './NineBoxMatrix'
-import { detectPattern, median, type PatternResult } from './nine-box-utils'
+import NineBoxPortada from './NineBoxPortada'
+import {
+  detectPattern,
+  interpretEngagement,
+  median,
+  type PatternResult,
+} from './nine-box-utils'
 import { formatDisplayName } from '@/lib/utils/formatName'
+import {
+  PersonExposureNarrativeService,
+  type PersonExposureNarrative,
+} from '@/lib/services/PersonExposureNarrativeService'
 import TeslaLine from '../_shared/TeslaLine'
 import ConfidenceDot from '../_shared/ConfidenceDot'
 import { useAnimatedNumber } from '../_shared/useAnimatedNumber'
@@ -288,46 +299,29 @@ function ObservacionSection({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FINANCIAL HUD — panel lateral con Observacion + Decision de Valor
+// COHORT VIEW — vista por defecto del HUD (cuando NO hay hover)
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface CohortStats {
-  count: number
-  avgExposurePct: number
-  avgRoleFit: number
-  avgTenureMonths: number
-  avgAugmentationPct: number
-  avgEngagement: number  // 0-5
-  avgSalary: number
-  tierBreakdown: Record<RetentionEntry['tier'], number>
-  sumSalary: number
-  sumFiniquito: number
-  paybackMonths: number
-}
-
-interface FinancialHUDProps {
-  stats: CohortStats
-  pattern: PatternResult
-  hoveredPerson: RetentionEntry | null
-}
-
-const FinancialHUD = memo(function FinancialHUD({
+function CohortView({
   stats,
   pattern,
-  hoveredPerson,
-}: FinancialHUDProps) {
-  const animatedCount = useAnimatedNumber(stats.count, 300)
-  const animatedSalary = useAnimatedNumber(stats.sumSalary)
-  const animatedFiniquito = useAnimatedNumber(stats.sumFiniquito)
-  const animatedPayback = useAnimatedNumber(stats.paybackMonths)
-
-  const hasCohort = stats.count > 0
-
+  hasCohort,
+  animatedCount,
+  animatedSalary,
+  animatedFiniquito,
+  animatedPayback,
+}: {
+  stats: CohortStats
+  pattern: PatternResult
+  hasCohort: boolean
+  animatedCount: number
+  animatedSalary: number
+  animatedFiniquito: number
+  animatedPayback: number
+}) {
   return (
-    <aside className="w-full md:w-[340px] flex-shrink-0 fhr-card relative overflow-hidden flex flex-col p-0">
-      <TeslaLine />
-      <div className="flex flex-col gap-6 p-6 overflow-y-auto">
-      {/* ── Cohorte ───────────────────────────────────────── */}
+    <>
+      {/* Cohorte */}
       <div>
         <p className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">
           Cohorte del escenario
@@ -344,10 +338,8 @@ const FinancialHUD = memo(function FinancialHUD({
 
       {hasCohort && (
         <>
-          {/* ── La Observación (pattern-aware) ────────────── */}
           <ObservacionSection stats={stats} pattern={pattern} />
 
-          {/* ── La Decisión de Valor ──────────────────────── */}
           <HudSection title="La Decisión de Valor">
             <HudStat
               label="Masa salarial"
@@ -376,70 +368,201 @@ const FinancialHUD = memo(function FinancialHUD({
           </HudSection>
         </>
       )}
+    </>
+  )
+}
 
-      {/* ── Hover preview — solo datos, cero veredicto ────── */}
-      {hoveredPerson && (
-        <div className="mt-auto border-t border-white/5 pt-5">
-          <p className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">
-            Preview
-          </p>
-          <p className="text-sm font-medium text-cyan-400 mt-2 truncate">
-            {formatDisplayName(hoveredPerson.employeeName)}
-          </p>
-          <p className="text-xs font-light text-slate-400 truncate">
-            {hoveredPerson.position}
-          </p>
-          <p className="text-[10px] font-light text-slate-500 truncate mt-0.5">
-            {hoveredPerson.departmentName}
-          </p>
-          <div className="mt-3 space-y-1 font-mono text-[10px]">
-            <div className="flex justify-between gap-2">
-              <span className="text-slate-500">exposición</span>
-              <span className="text-slate-300 tabular-nums">
-                {Math.round(hoveredPerson.observedExposure * 100)}%
-              </span>
-            </div>
-            <div className="flex justify-between gap-2">
-              <span className="text-slate-500">automatización</span>
-              <span className="text-slate-300 tabular-nums">
-                {Math.round(hoveredPerson.automationShare * 100)}%
-              </span>
-            </div>
-            <div className="flex justify-between gap-2">
-              <span className="text-slate-500">augmentación</span>
-              <span className="text-slate-300 tabular-nums">
-                {Math.round(hoveredPerson.augmentationShare * 100)}%
-              </span>
-            </div>
-            <div className="flex justify-between gap-2">
-              <span className="text-slate-500">role fit</span>
-              <span className="text-slate-300 tabular-nums">
-                {Math.round(hoveredPerson.roleFitScore)}%
-              </span>
-            </div>
-            {hoveredPerson.potentialEngagement !== null && (
-              <div className="flex justify-between gap-2">
-                <span className="text-slate-500">compromiso</span>
-                <span className="text-slate-300 tabular-nums">
-                  {hoveredPerson.potentialEngagement.toFixed(1)} / 5
-                </span>
-              </div>
-            )}
-            <div className="flex justify-between gap-2">
-              <span className="text-slate-500">salario</span>
-              <span className="text-slate-300 tabular-nums">
-                {formatCLP(hoveredPerson.salary)} / mes
-              </span>
-            </div>
-            <div className="flex justify-between gap-2">
-              <span className="text-slate-500">antigüedad</span>
-              <span className="text-slate-300 tabular-nums">
-                {formatTenureMonths(hoveredPerson.tenureMonths)}
-              </span>
-            </div>
-          </div>
+// ─────────────────────────────────────────────────────────────────────────────
+// PERSON VIEW — vista del HUD durante hover sobre un dot
+// Reemplaza temporalmente la vista de cohorte. Vuelve a CohortView al salir.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function PersonView({
+  person,
+  isPinned,
+}: {
+  person: RetentionEntry
+  isPinned: boolean
+}) {
+  // Narrativa per-persona — motor PROPIO del módulo Workforce Planning.
+  // Cruza focalizaScore × roleFit × engagement → 6 casos consolidados.
+  // Reemplaza TalentNarrativeService (que era de Sucesión y no conocía exposición IA).
+  const narrative: PersonExposureNarrative = PersonExposureNarrativeService.build({
+    focalizaScore: person.focalizaScore,
+    roleFit: person.roleFitScore,
+    engagement: person.potentialEngagement,
+    employeeName: formatDisplayName(person.employeeName),
+  })
+  const engagementLabel = interpretEngagement(person.potentialEngagement)
+
+  // Color del bloque narrativa por accent semántico del servicio
+  const accentClass =
+    narrative.accent === 'amber'
+      ? 'border-amber-500/30 bg-amber-500/[0.05]'
+      : narrative.accent === 'cyan'
+        ? 'border-cyan-500/25 bg-cyan-500/[0.04]'
+        : 'border-slate-700/40 bg-slate-800/30'
+
+  return (
+    <div>
+      {/* Header — nombre + cargo + departamento */}
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[9px] uppercase tracking-widest text-cyan-400/80 font-bold">
+          {isPinned ? 'Persona · fijada' : 'Persona'}
+        </p>
+        {isPinned && (
+          <span className="text-[9px] text-slate-500 italic">
+            Click para soltar
+          </span>
+        )}
+      </div>
+      <p className="text-xl font-light text-white mt-1 leading-tight">
+        {formatDisplayName(person.employeeName)}
+      </p>
+      <p className="text-sm font-light text-slate-300 mt-1 truncate">
+        {person.position}
+      </p>
+      <p className="text-xs font-light text-slate-500 mt-0.5 truncate">
+        {person.departmentName}
+      </p>
+
+      {/* ── TRIAJE NARRATIVO ─────────────────────────────────────────
+          Headline (contradicción/riesgo) + context (lectura ejecutiva)
+          + exposureLens (qué implica la exposición específicamente)
+          + urgencyLevel (consecuencia al negocio).
+          Va ARRIBA de los datos. Interpretación primero, números después. */}
+      <div className={`mt-5 rounded-lg border ${accentClass} px-3 py-3`}>
+        <p className="text-xs font-medium text-white leading-snug mb-2">
+          {narrative.headline}
+        </p>
+        <p className="text-[11px] font-light text-slate-300 leading-relaxed">
+          {narrative.context}
+        </p>
+        <p className="text-[10.5px] font-light text-purple-300/90 leading-relaxed mt-2 pt-2 border-t border-white/5">
+          {narrative.exposureLens}
+        </p>
+        <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mt-2 pt-2 border-t border-white/5">
+          {narrative.urgencyLevel}
+        </p>
+      </div>
+
+      {/* ── DATOS DE RESPALDO — labels humanos, sin jerga ───────────── */}
+      <div className="mt-5 pt-5 border-t border-white/5">
+        <p className="text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-3">
+          Datos
+        </p>
+        <div className="space-y-2">
+          <HudStat
+            label="Dominio del cargo"
+            value={`${Math.round(person.roleFitScore)}%`}
+            accent={person.roleFitScore >= 75 ? 'cyan' : 'slate'}
+          />
+          {engagementLabel && (
+            <HudStat
+              label="Compromiso"
+              value={engagementLabel}
+              accent={
+                engagementLabel === 'Crítico'
+                  ? 'amber'
+                  : engagementLabel === 'Alto'
+                    ? 'cyan'
+                    : 'slate'  // 'Estable' (NEUTRAL Test Ácido) — sin urgencia
+              }
+            />
+          )}
+          <HudStat
+            label="Antigüedad"
+            value={formatTenureMonths(person.tenureMonths)}
+          />
         </div>
-      )}
+      </div>
+
+      {/* ── FINANCIERO ──────────────────────────────────────────────── */}
+      <div className="mt-5 pt-5 border-t border-white/5">
+        <p className="text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-3">
+          Financiero
+        </p>
+        <div className="space-y-2">
+          <HudStat
+            label="Salario"
+            value={`${formatCLP(person.salary)} / mes`}
+            accent="amber"
+          />
+          {person.finiquitoToday !== null && (
+            <HudStat
+              label="Finiquito hoy"
+              value={formatCLP(person.finiquitoToday)}
+              accent="amber"
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FINANCIAL HUD — panel lateral con Observacion + Decision de Valor
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface CohortStats {
+  count: number
+  avgExposurePct: number
+  avgRoleFit: number
+  avgTenureMonths: number
+  avgAugmentationPct: number
+  avgEngagement: number  // 0-5
+  avgSalary: number
+  tierBreakdown: Record<RetentionEntry['tier'], number>
+  sumSalary: number
+  sumFiniquito: number
+  paybackMonths: number
+}
+
+interface FinancialHUDProps {
+  stats: CohortStats
+  pattern: PatternResult
+  /** Persona mostrada: pinned (sticky) > hovered. Null = vista cohorte. */
+  displayedPerson: RetentionEntry | null
+  /** Si la persona está pinned (click-toggle), se muestra hint para soltar */
+  isPinned: boolean
+}
+
+const FinancialHUD = memo(function FinancialHUD({
+  stats,
+  pattern,
+  displayedPerson,
+  isPinned,
+}: FinancialHUDProps) {
+  const animatedCount = useAnimatedNumber(stats.count, 300)
+  const animatedSalary = useAnimatedNumber(stats.sumSalary)
+  const animatedFiniquito = useAnimatedNumber(stats.sumFiniquito)
+  const animatedPayback = useAnimatedNumber(stats.paybackMonths)
+
+  const hasCohort = stats.count > 0
+
+  return (
+    <aside className="w-full md:w-[340px] flex-shrink-0 fhr-card relative overflow-hidden flex flex-col p-0">
+      <TeslaLine />
+      <div className="flex flex-col gap-6 p-6 overflow-y-auto">
+        {/* ─────────────────────────────────────────────────────────────
+            CONMUTACIÓN: persona (hover/pinned) vs cohorte (default)
+            - Hover: muestra persona, debounced 150ms al salir
+            - Click: pin → persona sticky hasta nuevo click
+            ───────────────────────────────────────────────────────────── */}
+        {displayedPerson ? (
+          <PersonView person={displayedPerson} isPinned={isPinned} />
+        ) : (
+          <CohortView
+            stats={stats}
+            pattern={pattern}
+            hasCohort={hasCohort}
+            animatedCount={animatedCount}
+            animatedSalary={animatedSalary}
+            animatedFiniquito={animatedFiniquito}
+            animatedPayback={animatedPayback}
+          />
+        )}
       </div>
     </aside>
   )
@@ -454,6 +577,9 @@ interface NineBoxLiveProps {
 }
 
 export default function NineBoxLive({ data }: NineBoxLiveProps) {
+  // ── Motor 2 estados: portada → matrix (Patrón G) ─────────────────────
+  const [view, setView] = useState<'portada' | 'matrix'>('portada')
+
   // ── 1. Filtrar gente con nineBoxPosition no-null ─────────────────────
   const people = useMemo(
     () =>
@@ -470,14 +596,24 @@ export default function NineBoxLive({ data }: NineBoxLiveProps) {
   // ── 3. Estado de interacción ─────────────────────────────────────────
   const [lassoSelectedIds, setLassoSelectedIds] = useState<Set<string>>(new Set())
   const [hoveredPerson, setHoveredPerson] = useState<RetentionEntry | null>(null)
+  // Pinned: persona fijada con click. Override del hover — el HUD muestra
+  // siempre la pinned cuando existe. Click otra vez → unpin.
+  const [pinnedPersonId, setPinnedPersonId] = useState<string | null>(null)
 
   // ── 4. Eligibles bajo el escenario ───────────────────────────────────
-  // people que cumplen AMBOS sliders: exposicion >= min y roleFit >= min
+  // Filtro por focalizaScore (canónico Eloundou). Si la persona no tiene
+  // focalizaScore (cargo sin clasificar O*NET) → se incluye SOLO si el
+  // umbral es 0; al filtrar por exposición específica, no aplica.
   const eligibleIds = useMemo(() => {
     const ids = new Set<string>()
     const expoThreshold = exposureMin / 100
     for (const p of people) {
-      if (p.observedExposure >= expoThreshold && p.roleFitScore >= roleFitMin) {
+      const focaliza = p.focalizaScore
+      const passesExposure =
+        expoThreshold === 0
+          ? true
+          : focaliza !== null && focaliza >= expoThreshold
+      if (passesExposure && p.roleFitScore >= roleFitMin) {
         ids.add(p.employeeId)
       }
     }
@@ -515,7 +651,14 @@ export default function NineBoxLive({ data }: NineBoxLiveProps) {
       }
     }
 
-    const sumExposure = cohort.reduce((s, p) => s + p.observedExposure, 0)
+    // Promedio focalizaScore (Eloundou canónico). Excluye nulls — si un cargo
+    // no está clasificado en O*NET, no contribuye al promedio. Si TODOS son
+    // null, queda 0 (caso degenerado, raro).
+    const focalizaValues = cohort
+      .map(p => p.focalizaScore)
+      .filter((v): v is number => v !== null)
+    const sumExposure = focalizaValues.reduce((s, v) => s + v, 0)
+    const focalizaCount = focalizaValues.length
     const sumRoleFit = cohort.reduce((s, p) => s + p.roleFitScore, 0)
     const sumTenure = cohort.reduce((s, p) => s + p.tenureMonths, 0)
     const sumSalary = cohort.reduce((s, p) => s + p.salary, 0)
@@ -545,7 +688,7 @@ export default function NineBoxLive({ data }: NineBoxLiveProps) {
 
     return {
       count,
-      avgExposurePct: (sumExposure / count) * 100,
+      avgExposurePct: focalizaCount > 0 ? (sumExposure / focalizaCount) * 100 : 0,
       avgRoleFit: sumRoleFit / count,
       avgTenureMonths: sumTenure / count,
       avgAugmentationPct: (sumAugmentation / count) * 100,
@@ -571,14 +714,38 @@ export default function NineBoxLive({ data }: NineBoxLiveProps) {
   }, [people, cohortIds, salaryMedianRef])
 
   // ── 7. Handlers ──────────────────────────────────────────────────────
+  // Click sobre dot: toggle pin. Si la persona ya estaba pinned → unpin
+  // (vuelve a vista cohorte). Si no → pin (override hover).
   const handleDotClick = useCallback((personId: string) => {
-    // eslint-disable-next-line no-console
-    console.log('TODO: navegar a TaskMicroscope', personId)
+    setPinnedPersonId(prev => (prev === personId ? null : personId))
   }, [])
+
+  // Persona efectivamente mostrada en el HUD: pinned (si existe) > hovered
+  const displayedPerson = useMemo<RetentionEntry | null>(() => {
+    if (pinnedPersonId) {
+      return people.find(p => p.employeeId === pinnedPersonId) ?? null
+    }
+    return hoveredPerson
+  }, [pinnedPersonId, hoveredPerson, people])
 
   const handleLassoSelect = useCallback((ids: string[]) => {
     setLassoSelectedIds(new Set(ids))
   }, [])
+
+  // ── Tap-outside (Apple pattern): click en SVG vacío desfija pin ──────
+  const handleEmptyClick = useCallback(() => {
+    setPinnedPersonId(null)
+  }, [])
+
+  // ── Escape global desfija pin (universal Apple/Tesla pattern) ────────
+  useEffect(() => {
+    if (!pinnedPersonId) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPinnedPersonId(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pinnedPersonId])
 
   // ─────────────────────────────────────────────────────────────────────
   // EMPTY STATE
@@ -601,28 +768,145 @@ export default function NineBoxLive({ data }: NineBoxLiveProps) {
   }
 
   // ─────────────────────────────────────────────────────────────────────
-  // RENDER
+  // RENDER — motor 2 estados Patrón G (portada → matrix)
   // ─────────────────────────────────────────────────────────────────────
 
+  // NOTA layout: el orchestrator usa `flex items-center justify-center`
+  // (centra al child con su altura natural). Por eso NO usamos `absolute
+  // inset-0` aquí — el wrapper colapsaría a 0 y no se vería nada.
+  // En su lugar: render condicional inline. La portada tiene min-h propia
+  // y la matrix tiene su layout flex que ocupa h-full naturalmente.
+  return (
+    <div className="w-full h-full">
+      <AnimatePresence mode="wait">
+        {view === 'portada' ? (
+          <motion.div
+            key="portada"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.25 }}
+            className="w-full h-full"
+          >
+            <NineBoxPortada
+              people={people}
+              onContinue={() => setView('matrix')}
+            />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="matrix"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="w-full h-full"
+          >
+            <MatrixView
+              data={data}
+              people={people}
+              exposureMin={exposureMin}
+              setExposureMin={setExposureMin}
+              roleFitMin={roleFitMin}
+              setRoleFitMin={setRoleFitMin}
+              eligibleIds={eligibleIds}
+              lassoSelectedIds={lassoSelectedIds}
+              hoveredPerson={hoveredPerson}
+              setHoveredPerson={setHoveredPerson}
+              displayedPerson={displayedPerson}
+              pinnedPersonId={pinnedPersonId}
+              stats={stats}
+              pattern={pattern}
+              handleDotClick={handleDotClick}
+              handleLassoSelect={handleLassoSelect}
+              handleEmptyClick={handleEmptyClick}
+              onBack={() => setView('portada')}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// MATRIX VIEW — vista interactiva (Estado 2 del motor)
+// Encapsula el contenido previo del componente para mantener separación
+// limpia entre estado portada y estado matrix.
+// ═════════════════════════════════════════════════════════════════════════════
+
+interface MatrixViewProps {
+  data: WorkforceDiagnosticData
+  people: RetentionEntry[]
+  exposureMin: number
+  setExposureMin: (n: number) => void
+  roleFitMin: number
+  setRoleFitMin: (n: number) => void
+  eligibleIds: Set<string>
+  lassoSelectedIds: Set<string>
+  hoveredPerson: RetentionEntry | null
+  setHoveredPerson: (p: RetentionEntry | null) => void
+  /** Persona mostrada en HUD: pinnedPersonId (si existe) > hoveredPerson */
+  displayedPerson: RetentionEntry | null
+  /** Para resaltar visualmente el dot pinned en la matriz */
+  pinnedPersonId: string | null
+  stats: CohortStats
+  pattern: PatternResult
+  handleDotClick: (id: string) => void
+  handleLassoSelect: (ids: string[]) => void
+  handleEmptyClick: () => void
+  onBack: () => void
+}
+
+function MatrixView({
+  data,
+  people,
+  exposureMin,
+  setExposureMin,
+  roleFitMin,
+  setRoleFitMin,
+  eligibleIds,
+  lassoSelectedIds,
+  hoveredPerson,
+  setHoveredPerson,
+  displayedPerson,
+  pinnedPersonId,
+  stats,
+  pattern,
+  handleDotClick,
+  handleLassoSelect,
+  handleEmptyClick,
+  onBack,
+}: MatrixViewProps) {
   return (
     <div className="w-full h-full flex flex-col gap-4 p-4 md:p-6 lg:p-8">
-      {/* ── Header ────────────────────────────────────────────────── */}
+      {/* ── Header (mobile-first) ──────────────────────────────────── */}
       <header className="flex-shrink-0 flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        {/* Top row: título + controles. Mobile = stack; ≥md = row */}
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
+          <div className="min-w-0">
             <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">
               Instrumento · Triaje de talento
             </p>
-            <h1 className="text-2xl md:text-3xl font-extralight text-white mt-1.5 tracking-tight">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-extralight text-white mt-1.5 tracking-tight">
               9-Box <span className="fhr-title-gradient">× Exposición IA</span>
             </h1>
-            <p className="text-sm font-light text-slate-400 mt-2 max-w-2xl leading-relaxed">
-              Cada punto es una persona. Color = exposición a IA.
-              Tamaño = salario. Mueve los sliders para definir el escenario;
-              dibuja un lasso para acotar.
+            <p className="text-xs sm:text-sm font-light text-slate-400 mt-2 leading-relaxed">
+              Tu mapa de talento × exposición a IA.
             </p>
           </div>
-          <ConfidenceDot confidence={data.retentionPriority.confidence} />
+          {/* Controles: en móvil arriba a la derecha de su propia fila, en md a la derecha */}
+          <div className="flex items-center gap-3 self-start md:self-auto md:flex-shrink-0">
+            <button
+              type="button"
+              onClick={onBack}
+              className="text-[10px] uppercase tracking-widest text-slate-500 hover:text-cyan-400 font-bold transition-colors whitespace-nowrap"
+              aria-label="Volver a portada"
+            >
+              ← Resumen
+            </button>
+            <ConfidenceDot confidence={data.retentionPriority.confidence} />
+          </div>
         </div>
 
         {/* ── Sliders del escenario ──────────────────────────────── */}
@@ -639,21 +923,31 @@ export default function NineBoxLive({ data }: NineBoxLiveProps) {
           />
         </div>
 
-        {/* ── Leyenda ────────────────────────────────────────────── */}
-        <div className="flex items-center gap-6 text-[10px] font-mono uppercase tracking-wider text-slate-500">
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-cyan-400" />
-            <span>Exposición &lt; 40%</span>
+        {/* ── Leyenda + contador (wrap-friendly) ─────────────────── */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap sm:gap-x-6 sm:gap-y-2 text-[10px] font-mono uppercase tracking-wider text-slate-500">
+          <div className="flex items-center flex-wrap gap-x-4 gap-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-cyan-400" />
+              <span>Exposición &lt; 40%</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-amber-500" />
+              <span>40 – 70%</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-red-500" />
+              <span>&gt; 70%</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full border-2 border-amber-500" />
+              <span>Patrón urgente</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full border-2 border-cyan-400" />
+              <span>Patrón estratégico</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-amber-500" />
-            <span>40 – 70%</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-red-500" />
-            <span>&gt; 70%</span>
-          </div>
-          <div className="ml-auto text-slate-600">
+          <div className="text-slate-600 sm:ml-auto">
             {eligibleIds.size} de {people.length}{' '}
             {people.length === 1 ? 'persona' : 'personas'} en el escenario
           </div>
@@ -671,13 +965,15 @@ export default function NineBoxLive({ data }: NineBoxLiveProps) {
             onLassoSelect={handleLassoSelect}
             onDotClick={handleDotClick}
             onDotHover={setHoveredPerson}
+            onEmptyClick={handleEmptyClick}
           />
         </div>
 
         <FinancialHUD
           stats={stats}
           pattern={pattern}
-          hoveredPerson={hoveredPerson}
+          displayedPerson={displayedPerson}
+          isPinned={pinnedPersonId !== null && displayedPerson !== null && displayedPerson.employeeId === pinnedPersonId}
         />
       </div>
     </div>

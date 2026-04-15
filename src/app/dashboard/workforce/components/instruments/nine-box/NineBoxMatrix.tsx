@@ -19,6 +19,8 @@ import {
   type Point,
 } from './nine-box-utils'
 import { getNineBoxLabel } from '@/config/nineBoxLabels'
+import { formatDisplayName } from '@/lib/utils/formatName'
+import { PersonExposureNarrativeService } from '@/lib/services/PersonExposureNarrativeService'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTES DE LAYOUT — viewBox fijo, escalable con preserveAspectRatio
@@ -51,6 +53,8 @@ interface NineBoxMatrixProps {
   onLassoSelect: (ids: string[]) => void
   onDotClick: (personId: string) => void
   onDotHover: (person: RetentionEntry | null) => void
+  /** Click en SVG vacío (sin lasso significativo) — desfija pin (tap-outside Apple pattern) */
+  onEmptyClick?: () => void
 }
 
 interface PositionedPerson {
@@ -59,6 +63,10 @@ interface PositionedPerson {
   cy: number
   r: number
   color: string
+  /** Accent narrativo del PersonExposureNarrativeService (cyan|amber|slate).
+   *  'amber' = patrón crítico (FUGA_INMINENTE, NO_REEMPLAZO, BRECHA_CORE_HUMANO).
+   *  Los amber reciben outer-ring visible ANTES del click → urgencia detectable a simple vista. */
+  accent: 'amber' | 'cyan' | 'slate'
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,10 +80,35 @@ export default memo(function NineBoxMatrix({
   onLassoSelect,
   onDotClick,
   onDotHover,
+  onEmptyClick,
 }: NineBoxMatrixProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [lassoPath, setLassoPath] = useState<Point[]>([])
   const [isDrawing, setIsDrawing] = useState(false)
+  // Hover state interno — para feedback visual inmediato (scale + glow + tooltip)
+  const [hoverId, setHoverId] = useState<string | null>(null)
+  // Hint inicial — desaparece tras el primer hover de cualquier dot
+  const [hasHoveredOnce, setHasHoveredOnce] = useState(false)
+  // Debounce timer para "ocultar" el HUD lateral cuando el mouse sale del dot.
+  // El visual del dot (hoverId) se limpia inmediato; el HUD se retiene 150ms
+  // por si el mouse cruza espacios entre dots cercanos (evita flicker).
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const HIDE_DELAY_MS = 150
+
+  const cancelHideTimer = useCallback(() => {
+    if (hideTimerRef.current !== null) {
+      clearTimeout(hideTimerRef.current)
+      hideTimerRef.current = null
+    }
+  }, [])
+
+  const scheduleHide = useCallback(() => {
+    cancelHideTimer()
+    hideTimerRef.current = setTimeout(() => {
+      onDotHover(null)
+      hideTimerRef.current = null
+    }, HIDE_DELAY_MS)
+  }, [cancelHideTimer, onDotHover])
 
   // ── Calcular posiciones de todos los dots (memoizado) ────────────────
   const positioned = useMemo<PositionedPerson[]>(() => {
@@ -100,6 +133,14 @@ export default memo(function NineBoxMatrix({
         const cx = PAD_LEFT + cell.col * CELL_W + dx
         const cy = PAD_TOP + (2 - cell.row) * CELL_H + dy
 
+        // Accent narrativo per-persona — clasifica con el mismo servicio que PersonView.
+        // Garantiza que el halo visible coincida con la narrativa que aparece al click.
+        const narrativeAccent = PersonExposureNarrativeService.build({
+          focalizaScore: person.focalizaScore,
+          roleFit: person.roleFitScore,
+          engagement: person.potentialEngagement,
+        }).accent
+
         return {
           person,
           cx,
@@ -108,6 +149,7 @@ export default memo(function NineBoxMatrix({
           // Color por focalizaScore del cargo (Eloundou, indicador PADRE).
           // Fallback a observedExposure (Anthropic rollup) si el cargo no tiene Eloundou.
           color: exposureColor(person.focalizaScore ?? person.observedExposure),
+          accent: narrativeAccent,
         }
       })
       .filter((p): p is PositionedPerson => p !== null)
@@ -152,9 +194,10 @@ export default memo(function NineBoxMatrix({
     setIsDrawing(false)
 
     if (lassoPath.length < 3) {
-      // Click simple — limpiar selección
+      // Click simple en SVG vacío — limpiar selección Y desfijar pin (tap-outside)
       setLassoPath([])
       onLassoSelect([])
+      onEmptyClick?.()
       return
     }
 
@@ -205,19 +248,99 @@ export default memo(function NineBoxMatrix({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {/* ─── Capa 1: Cells (9 rectángulos sutiles) ──────────────────── */}
+      {/* ═══════════════════════════════════════════════════════════════
+          DEFS — Glassmorphism Focaliza Premium (9 placas de vidrio Tesla)
+          Capas: bgGlow → cellGlass (vidrio diagonal) → cellStroke (edge cyan→purple)
+                 → cellTopHighlight (luz superior tipo glass reflection)
+                 → teslaLine (gradient principal top de matriz)
+          ═══════════════════════════════════════════════════════════════ */}
+      <defs>
+        {/* Glow radial cyan puro de fondo — sin purple para evitar café */}
+        <radialGradient id="nineBoxBgGlow" cx="50%" cy="50%" r="60%">
+          <stop offset="0%" stopColor="rgba(34,211,238,0.05)" />
+          <stop offset="100%" stopColor="rgba(15,23,42,0)" />
+        </radialGradient>
+        {/* Cell glass — gradient diagonal cyan top-left → purple bottom-right.
+            Opacities muy bajas (0.04 → 0.015) para que sea VIDRIO, no color sólido.
+            Es la diferencia entre Apple Vision Pro y PowerPoint 2000. */}
+        <linearGradient id="nineBoxCellGlass" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="rgba(34,211,238,0.05)" />
+          <stop offset="50%" stopColor="rgba(255,255,255,0.015)" />
+          <stop offset="100%" stopColor="rgba(167,139,250,0.025)" />
+        </linearGradient>
+        {/* Edge — gradiente cyan→purple. El borde es lo que define la "placa" */}
+        <linearGradient id="nineBoxCellStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="rgba(34,211,238,0.22)" />
+          <stop offset="100%" stopColor="rgba(167,139,250,0.14)" />
+        </linearGradient>
+        {/* Top highlight — fake "luz superior" tipo reflexión de vidrio.
+            Sutil pero define la materialidad. Apple Vision Pro pattern. */}
+        <linearGradient id="nineBoxCellTopHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="rgba(255,255,255,0.06)" />
+          <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+        </linearGradient>
+        {/* Tesla line top de matriz — gradient cyan→purple→cyan principal */}
+        <linearGradient id="nineBoxTeslaLine" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="rgba(34,211,238,0)" />
+          <stop offset="35%" stopColor="rgba(34,211,238,0.5)" />
+          <stop offset="65%" stopColor="rgba(167,139,250,0.5)" />
+          <stop offset="100%" stopColor="rgba(167,139,250,0)" />
+        </linearGradient>
+      </defs>
+
+      {/* ─── Capa 0: Fondo glow radial — deja ver glassmorphism del card ─── */}
+      <rect
+        x={PAD_LEFT}
+        y={PAD_TOP}
+        width={GRID_W}
+        height={GRID_H}
+        fill="url(#nineBoxBgGlow)"
+        pointerEvents="none"
+      />
+
+      {/* ─── Capa 0b: Tesla line en top de la matriz ────────────────── */}
+      <line
+        x1={PAD_LEFT}
+        y1={PAD_TOP}
+        x2={PAD_LEFT + GRID_W}
+        y2={PAD_TOP}
+        stroke="url(#nineBoxTeslaLine)"
+        strokeWidth={1.5}
+        pointerEvents="none"
+      />
+
+      {/* ─── Capa 1: Cells — 9 placas de vidrio Tesla ───────────────────
+           Glassmorphism real: gradient diagonal cyan→white→purple muy sutil
+           + edge cyan→purple + top highlight (luz reflejada).
+           SIN tint cromático por exposición — los dots ya codifican esa señal.
+           El cerebro lee la concentración cromática del cluster como agregado.
+           Eliminar el tint resuelve el café/marrón de mezcla cálido+frío. */}
       <g>
         {cellMeta.map(cell => (
-          <rect
-            key={cell.key}
-            x={cell.x}
-            y={cell.y}
-            width={CELL_W}
-            height={CELL_H}
-            fill="rgba(15, 23, 42, 0.3)"
-            stroke="rgba(34, 211, 238, 0.08)"
-            strokeWidth={1}
-          />
+          <g key={cell.key}>
+            {/* Placa de vidrio */}
+            <rect
+              x={cell.x}
+              y={cell.y}
+              width={CELL_W}
+              height={CELL_H}
+              fill="url(#nineBoxCellGlass)"
+              stroke="url(#nineBoxCellStroke)"
+              strokeWidth={1}
+              rx={2}
+            />
+            {/* Top highlight — luz superior, fake glass reflection (Apple Vision Pro pattern).
+                Solo 30% de la altura, dentro del rect con offset 1px del borde. */}
+            <rect
+              x={cell.x + 1}
+              y={cell.y + 1}
+              width={CELL_W - 2}
+              height={CELL_H * 0.3}
+              fill="url(#nineBoxCellTopHighlight)"
+              pointerEvents="none"
+              rx={2}
+            />
+          </g>
         ))}
       </g>
 
@@ -304,42 +427,252 @@ export default memo(function NineBoxMatrix({
       </g>
 
       {/* ─── Capa 4: Dots (empleados) ───────────────────────────────── */}
+      {/* Mejoras visuales aplicadas:
+          - Halo glow del propio color (separa del bg-slate sin perder identidad)
+          - Stroke = color del dot al 60% (define borde sin negro duro)
+          - Hover: scale 1.25 + glow fuerte + transition spring
+          - Hit area expandida (circle invisible r+8) — captura mouse confiable
+          - Debounce 150ms en hide → evita flicker entre dots cercanos */}
       <g>
-        {positioned.map(({ person, cx, cy, r, color }) => {
+        {positioned.map(({ person, cx, cy, r, color, accent }) => {
           const isSelected = selectedIds.has(person.employeeId)
           const isEligible = eligibleIds.has(person.employeeId)
-          // Opacity:
-          //   eligible + selected: 1.0
-          //   eligible + not selected: 0.7
-          //   not eligible (fuera del escenario): 0.12
-          const fillOpacity = !isEligible ? 0.12 : isSelected ? 1 : 0.7
+          const isHovered = hoverId === person.employeeId
+          // Outer ring de patrón narrativo: codifica accent del PersonExposureNarrativeService.
+          //   - amber = patrón urgente (FUGA_INMINENTE, NO_REEMPLAZO, BRECHA_CORE_HUMANO)
+          //   - cyan  = patrón estratégico (TALENTO_CRITICO_MOVER, NUCLEO_INTOCABLE)
+          //   - slate = OPERACION_ESTABLE → SIN ring (no satura, mayoría de la población)
+          // Hace los hallazgos del motor visibles ANTES del click.
+          const ringColor =
+            accent === 'amber' ? '#F59E0B'
+            : accent === 'cyan' ? '#22D3EE'
+            : null
+          const showPatternRing = ringColor !== null && isEligible
+
+          const fillOpacity = !isEligible ? 0.12 : isSelected ? 1 : 0.85
+          const effectiveR = isHovered ? r * 1.25 : r
+
+          // Halo glow:
+          //   - hovered:  glow fuerte (12px) del propio color
+          //   - selected: glow cyan (selección)
+          //   - eligible: glow base sutil (6px) del propio color
+          //   - dimmed:   sin glow
+          const filter = !isEligible
+            ? 'none'
+            : isHovered
+              ? `drop-shadow(0 0 12px ${color})`
+              : isSelected
+                ? 'drop-shadow(0 0 8px rgba(34, 211, 238, 0.7))'
+                : `drop-shadow(0 0 6px ${color}40)`
+
+          // Stroke: cyan si selected, color del dot 60% si eligible, transparente si dimmed
+          const strokeColor = isSelected
+            ? '#22D3EE'
+            : isEligible
+              ? `${color}99`
+              : 'rgba(0,0,0,0.3)'
+          const strokeW = isSelected ? 2.5 : isHovered ? 2 : 1
+
+          // Hit area expandida — mínimo 18px de radio, o r+8 si el dot es grande
+          const hitR = Math.max(effectiveR + 8, 18)
+
           return (
-            <circle
-              key={person.employeeId}
-              cx={cx}
-              cy={cy}
-              r={r}
-              fill={color}
-              fillOpacity={fillOpacity}
-              stroke={isSelected ? '#22D3EE' : 'rgba(0,0,0,0.4)'}
-              strokeWidth={isSelected ? 2.5 : 0.5}
-              style={{
-                cursor: 'pointer',
-                filter: isSelected
-                  ? 'drop-shadow(0 0 6px rgba(34, 211, 238, 0.7))'
-                  : 'none',
-                transition: 'fill-opacity 250ms, stroke-width 200ms',
-              }}
-              onClick={(e) => {
-                e.stopPropagation()
-                onDotClick(person.employeeId)
-              }}
-              onMouseEnter={() => onDotHover(person)}
-              onMouseLeave={() => onDotHover(null)}
-            />
+            <g key={person.employeeId}>
+              {/* Outer ring de patrón narrativo (amber=urgente / cyan=estratégico).
+                  Se renderiza ANTES del fill, queda atrás. No interfiere con hit area.
+                  Grosor 2px + opacity 0.85 para que sea visible sin saturar. */}
+              {showPatternRing && ringColor && (
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={effectiveR + 5}
+                  fill="none"
+                  stroke={ringColor}
+                  strokeWidth={2}
+                  strokeOpacity={isHovered ? 1 : 0.85}
+                  style={{
+                    pointerEvents: 'none',
+                    transition: 'r 200ms cubic-bezier(0.4,0,0.2,1), stroke-opacity 200ms',
+                  }}
+                />
+              )}
+              {/* Visual circle — pointer-events:none para que el hit lo maneje el invisible */}
+              <circle
+                cx={cx}
+                cy={cy}
+                r={effectiveR}
+                fill={color}
+                fillOpacity={fillOpacity}
+                stroke={strokeColor}
+                strokeWidth={strokeW}
+                style={{
+                  filter,
+                  pointerEvents: 'none',
+                  transition: 'r 200ms cubic-bezier(0.4,0,0.2,1), fill-opacity 250ms, stroke-width 200ms, filter 200ms',
+                }}
+              />
+              {/* Hit area invisible — captura mouse en área generosa */}
+              <circle
+                cx={cx}
+                cy={cy}
+                r={hitR}
+                fill="transparent"
+                style={{ cursor: 'pointer' }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  cancelHideTimer()
+                  onDotClick(person.employeeId)
+                }}
+                onMouseEnter={() => {
+                  cancelHideTimer()
+                  setHoverId(person.employeeId)
+                  if (!hasHoveredOnce) setHasHoveredOnce(true)
+                  onDotHover(person)
+                }}
+                onMouseLeave={() => {
+                  setHoverId(null)
+                  scheduleHide()
+                }}
+              />
+            </g>
           )
         })}
       </g>
+
+      {/* ─── Capa 4b: Tooltip flotante extendido — nombre + cargo + datos clave ─── */}
+      {(() => {
+        if (!hoverId) return null
+        const hovered = positioned.find(p => p.person.employeeId === hoverId)
+        if (!hovered) return null
+        const TT_W = 280
+        const TT_H = 108
+        // Si el dot está en el tercio derecho del viewbox, posicionar tooltip a la izquierda
+        const isRightSide = hovered.cx > VIEWBOX_W * 0.66
+        const ttX = isRightSide
+          ? hovered.cx - hovered.r - TT_W - 6
+          : hovered.cx + hovered.r + 6
+        const ttY = hovered.cy - TT_H / 2
+        const p = hovered.person
+        // Datos clave: Exposición (focalizaScore canónico, fallback observed),
+        // Dominio (roleFit) y Compromiso (engagement discreto AAE).
+        const expo = p.focalizaScore ?? p.observedExposure
+        const expoStr = expo !== null ? `${Math.round(expo * 100)}%` : '—'
+        const fitStr = `${Math.round(p.roleFitScore)}%`
+        const engStr =
+          p.potentialEngagement === 3 ? 'Alto'
+          : p.potentialEngagement === 1 ? 'Crítico'
+          : p.potentialEngagement === 2 ? 'Estable'
+          : '—'
+        // Border color refleja accent narrativo — coherente con outer ring
+        const borderColor = hovered.accent === 'amber'
+          ? 'rgba(245, 158, 11, 0.5)'
+          : hovered.accent === 'cyan'
+            ? 'rgba(34, 211, 238, 0.5)'
+            : 'rgba(148, 163, 184, 0.4)'
+        return (
+          <foreignObject
+            x={ttX}
+            y={ttY}
+            width={TT_W}
+            height={TT_H}
+            style={{ pointerEvents: 'none' }}
+          >
+            <div
+              style={{
+                background: 'rgba(15, 23, 42, 0.95)',
+                backdropFilter: 'blur(8px)',
+                border: `1px solid ${borderColor}`,
+                borderRadius: 6,
+                padding: '8px 10px',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                color: '#E2E8F0',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 400,
+                  color: '#F1F5F9',
+                  lineHeight: 1.2,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {formatDisplayName(p.employeeName)}
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 300,
+                  color: '#CBD5E1',
+                  lineHeight: 1.3,
+                  marginTop: 3,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {p.position}
+              </div>
+              {p.departmentName && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 300,
+                    color: '#94A3B8',
+                    lineHeight: 1.3,
+                    marginTop: 1,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {p.departmentName}
+                </div>
+              )}
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 12,
+                  marginTop: 8,
+                  paddingTop: 7,
+                  borderTop: '1px solid rgba(255,255,255,0.08)',
+                  fontSize: 11,
+                  color: '#94A3B8',
+                  fontWeight: 300,
+                }}
+              >
+                <span>Exposición <span style={{ color: '#67E8F9', fontWeight: 500 }}>{expoStr}</span></span>
+                <span>Dominio <span style={{ color: '#67E8F9', fontWeight: 500 }}>{fitStr}</span></span>
+                <span>Compromiso <span style={{
+                  color: engStr === 'Crítico' ? '#FBBF24'
+                    : engStr === 'Alto' ? '#67E8F9'
+                    : '#CBD5E1',
+                  fontWeight: 500,
+                }}>{engStr}</span></span>
+              </div>
+            </div>
+          </foreignObject>
+        )
+      })()}
+
+      {/* ─── Capa 4c: Hint inicial — desaparece tras primer hover ───── */}
+      {!hasHoveredOnce && positioned.length > 0 && (
+        <text
+          x={VIEWBOX_W / 2}
+          y={VIEWBOX_H - 32}
+          fontSize={11}
+          fill="rgba(148, 163, 184, 0.55)"
+          fontFamily="system-ui, -apple-system, sans-serif"
+          fontStyle="italic"
+          textAnchor="middle"
+          style={{ pointerEvents: 'none' }}
+        >
+          Pasa el mouse sobre cualquier punto para ver detalle
+        </text>
+      )}
 
       {/* ─── Capa 5: Lasso path (mientras se dibuja) ────────────────── */}
       {lassoPath.length > 1 && (

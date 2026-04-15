@@ -161,7 +161,9 @@ export type PatternKey = 'zombie' | 'fuga' | 'inercia' | 'default'
 
 export interface PatternCandidate {
   /** Cualquier item agrupable; usamos un subset estructural */
-  observedExposure: number
+  observedExposure: number          // legacy Anthropic — mantenido por compat
+  /** focalizaScore Eloundou (canónico). Puede ser null si cargo no clasificado. */
+  focalizaScore: number | null
   roleFitScore: number
   salary: number
   augmentationShare: number
@@ -193,6 +195,142 @@ export function median(values: number[]): number {
     : (sorted[mid - 1] + sorted[mid]) / 2
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. INTERPRETACIÓN DE COMPROMISO — engagement AAE 1/2/3 → label humano
+// ─────────────────────────────────────────────────────────────────────────────
+// FUENTE: PerformanceRating.potentialEngagement — Int discreto 1/2/3
+// (schema.prisma:2073 + WorkforceIntelligenceService L404). NUNCA escala
+// continua. Usa Test Ácido AAE de TalentIntelligenceService:
+//   3 = HIGH ('Alto')   ·   1 = LOW ('Crítico')   ·   2 = NEUTRAL ('Estable')
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type EngagementLevel = 'Crítico' | 'Estable' | 'Alto'
+
+export function interpretEngagement(score: number | null): EngagementLevel | null {
+  if (score === null) return null
+  // Test Ácido — escala discreta 1/2/3
+  if (score === 1) return 'Crítico'
+  if (score === 3) return 'Alto'
+  // score === 2 (NEUTRAL del Test Ácido) — etiqueta neutral, no fuga
+  return 'Estable'
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. INTERPRETACIÓN DE EXPOSICIÓN IA — focalizaScore → label humano
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ExposureLevel = 'Baja' | 'Media' | 'Alta' | 'Crítica'
+
+export function interpretExposure(focalizaScore: number | null): ExposureLevel | null {
+  if (focalizaScore === null) return null
+  if (focalizaScore < 0.3) return 'Baja'
+  if (focalizaScore < 0.6) return 'Media'
+  if (focalizaScore < 0.8) return 'Alta'
+  return 'Crítica'
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 10. PERSON EXPOSURE INSIGHT — narrativa interpretativa individual
+// Cruza focalizaScore × roleFit × engagement × tier y devuelve 2-3 líneas
+// que explican QUÉ SIGNIFICA esa combinación para el negocio.
+//
+// Tono arbitrador (skill focalizahr-narrativas):
+// - Sin prescribir acción
+// - Consecuencia, no instrucción
+// - Color del propio dato, no del sistema
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface PersonExposureInsight {
+  headline: string                                // 4-7 palabras
+  context: string                                 // 2 líneas — qué significa
+  accent: 'cyan' | 'purple' | 'amber' | 'slate'  // color del bloque
+}
+
+export function getPersonExposureInsight(person: {
+  focalizaScore: number | null
+  roleFitScore: number
+  potentialEngagement: number | null
+  tier: 'intocable' | 'valioso' | 'neutro' | 'prescindible'
+}): PersonExposureInsight {
+  const exposure = person.focalizaScore
+  const roleFit = person.roleFitScore
+  const engagement = person.potentialEngagement
+  const isHighExposure = exposure !== null && exposure >= 0.6
+  const isHighRoleFit = roleFit >= 75
+  const isHighEngagement = engagement !== null && engagement >= 3.5
+  const isLowEngagement = engagement !== null && engagement < 2
+
+  // Sin focalizaScore → cargo sin clasificar O*NET
+  if (exposure === null) {
+    return {
+      headline: 'Cargo sin clasificación de exposición IA',
+      context: `Su cargo no tiene mapeo a O*NET vigente. El dominio del cargo es ${Math.round(roleFit)}% — la lectura de IA queda pendiente hasta clasificar el cargo.`,
+      accent: 'slate',
+    }
+  }
+
+  // Alta exposición × Alto dominio × Compromiso crítico → riesgo doble
+  if (isHighExposure && isHighRoleFit && isLowEngagement) {
+    return {
+      headline: 'Talento crítico, cargo automatizable, compromiso a la baja',
+      context: 'Domina un cargo cuya naturaleza la IA puede ejecutar y, en paralelo, su compromiso erosiona. Si se va, pierdes la inversión humana y la justificación del cargo al mismo tiempo.',
+      accent: 'amber',
+    }
+  }
+
+  // Alta exposición × Alto dominio × Comprometido → activo a rediseñar
+  if (isHighExposure && isHighRoleFit && isHighEngagement) {
+    return {
+      headline: 'Domina un cargo que la IA puede absorber',
+      context: 'Su dominio es alto y está comprometido — pero el cargo en sí está en zona de automatización. Su valor futuro depende de cómo el rol se rediseñe.',
+      accent: 'purple',
+    }
+  }
+
+  // Alta exposición × Bajo dominio → obsolescencia doble
+  if (isHighExposure && !isHighRoleFit) {
+    return {
+      headline: 'Bajo dominio en un cargo de alta exposición',
+      context: 'No domina el cargo y el cargo está en zona automatizable. La inversión en su desarrollo en este rol específico tiene retorno limitado.',
+      accent: 'amber',
+    }
+  }
+
+  // Baja-media exposición × Alto dominio × Comprometido → núcleo del valor
+  if (!isHighExposure && isHighRoleFit && isHighEngagement) {
+    return {
+      headline: 'Núcleo del valor humano de tu organización',
+      context: 'Domina un cargo que la IA no puede absorber y está comprometido. Es el tipo de talento que define la diferencia competitiva — el que más cuesta reemplazar.',
+      accent: 'cyan',
+    }
+  }
+
+  // Baja-media exposición × Alto dominio × Compromiso bajo → fuga silenciosa
+  if (!isHighExposure && isHighRoleFit && isLowEngagement) {
+    return {
+      headline: 'Talento insustituible con compromiso a la baja',
+      context: 'Domina un cargo blindado de la IA pero su compromiso erosiona. La pérdida no la cubre la tecnología — solo otra persona con años de aprendizaje.',
+      accent: 'amber',
+    }
+  }
+
+  // Baja exposición × Bajo dominio → desarrollo
+  if (!isHighExposure && !isHighRoleFit) {
+    return {
+      headline: 'En desarrollo en un cargo protegido',
+      context: 'No domina el cargo todavía, pero el cargo no está expuesto a la IA — hay tiempo para invertir. La pregunta es si esa inversión está alineada con tu plan.',
+      accent: 'slate',
+    }
+  }
+
+  // Default — composición sin patrón claro
+  return {
+    headline: 'Composición sin patrón dominante',
+    context: 'Los indicadores de exposición, dominio y compromiso no convergen en un patrón único. Revisa los datos individualmente para una lectura más fina.',
+    accent: 'slate',
+  }
+}
+
 /**
  * Detecta el patrón dominante de una cohorte.
  *
@@ -218,19 +356,25 @@ export function detectPattern(
   }
 
   // ── Conteos por patrón ──────────────────────────────────────────────
+  // Helper: exposición efectiva por persona — focalizaScore primario,
+  // observedExposure como fallback si el cargo no está clasificado en O*NET.
+  const effectiveExposure = (p: PatternCandidate): number =>
+    p.focalizaScore !== null ? p.focalizaScore : p.observedExposure
+
   const zombieCount = cohort.filter(
-    p => p.roleFitScore > 75 && p.observedExposure > 0.5,
+    p => p.roleFitScore > 75 && effectiveExposure(p) > 0.5,
   ).length
 
+  // Fuga aumentada — engagement AAE discreto 1/2/3, HIGH = 3 (Test Ácido).
+  // Antes usaba `>= 4` (escala continua incorrecta) → nunca disparaba.
   const fugaCount = cohort.filter(
     p =>
-      p.potentialEngagement !== null &&
-      p.potentialEngagement >= 4 &&
+      p.potentialEngagement === 3 &&
       p.augmentationShare > 0.5,
   ).length
 
   const inerciaCount = cohort.filter(
-    p => p.observedExposure > 0.5 && p.salary > salaryMedianRef,
+    p => effectiveExposure(p) > 0.5 && p.salary > salaryMedianRef,
   ).length
 
   // ── Proporciones ────────────────────────────────────────────────────
