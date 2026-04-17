@@ -110,7 +110,7 @@ export const NARRATIVE_TEMPLATES: Record<LenteId, string> = {
 
   l8_retencion: `El sistema cruzó metas, rendimiento y adaptabilidad futura e identificó {N_PRESCINDIBLES} personas prescindibles por valor relativo. No por política ni antigüedad — por evidencia de tres fuentes independientes. La lista roja está lista.`,
 
-  l9_pasivo: `El costo total de ejecutar la lista roja es {CLP_FINIQUITOS} en finiquitos según legislación laboral chilena. Con el ahorro mensual de {CLP_AHORRO_MES}, la inversión se recupera en {N_MESES} meses. El mes {MES_PAYBACK} es el primer mes en que la decisión genera utilidad neta.`,
+  l9_pasivo: `Tu pasivo laboral acumulado es {CLP_FINIQUITOS} si hoy se desvincula a toda la dotación con derecho a indemnización ({N_ELEGIBLES} personas con más de un año). En 12 meses, ese pasivo crece a {CLP_Q4} — un incremento de {CLP_COSTO_ESPERA} solo por antigüedad adicional. Cada mes que postergas una decisión de reestructura, ese número sube.`,
 }
 
 // ════════════════════════════════════════════════════════════════════════════

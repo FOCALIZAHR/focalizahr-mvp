@@ -22,7 +22,9 @@ import type {
 import type { OrganizationExposureResult } from '@/lib/services/AIExposureService'
 import {
   calculateFiniquitoConTopeCustomUF,
+  calculateMonthsUntilNextYear,
   UF_VALUE_CLP,
+  FINIQUITO_YEARS_CAP,
 } from '@/lib/utils/TalentFinancialFormulas'
 import {
   LENTES_META,
@@ -272,44 +274,99 @@ export async function resolverLente(
     }
 
     // ── L3: Riesgo de Adopción (boicot interno) ─────────────────────────
+    // Iterar sobre TODOS los deptos del dataset (no solo los que cruzan el
+    // umbral estricto de detectAdoptionRisk). El fallback AAE (implementado
+    // en resolverClimaPorDepartamento) asegura que siempre haya un "peor"
+    // depto mientras exista engagement AAE (jerarquía pulso → experiencia →
+    // AAE). `detectAdoptionRisk.departments` queda como subset "strict" para
+    // resaltar los casos verdaderamente críticos en la UI.
     case 'l3_adopcion': {
-      const adopt = diagnostic.adoptionRisk
       const inerciaByDept = new Map(
         diagnostic.inertiaCost.byDepartment.map(d => [d.departmentId, d])
       )
       const totalInertia = diagnostic.inertiaCost.totalMonthly || 1
       const climaPorDept = await resolverClimaPorDepartamento(ctx)
+      const strictIds = new Set(
+        diagnostic.adoptionRisk.departments.map(d => d.departmentId)
+      )
 
-      // Emparejar adoption risk con clima + inercia para priorizar
-      const enriquecidos = adopt.departments.map(d => {
+      // Agrupar enriched por departmentId (todos los que tienen empleados)
+      interface DeptAgg {
+        departmentId: string
+        departmentName: string
+        totalExp: number
+        totalEng: number
+        count: number
+        engCount: number
+      }
+      const deptAgg = new Map<string, DeptAgg>()
+      for (const e of enriched) {
+        if (!e.departmentId) continue
+        let agg = deptAgg.get(e.departmentId)
+        if (!agg) {
+          agg = {
+            departmentId: e.departmentId,
+            departmentName: e.departmentName || 'Sin nombre',
+            totalExp: 0,
+            totalEng: 0,
+            count: 0,
+            engCount: 0,
+          }
+          deptAgg.set(e.departmentId, agg)
+        }
+        agg.totalExp += effExposure(e)
+        agg.count++
+        if (e.potentialEngagement !== null) {
+          agg.totalEng += e.potentialEngagement
+          agg.engCount++
+        }
+      }
+
+      // Construir ranking con clima (pulso/experiencia/AAE fallback)
+      const enriquecidos = [...deptAgg.values()].map(d => {
         const clima = climaPorDept.get(d.departmentId)
         const ine = inerciaByDept.get(d.departmentId)
         const pctPotencial = ine
           ? (ine.monthlyCost / totalInertia) * 100
           : 0
-        // Fallback clima: si no hay en mapa, usar el avgEngagement del adoptionRisk
+        const avgExposure = d.count > 0 ? d.totalExp / d.count : 0
+        // Clima: fuente preferida si existe; si no, derivar del engAgg local
+        const avgEngagement = d.engCount > 0 ? d.totalEng / d.engCount : null
         const climaScale5 = clima
           ? clima.scoreScale5
-          : engagementToScale5(d.avgEngagement)
+          : avgEngagement !== null
+            ? engagementToScale5(avgEngagement)
+            : 0
+        // usandoFallback: true cuando no hay NPS (pulso/experiencia)
         const usandoFallback = clima?.usandoFallback ?? true
         return {
-          ...d,
+          departmentId: d.departmentId,
+          departmentName: d.departmentName,
+          avgExposure,
+          avgEngagement: avgEngagement ?? 2,
+          headcount: d.count,
           climaScale5,
           pctPotencial,
-          climaFuente: clima?.fuente ?? 'engagement_aae',
+          climaFuente: clima?.fuente ?? (avgEngagement !== null ? 'engagement_aae' : null),
           usandoFallback,
+          matchStrict: strictIds.has(d.departmentId),
         }
       })
 
-      // Peor: mayor potencial de ahorro × peor clima (minimizar climaScale5, maximizar pctPotencial)
+      // Score compuesto sin threshold binario: exposición × (5 - clima)
+      // A mayor exposición y menor clima, mayor prioridad de intervención.
       const ordenados = [...enriquecidos].sort((a, b) => {
-        const scoreA = a.pctPotencial * (5 - a.climaScale5)
-        const scoreB = b.pctPotencial * (5 - b.climaScale5)
+        const scoreA = a.avgExposure * (5 - a.climaScale5)
+        const scoreB = b.avgExposure * (5 - b.climaScale5)
         return scoreB - scoreA
       })
       const peor = ordenados[0]
 
-      const hayData = !!peor && peor.pctPotencial > 0
+      // hayData: basta con tener ≥1 depto con empleados + alguna señal de clima
+      const hayData =
+        !!peor &&
+        peor.headcount > 0 &&
+        (peor.climaFuente !== null || peor.avgExposure > 0)
 
       return {
         ...meta,
@@ -465,71 +522,181 @@ export async function resolverLente(
       }
     }
 
-    // ── L9: Pasivo Laboral (costoEspera es el gatillo de venta) ─────────
+    // ── L9: Pasivo Laboral — scope "pasivo latente organizacional" ──────
+    // Cambio semántico (Abril 2026): de "costo de lista roja" a "liability
+    // financiero latente de toda la dotación con tenure ≥ 12 meses". El pasivo
+    // laboral siempre existe y siempre crece — es el cálculo canónico para
+    // el directorio, independiente de si hay candidatos a desvinculación.
+    //
+    // Output tiene dos dimensiones:
+    //   1. `persons` (top-15 por costoEspera) — Tab 1 Pasivo Latente
+    //   2. `scatter` (todos + zonas + VPP) — Tab 2 Talent Arbitrage Map
+    //   3. `alertasProximidad` — personas con score<40 y aniversario < 45d
     case 'l9_pasivo': {
-      const prescindibles = diagnostic.retentionPriority.ranking.filter(
-        r => r.tier === 'prescindible'
+      // Cross-lookup retentionScore por employeeId
+      const retentionById = new Map(
+        diagnostic.retentionPriority.ranking.map(r => [r.employeeId, r])
       )
+
+      // Elegibles: activos con tenure ≥ 12 meses (sin derecho a indemnización bajo 1 año)
+      const elegibles = enriched.filter(e => e.tenureMonths >= 12)
 
       let totalHoy = 0
       let totalQ2 = 0
       let totalQ4 = 0
-      let ahorroMensual = 0
-      const breakdown = prescindibles.map(p => {
+      let ahorroMensualTotal = 0
+
+      interface PersonL9 {
+        employeeId: string
+        employeeName: string
+        position: string
+        departmentName: string
+        salary: number
+        tenureMonths: number
+        mesesFiniquito: number       // años de servicio × 1 (cap 11)
+        finiquitoHoy: number
+        finiquitoQ2: number
+        finiquitoQ4: number
+        costoEspera: number           // Q4 - hoy (gatillo)
+        retentionScore: number | null
+        exposureIA: number | null
+        vpp: number | null             // retentionScore / mesesFiniquito
+        zona: 'agilidad_total' | 'cimientos_oro' | 'ventana_decision' | 'talent_trap' | null
+        focalizaScore: number | null
+      }
+
+      const todos: PersonL9[] = elegibles.map(e => {
         const hoy =
-          p.finiquitoToday ??
-          calculateFiniquitoConTopeCustomUF(p.salary, p.tenureMonths, UF_VALUE_CLP)
-        // Q2 = +6 meses, Q4 = +12 meses (TASK parte 7)
+          e.finiquitoToday ??
+          calculateFiniquitoConTopeCustomUF(e.salary, e.tenureMonths, UF_VALUE_CLP)
         const q2 = calculateFiniquitoConTopeCustomUF(
-          p.salary,
-          p.tenureMonths + 6,
+          e.salary,
+          e.tenureMonths + 6,
           UF_VALUE_CLP
         )
         const q4 = calculateFiniquitoConTopeCustomUF(
-          p.salary,
-          p.tenureMonths + 12,
+          e.salary,
+          e.tenureMonths + 12,
           UF_VALUE_CLP
         )
         totalHoy += hoy
         totalQ2 += q2
         totalQ4 += q4
-        ahorroMensual += p.salary  // TASK parte 7: ahorroMes = salary
+        ahorroMensualTotal += e.salary
+
+        // mesesFiniquito: años cumplidos cap 11 (escala X del scatter)
+        const fullYears = Math.floor(e.tenureMonths / 12)
+        const remainingMonths = e.tenureMonths % 12
+        const yearsOfService = remainingMonths >= 6 ? fullYears + 1 : fullYears
+        const mesesFiniquito = Math.min(yearsOfService, FINIQUITO_YEARS_CAP)
+
+        const retention = retentionById.get(e.employeeId)
+        const retentionScore = retention?.retentionScore ?? null
+        const exposureIA = e.focalizaScore ?? e.observedExposure ?? null
+
+        // VPP — sólo si tenemos score y tenure > 0
+        const vpp =
+          retentionScore !== null && mesesFiniquito > 0
+            ? retentionScore / mesesFiniquito
+            : null
+
+        // Zona scatter (thresholds: score 60 = divisor alto/bajo; tenure 3y = divisor)
+        let zona: PersonL9['zona'] = null
+        if (retentionScore !== null) {
+          const scoreAlto = retentionScore >= 60
+          const tenureAlto = mesesFiniquito >= 3
+          if (scoreAlto && !tenureAlto) zona = 'agilidad_total'
+          else if (scoreAlto && tenureAlto) zona = 'cimientos_oro'
+          else if (!scoreAlto && !tenureAlto) zona = 'ventana_decision'
+          else zona = 'talent_trap'
+        }
+
         return {
+          employeeId: e.employeeId,
+          employeeName: e.employeeName,
+          position: e.position,
+          departmentName: e.departmentName,
+          salary: e.salary,
+          tenureMonths: e.tenureMonths,
+          mesesFiniquito,
+          finiquitoHoy: hoy,
+          finiquitoQ2: q2,
+          finiquitoQ4: q4,
+          costoEspera: q4 - hoy,
+          retentionScore,
+          exposureIA,
+          vpp,
+          zona,
+          focalizaScore: e.focalizaScore,
+        }
+      })
+
+      // Top-15 por costoEspera (Tab 1 persons list)
+      const top15 = [...todos]
+        .sort((a, b) => b.costoEspera - a.costoEspera)
+        .slice(0, 15)
+
+      // Alertas de Proximidad (Aniversario financiero)
+      // Gatillo: retentionScore < 40 AND próximo salto de finiquito en < 45 días
+      interface AlertaProximidad {
+        employeeId: string
+        employeeName: string
+        position: string
+        departmentName: string
+        retentionScore: number
+        daysToAnniversary: number
+        salarioAdicional: number
+      }
+      const alertasProximidad: AlertaProximidad[] = []
+      for (const p of todos) {
+        if (p.retentionScore === null || p.retentionScore >= 40) continue
+        const mesesToJump = calculateMonthsUntilNextYear(p.tenureMonths)
+        if (mesesToJump === null) continue
+        const daysToAnniversary = Math.round(mesesToJump * 30)
+        if (daysToAnniversary > 45) continue
+        alertasProximidad.push({
           employeeId: p.employeeId,
           employeeName: p.employeeName,
           position: p.position,
           departmentName: p.departmentName,
-          salary: p.salary,
-          tenureMonths: p.tenureMonths,
-          finiquitoHoy: hoy,
-          finiquitoQ2: q2,
-          finiquitoQ4: q4,
-          costoEspera: q4 - hoy,  // gatillo de venta del TASK
-        }
-      })
+          retentionScore: p.retentionScore,
+          daysToAnniversary,
+          salarioAdicional: p.salary, // en Chile, 1 año más = 1 sueldo más
+        })
+      }
 
-      // Payback: meses para recuperar inversión (finiquitos) con ahorro mensual
+      // Totales para narrativa y payback
+      const costoEsperaTotal = totalQ4 - totalHoy
       const paybackMeses =
-        ahorroMensual > 0 ? Math.ceil(totalHoy / ahorroMensual) : null
+        ahorroMensualTotal > 0 ? Math.ceil(totalHoy / ahorroMensualTotal) : null
       const mesPayback = paybackMeses ?? 0
 
       return {
         ...meta,
-        hayData: prescindibles.length > 0,
+        hayData: elegibles.length > 0,
         datos: {
           CLP_FINIQUITOS: formatCLP(totalHoy),
-          CLP_AHORRO_MES: formatCLP(ahorroMensual),
+          CLP_Q4: formatCLP(totalQ4),
+          CLP_COSTO_ESPERA: formatCLP(costoEsperaTotal),
+          CLP_AHORRO_MES: formatCLP(ahorroMensualTotal),
+          N_ELEGIBLES: formatInt(elegibles.length),
           N_MESES: paybackMeses !== null ? formatInt(paybackMeses) : '∞',
           MES_PAYBACK: paybackMeses !== null ? formatInt(mesPayback) : '∞',
         },
         detalle: {
-          persons: breakdown,
+          // Tab 1 — Pasivo Latente
+          persons: top15,
           totalHoy,
           totalQ2,
           totalQ4,
-          costoEsperaTotal: totalQ4 - totalHoy,
-          ahorroMensual,
+          costoEsperaTotal,
+          ahorroMensual: ahorroMensualTotal,
           paybackMeses,
+          totalElegibles: elegibles.length,
+          // Tab 2 — Talent Arbitrage Map (todos con retentionScore + zona)
+          scatter: todos.filter(p => p.zona !== null),
+          // Alerta Proximidad (puede estar vacía hoy si nadie tiene score<40)
+          alertasProximidad,
         },
       }
     }
