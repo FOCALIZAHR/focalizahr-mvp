@@ -55,6 +55,18 @@ export interface SimulatorTask {
   /** Frase narrativa (2-3 oraciones) del cruce betaEloundou × dim dominante.
    *  null si no hay anthropicData, señal débil, o combinación sin frase. */
   classificationPhrase: string | null
+  // Sistema IPI (Índice de Presión de IA) — ver AutomationClassificationService
+  ipi: number
+  ipiSemaforo: 'alta' | 'media' | 'baja' | 'sin_señal'
+  perfilLabel:
+    | 'DELEGACION_ACTIVA'
+    | 'AMPLIFICACION_ACTIVA'
+    | 'DELEGACION_PARCIAL'
+    | 'ASISTENCIA_PRODUCTIVA'
+    | 'RESISTENTE'
+    | 'CONSULTA_PUNTUAL'
+    | 'SIN_PATRON'
+  showVerifiedBadge: boolean
 }
 
 export interface SimulatorPayload {
@@ -234,10 +246,12 @@ export async function GET(
           : Math.min(40, Math.floor(160 / Math.max(activeTasks.length, 1)))
 
         const anthropicData = buildAnthropicData(fresh)
+        const beta = fresh?.focalizaScore ?? null
         const classificationPhrase = AutomationClassificationService.getPhrase(
-          fresh?.focalizaScore ?? null,
+          beta,
           anthropicData,
         )
+        const ipiFields = AutomationClassificationService.buildIpiFields(beta, anthropicData)
 
         return {
           taskId: t.taskId,
@@ -245,11 +259,12 @@ export async function GET(
           descriptionEn: fresh?.taskDescription ?? t.description,
           importance,
           hoursPerMonth,
-          betaScore: fresh?.focalizaScore ?? null,
+          betaScore: beta,
           isAutomatedHint: t.isAutomated,
           isActive: t.isActive !== false,
           anthropicData,
           classificationPhrase,
+          ...ipiFields,
         }
       })
     } else if (descriptor.socCode) {
@@ -286,6 +301,10 @@ export async function GET(
           : Math.min(40, Math.floor(160 / Math.max(onetTasks.length, 1)))
 
         const anthropicData = buildAnthropicData(t)
+        const ipiFields = AutomationClassificationService.buildIpiFields(
+          t.focalizaScore,
+          anthropicData,
+        )
         return {
           taskId: t.id,
           description: t.taskDescriptionEs ?? t.taskDescription,
@@ -300,6 +319,7 @@ export async function GET(
             t.focalizaScore,
             anthropicData,
           ),
+          ...ipiFields,
         }
       })
     }

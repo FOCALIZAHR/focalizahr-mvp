@@ -605,6 +605,18 @@ export const PERMISSIONS = {
     'HR_MANAGER',
     'CEO'
   ],
+  'workforce:budget:view': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'CEO'
+  ],
+  'workforce:budget:approve': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'CEO'
+  ],
 } as const;
 
 // =============================================================================

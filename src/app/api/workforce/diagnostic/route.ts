@@ -71,6 +71,33 @@ export async function GET(request: NextRequest) {
       (e.focalizaScore ?? e.observedExposure) > 0.5 && e.potentialAbility === 1
     ).length
 
+    // ── Span de Control real desde directReportsCount ──────────────
+    const leaders = enriched.filter(e => e.directReportsCount > 0)
+    const globalAvgSpan = leaders.length > 0
+      ? Math.round((leaders.reduce((s, e) => s + e.directReportsCount, 0) / leaders.length) * 10) / 10
+      : 0
+
+    const spanByDept = new Map<string, { nombre: string; totalReports: number; lideres: number }>()
+    for (const e of leaders) {
+      const deptName = e.departmentName ?? 'Sin gerencia'
+      const entry = spanByDept.get(deptName) ?? { nombre: deptName, totalReports: 0, lideres: 0 }
+      entry.totalReports += e.directReportsCount
+      entry.lideres += 1
+      spanByDept.set(deptName, entry)
+    }
+
+    const spanData = {
+      global: globalAvgSpan,
+      totalLideres: leaders.length,
+      porGerencia: [...spanByDept.values()]
+        .map(d => ({
+          nombre: d.nombre,
+          avgSpan: Math.round((d.totalReports / d.lideres) * 10) / 10,
+          lideres: d.lideres,
+        }))
+        .sort((a, b) => b.avgSpan - a.avgSpan),
+    }
+
     // ── Response combinado ───────────────────────────────────────────
     return NextResponse.json({
       success: true,
@@ -81,6 +108,7 @@ export async function GET(request: NextRequest) {
         orgAugmentationShare,
         zonaCriticaCount,
         headcountExpuestos,
+        spanData,
       },
     })
   } catch (error: unknown) {

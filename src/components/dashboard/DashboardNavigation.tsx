@@ -39,6 +39,8 @@ import {
   Zap,
   DollarSign,
   FileText,
+  Brain,
+  Wallet,
 } from 'lucide-react';
 
 // ============================================================================
@@ -154,6 +156,17 @@ export default function DashboardNavigation({
       href: '/dashboard/talent-actions',
       icon: Activity,
       active: pathname.startsWith('/dashboard/talent-actions'),
+    }] : []),
+    // Fuerza de Trabajo - Diagnostico (workforce intelligence) + Presupuesto
+    ...(canSeeExecutiveHub ? [{
+      id: 'workforce',
+      label: 'Fuerza de Trabajo',
+      icon: Brain,
+      isDropdown: true,
+      subItems: [
+        { id: 'workforce-diagnostico', label: 'Diagnostico', href: '/dashboard/workforce', icon: Brain },
+        { id: 'workforce-presupuesto', label: 'Presupuesto', href: '/dashboard/workforce/presupuesto', icon: Wallet },
+      ],
     }] : []),
     // Descriptores de Cargo - Mismos roles que configuración
     ...(canSeeExecutiveHub ? [{

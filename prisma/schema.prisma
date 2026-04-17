@@ -228,6 +228,7 @@ model Account {
   // INTELLIGENCE INSIGHT (Auditor de Intervenciones)
   // ═══════════════════════════════════════════════════
   intelligenceInsights     IntelligenceInsight[]
+  budgetScenarios          BudgetScenario[]
 
   // ═══════════════════════════════════════════════════
   // CONFIGURACIÓN SALARIAL (SalaryConfig v1.2)
@@ -3388,4 +3389,33 @@ model JobDescriptor {
   @@index([socCode], map: "idx_job_descriptor_soc")
   @@index([status], map: "idx_job_descriptor_status")
   @@map("job_descriptors")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BUDGET SCENARIO — Escenario de presupuesto de dotación guardado
+// ═══════════════════════════════════════════════════════════════════════════
+model BudgetScenario {
+  id          String   @id @default(cuid())
+  accountId   String   @map("account_id")
+  createdBy   String   @map("created_by")
+  name        String
+  year        Int
+  status      String   @default("draft")
+
+  supuestos                Json    @db.JsonB
+  movimientos              Json    @db.JsonB
+  provisionesSeleccionadas String[] @map("provisiones_seleccionadas")
+  mesesSalidaPorPersona    Json    @default("{}") @map("meses_salida_por_persona") @db.JsonB
+  prescindiblesIds         String[] @map("prescindibles_ids")
+
+  headcountAlGuardar    Int   @map("headcount_al_guardar")
+  masaSalarialAlGuardar Float @map("masa_salarial_al_guardar")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, year], map: "idx_budget_scenario_account_year")
+  @@map("budget_scenarios")
 }

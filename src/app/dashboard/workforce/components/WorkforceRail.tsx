@@ -23,6 +23,7 @@ const WORKFORCE_CARDS: WorkforceCardType[] = [
   'estructura',
   'benchmarks',
   'simulador',
+  'presupuesto',
 ]
 
 interface WorkforceRailProps {

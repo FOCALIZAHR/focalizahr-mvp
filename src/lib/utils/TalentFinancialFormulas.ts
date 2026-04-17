@@ -142,3 +142,30 @@ export function calculateBreakevenMonths(
   if (finiquito === null || finiquito <= 0 || monthlyGap <= 0) return null
   return Math.round(finiquito / monthlyGap)
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// 6. FINIQUITO CON TOPE CUSTOM UF — Para presupuesto con UF configurable
+// ════════════════════════════════════════════════════════════════════════════
+
+export function calculateFiniquitoConTopeCustomUF(
+  salary: number,
+  tenureMonths: number,
+  ufValueCLP: number
+): number {
+  const salaryCapped = Math.min(salary, FINIQUITO_UF_CAP * ufValueCLP)
+  return calculateFiniquito(salaryCapped, tenureMonths)
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 7. FINIQUITO FUTURO — Proyección a N días adicionales de antigüedad
+// ════════════════════════════════════════════════════════════════════════════
+
+export function calculateFiniquitoFuturo(
+  salary: number,
+  tenureMonths: number,
+  diasAdicionales: number,
+  ufValueCLP: number = UF_VALUE_CLP
+): number {
+  const tenureProyectado = tenureMonths + Math.floor(diasAdicionales / 30)
+  return calculateFiniquitoConTopeCustomUF(salary, tenureProyectado, ufValueCLP)
+}

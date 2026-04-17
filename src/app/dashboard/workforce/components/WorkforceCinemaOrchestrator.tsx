@@ -13,6 +13,7 @@ import { RefreshCw, AlertTriangle, Cpu, ArrowLeft, Home } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useWorkforceData } from '../hooks/useWorkforceData'
+import WorkforceToolbar from './WorkforceToolbar'
 import WorkforceMissionControl from './WorkforceMissionControl'
 import WorkforceRail from './WorkforceRail'
 import type { WorkforceCardType } from './WorkforceRailCard'
@@ -98,10 +99,11 @@ function EmptyState() {
 // MAIN ORCHESTRATOR
 // ═══════════════════════════════════════════════════════════════════════
 
-type View = 'lobby' | WorkforceCardType
+type View = 'lobby' | Exclude<WorkforceCardType, 'presupuesto'>
 
 export default function WorkforceCinemaOrchestrator() {
   const { data, isLoading, error, reload } = useWorkforceData()
+  const router = useRouter()
 
   const [view, setView] = useState<View>('lobby')
   const [isRailExpanded, setIsRailExpanded] = useState(false)
@@ -115,6 +117,13 @@ export default function WorkforceCinemaOrchestrator() {
 
   // ── Handlers ────────────────────────────────────────────────────────
   const handleSelectCard = (card: WorkforceCardType) => {
+    // Excepcion: Presupuesto vive en pagina separada porque el wizard
+    // de 5 pasos es demasiado complejo para renderizar dentro del Orchestrator.
+    // Todos los demas cards usan setView(). Este usa router.push().
+    if (card === 'presupuesto') {
+      router.push('/dashboard/workforce/presupuesto')
+      return
+    }
     setView(card)
     setIsRailExpanded(false)
   }
@@ -233,6 +242,20 @@ export default function WorkforceCinemaOrchestrator() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Toolbar — solo en vistas de trabajo, no en lobby */}
+      <AnimatePresence>
+        {!isLobby && data && (
+          <motion.div
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 40 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          >
+            <WorkforceToolbar data={data} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Backdrop blur when rail expanded */}
       <AnimatePresence>

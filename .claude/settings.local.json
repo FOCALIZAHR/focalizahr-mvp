@@ -29,7 +29,9 @@
       "Read(//tmp/**)",
       "Bash(mkdir -p .claude/skills/focalizahr-narrativas/references)",
       "Bash(cp .claude/tasks/PATRON_PERSUASION_HACKEAR_CEO.md .claude/skills/focalizahr-narrativas/references/patron-persuasion.md)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(find . -name \"occ_level*\")",
+      "Bash(find . -name \"eloundou*\")"
     ]
   }
 }

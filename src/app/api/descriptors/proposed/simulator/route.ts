@@ -168,6 +168,10 @@ export async function GET(request: NextRequest) {
           ? Math.min(40, Math.round((160 * importance) / sumImportance))
           : Math.min(40, Math.floor(160 / Math.max(onetTasks.length, 1)))
       const anthropicData = buildAnthropicData(t)
+      const ipiFields = AutomationClassificationService.buildIpiFields(
+        t.focalizaScore,
+        anthropicData,
+      )
       return {
         taskId: t.id,
         description: t.taskDescriptionEs ?? t.taskDescription,
@@ -182,6 +186,7 @@ export async function GET(request: NextRequest) {
           t.focalizaScore,
           anthropicData,
         ),
+        ...ipiFields,
       }
     })
 

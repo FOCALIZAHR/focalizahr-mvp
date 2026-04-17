@@ -318,6 +318,18 @@ export interface ForensicTask {
   anthropicData: AnthropicDimensionData | null
   /** Frase narrativa larga del cruce β × dim dominante (null si señal débil) */
   classificationPhrase: string | null
+  // Sistema IPI (ver AutomationClassificationService)
+  ipi: number
+  ipiSemaforo: 'alta' | 'media' | 'baja' | 'sin_señal'
+  perfilLabel:
+    | 'DELEGACION_ACTIVA'
+    | 'AMPLIFICACION_ACTIVA'
+    | 'DELEGACION_PARCIAL'
+    | 'ASISTENCIA_PRODUCTIVA'
+    | 'RESISTENTE'
+    | 'CONSULTA_PUNTUAL'
+    | 'SIN_PATRON'
+  showVerifiedBadge: boolean
   // Mutables (solo β=0.5: slider de delegación)
   /** Horas/mes humanas restantes. Para β=0.5 se puede reducir hasta 50%. */
   hoursPerMonth: number
@@ -628,6 +640,10 @@ export function buildForensicTasks(payload: SimulatorPayload): ForensicTask[] {
       isAutomatedHint: t.isAutomatedHint,
       anthropicData: t.anthropicData,
       classificationPhrase: t.classificationPhrase ?? null,
+      ipi: t.ipi,
+      ipiSemaforo: t.ipiSemaforo,
+      perfilLabel: t.perfilLabel,
+      showVerifiedBadge: t.showVerifiedBadge,
       hoursPerMonth: t.hoursPerMonth,
       originalHours: t.hoursPerMonth,
     }))

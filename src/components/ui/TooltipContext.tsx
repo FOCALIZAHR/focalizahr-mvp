@@ -6,7 +6,8 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Info, HelpCircle, TrendingUp, Target, Zap } from 'lucide-react';
 
@@ -20,6 +21,12 @@ interface TooltipContextProps {
   position?: 'top' | 'bottom' | 'left' | 'right';
   variant?: 'momentum' | 'projection' | 'action' | 'risk' | 'pattern';
   showIcon?: boolean;
+  // Cuando el trigger vive dentro de un contenedor con overflow-hidden
+  // (ej. cards con Tesla line), pasar usePortal para que el tooltip
+  // se renderice en document.body con position fixed y no se corte.
+  usePortal?: boolean;
+  // Si se pasa, la seccion "actionable" se vuelve clickeable y ejecuta el handler.
+  onActionableClick?: () => void;
 }
 
 // 🎨 VARIANTES VISUALES POR TIPO
@@ -69,30 +76,179 @@ export function TooltipContext({
   actionable,
   position = 'top',
   variant = 'momentum',
-  showIcon = false
+  showIcon = false,
+  usePortal = false,
+  onActionableClick
 }: TooltipContextProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  
+  const [mounted, setMounted] = useState(false);
+  const [portalCoords, setPortalCoords] = useState<{ left: number; top: number; bottom: number } | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // En modo portal: al salir del trigger damos 200ms de gracia para que el
+  // mouse pueda entrar al tooltip sin que se cierre. Si entra al tooltip,
+  // cancelamos el cierre; si no, se cierra.
+  const cancelHide = () => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+  };
+  const scheduleHide = () => {
+    cancelHide();
+    hideTimeoutRef.current = setTimeout(() => setIsVisible(false), 200);
+  };
+
   const styles = getVariantStyles(variant);
   const IconComponent = styles.icon;
 
   React.useEffect(() => {
     setIsMobile(window.innerWidth < 768);
+    setMounted(true);
   }, []);
+
+  // Calcula coords del trigger cuando se abre en modo portal.
+  useLayoutEffect(() => {
+    if (!usePortal || !isVisible || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPortalCoords({
+      left: rect.left + rect.width / 2,
+      top: rect.bottom,
+      bottom: window.innerHeight - rect.top,
+    });
+  }, [usePortal, isVisible]);
 
   const positionClasses = {
     top: 'bottom-full mb-3',
-    bottom: 'top-full mt-3', 
+    bottom: 'top-full mt-3',
     left: 'right-full mr-3',
     right: 'left-full ml-3'
   };
 
+  const tooltipContent = (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95, y: position === 'top' ? 10 : -10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95, y: position === 'top' ? 10 : -10 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      onMouseEnter={usePortal ? cancelHide : undefined}
+      onMouseLeave={usePortal ? scheduleHide : undefined}
+      className={`
+        ${usePortal ? 'fixed' : `absolute ${positionClasses[position]}`} z-[60]
+        ${isMobile ? 'w-80' : 'w-96'} max-w-screen-sm
+        ${styles.bg} ${styles.border} backdrop-blur-xl
+        rounded-xl p-4 shadow-2xl
+        ${usePortal ? '' : 'left-1/2 transform -translate-x-1/2'}
+      `}
+      style={
+        usePortal && portalCoords
+          ? {
+              left: `${portalCoords.left}px`,
+              ...(position === 'top'
+                ? { bottom: `${portalCoords.bottom + 12}px` }
+                : { top: `${portalCoords.top + 12}px` }),
+              transform: 'translateX(-50%)',
+            }
+          : undefined
+      }
+    >
+      {/* Header con icono */}
+      <div className="flex items-start gap-3 mb-3">
+        <div className={`p-2 rounded-lg ${styles.bg} ${styles.border}`}>
+          <IconComponent className={`h-4 w-4 ${styles.titleColor}`} />
+        </div>
+        <div className="flex-1">
+          <h4 className={`font-semibold text-sm ${styles.titleColor} mb-1`}>
+            {title}
+          </h4>
+          <p className="text-white/90 text-xs leading-relaxed">
+            {explanation}
+          </p>
+        </div>
+      </div>
+
+      {/* Details List */}
+      {details.length > 0 && (
+        <div className="mb-3">
+          <div className="text-white/70 text-xs space-y-1">
+            {details.map((detail, index) => (
+              <div key={index} className="flex items-start gap-2">
+                <div className="w-1 h-1 bg-white/40 rounded-full mt-2 flex-shrink-0" />
+                <span>{detail}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Actionable Insight */}
+      {actionable && (
+        onActionableClick ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onActionableClick();
+              setIsVisible(false);
+            }}
+            className={`w-full text-left ${styles.bg} ${styles.border} rounded-lg p-3 hover:brightness-125 transition-all cursor-pointer`}
+          >
+            <div className="flex items-start gap-2">
+              <Zap className={`h-3 w-3 ${styles.titleColor} mt-0.5 flex-shrink-0`} />
+              <p className={`text-xs font-medium ${styles.titleColor}`}>
+                {actionable}
+              </p>
+            </div>
+          </button>
+        ) : (
+          <div className={`${styles.bg} ${styles.border} rounded-lg p-3`}>
+            <div className="flex items-start gap-2">
+              <Zap className={`h-3 w-3 ${styles.titleColor} mt-0.5 flex-shrink-0`} />
+              <p className={`text-xs font-medium ${styles.titleColor}`}>
+                {actionable}
+              </p>
+            </div>
+          </div>
+        )
+      )}
+
+      {/* Arrow Pointer — solo en modo inline (portal no lo necesita) */}
+      {!usePortal && (
+        <div
+          className={`
+            absolute w-0 h-0
+            ${position === 'top' ? 'top-full border-l-[6px] border-r-[6px] border-t-[6px] border-transparent border-t-slate-800' : ''}
+            ${position === 'bottom' ? 'bottom-full border-l-[6px] border-r-[6px] border-b-[6px] border-transparent border-b-slate-800' : ''}
+            left-1/2 transform -translate-x-1/2
+          `}
+        />
+      )}
+
+      {/* Mobile: Tap para cerrar */}
+      {isMobile && (
+        <div className="text-center mt-3 pt-2 border-t border-white/10">
+          <span className="text-xs text-white/50">Toca fuera para cerrar</span>
+        </div>
+      )}
+    </motion.div>
+  );
+
   return (
-    <div 
-      className="relative inline-block"
-      onMouseEnter={() => !isMobile && setIsVisible(true)}
-      onMouseLeave={() => !isMobile && setIsVisible(false)}
+    <div
+      ref={triggerRef}
+      className={usePortal ? 'inline-block' : 'relative inline-block'}
+      onMouseEnter={() => {
+        if (isMobile) return;
+        cancelHide();
+        setIsVisible(true);
+      }}
+      onMouseLeave={() => {
+        if (isMobile) return;
+        if (usePortal) scheduleHide();
+        else setIsVisible(false);
+      }}
       onClick={() => isMobile && setIsVisible(!isVisible)}
     >
       {/* Trigger Element */}
@@ -104,85 +260,18 @@ export function TooltipContext({
       </div>
 
       {/* Tooltip Content */}
-      <AnimatePresence>
-        {isVisible && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: position === 'top' ? 10 : -10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: position === 'top' ? 10 : -10 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className={`
-              absolute z-50 ${positionClasses[position]}
-              ${isMobile ? 'w-80' : 'w-96'} max-w-screen-sm
-              ${styles.bg} ${styles.border} backdrop-blur-xl
-              rounded-xl p-4 shadow-2xl
-              left-1/2 transform -translate-x-1/2
-            `}
-          >
-            {/* Header con icono */}
-            <div className="flex items-start gap-3 mb-3">
-              <div className={`p-2 rounded-lg ${styles.bg} ${styles.border}`}>
-                <IconComponent className={`h-4 w-4 ${styles.titleColor}`} />
-              </div>
-              <div className="flex-1">
-                <h4 className={`font-semibold text-sm ${styles.titleColor} mb-1`}>
-                  {title}
-                </h4>
-                <p className="text-white/90 text-xs leading-relaxed">
-                  {explanation}
-                </p>
-              </div>
-            </div>
-
-            {/* Details List */}
-            {details.length > 0 && (
-              <div className="mb-3">
-                <div className="text-white/70 text-xs space-y-1">
-                  {details.map((detail, index) => (
-                    <div key={index} className="flex items-start gap-2">
-                      <div className="w-1 h-1 bg-white/40 rounded-full mt-2 flex-shrink-0" />
-                      <span>{detail}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Actionable Insight */}
-            {actionable && (
-              <div className={`${styles.bg} ${styles.border} rounded-lg p-3`}>
-                <div className="flex items-start gap-2">
-                  <Zap className={`h-3 w-3 ${styles.titleColor} mt-0.5 flex-shrink-0`} />
-                  <p className={`text-xs font-medium ${styles.titleColor}`}>
-                    {actionable}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Arrow Pointer */}
-            <div 
-              className={`
-                absolute w-0 h-0
-                ${position === 'top' ? 'top-full border-l-[6px] border-r-[6px] border-t-[6px] border-transparent border-t-slate-800' : ''}
-                ${position === 'bottom' ? 'bottom-full border-l-[6px] border-r-[6px] border-b-[6px] border-transparent border-b-slate-800' : ''}
-                left-1/2 transform -translate-x-1/2
-              `} 
-            />
-
-            {/* Mobile: Tap para cerrar */}
-            {isMobile && (
-              <div className="text-center mt-3 pt-2 border-t border-white/10">
-                <span className="text-xs text-white/50">Toca fuera para cerrar</span>
-              </div>
-            )}
-          </motion.div>
+      {usePortal && mounted
+        ? createPortal(
+            <AnimatePresence>{isVisible && tooltipContent}</AnimatePresence>,
+            document.body,
+          )
+        : (
+          <AnimatePresence>{isVisible && tooltipContent}</AnimatePresence>
         )}
-      </AnimatePresence>
 
       {/* Mobile: Overlay para cerrar */}
       {isMobile && isVisible && (
-        <div 
+        <div
           className="fixed inset-0 z-40"
           onClick={() => setIsVisible(false)}
         />

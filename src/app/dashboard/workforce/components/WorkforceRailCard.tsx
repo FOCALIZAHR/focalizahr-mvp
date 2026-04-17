@@ -9,7 +9,7 @@
 
 import { memo, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Brain, Users, TrendingUp, Sliders, Grid3x3, Layers } from 'lucide-react'
+import { Brain, Users, TrendingUp, Sliders, Grid3x3, Layers, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { WorkforceDiagnosticData } from '../types/workforce.types'
 import { computeHallazgosCount } from '../utils/workforce.utils'
@@ -25,6 +25,7 @@ export type WorkforceCardType =
   | 'estructura'
   | 'benchmarks'
   | 'simulador'
+  | 'presupuesto'
 
 const CARD_ICONS: Record<WorkforceCardType, typeof Brain> = {
   diagnostico: Brain,
@@ -33,6 +34,7 @@ const CARD_ICONS: Record<WorkforceCardType, typeof Brain> = {
   estructura: Users,
   benchmarks: TrendingUp,
   simulador: Sliders,
+  presupuesto: Wallet,
 }
 
 const CARD_LABELS: Record<WorkforceCardType, string> = {
@@ -42,6 +44,7 @@ const CARD_LABELS: Record<WorkforceCardType, string> = {
   estructura: 'Estructura',
   benchmarks: 'Benchmarks',
   simulador: 'Simulador',
+  presupuesto: 'Presupuesto',
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -74,6 +77,8 @@ function getDotStatus(card: WorkforceCardType, data: WorkforceDiagnosticData): D
       return 'none'
     case 'simulador':
       return 'none'
+    case 'presupuesto':
+      return 'cyan'
   }
 }
 
@@ -150,6 +155,11 @@ function getCardNarrative(card: WorkforceCardType, data: WorkforceDiagnosticData
       return {
         text: 'Proximamente',
         tooltip: '3 tesis (Eficiencia, Crecimiento, Evolucion) con sliders interactivos',
+      }
+    case 'presupuesto':
+      return {
+        text: 'Presupuesto anual en 5 pasos',
+        tooltip: 'Wizard que proyecta costo, finiquitos y timing de decisiones para directorio',
       }
   }
 }

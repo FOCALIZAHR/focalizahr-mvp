@@ -169,10 +169,150 @@ export function getAnthropicPhrase(
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// 3. SISTEMA IPI — Índice de Presión de IA por tarea
+// ═════════════════════════════════════════════════════════════════════════════
+// IPI cruza el QUÉ (betaEloundou: 0/0.5/1) con el CÓMO (5 dims Anthropic
+// ponderadas). Resultado: 0-1 donde 1 = máxima presión de IA sobre la tarea.
+//
+//   IPI = (betaEloundou × 0.6) + (presionInteraccion × 0.4)
+//   presionInteraccion = Σ(dim × peso)
+//     directive=1.0, feedbackLoop=0.8, taskIteration=0.5,
+//     learning=0.4, validation=0.3
+//
+// Las 5 dims Anthropic suman ≈1.0 en la fuente → presión ≤ 1.0.
+// Clamp defensivo al final por si la distribución real cambia.
+
+const IPI_DIM_WEIGHTS: Record<keyof AnthropicDimensionValues, number> = {
+  directive: 1.0,
+  feedbackLoop: 0.8,
+  taskIteration: 0.5,
+  learning: 0.4,
+  validation: 0.3,
+}
+
+export function calcularIPI(
+  betaEloundou: number | null,
+  dims: AnthropicDimensionValues | null | undefined,
+): number {
+  const beta = betaEloundou ?? 0
+  const presionInteraccion = dims
+    ? (dims.directive ?? 0) * IPI_DIM_WEIGHTS.directive +
+      (dims.feedbackLoop ?? 0) * IPI_DIM_WEIGHTS.feedbackLoop +
+      (dims.taskIteration ?? 0) * IPI_DIM_WEIGHTS.taskIteration +
+      (dims.learning ?? 0) * IPI_DIM_WEIGHTS.learning +
+      (dims.validation ?? 0) * IPI_DIM_WEIGHTS.validation
+    : 0
+  const ipi = beta * 0.6 + presionInteraccion * 0.4
+  return Math.min(Math.max(ipi, 0), 1)
+}
+
+export type IpiSemaforo = 'alta' | 'media' | 'baja' | 'sin_señal'
+
+export function getIpiSemaforo(ipi: number): IpiSemaforo {
+  if (ipi < 0.10) return 'sin_señal'
+  if (ipi < 0.35) return 'baja'
+  if (ipi < 0.65) return 'media'
+  return 'alta'
+}
+
+export type IpiGrupo = 'automation' | 'augmentation'
+
+/** Dim dominante + su valor, o null si no hay dims o todas son 0. */
+export function getDominantDim(
+  dims: AnthropicDimensionValues | null | undefined,
+): { key: keyof AnthropicDimensionValues; value: number } | null {
+  if (!dims) return null
+  const entries: Array<[keyof AnthropicDimensionValues, number]> = [
+    ['directive', dims.directive ?? 0],
+    ['feedbackLoop', dims.feedbackLoop ?? 0],
+    ['taskIteration', dims.taskIteration ?? 0],
+    ['validation', dims.validation ?? 0],
+    ['learning', dims.learning ?? 0],
+  ]
+  entries.sort((a, b) => b[1] - a[1])
+  const [key, value] = entries[0]
+  if (value <= 0) return null
+  return { key, value }
+}
+
+export function getIpiGrupo(
+  dim: keyof AnthropicDimensionValues,
+): IpiGrupo {
+  if (dim === 'directive' || dim === 'feedbackLoop') return 'automation'
+  return 'augmentation'
+}
+
+export type PerfilLabel =
+  | 'DELEGACION_ACTIVA'
+  | 'AMPLIFICACION_ACTIVA'
+  | 'DELEGACION_PARCIAL'
+  | 'ASISTENCIA_PRODUCTIVA'
+  | 'RESISTENTE'
+  | 'CONSULTA_PUNTUAL'
+  | 'SIN_PATRON'
+
+export function getPerfilLabel(
+  betaEloundou: number | null,
+  grupo: IpiGrupo | null,
+  hasDims: boolean,
+): PerfilLabel {
+  if (!hasDims || grupo === null) return 'SIN_PATRON'
+  if (betaEloundou === 1.0 && grupo === 'automation') return 'DELEGACION_ACTIVA'
+  if (betaEloundou === 1.0 && grupo === 'augmentation') return 'AMPLIFICACION_ACTIVA'
+  if (betaEloundou === 0.5 && grupo === 'automation') return 'DELEGACION_PARCIAL'
+  if (betaEloundou === 0.5 && grupo === 'augmentation') return 'ASISTENCIA_PRODUCTIVA'
+  if (betaEloundou === 0.0 && grupo === 'automation') return 'RESISTENTE'
+  if (betaEloundou === 0.0 && grupo === 'augmentation') return 'CONSULTA_PUNTUAL'
+  return 'SIN_PATRON'
+}
+
+/** Badge "verificado Anthropic" — hay dims Y la dominante supera 0.15. */
+export function showVerifiedBadge(
+  hasAnthropicData: boolean,
+  maxDimScore: number,
+): boolean {
+  return hasAnthropicData && maxDimScore > 0.15
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPER AGREGADO — alimenta los 4 campos IPI que consumen las APIs/UI.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface IpiFields {
+  ipi: number
+  ipiSemaforo: IpiSemaforo
+  perfilLabel: PerfilLabel
+  showVerifiedBadge: boolean
+}
+
+export function buildIpiFields(
+  betaEloundou: number | null,
+  dims: AnthropicDimensionValues | null | undefined,
+): IpiFields {
+  const ipi = calcularIPI(betaEloundou, dims)
+  const ipiSemaforo = getIpiSemaforo(ipi)
+  const dominant = getDominantDim(dims)
+  const maxDimScore = dominant?.value ?? 0
+  const hasAnthropicData = !!dims
+  const verified = showVerifiedBadge(hasAnthropicData, maxDimScore)
+  // Señal débil (maxDimScore < 0.15) se trata como "sin patrón" para el perfil.
+  const grupo = verified && dominant ? getIpiGrupo(dominant.key) : null
+  const perfilLabel = getPerfilLabel(betaEloundou, grupo, verified)
+  return { ipi, ipiSemaforo, perfilLabel, showVerifiedBadge: verified }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // NAMESPACE EXPORT
 // ═════════════════════════════════════════════════════════════════════════════
 
 export const AutomationClassificationService = {
   classify: classifyAutomation,
   getPhrase: getAnthropicPhrase,
+  calcularIPI,
+  getIpiSemaforo,
+  getDominantDim,
+  getIpiGrupo,
+  getPerfilLabel,
+  showVerifiedBadge,
+  buildIpiFields,
 }

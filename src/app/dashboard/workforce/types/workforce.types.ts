@@ -62,6 +62,17 @@ export interface WorkforceDiagnosticData {
   orgAugmentationShare: number
   zonaCriticaCount: number
   headcountExpuestos: number
+
+  // Span de control real (directReportsCount)
+  spanData: {
+    global: number
+    totalLideres: number
+    porGerencia: Array<{
+      nombre: string
+      avgSpan: number
+      lideres: number
+    }>
+  }
 }
 
 // Re-export types that cascade components will need
