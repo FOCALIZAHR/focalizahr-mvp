@@ -617,6 +617,17 @@ export const PERMISSIONS = {
     'ACCOUNT_OWNER',
     'CEO'
   ],
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // EFFICIENCY INTELLIGENCE HUB
+  // ─────────────────────────────────────────────────────────────────────────
+  'efficiency:view': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'CEO'
+  ],
 } as const;
 
 // =============================================================================
