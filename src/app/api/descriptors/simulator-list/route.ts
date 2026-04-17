@@ -24,6 +24,7 @@ import {
 } from '@/lib/services/AuthorizationService'
 import { prisma } from '@/lib/prisma'
 import { socCodeVariants } from '@/lib/utils/socCode'
+import { normalizePositionText } from '@/lib/utils/normalizePosition'
 
 export type SimulatorListKind = 'verified' | 'proposed' | 'unmapped'
 
@@ -58,10 +59,12 @@ export interface SimulatorListCoverage {
   coveragePct: number  // verified / totalCargos × 100, redondeado
 }
 
-/** Normalización canónica para matching position ↔ descriptor ↔ mapping. */
-function norm(s: string): string {
-  return s.toLowerCase().replace(/_/g, ' ').replace(/\s+/g, ' ').trim()
-}
+/**
+ * Normalización canónica para matching position ↔ descriptor ↔ mapping.
+ * Alias a `normalizePositionText` (single source of truth) — minimiza diff
+ * en los call sites que ya usan `norm`.
+ */
+const norm = normalizePositionText
 
 export async function GET(request: NextRequest) {
   try {

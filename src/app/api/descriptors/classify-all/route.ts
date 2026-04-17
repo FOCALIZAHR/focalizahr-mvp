@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationService'
 import { OccupationResolver } from '@/lib/services/OccupationResolver'
 import { prisma } from '@/lib/prisma'
+import { normalizePositionText } from '@/lib/utils/normalizePosition'
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,9 +38,8 @@ export async function POST(request: NextRequest) {
 
     for (const emp of employees) {
       if (!emp.position) continue
-      const key = emp.position.toLowerCase().trim()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim()
+      // Normalización canónica — match contra occupation_mappings.position_text
+      const key = normalizePositionText(emp.position)
       if (!positionMap.has(key)) {
         positionMap.set(key, {
           positionText: emp.position,
@@ -49,18 +49,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2. Verificar cuáles ya tienen mapping (excluyendo los que vamos a re-clasificar)
+    // 2. Verificar cuáles ya tienen mapping (excluyendo los que vamos a re-clasificar).
+    // CRÍTICO: la normalización debe coincidir con la canónica para NO sobrescribir
+    // correcciones manuales de cargos con `_` o paréntesis en el texto original.
     const existingMappings = await prisma.occupationMapping.findMany({
       where: { accountId, source: 'MANUAL' }, // Solo preservar MANUAL
       select: { positionText: true },
     })
-    const manualMapped = new Set(existingMappings.map(m => m.positionText.toLowerCase().trim()))
+    const manualMapped = new Set(
+      existingMappings.map(m => normalizePositionText(m.positionText))
+    )
 
     // 3. Filtrar: clasificar todo lo que NO sea MANUAL
     const toClassify = Array.from(positionMap.values()).filter(
-      p => !manualMapped.has(p.positionText.toLowerCase().trim()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim())
+      p => !manualMapped.has(normalizePositionText(p.positionText))
     )
 
     if (toClassify.length === 0) {

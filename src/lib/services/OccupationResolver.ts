@@ -9,6 +9,7 @@
 import { prisma } from '@/lib/prisma'
 import { SOC_ALIASES, STRONG_KEYWORDS, SOC_TITLES_ES } from '@/config/OnetOccupationConfig'
 import type { OccupationConfidence } from '@prisma/client'
+import { normalizePositionText } from '@/lib/utils/normalizePosition'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -43,14 +44,9 @@ interface BatchStats {
 // HELPERS
 // ════════════════════════════════════════════════════════════════════════════
 
-function normalize(text: string): string {
-  return text
-    .toLowerCase().trim()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[_]+/g, ' ')
-    .replace(/[^a-z0-9\s\-\/&.]/g, '')
-    .replace(/\s+/g, ' ').trim()
-}
+// `normalize` local migrado a normalizePositionText de @/lib/utils/normalizePosition
+// (single source of truth). Alias para minimizar diff en los call sites.
+const normalize = normalizePositionText
 
 const STOPWORDS = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'en', 'con', 'para', 'por', 'una', 'uno', 'que', 'y', 'o', 'a'])
 

@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationService'
 import { prisma } from '@/lib/prisma'
 import { SOC_TITLES_ES } from '@/config/OnetOccupationConfig'
+import { normalizePositionText } from '@/lib/utils/normalizePosition'
 
 export async function GET(request: NextRequest) {
   try {
@@ -39,13 +40,17 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const mappingMap = new Map(mappings.map(m => [m.positionText.toLowerCase().trim(), m]))
+    // Normalización canónica — evita falsos negativos de "sin mapeo" en cargos
+    // con `_` o paréntesis en el texto original del cliente.
+    const mappingMap = new Map(
+      mappings.map(m => [normalizePositionText(m.positionText), m])
+    )
 
     // 3. Employee counts per position
     const countMap = new Map<string, number>()
     for (const e of employees) {
       if (!e.position) continue
-      const key = e.position.toLowerCase().trim()
+      const key = normalizePositionText(e.position)
       countMap.set(key, (countMap.get(key) ?? 0) + 1)
     }
 
@@ -64,7 +69,7 @@ export async function GET(request: NextRequest) {
     const unmapped: PositionMapping[] = []
 
     for (const pos of uniquePositions) {
-      const key = pos.toLowerCase().trim()
+      const key = normalizePositionText(pos)
       const mapping = mappingMap.get(key)
       const empCount = countMap.get(key) ?? 0
 

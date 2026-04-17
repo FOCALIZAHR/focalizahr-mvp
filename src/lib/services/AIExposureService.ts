@@ -15,6 +15,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { socCodeVariants } from '@/lib/utils/socCode'
+import { normalizePositionText } from '@/lib/utils/normalizePosition'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -127,19 +128,9 @@ const DEFAULT_EXPOSURE: ExposureResult = {
   source: 'default',
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// HELPER — normalizar position text (mismo que OccupationMapper)
-// ════════════════════════════════════════════════════════════════════════════
-
-function normalizePosition(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9\s\-\/&.]/g, '')
-    .replace(/\s+/g, ' ')
-}
+// normalizePosition migrado a @/lib/utils/normalizePosition
+// (función normalizePositionText). Se eliminó la copia local para evitar
+// divergencias de normalización entre lectores y escritores.
 
 // ════════════════════════════════════════════════════════════════════════════
 // SERVICE
@@ -238,25 +229,19 @@ export class AIExposureService {
         }
       }
 
-      // 2. Obtener SOC codes de los empleados via OccupationMapping
-      const positionTexts = [...new Set(
-        employees
-          .map(e => e.position)
-          .filter((p): p is string => !!p)
-          .map(normalizePosition)
-      )]
-
+      // 2. Obtener SOC codes de los empleados via OccupationMapping.
+      // Carga completa + lookup normalizado en memoria (evita divergencias
+      // si el texto guardado está con otra normalización).
       const mappings = await prisma.occupationMapping.findMany({
         where: {
           accountId,
-          positionText: { in: positionTexts },
           socCode: { not: null },
         },
         select: { positionText: true, socCode: true },
       })
 
-      const positionToSoc = new Map(
-        mappings.map(m => [m.positionText, m.socCode!])
+      const positionToSoc = new Map<string, string>(
+        mappings.map(m => [normalizePositionText(m.positionText), m.socCode!])
       )
 
       // 3. Obtener exposiciones por SOC code único — focalizaScore primario
@@ -288,7 +273,7 @@ export class AIExposureService {
 
       for (const emp of employees) {
         if (!emp.position) continue
-        const normalized = normalizePosition(emp.position)
+        const normalized = normalizePositionText(emp.position)
         const socCode = positionToSoc.get(normalized)
         if (!socCode) continue
 
@@ -400,7 +385,9 @@ export class AIExposureService {
         where: { accountId, socCode: { not: null } },
         select: { positionText: true, socCode: true },
       })
-      const positionToSoc = new Map(allMappings.map(m => [m.positionText, m.socCode!]))
+      const positionToSoc = new Map<string, string>(
+        allMappings.map(m => [normalizePositionText(m.positionText), m.socCode!])
+      )
 
       // 3. Obtener todas las ocupaciones con exposición — focalizaScore primario
       const uniqueSocCodes = [...new Set(allMappings.map(m => m.socCode!).filter(Boolean))]
@@ -433,7 +420,7 @@ export class AIExposureService {
 
       for (const emp of employees) {
         if (!emp.position) continue
-        const normalized = normalizePosition(emp.position)
+        const normalized = normalizePositionText(emp.position)
         const socCode = positionToSoc.get(normalized)
         if (!socCode) continue
 

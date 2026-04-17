@@ -21,6 +21,7 @@ import {
   calculateMonthlyGap,
   calculateFiniquito,
 } from '@/lib/utils/TalentFinancialFormulas'
+import { normalizePositionText } from '@/lib/utils/normalizePosition'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES — EnrichedEmployee (el dataset central)
@@ -269,9 +270,9 @@ export interface OrganizationDiagnostic {
 // HELPERS
 // ════════════════════════════════════════════════════════════════════════════
 
-function normalizePosition(text: string): string {
-  return text.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s\-\/&.]/g, '').replace(/\s+/g, ' ')
-}
+// normalizePosition migrado a @/lib/utils/normalizePosition (normalizePositionText).
+// Se eliminó la función local buggy que no convertía `_` a espacio
+// y absorbía contenido de paréntesis como caracteres.
 
 /**
  * Exposición efectiva por persona — focalizaScore (Eloundou canónico) primario,
@@ -336,14 +337,19 @@ export class WorkforceIntelligenceService {
     }
 
     // Query C: OccupationMapping → OnetOccupation
-    const positionTexts = [...new Set(employees.map(e => e.position).filter(Boolean).map(p => normalizePosition(p!)))]
-    const mappings = await prisma.occupationMapping.findMany({
-      where: { accountId, positionText: { in: positionTexts }, socCode: { not: null } },
+    // Carga TODOS los mappings del account (sin filtrar por positionText) y
+    // construye el lookup en memoria con la normalización canónica. Esto
+    // evita divergencias si el texto guardado quedó con una normalización
+    // anterior ligeramente distinta.
+    const allMappings = await prisma.occupationMapping.findMany({
+      where: { accountId, socCode: { not: null } },
       select: { positionText: true, socCode: true },
     })
-    const posToSoc = new Map(mappings.map(m => [m.positionText, m.socCode!]))
+    const posToSoc = new Map<string, string>(
+      allMappings.map(m => [normalizePositionText(m.positionText), m.socCode!])
+    )
 
-    const uniqueSocs = [...new Set(mappings.map(m => m.socCode!).filter(Boolean))]
+    const uniqueSocs = [...new Set(allMappings.map(m => m.socCode!).filter(Boolean))]
     const occupations = uniqueSocs.length > 0
       ? await prisma.onetOccupation.findMany({
           where: { socCode: { in: uniqueSocs } },
@@ -372,8 +378,8 @@ export class WorkforceIntelligenceService {
     // ENRICH
     return employees.map(emp => {
       const rating = ratingsMap.get(emp.id)
-      const normalized = emp.position ? normalizePosition(emp.position) : ''
-      const socCode = posToSoc.get(normalized) ?? null
+      const normalized = emp.position ? normalizePositionText(emp.position) : ''
+      const socCode = normalized ? posToSoc.get(normalized) ?? null : null
       const occ = socCode ? socToOcc.get(socCode) : null
       const salary = salaryCache.get(emp.acotadoGroup ?? '') ?? defaultSalary
       const roleFitScore = rating?.roleFitScore ?? 0

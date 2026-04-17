@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationService'
 import { prisma } from '@/lib/prisma'
 import { SOC_TITLES_ES } from '@/config/OnetOccupationConfig'
+import { normalizePositionText } from '@/lib/utils/normalizePosition'
 
 export async function PUT(request: NextRequest) {
   try {
@@ -27,13 +28,8 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // Normalizar positionText para evitar duplicados por case/acentos
-    const normalizedPosition = positionText
-      .toLowerCase().trim()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[_]+/g, ' ')
-      .replace(/[^a-z0-9\s\-\/&.]/g, '')
-      .replace(/\s+/g, ' ').trim()
+    // Normalización canónica (single source of truth en @/lib/utils/normalizePosition)
+    const normalizedPosition = normalizePositionText(positionText)
 
     // Validar que el SOC code existe
     const occupation = await prisma.onetOccupation.findUnique({

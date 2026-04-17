@@ -20,6 +20,7 @@ import {
   SOC_TITLES_ES,
 } from '@/config/OnetOccupationConfig'
 import type { OccupationConfidence, OccupationMappingSource } from '@prisma/client'
+import { normalizePositionText } from '@/lib/utils/normalizePosition'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -60,17 +61,9 @@ const LLM_MONTHLY_LIMIT = 50
 // HELPERS
 // ════════════════════════════════════════════════════════════════════════════
 
-function normalize(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // quitar acentos
-    .replace(/[_]+/g, ' ')          // underscores → espacios ANTES de limpiar
-    .replace(/[^a-z0-9\s\-\/&.]/g, '') // solo alfanumérico + separadores
-    .replace(/\s+/g, ' ')
-    .trim()
-}
+// `normalize` local migrado a normalizePositionText de @/lib/utils/normalizePosition
+// (single source of truth). Alias para minimizar diff en los call sites.
+const normalize = normalizePositionText
 
 // ════════════════════════════════════════════════════════════════════════════
 // SERVICE
@@ -481,10 +474,13 @@ Responde SOLO con JSON: {"socCode": "XX-XXXX.XX", "confidence": "HIGH"|"MEDIUM"|
     contextCategory?: string | null,
     contextJobLevel?: string | null
   ): Promise<void> {
+    // Defensa en profundidad: normalizar antes de persistir garantiza que
+    // cualquier caller nuevo no rompa la invariante de matching con lectores.
+    const normalizedText = normalizePositionText(positionText)
     try {
       await prisma.occupationMapping.upsert({
         where: {
-          accountId_positionText: { accountId, positionText },
+          accountId_positionText: { accountId, positionText: normalizedText },
         },
         update: {
           socCode,
@@ -496,7 +492,7 @@ Responde SOLO con JSON: {"socCode": "XX-XXXX.XX", "confidence": "HIGH"|"MEDIUM"|
         },
         create: {
           accountId,
-          positionText,
+          positionText: normalizedText,
           socCode,
           confidence,
           source,

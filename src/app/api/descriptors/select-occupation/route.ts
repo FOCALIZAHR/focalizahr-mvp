@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationService'
 import { JobDescriptorService } from '@/lib/services/JobDescriptorService'
 import { prisma } from '@/lib/prisma'
+import { normalizePositionText } from '@/lib/utils/normalizePosition'
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,10 +27,8 @@ export async function POST(request: NextRequest) {
     // 1. Load tasks for the selected SOC code
     const result = await JobDescriptorService.loadTasksForSocCode(socCode)
 
-    // 2. Persist mapping as MANUAL selection
-    const normalizedPosition = jobTitle.toLowerCase().trim()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9\s\-\/&.]/g, '').replace(/\s+/g, ' ')
+    // 2. Persist mapping as MANUAL selection — normalización canónica compartida
+    const normalizedPosition = normalizePositionText(jobTitle)
 
     await prisma.occupationMapping.upsert({
       where: {

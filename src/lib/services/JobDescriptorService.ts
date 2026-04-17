@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma'
 import { OccupationMapper } from './OccupationMapper'
 import { CompetencyService } from './CompetencyService'
 import { socCodeVariants } from '@/lib/utils/socCode'
+import { normalizePositionText } from '@/lib/utils/normalizePosition'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -617,7 +618,8 @@ export class JobDescriptorService {
 
     for (const emp of employees) {
       if (!emp.position) continue
-      const key = emp.position.toLowerCase().trim()
+      // Normalización canónica — consistente con occupation_mappings.position_text
+      const key = normalizePositionText(emp.position)
       const existing = positionMap.get(key)
       if (existing) {
         existing.count++
@@ -642,7 +644,7 @@ export class JobDescriptorService {
     })
 
     const descriptorMap = new Map(
-      descriptors.map(d => [d.jobTitle.toLowerCase().trim(), d])
+      descriptors.map(d => [normalizePositionText(d.jobTitle), d])
     )
 
     // 2b. Obtener mappings de OccupationMapping (clasificación masiva)
@@ -656,7 +658,7 @@ export class JobDescriptorService {
     })
 
     const mappingMap = new Map(
-      mappings.map(m => [m.positionText.toLowerCase().trim(), m])
+      mappings.map(m => [normalizePositionText(m.positionText), m])
     )
 
     // 3. Combinar
@@ -667,7 +669,7 @@ export class JobDescriptorService {
       const mapping = mappingMap.get(positionKey)
       // Buscar el título original (case preservado) del primer employee
       const originalTitle = employees.find(
-        e => e.position?.toLowerCase().trim() === positionKey
+        e => e.position && normalizePositionText(e.position) === positionKey
       )?.position ?? positionKey
 
       result.push({
