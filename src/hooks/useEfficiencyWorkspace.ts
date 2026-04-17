@@ -91,6 +91,35 @@ const LENTES_DISPONIBLES: LenteId[] = [
 ]
 
 // ════════════════════════════════════════════════════════════════════════════
+// PERSISTENCIA — sessionStorage (Sesión 4 agregará persistencia real en BD)
+// ════════════════════════════════════════════════════════════════════════════
+
+const CARRITO_STORAGE_KEY = 'efficiency_carrito_v1'
+
+/** Serializa el Map como array de tuplas para sessionStorage */
+function serializeCarrito(carrito: Map<string, DecisionItem>): string {
+  return JSON.stringify([...carrito.entries()])
+}
+
+/** Hidrata el Map desde sessionStorage (no-op en SSR) */
+function hydrateCarrito(): Map<string, DecisionItem> {
+  if (typeof window === 'undefined') return new Map()
+  try {
+    const raw = sessionStorage.getItem(CARRITO_STORAGE_KEY)
+    if (!raw) return new Map()
+    const entries = JSON.parse(raw) as Array<[string, DecisionItem]>
+    return new Map(entries)
+  } catch {
+    return new Map()
+  }
+}
+
+/** Lee el carrito desde sessionStorage (helper para consumo externo) */
+export function leerCarritoPersistido(): DecisionItem[] {
+  return [...hydrateCarrito().values()]
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // HOOK
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -150,8 +179,20 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
     new Set(['l1_inercia'])
   )
 
-  // ── State: carrito ─────────────────────────────────────────────
-  const [carrito, setCarrito] = useState<Map<string, DecisionItem>>(new Map())
+  // ── State: carrito (hidratado desde sessionStorage si existe) ──
+  const [carrito, setCarrito] = useState<Map<string, DecisionItem>>(() =>
+    hydrateCarrito()
+  )
+
+  // Persiste el carrito en sessionStorage en cada cambio
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      sessionStorage.setItem(CARRITO_STORAGE_KEY, serializeCarrito(carrito))
+    } catch {
+      // quota exceeded u otro — ignorar, no romper la sesión
+    }
+  }, [carrito])
 
   // ── Effect: fetch diagnostic al montar ─────────────────────────
   useEffect(() => {
