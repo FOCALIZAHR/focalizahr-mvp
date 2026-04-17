@@ -528,7 +528,7 @@ export class JobDescriptorService {
       data: {
         accountId,
         jobTitle: data.jobTitle,
-        departmentId: data.departmentId ?? '',
+        departmentId: data.departmentId || null,
         ...payload,
         status: 'DRAFT',
       },
@@ -563,13 +563,13 @@ export class JobDescriptorService {
     jobTitle: string,
     departmentId?: string
   ): Promise<any | null> {
-    return prisma.jobDescriptor.findUnique({
+    // findFirst (no findUnique con composite) porque la composite key con null
+    // en PostgreSQL requiere lookup explícito — findFirst lo maneja correctamente.
+    return prisma.jobDescriptor.findFirst({
       where: {
-        accountId_jobTitle_departmentId: {
-          accountId,
-          jobTitle,
-          departmentId: departmentId ?? '',
-        },
+        accountId,
+        jobTitle,
+        departmentId: departmentId || null,
       },
     })
   }
