@@ -192,13 +192,19 @@ export default function PlanDocumentoPage() {
   ])
 
   // ── Autosave server (debounce 1.5s) para planes existentes ────
+  // `isDirtyRef` bloquea el PUT hasta que el usuario edita explícitamente
+  // via handlers. Sin esta guarda, la hidratación inicial (que hace setStates
+  // después del GET) dispara un PUT que puede sobrescribir datos si hay alguna
+  // discrepancia transitoria entre el estado hidratado y el estado local.
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isDirtyRef = useRef(false)
   const [autosaveState, setAutosaveState] = useState<
     'idle' | 'saving' | 'saved' | 'error'
   >('idle')
 
   useEffect(() => {
     if (!hydrated || esPlanNuevo) return
+    if (!isDirtyRef.current) return // no PUT hasta que el usuario edite
     setAutosaveState('saving')
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
     autosaveTimer.current = setTimeout(async () => {
@@ -222,6 +228,7 @@ export default function PlanDocumentoPage() {
           }),
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        isDirtyRef.current = false
         setAutosaveState('saved')
         setTimeout(
           () => setAutosaveState(prev => (prev === 'saved' ? 'idle' : prev)),
@@ -245,35 +252,59 @@ export default function PlanDocumentoPage() {
     planNombre,
   ])
 
-  // ── Handlers ──────────────────────────────────────────────────
-  const handleNarrativaChange = useCallback((key: string, texto: string) => {
-    setNarrativasEditadas(prev => ({ ...prev, [key]: texto }))
+  // ── Handlers — marcan isDirtyRef para gatillar autosave ──────
+  const markDirty = useCallback(() => {
+    isDirtyRef.current = true
   }, [])
 
-  const handleNarrativaEjecutivaChange = useCallback((texto: string) => {
-    setNarrativaEjecutivaEditada(texto)
-  }, [])
+  const handleNarrativaChange = useCallback(
+    (key: string, texto: string) => {
+      setNarrativasEditadas(prev => ({ ...prev, [key]: texto }))
+      markDirty()
+    },
+    [markDirty]
+  )
 
-  const handleApprove = useCallback((key: string) => {
-    setDecisiones(prev =>
-      prev.map(d => (decisionKey(d) === key ? { ...d, aprobado: true } : d))
-    )
-  }, [])
+  const handleNarrativaEjecutivaChange = useCallback(
+    (texto: string) => {
+      setNarrativaEjecutivaEditada(texto)
+      markDirty()
+    },
+    [markDirty]
+  )
 
-  const handleRevoke = useCallback((key: string) => {
-    setDecisiones(prev =>
-      prev.map(d => (decisionKey(d) === key ? { ...d, aprobado: false } : d))
-    )
-  }, [])
+  const handleApprove = useCallback(
+    (key: string) => {
+      setDecisiones(prev =>
+        prev.map(d => (decisionKey(d) === key ? { ...d, aprobado: true } : d))
+      )
+      markDirty()
+    },
+    [markDirty]
+  )
 
-  const handleRemove = useCallback((key: string) => {
-    setDecisiones(prev => prev.filter(d => decisionKey(d) !== key))
-    setNarrativasEditadas(prev => {
-      const next = { ...prev }
-      delete next[key]
-      return next
-    })
-  }, [])
+  const handleRevoke = useCallback(
+    (key: string) => {
+      setDecisiones(prev =>
+        prev.map(d => (decisionKey(d) === key ? { ...d, aprobado: false } : d))
+      )
+      markDirty()
+    },
+    [markDirty]
+  )
+
+  const handleRemove = useCallback(
+    (key: string) => {
+      setDecisiones(prev => prev.filter(d => decisionKey(d) !== key))
+      setNarrativasEditadas(prev => {
+        const next = { ...prev }
+        delete next[key]
+        return next
+      })
+      markDirty()
+    },
+    [markDirty]
+  )
 
   const handleClearCarrito = useCallback(() => {
     if (
@@ -285,7 +316,24 @@ export default function PlanDocumentoPage() {
     setDecisiones([])
     setNarrativasEditadas({})
     setNarrativaEjecutivaEditada(null)
-  }, [])
+    markDirty()
+  }, [markDirty])
+
+  // Los wrappers para tesis / planNombre marcan dirty también
+  const handleTesisChange = useCallback(
+    (t: Tesis) => {
+      setTesis(t)
+      markDirty()
+    },
+    [markDirty]
+  )
+  const handlePlanNombreChange = useCallback(
+    (n: string) => {
+      setPlanNombre(n)
+      markDirty()
+    },
+    [markDirty]
+  )
 
   // ── Guardar borrador (POST para nuevos, PUT para existentes) ──
   const [guardando, setGuardando] = useState(false)
@@ -339,6 +387,7 @@ export default function PlanDocumentoPage() {
             resumenSnap,
           }),
         })
+        isDirtyRef.current = false
         setAutosaveState('saved')
         setTimeout(() => setAutosaveState('idle'), 1200)
       }
@@ -441,8 +490,8 @@ export default function PlanDocumentoPage() {
         onApprove={handleApprove}
         onRevoke={handleRevoke}
         onRemove={handleRemove}
-        onTesisChange={setTesis}
-        onPlanNombreChange={setPlanNombre}
+        onTesisChange={handleTesisChange}
+        onPlanNombreChange={handlePlanNombreChange}
         onGuardarBorrador={handleGuardarBorrador}
         onGenerarBusinessCase={handleGenerarBusinessCase}
       />
