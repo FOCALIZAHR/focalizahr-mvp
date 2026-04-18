@@ -306,18 +306,9 @@ export default function PlanDocumentoPage() {
     [markDirty]
   )
 
-  const handleClearCarrito = useCallback(() => {
-    if (
-      typeof window !== 'undefined' &&
-      !window.confirm('¿Vaciar todo el plan? Esta acción no se puede deshacer.')
-    ) {
-      return
-    }
-    setDecisiones([])
-    setNarrativasEditadas({})
-    setNarrativaEjecutivaEditada(null)
-    markDirty()
-  }, [markDirty])
+  // Nota: el CarritoBar en el plan view NO recibe onClear — vaciar el
+  // contenido equivale a destruir el plan. Para archivar el plan se usa
+  // DELETE /api/efficiency/plans/[planId] via botón dedicado.
 
   // Los wrappers para tesis / planNombre marcan dirty también
   const handleTesisChange = useCallback(
@@ -538,8 +529,9 @@ export default function PlanDocumentoPage() {
         </div>
       )}
 
-      {/* CarritoBar siempre visible — muestra totales del plan actual */}
-      <CarritoBar decisiones={decisiones} onClear={handleClearCarrito} />
+      {/* CarritoBar visible como resumen — SIN botón de vaciar (vaciar
+          aquí equivale a destruir el plan; usar Archivar en cambio). */}
+      <CarritoBar decisiones={decisiones} />
     </>
   )
 }

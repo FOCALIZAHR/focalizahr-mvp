@@ -21,6 +21,7 @@ import { EfficiencyRail } from './EfficiencyRail'
 import { PanelAcumuladores } from './panel-acumuladores/PanelAcumuladores'
 import { RiesgoAdopcionGuardarrail } from './guardarrail/RiesgoAdopcionGuardarrail'
 import { CarritoBar } from './carrito/CarritoBar'
+import { MisPlanesBtn } from './MisPlanesBtn'
 
 // Componentes específicos por lente — placeholder por ahora (cada uno se
 // reemplaza en tareas 8..13 con su implementación real).
@@ -113,35 +114,38 @@ export function EfficiencyHub() {
                 9 lentes · 3 familias · Un plan listo para el directorio.
               </p>
             </div>
-            <div className="hidden md:flex items-center gap-6 text-right text-xs">
-              <div>
-                <p className="text-[9px] uppercase tracking-widest text-slate-500">
-                  Personas analizadas
-                </p>
-                <p className="text-sm font-light text-white mt-0.5">
-                  {ws.data.meta.enrichedCount.toLocaleString('es-CL')} /{' '}
-                  {ws.data.meta.totalEmployees.toLocaleString('es-CL')}
-                </p>
-              </div>
-              <div>
-                <p className="text-[9px] uppercase tracking-widest text-slate-500">
-                  Exposición IA promedio
-                </p>
-                <p className="text-sm font-light text-cyan-300 mt-0.5">
-                  {Math.round(ws.data.meta.avgExposure * 100)}%
-                </p>
-              </div>
-              {ws.gerenciasExcluidas.size > 0 && (
+            <div className="flex items-center gap-4 md:gap-6 flex-wrap justify-end">
+              <div className="hidden md:flex items-center gap-6 text-right text-xs">
                 <div>
                   <p className="text-[9px] uppercase tracking-widest text-slate-500">
-                    Excluidas L3
+                    Personas analizadas
                   </p>
-                  <p className="text-sm font-light text-red-300 mt-0.5">
-                    {ws.gerenciasExcluidas.size} gerencia
-                    {ws.gerenciasExcluidas.size === 1 ? '' : 's'}
+                  <p className="text-sm font-light text-white mt-0.5">
+                    {ws.data.meta.enrichedCount.toLocaleString('es-CL')} /{' '}
+                    {ws.data.meta.totalEmployees.toLocaleString('es-CL')}
                   </p>
                 </div>
-              )}
+                <div>
+                  <p className="text-[9px] uppercase tracking-widest text-slate-500">
+                    Exposición IA promedio
+                  </p>
+                  <p className="text-sm font-light text-cyan-300 mt-0.5">
+                    {Math.round(ws.data.meta.avgExposure * 100)}%
+                  </p>
+                </div>
+                {ws.gerenciasExcluidas.size > 0 && (
+                  <div>
+                    <p className="text-[9px] uppercase tracking-widest text-slate-500">
+                      Excluidas L3
+                    </p>
+                    <p className="text-sm font-light text-red-300 mt-0.5">
+                      {ws.gerenciasExcluidas.size} gerencia
+                      {ws.gerenciasExcluidas.size === 1 ? '' : 's'}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <MisPlanesBtn />
             </div>
           </div>
         </header>

@@ -29,7 +29,12 @@ import { formatCLP } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
 
 interface CarritoBarProps {
   decisiones: DecisionItem[]
-  onClear: () => void
+  /**
+   * Callback para vaciar el carrito. Si se omite, el botón de vaciar
+   * NO se renderiza. Útil en vistas donde la acción "vaciar" no tiene
+   * semántica clara (ej. plan documento persistido).
+   */
+  onClear?: () => void
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -129,14 +134,16 @@ export function CarritoBar({ decisiones, onClear }: CarritoBarProps) {
 
             {/* Acciones */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={onClear}
-                className="inline-flex items-center gap-1.5 text-xs font-medium p-2 md:px-3 md:py-2 rounded-lg border border-slate-700 bg-slate-800/60 text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-colors"
-                aria-label="Vaciar carrito"
-                title="Vaciar plan"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
+              {onClear && (
+                <button
+                  onClick={onClear}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium p-2 md:px-3 md:py-2 rounded-lg border border-slate-700 bg-slate-800/60 text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-colors"
+                  aria-label="Vaciar carrito"
+                  title="Vaciar carrito del hub"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              )}
               <Link
                 href="/dashboard/efficiency/plan/nuevo"
                 className="inline-flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-lg border border-cyan-400/50 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-200 hover:text-white hover:border-cyan-300 hover:from-cyan-500/30 hover:to-purple-500/30 transition-all"
