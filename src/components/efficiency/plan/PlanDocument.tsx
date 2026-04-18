@@ -30,6 +30,9 @@ import {
   TrendingUp as TrendingUpIcon,
   Compass,
   Pencil,
+  Archive,
+  Undo2,
+  Check,
 } from 'lucide-react'
 import Link from 'next/link'
 import { MetricasResumen } from './MetricasResumen'
@@ -112,6 +115,15 @@ export interface PlanDocumentProps {
   onPlanNombreChange: (nombre: string) => void
   onGuardarBorrador: () => void
   onGenerarBusinessCase: () => void
+
+  /** Estado persistido del plan. Solo aplica a planes guardados (no 'nuevo') */
+  estado?: 'borrador' | 'aprobado' | 'archivado'
+  /** Archivar plan (soft delete). Si se omite, no se renderiza el botón. */
+  onArchivar?: () => void
+  /** Restaurar plan archivado a estado borrador. Solo si estado='archivado'. */
+  onRestaurar?: () => void
+  /** Aprobar todas las decisiones en borrador de una vez. */
+  onApproveAll?: () => void
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -133,6 +145,10 @@ export function PlanDocument({
   onPlanNombreChange,
   onGuardarBorrador,
   onGenerarBusinessCase,
+  estado = 'borrador',
+  onArchivar,
+  onRestaurar,
+  onApproveAll,
 }: PlanDocumentProps) {
   // Resumen métricas
   const resumen = useMemo(
@@ -242,18 +258,65 @@ export function PlanDocument({
     )
   }
 
+  // Decisiones pendientes por aprobar (para "Aprobar todas")
+  const pendientes = decisiones.filter(d => !d.aprobado).length
+
   // ── Plan ejecutivo ────────────────────────────────────────────
   return (
     <div className="fhr-bg-main min-h-screen pb-32">
-      <div className="max-w-4xl mx-auto px-4 md:px-8 py-6 md:py-10">
-        {/* Back link */}
-        <Link
-          href="/dashboard/efficiency"
-          className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-300 transition-colors mb-6 font-light"
+      {/* Banner archivado */}
+      {estado === 'archivado' && (
+        <div
+          className="border-b"
+          style={{
+            background: 'rgba(100, 116, 139, 0.12)',
+            borderColor: 'rgba(100, 116, 139, 0.3)',
+          }}
         >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Volver al Efficiency Hub
-        </Link>
+          <div className="max-w-4xl mx-auto px-4 md:px-8 py-3 flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <Archive className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <p className="text-xs text-slate-300 font-light">
+                <span className="font-medium">Este plan está archivado.</span>
+                <span className="text-slate-500 ml-1">
+                  Queda guardado pero no aparece en "Mis planes" activos.
+                </span>
+              </p>
+            </div>
+            {onRestaurar && (
+              <button
+                onClick={onRestaurar}
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-cyan-400/50 bg-cyan-500/10 text-cyan-200 hover:text-white hover:border-cyan-300 transition-colors"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+                Restaurar
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-4xl mx-auto px-4 md:px-8 py-6 md:py-10">
+        {/* Back link + Archivar */}
+        <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+          <Link
+            href="/dashboard/efficiency"
+            className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-300 transition-colors font-light"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Volver al Efficiency Hub
+          </Link>
+          {onArchivar && estado !== 'archivado' && (
+            <button
+              onClick={onArchivar}
+              className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-amber-300 transition-colors font-light"
+              title="Archivar plan (queda guardado pero no aparece en Mis planes)"
+            >
+              <Archive className="w-3.5 h-3.5" />
+              Archivar plan
+            </button>
+          )}
+        </div>
 
         {/* HEADER */}
         <header className="mb-10">
@@ -406,11 +469,36 @@ export function PlanDocument({
           </div>
         </section>
 
+        {/* Aprobar todas (bulk action) — solo visible si hay pendientes */}
+        {onApproveAll && pendientes > 0 && estado !== 'archivado' && (
+          <section className="mb-4 flex items-center justify-between gap-3 flex-wrap p-3 rounded-lg bg-slate-900/50 border border-slate-800/60">
+            <p className="text-xs text-slate-400 font-light">
+              <span className="text-amber-300 font-medium">
+                {pendientes}
+              </span>{' '}
+              {pendientes === 1 ? 'decisión pendiente' : 'decisiones pendientes'}{' '}
+              de aprobar.
+            </p>
+            <button
+              onClick={onApproveAll}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-4 py-2 rounded-md border border-emerald-400/50 bg-emerald-500/10 text-emerald-200 hover:text-white hover:border-emerald-300 transition-colors"
+            >
+              <Check className="w-3.5 h-3.5" />
+              Aprobar todas ({pendientes})
+            </button>
+          </section>
+        )}
+
         {/* CTAs */}
         <section className="flex items-center justify-between gap-4 flex-wrap pt-2">
           <button
             onClick={onGuardarBorrador}
-            className="inline-flex items-center gap-2 text-sm font-medium px-5 py-2.5 rounded-lg border border-slate-700 bg-slate-800/60 text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
+            disabled={estado === 'archivado'}
+            className={`inline-flex items-center gap-2 text-sm font-medium px-5 py-2.5 rounded-lg border transition-colors ${
+              estado === 'archivado'
+                ? 'border-slate-800 bg-slate-900/40 text-slate-600 cursor-not-allowed'
+                : 'border-slate-700 bg-slate-800/60 text-slate-300 hover:text-white hover:border-slate-600'
+            }`}
           >
             <Save className="w-4 h-4" />
             Guardar borrador
@@ -418,19 +506,21 @@ export function PlanDocument({
 
           <button
             onClick={onGenerarBusinessCase}
-            disabled={!todasAprobadas}
+            disabled={!todasAprobadas || estado === 'archivado'}
             className={`inline-flex items-center gap-2 text-sm font-medium px-6 py-3 rounded-lg border transition-all ${
-              todasAprobadas
+              todasAprobadas && estado !== 'archivado'
                 ? 'border-cyan-400/60 bg-gradient-to-r from-cyan-500/25 to-purple-500/25 text-white hover:border-cyan-300 hover:from-cyan-500/35 hover:to-purple-500/35'
                 : 'border-slate-700 bg-slate-800/40 text-slate-500 cursor-not-allowed'
             }`}
             style={
-              todasAprobadas
+              todasAprobadas && estado !== 'archivado'
                 ? { boxShadow: '0 0 18px rgba(34, 211, 238, 0.3)' }
                 : undefined
             }
             title={
-              todasAprobadas
+              estado === 'archivado'
+                ? 'Plan archivado — restaurar para generar Business Case'
+                : todasAprobadas
                 ? 'Todas las decisiones aprobadas — listo para el directorio'
                 : `Faltan ${totalDecisiones - aprobadas} de ${totalDecisiones} decisiones por aprobar`
             }
@@ -440,7 +530,7 @@ export function PlanDocument({
           </button>
         </section>
 
-        {!todasAprobadas && (
+        {!todasAprobadas && estado !== 'archivado' && (
           <p className="text-[11px] text-slate-500 font-light mt-3 text-right">
             El Business Case se habilita cuando todas las decisiones están
             aprobadas.

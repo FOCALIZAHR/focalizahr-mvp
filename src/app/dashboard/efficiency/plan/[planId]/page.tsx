@@ -111,6 +111,9 @@ export default function PlanDocumentoPage() {
   >(null)
   const [tesis, setTesis] = useState<Tesis>('eficiencia')
   const [planNombre, setPlanNombre] = useState('Plan sin nombre')
+  const [estado, setEstado] = useState<'borrador' | 'aprobado' | 'archivado'>(
+    'borrador'
+  )
 
   // ── Hidratación inicial ────────────────────────────────────────
   useEffect(() => {
@@ -156,6 +159,9 @@ export default function PlanDocumentoPage() {
         setNarrativaEjecutivaEditada(p.narrativaEjecEdit)
         setTesis((p.tesisElegida as Tesis) ?? 'eficiencia')
         setPlanNombre(p.nombre ?? 'Plan sin nombre')
+        setEstado(
+          (p.estado as 'borrador' | 'aprobado' | 'archivado') ?? 'borrador'
+        )
         setHydrated(true)
       } catch (e) {
         if (!cancelled) {
@@ -419,7 +425,7 @@ export default function PlanDocumentoPage() {
     markDirty,
   ])
 
-  // ── Generar Business Case (PDF download) ──────────────────────
+  // ── Generar Business Case (PDF download + marcar aprobado) ───
   const [exportando, setExportando] = useState(false)
   const handleGenerarBusinessCase = useCallback(async () => {
     if (esPlanNuevo) {
@@ -454,6 +460,22 @@ export default function PlanDocumentoPage() {
       a.click()
       a.remove()
       URL.revokeObjectURL(url)
+
+      // Al generar Business Case exitosamente → marcar como 'aprobado'
+      // (solo si estaba en borrador — no degradar desde aprobado ni cambiar archivado)
+      if (estado === 'borrador') {
+        try {
+          await fetch(`/api/efficiency/plans/${planId}`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: 'aprobado' }),
+          })
+          setEstado('aprobado')
+        } catch {
+          // No bloqueante — el PDF ya se descargó
+        }
+      }
     } catch (e) {
       if (typeof window !== 'undefined') {
         window.alert(e instanceof Error ? e.message : 'Error al generar PDF')
@@ -461,7 +483,79 @@ export default function PlanDocumentoPage() {
     } finally {
       setExportando(false)
     }
-  }, [esPlanNuevo, planId, planNombre])
+  }, [esPlanNuevo, planId, planNombre, estado])
+
+  // ── Archivar plan ──────────────────────────────────────────────
+  const handleArchivar = useCallback(async () => {
+    if (esPlanNuevo) return
+    if (
+      typeof window !== 'undefined' &&
+      !window.confirm(
+        '¿Archivar este plan?\n\nEl plan queda guardado pero ya no aparece en "Mis planes" activos. Siempre podés restaurarlo después.'
+      )
+    ) {
+      return
+    }
+    try {
+      const res = await fetch(`/api/efficiency/plans/${planId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? `HTTP ${res.status}`)
+      }
+      setEstado('archivado')
+    } catch (e) {
+      if (typeof window !== 'undefined') {
+        window.alert(
+          e instanceof Error ? e.message : 'Error al archivar el plan'
+        )
+      }
+    }
+  }, [esPlanNuevo, planId])
+
+  // ── Restaurar plan archivado ──────────────────────────────────
+  const handleRestaurar = useCallback(async () => {
+    if (esPlanNuevo) return
+    try {
+      const res = await fetch(`/api/efficiency/plans/${planId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'borrador' }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? `HTTP ${res.status}`)
+      }
+      setEstado('borrador')
+    } catch (e) {
+      if (typeof window !== 'undefined') {
+        window.alert(
+          e instanceof Error ? e.message : 'Error al restaurar el plan'
+        )
+      }
+    }
+  }, [esPlanNuevo, planId])
+
+  // ── Aprobar todas las decisiones en borrador ──────────────────
+  const handleApproveAll = useCallback(() => {
+    const pendientes = decisiones.filter(d => !d.aprobado).length
+    if (pendientes === 0) return
+    if (
+      typeof window !== 'undefined' &&
+      !window.confirm(
+        `¿Aprobar ${pendientes} ${
+          pendientes === 1 ? 'decisión pendiente' : 'decisiones pendientes'
+        }? Esto habilita inmediatamente la generación del Business Case.`
+      )
+    ) {
+      return
+    }
+    setDecisiones(prev => prev.map(d => ({ ...d, aprobado: true })))
+    markDirty()
+  }, [decisiones, markDirty])
 
   // ── Render ────────────────────────────────────────────────────
   if (!hydrated) {
@@ -493,6 +587,7 @@ export default function PlanDocumentoPage() {
         narrativaEjecutivaEditada={narrativaEjecutivaEditada}
         tesis={tesis}
         planNombre={planNombre}
+        estado={estado}
         onNarrativaChange={handleNarrativaChange}
         onNarrativaEjecutivaChange={handleNarrativaEjecutivaChange}
         onApprove={handleApprove}
@@ -502,6 +597,9 @@ export default function PlanDocumentoPage() {
         onPlanNombreChange={handlePlanNombreChange}
         onGuardarBorrador={handleGuardarBorrador}
         onGenerarBusinessCase={handleGenerarBusinessCase}
+        onArchivar={!esPlanNuevo ? handleArchivar : undefined}
+        onRestaurar={!esPlanNuevo ? handleRestaurar : undefined}
+        onApproveAll={handleApproveAll}
       />
 
       {/* Indicador autosave flotante (solo planes existentes) */}
