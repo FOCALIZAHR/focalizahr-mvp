@@ -16,6 +16,7 @@
 'use client'
 
 import { Loader2 } from 'lucide-react'
+import Link from 'next/link'
 import { useEfficiencyWorkspace } from '@/hooks/useEfficiencyWorkspace'
 import { EfficiencyRail } from './EfficiencyRail'
 import { PanelAcumuladores } from './panel-acumuladores/PanelAcumuladores'
@@ -106,13 +107,31 @@ export function EfficiencyHub() {
         <header className="flex-shrink-0 max-w-7xl mx-auto w-full px-4 pt-5 pb-3 md:px-8 md:pt-6 md:pb-4">
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div>
-              <h1 className="text-xl md:text-2xl font-extralight text-white leading-tight">
+              {/* Breadcrumb — contexto de navegación */}
+              <nav
+                aria-label="Ruta"
+                className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] font-medium mb-2"
+              >
+                <Link
+                  href="/dashboard"
+                  className="text-slate-500 hover:text-cyan-300 transition-colors"
+                >
+                  Dashboard
+                </Link>
+                <span className="text-slate-700">·</span>
+                <Link
+                  href="/dashboard/workforce"
+                  className="text-slate-500 hover:text-cyan-300 transition-colors"
+                >
+                  Workforce
+                </Link>
+                <span className="text-slate-700">·</span>
+                <span className="text-cyan-400">Eficiencia</span>
+              </nav>
+              <h1 className="text-xl md:text-2xl font-light text-white leading-tight">
                 Efficiency{' '}
-                <span className="fhr-title-gradient">Intelligence Hub</span>
+                <span className="fhr-title-gradient">Intelligence</span> Hub
               </h1>
-              <p className="text-xs text-slate-400 font-light mt-0.5">
-                9 lentes · 3 familias · Un plan listo para el directorio.
-              </p>
             </div>
             <div className="flex items-center gap-4 md:gap-6 flex-wrap justify-end">
               <div className="hidden md:flex items-center gap-6 text-right text-xs">
