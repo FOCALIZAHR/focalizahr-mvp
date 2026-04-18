@@ -231,6 +231,11 @@ model Account {
   budgetScenarios          BudgetScenario[]
 
   // ═══════════════════════════════════════════════════
+  // EFFICIENCY INTELLIGENCE HUB
+  // ═══════════════════════════════════════════════════
+  efficiencyPlans          EfficiencyPlan[]
+
+  // ═══════════════════════════════════════════════════
   // CONFIGURACIÓN SALARIAL (SalaryConfig v1.2)
   // ═══════════════════════════════════════════════════
   averageMonthlySalary    Int?    @map("average_monthly_salary")
@@ -3418,4 +3423,43 @@ model BudgetScenario {
 
   @@index([accountId, year], map: "idx_budget_scenario_account_year")
   @@map("budget_scenarios")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// EFFICIENCY PLAN — Plan de Eficiencia Organizacional (Efficiency Hub)
+// Plan persistente con decisiones del CEO, narrativas editables, snapshot de
+// métricas y tesis (Eficiencia / Crecimiento / Evolución). Base del Business
+// Case exportable a PDF para el directorio.
+// ════════════════════════════════════════════════════════════════════════════
+model EfficiencyPlan {
+  id             String   @id @default(cuid())
+  accountId      String   @map("account_id")
+  createdBy      String   @map("created_by")       // email del user que lo creó
+  nombre         String   @default("Plan sin nombre")
+  estado         String   @default("borrador")      // borrador | aprobado | archivado
+  tesisElegida   String   @default("eficiencia") @map("tesis_elegida")
+
+  // Array de IDs de lentes activos (ej. ['l1_inercia', 'l4_fantasma'])
+  lentesActivos  String[] @map("lentes_activos")
+
+  // DecisionItem[] — shape definido en EfficiencyCalculator
+  decisiones     Json     @db.JsonB
+
+  // { [decisionKey]: narrativaEditada }
+  narrativasEdit Json     @default("{}") @map("narrativas_edit") @db.JsonB
+
+  // Narrativa ejecutiva global editada por el CEO (null = usar auto-generada)
+  narrativaEjecEdit String? @map("narrativa_ejec_edit") @db.Text
+
+  // Snapshot de métricas al momento del último guardado (ResumenCarrito)
+  resumenSnap    Json     @default("{}") @map("resumen_snap") @db.JsonB
+
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  account        Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, estado], map: "idx_efficiency_plan_account_estado")
+  @@index([accountId, updatedAt], map: "idx_efficiency_plan_account_updated")
+  @@map("efficiency_plans")
 }
