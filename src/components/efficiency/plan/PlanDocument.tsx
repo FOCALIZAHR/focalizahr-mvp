@@ -29,6 +29,7 @@ import {
   Target,
   TrendingUp as TrendingUpIcon,
   Compass,
+  Pencil,
 } from 'lucide-react'
 import Link from 'next/link'
 import { MetricasResumen } from './MetricasResumen'
@@ -259,13 +260,23 @@ export function PlanDocument({
           <p className="text-[10px] uppercase tracking-[0.22em] text-cyan-400 font-medium">
             Plan de Eficiencia Organizacional
           </p>
-          <input
-            value={planNombre}
-            onChange={e => onPlanNombreChange(e.target.value)}
-            placeholder="Nombre del plan — ej. Q2 Automatización & Talento"
-            className="mt-2 w-full bg-transparent text-2xl md:text-3xl font-extralight text-white leading-tight border-0 focus:outline-none placeholder:text-slate-600 pb-1 border-b border-transparent focus:border-cyan-500/30 transition-colors"
-            style={{ letterSpacing: '-0.01em' }}
-          />
+          <div className="mt-2 relative group">
+            <input
+              value={planNombre === 'Plan sin nombre' ? '' : planNombre}
+              onChange={e => onPlanNombreChange(e.target.value || 'Plan sin nombre')}
+              placeholder="Ponle un nombre a este plan — ej. Q2 Automatización & Talento"
+              className="w-full bg-transparent text-2xl md:text-3xl font-extralight text-white leading-tight border-0 focus:outline-none placeholder:text-slate-500/70 pb-1 border-b border-dashed border-slate-700/60 hover:border-cyan-500/40 focus:border-cyan-500 transition-colors pr-9"
+              style={{ letterSpacing: '-0.01em' }}
+              aria-label="Nombre del plan"
+            />
+            <Pencil
+              className="absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-hover:text-cyan-400 group-focus-within:text-cyan-400 pointer-events-none transition-colors"
+              aria-hidden
+            />
+          </div>
+          <p className="text-[10px] text-slate-500 font-light mt-1">
+            Click para editar · el nombre aparece en el Business Case del directorio.
+          </p>
           <div className="flex items-center gap-4 mt-3 text-xs text-slate-500 font-light flex-wrap">
             <span>
               <span className="text-slate-300 font-medium">{totalDecisiones}</span>{' '}

@@ -329,6 +329,22 @@ export default function PlanDocumentoPage() {
   // ── Guardar borrador (POST para nuevos, PUT para existentes) ──
   const [guardando, setGuardando] = useState(false)
   const handleGuardarBorrador = useCallback(async () => {
+    // Si el plan nuevo sigue con el nombre default, pedirlo explícitamente
+    // (evita que el dashboard "Mis planes" quede lleno de "Plan sin nombre")
+    let nombreFinal = planNombre
+    if (esPlanNuevo && (planNombre === 'Plan sin nombre' || !planNombre.trim())) {
+      if (typeof window !== 'undefined') {
+        const nuevo = window.prompt(
+          'Ponle un nombre a este plan (para reconocerlo en "Mis planes"):',
+          ''
+        )
+        if (nuevo === null) return // user canceló
+        nombreFinal = nuevo.trim() || 'Plan sin nombre'
+        setPlanNombre(nombreFinal)
+        markDirty()
+      }
+    }
+
     setGuardando(true)
     try {
       const lentesActivos = Array.from(
@@ -343,7 +359,7 @@ export default function PlanDocumentoPage() {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            nombre: planNombre,
+            nombre: nombreFinal,
             tesisElegida: tesis,
             lentesActivos,
             decisiones,
@@ -400,6 +416,7 @@ export default function PlanDocumentoPage() {
     narrativasEditadas,
     narrativaEjecutivaEditada,
     router,
+    markDirty,
   ])
 
   // ── Generar Business Case (PDF download) ──────────────────────
