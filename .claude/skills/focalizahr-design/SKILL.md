@@ -16,6 +16,22 @@ description: |
 
 ---
 
+## 🧭 REFERENCIA VISUAL CANÓNICA OBLIGATORIA
+
+**`src/app/dashboard/executive-hub/components/GoalsCorrelation/cascada/CompensationPortada.tsx`** es el **patrón maestro**.
+
+Antes de crear cualquier componente nuevo, leer ese archivo y replicar:
+
+- **Tesla line superior** — `absolute top-0 h-[2px]` con gradient `transparent → #22D3EE → #A78BFA → transparent` y `opacity: 0.7`
+- **Word-split de títulos** — primera palabra en `text-white font-extralight`, segunda en `fhr-title-gradient`
+- **Container glassmorphism** — `rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm overflow-hidden`
+- **PremiumButton para CTAs** — `<PrimaryButton>` / `<SecondaryButton>` de `@/components/ui/PremiumButton`. Nunca botones custom con `style={{borderColor, background}}` inline
+- **Número hero** — `text-[72px] font-extralight tabular-nums text-white leading-[0.9]` (centrado cuando aplica)
+
+> Si el diagnóstico de un componente nuevo dice "no se parece a FocalizaHR", la causa casi siempre es omitir uno de estos 5 elementos.
+
+---
+
 ## 🎯 CUÁNDO USAR ESTA SKILL
 
 ```yaml

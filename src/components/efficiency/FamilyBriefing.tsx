@@ -3,20 +3,22 @@
 // src/components/efficiency/FamilyBriefing.tsx
 // ════════════════════════════════════════════════════════════════════════════
 // Aparece entre el Shock Global (Nivel 1) y los lentes específicos (Nivel 3).
-// El CEO lee de arriba a abajo como un briefing ejecutivo: eyebrow, narrativa,
-// bloques de lentes de la familia, y a la derecha el "potencial de recuperación"
-// en estado quiet.
+// El CEO lee de arriba a abajo como un briefing ejecutivo.
 //
-// FILOSOFÍA:
-//  · Sin cajas pesadas. Sin semáforos. Sin emojis.
-//  · Espaciado generoso entre bloques.
-//  · Un bloque por lente de la familia: 4 líneas + CTA.
-//  · Lentes sin datos → opacity-40, label "Sin señales detectadas", sin CTA.
+// PATRÓN MAESTRO: src/app/dashboard/executive-hub/components/GoalsCorrelation/
+//   cascada/CompensationPortada.tsx
+//   · Container glassmorphism (rounded-2xl border-slate-800/40 bg-slate-900/60 backdrop-blur-sm)
+//   · Tesla line superior (gradient cyan→purple)
+//   · Word-split de títulos (white + fhr-title-gradient)
+//   · Número hero text-[72px] font-extralight
+//   · PremiumButton (Secondary) para CTAs
 // ════════════════════════════════════════════════════════════════════════════
 
 'use client'
 
+import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
+import { SecondaryButton } from '@/components/ui/PremiumButton'
 import type { LenteAPI } from '@/hooks/useEfficiencyWorkspace'
 import {
   formatCLP,
@@ -31,21 +33,25 @@ import {
 // ════════════════════════════════════════════════════════════════════════════
 
 interface FamiliaMeta {
+  /** Status eyebrow alineado con el rail (DIAGNÓSTICO / OPORTUNIDAD / PROTECCIÓN) */
   eyebrow: string
-  subtitulo: string
+  /** Primera palabra del título — white font-extralight */
+  titleFirst: string
+  /** Segunda palabra — con fhr-title-gradient */
+  titleGradient: string
+  /** Color accent de familia (solo eyebrow, Tesla line, accents internos) */
   accent: string
-  /** Lentes que pertenecen a esta familia, en orden canónico */
   lentes: LenteId[]
-  /** Label del "potencial de recuperación" (p.ej. "/mes" vs "en 12 meses") */
+  /** Label del potencial de recuperación (/mes vs en 12 meses) */
   potencialLabel: string
-  /** Extractor del potencial desde el diccionario de lentes */
   getPotencial: (lentes: Record<LenteId, LenteAPI>) => number
 }
 
 const FAMILIA_META: Record<FamiliaId, FamiliaMeta> = {
   choque_tecnologico: {
-    eyebrow: 'CHOQUE TECNOLÓGICO',
-    subtitulo: 'Inercia frente a las capacidades de IA disponibles',
+    eyebrow: 'DIAGNÓSTICO',
+    titleFirst: 'Choque',
+    titleGradient: 'tecnológico',
     accent: '#22D3EE',
     lentes: ['l1_inercia', 'l2_zombie'],
     potencialLabel: '/mes',
@@ -55,8 +61,9 @@ const FAMILIA_META: Record<FamiliaId, FamiliaMeta> = {
     },
   },
   grasa_organizacional: {
-    eyebrow: 'GRASA ORGANIZACIONAL',
-    subtitulo: 'Costo estructural sin rendimiento equivalente',
+    eyebrow: 'OPORTUNIDAD',
+    titleFirst: 'Grasa',
+    titleGradient: 'organizacional',
     accent: '#A78BFA',
     lentes: ['l4_fantasma', 'l5_brecha'],
     potencialLabel: '/mes',
@@ -66,10 +73,10 @@ const FAMILIA_META: Record<FamiliaId, FamiliaMeta> = {
     },
   },
   riesgo_financiero: {
-    eyebrow: 'RIESGO FINANCIERO',
-    subtitulo: 'Pasivos latentes y talento en ventana de decisión',
+    eyebrow: 'PROTECCIÓN',
+    titleFirst: 'Riesgo',
+    titleGradient: 'financiero',
     accent: '#F59E0B',
-    // l7_fuga representa también a l8_retencion (fusionados en el rail)
     lentes: ['l7_fuga', 'l9_pasivo'],
     potencialLabel: 'en 12 meses',
     getPotencial: lentes => {
@@ -88,7 +95,6 @@ const FAMILIA_META: Record<FamiliaId, FamiliaMeta> = {
 interface LenteCopy {
   titulo: string
   queHay: string
-  /** Fn que arma el texto "Qué encontramos" usando datos y detalle del lente */
   queEncontramos: (lente: LenteAPI) => string
   queDecides: string
   cta: string
@@ -97,12 +103,10 @@ interface LenteCopy {
 const LENTE_COPY: Record<LenteId, LenteCopy> = {
   l1_inercia: {
     titulo: 'L1 · COSTO DE INERCIA',
-    queHay:
-      'Análisis de cargos saturados por tareas automatizables.',
+    queHay: 'Análisis de cargos saturados por tareas automatizables.',
     queEncontramos: lente => {
       const d = lente.detalle as { totalMonthly?: number } | null
-      const mes = d?.totalMonthly ?? 0
-      return `${formatCLP(mes)}/mes en inversión atrapada.`
+      return `${formatCLP(d?.totalMonthly ?? 0)}/mes en inversión atrapada.`
     },
     queDecides: 'Aislar la ineficiencia y liberar presupuesto.',
     cta: 'Iniciar análisis',
@@ -113,8 +117,7 @@ const LENTE_COPY: Record<LenteId, LenteCopy> = {
       'Perfiles que rinden hoy pero con baja capacidad de adaptación frente al cambio tecnológico.',
     queEncontramos: lente => {
       const d = lente.detalle as { count?: number } | null
-      const n = d?.count ?? 0
-      return `${formatInt(n)} personas en zona crítica.`
+      return `${formatInt(d?.count ?? 0)} personas en zona crítica.`
     },
     queDecides:
       'Proteger, reubicar o reconvertir antes de que el mercado lo defina.',
@@ -130,8 +133,7 @@ const LENTE_COPY: Record<LenteId, LenteCopy> = {
   },
   l4_fantasma: {
     titulo: 'L4 · CARGOS FANTASMA',
-    queHay:
-      'Pares de cargos con títulos distintos y trabajo compartido.',
+    queHay: 'Pares de cargos con títulos distintos y trabajo compartido.',
     queEncontramos: lente => {
       const d = lente.detalle as
         | { pairs?: unknown[]; avgOverlap?: number }
@@ -149,16 +151,14 @@ const LENTE_COPY: Record<LenteId, LenteCopy> = {
       'Brecha entre el salario pagado y el rendimiento observado por persona.',
     queEncontramos: lente => {
       const d = lente.detalle as { total?: number } | null
-      const total = d?.total ?? 0
-      return `${formatCLP(total)}/mes en salario pagado sin rendimiento equivalente.`
+      return `${formatCLP(d?.total ?? 0)}/mes en salario pagado sin rendimiento equivalente.`
     },
     queDecides: 'Nivelar el costo al rendimiento o decidir reestructura.',
     cta: 'Radiografía por persona',
   },
   l6_seniority: {
     titulo: 'L6 · COMPRESIÓN DE SENIORITY',
-    queHay:
-      'Familias de cargo donde un Junior con IA iguala al Senior actual.',
+    queHay: 'Familias de cargo donde un Junior con IA iguala al Senior actual.',
     queEncontramos: () => 'Módulo en construcción.',
     queDecides: 'Reperfilar la línea de nómina senior.',
     cta: 'Próximamente',
@@ -169,8 +169,7 @@ const LENTE_COPY: Record<LenteId, LenteCopy> = {
       'Mapa de talento aumentado con IA frente a zona de riesgo financiero.',
     queEncontramos: lente => {
       const d = lente.detalle as { count?: number } | null
-      const n = d?.count ?? 0
-      return `${formatInt(n)} personas analizadas entre zona de protección y decisión.`
+      return `${formatInt(d?.count ?? 0)} personas analizadas entre zona de protección y decisión.`
     },
     queDecides:
       'Priorizar inversión en quienes multiplicarán el output con IA.',
@@ -188,8 +187,7 @@ const LENTE_COPY: Record<LenteId, LenteCopy> = {
     queHay: 'Simulación del pasivo laboral en 12 meses según antigüedad.',
     queEncontramos: lente => {
       const d = lente.detalle as { costoEsperaTotal?: number } | null
-      const costo = d?.costoEsperaTotal ?? 0
-      return `${formatCLP(costo)} adicional si postergás 12 meses.`
+      return `${formatCLP(d?.costoEsperaTotal ?? 0)} adicional si postergás 12 meses.`
     },
     queDecides:
       'Postergar con costo medido o actuar antes del aniversario financiero.',
@@ -226,91 +224,146 @@ export function FamilyBriefing({
   const focosCount = lentesDeLaFamilia.filter(x => x.data.hayData).length
   const potencial = meta.getPotencial(lentes)
 
+  // Fix 5 — CSS var local para eliminar repetición de style={{color: accent}}
+  const rootStyle = {
+    ['--familia-accent' as string]: meta.accent,
+  } as React.CSSProperties
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-10 md:gap-14">
-      {/* ── CENTRO 70% ───────────────────────────────────────────────── */}
-      <div className="min-w-0 space-y-10">
-        {/* Eyebrow con color de familia */}
+    <div
+      className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-8 md:gap-10"
+      style={rootStyle}
+    >
+      {/* ══════════════════════════════════════════════════════════════════
+          CENTRO — Portada glassmorphism con Tesla line (Fix 1)
+          ══════════════════════════════════════════════════════════════════ */}
+      <section className="relative rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
+        {/* Tesla line — patrón canónico CompensationPortada:38-44 */}
         <div
-          className="text-xs tracking-[0.3em] font-light"
-          style={{ color: meta.accent }}
-        >
-          {meta.eyebrow}
+          className="absolute top-0 left-0 right-0 h-[2px] z-10"
+          style={{
+            background:
+              'linear-gradient(90deg, transparent 5%, #22D3EE 35%, #A78BFA 65%, transparent 95%)',
+            opacity: 0.7,
+          }}
+          aria-hidden
+        />
+
+        <div className="px-6 py-10 md:px-10 md:py-14">
+          {/* ─── Header: eyebrow + word-split title (Fix 2) ─── */}
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="mb-8"
+          >
+            <div className="text-[10px] tracking-[0.3em] font-light mb-3 text-[color:var(--familia-accent)]">
+              {meta.eyebrow}
+            </div>
+            <h2 className="text-3xl md:text-4xl font-extralight text-white tracking-tight leading-tight">
+              {meta.titleFirst}
+            </h2>
+            <p className="text-2xl md:text-3xl font-light tracking-tight leading-tight fhr-title-gradient mt-1">
+              {meta.titleGradient}
+            </p>
+          </motion.div>
+
+          {/* ─── Narrativa de briefing ─── */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.15 }}
+            className="text-base md:text-lg font-light text-slate-300 leading-relaxed max-w-2xl mb-10"
+          >
+            El motor ha procesado la inercia del modelo operativo frente a las
+            capacidades de IA disponibles. Se detectaron{' '}
+            <span className="text-white font-normal">
+              {focosCount === 1 ? '1 foco' : `${focosCount} focos`}
+            </span>{' '}
+            que requieren intervención.
+          </motion.p>
+
+          {/* ─── Bloques de lentes ─── */}
+          <div className="space-y-10">
+            {lentesDeLaFamilia.map(({ id, data }, i) => (
+              <motion.div
+                key={id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.25 + i * 0.08 }}
+              >
+                <LenteBlock
+                  id={id}
+                  lente={data}
+                  onSelect={onSelectLente}
+                  dividerTop={i > 0}
+                />
+              </motion.div>
+            ))}
+          </div>
         </div>
+      </section>
 
-        {/* Narrativa de briefing */}
-        <p className="text-base md:text-lg font-light text-slate-300 leading-relaxed max-w-2xl">
-          El motor ha procesado la inercia del modelo operativo frente a las
-          capacidades de IA disponibles. Se detectaron{' '}
-          <span className="text-white font-normal">
-            {focosCount === 1
-              ? '1 foco'
-              : `${focosCount} focos`}
-          </span>{' '}
-          que requieren intervención.
-        </p>
-
-        {/* Bloques de lentes */}
-        <div className="space-y-10 pt-2">
-          {lentesDeLaFamilia.map(({ id, data }) => (
-            <LenteBlock
-              key={id}
-              id={id}
-              lente={data}
-              accent={meta.accent}
-              onSelect={onSelectLente}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* ── DERECHA 30% — Potencial quiet ─────────────────────────────── */}
-      <aside className="hidden md:flex flex-col border-l border-slate-800/40 pl-8 pt-1">
-        <div className="text-[10px] tracking-[0.28em] font-light text-slate-500 mb-6">
+      {/* ══════════════════════════════════════════════════════════════════
+          ASIDE — Potencial de recuperación (Fix 4: hero 72px)
+          ══════════════════════════════════════════════════════════════════ */}
+      <aside className="hidden md:flex flex-col pt-10 pl-2">
+        <div className="text-[10px] tracking-[0.28em] font-light text-slate-500 mb-5">
           POTENCIAL DE RECUPERACIÓN
         </div>
-        <div
-          className="text-3xl md:text-4xl font-extralight tabular-nums leading-none"
-          style={{ color: '#E2E8F0' }}
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.35 }}
+          className="text-[56px] xl:text-[72px] font-extralight text-white leading-[0.9] tabular-nums"
         >
           {formatCLP(potencial)}
-        </div>
-        <div className="text-xs font-light text-slate-500 mt-3">
+        </motion.p>
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.55 }}
+          className="text-xs font-light text-slate-500 mt-3"
+        >
           {meta.potencialLabel}
-        </div>
+        </motion.p>
       </aside>
     </div>
   )
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// BLOQUE DE LENTE
+// BLOQUE DE LENTE — dentro de la portada, separador sutil entre bloques
 // ════════════════════════════════════════════════════════════════════════════
 
 interface LenteBlockProps {
   id: LenteId
   lente: LenteAPI
-  accent: string
   onSelect: (id: LenteId) => void
+  dividerTop: boolean
 }
 
-function LenteBlock({ id, lente, accent, onSelect }: LenteBlockProps) {
+function LenteBlock({ id, lente, onSelect, dividerTop }: LenteBlockProps) {
   const copy = LENTE_COPY[id]
   if (!copy) return null
-
   const hayData = lente.hayData
 
   return (
-    <div className={hayData ? '' : 'opacity-40'}>
-      {/* Título del lente */}
+    <div
+      className={`${hayData ? '' : 'opacity-40'} ${
+        dividerTop ? 'pt-10 border-t border-slate-800/40' : ''
+      }`}
+    >
+      {/* Título del lente con accent via CSS var */}
       <div
-        className="text-[11px] uppercase tracking-[0.22em] font-medium mb-4"
-        style={{ color: hayData ? accent : '#64748B' }}
+        className={`text-[11px] uppercase tracking-[0.22em] font-medium mb-4 ${
+          hayData ? 'text-[color:var(--familia-accent)]' : 'text-slate-500'
+        }`}
       >
         {copy.titulo}
       </div>
 
-      {/* 3 líneas semánticas — label tenue + texto blanco */}
+      {/* 3 filas semánticas */}
       <dl className="space-y-3 text-sm font-light">
         <Row label="Qué hay" value={copy.queHay} />
         {hayData ? (
@@ -328,27 +381,25 @@ function LenteBlock({ id, lente, accent, onSelect }: LenteBlockProps) {
         <Row label="Qué decides" value={copy.queDecides} />
       </dl>
 
-      {/* CTA — sólo si hay data */}
+      {/* CTA — Fix 3: SecondaryButton de PremiumButton */}
       {hayData && copy.cta && (
-        <button
-          onClick={() => onSelect(id)}
-          className="mt-6 inline-flex items-center gap-2 text-sm font-light px-4 py-2 rounded-md border transition-all group"
-          style={{
-            borderColor: `${accent}40`,
-            color: accent,
-            background: `linear-gradient(135deg, ${accent}08, ${accent}14)`,
-          }}
-        >
-          <span>{copy.cta}</span>
-          <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-        </button>
+        <div className="mt-6">
+          <SecondaryButton
+            icon={ArrowRight}
+            iconPosition="right"
+            size="sm"
+            onClick={() => onSelect(id)}
+          >
+            {copy.cta}
+          </SecondaryButton>
+        </div>
       )}
     </div>
   )
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// ROW auxiliar — label izquierda tenue, valor derecha
+// ROW — label izquierda tenue, valor derecha
 // ════════════════════════════════════════════════════════════════════════════
 
 function Row({
@@ -367,9 +418,7 @@ function Row({
       </dt>
       <dd
         className={
-          highlight
-            ? 'text-white font-normal'
-            : 'text-slate-300'
+          highlight ? 'text-white font-normal' : 'text-slate-300'
         }
       >
         {value}
