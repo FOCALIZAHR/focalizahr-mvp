@@ -57,9 +57,6 @@ export default function ModuleToolbar({ tools, ctaLabel, onCTA }: ModuleToolbarP
 
   const activeTool = tools.find(t => t.id === activeId) ?? null
   const hoveredTool = tools.find(t => t.id === hoveredId)
-  const barMax = activeTool
-    ? Math.max(...activeTool.breakdown.map(b => b.value), 1)
-    : 1
 
   return (
     <div className="fixed right-4 top-1/2 -translate-y-1/2 z-[55] flex flex-row-reverse items-center">
@@ -225,39 +222,28 @@ export default function ModuleToolbar({ tools, ctaLabel, onCTA }: ModuleToolbarP
                 </div>
               </div>
 
-              {/* Bars */}
+              {/* Breakdown — label izquierda + valor derecha (sin barra).
+                  El valor se colorea con el accent del tool activo; preserva
+                  la jerarquía tipográfica del diseño previo. */}
               <div className="flex flex-col gap-[5px]">
                 {[...activeTool.breakdown]
                   .sort((a, b) => b.value - a.value)
-                  .map(item => {
-                    const pct = Math.min((item.value / barMax) * 100, 100)
-                    return (
-                      <div key={item.label} className="flex items-center gap-2">
-                        <span className="w-[70px] text-[10px] font-light text-slate-500/45 text-right flex-shrink-0 truncate">
-                          {item.label}
-                        </span>
-                        <div className="flex-1 h-[5px] rounded-[3px] bg-slate-700/[0.12] overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${pct}%` }}
-                            transition={{ duration: 0.4, ease: 'easeOut' }}
-                            className="h-full rounded-[3px]"
-                            style={{
-                              background: activeTool.color,
-                              opacity: 0.6,
-                              boxShadow: `0 0 6px ${activeTool.color}25`,
-                            }}
-                          />
-                        </div>
-                        <span
-                          className="w-10 text-[10px] font-light tabular-nums text-right flex-shrink-0"
-                          style={{ color: activeTool.color, opacity: 0.7 }}
-                        >
-                          {item.formatted}
-                        </span>
-                      </div>
-                    )
-                  })}
+                  .map(item => (
+                    <div
+                      key={item.label}
+                      className="flex items-baseline justify-between gap-3"
+                    >
+                      <span className="text-[10px] font-light text-slate-500/45 truncate">
+                        {item.label}
+                      </span>
+                      <span
+                        className="text-[11px] font-light tabular-nums text-right flex-shrink-0"
+                        style={{ color: activeTool.color }}
+                      >
+                        {item.formatted}
+                      </span>
+                    </div>
+                  ))}
               </div>
 
               {/* Narrative */}
