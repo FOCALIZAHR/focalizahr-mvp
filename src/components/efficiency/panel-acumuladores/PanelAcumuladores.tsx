@@ -53,10 +53,26 @@ export function PanelAcumuladores({
   const resumenLente = calcularResumenCarrito(decisionesDelLenteActivo)
   const hayDelLente = decisionesDelLenteActivo.length > 0
 
+  const sinNadaEnPlan = !hayDelLente && resumenGlobal.decisiones === 0
+
+  // Estado inicial elegante: sin bordes agresivos, centrado vertical
+  if (sinNadaEnPlan) {
+    return (
+      <aside
+        aria-label="Acumuladores del plan"
+        className="h-full flex flex-col items-center justify-center px-6"
+      >
+        <p className="text-sm font-light text-slate-500 text-center max-w-[18ch] leading-relaxed">
+          El plan espera tu primera decisión.
+        </p>
+      </aside>
+    )
+  }
+
   return (
     <aside
       aria-label="Acumuladores del plan"
-      className="h-full flex flex-col rounded-xl bg-slate-900/40 backdrop-blur-xl border border-slate-800/60 overflow-hidden"
+      className="h-full flex flex-col rounded-xl bg-slate-900/30 backdrop-blur-xl border border-slate-800/40 overflow-hidden"
     >
       <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent px-5 py-6 pb-32 space-y-6">
         {/* ── SECCIÓN 1: decisiones del lente activo ──────────────

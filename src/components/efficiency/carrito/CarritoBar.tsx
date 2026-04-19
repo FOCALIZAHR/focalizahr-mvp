@@ -2,21 +2,16 @@
 // CARRITO BAR — Resumen compacto fixed bottom (ancla psicológica del CEO)
 // src/components/efficiency/carrito/CarritoBar.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// Versión simplificada: las métricas detalladas viven en PanelAcumuladores.
-// Esta barra es un resumen compacto siempre visible con CTA "Ver Plan →".
-//
-// - position: fixed; bottom: 0 — NUNCA desaparece
-// - z-40 para no pisar modales (z-45+)
-// - Tesla line superior cyan → purple
-// - Estado vacío: mensaje guía + CTA deshabilitado
-// - Estado con decisiones: resumen 1 línea + CTA habilitado
+// Versión minimalista sin emojis. Siempre visible con el mismo formato:
+//   "{N} Decisiones · {X} FTEs · {monto}/mes"
+// Tenue si vacío, cyan cuando hay decisiones. CTA "Ver Plan →" al lado.
 // ════════════════════════════════════════════════════════════════════════════
 
 'use client'
 
 import { useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowRight, RotateCcw, ShoppingBag } from 'lucide-react'
+import { ArrowRight, RotateCcw } from 'lucide-react'
 import {
   calcularResumenCarrito,
   type DecisionItem,
@@ -48,6 +43,10 @@ export function CarritoBar({ decisiones, onClear }: CarritoBarProps) {
   )
   const vacio = resumen.decisiones === 0
 
+  const fteTxt = resumen.fteLiberados.toLocaleString('es-CL', {
+    maximumFractionDigits: 1,
+  })
+
   return (
     <div
       className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/80"
@@ -66,119 +65,108 @@ export function CarritoBar({ decisiones, onClear }: CarritoBarProps) {
       />
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-3 flex items-center gap-4 md:gap-6">
-        {vacio ? (
-          <>
-            <ShoppingBag className="w-4 h-4 text-slate-600 flex-shrink-0" />
-            <p className="flex-1 text-xs md:text-sm text-slate-400 font-light">
-              Agrega decisiones desde los lentes para construir tu{' '}
-              <span className="text-cyan-300">Plan de Eficiencia</span>.
-            </p>
+        {/* Texto puro: N Decisiones · X FTEs · $ */}
+        <p
+          className={`flex-1 text-xs md:text-sm font-light flex items-baseline gap-1.5 flex-wrap ${
+            vacio ? 'text-slate-500' : 'text-slate-300'
+          }`}
+        >
+          <span>
+            <span
+              className={
+                vacio ? 'text-slate-500' : 'text-white font-medium'
+              }
+            >
+              {resumen.decisiones}
+            </span>{' '}
+            {resumen.decisiones === 1 ? 'Decisión' : 'Decisiones'}
+          </span>
+          <span className="text-slate-700">·</span>
+          <span>
+            <span
+              className={
+                vacio ? 'text-slate-500' : 'text-cyan-300 font-medium'
+              }
+            >
+              {fteTxt}
+            </span>{' '}
+            {resumen.fteLiberados === 1 ? 'FTE' : 'FTEs'}
+          </span>
+          <span className="text-slate-700">·</span>
+          <span
+            className={
+              vacio ? 'text-slate-500' : 'text-emerald-300 font-medium'
+            }
+          >
+            {formatCLP(resumen.ahorroMensual)}
+            <span
+              className={`ml-1 text-[10px] font-light ${
+                vacio ? 'text-slate-600' : 'text-slate-500'
+              }`}
+            >
+              /mes
+            </span>
+          </span>
+          {!vacio && resumen.inversion > 0 && (
+            <>
+              <span className="text-slate-700">·</span>
+              <span>
+                <span className="text-amber-300 font-medium">
+                  {formatCLP(resumen.inversion)}
+                </span>
+                <span className="ml-1 text-[10px] font-light text-slate-500">
+                  inversión
+                </span>
+              </span>
+            </>
+          )}
+          {!vacio && resumen.paybackMeses !== null && (
+            <>
+              <span className="text-slate-700">·</span>
+              <span>
+                <span className="text-purple-300 font-medium">
+                  {resumen.paybackMeses}m
+                </span>
+                <span className="ml-1 text-[10px] font-light text-slate-500">
+                  payback
+                </span>
+              </span>
+            </>
+          )}
+        </p>
+
+        {/* Acciones */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {onClear && !vacio && (
+            <button
+              onClick={onClear}
+              className="inline-flex items-center gap-1.5 text-xs font-medium p-2 md:px-3 md:py-2 rounded-lg border border-slate-700 bg-slate-800/60 text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-colors"
+              aria-label="Vaciar carrito"
+              title="Vaciar carrito del hub"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {vacio ? (
             <button
               disabled
-              className="flex-shrink-0 inline-flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-lg border border-slate-700 bg-slate-800/50 text-slate-500 cursor-not-allowed"
+              className="inline-flex items-center gap-2 text-xs font-light px-4 py-2 rounded-lg border border-slate-800 bg-transparent text-slate-600 cursor-not-allowed"
             >
               Ver Plan
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
-          </>
-        ) : (
-          <>
-            {/* Icono + N decisiones */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <div className="w-7 h-7 rounded-full bg-cyan-500/15 border border-cyan-500/40 flex items-center justify-center">
-                <span className="text-[11px] font-medium text-cyan-300">
-                  {resumen.decisiones}
-                </span>
-              </div>
-              <span className="text-xs text-slate-400 font-light hidden md:inline">
-                {resumen.decisiones === 1 ? 'decisión' : 'decisiones'}
-              </span>
-            </div>
-
-            {/* Separador vertical */}
-            <div className="hidden md:block w-px h-6 bg-slate-800" aria-hidden />
-
-            {/* Métricas compactas inline */}
-            <div className="flex-1 flex items-baseline gap-4 md:gap-6 overflow-x-auto scrollbar-hide">
-              <InlineStat
-                label="FTE"
-                value={resumen.fteLiberados.toLocaleString('es-CL', {
-                  maximumFractionDigits: 1,
-                })}
-                color="text-cyan-300"
-              />
-              <InlineStat
-                label="Ahorro/mes"
-                value={formatCLP(resumen.ahorroMensual)}
-                color="text-emerald-300"
-              />
-              <InlineStat
-                label="Inversión"
-                value={formatCLP(resumen.inversion)}
-                color="text-amber-300"
-              />
-              <InlineStat
-                label="Payback"
-                value={
-                  resumen.paybackMeses === null
-                    ? '∞'
-                    : `${resumen.paybackMeses}m`
-                }
-                color={
-                  resumen.paybackMeses === null
-                    ? 'text-slate-400'
-                    : 'text-purple-300'
-                }
-              />
-            </div>
-
-            {/* Acciones */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {onClear && (
-                <button
-                  onClick={onClear}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium p-2 md:px-3 md:py-2 rounded-lg border border-slate-700 bg-slate-800/60 text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-colors"
-                  aria-label="Vaciar carrito"
-                  title="Vaciar carrito del hub"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-              )}
-              <Link
-                href="/dashboard/efficiency/plan/nuevo"
-                className="inline-flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-lg border border-cyan-400/50 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-200 hover:text-white hover:border-cyan-300 hover:from-cyan-500/30 hover:to-purple-500/30 transition-all"
-                style={{ boxShadow: '0 0 14px rgba(34, 211, 238, 0.25)' }}
-              >
-                Ver Plan
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          </>
-        )}
+          ) : (
+            <Link
+              href="/dashboard/efficiency/plan/nuevo"
+              className="inline-flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-lg border border-cyan-400/50 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-200 hover:text-white hover:border-cyan-300 hover:from-cyan-500/30 hover:to-purple-500/30 transition-all"
+              style={{ boxShadow: '0 0 14px rgba(34, 211, 238, 0.25)' }}
+            >
+              Ver Plan
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          )}
+        </div>
       </div>
-    </div>
-  )
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// INLINE STAT
-// ════════════════════════════════════════════════════════════════════════════
-
-function InlineStat({
-  label,
-  value,
-  color,
-}: {
-  label: string
-  value: string
-  color: string
-}) {
-  return (
-    <div className="flex items-baseline gap-1.5 whitespace-nowrap">
-      <span className="text-[10px] uppercase tracking-wider text-slate-500 font-light">
-        {label}
-      </span>
-      <span className={`text-sm font-light ${color}`}>{value}</span>
     </div>
   )
 }

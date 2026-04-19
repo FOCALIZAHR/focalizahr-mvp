@@ -24,9 +24,10 @@ import {
   type DecisionItem,
   type ResumenCarrito,
 } from '@/lib/services/efficiency/EfficiencyCalculator'
-import type {
-  LenteId,
-  FamiliaId,
+import {
+  LENTES_META,
+  type LenteId,
+  type FamiliaId,
 } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -90,6 +91,23 @@ const LENTES_DISPONIBLES: LenteId[] = [
   'l9_pasivo',
 ]
 
+/**
+ * Lentes agrupados por familia en orden canónico — usado para prev/next
+ * navegación dentro de una familia (el CEO puede avanzar linealmente por
+ * los lentes de la familia seleccionada).
+ */
+export const LENTES_POR_FAMILIA: Record<FamiliaId, LenteId[]> = {
+  choque_tecnologico: ['l1_inercia', 'l2_zombie'],
+  grasa_organizacional: ['l4_fantasma', 'l5_brecha'],
+  riesgo_financiero: ['l7_fuga', 'l9_pasivo'],
+}
+
+const FAMILIA_ORDEN: FamiliaId[] = [
+  'choque_tecnologico',
+  'grasa_organizacional',
+  'riesgo_financiero',
+]
+
 // ════════════════════════════════════════════════════════════════════════════
 // PERSISTENCIA — sessionStorage (Sesión 4 agregará persistencia real en BD)
 // ════════════════════════════════════════════════════════════════════════════
@@ -144,9 +162,25 @@ export interface UseEfficiencyWorkspaceReturn {
   }>
 
   // Navegación lentes
-  activeLenteId: LenteId
+  /** null = estado lobby (shock global). LenteId = lente activo en portada */
+  activeLenteId: LenteId | null
+  /** Familia del lente activo (derivada), o null si en lobby */
+  activeFamiliaId: FamiliaId | null
   setActiveLenteId: (id: LenteId) => void
+  /** Selecciona una familia: setea activeLenteId al primer lente de la familia */
+  selectFamilia: (familia: FamiliaId) => void
+  /** Vuelve al lobby (activeLenteId = null; shock global) */
+  returnToLobby: () => void
+  /** Avanza al siguiente lente dentro de la familia activa (cíclico) */
+  nextLenteInFamilia: () => void
+  /** Retrocede al anterior lente dentro de la familia activa (cíclico) */
+  prevLenteInFamilia: () => void
+  /** Índice del lente activo dentro de su familia (0-based); null si lobby */
+  lenteIndexInFamilia: number | null
+  /** Cantidad de lentes en la familia activa; null si lobby */
+  lentesCountInFamilia: number | null
   lentesVisitados: Set<LenteId>
+  familiasVisitadas: Set<FamiliaId>
   lentesDisponibles: LenteId[]
 
   // Carrito
@@ -159,6 +193,11 @@ export interface UseEfficiencyWorkspaceReturn {
   // Derivados
   decisionesDelLenteActivo: DecisionItem[]
   resumenCarrito: ResumenCarrito
+  /**
+   * Shock Global: L1.totalMonthly + L5.total (ambos flujo mensual CLP).
+   * El número protagonista del estado lobby.
+   */
+  shockGlobalMonthly: number
 }
 
 export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
@@ -174,9 +213,11 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
   )
 
   // ── State: navegación ──────────────────────────────────────────
-  const [activeLenteId, setActiveLenteIdState] = useState<LenteId>('l1_inercia')
-  const [lentesVisitados, setLentesVisitados] = useState<Set<LenteId>>(
-    new Set(['l1_inercia'])
+  // null = lobby (shock global); LenteId = portada de un lente
+  const [activeLenteId, setActiveLenteIdState] = useState<LenteId | null>(null)
+  const [lentesVisitados, setLentesVisitados] = useState<Set<LenteId>>(new Set())
+  const [familiasVisitadas, setFamiliasVisitadas] = useState<Set<FamiliaId>>(
+    new Set()
   )
 
   // ── State: carrito (hidratado desde sessionStorage si existe) ──
@@ -269,6 +310,50 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
       next.add(id)
       return next
     })
+    // Marcar familia del lente como visitada
+    const fam = LENTES_META[id]?.familia
+    if (fam) {
+      setFamiliasVisitadas(prev => {
+        if (prev.has(fam)) return prev
+        const next = new Set(prev)
+        next.add(fam)
+        return next
+      })
+    }
+  }, [])
+
+  const selectFamilia = useCallback((familia: FamiliaId) => {
+    const primerLente = LENTES_POR_FAMILIA[familia]?.[0]
+    if (!primerLente) return
+    setActiveLenteId(primerLente)
+  }, [setActiveLenteId])
+
+  const returnToLobby = useCallback(() => {
+    setActiveLenteIdState(null)
+  }, [])
+
+  const nextLenteInFamilia = useCallback(() => {
+    setActiveLenteIdState(current => {
+      if (!current) return current
+      const fam = LENTES_META[current]?.familia
+      if (!fam) return current
+      const lentesFam = LENTES_POR_FAMILIA[fam] ?? []
+      const idx = lentesFam.indexOf(current)
+      if (idx < 0 || lentesFam.length < 2) return current
+      return lentesFam[(idx + 1) % lentesFam.length]
+    })
+  }, [])
+
+  const prevLenteInFamilia = useCallback(() => {
+    setActiveLenteIdState(current => {
+      if (!current) return current
+      const fam = LENTES_META[current]?.familia
+      if (!fam) return current
+      const lentesFam = LENTES_POR_FAMILIA[fam] ?? []
+      const idx = lentesFam.indexOf(current)
+      if (idx < 0 || lentesFam.length < 2) return current
+      return lentesFam[(idx - 1 + lentesFam.length) % lentesFam.length]
+    })
   }, [])
 
   // ── Callbacks: carrito ─────────────────────────────────────────
@@ -318,22 +403,51 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
       }))
   }, [data])
 
-  const decisionesDelLenteActivo = useMemo(
-    () =>
-      [...carrito.values()].filter(d => {
-        // L7L8 se registra bajo l7_fuga en el rail; incluir ambos IDs en el filtro
-        if (activeLenteId === 'l7_fuga') {
-          return d.lenteId === 'l7_fuga' || d.lenteId === 'l8_retencion'
-        }
-        return d.lenteId === activeLenteId
-      }),
-    [carrito, activeLenteId]
-  )
+  const decisionesDelLenteActivo = useMemo(() => {
+    if (!activeLenteId) return []
+    return [...carrito.values()].filter(d => {
+      // L7L8 se registra bajo l7_fuga en el rail; incluir ambos IDs en el filtro
+      if (activeLenteId === 'l7_fuga') {
+        return d.lenteId === 'l7_fuga' || d.lenteId === 'l8_retencion'
+      }
+      return d.lenteId === activeLenteId
+    })
+  }, [carrito, activeLenteId])
 
   const resumenCarrito = useMemo(
     () => calcularResumenCarrito([...carrito.values()]),
     [carrito]
   )
+
+  // ── Derivados de navegación dentro de familia ────────────────
+  const activeFamiliaId: FamiliaId | null = activeLenteId
+    ? LENTES_META[activeLenteId]?.familia ?? null
+    : null
+
+  const lenteIndexInFamilia = useMemo(() => {
+    if (!activeLenteId || !activeFamiliaId) return null
+    const lentes = LENTES_POR_FAMILIA[activeFamiliaId] ?? []
+    const idx = lentes.indexOf(activeLenteId)
+    return idx >= 0 ? idx : null
+  }, [activeLenteId, activeFamiliaId])
+
+  const lentesCountInFamilia = activeFamiliaId
+    ? LENTES_POR_FAMILIA[activeFamiliaId]?.length ?? null
+    : null
+
+  // ── Shock Global — L1.totalMonthly + L5.total (mensual puro) ──
+  const shockGlobalMonthly = useMemo(() => {
+    if (!data) return 0
+    const l1Detalle = data.lentes.l1_inercia?.detalle as
+      | { totalMonthly?: number }
+      | null
+    const l5Detalle = data.lentes.l5_brecha?.detalle as
+      | { total?: number }
+      | null
+    const l1 = l1Detalle?.totalMonthly ?? 0
+    const l5 = l5Detalle?.total ?? 0
+    return l1 + l5
+  }, [data])
 
   // ── Return ─────────────────────────────────────────────────────
   return {
@@ -346,8 +460,16 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
     gerenciasExcluidas,
     gerenciasCriticasL3,
     activeLenteId,
+    activeFamiliaId,
     setActiveLenteId,
+    selectFamilia,
+    returnToLobby,
+    nextLenteInFamilia,
+    prevLenteInFamilia,
+    lenteIndexInFamilia,
+    lentesCountInFamilia,
     lentesVisitados,
+    familiasVisitadas,
     lentesDisponibles: LENTES_DISPONIBLES,
     carrito,
     upsertDecision,
@@ -356,5 +478,6 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
     clearCarrito,
     decisionesDelLenteActivo,
     resumenCarrito,
+    shockGlobalMonthly,
   }
 }

@@ -45,7 +45,8 @@ TRIGGERS:
 | `references/css-classes.md` | Para usar clases `.fhr-*` |
 | `references/premium-components.md` | Para Línea Tesla, Glassmorphism, Gauges |
 | `references/anti-patterns.md` | Para verificar qué NO hacer |
-
+| `→ SKILL focalizahr-notificaciones` | **Para CUALQUIER toast/feedback al usuario** - Nunca usar shadcn `use-toast` |
+| `MANIFIESTO_FOCALIZAHR_v5.md` | **ANTES de elegir patrón** - Principios 7, 8 y 13: gravedad, personas, contexto |
 ---
 
 ## ⚡ QUICK REFERENCE - COPIAR Y PEGAR
@@ -347,6 +348,10 @@ UX:
 PATRONES:
   □ ¿Sigue alguno de los 7 patrones UX?
   □ ¿NO usa anti-patrones prohibidos?
+  MANIFIESTO:
+  □ ¿La gravedad de la decisión justifica el patrón elegido? (P8)
+  □ ¿Las personas se tratan como personas, no como filas? (P7)
+  □ ¿La profundidad y momento de exposición están definidos en el spec? (P13)
 ```
 
 ---
