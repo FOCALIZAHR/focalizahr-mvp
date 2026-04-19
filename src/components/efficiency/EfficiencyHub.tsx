@@ -129,26 +129,18 @@ export function EfficiencyHub() {
   return (
     <>
       <div className="fhr-bg-main h-screen flex flex-col overflow-hidden">
-        {/* ── HEADER compacto: eyebrow + Mis planes ──────────────── */}
-        <header className="flex-shrink-0 max-w-7xl mx-auto w-full px-4 md:px-8 py-2">
+        {/* ── HEADER ultracompacto: solo rail + MisPlanesBtn ───────
+            Altura objetivo ~32px. Sin título, sin eyebrow, sin stats. */}
+        <header className="flex-shrink-0 max-w-7xl mx-auto w-full px-4 md:px-8 border-b border-slate-800/40">
           <div className="flex items-center justify-between gap-4">
-            <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium">
-              Eficiencia{' '}
-              <span className="text-slate-700">·</span>{' '}
-              <span className="text-slate-400">Plan organizacional</span>
-            </p>
+            <EfficiencyRail
+              activeFamiliaId={ws.activeFamiliaId}
+              familiasVisitadas={ws.familiasVisitadas}
+              onSelect={ws.selectFamilia}
+            />
             <MisPlanesBtn />
           </div>
         </header>
-
-        {/* ── RAIL: 3 tabs underline ─────────────────────────────── */}
-        <div className="flex-shrink-0 max-w-7xl mx-auto w-full px-4 md:px-8 pb-1">
-          <EfficiencyRail
-            activeFamiliaId={ws.activeFamiliaId}
-            familiasVisitadas={ws.familiasVisitadas}
-            onSelect={ws.selectFamilia}
-          />
-        </div>
 
         {/* ── WORKSPACE ──────────────────────────────────────────── */}
         <main className="flex-1 min-h-0 max-w-7xl mx-auto w-full px-4 md:px-8 overflow-hidden">

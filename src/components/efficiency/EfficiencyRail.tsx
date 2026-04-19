@@ -70,7 +70,7 @@ export function EfficiencyRail({
   return (
     <nav
       aria-label="Familias de diagnóstico"
-      className="w-full flex items-stretch gap-6 md:gap-12 overflow-x-auto scrollbar-hide"
+      className="flex items-center gap-5 md:gap-8 overflow-x-auto scrollbar-hide"
     >
       {FAMILIAS_UI.map(familia => {
         const isActive = activeFamiliaId === familia.id
@@ -80,52 +80,39 @@ export function EfficiencyRail({
           <button
             key={familia.id}
             onClick={() => onSelect(familia.id)}
-            className="group relative flex flex-col items-start flex-shrink-0 py-2.5 px-0.5 transition-colors"
-            style={{ minWidth: '180px' }}
+            className="group relative flex items-center gap-1.5 flex-shrink-0 py-2 transition-colors"
+            title={familia.subtitulo}
           >
-            {/* Line label (número + nombre) */}
-            <div className="flex items-center gap-2 mb-0.5">
-              <span
-                className="text-[10px] font-light tabular-nums tracking-widest transition-colors"
-                style={{
-                  color: isActive ? familia.accent : '#64748B',
-                }}
-              >
-                {familia.numero}
-              </span>
-              <span
-                className="text-xs uppercase tracking-[0.15em] font-medium transition-colors"
-                style={{
-                  color: isActive
-                    ? '#FFFFFF'
-                    : isVisited
-                    ? '#CBD5E1'
-                    : '#64748B',
-                }}
-              >
-                {familia.header}
-              </span>
-              {isVisited && !isActive && (
-                <span
-                  className="w-1 h-1 rounded-full flex-shrink-0"
-                  style={{
-                    backgroundColor: familia.accent,
-                    opacity: 0.5,
-                  }}
-                  aria-hidden
-                />
-              )}
-            </div>
-
-            {/* Subtítulo dramático */}
             <span
-              className="text-[11px] font-light leading-tight transition-colors"
+              className="text-[10px] font-light tabular-nums tracking-widest transition-colors"
               style={{
-                color: isActive ? '#94A3B8' : '#475569',
+                color: isActive ? familia.accent : '#64748B',
               }}
             >
-              {familia.subtitulo}
+              {familia.numero}
             </span>
+            <span
+              className="text-[11px] uppercase tracking-[0.18em] font-medium transition-colors whitespace-nowrap"
+              style={{
+                color: isActive
+                  ? '#FFFFFF'
+                  : isVisited
+                  ? '#CBD5E1'
+                  : '#64748B',
+              }}
+            >
+              {familia.header}
+            </span>
+            {isVisited && !isActive && (
+              <span
+                className="w-1 h-1 rounded-full flex-shrink-0"
+                style={{
+                  backgroundColor: familia.accent,
+                  opacity: 0.5,
+                }}
+                aria-hidden
+              />
+            )}
 
             {/* Underline cyan 1px cuando activo */}
             {isActive && (
