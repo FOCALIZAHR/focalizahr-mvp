@@ -74,23 +74,13 @@ function LenteCardRoot({
   const color = FAMILIA_COLORS[lente.familia]
   const effectiveEstado: LenteEstado = estado ?? (lente.hayData ? 'activo' : 'vacio')
 
+  // Sin contenedor envolvente con borders/background. El contenido vive
+  // directamente sobre el fondo oscuro del Hub. Espacio negativo y scroll
+  // lo maneja el panel izquierdo del EfficiencyHub.
   return (
-    <article
-      className="relative h-full flex flex-col rounded-xl bg-slate-900/60 backdrop-blur-xl border border-slate-800/70 overflow-hidden"
-      style={{ boxShadow: `0 0 32px ${color.glow}` }}
-    >
-      {/* Tesla line superior */}
-      <div
-        className="absolute top-0 left-0 right-0 h-[2px]"
-        style={{
-          background: `linear-gradient(90deg, transparent, ${color.accent}, transparent)`,
-          boxShadow: `0 0 12px ${color.glow}`,
-        }}
-        aria-hidden
-      />
-
-      {/* Header */}
-      <header className="flex-shrink-0 px-6 md:px-8 pt-6 pb-4 border-b border-slate-800/50">
+    <div className="relative w-full">
+      {/* Header — eyebrow familia + título del lente */}
+      <header className="mb-6">
         <p
           className="text-[10px] uppercase tracking-[0.18em] font-medium"
           style={{ color: color.accent }}
@@ -99,17 +89,17 @@ function LenteCardRoot({
         </p>
         <div className="flex items-start justify-between gap-4 mt-1">
           <div>
-            <h2 className="text-xl md:text-2xl font-light text-white leading-tight">
+            <h2 className="text-2xl md:text-3xl font-extralight text-white leading-tight">
               {tituloOverride ?? lente.titulo}
             </h2>
-            <p className="text-xs text-slate-400 mt-1 font-light">
+            <p className="text-sm text-slate-400 mt-1 font-light">
               {lente.subtitulo}
             </p>
           </div>
 
           {/* Badge estado */}
           {effectiveEstado === 'congelado' && (
-            <span className="flex-shrink-0 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider px-2 py-1 rounded-md border border-slate-700 bg-slate-800/60 text-slate-400">
+            <span className="flex-shrink-0 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider px-2 py-1 rounded-md border border-slate-700 bg-slate-800/40 text-slate-400">
               <Snowflake className="w-3 h-3" />
               Congelado
             </span>
@@ -117,38 +107,31 @@ function LenteCardRoot({
         </div>
       </header>
 
-      {/* Contenido — scroll interno */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-        {effectiveEstado === 'vacio' ? (
-          <div className="h-full flex items-center justify-center px-8 py-12">
-            <div className="text-center max-w-sm">
-              <p className="text-sm text-slate-400 font-light">
-                Sin señales detectadas en este lente por ahora.
-              </p>
-              <p className="text-xs text-slate-500 font-light mt-2">
-                Cuando los motores detecten el patrón, el lente se activa
-                automáticamente.
-              </p>
-            </div>
-          </div>
-        ) : effectiveEstado === 'congelado' ? (
-          <div className="h-full flex items-center justify-center px-8 py-12">
-            <div className="text-center max-w-sm">
-              <Snowflake className="w-8 h-8 text-slate-600 mx-auto mb-3" />
-              <p className="text-sm text-slate-400 font-light">
-                Lente temporalmente congelado.
-              </p>
-              <p className="text-xs text-slate-500 font-light mt-2">
-                Falta cobertura suficiente de datos para activarlo con
-                confianza.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="px-6 md:px-8 py-6">{children}</div>
-        )}
-      </div>
-    </article>
+      {/* Contenido — sin contenedor, flow libre */}
+      {effectiveEstado === 'vacio' ? (
+        <div className="py-16 text-center">
+          <p className="text-sm text-slate-400 font-light">
+            Sin señales detectadas en este lente por ahora.
+          </p>
+          <p className="text-xs text-slate-500 font-light mt-2 max-w-sm mx-auto">
+            Cuando los motores detecten el patrón, el lente se activa
+            automáticamente.
+          </p>
+        </div>
+      ) : effectiveEstado === 'congelado' ? (
+        <div className="py-16 text-center">
+          <Snowflake className="w-8 h-8 text-slate-600 mx-auto mb-3" />
+          <p className="text-sm text-slate-400 font-light">
+            Lente temporalmente congelado.
+          </p>
+          <p className="text-xs text-slate-500 font-light mt-2 max-w-sm mx-auto">
+            Falta cobertura suficiente de datos para activarlo con confianza.
+          </p>
+        </div>
+      ) : (
+        children
+      )}
+    </div>
   )
 }
 

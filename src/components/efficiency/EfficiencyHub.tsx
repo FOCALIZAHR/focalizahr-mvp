@@ -7,7 +7,7 @@
 //   · Rail horizontal: 3 tabs underline por familia (sin pills)
 //   · Panel central 70% con AnimatePresence:
 //       - Lobby (activeLenteId=null): ShockGlobalPortada con número 96px
-//       - Lente activo: LenteNavegacion + componente L* específico
+//       - Lente activo: componente L* + footer CTA al final
 //   · Panel derecho 30%: PanelAcumuladores (empty state elegante si vacío)
 //   · EfficiencyToolbar fixed right (3 tools por familia)
 //   · CarritoBar fixed bottom
@@ -24,8 +24,10 @@ import { RiesgoAdopcionGuardarrail } from './guardarrail/RiesgoAdopcionGuardarra
 import { CarritoBar } from './carrito/CarritoBar'
 import { MisPlanesBtn } from './MisPlanesBtn'
 import { ShockGlobalPortada } from './ShockGlobalPortada'
-import { LenteNavegacion } from './LenteNavegacion'
+import { LenteFooterNav } from './LenteFooterNav'
 import EfficiencyToolbar from './EfficiencyToolbar'
+import { LENTES_POR_FAMILIA } from '@/hooks/useEfficiencyWorkspace'
+import { LENTES_META } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
 
 // Componentes específicos por lente
 import { L1CostoInercia } from './lentes/L1CostoInercia'
@@ -101,11 +103,34 @@ export function EfficiencyHub() {
     ? LENTE_COMPONENTS[ws.activeLenteId] ?? null
     : null
 
+  // Colores de familia para el CTA de footer nav
+  const familiaAccent: Record<string, string> = {
+    choque_tecnologico: '#22D3EE',
+    grasa_organizacional: '#A78BFA',
+    riesgo_financiero: '#F59E0B',
+  }
+
+  // Derivar títulos de lentes vecinos dentro de la familia para el footer nav
+  let proximoLenteTitulo: string | undefined
+  let anteriorLenteTitulo: string | undefined
+  if (ws.activeLenteId && ws.activeFamiliaId && ws.lentesCountInFamilia) {
+    const lentesFam = LENTES_POR_FAMILIA[ws.activeFamiliaId] ?? []
+    const idx = ws.lenteIndexInFamilia ?? 0
+    const nextIdx = (idx + 1) % lentesFam.length
+    const prevIdx = (idx - 1 + lentesFam.length) % lentesFam.length
+    proximoLenteTitulo = LENTES_META[lentesFam[nextIdx]]?.titulo
+    if (lentesFam.length > 1 && prevIdx !== idx) {
+      anteriorLenteTitulo = LENTES_META[lentesFam[prevIdx]]?.titulo
+    }
+  }
+
+  const muestraPanelDerecho = !!ws.activeLenteId
+
   return (
     <>
       <div className="fhr-bg-main h-screen flex flex-col overflow-hidden">
         {/* ── HEADER compacto: eyebrow + Mis planes ──────────────── */}
-        <header className="flex-shrink-0 max-w-7xl mx-auto w-full px-4 pt-5 pb-2 md:px-8 md:pt-6 md:pb-3">
+        <header className="flex-shrink-0 max-w-7xl mx-auto w-full px-4 md:px-8 py-2">
           <div className="flex items-center justify-between gap-4">
             <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium">
               Eficiencia{' '}
@@ -117,7 +142,7 @@ export function EfficiencyHub() {
         </header>
 
         {/* ── RAIL: 3 tabs underline ─────────────────────────────── */}
-        <div className="flex-shrink-0 max-w-7xl mx-auto w-full px-4 md:px-8">
+        <div className="flex-shrink-0 max-w-7xl mx-auto w-full px-4 md:px-8 pb-1">
           <EfficiencyRail
             activeFamiliaId={ws.activeFamiliaId}
             familiasVisitadas={ws.familiasVisitadas}
@@ -125,11 +150,17 @@ export function EfficiencyHub() {
           />
         </div>
 
-        {/* ── WORKSPACE 70/30 ────────────────────────────────────── */}
-        <main className="flex-1 min-h-0 max-w-7xl mx-auto w-full px-4 md:px-8 py-4 md:py-6 overflow-hidden">
-          <div className="h-full grid grid-cols-1 md:grid-cols-[1fr_320px] gap-4 md:gap-6 min-h-0">
-            {/* Panel activo 70% */}
-            <div className="min-h-0 min-w-0">
+        {/* ── WORKSPACE ──────────────────────────────────────────── */}
+        <main className="flex-1 min-h-0 max-w-7xl mx-auto w-full px-4 md:px-8 overflow-hidden">
+          <div
+            className={`h-full grid gap-4 md:gap-6 min-h-0 ${
+              muestraPanelDerecho
+                ? 'grid-cols-1 md:grid-cols-[1fr_320px]'
+                : 'grid-cols-1'
+            }`}
+          >
+            {/* Panel activo — scroll libre sin contenedor envolvente */}
+            <div className="min-h-0 min-w-0 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent pt-4 md:pt-5 pb-32">
               <AnimatePresence mode="wait">
                 {!ws.activeLenteId ? (
                   <ShockGlobalPortada
@@ -143,31 +174,34 @@ export function EfficiencyHub() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
                     transition={{ duration: 0.2, ease: 'easeOut' }}
-                    className="h-full min-h-0 flex flex-col"
                   >
+                    <ActiveComponent
+                      lente={activeLente}
+                      decisionesActuales={ws.decisionesDelLenteActivo}
+                      onUpsert={ws.upsertDecision}
+                      onRemove={ws.removeDecision}
+                      onClearLente={() =>
+                        ws.activeLenteId && ws.clearLente(ws.activeLenteId)
+                      }
+                      gerenciasExcluidas={ws.gerenciasExcluidas}
+                      allLentes={ws.data.lentes}
+                    />
+
+                    {/* Footer nav: CTA grande al final del lente */}
                     {ws.lenteIndexInFamilia !== null &&
-                      ws.lentesCountInFamilia !== null && (
-                        <LenteNavegacion
+                      ws.lentesCountInFamilia !== null &&
+                      ws.activeFamiliaId &&
+                      proximoLenteTitulo && (
+                        <LenteFooterNav
                           index={ws.lenteIndexInFamilia}
                           total={ws.lentesCountInFamilia}
-                          tituloLenteActivo={activeLente.titulo}
-                          onPrev={ws.prevLenteInFamilia}
+                          proximoTitulo={proximoLenteTitulo}
+                          anteriorTitulo={anteriorLenteTitulo}
+                          accentColor={familiaAccent[ws.activeFamiliaId]}
                           onNext={ws.nextLenteInFamilia}
+                          onPrev={ws.prevLenteInFamilia}
                         />
                       )}
-                    <div className="flex-1 min-h-0 overflow-hidden">
-                      <ActiveComponent
-                        lente={activeLente}
-                        decisionesActuales={ws.decisionesDelLenteActivo}
-                        onUpsert={ws.upsertDecision}
-                        onRemove={ws.removeDecision}
-                        onClearLente={() =>
-                          ws.activeLenteId && ws.clearLente(ws.activeLenteId)
-                        }
-                        gerenciasExcluidas={ws.gerenciasExcluidas}
-                        allLentes={ws.data.lentes}
-                      />
-                    </div>
                   </motion.div>
                 ) : (
                   <div className="h-full flex items-center justify-center">
@@ -179,18 +213,20 @@ export function EfficiencyHub() {
               </AnimatePresence>
             </div>
 
-            {/* Panel acumuladores 30% */}
-            <div className="hidden md:block min-h-0">
-              <PanelAcumuladores
-                tituloLenteActivo={activeLente?.titulo ?? ''}
-                decisionesDelLenteActivo={ws.decisionesDelLenteActivo}
-                resumenGlobal={ws.resumenCarrito}
-                onRemove={ws.removeDecision}
-                onClearLente={() =>
-                  ws.activeLenteId && ws.clearLente(ws.activeLenteId)
-                }
-              />
-            </div>
+            {/* Panel acumuladores 30% — solo cuando hay lente activo */}
+            {muestraPanelDerecho && (
+              <div className="hidden md:block min-h-0 pt-4 md:pt-5 pb-32">
+                <PanelAcumuladores
+                  tituloLenteActivo={activeLente?.titulo ?? ''}
+                  decisionesDelLenteActivo={ws.decisionesDelLenteActivo}
+                  resumenGlobal={ws.resumenCarrito}
+                  onRemove={ws.removeDecision}
+                  onClearLente={() =>
+                    ws.activeLenteId && ws.clearLente(ws.activeLenteId)
+                  }
+                />
+              </div>
+            )}
           </div>
         </main>
       </div>
