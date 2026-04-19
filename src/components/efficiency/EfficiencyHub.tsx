@@ -24,6 +24,7 @@ import { RiesgoAdopcionGuardarrail } from './guardarrail/RiesgoAdopcionGuardarra
 import { CarritoBar } from './carrito/CarritoBar'
 import { MisPlanesBtn } from './MisPlanesBtn'
 import { ShockGlobalPortada } from './ShockGlobalPortada'
+import { FamilyBriefing } from './FamilyBriefing'
 import { LenteFooterNav } from './LenteFooterNav'
 import EfficiencyToolbar from './EfficiencyToolbar'
 import { LENTES_POR_FAMILIA } from '@/hooks/useEfficiencyWorkspace'
@@ -124,7 +125,10 @@ export function EfficiencyHub() {
     }
   }
 
-  const muestraPanelDerecho = !!ws.activeLenteId
+  // Panel derecho (PanelAcumuladores) aparece sólo cuando hay lente activo.
+  // En lobby y briefing el panel derecho vive INLINE dentro del componente
+  // (el briefing monta su propio "potencial quiet" en el grid 1fr/260px).
+  const muestraPanelDerecho = ws.hubView === 'lente'
 
   return (
     <>
@@ -154,11 +158,25 @@ export function EfficiencyHub() {
             {/* Panel activo — scroll libre sin contenedor envolvente */}
             <div className="min-h-0 min-w-0 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent pt-4 md:pt-5 pb-32">
               <AnimatePresence mode="wait">
-                {!ws.activeLenteId ? (
+                {ws.hubView === 'lobby' ? (
                   <ShockGlobalPortada
                     key="lobby"
                     shockGlobalMonthly={ws.shockGlobalMonthly}
                   />
+                ) : ws.hubView === 'briefing' && ws.activeFamiliaId ? (
+                  <motion.div
+                    key={`briefing-${ws.activeFamiliaId}`}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                  >
+                    <FamilyBriefing
+                      familiaId={ws.activeFamiliaId}
+                      lentes={ws.data.lentes}
+                      onSelectLente={ws.selectLente}
+                    />
+                  </motion.div>
                 ) : ActiveComponent && activeLente ? (
                   <motion.div
                     key={ws.activeLenteId}
@@ -192,6 +210,7 @@ export function EfficiencyHub() {
                           accentColor={familiaAccent[ws.activeFamiliaId]}
                           onNext={ws.nextLenteInFamilia}
                           onPrev={ws.prevLenteInFamilia}
+                          onBackToBriefing={ws.returnToBriefing}
                         />
                       )}
                   </motion.div>

@@ -164,12 +164,23 @@ export interface UseEfficiencyWorkspaceReturn {
   // Navegación lentes
   /** null = estado lobby (shock global). LenteId = lente activo en portada */
   activeLenteId: LenteId | null
-  /** Familia del lente activo (derivada), o null si en lobby */
+  /**
+   * Familia activa — state INDEPENDIENTE de activeLenteId.
+   *   · null + null → lobby (shock global)
+   *   · FamiliaId + null → briefing (Nivel 2)
+   *   · FamiliaId + LenteId → lente activo (Nivel 3)
+   */
   activeFamiliaId: FamiliaId | null
+  /** Vista actual del hub — derivada de activeFamiliaId + activeLenteId */
+  hubView: 'lobby' | 'briefing' | 'lente'
   setActiveLenteId: (id: LenteId) => void
-  /** Selecciona una familia: setea activeLenteId al primer lente de la familia */
+  /** Selecciona una familia → pasa a briefing de esa familia */
   selectFamilia: (familia: FamiliaId) => void
-  /** Vuelve al lobby (activeLenteId = null; shock global) */
+  /** Selecciona un lente específico desde el briefing */
+  selectLente: (id: LenteId) => void
+  /** Vuelve del lente al briefing de su familia (mantiene activeFamiliaId) */
+  returnToBriefing: () => void
+  /** Vuelve al lobby (borra activeFamiliaId + activeLenteId; shock global) */
   returnToLobby: () => void
   /** Avanza al siguiente lente dentro de la familia activa (cíclico) */
   nextLenteInFamilia: () => void
@@ -213,7 +224,11 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
   )
 
   // ── State: navegación ──────────────────────────────────────────
-  // null = lobby (shock global); LenteId = portada de un lente
+  // activeFamiliaId + activeLenteId combinan 3 vistas:
+  //   null + null           → lobby (shock global)
+  //   FamiliaId + null      → briefing (Nivel 2)
+  //   FamiliaId + LenteId   → lente (Nivel 3)
+  const [activeFamiliaId, setActiveFamiliaIdState] = useState<FamiliaId | null>(null)
   const [activeLenteId, setActiveLenteIdState] = useState<LenteId | null>(null)
   const [lentesVisitados, setLentesVisitados] = useState<Set<LenteId>>(new Set())
   const [familiasVisitadas, setFamiliasVisitadas] = useState<Set<FamiliaId>>(
@@ -302,33 +317,55 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
   }, [])
 
   // ── Callbacks: navegación ──────────────────────────────────────
-  const setActiveLenteId = useCallback((id: LenteId) => {
-    setActiveLenteIdState(id)
-    setLentesVisitados(prev => {
-      if (prev.has(id)) return prev
+  const markFamiliaVisitada = useCallback((fam: FamiliaId) => {
+    setFamiliasVisitadas(prev => {
+      if (prev.has(fam)) return prev
       const next = new Set(prev)
-      next.add(id)
+      next.add(fam)
       return next
     })
-    // Marcar familia del lente como visitada
-    const fam = LENTES_META[id]?.familia
-    if (fam) {
-      setFamiliasVisitadas(prev => {
-        if (prev.has(fam)) return prev
-        const next = new Set(prev)
-        next.add(fam)
-        return next
-      })
-    }
   }, [])
 
-  const selectFamilia = useCallback((familia: FamiliaId) => {
-    const primerLente = LENTES_POR_FAMILIA[familia]?.[0]
-    if (!primerLente) return
-    setActiveLenteId(primerLente)
-  }, [setActiveLenteId])
+  const setActiveLenteId = useCallback(
+    (id: LenteId) => {
+      const fam = LENTES_META[id]?.familia
+      setActiveFamiliaIdState(fam ?? null)
+      setActiveLenteIdState(id)
+      setLentesVisitados(prev => {
+        if (prev.has(id)) return prev
+        const next = new Set(prev)
+        next.add(id)
+        return next
+      })
+      if (fam) markFamiliaVisitada(fam)
+    },
+    [markFamiliaVisitada]
+  )
 
+  /**
+   * Selecciona una familia → entra al briefing (Nivel 2).
+   * NO selecciona lente automáticamente — el CEO decide desde el briefing.
+   */
+  const selectFamilia = useCallback(
+    (familia: FamiliaId) => {
+      setActiveFamiliaIdState(familia)
+      setActiveLenteIdState(null)
+      markFamiliaVisitada(familia)
+    },
+    [markFamiliaVisitada]
+  )
+
+  /** Alias de setActiveLenteId con semántica de "elegir lente desde briefing". */
+  const selectLente = setActiveLenteId
+
+  /** Vuelve del lente al briefing (preserva activeFamiliaId). */
+  const returnToBriefing = useCallback(() => {
+    setActiveLenteIdState(null)
+  }, [])
+
+  /** Vuelve al lobby — borra familia y lente. */
   const returnToLobby = useCallback(() => {
+    setActiveFamiliaIdState(null)
     setActiveLenteIdState(null)
   }, [])
 
@@ -420,9 +457,11 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
   )
 
   // ── Derivados de navegación dentro de familia ────────────────
-  const activeFamiliaId: FamiliaId | null = activeLenteId
-    ? LENTES_META[activeLenteId]?.familia ?? null
-    : null
+  const hubView: 'lobby' | 'briefing' | 'lente' = activeLenteId
+    ? 'lente'
+    : activeFamiliaId
+      ? 'briefing'
+      : 'lobby'
 
   const lenteIndexInFamilia = useMemo(() => {
     if (!activeLenteId || !activeFamiliaId) return null
@@ -461,8 +500,11 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
     gerenciasCriticasL3,
     activeLenteId,
     activeFamiliaId,
+    hubView,
     setActiveLenteId,
     selectFamilia,
+    selectLente,
+    returnToBriefing,
     returnToLobby,
     nextLenteInFamilia,
     prevLenteInFamilia,
