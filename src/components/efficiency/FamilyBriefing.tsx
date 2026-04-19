@@ -51,7 +51,7 @@ const FAMILIA_META: Record<FamiliaId, FamiliaMeta> = {
   choque_tecnologico: {
     eyebrow: 'DIAGNÓSTICO',
     titleFirst: 'Choque',
-    titleGradient: 'tecnológico',
+    titleGradient: 'Tecnológico',
     accent: '#22D3EE',
     lentes: ['l1_inercia', 'l2_zombie'],
     potencialLabel: '/mes',
@@ -63,7 +63,7 @@ const FAMILIA_META: Record<FamiliaId, FamiliaMeta> = {
   grasa_organizacional: {
     eyebrow: 'OPORTUNIDAD',
     titleFirst: 'Grasa',
-    titleGradient: 'organizacional',
+    titleGradient: 'Organizacional',
     accent: '#A78BFA',
     lentes: ['l4_fantasma', 'l5_brecha'],
     potencialLabel: '/mes',
@@ -75,7 +75,7 @@ const FAMILIA_META: Record<FamiliaId, FamiliaMeta> = {
   riesgo_financiero: {
     eyebrow: 'PROTECCIÓN',
     titleFirst: 'Riesgo',
-    titleGradient: 'financiero',
+    titleGradient: 'Financiero',
     accent: '#F59E0B',
     lentes: ['l7_fuga', 'l9_pasivo'],
     potencialLabel: 'en 12 meses',
@@ -238,13 +238,16 @@ export function FamilyBriefing({
           CENTRO — Portada glassmorphism con Tesla line (Fix 1)
           ══════════════════════════════════════════════════════════════════ */}
       <section className="relative rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
-        {/* Tesla line — patrón canónico CompensationPortada:38-44 */}
+        {/* Tesla line — patrón canónico SKILL.md quick reference
+            (gradient cyan→purple + boxShadow glow para visibilidad).
+            El overflow-hidden del <section> clipea los extremos redondeados
+            sin ocultar la línea en el top del viewport del card. */}
         <div
           className="absolute top-0 left-0 right-0 h-[2px] z-10"
           style={{
             background:
-              'linear-gradient(90deg, transparent 5%, #22D3EE 35%, #A78BFA 65%, transparent 95%)',
-            opacity: 0.7,
+              'linear-gradient(90deg, transparent, #22D3EE, #A78BFA, transparent)',
+            boxShadow: '0 0 20px #22D3EE',
           }}
           aria-hidden
         />

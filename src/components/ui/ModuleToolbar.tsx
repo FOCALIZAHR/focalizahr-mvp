@@ -62,7 +62,7 @@ export default function ModuleToolbar({ tools, ctaLabel, onCTA }: ModuleToolbarP
     : 1
 
   return (
-    <div className="fixed right-4 top-1/2 -translate-y-1/2 z-[45] flex flex-row-reverse items-center">
+    <div className="fixed right-4 top-1/2 -translate-y-1/2 z-[55] flex flex-row-reverse items-center">
       {/* Icon strip */}
       <div
         className="flex flex-col gap-0.5 p-[5px] rounded-[14px]"
