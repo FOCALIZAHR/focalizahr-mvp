@@ -2,16 +2,23 @@
 // ACTO ANCLA — Nivel 1B del Efficiency Hub (entre Shock Global y Familia)
 // src/components/efficiency/ActoAncla.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// CLON VISUAL de src/components/executive/AnclaInteligente.tsx
+// CLON LITERAL del patrón visual de
+//   src/components/executive/AnclaInteligente.tsx
 // (el Acto Ancla que usa Workforce y P&L Talent).
 //
-// Gauge central sin arco de progreso (solo track tenue) con el capital
-// comprometido total. Los 4 nodos NO son clickeables — muestran los 3
-// cargos con mayor capital expuesto (desde L1.byPosition) + 1 nodo
-// ancla científica con la exposición global de la organización.
+// Preserva los 7 elementos canónicos:
+//   1. GAUGE_SIZE 272                       2. Glow background detrás del gauge
+//   3. Tipografía font-semibold del score   4. Label corto dentro del gauge
+//   5. Tier dinámico de nodos               6. Micro-barra 2px proporcional
+//   7. Sin border-l decorativo en ningún nodo
 //
-// Un único CTA primario abajo: "Explorar capital en riesgo →" que
-// navega a FamilyBriefing de la familia `capital_en_riesgo`.
+// Adaptaciones permitidas para CLP:
+//   · Sin arco de progreso (queda solo el track)
+//   · Número central = capital comprometido en CLP, formato "$XX[.X]M"
+//     manteniendo el patrón "{score}<suffix>" del original
+//   · Label corto "AL MES"
+//   · barWidth = proporción del nodo sobre el total (en % 0-100)
+//   · Tier por proporción: mayor=cyan · medio=amber · menor=purple · ancla=slate
 // ════════════════════════════════════════════════════════════════════════════
 
 'use client'
@@ -19,21 +26,13 @@
 import { memo, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Info } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { PrimaryButton } from '@/components/ui/PremiumButton'
 import {
-  formatCLP,
   formatInt,
   type FamiliaId,
 } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
 import type { DiagnosticData } from '@/hooks/useEfficiencyWorkspace'
-
-// ════════════════════════════════════════════════════════════════════════════
-// GAUGE GEOMETRY — clonado del original, agrandado para CLP
-// ════════════════════════════════════════════════════════════════════════════
-
-const GAUGE_SIZE = 360
-const GAUGE_STROKE = 10
-const GAUGE_RADIUS = GAUGE_SIZE / 2 - GAUGE_STROKE - 8
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -45,19 +44,59 @@ interface ActoAnclaProps {
   onBack?: () => void
 }
 
-interface NodoData {
-  /** Valor grande ya formateado (ej: "$20.5M" o "72%") */
-  displayValue: string
-  /** Título corto uppercase del cargo o etiqueta ancla */
-  label: string
-  /** Subtítulo descriptivo (ej: "72% tareas automatizables · 12 FTEs") */
-  sublabel: string
-  /** Ancla científica → render diferenciado (borde más tenue + icon Info) */
-  isAnchor: boolean
+// ════════════════════════════════════════════════════════════════════════════
+// COLOR LOGIC — clonado de AnclaInteligente + tier 'slate' para ancla
+// ════════════════════════════════════════════════════════════════════════════
+
+type TierColor = 'cyan' | 'amber' | 'purple' | 'slate'
+
+const TIER_HEX: Record<TierColor, string> = {
+  cyan: '#22D3EE',
+  amber: '#F59E0B',
+  purple: '#A78BFA',
+  slate: '#64748B',
+}
+
+const TIER_TEXT: Record<TierColor, string> = {
+  cyan: 'text-cyan-400',
+  amber: 'text-amber-400',
+  purple: 'text-purple-400',
+  slate: 'text-slate-400',
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// BUILD NODOS — top 3 cargos desde L1.byPosition + nodo ancla (focalizaScore)
+// GAUGE GEOMETRY — IDÉNTICO a AnclaInteligente
+// ════════════════════════════════════════════════════════════════════════════
+
+const GAUGE_SIZE = 272
+const GAUGE_STROKE = 10
+const GAUGE_RADIUS = GAUGE_SIZE / 2 - GAUGE_STROKE - 8
+
+// ════════════════════════════════════════════════════════════════════════════
+// HELPER — split CLP en mainText + unit para usar el patrón "{score}<suffix>"
+// "$65.2M" → { mainText: "$65.2", unit: "M" }
+// "$1.2MM" → { mainText: "$1.2",  unit: "MM" }
+// "$650k"  → { mainText: "$650",  unit: "k" }
+// ════════════════════════════════════════════════════════════════════════════
+
+function splitCLP(value: number): { mainText: string; unit: string } {
+  if (!isFinite(value) || value <= 0) return { mainText: '$0', unit: '' }
+  if (value >= 1_000_000_000) {
+    const main = (value / 1_000_000_000).toFixed(1).replace(/\.0$/, '')
+    return { mainText: `$${main}`, unit: 'MM' }
+  }
+  if (value >= 1_000_000) {
+    const main = (value / 1_000_000).toFixed(1).replace(/\.0$/, '')
+    return { mainText: `$${main}`, unit: 'M' }
+  }
+  if (value >= 1_000) {
+    return { mainText: `$${Math.round(value / 1_000)}`, unit: 'k' }
+  }
+  return { mainText: `$${Math.round(value)}`, unit: '' }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// BUILD NODOS — top 3 cargos + ancla científica
 // ════════════════════════════════════════════════════════════════════════════
 
 interface PositionCostShape {
@@ -65,6 +104,23 @@ interface PositionCostShape {
   monthlyCost: number
   headcount: number
   avgExposure: number
+}
+
+interface NodoData {
+  /** Texto principal del número (ej: "$20.5", "43") */
+  mainText: string
+  /** Sufijo pequeño (ej: "M", "%", "MM") */
+  unit: string
+  /** Label uppercase corto (cargo o etiqueta ancla) */
+  label: string
+  /** Narrativa de una línea */
+  narrative: string
+  /** Tier de color */
+  tier: TierColor
+  /** Width 0-100 de la micro-barra */
+  barWidth: number
+  /** Tooltip opcional con sustento (solo nodo ancla) */
+  tooltip?: string
 }
 
 function buildNodos(data: DiagnosticData): NodoData[] {
@@ -76,39 +132,57 @@ function buildNodos(data: DiagnosticData): NodoData[] {
     .sort((a, b) => b.monthlyCost - a.monthlyCost)
     .slice(0, 3)
 
-  const cargos: NodoData[] = top3.map(p => ({
-    displayValue: formatCLP(p.monthlyCost),
-    label: p.position,
-    sublabel: `${Math.round(p.avgExposure * 100)}% tareas automatizables · ${formatInt(p.headcount)} FTE${p.headcount === 1 ? '' : 's'}`,
-    isAnchor: false,
-  }))
+  const totalTop3 = top3.reduce((s, p) => s + p.monthlyCost, 0)
 
-  // Padding si hay menos de 3 cargos con data — nodos ghost
+  // Tiers asignados por orden: mayor → cyan, medio → amber, menor → purple
+  const TIERS_BY_RANK: TierColor[] = ['cyan', 'amber', 'purple']
+
+  const cargos: NodoData[] = top3.map((p, idx) => {
+    const split = splitCLP(p.monthlyCost)
+    const proporcion = totalTop3 > 0 ? (p.monthlyCost / totalTop3) * 100 : 0
+    return {
+      mainText: split.mainText,
+      unit: split.unit,
+      label: p.position,
+      narrative: `${Math.round(p.avgExposure * 100)}% tareas automatizables · ${formatInt(p.headcount)} FTE${p.headcount === 1 ? '' : 's'}`,
+      tier: TIERS_BY_RANK[idx] ?? 'purple',
+      barWidth: proporcion,
+    }
+  })
+
+  // Padding ghost si hay menos de 3 cargos con data
   while (cargos.length < 3) {
+    const idx = cargos.length
     cargos.push({
-      displayValue: '—',
+      mainText: '0',
+      unit: '',
       label: 'Sin señal',
-      sublabel: 'No se detectaron cargos en zona crítica',
-      isAnchor: false,
+      narrative: 'No se detectaron cargos en zona crítica',
+      tier: TIERS_BY_RANK[idx] ?? 'purple',
+      barWidth: 0,
     })
   }
 
-  // Nodo 4 — ancla científica (exposición IA global)
+  // Nodo 4 — ancla científica (exposición IA global) · tier 'slate' especial
   const exposicionPctOrg = Math.round((data.meta.avgExposure ?? 0) * 100)
   const personasAnalizadas =
     data.meta.enrichedCount ?? data.meta.totalEmployees ?? 0
   cargos.push({
-    displayValue: `${exposicionPctOrg}%`,
+    mainText: String(exposicionPctOrg),
+    unit: '%',
     label: 'Exposición global',
-    sublabel: `Basado en ${formatInt(personasAnalizadas)} posiciones analizadas`,
-    isAnchor: true,
+    narrative: `Basado en ${formatInt(personasAnalizadas)} posiciones analizadas`,
+    tier: 'slate',
+    barWidth: Math.max(0, Math.min(100, exposicionPctOrg)),
+    tooltip:
+      'focalizaScore Eloundou — promedio ponderado de la exposición IA de cada cargo de la dotación analizada.',
   })
 
   return cargos
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// COMPONENTE
+// COMPONENTE — JSX clonado literal de AnclaInteligente
 // ════════════════════════════════════════════════════════════════════════════
 
 export default memo(function ActoAncla({
@@ -119,14 +193,17 @@ export default memo(function ActoAncla({
   const nodes = useMemo(() => buildNodos(data), [data])
 
   // Capital comprometido en cargos de alta exposición = L1.totalMonthly
-  // (inercia mensual). Distinto del número de la portada (L1+L5) porque
-  // L5 es brecha de productividad, no exposición IA.
   const capitalMensual = useMemo(() => {
     const d = data.lentes.l1_inercia?.detalle as
       | { totalMonthly?: number }
       | null
     return d?.totalMonthly ?? 0
   }, [data])
+
+  const centralSplit = useMemo(() => splitCLP(capitalMensual), [capitalMensual])
+
+  // Color del glow del gauge: cyan (color de la familia destino del CTA)
+  const scoreColor = TIER_HEX.cyan
 
   return (
     <div className="relative rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm">
@@ -152,7 +229,7 @@ export default memo(function ActoAncla({
           </button>
         )}
 
-        {/* ═══ GAUGE CENTRAL — anillo tenue sin progress ═══ */}
+        {/* ═══ GAUGE CENTRAL ═══ */}
         <div className="flex flex-col items-center">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -161,6 +238,13 @@ export default memo(function ActoAncla({
             className="relative"
             style={{ width: GAUGE_SIZE, height: GAUGE_SIZE }}
           >
+            {/* Glow background — restaurado, color cyan (familia destino) */}
+            <div
+              className="absolute inset-0 rounded-full blur-[60px] opacity-20"
+              style={{ backgroundColor: scoreColor }}
+            />
+
+            {/* SVG gauge — solo track, sin progress arc */}
             <svg
               className="absolute inset-0 -rotate-90"
               viewBox={`0 0 ${GAUGE_SIZE} ${GAUGE_SIZE}`}
@@ -170,33 +254,39 @@ export default memo(function ActoAncla({
                 cy={GAUGE_SIZE / 2}
                 r={GAUGE_RADIUS}
                 fill="none"
-                stroke="rgba(51, 65, 85, 0.3)"
+                stroke="rgba(51, 65, 85, 0.4)"
                 strokeWidth={GAUGE_STROKE}
               />
             </svg>
 
-            <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
+            {/* Score (font-semibold, blanco) + label "AL MES" — patrón canónico */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
               <motion.span
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.6, delay: 0.4 }}
-                className="text-[96px] font-extralight text-white leading-none tabular-nums tracking-tight"
+                className="text-[96px] font-semibold text-white leading-none tabular-nums tracking-tight"
               >
-                {formatCLP(capitalMensual)}
+                {centralSplit.mainText}
+                {centralSplit.unit && (
+                  <span className="text-3xl text-slate-500 font-light">
+                    {centralSplit.unit}
+                  </span>
+                )}
               </motion.span>
               <motion.span
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.55 }}
-                className="text-xs tracking-widest uppercase text-slate-500 font-light mt-4 max-w-[260px] leading-snug"
+                transition={{ duration: 0.6, delay: 0.6 }}
+                className="text-[10px] uppercase tracking-[3px] text-slate-500 font-medium mt-1"
               >
-                Capital comprometido en cargos de alta exposición
+                AL MES
               </motion.span>
             </div>
           </motion.div>
         </div>
 
-        {/* ═══ LÍNEAS SVG + NODOS ═══ */}
+        {/* ═══ LÍNEAS SVG + NODOS ═══ — clonado literal */}
         <div className="relative mt-2">
           <svg
             className="absolute inset-x-0 top-0 w-full pointer-events-none"
@@ -205,7 +295,7 @@ export default memo(function ActoAncla({
             preserveAspectRatio="none"
           >
             <defs>
-              <linearGradient id="acto-ancla-line" x1="0%" y1="0%" x2="0%" y2="100%">
+              <linearGradient id="ancla-line-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" stopColor="#22D3EE" stopOpacity="0.5" />
                 <stop offset="100%" stopColor="#A78BFA" stopOpacity="0.25" />
               </linearGradient>
@@ -223,7 +313,7 @@ export default memo(function ActoAncla({
                 <motion.path
                   key={`line-${idx}`}
                   d={path}
-                  stroke="url(#acto-ancla-line)"
+                  stroke="url(#ancla-line-gradient)"
                   strokeWidth="1.5"
                   fill="none"
                   strokeLinecap="round"
@@ -239,50 +329,84 @@ export default memo(function ActoAncla({
             })}
           </svg>
 
-          {/* Nodos (NO clickeables) */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-20">
-            {nodes.map((node, idx) => (
-              <motion.div
-                key={`node-${idx}`}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 1.4 + idx * 0.15 }}
-                className={
-                  node.isAnchor
-                    ? 'text-center border-l border-slate-800/30 pl-4'
-                    : 'text-center'
-                }
-              >
-                <p
-                  className={
-                    node.isAnchor
-                      ? 'text-3xl md:text-4xl font-extralight font-mono tabular-nums leading-none text-slate-300'
-                      : 'text-3xl md:text-4xl font-extralight font-mono tabular-nums leading-none text-white'
-                  }
+          {/* Nodos — patrón canónico: número + suffix, micro-barra, label, narrativa */}
+          <div
+            className={cn(
+              'grid gap-4 pt-20',
+              nodes.length === 4 && 'grid-cols-2 md:grid-cols-4'
+            )}
+          >
+            {nodes.map((node, idx) => {
+              const nodeColor = TIER_HEX[node.tier]
+              const nodeTextClass = TIER_TEXT[node.tier]
+              const isGhost = node.barWidth === 0
+
+              return (
+                <motion.div
+                  key={`node-${idx}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: 1.4 + idx * 0.15 }}
+                  className="text-center"
                 >
-                  {node.displayValue}
-                </p>
-
-                <div className="flex items-center justify-center gap-1 mt-3">
+                  {/* Número grande — white por defecto, slate-500 en ghost */}
                   <p
-                    className={
-                      node.isAnchor
-                        ? 'text-[10px] uppercase tracking-wider text-slate-500 font-medium'
-                        : 'text-[10px] uppercase tracking-wider text-slate-400 font-medium'
-                    }
+                    className={cn(
+                      'text-3xl md:text-4xl font-extralight font-mono tabular-nums leading-none',
+                      isGhost ? 'text-slate-500' : 'text-white'
+                    )}
                   >
-                    {node.label}
+                    {node.mainText}
+                    {node.unit && (
+                      <span className="text-lg text-slate-600">{node.unit}</span>
+                    )}
                   </p>
-                  {node.isAnchor && (
-                    <Info className="w-3 h-3 text-slate-600" aria-hidden />
-                  )}
-                </div>
 
-                <p className="text-[11px] font-light text-slate-500 leading-snug mt-1.5 max-w-[200px] mx-auto">
-                  {node.sublabel}
-                </p>
-              </motion.div>
-            ))}
+                  {/* Micro-barra 2px — proporción del nodo sobre el total */}
+                  <div className="h-[2px] bg-slate-800/60 rounded-full mt-2.5 overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${node.barWidth}%` }}
+                      transition={{
+                        duration: 0.8,
+                        delay: 1.6 + idx * 0.15,
+                        ease: [0.16, 1, 0.3, 1],
+                      }}
+                      className="h-full rounded-full"
+                      style={{
+                        backgroundColor: isGhost ? '#475569' : nodeColor,
+                        opacity: isGhost ? 0.3 : 1,
+                      }}
+                    />
+                  </div>
+
+                  {/* Label + tooltip opcional (i) */}
+                  <div className="flex items-center justify-center gap-1 mt-3">
+                    <p
+                      className={cn(
+                        'text-[10px] uppercase tracking-wider font-medium',
+                        isGhost ? 'text-slate-500' : nodeTextClass
+                      )}
+                    >
+                      {node.label}
+                    </p>
+                    {node.tooltip && (
+                      <span className="group/tip relative inline-flex">
+                        <Info className="w-3 h-3 text-slate-600 hover:text-slate-400 cursor-help transition-colors" />
+                        <span className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 px-3 py-2.5 rounded-lg bg-slate-950 border border-slate-700/40 text-[10px] text-slate-300 leading-relaxed opacity-0 group-hover/tip:opacity-100 transition-opacity pointer-events-none z-50 shadow-2xl shadow-black/50 text-left normal-case tracking-normal font-light">
+                          {node.tooltip}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Narrativa (una línea) */}
+                  <p className="text-[11px] font-light text-slate-500 leading-snug mt-1.5 max-w-[180px] mx-auto">
+                    {node.narrative}
+                  </p>
+                </motion.div>
+              )
+            })}
           </div>
         </div>
 
