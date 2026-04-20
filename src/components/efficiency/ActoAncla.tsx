@@ -32,6 +32,8 @@ import {
   formatInt,
   type FamiliaId,
 } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
+import { normalizePositionText } from '@/lib/utils/normalizePosition'
+import { toTitleCase } from '@/lib/utils/formatName'
 import type { DiagnosticData } from '@/hooks/useEfficiencyWorkspace'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -74,19 +76,26 @@ const GAUGE_RADIUS = GAUGE_SIZE / 2 - GAUGE_STROKE - 8
 
 // ════════════════════════════════════════════════════════════════════════════
 // HELPER — split CLP en mainText + unit para usar el patrón "{score}<suffix>"
-// "$65.2M" → { mainText: "$65.2", unit: "M" }
-// "$1.2MM" → { mainText: "$1.2",  unit: "MM" }
-// "$650k"  → { mainText: "$650",  unit: "k" }
+// "$782M" → { mainText: "$782", unit: "M" }   (anual sin decimales)
+// "$1MM"  → { mainText: "$1",   unit: "MM" }
+// El Acto Ancla usa siempre noDecimals=true (valor anual, números limpios).
 // ════════════════════════════════════════════════════════════════════════════
 
-function splitCLP(value: number): { mainText: string; unit: string } {
+function splitCLP(
+  value: number,
+  noDecimals = false
+): { mainText: string; unit: string } {
   if (!isFinite(value) || value <= 0) return { mainText: '$0', unit: '' }
   if (value >= 1_000_000_000) {
-    const main = (value / 1_000_000_000).toFixed(1).replace(/\.0$/, '')
+    const main = noDecimals
+      ? String(Math.round(value / 1_000_000_000))
+      : (value / 1_000_000_000).toFixed(1).replace(/\.0$/, '')
     return { mainText: `$${main}`, unit: 'MM' }
   }
   if (value >= 1_000_000) {
-    const main = (value / 1_000_000).toFixed(1).replace(/\.0$/, '')
+    const main = noDecimals
+      ? String(Math.round(value / 1_000_000))
+      : (value / 1_000_000).toFixed(1).replace(/\.0$/, '')
     return { mainText: `$${main}`, unit: 'M' }
   }
   if (value >= 1_000) {
@@ -138,12 +147,15 @@ function buildNodos(data: DiagnosticData): NodoData[] {
   const TIERS_BY_RANK: TierColor[] = ['cyan', 'amber', 'purple']
 
   const cargos: NodoData[] = top3.map((p, idx) => {
-    const split = splitCLP(p.monthlyCost)
+    // Valor anual sin decimales — alineado con el contexto "MM$ / AÑO" central
+    const annual = p.monthlyCost * 12
+    const split = splitCLP(annual, true)
     const proporcion = totalTop3 > 0 ? (p.monthlyCost / totalTop3) * 100 : 0
     return {
       mainText: split.mainText,
       unit: split.unit,
-      label: p.position,
+      // "ANALISTA_RRHH" → normalize → "analista rrhh" → toTitleCase → "Analista Rrhh"
+      label: toTitleCase(normalizePositionText(p.position)),
       narrative: `${Math.round(p.avgExposure * 100)}% tareas automatizables · ${formatInt(p.headcount)} FTE${p.headcount === 1 ? '' : 's'}`,
       tier: TIERS_BY_RANK[idx] ?? 'purple',
       barWidth: proporcion,
@@ -192,15 +204,18 @@ export default memo(function ActoAncla({
 }: ActoAnclaProps) {
   const nodes = useMemo(() => buildNodos(data), [data])
 
-  // Capital comprometido en cargos de alta exposición = L1.totalMonthly
-  const capitalMensual = useMemo(() => {
+  // Capital comprometido en cargos de alta exposición — visto en escala
+  // ANUAL sin decimales (más letal que mensual: "$782M / año" pega más
+  // fuerte en sala de directorio que "$65M / mes"). El label inferior
+  // "MM$ / AÑO" da el contexto, no el número.
+  const capitalAnual = useMemo(() => {
     const d = data.lentes.l1_inercia?.detalle as
       | { totalMonthly?: number }
       | null
-    return d?.totalMonthly ?? 0
+    return (d?.totalMonthly ?? 0) * 12
   }, [data])
 
-  const centralSplit = useMemo(() => splitCLP(capitalMensual), [capitalMensual])
+  const centralSplit = useMemo(() => splitCLP(capitalAnual, true), [capitalAnual])
 
   // Color del glow del gauge: cyan (color de la familia destino del CTA)
   const scoreColor = TIER_HEX.cyan
@@ -280,7 +295,7 @@ export default memo(function ActoAncla({
                 transition={{ duration: 0.6, delay: 0.6 }}
                 className="text-[10px] uppercase tracking-[3px] text-slate-500 font-medium mt-1"
               >
-                AL MES
+                MM$ / AÑO
               </motion.span>
             </div>
           </motion.div>
