@@ -134,15 +134,23 @@ export function EfficiencyHub() {
   return (
     <>
       <div className="fhr-bg-main h-screen flex flex-col overflow-hidden">
-        {/* ── HEADER ultracompacto: solo rail + MisPlanesBtn ───────
-            Altura objetivo ~32px. Sin título, sin eyebrow, sin stats. */}
+        {/* ── HEADER ultracompacto ─────────────────────────────────
+            · lobby + ancla → eyebrow + Mis planes (sin rail)
+            · briefing + lente → rail de familias + Mis planes
+            El Acto Ancla es la primera vez que el CEO ve las 3 familias. */}
         <header className="flex-shrink-0 max-w-7xl mx-auto w-full px-4 md:px-8 border-b border-slate-800/40">
-          <div className="flex items-center justify-between gap-4">
-            <EfficiencyRail
-              activeFamiliaId={ws.activeFamiliaId}
-              familiasVisitadas={ws.familiasVisitadas}
-              onSelect={ws.selectFamilia}
-            />
+          <div className="flex items-center justify-between gap-4 py-3">
+            {ws.hubView === 'lobby' || ws.hubView === 'ancla' ? (
+              <span className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-light">
+                Efficiency Intelligence
+              </span>
+            ) : (
+              <EfficiencyRail
+                activeFamiliaId={ws.activeFamiliaId}
+                familiasVisitadas={ws.familiasVisitadas}
+                onSelect={ws.selectFamilia}
+              />
+            )}
             <MisPlanesBtn />
           </div>
         </header>
