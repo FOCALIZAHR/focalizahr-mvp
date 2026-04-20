@@ -34,20 +34,20 @@ import type { FamiliaId } from '@/lib/services/efficiency/EfficiencyNarrativeEng
 // ════════════════════════════════════════════════════════════════════════════
 
 const FAMILIA_COLORS: Record<FamiliaId, { accent: string; glow: string; label: string }> = {
-  choque_tecnologico: {
+  capital_en_riesgo: {
     accent: '#22D3EE',
     glow: 'rgba(34, 211, 238, 0.25)',
-    label: 'Diagnóstico · Choque Tecnológico',
+    label: 'Capital en riesgo',
   },
-  grasa_organizacional: {
+  ruta_ejecucion: {
     accent: '#A78BFA',
     glow: 'rgba(167, 139, 250, 0.25)',
-    label: 'Oportunidad · Grasa Organizacional',
+    label: 'Ruta de ejecución',
   },
-  riesgo_financiero: {
+  costo_esperar: {
     accent: '#F59E0B',
     glow: 'rgba(245, 158, 11, 0.25)',
-    label: 'Protección · Riesgo Financiero',
+    label: 'Costo de esperar',
   },
 }
 

@@ -20,7 +20,7 @@ export type LenteId =
   | 'l8_retencion'
   | 'l9_pasivo'
 
-export type FamiliaId = 'choque_tecnologico' | 'grasa_organizacional' | 'riesgo_financiero'
+export type FamiliaId = 'capital_en_riesgo' | 'ruta_ejecucion' | 'costo_esperar'
 
 export interface LenteMeta {
   id: LenteId
@@ -30,61 +30,68 @@ export interface LenteMeta {
 }
 
 export const LENTES_META: Record<LenteId, LenteMeta> = {
-  // ── FAMILIA 1 — CHOQUE TECNOLÓGICO ──────────────────────────────────
+  // ── FAMILIA 1 — CAPITAL EN RIESGO ───────────────────────────────────
+  //    Cuánto capital mensual vive en cargos que la IA ya resuelve o que
+  //    comparten trabajo entre sí sin agregarlo.
   l1_inercia: {
     id: 'l1_inercia',
-    familia: 'choque_tecnologico',
-    titulo: 'Costo de Inercia',
+    familia: 'capital_en_riesgo',
+    titulo: 'Costo de no decidir',
     subtitulo: 'FTEs atrapados en tareas automatizables',
   },
-  l2_zombie: {
-    id: 'l2_zombie',
-    familia: 'choque_tecnologico',
-    titulo: 'Paradoja del Talento Zombie',
-    subtitulo: 'Rinden hoy, no pueden adaptarse mañana',
-  },
-  l3_adopcion: {
-    id: 'l3_adopcion',
-    familia: 'choque_tecnologico',
-    titulo: 'Riesgo de Adopción',
-    subtitulo: 'Invertir donde el clima no cooperará',
-  },
-  // ── FAMILIA 2 — GRASA ORGANIZACIONAL ────────────────────────────────
   l4_fantasma: {
     id: 'l4_fantasma',
-    familia: 'grasa_organizacional',
-    titulo: 'Cargos Fantasma',
+    familia: 'capital_en_riesgo',
+    titulo: 'Cargos sin impacto',
     subtitulo: 'Títulos distintos, mismo trabajo',
+  },
+
+  // ── FAMILIA 2 — RUTA DE EJECUCIÓN ───────────────────────────────────
+  //    A quién reentrenar, a quién reubicar, a quién acompañar.
+  //    Decisiones sobre personas reales en el camino hacia el nuevo modelo.
+  l2_zombie: {
+    id: 'l2_zombie',
+    familia: 'ruta_ejecucion',
+    titulo: 'Talento estancado',
+    subtitulo: 'Rinden hoy, no pueden adaptarse mañana',
   },
   l5_brecha: {
     id: 'l5_brecha',
-    familia: 'grasa_organizacional',
+    familia: 'ruta_ejecucion',
     titulo: 'Brecha de Productividad',
     subtitulo: 'Salario pagado sin rendimiento equivalente',
   },
   l6_seniority: {
     id: 'l6_seniority',
-    familia: 'grasa_organizacional',
+    familia: 'ruta_ejecucion',
     titulo: 'Compresión de Seniority',
     subtitulo: 'Junior con IA = output de Senior',
   },
-  // ── FAMILIA 3 — RIESGO FINANCIERO ───────────────────────────────────
   l7_fuga: {
     id: 'l7_fuga',
-    familia: 'riesgo_financiero',
-    titulo: 'Fuga de Talento Aumentado',
+    familia: 'ruta_ejecucion',
+    titulo: 'Talento en riesgo',
     subtitulo: 'Quien se volverá 3x productivo con IA',
   },
   l8_retencion: {
     id: 'l8_retencion',
-    familia: 'riesgo_financiero',
-    titulo: 'Prioridad de Retención',
+    familia: 'ruta_ejecucion',
+    titulo: 'Prioridad de retención',
     subtitulo: 'Intocables, valiosos, neutros, prescindibles',
+  },
+
+  // ── FAMILIA 3 — COSTO DE ESPERAR ────────────────────────────────────
+  //    Cuánto se encarece la decisión por cada mes de postergación.
+  l3_adopcion: {
+    id: 'l3_adopcion',
+    familia: 'costo_esperar',
+    titulo: 'Riesgo de adopción',
+    subtitulo: 'Invertir donde el clima no cooperará',
   },
   l9_pasivo: {
     id: 'l9_pasivo',
-    familia: 'riesgo_financiero',
-    titulo: 'Pasivo Laboral',
+    familia: 'costo_esperar',
+    titulo: 'Costo de esperar',
     subtitulo: 'Shock de finiquitos y payback',
   },
 }

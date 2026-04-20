@@ -79,33 +79,34 @@ const CLIMA_CRITICO_THRESHOLD = 2.5
 
 /**
  * Lentes disponibles en el rail (orden canónico).
- * L3 es guardarraíl pre-Hub, no está aquí.
- * L6 está congelado — omitido del rail (no se muestra "Próximamente").
+ * L6 está congelado — omitido del rail.
+ * L8 se fusiona con L7 en el componente L7L8MapaTalento.
+ * L3 pasó de guardarraíl pre-Hub a lente normal dentro de "Costo de esperar".
  */
 const LENTES_DISPONIBLES: LenteId[] = [
   'l1_inercia',
-  'l2_zombie',
   'l4_fantasma',
+  'l2_zombie',
   'l5_brecha',
-  'l7_fuga',      // el componente L7L8MapaTalento se registra bajo l7_fuga
+  'l7_fuga',      // L7L8MapaTalento se registra bajo l7_fuga
+  'l3_adopcion',
   'l9_pasivo',
 ]
 
 /**
  * Lentes agrupados por familia en orden canónico — usado para prev/next
- * navegación dentro de una familia (el CEO puede avanzar linealmente por
- * los lentes de la familia seleccionada).
+ * navegación dentro de una familia.
  */
 export const LENTES_POR_FAMILIA: Record<FamiliaId, LenteId[]> = {
-  choque_tecnologico: ['l1_inercia', 'l2_zombie'],
-  grasa_organizacional: ['l4_fantasma', 'l5_brecha'],
-  riesgo_financiero: ['l7_fuga', 'l9_pasivo'],
+  capital_en_riesgo: ['l1_inercia', 'l4_fantasma'],
+  ruta_ejecucion: ['l2_zombie', 'l5_brecha', 'l7_fuga'],
+  costo_esperar: ['l3_adopcion', 'l9_pasivo'],
 }
 
 const FAMILIA_ORDEN: FamiliaId[] = [
-  'choque_tecnologico',
-  'grasa_organizacional',
-  'riesgo_financiero',
+  'capital_en_riesgo',
+  'ruta_ejecucion',
+  'costo_esperar',
 ]
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -147,19 +148,13 @@ export interface UseEfficiencyWorkspaceReturn {
   error: string | null
   data: DiagnosticData | null
 
-  // Flow
-  step: 'guardarrail' | 'hub'
-  acceptGuardarrail: () => void
-  /** Alterna inclusión manual de una gerencia originalmente excluida */
+  // Flow — gerenciasExcluidas se pre-inicializa desde L3 crítico al cargar
+  // data y actúa como filtro silencioso para lentes que lo consumen
+  // (L5BrechaProductividad, _LentePlaceholder). La pantalla guardarraíl
+  // previa al Hub fue eliminada: L3 pasó a ser un lente más dentro de
+  // la familia "Costo de esperar".
   toggleGerenciaExclusion: (departmentId: string) => void
   gerenciasExcluidas: Set<string>
-  gerenciasCriticasL3: Array<{
-    departmentId: string
-    departmentName: string
-    climaScale5: number
-    pctPotencial: number
-    usandoFallback: boolean
-  }>
 
   // Navegación lentes
   /** null = estado lobby (shock global). LenteId = lente activo en portada */
@@ -221,7 +216,6 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
   const [data, setData] = useState<DiagnosticData | null>(null)
 
   // ── State: flow ─────────────────────────────────────────────────
-  const [step, setStep] = useState<'guardarrail' | 'hub'>('guardarrail')
   const [gerenciasExcluidas, setGerenciasExcluidas] = useState<Set<string>>(
     new Set()
   )
@@ -272,7 +266,9 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
         }
         setData(json.data)
 
-        // Inicializar gerenciasExcluidas desde L3 crítico
+        // Pre-inicializar gerenciasExcluidas desde L3 crítico (clima < 2.5
+        // sobre 5). Filtro silencioso — antes levantaba la pantalla
+        // guardarraíl, hoy solo alimenta el filtro de lentes operativos.
         const l3 = json.data.lentes.l3_adopcion
         if (l3?.hayData) {
           const ranking =
@@ -289,12 +285,7 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
           }
           if (iniciales.size > 0) {
             setGerenciasExcluidas(iniciales)
-            setStep('guardarrail')
-          } else {
-            setStep('hub')
           }
-        } else {
-          setStep('hub')
         }
       } catch (e) {
         if (!cancelled) {
@@ -310,8 +301,6 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
   }, [])
 
   // ── Callbacks: flow ────────────────────────────────────────────
-  const acceptGuardarrail = useCallback(() => setStep('hub'), [])
-
   const toggleGerenciaExclusion = useCallback((departmentId: string) => {
     setGerenciasExcluidas(prev => {
       const next = new Set(prev)
@@ -437,22 +426,6 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
   const clearCarrito = useCallback(() => setCarrito(new Map()), [])
 
   // ── Derivados memoizados ──────────────────────────────────────
-  const gerenciasCriticasL3 = useMemo(() => {
-    if (!data?.lentes.l3_adopcion?.hayData) return []
-    const ranking =
-      ((data.lentes.l3_adopcion.detalle as Record<string, unknown>)
-        ?.ranking as Array<Record<string, unknown>>) ?? []
-    return ranking
-      .filter(g => (g.climaScale5 as number) < CLIMA_CRITICO_THRESHOLD)
-      .map(g => ({
-        departmentId: (g.departmentId as string) ?? '',
-        departmentName: (g.departmentName as string) ?? 'Sin nombre',
-        climaScale5: (g.climaScale5 as number) ?? 0,
-        pctPotencial: (g.pctPotencial as number) ?? 0,
-        usandoFallback: (g.usandoFallback as boolean) ?? false,
-      }))
-  }, [data])
-
   const decisionesDelLenteActivo = useMemo(() => {
     if (!activeLenteId) return []
     return [...carrito.values()].filter(d => {
@@ -508,11 +481,8 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
     loading,
     error,
     data,
-    step,
-    acceptGuardarrail,
     toggleGerenciaExclusion,
     gerenciasExcluidas,
-    gerenciasCriticasL3,
     activeLenteId,
     activeFamiliaId,
     hubView,

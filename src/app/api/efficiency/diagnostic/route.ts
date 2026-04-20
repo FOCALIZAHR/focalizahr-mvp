@@ -45,22 +45,22 @@ const GLOBAL_ROLES = [
 
 const FAMILIAS = [
   {
-    id: 'choque_tecnologico',
-    titulo: 'Choque Tecnológico',
-    subtitulo: 'Lo que la IA está cambiando hoy',
-    lentes: ['l1_inercia', 'l2_zombie', 'l3_adopcion'] as LenteId[],
+    id: 'capital_en_riesgo',
+    titulo: 'Capital en riesgo',
+    subtitulo: 'Cuánto capital vive en cargos que la IA ya resuelve',
+    lentes: ['l1_inercia', 'l4_fantasma'] as LenteId[],
   },
   {
-    id: 'grasa_organizacional',
-    titulo: 'Grasa Organizacional',
-    subtitulo: 'Lo que se paga sin rendimiento equivalente',
-    lentes: ['l4_fantasma', 'l5_brecha', 'l6_seniority'] as LenteId[],
+    id: 'ruta_ejecucion',
+    titulo: 'Ruta de ejecución',
+    subtitulo: 'A quién reentrenar, reubicar o acompañar',
+    lentes: ['l2_zombie', 'l5_brecha', 'l7_fuga'] as LenteId[],
   },
   {
-    id: 'riesgo_financiero',
-    titulo: 'Riesgo Financiero',
-    subtitulo: 'El bisturí: a quién proteger y a quién soltar',
-    lentes: ['l7_fuga', 'l8_retencion', 'l9_pasivo'] as LenteId[],
+    id: 'costo_esperar',
+    titulo: 'Costo de esperar',
+    subtitulo: 'Cuánto se encarece la decisión cada mes que pasa',
+    lentes: ['l3_adopcion', 'l9_pasivo'] as LenteId[],
   },
 ]
 

@@ -3,16 +3,16 @@
 // src/components/efficiency/EfficiencyToolbar.tsx
 // ════════════════════════════════════════════════════════════════════════════
 // Reutiliza ModuleToolbar (patrón WorkforceToolbar). 3 tools:
-//   · Diagnóstico (Zap) → L1 + L2 agregados
-//   · Oportunidad (GitBranch) → L4 + L5
-//   · Protección (ShieldAlert) → L7+L8 + L9
+//   · Capital en riesgo  (Target)    → L1 + L4
+//   · Ruta de ejecución  (GitBranch) → L2 + L5 + L7+L8
+//   · Costo de esperar   (Clock)     → L9 + L3
 // Glassmorphism, fixed right, visible en todas las vistas del hub.
 // ════════════════════════════════════════════════════════════════════════════
 
 'use client'
 
 import { useMemo } from 'react'
-import { Zap, GitBranch, ShieldAlert } from 'lucide-react'
+import { Target, GitBranch, Clock } from 'lucide-react'
 import ModuleToolbar, {
   type ToolDefinition,
   type ToolBreakdown,
@@ -94,48 +94,49 @@ export default function EfficiencyToolbar({ data }: EfficiencyToolbarProps) {
 
     const l1 = lentes.l1_inercia
     const l2 = lentes.l2_zombie
+    const l3 = lentes.l3_adopcion
     const l4 = lentes.l4_fantasma
     const l5 = lentes.l5_brecha
     const l7 = lentes.l7_fuga
     const l9 = lentes.l9_pasivo
 
-    // Tool 1 — Diagnóstico (Choque Tecnológico)
-    const diagnosticoMetric =
+    // Tool 1 — Capital en riesgo (L1 + L4)
+    const capitalMetric =
       l1?.hayData
         ? formatCLP(getNumber(l1.detalle, 'totalMonthly'))
-        : l2?.hayData
-        ? `${getNumber(l2.detalle, 'count')}`
+        : l4?.hayData
+        ? `${getArrayLen(l4.detalle, 'pairs')}`
         : '—'
-    const diagnosticoBreakdown: ToolBreakdown[] = [
+    const capitalBreakdown: ToolBreakdown[] = [
       {
-        label: 'Costo inercia',
+        label: 'Costo de no decidir',
         value: headlineValue(l1),
         formatted: headlineMetric(l1),
       },
       {
-        label: 'Talento zombie',
-        value: headlineValue(l2),
-        formatted: l2?.hayData
-          ? `${getNumber(l2.detalle, 'count')} ${
-              getNumber(l2.detalle, 'count') === 1 ? 'persona' : 'personas'
+        label: 'Cargos sin impacto',
+        value: headlineValue(l4),
+        formatted: l4?.hayData
+          ? `${getArrayLen(l4.detalle, 'pairs')} ${
+              getArrayLen(l4.detalle, 'pairs') === 1 ? 'par' : 'pares'
             }`
           : '—',
       },
     ]
 
-    // Tool 2 — Oportunidad (Grasa Organizacional)
-    const oportunidadMetric = l5?.hayData
+    // Tool 2 — Ruta de ejecución (L2 + L5 + L7+L8)
+    const rutaMetric = l5?.hayData
       ? formatCLP(getNumber(l5.detalle, 'total'))
-      : l4?.hayData
-      ? `${getArrayLen(l4.detalle, 'pairs')}`
+      : l2?.hayData
+      ? `${getNumber(l2.detalle, 'count')}`
       : '—'
-    const oportunidadBreakdown: ToolBreakdown[] = [
+    const rutaBreakdown: ToolBreakdown[] = [
       {
-        label: 'Cargos fantasma',
-        value: headlineValue(l4),
-        formatted: l4?.hayData
-          ? `${getArrayLen(l4.detalle, 'pairs')} ${
-              getArrayLen(l4.detalle, 'pairs') === 1 ? 'par' : 'pares'
+        label: 'Talento estancado',
+        value: headlineValue(l2),
+        formatted: l2?.hayData
+          ? `${getNumber(l2.detalle, 'count')} ${
+              getNumber(l2.detalle, 'count') === 1 ? 'persona' : 'personas'
             }`
           : '—',
       },
@@ -144,15 +145,8 @@ export default function EfficiencyToolbar({ data }: EfficiencyToolbarProps) {
         value: headlineValue(l5),
         formatted: headlineMetric(l5),
       },
-    ]
-
-    // Tool 3 — Protección (Riesgo Financiero)
-    const proteccionMetric = l9?.hayData
-      ? formatCLP(getNumber(l9.detalle, 'costoEsperaTotal'))
-      : '—'
-    const proteccionBreakdown: ToolBreakdown[] = [
       {
-        label: 'Mapa de talento',
+        label: 'Talento en riesgo',
         value: headlineValue(l7),
         formatted: l7?.hayData
           ? `${getNumber(l7.detalle, 'count')} ${
@@ -160,46 +154,61 @@ export default function EfficiencyToolbar({ data }: EfficiencyToolbarProps) {
             }`
           : '—',
       },
+    ]
+
+    // Tool 3 — Costo de esperar (L9 + L3)
+    const esperarMetric = l9?.hayData
+      ? formatCLP(getNumber(l9.detalle, 'costoEsperaTotal'))
+      : '—'
+    const rankingLen = l3?.hayData ? getArrayLen(l3.detalle, 'ranking') : 0
+    const esperarBreakdown: ToolBreakdown[] = [
       {
         label: 'Pasivo laboral',
         value: headlineValue(l9),
         formatted: headlineMetric(l9),
       },
+      {
+        label: 'Riesgo de adopción',
+        value: rankingLen,
+        formatted: l3?.hayData
+          ? `${rankingLen} ${rankingLen === 1 ? 'gerencia' : 'gerencias'}`
+          : '—',
+      },
     ]
 
     return [
       {
-        id: 'diagnostico',
-        label: 'Diagnóstico',
-        icon: Zap,
-        metric: diagnosticoMetric,
+        id: 'capital_en_riesgo',
+        label: 'Capital en riesgo',
+        icon: Target,
+        metric: capitalMetric,
         unit: l1?.hayData ? '/mes' : '',
         color: '#22D3EE',
-        breakdown: diagnosticoBreakdown,
+        breakdown: capitalBreakdown,
         narrative: l1?.hayData
           ? `La organización paga ${formatCLP(getNumber(l1.detalle, 'totalMonthly'))} al mes por trabajo que la IA ya resolvió.`
           : undefined,
       },
       {
-        id: 'oportunidad',
-        label: 'Oportunidad',
+        id: 'ruta_ejecucion',
+        label: 'Ruta de ejecución',
         icon: GitBranch,
-        metric: oportunidadMetric,
+        metric: rutaMetric,
         unit: l5?.hayData ? '/mes' : '',
         color: '#A78BFA',
-        breakdown: oportunidadBreakdown,
+        breakdown: rutaBreakdown,
         narrative: l5?.hayData
           ? `${formatCLP(getNumber(l5.detalle, 'total'))} de salario sin rendimiento equivalente cada mes.`
           : undefined,
       },
       {
-        id: 'proteccion',
-        label: 'Protección',
-        icon: ShieldAlert,
-        metric: proteccionMetric,
-        unit: l9?.hayData ? 'costo espera' : '',
+        id: 'costo_esperar',
+        label: 'Costo de esperar',
+        icon: Clock,
+        metric: esperarMetric,
+        unit: l9?.hayData ? 'en 12m' : '',
         color: '#F59E0B',
-        breakdown: proteccionBreakdown,
+        breakdown: esperarBreakdown,
         narrative: l9?.hayData
           ? `${formatCLP(getNumber(l9.detalle, 'costoEsperaTotal'))} adicional si postergás la decisión doce meses.`
           : undefined,

@@ -44,15 +44,15 @@ export interface EfficiencyPlanPDFData {
 // ════════════════════════════════════════════════════════════════════════════
 
 const FAMILIA_LABEL: Record<FamiliaId, string> = {
-  choque_tecnologico: 'Diagnóstico · Choque Tecnológico',
-  grasa_organizacional: 'Oportunidad · Grasa Organizacional',
-  riesgo_financiero: 'Protección · Riesgo Financiero',
+  capital_en_riesgo: 'Capital en riesgo',
+  ruta_ejecucion: 'Ruta de ejecución',
+  costo_esperar: 'Costo de esperar',
 }
 
 const FAMILIA_COLOR: Record<FamiliaId, [number, number, number]> = {
-  choque_tecnologico: [34, 211, 238], // cyan
-  grasa_organizacional: [167, 139, 250], // purple
-  riesgo_financiero: [245, 158, 11], // amber
+  capital_en_riesgo: [34, 211, 238], // cyan
+  ruta_ejecucion: [167, 139, 250], // purple
+  costo_esperar: [245, 158, 11], // amber
 }
 
 const TESIS_LABEL: Record<string, string> = {
@@ -353,9 +353,9 @@ function agruparPorFamilia(
   decisiones: DecisionItem[]
 ): Array<{ familia: FamiliaId; items: DecisionItem[] }> {
   const order: FamiliaId[] = [
-    'choque_tecnologico',
-    'grasa_organizacional',
-    'riesgo_financiero',
+    'capital_en_riesgo',
+    'ruta_ejecucion',
+    'costo_esperar',
   ]
   const grouped = new Map<FamiliaId, DecisionItem[]>()
   for (const fam of order) grouped.set(fam, [])

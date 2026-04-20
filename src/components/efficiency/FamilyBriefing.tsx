@@ -43,36 +43,36 @@ interface FamiliaMeta {
 }
 
 const FAMILIA_META: Record<FamiliaId, FamiliaMeta> = {
-  choque_tecnologico: {
-    eyebrow: 'EXPOSICIÓN AL CAMBIO',
-    titleFirst: 'Choque',
-    titleGradient: 'Tecnológico',
+  capital_en_riesgo: {
+    eyebrow: 'DECISIÓN PENDIENTE',
+    titleFirst: 'Capital',
+    titleGradient: 'en riesgo',
     accent: '#22D3EE',
-    lentes: ['l1_inercia', 'l2_zombie'],
+    lentes: ['l1_inercia', 'l4_fantasma'],
     potencialLabel: '/mes',
     getPotencial: lentes => {
       const d = lentes.l1_inercia?.detalle as { totalMonthly?: number } | null
       return d?.totalMonthly ?? 0
     },
   },
-  grasa_organizacional: {
-    eyebrow: 'CAPACIDAD RECUPERABLE',
-    titleFirst: 'Grasa',
-    titleGradient: 'Organizacional',
+  ruta_ejecucion: {
+    eyebrow: 'A QUIÉN MOVER',
+    titleFirst: 'Ruta de',
+    titleGradient: 'ejecución',
     accent: '#A78BFA',
-    lentes: ['l4_fantasma', 'l5_brecha'],
+    lentes: ['l2_zombie', 'l5_brecha', 'l7_fuga'],
     potencialLabel: '/mes',
     getPotencial: lentes => {
       const d = lentes.l5_brecha?.detalle as { total?: number } | null
       return d?.total ?? 0
     },
   },
-  riesgo_financiero: {
-    eyebrow: 'COSTO DE ESPERAR',
-    titleFirst: 'Riesgo',
-    titleGradient: 'Financiero',
+  costo_esperar: {
+    eyebrow: 'PRECIO DE LA POSTERGACIÓN',
+    titleFirst: 'Costo de',
+    titleGradient: 'esperar',
     accent: '#F59E0B',
-    lentes: ['l7_fuga', 'l9_pasivo'],
+    lentes: ['l3_adopcion', 'l9_pasivo'],
     potencialLabel: 'en 12 meses',
     getPotencial: lentes => {
       const d = lentes.l9_pasivo?.detalle as
@@ -153,11 +153,25 @@ const LENTE_COPY: Record<LenteId, LenteCopy> = {
   },
   l3_adopcion: {
     titulo: 'L3 · RIESGO DE ADOPCIÓN',
-    narrativa: 'Guardarraíl aplicado antes del Hub.',
-    getHero: () => '—',
-    getHeroUnit: () => '',
-    getImpacto: () => 'Guardarraíl pre-Hub',
-    getDesglose: () => ['No invertir donde el clima no cooperará.'],
+    narrativa:
+      'Gerencias donde el clima no acompañará la inversión. Cada mes de demora aumenta la resistencia.',
+    getHero: lente => {
+      const d = lente.detalle as { ranking?: unknown[] } | null
+      return formatInt(d?.ranking?.length ?? 0)
+    },
+    getHeroUnit: lente => {
+      const d = lente.detalle as { ranking?: unknown[] } | null
+      return (d?.ranking?.length ?? 0) === 1 ? 'gerencia' : 'gerencias'
+    },
+    getImpacto: lente => {
+      const d = lente.detalle as { ranking?: unknown[] } | null
+      const n = d?.ranking?.length ?? 0
+      return `${formatInt(n)} en zona de fricción`
+    },
+    getDesglose: () => [
+      'Clima crítico bajo el umbral 2.5 / 5',
+      'Inversión rendirá menos sin acompañamiento previo',
+    ],
   },
   l4_fantasma: {
     titulo: 'L4 · CARGOS SIN IMPACTO',

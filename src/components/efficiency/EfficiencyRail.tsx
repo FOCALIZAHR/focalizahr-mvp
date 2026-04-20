@@ -26,24 +26,24 @@ interface FamiliaMeta {
 
 const FAMILIAS_UI: FamiliaMeta[] = [
   {
-    id: 'choque_tecnologico',
+    id: 'capital_en_riesgo',
     numero: '01',
-    header: 'DIAGNÓSTICO',
-    subtitulo: 'Choque Tecnológico',
+    header: 'CAPITAL EN RIESGO',
+    subtitulo: 'Cargos donde la IA ya hace el trabajo',
     accent: '#22D3EE',
   },
   {
-    id: 'grasa_organizacional',
+    id: 'ruta_ejecucion',
     numero: '02',
-    header: 'OPORTUNIDAD',
-    subtitulo: 'Grasa Organizacional',
+    header: 'RUTA DE EJECUCIÓN',
+    subtitulo: 'Reentrenar, reubicar o acompañar',
     accent: '#A78BFA',
   },
   {
-    id: 'riesgo_financiero',
+    id: 'costo_esperar',
     numero: '03',
-    header: 'PROTECCIÓN',
-    subtitulo: 'Riesgo Financiero',
+    header: 'COSTO DE ESPERAR',
+    subtitulo: 'Cuánto se encarece postergar',
     accent: '#F59E0B',
   },
 ]

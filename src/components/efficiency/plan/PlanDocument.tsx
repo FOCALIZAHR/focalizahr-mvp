@@ -85,9 +85,9 @@ const TESIS_META: Record<
 }
 
 const FAMILIA_META: Record<FamiliaId, { label: string; accent: string }> = {
-  choque_tecnologico: { label: 'Diagnóstico · Choque Tecnológico', accent: '#22D3EE' },
-  grasa_organizacional: { label: 'Oportunidad · Grasa Organizacional', accent: '#A78BFA' },
-  riesgo_financiero: { label: 'Protección · Riesgo Financiero', accent: '#F59E0B' },
+  capital_en_riesgo: { label: 'Capital en riesgo', accent: '#22D3EE' },
+  ruta_ejecucion: { label: 'Ruta de ejecución', accent: '#A78BFA' },
+  costo_esperar: { label: 'Costo de esperar', accent: '#F59E0B' },
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -159,9 +159,9 @@ export function PlanDocument({
   // Agrupar decisiones por familia (orden canónico)
   const decisionesPorFamilia = useMemo(() => {
     const order: FamiliaId[] = [
-      'choque_tecnologico',
-      'grasa_organizacional',
-      'riesgo_financiero',
+      'capital_en_riesgo',
+      'ruta_ejecucion',
+      'costo_esperar',
     ]
     const grouped = new Map<FamiliaId, DecisionItem[]>()
     for (const fam of order) grouped.set(fam, [])
@@ -593,12 +593,12 @@ function fraseFamilia(familia: FamiliaId, items: DecisionItem[]): string {
   const n = items.length
 
   switch (familia) {
-    case 'choque_tecnologico':
-      return `En el frente tecnológico, el plan interviene en ${lista.toLowerCase()} para capturar capacidad liberable y contener exposición a automatización.`
-    case 'grasa_organizacional':
-      return `En el frente estructural, actúa sobre ${lista.toLowerCase()} — ${n} ajuste${n === 1 ? '' : 's'} que eliminan duplicación y brecha de rendimiento.`
-    case 'riesgo_financiero':
-      return `En el frente de talento, blinda lo que no se puede perder y formaliza la transición del ${lista.toLowerCase()} — con costos auditables según legislación laboral.`
+    case 'capital_en_riesgo':
+      return `En capital en riesgo, el plan interviene en ${lista.toLowerCase()} para recuperar capacidad comprometida en cargos de alta exposición a IA.`
+    case 'ruta_ejecucion':
+      return `En ruta de ejecución, actúa sobre ${lista.toLowerCase()} — ${n} decisión${n === 1 ? '' : 'es'} sobre a quién reentrenar, reubicar o acompañar en la transición.`
+    case 'costo_esperar':
+      return `En costo de esperar, formaliza ${lista.toLowerCase()} con costos auditables, evitando que cada mes de postergación siga encareciendo la decisión.`
     default:
       return ''
   }

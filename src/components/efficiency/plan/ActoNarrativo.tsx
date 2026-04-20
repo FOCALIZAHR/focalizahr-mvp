@@ -28,17 +28,17 @@ import {
 // ════════════════════════════════════════════════════════════════════════════
 
 const FAMILIA_COLORS: Record<FamiliaId, { accent: string; label: string }> = {
-  choque_tecnologico: {
+  capital_en_riesgo: {
     accent: '#22D3EE',
-    label: 'Diagnóstico',
+    label: 'Capital en riesgo',
   },
-  grasa_organizacional: {
+  ruta_ejecucion: {
     accent: '#A78BFA',
-    label: 'Oportunidad',
+    label: 'Ruta de ejecución',
   },
-  riesgo_financiero: {
+  costo_esperar: {
     accent: '#F59E0B',
-    label: 'Protección',
+    label: 'Costo de esperar',
   },
 }
 

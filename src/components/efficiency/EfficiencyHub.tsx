@@ -20,7 +20,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEfficiencyWorkspace } from '@/hooks/useEfficiencyWorkspace'
 import { EfficiencyRail } from './EfficiencyRail'
 import { PanelAcumuladores } from './panel-acumuladores/PanelAcumuladores'
-import { RiesgoAdopcionGuardarrail } from './guardarrail/RiesgoAdopcionGuardarrail'
 import { CarritoBar } from './carrito/CarritoBar'
 import { MisPlanesBtn } from './MisPlanesBtn'
 import { ShockGlobalPortada } from './ShockGlobalPortada'
@@ -88,17 +87,6 @@ export function EfficiencyHub() {
     )
   }
 
-  if (ws.step === 'guardarrail') {
-    return (
-      <RiesgoAdopcionGuardarrail
-        gerenciasCriticas={ws.gerenciasCriticasL3}
-        gerenciasExcluidas={ws.gerenciasExcluidas}
-        onToggleExclusion={ws.toggleGerenciaExclusion}
-        onAccept={ws.acceptGuardarrail}
-      />
-    )
-  }
-
   // ── HUB principal ─────────────────────────────────────────────
   const activeLente = ws.activeLenteId ? ws.data.lentes[ws.activeLenteId] : null
   const ActiveComponent = ws.activeLenteId
@@ -107,9 +95,9 @@ export function EfficiencyHub() {
 
   // Colores de familia para el CTA de footer nav
   const familiaAccent: Record<string, string> = {
-    choque_tecnologico: '#22D3EE',
-    grasa_organizacional: '#A78BFA',
-    riesgo_financiero: '#F59E0B',
+    capital_en_riesgo: '#22D3EE',
+    ruta_ejecucion: '#A78BFA',
+    costo_esperar: '#F59E0B',
   }
 
   // Derivar títulos de lentes vecinos dentro de la familia para el footer nav
@@ -176,7 +164,6 @@ export function EfficiencyHub() {
                 ) : ws.hubView === 'ancla' ? (
                   <ActoAncla
                     key="ancla"
-                    shockGlobalMonthly={ws.shockGlobalMonthly}
                     data={ws.data}
                     onSelectFamilia={ws.selectFamilia}
                     onBack={ws.returnToLobby}
