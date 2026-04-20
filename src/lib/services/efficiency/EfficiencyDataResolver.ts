@@ -223,6 +223,7 @@ export async function resolverLente(
           totalMonthly: inercia.totalMonthly,
           totalAnnual: inercia.totalAnnual,
           byDepartment: inercia.byDepartment,
+          byPosition: inercia.byPosition,
           ftesByDepartment: ftes.byDepartment,
         },
       }

@@ -152,8 +152,23 @@ export interface DepartmentCost {
   avgExposure: number
 }
 
+/**
+ * Desglose de Inercia por cargo (position/jobTitle).
+ * Misma fórmula canónica que DepartmentCost (salary × effExposure), solo
+ * cambia la clave de agrupación. Usado por el Acto Ancla del Efficiency
+ * Hub para destacar los cargos con mayor capital comprometido.
+ */
+export interface PositionCost {
+  position: string
+  monthlyCost: number
+  annualCost: number
+  headcount: number
+  avgExposure: number
+}
+
 export interface InertiaCostResult {
   byDepartment: DepartmentCost[]
+  byPosition: PositionCost[]
   totalMonthly: number
   totalAnnual: number
   confidence: 'high' | 'medium' | 'low'
@@ -655,6 +670,7 @@ export class WorkforceIntelligenceService {
 
   static calculateInertiaCost(enriched: EnrichedEmployee[]): InertiaCostResult {
     const deptAgg = new Map<string, { id: string; name: string; cost: number; count: number; totalExp: number }>()
+    const positionAgg = new Map<string, { name: string; cost: number; count: number; totalExp: number }>()
 
     for (const e of enriched) {
       const exp = effExposure(e)
@@ -664,6 +680,14 @@ export class WorkforceIntelligenceService {
       d.cost += e.salary * exp
       d.count++
       d.totalExp += exp
+
+      // Mismo patrón, agrupado por cargo. Requiere position no vacío.
+      if (!e.position) continue
+      if (!positionAgg.has(e.position)) positionAgg.set(e.position, { name: e.position, cost: 0, count: 0, totalExp: 0 })
+      const p = positionAgg.get(e.position)!
+      p.cost += e.salary * exp
+      p.count++
+      p.totalExp += exp
     }
 
     const byDepartment: DepartmentCost[] = [...deptAgg.values()]
@@ -676,8 +700,19 @@ export class WorkforceIntelligenceService {
       }))
       .sort((a, b) => b.monthlyCost - a.monthlyCost)
 
+    const byPosition: PositionCost[] = [...positionAgg.values()]
+      .map(p => ({
+        position: p.name,
+        monthlyCost: Math.round(p.cost),
+        annualCost: Math.round(p.cost * 12),
+        headcount: p.count,
+        avgExposure: p.count > 0 ? Math.round((p.totalExp / p.count) * 100) / 100 : 0,
+      }))
+      .sort((a, b) => b.monthlyCost - a.monthlyCost)
+
     return {
       byDepartment,
+      byPosition,
       totalMonthly: byDepartment.reduce((s, d) => s + d.monthlyCost, 0),
       totalAnnual: byDepartment.reduce((s, d) => s + d.annualCost, 0),
       confidence: enriched.some(e => effExposure(e) > 0) ? 'high' : 'low',
@@ -938,7 +973,7 @@ export class WorkforceIntelligenceService {
         redundancy: { pairs: [], totalEstimatedSavings: 0, confidence: 'low' },
         adoptionRisk: { departments: [], confidence: 'low' },
         seniorityCompression: { opportunities: [], totalAnnualSavings: 0, confidence: 'low' },
-        inertiaCost: { byDepartment: [], totalMonthly: 0, totalAnnual: 0, confidence: 'low' },
+        inertiaCost: { byDepartment: [], byPosition: [], totalMonthly: 0, totalAnnual: 0, confidence: 'low' },
         liberatedFTEs: { byDepartment: [], totalFTEs: 0, totalMonthlySavings: 0, confidence: 'low' },
         severanceLiability: { totalSeverance: 0, monthlyFTESavings: 0, paybackMonths: 0, affectedCount: 0, confidence: 'low' },
         retentionPriority: { ranking: [], intocablesCount: 0, prescindiblesCount: 0, confidence: 'low' },
