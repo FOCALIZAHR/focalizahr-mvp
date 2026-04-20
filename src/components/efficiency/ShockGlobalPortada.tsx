@@ -10,14 +10,19 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import { ArrowRight } from 'lucide-react'
+import { PrimaryButton } from '@/components/ui/PremiumButton'
 import { formatCLP } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
 
 interface ShockGlobalPortadaProps {
   shockGlobalMonthly: number
+  /** CTA "Ver diagnóstico →" — abre el Acto Ancla (Nivel 1B) */
+  onShowDiagnostico?: () => void
 }
 
 export function ShockGlobalPortada({
   shockGlobalMonthly,
+  onShowDiagnostico,
 }: ShockGlobalPortadaProps) {
   return (
     <motion.div
@@ -42,6 +47,23 @@ export function ShockGlobalPortada({
       <p className="text-base md:text-lg font-light text-slate-400 mt-6 max-w-xl leading-relaxed">
         La organización financia hoy trabajo que la IA ya resolvió.
       </p>
+
+      {onShowDiagnostico && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.25, ease: 'easeOut' }}
+          className="mt-12"
+        >
+          <PrimaryButton
+            icon={ArrowRight}
+            iconPosition="right"
+            onClick={onShowDiagnostico}
+          >
+            Ver diagnóstico
+          </PrimaryButton>
+        </motion.div>
+      )}
     </motion.div>
   )
 }

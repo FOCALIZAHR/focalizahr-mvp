@@ -166,13 +166,16 @@ export interface UseEfficiencyWorkspaceReturn {
   activeLenteId: LenteId | null
   /**
    * Familia activa — state INDEPENDIENTE de activeLenteId.
-   *   · null + null → lobby (shock global)
-   *   · FamiliaId + null → briefing (Nivel 2)
-   *   · FamiliaId + LenteId → lente activo (Nivel 3)
+   *   · null + null + !ancla → lobby (shock global)
+   *   · null + null + ancla  → acto ancla (Nivel 1B)
+   *   · FamiliaId + null     → briefing (Nivel 2)
+   *   · FamiliaId + LenteId  → lente activo (Nivel 3)
    */
   activeFamiliaId: FamiliaId | null
-  /** Vista actual del hub — derivada de activeFamiliaId + activeLenteId */
-  hubView: 'lobby' | 'briefing' | 'lente'
+  /** Vista actual del hub */
+  hubView: 'lobby' | 'ancla' | 'briefing' | 'lente'
+  /** Abre el Acto Ancla desde el lobby (ShockGlobalPortada CTA) */
+  showAncla: () => void
   setActiveLenteId: (id: LenteId) => void
   /** Selecciona una familia → pasa a briefing de esa familia */
   selectFamilia: (familia: FamiliaId) => void
@@ -230,6 +233,8 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
   //   FamiliaId + LenteId   → lente (Nivel 3)
   const [activeFamiliaId, setActiveFamiliaIdState] = useState<FamiliaId | null>(null)
   const [activeLenteId, setActiveLenteIdState] = useState<LenteId | null>(null)
+  // Acto Ancla (Nivel 1B) — abre desde lobby, se cierra al seleccionar familia o volver al lobby
+  const [anclaOpen, setAnclaOpen] = useState(false)
   const [lentesVisitados, setLentesVisitados] = useState<Set<LenteId>>(new Set())
   const [familiasVisitadas, setFamiliasVisitadas] = useState<Set<FamiliaId>>(
     new Set()
@@ -345,15 +350,22 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
   /**
    * Selecciona una familia → entra al briefing (Nivel 2).
    * NO selecciona lente automáticamente — el CEO decide desde el briefing.
+   * Cierra el Acto Ancla si estaba abierto.
    */
   const selectFamilia = useCallback(
     (familia: FamiliaId) => {
       setActiveFamiliaIdState(familia)
       setActiveLenteIdState(null)
+      setAnclaOpen(false)
       markFamiliaVisitada(familia)
     },
     [markFamiliaVisitada]
   )
+
+  /** Abre el Acto Ancla desde el lobby (CTA "Ver diagnóstico →"). */
+  const showAncla = useCallback(() => {
+    setAnclaOpen(true)
+  }, [])
 
   /** Alias de setActiveLenteId con semántica de "elegir lente desde briefing". */
   const selectLente = setActiveLenteId
@@ -363,10 +375,11 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
     setActiveLenteIdState(null)
   }, [])
 
-  /** Vuelve al lobby — borra familia y lente. */
+  /** Vuelve al lobby — borra familia, lente y cierra ancla. */
   const returnToLobby = useCallback(() => {
     setActiveFamiliaIdState(null)
     setActiveLenteIdState(null)
+    setAnclaOpen(false)
   }, [])
 
   const nextLenteInFamilia = useCallback(() => {
@@ -457,11 +470,13 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
   )
 
   // ── Derivados de navegación dentro de familia ────────────────
-  const hubView: 'lobby' | 'briefing' | 'lente' = activeLenteId
+  const hubView: 'lobby' | 'ancla' | 'briefing' | 'lente' = activeLenteId
     ? 'lente'
     : activeFamiliaId
       ? 'briefing'
-      : 'lobby'
+      : anclaOpen
+        ? 'ancla'
+        : 'lobby'
 
   const lenteIndexInFamilia = useMemo(() => {
     if (!activeLenteId || !activeFamiliaId) return null
@@ -501,6 +516,7 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
     activeLenteId,
     activeFamiliaId,
     hubView,
+    showAncla,
     setActiveLenteId,
     selectFamilia,
     selectLente,

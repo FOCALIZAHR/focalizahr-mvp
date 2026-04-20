@@ -24,6 +24,7 @@ import { RiesgoAdopcionGuardarrail } from './guardarrail/RiesgoAdopcionGuardarra
 import { CarritoBar } from './carrito/CarritoBar'
 import { MisPlanesBtn } from './MisPlanesBtn'
 import { ShockGlobalPortada } from './ShockGlobalPortada'
+import ActoAncla from './ActoAncla'
 import { FamilyBriefing } from './FamilyBriefing'
 import { LenteFooterNav } from './LenteFooterNav'
 import EfficiencyToolbar from './EfficiencyToolbar'
@@ -162,6 +163,15 @@ export function EfficiencyHub() {
                   <ShockGlobalPortada
                     key="lobby"
                     shockGlobalMonthly={ws.shockGlobalMonthly}
+                    onShowDiagnostico={ws.showAncla}
+                  />
+                ) : ws.hubView === 'ancla' ? (
+                  <ActoAncla
+                    key="ancla"
+                    shockGlobalMonthly={ws.shockGlobalMonthly}
+                    data={ws.data}
+                    onSelectFamilia={ws.selectFamilia}
+                    onBack={ws.returnToLobby}
                   />
                 ) : ws.hubView === 'briefing' && ws.activeFamiliaId ? (
                   <motion.div
