@@ -263,11 +263,14 @@ export function EfficiencyHub() {
       {/* Toolbar lateral (fixed right) — siempre presente */}
       <EfficiencyToolbar data={ws.data} />
 
-      {/* CarritoBar fixed bottom */}
-      <CarritoBar
-        decisiones={[...ws.carrito.values()]}
-        onClear={ws.clearCarrito}
-      />
+      {/* CarritoBar fixed bottom — solo cuando el CEO ya está operando.
+          En lobby/ancla no hay decisiones posibles, el carrito no tiene contexto. */}
+      {(ws.hubView === 'briefing' || ws.hubView === 'lente') && (
+        <CarritoBar
+          decisiones={[...ws.carrito.values()]}
+          onClear={ws.clearCarrito}
+        />
+      )}
     </>
   )
 }

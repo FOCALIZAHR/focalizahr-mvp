@@ -28,6 +28,15 @@ import {
 import type { DiagnosticData } from '@/hooks/useEfficiencyWorkspace'
 
 // ════════════════════════════════════════════════════════════════════════════
+// GAUGE GEOMETRY — mismas constantes que AnclaInteligente (Workforce)
+// Clonado exacto. Única diferencia: sin progress arc, solo el track tenue.
+// ════════════════════════════════════════════════════════════════════════════
+
+const GAUGE_SIZE = 272
+const GAUGE_STROKE = 10
+const GAUGE_RADIUS = GAUGE_SIZE / 2 - GAUGE_STROKE - 8
+
+// ════════════════════════════════════════════════════════════════════════════
 // TIPOS
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -150,20 +159,52 @@ export default memo(function ActoAncla({
         </button>
       )}
 
-      {/* ═══ CENTRO — número protagonista (mismo que ShockGlobalPortada) ═══ */}
-      <div className="text-center">
-        <p
-          className="font-extralight text-white leading-none"
-          style={{
-            fontSize: 'clamp(56px, 9vw, 96px)',
-            letterSpacing: '-0.03em',
-          }}
+      {/* ═══ GAUGE CENTRAL — clonado de AnclaInteligente sin progress arc ═══
+          Mismo tamaño, mismo track, misma estructura SVG. Sin relleno:
+          solo el anillo tenue slate-700/30. El CLP protagonista vive dentro. */}
+      <div className="flex flex-col items-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="relative"
+          style={{ width: GAUGE_SIZE, height: GAUGE_SIZE }}
         >
-          {formatCLP(shockGlobalMonthly)}
-        </p>
-        <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 mt-4">
-          al mes
-        </p>
+          <svg
+            className="absolute inset-0 -rotate-90"
+            viewBox={`0 0 ${GAUGE_SIZE} ${GAUGE_SIZE}`}
+          >
+            {/* Track tenue — único trazo del gauge (sin progress) */}
+            <circle
+              cx={GAUGE_SIZE / 2}
+              cy={GAUGE_SIZE / 2}
+              r={GAUGE_RADIUS}
+              fill="none"
+              stroke="rgba(51, 65, 85, 0.3)"
+              strokeWidth={GAUGE_STROKE}
+            />
+          </svg>
+
+          {/* Número protagonista + label dentro del gauge */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <motion.span
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="text-[96px] font-extralight text-white leading-none tabular-nums tracking-tight"
+            >
+              {formatCLP(shockGlobalMonthly)}
+            </motion.span>
+            <motion.span
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, delay: 0.6 }}
+              className="text-[10px] uppercase tracking-[3px] text-slate-500 font-medium mt-1"
+            >
+              al mes
+            </motion.span>
+          </div>
+        </motion.div>
       </div>
 
       {/* ═══ LÍNEAS SVG — del centro hacia los 4 nodos ═══ */}
