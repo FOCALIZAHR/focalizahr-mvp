@@ -17,12 +17,21 @@
 
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bot, Zap, Sparkles } from 'lucide-react'
+import { Bot, Zap, Sparkles, Check } from 'lucide-react'
 import { LenteLayout } from './LenteLayout'
 import { LenteCard } from './LenteCard'
 import type { LenteComponentProps } from './_LentePlaceholder'
 import { formatCLP } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
 import type { DecisionItem } from '@/lib/services/efficiency/EfficiencyCalculator'
+import { normalizePositionText } from '@/lib/utils/normalizePosition'
+import { toTitleCase } from '@/lib/utils/formatName'
+
+/** Normaliza strings crudos de BD ("ANALISTA_RRHH") a display humano
+ *  ("Analista Rrhh"). Canónico del SKILL.md — anti-patrón mostrar
+ *  UPPERCASE o snake_case tal cual llegan del backend. */
+function formatLabel(raw: string): string {
+  return toTitleCase(normalizePositionText(raw))
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS DEL DETALLE (según EfficiencyDataResolver → L1)
@@ -291,6 +300,28 @@ export function L1CostoInercia({
     0
   )
 
+  // Resumen del checkpoint — áreas activas (pct > 0) con su % y ahorro proyectado
+  const checkpointSummary = hasInteraction
+    ? {
+        items: rows
+          .filter(r => (captureByDept[r.departmentId] ?? 0) > 0)
+          .map(r => {
+            const pct = captureByDept[r.departmentId]
+            const ahorro = Math.round(r.monthlyCost * (pct / 100))
+            return {
+              label: formatLabel(r.departmentName),
+              detail: `${pct}%`,
+              value: `${formatCLP(ahorro)}/mes`,
+            }
+          }),
+        totalLabel: (() => {
+          const n = Object.values(captureByDept).filter(v => v > 0).length
+          return `${n} ${n === 1 ? 'área' : 'áreas'} en tu plan`
+        })(),
+        totalValue: `${formatCLP(Math.round(capitalRecuperado))}/mes`,
+      }
+    : undefined
+
   return (
     <LenteLayout
       familiaAccent={L1_ACCENT}
@@ -300,6 +331,7 @@ export function L1CostoInercia({
       ctaQuirofanoEyebrow="SIMULACIÓN DE CAPTURA"
       narrativaDinamica={narrativaDinamica(avgPct)}
       hasInteraction={hasInteraction}
+      checkpointSummary={checkpointSummary}
       onNextLente={onNextLente}
       proximoLenteTitulo={proximoLenteTitulo}
       onActChange={onActChange}
@@ -406,7 +438,7 @@ function HallazgoMapa({ rows }: { rows: Row[] }) {
                     {ipi.label}
                   </p>
                   <p className="text-lg font-light text-white leading-tight mt-0.5">
-                    {r.departmentName}
+                    {formatLabel(r.departmentName)}
                   </p>
                 </div>
               </div>
@@ -525,7 +557,7 @@ function QuirofanoSliders({ rows, captureByDept, onChange }: QuirofanoSlidersPro
             <div key={r.departmentId}>
               <div className="flex items-baseline justify-between mb-2 gap-2 flex-wrap">
                 <span className="text-sm text-slate-200 font-light">
-                  {r.departmentName}
+                  {formatLabel(r.departmentName)}
                 </span>
                 <span
                   className="text-xs font-medium tabular-nums"
@@ -583,6 +615,12 @@ function QuirofanoSliders({ rows, captureByDept, onChange }: QuirofanoSlidersPro
                     className="overflow-hidden"
                   >
                     <div className="mt-3 pt-3 border-t border-slate-800/40 space-y-1.5">
+                      {/* Feedback inline — confirma registro en el plan
+                          sin esperar al checkpoint. Sutil, slate-500. */}
+                      <div className="flex items-center gap-1.5 text-[10px] font-light text-slate-500 mb-2">
+                        <Check className="w-3 h-3 text-emerald-500/70" />
+                        <span>Decisión registrada en tu plan</span>
+                      </div>
                       {r.breakdown.map(pos => {
                         const ftesProj = pos.liberatedFTEs * (pct / 100)
                         const ahorroProj = pos.monthlyCost * (pct / 100)
@@ -592,7 +630,7 @@ function QuirofanoSliders({ rows, captureByDept, onChange }: QuirofanoSlidersPro
                             className="flex items-baseline justify-between gap-3 text-[11px] font-light text-slate-400 flex-wrap"
                           >
                             <span className="text-slate-300 truncate max-w-[40%]">
-                              {pos.position}
+                              {formatLabel(pos.position)}
                             </span>
                             <span className="flex items-baseline gap-3 tabular-nums text-[11px]">
                               <span>

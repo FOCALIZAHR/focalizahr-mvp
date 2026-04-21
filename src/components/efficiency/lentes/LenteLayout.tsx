@@ -28,7 +28,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -42,7 +42,7 @@ const HERO_LAYOUT_ID = 'lente-hero-value'
 // TYPES
 // ════════════════════════════════════════════════════════════════════════════
 
-export type LenteActo = 'silencio' | 'expediente' | 'quirofano'
+export type LenteActo = 'silencio' | 'expediente' | 'quirofano' | 'checkpoint'
 type Acto = LenteActo
 
 type TotalizadorTint = 'default' | 'accent' | 'emerald' | 'warning'
@@ -93,6 +93,22 @@ export interface LenteLayoutProps {
   /** Si false, el CTA "Siguiente" no se renderiza. El lente decide qué
    *  cuenta como interacción (slider > 0, toggle activado, etc). */
   hasInteraction: boolean
+
+  // ─── ACTO 4: CHECKPOINT (Pantalla de Guía — opcional) ───
+  /** Resumen compacto que se muestra en el Acto Checkpoint antes de
+   *  navegar al siguiente lente. Si no viene, el CTA "Siguiente" del
+   *  Acto Quirófano llama directo a `onNextLente` (sin checkpoint).
+   *  Estructura genérica — cada lente arma su resumen: L1 muestra
+   *  áreas×pct, L2 podría mostrar escenarios, etc. */
+  checkpointSummary?: {
+    items: Array<{
+      label: string
+      detail: string      // ej. "70%"
+      value: string       // ej. "$12.7M/mes"
+    }>
+    totalLabel: string    // ej. "2 áreas en tu plan"
+    totalValue: string    // ej. "$17.7M/mes"
+  }
 
   // ─── Navegación externa (al siguiente lente de la familia) ───
   onNextLente?: () => void
@@ -169,9 +185,28 @@ export function LenteLayout(props: LenteLayoutProps) {
               narrativaDinamica={props.narrativaDinamica}
               totalizador={props.totalizador}
               hasInteraction={props.hasInteraction}
-              onNextLente={props.onNextLente}
+              onSiguiente={() => {
+                // Si hay checkpoint summary, pasa por el Acto Checkpoint.
+                // Si no, navega directo al siguiente lente.
+                if (props.checkpointSummary) {
+                  setAct('checkpoint')
+                } else {
+                  props.onNextLente?.()
+                }
+              }}
               proximoLenteTitulo={props.proximoLenteTitulo}
               onBack={() => setAct('expediente')}
+            />
+          )}
+
+          {act === 'checkpoint' && props.checkpointSummary && (
+            <ActoCheckpoint
+              key="checkpoint"
+              accent={props.familiaAccent}
+              summary={props.checkpointSummary}
+              proximoLenteTitulo={props.proximoLenteTitulo}
+              onNext={() => props.onNextLente?.()}
+              onBack={() => setAct('quirofano')}
             />
           )}
         </AnimatePresence>
@@ -354,7 +389,9 @@ interface ActoQuirofanoProps {
   narrativaDinamica?: string
   totalizador?: { metricas: TotalizadorMetrica[] }
   hasInteraction: boolean
-  onNextLente?: () => void
+  /** Acción del CTA "Siguiente →" — el layout decide si dispara
+   *  checkpoint o navegación directa. */
+  onSiguiente?: () => void
   proximoLenteTitulo?: string
   onBack: () => void
 }
@@ -368,7 +405,7 @@ function ActoQuirofano({
   narrativaDinamica,
   totalizador,
   hasInteraction,
-  onNextLente,
+  onSiguiente,
   proximoLenteTitulo,
   onBack,
 }: ActoQuirofanoProps) {
@@ -449,7 +486,7 @@ function ActoQuirofano({
 
       {/* CTA Siguiente — solo visible si hay interacción Y hay callback */}
       <AnimatePresence>
-        {hasInteraction && onNextLente && (
+        {hasInteraction && onSiguiente && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -460,7 +497,145 @@ function ActoQuirofano({
             <PrimaryButton
               icon={ArrowRight}
               iconPosition="right"
-              onClick={onNextLente}
+              onClick={onSiguiente}
+            >
+              {proximoLenteTitulo
+                ? `Siguiente: ${proximoLenteTitulo}`
+                : 'Siguiente'}
+            </PrimaryButton>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ACTO 4: CHECKPOINT (Pantalla de Guía — confirma decisión antes de avanzar)
+// ════════════════════════════════════════════════════════════════════════════
+
+interface ActoCheckpointProps {
+  accent: string
+  summary: NonNullable<LenteLayoutProps['checkpointSummary']>
+  proximoLenteTitulo?: string
+  onNext: () => void
+  onBack: () => void
+}
+
+function ActoCheckpoint({
+  accent,
+  summary,
+  proximoLenteTitulo,
+  onNext,
+  onBack,
+}: ActoCheckpointProps) {
+  // El CTA aparece con delay de 1500ms para que el CEO absorba la
+  // confirmación antes de poder avanzar. Timing del Patrón Pantalla
+  // de Guía del SKILL.md.
+  const [ctaReady, setCtaReady] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setCtaReady(true), 1500)
+    return () => clearTimeout(t)
+  }, [])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-col items-center text-center min-h-[60vh] justify-center py-6"
+    >
+      {/* Back sutil arriba-izquierda */}
+      <button
+        onClick={onBack}
+        className="self-start flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs mb-8"
+      >
+        <ArrowLeft className="w-3.5 h-3.5" />
+        Volver
+      </button>
+
+      {/* Icon Check con glow accent — escala in */}
+      <motion.div
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        className="relative mb-6"
+      >
+        <div
+          className="w-16 h-16 rounded-full flex items-center justify-center"
+          style={{
+            backgroundColor: `${accent}15`,
+            border: `1px solid ${accent}60`,
+            boxShadow: `0 0 32px ${accent}40`,
+          }}
+        >
+          <Check className="w-8 h-8" style={{ color: accent }} />
+        </div>
+      </motion.div>
+
+      {/* Título */}
+      <motion.h2
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.2 }}
+        className="text-3xl md:text-4xl font-extralight text-white tracking-tight leading-tight mb-8"
+      >
+        Decisión registrada
+      </motion.h2>
+
+      {/* Resumen compacto de items */}
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.4 }}
+        className="w-full max-w-md space-y-2 mb-8"
+      >
+        {summary.items.map((item, idx) => (
+          <div
+            key={idx}
+            className="flex items-baseline justify-between gap-3 text-sm font-light border-b border-slate-800/40 pb-2"
+          >
+            <span className="text-slate-300 truncate">{item.label}</span>
+            <span className="flex items-baseline gap-3 tabular-nums">
+              <span className="text-slate-500 text-xs">{item.detail}</span>
+              <span className="text-white">{item.value}</span>
+            </span>
+          </div>
+        ))}
+      </motion.div>
+
+      {/* Total */}
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.6 }}
+        className="mb-10 text-center"
+      >
+        <p className="text-[10px] uppercase tracking-widest text-slate-500">
+          {summary.totalLabel}
+        </p>
+        <p
+          className="text-3xl font-extralight tabular-nums mt-1"
+          style={{ color: accent }}
+        >
+          {summary.totalValue}
+        </p>
+      </motion.div>
+
+      {/* CTA con delay — el CEO absorbe la confirmación antes de avanzar */}
+      <AnimatePresence>
+        {ctaReady && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <PrimaryButton
+              icon={ArrowRight}
+              iconPosition="right"
+              onClick={onNext}
             >
               {proximoLenteTitulo
                 ? `Siguiente: ${proximoLenteTitulo}`
