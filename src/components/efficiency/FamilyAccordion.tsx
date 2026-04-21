@@ -118,7 +118,7 @@ function FamilyCard({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, delay: 0.5 }}
-            className="relative h-full rounded-2xl border border-white/5 bg-slate-900/40 backdrop-blur-2xl overflow-hidden"
+            className="relative h-full rounded-2xl border border-white/5 bg-gradient-to-b from-white/[0.06] to-slate-900/10 backdrop-blur-2xl overflow-hidden"
             style={{
               // Halo envolvente muy sutil en color de familia — da sensación
               // de "mesa flotante" sin marco pesado. Alpha 0F (~6%).
