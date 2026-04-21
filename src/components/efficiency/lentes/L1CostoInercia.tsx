@@ -279,7 +279,27 @@ export function L1CostoInercia({
 // HALLAZGO — mapa por área con perfil IA protagónico (no badge secundario)
 // ════════════════════════════════════════════════════════════════════════════
 
+// Narrativa extendida por IPI — descubrimiento, no descripción técnica.
+// La `IPI_META.description` se mantiene para el Acto Quirófano/tooltips
+// donde el espacio es limitado.
+const IPI_NARRATIVA_HALLAZGO: Record<IPI, string> = {
+  delegacion:
+    'La IA ejecuta estas tareas de principio a fin. Tu única decisión es cuándo activarla — binaria: sí o no. Cero reentrenamiento humano.',
+  asistencia:
+    'La IA copilotea, no reemplaza. Las personas del área deben aprender a operar con IA. El límite de captura es la capacitación, no la tecnología.',
+  aprendizaje:
+    'La IA todavía no ejecuta estas tareas sola — las acompaña. Cada mes de uso la entrena con los datos de tu empresa. Activación temprana acumula ventaja.',
+}
+
 function HallazgoMapa({ rows }: { rows: Row[] }) {
+  const patronesUnicos = new Set(rows.map(r => r.ipi)).size
+  const countLabel =
+    patronesUnicos === 1
+      ? 'un patrón claro'
+      : patronesUnicos === 2
+      ? 'dos patrones distintos'
+      : `${patronesUnicos} patrones distintos`
+
   return (
     <div>
       <p className="text-[10px] uppercase tracking-[0.22em] text-cyan-400 font-medium mb-2">
@@ -289,59 +309,76 @@ function HallazgoMapa({ rows }: { rows: Row[] }) {
         Por área, cómo actúa la IA
       </h3>
 
-      {/* Narrativa contextual — por qué esto es un descubrimiento
-          (Mandamiento 8: narrativa antes que dato). */}
-      <p className="text-sm text-slate-400 font-light leading-relaxed max-w-2xl mb-6">
-        El motor cruzó tu nómina con el mapa de exposición a IA de{' '}
-        <span className="text-slate-300">O*NET</span> y el índice de automatización{' '}
-        <span className="text-slate-300">Eloundou</span>. Esto es lo que encontró.
+      {/* Narrativa contextual estilo Apple: el plato, no la receta. */}
+      <p className="text-sm text-slate-400 font-light leading-relaxed max-w-2xl mb-8">
+        Cruzamos cada cargo de tu nómina con la capacidad real de la IA hoy.
+        Encontramos {countLabel} en tu organización.
       </p>
 
-      <div className="space-y-3">
+      {/* Cards como descubrimientos protagonistas — más espacio, jerarquía
+          interna clara, narrativa específica por IPI. */}
+      <div className="space-y-4">
         {rows.map(r => {
           const ipi = IPI_META[r.ipi]
           const Icon = ipi.icon
+          const narrativa = IPI_NARRATIVA_HALLAZGO[r.ipi]
           return (
             <div
               key={r.departmentId}
-              className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/30 transition-colors hover:border-slate-600/40"
+              className="p-6 rounded-xl bg-slate-800/30 border border-slate-700/30 transition-colors hover:border-slate-600/50"
+              style={{
+                // Halo accent sutil del IPI — da identidad al card sin border pesado
+                boxShadow: `inset 3px 0 0 ${ipi.color}`,
+              }}
             >
-              <div className="flex items-center gap-2 mb-3 flex-wrap">
-                <span
-                  className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider px-2.5 py-1 rounded-md font-medium"
+              {/* Header: badge IPI grande (protagonista del descubrimiento) */}
+              <div className="flex items-center gap-2.5 mb-4">
+                <div
+                  className="inline-flex items-center justify-center w-9 h-9 rounded-lg"
                   style={{
                     color: ipi.color,
                     backgroundColor: `${ipi.color}15`,
                     border: `1px solid ${ipi.color}40`,
                   }}
                 >
-                  <Icon className="w-3.5 h-3.5" />
-                  {ipi.label}
-                </span>
+                  <Icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <p
+                    className="text-xs uppercase tracking-[0.18em] font-semibold leading-tight"
+                    style={{ color: ipi.color }}
+                  >
+                    {ipi.label}
+                  </p>
+                  <p className="text-lg font-light text-white leading-tight mt-0.5">
+                    {r.departmentName}
+                  </p>
+                </div>
               </div>
-              <p className="text-base font-medium text-white mb-1.5">
-                {r.departmentName}
+
+              {/* Narrativa del descubrimiento — más robusta que antes */}
+              <p className="text-sm text-slate-300 font-light leading-relaxed max-w-xl mb-4">
+                {narrativa}
               </p>
-              <p className="text-[11px] text-slate-500 font-light mb-3 leading-snug max-w-xl">
-                {ipi.description}
-              </p>
+
+              {/* Métricas inline — contexto secundario */}
               <div className="flex items-center gap-x-5 gap-y-1 text-xs text-slate-400 font-light flex-wrap">
                 <span>
                   Costo atrapado{' '}
-                  <span className="text-white font-medium">
+                  <span className="text-white font-medium tabular-nums">
                     {formatCLP(r.monthlyCost)}
                   </span>
                   /mes
                 </span>
                 <span>
                   FTEs liberables{' '}
-                  <span className="text-cyan-300 font-medium">
+                  <span className="text-cyan-300 font-medium tabular-nums">
                     {r.liberatedFTEs.toFixed(1)}
                   </span>
                 </span>
                 <span className="text-slate-500">
                   Exposición{' '}
-                  <span className="text-slate-300">
+                  <span className="text-slate-300 tabular-nums">
                     {Math.round(r.avgExposure * 100)}%
                   </span>
                 </span>
@@ -365,26 +402,7 @@ function ExpedienteLateral({ detalle }: { detalle: L1Detalle }) {
         EL EXPEDIENTE
       </p>
 
-      {/* Segundo hero — río del número: $65M/mes arriba (hero global)
-          conecta con $XXX.XM/año acá (hero anual del lente).
-          Regla del Río: el CEO ve la continuidad cronológica del impacto. */}
-      <div>
-        <p
-          className="font-extralight text-white tabular-nums leading-none"
-          style={{
-            fontSize: 'clamp(36px, 4vw, 48px)',
-            letterSpacing: '-0.02em',
-          }}
-        >
-          {formatCLP(detalle.totalAnnual)}
-        </p>
-        <p className="text-[11px] uppercase tracking-widest text-amber-300/90 font-medium mt-2">
-          Si no actúas · al año
-        </p>
-      </div>
-
-      <div className="h-px bg-slate-800/40" aria-hidden />
-
+      {/* Operacional primero — lo que el CEO puede accionar */}
       <div>
         <p className="text-xl font-extralight text-white tabular-nums leading-tight">
           {detalle.totalFTEs.toFixed(1)}
@@ -402,6 +420,20 @@ function ExpedienteLateral({ detalle }: { detalle: L1Detalle }) {
         </p>
         <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
           Áreas con señal
+        </p>
+      </div>
+
+      <div className="h-px bg-slate-800/40" aria-hidden />
+
+      {/* Dato de referencia — el CEO ya vio esta cifra varias veces.
+          Baja tipografía (text-base text-slate-400) para que no compita
+          con el CarritoBar que ya lleva la contabilidad financiera. */}
+      <div>
+        <p className="text-base font-light text-slate-400 tabular-nums leading-tight">
+          {formatCLP(detalle.totalAnnual)}
+        </p>
+        <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
+          Costo si no actúas · al año
         </p>
       </div>
     </aside>
