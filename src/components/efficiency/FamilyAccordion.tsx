@@ -24,6 +24,7 @@ import {
   type LenteId,
 } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
 import { FamilyBriefing, FAMILIA_META } from './FamilyBriefing'
+import { MisPlanesBtn } from './MisPlanesBtn'
 
 // ════════════════════════════════════════════════════════════════════════════
 // PROPS
@@ -108,35 +109,32 @@ function FamilyCard({
     >
       <AnimatePresence mode="wait">
         {isActive ? (
-          // ─── CARD EXPANDIDA — wrapper canónico CompensationPortada ───
+          // ─── CARD EXPANDIDA — wrapper canónico con más vidrio, menos contraste ───
           <motion.div
             key="expanded"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, delay: 0.5 }}
-            className="relative h-full rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm overflow-hidden"
+            className="relative h-full rounded-2xl border border-slate-800/40 bg-slate-900/40 backdrop-blur-2xl overflow-hidden"
           >
-            {/* Tesla line canónica */}
+            {/* Tesla line con glow cyan visible */}
             <div
-              className="absolute top-0 left-0 right-0 h-[2px]"
+              className="absolute top-0 left-0 right-0 h-[2px] z-10"
               style={{
                 background:
                   'linear-gradient(90deg, transparent 5%, #22D3EE 35%, #A78BFA 65%, transparent 95%)',
-                opacity: 0.7,
+                boxShadow: '0 0 20px rgba(34, 211, 238, 0.35)',
               }}
               aria-hidden
             />
 
             <div className="px-6 py-10 md:px-10 md:py-12">
-              {/* Eyebrow — nombre de familia (reemplaza "DECISIÓN PENDIENTE")
-                  Misma tipografía y color del eyebrow original que vivía en
-                  FamilyBriefing: text-[10px] tracking-[0.3em] uppercase color accent. */}
-              <div
-                className="text-[10px] tracking-[0.3em] uppercase font-light mb-6"
-                style={{ color: meta.accent }}
-              >
-                {nombre}
+              {/* Header del accordion: Mis planes arriba-derecha.
+                  Eyebrow uppercase eliminado — el <h2> gradient del
+                  FamilyBriefing es la identidad única de la familia. */}
+              <div className="flex justify-end mb-4">
+                <MisPlanesBtn />
               </div>
 
               <FamilyBriefing
