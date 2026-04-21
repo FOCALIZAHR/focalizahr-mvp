@@ -24,7 +24,6 @@ import {
   type LenteId,
 } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
 import { FamilyBriefing, FAMILIA_META } from './FamilyBriefing'
-import { MisPlanesBtn } from './MisPlanesBtn'
 
 // ════════════════════════════════════════════════════════════════════════════
 // PROPS
@@ -109,7 +108,7 @@ function FamilyCard({
     >
       <AnimatePresence mode="wait">
         {isActive ? (
-          // ─── CARD EXPANDIDA — wrapper canónico con más vidrio, menos contraste ───
+          // ─── CARD EXPANDIDA — wrapper canónico con más vidrio, Tesla line accent ───
           <motion.div
             key="expanded"
             initial={{ opacity: 0 }}
@@ -118,25 +117,19 @@ function FamilyCard({
             transition={{ duration: 0.2, delay: 0.5 }}
             className="relative h-full rounded-2xl border border-slate-800/40 bg-slate-900/40 backdrop-blur-2xl overflow-hidden"
           >
-            {/* Tesla line con glow cyan visible */}
+            {/* Tesla line — color y glow adoptan el accent de la familia
+                activa (cyan / purple / amber). Firma cromática coherente
+                con el eyebrow del h2 gradient y las cards colapsadas. */}
             <div
               className="absolute top-0 left-0 right-0 h-[2px] z-10"
               style={{
-                background:
-                  'linear-gradient(90deg, transparent 5%, #22D3EE 35%, #A78BFA 65%, transparent 95%)',
-                boxShadow: '0 0 20px rgba(34, 211, 238, 0.35)',
+                background: `linear-gradient(90deg, transparent 5%, ${meta.accent} 50%, transparent 95%)`,
+                boxShadow: `0 0 25px ${meta.accent}60`,
               }}
               aria-hidden
             />
 
             <div className="px-6 py-10 md:px-10 md:py-12">
-              {/* Header del accordion: Mis planes arriba-derecha.
-                  Eyebrow uppercase eliminado — el <h2> gradient del
-                  FamilyBriefing es la identidad única de la familia. */}
-              <div className="flex justify-end mb-4">
-                <MisPlanesBtn />
-              </div>
-
               <FamilyBriefing
                 familiaId={familiaId}
                 lentes={lentes}

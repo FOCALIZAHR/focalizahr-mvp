@@ -17,6 +17,7 @@ import {
   type DecisionItem,
 } from '@/lib/services/efficiency/EfficiencyCalculator'
 import { formatCLP } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
+import { MisPlanesBtn } from '../MisPlanesBtn'
 
 // ════════════════════════════════════════════════════════════════════════════
 // PROPS
@@ -65,6 +66,13 @@ export function CarritoBar({ decisiones, onClear }: CarritoBarProps) {
       />
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-3 flex items-center gap-4 md:gap-6">
+        {/* Eyebrow branding del módulo — identidad del hub que antes vivía
+            en el header sticky superior. Solo visible en desktop para no
+            comprimir la fila en mobile. */}
+        <span className="hidden md:inline text-[10px] uppercase tracking-[0.22em] text-slate-500 font-light flex-shrink-0">
+          Efficiency Intelligence
+        </span>
+
         {/* Texto puro: N Decisiones · X FTEs · $ */}
         <p
           className={`flex-1 text-xs md:text-sm font-light flex items-baseline gap-1.5 flex-wrap ${
@@ -147,6 +155,8 @@ export function CarritoBar({ decisiones, onClear }: CarritoBarProps) {
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
           )}
+          {/* Mis planes — antes vivía en el header sticky, ahora junto al CTA */}
+          <MisPlanesBtn />
           {vacio ? (
             <button
               disabled

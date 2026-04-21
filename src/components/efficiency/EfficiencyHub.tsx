@@ -15,8 +15,9 @@
 
 'use client'
 
-import { Loader2 } from 'lucide-react'
+import { Loader2, ArrowLeft } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { SecondaryButton } from '@/components/ui/PremiumButton'
 import { useEfficiencyWorkspace } from '@/hooks/useEfficiencyWorkspace'
 import { PanelAcumuladores } from './panel-acumuladores/PanelAcumuladores'
 import { CarritoBar } from './carrito/CarritoBar'
@@ -175,6 +176,20 @@ export function EfficiencyHub() {
                     exit={{ opacity: 0, y: -4 }}
                     transition={{ duration: 0.2, ease: 'easeOut' }}
                   >
+                    {/* Header del lente — botón "Volver al menú" arriba-derecha.
+                        Acceso sin scroll al briefing (las 3 cards expansibles),
+                        complementa al LenteFooterNav que vive al pie. */}
+                    <div className="flex justify-end mb-4 md:mb-6">
+                      <SecondaryButton
+                        icon={ArrowLeft}
+                        iconPosition="left"
+                        onClick={ws.returnToBriefing}
+                        size="sm"
+                      >
+                        Volver al menú
+                      </SecondaryButton>
+                    </div>
+
                     <ActiveComponent
                       lente={activeLente}
                       decisionesActuales={ws.decisionesDelLenteActivo}
