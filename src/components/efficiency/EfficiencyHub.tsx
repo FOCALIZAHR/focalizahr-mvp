@@ -123,21 +123,23 @@ export function EfficiencyHub() {
     <>
       <div className="fhr-bg-main min-h-screen">
         {/* ── HEADER sticky — siempre visible al scrollear ────────
-            · lobby + ancla → eyebrow + Mis planes (sin rail)
-            · briefing + lente → rail de familias + Mis planes
-            El Acto Ancla es la primera vez que el CEO ve las 3 familias. */}
+            · lobby + ancla + briefing → eyebrow + Mis planes (sin rail).
+              En briefing el FamilyAccordion ya muestra las 3 familias
+              simultáneamente — el rail superior duplicaría la navegación.
+            · lente → rail de familias + Mis planes (única vista que
+              necesita atajo a otras familias). */}
         <header className="sticky top-0 z-50 bg-slate-950/85 backdrop-blur-xl border-b border-slate-800/40">
           <div className="max-w-7xl mx-auto w-full px-4 md:px-8 flex items-center justify-between gap-4 py-3">
-            {ws.hubView === 'lobby' || ws.hubView === 'ancla' ? (
-              <span className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-light">
-                Efficiency Intelligence
-              </span>
-            ) : (
+            {ws.hubView === 'lente' ? (
               <EfficiencyRail
                 activeFamiliaId={ws.activeFamiliaId}
                 familiasVisitadas={ws.familiasVisitadas}
                 onSelect={ws.selectFamilia}
               />
+            ) : (
+              <span className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-light">
+                Efficiency Intelligence
+              </span>
             )}
             <MisPlanesBtn />
           </div>

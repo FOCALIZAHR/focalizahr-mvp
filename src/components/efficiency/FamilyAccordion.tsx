@@ -76,10 +76,18 @@ export function FamilyAccordion({
   onSelectLente,
   onSelectFamilia,
 }: FamilyAccordionProps) {
+  // Defensa: garantizar que SIEMPRE haya una familia expandida.
+  // Si el upstream pasa un ID fuera de FAMILIA_ORDEN o vacío, default
+  // a F1 'capital_en_riesgo' — nunca el accordion se monta con las 3
+  // colapsadas.
+  const safeActive: FamiliaId = FAMILIA_ORDEN.includes(activeFamiliaId)
+    ? activeFamiliaId
+    : 'capital_en_riesgo'
+
   return (
     <div className="flex flex-col md:flex-row gap-3 md:gap-4 items-stretch">
       {FAMILIA_ORDEN.map(familiaId => {
-        const isActive = familiaId === activeFamiliaId
+        const isActive = familiaId === safeActive
         const meta = FAMILIA_META[familiaId]
         if (!meta) return null
 
@@ -120,13 +128,15 @@ function FamilyCard({
   const meta = FAMILIA_META[familiaId]
   const potencial = getPotencialFamilia(familiaId, lentes)
   const nombre = `${meta.titleFirst} ${meta.titleGradient}`
+  // Lentes con data real dentro de esta familia
+  const lentesActivos = meta.lentes.filter(id => lentes[id]?.hayData).length
 
   return (
     <div
       className={`transition-all duration-500 ease-in-out ${
         isActive
-          ? 'w-full md:w-[75%] h-auto'
-          : 'w-full md:w-[12.5%] h-16 md:h-auto'
+          ? 'w-full md:w-[80%] h-auto'
+          : 'w-full md:w-[10%] h-16 md:h-auto'
       }`}
     >
       <AnimatePresence mode="wait">
@@ -156,20 +166,25 @@ function FamilyCard({
             transition={{ duration: 0.2, delay: 0.5 }}
             onClick={() => onSelectFamilia(familiaId)}
             aria-label={`Expandir ${nombre}`}
-            className="group h-full w-full rounded-2xl border border-slate-800/40 bg-slate-900/30 hover:bg-white/5 transition-colors duration-200 overflow-hidden focus:outline-none focus-visible:bg-white/5"
+            className="group h-full w-full rounded-2xl border border-slate-800/40 bg-slate-900/30 cursor-pointer hover:bg-slate-800/50 transition-colors duration-200 overflow-hidden focus:outline-none focus-visible:bg-slate-800/50"
             style={{
               boxShadow: `inset 2px 0 0 ${meta.accent}`,
             }}
           >
             {/* Mobile: layout horizontal compacto */}
-            <div className="flex md:hidden h-full items-center justify-between px-4">
-              <span
-                className="text-[10px] uppercase tracking-widest font-medium"
-                style={{ color: meta.accent }}
-              >
-                {nombre}
-              </span>
-              <span className="text-xl font-extralight text-white tabular-nums">
+            <div className="flex md:hidden h-full items-center justify-between px-4 gap-3">
+              <div className="flex flex-col min-w-0">
+                <span
+                  className="text-[10px] uppercase tracking-widest font-medium truncate"
+                  style={{ color: meta.accent }}
+                >
+                  {nombre}
+                </span>
+                <span className="text-[9px] font-light text-slate-500 truncate">
+                  {lentesActivos} {lentesActivos === 1 ? 'análisis disponible' : 'análisis disponibles'}
+                </span>
+              </div>
+              <span className="text-xl font-extralight text-white tabular-nums flex-shrink-0">
                 {formatCLP(potencial)}
               </span>
             </div>
@@ -188,6 +203,9 @@ function FamilyCard({
                   style={{ color: meta.accent }}
                 >
                   {nombre}
+                </span>
+                <span className="text-[9px] font-light text-slate-500">
+                  {lentesActivos} {lentesActivos === 1 ? 'análisis disponible' : 'análisis disponibles'}
                 </span>
                 <span className="text-xl font-extralight text-white tabular-nums">
                   {formatCLP(potencial)}
