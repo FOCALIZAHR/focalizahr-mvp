@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Snowflake, ArrowRightLeft, Calendar, AlertTriangle } from 'lucide-react'
+import { Snowflake, ArrowRightLeft, Calendar } from 'lucide-react'
 import { LenteLayout } from './LenteLayout'
 import { LenteCard } from './LenteCard'
 import type { LenteComponentProps } from './_LentePlaceholder'
@@ -30,6 +30,8 @@ import {
   decisionKey,
   type DecisionItem,
 } from '@/lib/services/efficiency/EfficiencyCalculator'
+import { formatDisplayName, getInitials } from '@/lib/utils/formatName'
+import { getNineBoxLabel } from '@/config/nineBoxLabels'
 
 // ════════════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -55,21 +57,6 @@ function formatLabel(raw: string): string {
       return lower.charAt(0).toUpperCase() + lower.slice(1)
     })
     .join(' ')
-}
-
-/** Iniciales de un nombre para el avatar del rail. */
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return '··'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-}
-
-/** Short name: primer nombre + apellido. */
-function shortName(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length <= 1) return name
-  return `${parts[0]} ${parts[parts.length - 1]}`
 }
 
 function formatTenure(months: number): string {
@@ -190,7 +177,7 @@ function effExposure(p: PersonAlert): number {
 
 function narrativaDinamica(total: number, tomadas: number): string {
   if (tomadas === 0)
-    return 'Revisa cada expediente antes de decidir. El motor no elige por vos.'
+    return 'Revisa cada expediente antes de decidir. La decisión es tuya.'
   if (tomadas < Math.ceil(total / 2))
     return `${tomadas} de ${total} decididas. Cada persona es un caso distinto — no hay plantilla.`
   if (tomadas < total)
@@ -299,10 +286,14 @@ export function L2TalentoZombie({
   }, 0)
 
   const gapTotal = personsSorted.reduce((s, p) => s + p.salary, 0)
-  const tenureAvg =
-    personsSorted.length > 0
-      ? personsSorted.reduce((s, p) => s + p.tenureMonths, 0) / personsSorted.length
-      : 0
+  // Pasivo laboral hoy = Σ finiquitoToday de todas las personas.
+  // Con el fix raíz del enricher (commit simultáneo), finiquitoToday
+  // llega como number real para todos los zombies (antes era null por
+  // el gate roleFitScore < 75).
+  const pasivoLaboralHoy = personsSorted.reduce(
+    (s, p) => s + (p.finiquitoToday ?? 0),
+    0
+  )
 
   const checkpointSummary = hasInteraction
     ? {
@@ -311,7 +302,7 @@ export function L2TalentoZombie({
           .map(p => {
             const tipo = decisiones[p.employeeId]!
             return {
-              label: `${shortName(p.employeeName)} · ${formatLabel(p.position)}`,
+              label: `${formatDisplayName(p.employeeName)} · ${formatLabel(p.position)}`,
               detail: DECISION_META[tipo].label,
               value:
                 tipo === 'reubicar' ? '$0/mes' : `${formatCLP(p.salary)}/mes`,
@@ -332,6 +323,7 @@ export function L2TalentoZombie({
       heroValue={String(detalle.count)}
       heroUnit={`personas rinden hoy y no podrán adaptarse · ${Math.round(detalle.avgExposure * 100)}% exposición IA promedio`}
       narrativaPuente="Cada persona tiene un contexto propio. El expediente te deja simular el costo y la consecuencia de cada ruta antes de comprometerla."
+      ctaSimularLabel="Abrir expedientes"
       ctaQuirofanoEyebrow="EXPEDIENTE DE TALENTO"
       narrativaDinamica={narrativaDinamica(personsSorted.length, tomadas)}
       hasInteraction={hasInteraction}
@@ -363,7 +355,7 @@ export function L2TalentoZombie({
         <ExpedienteLateral
           personsCount={personsSorted.length}
           gapTotal={gapTotal}
-          tenureAvg={tenureAvg}
+          pasivoLaboralHoy={pasivoLaboralHoy}
         />
       )}
       renderQuirofano={() => (
@@ -393,11 +385,12 @@ function HallazgoResumen({ rows }: { rows: PersonAlert[] }) {
         Talento en zona crítica
       </h3>
 
+      {/* Narrativa de 3 patas: rinde bien + cargo expuesto + no adaptable.
+          Sin mencionar algoritmos (P12 — plato, no receta). */}
       <p className="text-sm text-slate-400 font-light leading-relaxed max-w-2xl mb-6">
-        Cruzamos desempeño actual, exposición del cargo a IA y capacidad de
-        adaptación. Estas {rows.length}{' '}
-        {rows.length === 1 ? 'persona rinde' : 'personas rinden'} excelente hoy,
-        pero los datos dicen que no podrán seguir el cambio.
+        Talento que rinde excelente hoy en cargos que la IA transforma. La
+        evidencia de competencias dice que la reconversión no es viable. Sus
+        mejores ejecutores de hoy son su mayor pasivo mañana.
       </p>
 
       <div className="space-y-2">
@@ -409,7 +402,7 @@ function HallazgoResumen({ rows }: { rows: PersonAlert[] }) {
             <Avatar name={p.employeeName} size={32} accent={L2_ACCENT} />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white truncate">
-                {p.employeeName}
+                {formatDisplayName(p.employeeName)}
               </p>
               <p className="text-xs text-slate-400 font-light truncate">
                 {formatLabel(p.position)} · {formatLabel(p.departmentName)}
@@ -434,10 +427,14 @@ function HallazgoResumen({ rows }: { rows: PersonAlert[] }) {
 interface ExpedienteLateralProps {
   personsCount: number
   gapTotal: number
-  tenureAvg: number
+  pasivoLaboralHoy: number
 }
 
-function ExpedienteLateral({ personsCount, gapTotal, tenureAvg }: ExpedienteLateralProps) {
+function ExpedienteLateral({
+  personsCount,
+  gapTotal,
+  pasivoLaboralHoy,
+}: ExpedienteLateralProps) {
   return (
     <aside className="rounded-lg border border-slate-800/40 bg-slate-900/30 p-5 space-y-5">
       <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium">
@@ -467,11 +464,11 @@ function ExpedienteLateral({ personsCount, gapTotal, tenureAvg }: ExpedienteLate
       <div className="h-px bg-slate-800/40" aria-hidden />
 
       <div>
-        <p className="text-base font-light text-slate-400 tabular-nums leading-tight">
-          {formatTenure(Math.round(tenureAvg))}
+        <p className="text-xl font-extralight text-amber-300/90 tabular-nums leading-tight">
+          {formatCLP(pasivoLaboralHoy)}
         </p>
         <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
-          Antigüedad promedio
+          Pasivo laboral hoy
         </p>
       </div>
     </aside>
@@ -557,7 +554,7 @@ function RailPersonas({ rows, activeId, onSelect, decisiones }: RailPersonasProp
             <Avatar name={p.employeeName} size={28} accent={L2_ACCENT} />
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-white truncate">
-                {shortName(p.employeeName)}
+                {formatDisplayName(p.employeeName)}
               </p>
               <p className="text-[10px] font-light text-slate-500 truncate">
                 {formatLabel(p.position)}
@@ -614,7 +611,7 @@ function SeccionIdentidad({ persona }: { persona: PersonAlert }) {
         <Avatar name={persona.employeeName} size={56} accent={L2_ACCENT} />
         <div>
           <h3 className="text-xl md:text-2xl font-light text-white leading-tight">
-            {persona.employeeName}
+            {formatDisplayName(persona.employeeName)}
           </h3>
           <p className="text-sm text-slate-400 font-light mt-0.5">
             {formatLabel(persona.position)} · {formatLabel(persona.departmentName)}
@@ -679,9 +676,7 @@ function SeccionContexto({ persona }: { persona: PersonAlert }) {
           <Chip label={`Metas ${Math.round(persona.metasCompliance)}%`} />
         )}
         {persona.nineBoxPosition && (
-          <Chip
-            label={`ADN: ${persona.nineBoxPosition.replace(/_/g, ' ').toLowerCase()}`}
-          />
+          <Chip label={`ADN: ${getNineBoxLabel(persona.nineBoxPosition)}`} />
         )}
       </div>
     </section>
@@ -842,6 +837,9 @@ function Avatar({
   size: number
   accent: string
 }) {
+  // Primero normalizar el nombre ("CARRASCO NUÑEZ MARTA" → "Marta Carrasco")
+  // y después extraer iniciales ("MC"). Coherente con el resto del UI.
+  const display = formatDisplayName(name)
   return (
     <div
       className="flex-shrink-0 rounded-full flex items-center justify-center font-medium tabular-nums"
@@ -854,7 +852,7 @@ function Avatar({
         fontSize: size * 0.38,
       }}
     >
-      {initials(name)}
+      {getInitials(display)}
     </div>
   )
 }

@@ -478,7 +478,9 @@ export class WorkforceIntelligenceService {
         nineBoxPosition: rating?.nineBoxPosition ?? null,
         salary,
         monthlyGap: calculateMonthlyGap(salary, roleFitScore),
-        finiquitoToday: roleFitScore < 75 ? calculateFiniquito(salary, tenureMonths) : null,
+        // Se calcula SIEMPRE. El consumer decide si mostrarlo.
+        // Enricher no impone filtros UX — Principio 15 (arquitectura sin parches).
+        finiquitoToday: calculateFiniquito(salary, tenureMonths),
         isIncumbentOfCriticalPosition: criticalIncumbents.has(emp.id),
       }
     })

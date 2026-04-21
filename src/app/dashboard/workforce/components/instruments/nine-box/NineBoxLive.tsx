@@ -488,7 +488,7 @@ function PersonView({
             value={`${formatCLP(person.salary)} / mes`}
             accent="amber"
           />
-          {person.finiquitoToday !== null && (
+          {person.roleFitScore < 75 && person.finiquitoToday !== null && (
             <HudStat
               label="Finiquito hoy"
               value={formatCLP(person.finiquitoToday)}
