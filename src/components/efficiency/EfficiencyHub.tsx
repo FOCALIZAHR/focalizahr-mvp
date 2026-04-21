@@ -121,13 +121,13 @@ export function EfficiencyHub() {
 
   return (
     <>
-      <div className="fhr-bg-main h-screen flex flex-col overflow-hidden">
-        {/* ── HEADER ultracompacto ─────────────────────────────────
+      <div className="fhr-bg-main min-h-screen">
+        {/* ── HEADER sticky — siempre visible al scrollear ────────
             · lobby + ancla → eyebrow + Mis planes (sin rail)
             · briefing + lente → rail de familias + Mis planes
             El Acto Ancla es la primera vez que el CEO ve las 3 familias. */}
-        <header className="flex-shrink-0 max-w-7xl mx-auto w-full px-4 md:px-8 border-b border-slate-800/40">
-          <div className="flex items-center justify-between gap-4 py-3">
+        <header className="sticky top-0 z-50 bg-slate-950/85 backdrop-blur-xl border-b border-slate-800/40">
+          <div className="max-w-7xl mx-auto w-full px-4 md:px-8 flex items-center justify-between gap-4 py-3">
             {ws.hubView === 'lobby' || ws.hubView === 'ancla' ? (
               <span className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-light">
                 Efficiency Intelligence
@@ -143,26 +143,22 @@ export function EfficiencyHub() {
           </div>
         </header>
 
-        {/* ── WORKSPACE ──────────────────────────────────────────── */}
-        <main className="flex-1 min-h-0 max-w-7xl mx-auto w-full px-4 md:px-8 overflow-hidden">
+        {/* ── WORKSPACE ─────────────────────────────────────────────
+            Patrón A: page scroll natural. Sin overflow interno, sin
+            alturas calculadas. El navegador maneja el único scroll.
+            · pb-32 reserva espacio bajo el CarritoBar fixed bottom.
+            · El componente activo decide su altura natural; las vistas
+              above-the-fold (lobby, ancla) usan min-h-[calc(100vh-Xpx)]. */}
+        <main className="max-w-7xl mx-auto w-full px-4 md:px-8 pb-32">
           <div
-            className={`h-full grid gap-4 md:gap-6 min-h-0 ${
+            className={`grid gap-4 md:gap-6 ${
               muestraPanelDerecho
                 ? 'grid-cols-1 md:grid-cols-[1fr_320px]'
                 : 'grid-cols-1'
             }`}
           >
-            {/* Panel activo — overflow condicional:
-                · lobby + ancla → above-the-fold sin scroll
-                · briefing + lente → scroll vertical libre con padding
-                  reservado para CarritoBar fixed bottom */}
-            <div
-              className={
-                ws.hubView === 'lobby' || ws.hubView === 'ancla'
-                  ? 'min-h-0 min-w-0 overflow-hidden pt-4 md:pt-5'
-                  : 'min-h-0 min-w-0 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent pt-4 md:pt-5 pb-32'
-              }
-            >
+            {/* Panel activo — altura natural, sin overflow propio */}
+            <div className="min-w-0 pt-4 md:pt-5">
               <AnimatePresence mode="wait">
                 {ws.hubView === 'lobby' ? (
                   <ShockGlobalPortada
@@ -238,18 +234,21 @@ export function EfficiencyHub() {
               </AnimatePresence>
             </div>
 
-            {/* Panel acumuladores 30% — solo cuando hay lente activo */}
+            {/* Panel acumuladores 30% — sticky lateral, siempre visible
+                mientras se opera el lente. top-[72px] = altura header sticky. */}
             {muestraPanelDerecho && (
-              <div className="hidden md:block min-h-0 pt-4 md:pt-5 pb-32">
-                <PanelAcumuladores
-                  tituloLenteActivo={activeLente?.titulo ?? ''}
-                  decisionesDelLenteActivo={ws.decisionesDelLenteActivo}
-                  resumenGlobal={ws.resumenCarrito}
-                  onRemove={ws.removeDecision}
-                  onClearLente={() =>
-                    ws.activeLenteId && ws.clearLente(ws.activeLenteId)
-                  }
-                />
+              <div className="hidden md:block pt-4 md:pt-5">
+                <div className="sticky top-[72px]">
+                  <PanelAcumuladores
+                    tituloLenteActivo={activeLente?.titulo ?? ''}
+                    decisionesDelLenteActivo={ws.decisionesDelLenteActivo}
+                    resumenGlobal={ws.resumenCarrito}
+                    onRemove={ws.removeDecision}
+                    onClearLente={() =>
+                      ws.activeLenteId && ws.clearLente(ws.activeLenteId)
+                    }
+                  />
+                </div>
               </div>
             )}
           </div>
