@@ -108,7 +108,10 @@ function FamilyCard({
     >
       <AnimatePresence mode="wait">
         {isActive ? (
-          // ─── CARD EXPANDIDA — wrapper vidrio flotante con Tesla protagónica ───
+          // ─── CARD EXPANDIDA — vidrio flotante con barra lateral accent ───
+          //   Firma visual UNIFICADA con las cards colapsadas: barra vertical
+          //   izquierda en color de familia. La expandida se diferencia por
+          //   el halo envolvente + el tamaño, no por un tipo distinto de línea.
           <motion.div
             key="expanded"
             initial={{ opacity: 0 }}
@@ -122,13 +125,12 @@ function FamilyCard({
               boxShadow: `0 0 60px ${meta.accent}0F`,
             }}
           >
-            {/* Tesla line protagónica — h-[3px] con doble glow en color de
-                familia. Firma visible que sostiene la card. */}
+            {/* Barra vertical izquierda — misma firma que las cards colapsadas */}
             <div
-              className="absolute top-0 left-0 right-0 h-[3px] z-10"
+              className="absolute left-0 top-0 bottom-0 w-[2px] z-10"
               style={{
-                background: `linear-gradient(90deg, transparent, ${meta.accent}, transparent)`,
-                boxShadow: `0 0 20px ${meta.accent}, 0 0 40px ${meta.accent}66`,
+                background: meta.accent,
+                boxShadow: `0 0 15px ${meta.accent}, 0 0 30px ${meta.accent}66`,
               }}
               aria-hidden
             />
