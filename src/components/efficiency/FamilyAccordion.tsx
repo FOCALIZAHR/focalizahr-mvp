@@ -125,12 +125,13 @@ function FamilyCard({
               boxShadow: `0 0 60px ${meta.accent}0F`,
             }}
           >
-            {/* Barra vertical izquierda — misma firma que las cards colapsadas */}
+            {/* Tesla line vertical — firma canónica del proyecto adaptada
+                al eje vertical. Desvanecimiento en los extremos. */}
             <div
               className="absolute left-0 top-0 bottom-0 w-[2px] z-10"
               style={{
-                background: meta.accent,
-                boxShadow: `0 0 15px ${meta.accent}, 0 0 30px ${meta.accent}66`,
+                background: `linear-gradient(180deg, transparent, ${meta.accent}, transparent)`,
+                boxShadow: `0 0 20px ${meta.accent}`,
               }}
               aria-hidden
             />
@@ -160,12 +161,13 @@ function FamilyCard({
             aria-label={`Expandir ${nombre}`}
             className="group relative h-full w-full rounded-2xl bg-slate-950 cursor-pointer hover:bg-slate-800/50 transition-colors duration-200 overflow-hidden focus:outline-none focus-visible:bg-slate-800/50"
           >
-            {/* Barra vertical izquierda — Tesla line lateral en color de familia */}
+            {/* Tesla line vertical — firma canónica con desvanecimiento
+                en los extremos, misma que la card expandida. */}
             <div
               className="absolute left-0 top-0 bottom-0 w-[2px]"
               style={{
-                background: meta.accent,
-                boxShadow: `0 0 15px ${meta.accent}, 0 0 30px ${meta.accent}66`,
+                background: `linear-gradient(180deg, transparent, ${meta.accent}, transparent)`,
+                boxShadow: `0 0 20px ${meta.accent}`,
               }}
               aria-hidden
             />
