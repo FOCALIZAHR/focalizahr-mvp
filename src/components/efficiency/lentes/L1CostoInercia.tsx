@@ -23,14 +23,45 @@ import { LenteCard } from './LenteCard'
 import type { LenteComponentProps } from './_LentePlaceholder'
 import { formatCLP } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
 import type { DecisionItem } from '@/lib/services/efficiency/EfficiencyCalculator'
-import { normalizePositionText } from '@/lib/utils/normalizePosition'
-import { toTitleCase } from '@/lib/utils/formatName'
-
-/** Normaliza strings crudos de BD ("ANALISTA_RRHH") a display humano
- *  ("Analista Rrhh"). Canónico del SKILL.md — anti-patrón mostrar
- *  UPPERCASE o snake_case tal cual llegan del backend. */
+/** Normaliza strings crudos de BD ("ANALISTA_RRHH", "OPERACIONES")
+ *  a display humano ("Analista RRHH", "Operaciones"). Canónico del
+ *  SKILL.md — anti-patrón mostrar UPPERCASE o snake_case tal cual.
+ *
+ *  Reglas:
+ *  · Split por `_`, espacios y paréntesis.
+ *  · Siglas (palabras de 2-5 caracteres en mayúsculas) se preservan
+ *    tal cual ("TI", "RRHH", "CEO", "HRBP", "PYME").
+ *  · Resto se lleva a title case.
+ *
+ *  Ejemplos:
+ *    "TI"             → "TI"
+ *    "RRHH"           → "RRHH"
+ *    "OPERACIONES"    → "Operaciones"
+ *    "ANALISTA_RRHH"  → "Analista RRHH"
+ *    "Gerencia de TI" → "Gerencia De TI"
+ */
 function formatLabel(raw: string): string {
-  return toTitleCase(normalizePositionText(raw))
+  if (!raw) return ''
+
+  const cleaned = raw
+    .trim()
+    .replace(/\s*\([^)]*\)\s*/g, ' ')
+    .replace(/[()]/g, ' ')
+    .replace(/[_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return cleaned
+    .split(' ')
+    .filter(Boolean)
+    .map(word => {
+      // Sigla: 2-5 caracteres, solo letras mayúsculas (con acentos/ñ)
+      const isSigla = /^[A-ZÁÉÍÓÚÜÑ]{2,5}$/.test(word)
+      if (isSigla) return word
+      const lower = word.toLowerCase()
+      return lower.charAt(0).toUpperCase() + lower.slice(1)
+    })
+    .join(' ')
 }
 
 // ════════════════════════════════════════════════════════════════════════════
