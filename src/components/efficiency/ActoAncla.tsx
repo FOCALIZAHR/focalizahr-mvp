@@ -76,37 +76,11 @@ const GAUGE_STROKE = 10
 const GAUGE_RADIUS = GAUGE_SIZE / 2 - GAUGE_STROKE - 8
 
 // ════════════════════════════════════════════════════════════════════════════
-// HELPER — split CLP en mainText + unit para usar el patrón "{score}<suffix>"
-// "$782M" → { mainText: "$782", unit: "M" }   (anual sin decimales)
-// "$1MM"  → { mainText: "$1",   unit: "MM" }
-// El Acto Ancla usa siempre noDecimals=true (valor anual, números limpios).
-// ════════════════════════════════════════════════════════════════════════════
-
-function splitCLP(
-  value: number,
-  noDecimals = false
-): { mainText: string; unit: string } {
-  if (!isFinite(value) || value <= 0) return { mainText: '$0', unit: '' }
-  if (value >= 1_000_000_000) {
-    const main = noDecimals
-      ? String(Math.round(value / 1_000_000_000))
-      : (value / 1_000_000_000).toFixed(1).replace(/\.0$/, '')
-    return { mainText: `$${main}`, unit: 'MM' }
-  }
-  if (value >= 1_000_000) {
-    const main = noDecimals
-      ? String(Math.round(value / 1_000_000))
-      : (value / 1_000_000).toFixed(1).replace(/\.0$/, '')
-    return { mainText: `$${main}`, unit: 'M' }
-  }
-  if (value >= 1_000) {
-    return { mainText: `$${Math.round(value / 1_000)}`, unit: 'k' }
-  }
-  return { mainText: `$${Math.round(value)}`, unit: '' }
-}
-
-// ════════════════════════════════════════════════════════════════════════════
 // BUILD NODOS — top 3 cargos + ancla científica
+// Todos los nodos cargo y el central usan la misma escala: anual entero
+// en millones, sin $ ni M. El label "MM$ / AÑO" del gauge central da el
+// contexto global para todos los valores. El nodo ancla usa "%" porque
+// es una escala distinta (exposición global, no monto).
 // ════════════════════════════════════════════════════════════════════════════
 
 interface PositionCostShape {
@@ -148,13 +122,13 @@ function buildNodos(data: DiagnosticData): NodoData[] {
   const TIERS_BY_RANK: TierColor[] = ['cyan', 'amber', 'purple']
 
   const cargos: NodoData[] = top3.map((p, idx) => {
-    // Valor anual sin decimales — alineado con el contexto "MM$ / AÑO" central
-    const annual = p.monthlyCost * 12
-    const split = splitCLP(annual, true)
+    // Anual entero en millones, sin $ ni M — el contexto "MM$ / AÑO"
+    // del gauge central aplica a todos los nodos por igual.
+    const annualMillions = Math.round((p.monthlyCost * 12) / 1_000_000)
     const proporcion = totalTop3 > 0 ? (p.monthlyCost / totalTop3) * 100 : 0
     return {
-      mainText: split.mainText,
-      unit: split.unit,
+      mainText: formatInt(annualMillions),
+      unit: '',
       // "ANALISTA_RRHH" → normalize → "analista rrhh" → toTitleCase → "Analista Rrhh"
       label: toTitleCase(normalizePositionText(p.position)),
       narrative: `${Math.round(p.avgExposure * 100)}% tareas automatizables · ${formatInt(p.headcount)} FTE${p.headcount === 1 ? '' : 's'}`,
@@ -280,23 +254,24 @@ export default memo(function ActoAncla({
               />
             </svg>
 
-            {/* Score (font-semibold, blanco) + label "AL MES" — patrón canónico */}
+            {/* Narrativa Antes de Dato: label "MM$ / AÑO" arriba da contexto
+                antes del número. Score (font-semibold, blanco) debajo. */}
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <motion.span
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.6, delay: 0.4 }}
-                className="text-[96px] font-semibold text-white leading-none tabular-nums tracking-tight"
+                className="text-[10px] uppercase tracking-[3px] text-slate-500 font-medium mb-2"
               >
-                {formatInt(centralNumber)}
+                MM$ / AÑO
               </motion.span>
               <motion.span
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.6, delay: 0.6 }}
-                className="text-[10px] uppercase tracking-[3px] text-slate-500 font-medium mt-1"
+                className="text-[96px] font-semibold text-white leading-none tabular-nums tracking-tight"
               >
-                MM$ / AÑO
+                {formatInt(centralNumber)}
               </motion.span>
             </div>
           </motion.div>
