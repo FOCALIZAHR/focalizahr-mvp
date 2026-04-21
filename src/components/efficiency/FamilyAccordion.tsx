@@ -142,7 +142,12 @@ function FamilyCard({
             </div>
           </motion.div>
         ) : (
-          // ─── CARD COLAPSADA — solo título rotado, sin border ni bg ───
+          // ─── CARD COLAPSADA — barra vertical izquierda + título rotado ───
+          //   Firma visual única: barra vertical accent + texto vertical
+          //   rotado forman unidad cromática alineada al eje vertical de
+          //   la card. Cada familia queda identificada inequívocamente
+          //   por su color (cyan / purple / amber) sin competir con el
+          //   título del accordion.
           <motion.button
             key="collapsed"
             initial={{ opacity: 0 }}
@@ -151,8 +156,18 @@ function FamilyCard({
             transition={{ duration: 0.2, delay: 0.5 }}
             onClick={() => onSelectFamilia(familiaId)}
             aria-label={`Expandir ${nombre}`}
-            className="group h-full w-full rounded-2xl bg-slate-950 cursor-pointer hover:bg-slate-800/50 transition-colors duration-200 overflow-hidden focus:outline-none focus-visible:bg-slate-800/50"
+            className="group relative h-full w-full rounded-2xl bg-slate-950 cursor-pointer hover:bg-slate-800/50 transition-colors duration-200 overflow-hidden focus:outline-none focus-visible:bg-slate-800/50"
           >
+            {/* Barra vertical izquierda — Tesla line lateral en color de familia */}
+            <div
+              className="absolute left-0 top-0 bottom-0 w-[2px]"
+              style={{
+                background: meta.accent,
+                boxShadow: `0 0 15px ${meta.accent}, 0 0 30px ${meta.accent}66`,
+              }}
+              aria-hidden
+            />
+
             {/* Mobile: solo nombre, horizontal */}
             <div className="flex md:hidden h-full items-center justify-center px-4">
               <span
