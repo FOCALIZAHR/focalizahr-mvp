@@ -11,6 +11,7 @@
 import type { LenteAPI } from '@/hooks/useEfficiencyWorkspace'
 import type { DecisionItem } from '@/lib/services/efficiency/EfficiencyCalculator'
 import type { LenteId } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
+import type { LenteActo } from './LenteLayout'
 
 /**
  * Interfaz canónica que recibe cada componente de lente (L1..L9).
@@ -37,4 +38,8 @@ export interface LenteComponentProps {
   allLentes?: Record<LenteId, LenteAPI>
   onNextLente?: () => void
   proximoLenteTitulo?: string
+  /** Callback opcional que dispara el LenteLayout cuando cambia el acto
+   *  interno (silencio/expediente/quirofano). El EfficiencyHub lo usa
+   *  para atenuar el PanelAcumuladores durante el Acto Silencio. */
+  onActChange?: (act: LenteActo) => void
 }

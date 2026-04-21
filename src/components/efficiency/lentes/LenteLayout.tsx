@@ -26,7 +26,7 @@
 
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react'
 import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton'
@@ -42,7 +42,8 @@ const HERO_LAYOUT_ID = 'lente-hero-value'
 // TYPES
 // ════════════════════════════════════════════════════════════════════════════
 
-type Acto = 'silencio' | 'expediente' | 'quirofano'
+export type LenteActo = 'silencio' | 'expediente' | 'quirofano'
+type Acto = LenteActo
 
 type TotalizadorTint = 'default' | 'accent' | 'emerald' | 'warning'
 
@@ -97,6 +98,12 @@ export interface LenteLayoutProps {
   onNextLente?: () => void
   /** Para el label del CTA: "Siguiente: {proximoLenteTitulo} →". */
   proximoLenteTitulo?: string
+
+  // ─── Hook de acto al consumidor (opcional) ───
+  /** Notifica al consumidor cuando cambia el acto. Útil para que el
+   *  EfficiencyHub ajuste elementos fuera del layout (ej: atenuar el
+   *  PanelAcumuladores durante el Acto Silencio). */
+  onActChange?: (act: LenteActo) => void
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -105,6 +112,13 @@ export interface LenteLayoutProps {
 
 export function LenteLayout(props: LenteLayoutProps) {
   const [act, setAct] = useState<Acto>('silencio')
+
+  // Notificar al consumidor cuando cambia el acto — ajustes externos
+  // (ej: PanelAcumuladores atenuado en el Acto Silencio).
+  useEffect(() => {
+    props.onActChange?.(act)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [act])
 
   return (
     <div className="relative rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
@@ -255,7 +269,7 @@ function ActoExpediente({
           className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          Silencio
+          Volver
         </button>
 
         <div className="text-right">
@@ -372,7 +386,7 @@ function ActoQuirofano({
           className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          Expediente
+          Volver
         </button>
 
         <div className="text-right">

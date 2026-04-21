@@ -15,12 +15,14 @@
 
 'use client'
 
+import { useState } from 'react'
 import { Loader2, ArrowLeft } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { SecondaryButton } from '@/components/ui/PremiumButton'
 import { useEfficiencyWorkspace } from '@/hooks/useEfficiencyWorkspace'
 import { PanelAcumuladores } from './panel-acumuladores/PanelAcumuladores'
 import { CarritoBar } from './carrito/CarritoBar'
+import type { LenteActo } from './lentes/LenteLayout'
 import { ShockGlobalPortada } from './ShockGlobalPortada'
 import ActoAncla from './ActoAncla'
 import { FamilyAccordion } from './FamilyAccordion'
@@ -59,6 +61,10 @@ const LENTE_COMPONENTS: Partial<Record<LenteId, React.FC<LenteComponentProps>>> 
 
 export function EfficiencyHub() {
   const ws = useEfficiencyWorkspace()
+  // Acto del lente activo (reportado por LenteLayout vía onActChange).
+  // Se usa para atenuar el PanelAcumuladores durante el Acto Silencio,
+  // donde el número hero debe respirar sin competencia visual.
+  const [lenteActo, setLenteActo] = useState<LenteActo | null>(null)
 
   if (ws.loading) {
     return (
@@ -202,6 +208,7 @@ export function EfficiencyHub() {
                       allLentes={ws.data.lentes}
                       onNextLente={ws.nextLenteInFamilia}
                       proximoLenteTitulo={proximoLenteTitulo}
+                      onActChange={setLenteActo}
                     />
 
                     {/* Footer nav: CTA grande al final del lente */}
@@ -232,9 +239,17 @@ export function EfficiencyHub() {
             </div>
 
             {/* Panel acumuladores 30% — sticky lateral, siempre visible
-                mientras se opera el lente. top-4 = sin header encima. */}
+                mientras se opera el lente. top-4 = sin header encima.
+                Atenuado durante el Acto Silencio para no competir con
+                el número hero protagonista. */}
             {muestraPanelDerecho && (
-              <div className="hidden md:block pt-4 md:pt-5">
+              <div
+                className={`hidden md:block pt-4 md:pt-5 transition-opacity duration-500 ${
+                  lenteActo === 'silencio'
+                    ? 'opacity-30 pointer-events-none'
+                    : 'opacity-100'
+                }`}
+              >
                 <div className="sticky top-4">
                   <PanelAcumuladores
                     tituloLenteActivo={activeLente?.titulo ?? ''}

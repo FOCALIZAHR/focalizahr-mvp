@@ -131,6 +131,7 @@ export function L1CostoInercia({
   onRemove,
   onNextLente,
   proximoLenteTitulo,
+  onActChange,
 }: LenteComponentProps) {
   const detalle = lente.detalle as L1Detalle | null
   const [captureByDept, setCaptureByDept] = useState<Record<string, number>>({})
@@ -213,6 +214,7 @@ export function L1CostoInercia({
       hasInteraction={hasInteraction}
       onNextLente={onNextLente}
       proximoLenteTitulo={proximoLenteTitulo}
+      onActChange={onActChange}
       totalizador={{
         metricas: [
           {
@@ -250,9 +252,17 @@ function HallazgoMapa({ rows }: { rows: Row[] }) {
       <p className="text-[10px] uppercase tracking-[0.22em] text-cyan-400 font-medium mb-2">
         EL MAPA
       </p>
-      <h3 className="text-xl md:text-2xl font-light text-white mb-6 leading-tight">
+      <h3 className="text-xl md:text-2xl font-light text-white mb-4 leading-tight">
         Por área, cómo actúa la IA
       </h3>
+
+      {/* Narrativa contextual — por qué esto es un descubrimiento
+          (Mandamiento 8: narrativa antes que dato). */}
+      <p className="text-sm text-slate-400 font-light leading-relaxed max-w-2xl mb-6">
+        El motor cruzó tu nómina con el mapa de exposición a IA de{' '}
+        <span className="text-slate-300">O*NET</span> y el índice de automatización{' '}
+        <span className="text-slate-300">Eloundou</span>. Esto es lo que encontró.
+      </p>
 
       <div className="space-y-3">
         {rows.map(r => {
@@ -322,8 +332,28 @@ function ExpedienteLateral({ detalle }: { detalle: L1Detalle }) {
         EL EXPEDIENTE
       </p>
 
+      {/* Segundo hero — río del número: $65M/mes arriba (hero global)
+          conecta con $XXX.XM/año acá (hero anual del lente).
+          Regla del Río: el CEO ve la continuidad cronológica del impacto. */}
       <div>
-        <p className="text-2xl font-extralight text-white tabular-nums leading-tight">
+        <p
+          className="font-extralight text-white tabular-nums leading-none"
+          style={{
+            fontSize: 'clamp(36px, 4vw, 48px)',
+            letterSpacing: '-0.02em',
+          }}
+        >
+          {formatCLP(detalle.totalAnnual)}
+        </p>
+        <p className="text-[11px] uppercase tracking-widest text-amber-300/90 font-medium mt-2">
+          Si no actúas · al año
+        </p>
+      </div>
+
+      <div className="h-px bg-slate-800/40" aria-hidden />
+
+      <div>
+        <p className="text-xl font-extralight text-white tabular-nums leading-tight">
           {detalle.totalFTEs.toFixed(1)}
         </p>
         <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
@@ -334,18 +364,7 @@ function ExpedienteLateral({ detalle }: { detalle: L1Detalle }) {
       <div className="h-px bg-slate-800/40" aria-hidden />
 
       <div>
-        <p className="text-2xl font-extralight text-white tabular-nums leading-tight">
-          {formatCLP(detalle.totalAnnual)}
-        </p>
-        <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
-          Si no actúas · al año
-        </p>
-      </div>
-
-      <div className="h-px bg-slate-800/40" aria-hidden />
-
-      <div>
-        <p className="text-2xl font-extralight text-white tabular-nums leading-tight">
+        <p className="text-xl font-extralight text-white tabular-nums leading-tight">
           {detalle.byDepartment.length}
         </p>
         <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
