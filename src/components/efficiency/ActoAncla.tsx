@@ -67,11 +67,12 @@ const TIER_TEXT: Record<TierColor, string> = {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// GAUGE GEOMETRY — IDÉNTICO a AnclaInteligente
+// GAUGE GEOMETRY — reducido a 220px para caber sin scroll en una pantalla
+// (gauge + líneas SVG + 4 nodos + CTA en h-[calc(100vh-120px)]).
 // ════════════════════════════════════════════════════════════════════════════
 
-const GAUGE_SIZE = 272
-const GAUGE_STROKE = 10
+const GAUGE_SIZE = 220
+const GAUGE_STROKE = 8
 const GAUGE_RADIUS = GAUGE_SIZE / 2 - GAUGE_STROKE - 8
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -226,7 +227,7 @@ export default memo(function ActoAncla({
   const scoreColor = TIER_HEX.cyan
 
   return (
-    <div className="relative h-full overflow-hidden rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm flex flex-col">
+    <div className="relative h-[calc(100vh-120px)] overflow-hidden rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm flex flex-col">
       {/* Tesla line top */}
       <div
         className="absolute top-0 left-0 right-0 h-[2px] z-10"
@@ -237,12 +238,12 @@ export default memo(function ActoAncla({
         }}
       />
 
-      <div className="flex-1 min-h-0 px-6 py-6 md:px-10 md:py-8 flex flex-col">
+      <div className="flex-1 min-h-0 px-6 py-5 md:px-10 md:py-6 flex flex-col">
         {/* Back button */}
         {onBack && (
           <button
             onClick={onBack}
-            className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs mb-4 self-start"
+            className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs mb-3 self-start"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Portada
@@ -301,12 +302,12 @@ export default memo(function ActoAncla({
           </motion.div>
         </div>
 
-        {/* ═══ LÍNEAS SVG + NODOS ═══ — clonado literal */}
-        <div className="relative mt-2">
+        {/* ═══ LÍNEAS SVG + NODOS ═══ — altura compactada (60px) */}
+        <div className="relative mt-1">
           <svg
             className="absolute inset-x-0 top-0 w-full pointer-events-none"
-            style={{ height: 80 }}
-            viewBox="0 0 1000 80"
+            style={{ height: 60 }}
+            viewBox="0 0 1000 60"
             preserveAspectRatio="none"
           >
             <defs>
@@ -319,9 +320,9 @@ export default memo(function ActoAncla({
               const originX = 500
               const originY = 0
               const nodeX = 1000 * ((idx + 0.5) / nodes.length)
-              const nodeY = 75
+              const nodeY = 55
               const ctrlX = (originX + nodeX) / 2
-              const ctrlY = 40
+              const ctrlY = 30
               const path = `M ${originX} ${originY} Q ${ctrlX} ${ctrlY}, ${nodeX} ${nodeY}`
 
               return (
@@ -347,7 +348,7 @@ export default memo(function ActoAncla({
           {/* Nodos — patrón canónico: número + suffix, micro-barra, label, narrativa */}
           <div
             className={cn(
-              'grid gap-4 pt-20',
+              'grid gap-4 pt-16',
               nodes.length === 4 && 'grid-cols-2 md:grid-cols-4'
             )}
           >
@@ -430,7 +431,7 @@ export default memo(function ActoAncla({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 1.4 + nodes.length * 0.15 + 0.3 }}
-          className="flex justify-center mt-6"
+          className="flex justify-center mt-auto pt-6"
         >
           <PrimaryButton
             icon={ArrowRight}
