@@ -16,6 +16,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Bot, Zap, Sparkles } from 'lucide-react'
 import { LenteLayout } from './LenteLayout'
 import { LenteCard } from './LenteCard'
@@ -102,7 +103,7 @@ function inferIPI(avgExposure: number): IPI {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// NARRATIVA DINÁMICA — reactiva al % promedio capturado
+// NARRATIVA DINÁMICA MACRO — promedio general de captura (todos los sliders)
 // ════════════════════════════════════════════════════════════════════════════
 
 function narrativaDinamica(avgPct: number): string {
@@ -113,6 +114,38 @@ function narrativaDinamica(avgPct: number): string {
   if (avgPct <= 80)
     return 'Captura decidida. Impacto financiero significativo.'
   return 'Migración agresiva hacia IA. Máxima eficiencia, máximo impacto organizacional.'
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// NARRATIVA MICRO — por slider, contextualizada al IPI del área
+// Tono McKinsey: directo, consecuencia no instrucción (P12).
+// ════════════════════════════════════════════════════════════════════════════
+
+function narrativaIPIporSlider(ipi: IPI, pct: number): string {
+  if (pct === 0) return ''
+
+  if (ipi === 'delegacion') {
+    if (pct <= 30)
+      return 'La IA ya ejecuta estas tareas. A este nivel solo activás una parte de lo que ya está disponible.'
+    if (pct <= 70)
+      return 'Activación directa: la IA ejecuta autónomamente. Decisión de cuándo, no de cómo.'
+    return 'Captura máxima en tareas donde la IA ya opera sola. Sin fricción humana — la capacidad está allí esperando ser liberada.'
+  }
+
+  if (ipi === 'asistencia') {
+    if (pct <= 30)
+      return 'La IA copilotea. A este nivel, pocos flujos cambian — adopción voluntaria basta.'
+    if (pct <= 70)
+      return 'Las personas del área necesitan operar con IA. Capacitación es prerequisito, no opcional.'
+    return 'Captura alta en modo asistencia: el cambio es cultural y de procesos. Capacitación es el cuello de botella real, no la tecnología.'
+  }
+
+  // aprendizaje
+  if (pct <= 30)
+    return 'Exposición baja. La IA acompaña tareas, todavía no las ejecuta sola.'
+  if (pct <= 70)
+    return 'Exposición baja. Capturar más depende de madurez tecnológica futura, no de activación hoy.'
+  return 'Exposición baja con captura forzada. Los datos no sustentan este nivel — revisar si el supuesto es realista.'
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -394,11 +427,12 @@ function QuirofanoSliders({ rows, captureByDept, onChange }: QuirofanoSlidersPro
         en vivo con cada movimiento.
       </p>
 
-      <div className="space-y-5">
+      <div className="space-y-6">
         {rows.map(r => {
           const pct = captureByDept[r.departmentId] ?? 0
           const ipi = IPI_META[r.ipi]
           const ahorroProyectado = Math.round(r.monthlyCost * (pct / 100))
+          const narrativaMicro = narrativaIPIporSlider(r.ipi, pct)
 
           return (
             <div key={r.departmentId}>
@@ -430,6 +464,23 @@ function QuirofanoSliders({ rows, captureByDept, onChange }: QuirofanoSlidersPro
                 }}
                 aria-label={`Captura en ${r.departmentName}`}
               />
+
+              {/* Narrativa micro contextualizada al IPI — capa inferior
+                  al promedio global. Fade on change cuando cambia el rango. */}
+              <AnimatePresence mode="wait">
+                {narrativaMicro && (
+                  <motion.p
+                    key={narrativaMicro}
+                    initial={{ opacity: 0, y: 2 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="text-[11px] font-light text-slate-500 italic leading-snug mt-2 max-w-xl"
+                  >
+                    {narrativaMicro}
+                  </motion.p>
+                )}
+              </AnimatePresence>
             </div>
           )
         })}
