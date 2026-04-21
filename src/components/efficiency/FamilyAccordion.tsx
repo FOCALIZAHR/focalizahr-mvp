@@ -108,23 +108,27 @@ function FamilyCard({
     >
       <AnimatePresence mode="wait">
         {isActive ? (
-          // ─── CARD EXPANDIDA — wrapper canónico con más vidrio, Tesla line accent ───
+          // ─── CARD EXPANDIDA — wrapper vidrio flotante con Tesla protagónica ───
           <motion.div
             key="expanded"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, delay: 0.5 }}
-            className="relative h-full rounded-2xl border border-slate-800/40 bg-slate-900/40 backdrop-blur-2xl overflow-hidden"
+            className="relative h-full rounded-2xl border border-white/5 bg-slate-900/40 backdrop-blur-2xl overflow-hidden"
+            style={{
+              // Halo envolvente muy sutil en color de familia — da sensación
+              // de "mesa flotante" sin marco pesado. Alpha 0F (~6%).
+              boxShadow: `0 0 60px ${meta.accent}0F`,
+            }}
           >
-            {/* Tesla line — color y glow adoptan el accent de la familia
-                activa (cyan / purple / amber). Firma cromática coherente
-                con el eyebrow del h2 gradient y las cards colapsadas. */}
+            {/* Tesla line protagónica — h-[3px] con doble glow en color de
+                familia. Firma visible que sostiene la card. */}
             <div
-              className="absolute top-0 left-0 right-0 h-[2px] z-10"
+              className="absolute top-0 left-0 right-0 h-[3px] z-10"
               style={{
-                background: `linear-gradient(90deg, transparent 5%, ${meta.accent} 50%, transparent 95%)`,
-                boxShadow: `0 0 25px ${meta.accent}60`,
+                background: `linear-gradient(90deg, transparent, ${meta.accent}, transparent)`,
+                boxShadow: `0 0 20px ${meta.accent}, 0 0 40px ${meta.accent}66`,
               }}
               aria-hidden
             />
