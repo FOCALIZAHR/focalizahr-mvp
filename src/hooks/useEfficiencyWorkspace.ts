@@ -103,7 +103,7 @@ export const LENTES_POR_FAMILIA: Record<FamiliaId, LenteId[]> = {
   costo_esperar: ['l3_adopcion', 'l9_pasivo'],
 }
 
-const FAMILIA_ORDEN: FamiliaId[] = [
+export const FAMILIA_ORDEN: FamiliaId[] = [
   'capital_en_riesgo',
   'ruta_ejecucion',
   'costo_esperar',

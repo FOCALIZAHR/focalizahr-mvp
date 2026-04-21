@@ -33,7 +33,7 @@ import {
 // CONFIG — metadatos de familia
 // ════════════════════════════════════════════════════════════════════════════
 
-interface FamiliaMeta {
+export interface FamiliaMeta {
   eyebrow: string
   titleFirst: string
   titleGradient: string
@@ -49,7 +49,7 @@ interface FamiliaMeta {
   conectores: string[]
 }
 
-const FAMILIA_META: Record<FamiliaId, FamiliaMeta> = {
+export const FAMILIA_META: Record<FamiliaId, FamiliaMeta> = {
   capital_en_riesgo: {
     eyebrow: 'DECISIÓN PENDIENTE',
     titleFirst: 'Capital',

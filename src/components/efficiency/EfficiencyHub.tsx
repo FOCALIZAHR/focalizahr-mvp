@@ -24,7 +24,7 @@ import { CarritoBar } from './carrito/CarritoBar'
 import { MisPlanesBtn } from './MisPlanesBtn'
 import { ShockGlobalPortada } from './ShockGlobalPortada'
 import ActoAncla from './ActoAncla'
-import { FamilyBriefing } from './FamilyBriefing'
+import { FamilyAccordion } from './FamilyAccordion'
 import { LenteFooterNav } from './LenteFooterNav'
 import EfficiencyToolbar from './EfficiencyToolbar'
 import { LENTES_POR_FAMILIA } from '@/hooks/useEfficiencyWorkspace'
@@ -175,16 +175,17 @@ export function EfficiencyHub() {
                   />
                 ) : ws.hubView === 'briefing' && ws.activeFamiliaId ? (
                   <motion.div
-                    key={`briefing-${ws.activeFamiliaId}`}
+                    key="briefing-accordion"
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
                     transition={{ duration: 0.2, ease: 'easeOut' }}
                   >
-                    <FamilyBriefing
-                      familiaId={ws.activeFamiliaId}
+                    <FamilyAccordion
+                      activeFamiliaId={ws.activeFamiliaId}
                       lentes={ws.data.lentes}
                       onSelectLente={ws.selectLente}
+                      onSelectFamilia={ws.selectFamilia}
                     />
                   </motion.div>
                 ) : ActiveComponent && activeLente ? (
