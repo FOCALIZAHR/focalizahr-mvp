@@ -73,6 +73,8 @@ interface PositionInDepartmentCost {
   monthlyCost: number
   headcount: number
   avgExposure: number
+  avgAutomationShare: number
+  avgAugmentationShare: number
   avgRoleFit: number | null
 }
 
@@ -83,6 +85,8 @@ interface DepartmentCost {
   annualCost: number
   headcount: number
   avgExposure: number
+  avgAutomationShare: number
+  avgAugmentationShare: number
   byPosition: PositionInDepartmentCost[]
 }
 
@@ -169,9 +173,27 @@ const IPI_META: Record<IPI, IPIMeta> = {
   },
 }
 
-function inferIPI(avgExposure: number): IPI {
-  if (avgExposure >= 0.5) return 'delegacion'
-  if (avgExposure >= 0.3) return 'asistencia'
+/** Clasifica el perfil IA dominante de un departamento o cargo usando
+ *  los shares reales del Anthropic Index (automationShare + augmentationShare)
+ *  en lugar de una heurística sobre focalizaScore.
+ *
+ *  Semántica canónica:
+ *    · delegacion  → automationShare dominante y > 0.5 (IA ejecuta sola)
+ *    · asistencia  → augmentationShare > 0.5 (IA copilotea)
+ *    · aprendizaje → ambas bajas (territorio emergente, IA todavía no ejecuta)
+ *
+ *  Si los shares son 0 (cargo sin cobertura Anthropic), clasifica como
+ *  aprendizaje — es el estado real del mapping, no un fallback. */
+function inferIPI(d: {
+  avgAutomationShare: number
+  avgAugmentationShare: number
+}): IPI {
+  if (d.avgAutomationShare > d.avgAugmentationShare && d.avgAutomationShare > 0.5) {
+    return 'delegacion'
+  }
+  if (d.avgAugmentationShare > 0.5) {
+    return 'asistencia'
+  }
   return 'aprendizaje'
 }
 
@@ -272,7 +294,7 @@ export function L1CostoInercia({
         return {
           ...d,
           liberatedFTEs: fte?.liberatedFTEs ?? 0,
-          ipi: inferIPI(d.avgExposure),
+          ipi: inferIPI(d),
           breakdown,
         }
       })

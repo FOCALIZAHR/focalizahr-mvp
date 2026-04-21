@@ -147,12 +147,18 @@ export interface SeniorityCompressionResult {
  * Desglose de Inercia por cargo DENTRO de un departamento.
  * Preserva el cruce cargo×área que antes se perdía al colapsar el
  * cálculo al total del depto. Habilita progressive disclosure en L1.
+ *
+ * avgAutomationShare + avgAugmentationShare vienen del Anthropic Index
+ * (via OnetOccupation). Permiten clasificar IPI (Delegación / Asistencia
+ * / Aprendizaje) con data real en lugar de heurística sobre avgExposure.
  */
 export interface PositionInDepartmentCost {
   position: string
   monthlyCost: number
   headcount: number
   avgExposure: number
+  avgAutomationShare: number
+  avgAugmentationShare: number
   /** Promedio de roleFitScore de las personas del cargo en este depto. */
   avgRoleFit: number | null
 }
@@ -164,6 +170,8 @@ export interface DepartmentCost {
   annualCost: number
   headcount: number
   avgExposure: number
+  avgAutomationShare: number
+  avgAugmentationShare: number
   /** Desglose por cargo dentro de este departamento. */
   byPosition: PositionInDepartmentCost[]
 }
@@ -180,6 +188,8 @@ export interface PositionCost {
   annualCost: number
   headcount: number
   avgExposure: number
+  avgAutomationShare: number
+  avgAugmentationShare: number
 }
 
 export interface InertiaCostResult {
@@ -700,45 +710,78 @@ export class WorkforceIntelligenceService {
   // ──────────────────────────────────────────────────────────────────────
 
   static calculateInertiaCost(enriched: EnrichedEmployee[]): InertiaCostResult {
-    const deptAgg = new Map<string, { id: string; name: string; cost: number; count: number; totalExp: number }>()
-    const positionAgg = new Map<string, { name: string; cost: number; count: number; totalExp: number }>()
+    // Acumuladores extendidos con totalAutomation + totalAugmentation para
+    // clasificación IPI (Delegación/Asistencia/Aprendizaje) basada en
+    // Anthropic Index real en lugar de heurística sobre avgExposure.
+    interface Acum {
+      cost: number
+      count: number
+      totalExp: number
+      totalAutomation: number
+      totalAugmentation: number
+    }
+    const makeAcum = (): Acum => ({
+      cost: 0, count: 0, totalExp: 0, totalAutomation: 0, totalAugmentation: 0,
+    })
+
+    const deptAgg = new Map<string, { id: string; name: string } & Acum>()
+    const positionAgg = new Map<string, { name: string } & Acum>()
     // Cruce cargo×área — preservado para progressive disclosure en L1.
-    // { deptId → { position → acumuladores } }
     const deptPositionAgg = new Map<
       string,
-      Map<string, { cost: number; count: number; totalExp: number; totalRoleFit: number; roleFitCount: number }>
+      Map<string, Acum & { totalRoleFit: number; roleFitCount: number }>
     >()
 
     for (const e of enriched) {
       const exp = effExposure(e)
       if (!e.departmentId || exp === 0) continue
-      if (!deptAgg.has(e.departmentId)) deptAgg.set(e.departmentId, { id: e.departmentId, name: e.departmentName, cost: 0, count: 0, totalExp: 0 })
+
+      // Agregación por departamento
+      if (!deptAgg.has(e.departmentId)) {
+        deptAgg.set(e.departmentId, {
+          id: e.departmentId, name: e.departmentName, ...makeAcum(),
+        })
+      }
       const d = deptAgg.get(e.departmentId)!
       d.cost += e.salary * exp
       d.count++
       d.totalExp += exp
+      d.totalAutomation += e.automationShare
+      d.totalAugmentation += e.augmentationShare
 
       // Agregación por cargo global (cross-dept)
       if (!e.position) continue
-      if (!positionAgg.has(e.position)) positionAgg.set(e.position, { name: e.position, cost: 0, count: 0, totalExp: 0 })
+      if (!positionAgg.has(e.position)) {
+        positionAgg.set(e.position, { name: e.position, ...makeAcum() })
+      }
       const p = positionAgg.get(e.position)!
       p.cost += e.salary * exp
       p.count++
       p.totalExp += exp
+      p.totalAutomation += e.automationShare
+      p.totalAugmentation += e.augmentationShare
 
       // Agregación por cargo DENTRO del depto
       if (!deptPositionAgg.has(e.departmentId)) deptPositionAgg.set(e.departmentId, new Map())
       const dpMap = deptPositionAgg.get(e.departmentId)!
-      if (!dpMap.has(e.position)) dpMap.set(e.position, { cost: 0, count: 0, totalExp: 0, totalRoleFit: 0, roleFitCount: 0 })
+      if (!dpMap.has(e.position)) {
+        dpMap.set(e.position, { ...makeAcum(), totalRoleFit: 0, roleFitCount: 0 })
+      }
       const dp = dpMap.get(e.position)!
       dp.cost += e.salary * exp
       dp.count++
       dp.totalExp += exp
+      dp.totalAutomation += e.automationShare
+      dp.totalAugmentation += e.augmentationShare
       if (e.roleFitScore !== null && e.roleFitScore !== undefined && !Number.isNaN(e.roleFitScore)) {
         dp.totalRoleFit += e.roleFitScore
         dp.roleFitCount++
       }
     }
+
+    // Helper para el promedio redondeado a 2 decimales
+    const avg = (total: number, count: number) =>
+      count > 0 ? Math.round((total / count) * 100) / 100 : 0
 
     const byDepartment: DepartmentCost[] = [...deptAgg.values()]
       .map(d => {
@@ -748,7 +791,9 @@ export class WorkforceIntelligenceService {
             position,
             monthlyCost: Math.round(p.cost),
             headcount: p.count,
-            avgExposure: p.count > 0 ? Math.round((p.totalExp / p.count) * 100) / 100 : 0,
+            avgExposure: avg(p.totalExp, p.count),
+            avgAutomationShare: avg(p.totalAutomation, p.count),
+            avgAugmentationShare: avg(p.totalAugmentation, p.count),
             avgRoleFit: p.roleFitCount > 0
               ? Math.round((p.totalRoleFit / p.roleFitCount) * 100) / 100
               : null,
@@ -760,7 +805,9 @@ export class WorkforceIntelligenceService {
           monthlyCost: Math.round(d.cost),
           annualCost: Math.round(d.cost * 12),
           headcount: d.count,
-          avgExposure: d.count > 0 ? Math.round((d.totalExp / d.count) * 100) / 100 : 0,
+          avgExposure: avg(d.totalExp, d.count),
+          avgAutomationShare: avg(d.totalAutomation, d.count),
+          avgAugmentationShare: avg(d.totalAugmentation, d.count),
           byPosition,
         }
       })
@@ -772,7 +819,9 @@ export class WorkforceIntelligenceService {
         monthlyCost: Math.round(p.cost),
         annualCost: Math.round(p.cost * 12),
         headcount: p.count,
-        avgExposure: p.count > 0 ? Math.round((p.totalExp / p.count) * 100) / 100 : 0,
+        avgExposure: avg(p.totalExp, p.count),
+        avgAutomationShare: avg(p.totalAutomation, p.count),
+        avgAugmentationShare: avg(p.totalAugmentation, p.count),
       }))
       .sort((a, b) => b.monthlyCost - a.monthlyCost)
 
