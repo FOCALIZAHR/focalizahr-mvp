@@ -152,8 +152,17 @@ export function EfficiencyHub() {
                 : 'grid-cols-1'
             }`}
           >
-            {/* Panel activo — scroll libre sin contenedor envolvente */}
-            <div className="min-h-0 min-w-0 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent pt-4 md:pt-5 pb-32">
+            {/* Panel activo — overflow condicional:
+                · lobby + ancla → above-the-fold sin scroll
+                · briefing + lente → scroll vertical libre con padding
+                  reservado para CarritoBar fixed bottom */}
+            <div
+              className={
+                ws.hubView === 'lobby' || ws.hubView === 'ancla'
+                  ? 'min-h-0 min-w-0 overflow-hidden pt-4 md:pt-5'
+                  : 'min-h-0 min-w-0 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent pt-4 md:pt-5 pb-32'
+              }
+            >
               <AnimatePresence mode="wait">
                 {ws.hubView === 'lobby' ? (
                   <ShockGlobalPortada

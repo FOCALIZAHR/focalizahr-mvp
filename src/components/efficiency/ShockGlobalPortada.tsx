@@ -37,8 +37,19 @@ export function ShockGlobalPortada({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
-      className="h-full flex flex-col items-center justify-center px-6 text-center"
+      className="relative h-full overflow-hidden flex flex-col items-center justify-center px-6 text-center"
     >
+      {/* Tesla line top — firma visual canónica */}
+      <div
+        className="absolute top-0 left-0 right-0 h-[2px] z-10"
+        style={{
+          background:
+            'linear-gradient(90deg, transparent, #22D3EE, #A78BFA, transparent)',
+          boxShadow: '0 0 20px #22D3EE',
+        }}
+        aria-hidden
+      />
+
       <p
         className="font-extralight text-white leading-none tabular-nums"
         style={{
@@ -48,10 +59,10 @@ export function ShockGlobalPortada({
       >
         {formatInt(shockAnualMillones)}
       </p>
-      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 mt-4">
+      <p className="text-xs uppercase tracking-widest text-slate-500 mt-4">
         MM$ / AÑO
       </p>
-      <p className="text-base md:text-lg font-light text-slate-400 mt-6 max-w-xl leading-relaxed">
+      <p className="text-base font-light text-slate-400 mt-6 max-w-xl leading-relaxed">
         La organización financia hoy trabajo que la IA ya resolvió.
       </p>
 
@@ -60,7 +71,7 @@ export function ShockGlobalPortada({
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.25, ease: 'easeOut' }}
-          className="mt-12"
+          className="mt-10"
         >
           <PrimaryButton
             icon={ArrowRight}

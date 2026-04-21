@@ -226,10 +226,10 @@ export default memo(function ActoAncla({
   const scoreColor = TIER_HEX.cyan
 
   return (
-    <div className="relative rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm">
+    <div className="relative h-full overflow-hidden rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm flex flex-col">
       {/* Tesla line top */}
       <div
-        className="absolute top-0 left-0 right-0 h-[2px]"
+        className="absolute top-0 left-0 right-0 h-[2px] z-10"
         style={{
           background:
             'linear-gradient(90deg, transparent 5%, #22D3EE 35%, #A78BFA 65%, transparent 95%)',
@@ -237,12 +237,12 @@ export default memo(function ActoAncla({
         }}
       />
 
-      <div className="px-6 py-10 md:px-10 md:py-14">
+      <div className="flex-1 min-h-0 px-6 py-6 md:px-10 md:py-8 flex flex-col">
         {/* Back button */}
         {onBack && (
           <button
             onClick={onBack}
-            className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs mb-6"
+            className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 transition-colors text-xs mb-4 self-start"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Portada
@@ -430,7 +430,7 @@ export default memo(function ActoAncla({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 1.4 + nodes.length * 0.15 + 0.3 }}
-          className="flex justify-center mt-10"
+          className="flex justify-center mt-6"
         >
           <PrimaryButton
             icon={ArrowRight}
