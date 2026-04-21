@@ -693,7 +693,7 @@ function QuirofanoSliders({ rows, captureByDept, onChange }: QuirofanoSlidersPro
                               </span>
                               {pos.avgRoleFit !== null && (
                                 <span>
-                                  RoleFit{' '}
+                                  Dominio{' '}
                                   <span className="text-slate-300">
                                     {Math.round(pos.avgRoleFit)}%
                                   </span>
