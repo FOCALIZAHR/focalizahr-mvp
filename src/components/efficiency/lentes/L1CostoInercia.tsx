@@ -177,36 +177,22 @@ const IPI_META: Record<IPI, IPIMeta> = {
   },
 }
 
-/** Clasifica el perfil IA dominante de un departamento usando los
- *  shares reales del Anthropic Index (automationShare + augmentationShare).
- *  Inteligencia real, no heurística sobre focalizaScore.
+/** Clasifica el perfil IA dominante de un departamento.
  *
- *  Semántica canónica:
- *    · delegacion  → automationShare dominante y > 0.3 (IA ejecuta sola)
- *    · asistencia  → augmentationShare > 0.3 (IA copilotea)
- *    · aprendizaje → ambas bajas (territorio emergente, IA todavía no ejecuta)
+ *  TEMPORAL (Abril 2026): heurística sobre avgExposure (focalizaScore
+ *  canónico). Los shares del Anthropic Index (automationShare +
+ *  augmentationShare) ya están expuestos en el backend pero NO se
+ *  consumen aún — primero hay que entender su distribución real antes
+ *  de definir umbrales. Tuneo prematuro a 0.3 rompió la clasificación
+ *  porque los shares están sesgados a la izquierda en la demo actual.
  *
- *  Umbral 0.3 (no 0.5): los shares del Anthropic Index son valores
- *  absolutos típicamente bajos — 0.5 clasificaría a casi todo como
- *  aprendizaje. 0.3 captura señales reales sin ser ruidoso.
- *
- *  Si los shares son 0 (cargo sin cobertura Anthropic), clasifica como
- *  aprendizaje — es el estado real del mapping, no un fallback.
- *
- *  Se aplica a nivel DEPARTAMENTO. El desglose por cargo (r.breakdown)
- *  hereda el IPI del depto — no recalcula por cargo porque el CEO ve
- *  el "perfil del área" como unidad narrativa, no de cada cargo
- *  individualmente. */
-function inferIPI(d: {
-  avgAutomationShare: number
-  avgAugmentationShare: number
-}): IPI {
-  if (d.avgAutomationShare > d.avgAugmentationShare && d.avgAutomationShare > 0.3) {
-    return 'delegacion'
-  }
-  if (d.avgAugmentationShare > 0.3) {
-    return 'asistencia'
-  }
+ *  Umbrales canónicos sobre avgExposure:
+ *    · delegacion  → avgExposure >= 0.5
+ *    · asistencia  → avgExposure >= 0.3
+ *    · aprendizaje → el resto */
+function inferIPI(d: { avgExposure: number }): IPI {
+  if (d.avgExposure >= 0.5) return 'delegacion'
+  if (d.avgExposure >= 0.3) return 'asistencia'
   return 'aprendizaje'
 }
 
