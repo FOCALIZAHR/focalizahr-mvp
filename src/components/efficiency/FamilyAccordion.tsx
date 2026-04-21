@@ -20,40 +20,10 @@ import {
   type LenteAPI,
 } from '@/hooks/useEfficiencyWorkspace'
 import {
-  formatCLP,
   type FamiliaId,
   type LenteId,
 } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
 import { FamilyBriefing, FAMILIA_META } from './FamilyBriefing'
-
-// ════════════════════════════════════════════════════════════════════════════
-// POTENCIAL POR FAMILIA — canónico, usado en card colapsada
-// Cada familia tiene un lente "ancla" cuyo dato duro resume la magnitud.
-// ════════════════════════════════════════════════════════════════════════════
-
-function getPotencialFamilia(
-  familiaId: FamiliaId,
-  lentes: Record<LenteId, LenteAPI>
-): number {
-  switch (familiaId) {
-    case 'capital_en_riesgo': {
-      const d = lentes.l1_inercia?.detalle as { totalMonthly?: number } | null
-      return d?.totalMonthly ?? 0
-    }
-    case 'ruta_ejecucion': {
-      const d = lentes.l5_brecha?.detalle as { total?: number } | null
-      return d?.total ?? 0
-    }
-    case 'costo_esperar': {
-      const d = lentes.l9_pasivo?.detalle as
-        | { costoEsperaTotal?: number }
-        | null
-      return d?.costoEsperaTotal ?? 0
-    }
-    default:
-      return 0
-  }
-}
 
 // ════════════════════════════════════════════════════════════════════════════
 // PROPS
@@ -126,10 +96,7 @@ function FamilyCard({
   onSelectFamilia,
 }: FamilyCardProps) {
   const meta = FAMILIA_META[familiaId]
-  const potencial = getPotencialFamilia(familiaId, lentes)
   const nombre = `${meta.titleFirst} ${meta.titleGradient}`
-  // Lentes con data real dentro de esta familia
-  const lentesActivos = meta.lentes.filter(id => lentes[id]?.hayData).length
 
   return (
     <div
@@ -171,46 +138,28 @@ function FamilyCard({
               boxShadow: `inset 2px 0 0 ${meta.accent}`,
             }}
           >
-            {/* Mobile: layout horizontal compacto */}
-            <div className="flex md:hidden h-full items-center justify-between px-4 gap-3">
-              <div className="flex flex-col min-w-0">
-                <span
-                  className="text-[10px] uppercase tracking-widest font-medium truncate"
-                  style={{ color: meta.accent }}
-                >
-                  {nombre}
-                </span>
-                <span className="text-[9px] font-light text-slate-500 truncate">
-                  {lentesActivos} {lentesActivos === 1 ? 'análisis disponible' : 'análisis disponibles'}
-                </span>
-              </div>
-              <span className="text-xl font-extralight text-white tabular-nums flex-shrink-0">
-                {formatCLP(potencial)}
+            {/* Mobile: solo nombre, horizontal */}
+            <div className="flex md:hidden h-full items-center justify-center px-4">
+              <span
+                className="text-xs uppercase tracking-widest font-medium truncate"
+                style={{ color: meta.accent }}
+              >
+                {nombre}
               </span>
             </div>
 
-            {/* Desktop: texto vertical rotado */}
-            <div className="hidden md:flex h-full min-h-[400px] items-center justify-center py-8">
-              <div
-                className="flex items-center gap-6 whitespace-nowrap"
+            {/* Desktop: solo nombre, vertical rotado -90deg */}
+            <div className="hidden md:flex h-full min-h-[400px] items-center justify-center">
+              <span
+                className="text-xs uppercase tracking-widest font-medium whitespace-nowrap"
                 style={{
+                  color: meta.accent,
                   writingMode: 'vertical-rl',
                   transform: 'rotate(180deg)',
                 }}
               >
-                <span
-                  className="text-[10px] uppercase tracking-widest font-medium"
-                  style={{ color: meta.accent }}
-                >
-                  {nombre}
-                </span>
-                <span className="text-[9px] font-light text-slate-500">
-                  {lentesActivos} {lentesActivos === 1 ? 'análisis disponible' : 'análisis disponibles'}
-                </span>
-                <span className="text-xl font-extralight text-white tabular-nums">
-                  {formatCLP(potencial)}
-                </span>
-              </div>
+                {nombre}
+              </span>
             </div>
           </motion.button>
         )}
