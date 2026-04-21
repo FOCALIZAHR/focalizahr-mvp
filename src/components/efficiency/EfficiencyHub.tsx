@@ -200,6 +200,8 @@ export function EfficiencyHub() {
                       }
                       gerenciasExcluidas={ws.gerenciasExcluidas}
                       allLentes={ws.data.lentes}
+                      onNextLente={ws.nextLenteInFamilia}
+                      proximoLenteTitulo={proximoLenteTitulo}
                     />
 
                     {/* Footer nav: CTA grande al final del lente */}

@@ -21,6 +21,11 @@ import type { LenteId } from '@/lib/services/efficiency/EfficiencyNarrativeEngin
  * · `onClearLente`          → vaciar todas las decisiones del lente.
  * · `gerenciasExcluidas`    → filtrar listas locales (L3 guardarraíl).
  * · `allLentes`             → mapa completo — usado por L7+L8 que es fusión.
+ * · `onNextLente`           → navegar al siguiente lente de la familia.
+ *                             Usado por LenteLayout para el CTA "Siguiente →"
+ *                             del Acto 3 (quirófano), condicional a interacción.
+ * · `proximoLenteTitulo`    → título del siguiente lente en la familia, para
+ *                             el label del CTA ("Siguiente: {titulo} →").
  */
 export interface LenteComponentProps {
   lente: LenteAPI
@@ -30,4 +35,6 @@ export interface LenteComponentProps {
   onClearLente: () => void
   gerenciasExcluidas: Set<string>
   allLentes?: Record<LenteId, LenteAPI>
+  onNextLente?: () => void
+  proximoLenteTitulo?: string
 }
