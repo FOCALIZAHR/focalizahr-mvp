@@ -28,6 +28,14 @@ import type { DecisionItem } from '@/lib/services/efficiency/EfficiencyCalculato
 // TIPOS DEL DETALLE (según EfficiencyDataResolver → L1)
 // ════════════════════════════════════════════════════════════════════════════
 
+interface PositionInDepartmentCost {
+  position: string
+  monthlyCost: number
+  headcount: number
+  avgExposure: number
+  avgRoleFit: number | null
+}
+
 interface DepartmentCost {
   departmentName: string
   departmentId: string
@@ -35,6 +43,16 @@ interface DepartmentCost {
   annualCost: number
   headcount: number
   avgExposure: number
+  byPosition: PositionInDepartmentCost[]
+}
+
+interface PositionInDepartmentFTE {
+  position: string
+  socCode: string
+  liberatedFTEs: number
+  headcount: number
+  avgRoleFit: number | null
+  monthlySavings: number
 }
 
 interface DepartmentFTE {
@@ -43,6 +61,7 @@ interface DepartmentFTE {
   liberatedFTEs: number
   monthlySavings: number
   headcount: number
+  byPosition: PositionInDepartmentFTE[]
 }
 
 interface L1Detalle {
@@ -53,7 +72,21 @@ interface L1Detalle {
   ftesByDepartment: DepartmentFTE[]
 }
 
-type Row = DepartmentCost & { liberatedFTEs: number; ipi: IPI }
+/** Combinación de los dos byPosition (cost + FTE) para un depto,
+ *  unificada por `position` como clave. */
+interface PositionBreakdown {
+  position: string
+  headcount: number          // de cost (consistente con headcount del cargo)
+  avgRoleFit: number | null
+  monthlyCost: number        // de cost
+  liberatedFTEs: number      // de FTE (0 si no hay socCode)
+}
+
+type Row = DepartmentCost & {
+  liberatedFTEs: number
+  ipi: IPI
+  breakdown: PositionBreakdown[]
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // IPI — Perfil de Impacto IA (heurística por avgExposure)
@@ -169,18 +202,40 @@ export function L1CostoInercia({
   const detalle = lente.detalle as L1Detalle | null
   const [captureByDept, setCaptureByDept] = useState<Record<string, number>>({})
 
-  // Cross-merge byDepartment + ftesByDepartment + inferencia IPI
+  // Cross-merge byDepartment + ftesByDepartment + inferencia IPI +
+  // breakdown por cargo (unifica byPosition de cost con byPosition de FTE).
   const rows: Row[] = useMemo(() => {
     if (!detalle) return []
     const fteMap = new Map(
       detalle.ftesByDepartment.map(f => [f.departmentId, f])
     )
+
     return detalle.byDepartment
-      .map(d => ({
-        ...d,
-        liberatedFTEs: fteMap.get(d.departmentId)?.liberatedFTEs ?? 0,
-        ipi: inferIPI(d.avgExposure),
-      }))
+      .map(d => {
+        const fte = fteMap.get(d.departmentId)
+        // FTE por position dentro de este depto, indexado por nombre
+        const ftePositionMap = new Map(
+          (fte?.byPosition ?? []).map(p => [p.position, p])
+        )
+        // Merge: iteramos sobre byPosition de cost (fuente canónica de
+        // monthlyCost y headcount); el FTE se suma si hay match por name.
+        const breakdown: PositionBreakdown[] = d.byPosition
+          .map(p => ({
+            position: p.position,
+            headcount: p.headcount,
+            avgRoleFit: p.avgRoleFit,
+            monthlyCost: p.monthlyCost,
+            liberatedFTEs: ftePositionMap.get(p.position)?.liberatedFTEs ?? 0,
+          }))
+          .sort((a, b) => b.monthlyCost - a.monthlyCost)
+
+        return {
+          ...d,
+          liberatedFTEs: fte?.liberatedFTEs ?? 0,
+          ipi: inferIPI(d.avgExposure),
+          breakdown,
+        }
+      })
       .sort((a, b) => b.monthlyCost - a.monthlyCost)
   }, [detalle])
 
@@ -511,6 +566,64 @@ function QuirofanoSliders({ rows, captureByDept, onChange }: QuirofanoSlidersPro
                   >
                     {narrativaMicro}
                   </motion.p>
+                )}
+              </AnimatePresence>
+
+              {/* Progressive disclosure — desglose por cargo cuando pct > 0.
+                  Convierte FTEs abstractos en personas reales con roleFit
+                  conocido. El CEO decide sobre gente que rinde bien en
+                  cargos que la IA transforma (P7 del manifiesto). */}
+              <AnimatePresence>
+                {pct > 0 && r.breakdown.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-3 pt-3 border-t border-slate-800/40 space-y-1.5">
+                      {r.breakdown.map(pos => {
+                        const ftesProj = pos.liberatedFTEs * (pct / 100)
+                        const ahorroProj = pos.monthlyCost * (pct / 100)
+                        return (
+                          <div
+                            key={pos.position}
+                            className="flex items-baseline justify-between gap-3 text-[11px] font-light text-slate-400 flex-wrap"
+                          >
+                            <span className="text-slate-300 truncate max-w-[40%]">
+                              {pos.position}
+                            </span>
+                            <span className="flex items-baseline gap-3 tabular-nums text-[11px]">
+                              <span>
+                                {pos.headcount}{' '}
+                                <span className="text-slate-600">
+                                  {pos.headcount === 1 ? 'pers' : 'pers'}
+                                </span>
+                              </span>
+                              {pos.avgRoleFit !== null && (
+                                <span>
+                                  RoleFit{' '}
+                                  <span className="text-slate-300">
+                                    {Math.round(pos.avgRoleFit)}%
+                                  </span>
+                                </span>
+                              )}
+                              <span>
+                                <span className="text-cyan-300">
+                                  {ftesProj.toFixed(1)}
+                                </span>{' '}
+                                <span className="text-slate-600">FTE</span>
+                              </span>
+                              <span className="text-emerald-300">
+                                {formatCLP(Math.round(ahorroProj))}
+                              </span>
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </motion.div>
                 )}
               </AnimatePresence>
             </div>

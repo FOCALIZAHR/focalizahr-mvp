@@ -143,6 +143,20 @@ export interface SeniorityCompressionResult {
   confidence: 'high' | 'medium' | 'low'
 }
 
+/**
+ * Desglose de Inercia por cargo DENTRO de un departamento.
+ * Preserva el cruce cargo×área que antes se perdía al colapsar el
+ * cálculo al total del depto. Habilita progressive disclosure en L1.
+ */
+export interface PositionInDepartmentCost {
+  position: string
+  monthlyCost: number
+  headcount: number
+  avgExposure: number
+  /** Promedio de roleFitScore de las personas del cargo en este depto. */
+  avgRoleFit: number | null
+}
+
 export interface DepartmentCost {
   departmentName: string
   departmentId: string
@@ -150,10 +164,12 @@ export interface DepartmentCost {
   annualCost: number
   headcount: number
   avgExposure: number
+  /** Desglose por cargo dentro de este departamento. */
+  byPosition: PositionInDepartmentCost[]
 }
 
 /**
- * Desglose de Inercia por cargo (position/jobTitle).
+ * Desglose de Inercia por cargo (position/jobTitle) a nivel global.
  * Misma fórmula canónica que DepartmentCost (salary × effExposure), solo
  * cambia la clave de agrupación. Usado por el Acto Ancla del Efficiency
  * Hub para destacar los cargos con mayor capital comprometido.
@@ -174,12 +190,27 @@ export interface InertiaCostResult {
   confidence: 'high' | 'medium' | 'low'
 }
 
+/**
+ * Desglose de FTEs liberables por cargo DENTRO de un departamento.
+ * Complementa PositionInDepartmentCost para el eje operacional.
+ */
+export interface PositionInDepartmentFTE {
+  position: string
+  socCode: string
+  liberatedFTEs: number
+  headcount: number
+  avgRoleFit: number | null
+  monthlySavings: number
+}
+
 export interface DepartmentFTE {
   departmentName: string
   departmentId: string
   liberatedFTEs: number
   monthlySavings: number
   headcount: number
+  /** Desglose por cargo dentro de este departamento. */
+  byPosition: PositionInDepartmentFTE[]
 }
 
 export interface LiberatedFTEsResult {
@@ -671,6 +702,12 @@ export class WorkforceIntelligenceService {
   static calculateInertiaCost(enriched: EnrichedEmployee[]): InertiaCostResult {
     const deptAgg = new Map<string, { id: string; name: string; cost: number; count: number; totalExp: number }>()
     const positionAgg = new Map<string, { name: string; cost: number; count: number; totalExp: number }>()
+    // Cruce cargo×área — preservado para progressive disclosure en L1.
+    // { deptId → { position → acumuladores } }
+    const deptPositionAgg = new Map<
+      string,
+      Map<string, { cost: number; count: number; totalExp: number; totalRoleFit: number; roleFitCount: number }>
+    >()
 
     for (const e of enriched) {
       const exp = effExposure(e)
@@ -681,23 +718,52 @@ export class WorkforceIntelligenceService {
       d.count++
       d.totalExp += exp
 
-      // Mismo patrón, agrupado por cargo. Requiere position no vacío.
+      // Agregación por cargo global (cross-dept)
       if (!e.position) continue
       if (!positionAgg.has(e.position)) positionAgg.set(e.position, { name: e.position, cost: 0, count: 0, totalExp: 0 })
       const p = positionAgg.get(e.position)!
       p.cost += e.salary * exp
       p.count++
       p.totalExp += exp
+
+      // Agregación por cargo DENTRO del depto
+      if (!deptPositionAgg.has(e.departmentId)) deptPositionAgg.set(e.departmentId, new Map())
+      const dpMap = deptPositionAgg.get(e.departmentId)!
+      if (!dpMap.has(e.position)) dpMap.set(e.position, { cost: 0, count: 0, totalExp: 0, totalRoleFit: 0, roleFitCount: 0 })
+      const dp = dpMap.get(e.position)!
+      dp.cost += e.salary * exp
+      dp.count++
+      dp.totalExp += exp
+      if (e.roleFitScore !== null && e.roleFitScore !== undefined && !Number.isNaN(e.roleFitScore)) {
+        dp.totalRoleFit += e.roleFitScore
+        dp.roleFitCount++
+      }
     }
 
     const byDepartment: DepartmentCost[] = [...deptAgg.values()]
-      .map(d => ({
-        departmentName: d.name, departmentId: d.id,
-        monthlyCost: Math.round(d.cost),
-        annualCost: Math.round(d.cost * 12),
-        headcount: d.count,
-        avgExposure: d.count > 0 ? Math.round((d.totalExp / d.count) * 100) / 100 : 0,
-      }))
+      .map(d => {
+        const dpMap = deptPositionAgg.get(d.id) ?? new Map()
+        const byPosition: PositionInDepartmentCost[] = [...dpMap.entries()]
+          .map(([position, p]) => ({
+            position,
+            monthlyCost: Math.round(p.cost),
+            headcount: p.count,
+            avgExposure: p.count > 0 ? Math.round((p.totalExp / p.count) * 100) / 100 : 0,
+            avgRoleFit: p.roleFitCount > 0
+              ? Math.round((p.totalRoleFit / p.roleFitCount) * 100) / 100
+              : null,
+          }))
+          .sort((a, b) => b.monthlyCost - a.monthlyCost)
+
+        return {
+          departmentName: d.name, departmentId: d.id,
+          monthlyCost: Math.round(d.cost),
+          annualCost: Math.round(d.cost * 12),
+          headcount: d.count,
+          avgExposure: d.count > 0 ? Math.round((d.totalExp / d.count) * 100) / 100 : 0,
+          byPosition,
+        }
+      })
       .sort((a, b) => b.monthlyCost - a.monthlyCost)
 
     const byPosition: PositionCost[] = [...positionAgg.values()]
@@ -724,17 +790,44 @@ export class WorkforceIntelligenceService {
   // ──────────────────────────────────────────────────────────────────────
 
   static async calculateLiberatedFTEs(enriched: EnrichedEmployee[]): Promise<LiberatedFTEsResult> {
-    // Headcount por SOC code por departamento
-    const socDeptHeadcount = new Map<string, Map<string, { name: string; count: number; avgSalary: number }>>()
+    // Cruce deptId × socCode — preserva datos por cargo dentro del depto.
+    // Incluye position (human-readable) y roleFit para progressive disclosure.
+    interface SocDeptEntry {
+      deptName: string
+      position: string // human-readable; si varios position mapean al mismo socCode, gana el más frecuente
+      positionFreq: Map<string, number>
+      count: number
+      avgSalary: number
+      totalRoleFit: number
+      roleFitCount: number
+    }
+    const socDeptHeadcount = new Map<string, Map<string, SocDeptEntry>>()
 
     for (const e of enriched) {
       if (!e.socCode || !e.departmentId) continue
       if (!socDeptHeadcount.has(e.departmentId)) socDeptHeadcount.set(e.departmentId, new Map())
       const dept = socDeptHeadcount.get(e.departmentId)!
-      if (!dept.has(e.socCode)) dept.set(e.socCode, { name: e.departmentName, count: 0, avgSalary: 0 })
+      if (!dept.has(e.socCode)) {
+        dept.set(e.socCode, {
+          deptName: e.departmentName,
+          position: e.position ?? '',
+          positionFreq: new Map(),
+          count: 0,
+          avgSalary: 0,
+          totalRoleFit: 0,
+          roleFitCount: 0,
+        })
+      }
       const entry = dept.get(e.socCode)!
       entry.avgSalary = (entry.avgSalary * entry.count + e.salary) / (entry.count + 1)
       entry.count++
+      if (e.position) {
+        entry.positionFreq.set(e.position, (entry.positionFreq.get(e.position) ?? 0) + 1)
+      }
+      if (e.roleFitScore !== null && e.roleFitScore !== undefined && !Number.isNaN(e.roleFitScore)) {
+        entry.totalRoleFit += e.roleFitScore
+        entry.roleFitCount++
+      }
     }
 
     // Query tasks para todos los SOC codes
@@ -759,29 +852,59 @@ export class WorkforceIntelligenceService {
       socAutoCapacity.set(soc, data.sumImportance > 0 ? data.sumWeighted / data.sumImportance : 0)
     }
 
-    // Calcular FTEs liberados por depto
+    // Calcular FTEs liberados por depto + preservar desglose por cargo
     const byDepartment: DepartmentFTE[] = []
 
     for (const [deptId, socMap] of socDeptHeadcount) {
       let totalFTE = 0
       let totalSavings = 0
       let headcount = 0
+      const byPosition: PositionInDepartmentFTE[] = []
 
       for (const [socCode, data] of socMap) {
         const autoCapacity = socAutoCapacity.get(socCode) ?? 0
         const liberatedFTE = autoCapacity * data.count
+        const positionSavings = liberatedFTE * data.avgSalary
+
         totalFTE += liberatedFTE
-        totalSavings += liberatedFTE * data.avgSalary
+        totalSavings += positionSavings
         headcount += data.count
+
+        // Position más frecuente dentro del socCode en este depto
+        let topPosition = data.position
+        let topFreq = 0
+        for (const [pos, freq] of data.positionFreq) {
+          if (freq > topFreq) {
+            topFreq = freq
+            topPosition = pos
+          }
+        }
+
+        if (liberatedFTE > 0) {
+          byPosition.push({
+            position: topPosition,
+            socCode,
+            liberatedFTEs: Math.round(liberatedFTE * 10) / 10,
+            headcount: data.count,
+            avgRoleFit:
+              data.roleFitCount > 0
+                ? Math.round((data.totalRoleFit / data.roleFitCount) * 100) / 100
+                : null,
+            monthlySavings: Math.round(positionSavings),
+          })
+        }
       }
+
+      byPosition.sort((a, b) => b.liberatedFTEs - a.liberatedFTEs)
 
       if (totalFTE > 0) {
         byDepartment.push({
-          departmentName: [...socMap.values()][0]?.name ?? '',
+          departmentName: [...socMap.values()][0]?.deptName ?? '',
           departmentId: deptId,
           liberatedFTEs: Math.round(totalFTE * 10) / 10,
           monthlySavings: Math.round(totalSavings),
           headcount,
+          byPosition,
         })
       }
     }
