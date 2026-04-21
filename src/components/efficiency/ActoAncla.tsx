@@ -201,7 +201,7 @@ export default memo(function ActoAncla({
   const scoreColor = TIER_HEX.cyan
 
   return (
-    <div className="relative min-h-[calc(100vh-120px)] rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm flex flex-col">
+    <div className="relative min-h-screen rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm flex flex-col">
       {/* Tesla line top */}
       <div
         className="absolute top-0 left-0 right-0 h-[2px] z-10"

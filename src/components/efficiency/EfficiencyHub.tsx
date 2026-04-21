@@ -18,10 +18,8 @@
 import { Loader2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEfficiencyWorkspace } from '@/hooks/useEfficiencyWorkspace'
-import { EfficiencyRail } from './EfficiencyRail'
 import { PanelAcumuladores } from './panel-acumuladores/PanelAcumuladores'
 import { CarritoBar } from './carrito/CarritoBar'
-import { MisPlanesBtn } from './MisPlanesBtn'
 import { ShockGlobalPortada } from './ShockGlobalPortada'
 import ActoAncla from './ActoAncla'
 import { FamilyAccordion } from './FamilyAccordion'
@@ -122,33 +120,12 @@ export function EfficiencyHub() {
   return (
     <>
       <div className="fhr-bg-main min-h-screen">
-        {/* ── HEADER sticky — siempre visible al scrollear ────────
-            · lobby + ancla + briefing → eyebrow + Mis planes (sin rail).
-              En briefing el FamilyAccordion ya muestra las 3 familias
-              simultáneamente — el rail superior duplicaría la navegación.
-            · lente → rail de familias + Mis planes (única vista que
-              necesita atajo a otras familias). */}
-        <header className="sticky top-0 z-50 bg-slate-950/85 backdrop-blur-xl border-b border-slate-800/40">
-          <div className="max-w-7xl mx-auto w-full px-4 md:px-8 flex items-center justify-between gap-4 py-3">
-            {ws.hubView === 'lente' ? (
-              <EfficiencyRail
-                activeFamiliaId={ws.activeFamiliaId}
-                familiasVisitadas={ws.familiasVisitadas}
-                onSelect={ws.selectFamilia}
-              />
-            ) : (
-              <span className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-light">
-                Efficiency Intelligence
-              </span>
-            )}
-            <MisPlanesBtn />
-          </div>
-        </header>
-
         {/* ── WORKSPACE ─────────────────────────────────────────────
-            Patrón A: page scroll natural. Sin overflow interno, sin
-            alturas calculadas. El navegador maneja el único scroll.
-            · pb-32 reserva espacio bajo el CarritoBar fixed bottom.
+            Patrón A: page scroll natural. Sin header sticky — "Efficiency
+            Intelligence" + "Mis planes" viven en el CarritoBar (fixed
+            bottom, solo visible en briefing/lente). En lobby/ancla el
+            CEO está en modo contemplativo, no necesita navegación global.
+            · pb-32 reserva espacio bajo el CarritoBar.
             · El componente activo decide su altura natural; las vistas
               above-the-fold (lobby, ancla) usan min-h-[calc(100vh-Xpx)]. */}
         <main className="max-w-7xl mx-auto w-full px-4 md:px-8 pb-32">
@@ -238,10 +215,10 @@ export function EfficiencyHub() {
             </div>
 
             {/* Panel acumuladores 30% — sticky lateral, siempre visible
-                mientras se opera el lente. top-[72px] = altura header sticky. */}
+                mientras se opera el lente. top-4 = sin header encima. */}
             {muestraPanelDerecho && (
               <div className="hidden md:block pt-4 md:pt-5">
-                <div className="sticky top-[72px]">
+                <div className="sticky top-4">
                   <PanelAcumuladores
                     tituloLenteActivo={activeLente?.titulo ?? ''}
                     decisionesDelLenteActivo={ws.decisionesDelLenteActivo}

@@ -34,12 +34,13 @@ import {
 // ════════════════════════════════════════════════════════════════════════════
 
 export interface FamiliaMeta {
-  eyebrow: string
   titleFirst: string
   titleGradient: string
   accent: string
   lentes: LenteId[]
-  /** Tesis letal tipo McKinsey — recibe los lentes para inyectar dato duro */
+  /** Tesis letal tipo McKinsey — recibe los lentes para inyectar dato duro.
+      Renderizada sin highlights (text-slate-300 uniforme). Las 3 partes
+      se concatenan como prosa pura. */
   getTesis: (lentes: Record<LenteId, LenteAPI>) => {
     frasePreKeyword: string
     keyword: string
@@ -51,7 +52,6 @@ export interface FamiliaMeta {
 
 export const FAMILIA_META: Record<FamiliaId, FamiliaMeta> = {
   capital_en_riesgo: {
-    eyebrow: 'DECISIÓN PENDIENTE',
     titleFirst: 'Capital',
     titleGradient: 'en riesgo',
     accent: '#22D3EE',
@@ -71,7 +71,6 @@ export const FAMILIA_META: Record<FamiliaId, FamiliaMeta> = {
   },
 
   ruta_ejecucion: {
-    eyebrow: 'A QUIÉN MOVER',
     titleFirst: 'Ruta de',
     titleGradient: 'ejecución',
     accent: '#A78BFA',
@@ -92,7 +91,6 @@ export const FAMILIA_META: Record<FamiliaId, FamiliaMeta> = {
   },
 
   costo_esperar: {
-    eyebrow: 'PRECIO DE LA POSTERGACIÓN',
     titleFirst: 'Costo de',
     titleGradient: 'esperar',
     accent: '#F59E0B',
@@ -259,23 +257,20 @@ export function FamilyBriefing({
 
   return (
     <div className="max-w-4xl mx-auto" style={rootStyle}>
-      {/* ─── Header ─── */}
+      {/* ─── Header (sin eyebrow — el wrapper del accordion lo aporta) ─── */}
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
         className="mb-10"
       >
-        <div className="text-[10px] tracking-[0.3em] font-light mb-3 text-[color:var(--familia-accent)]">
-          {meta.eyebrow}
-        </div>
         <h2 className="text-3xl md:text-4xl font-extralight text-white tracking-tight leading-tight">
           {meta.titleFirst}{' '}
           <span className="fhr-title-gradient">{meta.titleGradient}</span>
         </h2>
       </motion.div>
 
-      {/* ─── Tesis letal ─── */}
+      {/* ─── Tesis letal — text-slate-300 uniforme, sin highlights ─── */}
       <motion.p
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -283,9 +278,7 @@ export function FamilyBriefing({
         className="text-lg md:text-xl font-light text-slate-300 leading-relaxed max-w-3xl mb-14"
       >
         {tesis.frasePreKeyword}
-        <span className="text-[color:var(--familia-accent)]">
-          {tesis.keyword}
-        </span>
+        {tesis.keyword}
         {tesis.frasePostKeyword}
       </motion.p>
 

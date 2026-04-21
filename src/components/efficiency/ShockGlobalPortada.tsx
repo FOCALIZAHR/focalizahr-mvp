@@ -37,7 +37,7 @@ export function ShockGlobalPortada({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
-      className="relative min-h-[calc(100vh-120px)] flex flex-col items-center justify-center px-6 text-center"
+      className="relative min-h-screen flex flex-col items-center justify-center px-6 text-center"
     >
       {/* Tesla line top — firma visual canónica */}
       <div

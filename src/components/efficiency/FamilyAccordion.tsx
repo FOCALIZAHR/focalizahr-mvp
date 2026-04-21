@@ -108,23 +108,46 @@ function FamilyCard({
     >
       <AnimatePresence mode="wait">
         {isActive ? (
-          // ─── CARD EXPANDIDA — contenido FamilyBriefing ───
+          // ─── CARD EXPANDIDA — wrapper canónico CompensationPortada ───
           <motion.div
             key="expanded"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, delay: 0.5 }}
-            className="h-full"
+            className="relative h-full rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm overflow-hidden"
           >
-            <FamilyBriefing
-              familiaId={familiaId}
-              lentes={lentes}
-              onSelectLente={onSelectLente}
+            {/* Tesla line canónica */}
+            <div
+              className="absolute top-0 left-0 right-0 h-[2px]"
+              style={{
+                background:
+                  'linear-gradient(90deg, transparent 5%, #22D3EE 35%, #A78BFA 65%, transparent 95%)',
+                opacity: 0.7,
+              }}
+              aria-hidden
             />
+
+            <div className="px-6 py-10 md:px-10 md:py-12">
+              {/* Eyebrow — nombre de familia (reemplaza "DECISIÓN PENDIENTE")
+                  Misma tipografía y color del eyebrow original que vivía en
+                  FamilyBriefing: text-[10px] tracking-[0.3em] uppercase color accent. */}
+              <div
+                className="text-[10px] tracking-[0.3em] uppercase font-light mb-6"
+                style={{ color: meta.accent }}
+              >
+                {nombre}
+              </div>
+
+              <FamilyBriefing
+                familiaId={familiaId}
+                lentes={lentes}
+                onSelectLente={onSelectLente}
+              />
+            </div>
           </motion.div>
         ) : (
-          // ─── CARD COLAPSADA — label vertical + número protagonista ───
+          // ─── CARD COLAPSADA — solo título rotado, sin border ni bg ───
           <motion.button
             key="collapsed"
             initial={{ opacity: 0 }}
@@ -133,10 +156,7 @@ function FamilyCard({
             transition={{ duration: 0.2, delay: 0.5 }}
             onClick={() => onSelectFamilia(familiaId)}
             aria-label={`Expandir ${nombre}`}
-            className="group h-full w-full rounded-2xl border border-slate-800/40 bg-slate-900/30 cursor-pointer hover:bg-slate-800/50 transition-colors duration-200 overflow-hidden focus:outline-none focus-visible:bg-slate-800/50"
-            style={{
-              boxShadow: `inset 2px 0 0 ${meta.accent}`,
-            }}
+            className="group h-full w-full rounded-2xl bg-slate-950 cursor-pointer hover:bg-slate-800/50 transition-colors duration-200 overflow-hidden focus:outline-none focus-visible:bg-slate-800/50"
           >
             {/* Mobile: solo nombre, horizontal */}
             <div className="flex md:hidden h-full items-center justify-center px-4">
