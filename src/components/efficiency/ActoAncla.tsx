@@ -215,7 +215,12 @@ export default memo(function ActoAncla({
     return (d?.totalMonthly ?? 0) * 12
   }, [data])
 
-  const centralSplit = useMemo(() => splitCLP(capitalAnual, true), [capitalAnual])
+  // Número central limpio — solo el entero en millones.
+  // La leyenda "MM$ / AÑO" da el contexto. Sin $ ni M redundantes.
+  const centralNumber = useMemo(
+    () => Math.round(capitalAnual / 1_000_000),
+    [capitalAnual]
+  )
 
   // Color del glow del gauge: cyan (color de la familia destino del CTA)
   const scoreColor = TIER_HEX.cyan
@@ -282,12 +287,7 @@ export default memo(function ActoAncla({
                 transition={{ duration: 0.6, delay: 0.4 }}
                 className="text-[96px] font-semibold text-white leading-none tabular-nums tracking-tight"
               >
-                {centralSplit.mainText}
-                {centralSplit.unit && (
-                  <span className="text-3xl text-slate-500 font-light">
-                    {centralSplit.unit}
-                  </span>
-                )}
+                {formatInt(centralNumber)}
               </motion.span>
               <motion.span
                 initial={{ opacity: 0 }}
