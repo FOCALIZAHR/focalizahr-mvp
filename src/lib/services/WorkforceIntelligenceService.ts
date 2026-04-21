@@ -203,6 +203,9 @@ export interface InertiaCostResult {
 /**
  * Desglose de FTEs liberables por cargo DENTRO de un departamento.
  * Complementa PositionInDepartmentCost para el eje operacional.
+ *
+ * avgAutomationShare/avgAugmentationShare a nivel socCode×depto
+ * habilita clasificación IPI consistente con DepartmentCost.
  */
 export interface PositionInDepartmentFTE {
   position: string
@@ -211,6 +214,8 @@ export interface PositionInDepartmentFTE {
   headcount: number
   avgRoleFit: number | null
   monthlySavings: number
+  avgAutomationShare: number
+  avgAugmentationShare: number
 }
 
 export interface DepartmentFTE {
@@ -219,6 +224,9 @@ export interface DepartmentFTE {
   liberatedFTEs: number
   monthlySavings: number
   headcount: number
+  /** Ponderado por headcount de cada socCode del depto. */
+  avgAutomationShare: number
+  avgAugmentationShare: number
   /** Desglose por cargo dentro de este departamento. */
   byPosition: PositionInDepartmentFTE[]
 }
@@ -849,6 +857,8 @@ export class WorkforceIntelligenceService {
       avgSalary: number
       totalRoleFit: number
       roleFitCount: number
+      totalAutomation: number
+      totalAugmentation: number
     }
     const socDeptHeadcount = new Map<string, Map<string, SocDeptEntry>>()
 
@@ -865,11 +875,15 @@ export class WorkforceIntelligenceService {
           avgSalary: 0,
           totalRoleFit: 0,
           roleFitCount: 0,
+          totalAutomation: 0,
+          totalAugmentation: 0,
         })
       }
       const entry = dept.get(e.socCode)!
       entry.avgSalary = (entry.avgSalary * entry.count + e.salary) / (entry.count + 1)
       entry.count++
+      entry.totalAutomation += e.automationShare
+      entry.totalAugmentation += e.augmentationShare
       if (e.position) {
         entry.positionFreq.set(e.position, (entry.positionFreq.get(e.position) ?? 0) + 1)
       }
@@ -908,6 +922,9 @@ export class WorkforceIntelligenceService {
       let totalFTE = 0
       let totalSavings = 0
       let headcount = 0
+      // Acumuladores de shares ponderados por headcount a nivel depto
+      let totalAutomation = 0
+      let totalAugmentation = 0
       const byPosition: PositionInDepartmentFTE[] = []
 
       for (const [socCode, data] of socMap) {
@@ -918,6 +935,8 @@ export class WorkforceIntelligenceService {
         totalFTE += liberatedFTE
         totalSavings += positionSavings
         headcount += data.count
+        totalAutomation += data.totalAutomation
+        totalAugmentation += data.totalAugmentation
 
         // Position más frecuente dentro del socCode en este depto
         let topPosition = data.position
@@ -940,6 +959,14 @@ export class WorkforceIntelligenceService {
                 ? Math.round((data.totalRoleFit / data.roleFitCount) * 100) / 100
                 : null,
             monthlySavings: Math.round(positionSavings),
+            avgAutomationShare:
+              data.count > 0
+                ? Math.round((data.totalAutomation / data.count) * 100) / 100
+                : 0,
+            avgAugmentationShare:
+              data.count > 0
+                ? Math.round((data.totalAugmentation / data.count) * 100) / 100
+                : 0,
           })
         }
       }
@@ -953,6 +980,14 @@ export class WorkforceIntelligenceService {
           liberatedFTEs: Math.round(totalFTE * 10) / 10,
           monthlySavings: Math.round(totalSavings),
           headcount,
+          avgAutomationShare:
+            headcount > 0
+              ? Math.round((totalAutomation / headcount) * 100) / 100
+              : 0,
+          avgAugmentationShare:
+            headcount > 0
+              ? Math.round((totalAugmentation / headcount) * 100) / 100
+              : 0,
           byPosition,
         })
       }

@@ -97,6 +97,8 @@ interface PositionInDepartmentFTE {
   headcount: number
   avgRoleFit: number | null
   monthlySavings: number
+  avgAutomationShare: number
+  avgAugmentationShare: number
 }
 
 interface DepartmentFTE {
@@ -105,6 +107,8 @@ interface DepartmentFTE {
   liberatedFTEs: number
   monthlySavings: number
   headcount: number
+  avgAutomationShare: number
+  avgAugmentationShare: number
   byPosition: PositionInDepartmentFTE[]
 }
 
