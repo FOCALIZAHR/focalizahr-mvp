@@ -239,15 +239,28 @@ export async function resolverLente(
       const enrichedById = new Map(enriched.map(e => [e.employeeId, e]))
       const personasEnriquecidas = z.persons.map(p => {
         const e = enrichedById.get(p.employeeId)
+        const tenure = e?.tenureMonths ?? 0
         return {
           ...p,
           // Canónico Eloundou (primario) — fallback a observedExposure legacy
           focalizaScore: e?.focalizaScore ?? null,
-          tenureMonths: e?.tenureMonths ?? 0,
+          tenureMonths: tenure,
           riskQuadrant: e?.riskQuadrant ?? null,
           mobilityQuadrant: e?.mobilityQuadrant ?? null,
           nineBoxPosition: e?.nineBoxPosition ?? null,
           finiquitoToday: e?.finiquitoToday ?? null,
+          // v3.2 — ficha rica L2: adaptabilidad + reloj financiero progresivo
+          potentialAbility: e?.potentialAbility ?? null,
+          finiquitoIn6m: calculateFiniquitoConTopeCustomUF(
+            p.salary,
+            tenure + 6,
+            UF_VALUE_CLP
+          ),
+          finiquitoIn12m: calculateFiniquitoConTopeCustomUF(
+            p.salary,
+            tenure + 12,
+            UF_VALUE_CLP
+          ),
         }
       })
       // avgExposure usa focalizaScore primario (canónico) con fallback

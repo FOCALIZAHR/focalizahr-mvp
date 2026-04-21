@@ -1,22 +1,28 @@
 // ════════════════════════════════════════════════════════════════════════════
-// L2 — TALENTO ZOMBIE (personas con alto rendimiento en cargos que la IA absorbe)
+// L2 — TALENTO ESTANCADO (migrado a LenteLayout — 4 actos)
 // src/components/efficiency/lentes/L2TalentoZombie.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// Patrón G:
-//  · Portada   → N personas + badge destructive "Pasivo Tóxico"
-//  · Evidencia → ficha rica por persona (rol, exposición, metas, gap mensual)
-//  · Interacción → 3 opciones por persona:
-//     [Congelar cargo] [Reubicar] [Transición acordada]
+// Personas que rinden excelente hoy pero no podrán adaptarse al cambio
+// tecnológico. Lente PERSONA-POR-PERSONA con 3 escenarios simulables por
+// individuo (Congelar / Reubicar / Transición).
 //
-// Nivel análisis  → cargo (la exposición es del cargo, no de la persona)
-// Nivel acción    → persona (la decisión impacta al individuo)
-// Nunca mezclar. La UI lo deja explícito.
+// Patrón UI: Cinema Mode compacto dentro del Acto Quirófano:
+//   Rail (240px desktop / tabs horizontales mobile) con lista de personas
+//   + Spotlight (ficha rica con 6 secciones + decisión con consecuencia).
+//
+// Anti-jerga canónica (P12):
+//   · "Dominio del cargo"  (no "RoleFit")
+//   · "Exposición IA"      (no "Exposición" a secas)
+//   · "Talento estancado"  (no "zombie" visible al CEO)
+//   · Adaptabilidad narrativa (Baja/Media/Alta, no "2/3" crudo)
 // ════════════════════════════════════════════════════════════════════════════
 
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Snowflake, ArrowRightLeft, Calendar, AlertTriangle } from 'lucide-react'
+import { LenteLayout } from './LenteLayout'
 import { LenteCard } from './LenteCard'
 import type { LenteComponentProps } from './_LentePlaceholder'
 import { formatCLP } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
@@ -26,30 +32,89 @@ import {
 } from '@/lib/services/efficiency/EfficiencyCalculator'
 
 // ════════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Normaliza strings de BD ("ANALISTA_RRHH") a display humano ("Analista RRHH"). */
+function formatLabel(raw: string): string {
+  if (!raw) return ''
+  const cleaned = raw
+    .trim()
+    .replace(/\s*\([^)]*\)\s*/g, ' ')
+    .replace(/[()]/g, ' ')
+    .replace(/[_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return cleaned
+    .split(' ')
+    .filter(Boolean)
+    .map(word => {
+      const isSigla = /^[A-ZÁÉÍÓÚÜÑ]{2,5}$/.test(word)
+      if (isSigla) return word
+      const lower = word.toLowerCase()
+      return lower.charAt(0).toUpperCase() + lower.slice(1)
+    })
+    .join(' ')
+}
+
+/** Iniciales de un nombre para el avatar del rail. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '··'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+/** Short name: primer nombre + apellido. */
+function shortName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length <= 1) return name
+  return `${parts[0]} ${parts[parts.length - 1]}`
+}
+
+function formatTenure(months: number): string {
+  const y = Math.floor(months / 12)
+  const m = months % 12
+  if (y === 0) return `${m}m`
+  if (m === 0) return `${y}y`
+  return `${y}y ${m}m`
+}
+
+/** Adaptabilidad narrativa — nunca "2/3" crudo al CEO (P12). */
+function labelAdaptabilidad(potentialAbility: number | null): string {
+  if (potentialAbility === null) return 'Sin señal'
+  if (potentialAbility === 1) return 'Baja'
+  if (potentialAbility === 2) return 'Media'
+  return 'Alta'
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // TIPOS
 // ════════════════════════════════════════════════════════════════════════════
 
 interface PersonAlert {
-  // Base PersonAlert
   employeeId: string
   employeeName: string
   position: string
   departmentName: string
-  observedExposure: number      // legacy Anthropic
+  observedExposure: number
   roleFitScore: number
   salary: number
   financialImpact: number
   acotadoGroup: string | null
   standardCategory: string | null
   metasCompliance: number | null
-
-  // Cross-lookup enriched (opción 3 — propagados desde EnrichedEmployee)
-  focalizaScore: number | null     // Eloundou canónico (primario)
+  // Enriquecidos en el resolver
+  focalizaScore: number | null
   tenureMonths: number
-  riskQuadrant: string | null       // FUGA_CEREBROS | MOTOR_EQUIPO | BURNOUT_RISK | BAJO_RENDIMIENTO
-  mobilityQuadrant: string | null   // SUCESOR_NATURAL | EXPERTO_ANCLA | AMBICIOSO_PREMATURO | EN_DESARROLLO
+  riskQuadrant: string | null
+  mobilityQuadrant: string | null
   nineBoxPosition: string | null
   finiquitoToday: number | null
+  // v3.2 — ficha rica
+  potentialAbility: number | null
+  finiquitoIn6m: number
+  finiquitoIn12m: number
 }
 
 interface L2Detalle {
@@ -59,9 +124,40 @@ interface L2Detalle {
   avgExposure: number
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// LABELS DE CUADRANTES (narrativa ejecutiva, no técnica)
-// ════════════════════════════════════════════════════════════════════════════
+type DecisionType = 'congelar' | 'reubicar' | 'transicion'
+
+interface DecisionMeta {
+  label: string
+  description: string
+  color: string
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>
+  /** Timing de la consecuencia (para mostrar antes de elegir). */
+  timing: string
+}
+
+const DECISION_META: Record<DecisionType, DecisionMeta> = {
+  congelar: {
+    label: 'Congelar cargo',
+    description: 'Cuando la persona salga, el cargo no se reemplaza.',
+    color: '#22D3EE',
+    icon: Snowflake,
+    timing: 'Salida natural (12-18m)',
+  },
+  reubicar: {
+    label: 'Reubicar',
+    description: 'Mover a un cargo donde sus competencias siguen siendo relevantes.',
+    color: '#A78BFA',
+    icon: ArrowRightLeft,
+    timing: 'Inmediato · cargo liberado',
+  },
+  transicion: {
+    label: 'Transición acordada',
+    description: 'Salida con timing y costo cierto.',
+    color: '#F59E0B',
+    icon: Calendar,
+    timing: 'Inmediato · costo cierto',
+  },
+}
 
 const RISK_LABEL: Record<string, string> = {
   FUGA_CEREBROS: 'Fuga potencial',
@@ -77,52 +173,33 @@ const MOBILITY_LABEL: Record<string, string> = {
   EN_DESARROLLO: 'En desarrollo',
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// CONSTANTES
+// ════════════════════════════════════════════════════════════════════════════
+
+const L2_ACCENT = '#A78BFA' // ruta_ejecucion purple
+
 /** Exposición efectiva — Eloundou primario, legacy Anthropic fallback */
 function effExposure(p: PersonAlert): number {
   return p.focalizaScore ?? p.observedExposure ?? 0
 }
 
-function formatTenure(months: number): string {
-  const y = Math.floor(months / 12)
-  const m = months % 12
-  if (y === 0) return `${m}m`
-  if (m === 0) return `${y}y`
-  return `${y}y ${m}m`
-}
+// ════════════════════════════════════════════════════════════════════════════
+// NARRATIVA DINÁMICA MACRO — para el acto quirófano
+// ════════════════════════════════════════════════════════════════════════════
 
-type DecisionType = 'congelar' | 'reubicar' | 'transicion'
-
-const DECISION_META: Record<
-  DecisionType,
-  {
-    label: string
-    description: string
-    color: string
-    icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>
-  }
-> = {
-  congelar: {
-    label: 'Congelar cargo',
-    description: 'Decisión de cargo: no reemplazar si la persona sale',
-    color: '#22D3EE',
-    icon: Snowflake,
-  },
-  reubicar: {
-    label: 'Reubicar',
-    description: 'Mover a un cargo donde sus competencias siguen siendo relevantes',
-    color: '#A78BFA',
-    icon: ArrowRightLeft,
-  },
-  transicion: {
-    label: 'Transición acordada',
-    description: 'Salida con timing definido — costo del finiquito se conoce',
-    color: '#F59E0B',
-    icon: Calendar,
-  },
+function narrativaDinamica(total: number, tomadas: number): string {
+  if (tomadas === 0)
+    return 'Revisa cada expediente antes de decidir. El motor no elige por vos.'
+  if (tomadas < Math.ceil(total / 2))
+    return `${tomadas} de ${total} decididas. Cada persona es un caso distinto — no hay plantilla.`
+  if (tomadas < total)
+    return 'Más de la mitad del expediente cerrado. Los pendientes esperan tu criterio.'
+  return 'Cada persona tiene una ruta. Lo siguiente es ejecutar.'
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// COMPONENTE
+// COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
 
 export function L2TalentoZombie({
@@ -130,18 +207,19 @@ export function L2TalentoZombie({
   decisionesActuales,
   onUpsert,
   onRemove,
+  onNextLente,
+  proximoLenteTitulo,
+  onActChange,
 }: LenteComponentProps) {
   const detalle = lente.detalle as L2Detalle | null
 
-  // Estado local: decisión tomada por persona
+  const [personaActivaId, setPersonaActivaId] = useState<string | null>(null)
   const [decisiones, setDecisiones] = useState<Record<string, DecisionType | null>>({})
 
-  // Hidrata desde carrito existente (best-effort: si el nombre incluye marker, lo identifica)
+  // Hidrata desde el carrito (mismo patrón que hoy — convención sufijo · tipo)
   useEffect(() => {
     const inicial: Record<string, DecisionType | null> = {}
     for (const d of decisionesActuales) {
-      // Tipo de decisión se guarda en la narrativa metadata — reconstruir del nombre:
-      // convención: "{nombre} · {decisionType}"
       const match = d.nombre.match(/· (congelar|reubicar|transicion)$/)
       if (match) inicial[d.id] = match[1] as DecisionType
     }
@@ -151,12 +229,22 @@ export function L2TalentoZombie({
 
   const personsSorted = useMemo(() => {
     if (!detalle?.persons) return []
-    // Ordenar por financialImpact descendente (mayor gap primero)
-    return [...detalle.persons].sort((a, b) => b.financialImpact - a.financialImpact)
+    return [...detalle.persons].sort((a, b) => b.salary - a.salary)
   }, [detalle])
 
+  // Persona activa default = primera de la lista
+  useEffect(() => {
+    if (personaActivaId === null && personsSorted.length > 0) {
+      setPersonaActivaId(personsSorted[0].employeeId)
+    }
+  }, [personsSorted, personaActivaId])
+
   if (!lente.hayData || !detalle || personsSorted.length === 0) {
-    return <LenteCard lente={lente} estado="vacio">{null}</LenteCard>
+    return (
+      <LenteCard lente={lente} estado="vacio">
+        {null}
+      </LenteCard>
+    )
   }
 
   const handleToggleDecision = (person: PersonAlert, tipo: DecisionType) => {
@@ -173,251 +261,618 @@ export function L2TalentoZombie({
       return
     }
 
-    // Transición: la inversión es el finiquito real.
-    // Congelar / Reubicar: no hay inversión one-time.
-    const finiquito =
-      tipo === 'transicion' ? person.finiquitoToday ?? 0 : 0
+    // FIX: ahorroMes = salary mensual real (antes era salary × 12 anual).
+    // El CarritoBar y PanelAcumuladores derivan ahorroAnual × 12
+    // automáticamente desde calcularResumenCarrito.
+    const ahorroMes = tipo === 'reubicar' ? 0 : person.salary
+    const finiquito = tipo === 'transicion' ? person.finiquitoToday ?? 0 : 0
 
     const item: DecisionItem = {
       id: person.employeeId,
       lenteId: 'l2_zombie',
       tipo: 'persona',
-      // Convención interna: sufijo · tipo para re-hidratar al volver
       nombre: `${person.employeeName} · ${tipo}`,
       gerencia: person.departmentName,
-      ahorroMes: person.financialImpact,
+      ahorroMes,
       finiquito,
       fteEquivalente: tipo === 'transicion' ? 1 : 0,
-      narrativa: `${lente.narrativa}\n\nDecisión: ${DECISION_META[tipo].label}. ${DECISION_META[tipo].description}.`,
+      narrativa: `${lente.narrativa}\n\n${DECISION_META[tipo].label}: ${DECISION_META[tipo].description}`,
       aprobado: false,
     }
     onUpsert(item)
   }
 
+  // ─── Derivados reactivos ────────────────────────────────────────────────
+  const tomadas = Object.values(decisiones).filter(v => v !== null).length
+  const hasInteraction = tomadas > 0
+
+  const ahorroMensualTotal = personsSorted.reduce((s, p) => {
+    const d = decisiones[p.employeeId]
+    if (!d) return s
+    return s + (d === 'reubicar' ? 0 : p.salary)
+  }, 0)
+
+  const inversionTotal = personsSorted.reduce((s, p) => {
+    const d = decisiones[p.employeeId]
+    if (d === 'transicion') return s + (p.finiquitoToday ?? 0)
+    return s
+  }, 0)
+
+  const gapTotal = personsSorted.reduce((s, p) => s + p.salary, 0)
+  const tenureAvg =
+    personsSorted.length > 0
+      ? personsSorted.reduce((s, p) => s + p.tenureMonths, 0) / personsSorted.length
+      : 0
+
+  const checkpointSummary = hasInteraction
+    ? {
+        items: personsSorted
+          .filter(p => decisiones[p.employeeId] !== null)
+          .map(p => {
+            const tipo = decisiones[p.employeeId]!
+            return {
+              label: `${shortName(p.employeeName)} · ${formatLabel(p.position)}`,
+              detail: DECISION_META[tipo].label,
+              value:
+                tipo === 'reubicar' ? '$0/mes' : `${formatCLP(p.salary)}/mes`,
+            }
+          }),
+        totalLabel: `${tomadas} ${tomadas === 1 ? 'decisión' : 'decisiones'} en tu plan`,
+        totalValue: `${formatCLP(ahorroMensualTotal)}/mes`,
+      }
+    : undefined
+
+  const personaActiva = personaActivaId
+    ? personsSorted.find(p => p.employeeId === personaActivaId) ?? null
+    : null
+
   return (
-    <LenteCard lente={lente}>
-      {/* ── Portada ─────────────────────────────────────────────── */}
-      <LenteCard.Portada
-        metricaProtagonista={String(detalle.count)}
-        metricaLabel={`personas · ${Math.round(detalle.avgExposure * 100)}% exposición promedio`}
-        badge={
-          <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-md border border-red-500/40 bg-red-500/15 text-red-300">
-            <AlertTriangle className="w-3 h-3" />
-            Pasivo Tóxico
-          </span>
-        }
-      >
-        {lente.narrativa}
-      </LenteCard.Portada>
-
-      {/* ── Evidencia + Interacción combinadas por persona ────── */}
-      <LenteCard.Evidencia titulo="Quiénes son, cuánto cuestan">
-        <div className="space-y-4">
-          {personsSorted.map(p => {
-            const decision = decisiones[p.employeeId] ?? null
-            const metasPct = p.metasCompliance
-            return (
-              <div
-                key={p.employeeId}
-                className="p-4 rounded-lg bg-slate-900/60 border border-slate-800/60"
-              >
-                {/* Header persona */}
-                <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
-                  <div>
-                    <p className="text-sm font-medium text-white">
-                      {p.employeeName}
-                    </p>
-                    <p className="text-xs text-slate-400 font-light mt-0.5">
-                      {p.position} · {p.departmentName}
-                      <span className="text-slate-500"> · {formatTenure(p.tenureMonths)}</span>
-                    </p>
-                  </div>
-                  {decision && (
-                    <span
-                      className="flex-shrink-0 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md border font-medium"
-                      style={{
-                        color: DECISION_META[decision].color,
-                        borderColor: `${DECISION_META[decision].color}60`,
-                        backgroundColor: `${DECISION_META[decision].color}15`,
-                      }}
-                    >
-                      {DECISION_META[decision].label}
-                    </span>
-                  )}
-                </div>
-
-                {/* Cuadrantes + nineBox (narrativa de contexto) */}
-                {(p.riskQuadrant || p.mobilityQuadrant || p.nineBoxPosition) && (
-                  <div className="flex items-center gap-2 flex-wrap mb-3">
-                    {p.riskQuadrant && (
-                      <QuadrantChip
-                        label={RISK_LABEL[p.riskQuadrant] ?? p.riskQuadrant}
-                        tone={
-                          p.riskQuadrant === 'MOTOR_EQUIPO'
-                            ? 'good'
-                            : p.riskQuadrant === 'FUGA_CEREBROS' || p.riskQuadrant === 'BURNOUT_RISK'
-                            ? 'bad'
-                            : 'neutral'
-                        }
-                      />
-                    )}
-                    {p.mobilityQuadrant && (
-                      <QuadrantChip
-                        label={MOBILITY_LABEL[p.mobilityQuadrant] ?? p.mobilityQuadrant}
-                        tone={
-                          p.mobilityQuadrant === 'SUCESOR_NATURAL'
-                            ? 'good'
-                            : p.mobilityQuadrant === 'EN_DESARROLLO'
-                            ? 'neutral'
-                            : 'neutral'
-                        }
-                      />
-                    )}
-                    {p.nineBoxPosition && (
-                      <QuadrantChip
-                        label={`9-Box: ${p.nineBoxPosition.replace(/_/g, ' ').toLowerCase()}`}
-                        tone="neutral"
-                      />
-                    )}
-                  </div>
-                )}
-
-                {/* Stats: roleFit + exposición canónica + metas + gap */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                  <Stat
-                    label="Role Fit"
-                    value={`${Math.round(p.roleFitScore)}%`}
-                    tone={p.roleFitScore >= 75 ? 'good' : p.roleFitScore >= 50 ? 'neutral' : 'bad'}
-                  />
-                  <Stat
-                    label="Exposición IA"
-                    value={`${Math.round(effExposure(p) * 100)}%`}
-                    tone={effExposure(p) >= 0.5 ? 'bad' : 'neutral'}
-                  />
-                  <Stat
-                    label="Metas"
-                    value={metasPct !== null ? `${Math.round(metasPct)}%` : '—'}
-                    tone={
-                      metasPct === null
-                        ? 'neutral'
-                        : metasPct >= 80
-                        ? 'good'
-                        : metasPct >= 60
-                        ? 'neutral'
-                        : 'bad'
-                    }
-                  />
-                  <Stat
-                    label="Gap / mes"
-                    value={formatCLP(p.financialImpact)}
-                    tone="bad"
-                  />
-                </div>
-
-                {/* Reloj de finiquito (si hay datos de tenure) */}
-                {p.finiquitoToday !== null && p.finiquitoToday > 0 && (
-                  <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-slate-900/80 border border-slate-800/80 mb-4">
-                    <span className="text-[10px] uppercase tracking-wider text-slate-500">
-                      Finiquito hoy
-                    </span>
-                    <span className="text-sm font-medium text-emerald-300">
-                      {formatCLP(p.finiquitoToday)}
-                    </span>
-                  </div>
-                )}
-
-                {/* 3 Opciones de decisión */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-3 border-t border-slate-800/60">
-                  {(['congelar', 'reubicar', 'transicion'] as DecisionType[]).map(
-                    tipo => {
-                      const meta = DECISION_META[tipo]
-                      const Icon = meta.icon
-                      const selected = decision === tipo
-                      return (
-                        <button
-                          key={tipo}
-                          onClick={() => handleToggleDecision(p, tipo)}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-md border text-xs font-medium transition-colors text-left ${
-                            selected
-                              ? 'border-transparent text-white'
-                              : 'border-slate-800 bg-slate-900/40 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                          }`}
-                          style={
-                            selected
-                              ? {
-                                  backgroundColor: `${meta.color}20`,
-                                  borderColor: `${meta.color}70`,
-                                  boxShadow: `0 0 12px ${meta.color}30`,
-                                }
-                              : undefined
-                          }
-                          title={meta.description}
-                        >
-                          <Icon
-                            className="w-3.5 h-3.5 flex-shrink-0"
-                            style={{ color: selected ? meta.color : undefined }}
-                          />
-                          <span className="truncate">{meta.label}</span>
-                        </button>
-                      )
-                    }
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </LenteCard.Evidencia>
-    </LenteCard>
+    <LenteLayout
+      familiaAccent={L2_ACCENT}
+      heroValue={String(detalle.count)}
+      heroUnit={`personas rinden hoy y no podrán adaptarse · ${Math.round(detalle.avgExposure * 100)}% exposición IA promedio`}
+      narrativaPuente="Cada persona tiene un contexto propio. El expediente te deja simular el costo y la consecuencia de cada ruta antes de comprometerla."
+      ctaQuirofanoEyebrow="EXPEDIENTE DE TALENTO"
+      narrativaDinamica={narrativaDinamica(personsSorted.length, tomadas)}
+      hasInteraction={hasInteraction}
+      checkpointSummary={checkpointSummary}
+      onNextLente={onNextLente}
+      proximoLenteTitulo={proximoLenteTitulo}
+      onActChange={onActChange}
+      totalizador={{
+        metricas: [
+          {
+            label: 'Personas decididas',
+            value: `${tomadas} / ${personsSorted.length}`,
+            tint: 'accent',
+          },
+          {
+            label: 'Ahorro mensual',
+            value: `${formatCLP(ahorroMensualTotal)}/mes`,
+            tint: 'emerald',
+          },
+          {
+            label: 'Inversión (finiquitos)',
+            value: formatCLP(inversionTotal),
+            tint: 'warning',
+          },
+        ],
+      }}
+      renderHallazgo={() => <HallazgoResumen rows={personsSorted} />}
+      renderExpediente={() => (
+        <ExpedienteLateral
+          personsCount={personsSorted.length}
+          gapTotal={gapTotal}
+          tenureAvg={tenureAvg}
+        />
+      )}
+      renderQuirofano={() => (
+        <QuirofanoSplit
+          rows={personsSorted}
+          personaActiva={personaActiva}
+          onSelectPersona={setPersonaActivaId}
+          decisiones={decisiones}
+          onDecision={handleToggleDecision}
+        />
+      )}
+    />
   )
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// STAT CHIP
+// ACTO 2 — HALLAZGO (lista preview + contexto)
 // ════════════════════════════════════════════════════════════════════════════
 
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string
-  value: string
-  tone: 'good' | 'neutral' | 'bad'
-}) {
-  const color =
-    tone === 'good' ? 'text-emerald-300' : tone === 'bad' ? 'text-red-300' : 'text-slate-200'
+function HallazgoResumen({ rows }: { rows: PersonAlert[] }) {
   return (
     <div>
-      <p className="text-[9px] uppercase tracking-wider text-slate-500 font-light">
-        {label}
+      <p className="text-[10px] uppercase tracking-[0.22em] text-purple-400 font-medium mb-2">
+        EL EXPEDIENTE
       </p>
-      <p className={`text-sm font-light mt-0.5 ${color}`}>{value}</p>
+      <h3 className="text-xl md:text-2xl font-light text-white mb-4 leading-tight">
+        Talento en zona crítica
+      </h3>
+
+      <p className="text-sm text-slate-400 font-light leading-relaxed max-w-2xl mb-6">
+        Cruzamos desempeño actual, exposición del cargo a IA y capacidad de
+        adaptación. Estas {rows.length}{' '}
+        {rows.length === 1 ? 'persona rinde' : 'personas rinden'} excelente hoy,
+        pero los datos dicen que no podrán seguir el cambio.
+      </p>
+
+      <div className="space-y-2">
+        {rows.map(p => (
+          <div
+            key={p.employeeId}
+            className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/20 border border-slate-700/20"
+          >
+            <Avatar name={p.employeeName} size={32} accent={L2_ACCENT} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">
+                {p.employeeName}
+              </p>
+              <p className="text-xs text-slate-400 font-light truncate">
+                {formatLabel(p.position)} · {formatLabel(p.departmentName)}
+              </p>
+            </div>
+            {p.riskQuadrant && (
+              <span className="hidden sm:inline-flex text-[10px] uppercase tracking-wider text-slate-400 font-light flex-shrink-0">
+                {RISK_LABEL[p.riskQuadrant] ?? p.riskQuadrant}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// QUADRANT CHIP — etiqueta narrativa con tono
+// ACTO 2 — EXPEDIENTE LATERAL (3 stats del caso)
 // ════════════════════════════════════════════════════════════════════════════
 
-function QuadrantChip({
+interface ExpedienteLateralProps {
+  personsCount: number
+  gapTotal: number
+  tenureAvg: number
+}
+
+function ExpedienteLateral({ personsCount, gapTotal, tenureAvg }: ExpedienteLateralProps) {
+  return (
+    <aside className="rounded-lg border border-slate-800/40 bg-slate-900/30 p-5 space-y-5">
+      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium">
+        EN CIFRAS
+      </p>
+
+      <div>
+        <p className="text-xl font-extralight text-white tabular-nums leading-tight">
+          {personsCount}
+        </p>
+        <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
+          Personas en zona
+        </p>
+      </div>
+
+      <div className="h-px bg-slate-800/40" aria-hidden />
+
+      <div>
+        <p className="text-xl font-extralight text-white tabular-nums leading-tight">
+          {formatCLP(gapTotal)}
+        </p>
+        <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
+          Costo pagado / mes
+        </p>
+      </div>
+
+      <div className="h-px bg-slate-800/40" aria-hidden />
+
+      <div>
+        <p className="text-base font-light text-slate-400 tabular-nums leading-tight">
+          {formatTenure(Math.round(tenureAvg))}
+        </p>
+        <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
+          Antigüedad promedio
+        </p>
+      </div>
+    </aside>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ACTO 3 — QUIRÓFANO SPLIT (Rail + Spotlight)
+// ════════════════════════════════════════════════════════════════════════════
+
+interface QuirofanoSplitProps {
+  rows: PersonAlert[]
+  personaActiva: PersonAlert | null
+  onSelectPersona: (id: string) => void
+  decisiones: Record<string, DecisionType | null>
+  onDecision: (p: PersonAlert, t: DecisionType) => void
+}
+
+function QuirofanoSplit({
+  rows,
+  personaActiva,
+  onSelectPersona,
+  decisiones,
+  onDecision,
+}: QuirofanoSplitProps) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-6 md:gap-8">
+      <RailPersonas
+        rows={rows}
+        activeId={personaActiva?.employeeId ?? null}
+        onSelect={onSelectPersona}
+        decisiones={decisiones}
+      />
+      {personaActiva && (
+        <FichaRica
+          persona={personaActiva}
+          decision={decisiones[personaActiva.employeeId] ?? null}
+          onChoose={tipo => onDecision(personaActiva, tipo)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// RAIL DE PERSONAS — desktop vertical · mobile horizontal scroll (swipe)
+// ════════════════════════════════════════════════════════════════════════════
+
+interface RailPersonasProps {
+  rows: PersonAlert[]
+  activeId: string | null
+  onSelect: (id: string) => void
+  decisiones: Record<string, DecisionType | null>
+}
+
+function RailPersonas({ rows, activeId, onSelect, decisiones }: RailPersonasProps) {
+  return (
+    <nav
+      aria-label="Lista de personas"
+      className="flex md:block overflow-x-auto md:overflow-x-visible md:max-h-[640px] md:overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent gap-2 md:gap-0 md:space-y-1 pb-2 md:pb-0"
+    >
+      {rows.map(p => {
+        const isActive = p.employeeId === activeId
+        const decision = decisiones[p.employeeId]
+        return (
+          <button
+            key={p.employeeId}
+            onClick={() => onSelect(p.employeeId)}
+            className={`flex-shrink-0 md:w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg border transition-colors text-left min-w-[200px] md:min-w-0 ${
+              isActive
+                ? 'bg-slate-800/50'
+                : 'bg-transparent hover:bg-slate-800/30'
+            }`}
+            style={
+              isActive
+                ? {
+                    borderColor: `${L2_ACCENT}80`,
+                    boxShadow: `inset 3px 0 0 ${L2_ACCENT}`,
+                  }
+                : { borderColor: 'rgba(51, 65, 85, 0.4)' }
+            }
+          >
+            <Avatar name={p.employeeName} size={28} accent={L2_ACCENT} />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-white truncate">
+                {shortName(p.employeeName)}
+              </p>
+              <p className="text-[10px] font-light text-slate-500 truncate">
+                {formatLabel(p.position)}
+              </p>
+            </div>
+            {decision && (
+              <span
+                className="flex-shrink-0 w-1.5 h-1.5 rounded-full"
+                style={{ backgroundColor: DECISION_META[decision].color }}
+                aria-label={`Decidido: ${DECISION_META[decision].label}`}
+              />
+            )}
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// FICHA RICA — 5 secciones de contexto + sección decisión
+// ════════════════════════════════════════════════════════════════════════════
+
+interface FichaRicaProps {
+  persona: PersonAlert
+  decision: DecisionType | null
+  onChoose: (tipo: DecisionType) => void
+}
+
+function FichaRica({ persona, decision, onChoose }: FichaRicaProps) {
+  return (
+    <motion.div
+      key={persona.employeeId}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="space-y-6 min-w-0"
+    >
+      <SeccionIdentidad persona={persona} />
+      <SeccionRadiografia persona={persona} />
+      <SeccionContexto persona={persona} />
+      <SeccionRelojFinanciero persona={persona} />
+      <SeccionDecision persona={persona} decision={decision} onChoose={onChoose} />
+    </motion.div>
+  )
+}
+
+// ── Sección 1: Identidad ────────────────────────────────────────────────────
+
+function SeccionIdentidad({ persona }: { persona: PersonAlert }) {
+  return (
+    <section>
+      <div className="flex items-center gap-4">
+        <Avatar name={persona.employeeName} size={56} accent={L2_ACCENT} />
+        <div>
+          <h3 className="text-xl md:text-2xl font-light text-white leading-tight">
+            {persona.employeeName}
+          </h3>
+          <p className="text-sm text-slate-400 font-light mt-0.5">
+            {formatLabel(persona.position)} · {formatLabel(persona.departmentName)}
+          </p>
+          <p className="text-xs text-slate-500 font-light mt-1">
+            Antigüedad: {formatTenure(persona.tenureMonths)}
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ── Sección 2: Radiografía ──────────────────────────────────────────────────
+
+function SeccionRadiografia({ persona }: { persona: PersonAlert }) {
+  return (
+    <section>
+      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium mb-3">
+        RADIOGRAFÍA
+      </p>
+      <div className="grid grid-cols-3 gap-3">
+        <Stat
+          label="Dominio del cargo"
+          value={`${Math.round(persona.roleFitScore)}%`}
+        />
+        <Stat
+          label="Exposición IA"
+          value={`${Math.round(effExposure(persona) * 100)}%`}
+        />
+        <Stat
+          label="Adaptabilidad"
+          value={labelAdaptabilidad(persona.potentialAbility)}
+        />
+      </div>
+    </section>
+  )
+}
+
+// ── Sección 3: Contexto (cuadrantes + metas + ADN) ──────────────────────────
+
+function SeccionContexto({ persona }: { persona: PersonAlert }) {
+  const hasChips =
+    persona.riskQuadrant || persona.mobilityQuadrant || persona.nineBoxPosition
+  if (!hasChips && persona.metasCompliance === null) return null
+
+  return (
+    <section>
+      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium mb-3">
+        CONTEXTO
+      </p>
+      <div className="flex items-center gap-2 flex-wrap">
+        {persona.riskQuadrant && (
+          <Chip label={RISK_LABEL[persona.riskQuadrant] ?? persona.riskQuadrant} />
+        )}
+        {persona.mobilityQuadrant && (
+          <Chip
+            label={MOBILITY_LABEL[persona.mobilityQuadrant] ?? persona.mobilityQuadrant}
+          />
+        )}
+        {persona.metasCompliance !== null && (
+          <Chip label={`Metas ${Math.round(persona.metasCompliance)}%`} />
+        )}
+        {persona.nineBoxPosition && (
+          <Chip
+            label={`ADN: ${persona.nineBoxPosition.replace(/_/g, ' ').toLowerCase()}`}
+          />
+        )}
+      </div>
+    </section>
+  )
+}
+
+// ── Sección 4: Reloj financiero ─────────────────────────────────────────────
+
+function SeccionRelojFinanciero({ persona }: { persona: PersonAlert }) {
+  const hoy = persona.finiquitoToday ?? 0
+  const delta6 = persona.finiquitoIn6m - hoy
+  const delta12 = persona.finiquitoIn12m - hoy
+
+  return (
+    <section>
+      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium mb-3">
+        RELOJ FINANCIERO
+      </p>
+      <div className="rounded-lg border border-slate-800/40 bg-slate-900/30 divide-y divide-slate-800/40">
+        <FilaReloj label="Hoy" valor={formatCLP(hoy)} delta={null} />
+        <FilaReloj
+          label="+6 meses"
+          valor={formatCLP(persona.finiquitoIn6m)}
+          delta={delta6 > 0 ? `+${formatCLP(delta6)}` : null}
+        />
+        <FilaReloj
+          label="+12 meses"
+          valor={formatCLP(persona.finiquitoIn12m)}
+          delta={delta12 > 0 ? `+${formatCLP(delta12)}` : null}
+        />
+      </div>
+    </section>
+  )
+}
+
+function FilaReloj({
   label,
-  tone,
+  valor,
+  delta,
 }: {
   label: string
-  tone: 'good' | 'neutral' | 'bad'
+  valor: string
+  delta: string | null
 }) {
-  const styles =
-    tone === 'good'
-      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-      : tone === 'bad'
-      ? 'border-red-500/40 bg-red-500/10 text-red-300'
-      : 'border-slate-700 bg-slate-800/60 text-slate-300'
   return (
-    <span
-      className={`inline-flex items-center text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md border font-light ${styles}`}
+    <div className="flex items-baseline justify-between gap-4 px-4 py-2.5">
+      <span className="text-[10px] uppercase tracking-widest text-slate-500 font-medium">
+        {label}
+      </span>
+      <span className="flex items-baseline gap-3">
+        <span className="text-sm text-white font-light tabular-nums">{valor}</span>
+        {delta && (
+          <span className="text-[11px] text-amber-300/80 font-light tabular-nums">
+            {delta}
+          </span>
+        )}
+      </span>
+    </div>
+  )
+}
+
+// ── Sección 5: Decisión — 3 escenarios como ToggleGroup mutuamente excluyente
+
+function SeccionDecision({
+  persona,
+  decision,
+  onChoose,
+}: {
+  persona: PersonAlert
+  decision: DecisionType | null
+  onChoose: (tipo: DecisionType) => void
+}) {
+  return (
+    <section>
+      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium mb-3">
+        DECISIÓN
+      </p>
+      <div
+        role="radiogroup"
+        aria-label="Escenario de decisión"
+        className="grid grid-cols-1 md:grid-cols-3 gap-2"
+      >
+        {(['congelar', 'reubicar', 'transicion'] as DecisionType[]).map(tipo => {
+          const meta = DECISION_META[tipo]
+          const Icon = meta.icon
+          const selected = decision === tipo
+          const ahorro = tipo === 'reubicar' ? 0 : persona.salary
+          const finiquito = tipo === 'transicion' ? persona.finiquitoToday ?? 0 : 0
+
+          return (
+            <button
+              key={tipo}
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChoose(tipo)}
+              className={`flex flex-col gap-2 p-3 rounded-lg border text-left transition-all ${
+                selected
+                  ? 'border-transparent'
+                  : 'border-slate-800 bg-slate-900/40 hover:border-slate-700 hover:bg-slate-900/60'
+              }`}
+              style={
+                selected
+                  ? {
+                      backgroundColor: `${meta.color}18`,
+                      borderColor: `${meta.color}80`,
+                      boxShadow: `0 0 16px ${meta.color}30`,
+                    }
+                  : undefined
+              }
+            >
+              <div className="flex items-center gap-2">
+                <Icon
+                  className="w-4 h-4 flex-shrink-0"
+                  style={{ color: meta.color }}
+                />
+                <span
+                  className="text-xs font-medium"
+                  style={{ color: selected ? meta.color : '#e2e8f0' }}
+                >
+                  {meta.label}
+                </span>
+              </div>
+              <div className="space-y-0.5 text-[11px] font-light tabular-nums">
+                <p className="text-slate-400">
+                  Ahorro:{' '}
+                  <span className={ahorro > 0 ? 'text-emerald-300' : 'text-slate-500'}>
+                    {ahorro > 0 ? `${formatCLP(ahorro)}/mes` : '—'}
+                  </span>
+                </p>
+                <p className="text-slate-400">
+                  Finiquito:{' '}
+                  <span className={finiquito > 0 ? 'text-amber-300' : 'text-slate-500'}>
+                    {finiquito > 0 ? formatCLP(finiquito) : '—'}
+                  </span>
+                </p>
+                <p className="text-slate-500 leading-snug pt-1 normal-nums">
+                  {meta.timing}
+                </p>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ÁTOMOS UI
+// ════════════════════════════════════════════════════════════════════════════
+
+function Avatar({
+  name,
+  size,
+  accent,
+}: {
+  name: string
+  size: number
+  accent: string
+}) {
+  return (
+    <div
+      className="flex-shrink-0 rounded-full flex items-center justify-center font-medium tabular-nums"
+      style={{
+        width: size,
+        height: size,
+        backgroundColor: `${accent}15`,
+        border: `1px solid ${accent}40`,
+        color: accent,
+        fontSize: size * 0.38,
+      }}
     >
+      {initials(name)}
+    </div>
+  )
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-wider text-slate-500 font-medium mb-1">
+        {label}
+      </p>
+      <p className="text-base font-light text-white tabular-nums">{value}</p>
+    </div>
+  )
+}
+
+function Chip({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md border border-slate-700/50 bg-slate-800/40 text-slate-300 font-light">
       {label}
     </span>
   )
