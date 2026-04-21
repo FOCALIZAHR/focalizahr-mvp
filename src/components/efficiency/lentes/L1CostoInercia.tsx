@@ -177,25 +177,34 @@ const IPI_META: Record<IPI, IPIMeta> = {
   },
 }
 
-/** Clasifica el perfil IA dominante de un departamento o cargo usando
- *  los shares reales del Anthropic Index (automationShare + augmentationShare)
- *  en lugar de una heurística sobre focalizaScore.
+/** Clasifica el perfil IA dominante de un departamento usando los
+ *  shares reales del Anthropic Index (automationShare + augmentationShare).
+ *  Inteligencia real, no heurística sobre focalizaScore.
  *
  *  Semántica canónica:
- *    · delegacion  → automationShare dominante y > 0.5 (IA ejecuta sola)
- *    · asistencia  → augmentationShare > 0.5 (IA copilotea)
+ *    · delegacion  → automationShare dominante y > 0.3 (IA ejecuta sola)
+ *    · asistencia  → augmentationShare > 0.3 (IA copilotea)
  *    · aprendizaje → ambas bajas (territorio emergente, IA todavía no ejecuta)
  *
+ *  Umbral 0.3 (no 0.5): los shares del Anthropic Index son valores
+ *  absolutos típicamente bajos — 0.5 clasificaría a casi todo como
+ *  aprendizaje. 0.3 captura señales reales sin ser ruidoso.
+ *
  *  Si los shares son 0 (cargo sin cobertura Anthropic), clasifica como
- *  aprendizaje — es el estado real del mapping, no un fallback. */
+ *  aprendizaje — es el estado real del mapping, no un fallback.
+ *
+ *  Se aplica a nivel DEPARTAMENTO. El desglose por cargo (r.breakdown)
+ *  hereda el IPI del depto — no recalcula por cargo porque el CEO ve
+ *  el "perfil del área" como unidad narrativa, no de cada cargo
+ *  individualmente. */
 function inferIPI(d: {
   avgAutomationShare: number
   avgAugmentationShare: number
 }): IPI {
-  if (d.avgAutomationShare > d.avgAugmentationShare && d.avgAutomationShare > 0.5) {
+  if (d.avgAutomationShare > d.avgAugmentationShare && d.avgAutomationShare > 0.3) {
     return 'delegacion'
   }
-  if (d.avgAugmentationShare > 0.5) {
+  if (d.avgAugmentationShare > 0.3) {
     return 'asistencia'
   }
   return 'aprendizaje'
