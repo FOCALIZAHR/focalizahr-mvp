@@ -13,14 +13,20 @@
 //
 // Spec: .claude/tasks/SPEC_L4_ARQUITECTURA_LIDERAZGO.md
 //
-// Modo Estructural (default, sin cycleId):
+// Dos modos automáticos según data disponible:
+//
+// Modo Estructural (fallback sin ciclo activo):
 //   · Span + arquetipo + densidad + costo
 //   · Narrativas basadas solo en spanZone
 //   · Funciona desde día 1, sin prerequisitos
 //
-// Modo Completo (cuando cycleId disponible — próximo commit):
-//   · Agrega perfilEvaluativo + metasEquipoPct
-//   · Activa matriz de 8 narrativas cruzadas
+// Modo Completo (cuando hay PerformanceCycle con managerScore):
+//   · Agrega perfilEvaluativo (via evaluatorStatsEngine sobre managerScore
+//     del ciclo: avg + stdDev calculados en memoria)
+//   · Agrega metasEquipoPct (via GoalsService.getEmployeeGoalsScore,
+//     INDEPENDIENTE del ciclo — mismo patrón que Workforce/Simulador)
+//   · Agrega roleFitPromedio (desde enriched.roleFitScore del ciclo)
+//   · Activa las 8 combinaciones narrativas del spec §7
 //
 // Hallazgos de validación (§16 del spec):
 //   · Emplea directReportsCount del enriched (ya filtra status=ACTIVE)
@@ -35,6 +41,8 @@ import { prisma } from '@/lib/prisma'
 import type { EnrichedEmployee } from './WorkforceIntelligenceService'
 import { PositionAdapter } from './PositionAdapter'
 import { SalaryConfigService } from './SalaryConfigService'
+import { GoalsService } from './GoalsService'
+import { getEvaluationClassification } from '@/lib/utils/evaluatorStatsEngine'
 import {
   SPAN_OPTIMO,
   SPAN_FALLBACK,
@@ -48,6 +56,7 @@ import {
   type OrgSpanSummary,
   type OrgSpanIntelligence,
   type RangoOptimo,
+  type PerfilEvaluativo,
 } from '@/types/span'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -95,20 +104,31 @@ function resolveRango(standardJobLevel: string | null): RangoOptimo {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// NARRATIVAS — Modo Estructural (sin cycleId)
-// Matriz reducida del spec §7. Modo Completo extiende esto en commit futuro.
+// NARRATIVAS — Matriz completa del spec §7 (8 combinaciones + reglas prioridad)
+// ════════════════════════════════════════════════════════════════════════════
+// Funciona en dos modos según si hay cycleId disponible:
+//   · Modo Estructural (perfilEval=null, metasPct=null): narrativa solo por
+//     spanZone. Fallback cuando no hay ciclo activo con evaluaciones.
+//   · Modo Completo (perfilEval y/o metasPct presentes): las 8 combinaciones
+//     del spec se activan según reglas de prioridad (§7).
 // ════════════════════════════════════════════════════════════════════════════
 
-function getSpanNarrativeEstructural(
+function getSpanNarrative(
   firstName: string,
   spanZone: SpanZone,
   span: number,
   rangoOptimo: RangoOptimo,
   tenureMeses: number,
-  costoFTE: number
+  costoFTE: number,
+  perfilEval: PerfilEvaluativo | null,
+  metasPct: number | null
 ): SpanNarrativeResult {
   const esNuevo = tenureMeses < 6
+  const hasCycleData = perfilEval !== null
+  const metasBajas = metasPct !== null && metasPct < 65
+  const metasAltas = metasPct !== null && metasPct >= 85
 
+  // REGLA 1 — MICRO-EQUIPO siempre gana (span ≤ 2)
   if (spanZone === 'MICRO') {
     return {
       zona: 'ROJA',
@@ -120,7 +140,53 @@ function getSpanNarrativeEstructural(
     }
   }
 
+  // REGLA 2 — SUB-SPAN (narrativas contextuales)
   if (spanZone === 'SUB') {
+    // SUB + INDULGENTE + metas bajas → CAPA SIN VALOR
+    if (hasCycleData && perfilEval === 'INDULGENTE' && metasBajas) {
+      return {
+        zona: 'ROJA',
+        titulo: 'Capa sin valor',
+        narrativa: `${firstName} gestiona ${span} personas y no detecta que su equipo no está cumpliendo. Evalúa bien a todos — pero los resultados dicen otra cosa.`,
+        consecuencia: `Costo de esta capa: ${formatCLP(costoFTE)} por persona gestionada.`,
+        accionSugerida: 'Consolidar',
+        urgencia: 'ALTA',
+      }
+    }
+    // SUB + SEVERA + metas altas → MICROMANAGEMENT
+    if (hasCycleData && perfilEval === 'SEVERA' && metasAltas) {
+      return {
+        zona: 'AMARILLA',
+        titulo: 'Micromanagement de alta presión',
+        narrativa: `${firstName} tiene ${span} directos y los evalúa con estándares exigentes. Su equipo entrega — pero a qué costo.`,
+        consecuencia: `Riesgo de agotamiento: monitorear retención del equipo.`,
+        accionSugerida: esNuevo ? 'Monitorear' : 'Revisar estilo',
+        urgencia: 'MEDIA',
+      }
+    }
+    // SUB + CENTRAL + metas bajas → CAPA CIEGA
+    if (hasCycleData && perfilEval === 'CENTRAL' && metasBajas) {
+      return {
+        zona: 'ROJA',
+        titulo: 'Capa ciega a su propio problema',
+        narrativa: `${firstName} evalúa a todos igual y su equipo cumple al ${Math.round(metasPct!)}%. No hay señal de autocorrección.`,
+        consecuencia: `Sin diferenciación en las evaluaciones, el equipo no recibe la señal de que algo no está funcionando.`,
+        accionSugerida: 'Coaching · Revisión',
+        urgencia: 'ALTA',
+      }
+    }
+    // SUB + OPTIMA + metas no bajas → CAPACIDAD SUBUTILIZADA
+    if (!metasBajas && (!hasCycleData || perfilEval === 'OPTIMA')) {
+      return {
+        zona: 'AMARILLA',
+        titulo: 'Capacidad subutilizada',
+        narrativa: `El equipo de ${firstName} entrega. El problema es estructural: gestiona ${span} ${span === 1 ? 'persona' : 'personas'} cuando su cargo admite hasta ${rangoOptimo.max}.`,
+        consecuencia: `Ampliar su equipo capturaría capacidad sin costo adicional.`,
+        accionSugerida: 'Ampliar equipo',
+        urgencia: 'BAJA',
+      }
+    }
+    // SUB genérico
     return {
       zona: 'AMARILLA',
       titulo: 'Sub-spanning estructural',
@@ -131,7 +197,42 @@ function getSpanNarrativeEstructural(
     }
   }
 
+  // REGLA 3 — SOBRE-SPAN
   if (spanZone === 'SOBRE') {
+    // SOBRE + INDULGENTE + metas bajas → SOBRECARGA CON VISTA GORDA
+    if (hasCycleData && perfilEval === 'INDULGENTE' && metasBajas) {
+      return {
+        zona: 'ROJA',
+        titulo: 'Sobrecarga con vista gorda',
+        narrativa: `${firstName} tiene ${span} directos, evalúa a todos bien, y su equipo cumple al ${Math.round(metasPct!)}%. No alcanza a ver lo que tiene enfrente.`,
+        consecuencia: `Con ${span} personas a cargo, los problemas individuales quedan invisibles.`,
+        accionSugerida: 'Reducir equipo · Calibración',
+        urgencia: 'ALTA',
+      }
+    }
+    // SOBRE + OPTIMA + metas altas → LÍDER DE ALTA CAPACIDAD
+    if (metasAltas && (!hasCycleData || perfilEval === 'OPTIMA')) {
+      return {
+        zona: 'VERDE',
+        titulo: 'Líder de alta capacidad',
+        narrativa: `${firstName} gestiona ${span} personas con cumplimiento de metas sobre el ${Math.round(metasPct!)}%. Este patrón es replicable.`,
+        consecuencia: `¿Hay otros líderes que puedan aprender de este modelo de gestión?`,
+        accionSugerida: 'Mantener',
+        urgencia: 'NINGUNA',
+      }
+    }
+    // SOBRE + SEVERA + metas altas → RESULTADO A COSTA DE PRESIÓN
+    if (hasCycleData && perfilEval === 'SEVERA' && metasAltas) {
+      return {
+        zona: 'AMARILLA',
+        titulo: 'Resultado a costa de presión',
+        narrativa: `Los números de ${firstName} son sólidos. Sus evaluaciones están consistentemente en el rango severo. El equipo entrega — ¿por cuánto tiempo más?`,
+        consecuencia: `Monitorear retención del equipo en los próximos 6 meses.`,
+        accionSugerida: 'Monitorear retención',
+        urgencia: 'MEDIA',
+      }
+    }
+    // SOBRE genérico
     return {
       zona: 'AMARILLA',
       titulo: 'Equipo sobredimensionado',
@@ -142,7 +243,19 @@ function getSpanNarrativeEstructural(
     }
   }
 
-  // EN_RANGO — estructura saludable
+  // EN_RANGO + INDULGENTE + metas bajas → ESTRUCTURA OK, GESTIÓN A REVISAR
+  if (hasCycleData && perfilEval === 'INDULGENTE' && metasBajas) {
+    return {
+      zona: 'AMARILLA',
+      titulo: 'Estructura OK · Gestión a revisar',
+      narrativa: `${firstName} tiene el span correcto para su cargo. El problema no es cuánta gente gestiona — es lo que percibe de ella.`,
+      consecuencia: `Evaluaciones indulgentes + metas bajas: la señal no llega al equipo.`,
+      accionSugerida: 'Calibración evaluativa',
+      urgencia: 'MEDIA',
+    }
+  }
+
+  // EN_RANGO + todo OK → ESTRUCTURA SALUDABLE
   return {
     zona: 'VERDE',
     titulo: 'Estructura saludable',
@@ -278,6 +391,106 @@ export class SpanIntelligenceService {
       return result.monthlySalary
     }
 
+    // ── Modo Completo: perfil evaluativo + metas equipo + roleFit ─────
+    // Detecta ciclo activo más reciente (mismo criterio que
+    // WorkforceIntelligenceService.buildEnrichedDataset). Si no hay,
+    // cae automáticamente a Modo Estructural (perfilEval=null,
+    // metasPct=null) y la matriz de narrativas usa fallbacks genéricos.
+    const cycle = await prisma.performanceCycle.findFirst({
+      where: {
+        accountId,
+        status: { in: ['ACTIVE', 'IN_REVIEW', 'COMPLETED'] },
+        performanceRatings: { some: { managerScore: { not: null } } },
+      },
+      orderBy: { endDate: 'desc' },
+      select: { id: true },
+    })
+
+    // Perfil evaluativo por manager — calcula avg + stdDev en memoria
+    // desde managerScore del ciclo. No depende de ManagerVarianceService
+    // para tener el control sobre stdDev (requerido por
+    // getEvaluationClassification).
+    const evalStatsByManagerId = new Map<
+      string,
+      { avg: number; stdDev: number; count: number }
+    >()
+    if (cycle) {
+      const scoreRatings = await prisma.performanceRating.findMany({
+        where: {
+          cycleId: cycle.id,
+          accountId,
+          managerScore: { not: null },
+          employee: { managerId: { not: null } },
+        },
+        select: {
+          managerScore: true,
+          employee: { select: { managerId: true } },
+        },
+      })
+      const scoresByManagerId = new Map<string, number[]>()
+      for (const r of scoreRatings) {
+        const mgrId = r.employee.managerId
+        if (!mgrId || r.managerScore === null) continue
+        if (!scoresByManagerId.has(mgrId)) scoresByManagerId.set(mgrId, [])
+        scoresByManagerId.get(mgrId)!.push(r.managerScore)
+      }
+      for (const [mgrId, scores] of scoresByManagerId) {
+        const count = scores.length
+        const avg = scores.reduce((s, x) => s + x, 0) / count
+        const variance =
+          scores.reduce((s, x) => s + (x - avg) ** 2, 0) / count
+        const stdDev = Math.sqrt(variance)
+        evalStatsByManagerId.set(mgrId, { avg, stdDev, count })
+      }
+    }
+
+    // Metas del equipo — GoalsService.getEmployeeGoalsScore es
+    // INDEPENDIENTE de cycleId (usa as-of-date actual). Se consulta por
+    // cada directo activo del manager y se promedia. Uso canónico —
+    // mismo patrón que Workforce y Simulador.
+    const asOf = new Date()
+    const directsByManagerId = new Map<string, string[]>()
+    for (const e of enriched) {
+      const mgrId = managerIdById.get(e.employeeId)
+      if (!mgrId) continue
+      if (!directsByManagerId.has(mgrId)) directsByManagerId.set(mgrId, [])
+      directsByManagerId.get(mgrId)!.push(e.employeeId)
+    }
+
+    const metasEquipoByManagerId = new Map<string, number>()
+    const metasPromises: Array<Promise<void>> = []
+    for (const m of managerCandidates) {
+      const directs = directsByManagerId.get(m.employeeId) ?? []
+      if (directs.length === 0) continue
+      metasPromises.push(
+        (async () => {
+          const scores = await Promise.all(
+            directs.map(id => GoalsService.getEmployeeGoalsScore(id, asOf))
+          )
+          const conMetas = scores.filter(s => s.goalsCount > 0)
+          if (conMetas.length === 0) return
+          const avg =
+            conMetas.reduce((s, x) => s + x.score, 0) / conMetas.length
+          metasEquipoByManagerId.set(m.employeeId, avg)
+        })()
+      )
+    }
+    await Promise.all(metasPromises)
+
+    // RoleFit promedio del equipo — desde enriched (ya cargado
+    // con el cycle activo del enricher principal)
+    const roleFitByManagerId = new Map<string, number>()
+    for (const m of managerCandidates) {
+      const directs = directsByManagerId.get(m.employeeId) ?? []
+      if (directs.length === 0) continue
+      const scores = directs
+        .map(id => enrichedById.get(id)?.roleFitScore)
+        .filter((v): v is number => v !== null && v !== undefined)
+      if (scores.length === 0) continue
+      const avg = scores.reduce((s, x) => s + x, 0) / scores.length
+      roleFitByManagerId.set(m.employeeId, avg)
+    }
+
     // ── Build profiles ─────────────────────────────────────────────────
     const profiles: SpanManagerProfile[] = []
     for (const m of managerCandidates) {
@@ -291,16 +504,31 @@ export class SpanIntelligenceService {
       const salary = await estimateSalary(m.acotadoGroup)
       const costoFTE = spanActivo > 0 ? salary / spanActivo : salary
 
+      // Señales del Modo Completo (null si no hay cycle o sin data)
+      const evalStats = evalStatsByManagerId.get(m.employeeId) ?? null
+      const perfilEvaluativo: PerfilEvaluativo | null = evalStats
+        ? getEvaluationClassification(
+            evalStats.avg,
+            evalStats.stdDev,
+            evalStats.count
+          )
+        : null
+      const avgScore = evalStats ? evalStats.avg : null
+      const metasEquipoPct = metasEquipoByManagerId.get(m.employeeId) ?? null
+      const roleFitPromedio = roleFitByManagerId.get(m.employeeId) ?? null
+
       // Primer nombre para narrativas
       const firstName = m.employeeName.split(/[\s,]+/).filter(Boolean)[0] ?? m.employeeName
 
-      const narrativa = getSpanNarrativeEstructural(
+      const narrativa = getSpanNarrative(
         firstName,
         spanZone,
         spanActivo,
         rangoOptimo,
         m.tenureMonths,
-        costoFTE
+        costoFTE,
+        perfilEvaluativo,
+        metasEquipoPct
       )
 
       profiles.push({
@@ -317,10 +545,10 @@ export class SpanIntelligenceService {
         spanZone,
         spanGap,
         rangoOptimo,
-        perfilEvaluativo: null, // Modo Completo en commit futuro
-        avgScore: null,
-        metasEquipoPct: null,
-        roleFitPromedio: null,
+        perfilEvaluativo,
+        avgScore,
+        metasEquipoPct,
+        roleFitPromedio,
         salarioManager: salary,
         costoFTEgestionado: costoFTE,
         narrativa,

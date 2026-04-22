@@ -749,6 +749,7 @@ function FichaLectura({
     >
       <SeccionIdentidad manager={manager} />
       <SeccionRadiografiaSpan manager={manager} />
+      <SeccionPerfilEvaluativo manager={manager} />
       <SeccionNarrativaCaso manager={manager} />
       <SeccionCosto manager={manager} />
 
@@ -942,7 +943,99 @@ function SeccionNarrativaCaso({ manager }: { manager: SpanManagerProfile }) {
   )
 }
 
-// ── Sección 4: Costo de la capa ────────────────────────────────────────────
+// ── Sección 4: Perfil evaluativo + resultados del equipo (Modo Completo) ──
+
+function SeccionPerfilEvaluativo({
+  manager,
+}: {
+  manager: SpanManagerProfile
+}) {
+  // En Modo Estructural (sin cycleId): todos los campos son null,
+  // la sección no se renderiza — el lente funciona sin prerequisitos.
+  const tieneAlgo =
+    manager.perfilEvaluativo !== null ||
+    manager.metasEquipoPct !== null ||
+    manager.roleFitPromedio !== null
+  if (!tieneAlgo) return null
+
+  return (
+    <section>
+      <p className="text-[10px] uppercase tracking-widest text-slate-500 font-medium mb-3">
+        PERFIL EVALUATIVO Y RESULTADOS DEL EQUIPO
+      </p>
+      <div className="rounded-[20px] border border-slate-800 bg-[#0F172A]/90 backdrop-blur-2xl p-5 md:p-6 space-y-5">
+        {manager.perfilEvaluativo !== null && (
+          <div>
+            <div className="flex items-baseline justify-between gap-4 flex-wrap">
+              <TooltipContext
+                variant="pattern"
+                position="top"
+                usePortal
+                title="Perfil evaluativo"
+                explanation="Cómo evalúa el manager a su equipo según la distribución de scores."
+                details={[
+                  'ÓPTIMA: distribución equilibrada, criterio calibrado.',
+                  'CENTRAL: agrupa a todos en puntajes medios — falta diferenciación.',
+                  'SEVERA: promedio bajo, estándares exigentes.',
+                  'INDULGENTE: promedio alto, poca diferenciación por arriba.',
+                ]}
+              >
+                <span className="text-sm font-medium text-white tracking-wide">
+                  {formatPerfilLabel(manager.perfilEvaluativo)}
+                </span>
+              </TooltipContext>
+              {manager.avgScore !== null && (
+                <span className="text-xs text-slate-400 font-light tabular-nums">
+                  Promedio evaluaciones:{' '}
+                  <span className="text-slate-200">
+                    {manager.avgScore.toFixed(2)}
+                  </span>{' '}
+                  / 5
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {(manager.metasEquipoPct !== null || manager.roleFitPromedio !== null) && (
+          <div className="grid grid-cols-2 gap-4">
+            {manager.metasEquipoPct !== null && (
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-slate-500 font-medium mb-1">
+                  Cumplimiento de metas
+                </p>
+                <p className="text-lg font-extralight text-white tabular-nums">
+                  {Math.round(manager.metasEquipoPct)}%
+                </p>
+              </div>
+            )}
+            {manager.roleFitPromedio !== null && (
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-slate-500 font-medium mb-1">
+                  Dominio del cargo (prom.)
+                </p>
+                <p className="text-lg font-extralight text-white tabular-nums">
+                  {Math.round(manager.roleFitPromedio)}%
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function formatPerfilLabel(perfil: NonNullable<SpanManagerProfile['perfilEvaluativo']>): string {
+  switch (perfil) {
+    case 'OPTIMA': return 'Óptima'
+    case 'CENTRAL': return 'Central'
+    case 'SEVERA': return 'Severa'
+    case 'INDULGENTE': return 'Indulgente'
+  }
+}
+
+// ── Sección 5: Costo de la capa ────────────────────────────────────────────
 
 function SeccionCosto({ manager }: { manager: SpanManagerProfile }) {
   return (
