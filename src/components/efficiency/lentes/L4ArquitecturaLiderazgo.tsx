@@ -355,10 +355,7 @@ export function L4ArquitecturaLiderazgo({
         ],
       }}
       renderHallazgo={() => <HallazgoZonas data={detalle} />}
-      // renderExpediente intencionalmente omitido — L4 mete las cifras
-      // dentro del HallazgoZonas como fila horizontal superior. Esto
-      // libera el aside del 30% para que las 3 cards de zonas usen
-      // el ancho completo del lente (su grid 3-cols se ahogaba en 33%).
+      renderExpediente={() => <ExpedienteLateral data={detalle} />}
       renderQuirofano={() => {
         if (managersDecidibles.length === 0) {
           return (
@@ -398,7 +395,6 @@ export function L4ArquitecturaLiderazgo({
 
 function HallazgoZonas({ data }: { data: OrgSpanIntelligence }) {
   const total = data.managers.length
-  const tieneCapasSuboptimas = data.org.costoCapasSuboptimas > 0
 
   return (
     <div>
@@ -415,34 +411,7 @@ function HallazgoZonas({ data }: { data: OrgSpanIntelligence }) {
         gestión real.
       </p>
 
-      {/* CIFRAS — fila horizontal arriba (antes vivían en ExpedienteLateral
-          aside). Pasaron acá para liberar el ancho del 30% del aside,
-          que ahogaba las 3 ZonaCards a 33% del ancho del lente. */}
-      <div
-        className={`grid grid-cols-2 ${tieneCapasSuboptimas ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-3 md:gap-4 mb-6`}
-      >
-        <CifraCard
-          value={String(data.org.totalManagers)}
-          label="Jefaturas activas"
-        />
-        <CifraCard
-          value={`${(data.org.densidadGerencial * 100).toFixed(0)}%`}
-          label="Densidad gerencial"
-        />
-        <CifraCard
-          value={formatCLP(data.org.costoFTEpromedio)}
-          label="Costo por FTE gestionado (prom.)"
-        />
-        {tieneCapasSuboptimas && (
-          <CifraCard
-            value={formatCLP(data.org.costoCapasSuboptimas)}
-            label="Capas subóptimas / mes"
-            tone="amber"
-          />
-        )}
-      </div>
-
-      {/* 3 ZonaCards — ahora a todo el ancho del lente */}
+      {/* 3 cards — distribución por zona */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-6">
         <ZonaCard
           zona="ROJA"
@@ -475,32 +444,6 @@ function HallazgoZonas({ data }: { data: OrgSpanIntelligence }) {
           </p>
         </div>
       )}
-    </div>
-  )
-}
-
-/** Card compacta de cifra para la fila horizontal del Hallazgo. */
-function CifraCard({
-  value,
-  label,
-  tone = 'default',
-}: {
-  value: string
-  label: string
-  tone?: 'default' | 'amber'
-}) {
-  const valueClass =
-    tone === 'amber' ? 'text-amber-300/90' : 'text-white'
-  return (
-    <div className="rounded-[20px] border border-slate-800 bg-[#0F172A]/90 backdrop-blur-2xl p-5 md:p-6">
-      <p
-        className={`text-2xl md:text-3xl font-extralight ${valueClass} tabular-nums leading-tight`}
-      >
-        {value}
-      </p>
-      <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1.5">
-        {label}
-      </p>
     </div>
   )
 }
@@ -553,6 +496,65 @@ function ZonaCard({
         {descripcion}
       </p>
     </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ACTO 2 — EXPEDIENTE LATERAL
+// ════════════════════════════════════════════════════════════════════════════
+
+function ExpedienteLateral({ data }: { data: OrgSpanIntelligence }) {
+  return (
+    <aside className="rounded-[20px] border border-slate-800 bg-[#0F172A]/90 backdrop-blur-2xl p-5 md:p-6 space-y-5">
+      <p className="text-[10px] uppercase tracking-widest text-slate-500 font-medium">
+        EN CIFRAS
+      </p>
+
+      <div>
+        <p className="text-xl font-extralight text-white tabular-nums leading-tight">
+          {data.org.totalManagers}
+        </p>
+        <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
+          Jefaturas activas
+        </p>
+      </div>
+
+      <div className="h-px bg-slate-800/40" aria-hidden />
+
+      <div>
+        <p className="text-xl font-extralight text-white tabular-nums leading-tight">
+          {(data.org.densidadGerencial * 100).toFixed(0)}%
+        </p>
+        <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
+          Densidad gerencial
+        </p>
+      </div>
+
+      <div className="h-px bg-slate-800/40" aria-hidden />
+
+      <div>
+        <p className="text-xl font-extralight text-white tabular-nums leading-tight">
+          {formatCLP(data.org.costoFTEpromedio)}
+        </p>
+        <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
+          Costo por FTE gestionado (prom.)
+        </p>
+      </div>
+
+      {data.org.costoCapasSuboptimas > 0 && (
+        <>
+          <div className="h-px bg-slate-800/40" aria-hidden />
+          <div>
+            <p className="text-xl font-extralight text-amber-300/90 tabular-nums leading-tight">
+              {formatCLP(data.org.costoCapasSuboptimas)}
+            </p>
+            <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
+              Capas subóptimas / mes
+            </p>
+          </div>
+        </>
+      )}
+    </aside>
   )
 }
 
