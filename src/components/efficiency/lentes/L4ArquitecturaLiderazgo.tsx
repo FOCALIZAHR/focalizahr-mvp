@@ -143,12 +143,6 @@ const ZONA_COLOR: Record<SpanNarrativaZona, string> = {
   ROJA: '#EF4444',
 }
 
-const ZONA_LABEL: Record<SpanNarrativaZona, string> = {
-  VERDE: 'Estructura saludable',
-  AMARILLA: 'Revisable',
-  ROJA: 'Fuera de rango',
-}
-
 // ════════════════════════════════════════════════════════════════════════════
 // NARRATIVA DINÁMICA MACRO
 // ════════════════════════════════════════════════════════════════════════════
@@ -411,27 +405,17 @@ function HallazgoZonas({ data }: { data: OrgSpanIntelligence }) {
         gestión real.
       </p>
 
-      {/* 3 cards — distribución por zona */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-6">
-        <ZonaCard
-          zona="ROJA"
-          count={data.org.managersEnRojo}
-          total={total}
-          descripcion="Capas fuera del rango estructural o con equipo mínimo. Requieren decisión."
-        />
-        <ZonaCard
-          zona="AMARILLA"
-          count={data.org.managersEnAmarillo}
-          total={total}
-          descripcion="Span revisable. La decisión depende de contexto — consolidar, ampliar o redistribuir."
-        />
-        <ZonaCard
-          zona="VERDE"
-          count={data.org.managersEnVerde}
-          total={total}
-          descripcion="Operan en su rango óptimo. Estructura saludable, no requieren intervención hoy."
-        />
-      </div>
+      {/* Distribución por zona — barra apilada + leyenda inline.
+          Patrón Tesla telemetría: visualización proporcional + datos
+          tipográficos. Ocupa ~80px vs ~250px del grid de 3 cards
+          previo, libera espacio vertical y comunica la salud de la
+          pirámide de un vistazo. */}
+      <DistribucionZonas
+        rojo={data.org.managersEnRojo}
+        amarillo={data.org.managersEnAmarillo}
+        verde={data.org.managersEnVerde}
+        total={total}
+      />
 
       {/* Narrativa densidad */}
       {data.org.densidadNarrativa && (
@@ -448,53 +432,101 @@ function HallazgoZonas({ data }: { data: OrgSpanIntelligence }) {
   )
 }
 
-function ZonaCard({
-  zona,
-  count,
+/**
+ * Distribución de zonas — visualización Tesla telemetría.
+ * Barra apilada full width proporcional + leyenda inline tipográfica.
+ *
+ * Decisión de diseño: una distribución pide visualización, no 3 cards.
+ * Cada segmento de la barra escala con el count; las zonas con count=0
+ * se omiten visualmente (sin quedar segmento de 0px que se vea raro).
+ *
+ * Apple keynote en la leyenda: número grande font-extralight + label
+ * uppercase tracking-widest. Cero contenedores, pura tipografía.
+ */
+function DistribucionZonas({
+  rojo,
+  amarillo,
+  verde,
   total,
-  descripcion,
 }: {
-  zona: SpanNarrativaZona
-  count: number
+  rojo: number
+  amarillo: number
+  verde: number
   total: number
-  descripcion: string
 }) {
-  const color = ZONA_COLOR[zona]
-  const label = ZONA_LABEL[zona]
-  const isUrgente = zona === 'ROJA'
+  const totalSafe = total > 0 ? total : 1 // evita /0 si todo está en 0
+  const segments: Array<{ count: number; color: string }> = [
+    { count: rojo, color: ZONA_COLOR.ROJA },
+    { count: amarillo, color: ZONA_COLOR.AMARILLA },
+    { count: verde, color: ZONA_COLOR.VERDE },
+  ]
 
   return (
-    <div
-      className="rounded-[20px] border bg-[#0F172A]/90 backdrop-blur-2xl p-5 md:p-6"
-      style={{
-        borderColor: isUrgente ? `${color}50` : 'rgb(30 41 59)',
-        boxShadow: isUrgente ? `inset 3px 0 0 ${color}` : undefined,
-      }}
-    >
-      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-        <div className="flex items-center gap-2 min-w-0">
-          <span
-            className="w-2 h-2 rounded-full flex-shrink-0"
-            style={{ backgroundColor: color }}
-          />
-          <span className="text-xs font-medium truncate" style={{ color }}>
-            {label}
-          </span>
-        </div>
+    <div className="mb-6">
+      {/* Barra apilada — telemetría visual */}
+      <div
+        className="h-3 rounded-full overflow-hidden flex bg-slate-900/40 border border-slate-800"
+        role="img"
+        aria-label={`Distribución de jefaturas: ${rojo} fuera de rango, ${amarillo} revisables, ${verde} en su rango óptimo`}
+      >
+        {segments.map((seg, i) =>
+          seg.count > 0 ? (
+            <div
+              key={i}
+              className="h-full transition-all duration-500"
+              style={{
+                width: `${(seg.count / totalSafe) * 100}%`,
+                backgroundColor: seg.color,
+              }}
+            />
+          ) : null
+        )}
       </div>
 
-      <div className="flex items-baseline gap-3 mb-3">
-        <p className="text-3xl font-extralight text-white tabular-nums leading-none">
-          {count}
-        </p>
-        <p className="text-xs text-slate-500 font-light">
-          de {total} {total === 1 ? 'manager' : 'managers'}
-        </p>
+      {/* Leyenda inline — Apple keynote tipográfico */}
+      <div className="flex items-baseline justify-between gap-6 mt-4 flex-wrap">
+        <ZonaInline
+          color={ZONA_COLOR.ROJA}
+          count={rojo}
+          label="fuera de rango"
+        />
+        <ZonaInline
+          color={ZONA_COLOR.AMARILLA}
+          count={amarillo}
+          label="revisables"
+        />
+        <ZonaInline
+          color={ZONA_COLOR.VERDE}
+          count={verde}
+          label="en su rango óptimo"
+        />
       </div>
+    </div>
+  )
+}
 
-      <p className="text-xs text-slate-400 font-light leading-relaxed">
-        {descripcion}
-      </p>
+function ZonaInline({
+  color,
+  count,
+  label,
+}: {
+  color: string
+  count: number
+  label: string
+}) {
+  return (
+    <div className="flex items-baseline gap-2.5 min-w-0">
+      <span
+        className="w-2 h-2 rounded-full flex-shrink-0 self-center"
+        style={{ backgroundColor: color }}
+        aria-hidden
+      />
+      <span className="text-2xl md:text-3xl font-extralight text-white tabular-nums leading-none">
+        {count}
+      </span>
+      <span className="text-[10px] uppercase tracking-widest text-slate-500 font-medium">
+        {label}
+      </span>
     </div>
   )
 }
