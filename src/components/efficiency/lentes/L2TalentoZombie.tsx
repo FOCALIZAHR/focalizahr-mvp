@@ -132,7 +132,8 @@ const DECISION_META: Record<DecisionType, DecisionMeta> = {
   },
   reubicar: {
     label: 'Reubicar',
-    description: 'Mover a un cargo donde sus competencias siguen siendo relevantes.',
+    description:
+      'Este camino busca rescatar al talento que ya conoces y moverlo donde la IA y automatización no compita. Pero solo funciona si la persona tiene la adaptabilidad para aprender nuevos roles. Es una apuesta de riesgo.',
     color: '#A78BFA',
     icon: ArrowRightLeft,
     timing: 'Inmediato · cargo liberado',
@@ -177,7 +178,7 @@ function effExposure(p: PersonAlert): number {
 
 function narrativaDinamica(total: number, tomadas: number): string {
   if (tomadas === 0)
-    return 'Revisa cada expediente antes de decidir. La decisión es tuya.'
+    return 'Estas personas hoy rinden, pero sus posiciones son frágiles frente a la automatización IA. El instinto es proteger la trayectoria, pero el finiquito va creciendo y los competidores ya están incorporando la IA. Cada caso espera una definición para detener el impacto operacional y financiero.'
   if (tomadas < Math.ceil(total / 2))
     return `${tomadas} de ${total} decididas. Cada persona es un caso distinto — no hay plantilla.`
   if (tomadas < total)
@@ -322,7 +323,7 @@ export function L2TalentoZombie({
       familiaAccent={L2_ACCENT}
       heroValue={String(detalle.count)}
       heroUnit={`personas rinden hoy y no podrán adaptarse · ${Math.round(detalle.avgExposure * 100)}% exposición IA promedio`}
-      narrativaPuente="Cada persona tiene un contexto propio. El expediente te deja simular el costo y la consecuencia de cada ruta antes de comprometerla."
+      narrativaPuente="Cada persona en esta lista tiene seguramente una historia de éxito y compromiso con la organización. Pero el análisis es frío: sus cargos están desapareciendo. Entrar en cada caso permite ver qué cuesta más: si actuar hoy o esperar a que el problema crezca."
       ctaSimularLabel="Abrir expedientes"
       ctaQuirofanoEyebrow="EXPEDIENTE DE TALENTO"
       narrativaDinamica={narrativaDinamica(personsSorted.length, tomadas)}
@@ -594,6 +595,7 @@ function FichaRica({ persona, decision, onChoose }: FichaRicaProps) {
       className="space-y-6 min-w-0"
     >
       <SeccionIdentidad persona={persona} />
+      <SeccionNarrativa persona={persona} />
       <SeccionRadiografia persona={persona} />
       <SeccionContexto persona={persona} />
       <SeccionRelojFinanciero persona={persona} />
@@ -621,6 +623,29 @@ function SeccionIdentidad({ persona }: { persona: PersonAlert }) {
           </p>
         </div>
       </div>
+    </section>
+  )
+}
+
+// ── Sección NARRATIVA — caso individual con datos interpolados ─────────────
+
+function SeccionNarrativa({ persona }: { persona: PersonAlert }) {
+  const nombre = formatDisplayName(persona.employeeName)
+  const exposurePct = Math.round(effExposure(persona) * 100)
+  return (
+    <section>
+      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium mb-3">
+        EL CASO
+      </p>
+      <p className="text-sm md:text-[15px] font-light text-slate-300 leading-relaxed max-w-3xl">
+        {nombre} rinde excelente hoy y su valor no está en duda, pero la IA
+        ya es capaz de absorber el {exposurePct}% de sus funciones actuales.
+        El instinto natural es reubicar a este talento, pero el diagnóstico
+        reciente de su líder directo advierte una baja adaptabilidad al cambio.
+        Esto indica que es mucho menos probable que logre transferir su
+        rendimiento a un rol distinto si lo comparamos con otros perfiles.
+        No actuar hoy expone qué tan caro es postergar lo inevitable.
+      </p>
     </section>
   )
 }
