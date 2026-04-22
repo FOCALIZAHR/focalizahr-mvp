@@ -199,19 +199,23 @@ function calcularFiniquitoTiming(p: PersonL9, meses: number): number {
 // NARRATIVAS
 // ════════════════════════════════════════════════════════════════════════════
 
-/** Narrativa por zona del scatter — lo que la zona significa para esta persona. */
-function narrativaZona(zona: ZonaL9 | null, first: string): string {
+/** Narrativa "EL CASO" por zona decidible. El Quirófano solo expone
+ *  personas en ventana_decision o talent_trap — las zonas estratégicas
+ *  (Cimientos + Agilidad) viven en el Hallazgo del Acto 2 como contexto
+ *  clasificatorio, no reciben ficha rica ni decisión de timing.
+ *
+ *  El tipo del parámetro está restringido a las dos zonas decidibles
+ *  (P15 — zero código muerto). Si mañana se reintroducen otras zonas
+ *  al Quirófano, TypeScript obligará a extender el switch. */
+function narrativaZona(
+  zona: 'ventana_decision' | 'talent_trap',
+  first: string
+): string {
   switch (zona) {
     case 'talent_trap':
       return `${first} sigue en nómina pero el aporte ya no justifica el cargo. El finiquito acumulado lo vuelve caro de mover. Cada mes que pasa, el costo de salida sube — y la productividad sigue ausente.`
     case 'ventana_decision':
       return `${first} aún no genera un impacto financiero crítico. Postergar solo sirve para pagar un finiquito más caro en el futuro cercano.`
-    case 'cimientos_oro':
-      return `Pasivo alto, justificado por el valor que entrega. La decisión aquí es preservar — no liberar. El costo de perderlo supera al pasivo acumulado.`
-    case 'agilidad_total':
-      return `Bajo costo de salida y alto valor. La pregunta no es cuándo dejarlo ir — es cómo retenerlo. Aquí el costo está en perderlo, no en esperarlo.`
-    default:
-      return `${first} es elegible a indemnización. El reloj de aniversario corre — cada año cumplido suma un sueldo al finiquito.`
   }
 }
 
@@ -223,7 +227,7 @@ function narrativaTiming(timing: Timing, first: string): string {
     case 'q1':
       return `Mantener a ${first} 3 meses más. Si pasa un aniversario en ese período, el finiquito sube un sueldo entero.`
     case 'q2':
-      return `Postergar 6 meses. La persona sigue en nómina ese período. El finiquito crece y un aniversario en el camino lo dispara.`
+      return `Postergar 6 meses. La persona sigue en nómina ese período. El finiquito crece y un aniversario en ese horizonte lo dispara.`
   }
 }
 
@@ -1205,6 +1209,17 @@ function SeccionNarrativa({
   persona: PersonL9
   first: string
 }) {
+  // Narrowing defensivo (P15): solo rendereamos la narrativa si la
+  // zona es decidible. En el flujo actual del Quirófano siempre lo es
+  // (Rail filtra a ventana_decision + talent_trap), pero mantener el
+  // guard protege contra futuros cambios del filtro y convence a TS.
+  if (
+    persona.zona !== 'ventana_decision' &&
+    persona.zona !== 'talent_trap'
+  ) {
+    return null
+  }
+
   return (
     <section>
       <p className="text-[10px] uppercase tracking-widest text-slate-500 font-medium mb-3">
