@@ -383,6 +383,17 @@ function detectChanges(
     });
   }
 
+  // Department (bulk import) — sin esto, empleados con solo cambio de
+  // depto no entran a toUpdate[] y el UPDATE nunca se ejecuta.
+  // mapFieldToChangeType('departmentId') ya mapea a 'TRANSFER'.
+  if (current.departmentId !== newData.resolvedDepartmentId) {
+    changes.push({
+      field: 'departmentId',
+      oldValue: current.departmentId,
+      newValue: newData.resolvedDepartmentId || null
+    });
+  }
+
   // Status (basado en isActive)
   const newStatus = mapIsActiveToStatus(newData.isActive);
   if (current.status !== newStatus) {
