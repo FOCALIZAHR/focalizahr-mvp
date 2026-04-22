@@ -137,10 +137,15 @@ const ACCION_META: Record<AccionL4, AccionMeta> = {
 
 const L4_ACCENT = '#22D3EE' // capital_en_riesgo (familia F1)
 
+// Paleta canónica L4 — respeta SPEC §12 ("semáforos no son protagonistas").
+// El lente vive en la familia capital_en_riesgo (accent cyan). Lo saludable
+// es neutro (no requiere atención); lo revisable lleva el accent del lente;
+// solo lo accionable real lleva amber. Un solo color saturado por estado
+// reduce ruido y respeta la jerarquía.
 const ZONA_COLOR: Record<SpanNarrativaZona, string> = {
-  VERDE: '#10B981',
-  AMARILLA: '#F59E0B',
-  ROJA: '#EF4444',
+  VERDE: '#475569',     // slate-600 — saludable, neutro, "silencio"
+  AMARILLA: '#22D3EE',  // cyan accent L4 — revisable, atención moderada
+  ROJA: '#F59E0B',      // amber warning — único color de alarma real
 }
 
 // ════════════════════════════════════════════════════════════════════════════
