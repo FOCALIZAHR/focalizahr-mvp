@@ -35,11 +35,11 @@ import {
   AlertTriangle,
   Circle,
   CheckCircle2,
-  Check,
-  Info,
 } from 'lucide-react'
 import { LenteLayout } from './LenteLayout'
 import { LenteCard } from './LenteCard'
+import { TooltipContext } from '@/components/ui/TooltipContext'
+import { useToast } from '@/components/ui/toast-system'
 import type { LenteComponentProps } from './_LentePlaceholder'
 import { formatCLP } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
 import {
@@ -270,6 +270,7 @@ export function L9PasivoLaboral({
   onActChange,
 }: LenteComponentProps) {
   const detalle = lente.detalle as L9Detalle | null
+  const toast = useToast()
 
   const [personaActivaId, setPersonaActivaId] = useState<string | null>(null)
   const [timingByPerson, setTimingByPerson] = useState<
@@ -337,6 +338,7 @@ export function L9PasivoLaboral({
   const handleTiming = (p: PersonL9, timing: Timing) => {
     const current = timingByPerson[p.employeeId]
     const isToggleOff = current === timing
+    const displayName = formatDisplayName(p.employeeName)
 
     setTimingByPerson(prev => ({
       ...prev,
@@ -345,6 +347,7 @@ export function L9PasivoLaboral({
 
     if (isToggleOff) {
       onRemove(decisionKey({ tipo: 'persona', id: p.employeeId }))
+      toast.info(`${displayName} salió del plan`, 'Decisión removida')
       return
     }
 
@@ -367,11 +370,26 @@ export function L9PasivoLaboral({
       aprobado: false,
     }
     onUpsert(item)
+    toast.success(
+      `${displayName} → ${TIMING_META[timing].label} · Finiquito ${formatCLP(finiquitoTiming)}`,
+      'Decisión registrada'
+    )
   }
 
   // ─── Derivados reactivos ────────────────────────────────────────────────
   const tomadas = Object.values(timingByPerson).filter(v => v !== null).length
   const hasInteraction = tomadas > 0
+
+  // Costo de esperar SOLO de las personas decidibles. El hero lo usa
+  // como heroValue para que el número grande sume sobre las personas
+  // que el subtitle anuncia (cuadra con "{N} personas requieren
+  // decisión"). El detalle.costoEsperaTotal del backend agrega los 50
+  // elegibles — pasivo total que no es accionable hoy y vive en el
+  // ExpedienteLateral.
+  const costoEsperaDecidibles = personsDecidibles.reduce(
+    (s, p) => s + p.costoEspera,
+    0
+  )
 
   const inversionTotal = personsDecidibles.reduce((s, p) => {
     const t = timingByPerson[p.employeeId]
@@ -422,8 +440,8 @@ export function L9PasivoLaboral({
   return (
     <LenteLayout
       familiaAccent={L9_ACCENT}
-      heroValue={formatCLP(detalle.costoEsperaTotal)}
-      heroUnit={`${personsDecidibles.length} ${personsDecidibles.length === 1 ? 'persona requiere' : 'personas requieren'} decisión de timing · ${detalle.totalElegibles} en nómina elegible`}
+      heroValue={formatCLP(costoEsperaDecidibles)}
+      heroUnit={`adicional en 12m si no decides hoy · ${personsDecidibles.length} ${personsDecidibles.length === 1 ? 'persona' : 'personas'} en zonas que requieren acción`}
       narrativaPuente="El pasivo laboral no es estático — crece por escalones con cada aniversario. Cada persona tiene su propio reloj. Ver caso por caso permite anticipar los saltos antes de que se conviertan en costo."
       ctaSimularLabel="Ver casos"
       ctaQuirofanoEyebrow="EXPEDIENTE DE TIMING"
@@ -864,7 +882,10 @@ function QuirofanoSplit({
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// RAIL DE PERSONAS — top-15 con dot timing y dot zona secundaria
+// RAIL DE PERSONAS — solo dot de timing (estado de decisión).
+// El dot de zona se eliminó: la info ya vive en el chip de
+// SeccionPosicionMapa de la ficha rica. Reducir ruido visual y
+// alinear con paleta unificada amber accent (Mandamiento 1: jerarquía).
 // ════════════════════════════════════════════════════════════════════════════
 
 interface RailPersonasProps {
@@ -888,7 +909,6 @@ function RailPersonas({
       {rows.map(p => {
         const isActive = p.employeeId === activeId
         const timing = timings[p.employeeId]
-        const zonaColor = p.zona ? ZONA_COLOR[p.zona] : null
         return (
           <button
             key={p.employeeId}
@@ -916,24 +936,15 @@ function RailPersonas({
                 {formatLabel(p.position)}
               </p>
             </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {/* Dot timing — primario, color del timing elegido */}
-              {timing && (
-                <span
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ backgroundColor: TIMING_META[timing].color }}
-                  aria-label={`Timing: ${TIMING_META[timing].label}`}
-                />
-              )}
-              {/* Dot zona — secundario, sólo si no hay timing aún */}
-              {zonaColor && !timing && (
-                <span
-                  className="w-1.5 h-1.5 rounded-full opacity-50"
-                  style={{ backgroundColor: zonaColor }}
-                  aria-label={`Zona: ${ZONA_LABEL[p.zona!]}`}
-                />
-              )}
-            </div>
+            {/* Dot timing — único indicador en el rail. Amber accent
+                uniforme para alinear con la paleta del lente. */}
+            {timing && (
+              <span
+                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: L9_ACCENT }}
+                aria-label={`Timing: ${TIMING_META[timing].label}`}
+              />
+            )}
           </button>
         )
       })}
@@ -1130,13 +1141,19 @@ function SeccionIdentidad({ persona }: { persona: PersonL9 }) {
             {persona.retentionScore !== null && (
               <>
                 {' · '}
-                <span
-                  className="inline-flex items-baseline gap-1 cursor-help"
-                  title="Indicador compuesto que mide la probabilidad de permanencia. Combina desempeño, potencial y variables de riesgo de salida."
+                <TooltipContext
+                  variant="pattern"
+                  position="top"
+                  usePortal
+                  showIcon
+                  title="Score retención"
+                  explanation="Indicador compuesto que mide la probabilidad de permanencia."
+                  details={[
+                    'Combina desempeño, potencial y variables de riesgo de salida.',
+                  ]}
                 >
-                  Score retención {Math.round(persona.retentionScore)}
-                  <Info className="w-3 h-3 inline-block translate-y-px text-slate-500" />
-                </span>
+                  <span>Score retención {Math.round(persona.retentionScore)}</span>
+                </TooltipContext>
               </>
             )}
           </p>
@@ -1370,13 +1387,19 @@ function SeccionDecisionTiming({
                 ) : (
                   <Circle className="w-4 h-4 text-slate-600 flex-shrink-0" />
                 )}
+                {/* Icon en slate uniforme — la diferenciación entre
+                    timings es semántica (icon + label + consecuencia),
+                    no cromática. Mandamiento 7: mismo problema =
+                    misma solución visual. */}
                 <Icon
-                  className="w-4 h-4 flex-shrink-0"
-                  style={{ color: meta.color }}
+                  className={`w-4 h-4 flex-shrink-0 ${
+                    isThisSelected ? 'text-amber-400' : 'text-slate-400'
+                  }`}
                 />
                 <span
-                  className="text-xs font-medium uppercase tracking-wider"
-                  style={{ color: isThisSelected ? '#F59E0B' : '#cbd5e1' }}
+                  className={`text-xs font-medium uppercase tracking-wider ${
+                    isThisSelected ? 'text-amber-400' : 'text-slate-300'
+                  }`}
                 >
                   {meta.label}
                 </span>
@@ -1399,12 +1422,10 @@ function SeccionDecisionTiming({
         })}
       </div>
 
-      {someoneSelected && (
-        <p className="mt-3 flex items-center gap-1.5 text-xs font-light text-emerald-400/90">
-          <Check className="w-3 h-3" />
-          Registrada en tu plan
-        </p>
-      )}
+      {/* El feedback de "registrada en tu plan" se emite via toast
+          premium (useToast en handleTiming). Esto evita un banner
+          inline emerald que sumaría una mención cromática extra y
+          rompería la jerarquía visual del SeccionDecisionTiming. */}
     </section>
   )
 }
