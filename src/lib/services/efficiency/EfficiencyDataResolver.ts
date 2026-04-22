@@ -20,6 +20,7 @@ import type {
   EnrichedEmployee,
 } from '@/lib/services/WorkforceIntelligenceService'
 import type { OrganizationExposureResult } from '@/lib/services/AIExposureService'
+import { SpanIntelligenceService } from '@/lib/services/SpanIntelligenceService'
 import {
   calculateFiniquitoConTopeCustomUF,
   calculateMonthsUntilNextYear,
@@ -400,38 +401,29 @@ export async function resolverLente(
 
     // ── L4: Cargos Fantasma (redundancia estructural) ───────────────────
     case 'l4_fantasma': {
-      const r = diagnostic.redundancy
-      const avgOverlap =
-        r.pairs.length > 0
-          ? r.pairs.reduce((s, p) => s + p.overlapPercent, 0) / r.pairs.length
-          : 0
-      // % automatizable ≈ promedio automationShare de los cargos involucrados.
-      // Cruce con enriched por socCode.
-      const socsInPairs = new Set<string>()
-      for (const p of r.pairs) {
-        socsInPairs.add(p.socCodeA)
-        socsInPairs.add(p.socCodeB)
-      }
-      const involved = enriched.filter(e => e.socCode && socsInPairs.has(e.socCode))
-      const avgAutomation =
-        involved.length > 0
-          ? involved.reduce((s, e) => s + e.automationShare, 0) / involved.length
-          : 0
+      // Reemplazo del antiguo "Cargos sin impacto" (Jaccard) por
+      // "Arquitectura de Liderazgo" — análisis de span de control por
+      // arquetipo McKinsey. ID interno preservado (l4_fantasma) por
+      // compatibilidad con FamiliaId/LenteId en DB y consumers.
+      //
+      // Spec: .claude/tasks/SPEC_L4_ARQUITECTURA_LIDERAZGO.md
+      const spanData = await SpanIntelligenceService.getOrgSpanIntelligence(
+        ctx.accountId,
+        enriched
+      )
 
       return {
         ...meta,
-        hayData: r.pairs.length > 0,
+        hayData: spanData.managers.length > 0,
         datos: {
-          N_PARES: formatInt(r.pairs.length),
-          OVERLAP: formatPct(avgOverlap),
-          PCT_AUTOMATIZABLE: formatPct(avgAutomation * 100),
+          N_MANAGERS: formatInt(spanData.org.totalManagers),
+          N_FUERA_RANGO: formatInt(
+            spanData.org.managersEnRojo + spanData.org.managersEnAmarillo
+          ),
+          DENSIDAD: formatPct(spanData.org.densidadGerencial * 100),
+          CLP_CAPAS_SUBOPTIMAS: formatCLP(spanData.org.costoCapasSuboptimas),
         },
-        detalle: {
-          pairs: r.pairs,
-          totalEstimatedSavings: r.totalEstimatedSavings,
-          avgOverlap,
-          avgAutomation,
-        },
+        detalle: spanData,
       }
     }
 
