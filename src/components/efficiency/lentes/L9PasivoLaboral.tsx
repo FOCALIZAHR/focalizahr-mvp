@@ -380,12 +380,12 @@ export function L9PasivoLaboral({
   const tomadas = Object.values(timingByPerson).filter(v => v !== null).length
   const hasInteraction = tomadas > 0
 
-  // Costo de esperar SOLO de las personas decidibles. El hero lo usa
-  // como heroValue para que el número grande sume sobre las personas
-  // que el subtitle anuncia (cuadra con "{N} personas requieren
-  // decisión"). El detalle.costoEsperaTotal del backend agrega los 50
-  // elegibles — pasivo total que no es accionable hoy y vive en el
-  // ExpedienteLateral.
+  // Costo de esperar SOLO de las personas decidibles (ventana_decision
+  // + talent_trap). Se usa en el subtitle del hero para hacer explícita
+  // la distinción: del crecimiento agregado del pasivo, esta fracción
+  // recae sobre personas cuyo desempeño no lo justifica — es el costo
+  // evitable. Las otras 47 (Cimientos + Agilidad) también engordan el
+  // pasivo, pero ese crecimiento es inversión en talento que sí rinde.
   const costoEsperaDecidibles = personsDecidibles.reduce(
     (s, p) => s + p.costoEspera,
     0
@@ -440,8 +440,8 @@ export function L9PasivoLaboral({
   return (
     <LenteLayout
       familiaAccent={L9_ACCENT}
-      heroValue={formatCLP(costoEsperaDecidibles)}
-      heroUnit={`adicional en 12m si no decides hoy · ${personsDecidibles.length} ${personsDecidibles.length === 1 ? 'persona' : 'personas'} en zonas que requieren acción`}
+      heroValue={formatCLP(detalle.costoEsperaTotal)}
+      heroUnit={`crecerá tu pasivo laboral en 12 meses si nada cambia · ${formatCLP(costoEsperaDecidibles)} de ese aumento recae sobre ${personsDecidibles.length} ${personsDecidibles.length === 1 ? 'persona cuyo desempeño no lo justifica' : 'personas cuyo desempeño no lo justifica'}`}
       narrativaPuente="El pasivo laboral no es estático — crece por escalones con cada aniversario. Cada persona tiene su propio reloj. Ver caso por caso permite anticipar los saltos antes de que se conviertan en costo."
       ctaSimularLabel="Ver casos"
       ctaQuirofanoEyebrow="EXPEDIENTE DE TIMING"
