@@ -55,6 +55,12 @@ const LENTE_COMPONENTS: Partial<Record<LenteId, React.FC<LenteComponentProps>>> 
   l9_pasivo: L9PasivoLaboral,
 }
 
+// Lentes migrados al molde maestro LenteLayout — su CTA "Siguiente" vive
+// en el totalizador del checkpoint (PrimaryButton canónico), por lo que
+// el LenteFooterNav legacy debe ocultarse para evitar duplicación.
+// Los lentes que aún usan LenteCard sí lo necesitan.
+const LENTES_CON_LAYOUT: Set<LenteId> = new Set(['l1_inercia', 'l2_zombie'])
+
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
@@ -211,8 +217,12 @@ export function EfficiencyHub() {
                       onActChange={setLenteActo}
                     />
 
-                    {/* Footer nav: CTA grande al final del lente */}
-                    {ws.lenteIndexInFamilia !== null &&
+                    {/* Footer nav legacy — solo para lentes que aún usan
+                        LenteCard. Los migrados a LenteLayout tienen su CTA
+                        canónico en el checkpoint del molde. */}
+                    {ws.activeLenteId &&
+                      !LENTES_CON_LAYOUT.has(ws.activeLenteId) &&
+                      ws.lenteIndexInFamilia !== null &&
                       ws.lentesCountInFamilia !== null &&
                       ws.activeFamiliaId &&
                       proximoLenteTitulo && (

@@ -256,11 +256,15 @@ export function L2TalentoZombie({
       return
     }
 
-    // FIX: ahorroMes = salary mensual real (antes era salary × 12 anual).
-    // El CarritoBar y PanelAcumuladores derivan ahorroAnual × 12
-    // automáticamente desde calcularResumenCarrito.
-    const ahorroMes = tipo === 'reubicar' ? 0 : person.salary
+    // Matemática del carrito por escenario:
+    //   · Esperar    → 0 ahorro / 0 finiquito / 0 FTE (sigue en nómina)
+    //   · Reubicar   → 0 ahorro / 0 finiquito / 0 FTE (sigue en nómina, otro cargo)
+    //   · Transición → ahorro = salary, finiquito = finiquitoToday, FTE = 1 (sale)
+    // Solo Transición tiene impacto financiero inmediato; Esperar y Reubicar
+    // son decisiones estratégicas que no liberan capital ni FTE hoy.
+    const ahorroMes = tipo === 'transicion' ? person.salary : 0
     const finiquito = tipo === 'transicion' ? person.finiquitoToday ?? 0 : 0
+    const fteEquivalente = tipo === 'transicion' ? 1 : 0
 
     const item: DecisionItem = {
       id: person.employeeId,
@@ -270,7 +274,7 @@ export function L2TalentoZombie({
       gerencia: person.departmentName,
       ahorroMes,
       finiquito,
-      fteEquivalente: tipo === 'transicion' ? 1 : 0,
+      fteEquivalente,
       narrativa: `${lente.narrativa}\n\n${DECISION_META[tipo].label}: ${DECISION_META[tipo].description}`,
       aprobado: false,
     }
@@ -281,10 +285,12 @@ export function L2TalentoZombie({
   const tomadas = Object.values(decisiones).filter(v => v !== null).length
   const hasInteraction = tomadas > 0
 
+  // Solo Transición libera salary/mes hoy. Esperar y Reubicar mantienen
+  // a la persona en nómina — sin ahorro inmediato.
   const ahorroMensualTotal = personsSorted.reduce((s, p) => {
     const d = decisiones[p.employeeId]
-    if (!d) return s
-    return s + (d === 'reubicar' ? 0 : p.salary)
+    if (d === 'transicion') return s + p.salary
+    return s
   }, 0)
 
   const inversionTotal = personsSorted.reduce((s, p) => {
@@ -313,7 +319,9 @@ export function L2TalentoZombie({
               label: `${formatDisplayName(p.employeeName)} · ${formatLabel(p.position)}`,
               detail: DECISION_META[tipo].label,
               value:
-                tipo === 'reubicar' ? '$0/mes' : `${formatCLP(p.salary)}/mes`,
+                tipo === 'transicion'
+                  ? `${formatCLP(p.salary)}/mes`
+                  : '$0/mes',
             }
           }),
         totalLabel: `${tomadas} ${tomadas === 1 ? 'decisión' : 'decisiones'} en tu plan`,
@@ -964,19 +972,21 @@ function narrativaPorTipo(tipo: DecisionType, first: string): string {
   }
 }
 
-/** Consecuencia (números secundarios) por escenario. */
+/** Consecuencia (números secundarios) por escenario.
+ *  Solo Transición tiene impacto financiero hoy — Esperar y Reubicar
+ *  mantienen a la persona en nómina y no liberan capital inmediato. */
 function consecuenciaPorTipo(
   tipo: DecisionType,
-  ahorro: number,
+  salary: number,
   finiquito: number
 ): string {
   switch (tipo) {
     case 'congelar':
-      return `Ahorro ${formatCLP(ahorro)}/mes cuando salga · Finiquito $0`
+      return `Sin ahorro hoy · Cuando salga: ${formatCLP(salary)}/mes liberados`
     case 'reubicar':
-      return `Ahorro $0/mes · Sin costo directo`
+      return `Sin ahorro hoy · Sigue en nómina, otro cargo`
     case 'transicion':
-      return `Ahorro ${formatCLP(ahorro)}/mes inmediato · Finiquito ${formatCLP(finiquito)}`
+      return `Ahorro ${formatCLP(salary)}/mes inmediato · Finiquito ${formatCLP(finiquito)}`
   }
 }
 
@@ -1015,10 +1025,9 @@ function SeccionDecision({
           const Icon = meta.icon
           const isThisSelected = decision === tipo
           const isDimmed = someoneSelected && !isThisSelected
-          const ahorro = tipo === 'reubicar' ? 0 : persona.salary
           const finiquito = tipo === 'transicion' ? persona.finiquitoToday ?? 0 : 0
           const narrativa = narrativaPorTipo(tipo, first)
-          const consecuencia = consecuenciaPorTipo(tipo, ahorro, finiquito)
+          const consecuencia = consecuenciaPorTipo(tipo, persona.salary, finiquito)
 
           // Estados canónicos SKILL (purple = accent F2 ruta_ejecucion):
           //   · default   → dashed border-slate-700, glassmorphism
