@@ -288,20 +288,20 @@ export function L9PasivoLaboral({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Top-15 entregado por el backend (sorted por costoEspera DESC).
-  // Se usa para el Hallazgo (cards de zonas) que necesita TODAS las personas.
-  const personsTop15 = useMemo(() => {
-    return detalle?.persons ?? []
-  }, [detalle])
-
-  // Decidibles: solo zonas que requieren decisión de timing.
-  // Cimientos de oro y Agilidad total son contexto estratégico —
-  // no entran al Rail ni al Quirófano.
+  // Decidibles: TODAS las personas elegibles (no solo top-15) cuya zona
+  // requiere decisión de timing. El backend entrega `scatter` con todos
+  // los elegibles que tienen zona — el filtro saca cimientos_oro y
+  // agilidad_total (contexto estratégico, no decidibles).
+  //
+  // Sort por costoEspera DESC para que el Rail muestre primero las que
+  // más urgen. NO se limita a 15 — puede haber más o menos según el
+  // tamaño de la organización.
   const personsDecidibles = useMemo(() => {
-    return personsTop15.filter(
-      p => p.zona === 'ventana_decision' || p.zona === 'talent_trap'
-    )
-  }, [personsTop15])
+    if (!detalle?.scatter) return []
+    return [...detalle.scatter]
+      .filter(p => p.zona === 'ventana_decision' || p.zona === 'talent_trap')
+      .sort((a, b) => b.costoEspera - a.costoEspera)
+  }, [detalle])
 
   // Persona activa default = primera decidible. Si la activa actual ya
   // no está en el set decidible (cambio de filtro o data), reasignar.
@@ -325,7 +325,7 @@ export function L9PasivoLaboral({
     return m
   }, [detalle])
 
-  if (!lente.hayData || !detalle || personsTop15.length === 0) {
+  if (!lente.hayData || !detalle || detalle.persons.length === 0) {
     return (
       <LenteCard lente={lente} estado="vacio">
         {null}
