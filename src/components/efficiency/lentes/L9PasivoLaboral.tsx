@@ -1147,9 +1147,12 @@ function SeccionIdentidad({ persona }: { persona: PersonL9 }) {
                   usePortal
                   showIcon
                   title="Score retención"
-                  explanation="Indicador compuesto que mide la probabilidad de permanencia."
+                  explanation="Mide cuánto valor entrega esta persona y cuánto justifica retenerla, en escala 0 a 150+."
                   details={[
-                    'Combina desempeño, potencial y variables de riesgo de salida.',
+                    'Combina cumplimiento de metas (40%), dominio del cargo (30%) y potencial de adaptación (30%).',
+                    'Sube si la persona ocupa un cargo crítico o es sucesora natural.',
+                    'Se amplifica por la exposición a IA del cargo — a mayor exposición + score alto, más valioso retener.',
+                    'Tiers: menos de 40 prescindible · 40-80 neutro · 80-120 valioso · más de 120 intocable.',
                   ]}
                 >
                   <span>Score retención {Math.round(persona.retentionScore)}</span>
