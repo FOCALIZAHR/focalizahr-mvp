@@ -288,18 +288,35 @@ export function L9PasivoLaboral({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const personsSorted = useMemo(() => {
-    if (!detalle?.persons) return []
-    // El backend ya entrega top-15 sorted por costoEspera DESC
-    return detalle.persons
+  // Top-15 entregado por el backend (sorted por costoEspera DESC).
+  // Se usa para el Hallazgo (cards de zonas) que necesita TODAS las personas.
+  const personsTop15 = useMemo(() => {
+    return detalle?.persons ?? []
   }, [detalle])
 
-  // Persona activa default = primera de la lista
+  // Decidibles: solo zonas que requieren decisión de timing.
+  // Cimientos de oro y Agilidad total son contexto estratégico —
+  // no entran al Rail ni al Quirófano.
+  const personsDecidibles = useMemo(() => {
+    return personsTop15.filter(
+      p => p.zona === 'ventana_decision' || p.zona === 'talent_trap'
+    )
+  }, [personsTop15])
+
+  // Persona activa default = primera decidible. Si la activa actual ya
+  // no está en el set decidible (cambio de filtro o data), reasignar.
   useEffect(() => {
-    if (personaActivaId === null && personsSorted.length > 0) {
-      setPersonaActivaId(personsSorted[0].employeeId)
+    if (personsDecidibles.length === 0) {
+      if (personaActivaId !== null) setPersonaActivaId(null)
+      return
     }
-  }, [personsSorted, personaActivaId])
+    const stillValid = personsDecidibles.some(
+      p => p.employeeId === personaActivaId
+    )
+    if (!stillValid) {
+      setPersonaActivaId(personsDecidibles[0].employeeId)
+    }
+  }, [personsDecidibles, personaActivaId])
 
   // Map de alertas por employeeId para lookup O(1) en cada ficha
   const alertaPorEmployee = useMemo(() => {
@@ -308,7 +325,7 @@ export function L9PasivoLaboral({
     return m
   }, [detalle])
 
-  if (!lente.hayData || !detalle || personsSorted.length === 0) {
+  if (!lente.hayData || !detalle || personsTop15.length === 0) {
     return (
       <LenteCard lente={lente} estado="vacio">
         {null}
@@ -355,13 +372,13 @@ export function L9PasivoLaboral({
   const tomadas = Object.values(timingByPerson).filter(v => v !== null).length
   const hasInteraction = tomadas > 0
 
-  const inversionTotal = personsSorted.reduce((s, p) => {
+  const inversionTotal = personsDecidibles.reduce((s, p) => {
     const t = timingByPerson[p.employeeId]
     if (!t) return s
     return s + calcularFiniquitoTiming(p, TIMING_MESES[t])
   }, 0)
 
-  const ahorroMensualTotal = personsSorted.reduce((s, p) => {
+  const ahorroMensualTotal = personsDecidibles.reduce((s, p) => {
     const t = timingByPerson[p.employeeId]
     if (!t) return s
     return s + p.salary
@@ -374,7 +391,7 @@ export function L9PasivoLaboral({
 
   const checkpointSummary = hasInteraction
     ? {
-        items: personsSorted
+        items: personsDecidibles
           .filter(p => timingByPerson[p.employeeId] !== null)
           .map(p => {
             const t = timingByPerson[p.employeeId]!
@@ -391,14 +408,14 @@ export function L9PasivoLaboral({
     : undefined
 
   const personaActiva = personaActivaId
-    ? personsSorted.find(p => p.employeeId === personaActivaId) ?? null
+    ? personsDecidibles.find(p => p.employeeId === personaActivaId) ?? null
     : null
 
   return (
     <LenteLayout
       familiaAccent={L9_ACCENT}
       heroValue={formatCLP(detalle.costoEsperaTotal)}
-      heroUnit={`de pasivo adicional si esperas 12 meses · ${detalle.totalElegibles} personas elegibles a indemnización`}
+      heroUnit={`${personsDecidibles.length} ${personsDecidibles.length === 1 ? 'persona requiere' : 'personas requieren'} decisión de timing · ${detalle.totalElegibles} en nómina elegible`}
       narrativaPuente="El pasivo laboral no es estático — crece por escalones con cada aniversario. Cada persona tiene su propio reloj. Ver caso por caso permite anticipar los saltos antes de que se conviertan en costo."
       ctaSimularLabel="Ver casos"
       ctaQuirofanoEyebrow="EXPEDIENTE DE TIMING"
@@ -411,7 +428,7 @@ export function L9PasivoLaboral({
         metricas: [
           {
             label: 'Personas decididas',
-            value: `${tomadas} / ${personsSorted.length}`,
+            value: `${tomadas} / ${personsDecidibles.length}`,
             tint: 'accent',
           },
           {
@@ -431,45 +448,121 @@ export function L9PasivoLaboral({
         ],
       }}
       renderHallazgo={() => (
-        <HallazgoArbitrageReducido
+        <HallazgoZonas
           scatter={detalle.scatter}
           alertasProximidad={detalle.alertasProximidad}
         />
       )}
       renderExpediente={() => <ExpedienteLateral detalle={detalle} />}
-      renderQuirofano={() => (
-        <>
-          {detalle.alertasProximidad.length > 0 && (
-            <AlertasProximidadBanner alertas={detalle.alertasProximidad} />
-          )}
-          <NarrativaContextoArriba
-            mensaje={narrativaDinamica(personsSorted.length, tomadas)}
-          />
-          <QuirofanoSplit
-            rows={personsSorted}
-            personaActiva={personaActiva}
-            onSelectPersona={setPersonaActivaId}
-            timings={timingByPerson}
-            onTiming={handleTiming}
-            alertaPorEmployee={alertaPorEmployee}
-          />
-        </>
-      )}
+      renderQuirofano={() => {
+        // Edge case: top-15 está todo en zonas estratégicas (Cimientos /
+        // Agilidad). No hay decisiones de salida que tomar — caso "blindaje".
+        if (personsDecidibles.length === 0) {
+          return (
+            <div className="rounded-[20px] border border-emerald-500/30 bg-emerald-500/5 backdrop-blur-2xl p-6 md:p-8 max-w-2xl">
+              <p className="text-[10px] uppercase tracking-widest text-emerald-300 font-medium mb-2">
+                BLINDAJE
+              </p>
+              <p className="text-sm md:text-base font-light text-emerald-100 leading-relaxed">
+                Las personas más costosas de tu nómina están en zonas
+                estratégicas — Cimientos de oro o Agilidad total. Ninguna
+                requiere decisión de salida hoy. El pasivo es saludable.
+              </p>
+            </div>
+          )
+        }
+        return (
+          <>
+            {detalle.alertasProximidad.length > 0 && (
+              <AlertasProximidadBanner alertas={detalle.alertasProximidad} />
+            )}
+            <NarrativaContextoArriba
+              mensaje={narrativaDinamica(personsDecidibles.length, tomadas)}
+            />
+            <QuirofanoSplit
+              rows={personsDecidibles}
+              personaActiva={personaActiva}
+              onSelectPersona={setPersonaActivaId}
+              timings={timingByPerson}
+              onTiming={handleTiming}
+              alertaPorEmployee={alertaPorEmployee}
+            />
+          </>
+        )
+      }}
     />
   )
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// ACTO 2 — HALLAZGO: Talent Arbitrage Map reducido
+// ACTO 2 — HALLAZGO: 4 zonas como cards 2×2 + scatter como evidencia
 // ════════════════════════════════════════════════════════════════════════════
 
-function HallazgoArbitrageReducido({
+interface ZonaAggregada {
+  count: number
+  pasivo: number
+}
+
+interface ZonaCardConfig {
+  zona: ZonaL9
+  tono: 'estrategico' | 'requiere_decision'
+  descripcion: string
+}
+
+// Orden visual del grid (2 superiores estratégicas / 2 inferiores urgentes)
+const ZONA_CARDS_ORDER: ZonaCardConfig[] = [
+  {
+    zona: 'cimientos_oro',
+    tono: 'estrategico',
+    descripcion:
+      'Pasivo alto, justificado por el valor que entregan. Preservar — el costo de perderlas supera al pasivo.',
+  },
+  {
+    zona: 'agilidad_total',
+    tono: 'estrategico',
+    descripcion:
+      'Bajo costo de salida, alto valor. La pregunta es cómo retenerlas — el costo está en perderlas.',
+  },
+  {
+    zona: 'talent_trap',
+    tono: 'requiere_decision',
+    descripcion:
+      'Aporte ya no justifica el cargo. El finiquito acumulado vuelve cara la salida — cada mes suma.',
+  },
+  {
+    zona: 'ventana_decision',
+    tono: 'requiere_decision',
+    descripcion:
+      'Aún no acumulan gran pasivo. Decidir hoy es decidir barato — antes del próximo aniversario.',
+  },
+]
+
+function HallazgoZonas({
   scatter,
   alertasProximidad,
 }: {
   scatter: PersonL9[]
   alertasProximidad: AlertaProximidad[]
 }) {
+  const [verScatter, setVerScatter] = useState(false)
+
+  // Agregaciones por zona — count + pasivo acumulado (suma de finiquitoHoy)
+  const byZona = useMemo(() => {
+    const groups: Record<ZonaL9, ZonaAggregada> = {
+      agilidad_total: { count: 0, pasivo: 0 },
+      cimientos_oro: { count: 0, pasivo: 0 },
+      ventana_decision: { count: 0, pasivo: 0 },
+      talent_trap: { count: 0, pasivo: 0 },
+    }
+    for (const p of scatter) {
+      if (p.zona) {
+        groups[p.zona].count++
+        groups[p.zona].pasivo += p.finiquitoHoy
+      }
+    }
+    return groups
+  }, [scatter])
+
   return (
     <div>
       <p className="text-[10px] uppercase tracking-widest text-amber-400 font-medium mb-2">
@@ -481,14 +574,116 @@ function HallazgoArbitrageReducido({
       </h3>
       <p className="text-sm text-slate-400 font-light leading-relaxed max-w-2xl mb-6">
         No todas las personas pesan igual en el pasivo. Algunas cuestan poco
-        hoy y dan futuro. Otras cuestan caro y ya no aportan. El mapa separa
-        el pasivo estratégico del dinero muerto.
+        hoy y dan futuro. Otras requieren decisión de timing antes del
+        próximo aniversario.
       </p>
-      <TalentArbitrageMap
-        scatter={scatter}
-        alertasProximidad={alertasProximidad}
-        variant="reduced"
-      />
+
+      {/* Grid 2×2 — superiores estratégicas / inferiores requieren decisión */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-6">
+        {ZONA_CARDS_ORDER.map(cfg => (
+          <ZonaCard
+            key={cfg.zona}
+            config={cfg}
+            data={byZona[cfg.zona]}
+          />
+        ))}
+      </div>
+
+      {/* Progressive disclosure — scatter como evidencia de soporte.
+          Escalable a 1000-5000 empleados sin que protagonice el acto. */}
+      <button
+        onClick={() => setVerScatter(v => !v)}
+        className="text-xs font-light text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+      >
+        {verScatter ? '−' : '+'} {verScatter ? 'Ocultar' : 'Ver'} distribución
+        detallada
+      </button>
+
+      <AnimatePresence initial={false}>
+        {verScatter && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+            className="overflow-hidden"
+          >
+            <div className="pt-5">
+              <TalentArbitrageMap
+                scatter={scatter}
+                alertasProximidad={alertasProximidad}
+                variant="reduced"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function ZonaCard({
+  config,
+  data,
+}: {
+  config: ZonaCardConfig
+  data: ZonaAggregada
+}) {
+  const color = ZONA_COLOR[config.zona]
+  const label = ZONA_LABEL[config.zona]
+  const isUrgente = config.tono === 'requiere_decision'
+
+  return (
+    <div
+      className="rounded-[20px] border bg-[#0F172A]/90 backdrop-blur-2xl p-5 md:p-6"
+      style={{
+        borderColor: isUrgente ? `${color}50` : 'rgb(30 41 59)',
+        boxShadow: isUrgente ? `inset 3px 0 0 ${color}` : undefined,
+      }}
+    >
+      {/* Header: dot + label + tag estratégico/decisión */}
+      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className="w-2 h-2 rounded-full flex-shrink-0"
+            style={{ backgroundColor: color }}
+          />
+          <span
+            className="text-xs font-medium truncate"
+            style={{ color }}
+          >
+            {label}
+          </span>
+        </div>
+        <span
+          className={`text-[10px] uppercase tracking-widest font-medium flex-shrink-0 ${
+            isUrgente ? 'text-amber-400/90' : 'text-emerald-400/80'
+          }`}
+        >
+          {isUrgente ? 'Requiere decisión' : 'Estratégico'}
+        </span>
+      </div>
+
+      {/* Métricas: count protagonista + pasivo acumulado debajo */}
+      <div className="flex items-baseline gap-3 mb-3">
+        <p className="text-3xl font-extralight text-white tabular-nums leading-none">
+          {data.count}
+        </p>
+        <p className="text-xs text-slate-500 font-light">
+          {data.count === 1 ? 'persona' : 'personas'}
+        </p>
+      </div>
+
+      <p className="text-[11px] uppercase tracking-widest text-slate-500 font-medium mb-1">
+        Pasivo acumulado
+      </p>
+      <p className="text-sm font-light text-slate-200 tabular-nums mb-4">
+        {formatCLP(data.pasivo)}
+      </p>
+
+      <p className="text-xs text-slate-400 font-light leading-relaxed">
+        {config.descripcion}
+      </p>
     </div>
   )
 }
