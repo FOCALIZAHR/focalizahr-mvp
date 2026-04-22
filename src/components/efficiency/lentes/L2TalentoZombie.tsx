@@ -124,7 +124,7 @@ interface DecisionMeta {
 
 const DECISION_META: Record<DecisionType, DecisionMeta> = {
   congelar: {
-    label: 'Congelar cargo',
+    label: 'Esperar',
     description: 'Cuando la persona salga, el cargo no se reemplaza.',
     color: '#22D3EE',
     icon: Snowflake,
@@ -795,6 +795,34 @@ function FilaReloj({
 
 // ── Sección 5: Decisión — 3 escenarios como ToggleGroup mutuamente excluyente
 
+/** Narrativa por escenario con interpolación del primer nombre. */
+function narrativaPorTipo(tipo: DecisionType, first: string): string {
+  switch (tipo) {
+    case 'congelar':
+      return `Si ${first} renuncia en algún momento, su cargo no se reemplaza. No hay costo, pero tampoco hay fecha cierta.`
+    case 'reubicar':
+      return `Mover a ${first} donde la IA no compita. La apuesta es que rinda igual en un rol distinto. Si la adaptabilidad es baja, el riesgo es alto. Definir un plazo.`
+    case 'transicion':
+      return `Acuerdo de salida amistoso. Costo cierto, timing cierto. Si no hay acuerdo, se activa desvinculación formal.`
+  }
+}
+
+/** Consecuencia (números secundarios) por escenario. */
+function consecuenciaPorTipo(
+  tipo: DecisionType,
+  ahorro: number,
+  finiquito: number
+): string {
+  switch (tipo) {
+    case 'congelar':
+      return `Ahorro ${formatCLP(ahorro)}/mes cuando salga · Finiquito $0`
+    case 'reubicar':
+      return `Ahorro $0/mes · Sin costo directo`
+    case 'transicion':
+      return `Ahorro ${formatCLP(ahorro)}/mes inmediato · Finiquito ${formatCLP(finiquito)}`
+  }
+}
+
 function SeccionDecision({
   persona,
   decision,
@@ -805,36 +833,43 @@ function SeccionDecision({
   onChoose: (tipo: DecisionType) => void
 }) {
   const someoneSelected = decision !== null
+  const displayName = formatDisplayName(persona.employeeName)
+  const first = displayName.split(' ')[0] || displayName
 
   return (
     <section>
-      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium mb-3">
-        DECISIÓN
+      {/* Eyebrow ancla la gravedad: el nombre de la persona (no "DECISIÓN") */}
+      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium mb-4">
+        TU DECISIÓN SOBRE {displayName}
       </p>
+
+      {/* Vertical stack — una opción debajo de otra, padding generoso.
+          P7: no es un carrito de compras. P8: número es consecuencia. */}
       <div
         role="radiogroup"
         aria-label="Escenario de decisión"
-        className="grid grid-cols-1 md:grid-cols-3 gap-2"
+        className="space-y-3"
       >
         {(['congelar', 'reubicar', 'transicion'] as DecisionType[]).map(tipo => {
           const meta = DECISION_META[tipo]
           const Icon = meta.icon
           const isThisSelected = decision === tipo
-          // Otras 2 cards atenuadas cuando hay una seleccionada (foco visual).
           const isDimmed = someoneSelected && !isThisSelected
           const ahorro = tipo === 'reubicar' ? 0 : persona.salary
           const finiquito = tipo === 'transicion' ? persona.finiquitoToday ?? 0 : 0
+          const narrativa = narrativaPorTipo(tipo, first)
+          const consecuencia = consecuenciaPorTipo(tipo, ahorro, finiquito)
 
-          // Estados explícitos del ToggleGroup (purple = accent F2 ruta_ejecucion):
-          //   · default → border-slate-800
-          //   · hover   → border-purple-400/50, cursor-pointer
-          //   · selected→ border-purple-400, bg-purple-500/10, scale-[1.02]
-          //   · dimmed  → opacity-50 (las otras 2 cuando hay una seleccionada)
+          // Estados ToggleGroup (purple = accent F2 ruta_ejecucion):
+          //   · default   → border-slate-800
+          //   · hover     → border-purple-400/50
+          //   · selected  → border-purple-400, bg-purple-500/10
+          //   · unselected→ opacity-60 (cuando hay una seleccionada)
           const cardClass = isThisSelected
-            ? 'flex flex-col gap-2 p-3 rounded-lg text-left cursor-pointer transition-all border border-purple-400 bg-purple-500/10 scale-[1.02]'
+            ? 'w-full text-left p-5 rounded-lg cursor-pointer transition-all border border-purple-400 bg-purple-500/10'
             : isDimmed
-            ? 'flex flex-col gap-2 p-3 rounded-lg text-left cursor-pointer transition-all border border-slate-800 bg-slate-900/40 opacity-50 hover:opacity-80 hover:border-purple-400/50'
-            : 'flex flex-col gap-2 p-3 rounded-lg text-left cursor-pointer transition-all border border-slate-800 bg-slate-900/40 hover:border-purple-400/50'
+            ? 'w-full text-left p-5 rounded-lg cursor-pointer transition-all border border-slate-800 bg-slate-900/40 opacity-60 hover:opacity-90 hover:border-purple-400/50'
+            : 'w-full text-left p-5 rounded-lg cursor-pointer transition-all border border-slate-800 bg-slate-900/40 hover:border-purple-400/50'
 
           return (
             <button
@@ -844,33 +879,32 @@ function SeccionDecision({
               onClick={() => onChoose(tipo)}
               className={cardClass}
             >
-              <div className="flex items-center gap-2">
+              {/* Header: icon + label uppercase del escenario */}
+              <div className="flex items-center gap-2 mb-2.5">
                 <Icon
                   className="w-4 h-4 flex-shrink-0"
                   style={{ color: meta.color }}
                 />
                 <span
-                  className="text-xs font-medium"
-                  style={{ color: isThisSelected ? '#A78BFA' : '#e2e8f0' }}
+                  className="text-xs font-medium uppercase tracking-wider"
+                  style={{ color: isThisSelected ? '#A78BFA' : '#cbd5e1' }}
                 >
                   {meta.label}
                 </span>
               </div>
-              <div className="space-y-0.5 text-[11px] font-light tabular-nums">
-                <p className="text-slate-400">
-                  Ahorro:{' '}
-                  <span className={ahorro > 0 ? 'text-emerald-300' : 'text-slate-300'}>
-                    {`${formatCLP(ahorro)}/mes`}
-                  </span>
+
+              {/* Narrativa — protagonista visual */}
+              <p className="text-sm font-light text-slate-300 leading-relaxed mb-4 max-w-2xl">
+                {narrativa}
+              </p>
+
+              {/* Consecuencia — números secundarios bajo label tracking-widest */}
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-slate-500 font-medium mb-1">
+                  Consecuencia
                 </p>
-                <p className="text-slate-400">
-                  Finiquito:{' '}
-                  <span className={finiquito > 0 ? 'text-amber-300' : 'text-slate-300'}>
-                    {formatCLP(finiquito)}
-                  </span>
-                </p>
-                <p className="text-slate-500 leading-snug pt-1 normal-nums">
-                  {meta.timing}
+                <p className="text-xs text-slate-400 font-light tabular-nums leading-snug">
+                  {consecuencia}
                 </p>
               </div>
             </button>
