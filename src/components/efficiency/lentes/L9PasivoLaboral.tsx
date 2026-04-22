@@ -36,6 +36,7 @@ import {
   Circle,
   CheckCircle2,
   Check,
+  Info,
 } from 'lucide-react'
 import { LenteLayout } from './LenteLayout'
 import { LenteCard } from './LenteCard'
@@ -204,7 +205,7 @@ function narrativaZona(zona: ZonaL9 | null, first: string): string {
     case 'talent_trap':
       return `${first} sigue en nómina pero el aporte ya no justifica el cargo. El finiquito acumulado lo vuelve caro de mover. Cada mes que pasa, el costo de salida sube — y la productividad sigue ausente.`
     case 'ventana_decision':
-      return `${first} aún no acumula gran pasivo. Decidir hoy es decidir barato. Si pasa el próximo aniversario, el costo de salida sube un sueldo entero.`
+      return `${first} aún no genera un impacto financiero crítico. Postergar solo sirve para pagar un finiquito más caro en el futuro cercano.`
     case 'cimientos_oro':
       return `Pasivo alto, justificado por el valor que entrega. La decisión aquí es preservar — no liberar. El costo de perderlo supera al pasivo acumulado.`
     case 'agilidad_total':
@@ -515,25 +516,25 @@ const ZONA_CARDS_ORDER: ZonaCardConfig[] = [
     zona: 'cimientos_oro',
     tono: 'estrategico',
     descripcion:
-      'Pasivo alto, justificado por el valor que entregan. Preservar — el costo de perderlas supera al pasivo.',
+      'El pasivo es alto — y a primera vista parece liberarlo. Pero el valor que entrega lo justifica. Perderlo cuesta más que mantenerlo.',
   },
   {
     zona: 'agilidad_total',
     tono: 'estrategico',
     descripcion:
-      'Bajo costo de salida, alto valor. La pregunta es cómo retenerlas — el costo está en perderlas.',
+      'Mínimo costo de salida y alto valor de futuro. El riesgo no es el dinero que sale, sino que la competencia identifique su valor antes que nosotros.',
   },
   {
     zona: 'talent_trap',
     tono: 'requiere_decision',
     descripcion:
-      'Aporte ya no justifica el cargo. El finiquito acumulado vuelve cara la salida — cada mes suma.',
+      'El finiquito crece cada mes sin que el rendimiento ni el potencial lo justifiquen. Mantener la inercia solo encarece una salida inevitable.',
   },
   {
     zona: 'ventana_decision',
     tono: 'requiere_decision',
     descripcion:
-      'Aún no acumulan gran pasivo. Decidir hoy es decidir barato — antes del próximo aniversario.',
+      'Bajo pasivo acumulado y bajo índice de continuidad. El próximo aniversario encarece la salida un sueldo entero. Hoy es el punto de menor impacto.',
   },
 ]
 
@@ -1122,7 +1123,13 @@ function SeccionIdentidad({ persona }: { persona: PersonL9 }) {
             {persona.retentionScore !== null && (
               <>
                 {' · '}
-                Score retención {Math.round(persona.retentionScore)}
+                <span
+                  className="inline-flex items-baseline gap-1 cursor-help"
+                  title="Indicador compuesto que mide la probabilidad de permanencia. Combina desempeño, potencial y variables de riesgo de salida."
+                >
+                  Score retención {Math.round(persona.retentionScore)}
+                  <Info className="w-3 h-3 inline-block translate-y-px text-slate-500" />
+                </span>
               </>
             )}
           </p>
@@ -1209,12 +1216,12 @@ function SeccionRelojAniversario({
                 Aniversario en {alerta.daysToAnniversary} días
               </p>
               <p className="text-xs text-amber-200/80 font-light leading-snug mt-1.5">
-                Cada año cumplido suma un sueldo entero al finiquito. Actuar
-                antes evita aprox.{' '}
+                Antes del aniversario, el costo se mantiene en el actual.
+                Pasada esa fecha, la normativa añade automáticamente{' '}
                 <span className="font-medium tabular-nums">
                   {formatCLP(alerta.salarioAdicional)}
                 </span>{' '}
-                de indemnización adicional.
+                por un nuevo año de servicio.
               </p>
             </div>
           </div>
