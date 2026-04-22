@@ -20,8 +20,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
-import { Snowflake, ArrowRightLeft, Calendar } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Snowflake, ArrowRightLeft, Calendar, Check } from 'lucide-react'
 import { LenteLayout } from './LenteLayout'
 import { LenteCard } from './LenteCard'
 import type { LenteComponentProps } from './_LentePlaceholder'
@@ -326,7 +326,6 @@ export function L2TalentoZombie({
       narrativaPuente="Cada persona en esta lista tiene seguramente una historia de éxito y compromiso con la organización. Pero el análisis es frío: sus cargos están desapareciendo. Entrar en cada caso permite ver qué cuesta más: si actuar hoy o esperar a que el problema crezca."
       ctaSimularLabel="Abrir expedientes"
       ctaQuirofanoEyebrow="EXPEDIENTE DE TALENTO"
-      narrativaDinamica={narrativaDinamica(personsSorted.length, tomadas)}
       hasInteraction={hasInteraction}
       checkpointSummary={checkpointSummary}
       onNextLente={onNextLente}
@@ -360,13 +359,21 @@ export function L2TalentoZombie({
         />
       )}
       renderQuirofano={() => (
-        <QuirofanoSplit
-          rows={personsSorted}
-          personaActiva={personaActiva}
-          onSelectPersona={setPersonaActivaId}
-          decisiones={decisiones}
-          onDecision={handleToggleDecision}
-        />
+        <>
+          {/* Narrativa dinámica ARRIBA del split — el contexto emocional
+              prepara la decisión, no la comenta después. Renderizado aquí
+              en vez del slot del LenteLayout para controlar la posición. */}
+          <NarrativaContextoArriba
+            mensaje={narrativaDinamica(personsSorted.length, tomadas)}
+          />
+          <QuirofanoSplit
+            rows={personsSorted}
+            personaActiva={personaActiva}
+            onSelectPersona={setPersonaActivaId}
+            decisiones={decisiones}
+            onDecision={handleToggleDecision}
+          />
+        </>
       )}
     />
   )
@@ -473,6 +480,29 @@ function ExpedienteLateral({
         </p>
       </div>
     </aside>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// NARRATIVA DINÁMICA ARRIBA — contexto emocional antes de las decisiones
+// ════════════════════════════════════════════════════════════════════════════
+
+function NarrativaContextoArriba({ mensaje }: { mensaje: string }) {
+  return (
+    <div className="mb-6 pb-6 border-b border-slate-800/40">
+      <AnimatePresence mode="wait">
+        <motion.p
+          key={mensaje}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.25 }}
+          className="text-sm md:text-base font-light text-slate-300 italic leading-relaxed max-w-3xl"
+        >
+          {mensaje}
+        </motion.p>
+      </AnimatePresence>
+    </div>
   )
 }
 
@@ -701,7 +731,7 @@ function SeccionContexto({ persona }: { persona: PersonAlert }) {
           <Chip label={`Metas ${Math.round(persona.metasCompliance)}%`} />
         )}
         {persona.nineBoxPosition && (
-          <Chip label={`ADN: ${getNineBoxLabel(persona.nineBoxPosition)}`} />
+          <Chip label={getNineBoxLabel(persona.nineBoxPosition)} />
         )}
       </div>
     </section>
@@ -774,6 +804,8 @@ function SeccionDecision({
   decision: DecisionType | null
   onChoose: (tipo: DecisionType) => void
 }) {
+  const someoneSelected = decision !== null
+
   return (
     <section>
       <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium mb-3">
@@ -787,30 +819,30 @@ function SeccionDecision({
         {(['congelar', 'reubicar', 'transicion'] as DecisionType[]).map(tipo => {
           const meta = DECISION_META[tipo]
           const Icon = meta.icon
-          const selected = decision === tipo
+          const isThisSelected = decision === tipo
+          // Otras 2 cards atenuadas cuando hay una seleccionada (foco visual).
+          const isDimmed = someoneSelected && !isThisSelected
           const ahorro = tipo === 'reubicar' ? 0 : persona.salary
           const finiquito = tipo === 'transicion' ? persona.finiquitoToday ?? 0 : 0
+
+          // Estados explícitos del ToggleGroup (purple = accent F2 ruta_ejecucion):
+          //   · default → border-slate-800
+          //   · hover   → border-purple-400/50, cursor-pointer
+          //   · selected→ border-purple-400, bg-purple-500/10, scale-[1.02]
+          //   · dimmed  → opacity-50 (las otras 2 cuando hay una seleccionada)
+          const cardClass = isThisSelected
+            ? 'flex flex-col gap-2 p-3 rounded-lg text-left cursor-pointer transition-all border border-purple-400 bg-purple-500/10 scale-[1.02]'
+            : isDimmed
+            ? 'flex flex-col gap-2 p-3 rounded-lg text-left cursor-pointer transition-all border border-slate-800 bg-slate-900/40 opacity-50 hover:opacity-80 hover:border-purple-400/50'
+            : 'flex flex-col gap-2 p-3 rounded-lg text-left cursor-pointer transition-all border border-slate-800 bg-slate-900/40 hover:border-purple-400/50'
 
           return (
             <button
               key={tipo}
               role="radio"
-              aria-checked={selected}
+              aria-checked={isThisSelected}
               onClick={() => onChoose(tipo)}
-              className={`flex flex-col gap-2 p-3 rounded-lg border text-left transition-all ${
-                selected
-                  ? 'border-transparent'
-                  : 'border-slate-800 bg-slate-900/40 hover:border-slate-700 hover:bg-slate-900/60'
-              }`}
-              style={
-                selected
-                  ? {
-                      backgroundColor: `${meta.color}18`,
-                      borderColor: `${meta.color}80`,
-                      boxShadow: `0 0 16px ${meta.color}30`,
-                    }
-                  : undefined
-              }
+              className={cardClass}
             >
               <div className="flex items-center gap-2">
                 <Icon
@@ -819,7 +851,7 @@ function SeccionDecision({
                 />
                 <span
                   className="text-xs font-medium"
-                  style={{ color: selected ? meta.color : '#e2e8f0' }}
+                  style={{ color: isThisSelected ? '#A78BFA' : '#e2e8f0' }}
                 >
                   {meta.label}
                 </span>
@@ -827,14 +859,14 @@ function SeccionDecision({
               <div className="space-y-0.5 text-[11px] font-light tabular-nums">
                 <p className="text-slate-400">
                   Ahorro:{' '}
-                  <span className={ahorro > 0 ? 'text-emerald-300' : 'text-slate-500'}>
-                    {ahorro > 0 ? `${formatCLP(ahorro)}/mes` : '—'}
+                  <span className={ahorro > 0 ? 'text-emerald-300' : 'text-slate-300'}>
+                    {`${formatCLP(ahorro)}/mes`}
                   </span>
                 </p>
                 <p className="text-slate-400">
                   Finiquito:{' '}
-                  <span className={finiquito > 0 ? 'text-amber-300' : 'text-slate-500'}>
-                    {finiquito > 0 ? formatCLP(finiquito) : '—'}
+                  <span className={finiquito > 0 ? 'text-amber-300' : 'text-slate-300'}>
+                    {formatCLP(finiquito)}
                   </span>
                 </p>
                 <p className="text-slate-500 leading-snug pt-1 normal-nums">
@@ -845,6 +877,14 @@ function SeccionDecision({
           )
         })}
       </div>
+
+      {/* Feedback de registro — solo visible cuando hay decisión activa */}
+      {someoneSelected && (
+        <p className="mt-3 flex items-center gap-1.5 text-xs font-light text-emerald-400/90">
+          <Check className="w-3 h-3" />
+          Registrada en tu plan
+        </p>
+      )}
     </section>
   )
 }
