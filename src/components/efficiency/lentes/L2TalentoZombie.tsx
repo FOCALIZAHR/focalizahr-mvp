@@ -21,7 +21,14 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Snowflake, ArrowRightLeft, Calendar, Check } from 'lucide-react'
+import {
+  Snowflake,
+  ArrowRightLeft,
+  Calendar,
+  Check,
+  Circle,
+  CheckCircle2,
+} from 'lucide-react'
 import { LenteLayout } from './LenteLayout'
 import { LenteCard } from './LenteCard'
 import type { LenteComponentProps } from './_LentePlaceholder'
@@ -322,9 +329,9 @@ export function L2TalentoZombie({
     <LenteLayout
       familiaAccent={L2_ACCENT}
       heroValue={String(detalle.count)}
-      heroUnit={`personas rinden hoy y no podrán adaptarse · ${Math.round(detalle.avgExposure * 100)}% exposición IA promedio`}
+      heroUnit={`personas rinden hoy en cargos donde la IA ya hace el ${Math.round(detalle.avgExposure * 100)}% del trabajo`}
       narrativaPuente="Cada persona en esta lista tiene seguramente una historia de éxito y compromiso con la organización. Pero el análisis es frío: sus cargos están desapareciendo. Entrar en cada caso permite ver qué cuesta más: si actuar hoy o esperar a que el problema crezca."
-      ctaSimularLabel="Abrir expedientes"
+      ctaSimularLabel="Ver casos"
       ctaQuirofanoEyebrow="EXPEDIENTE DE TALENTO"
       hasInteraction={hasInteraction}
       checkpointSummary={checkpointSummary}
@@ -386,11 +393,12 @@ export function L2TalentoZombie({
 function HallazgoResumen({ rows }: { rows: PersonAlert[] }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-[0.22em] text-purple-400 font-medium mb-2">
+      <p className="text-[10px] uppercase tracking-widest text-purple-400 font-medium mb-2">
         EL EXPEDIENTE
       </p>
-      <h3 className="text-xl md:text-2xl font-light text-white mb-4 leading-tight">
-        Talento en zona crítica
+      <h3 className="text-xl md:text-2xl font-extralight text-white mb-4 leading-tight">
+        Rendimiento excelente,{' '}
+        <span className="fhr-title-gradient">cargos en riesgo</span>
       </h3>
 
       {/* Narrativa de 3 patas: rinde bien + cargo expuesto + no adaptable.
@@ -444,8 +452,8 @@ function ExpedienteLateral({
   pasivoLaboralHoy,
 }: ExpedienteLateralProps) {
   return (
-    <aside className="rounded-lg border border-slate-800/40 bg-slate-900/30 p-5 space-y-5">
-      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium">
+    <aside className="rounded-[20px] border border-slate-800 bg-[#0F172A]/90 backdrop-blur-2xl p-5 md:p-6 space-y-5">
+      <p className="text-[10px] uppercase tracking-widest text-slate-500 font-medium">
         EN CIFRAS
       </p>
 
@@ -465,7 +473,7 @@ function ExpedienteLateral({
           {formatCLP(gapTotal)}
         </p>
         <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
-          Costo pagado / mes
+          Costo mensual en riesgo
         </p>
       </div>
 
@@ -606,7 +614,16 @@ function RailPersonas({ rows, activeId, onSelect, decisiones }: RailPersonasProp
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// FICHA RICA — 5 secciones de contexto + sección decisión
+// FICHA RICA — sub-actos dentro del Quirófano: LECTURA → DECISIÓN
+// ════════════════════════════════════════════════════════════════════════════
+// El CEO primero entiende el caso (FichaLectura), después actúa
+// (FichaDecision). La separación visual entre los dos momentos elimina la
+// mezcla de "leer" y "decidir" en el mismo scroll. Mismo patrón que el
+// LenteLayout aplica a nivel macro entre Hallazgo/Quirófano, replicado
+// aquí a nivel micro dentro del Spotlight.
+//
+// Cambiar de persona en el Rail resetea siempre a 'lectura' — el caso
+// nuevo merece una lectura nueva antes de la decisión.
 // ════════════════════════════════════════════════════════════════════════════
 
 interface FichaRicaProps {
@@ -616,20 +633,160 @@ interface FichaRicaProps {
 }
 
 function FichaRica({ persona, decision, onChoose }: FichaRicaProps) {
+  const [vista, setVista] = useState<'lectura' | 'decision'>('lectura')
+
+  // Cada persona arranca en lectura — predictibilidad sobre todo
+  useEffect(() => {
+    setVista('lectura')
+  }, [persona.employeeId])
+
+  return (
+    <div className="min-w-0">
+      <AnimatePresence mode="wait">
+        {vista === 'lectura' ? (
+          <FichaLectura
+            key={`lectura-${persona.employeeId}`}
+            persona={persona}
+            decision={decision}
+            onSimular={() => setVista('decision')}
+          />
+        ) : (
+          <FichaDecision
+            key={`decision-${persona.employeeId}`}
+            persona={persona}
+            decision={decision}
+            onChoose={onChoose}
+            onVolver={() => setVista('lectura')}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ── MOMENTO 1 — LECTURA: contexto rico + CTA al final ──────────────────────
+
+function FichaLectura({
+  persona,
+  decision,
+  onSimular,
+}: {
+  persona: PersonAlert
+  decision: DecisionType | null
+  onSimular: () => void
+}) {
+  const first =
+    formatDisplayName(persona.employeeName).split(' ')[0] ||
+    formatDisplayName(persona.employeeName)
+  const yaDecidido = decision !== null
+  const meta = decision ? DECISION_META[decision] : null
+
   return (
     <motion.div
-      key={persona.employeeId}
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
       transition={{ duration: 0.25 }}
-      className="space-y-6 min-w-0"
+      className="space-y-8 md:space-y-10"
     >
       <SeccionIdentidad persona={persona} />
       <SeccionNarrativa persona={persona} />
       <SeccionRadiografia persona={persona} />
       <SeccionContexto persona={persona} />
       <SeccionRelojFinanciero persona={persona} />
-      <SeccionDecision persona={persona} decision={decision} onChoose={onChoose} />
+
+      {/* CTA puente — separa "entender" de "actuar". Si ya hay decisión
+          tomada, mostramos cuál es y permitimos modificar; si no, invita
+          a simular. La gravedad de la decisión vive en el otro momento. */}
+      <div className="pt-2">
+        {yaDecidido && meta ? (
+          <button
+            onClick={onSimular}
+            className="group w-full flex items-center justify-between gap-4 p-5 md:p-6 rounded-[20px] border border-solid border-purple-400/40 bg-purple-500/5 hover:bg-purple-500/10 backdrop-blur-2xl transition-colors text-left cursor-pointer"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <CheckCircle2 className="w-4 h-4 text-purple-400 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-widest text-slate-500 font-medium mb-0.5">
+                  Tu decisión actual
+                </p>
+                <p className="text-sm font-light text-purple-300">
+                  {meta.label}
+                </p>
+              </div>
+            </div>
+            <span className="text-xs font-medium text-purple-400 flex-shrink-0 group-hover:translate-x-0.5 transition-transform">
+              Cambiar →
+            </span>
+          </button>
+        ) : (
+          <button
+            onClick={onSimular}
+            className="group w-full flex items-center justify-between gap-4 p-5 md:p-6 rounded-[20px] border border-dashed border-slate-700 bg-[#0F172A]/90 backdrop-blur-2xl hover:border-purple-400/60 hover:bg-purple-500/5 transition-colors text-left cursor-pointer"
+          >
+            <span className="text-sm font-light text-slate-200">
+              Simular escenarios para {first}
+            </span>
+            <span className="text-purple-400 flex-shrink-0 group-hover:translate-x-0.5 transition-transform">
+              →
+            </span>
+          </button>
+        )}
+      </div>
+    </motion.div>
+  )
+}
+
+// ── MOMENTO 2 — DECISIÓN: pantalla limpia, solo la elección ────────────────
+
+function FichaDecision({
+  persona,
+  decision,
+  onChoose,
+  onVolver,
+}: {
+  persona: PersonAlert
+  decision: DecisionType | null
+  onChoose: (tipo: DecisionType) => void
+  onVolver: () => void
+}) {
+  const displayName = formatDisplayName(persona.employeeName)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.25 }}
+      className="space-y-6"
+    >
+      {/* Botón volver — arriba, discreto, rumbo al expediente */}
+      <button
+        onClick={onVolver}
+        className="text-xs font-light text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+      >
+        ← Volver al expediente
+      </button>
+
+      {/* Contexto mínimo — el CEO sabe sobre quién está decidiendo */}
+      <div className="flex items-center gap-3 pb-5 border-b border-slate-800/40">
+        <Avatar name={persona.employeeName} size={44} accent={L2_ACCENT} />
+        <div className="min-w-0">
+          <h3 className="text-lg md:text-xl font-light text-white leading-tight truncate">
+            {displayName}
+          </h3>
+          <p className="text-xs text-slate-400 font-light mt-0.5 truncate">
+            {formatLabel(persona.position)} ·{' '}
+            {formatLabel(persona.departmentName)}
+          </p>
+        </div>
+      </div>
+
+      <SeccionDecision
+        persona={persona}
+        decision={decision}
+        onChoose={onChoose}
+      />
     </motion.div>
   )
 }
@@ -664,7 +821,7 @@ function SeccionNarrativa({ persona }: { persona: PersonAlert }) {
   const exposurePct = Math.round(effExposure(persona) * 100)
   return (
     <section>
-      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium mb-3">
+      <p className="text-[10px] uppercase tracking-widest text-slate-500 font-medium mb-3">
         EL CASO
       </p>
       <p className="text-sm md:text-[15px] font-light text-slate-300 leading-relaxed max-w-3xl">
@@ -685,7 +842,7 @@ function SeccionNarrativa({ persona }: { persona: PersonAlert }) {
 function SeccionRadiografia({ persona }: { persona: PersonAlert }) {
   return (
     <section>
-      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium mb-3">
+      <p className="text-[10px] uppercase tracking-widest text-slate-500 font-medium mb-3">
         RADIOGRAFÍA
       </p>
       <div className="grid grid-cols-3 gap-3">
@@ -715,7 +872,7 @@ function SeccionContexto({ persona }: { persona: PersonAlert }) {
 
   return (
     <section>
-      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium mb-3">
+      <p className="text-[10px] uppercase tracking-widest text-slate-500 font-medium mb-3">
         CONTEXTO
       </p>
       <div className="flex items-center gap-2 flex-wrap">
@@ -747,10 +904,10 @@ function SeccionRelojFinanciero({ persona }: { persona: PersonAlert }) {
 
   return (
     <section>
-      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium mb-3">
+      <p className="text-[10px] uppercase tracking-widest text-slate-500 font-medium mb-3">
         RELOJ FINANCIERO
       </p>
-      <div className="rounded-lg border border-slate-800/40 bg-slate-900/30 divide-y divide-slate-800/40">
+      <div className="rounded-[20px] border border-slate-800 bg-[#0F172A]/90 backdrop-blur-2xl divide-y divide-slate-800/60 overflow-hidden">
         <FilaReloj label="Hoy" valor={formatCLP(hoy)} delta={null} />
         <FilaReloj
           label="+6 meses"
@@ -777,7 +934,7 @@ function FilaReloj({
   delta: string | null
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 px-4 py-2.5">
+    <div className="flex items-baseline justify-between gap-4 px-5 md:px-6 py-3">
       <span className="text-[10px] uppercase tracking-widest text-slate-500 font-medium">
         {label}
       </span>
@@ -838,13 +995,16 @@ function SeccionDecision({
 
   return (
     <section>
-      {/* Eyebrow ancla la gravedad: el nombre de la persona (no "DECISIÓN") */}
-      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500 font-medium mb-4">
-        TU DECISIÓN SOBRE {displayName}
+      {/* Instrucción canónica del SKILL — explícita, no decorativa */}
+      <p className="text-[10px] uppercase tracking-widest text-slate-500 font-medium mb-4">
+        ELIGE UNA RUTA
       </p>
 
       {/* Vertical stack — una opción debajo de otra, padding generoso.
-          P7: no es un carrito de compras. P8: número es consecuencia. */}
+          Tokens canónicos del SKILL: rounded-[20px], bg-[#0F172A]/90
+          backdrop-blur-2xl, bordes dashed (sin selección) → solid
+          (seleccionada). Radio indicator inline (Circle/CheckCircle2)
+          ancla la naturaleza de elección única. */}
       <div
         role="radiogroup"
         aria-label="Escenario de decisión"
@@ -860,16 +1020,18 @@ function SeccionDecision({
           const narrativa = narrativaPorTipo(tipo, first)
           const consecuencia = consecuenciaPorTipo(tipo, ahorro, finiquito)
 
-          // Estados ToggleGroup (purple = accent F2 ruta_ejecucion):
-          //   · default   → border-slate-800
-          //   · hover     → border-purple-400/50
-          //   · selected  → border-purple-400, bg-purple-500/10
-          //   · unselected→ opacity-60 (cuando hay una seleccionada)
+          // Estados canónicos SKILL (purple = accent F2 ruta_ejecucion):
+          //   · default   → dashed border-slate-700, glassmorphism
+          //   · hover     → border-slate-600
+          //   · selected  → solid border-purple-400, bg-purple-500/10
+          //   · dimmed    → dashed border-slate-800 + opacity-50
+          const cardBase =
+            'w-full text-left p-5 md:p-6 rounded-[20px] backdrop-blur-2xl cursor-pointer transition-all duration-200'
           const cardClass = isThisSelected
-            ? 'w-full text-left p-5 rounded-lg cursor-pointer transition-all border border-purple-400 bg-purple-500/10'
+            ? `${cardBase} border border-solid border-purple-400 bg-purple-500/10`
             : isDimmed
-            ? 'w-full text-left p-5 rounded-lg cursor-pointer transition-all border border-slate-800 bg-slate-900/40 opacity-60 hover:opacity-90 hover:border-purple-400/50'
-            : 'w-full text-left p-5 rounded-lg cursor-pointer transition-all border border-slate-800 bg-slate-900/40 hover:border-purple-400/50'
+            ? `${cardBase} border border-dashed border-slate-800 bg-[#0F172A]/90 opacity-50 hover:opacity-90 hover:border-slate-600`
+            : `${cardBase} border border-dashed border-slate-700 bg-[#0F172A]/90 hover:border-slate-600`
 
           return (
             <button
@@ -879,8 +1041,13 @@ function SeccionDecision({
               onClick={() => onChoose(tipo)}
               className={cardClass}
             >
-              {/* Header: icon + label uppercase del escenario */}
-              <div className="flex items-center gap-2 mb-2.5">
+              {/* Header: radio indicator + icon escenario + label */}
+              <div className="flex items-center gap-2.5 mb-2.5">
+                {isThisSelected ? (
+                  <CheckCircle2 className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                ) : (
+                  <Circle className="w-4 h-4 text-slate-600 flex-shrink-0" />
+                )}
                 <Icon
                   className="w-4 h-4 flex-shrink-0"
                   style={{ color: meta.color }}
