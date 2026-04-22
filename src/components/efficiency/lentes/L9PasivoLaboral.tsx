@@ -393,7 +393,14 @@ export function L9PasivoLaboral({
   const checkpointSummary = hasInteraction
     ? {
         items: personsDecidibles
-          .filter(p => timingByPerson[p.employeeId] !== null)
+          // Type guard defensivo (P15): solo deja pasar personas con
+          // timing válido contra las keys reales de TIMING_META. Si
+          // mañana se agrega un Timing nuevo sin actualizar el enum,
+          // este filtro lo atrapa en compile-time en vez de crashear.
+          .filter((p): p is PersonL9 => {
+            const t = timingByPerson[p.employeeId]
+            return t === 'hoy' || t === 'q1' || t === 'q2'
+          })
           .map(p => {
             const t = timingByPerson[p.employeeId]!
             const finiq = calcularFiniquitoTiming(p, TIMING_MESES[t])
