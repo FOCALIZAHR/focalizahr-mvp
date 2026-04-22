@@ -356,6 +356,33 @@ export class SpanIntelligenceService {
       empsWithManager.map(e => [e.id, e.managerId])
     )
 
+    // ── Query lateral: parent del departamento (gerencia L2) ──────────
+    // El CEO piensa en "Gerencia de Tecnología" (L2 padre), no en
+    // "Desarrollo Software" (L3 operacional). Map para resolver el
+    // padre inmediato de cada departmentId presente en el enriched.
+    // Si un depto no tiene parent, fallback al propio depto (mismo
+    // patrón que ManagerVarianceService).
+    const allDeptIds = [...new Set(enriched.map(e => e.departmentId))]
+    const departments = await prisma.department.findMany({
+      where: { id: { in: allDeptIds } },
+      select: {
+        id: true,
+        displayName: true,
+        parentId: true,
+        parent: { select: { id: true, displayName: true } },
+      },
+    })
+    const gerenciaParentByDeptId = new Map<
+      string,
+      { parentId: string; parentName: string }
+    >()
+    for (const d of departments) {
+      gerenciaParentByDeptId.set(d.id, {
+        parentId: d.parent?.id ?? d.id,
+        parentName: d.parent?.displayName ?? d.displayName,
+      })
+    }
+
     // ── Contar directReports ACTIVOS por manager (in-memory) ──────────
     // Consistente con §16.5: filtrar por activos excluye fantasmas.
     const activeSpanByManagerId = new Map<string, number>()
@@ -537,12 +564,19 @@ export class SpanIntelligenceService {
         metasEquipoPct
       )
 
+      const gerenciaParent = gerenciaParentByDeptId.get(m.departmentId) ?? {
+        parentId: m.departmentId,
+        parentName: m.departmentName,
+      }
+
       profiles.push({
         managerId: m.employeeId,
         managerName: m.employeeName,
         cargo: m.position,
         gerenciaId: m.departmentId,
         gerenciaNombre: m.departmentName,
+        gerenciaParentId: gerenciaParent.parentId,
+        gerenciaParentNombre: gerenciaParent.parentName,
         standardJobLevel: standardJobLevel ?? 'sin_clasificar',
         performanceTrack: track,
         tenureMeses: m.tenureMonths,
@@ -638,15 +672,35 @@ function buildGerenciaRollup(
   profiles: SpanManagerProfile[],
   enriched: EnrichedEmployee[]
 ): GerenciaRollup[] {
-  // FTE total por gerencia (no solo managers — toda la dotación de la gerencia)
-  const fteByGerencia = new Map<string, number>()
+  // Index departmentId → parentId desde los profiles (todos los managers
+  // tienen gerenciaParentId resuelto). Para FTE por gerencia padre,
+  // necesitamos saber el parentId de TODOS los empleados (no solo
+  // managers) — usamos el mismo map del primer profile que tenga ese
+  // depto, fallback a departmentId puro si no aparece.
+  const parentByDeptId = new Map<string, { id: string; nombre: string }>()
+  for (const p of profiles) {
+    parentByDeptId.set(p.gerenciaId, {
+      id: p.gerenciaParentId,
+      nombre: p.gerenciaParentNombre,
+    })
+  }
+
+  // FTE total por gerencia padre (incluye toda la dotación de la gerencia,
+  // no solo managers). Si un depto del enriched no tiene su parent
+  // registrado en profiles, usa su propio departmentId/Name.
+  const fteByGerenciaParent = new Map<string, number>()
   for (const e of enriched) {
-    fteByGerencia.set(
-      e.departmentId,
-      (fteByGerencia.get(e.departmentId) ?? 0) + 1
+    const parent = parentByDeptId.get(e.departmentId) ?? {
+      id: e.departmentId,
+      nombre: e.departmentName,
+    }
+    fteByGerenciaParent.set(
+      parent.id,
+      (fteByGerenciaParent.get(parent.id) ?? 0) + 1
     )
   }
 
+  // Agrupar managers por gerencia padre
   const grupos = new Map<
     string,
     {
@@ -655,16 +709,19 @@ function buildGerenciaRollup(
     }
   >()
   for (const p of profiles) {
-    const key = p.gerenciaId
+    const key = p.gerenciaParentId
     if (!grupos.has(key))
-      grupos.set(key, { gerenciaNombre: p.gerenciaNombre, managers: [] })
+      grupos.set(key, {
+        gerenciaNombre: p.gerenciaParentNombre,
+        managers: [],
+      })
     grupos.get(key)!.managers.push(p)
   }
 
   const out: GerenciaRollup[] = []
   for (const [gerenciaId, { gerenciaNombre, managers }] of grupos) {
     const total = managers.length
-    const fteGerencia = fteByGerencia.get(gerenciaId) ?? total
+    const fteGerencia = fteByGerenciaParent.get(gerenciaId) ?? total
     out.push({
       gerenciaId,
       gerenciaNombre,

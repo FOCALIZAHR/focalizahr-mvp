@@ -34,6 +34,7 @@ import {
   Check,
   Circle,
   CheckCircle2,
+  Maximize2,
 } from 'lucide-react'
 import { LenteLayout } from './LenteLayout'
 import { LenteCard } from './LenteCard'
@@ -554,9 +555,10 @@ function DistribucionCompletaTrigger({ data }: { data: OrgSpanIntelligence }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-xs font-light text-slate-400 hover:text-cyan-300 transition-colors inline-flex items-center gap-1.5 cursor-pointer mb-6"
+        className="group inline-flex items-center gap-1.5 mb-6 -mx-1 px-2 py-1.5 rounded text-sm font-light text-cyan-400 hover:text-cyan-300 underline decoration-cyan-400/30 hover:decoration-cyan-300/60 underline-offset-4 transition-colors cursor-pointer"
       >
-        + Ver span de control por gerencia y arquetipo
+        <span>Ver distribución por gerencia y nivel</span>
+        <Maximize2 className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 transition-opacity" />
       </button>
       <AnimatePresence>
         {open && <DistribucionCompletaModal data={data} onClose={() => setOpen(false)} />}
@@ -607,7 +609,7 @@ function DistribucionCompletaModal({
               Distribución completa
             </p>
             <h3 className="text-base md:text-lg font-light text-white leading-tight mt-0.5">
-              Span de control · panorámica organizacional
+              Span de control · vista organizacional
             </h3>
           </div>
           <button
@@ -625,7 +627,7 @@ function DistribucionCompletaModal({
             Por Gerencia
           </TabButton>
           <TabButton active={tab === 'arquetipo'} onClick={() => setTab('arquetipo')}>
-            Por Arquetipo
+            Por Nivel
           </TabButton>
           <TabButton active={tab === 'piramide'} onClick={() => setTab('piramide')}>
             Pirámide
@@ -679,9 +681,8 @@ function TabGerencia({ data }: { data: OrgSpanIntelligence }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-400 font-light leading-relaxed mb-4">
-        Cada fila es una gerencia con sus managers activos. La densidad
-        gerencial muestra qué porcentaje de la dotación de esa gerencia
-        son jefes.
+        Cada fila es una gerencia con sus managers activos. Pasa el cursor
+        sobre las columnas para ver fórmulas y referencias.
       </p>
       <div className="overflow-x-auto -mx-6 md:-mx-8 px-6 md:px-8">
         <table className="w-full text-sm">
@@ -689,10 +690,45 @@ function TabGerencia({ data }: { data: OrgSpanIntelligence }) {
             <tr className="text-[10px] uppercase tracking-widest text-slate-500 font-medium border-b border-slate-800/60">
               <th className="text-left py-3 pr-4">Gerencia</th>
               <th className="text-right py-3 px-2">Managers</th>
-              <th className="text-right py-3 px-2">Span prom.</th>
-              <th className="text-right py-3 px-2">Densidad</th>
-              <th className="text-right py-3 px-2">Costo / FTE</th>
-              <th className="text-right py-3 pl-4 pl-2">Distribución</th>
+              <th className="text-right py-3 px-2">
+                <ColHeaderTooltip
+                  title="Span promedio"
+                  explanation="Cuántos reportes directos tiene cada jefe en promedio."
+                  details={[
+                    'Lo óptimo varía según el tipo de cargo',
+                    'Fuente: Peter Drucker · Harvard Business Review — Span of Management Theory',
+                  ]}
+                >
+                  Span prom.
+                </ColHeaderTooltip>
+              </th>
+              <th className="text-right py-3 px-2">
+                <ColHeaderTooltip
+                  title="Densidad gerencial"
+                  explanation="Cuántos jefes hay por cada 100 personas de la gerencia."
+                  details={[
+                    'Estándar LATAM PYME: 8–14%',
+                    'Sobre 20% es estructura sobre-jerarquizada',
+                    'Fuente: McKinsey + Bain — Span of Control Studies',
+                  ]}
+                >
+                  Densidad
+                </ColHeaderTooltip>
+              </th>
+              <th className="text-right py-3 px-2">
+                <ColHeaderTooltip
+                  title="Costo por FTE gestionado"
+                  explanation="Cuánto cuesta cada persona gestionada por este manager."
+                  details={[
+                    'Cálculo: salario del manager ÷ su span actual',
+                    'Comparable solo entre managers del mismo nivel',
+                    'El salario es un promedio estimado por nivel del cargo, no individual',
+                  ]}
+                >
+                  Costo / FTE
+                </ColHeaderTooltip>
+              </th>
+              <th className="text-right py-3 pl-2">Distribución</th>
             </tr>
           </thead>
           <tbody>
@@ -733,81 +769,200 @@ function TabGerencia({ data }: { data: OrgSpanIntelligence }) {
   )
 }
 
+/** Header de columna con tooltip premium (TooltipContext variant=pattern). */
+function ColHeaderTooltip({
+  title,
+  explanation,
+  details,
+  children,
+}: {
+  title: string
+  explanation: string
+  details: string[]
+  children: React.ReactNode
+}) {
+  return (
+    <TooltipContext
+      variant="pattern"
+      position="top"
+      usePortal
+      title={title}
+      explanation={explanation}
+      details={details}
+    >
+      <span className="cursor-help underline decoration-dotted decoration-slate-600 underline-offset-2">
+        {children}
+      </span>
+    </TooltipContext>
+  )
+}
+
 // ── TAB 2: Por Arquetipo ──────────────────────────────────────────────────
 
 function TabArquetipo({ data }: { data: OrgSpanIntelligence }) {
   if (data.byArquetipo.length === 0) {
     return (
       <p className="text-sm text-slate-400 font-light">
-        Sin managers activos para clasificar por arquetipo.
+        Sin managers activos para clasificar por nivel.
       </p>
     )
   }
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-400 font-light leading-relaxed mb-4">
-        Cada arquetipo McKinsey tiene un rango de span óptimo. La distancia
-        media indica cuánto se desvían los managers de esa categoría
-        respecto al rango esperado.
+        Cada nivel del cargo tiene un rango ideal de directos según el
+        arquetipo McKinsey al que pertenece. La distancia al óptimo indica
+        qué tan calibrada está la organización.
       </p>
       <div className="overflow-x-auto -mx-6 md:-mx-8 px-6 md:px-8">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-[10px] uppercase tracking-widest text-slate-500 font-medium border-b border-slate-800/60">
-              <th className="text-left py-3 pr-4">Arquetipo</th>
+              <th className="text-left py-3 pr-4">
+                <ColHeaderTooltip
+                  title="Arquetipo McKinsey"
+                  explanation="Cinco categorías que clasifican la naturaleza del trabajo gerencial. Cada una tiene su rango ideal de directos."
+                  details={[
+                    'Player/Coach: gerentes estratégicos (3–6 directos)',
+                    'Coach: subgerentes (4–8)',
+                    'Supervisor: jefes (5–10)',
+                    'Facilitator: supervisores (8–14)',
+                    'Coordinator: operativos (10–20)',
+                    'Fuente: McKinsey & Company — "How to identify the right spans of control for your organization"',
+                  ]}
+                >
+                  Nivel · Arquetipo
+                </ColHeaderTooltip>
+              </th>
               <th className="text-left py-3 px-2">Rango óptimo</th>
               <th className="text-right py-3 px-2">Managers</th>
-              <th className="text-right py-3 px-2">Span prom.</th>
-              <th className="text-right py-3 px-2">En rango</th>
-              <th className="text-right py-3 pl-2">Distancia al óptimo</th>
+              <th className="text-right py-3 px-2">
+                <ColHeaderTooltip
+                  title="Span promedio"
+                  explanation="Cuántos reportes directos tiene cada jefe en promedio."
+                  details={[
+                    'Lo óptimo varía según el tipo de cargo',
+                    'Color cyan: dentro del rango óptimo',
+                    'Color amber: fuera del rango — revisar arquetipo',
+                    'Fuente: Peter Drucker · Harvard Business Review',
+                  ]}
+                >
+                  Span prom.
+                </ColHeaderTooltip>
+              </th>
+              <th className="text-right py-3 px-2">
+                <ColHeaderTooltip
+                  title="Calibrados"
+                  explanation="Cuántos managers de este nivel tienen su span dentro del rango óptimo."
+                  details={[
+                    'El resto tiene equipos demasiado pequeños, demasiado grandes, o virtualmente sin reportes',
+                  ]}
+                >
+                  Calibrados
+                </ColHeaderTooltip>
+              </th>
+              <th className="text-right py-3 pl-2">
+                <ColHeaderTooltip
+                  title="Distancia al óptimo"
+                  explanation="Cuánto se aleja en promedio el span actual del rango ideal del cargo."
+                  details={[
+                    'Cero significa que todos están dentro del rango',
+                    '±3 o más sugiere revisar la definición del cargo',
+                  ]}
+                >
+                  Distancia al óptimo
+                </ColHeaderTooltip>
+              </th>
             </tr>
           </thead>
           <tbody>
-            {data.byArquetipo.map(a => (
-              <tr
-                key={a.standardJobLevel}
-                className="border-b border-slate-800/30 hover:bg-slate-800/20 transition-colors"
-              >
-                <td className="py-3 pr-4">
-                  <div>
-                    <p className="text-slate-200 font-light">{a.arquetipo}</p>
-                    <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-0.5">
-                      {a.standardJobLevel.replace(/_/g, ' ')}
-                    </p>
-                  </div>
-                </td>
-                <td className="py-3 px-2 text-slate-300 tabular-nums">
-                  {a.rangoOptimo.min}–{a.rangoOptimo.max}
-                </td>
-                <td className="text-right py-3 px-2 text-white tabular-nums">
-                  {a.totalManagers}
-                </td>
-                <td className="text-right py-3 px-2 text-slate-200 tabular-nums">
-                  {a.spanPromedio.toFixed(1)}
-                </td>
-                <td className="text-right py-3 px-2 text-slate-200 tabular-nums">
-                  {a.enRango} / {a.totalManagers}
-                </td>
-                <td className="text-right py-3 pl-2 tabular-nums">
-                  <span
-                    className={
-                      a.distanciaMediaAlOptimo < 1
-                        ? 'text-slate-300'
-                        : a.distanciaMediaAlOptimo < 3
-                          ? 'text-cyan-300'
-                          : 'text-amber-300'
-                    }
+            {data.byArquetipo.map(a => {
+              const enRango =
+                a.spanPromedio >= a.rangoOptimo.min &&
+                a.spanPromedio <= a.rangoOptimo.max
+              const spanColor = enRango
+                ? 'text-slate-200'
+                : Math.abs(a.distanciaMediaAlOptimo) < 3
+                  ? 'text-cyan-300'
+                  : 'text-amber-300'
+              const calibradosPct = (a.enRango / a.totalManagers) * 100
+              const distColor =
+                a.distanciaMediaAlOptimo < 1
+                  ? 'text-slate-300'
+                  : a.distanciaMediaAlOptimo < 3
+                    ? 'text-cyan-300'
+                    : 'text-amber-300'
+
+              return (
+                <tr
+                  key={a.standardJobLevel}
+                  className="border-b border-slate-800/30 hover:bg-slate-800/20 transition-colors"
+                >
+                  <td className="py-3 pr-4">
+                    <div>
+                      <p className="text-slate-200 font-light">{a.arquetipo}</p>
+                      <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-0.5">
+                        {a.standardJobLevel.replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                  </td>
+                  <td className="py-3 px-2 text-slate-300 tabular-nums">
+                    {a.rangoOptimo.min}–{a.rangoOptimo.max}
+                  </td>
+                  <td className="text-right py-3 px-2 text-white tabular-nums">
+                    {a.totalManagers}
+                  </td>
+                  <td
+                    className={`text-right py-3 px-2 tabular-nums font-medium ${spanColor}`}
                   >
+                    {a.spanPromedio.toFixed(1)}
+                  </td>
+                  <td className="py-3 px-2">
+                    <CalibradosCell
+                      enRango={a.enRango}
+                      total={a.totalManagers}
+                      pct={calibradosPct}
+                    />
+                  </td>
+                  <td className={`text-right py-3 pl-2 tabular-nums ${distColor}`}>
                     {a.distanciaMediaAlOptimo === 0
                       ? '0'
                       : `±${a.distanciaMediaAlOptimo.toFixed(1)}`}
-                  </span>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
+    </div>
+  )
+}
+
+/** Celda Calibrados con mini-barra cyan + ratio + porcentaje. */
+function CalibradosCell({
+  enRango,
+  total,
+  pct,
+}: {
+  enRango: number
+  total: number
+  pct: number
+}) {
+  return (
+    <div className="flex items-center justify-end gap-2.5">
+      <div className="w-16 h-1.5 rounded-full bg-slate-800 overflow-hidden flex-shrink-0">
+        <div
+          className="h-full bg-cyan-400 transition-all"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="text-slate-200 tabular-nums text-xs">
+        {enRango}/{total}
+      </span>
+      <span className="text-slate-500 tabular-nums text-xs w-10 text-right">
+        {pct.toFixed(0)}%
+      </span>
     </div>
   )
 }
@@ -828,56 +983,92 @@ function TabPiramide({ data }: { data: OrgSpanIntelligence }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-400 font-light leading-relaxed mb-6">
-        Tu organización vista como pirámide: cada capa muestra cuántas
-        personas tiene, cuántos son managers, y el ratio de control
-        (cuántas personas dependen jerárquicamente de cada manager de
-        esa capa).
+        Tu organización vista como pirámide. Cada capa muestra su tamaño
+        en personas y, cuando aplica, el span promedio y el ratio de
+        control. Pasa el cursor sobre los términos para ver fórmulas.
       </p>
 
       <div className="space-y-2">
         {data.piramide.map(nivel => {
-          const widthPct = Math.max((nivel.fteCount / maxFTE) * 100, 8)
+          const widthPct = Math.max((nivel.fteCount / maxFTE) * 100, 12)
+          const hasManagers = nivel.managersCount > 0 && nivel.spanPromedio !== null
           return (
-            <div key={nivel.standardJobLevel} className="flex items-center gap-4">
-              {/* Label nivel */}
-              <div className="w-44 flex-shrink-0 text-right">
+            <div
+              key={nivel.standardJobLevel}
+              className="flex items-center gap-4"
+            >
+              {/* Label nivel — con tooltip que explica el origen */}
+              <div className="w-48 flex-shrink-0 text-right">
                 <p className="text-xs font-medium text-slate-200 leading-tight">
                   {nivel.arquetipo}
                 </p>
-                <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-0.5">
-                  L{nivel.nivel} · {nivel.standardJobLevel.replace(/_/g, ' ')}
-                </p>
+                <TooltipContext
+                  variant="pattern"
+                  position="top"
+                  usePortal
+                  title={`Nivel L${nivel.nivel}`}
+                  explanation="Cada nivel se deriva del cargo del empleado en la estructura organizacional."
+                  details={[
+                    'L1 es el nivel más alto (gerentes y directores)',
+                    'L7 el más bajo (operativos)',
+                    'Siete niveles canónicos',
+                  ]}
+                >
+                  <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-0.5 cursor-help underline decoration-dotted decoration-slate-700 underline-offset-2 inline">
+                    L{nivel.nivel} · {nivel.standardJobLevel.replace(/_/g, ' ')}
+                  </p>
+                </TooltipContext>
               </div>
 
-              {/* Barra proporcional + datos */}
+              {/* Barra proporcional cyan sólido — métricas dentro */}
               <div className="flex-1 min-w-0">
                 <div
-                  className="rounded-md bg-cyan-500/15 border border-cyan-500/30 h-9 flex items-center px-3 transition-all"
-                  style={{ width: `${widthPct}%`, minWidth: '4rem' }}
+                  className="rounded-md h-10 flex items-center px-3 transition-all gap-3 border"
+                  style={{
+                    width: `${widthPct}%`,
+                    minWidth: '8rem',
+                    backgroundColor: hasManagers
+                      ? 'rgba(34, 211, 238, 0.55)'
+                      : 'rgba(71, 85, 105, 0.5)',
+                    borderColor: hasManagers
+                      ? 'rgba(34, 211, 238, 0.7)'
+                      : 'rgba(71, 85, 105, 0.6)',
+                  }}
                 >
-                  <span className="text-sm font-medium text-white tabular-nums">
+                  <span className="text-sm font-medium text-white tabular-nums whitespace-nowrap">
                     {nivel.fteCount} FTE
                   </span>
+                  {hasManagers && (
+                    <span className="text-xs font-light text-white/85 tabular-nums whitespace-nowrap">
+                      · span {nivel.spanPromedio!.toFixed(1)}
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {/* Métricas a la derecha */}
-              <div className="w-48 flex-shrink-0 flex items-baseline justify-end gap-4 text-xs font-light text-slate-400">
-                {nivel.managersCount > 0 && nivel.spanPromedio !== null && (
-                  <span className="tabular-nums">
-                    span{' '}
-                    <span className="text-slate-200">
-                      {nivel.spanPromedio.toFixed(1)}
+              {/* Ratio de control a la derecha — con tooltip */}
+              <div className="w-32 flex-shrink-0 flex items-baseline justify-end text-xs font-light">
+                {nivel.ratioControl !== null ? (
+                  <TooltipContext
+                    variant="pattern"
+                    position="top"
+                    usePortal
+                    title="Ratio de control"
+                    explanation="Por cada manager de esta capa, cuántas personas dependen jerárquicamente de él."
+                    details={[
+                      'Saludable: 1:5 a 1:10',
+                      'Bajo 1:3 sugiere que la capa no agrega valor estructural',
+                    ]}
+                  >
+                    <span className="tabular-nums cursor-help">
+                      <span className="text-slate-500">ratio </span>
+                      <span className="text-cyan-300">
+                        1:{nivel.ratioControl.toFixed(1)}
+                      </span>
                     </span>
-                  </span>
-                )}
-                {nivel.ratioControl !== null && (
-                  <span className="tabular-nums">
-                    ratio{' '}
-                    <span className="text-cyan-300">
-                      1:{nivel.ratioControl.toFixed(1)}
-                    </span>
-                  </span>
+                  </TooltipContext>
+                ) : (
+                  <span className="text-slate-700">—</span>
                 )}
               </div>
             </div>
@@ -886,8 +1077,8 @@ function TabPiramide({ data }: { data: OrgSpanIntelligence }) {
       </div>
 
       <p className="text-[11px] text-slate-500 font-light italic mt-6 leading-relaxed">
-        Ratio saludable de control: 1:5 a 1:10 por capa según arquetipo.
-        Ratios menores a 1:3 sugieren capa con baja apalancamiento jerárquico.
+        Capas en cyan tienen managers activos. Capas en slate son
+        contribuidores individuales (sin gestión de equipo).
       </p>
     </div>
   )

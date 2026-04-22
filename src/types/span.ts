@@ -41,8 +41,14 @@ export interface SpanManagerProfile {
   managerId: string
   managerName: string
   cargo: string
+  /** Departamento operacional inmediato del manager (L3 típicamente). */
   gerenciaId: string
   gerenciaNombre: string
+  /** Gerencia padre (L2) — concepto organizacional que el CEO reconoce
+   *  como "Gerencia de X". Fallback al departamento operacional si la
+   *  organización no tiene jerarquía L2 definida para este depto. */
+  gerenciaParentId: string
+  gerenciaParentNombre: string
   standardJobLevel: string
   performanceTrack: 'EJECUTIVO' | 'MANAGER' | 'COLABORADOR'
   tenureMeses: number
@@ -97,8 +103,12 @@ export interface OrgSpanSummary {
 // ROLLUPS PARA MODAL "DISTRIBUCIÓN COMPLETA" (3 tabs)
 // ════════════════════════════════════════════════════════════════════════════
 
-/** Distribución por gerencia — Tab 1 del modal. */
+/** Distribución por gerencia — Tab 1 del modal.
+ *  Agrupa por gerencia padre (L2) cuando existe — concepto organizacional
+ *  que el CEO reconoce. Fallback al departamento operacional si no hay
+ *  jerarquía L2 definida. */
 export interface GerenciaRollup {
+  /** ID de la gerencia (parent L2 cuando existe, departamento operacional si no). */
   gerenciaId: string
   gerenciaNombre: string
   totalManagers: number
