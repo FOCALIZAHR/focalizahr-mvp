@@ -59,7 +59,11 @@ const LENTE_COMPONENTS: Partial<Record<LenteId, React.FC<LenteComponentProps>>> 
 // en el totalizador del checkpoint (PrimaryButton canónico), por lo que
 // el LenteFooterNav legacy debe ocultarse para evitar duplicación.
 // Los lentes que aún usan LenteCard sí lo necesitan.
-const LENTES_CON_LAYOUT: Set<LenteId> = new Set(['l1_inercia', 'l2_zombie'])
+const LENTES_CON_LAYOUT: Set<LenteId> = new Set([
+  'l1_inercia',
+  'l2_zombie',
+  'l9_pasivo',
+])
 
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL

@@ -77,11 +77,27 @@ const ZONAS: Record<ZonaL9, ZonaConfig> = {
   },
   talent_trap: {
     id: 'talent_trap',
-    label: 'Talent Trap',
+    label: 'Pasivo sin retorno',
     descripcion: 'No aporta pero despedirlo golpea el flujo de caja.',
     color: '#EF4444',
     bgOpacity: 0.10,
   },
+}
+
+/** Label visible exportado para reutilización en chips de la ficha rica. */
+export const ZONA_LABEL: Record<ZonaL9, string> = {
+  agilidad_total: 'Agilidad total',
+  cimientos_oro: 'Cimientos de oro',
+  ventana_decision: 'Ventana de decisión',
+  talent_trap: 'Pasivo sin retorno',
+}
+
+/** Color por zona — para chips/badges fuera del scatter. */
+export const ZONA_COLOR: Record<ZonaL9, string> = {
+  agilidad_total: '#22D3EE',
+  cimientos_oro: '#10B981',
+  ventana_decision: '#F59E0B',
+  talent_trap: '#EF4444',
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -96,6 +112,11 @@ interface TalentArbitrageMapProps {
     retentionScore: number
     daysToAnniversary: number
   }>
+  /** 'full' (default) — versión Tab 2 standalone con stats arriba +
+   *  banner alertas abajo. 'reduced' — variante para el Acto Hallazgo de
+   *  L9 migrado a LenteLayout: scatter compacto + leyenda zonas, sin
+   *  stats grid ni banner alertas (esos se manejan fuera). */
+  variant?: 'full' | 'reduced'
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -105,7 +126,9 @@ interface TalentArbitrageMapProps {
 export function TalentArbitrageMap({
   scatter,
   alertasProximidad,
+  variant = 'full',
 }: TalentArbitrageMapProps) {
+  const isReduced = variant === 'reduced'
   // Agrupar por zona para render + stats
   const byZona = useMemo(() => {
     const groups: Record<ZonaL9, PersonL9[]> = {
@@ -148,35 +171,37 @@ export function TalentArbitrageMap({
 
   return (
     <div>
-      {/* Header: stats rápidas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <StatChip
-          label="Mapeados"
-          value={String(scatter.length)}
-          color="text-white"
-        />
-        <StatChip
-          label="VPP promedio"
-          value={vppStats.avgVpp.toFixed(1)}
-          hint="valor / mes-finiquito"
-          color="text-slate-200"
-        />
-        <StatChip
-          label="Dinero muerto"
-          value={String(vppStats.dineroMuerto)}
-          hint="VPP < 5"
-          color="text-red-300"
-        />
-        <StatChip
-          label="Activos eficientes"
-          value={String(vppStats.eficiente)}
-          hint="VPP > 15"
-          color="text-emerald-300"
-        />
-      </div>
+      {/* Header: stats rápidas — solo variante full (Tab 2 legacy) */}
+      {!isReduced && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          <StatChip
+            label="Mapeados"
+            value={String(scatter.length)}
+            color="text-white"
+          />
+          <StatChip
+            label="VPP promedio"
+            value={vppStats.avgVpp.toFixed(1)}
+            hint="valor / mes-finiquito"
+            color="text-slate-200"
+          />
+          <StatChip
+            label="Dinero muerto"
+            value={String(vppStats.dineroMuerto)}
+            hint="VPP < 5"
+            color="text-red-300"
+          />
+          <StatChip
+            label="Activos eficientes"
+            value={String(vppStats.eficiente)}
+            hint="VPP > 15"
+            color="text-emerald-300"
+          />
+        </div>
+      )}
 
-      {/* Scatter chart */}
-      <div className="relative h-[360px] md:h-[420px] mb-5 rounded-lg bg-slate-900/40 border border-slate-800/60 p-3">
+      {/* Scatter chart — altura reducida en variant 'reduced' */}
+      <div className={`relative ${isReduced ? 'h-[300px] md:h-[340px]' : 'h-[360px] md:h-[420px]'} mb-5 rounded-[20px] bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 p-3`}>
         <ResponsiveContainer width="100%" height="100%">
           <ScatterChart margin={{ top: 16, right: 24, bottom: 28, left: 24 }}>
             <CartesianGrid
@@ -342,8 +367,9 @@ export function TalentArbitrageMap({
         })}
       </div>
 
-      {/* Alerta Proximidad (mismo contenido que Tab 1 — se repite para contexto) */}
-      {alertasProximidad.length > 0 && (
+      {/* Alerta Proximidad — solo variante full. En 'reduced' el banner
+          se renderiza fuera (en el Quirófano de L9 LenteLayout). */}
+      {!isReduced && alertasProximidad.length > 0 && (
         <div
           className="p-3 rounded-md"
           style={{
