@@ -57,6 +57,9 @@ import {
   type OrgSpanIntelligence,
   type RangoOptimo,
   type PerfilEvaluativo,
+  type GerenciaRollup,
+  type ArquetipoRollup,
+  type PiramideNivel,
 } from '@/types/span'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -336,6 +339,9 @@ export class SpanIntelligenceService {
           densidadNarrativa: null,
         },
         managers: [],
+        byGerencia: [],
+        byArquetipo: [],
+        piramide: [],
       }
     }
 
@@ -595,6 +601,13 @@ export class SpanIntelligenceService {
       totalFTE
     )
 
+    // ── Rollups laterales para el modal "Distribución completa" ──────
+    // Cero queries adicionales — todo se agrega in-memory desde
+    // profiles + enriched.
+    const byGerencia = buildGerenciaRollup(profiles, enriched)
+    const byArquetipo = buildArquetipoRollup(profiles)
+    const piramide = buildPiramide(enriched, profiles)
+
     return {
       org: {
         totalFTE,
@@ -610,6 +623,152 @@ export class SpanIntelligenceService {
         densidadNarrativa,
       },
       managers: profiles,
+      byGerencia,
+      byArquetipo,
+      piramide,
     }
   }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ROLLUPS — agregaciones in-memory para el modal "Distribución completa"
+// ════════════════════════════════════════════════════════════════════════════
+
+function buildGerenciaRollup(
+  profiles: SpanManagerProfile[],
+  enriched: EnrichedEmployee[]
+): GerenciaRollup[] {
+  // FTE total por gerencia (no solo managers — toda la dotación de la gerencia)
+  const fteByGerencia = new Map<string, number>()
+  for (const e of enriched) {
+    fteByGerencia.set(
+      e.departmentId,
+      (fteByGerencia.get(e.departmentId) ?? 0) + 1
+    )
+  }
+
+  const grupos = new Map<
+    string,
+    {
+      gerenciaNombre: string
+      managers: SpanManagerProfile[]
+    }
+  >()
+  for (const p of profiles) {
+    const key = p.gerenciaId
+    if (!grupos.has(key))
+      grupos.set(key, { gerenciaNombre: p.gerenciaNombre, managers: [] })
+    grupos.get(key)!.managers.push(p)
+  }
+
+  const out: GerenciaRollup[] = []
+  for (const [gerenciaId, { gerenciaNombre, managers }] of grupos) {
+    const total = managers.length
+    const fteGerencia = fteByGerencia.get(gerenciaId) ?? total
+    out.push({
+      gerenciaId,
+      gerenciaNombre,
+      totalManagers: total,
+      spanPromedio: managers.reduce((s, m) => s + m.spanActual, 0) / total,
+      densidadGerencial: fteGerencia > 0 ? total / fteGerencia : 0,
+      costoFTEpromedio:
+        managers.reduce((s, m) => s + m.costoFTEgestionado, 0) / total,
+      enRojo: managers.filter(m => m.narrativa.zona === 'ROJA').length,
+      enAmarillo: managers.filter(m => m.narrativa.zona === 'AMARILLA').length,
+      enVerde: managers.filter(m => m.narrativa.zona === 'VERDE').length,
+    })
+  }
+  // Ordenar por managers descendente
+  return out.sort((a, b) => b.totalManagers - a.totalManagers)
+}
+
+function buildArquetipoRollup(
+  profiles: SpanManagerProfile[]
+): ArquetipoRollup[] {
+  const grupos = new Map<string, SpanManagerProfile[]>()
+  for (const p of profiles) {
+    const key = p.standardJobLevel
+    if (!grupos.has(key)) grupos.set(key, [])
+    grupos.get(key)!.push(p)
+  }
+
+  const out: ArquetipoRollup[] = []
+  for (const [standardJobLevel, managers] of grupos) {
+    const total = managers.length
+    const enRango = managers.filter(m => m.spanZone === 'EN_RANGO').length
+    out.push({
+      standardJobLevel,
+      arquetipo: managers[0].rangoOptimo.arquetipo,
+      rangoOptimo: managers[0].rangoOptimo,
+      totalManagers: total,
+      spanPromedio: managers.reduce((s, m) => s + m.spanActual, 0) / total,
+      enRango,
+      fueraRango: total - enRango,
+      distanciaMediaAlOptimo:
+        managers.reduce((s, m) => s + Math.abs(m.spanGap), 0) / total,
+    })
+  }
+  // Ordenar por order del arquetipo (gerentes arriba, operativos abajo)
+  // — usa el SPAN_OPTIMO key order como proxy
+  const orden = Object.keys(SPAN_OPTIMO)
+  return out.sort(
+    (a, b) =>
+      orden.indexOf(a.standardJobLevel) - orden.indexOf(b.standardJobLevel)
+  )
+}
+
+function buildPiramide(
+  enriched: EnrichedEmployee[],
+  profiles: SpanManagerProfile[]
+): PiramideNivel[] {
+  // FTE por standardJobLevel (toda la dotación, no solo managers)
+  const fteByLevel = new Map<string, number>()
+  for (const e of enriched) {
+    const key = e.standardJobLevel ?? 'sin_clasificar'
+    fteByLevel.set(key, (fteByLevel.get(key) ?? 0) + 1)
+  }
+
+  // Managers por level
+  const managersByLevel = new Map<string, SpanManagerProfile[]>()
+  for (const p of profiles) {
+    const key = p.standardJobLevel
+    if (!managersByLevel.has(key)) managersByLevel.set(key, [])
+    managersByLevel.get(key)!.push(p)
+  }
+
+  // Construir niveles en orden canónico (1 = más alto)
+  const orden = Object.keys(SPAN_OPTIMO) // gerente_director ... operativo_auxiliar
+  const out: PiramideNivel[] = []
+  for (let i = 0; i < orden.length; i++) {
+    const standardJobLevel = orden[i]
+    const fteCount = fteByLevel.get(standardJobLevel) ?? 0
+    if (fteCount === 0) continue // omitir niveles vacíos
+    const mgrs = managersByLevel.get(standardJobLevel) ?? []
+    const rango = SPAN_OPTIMO[standardJobLevel] ?? SPAN_FALLBACK
+    out.push({
+      nivel: i + 1,
+      standardJobLevel,
+      arquetipo: rango.arquetipo,
+      fteCount,
+      managersCount: mgrs.length,
+      spanPromedio:
+        mgrs.length > 0
+          ? mgrs.reduce((s, m) => s + m.spanActual, 0) / mgrs.length
+          : null,
+      ratioControl: null, // se calcula en el siguiente loop
+    })
+  }
+
+  // Ratio de control: managers de este nivel : FTE acumulado de niveles
+  // inferiores (lo que efectivamente "controla" esta capa).
+  let acumInferior = 0
+  for (let i = out.length - 1; i >= 0; i--) {
+    const nivel = out[i]
+    if (nivel.managersCount > 0 && acumInferior > 0) {
+      nivel.ratioControl = acumInferior / nivel.managersCount
+    }
+    acumInferior += nivel.fteCount
+  }
+
+  return out
 }

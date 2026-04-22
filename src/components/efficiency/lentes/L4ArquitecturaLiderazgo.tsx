@@ -404,11 +404,13 @@ function HallazgoZonas({ data }: { data: OrgSpanIntelligence }) {
         Tu pirámide,{' '}
         <span className="fhr-title-gradient">por calidad estructural</span>
       </h3>
-      <p className="text-sm text-slate-400 font-light leading-relaxed max-w-2xl mb-6">
+      <p className="text-sm text-slate-400 font-light leading-relaxed max-w-2xl mb-4">
         No todas las jefaturas pesan igual. Unas operan en su rango óptimo
         y producen; otras están fuera de arquetipo y acumulan costo sin
         gestión real.
       </p>
+
+      <DistribucionCompletaTrigger data={data} />
 
       {/* Distribución por zona — barra apilada + leyenda inline.
           Patrón Tesla telemetría: visualización proporcional + datos
@@ -532,6 +534,397 @@ function ZonaInline({
       <span className="text-[10px] uppercase tracking-widest text-slate-500 font-medium">
         {label}
       </span>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// MODAL "DISTRIBUCIÓN COMPLETA" — 3 tabs (Por Gerencia / Por Arquetipo / Pirámide)
+// ════════════════════════════════════════════════════════════════════════════
+// Botón disparador discreto debajo de la narrativa contextual del Hallazgo.
+// Modal full-screen con tabs underline (no pills). Cero impacto en el
+// flujo principal — es vista panorámica opcional pre-acción.
+
+type TabModal = 'gerencia' | 'arquetipo' | 'piramide'
+
+function DistribucionCompletaTrigger({ data }: { data: OrgSpanIntelligence }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="text-xs font-light text-slate-400 hover:text-cyan-300 transition-colors inline-flex items-center gap-1.5 cursor-pointer mb-6"
+      >
+        + Ver span de control por gerencia y arquetipo
+      </button>
+      <AnimatePresence>
+        {open && <DistribucionCompletaModal data={data} onClose={() => setOpen(false)} />}
+      </AnimatePresence>
+    </>
+  )
+}
+
+function DistribucionCompletaModal({
+  data,
+  onClose,
+}: {
+  data: OrgSpanIntelligence
+  onClose: () => void
+}) {
+  const [tab, setTab] = useState<TabModal>('gerencia')
+
+  // Cerrar con ESC
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 md:p-8"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20, scale: 0.98 }}
+        transition={{ duration: 0.25, ease: 'easeOut' }}
+        onClick={e => e.stopPropagation()}
+        className="relative w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-[20px] border border-slate-800 bg-[#0F172A]/95 backdrop-blur-2xl"
+      >
+        {/* Header */}
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 px-6 py-4 md:px-8 md:py-5 border-b border-slate-800/60 bg-[#0F172A]/95 backdrop-blur-2xl">
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-widest text-cyan-400 font-medium">
+              Distribución completa
+            </p>
+            <h3 className="text-base md:text-lg font-light text-white leading-tight mt-0.5">
+              Span de control · panorámica organizacional
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white transition-colors p-2 -mr-2"
+            aria-label="Cerrar"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Tabs underline */}
+        <div className="flex gap-6 px-6 md:px-8 border-b border-slate-800/60 sticky top-[73px] z-10 bg-[#0F172A]/95 backdrop-blur-2xl">
+          <TabButton active={tab === 'gerencia'} onClick={() => setTab('gerencia')}>
+            Por Gerencia
+          </TabButton>
+          <TabButton active={tab === 'arquetipo'} onClick={() => setTab('arquetipo')}>
+            Por Arquetipo
+          </TabButton>
+          <TabButton active={tab === 'piramide'} onClick={() => setTab('piramide')}>
+            Pirámide
+          </TabButton>
+        </div>
+
+        {/* Contenido del tab */}
+        <div className="p-6 md:p-8">
+          {tab === 'gerencia' && <TabGerencia data={data} />}
+          {tab === 'arquetipo' && <TabArquetipo data={data} />}
+          {tab === 'piramide' && <TabPiramide data={data} />}
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`pb-3 pt-4 text-sm font-medium transition-colors border-b-2 ${
+        active
+          ? 'text-cyan-400 border-cyan-400'
+          : 'text-slate-500 border-transparent hover:text-slate-300'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+// ── TAB 1: Por Gerencia ────────────────────────────────────────────────────
+
+function TabGerencia({ data }: { data: OrgSpanIntelligence }) {
+  if (data.byGerencia.length === 0) {
+    return (
+      <p className="text-sm text-slate-400 font-light">
+        Sin gerencias con managers activos.
+      </p>
+    )
+  }
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-400 font-light leading-relaxed mb-4">
+        Cada fila es una gerencia con sus managers activos. La densidad
+        gerencial muestra qué porcentaje de la dotación de esa gerencia
+        son jefes.
+      </p>
+      <div className="overflow-x-auto -mx-6 md:-mx-8 px-6 md:px-8">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-widest text-slate-500 font-medium border-b border-slate-800/60">
+              <th className="text-left py-3 pr-4">Gerencia</th>
+              <th className="text-right py-3 px-2">Managers</th>
+              <th className="text-right py-3 px-2">Span prom.</th>
+              <th className="text-right py-3 px-2">Densidad</th>
+              <th className="text-right py-3 px-2">Costo / FTE</th>
+              <th className="text-right py-3 pl-4 pl-2">Distribución</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.byGerencia.map(g => (
+              <tr
+                key={g.gerenciaId}
+                className="border-b border-slate-800/30 hover:bg-slate-800/20 transition-colors"
+              >
+                <td className="py-3 pr-4 text-slate-200 font-light">
+                  {formatLabel(g.gerenciaNombre)}
+                </td>
+                <td className="text-right py-3 px-2 text-white tabular-nums">
+                  {g.totalManagers}
+                </td>
+                <td className="text-right py-3 px-2 text-slate-200 tabular-nums">
+                  {g.spanPromedio.toFixed(1)}
+                </td>
+                <td className="text-right py-3 px-2 text-slate-200 tabular-nums">
+                  {(g.densidadGerencial * 100).toFixed(0)}%
+                </td>
+                <td className="text-right py-3 px-2 text-slate-200 tabular-nums">
+                  {formatCLP(g.costoFTEpromedio)}
+                </td>
+                <td className="text-right py-3 pl-2">
+                  <MiniBarra
+                    rojo={g.enRojo}
+                    amarillo={g.enAmarillo}
+                    verde={g.enVerde}
+                    total={g.totalManagers}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ── TAB 2: Por Arquetipo ──────────────────────────────────────────────────
+
+function TabArquetipo({ data }: { data: OrgSpanIntelligence }) {
+  if (data.byArquetipo.length === 0) {
+    return (
+      <p className="text-sm text-slate-400 font-light">
+        Sin managers activos para clasificar por arquetipo.
+      </p>
+    )
+  }
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-400 font-light leading-relaxed mb-4">
+        Cada arquetipo McKinsey tiene un rango de span óptimo. La distancia
+        media indica cuánto se desvían los managers de esa categoría
+        respecto al rango esperado.
+      </p>
+      <div className="overflow-x-auto -mx-6 md:-mx-8 px-6 md:px-8">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-widest text-slate-500 font-medium border-b border-slate-800/60">
+              <th className="text-left py-3 pr-4">Arquetipo</th>
+              <th className="text-left py-3 px-2">Rango óptimo</th>
+              <th className="text-right py-3 px-2">Managers</th>
+              <th className="text-right py-3 px-2">Span prom.</th>
+              <th className="text-right py-3 px-2">En rango</th>
+              <th className="text-right py-3 pl-2">Distancia al óptimo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.byArquetipo.map(a => (
+              <tr
+                key={a.standardJobLevel}
+                className="border-b border-slate-800/30 hover:bg-slate-800/20 transition-colors"
+              >
+                <td className="py-3 pr-4">
+                  <div>
+                    <p className="text-slate-200 font-light">{a.arquetipo}</p>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-0.5">
+                      {a.standardJobLevel.replace(/_/g, ' ')}
+                    </p>
+                  </div>
+                </td>
+                <td className="py-3 px-2 text-slate-300 tabular-nums">
+                  {a.rangoOptimo.min}–{a.rangoOptimo.max}
+                </td>
+                <td className="text-right py-3 px-2 text-white tabular-nums">
+                  {a.totalManagers}
+                </td>
+                <td className="text-right py-3 px-2 text-slate-200 tabular-nums">
+                  {a.spanPromedio.toFixed(1)}
+                </td>
+                <td className="text-right py-3 px-2 text-slate-200 tabular-nums">
+                  {a.enRango} / {a.totalManagers}
+                </td>
+                <td className="text-right py-3 pl-2 tabular-nums">
+                  <span
+                    className={
+                      a.distanciaMediaAlOptimo < 1
+                        ? 'text-slate-300'
+                        : a.distanciaMediaAlOptimo < 3
+                          ? 'text-cyan-300'
+                          : 'text-amber-300'
+                    }
+                  >
+                    {a.distanciaMediaAlOptimo === 0
+                      ? '0'
+                      : `±${a.distanciaMediaAlOptimo.toFixed(1)}`}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ── TAB 3: Pirámide organizacional ────────────────────────────────────────
+
+function TabPiramide({ data }: { data: OrgSpanIntelligence }) {
+  if (data.piramide.length === 0) {
+    return (
+      <p className="text-sm text-slate-400 font-light">
+        Sin niveles jerárquicos para visualizar.
+      </p>
+    )
+  }
+  // Ancho relativo de cada barra = fteCount del nivel / max FTE
+  const maxFTE = Math.max(...data.piramide.map(n => n.fteCount), 1)
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-400 font-light leading-relaxed mb-6">
+        Tu organización vista como pirámide: cada capa muestra cuántas
+        personas tiene, cuántos son managers, y el ratio de control
+        (cuántas personas dependen jerárquicamente de cada manager de
+        esa capa).
+      </p>
+
+      <div className="space-y-2">
+        {data.piramide.map(nivel => {
+          const widthPct = Math.max((nivel.fteCount / maxFTE) * 100, 8)
+          return (
+            <div key={nivel.standardJobLevel} className="flex items-center gap-4">
+              {/* Label nivel */}
+              <div className="w-44 flex-shrink-0 text-right">
+                <p className="text-xs font-medium text-slate-200 leading-tight">
+                  {nivel.arquetipo}
+                </p>
+                <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-0.5">
+                  L{nivel.nivel} · {nivel.standardJobLevel.replace(/_/g, ' ')}
+                </p>
+              </div>
+
+              {/* Barra proporcional + datos */}
+              <div className="flex-1 min-w-0">
+                <div
+                  className="rounded-md bg-cyan-500/15 border border-cyan-500/30 h-9 flex items-center px-3 transition-all"
+                  style={{ width: `${widthPct}%`, minWidth: '4rem' }}
+                >
+                  <span className="text-sm font-medium text-white tabular-nums">
+                    {nivel.fteCount} FTE
+                  </span>
+                </div>
+              </div>
+
+              {/* Métricas a la derecha */}
+              <div className="w-48 flex-shrink-0 flex items-baseline justify-end gap-4 text-xs font-light text-slate-400">
+                {nivel.managersCount > 0 && nivel.spanPromedio !== null && (
+                  <span className="tabular-nums">
+                    span{' '}
+                    <span className="text-slate-200">
+                      {nivel.spanPromedio.toFixed(1)}
+                    </span>
+                  </span>
+                )}
+                {nivel.ratioControl !== null && (
+                  <span className="tabular-nums">
+                    ratio{' '}
+                    <span className="text-cyan-300">
+                      1:{nivel.ratioControl.toFixed(1)}
+                    </span>
+                  </span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <p className="text-[11px] text-slate-500 font-light italic mt-6 leading-relaxed">
+        Ratio saludable de control: 1:5 a 1:10 por capa según arquetipo.
+        Ratios menores a 1:3 sugieren capa con baja apalancamiento jerárquico.
+      </p>
+    </div>
+  )
+}
+
+// ── Mini-barra para el tab Por Gerencia (versión compacta de DistribucionZonas) ──
+
+function MiniBarra({
+  rojo,
+  amarillo,
+  verde,
+  total,
+}: {
+  rojo: number
+  amarillo: number
+  verde: number
+  total: number
+}) {
+  const totalSafe = total > 0 ? total : 1
+  const segments = [
+    { count: rojo, color: ZONA_COLOR.ROJA },
+    { count: amarillo, color: ZONA_COLOR.AMARILLA },
+    { count: verde, color: ZONA_COLOR.VERDE },
+  ]
+  return (
+    <div className="inline-flex h-2 w-32 rounded-full overflow-hidden bg-slate-900/40 border border-slate-800">
+      {segments.map((s, i) =>
+        s.count > 0 ? (
+          <div
+            key={i}
+            style={{
+              width: `${(s.count / totalSafe) * 100}%`,
+              backgroundColor: s.color,
+            }}
+          />
+        ) : null
+      )}
     </div>
   )
 }

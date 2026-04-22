@@ -93,9 +93,57 @@ export interface OrgSpanSummary {
   densidadNarrativa: string | null
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// ROLLUPS PARA MODAL "DISTRIBUCIÓN COMPLETA" (3 tabs)
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Distribución por gerencia — Tab 1 del modal. */
+export interface GerenciaRollup {
+  gerenciaId: string
+  gerenciaNombre: string
+  totalManagers: number
+  spanPromedio: number
+  densidadGerencial: number      // managers en gerencia / totalFTE de gerencia
+  costoFTEpromedio: number
+  enRojo: number
+  enAmarillo: number
+  enVerde: number
+}
+
+/** Distribución por arquetipo McKinsey — Tab 2 del modal. */
+export interface ArquetipoRollup {
+  standardJobLevel: string       // gerente_director, jefe, etc.
+  arquetipo: string              // Player/Coach, Supervisor, etc.
+  rangoOptimo: RangoOptimo
+  totalManagers: number
+  spanPromedio: number
+  enRango: number
+  fueraRango: number
+  distanciaMediaAlOptimo: number // promedio de |spanGap| de los managers
+}
+
+/** Capa de la pirámide organizacional — Tab 3 del modal. */
+export interface PiramideNivel {
+  nivel: number                  // 1 = más alto (CEO/gerentes), 7 = más bajo
+  standardJobLevel: string       // gerente_director, jefe, etc.
+  arquetipo: string
+  fteCount: number               // headcount total de personas en este nivel
+  managersCount: number          // cuántos de esos FTE son managers (con span > 0)
+  spanPromedio: number | null    // promedio de span de los managers de este nivel
+  /** Ratio respecto al nivel inmediatamente inferior. Ej: nivel L3 con
+   *  ratio 1:5 significa que por cada manager L3 hay 5 personas en L4
+   *  o niveles inferiores conectados. Null para el nivel más bajo. */
+  ratioControl: number | null
+}
+
 export interface OrgSpanIntelligence {
   org: OrgSpanSummary
   managers: SpanManagerProfile[]
+  /** Rollups laterales para el modal "Distribución completa". Se calculan
+   *  in-memory desde managers + enriched, sin queries adicionales. */
+  byGerencia: GerenciaRollup[]
+  byArquetipo: ArquetipoRollup[]
+  piramide: PiramideNivel[]
 }
 
 // ════════════════════════════════════════════════════════════════════════════
