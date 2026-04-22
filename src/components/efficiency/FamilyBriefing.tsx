@@ -163,17 +163,29 @@ const LENTE_COPY: Record<LenteId, LenteCopy> = {
     queDecides: 'Intervenir clima antes de desplegar, o aceptar menor retorno.',
   },
   l4_fantasma: {
-    titulo: 'Cargos sin impacto',
+    titulo: 'Arquitectura de Liderazgo',
     queHay:
-      'Cargos con títulos distintos que comparten la mayor parte del trabajo.',
+      'Jefaturas con span fuera del rango óptimo de su arquetipo McKinsey.',
     getQueEncontro: lente => {
       const d = lente.detalle as
-        | { pairs?: unknown[]; totalEstimatedSavings?: number }
+        | {
+            org?: {
+              managersEnRojo?: number
+              managersEnAmarillo?: number
+              totalManagers?: number
+              costoCapasSuboptimas?: number
+            }
+          }
         | null
-      const n = d?.pairs?.length ?? 0
-      return `${formatInt(n)} ${n === 1 ? 'par' : 'pares'} detectados · ${formatCLP(d?.totalEstimatedSavings ?? 0)} ahorro potencial anual`
+      const enRojo = d?.org?.managersEnRojo ?? 0
+      const enAmarillo = d?.org?.managersEnAmarillo ?? 0
+      const totalManagers = d?.org?.totalManagers ?? 0
+      const fuera = enRojo + enAmarillo
+      const costo = d?.org?.costoCapasSuboptimas ?? 0
+      return `${formatInt(fuera)} de ${formatInt(totalManagers)} ${totalManagers === 1 ? 'jefatura' : 'jefaturas'} fuera de rango · ${formatCLP(costo)}/mes en capas subóptimas`
     },
-    queDecides: 'Consolidar pares o redistribuir el alcance de cada cargo.',
+    queDecides:
+      'Consolidar capas sin valor, ampliar equipos sub-spanning o redistribuir equipos sobredimensionados.',
   },
   l5_brecha: {
     titulo: 'Brecha de productividad',

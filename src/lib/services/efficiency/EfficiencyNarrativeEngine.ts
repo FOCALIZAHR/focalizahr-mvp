@@ -40,10 +40,13 @@ export const LENTES_META: Record<LenteId, LenteMeta> = {
     subtitulo: 'FTEs atrapados en tareas automatizables',
   },
   l4_fantasma: {
+    // ID interno preservado (l4_fantasma) — feedback de memoria: IDs
+    // internos no se cambian sin autorización. El concepto cambió:
+    // ahora analiza span de control por arquetipo McKinsey.
     id: 'l4_fantasma',
     familia: 'capital_en_riesgo',
-    titulo: 'Cargos sin impacto',
-    subtitulo: 'Títulos distintos, mismo trabajo',
+    titulo: 'Arquitectura de Liderazgo',
+    subtitulo: 'Calidad estructural de la pirámide gerencial',
   },
 
   // ── FAMILIA 2 — RUTA DE EJECUCIÓN ───────────────────────────────────

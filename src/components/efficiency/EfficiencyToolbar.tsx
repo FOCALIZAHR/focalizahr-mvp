@@ -43,6 +43,17 @@ function getArrayLen(detalle: unknown, key: string): number {
   return Array.isArray(v) ? v.length : 0
 }
 
+/** Managers fuera de rango (ROJA + AMARILLA) del detalle de L4. */
+function getL4FueraDeRango(detalle: unknown): number {
+  if (!detalle || typeof detalle !== 'object') return 0
+  const org = (detalle as { org?: Record<string, unknown> }).org
+  if (!org || typeof org !== 'object') return 0
+  const rojo = typeof org.managersEnRojo === 'number' ? org.managersEnRojo : 0
+  const amarillo =
+    typeof org.managersEnAmarillo === 'number' ? org.managersEnAmarillo : 0
+  return rojo + amarillo
+}
+
 function headlineMetric(lente?: LenteAPI): string {
   if (!lente || !lente.hayData) return '—'
   // Priorizar datos canónicos por lente
@@ -52,7 +63,7 @@ function headlineMetric(lente?: LenteAPI): string {
     case 'l2_zombie':
       return `${getNumber(lente.detalle, 'count')}`
     case 'l4_fantasma':
-      return `${getArrayLen(lente.detalle, 'pairs')}`
+      return `${getL4FueraDeRango(lente.detalle)}`
     case 'l5_brecha':
       return formatCLP(getNumber(lente.detalle, 'total'))
     case 'l7_fuga':
@@ -72,7 +83,7 @@ function headlineValue(lente?: LenteAPI): number {
     case 'l2_zombie':
       return getNumber(lente.detalle, 'count')
     case 'l4_fantasma':
-      return getArrayLen(lente.detalle, 'pairs')
+      return getL4FueraDeRango(lente.detalle)
     case 'l5_brecha':
       return getNumber(lente.detalle, 'total')
     case 'l7_fuga':

@@ -34,7 +34,7 @@ import { LENTES_META } from '@/lib/services/efficiency/EfficiencyNarrativeEngine
 // Componentes específicos por lente
 import { L1CostoInercia } from './lentes/L1CostoInercia'
 import { L2TalentoZombie } from './lentes/L2TalentoZombie'
-import { L4CargosFantasma } from './lentes/L4CargosFantasma'
+import { L4ArquitecturaLiderazgo } from './lentes/L4ArquitecturaLiderazgo'
 import { L5BrechaProductividad } from './lentes/L5BrechaProductividad'
 import { L7L8MapaTalento } from './lentes/L7L8MapaTalento'
 import { L9PasivoLaboral } from './lentes/L9PasivoLaboral'
@@ -49,7 +49,7 @@ import type { LenteComponentProps } from './lentes/_LentePlaceholder'
 const LENTE_COMPONENTS: Partial<Record<LenteId, React.FC<LenteComponentProps>>> = {
   l1_inercia: L1CostoInercia,
   l2_zombie: L2TalentoZombie,
-  l4_fantasma: L4CargosFantasma,
+  l4_fantasma: L4ArquitecturaLiderazgo,
   l5_brecha: L5BrechaProductividad,
   l7_fuga: L7L8MapaTalento,
   l9_pasivo: L9PasivoLaboral,
@@ -62,6 +62,7 @@ const LENTE_COMPONENTS: Partial<Record<LenteId, React.FC<LenteComponentProps>>> 
 const LENTES_CON_LAYOUT: Set<LenteId> = new Set([
   'l1_inercia',
   'l2_zombie',
+  'l4_fantasma',
   'l9_pasivo',
 ])
 
