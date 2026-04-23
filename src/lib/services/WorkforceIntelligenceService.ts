@@ -62,6 +62,8 @@ export interface EnrichedEmployee {
   finiquitoToday: number | null
   // Succession
   isIncumbentOfCriticalPosition: boolean
+  // Hierarchy (para cruces con CalibrationStats del evaluador)
+  managerId: string | null
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -276,6 +278,8 @@ export interface RetentionEntry {
   riskQuadrant: string | null         // FUGA_CEREBROS | MOTOR_EQUIPO | BURNOUT_RISK | BAJO_RENDIMIENTO
   mobilityQuadrant: string | null     // SUCESOR_NATURAL | EXPERTO_ANCLA | AMBICIOSO_PREMATURO | EN_DESARROLLO
   potentialAbility: number | null     // 1-3 base — para detectTalentZombies per-persona
+  // v3.4 — jerarquía (habilita cruce con calibración del evaluador en L5)
+  managerId: string | null
 }
 
 export interface RetentionPriorityResult {
@@ -373,6 +377,7 @@ export class WorkforceIntelligenceService {
       select: {
         id: true, fullName: true, position: true, hireDate: true,
         departmentId: true, standardJobLevel: true, acotadoGroup: true,
+        managerId: true,
         department: { select: { displayName: true, standardCategory: true } },
         _count: { select: { directReports: { where: { status: 'ACTIVE', accountId } } } },
       },
@@ -482,6 +487,7 @@ export class WorkforceIntelligenceService {
         // Enricher no impone filtros UX — Principio 15 (arquitectura sin parches).
         finiquitoToday: calculateFiniquito(salary, tenureMonths),
         isIncumbentOfCriticalPosition: criticalIncumbents.has(emp.id),
+        managerId: emp.managerId ?? null,
       }
     })
   }
@@ -1098,6 +1104,8 @@ export class WorkforceIntelligenceService {
           riskQuadrant: e.riskQuadrant,
           mobilityQuadrant: e.mobilityQuadrant,
           potentialAbility: e.potentialAbility,
+          // v3.4 — jerarquía para cruce con calibración del evaluador
+          managerId: e.managerId,
         }
       })
       .sort((a, b) => b.retentionScore - a.retentionScore)

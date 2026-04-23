@@ -21,6 +21,9 @@ import type {
 } from '@/lib/services/WorkforceIntelligenceService'
 import type { OrganizationExposureResult } from '@/lib/services/AIExposureService'
 import { SpanIntelligenceService } from '@/lib/services/SpanIntelligenceService'
+import { PerformanceRatingService } from '@/lib/services/PerformanceRatingService'
+import { TalentNarrativeService } from '@/lib/services/TalentNarrativeService'
+import type { EvaluationStatus } from '@/lib/utils/evaluatorStatsEngine'
 import {
   calculateFiniquitoConTopeCustomUF,
   calculateMonthsUntilNextYear,
@@ -203,7 +206,7 @@ export async function resolverLente(
   ctx: DiagnosticContext
 ): Promise<LenteOutput> {
   const meta = makeMeta(lenteId)
-  const { diagnostic, enriched } = ctx
+  const { accountId, departmentIds, diagnostic, enriched } = ctx
 
   switch (lenteId) {
     // ── L1: Costo de Inercia (FTEs Liberables + costo mensual) ──────────
@@ -431,23 +434,73 @@ export async function resolverLente(
     // TASK canónico: usa retentionPriority filtrado por tier='prescindible'
     // (retentionScore<40). El hero es la suma de salarios de esas personas
     // — "salario pagado sin rendimiento equivalente".
+    //
+    // Enriquecimiento L5:
+    //   · evaluatorStatus: cruce con PerformanceRatingService.getCalibrationStatsByDepartment
+    //     para detectar si el manager de la persona evalúa severa/indulgente.
+    //   · talentNarrative: pre-calculado con TalentNarrativeService (servicio backend
+    //     — NO puede llamarse desde el componente).
     case 'l5_brecha': {
       const prescindibles = diagnostic.retentionPriority.ranking.filter(
         r => r.tier === 'prescindible'
       )
       const salariosTotales = prescindibles.reduce((s, p) => s + p.salary, 0)
+
+      // Resolver último cycle con ratings (mismo patrón que buildEnrichedDataset)
+      const cycle = await prisma.performanceCycle.findFirst({
+        where: {
+          accountId,
+          status: { in: ['ACTIVE', 'IN_REVIEW', 'COMPLETED'] },
+          performanceRatings: { some: { roleFitScore: { not: null } } },
+        },
+        orderBy: { endDate: 'desc' },
+        select: { id: true },
+      })
+
+      // Mapa managerId → EvaluationStatus (OPTIMA/SEVERA/CENTRAL/INDULGENTE)
+      const managerStatusMap = new Map<string, EvaluationStatus>()
+      if (cycle) {
+        const calib = await PerformanceRatingService.getCalibrationStatsByDepartment(
+          cycle.id,
+          accountId,
+          departmentIds
+        )
+        for (const row of calib.byDepartment) {
+          managerStatusMap.set(row.managerId, row.status)
+        }
+      }
+
+      // Enriquecer cada persona con evaluatorStatus + narrativa pre-calculada
+      const personsEnriched = prescindibles.map(p => {
+        const evaluatorStatus: EvaluationStatus | null = p.managerId
+          ? managerStatusMap.get(p.managerId) ?? null
+          : null
+
+        const narrative = TalentNarrativeService.getIndividualNarrative(
+          p.riskQuadrant,
+          p.mobilityQuadrant,
+          p.roleFitScore,
+          p.employeeName
+        )
+        const talentNarrative = narrative
+          ? { headline: narrative.headline, context: narrative.context }
+          : null
+
+        return { ...p, evaluatorStatus, talentNarrative }
+      })
+
       return {
         ...meta,
-        hayData: prescindibles.length > 0,
+        hayData: personsEnriched.length > 0,
         datos: {
-          N_PERSONAS: formatInt(prescindibles.length),
+          N_PERSONAS: formatInt(personsEnriched.length),
           PERCENTIL: '40',
           UMBRAL: '40',
           CLP_MES: formatCLP(salariosTotales),
         },
         detalle: {
-          persons: prescindibles,          // con retentionScore, roleFit, metas, finiquitoToday
-          affectedCount: prescindibles.length,
+          persons: personsEnriched,
+          affectedCount: personsEnriched.length,
           total: salariosTotales,
           // bySegment se mantiene como info complementaria (origen productivityGap)
           gapOriginal: diagnostic.productivityGap.total,

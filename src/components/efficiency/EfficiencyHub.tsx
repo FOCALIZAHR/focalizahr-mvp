@@ -63,6 +63,7 @@ const LENTES_CON_LAYOUT: Set<LenteId> = new Set([
   'l1_inercia',
   'l2_zombie',
   'l4_fantasma',
+  'l5_brecha',
   'l9_pasivo',
 ])
 
