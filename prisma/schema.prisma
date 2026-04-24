@@ -240,6 +240,7 @@ model Account {
   // ═══════════════════════════════════════════════════
   complianceAnalyses       ComplianceAnalysis[]
   complianceAlerts         ComplianceAlert[]
+  compliancePlanActions    CompliancePlanAction[]
 
   // ═══════════════════════════════════════════════════
   // CONFIGURACIÓN SALARIAL (SalaryConfig v1.2)
@@ -329,8 +330,9 @@ model Campaign {
   performanceCycle PerformanceCycle?
 
   // Compliance (Ambiente Sano) — análisis LLM por depto + meta
-  complianceAnalyses ComplianceAnalysis[]
-  complianceAlerts   ComplianceAlert[]
+  complianceAnalyses    ComplianceAnalysis[]
+  complianceAlerts      ComplianceAlert[]
+  compliancePlanActions CompliancePlanAction[]
 
   @@index([accountId], map: "idx_campaigns_account")
   @@index([status], map: "idx_campaigns_status")
@@ -3502,13 +3504,21 @@ model ComplianceAnalysis {
   respondentCount Int?   @map("respondent_count")
   safetyScore     Float? @map("safety_score")
 
+  // ISA 0-100 (ver src/lib/services/compliance/ISAService.ts).
+  // Por depto: ISA del depto. Por ORG: ISA organizacional (promedio ponderado).
+  isaScore Int? @map("isa_score")
+
   // Output del LLM (campos top-level para queries; resto en payload)
   senalDominante     String?  @map("senal_dominante")
   confianzaAnalisis  String?  @map("confianza_analisis")
   alertaSesgoGenero  Boolean? @map("alerta_sesgo_genero")
   teatroCumplimiento Boolean? @map("teatro_cumplimiento")  // solo DEPARTMENT
 
-  // Payload completo (patrones + CoT en DEPARTMENT; meta-análisis en ORG)
+  // Payload completo con namespaces explícitos.
+  // DEPARTMENT: { patrones: PatronAnalysisOutput, safetyDetail: DepartmentSafetyScore, convergencia: DepartmentConvergencia }
+  // ORG:        { meta: MetaAnalysisOutput, global: {...}, narratives: ReportNarratives }
+  // Se persiste al completar el job correspondiente. /report lee y ensambla
+  // sin recalcular.
   resultPayload Json? @map("result_payload")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -3583,4 +3593,41 @@ model ComplianceAlert {
   @@index([alertType, status], map: "idx_compliance_alerts_type_status")
   @@index([createdAt], map: "idx_compliance_alerts_created")
   @@map("compliance_alerts")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// COMPLIANCE PLAN ACTION — acciones registradas por el CEO sobre triggers.
+// El CEO elige una intervención del catálogo para una dimensión/patrón/alerta
+// dada. Esto compone el "Plan del Ciclo" que se exporta al final.
+// Idempotente: un solo choice por triggerRef (unique compuesto).
+// ════════════════════════════════════════════════════════════════════════════
+model CompliancePlanAction {
+  id             String   @id @default(cuid())
+  campaignId     String   @map("campaign_id")
+  accountId      String   @map("account_id")
+
+  // Trigger: qué hallazgo desencadenó la acción.
+  triggerType    String   @map("trigger_type")     // 'dimension_low' | 'patron' | 'alert'
+  triggerRef     String   @map("trigger_ref")      // identificador único (dimKey, patronNombre, alertId)
+  triggerLabel   String   @map("trigger_label")    // copy ejecutivo
+
+  // Elección del CEO.
+  chosenOption   Int      @map("chosen_option")    // 0 | 1 | 2 (índice en las 3 opciones)
+  optionLabel    String   @map("option_label")     // titulo de intervención
+  interventionId String   @map("intervention_id")  // key del INTERVENTION_CATALOG
+
+  // Metadatos copiados del catálogo al persistir (snapshot).
+  evidencia      String?
+  plazo          String?
+
+  registeredAt   DateTime @default(now()) @map("registered_at")
+  registeredBy   String   @map("registered_by")    // email del usuario
+
+  campaign       Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  account        Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, triggerRef], map: "unique_plan_action_per_trigger")
+  @@index([campaignId], map: "idx_plan_actions_campaign")
+  @@index([accountId], map: "idx_plan_actions_account")
+  @@map("compliance_plan_actions")
 }
