@@ -316,6 +316,7 @@ const handleSubmit = async (responses: Array<{questionId: string, rating?: numbe
       configuration={configuration || undefined}
       campaignName={campaign.name}
       campaignTypeName={campaign.campaignType.name}
+      campaignTypeSlug={campaign.campaignType.slug}
       companyName={campaign.account?.companyName || 'La empresa'}
       estimatedDuration={campaign.campaignType.estimatedDuration}
       questionCount={campaign.campaignType.questionCount}

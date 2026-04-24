@@ -55,7 +55,8 @@ interface UnifiedSurveyProps {
   companyName?: string;
   campaignName?: string; // Nombre personalizado de la campaña
   companyLogo?: string;
-  campaignTypeName?: string; // Tipo de campaña
+  campaignTypeName?: string; // Tipo de campaña (visible)
+  campaignTypeSlug?: string; // Slug del CampaignType (control de UX — ej. modal pre-envío)
   questionCount?: number;
   estimatedDuration?: number;
   onSubmit: (responses: SurveyResponse[]) => void;
@@ -70,6 +71,12 @@ interface UnifiedSurveyProps {
   } | null;
 }
 
+// Slugs para los cuales el modal EvaluationReviewModal es apropiado.
+// Ese modal muestra clasificación de performance (EXCEPTIONAL/EXCEEDS/MEETS/...),
+// lo cual solo aplica cuando hay un evaluatee identificado. Otros productos
+// (Ambiente Sano, Pulso, Retención) envían directo sin modal.
+const SLUGS_CON_REVIEW_MODAL = ['performance-evaluation'];
+
 // ========================================
 // COMPONENTE PRINCIPAL ORQUESTADOR
 // ========================================
@@ -82,6 +89,7 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
   companyLogo,
   campaignName = "Encuesta",
   campaignTypeName = "Evaluación de Clima",
+  campaignTypeSlug,
   questionCount = questions.length,
   estimatedDuration = 10,
   onSubmit,
@@ -377,7 +385,15 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
                         </button>
                       ) : (
                         <button
-                          onClick={() => setShowReviewModal(true)}
+                          onClick={() => {
+                            // Solo Performance abre el modal de clasificación pre-envío.
+                            // Otros productos (Ambiente Sano, Pulso, etc.) envían directo.
+                            if (campaignTypeSlug && SLUGS_CON_REVIEW_MODAL.includes(campaignTypeSlug)) {
+                              setShowReviewModal(true);
+                            } else {
+                              handleConfirmSubmit();
+                            }
+                          }}
                           disabled={!isCurrentResponseValid() || isSubmitting}
                           className="px-8 py-2.5 text-sm font-medium
                                    bg-[#22D3EE] text-[#0F172A] rounded-full
@@ -386,7 +402,9 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
                                    transition-all duration-200 flex items-center gap-2"
                         >
                           <ClipboardCheck className="w-4 h-4" />
-                          Revisar y Enviar
+                          {campaignTypeSlug && SLUGS_CON_REVIEW_MODAL.includes(campaignTypeSlug)
+                            ? 'Revisar y Enviar'
+                            : 'Enviar'}
                         </button>
                       )}
                     </div>
@@ -424,18 +442,20 @@ const UnifiedSurveyComponent: React.FC<UnifiedSurveyProps> = ({
         </div>
       )}
 
-      {/* Review Modal */}
-      <EvaluationReviewModal
-        isOpen={showReviewModal}
-        onClose={() => setShowReviewModal(false)}
-        onConfirm={handleConfirmSubmit}
-        questions={questions}
-        responses={responses}
-        evaluateeName={evaluationContext?.evaluateeName}
-        evaluateePosition={evaluationContext?.evaluateePosition ?? undefined}
-        evaluateeDepartment={evaluationContext?.evaluateeDepartment}
-        isSubmitting={isSubmitting}
-      />
+      {/* Review Modal — solo productos con selector 360° (Performance). */}
+      {campaignTypeSlug && SLUGS_CON_REVIEW_MODAL.includes(campaignTypeSlug) && (
+        <EvaluationReviewModal
+          isOpen={showReviewModal}
+          onClose={() => setShowReviewModal(false)}
+          onConfirm={handleConfirmSubmit}
+          questions={questions}
+          responses={responses}
+          evaluateeName={evaluationContext?.evaluateeName}
+          evaluateePosition={evaluationContext?.evaluateePosition ?? undefined}
+          evaluateeDepartment={evaluationContext?.evaluateeDepartment}
+          isSubmitting={isSubmitting}
+        />
+      )}
     </div>
   );
 };

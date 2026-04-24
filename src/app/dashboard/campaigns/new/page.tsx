@@ -69,6 +69,11 @@ interface CampaignFormData {
   anonymousResults: boolean;
 }
 
+// Slugs de productos employee-based que requieren selector 360° (Jefe→Colaborador, etc.).
+// El resto de productos employee-based (pulso-ambientes-sanos, y futuros Pulso Express,
+// Experiencia Full, Retención cuando migren) van directo: crear → generar participants.
+const SLUGS_CON_TIPOS_EVALUACION = ['performance-evaluation'];
+
 interface CampaignType {
   id: string;
   name: string;
@@ -230,6 +235,14 @@ export default function NewCampaignPage() {
     const selected = (campaignTypes.length > 0 ? campaignTypes : mockCampaignTypes)
       .find(type => type.id === formData.campaignTypeId);
     return selected?.flowType === 'employee-based';
+  }, [formData.campaignTypeId, campaignTypes]);
+
+  // Solo algunos flows employee-based usan selector 360°. Ej: Performance sí,
+  // Ambiente Sano no (todos participan anónimamente).
+  const hasEvaluationTypes = useMemo(() => {
+    const selected = (campaignTypes.length > 0 ? campaignTypes : mockCampaignTypes)
+      .find(type => type.id === formData.campaignTypeId);
+    return !!selected && SLUGS_CON_TIPOS_EVALUACION.includes(selected.slug);
   }, [formData.campaignTypeId, campaignTypes]);
 
   useEffect(() => {
@@ -403,10 +416,12 @@ export default function NewCampaignPage() {
         if (eligibilitySummary.eligible < 5) {
           errors.participants = 'Se requieren al menos 5 participantes elegibles';
         }
-        // Validar al menos un tipo de evaluación seleccionado
-        if (!evaluationTypes.includesManager && !evaluationTypes.includesSelf &&
-            !evaluationTypes.includesUpward && !evaluationTypes.includesPeer) {
-          errors.evaluationTypes = 'Selecciona al menos un tipo de evaluación';
+        // Solo aplica a productos con selector 360° (ej. performance-evaluation).
+        if (hasEvaluationTypes) {
+          if (!evaluationTypes.includesManager && !evaluationTypes.includesSelf &&
+              !evaluationTypes.includesUpward && !evaluationTypes.includesPeer) {
+            errors.evaluationTypes = 'Selecciona al menos un tipo de evaluación';
+          }
         }
       } else {
         // Validación para concierge flow
@@ -518,10 +533,10 @@ export default function NewCampaignPage() {
       }
 
       // ════════════════════════════════════════════════════════════════
-      // EMPLOYEE-BASED FLOW: Crear PerformanceCycle asociado
-      // El API genera competencySnapshot automáticamente
+      // EMPLOYEE-BASED CON SELECTOR 360° (performance-evaluation):
+      // Crear PerformanceCycle asociado. El API genera competencySnapshot.
       // ════════════════════════════════════════════════════════════════
-      if (isEmployeeBasedFlow) {
+      if (hasEvaluationTypes) {
         console.log('🎯 Creando PerformanceCycle para evaluación de desempeño...');
 
         const cycleResponse = await fetch('/api/admin/performance-cycles', {
@@ -576,6 +591,43 @@ export default function NewCampaignPage() {
 
         console.log(`🎉 Creación completa: Campaign ${createdCampaign.id} + Cycle ${createdCycle.id}`);
         console.log(`📊 CompetencySnapshot: ${hasSnapshot ? 'SÍ' : 'NO'}`);
+        return;
+      }
+
+      // ════════════════════════════════════════════════════════════════
+      // EMPLOYEE-BASED SIN SELECTOR 360° (ej. pulso-ambientes-sanos):
+      // Generar Participants directo desde Employee ACTIVE y redirigir.
+      // ════════════════════════════════════════════════════════════════
+      if (isEmployeeBasedFlow) {
+        console.log('🌿 Generando participants desde nómina (Ambiente Sano)...');
+
+        const genResponse = await fetch('/api/compliance/generate-participants', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ campaignId: createdCampaign.id })
+        });
+
+        const genData = await genResponse.json();
+        if (!genResponse.ok) {
+          console.error('⚠️ Error generando participants:', genData);
+          setSubmitError(
+            genData?.error ??
+              'Campaña creada, pero falló la generación de participantes. Revisa la nómina.'
+          );
+          return;
+        }
+
+        console.log('✅ Participants generados:', genData);
+
+        const redirectUrl = `/dashboard?` + new URLSearchParams({
+          created: 'true',
+          campaign: createdCampaign.id,
+          name: createdCampaign.name
+        }).toString();
+        router.push(redirectUrl);
         return;
       }
 
@@ -1122,7 +1174,8 @@ export default function NewCampaignPage() {
                       </CardContent>
                     </Card>
 
-                    {/* Tipos de Evaluación 360° */}
+                    {/* Tipos de Evaluación 360° - solo slugs en SLUGS_CON_TIPOS_EVALUACION */}
+                    {hasEvaluationTypes && (
                     <Card className="professional-card">
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -1205,6 +1258,7 @@ export default function NewCampaignPage() {
                         )}
                       </CardContent>
                     </Card>
+                    )}
 
                     {/* Validation Errors */}
                     {validationErrors.participants && (
@@ -1406,23 +1460,23 @@ export default function NewCampaignPage() {
                         </dd>
                       </div>
                       {isEmployeeBasedFlow && (
-                        <>
-                          <div>
-                            <dt className="text-muted-foreground">Excluidos:</dt>
-                            <dd className="font-medium text-amber-500">{eligibilitySummary.excluded}</dd>
-                          </div>
-                          <div>
-                            <dt className="text-muted-foreground">Tipos de Evaluación:</dt>
-                            <dd className="font-medium">
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {evaluationTypes.includesManager && <Badge variant="outline">Jefe → Colaborador</Badge>}
-                                {evaluationTypes.includesSelf && <Badge variant="outline">Autoevaluación</Badge>}
-                                {evaluationTypes.includesUpward && <Badge variant="outline">Colaborador → Jefe</Badge>}
-                                {evaluationTypes.includesPeer && <Badge variant="outline">Entre Pares</Badge>}
-                              </div>
-                            </dd>
-                          </div>
-                        </>
+                        <div>
+                          <dt className="text-muted-foreground">Excluidos:</dt>
+                          <dd className="font-medium text-amber-500">{eligibilitySummary.excluded}</dd>
+                        </div>
+                      )}
+                      {hasEvaluationTypes && (
+                        <div>
+                          <dt className="text-muted-foreground">Tipos de Evaluación:</dt>
+                          <dd className="font-medium">
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {evaluationTypes.includesManager && <Badge variant="outline">Jefe → Colaborador</Badge>}
+                              {evaluationTypes.includesSelf && <Badge variant="outline">Autoevaluación</Badge>}
+                              {evaluationTypes.includesUpward && <Badge variant="outline">Colaborador → Jefe</Badge>}
+                              {evaluationTypes.includesPeer && <Badge variant="outline">Entre Pares</Badge>}
+                            </div>
+                          </dd>
+                        </div>
                       )}
                       <div>
                         <dt className="text-muted-foreground">Tiempo por Participante:</dt>

@@ -284,6 +284,16 @@ export default function EnhancedCampaignsList() {
         break;
     }
 
+    // Employee-based sin PerformanceCycle (Ambiente Sano y futuros similares):
+    // usa las rutas standard del switch, pero los participantes se generan desde
+    // nómina automáticamente — no corresponde "Gestionar Participantes" ni
+    // acciones de carga CSV.
+    if (isEmployeeBased && !cycleId) {
+      return actions.filter(
+        (a) => !a.id.includes('participants') && !a.id.includes('upload')
+      );
+    }
+
     return actions;
   };
 
