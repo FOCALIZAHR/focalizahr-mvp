@@ -236,6 +236,12 @@ model Account {
   efficiencyPlans          EfficiencyPlan[]
 
   // ═══════════════════════════════════════════════════
+  // COMPLIANCE (AMBIENTE SANO — Ley Karin)
+  // ═══════════════════════════════════════════════════
+  complianceAnalyses       ComplianceAnalysis[]
+  complianceAlerts         ComplianceAlert[]
+
+  // ═══════════════════════════════════════════════════
   // CONFIGURACIÓN SALARIAL (SalaryConfig v1.2)
   // ═══════════════════════════════════════════════════
   averageMonthlySalary    Int?    @map("average_monthly_salary")
@@ -321,6 +327,10 @@ model Campaign {
 
   // Vínculo con Performance (opcional)
   performanceCycle PerformanceCycle?
+
+  // Compliance (Ambiente Sano) — análisis LLM por depto + meta
+  complianceAnalyses ComplianceAnalysis[]
+  complianceAlerts   ComplianceAlert[]
 
   @@index([accountId], map: "idx_campaigns_account")
   @@index([status], map: "idx_campaigns_status")
@@ -711,6 +721,10 @@ model Department {
   exitRecords       ExitRecord[]
   exitInsights      DepartmentExitInsight[]
   exitAlerts        ExitAlert[]
+
+  // Compliance (Ambiente Sano) — análisis LLM por depto
+  complianceAnalyses ComplianceAnalysis[]
+  complianceAlerts   ComplianceAlert[]
 
   // ═══════════════════════════════════════════════════
   // RELACIONES EMPLOYEE MASTER
@@ -3462,4 +3476,111 @@ model EfficiencyPlan {
   @@index([accountId, estado], map: "idx_efficiency_plan_account_estado")
   @@index([accountId, updatedAt], map: "idx_efficiency_plan_account_updated")
   @@map("efficiency_plans")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// COMPLIANCE ANALYSIS — Ambiente Sano (Ley Karin)
+// Persistencia de outputs del LLM: un row por depto con n≥5 (scope DEPARTMENT)
+// más un row ORG con el meta-análisis cross-departamental. Los rows funcionan
+// también como cola de jobs asincrónica (status PENDING → RUNNING → COMPLETED).
+// ════════════════════════════════════════════════════════════════════════════
+model ComplianceAnalysis {
+  id           String  @id @default(cuid())
+  campaignId   String  @map("campaign_id")
+  accountId    String  @map("account_id")
+  scope        String                              // DEPARTMENT | ORG
+  departmentId String? @map("department_id")       // null si scope=ORG
+
+  // Cola de jobs
+  status       String    @default("PENDING")       // PENDING | RUNNING | COMPLETED | FAILED
+  errorMessage String?   @map("error_message") @db.Text
+  retryCount   Int       @default(0) @map("retry_count")
+  startedAt    DateTime? @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+
+  // Snapshot del contexto al momento del análisis
+  respondentCount Int?   @map("respondent_count")
+  safetyScore     Float? @map("safety_score")
+
+  // Output del LLM (campos top-level para queries; resto en payload)
+  senalDominante     String?  @map("senal_dominante")
+  confianzaAnalisis  String?  @map("confianza_analisis")
+  alertaSesgoGenero  Boolean? @map("alerta_sesgo_genero")
+  teatroCumplimiento Boolean? @map("teatro_cumplimiento")  // solo DEPARTMENT
+
+  // Payload completo (patrones + CoT en DEPARTMENT; meta-análisis en ORG)
+  resultPayload Json? @map("result_payload")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  account    Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  @@unique([campaignId, scope, departmentId], map: "unique_compliance_analysis")
+  @@index([campaignId, status], map: "idx_compliance_analysis_campaign_status")
+  @@index([status, createdAt], map: "idx_compliance_analysis_status_created")
+  @@index([accountId], map: "idx_compliance_analysis_account")
+  @@map("compliance_analysis")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// COMPLIANCE ALERT — Ambiente Sano (Ley Karin)
+// Alertas del ConvergenciaEngine. Cinco tipos: riesgo_convergente,
+// liderazgo_toxico, silencio_organizacional, deterioro_sostenido, senal_ignorada.
+// Mismo patrón de SLA/status que ExitAlert para familiaridad operacional.
+// ════════════════════════════════════════════════════════════════════════════
+model ComplianceAlert {
+  id           String  @id @default(cuid())
+  accountId    String  @map("account_id")
+  campaignId   String  @map("campaign_id")
+  departmentId String? @map("department_id")       // null en alertas org-wide
+
+  alertType String @map("alert_type")
+  // Tipos válidos (single source of truth en src/config/complianceAlertConfig.ts):
+  // - riesgo_convergente (Safety + Liderazgo bajos)
+  // - liderazgo_toxico (Safety < 2.5 en 2+ deptos mismo gerente)
+  // - silencio_organizacional (LLM detecta patrón)
+  // - deterioro_sostenido (Clima cae 3 períodos)
+  // - senal_ignorada (EXO bajo + salida posterior)
+
+  severity    String                               // critical|high|medium|low|informativa
+  title       String
+  description String @db.Text
+
+  // Contexto estructurado (señales disparadoras, scores snapshot, depto evidencias)
+  context Json?
+
+  // Convergencia — qué instrumentos aportaron señal
+  triggerSources String[] @map("trigger_sources")
+  triggerScore   Float?   @map("trigger_score")
+  signalsCount   Int?     @map("signals_count")
+
+  // Gestión (patrón ExitAlert)
+  status          String    @default("pending")     // pending|acknowledged|resolved|dismissed
+  acknowledgedAt  DateTime? @map("acknowledged_at")
+  acknowledgedBy  String?   @map("acknowledged_by")
+  resolvedAt      DateTime? @map("resolved_at")
+  resolvedBy      String?   @map("resolved_by")
+  resolutionNotes String?   @map("resolution_notes") @db.Text
+
+  // SLA
+  slaHours  Int?      @map("sla_hours")
+  dueDate   DateTime? @map("due_date")
+  slaStatus String?   @map("sla_status")            // on_track|at_risk|breached|null
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  account    Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  @@index([accountId, status], map: "idx_compliance_alerts_account_status")
+  @@index([campaignId, status], map: "idx_compliance_alerts_campaign_status")
+  @@index([departmentId, status], map: "idx_compliance_alerts_department_status")
+  @@index([alertType, status], map: "idx_compliance_alerts_type_status")
+  @@index([createdAt], map: "idx_compliance_alerts_created")
+  @@map("compliance_alerts")
 }
