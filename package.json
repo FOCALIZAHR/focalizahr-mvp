@@ -20,6 +20,8 @@
     "backfill:compliance-total-invited": "tsx prisma/scripts/backfill-compliance-total-invited.ts",
     "backfill:compliance-participant-department": "tsx prisma/scripts/backfill-compliance-participant-department.ts",
     "reset:compliance-stuck-jobs": "tsx prisma/scripts/reset-compliance-stuck-jobs.ts",
+    "backfill:compliance-namespaced": "tsx prisma/scripts/backfill-compliance-namespaced-payloads.ts",
+    "backfill:compliance-isa": "tsx prisma/scripts/backfill-compliance-isa.ts",
     "db:reset": "prisma migrate reset",
     "db:seed:departments": "tsx prisma/seedDepartments.ts",
     "db:seed:performance": "tsx prisma/seeds/performance-evaluation-seed.ts",
