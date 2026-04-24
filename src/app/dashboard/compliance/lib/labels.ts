@@ -87,7 +87,7 @@ export const DIMENSION_SHORT: Record<string, string> = {
 };
 
 /** Orden canónico de dimensiones (para grids, tablas, heatmap). */
-export const DIMENSION_ORDER: ReadonlyArray<keyof typeof DIMENSION_LABELS> = [
+export const DIMENSION_ORDER = [
   'P2_seguridad',
   'P3_disenso',
   'P4_microagresiones',
@@ -95,6 +95,8 @@ export const DIMENSION_ORDER: ReadonlyArray<keyof typeof DIMENSION_LABELS> = [
   'P7_liderazgo',
   'P8_agotamiento',
 ] as const;
+
+export type DimensionKey = (typeof DIMENSION_ORDER)[number];
 
 // ═══════════════════════════════════════════════════════════════════
 // Patrones LLM — labels ejecutivos, NUNCA nombres de código
