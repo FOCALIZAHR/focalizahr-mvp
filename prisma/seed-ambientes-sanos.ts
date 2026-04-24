@@ -44,6 +44,8 @@ async function crearPulsoAmbientesSanos() {
       category: 'clima',
       isActive: true,
       sortOrder: 4,
+      isPermanent: false,
+      flowType: 'employee-based',
       questions: {
         create: [
           {
@@ -61,6 +63,10 @@ async function crearPulsoAmbientesSanos() {
             questionOrder: 2,
             responseType: 'single_choice',
             choiceOptions: ["Qué valiente por alzar la voz", "Qué arriesgado, mejor no meterse"],
+            responseValueMapping: {
+              "Qué valiente por alzar la voz": 5,
+              "Qué arriesgado, mejor no meterse": 1
+            },
             isRequired: true,
             isActive: true
           },
@@ -70,6 +76,10 @@ async function crearPulsoAmbientesSanos() {
             questionOrder: 3,
             responseType: 'single_choice',
             choiceOptions: ["Se genera una discusión constructiva", "El líder lo toma de forma personal"],
+            responseValueMapping: {
+              "Se genera una discusión constructiva": 5,
+              "El líder lo toma de forma personal": 1
+            },
             isRequired: true,
             isActive: true
           },
@@ -78,6 +88,8 @@ async function crearPulsoAmbientesSanos() {
             category: 'reconocimiento',
             questionOrder: 4,
             responseType: 'rating_scale',
+            minLabel: 'Nunca',
+            maxLabel: 'Siempre',
             isRequired: true,
             isActive: true
           },
@@ -87,6 +99,10 @@ async function crearPulsoAmbientesSanos() {
             questionOrder: 5,
             responseType: 'single_choice',
             choiceOptions: ["Es un sistema equitativo y transparente", "Hay más flexibilidad según la persona"],
+            responseValueMapping: {
+              "Es un sistema equitativo y transparente": 5,
+              "Hay más flexibilidad según la persona": 1
+            },
             isRequired: true,
             isActive: true
           },
@@ -104,6 +120,8 @@ async function crearPulsoAmbientesSanos() {
             category: 'liderazgo',
             questionOrder: 7,
             responseType: 'rating_scale',
+            minLabel: 'Puede mejorar',
+            maxLabel: 'Excelente',
             isRequired: true,
             isActive: true
           },
@@ -112,6 +130,8 @@ async function crearPulsoAmbientesSanos() {
             category: 'satisfaccion',
             questionOrder: 8,
             responseType: 'rating_scale',
+            minLabel: 'Nunca',
+            maxLabel: 'Siempre',
             isRequired: true,
             isActive: true
           }
