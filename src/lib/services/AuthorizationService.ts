@@ -628,6 +628,26 @@ export const PERMISSIONS = {
     'HR_MANAGER',
     'CEO'
   ],
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // COMPLIANCE (AMBIENTE SANO — Ley Karin)
+  // ─────────────────────────────────────────────────────────────────────────
+  'compliance:view': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'CEO',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'HR_OPERATOR',
+    'AREA_MANAGER'     // Con filtrado jerárquico
+  ],
+  'compliance:manage': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'HR_OPERATOR'
+  ],
 } as const;
 
 // =============================================================================
