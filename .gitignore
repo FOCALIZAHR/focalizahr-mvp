@@ -50,7 +50,12 @@ Thumbs.dbnul
 
 # Claude & Temporal fixes
 .claude/tasks/
+.claude/settings.local.json
+.claude/skills/focalizahr-design.zip
 *.diff
+
+# Backups personales
+CLAUDE - RESPALDO.md
 
 data/onet/*.csv
 data/onet/onet/*.csv
