@@ -243,6 +243,11 @@ model Account {
   compliancePlanActions    CompliancePlanAction[]
 
   // ═══════════════════════════════════════════════════
+  // ACTION PLAN — modelo genérico multi-módulo
+  // ═══════════════════════════════════════════════════
+  actionPlans              ActionPlan[]
+
+  // ═══════════════════════════════════════════════════
   // CONFIGURACIÓN SALARIAL (SalaryConfig v1.2)
   // ═══════════════════════════════════════════════════
   averageMonthlySalary    Int?    @map("average_monthly_salary")
@@ -3478,6 +3483,56 @@ model EfficiencyPlan {
   @@index([accountId, estado], map: "idx_efficiency_plan_account_estado")
   @@index([accountId, updatedAt], map: "idx_efficiency_plan_account_updated")
   @@map("efficiency_plans")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ACTION PLAN — modelo genérico de carrito de decisiones multi-módulo
+// ════════════════════════════════════════════════════════════════════════════
+// Persiste el estado del "Carrito de Decisiones" del CEO mientras navega un
+// producto. Reutilizable: moduleType discrimina (compliance | exit | onboarding).
+//
+// Reglas de negocio (validadas en /api/action-plans):
+//   - Un solo borrador por (accountId, moduleType, campaignId) — enforced en API
+//   - estado='aprobado' → PUT 403 (inmutable)
+//   - allowAmendment=true en aprobado → POST nuevo borrador con parentPlanId
+//
+// Persistencia 3 capas: React state → sessionStorage → BD (autosave debounce 1.5s)
+// ════════════════════════════════════════════════════════════════════════════
+
+model ActionPlan {
+  id              String    @id @default(cuid())
+  accountId       String    @map("account_id")
+  campaignId      String?   @map("campaign_id")
+  moduleType      String    @map("module_type")     // 'compliance' | 'exit' | 'onboarding'
+  targetType      String?   @map("target_type")     // 'department' | 'employee' | 'gerencia'
+  targetId        String?   @map("target_id")
+
+  createdBy       String    @map("created_by")      // email del creador
+  updatedBy       String?   @map("updated_by")      // email del último editor
+  approvedBy      String?   @map("approved_by")     // email del aprobador
+  approvedAt      DateTime? @map("approved_at")
+
+  estado          String    @default("borrador")    // borrador | aprobado | archivado
+  allowAmendment  Boolean   @default(false)         @map("allow_amendment")
+  parentPlanId    String?   @map("parent_plan_id")  // ref al plan original cuando es enmienda
+
+  // DecisionItem[] del módulo — shape definido en cada producto
+  decisiones      Json      @default("[]") @db.JsonB
+  // { [decisionKey | triggerRef]: textoEditadoPorCEO }
+  narrativasEdit  Json      @default("{}") @map("narrativas_edit") @db.JsonB
+  // Snapshot de métricas resumen al momento del último guardado
+  resumenSnap     Json      @default("{}") @map("resumen_snap")    @db.JsonB
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt      @map("updated_at")
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, moduleType, campaignId], map: "idx_action_plan_lookup")
+  @@index([accountId, estado], map: "idx_action_plan_account_estado")
+  @@index([accountId, updatedAt], map: "idx_action_plan_account_updated")
+  @@index([parentPlanId], map: "idx_action_plan_parent")
+  @@map("action_plans")
 }
 
 // ════════════════════════════════════════════════════════════════════════════
