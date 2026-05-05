@@ -21,7 +21,11 @@ import type {
   ReportNarratives,
   DimensionNarrative,
 } from '../../src/lib/services/compliance/ComplianceNarrativeEngine';
-import type { ComplianceAlertType } from '../../src/config/complianceAlertConfig';
+import type {
+  ComplianceAlertType,
+  ComplianceSource,
+} from '../../src/config/complianceAlertConfig';
+import type { ConvergenciaGlobals } from '../../src/lib/services/compliance/ConvergenciaEngine';
 
 const prisma = new PrismaClient();
 
@@ -47,8 +51,8 @@ interface OrgPayloadShape {
     orgSafetyScore: number | null;
     orgISA?: number | null;
     skippedByPrivacy: unknown[];
-    activeSourcesGlobal: unknown[];
-    criticalByManager: unknown[];
+    activeSourcesGlobal: ComplianceSource[];
+    criticalByManager: ConvergenciaGlobals['criticalByManager'];
     previousOrgScore: number | null;
     previousCampaignLabel: string | null;
   };
@@ -135,12 +139,24 @@ async function main() {
   });
 
   // ── 5) Llamar a buildReportNarratives (DETERMINISTA, sin LLM) ────────────
+  // Lectura defensiva: payloads pre-deploy del campo `activeSourcesGlobal` /
+  // `criticalByManager` los traen como arrays vacíos en el shape persistido.
+  // Si el shape JSON viene incompleto (campañas legacy), defaultear a [].
+  const activeSourcesGlobal = Array.isArray(orgPayload.global.activeSourcesGlobal)
+    ? (orgPayload.global.activeSourcesGlobal as ComplianceSource[])
+    : [];
+  const criticalByManager = Array.isArray(orgPayload.global.criticalByManager)
+    ? (orgPayload.global.criticalByManager as ConvergenciaGlobals['criticalByManager'])
+    : [];
+
   const fresh = buildReportNarratives({
     orgSafetyScore: orgPayload.global.orgSafetyScore,
     scores: safetyScores,
     departmentAnalyses,
     meta: orgPayload.meta,
     convergencias,
+    activeSourcesGlobal,
+    criticalByManager,
     alertas: alerts.map((a) => ({
       alertType: a.alertType as ComplianceAlertType,
       title: a.title,
@@ -184,9 +200,34 @@ async function main() {
   }
 
   console.log('━'.repeat(80));
-  console.log(`  ${changedCount}/${newDims.length} narrativas cambian.`);
+  console.log(`  ${changedCount}/${newDims.length} narrativas dimensionales cambian.`);
   console.log('━'.repeat(80));
   console.log('');
+
+  // ── 6.B) Diff de narrativas org-level (cruceNarrativa + criticalByManagerNarrativa) ──
+  const oldCruce = orgPayload.narratives.cruceNarrativa;
+  const newCruce = fresh.cruceNarrativa;
+  const cruceChanged = oldCruce !== newCruce;
+  const oldCBM = orgPayload.narratives.criticalByManagerNarrativa;
+  const newCBM = fresh.criticalByManagerNarrativa;
+  const cbmChanged = oldCBM !== newCBM;
+
+  console.log('━'.repeat(80));
+  console.log('  DIFF — narratives.cruceNarrativa');
+  console.log('━'.repeat(80));
+  console.log(`${cruceChanged ? '🔄' : '✓ '}  ANTES:   ${oldCruce ?? '∅'}`);
+  console.log(`    DESPUÉS: ${newCruce ?? '∅'}`);
+  console.log('');
+
+  console.log('━'.repeat(80));
+  console.log('  DIFF — narratives.criticalByManagerNarrativa');
+  console.log('━'.repeat(80));
+  console.log(`${cbmChanged ? '🔄' : '✓ '}  ANTES:   ${oldCBM ?? '∅'}`);
+  console.log(`    DESPUÉS: ${newCBM ?? '∅'}`);
+  console.log('');
+
+  if (cruceChanged) changedCount++;
+  if (cbmChanged) changedCount++;
 
   // ── 7) Apply o salir ─────────────────────────────────────────────────────
   if (!apply) {

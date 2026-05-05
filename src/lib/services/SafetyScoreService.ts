@@ -1,26 +1,62 @@
 // src/lib/services/SafetyScoreService.ts
-// Ambiente Sano - Cálculo de Safety Score ponderado por departamento.
+// Ambiente Sano - Cálculo de Safety Score por departamento (escala 1-5).
 //
 // Lee Response.normalizedScore (persistente, calculado al submit vía calculateNormalizedScore).
 // NO duplica lógica de mapeo: el binario 5/1 de P2/P3/P5 vive en Question.responseValueMapping
 // (ver prisma/seed-ambientes-sanos.ts).
 //
 // Privacy: departamentos con n < 5 respondentes no se calculan (van a `skipped`).
-// Fórmula D4 del TASK_COMPLIANCE_AMBIENTE_SANO_IMPLEMENTATION.md.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// FÓRMULA (refactor 2026-05-05)
+// ─────────────────────────────────────────────────────────────────────────────
+// safetyScore = Σ(avg_invertido_por_pregunta) / N        (escala 1-5)
+//   donde N = nº de dimensiones presentes (esperado 6, ver SAFETY_QUESTION_ORDERS).
+//
+// Antes (≤ 2026-05-04) la fórmula usaba pesos arbitrarios por pregunta. Se eliminó
+// para tratar las 6 dimensiones del instrumento como pares — el espíritu del
+// instrumento (P2-P8) es que cada dimensión es una lente independiente del mismo
+// fenómeno, no un input ponderable.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// PREGUNTAS QUE ENTRAN AL CÁLCULO
+// ─────────────────────────────────────────────────────────────────────────────
+//   P2 - seguridad psicológica
+//   P3 - disenso (qué pasa al expresar desacuerdo)
+//   P4 - microagresiones (INVERTIDA: 6 - avg)
+//   P5 - equidad (asignación de tareas)
+//   P7 - calidad del liderazgo directo
+//   P8 - agotamiento relacional (INVERTIDA: 6 - avg)
+//
+// Por qué P1 NO entra: es texto abierto (responseType='text_open'). Se procesa
+// por LLM en `PatronesLLMService`, no por promedio numérico.
+//
+// Por qué P6 NO entra: es branching question UX-only. Define el wording de P7
+// ("Para tu desarrollo y bienestar, ¿qué es MÁS importante que tu líder fomente?
+// → feedback claro / autonomía"), pero no tiene `responseValueMapping` en el seed
+// y por tanto no produce `normalizedScore`. La brecha analítica P6→P7
+// (necesidad declarada vs experiencia recibida) NO se computa hoy — es deuda
+// funcional reconocida, no bug.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// INVERSIÓN P4 / P8 — IMPORTANTE PARA CONSUMERS
+// ─────────────────────────────────────────────────────────────────────────────
+// Los valores expuestos en `dimensionScores.P4_microagresiones` y
+// `dimensionScores.P8_agotamiento` YA VIENEN INVERTIDOS vía `6 - avg`.
+//
+// Lectura correcta:
+//   • 5.0 = óptimo (cero microagresiones percibidas / cero agotamiento relacional)
+//   • 1.0 = peor (alta frecuencia de microagresiones / agotamiento extremo)
+//
+// NO leer estos campos como "frecuencia bruta del fenómeno". Si alguien necesita
+// el avg crudo (no invertido), debe consultar Response.normalizedScore directo.
+// Esta inversión está aquí para que P4/P8 sumen consistentemente al rollup
+// (todas las dimensiones suben con el bienestar).
 
 import { prisma } from '@/lib/prisma';
 import { Gender } from '@prisma/client';
 
 const AMBIENTE_SANO_SLUG = 'pulso-ambientes-sanos';
-
-const SAFETY_SCORE_WEIGHTS: Record<number, number> = {
-  2: 0.25, // seguridad psicológica
-  3: 0.2, // liderazgo/disenso
-  4: 0.15, // microagresiones (inversa)
-  5: 0.15, // equidad
-  7: 0.2, // liderazgo/calidad
-  8: 0.05, // agotamiento relacional (inversa)
-};
 
 const INVERSE_QUESTIONS = new Set([4, 8]);
 const SAFETY_QUESTION_ORDERS = [2, 3, 4, 5, 7, 8];
@@ -94,17 +130,31 @@ function averageByQuestion(rows: ResponseRow[]): Map<number, number> {
   return averages;
 }
 
-function computeWeightedScore(averages: Map<number, number>): number | null {
-  let totalWeight = 0;
-  let weightedSum = 0;
-  for (const [order, weight] of Object.entries(SAFETY_SCORE_WEIGHTS)) {
-    const avg = averages.get(Number(order));
+/**
+ * Promedio simple de las dimensiones presentes (escala 1-5).
+ *
+ * Renormalización dinámica: si falta una dimensión (todos los respondentes
+ * la omitieron o hubo un bug de submit), el divisor cae a N<6. Se emite
+ * console.warn para hacer visible la pérdida de fidelidad — no es bloqueante,
+ * pero un score calculado sobre <6 dimensiones tiene menor cobertura del
+ * instrumento y puede ser menos representativo.
+ */
+function computeAverageScore(averages: Map<number, number>): number | null {
+  let sum = 0;
+  let count = 0;
+  for (const order of SAFETY_QUESTION_ORDERS) {
+    const avg = averages.get(order);
     if (avg === undefined) continue;
-    weightedSum += avg * weight;
-    totalWeight += weight;
+    sum += avg;
+    count += 1;
   }
-  if (totalWeight === 0) return null;
-  return weightedSum / totalWeight;
+  if (count === 0) return null;
+  if (count < SAFETY_QUESTION_ORDERS.length) {
+    console.warn(
+      `[SafetyScoreService] Renormalización: solo ${count}/${SAFETY_QUESTION_ORDERS.length} dimensiones presentes`
+    );
+  }
+  return sum / count;
 }
 
 function buildDimensionScores(
@@ -134,7 +184,7 @@ function buildGenderBreakdown(
     const uniqueParticipants = new Set(group.map((r) => r.participantId));
     if (uniqueParticipants.size < PRIVACY_THRESHOLD) return null;
     const averages = averageByQuestion(group);
-    const score = computeWeightedScore(averages);
+    const score = computeAverageScore(averages);
     if (score === null) return null;
     return { score, count: uniqueParticipants.size };
   };
@@ -158,7 +208,7 @@ function scoreFromRows(
     return { skip: true, respondentCount };
   }
   const averages = averageByQuestion(deptRows);
-  const safetyScore = computeWeightedScore(averages);
+  const safetyScore = computeAverageScore(averages);
   if (safetyScore === null) {
     return { skip: true, respondentCount };
   }
@@ -316,7 +366,7 @@ export async function calculateSafetyScores(
     }
 
     const averages = averageByQuestion(deptRows);
-    const safetyScore = computeWeightedScore(averages);
+    const safetyScore = computeAverageScore(averages);
     if (safetyScore === null) continue;
 
     result.push({

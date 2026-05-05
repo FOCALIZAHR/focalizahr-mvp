@@ -463,6 +463,8 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
       departmentAnalyses: deptAnalysesForNarratives,
       meta: llmResult.data,
       convergencias: deptConvergencias,
+      activeSourcesGlobal: globals.activeSourcesGlobal,
+      criticalByManager: globals.criticalByManager,
       alertas: freshAlerts.map((a) => ({
         alertType: a.alertType as ComplianceAlertType,
         title: a.title,

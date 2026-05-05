@@ -271,7 +271,13 @@ export async function GET(request: NextRequest) {
         completedAt: campaign.completedAt,
       },
       company: { name: campaign.account.companyName, country: campaign.account.country },
-      narratives: orgPayload.narratives,
+      // AREA_MANAGER: suprimir criticalByManagerNarrativa para coherencia con
+      // criticalByManager filtrado a [] abajo. Sin esto, el texto seguiría
+      // describiendo la agrupación cross-dept aunque la data esté vacía.
+      narratives:
+        userContext.role === 'AREA_MANAGER'
+          ? { ...orgPayload.narratives, criticalByManagerNarrativa: undefined }
+          : orgPayload.narratives,
       data: {
         orgSafetyScore: orgPayload.global.orgSafetyScore,
         orgISA: orgPayload.global.orgISA ?? null,

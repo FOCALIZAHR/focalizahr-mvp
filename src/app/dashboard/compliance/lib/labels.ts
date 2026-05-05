@@ -131,20 +131,16 @@ export const ALERTA_LABELS: Record<ComplianceAlertType, string> = {
 
 // ═══════════════════════════════════════════════════════════════════
 // Nodos del Acto Ancla — degradación elegante si producto no contratado
+// Fuente única de verdad: src/config/compliance/sourceLabels.ts
 // ═══════════════════════════════════════════════════════════════════
 
-export const NODO_LABELS: Record<string, string> = {
-  ambiente_sano: 'Ambiente',
-  exit:          'Salidas',
-  onboarding:    'Ingresos',
-  pulso:         'Clima',
-};
+import { SOURCE_LABEL_SHORT, SOURCE_REQUIRES_LABEL } from '@/config/compliance/sourceLabels';
 
-export const NODO_REQUIRES: Record<string, string> = {
-  exit:       'Requiere Exit Intelligence',
-  onboarding: 'Requiere Onboarding Journey',
-  pulso:      'Requiere Pulso Express',
-};
+export const NODO_LABELS: Record<string, string> = SOURCE_LABEL_SHORT;
+
+export const NODO_REQUIRES: Record<string, string> = Object.fromEntries(
+  Object.entries(SOURCE_REQUIRES_LABEL).filter(([, v]) => v !== null)
+) as Record<string, string>;
 
 // Legacy aliases (mantenidos para compat temporal en hooks antiguos)
 export const SOURCE_NODE_LABELS = NODO_LABELS;

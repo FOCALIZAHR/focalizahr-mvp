@@ -17,18 +17,22 @@
 //   - "Safety Score", "EXO", "LLM", "convergencia"
 //   - "se recomienda", "deberías", "es necesario"
 
-import type { ComplianceAlertType } from '@/config/complianceAlertConfig';
+import type { ComplianceAlertType, ComplianceSource } from '@/config/complianceAlertConfig';
 import type { DepartmentSafetyScore } from '@/lib/services/SafetyScoreService';
 import type {
   MetaAnalysisOutput,
   PatronAnalysisOutput,
   PatronNombre,
 } from './complianceTypes';
-import type { DepartmentConvergencia } from './ConvergenciaEngine';
+import type {
+  DepartmentConvergencia,
+  ConvergenciaGlobals,
+} from './ConvergenciaEngine';
 import {
   resolveDimensionNarrative,
   type ComplianceDimensionKey,
 } from '@/config/narratives/ComplianceNarrativeDictionary';
+import { SOURCE_LABEL_NARRATIVE } from '@/config/compliance/sourceLabels';
 
 // ═══════════════════════════════════════════════════════════════════
 // TIPOS DE SALIDA
@@ -42,6 +46,22 @@ export interface ReportNarratives {
   /** Departamentos con alerta_sesgo_genero=true en el análisis LLM. */
   alertasGenero: GenderAlertDetail[];
   artefacto3_convergencia: ConvergenciaNarrative[];
+  /**
+   * Narrativa org-level del cruce entre instrumentos activos. Solo poblada
+   * cuando `activeSourcesGlobal.length >= 2`. Persiste como campo top-level
+   * de ReportNarratives (no dentro de artefacto3_convergencia, que es array
+   * per-dept). `undefined` cuando no aplica.
+   */
+  cruceNarrativa?: string;
+  /**
+   * Narrativa org-level del patrón de liderazgo cuando varios departamentos
+   * críticos comparten línea de mando. Solo poblada cuando
+   * `criticalByManager.length > 0`. NO renderiza managerId — solo agrupa por
+   * departmentNames. Privacy hardened en el copy.
+   * El route handler suprime este campo para AREA_MANAGER (coherencia con
+   * el filtrado de criticalByManager).
+   */
+  criticalByManagerNarrativa?: string;
   artefacto4_alertas: AlertaNarrative[];
   cierre: CierreNarrative;
 }
@@ -475,6 +495,226 @@ function buildConvergencia(
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// ARTEFACTO 3.B — CRUCE NARRATIVA (org-level)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Formatea una lista de nombres de departamentos para prosa.
+ *   1 nombre  → "TI"
+ *   2 nombres → "TI y Equipos Médicos"
+ *   3+ nombres → "TI, Equipos Médicos y N más"
+ */
+function formatDeptList(names: string[]): string {
+  if (names.length === 0) return '';
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} y ${names[1]}`;
+  return `${names[0]}, ${names[1]} y ${names.length - 2} más`;
+}
+
+/**
+ * Identifica el par de fuentes más recurrente entre los deptos coincidentes.
+ * Retorna las 2 fuentes con más apariciones cross-dept en risk simultáneo.
+ */
+function identificarParDominante(
+  coincidentes: Array<{ dept: DepartmentConvergencia; sourcesEnRisk: ComplianceSource[] }>
+): [ComplianceSource, ComplianceSource] | null {
+  const counts = new Map<ComplianceSource, number>();
+  for (const c of coincidentes) {
+    for (const s of c.sourcesEnRisk) {
+      counts.set(s, (counts.get(s) ?? 0) + 1);
+    }
+  }
+  const ordered = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  if (ordered.length < 2) return null;
+  return [ordered[0][0], ordered[1][0]];
+}
+
+/**
+ * Narrativa org-level del cruce entre instrumentos. Describe qué coincide y
+ * qué diverge entre las fuentes activas.
+ *
+ * Guards:
+ *   - activeSourcesGlobal.length < 2 → undefined (no hay convergencia posible).
+ *   - deptos.length === 0 → undefined.
+ *
+ * 5 ramas según patrón dominante (ver plan
+ * `.claude/plans/compliance-engine-narrativas-cruce.md` sec 2.1).
+ */
+function buildConvergenciaCruce(
+  deptos: DepartmentConvergencia[],
+  activeSourcesGlobal: ComplianceSource[]
+): string | undefined {
+  if (activeSourcesGlobal.length < 2) return undefined;
+  if (deptos.length === 0) return undefined;
+
+  // Particionar deptos en buckets según cantidad de fuentes en risk.
+  const coincidentes: Array<{
+    dept: DepartmentConvergencia;
+    sourcesEnRisk: ComplianceSource[];
+  }> = [];
+  const aislados: Array<{
+    dept: DepartmentConvergencia;
+    sourceUnica: ComplianceSource;
+  }> = [];
+
+  for (const d of deptos) {
+    const sourcesEnRisk = (Object.keys(d.signals) as ComplianceSource[]).filter(
+      (s) => d.signals[s]?.isRisk === true
+    );
+    if (sourcesEnRisk.length >= 2) {
+      coincidentes.push({ dept: d, sourcesEnRisk });
+    } else if (sourcesEnRisk.length === 1) {
+      aislados.push({ dept: d, sourceUnica: sourcesEnRisk[0] });
+    }
+  }
+
+  // Sin material narrativo.
+  if (coincidentes.length === 0 && aislados.length === 0) return undefined;
+
+  // CASO 4 — Convergencia puntual (1 dept coincidente, 0 aislados).
+  if (coincidentes.length === 1 && aislados.length === 0) {
+    const c = coincidentes[0];
+    const par = identificarParDominante(coincidentes);
+    if (!par) return undefined;
+    const [f1, f2] = par;
+    return (
+      `${c.dept.departmentName} concentra señales en ${SOURCE_LABEL_NARRATIVE[f1]} y ${SOURCE_LABEL_NARRATIVE[f2]}. ` +
+      `El resto de la organización opera sin convergencia detectable. ` +
+      `La excepción tiene origen identificado.`
+    );
+  }
+
+  // CASO 5 — Señal única (0 coincidentes, 1 aislado).
+  if (coincidentes.length === 0 && aislados.length === 1) {
+    const a = aislados[0];
+    const otraFuente = activeSourcesGlobal.find((s) => s !== a.sourceUnica);
+    if (!otraFuente) return undefined;
+    return (
+      `Solo ${SOURCE_LABEL_NARRATIVE[a.sourceUnica]} está marcando riesgo, en ${a.dept.departmentName}. ` +
+      `${SOURCE_LABEL_NARRATIVE[otraFuente]} no lo confirma. ` +
+      `La señal existe, la confirmación cross-instrumento todavía no.`
+    );
+  }
+
+  // CASO 3 — Señales fragmentadas (0 coincidentes, ≥2 aislados en distintas fuentes).
+  if (coincidentes.length === 0 && aislados.length >= 2) {
+    // Buscar 2 aislados con fuentes distintas para el ejemplo.
+    const primero = aislados[0];
+    const segundo = aislados.find((a) => a.sourceUnica !== primero.sourceUnica);
+    if (!segundo) {
+      // Todos los aislados marcan la misma fuente — degradar a "señal fragmentada en una sola dimensión".
+      return (
+        `${aislados.length} departamentos muestran señal en ${SOURCE_LABEL_NARRATIVE[primero.sourceUnica]}, ninguna otra fuente lo confirma. ` +
+        `O cada fuente captura una dimensión diferente del mismo problema. ` +
+        `O todavía no hay un problema estructural. ` +
+        `La diferencia importa — un patrón consolidado no se mueve solo.`
+      );
+    }
+    return (
+      `${activeSourcesGlobal.length} fuentes activas, ninguna confirma a la otra. ` +
+      `${SOURCE_LABEL_NARRATIVE[primero.sourceUnica]} marca ${primero.dept.departmentName}, ` +
+      `${SOURCE_LABEL_NARRATIVE[segundo.sourceUnica]} marca ${segundo.dept.departmentName} — distintos. ` +
+      `O cada fuente captura una dimensión diferente del mismo problema. ` +
+      `O todavía no hay un problema estructural. ` +
+      `La diferencia importa — un patrón consolidado no se mueve solo.`
+    );
+  }
+
+  // CASO 1 — Coincidencia + divergencia (≥2 coincidentes Y ≥1 aislado).
+  if (coincidentes.length >= 2 && aislados.length >= 1) {
+    const par = identificarParDominante(coincidentes);
+    if (!par) return undefined;
+    const [f1, f2] = par;
+    const coincidentNames = coincidentes.map((c) => c.dept.departmentName);
+    const divergente = aislados[0];
+    return (
+      `${SOURCE_LABEL_NARRATIVE[f1]} y ${SOURCE_LABEL_NARRATIVE[f2]} coinciden en ${formatDeptList(coincidentNames)} — la convergencia se concentra ahí. ` +
+      `Pero divergen en ${divergente.dept.departmentName}: ${SOURCE_LABEL_NARRATIVE[divergente.sourceUnica]} marca riesgo y la otra no lo confirma. ` +
+      `La lectura todavía no es uniforme. ` +
+      `O el deterioro empezó por una sola dimensión y aún no contagió. ` +
+      `O las fuentes están midiendo realidades distintas del mismo equipo.`
+    );
+  }
+
+  // CASO 2 — Convergencia limpia (≥2 coincidentes, 0 aislados).
+  if (coincidentes.length >= 2 && aislados.length === 0) {
+    const par = identificarParDominante(coincidentes);
+    if (!par) return undefined;
+    const [f1, f2] = par;
+    const N = coincidentes.length;
+    const palabra = N === 1 ? 'departamento' : 'departamentos';
+    return (
+      `Las fuentes activas convergen en ${N} ${palabra}. ` +
+      `${SOURCE_LABEL_NARRATIVE[f1]} y ${SOURCE_LABEL_NARRATIVE[f2]} apuntan al mismo lugar. ` +
+      `Cuando dos lentes independientes coinciden, el hallazgo deja de ser una señal — se convierte en un dato.`
+    );
+  }
+
+  return undefined;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ARTEFACTO 3.C — PATRÓN DE LIDERAZGO (criticalByManager)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Narrativa org-level cuando varios departamentos críticos comparten línea
+ * de mando. Privacy hardened: NO renderiza managerId — solo nombres de
+ * departamentos. El copy explícitamente recuerda que el sistema agrupa, no
+ * acusa ("la inferencia es trabajo del lector").
+ *
+ * Guards:
+ *   - criticalByManager.length === 0 → undefined.
+ *   - Si todos los grupos tienen <2 deptos resueltos → undefined (defensive).
+ *
+ * 2 ramas (ver plan sec 2.2).
+ */
+function buildCriticalByManagerNarrative(
+  criticalByManager: ConvergenciaGlobals['criticalByManager'],
+  deptNamesById: Map<string, string>
+): string | undefined {
+  if (criticalByManager.length === 0) return undefined;
+
+  // Resolver names + filtrar grupos vacíos / con <2 deptos resueltos.
+  const grupos = criticalByManager
+    .map((g) => ({
+      managerId: g.managerId,
+      deptNames: g.departmentIds
+        .map((id) => deptNamesById.get(id))
+        .filter((n): n is string => typeof n === 'string'),
+    }))
+    .filter((g) => g.deptNames.length >= 2);
+
+  if (grupos.length === 0) return undefined;
+
+  // CASO 1 — Una sola línea de mando.
+  if (grupos.length === 1) {
+    const g = grupos[0];
+    return (
+      `${g.deptNames.length} departamentos concentran señales críticas bajo la misma línea de mando: ${formatDeptList(g.deptNames)}. ` +
+      `El riesgo no es geográfico — es jerárquico. ` +
+      `O hay un sesgo en cómo se gestionan los equipos. ` +
+      `O hay una decisión estructural que nadie ha cuestionado. ` +
+      `O la cultura sofoca las señales antes de que escalen al sistema. ` +
+      `El sistema no nombra responsables — agrupa los datos. ` +
+      `La inferencia es trabajo del lector. ` +
+      `Y cada ciclo sin esa inferencia es uno más sin corrección.`
+    );
+  }
+
+  // CASO 2 — Múltiples líneas de mando.
+  const totalDeptos = grupos.reduce((sum, g) => sum + g.deptNames.length, 0);
+  return (
+    `${grupos.length} líneas de mando distintas concentran riesgo crítico, cubriendo ${totalDeptos} departamentos. ` +
+    `No es un caso aislado — es un patrón estructural en la capa intermedia de gestión. ` +
+    `O la organización no exige el mismo estándar de liderazgo cross-equipo. ` +
+    `O hay un perfil compartido entre estas líneas de mando que no detecta riesgos a tiempo. ` +
+    `La convergencia bajo distintos responsables descarta la teoría del caso individual. ` +
+    `La señal apunta al sistema, no a las personas.`
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // ARTEFACTO 4 — ALERTAS + INTERVENCIONES
 // ═══════════════════════════════════════════════════════════════════
 
@@ -559,6 +799,10 @@ export interface BuildNarrativesInput {
   }>;
   meta: MetaAnalysisOutput | null;
   convergencias: DepartmentConvergencia[];
+  /** Unión cross-dept de fuentes activas — para cruceNarrativa. */
+  activeSourcesGlobal: ComplianceSource[];
+  /** Grupos de deptos críticos bajo el mismo managerId — para criticalByManagerNarrativa. */
+  criticalByManager: ConvergenciaGlobals['criticalByManager'];
   alertas: AlertaInput[];
   /** Score de la campaña anterior cerrada (misma slug + account), o null. */
   previousOrgScore?: number | null;
@@ -572,6 +816,11 @@ export function buildReportNarratives(input: BuildNarrativesInput): ReportNarrat
     (s) => s.riskLevel === 'risk' || s.riskLevel === 'critical'
   ).length;
   const teatroCount = input.departmentAnalyses.filter((d) => d.teatroCumplimiento).length;
+
+  // Lookup id→name desde convergencias para criticalByManagerNarrativa.
+  const deptNamesById = new Map(
+    input.convergencias.map((c) => [c.departmentId, c.departmentName])
+  );
 
   return {
     portada: buildPortada(
@@ -588,6 +837,14 @@ export function buildReportNarratives(input: BuildNarrativesInput): ReportNarrat
     artefacto2_patrones: buildPatrones(input.departmentAnalyses),
     alertasGenero: buildAlertasGenero(input.departmentAnalyses),
     artefacto3_convergencia: buildConvergencia(input.convergencias),
+    cruceNarrativa: buildConvergenciaCruce(
+      input.convergencias,
+      input.activeSourcesGlobal
+    ),
+    criticalByManagerNarrativa: buildCriticalByManagerNarrative(
+      input.criticalByManager,
+      deptNamesById
+    ),
     artefacto4_alertas: buildAlertas(input.alertas),
     cierre: buildCierre(riesgoDeptos, teatroCount),
   };
