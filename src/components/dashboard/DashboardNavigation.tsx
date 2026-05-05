@@ -41,6 +41,7 @@ import {
   FileText,
   Brain,
   Wallet,
+  Shield,
 } from 'lucide-react';
 
 // ============================================================================
@@ -120,6 +121,15 @@ export default function DashboardNavigation({
   const salaryConfigRoles = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_ADMIN', 'HR_MANAGER', 'CLIENT'];
   const canSeeSalaryConfig = user?.role && salaryConfigRoles.includes(user.role);
 
+  // RBAC: Compliance (Ambiente Sano — Ley Karin). Alineado con compliance:view
+  // en AuthorizationService. CLIENT incluido por compatibilidad sistema legacy.
+  const complianceViewRoles = [
+    'FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'CEO',
+    'HR_ADMIN', 'HR_MANAGER', 'HR_OPERATOR', 'AREA_MANAGER',
+    'CLIENT',
+  ];
+  const canSeeCompliance = user?.role && complianceViewRoles.includes(user.role);
+
   // Navigation Config con Dropdowns
   const navigationItems: NavigationItem[] = [
     {
@@ -131,6 +141,9 @@ export default function DashboardNavigation({
         { id: 'salud', label: 'Salud Departamental', href: '/dashboard/salud-departamental', icon: Activity, comingSoon: true },
         { id: 'onboarding', label: 'Onboarding Intelligence', href: '/dashboard/onboarding/inicio', icon: Rocket }, // ✅ CAMBIO 7: href actualizado
         { id: 'exit', label: 'Exit Intelligence', href: '/dashboard/exit/overview', icon: DoorOpen },
+        ...(canSeeCompliance
+          ? [{ id: 'compliance', label: 'Ambiente Sano', href: '/dashboard/compliance', icon: Shield }]
+          : []),
       ],
     },
     // Executive Hub - Solo roles ejecutivos

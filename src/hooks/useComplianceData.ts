@@ -8,7 +8,7 @@
 //   - Auto-select del depto con menor ISA al cargar report.
 //   - Navegación 9 secciones canónicas (COMPLIANCE_SECTIONS).
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useComplianceCampaigns } from './useComplianceCampaigns';
 import type {
   ComplianceCampaignSummary,
@@ -32,6 +32,10 @@ import {
 } from '@/app/dashboard/compliance/lib/labels';
 import { pickLowestISA } from '@/app/dashboard/compliance/lib/format';
 import { buildInterventionPlan } from '@/lib/services/compliance/InterventionEngine';
+import {
+  upgradeDecisionItem,
+  upgradeDecisions,
+} from '@/app/dashboard/compliance/components/sections/SectionDimensiones/_shared/triggerRef';
 
 function getAuthHeaders(): Record<string, string> {
   const token =
@@ -49,6 +53,40 @@ export interface RegisterPlanActionInput {
   interventionId: string;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// ActionPlan — carrito de decisiones (modelo genérico ActionPlan)
+// ═══════════════════════════════════════════════════════════════════
+
+export interface ComplianceDecisionItem {
+  triggerType: TriggerType;
+  /**
+   * Identificador único de la decisión. Para dimensiones se codifica el scope:
+   *   - `dim:KEY:org`            → plan organizacional
+   *   - `dim:KEY:dept:DEPTID`    → plan departamental
+   *   - `dim:KEY` (LEGACY)       → tratado como org y upgradeado al cargar
+   * Para no-dimensiones: `patron:NAME`, `alert:ID`.
+   */
+  triggerRef: string;
+  triggerLabel: string;       // nombre de la dimensión / patrón
+  dimensionKey?: string;      // 'P2_seguridad' (si trigger es dimension)
+  level?: 'atencion' | 'riesgo' | 'critico';
+  addedAt: string;            // ISO
+  /**
+   * Scope de la decisión. Auto-derivado del triggerRef en `upsertDecision` /
+   * hidratación si el caller no lo provee. Decisiones legacy (`dim:KEY` sin
+   * scope) se mappean a `'organization'` por compat backward (Opción A).
+   */
+  targetType?: 'organization' | 'department';
+  /** ID del depto cuando targetType === 'department'. null para organization. */
+  targetId?: string | null;
+}
+
+export interface ActionPlanState {
+  id: string;
+  estado: 'borrador' | 'aprobado' | 'archivado';
+  allowAmendment: boolean;
+}
+
 export interface UseComplianceDataReturn {
   pageState: CompliancePageState;
   error: string | null;
@@ -58,9 +96,10 @@ export interface UseComplianceDataReturn {
   selectedCampaign: ComplianceCampaignSummary | null;
   selectCampaign: (id: string) => void;
 
-  activeSection: ComplianceSectionId;
+  activeSection: ComplianceSectionId | null;
   selectSection: (id: ComplianceSectionId) => void;
   navigateNext: () => void;
+  exitToLobby: () => void;
   isRailExpanded: boolean;
   toggleRail: () => void;
 
@@ -80,6 +119,18 @@ export interface UseComplianceDataReturn {
 
   exportPDF: (type: 'executive' | 'semestral') => Promise<void>;
   isExporting: boolean;
+
+  // ── ActionPlan (modelo genérico) ────────────────────────────────
+  actionPlan: ActionPlanState | null;
+  decisiones: ComplianceDecisionItem[];
+  /** True si hay al menos una decisión registrada — gating para footer del Hub. */
+  hasDecisions: boolean;
+  upsertDecision: (item: ComplianceDecisionItem) => void;
+  removeDecision: (triggerRef: string) => void;
+  narrativasEdit: Record<string, string>;
+  updateNarrativaEdit: (triggerRef: string, texto: string) => void;
+  isPersistingPlan: boolean;
+  canEditPlan: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -178,7 +229,7 @@ export function useComplianceData(initialCampaignId?: string): UseComplianceData
   const [planActions, setPlanActions] = useState<CompliancePlanAction[]>([]);
   const [isSavingPlanAction, setIsSavingPlanAction] = useState(false);
 
-  const [activeSection, setActiveSection] = useState<ComplianceSectionId>('sintesis');
+  const [activeSection, setActiveSection] = useState<ComplianceSectionId | null>(null);
   const [isRailExpanded, setIsRailExpanded] = useState(false);
 
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null);
@@ -261,7 +312,7 @@ export function useComplianceData(initialCampaignId?: string): UseComplianceData
       setPlanActions([]);
     }
     // Reset navegación al cambiar de campaña
-    setActiveSection('sintesis');
+    setActiveSection(null);
     setSelectedDepartmentId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignCacheKey]);
@@ -338,10 +389,15 @@ export function useComplianceData(initialCampaignId?: string): UseComplianceData
 
   const navigateNext = useCallback(() => {
     setActiveSection((current) => {
+      if (current === null) return COMPLIANCE_SECTIONS[0].id;
       const idx = SECTION_INDEX[current];
       const next = COMPLIANCE_SECTIONS[idx + 1];
       return next ? next.id : current;
     });
+  }, []);
+
+  const exitToLobby = useCallback(() => {
+    setActiveSection(null);
   }, []);
 
   const toggleRail = useCallback(() => {
@@ -422,6 +478,298 @@ export function useComplianceData(initialCampaignId?: string): UseComplianceData
     setIsExporting(false);
   }, []);
 
+  // ═══════════════════════════════════════════════════════════════════
+  // ActionPlan — carrito de decisiones (autosave 1.5s, 3 capas)
+  // React state → sessionStorage (per-campaign) → BD (POST/PUT)
+  // ═══════════════════════════════════════════════════════════════════
+  const sessionKey = useMemo(
+    () =>
+      selectedCampaignId
+        ? `action_plan_compliance_${selectedCampaignId}_v1`
+        : null,
+    [selectedCampaignId]
+  );
+
+  const [actionPlan, setActionPlan] = useState<ActionPlanState | null>(null);
+  const [decisionesMap, setDecisionesMap] = useState<
+    Map<string, ComplianceDecisionItem>
+  >(new Map());
+  const [narrativasEdit, setNarrativasEdit] = useState<Record<string, string>>(
+    {}
+  );
+  const [isPersistingPlan, setIsPersistingPlan] = useState(false);
+  /**
+   * Flag: hubo un upgrade legacy → moderno en la última hidratación.
+   * Un effect separado (más abajo) lee este flag y gatilla `scheduleAutosave`
+   * para persistir el formato nuevo en BD. Reactivo y libre de race conditions
+   * (vs. usar refs directos antes que `scheduleAutosave` esté declarada).
+   */
+  const [pendingUpgradeAutosave, setPendingUpgradeAutosave] = useState(false);
+
+  const decisionesRef = useRef(decisionesMap);
+  const narrativasEditRef = useRef(narrativasEdit);
+  const actionPlanRef = useRef(actionPlan);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    decisionesRef.current = decisionesMap;
+  }, [decisionesMap]);
+  useEffect(() => {
+    narrativasEditRef.current = narrativasEdit;
+  }, [narrativasEdit]);
+  useEffect(() => {
+    actionPlanRef.current = actionPlan;
+  }, [actionPlan]);
+
+  // ── Hidratar desde sessionStorage al cambiar de campaña ──
+  useEffect(() => {
+    if (!sessionKey || typeof window === 'undefined') {
+      setActionPlan(null);
+      setDecisionesMap(new Map());
+      setNarrativasEdit({});
+      return;
+    }
+    try {
+      const raw = sessionStorage.getItem(sessionKey);
+      if (raw) {
+        const parsed = JSON.parse(raw) as {
+          actionPlan?: ActionPlanState | null;
+          decisiones?: Array<[string, ComplianceDecisionItem]>;
+          narrativasEdit?: Record<string, string>;
+        };
+        setActionPlan(parsed.actionPlan ?? null);
+
+        // Upgrade legacy triggerRefs ('dim:KEY' → 'dim:KEY:org') y enriquecer
+        // con targetType/targetId. La key del Map se rebuilda con el triggerRef
+        // upgradeado para que la dedup funcione correctamente.
+        const rawItems = (parsed.decisiones ?? []).map(([, item]) => item);
+        const { items: upgraded, anyUpgraded } = upgradeDecisions(rawItems);
+        const map = new Map<string, ComplianceDecisionItem>();
+        for (const it of upgraded) map.set(it.triggerRef, it);
+        setDecisionesMap(map);
+        setNarrativasEdit(parsed.narrativasEdit ?? {});
+
+        // Si hubo upgrades, marcar para que un effect posterior gatille
+        // autosave a BD con el formato nuevo (sino legacy data nunca migra).
+        if (anyUpgraded) setPendingUpgradeAutosave(true);
+      } else {
+        setActionPlan(null);
+        setDecisionesMap(new Map());
+        setNarrativasEdit({});
+      }
+    } catch {
+      /* parse error — start clean */
+    }
+  }, [sessionKey]);
+
+  // ── Cargar borrador desde BD (override de sessionStorage) ──
+  useEffect(() => {
+    if (!selectedCampaignId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/action-plans?moduleType=compliance&campaignId=${selectedCampaignId}&estado=borrador`,
+          { headers: getAuthHeaders() }
+        );
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          success: boolean;
+          data?: Array<{
+            id: string;
+            estado: string;
+            allowAmendment: boolean;
+            decisiones: unknown;
+            narrativasEdit: unknown;
+          }>;
+        };
+        if (cancelled || !json.success || !json.data || json.data.length === 0)
+          return;
+        const plan = json.data[0]; // único borrador por scope
+        const decsArr = Array.isArray(plan.decisiones)
+          ? (plan.decisiones as ComplianceDecisionItem[])
+          : [];
+
+        // Upgrade legacy triggerRefs y enriquecer scope. Mismo patrón que
+        // sessionStorage hydration — la BD puede tener datos pre-rediseño.
+        const { items: upgraded, anyUpgraded } = upgradeDecisions(decsArr);
+        const decsMap = new Map<string, ComplianceDecisionItem>();
+        for (const it of upgraded) decsMap.set(it.triggerRef, it);
+
+        const ne =
+          plan.narrativasEdit &&
+          typeof plan.narrativasEdit === 'object' &&
+          !Array.isArray(plan.narrativasEdit)
+            ? (plan.narrativasEdit as Record<string, string>)
+            : {};
+        setActionPlan({
+          id: plan.id,
+          estado: plan.estado as ActionPlanState['estado'],
+          allowAmendment: plan.allowAmendment,
+        });
+        setDecisionesMap(decsMap);
+        setNarrativasEdit(ne);
+
+        if (anyUpgraded) setPendingUpgradeAutosave(true);
+      } catch {
+        /* offline — usar sessionStorage */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCampaignId]);
+
+  // ── Persistir a sessionStorage en cada cambio ──
+  useEffect(() => {
+    if (!sessionKey || typeof window === 'undefined') return;
+    try {
+      sessionStorage.setItem(
+        sessionKey,
+        JSON.stringify({
+          actionPlan,
+          decisiones: [...decisionesMap.entries()],
+          narrativasEdit,
+        })
+      );
+    } catch {
+      /* quota exceeded — ignorar */
+    }
+  }, [sessionKey, actionPlan, decisionesMap, narrativasEdit]);
+
+  // ── Save (POST primer vez, PUT subsiguientes) ──
+  const doSave = useCallback(async () => {
+    if (!selectedCampaignId) return;
+    if (actionPlanRef.current?.estado === 'aprobado') return;
+    setIsPersistingPlan(true);
+    try {
+      const decisionesArr = [...decisionesRef.current.values()];
+      const ne = narrativasEditRef.current;
+
+      let id = actionPlanRef.current?.id ?? null;
+
+      if (!id) {
+        const res = await fetch('/api/action-plans', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            moduleType: 'compliance',
+            campaignId: selectedCampaignId,
+            decisiones: decisionesArr,
+            narrativasEdit: ne,
+          }),
+        });
+        if (res.ok) {
+          const json = (await res.json()) as {
+            data: { id: string; estado: string; allowAmendment: boolean };
+          };
+          setActionPlan({
+            id: json.data.id,
+            estado: json.data.estado as ActionPlanState['estado'],
+            allowAmendment: json.data.allowAmendment,
+          });
+          return; // POST ya guardó el state actual
+        }
+        if (res.status === 409) {
+          // Otro tab/race ya creó el borrador — adoptamos su id y PUT.
+          const json = (await res.json()) as { existingPlanId?: string };
+          if (json.existingPlanId) {
+            id = json.existingPlanId;
+            setActionPlan({
+              id,
+              estado: 'borrador',
+              allowAmendment: false,
+            });
+          } else {
+            return;
+          }
+        } else {
+          return;
+        }
+      }
+
+      if (id) {
+        await fetch(`/api/action-plans/${id}`, {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            decisiones: decisionesArr,
+            narrativasEdit: ne,
+          }),
+        });
+      }
+    } catch {
+      /* network/error — el próximo cambio re-intenta */
+    } finally {
+      setIsPersistingPlan(false);
+    }
+  }, [selectedCampaignId]);
+
+  const scheduleAutosave = useCallback(() => {
+    if (!selectedCampaignId) return;
+    if (actionPlanRef.current?.estado === 'aprobado') return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      void doSave();
+    }, 1500);
+  }, [selectedCampaignId, doSave]);
+
+  const upsertDecision = useCallback(
+    (item: ComplianceDecisionItem) => {
+      if (actionPlanRef.current?.estado === 'aprobado') return;
+      // Auto-enrich: upgradea legacy triggerRefs + agrega targetType/targetId.
+      // Si el caller ya proveyó esos fields, los preserva.
+      const enriched = upgradeDecisionItem(item);
+      setDecisionesMap((prev) => {
+        const next = new Map(prev);
+        next.set(enriched.triggerRef, enriched);
+        return next;
+      });
+      scheduleAutosave();
+    },
+    [scheduleAutosave]
+  );
+
+  const removeDecision = useCallback(
+    (triggerRef: string) => {
+      if (actionPlanRef.current?.estado === 'aprobado') return;
+      setDecisionesMap((prev) => {
+        if (!prev.has(triggerRef)) return prev;
+        const next = new Map(prev);
+        next.delete(triggerRef);
+        return next;
+      });
+      scheduleAutosave();
+    },
+    [scheduleAutosave]
+  );
+
+  const updateNarrativaEdit = useCallback(
+    (triggerRef: string, texto: string) => {
+      if (actionPlanRef.current?.estado === 'aprobado') return;
+      setNarrativasEdit((prev) => ({ ...prev, [triggerRef]: texto }));
+      scheduleAutosave();
+    },
+    [scheduleAutosave]
+  );
+
+  // Effect: si hubo upgrade durante la hidratación, gatillar autosave una vez
+  // para persistir el formato nuevo. Después el flag se resetea solo.
+  useEffect(() => {
+    if (!pendingUpgradeAutosave) return;
+    scheduleAutosave();
+    setPendingUpgradeAutosave(false);
+  }, [pendingUpgradeAutosave, scheduleAutosave]);
+
+  const decisiones = useMemo(
+    () => [...decisionesMap.values()],
+    [decisionesMap]
+  );
+
+  const hasDecisions = decisionesMap.size > 0;
+
+  const canEditPlan = actionPlan?.estado !== 'aprobado';
+
   return {
     pageState,
     error: campaignsError ?? reportError,
@@ -432,6 +780,7 @@ export function useComplianceData(initialCampaignId?: string): UseComplianceData
     activeSection,
     selectSection,
     navigateNext,
+    exitToLobby,
     isRailExpanded,
     toggleRail,
     activeParticipationRate,
@@ -447,5 +796,14 @@ export function useComplianceData(initialCampaignId?: string): UseComplianceData
     isSavingPlanAction,
     exportPDF,
     isExporting,
+    actionPlan,
+    decisiones,
+    hasDecisions,
+    upsertDecision,
+    removeDecision,
+    narrativasEdit,
+    updateNarrativaEdit,
+    isPersistingPlan,
+    canEditPlan,
   };
 }

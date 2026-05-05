@@ -1,19 +1,19 @@
 'use client';
 
 // src/app/dashboard/compliance/components/ComplianceOrchestrator.tsx
-// Orquestador principal del dashboard /dashboard/compliance (Cinema Mode).
-// Clon del patrón src/app/dashboard/evaluaciones/components/CinemaModeOrchestrator:
-//   - h-screen flex-col overflow-hidden (la página no scrollea)
-//   - Stage flex-1 con scroll interno
-//   - AnimatePresence mode="wait" entre secciones
-//   - Rail bottom drawer 50↔320px — sólo en estado 'closed'
+// Clon literal del patrón src/app/dashboard/evaluaciones/components/CinemaModeOrchestrator.tsx
+// (líneas 211-285). Cambia solo los datos, no la lógica.
+//
+// Routing dentro del estado 'closed':
+//   activeSection === null → ComplianceMissionControl (lobby)
+//   activeSection !== null → ComplianceStage + ComplianceRail
 
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useComplianceData } from '@/hooks/useComplianceData';
-import ComplianceHeader from './ComplianceHeader';
 import ComplianceStage from './ComplianceStage';
 import ComplianceRail from './ComplianceRail';
+import ComplianceMissionControl from './ComplianceMissionControl';
 import ComplianceSkeleton from './ComplianceSkeleton';
 import ComplianceErrorState from './ComplianceErrorState';
 import ComplianceEmptyState from './states/ComplianceEmptyState';
@@ -23,113 +23,76 @@ interface ComplianceOrchestratorProps {
   initialCampaignId?: string;
 }
 
-const stageVariants = {
-  initial: { opacity: 0, scale: 0.97, y: 12 },
-  animate: {
-    opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: { type: 'spring' as const, stiffness: 220, damping: 30 },
-  },
-  exit: {
-    opacity: 0,
-    scale: 0.97,
-    y: -12,
-    transition: { duration: 0.15 },
-  },
-};
-
 export default function ComplianceOrchestrator({
   initialCampaignId,
 }: ComplianceOrchestratorProps) {
   const hook = useComplianceData(initialCampaignId);
-  const showRail = hook.pageState === 'closed';
+
+  if (hook.pageState === 'loading') return <ComplianceSkeleton />;
+  if (hook.pageState === 'error') {
+    return <ComplianceErrorState error={hook.error ?? 'Error desconocido'} />;
+  }
+  if (hook.pageState === 'empty') return <ComplianceEmptyState />;
+  if (hook.pageState === 'active' && hook.activeCampaign) {
+    return (
+      <ComplianceActiveState
+        participationRate={hook.activeParticipationRate ?? 0}
+        campaign={hook.activeCampaign}
+      />
+    );
+  }
+
   const pendingAlerts =
     hook.report?.data.alerts.filter(
       (a) => a.status !== 'resolved' && a.status !== 'dismissed'
     ).length ?? 0;
 
+  const isSpotlight = hook.activeSection !== null;
+
+  // Lobby y SectionDimensiones se diseñaron single-viewport (Patrón G h fija) → centrar.
+  // Resto de secciones crecen al contenido — sin scroll interno, sin altura
+  // capeada. La página scrollea naturalmente (1 sola scrollbar nativa).
+  const alignItems =
+    !hook.activeSection || hook.activeSection === 'dimensiones'
+      ? 'items-center'
+      : 'items-start';
+
   return (
-    <div className="h-screen w-full bg-[#0F172A] text-white flex flex-col font-sans overflow-hidden">
-      {/* Glow sutil cyan arriba */}
-      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-900/10 via-transparent to-transparent pointer-events-none" />
+    <div className="min-h-screen w-full bg-[#0F172A] text-white flex flex-col font-sans">
 
-      <ComplianceHeader
-        campaigns={hook.campaigns}
-        selectedId={hook.selectedCampaignId}
-        onSelect={hook.selectCampaign}
-        pageState={hook.pageState}
-      />
+      {/* Stage — el header global se eliminó; selector + PDFs viven en el Rail */}
+      <div className={cn(
+        'flex-1 relative flex justify-center p-4 md:p-8',
+        alignItems,
+        'transition-all duration-500 ease-in-out',
+        isSpotlight
+          ? (hook.isRailExpanded ? 'mb-[320px]' : 'mb-[50px]')
+          : 'mb-0'
+      )}>
+        <AnimatePresence mode="wait">
+          {!isSpotlight && hook.selectedCampaign && (
+            <ComplianceMissionControl
+              key="lobby"
+              campaign={hook.selectedCampaign}
+              planActions={hook.planActions}
+              interventionPlan={hook.interventionPlan}
+              pendingAlerts={pendingAlerts}
+              onStart={hook.selectSection}
+            />
+          )}
 
-      {/* Stage — scroll interno, la página nunca scrollea */}
-      <div
-        className={cn(
-          'flex-1 relative overflow-y-auto overflow-x-hidden',
-          'transition-all duration-500 ease-in-out',
-          showRail ? (hook.isRailExpanded ? 'pb-[320px]' : 'pb-[70px]') : 'pb-4'
-        )}
-      >
-        <div className="min-h-full flex items-start md:items-center justify-center p-4 md:p-8">
-          <AnimatePresence mode="wait">
-            {hook.pageState === 'loading' && (
-              <motion.div
-                key="loading"
-                {...stageVariants}
-                className="w-full max-w-2xl"
-              >
-                <ComplianceSkeleton />
-              </motion.div>
-            )}
-
-            {hook.pageState === 'error' && (
-              <motion.div
-                key="error"
-                {...stageVariants}
-                className="w-full max-w-xl"
-              >
-                <ComplianceErrorState error={hook.error ?? 'Error desconocido'} />
-              </motion.div>
-            )}
-
-            {hook.pageState === 'empty' && (
-              <motion.div
-                key="empty"
-                {...stageVariants}
-                className="w-full max-w-2xl"
-              >
-                <ComplianceEmptyState />
-              </motion.div>
-            )}
-
-            {hook.pageState === 'active' && hook.activeCampaign && (
-              <motion.div
-                key="active"
-                {...stageVariants}
-                className="w-full max-w-2xl"
-              >
-                <ComplianceActiveState
-                  participationRate={hook.activeParticipationRate ?? 0}
-                  campaign={hook.activeCampaign}
-                />
-              </motion.div>
-            )}
-
-            {hook.pageState === 'closed' && (
-              <motion.div
-                key={`section-${hook.activeSection}`}
-                {...stageVariants}
-                className="w-full max-w-5xl"
-              >
-                <ComplianceStage hook={hook} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+          {isSpotlight && (
+            <ComplianceStage
+              key={`section-${hook.activeSection}`}
+              hook={hook}
+            />
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Backdrop blur cuando el Rail está expandido */}
+      {/* Backdrop blur when rail expanded */}
       <AnimatePresence>
-        {showRail && hook.isRailExpanded && (
+        {isSpotlight && hook.isRailExpanded && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -140,8 +103,8 @@ export default function ComplianceOrchestrator({
         )}
       </AnimatePresence>
 
-      {/* Rail — sólo en estado closed */}
-      {showRail && (
+      {/* Rail — solo visible cuando hay sección activa */}
+      {isSpotlight && (
         <ComplianceRail
           activeSection={hook.activeSection}
           isExpanded={hook.isRailExpanded}
@@ -153,6 +116,10 @@ export default function ComplianceOrchestrator({
           alertasCount={pendingAlerts}
           planActionsCount={hook.planActions.length}
           orgISA={hook.report?.data.orgISA ?? null}
+          campaigns={hook.campaigns}
+          selectedCampaignId={hook.selectedCampaignId}
+          onSelectCampaign={hook.selectCampaign}
+          pageState={hook.pageState}
         />
       )}
     </div>
