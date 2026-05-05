@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '\n╔══════════════════════════════════════════════════╗\n║  FOCALIZAHR — VERIFICACIÓN PRE-ENTREGA           ║\n╠══════════════════════════════════════════════════╣\n║                                                  ║\n║  BUILD Y TIPOS                                   ║\n║  □ npm run build — sin errores                   ║\n║  □ npx tsc --noEmit — sin errores                ║\n║  □ Sin any en código nuevo                       ║\n║  □ Sin console.log de debug                      ║\n║                                                  ║\n║  SEGURIDAD                                       ║\n║  □ accountId en toda query Prisma nueva          ║\n║  □ extractUserContext + hasPermission en APIs    ║\n║  □ Sin arrays de roles hardcodeados              ║\n║                                                  ║\n║  FRONTEND                                        ║\n║  □ Funciona en 320px sin scroll horizontal       ║\n║  □ Textos tienen breakpoints md:                 ║\n║  □ Sin CSS inline — solo clases .fhr-*           ║\n║  □ Botones usan PremiumButton                    ║\n║  □ Toast usa sistema FocalizaHR, no shadcn       ║\n║                                                  ║\n║  Si algo falla → corregir antes de terminar      ║\n╚══════════════════════════════════════════════════╝\n'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|Create",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if git diff --name-only 2>/dev/null | grep -q 'schema\\.prisma'; then echo '⚠️  schema.prisma modificado — ejecutar: npx prisma validate'; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -63,6 +63,7 @@ TRIGGERS:
 | `references/anti-patterns.md` | Para verificar qué NO hacer |
 | `→ SKILL focalizahr-notificaciones` | **Para CUALQUIER toast/feedback al usuario** - Nunca usar shadcn `use-toast` |
 | `MANIFIESTO_FOCALIZAHR_v5.md` | **ANTES de elegir patrón** - Principios 7, 8 y 13: gravedad, personas, contexto |
+| `references/empty-states.md` | **SIEMPRE** cuando un componente puede no tener datos — reemplaza todo `return null` |
 ---
 
 ## ⚡ QUICK REFERENCE - COPIAR Y PEGAR
@@ -359,7 +360,7 @@ MOBILE-FIRST:
 UX:
   □ ¿Solo 1 CTA principal visible?
   □ ¿Loading states implementados?
-  □ ¿Empty states con mensaje útil?
+  □ ¿Empty states usan FHREmptyState? → Ver references/empty-states.md
 
 PATRONES:
   □ ¿Sigue alguno de los 7 patrones UX?
@@ -378,3 +379,4 @@ Para casos complejos, consultar en Project Knowledge:
 - `FILOSOFIA_DISENO_FOCALIZAHR_v2.md` - Patrones de página completos
 - `FILOSOFIA_UX_SMART_ROUTER_v1_0.md` - Los 7 patrones UX detallados
 - `📬 SISTEMA DE NOTIFICACIONES FOCALIZAHR.docx` - CSS completo
+

@@ -22,6 +22,7 @@
     "reset:compliance-stuck-jobs": "tsx prisma/scripts/reset-compliance-stuck-jobs.ts",
     "backfill:compliance-namespaced": "tsx prisma/scripts/backfill-compliance-namespaced-payloads.ts",
     "backfill:compliance-isa": "tsx prisma/scripts/backfill-compliance-isa.ts",
+    "rebuild:compliance-narratives": "tsx prisma/scripts/rebuild-compliance-narratives.ts",
     "db:reset": "prisma migrate reset",
     "db:seed:departments": "tsx prisma/seedDepartments.ts",
     "db:seed:performance": "tsx prisma/seeds/performance-evaluation-seed.ts",
