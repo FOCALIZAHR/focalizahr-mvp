@@ -40,10 +40,9 @@ const TOOL: AnthropicTool = {
             },
             intensidad: {
               type: 'number',
-              minimum: 0,
-              maximum: 1,
+              enum: [0.2, 0.4, 0.6, 0.8, 0.95],
               description:
-                'Float 0.0-1.0. Prevalencia × severidad. 0.1-0.3 leve, 0.4-0.6 moderado, 0.7-0.8 alto, 0.9-1.0 crítico. EXCEPCIÓN: si prevalencia muy baja (1 respuesta) pero gravedad extrema → 0.5-0.6 e indicar en descripción.',
+                'Nivel de gravedad estricto. DEBES elegir SOLO UNO de estos valores exactos. 0.2=Leve, 0.4=Moderado-Bajo, 0.6=Moderado-Alto, 0.8=Grave, 0.95=Crítico.',
             },
             origen_percibido: {
               type: 'string',
@@ -77,10 +76,15 @@ const TOOL: AnthropicTool = {
         description:
           'True si hay microagresiones sexistas, paternalismo o evaluación diferencial.',
       },
-      contexto_genero: {
+      evidencia_genero: {
         type: 'string',
         description:
-          'Si alerta_sesgo_genero es true, justificar la evidencia aquí. Si false, dejar vacío.',
+          'Cita literal de la respuesta que activa la alerta. MÁXIMO 8 PALABRAS, entre comillas. Sin explicación. Si alerta_sesgo_genero es false, dejar vacío.',
+      },
+      analisis_genero: {
+        type: 'string',
+        description:
+          'Justificación clínica/legal de por qué la cita constituye un marcador de género. Lenguaje epidemiológico ("Sugiere paternalismo...", "Marcador de evaluación diferencial..."). Si alerta_sesgo_genero es false, dejar vacío.',
       },
       senal_dominante: {
         type: 'string',
@@ -91,7 +95,7 @@ const TOOL: AnthropicTool = {
         type: 'string',
         enum: ['alta', 'media', 'baja', 'insuficiente_data'],
         description:
-          "Si total palabras < 50 o respuestas monosilábicas → 'insuficiente_data' y patrones DEBE ser [].",
+          "Aplica la REGLA DE DENSIDAD SEMÁNTICA del system prompt. 'insuficiente_data' SOLO cuando dispara FILTRO DE RUIDO VACÍO (texto < 30 palabras Y compuesto exclusivamente por evasivas neutras). Si dispara LEXICAL OVERRIDE, usar 'media' con CASTIGO DE INTENSIDAD.",
       },
     },
     required: [
@@ -128,20 +132,44 @@ Para cada patrón, clasifica su origen percibido:
 - "indeterminado": SOLO si es genuinamente imposible deducirlo.
 
 LENTE DE GÉNERO (Obligatorio evaluar):
-Busca activamente paternalismo ("las chiquillas", "las niñitas"), desestimación ("le dan color", "es histérica"), evaluación diferencial ("ella es conflictiva" vs "él es asertivo"), o menciones a roles de cuidado/apariencia. Si detectas esto, activa la alerta de género INDEPENDIENTEMENTE de los 5 patrones. Si alerta_sesgo_genero es true, SIEMPRE justifica la evidencia en contexto_genero.
+Busca activamente paternalismo ("las chiquillas", "las niñitas"), desestimación ("le dan color", "es histérica"), evaluación diferencial ("ella es conflictiva" vs "él es asertivo"), o menciones a roles de cuidado/apariencia. Si detectas esto, activa la alerta de género INDEPENDIENTEMENTE de los 5 patrones. Si activas la alerta, DEBES separar la cita literal en evidencia_genero (máximo 8 palabras) y tu justificación clínica/legal en analisis_genero. No mezcles las dos cosas en un solo campo.
 
 REGLAS ESTRICTAS:
 1. CONTEXTO CHILENO: Entiende modismos como "hacer la cama", "mandar a la cresta", "hacerse el larry", "ley del hielo", "chaqueteo", "jefe florero". Interpreta su gravedad subyacente en contexto corporativo.
-2. CALIBRACIÓN DE INTENSIDAD (0.0 a 1.0):
-   - 0.1-0.3: Menciones aisladas o ambiguas. Lenguaje suave.
-   - 0.4-0.6: Prevalencia moderada (~30-50% de respuestas). Incomodidad clara.
-   - 0.7-0.8: Tema recurrente. Uso de absolutismos ("siempre", "nadie", "todos saben").
-   - 0.9-1.0: Consenso casi total o menciones de hostilidad severa explícita.
-   - EXCEPCIÓN DE SEVERIDAD EXTREMA: Si prevalencia es muy baja (1 sola respuesta) pero describe un hecho grave, específico o violento, asigna intensidad 0.5-0.6 e indica en descripción: "Un relato aislado pero severo sugiere..."
+2. CALIBRACIÓN DE INTENSIDAD (BUCKETS ESTRICTOS):
+Tienes prohibido inventar decimales. DEBES asignar la intensidad eligiendo ÚNICAMENTE uno de estos 5 valores exactos:
+- 0.2 (Leve): Menciones aisladas, lenguaje suave o ambiguo.
+- 0.4 (Moderado-Bajo): Prevalencia baja pero con marcadores claros, o aplicación de Castigo de Intensidad por Lexical Override.
+- 0.6 (Moderado-Alto): Prevalencia media (~30-50% de respuestas). Incomodidad clara y compartida.
+- 0.8 (Grave): Tema recurrente. Uso de absolutismos ("siempre", "nadie").
+- 0.95 (Crítico): Consenso casi total o menciones de hostilidad severa/violenta explícita.
 3. FRAGMENTOS: MÁXIMO ABSOLUTO 8 PALABRAS. Si contiene nombres, iniciales o cargos que identifiquen a una persona (ej. "lo que le pasó a la contadora nueva"), reemplazar por [CENSURADO].
 4. AUSENCIA DE PATRÓN: Si las respuestas denotan proceso sano ("Se investigaría", "RH tomaría cartas"), devuelve array patrones VACÍO []. No inventes problemas. Es aceptable y esperado.
 5. LENGUAJE CLÍNICO: La descripción NUNCA dice "Aquí hay acoso". Debe usar: "Las respuestas sugieren...", "Se observa un marcador de...", "El lenguaje colectivo indica...".
-6. CONFIANZA INSUFICIENTE: Si respuestas son monosílabos ("no sé", "nada", "bien") o total palabras < 50, usar confianza "insuficiente_data". En ese caso patrones DEBE ser [] y senal_dominante DEBE ser "datos_insuficientes".
+6. REGLA DE DENSIDAD SEMÁNTICA (RUIDO VS. SEÑAL):
+
+La pregunta pide describir obstáculos. El miedo produce textos cortos. Evalúa la validez así:
+
+A) FILTRO DE RUIDO VACÍO:
+Si el texto agregado es muy breve (< 30 palabras) Y está compuesto EXCLUSIVAMENTE por evasivas neutras ("nada", "todo bien", "ok", "sin comentarios"):
+→ confianza_analisis: 'insuficiente_data'
+→ patrones: []
+→ senal_dominante: 'datos_insuficientes'
+No inventes problemas donde no los hay.
+
+B) LEXICAL OVERRIDE (BYPASS CLÍNICO):
+Si el texto es breve pero contiene AL MENOS UNA FRASE de alta valencia psicológica:
+- Menciones de sesgo ("chiquillas", "los hombres")
+- Evasión por miedo ("mejor no hablar", "nadie hablará", "todos saben")
+- Trato injusto ("no me gusta el trato")
+El volumen de palabras deja de importar. DEBES extraer el patrón y/o activar alerta_sesgo_genero.
+
+C) CASTIGO DE INTENSIDAD:
+Si aplicas Lexical Override basado en pocas frases (1-2 de 5 personas):
+→ intensidad: OBLIGATORIAMENTE 0.4
+→ confianza_analisis: 'media'
+→ descripcion debe incluir: "Un relato breve pero severo sugiere..."
+
 7. SEÑAL DOMINANTE: Asigna el nombre del patrón con mayor intensidad. Si patrones vacío → "ambiente_sano". Si confianza insuficiente → "datos_insuficientes".`;
 
 // Few-shot: 1 departamento tóxico + 1 departamento sano.
@@ -173,7 +201,7 @@ const FEW_SHOT_TOXICO_ASSISTANT = {
     patrones: [
       {
         nombre: 'miedo_represalias',
-        intensidad: 0.85,
+        intensidad: 0.8,
         origen_percibido: 'vertical_descendente',
         fragmentos: ['le harían la cama al tiro', 'los que reclaman se van', 'a uno lo aíslan'],
         descripcion:
@@ -181,7 +209,7 @@ const FEW_SHOT_TOXICO_ASSISTANT = {
       },
       {
         nombre: 'resignacion_aprendida',
-        intensidad: 0.75,
+        intensidad: 0.8,
         origen_percibido: 'sistemico_procesos',
         fragmentos: ['así es aquí', 'RRHH nunca hace nada', 'ya nadie dice nada'],
         descripcion:
@@ -189,7 +217,7 @@ const FEW_SHOT_TOXICO_ASSISTANT = {
       },
       {
         nombre: 'favoritismo_implicito',
-        intensidad: 0.55,
+        intensidad: 0.6,
         origen_percibido: 'vertical_descendente',
         fragmentos: ['el gerente tiene sus favoritos'],
         descripcion:
@@ -197,8 +225,9 @@ const FEW_SHOT_TOXICO_ASSISTANT = {
       },
     ],
     alerta_sesgo_genero: true,
-    contexto_genero:
-      'Uso explícito de "las chiquillas" en contexto de desestimar un comportamiento del jefe, patrón paternalista típico.',
+    evidencia_genero: '"las chiquillas"',
+    analisis_genero:
+      'Uso explícito en contexto de desestimar un comportamiento del jefe, patrón paternalista típico.',
     senal_dominante: 'miedo_represalias',
     confianza_analisis: 'alta',
   },
@@ -225,10 +254,9 @@ const FEW_SHOT_SANO_ASSISTANT = {
   name: 'reportar_analisis_epidemiologico',
   input: {
     analisis_cot:
-      'Seis respuestas con contenido consistente: referencia a protocolos, canales formales, escucha del líder, precedentes ("como ha pasado antes"). Cero marcadores de miedo, silencio, favoritismo o represalias. Cero chilenismos negativos. No hay señal de género. Confianza alta (>50 palabras, contenido sustantivo, consistencia interna). No forzar patrones.',
+      'Seis respuestas con contenido consistente: referencia a protocolos, canales formales, escucha del líder, precedentes ("como ha pasado antes"). Cero marcadores de miedo, silencio, favoritismo o represalias. Cero chilenismos negativos. No hay señal de género. Confianza alta (contenido sustantivo, consistencia interna, cero marcadores de riesgo). No forzar patrones.',
     patrones: [],
     alerta_sesgo_genero: false,
-    contexto_genero: '',
     senal_dominante: 'ambiente_sano',
     confianza_analisis: 'alta',
   },
