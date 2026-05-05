@@ -1,28 +1,24 @@
 // src/lib/services/compliance/ConvergenciaEngine.ts
 // Ambiente Sano - Cruce de señales entre 4 instrumentos por departamento.
 //
-// Degradación elegante (O4): si el account no tiene uno de los instrumentos
-// (Exit, Onboarding, Pulso), el depto funciona con las señales que sí existan.
-// El engine no falla; solo reporta qué fuentes están activas.
+// Arquitectura:
+//   1. buildDepartmentConvergencia(input) — función pura: toma inputs y arma
+//      el DepartmentConvergencia. Sin I/O. Usada cuando los datos ya están
+//      en mano (caso Orchestrator al cerrar un DEPT job).
+//   2. buildGlobalConvergencia(departments[]) — función pura: calcula
+//      agregados cross-depto (activeSourcesGlobal, criticalByManager).
+//   3. loadDepartmentExternalSignals(deptId, accountId, deptAccumulatedExo)
+//      — carga las señales externas (Exit leadership, EXO, Pulso) para UN depto.
+//   4. runConvergencia(campaignId, accountId) — wrapper full-campaign que
+//      carga en bulk, compone y retorna ConvergenciaResult. Usado por el
+//      endpoint manual POST /api/compliance/convergencia.
 //
-// Reglas del TASK_COMPLIANCE_AMBIENTE_SANO_IMPLEMENTATION (Fase 3):
-//   Safety < 3.0 = riesgo | < 2.5 = crítico
-//   Exit Liderazgo < 2.5 = riesgo
-//   EXO Onboarding < 60 = riesgo | < 30 = crítico
-//   Clima Pulso < 3.2 Y tendencia descendente = riesgo
-//
-// Nivel de convergencia por departamento:
-//   - 1 señal bajo umbral → 'bajo' (monitoreo)
-//   - 2 señales → 'medio' (alerta informativa)
-//   - 3+ señales → 'convergente' (alerta 72h)
-//   - Safety < 2.5 + cualquier otra → 'critico' (alerta 24h)
-//
-// Este engine NO escribe alertas. Devuelve el análisis; ComplianceAlertService
-// decide qué persistir.
+// Degradación elegante O4: si el account no tiene uno de los instrumentos,
+// el nodo simplemente no aparece.
 
 import { prisma } from '@/lib/prisma';
 import type { ComplianceSource } from '@/config/complianceAlertConfig';
-import type { PatronAnalysisOutput } from './complianceTypes';
+import type { PatronAnalysisOutput, PatronDetectado } from './complianceTypes';
 
 const AMBIENTE_SANO_SLUG = 'pulso-ambientes-sanos';
 const PULSO_EXPRESS_SLUG = 'pulso-express';
@@ -63,7 +59,7 @@ export interface DepartmentConvergencia {
 
   level: ConvergenciaLevel;
 
-  /** Pattern silencio_organizacional detectado por LLM (del ComplianceAnalysis). */
+  /** Pattern silencio_organizacional detectado por LLM. */
   silencioDetected: boolean;
   /** Deterioro sostenido del Clima Pulso en 3+ períodos. */
   deterioroPulso: boolean;
@@ -71,16 +67,182 @@ export interface DepartmentConvergencia {
   senalIgnorada: boolean;
 }
 
-export interface ConvergenciaResult {
-  campaignId: string;
-  accountId: string;
+export interface ConvergenciaGlobals {
   activeSourcesGlobal: ComplianceSource[];
-  departments: DepartmentConvergencia[];
-  /** Agrupa departamentos en Safety crítico por su manager común (para liderazgo_toxico). */
   criticalByManager: Array<{
     managerId: string;
     departmentIds: string[];
   }>;
+}
+
+export interface ConvergenciaResult extends ConvergenciaGlobals {
+  campaignId: string;
+  accountId: string;
+  departments: DepartmentConvergencia[];
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Fuentes externas por departamento
+// ═══════════════════════════════════════════════════════════════════
+
+export interface DepartmentExternalSignals {
+  /** avgLeadership del último DepartmentExitInsight del depto. */
+  exitLead: number | null;
+  /** Department.accumulatedExoScore (proxy EXO Day-30 agregado). */
+  exoScore: number | null;
+  /** Últimos scores de clima de pulso-express (más reciente primero, hasta 3). */
+  pulsoHistory: number[];
+  /** Hay ExitRecord reciente con onboardingEXOScore bajo en este depto. */
+  senalIgnorada: boolean;
+}
+
+export async function loadDepartmentExternalSignals(
+  departmentId: string,
+  accountId: string,
+  deptAccumulatedExo: number | null | undefined
+): Promise<DepartmentExternalSignals> {
+  // 1. Exit leadership del último insight.
+  const latestExit = await prisma.departmentExitInsight.findFirst({
+    where: { accountId, departmentId },
+    orderBy: { periodEnd: 'desc' },
+    select: { avgLeadership: true },
+  });
+
+  // 2. Señal ignorada: exits recientes con EXO bajo en este depto.
+  const recentCutoff = new Date();
+  recentCutoff.setMonth(recentCutoff.getMonth() - 6);
+  const recentLowExoExit = await prisma.exitRecord.findFirst({
+    where: {
+      accountId,
+      departmentId,
+      exitDate: { gte: recentCutoff },
+      hadOnboarding: true,
+      onboardingEXOScore: { not: null, lt: EXO_RISK },
+    },
+    select: { id: true },
+  });
+
+  // 3. Pulso Express histórico (últimos 3 períodos) — score del depto.
+  const pulsoCampaigns = await prisma.campaign.findMany({
+    where: {
+      accountId,
+      campaignType: { slug: PULSO_EXPRESS_SLUG },
+      status: 'completed',
+      campaignResults: { isNot: null },
+    },
+    orderBy: { endDate: 'desc' },
+    take: 3,
+    include: { campaignResults: { select: { departmentScores: true } } },
+  });
+
+  const pulsoHistory: number[] = [];
+  for (const pc of pulsoCampaigns) {
+    const deptScores = (pc.campaignResults?.departmentScores ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const raw = deptScores[departmentId];
+    if (typeof raw === 'number') pulsoHistory.push(raw);
+  }
+
+  return {
+    exitLead: latestExit?.avgLeadership ?? null,
+    exoScore: deptAccumulatedExo ?? null,
+    pulsoHistory,
+    senalIgnorada: !!recentLowExoExit,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Función pura: arma DepartmentConvergencia desde inputs.
+// ═══════════════════════════════════════════════════════════════════
+
+export interface BuildDepartmentConvergenciaInput {
+  departmentId: string;
+  departmentName: string;
+  managerId: string | null;
+  safetyScore: number | null;
+  patrones: PatronDetectado[];
+  externalSignals: DepartmentExternalSignals;
+}
+
+export function buildDepartmentConvergencia(
+  input: BuildDepartmentConvergenciaInput
+): DepartmentConvergencia {
+  const { departmentId, departmentName, managerId, safetyScore, patrones, externalSignals } =
+    input;
+  const signals: Partial<Record<ComplianceSource, ConvergenciaSignal>> = {};
+
+  // Safety (ambiente_sano) — siempre presente para deptos con análisis.
+  if (safetyScore !== null) {
+    signals.ambiente_sano = {
+      source: 'ambiente_sano',
+      value: safetyScore,
+      isRisk: safetyScore < SAFETY_RISK,
+      isCritical: safetyScore < SAFETY_CRITICAL,
+    };
+  }
+
+  // Exit leadership.
+  if (externalSignals.exitLead !== null) {
+    signals.exit = {
+      source: 'exit',
+      value: externalSignals.exitLead,
+      isRisk: externalSignals.exitLead < EXIT_LEADERSHIP_RISK,
+      isCritical: false,
+    };
+  }
+
+  // EXO (proxy Department.accumulatedExoScore).
+  if (externalSignals.exoScore !== null) {
+    signals.onboarding = {
+      source: 'onboarding',
+      value: externalSignals.exoScore,
+      isRisk: externalSignals.exoScore < EXO_RISK,
+      isCritical: externalSignals.exoScore < EXO_CRITICAL,
+    };
+  }
+
+  // Pulso clima + tendencia descendente.
+  let deterioroPulso = false;
+  const hist = externalSignals.pulsoHistory;
+  if (hist.length >= 1) {
+    const latest = hist[0];
+    const trendingDown =
+      hist.length >= 2 && hist[0] < hist[1] && (hist.length < 3 || hist[1] < hist[2]);
+    deterioroPulso = hist.length >= 3 && hist[0] < hist[1] && hist[1] < hist[2];
+    signals.pulso = {
+      source: 'pulso',
+      value: latest,
+      isRisk: latest < PULSO_CLIMA_RISK && trendingDown,
+      isCritical: false,
+      note: trendingDown ? 'tendencia descendente' : undefined,
+    };
+  }
+
+  // Silencio organizacional.
+  const silencioDetected = patrones.some(
+    (p) => p.nombre === 'silencio_organizacional' && p.intensidad >= SILENCE_PATTERN_INTENSITY
+  );
+
+  const activeSources = Object.keys(signals) as ComplianceSource[];
+  const riskSignalsCount = activeSources.filter((s) => signals[s]?.isRisk).length;
+  const hasCriticalSafety = !!signals.ambiente_sano?.isCritical;
+  const level = levelFrom(riskSignalsCount, hasCriticalSafety, activeSources.length > 0);
+
+  return {
+    departmentId,
+    departmentName,
+    managerId,
+    signals,
+    activeSources,
+    riskSignalsCount,
+    hasCriticalSafety,
+    level,
+    silencioDetected,
+    deterioroPulso,
+    senalIgnorada: externalSignals.senalIgnorada,
+  };
 }
 
 function levelFrom(
@@ -96,23 +258,50 @@ function levelFrom(
   return 'sin_riesgo';
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Función pura: agregados cross-depto.
+// ═══════════════════════════════════════════════════════════════════
+
+export function buildGlobalConvergencia(
+  departments: DepartmentConvergencia[]
+): ConvergenciaGlobals {
+  const byManager = new Map<string, string[]>();
+  for (const d of departments) {
+    if (!d.hasCriticalSafety || !d.managerId) continue;
+    const arr = byManager.get(d.managerId) ?? [];
+    arr.push(d.departmentId);
+    byManager.set(d.managerId, arr);
+  }
+  const criticalByManager = Array.from(byManager.entries())
+    .filter(([, ids]) => ids.length >= 2)
+    .map(([managerId, departmentIds]) => ({ managerId, departmentIds }));
+
+  const activeSourcesGlobal = Array.from(
+    new Set(departments.flatMap((d) => d.activeSources))
+  ) as ComplianceSource[];
+
+  return { activeSourcesGlobal, criticalByManager };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Wrapper full-campaign: compone todo desde la DB.
+// Usado por POST /api/compliance/convergencia (re-ejecución manual).
+// El flujo del Orchestrator NO lo usa — persiste per-DEPT al cerrar.
+// ═══════════════════════════════════════════════════════════════════
+
 export async function runConvergencia(
   campaignId: string,
   accountId: string
 ): Promise<ConvergenciaResult> {
-  // Validar campaña Ambiente Sano
   const campaign = await prisma.campaign.findFirst({
     where: { id: campaignId, accountId },
     include: { campaignType: { select: { slug: true } } },
   });
   if (!campaign) throw new Error('Campaña no encontrada');
   if (campaign.campaignType.slug !== AMBIENTE_SANO_SLUG) {
-    throw new Error(
-      `ConvergenciaEngine solo aplica a "${AMBIENTE_SANO_SLUG}"`
-    );
+    throw new Error(`ConvergenciaEngine solo aplica a "${AMBIENTE_SANO_SLUG}"`);
   }
 
-  // 1. Safety Score y patrones LLM desde ComplianceAnalysis DEPARTMENT COMPLETED.
   const analyses = await prisma.complianceAnalysis.findMany({
     where: {
       campaignId,
@@ -136,184 +325,41 @@ export async function runConvergencia(
     };
   }
 
-  const departmentIds = analyses
-    .map((a) => a.departmentId)
-    .filter((id): id is string => id !== null);
-
-  // 2. Exit leadership: avgLeadership último DepartmentExitInsight por depto.
-  const latestExitInsights = await prisma.departmentExitInsight.findMany({
-    where: { accountId, departmentId: { in: departmentIds } },
-    orderBy: { periodEnd: 'desc' },
-  });
-  const exitByDept = new Map<string, number | null>();
-  for (const insight of latestExitInsights) {
-    if (!exitByDept.has(insight.departmentId)) {
-      exitByDept.set(insight.departmentId, insight.avgLeadership);
-    }
-  }
-
-  // 3. Señal ignorada: ExitRecords recientes con EXO bajo en el depto.
-  const recentCutoff = new Date();
-  recentCutoff.setMonth(recentCutoff.getMonth() - 6);
-  const recentExitsWithLowExo = await prisma.exitRecord.findMany({
-    where: {
+  const departments: DepartmentConvergencia[] = [];
+  for (const a of analyses) {
+    if (!a.departmentId || !a.department) continue;
+    const external = await loadDepartmentExternalSignals(
+      a.departmentId,
       accountId,
-      departmentId: { in: departmentIds },
-      exitDate: { gte: recentCutoff },
-      hadOnboarding: true,
-      onboardingEXOScore: { not: null, lt: EXO_RISK },
-    },
-    select: { departmentId: true },
-  });
-  const senalIgnoradaDepts = new Set(recentExitsWithLowExo.map((e) => e.departmentId));
+      a.department.accumulatedExoScore
+    );
+    // Estructura nueva (namespaced): resultPayload = { patrones: PatronAnalysisOutput, safetyDetail, convergencia }.
+    // Estructura vieja (plana): resultPayload = PatronAnalysisOutput directamente.
+    const rawPayload = a.resultPayload as Record<string, unknown> | null;
+    const isNamespaced = !!rawPayload && 'safetyDetail' in rawPayload;
+    const patronesLLM = isNamespaced
+      ? ((rawPayload as { patrones?: PatronAnalysisOutput }).patrones ?? null)
+      : (rawPayload as PatronAnalysisOutput | null);
+    const patrones = patronesLLM?.patrones ?? [];
 
-  // 4. Pulso Express: últimos 3 CampaignResult del account.
-  const pulsoCampaigns = await prisma.campaign.findMany({
-    where: {
-      accountId,
-      campaignType: { slug: PULSO_EXPRESS_SLUG },
-      status: 'completed',
-      campaignResults: { isNot: null },
-    },
-    orderBy: { endDate: 'desc' },
-    take: 3,
-    include: { campaignResults: true },
-  });
-
-  // Extraer score de clima por depto y período.
-  // `departmentScores` es JSON: { [departmentId]: scoreNumber }
-  const pulsoHistoryByDept = new Map<string, number[]>();
-  for (const pc of pulsoCampaigns) {
-    const deptScores = (pc.campaignResults?.departmentScores ?? {}) as Record<
-      string,
-      unknown
-    >;
-    for (const deptId of departmentIds) {
-      const raw = deptScores[deptId];
-      const num = typeof raw === 'number' ? raw : null;
-      if (num === null) continue;
-      const arr = pulsoHistoryByDept.get(deptId) ?? [];
-      arr.push(num);
-      pulsoHistoryByDept.set(deptId, arr);
-    }
+    departments.push(
+      buildDepartmentConvergencia({
+        departmentId: a.departmentId,
+        departmentName: a.department.displayName,
+        managerId: a.department.parentId,
+        safetyScore: a.safetyScore,
+        patrones,
+        externalSignals: external,
+      })
+    );
   }
 
-  // 5. Construir resultado por departamento.
-  const departments: DepartmentConvergencia[] = analyses.map((a) => {
-    if (!a.departmentId || !a.department) {
-      throw new Error(`ComplianceAnalysis ${a.id} sin departmentId`);
-    }
-    const departmentId = a.departmentId;
-    const departmentName = a.department.displayName;
-    const managerId = a.department.parentId;
-
-    const signals: Partial<Record<ComplianceSource, ConvergenciaSignal>> = {};
-
-    // Safety (ambiente_sano) — siempre presente para deptos con análisis COMPLETED.
-    const safety = a.safetyScore;
-    if (safety !== null) {
-      signals.ambiente_sano = {
-        source: 'ambiente_sano',
-        value: safety,
-        isRisk: safety < SAFETY_RISK,
-        isCritical: safety < SAFETY_CRITICAL,
-      };
-    }
-
-    // Exit leadership (degradación: null si no hay DepartmentExitInsight).
-    const exitLead = exitByDept.get(departmentId) ?? null;
-    if (exitLead !== null) {
-      signals.exit = {
-        source: 'exit',
-        value: exitLead,
-        isRisk: exitLead < EXIT_LEADERSHIP_RISK,
-        isCritical: false,
-      };
-    }
-
-    // EXO (Department.accumulatedExoScore como proxy de EXO Day-30 agregado).
-    const exo = a.department.accumulatedExoScore;
-    if (exo !== null && exo !== undefined) {
-      signals.onboarding = {
-        source: 'onboarding',
-        value: exo,
-        isRisk: exo < EXO_RISK,
-        isCritical: exo < EXO_CRITICAL,
-      };
-    }
-
-    // Pulso clima + tendencia descendente.
-    const hist = pulsoHistoryByDept.get(departmentId) ?? [];
-    let deterioroPulso = false;
-    if (hist.length >= 1) {
-      const latest = hist[0];
-      const trendingDown =
-        hist.length >= 2 &&
-        hist[0] < hist[1] &&
-        (hist.length < 3 || hist[1] < hist[2]);
-      deterioroPulso = hist.length >= 3 && hist[0] < hist[1] && hist[1] < hist[2];
-      signals.pulso = {
-        source: 'pulso',
-        value: latest,
-        isRisk: latest < PULSO_CLIMA_RISK && trendingDown,
-        isCritical: false,
-        note: trendingDown ? 'tendencia descendente' : undefined,
-      };
-    }
-
-    // Silencio organizacional: pattern desde payload LLM.
-    let silencioDetected = false;
-    const payload = a.resultPayload as PatronAnalysisOutput | null;
-    if (payload?.patrones) {
-      silencioDetected = payload.patrones.some(
-        (p) =>
-          p.nombre === 'silencio_organizacional' &&
-          p.intensidad >= SILENCE_PATTERN_INTENSITY
-      );
-    }
-
-    const activeSources = Object.keys(signals) as ComplianceSource[];
-    const riskSignalsCount = activeSources.filter((s) => signals[s]?.isRisk).length;
-    const hasCriticalSafety = !!signals.ambiente_sano?.isCritical;
-    const level = levelFrom(riskSignalsCount, hasCriticalSafety, activeSources.length > 0);
-
-    return {
-      departmentId,
-      departmentName,
-      managerId,
-      signals,
-      activeSources,
-      riskSignalsCount,
-      hasCriticalSafety,
-      level,
-      silencioDetected,
-      deterioroPulso,
-      senalIgnorada: senalIgnoradaDepts.has(departmentId),
-    };
-  });
-
-  // 6. Agrupar críticos por manager (para liderazgo_toxico).
-  const byManager = new Map<string, string[]>();
-  for (const d of departments) {
-    if (!d.hasCriticalSafety || !d.managerId) continue;
-    const arr = byManager.get(d.managerId) ?? [];
-    arr.push(d.departmentId);
-    byManager.set(d.managerId, arr);
-  }
-  const criticalByManager = Array.from(byManager.entries())
-    .filter(([, ids]) => ids.length >= 2)
-    .map(([managerId, departmentIds]) => ({ managerId, departmentIds }));
-
-  // 7. Fuentes activas globales (union de todas las departamentales).
-  const activeSourcesGlobal = Array.from(
-    new Set(departments.flatMap((d) => d.activeSources))
-  );
+  const globals = buildGlobalConvergencia(departments);
 
   return {
     campaignId,
     accountId,
-    activeSourcesGlobal,
     departments,
-    criticalByManager,
+    ...globals,
   };
 }

@@ -25,7 +25,9 @@ import type {
   MetaAnalysisOutput,
   PatronAnalysisOutput,
   ComplianceSource,
+  ComplianceReportDepartmentPatrones,
 } from '@/types/compliance';
+import { PATRON_LABELS } from '@/lib/services/compliance/ComplianceNarrativeEngine';
 
 type ReportType = 'executive' | 'semestral';
 
@@ -46,8 +48,47 @@ interface OrgPayload {
     criticalByManager: Array<{ managerId: string; departmentIds: string[] }>;
     previousOrgScore: number | null;
     previousCampaignLabel: string | null;
+    /** Sumas org-level agregadas en `processOrgMetaIfReady()`. Opcionales para
+     *  payloads persistidos antes del deploy — frontend lee `?? null`. */
+    totalTextResponses?: number;
+    totalRespondents?: number;
   };
   narratives: ReportNarratives;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Helper: slice de PatronAnalysisOutput por depto para exposición al frontend
+// ════════════════════════════════════════════════════════════════════════════
+// Reduce el payload LLM bruto a la forma renderable. Devuelve `undefined` si
+// el depto no tiene análisis (campañas legacy) — el frontend cae al agregado
+// cross-depto en `narratives.artefacto2_patrones[]`.
+//
+// Casos:
+//   - patrones=[] + senal_dominante='ambiente_sano' → patron_dominante=null
+//   - patrones=[] + confianza='insuficiente_data'   → patron_dominante=null
+//   - patrones[0] poblado                            → patron_dominante={…}
+//
+// Hereda RBAC del caller — solo se llama sobre deptos ya filtrados por
+// visibleDeptIds (línea ~173). Cero nueva superficie de ataque.
+
+function buildDeptPatronesSlice(
+  payload: PatronAnalysisOutput | undefined,
+): ComplianceReportDepartmentPatrones | undefined {
+  if (!payload) return undefined;
+  const dominante = payload.patrones[0] ?? null;
+  return {
+    senal_dominante: payload.senal_dominante,
+    confianza_analisis: payload.confianza_analisis,
+    patron_dominante: dominante
+      ? {
+          nombre: dominante.nombre,
+          nombreLegible: PATRON_LABELS[dominante.nombre],
+          intensidad: dominante.intensidad,
+          origen_percibido: dominante.origen_percibido,
+          fragmentos: dominante.fragmentos.slice(0, 3),
+        }
+      : null,
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -84,7 +125,7 @@ export async function GET(request: NextRequest) {
     const campaign = await prisma.campaign.findFirst({
       where: { id: campaignId, accountId: userContext.accountId },
       include: {
-        account: { select: { companyName: true } },
+        account: { select: { companyName: true, country: true } },
         campaignType: { select: { slug: true } },
       },
     });
@@ -194,7 +235,7 @@ export async function GET(request: NextRequest) {
         success: true,
         type: 'semestral',
         generatedAt: new Date().toISOString(),
-        company: { name: campaign.account.companyName },
+        company: { name: campaign.account.companyName, country: campaign.account.country },
         period: {
           startDate: campaign.startDate,
           endDate: campaign.endDate,
@@ -229,11 +270,13 @@ export async function GET(request: NextRequest) {
         endDate: campaign.endDate,
         completedAt: campaign.completedAt,
       },
-      company: { name: campaign.account.companyName },
+      company: { name: campaign.account.companyName, country: campaign.account.country },
       narratives: orgPayload.narratives,
       data: {
         orgSafetyScore: orgPayload.global.orgSafetyScore,
         orgISA: orgPayload.global.orgISA ?? null,
+        totalTextResponses: orgPayload.global.totalTextResponses ?? null,
+        totalRespondents: orgPayload.global.totalRespondents ?? null,
         departments: deptPayloads.map((p) => {
           const isa = p.isa ?? null;
           const prevIsa = previousIsaByDept.get(p.safetyDetail.departmentId) ?? null;
@@ -242,6 +285,7 @@ export async function GET(request: NextRequest) {
             ...p.safetyDetail,
             isaScore: isa,
             deltaVsAnterior,
+            patrones: buildDeptPatronesSlice(p.patrones),
           };
         }),
         skippedByPrivacy: filteredSkipped,

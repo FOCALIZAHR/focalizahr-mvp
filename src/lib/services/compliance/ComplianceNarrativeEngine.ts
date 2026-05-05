@@ -25,6 +25,10 @@ import type {
   PatronNombre,
 } from './complianceTypes';
 import type { DepartmentConvergencia } from './ConvergenciaEngine';
+import {
+  resolveDimensionNarrative,
+  type ComplianceDimensionKey,
+} from '@/config/narratives/ComplianceNarrativeDictionary';
 
 // ═══════════════════════════════════════════════════════════════════
 // TIPOS DE SALIDA
@@ -35,6 +39,8 @@ export interface ReportNarratives {
   ancla: AnclaNarrative;
   artefacto1_dimensiones: DimensionNarrative[];
   artefacto2_patrones: PatronNarrative[];
+  /** Departamentos con alerta_sesgo_genero=true en el análisis LLM. */
+  alertasGenero: GenderAlertDetail[];
   artefacto3_convergencia: ConvergenciaNarrative[];
   artefacto4_alertas: AlertaNarrative[];
   cierre: CierreNarrative;
@@ -43,6 +49,10 @@ export interface ReportNarratives {
 export interface PortadaNarrative {
   titular: string;
   subtitular: string;
+  /** Score de la campaña anterior (misma slug + account), si existe. */
+  previousScore?: number | null;
+  /** Texto ejecutivo tipo "+0.3 vs Semestre 2 2025" o "Primera medición". */
+  deltaLabel?: string | null;
 }
 
 export interface AnclaNarrative {
@@ -62,6 +72,18 @@ export interface PatronNarrative {
   nombreLegible: string;
   intensidad: number;
   descripcion: string;
+  /** Fragmentos agregados (ya anonimizados, max 8 palabras cada uno). */
+  fragmentos: string[];
+  /** Departamentos donde el patrón apareció. */
+  departments: string[];
+}
+
+export interface GenderAlertDetail {
+  departmentName: string;
+  parentDepartmentName: string | null;  // gerencia padre. null si payload pre-deploy o si el dept es root.
+  evidenciaGenero: string;   // cita literal ≤8 palabras. '' si proviene de payload legacy.
+  analisisGenero: string;    // justificación clínica/legal. Siempre poblado.
+  contextoGenero: string;    // legacy — espejo de analisisGenero para consumers viejos.
 }
 
 export interface ConvergenciaNarrative {
@@ -97,7 +119,7 @@ const DIMENSION_LABELS: Record<string, string> = {
   P8_agotamiento: 'Sostenibilidad del equipo',
 };
 
-const PATRON_LABELS: Record<PatronNombre, string> = {
+export const PATRON_LABELS: Record<PatronNombre, string> = {
   silencio_organizacional: 'Silencio organizacional',
   hostilidad_normalizada: 'Hostilidad normalizada',
   favoritismo_implicito: 'Favoritismo implícito',
@@ -126,13 +148,6 @@ const INTERVENCIONES: Record<ComplianceAlertType, string> = {
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════
 
-function classifyDimension(score: number | null): 'sano' | 'atencion' | 'riesgo' {
-  if (score === null) return 'atencion';
-  if (score < 3.0) return 'riesgo';
-  if (score < 3.5) return 'atencion';
-  return 'sano';
-}
-
 function countBy<T, K extends string>(arr: T[], key: (x: T) => K): Record<K, number> {
   const acc: Record<string, number> = {};
   for (const x of arr) {
@@ -146,12 +161,31 @@ function countBy<T, K extends string>(arr: T[], key: (x: T) => K): Record<K, num
 // PORTADA
 // ═══════════════════════════════════════════════════════════════════
 
+function buildDeltaLabel(
+  current: number | null,
+  previous: number | null,
+  previousLabel: string | null
+): string | null {
+  if (current === null || previous === null || !previousLabel) return null;
+  const diff = current - previous;
+  const rounded = Math.round(diff * 10) / 10;
+  if (rounded === 0) return `Sin cambio vs ${previousLabel}`;
+  const sign = rounded > 0 ? '+' : '';
+  return `${sign}${rounded.toFixed(1)} vs ${previousLabel}`;
+}
+
 function buildPortada(
   meta: MetaAnalysisOutput | null,
   departmentsCount: number,
   riesgoDeptos: number,
-  teatroCount: number
+  teatroCount: number,
+  currentOrgScore: number | null,
+  previousOrgScore: number | null,
+  previousCampaignLabel: string | null
 ): PortadaNarrative {
+  const deltaLabel = buildDeltaLabel(currentOrgScore, previousOrgScore, previousCampaignLabel);
+  const previousScore = previousOrgScore ?? null;
+
   if (meta?.hallazgo_narrativo_portada) {
     return {
       titular: meta.hallazgo_narrativo_portada,
@@ -159,6 +193,8 @@ function buildPortada(
         riesgoDeptos > 0
           ? `${riesgoDeptos} de ${departmentsCount} gerencias muestran señales que ameritan revisión.`
           : 'Las señales agregadas sostienen un diagnóstico general saludable.',
+      previousScore,
+      deltaLabel,
     };
   }
 
@@ -167,6 +203,8 @@ function buildPortada(
       titular:
         'Los números dicen una cosa; las respuestas, otra. La diferencia es la señal.',
       subtitular: `${teatroCount} gerencias puntúan alto en las métricas duras pero su lenguaje sugiere contención.`,
+      previousScore,
+      deltaLabel,
     };
   }
 
@@ -175,6 +213,8 @@ function buildPortada(
       titular: 'La organización opera con márgenes saludables en el ambiente de trabajo.',
       subtitular:
         'Ninguna gerencia entra en zona de revisión crítica. El foco está en sostener lo que funciona.',
+      previousScore,
+      deltaLabel,
     };
   }
 
@@ -182,6 +222,8 @@ function buildPortada(
     titular: `${riesgoDeptos} gerencias concentran el riesgo del semestre.`,
     subtitular:
       'El análisis revela concentración, no dispersión. Eso ordena la prioridad.',
+    previousScore,
+    deltaLabel,
   };
 }
 
@@ -222,21 +264,30 @@ function buildAncla(
 function buildDimensiones(scores: DepartmentSafetyScore[]): DimensionNarrative[] {
   if (scores.length === 0) return [];
 
-  const dimensionKeys = [
+  const dimensionKeys: ComplianceDimensionKey[] = [
     'P2_seguridad',
     'P3_disenso',
     'P4_microagresiones',
     'P5_equidad',
     'P7_liderazgo',
     'P8_agotamiento',
-  ] as const;
+  ];
 
   return dimensionKeys.map((key) => {
-    const values = scores
-      .map((s) => s.dimensionScores[key])
-      .filter((v): v is number => v !== null);
+    // Promedio ponderado por respondentCount — un depto con 30 voces pesa
+    // más que uno con 6 al describir el clima org de la dimensión.
+    let weighted = 0;
+    let totalWeight = 0;
+    for (const s of scores) {
+      const v = s.dimensionScores[key];
+      if (v === null || v === undefined) continue;
+      const w = s.respondentCount ?? 0;
+      if (w <= 0) continue;
+      weighted += v * w;
+      totalWeight += w;
+    }
 
-    if (values.length === 0) {
+    if (totalWeight === 0) {
       return {
         dimensionKey: key,
         dimensionNombre: DIMENSION_LABELS[key],
@@ -246,32 +297,13 @@ function buildDimensiones(scores: DepartmentSafetyScore[]): DimensionNarrative[]
       };
     }
 
-    const avg = values.reduce((a, b) => a + b, 0) / values.length;
-    const nivel = classifyDimension(avg);
-
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const spread = max - min;
-
-    const deptMin = scores.find((s) => s.dimensionScores[key] === min);
-    const deptMax = scores.find((s) => s.dimensionScores[key] === max);
-
-    let narrativa: string;
-    if (nivel === 'sano' && spread < 0.8) {
-      narrativa =
-        'La lectura es consistente entre gerencias. No hay brechas que requieran foco específico.';
-    } else if (nivel === 'sano') {
-      narrativa = `El promedio es sólido, pero la distancia entre ${deptMax?.departmentName ?? 'la mejor'} y ${deptMin?.departmentName ?? 'la más baja'} es ${spread.toFixed(1)} puntos. O la diferencia es de madurez de equipo, o hay una práctica concreta que una gerencia encontró y el resto no.`;
-    } else if (nivel === 'atencion') {
-      narrativa = `El promedio está en zona gris. La concentración del riesgo está en ${deptMin?.departmentName ?? 'una gerencia específica'}, que aporta el valor más bajo del grupo.`;
-    } else {
-      narrativa = `La dimensión cae por debajo del umbral de observación. La brecha con las gerencias más altas (${spread.toFixed(1)} puntos) descarta que sea un problema global: es localizado.`;
-    }
+    const orgScore = weighted / totalWeight;
+    const { uiLevel, narrativa } = resolveDimensionNarrative(key, orgScore);
 
     return {
       dimensionKey: key,
       dimensionNombre: DIMENSION_LABELS[key],
-      nivel,
+      nivel: uiLevel,
       narrativa,
     };
   });
@@ -289,16 +321,23 @@ function buildPatrones(
 ): PatronNarrative[] {
   const byPattern = new Map<
     PatronNombre,
-    { total: number; sumInt: number; deptos: string[] }
+    { total: number; sumInt: number; deptos: string[]; fragmentos: string[] }
   >();
 
   for (const d of departmentAnalyses) {
     const patrones = d.payload?.patrones ?? [];
     for (const p of patrones) {
-      const bucket = byPattern.get(p.nombre) ?? { total: 0, sumInt: 0, deptos: [] };
+      const bucket = byPattern.get(p.nombre) ?? {
+        total: 0,
+        sumInt: 0,
+        deptos: [],
+        fragmentos: [],
+      };
       bucket.total++;
       bucket.sumInt += p.intensidad;
       bucket.deptos.push(d.departmentName);
+      // Agregamos fragmentos (el LLM garantiza max 8 palabras + [CENSURADO]).
+      bucket.fragmentos.push(...(p.fragmentos ?? []));
       byPattern.set(p.nombre, bucket);
     }
   }
@@ -315,15 +354,63 @@ function buildPatrones(
         ? `El marcador aparece en ${deptosStr} con intensidad ${avgInt.toFixed(2)}. La evidencia es localizada.`
         : `El marcador se repite en ${bucket.deptos.length} gerencias (${deptosStr}) con intensidad promedio ${avgInt.toFixed(2)}. La consistencia sugiere un rasgo cultural, no un incidente puntual.`;
 
+    // Dedup + top 3 fragmentos por patrón (el LLM ya los acota, aquí solo
+    // evitamos repetidos).
+    const uniqueFragments = Array.from(new Set(bucket.fragmentos)).slice(0, 3);
+
     arr.push({
       nombre,
       nombreLegible: PATRON_LABELS[nombre],
       intensidad: avgInt,
       descripcion,
+      fragmentos: uniqueFragments,
+      departments: bucket.deptos,
     });
   }
 
   return arr.sort((a, b) => b.intensidad - a.intensidad).slice(0, 5);
+}
+
+function buildAlertasGenero(
+  departmentAnalyses: Array<{
+    departmentName: string;
+    parentDepartmentName: string | null;
+    payload: PatronAnalysisOutput | null;
+  }>
+): GenderAlertDetail[] {
+  const result: GenderAlertDetail[] = [];
+  for (const d of departmentAnalyses) {
+    if (!d.payload?.alerta_sesgo_genero) continue;
+
+    const evidenciaNueva = d.payload.evidencia_genero?.trim() ?? '';
+    const analisisNuevo = d.payload.analisis_genero?.trim() ?? '';
+    const contextoLegacy = d.payload.contexto_genero?.trim() ?? '';
+
+    // Path nuevo: al menos uno de los campos separados está poblado.
+    if (evidenciaNueva || analisisNuevo) {
+      const analisis = analisisNuevo || contextoLegacy;
+      if (!evidenciaNueva && !analisis) continue;
+      result.push({
+        departmentName: d.departmentName,
+        parentDepartmentName: d.parentDepartmentName,
+        evidenciaGenero: evidenciaNueva,
+        analisisGenero: analisis,
+        contextoGenero: analisis,
+      });
+      continue;
+    }
+
+    // Fallback legacy: solo contexto_genero presente en payload pre-deploy.
+    if (!contextoLegacy) continue;
+    result.push({
+      departmentName: d.departmentName,
+      parentDepartmentName: d.parentDepartmentName,
+      evidenciaGenero: '',
+      analisisGenero: contextoLegacy,
+      contextoGenero: contextoLegacy,
+    });
+  }
+  return result;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -466,12 +553,17 @@ export interface BuildNarrativesInput {
   scores: DepartmentSafetyScore[];
   departmentAnalyses: Array<{
     departmentName: string;
+    parentDepartmentName: string | null;
     payload: PatronAnalysisOutput | null;
     teatroCumplimiento: boolean;
   }>;
   meta: MetaAnalysisOutput | null;
   convergencias: DepartmentConvergencia[];
   alertas: AlertaInput[];
+  /** Score de la campaña anterior cerrada (misma slug + account), o null. */
+  previousOrgScore?: number | null;
+  /** Etiqueta ejecutiva corta de la campaña anterior — ej. "Semestre 2 2025". */
+  previousCampaignLabel?: string | null;
 }
 
 export function buildReportNarratives(input: BuildNarrativesInput): ReportNarratives {
@@ -482,10 +574,19 @@ export function buildReportNarratives(input: BuildNarrativesInput): ReportNarrat
   const teatroCount = input.departmentAnalyses.filter((d) => d.teatroCumplimiento).length;
 
   return {
-    portada: buildPortada(input.meta, departmentsCount, riesgoDeptos, teatroCount),
+    portada: buildPortada(
+      input.meta,
+      departmentsCount,
+      riesgoDeptos,
+      teatroCount,
+      input.orgSafetyScore,
+      input.previousOrgScore ?? null,
+      input.previousCampaignLabel ?? null
+    ),
     ancla: buildAncla(input.orgSafetyScore, departmentsCount, teatroCount),
     artefacto1_dimensiones: buildDimensiones(input.scores),
     artefacto2_patrones: buildPatrones(input.departmentAnalyses),
+    alertasGenero: buildAlertasGenero(input.departmentAnalyses),
     artefacto3_convergencia: buildConvergencia(input.convergencias),
     artefacto4_alertas: buildAlertas(input.alertas),
     cierre: buildCierre(riesgoDeptos, teatroCount),

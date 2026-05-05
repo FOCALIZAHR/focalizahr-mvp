@@ -134,17 +134,66 @@ import type {
   SafetyScoreSkip,
 } from '@/lib/services/SafetyScoreService';
 import type { DepartmentConvergencia } from '@/lib/services/compliance/ConvergenciaEngine';
-import type { MetaAnalysisOutput } from '@/lib/services/compliance/complianceTypes';
+import type {
+  ConfianzaAnalisis,
+  MetaAnalysisOutput,
+  OrigenPercibido,
+  PatronNombre,
+} from '@/lib/services/compliance/complianceTypes';
 import type {
   ComplianceAlertType,
   ComplianceSource,
   ComplianceSeverity,
 } from '@/config/complianceAlertConfig';
 
+// ─────────────────────────────────────────────────────────────────────
+// Patrones por depto — slice de PatronAnalysisOutput expuesta al frontend
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Patrón dominante por depto — slice renderable de
+ * `PatronAnalysisOutput.patrones[0]` (mayor intensidad).
+ *
+ * `null` si el depto no tiene patrones detectados — el campo `senal_dominante`
+ * en `ComplianceReportDepartmentPatrones` diferencia entre los dos casos:
+ *   - 'ambiente_sano'        → ambiente sano confirmado
+ *   - 'datos_insuficientes'  → no concluyente (confianza='insuficiente_data')
+ */
+export interface ComplianceReportPatronDominante {
+  nombre: PatronNombre;
+  /** Label canónico desde `PATRON_LABELS` del engine (single source of truth). */
+  nombreLegible: string;
+  intensidad: number;
+  /** 4 valores depto-level (sin 'mixto'; ese solo aplica a org-level). */
+  origen_percibido: OrigenPercibido;
+  /** Max 3 fragmentos, max 8 palabras c/u, identificadores → [CENSURADO]. */
+  fragmentos: string[];
+}
+
+/**
+ * Slice de `PatronAnalysisOutput` por depto expuesta al frontend para
+ * SectionPatrones ("La Voz"). Optional en `ComplianceReportDepartment` — campañas
+ * legacy sin análisis LLM completado simplemente no traen este campo, y el
+ * frontend cae al agregado cross-depto en `narratives.artefacto2_patrones[]`.
+ */
+export interface ComplianceReportDepartmentPatrones {
+  /** Patrón dominante por nombre. Casos especiales: 'ambiente_sano',
+   *  'datos_insuficientes'. Cualquier otro valor coincide con un PatronNombre. */
+  senal_dominante: string;
+  confianza_analisis: ConfianzaAnalisis;
+  patron_dominante: ComplianceReportPatronDominante | null;
+}
+
 /** Un depto enriquecido por el endpoint /report con ISA + delta vs ciclo anterior. */
 export interface ComplianceReportDepartment extends DepartmentSafetyScore {
   isaScore: number | null;
   deltaVsAnterior: number | null;
+  /**
+   * Optional — slice del PatronAnalysisOutput LLM por depto.
+   * Ausente en campañas legacy o sin análisis LLM completado. Frontend debe
+   * leer defensivamente con `dept.patrones?.patron_dominante`.
+   */
+  patrones?: ComplianceReportDepartmentPatrones;
 }
 
 export interface ComplianceReportAlert {
@@ -174,11 +223,19 @@ export interface ComplianceReportResponse {
   };
   company: {
     name: string;
+    country?: string;
   };
   narratives: ReportNarratives;
   data: {
     orgSafetyScore: number | null;
     orgISA: number | null;
+    /** Suma de respuestas P1 (proyectiva) válidas que entraron al LLM por depto.
+     *  `null` si el OrgPayload fue persistido antes del deploy de este campo. */
+    totalTextResponses: number | null;
+    /** Suma de respondentes al cuestionario cuantitativo a nivel org —
+     *  mismo denominador que `orgSafetyScore`. Respeta privacy threshold n≥5.
+     *  `null` si el OrgPayload fue persistido antes del deploy de este campo. */
+    totalRespondents: number | null;
     departments: ComplianceReportDepartment[];
     skippedByPrivacy: SafetyScoreSkip[];
     metaAnalysis: MetaAnalysisOutput | null;

@@ -24,12 +24,19 @@ export interface PatronDetectado {
   descripcion: string;
 }
 
-/** Output bruto del LLM para el análisis por departamento. */
+/**
+ * Output bruto del LLM para el análisis por departamento.
+ * Jobs nuevos llenan `evidencia_genero` + `analisis_genero` separados.
+ * Payloads pre-deploy (legacy) solo tienen `contexto_genero`; el engine
+ * `buildAlertasGenero` aplica fallback al consumir.
+ */
 export interface PatronAnalysisOutput {
   analisis_cot: string;
   patrones: PatronDetectado[];
   alerta_sesgo_genero: boolean;
-  contexto_genero?: string;
+  evidencia_genero?: string;     // cita literal ≤8 palabras (jobs nuevos)
+  analisis_genero?: string;      // justificación clínica (jobs nuevos)
+  contexto_genero?: string;      // legacy — payloads ya persistidos
   senal_dominante: string;
   confianza_analisis: ConfianzaAnalisis;
 }

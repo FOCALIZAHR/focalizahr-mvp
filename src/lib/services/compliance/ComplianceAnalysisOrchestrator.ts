@@ -40,6 +40,13 @@ interface DepartmentResultPayload {
   safetyDetail: DepartmentSafetyScore;
   convergencia: DepartmentConvergencia;
   isa: number; // ISA del depto (0-100)
+  textCount?: number; // Respuestas P1 válidas que entraron al LLM (post-trim).
+  /**
+   * Nombre del departamento padre (gerencia) al momento del cierre del job.
+   * Optional para backward-compat: payloads pre-deploy de este campo no lo
+   * tienen y `extractDeptParentName` cae a `null`.
+   */
+  parentDepartmentName?: string | null;
 }
 
 const AMBIENTE_SANO_SLUG = 'pulso-ambientes-sanos';
@@ -224,7 +231,13 @@ export async function processNextDepartmentJob(campaignId: string): Promise<bool
 
     const deptInfo = await prisma.department.findUnique({
       where: { id: job.departmentId },
-      select: { id: true, displayName: true, parentId: true, accumulatedExoScore: true },
+      select: {
+        id: true,
+        displayName: true,
+        parentId: true,
+        accumulatedExoScore: true,
+        parent: { select: { displayName: true } },
+      },
     });
 
     const externalSignals = await loadDepartmentExternalSignals(
@@ -258,6 +271,8 @@ export async function processNextDepartmentJob(campaignId: string): Promise<bool
       safetyDetail,
       convergencia,
       isa: isaScore,
+      textCount: textos.length,
+      parentDepartmentName: deptInfo?.parent?.displayName ?? null,
     };
 
     await prisma.complianceAnalysis.update({
@@ -433,6 +448,7 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
 
     const deptAnalysesForNarratives = completedDepts.map((d) => ({
       departmentName: d.department?.displayName ?? 'Sin nombre',
+      parentDepartmentName: extractDeptParentName(d.resultPayload),
       payload: extractDeptPatrones(d.resultPayload),
       teatroCumplimiento: !!d.teatroCumplimiento,
     }));
@@ -480,6 +496,20 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
       if (totalWeight > 0) orgISA = Math.round(weightedSum / totalWeight);
     }
 
+    // Sumas org-level: text responses (denominador "voz libre") + respondents
+    // (denominador safety, mismo que orgSafetyScore). Lectura defensiva: depts
+    // persistidos antes del deploy de textCount cuentan 0.
+    let totalTextResponses = 0;
+    let totalRespondents = 0;
+    for (const d of completedDepts) {
+      const payload = d.resultPayload as Record<string, unknown> | null;
+      const tc = payload && typeof payload.textCount === 'number' ? payload.textCount : 0;
+      totalTextResponses += tc;
+
+      const safetyDetail = extractDeptSafetyDetail(d.resultPayload);
+      totalRespondents += safetyDetail?.respondentCount ?? 0;
+    }
+
     const orgPayload = {
       meta: llmResult.data,
       global: {
@@ -490,6 +520,8 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
         criticalByManager: globals.criticalByManager,
         previousOrgScore,
         previousCampaignLabel,
+        totalTextResponses,
+        totalRespondents,
       },
       narratives,
     };
@@ -579,6 +611,17 @@ function extractDeptSafetyDetail(payload: unknown): DepartmentSafetyScore | null
 function extractDeptConvergencia(payload: unknown): DepartmentConvergencia | null {
   if (isNamespacedDept(payload)) return payload.convergencia;
   return null;
+}
+
+/**
+ * Lee `parentDepartmentName` defensivamente. Payloads legacy (pre-deploy del
+ * campo) no lo traen → null. Frontend cae al render sin gerencia.
+ */
+function extractDeptParentName(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const obj = payload as Record<string, unknown>;
+  const value = obj.parentDepartmentName;
+  return typeof value === 'string' ? value : null;
 }
 
 // Calcula orgSafetyScore y skippedByPrivacy agregando los DEPARTMENT rows

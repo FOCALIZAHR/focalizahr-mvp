@@ -146,6 +146,90 @@ function buildGenderBreakdown(
   return { male, female };
 }
 
+// Helper interno: dado un bucket de responses filtradas, arma el
+// DepartmentSafetyScore (o retorna null si bajo threshold).
+function scoreFromRows(
+  departmentId: string,
+  departmentName: string,
+  deptRows: ResponseRow[]
+): DepartmentSafetyScore | { skip: true; respondentCount: number } {
+  const respondentCount = new Set(deptRows.map((r) => r.participantId)).size;
+  if (respondentCount < PRIVACY_THRESHOLD) {
+    return { skip: true, respondentCount };
+  }
+  const averages = averageByQuestion(deptRows);
+  const safetyScore = computeWeightedScore(averages);
+  if (safetyScore === null) {
+    return { skip: true, respondentCount };
+  }
+  return {
+    departmentId,
+    departmentName,
+    safetyScore,
+    riskLevel: classifyRisk(safetyScore),
+    respondentCount,
+    dimensionScores: buildDimensionScores(averages),
+    genderBreakdown: buildGenderBreakdown(deptRows),
+  };
+}
+
+/**
+ * Calcula el DepartmentSafetyScore de UN solo departamento.
+ * Retorna null si el depto está bajo el privacy threshold o no tiene respuestas.
+ * Usado por el Orchestrator al cerrar un DEPARTMENT job.
+ */
+export async function calculateSafetyScoreForDepartment(
+  campaignId: string,
+  departmentId: string,
+  accountId: string
+): Promise<DepartmentSafetyScore | null> {
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: campaignId, accountId },
+    include: { campaignType: { select: { slug: true } } },
+  });
+  if (!campaign) throw new Error('Campaña no encontrada');
+  if (campaign.campaignType.slug !== AMBIENTE_SANO_SLUG) {
+    throw new Error(`SafetyScoreService solo aplica a campañas "${AMBIENTE_SANO_SLUG}"`);
+  }
+
+  const department = await prisma.department.findFirst({
+    where: { id: departmentId, accountId },
+    select: { id: true, displayName: true },
+  });
+  if (!department) return null;
+
+  const responses = await prisma.response.findMany({
+    where: {
+      normalizedScore: { not: null },
+      participant: { campaignId, departmentId },
+      question: { questionOrder: { in: SAFETY_QUESTION_ORDERS } },
+    },
+    select: {
+      normalizedScore: true,
+      participantId: true,
+      question: { select: { questionOrder: true } },
+      participant: { select: { departmentId: true, gender: true } },
+    },
+  });
+
+  const rows: ResponseRow[] = responses
+    .filter(
+      (r): r is typeof r & { normalizedScore: number } =>
+        r.normalizedScore !== null && r.participant.departmentId !== null
+    )
+    .map((r) => ({
+      normalizedScore: r.normalizedScore,
+      questionOrder: r.question.questionOrder,
+      participantId: r.participantId,
+      departmentId: r.participant.departmentId,
+      gender: r.participant.gender,
+    }));
+
+  const result = scoreFromRows(departmentId, department.displayName, rows);
+  if ('skip' in result) return null;
+  return result;
+}
+
 export async function calculateSafetyScores(
   campaignId: string,
   accountId: string
