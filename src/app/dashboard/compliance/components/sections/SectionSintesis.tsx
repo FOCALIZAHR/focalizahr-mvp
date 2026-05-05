@@ -74,11 +74,6 @@ export default function SectionSintesis({ hook }: { hook: UseComplianceDataRetur
             {portada.deltaLabel}
           </span>
         )}
-        {meta?.hallazgo_narrativo_portada && (
-          <p className="text-slate-400 font-light text-sm mt-8 italic leading-relaxed">
-            {meta.hallazgo_narrativo_portada}
-          </p>
-        )}
       </div>
 
       {/* 3 chips resumen */}
