@@ -19,6 +19,15 @@ interface Props {
   dept: MergedDept;
   isExpanded: boolean;
   onToggle: () => void;
+  /**
+   * Map de alertType → narrativa.consecuencia desde
+   * `report.narratives.artefacto4_alertas`. Construido una vez en el padre
+   * con `useMemo` y prop-drilled a cada banda. Permite que cada
+   * `<AlertaComplianceChip>` muestre el texto ejecutivo del engine en lugar
+   * del "SLA Nh" que se eliminó. Optional: campañas legacy sin
+   * artefacto4_alertas degradan a chip sin consecuencia.
+   */
+  narrativaByAlertType?: Map<string, string>;
 }
 
 // Borde lateral según nivel — peso, no color (spec).
@@ -29,7 +38,12 @@ function getBorderClass(nivel: string): string {
   return 'border-l border-slate-700/50';
 }
 
-export default function BandaDepartamento({ dept, isExpanded, onToggle }: Props) {
+export default function BandaDepartamento({
+  dept,
+  isExpanded,
+  onToggle,
+  narrativaByAlertType,
+}: Props) {
   const interna = dept.convergenciaInterna;
   const externa = dept.convergenciaExterna;
   const isaScore = dept.isaScore;
@@ -139,9 +153,13 @@ export default function BandaDepartamento({ dept, isExpanded, onToggle }: Props)
 
             {/* Alertas Compliance activas */}
             {dept.complianceAlerts.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5 mt-2">
+              <div className="flex flex-wrap gap-3 mt-2">
                 {dept.complianceAlerts.map((a) => (
-                  <AlertaComplianceChip key={a.id} alert={a} />
+                  <AlertaComplianceChip
+                    key={a.id}
+                    alert={a}
+                    consecuencia={narrativaByAlertType?.get(a.alertType)}
+                  />
                 ))}
               </div>
             ) : null}

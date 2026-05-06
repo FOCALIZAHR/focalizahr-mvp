@@ -16,12 +16,20 @@ import { GitBranch, Infinity as InfinityIcon, Activity, EyeOff, Eye, type Lucide
 import { STATE_MACHINE_COPY } from './_shared/STATE_MACHINE_COPY';
 import { CRITICAL_BY_MANAGER_COPY } from './_shared/CRITICAL_BY_MANAGER_COPY';
 import type { HeaderState, MergedDept } from './_shared/helpers';
+import type { SintesisEjecutivaOutput } from '@/lib/services/compliance/SintesisConvergenciaLLMService';
 
 interface Props {
   state: HeaderState;
   deptos: MergedDept[];
   /** True si algún dept tiene nivelFinal === 'critica_sistema'. Tesla rojo + pulse. */
   hayCriticaSistema: boolean;
+  /**
+   * Síntesis ejecutiva LLM por campaña — reemplaza veredicto y lego_narrativo
+   * del STATE_MACHINE_COPY hardcoded cuando existe. Generada por
+   * SintesisConvergenciaLLMService al cerrar el ciclo. Optional: fallback
+   * a STATE_MACHINE_COPY para campañas legacy o casos donde el LLM falló.
+   */
+  sintesisEjecutiva?: SintesisEjecutivaOutput;
 }
 
 const STATE_ICON: Record<HeaderState, LucideIcon> = {
@@ -36,9 +44,15 @@ export default function ConvergenciaOrgHeader({
   state,
   deptos,
   hayCriticaSistema,
+  sintesisEjecutiva,
 }: Props) {
   const copy = STATE_MACHINE_COPY[state];
   const Icon = STATE_ICON[state];
+
+  // titularLine1/titularLine2/contexto/cierre permanecen deterministas (STATE_MACHINE_COPY).
+  // Solo veredicto y lego se sustituyen con la síntesis LLM si existe.
+  const veredictoText = sintesisEjecutiva?.veredicto ?? copy.veredicto;
+  const legoText = sintesisEjecutiva?.lego_narrativo ?? copy.lego;
 
   // Tesla line dinámica
   const teslaConfig = (() => {
@@ -125,7 +139,7 @@ export default function ConvergenciaOrgHeader({
             </span>
           </div>
 
-          {/* Veredicto cursiva con border-l */}
+          {/* Veredicto cursiva con border-l — usa síntesis LLM si existe */}
           <p
             className="text-[13px] italic font-light leading-[1.6] pl-3"
             style={{
@@ -133,15 +147,15 @@ export default function ConvergenciaOrgHeader({
               borderLeft: '1px solid #1e293b',
             }}
           >
-            {copy.veredicto}
+            {veredictoText}
           </p>
 
-          {/* Lego narrativo */}
+          {/* Lego narrativo — usa síntesis LLM si existe */}
           <p
             className="text-sm font-light leading-[1.8]"
             style={{ color: '#cbd5e1' }}
           >
-            {copy.lego}
+            {legoText}
           </p>
 
           {/* Cierre de urgencia — solo si existe */}

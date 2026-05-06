@@ -28,6 +28,7 @@ import type {
   DepartmentConvergencia,
   ConvergenciaGlobals,
 } from './ConvergenciaEngine';
+import type { SintesisEjecutivaOutput } from './SintesisConvergenciaLLMService';
 import {
   resolveDimensionNarrative,
   type ComplianceDimensionKey,
@@ -64,6 +65,15 @@ export interface ReportNarratives {
   criticalByManagerNarrativa?: string;
   artefacto4_alertas: AlertaNarrative[];
   cierre: CierreNarrative;
+  /**
+   * Síntesis ejecutiva del header de C3 — texto LLM específico por campaña.
+   * Lo inyecta el orchestrator post-buildReportNarratives (después de
+   * SintesisConvergenciaLLMService). El engine NO la genera; solo extiende
+   * el contrato del shape para que viaje al frontend vía route.ts.
+   * Optional: campañas legacy o casos donde el LLM falló viajan sin este
+   * campo y el frontend cae al STATE_MACHINE_COPY hardcoded.
+   */
+  sintesisEjecutiva?: SintesisEjecutivaOutput;
 }
 
 export interface PortadaNarrative {

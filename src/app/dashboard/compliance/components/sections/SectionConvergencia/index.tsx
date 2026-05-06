@@ -49,6 +49,16 @@ export default function SectionConvergencia({ hook }: Props) {
       .sort(byUrgencia);
   }, [report]);
 
+  // Lookup alertType → narrativa.consecuencia desde
+  // `narratives.artefacto4_alertas`. Construido una sola vez y prop-drilled
+  // a cada banda → cada chip de alerta. Reemplaza el "SLA Nh" eliminado.
+  const narrativaByAlertType = useMemo(() => {
+    if (!report) return new Map<string, string>();
+    return new Map(
+      report.narratives.artefacto4_alertas.map((n) => [n.alertType, n.consecuencia])
+    );
+  }, [report]);
+
   if (!report) return null;
 
   // Empty state — 3 variantes según contexto del ciclo
@@ -71,6 +81,7 @@ export default function SectionConvergencia({ hook }: Props) {
         state={headerState}
         deptos={deptosConConvergencia}
         hayCriticaSistema={hayCriticaSistema}
+        sintesisEjecutiva={report.narratives.sintesisEjecutiva}
       />
       <div className="flex flex-col gap-3">
         {deptosConConvergencia.map((dept) => (
@@ -79,6 +90,7 @@ export default function SectionConvergencia({ hook }: Props) {
             dept={dept}
             isExpanded={expandedDeptId === dept.departmentId}
             onToggle={() => handleToggle(dept.departmentId)}
+            narrativaByAlertType={narrativaByAlertType}
           />
         ))}
       </div>
