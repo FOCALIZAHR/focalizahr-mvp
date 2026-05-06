@@ -188,6 +188,10 @@ async function main() {
     // recomputa acá (script idempotente para namespacing solamente), Motor A
     // queda en empty para rows sin ISA. Si el row ya tiene isaScore en BD,
     // se pasa para que A1/A5 puedan activarse.
+    // Motor B Fase 2 — externalAlerts: [] (backfill no recarga alertas
+    // externas — out-of-scope del namespace migration. convergenciaExterna
+    // saldrá con scoreTotal=0 + flags en false. Re-run del orchestrator
+    // sobre la campaña refresca el sub-objeto correctamente).
     const convergencia = buildDepartmentConvergencia({
       departmentId: row.departmentId,
       departmentName: row.department.displayName,
@@ -199,6 +203,7 @@ async function main() {
       dimensionScores: safetyDetail.dimensionScores,
       patronesOutput: patrones,
       teatroCumplimiento: !!row.teatroCumplimiento,
+      externalAlerts: [],
     });
 
     const newPayload = { patrones, safetyDetail, convergencia };

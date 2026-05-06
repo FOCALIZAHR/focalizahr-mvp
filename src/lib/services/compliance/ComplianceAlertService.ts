@@ -25,6 +25,10 @@ import type {
   ConvergenciaResult,
   DepartmentConvergencia,
 } from './ConvergenciaEngine';
+import {
+  loadDepartmentExternalAlerts,
+  computeConvergenciaExterna,
+} from './ConvergenciaEngine';
 import type { PatronAnalysisOutput } from './complianceTypes';
 import type { DepartmentSafetyScore } from '@/lib/services/SafetyScoreService';
 
@@ -37,7 +41,8 @@ export interface AlertCreationResult {
 
 /**
  * Contexto extendido per-dept para evaluar condiciones del spec v2 que no
- * viven en `DepartmentConvergencia` (dimensionScores, patronesOutput, ISAs).
+ * viven en `DepartmentConvergencia` (dimensionScores, patronesOutput, ISAs,
+ * alertas externas resumidas).
  * El orchestrator construye este Map antes de invocar el service.
  */
 export interface DeptAlertContext {
@@ -57,11 +62,30 @@ export interface DeptAlertContext {
    * sin resolver la causa". Decaimiento histórico es Fase 3.
    */
   previousCycleAlertsClosed: number;
+  // ─── Motor B Fase 2 — convergencia externa ────────────────────────
+  /** ExternalRiskScore = exoSignal + eisSignal + sum(pesoEfectivo de alertas). */
+  externalRiskScore: number;
+  /** Alguna alerta crítica con peso ≥ 0.9 ([ley_karin, toxic_exit, DESENGANCHE]). */
+  tieneAlertaCritica: boolean;
+  /** Flag fallaCicloDeVida del Motor B. */
+  fallaCicloDeVida: boolean;
+  /** Peso efectivo máximo de alertas tipo `liderazgo_concentracion` (rama D). */
+  liderazgoConcentracionPeso: number;
+  /** Peso efectivo máximo de alertas tipo `toxic_exit_detected` (rama E). */
+  toxicExitDetectedPeso: number;
 }
 
 // Threshold para `liderazgo_toxico` C (origen vertical + miedo/silencio fuerte).
 const C_INTENSIDAD_VERTICAL = 0.6;
 const DIM_LIDERAZGO_BAJA = 2.5;
+
+// Thresholds Motor B Fase 2 (spec sec 4)
+const RIESGO_CONVERGENTE_EXT_RAMA_A = 1.2;  // ExternalRiskScore mínimo rama A
+const RIESGO_CONVERGENTE_EXT_RAMA_B = 3.0;  // ExternalRiskScore mínimo rama B
+const LIDERAZGO_TOXICO_D_PESO_MIN = 1.2;    // peso liderazgo_concentracion
+const LIDERAZGO_TOXICO_D_DIM_MAX = 2.8;     // p3_disenso o p7_liderazgo
+const LIDERAZGO_TOXICO_E_PESO_MIN = 2.0;    // peso toxic_exit_detected
+const LIDERAZGO_TOXICO_E_P7_MAX = 3.0;      // p7_liderazgo
 
 function computeDueDate(slaHours: number | null): Date | null {
   if (slaHours === null) return null;
@@ -159,13 +183,30 @@ async function createDepartmentAlerts(
   const sesgoGenero = ctx.patronesOutput?.alerta_sesgo_genero === true;
 
   // ─── 1. riesgo_convergente ─────────────────────────────────────────
-  // Spec sec 4: (ISA<50 OR teatro) AND ≥1 caso A
-  //   OR ISA 50-74 AND ≥2 casos A
-  //   OR sesgo_genero detectado (A3 ya está en casos)
-  const ramaA = (isa !== null && isa < 50) || interna.teatroDetectado;
-  const ramaB = isa !== null && isa >= 50 && isa <= 74 && casos.length >= 2;
-  const debeRiesgoConvergente =
-    (ramaA && casos.length >= 1) || ramaB || sesgoGenero;
+  // Spec sec 4 Fase 2:
+  //   Rama A: (ISA<50 OR teatro) AND (
+  //             ≥1 caso A
+  //             OR ExternalRiskScore ≥ 1.2
+  //             OR tieneAlertaCritica
+  //             OR sesgo_genero
+  //           )
+  //   Rama B: ISA 50-74 AND ≥2 casos A AND ExternalRiskScore ≥ 3
+  const cond1 = (isa !== null && isa < 50) || interna.teatroDetectado;
+  const trigger1 =
+    casos.length >= 1 ||
+    ctx.externalRiskScore >= RIESGO_CONVERGENTE_EXT_RAMA_A ||
+    ctx.tieneAlertaCritica ||
+    sesgoGenero;
+  const ramaA = cond1 && trigger1;
+
+  const ramaB =
+    isa !== null &&
+    isa >= 50 &&
+    isa <= 74 &&
+    casos.length >= 2 &&
+    ctx.externalRiskScore >= RIESGO_CONVERGENTE_EXT_RAMA_B;
+
+  const debeRiesgoConvergente = ramaA || ramaB;
 
   if (debeRiesgoConvergente) {
     const cfg = COMPLIANCE_ALERT_TYPES.riesgo_convergente;
@@ -188,6 +229,11 @@ async function createDepartmentAlerts(
           nivelConvergencia: interna.nivelConvergencia,
           teatroDetectado: interna.teatroDetectado,
           sesgoGenero,
+          // Fase 2:
+          externalRiskScore: ctx.externalRiskScore,
+          tieneAlertaCritica: ctx.tieneAlertaCritica,
+          fallaCicloDeVida: ctx.fallaCicloDeVida,
+          rama: ramaA ? 'A' : 'B',
         },
       });
       if (outcome === 'created') {
@@ -239,11 +285,12 @@ async function createDepartmentAlerts(
     }
   }
 
-  // ─── 3. liderazgo_toxico per-dept (condiciones B y C) ──────────────
+  // ─── 3. liderazgo_toxico per-dept (condiciones B, C, D, E) ─────────
   // A: criticalByManager → se crea cross-dept en createLiderazgoToxicoAlerts.
   // B: A2 + (p3<2.5 OR p7<2.5).
   // C: origen_organizacional='vertical' + (silencio|miedo)>0.6 + p7<2.5.
-  // D, E: requieren alertas Exit (Fase 2).
+  // D: alerta liderazgo_concentracion peso ≥ 1.2 + (p3<2.8 OR p7<2.8) — Fase 2.
+  // E: alerta toxic_exit_detected peso ≥ 2.0 + p7<3.0 — Fase 2.
   const p3 = dims.P3_disenso;
   const p7 = dims.P7_liderazgo;
   const ramaLidB =
@@ -257,7 +304,16 @@ async function createDepartmentAlerts(
     p7 !== null &&
     p7 < DIM_LIDERAZGO_BAJA;
 
-  if (ramaLidB || ramaLidC) {
+  const ramaLidD =
+    ctx.liderazgoConcentracionPeso >= LIDERAZGO_TOXICO_D_PESO_MIN &&
+    ((p3 !== null && p3 < LIDERAZGO_TOXICO_D_DIM_MAX) ||
+      (p7 !== null && p7 < LIDERAZGO_TOXICO_D_DIM_MAX));
+  const ramaLidE =
+    ctx.toxicExitDetectedPeso >= LIDERAZGO_TOXICO_E_PESO_MIN &&
+    p7 !== null &&
+    p7 < LIDERAZGO_TOXICO_E_P7_MAX;
+
+  if (ramaLidB || ramaLidC || ramaLidD || ramaLidE) {
     const cfg = COMPLIANCE_ALERT_TYPES.liderazgo_toxico;
     try {
       const outcome = await upsertAlertOnce({
@@ -271,13 +327,22 @@ async function createDepartmentAlerts(
         triggerScore: isa,
         signalsCount: 1,
         context: {
-          rama: ramaLidB ? 'B_a2_dim' : 'C_vertical',
+          rama: ramaLidB
+            ? 'B_a2_dim'
+            : ramaLidC
+              ? 'C_vertical'
+              : ramaLidD
+                ? 'D_concentracion'
+                : 'E_toxic_exit',
           a2: casos.includes('A2'),
           p3_disenso: p3,
           p7_liderazgo: p7,
           origenVertical: ctx.origenVertical,
           silencioInt,
           miedoInt,
+          // Fase 2:
+          liderazgoConcentracionPeso: ctx.liderazgoConcentracionPeso,
+          toxicExitDetectedPeso: ctx.toxicExitDetectedPeso,
         },
       });
       if (outcome === 'created') {
@@ -471,6 +536,20 @@ export async function buildAlertContextsFromDb(
     }
   }
 
+  // Bulk fetch de Department para gold caches (EXO + EIS) — evita N+1.
+  const deptIds = completedDepts
+    .map((d) => d.departmentId)
+    .filter((id): id is string => id !== null);
+  const deptGolds = await prisma.department.findMany({
+    where: { id: { in: deptIds } },
+    select: {
+      id: true,
+      accumulatedExoScore: true,
+      accumulatedEISScore: true,
+    },
+  });
+  const goldByDeptId = new Map(deptGolds.map((d) => [d.id, d]));
+
   const map = new Map<string, DeptAlertContext>();
   for (const d of completedDepts) {
     if (!d.departmentId) continue;
@@ -478,6 +557,34 @@ export async function buildAlertContextsFromDb(
       patrones?: PatronAnalysisOutput;
       safetyDetail?: { dimensionScores?: DepartmentSafetyScore['dimensionScores'] };
     };
+
+    // Motor B Fase 2 — cargar alertas externas + computar resumen.
+    const externalAlerts = await loadDepartmentExternalAlerts(
+      d.departmentId,
+      accountId
+    );
+    const gold = goldByDeptId.get(d.departmentId);
+    const externa = computeConvergenciaExterna(
+      gold?.accumulatedExoScore ?? null,
+      gold?.accumulatedEISScore ?? null,
+      externalAlerts,
+      d.isaScore
+    );
+    // Pesos individuales para ramas D y E del liderazgo_toxico.
+    let liderazgoConcentracionPeso = 0;
+    let toxicExitDetectedPeso = 0;
+    for (const a of externalAlerts) {
+      if (a.alertType === 'liderazgo_concentracion') {
+        liderazgoConcentracionPeso = Math.max(
+          liderazgoConcentracionPeso,
+          a.pesoEfectivo
+        );
+      }
+      if (a.alertType === 'toxic_exit_detected') {
+        toxicExitDetectedPeso = Math.max(toxicExitDetectedPeso, a.pesoEfectivo);
+      }
+    }
+
     map.set(d.departmentId, {
       isaScore: d.isaScore,
       previousIsaScore: d.previousIsaScore,
@@ -492,6 +599,11 @@ export async function buildAlertContextsFromDb(
       patronesOutput: payload.patrones ?? null,
       origenVertical,
       previousCycleAlertsClosed: closedCountByDept.get(d.departmentId) ?? 0,
+      externalRiskScore: externa.scoreTotal,
+      tieneAlertaCritica: externa.tieneAlertaCritica,
+      fallaCicloDeVida: externa.fallaCicloDeVida,
+      liderazgoConcentracionPeso,
+      toxicExitDetectedPeso,
     });
   }
   return map;

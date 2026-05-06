@@ -20,6 +20,8 @@ import {
   buildDepartmentConvergencia,
   buildGlobalConvergencia,
   loadDepartmentExternalSignals,
+  loadDepartmentExternalAlerts,
+  computeConvergenciaExterna,
   detectCasosMotorA,
   applyA4ToDepartments,
 } from './ConvergenciaEngine';
@@ -251,6 +253,12 @@ export async function processNextDepartmentJob(campaignId: string): Promise<bool
       deptInfo?.accumulatedExoScore ?? null
     );
 
+    // Motor B Fase 2 — alertas externas pending/acknowledged per dept.
+    const externalAlerts = await loadDepartmentExternalAlerts(
+      job.departmentId,
+      job.accountId
+    );
+
     // Primer pass: convergencia legacy + Motor A skipped (isaScore=null).
     // El ISA se computa abajo y necesita riskSignalsCount/activeSources del pass.
     // Después se recalcula Motor A con el ISA real.
@@ -265,6 +273,7 @@ export async function processNextDepartmentJob(campaignId: string): Promise<bool
       dimensionScores: safetyDetail.dimensionScores,
       patronesOutput: llmResult.data,
       teatroCumplimiento: teatro,
+      externalAlerts,
     });
 
     // ISA — cálculo final que integra los 3 componentes (voz estructurada,
@@ -508,11 +517,57 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
       }
     }
 
+    // Motor B Fase 2 — cargar gold caches per dept en bulk (evita N+1).
+    const deptIdsForCtx = completedDepts
+      .map((d) => d.departmentId)
+      .filter((id): id is string => id !== null);
+    const deptGoldsForCtx = await prisma.department.findMany({
+      where: { id: { in: deptIdsForCtx } },
+      select: {
+        id: true,
+        accumulatedExoScore: true,
+        accumulatedEISScore: true,
+      },
+    });
+    const goldByDeptIdCtx = new Map(
+      deptGoldsForCtx.map((g) => [g.id, g])
+    );
+
     const deptContexts = new Map<string, DeptAlertContext>();
     for (const d of completedDepts) {
       if (!d.departmentId) continue;
       const safetyDetail = extractDeptSafetyDetail(d.resultPayload);
       const patronesOutput = extractDeptPatrones(d.resultPayload);
+
+      // Motor B Fase 2 — alertas externas + resumen.
+      const externalAlertsCtx = await loadDepartmentExternalAlerts(
+        d.departmentId,
+        orgJob.accountId
+      );
+      const goldCtx = goldByDeptIdCtx.get(d.departmentId);
+      const externaCtx = computeConvergenciaExterna(
+        goldCtx?.accumulatedExoScore ?? null,
+        goldCtx?.accumulatedEISScore ?? null,
+        externalAlertsCtx,
+        d.isaScore
+      );
+      let liderazgoConcentracionPesoCtx = 0;
+      let toxicExitDetectedPesoCtx = 0;
+      for (const a of externalAlertsCtx) {
+        if (a.alertType === 'liderazgo_concentracion') {
+          liderazgoConcentracionPesoCtx = Math.max(
+            liderazgoConcentracionPesoCtx,
+            a.pesoEfectivo
+          );
+        }
+        if (a.alertType === 'toxic_exit_detected') {
+          toxicExitDetectedPesoCtx = Math.max(
+            toxicExitDetectedPesoCtx,
+            a.pesoEfectivo
+          );
+        }
+      }
+
       deptContexts.set(d.departmentId, {
         isaScore: d.isaScore,
         previousIsaScore: d.previousIsaScore,
@@ -527,6 +582,11 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
         patronesOutput,
         origenVertical,
         previousCycleAlertsClosed: closedCountByDept.get(d.departmentId) ?? 0,
+        externalRiskScore: externaCtx.scoreTotal,
+        tieneAlertaCritica: externaCtx.tieneAlertaCritica,
+        fallaCicloDeVida: externaCtx.fallaCicloDeVida,
+        liderazgoConcentracionPeso: liderazgoConcentracionPesoCtx,
+        toxicExitDetectedPeso: toxicExitDetectedPesoCtx,
       });
     }
 

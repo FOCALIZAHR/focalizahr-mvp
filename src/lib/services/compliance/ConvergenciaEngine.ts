@@ -19,6 +19,17 @@
 import { prisma } from '@/lib/prisma';
 import type { ComplianceSource } from '@/config/complianceAlertConfig';
 import type { PatronAnalysisOutput, PatronDetectado } from './complianceTypes';
+import {
+  PESO_BASE_ALERTA,
+  ALERTAS_CRITICAS,
+  ALERTA_CRITICA_PESO_MIN,
+  BUMPABLE_ONBOARDING_TYPES,
+  applyBumpIfApplicable,
+  EXO_SIGNAL_THRESHOLDS,
+  EIS_SIGNAL_THRESHOLDS,
+  FALLA_CICLO_VIDA_ISA_MAX,
+  normalizeExitAlertType,
+} from '@/config/compliance/convergenciaWeights';
 
 const AMBIENTE_SANO_SLUG = 'pulso-ambientes-sanos';
 const PULSO_EXPRESS_SLUG = 'pulso-express';
@@ -111,6 +122,43 @@ export interface ConvergenciaInternaResult {
   enCriticalByManagerGroup: boolean;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// MOTOR B v2 — Convergencia Externa (Fase 2: Exit + Onboarding)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Alerta externa procesada por el motor — viene de ExitAlert o JourneyAlert
+ * con peso base + factor de decaimiento.
+ *
+ * Fase 2: factorDecaimiento = 1.0 siempre (solo pending/acknowledged).
+ * Fase 3: factorDecaimiento ∈ {1.0, 0.6, 0.3, 0.1} según antigüedad de
+ * resolved/dismissed.
+ */
+export interface ExternalAlert {
+  id: string;
+  alertType: string;          // canónico (post normalización)
+  producto: 'exit' | 'onboarding';
+  pesoBase: number;           // 0 (desconocido) | 1 | 2 | 3
+  factorDecaimiento: number;  // Fase 2: 1.0
+  pesoEfectivo: number;       // pesoBase × factorDecaimiento
+  status: string;
+  resolvedAt: Date | null;
+}
+
+/**
+ * Sub-objeto Motor B Fase 2 — convergencia externa con productos contratados.
+ * Spec sec 3 + sec 5 Fase 2.
+ */
+export interface ConvergenciaExternaResult {
+  exoSignal: 0 | 1 | 2;
+  eisSignal: 0 | 1 | 2;
+  pesoAlertas: number;          // suma de pesoEfectivo
+  scoreTotal: number;           // exoSignal + eisSignal + pesoAlertas
+  tieneAlertaCritica: boolean;  // alguna ALERTAS_CRITICAS con peso ≥ 0.9
+  fallaCicloDeVida: boolean;    // ISA<50 AND (eisSignal≥2 OR exoSignal≥2)
+  alertasConsideradas: ExternalAlert[];
+}
+
 export interface DepartmentConvergencia {
   departmentId: string;
   departmentName: string;
@@ -132,6 +180,9 @@ export interface DepartmentConvergencia {
 
   /** Motor A v2 — casos A1-A5. Calculado per-dept (A4 se patchea cross-dept en applyA4ToDepartments). */
   convergenciaInterna: ConvergenciaInternaResult;
+
+  /** Motor B Fase 2 — convergencia externa con Exit + Onboarding. */
+  convergenciaExterna: ConvergenciaExternaResult;
 }
 
 /**
@@ -273,6 +324,13 @@ export interface BuildDepartmentConvergenciaInput {
   patronesOutput: PatronAnalysisOutput | null;
   /** Flag teatro de cumplimiento detectado (detectTeatroCumplimiento). */
   teatroCumplimiento: boolean;
+  /**
+   * Alertas externas (Exit + Onboarding) pre-procesadas para este dept.
+   * Cargadas vía `loadDepartmentExternalAlerts`. Pueden estar vacías si el
+   * cliente no tiene productos externos contratados — Motor B degrada
+   * elegantemente (scoreTotal = 0).
+   */
+  externalAlerts: ExternalAlert[];
 }
 
 export function buildDepartmentConvergencia(
@@ -289,6 +347,7 @@ export function buildDepartmentConvergencia(
     dimensionScores,
     patronesOutput,
     teatroCumplimiento,
+    externalAlerts,
   } = input;
   const signals: Partial<Record<ComplianceSource, ConvergenciaSignal>> = {};
 
@@ -357,6 +416,14 @@ export function buildDepartmentConvergencia(
     teatroCumplimiento
   );
 
+  // Motor B v2 — convergencia externa (EIS + EXO + alertas pre-cargadas).
+  const convergenciaExterna = computeConvergenciaExterna(
+    externalSignals.exoScore,
+    externalSignals.exitEIS,
+    externalAlerts,
+    isaScore
+  );
+
   return {
     departmentId,
     departmentName,
@@ -370,6 +437,7 @@ export function buildDepartmentConvergencia(
     deterioroPulso,
     senalIgnorada: externalSignals.senalIgnorada,
     convergenciaInterna,
+    convergenciaExterna,
   };
 }
 
@@ -571,6 +639,191 @@ function buildCriticalByManagerWithDelta(
   return groups;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// MOTOR B v2 — Helpers puros (señales EIS/EXO + score externo)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * EXO signal (0/1/2 puntos) según rangos del spec sec 3.1.
+ *   ≥70 → 0 puntos (sano)
+ *   50-69 → 1 punto (riesgo)
+ *   <50 → 2 puntos (crítico)
+ *   null → 0 (sin datos = sin señal)
+ */
+function computeExoSignal(exoScore: number | null): 0 | 1 | 2 {
+  if (exoScore === null) return 0;
+  if (exoScore >= EXO_SIGNAL_THRESHOLDS.RISK) return 0;
+  if (exoScore >= EXO_SIGNAL_THRESHOLDS.CRITICAL) return 1;
+  return 2;
+}
+
+/**
+ * EIS signal (0/1/2 puntos) según rangos del spec sec 3.1.
+ *   ≥60 → 0 puntos (sano)
+ *   40-59 → 1 punto (riesgo)
+ *   <40 → 2 puntos (crítico)
+ *   null → 0 (sin datos = sin señal)
+ */
+function computeEisSignal(eisScore: number | null): 0 | 1 | 2 {
+  if (eisScore === null) return 0;
+  if (eisScore >= EIS_SIGNAL_THRESHOLDS.RISK) return 0;
+  if (eisScore >= EIS_SIGNAL_THRESHOLDS.CRITICAL) return 1;
+  return 2;
+}
+
+/**
+ * Computa la convergencia externa per-dept agregando señales de score
+ * continuo + pesos de alertas externas. Spec sec 3.
+ *
+ * Exportada para reuso en ComplianceAlertService.buildAlertContextsFromDb.
+ */
+export function computeConvergenciaExterna(
+  exoScore: number | null,
+  eisScore: number | null,
+  externalAlerts: ExternalAlert[],
+  isaScore: number | null
+): ConvergenciaExternaResult {
+  const exoSignal = computeExoSignal(exoScore);
+  const eisSignal = computeEisSignal(eisScore);
+
+  const pesoAlertas = externalAlerts.reduce((sum, a) => sum + a.pesoEfectivo, 0);
+  const scoreTotal = exoSignal + eisSignal + pesoAlertas;
+
+  const tieneAlertaCritica = externalAlerts.some(
+    (a) =>
+      ALERTAS_CRITICAS.includes(a.alertType) &&
+      a.pesoEfectivo >= ALERTA_CRITICA_PESO_MIN
+  );
+
+  const fallaCicloDeVida =
+    isaScore !== null &&
+    isaScore < FALLA_CICLO_VIDA_ISA_MAX &&
+    (eisSignal >= 2 || exoSignal >= 2);
+
+  return {
+    exoSignal,
+    eisSignal,
+    pesoAlertas,
+    scoreTotal,
+    tieneAlertaCritica,
+    fallaCicloDeVida,
+    alertasConsideradas: externalAlerts,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MOTOR B v2 — Helpers async (carga alertas + bump 90d)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Cuenta alertas Onboarding del depto en últimos 90 días por tipo bumpable.
+ * Spec sec 3.3: ABANDONO_DIA_1 (2→3) y BIENVENIDA_FALLIDA (1→2) si count ≥ 2.
+ *
+ * Cuenta TODAS las alertas del período (pending/ack/resolved/dismissed) —
+ * decisión literal del spec: la idea del bump es captar patrones repetitivos
+ * aunque algunas se hayan cerrado.
+ */
+async function loadBumpableCounts90Days(
+  departmentId: string,
+  accountId: string
+): Promise<Record<string, number>> {
+  const cutoff = new Date(Date.now() - 90 * 24 * 3600 * 1000);
+  const counts: Record<string, number> = {};
+  for (const t of BUMPABLE_ONBOARDING_TYPES) counts[t] = 0;
+
+  const rows = await prisma.journeyAlert.findMany({
+    where: {
+      accountId,
+      alertType: { in: BUMPABLE_ONBOARDING_TYPES as unknown as string[] },
+      createdAt: { gte: cutoff },
+      journey: { departmentId },
+    },
+    select: { alertType: true },
+  });
+
+  for (const r of rows) {
+    counts[r.alertType] = (counts[r.alertType] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/**
+ * Carga alertas externas pending/acknowledged para un dept.
+ * Exit (ExitAlert.departmentId directo) + Onboarding (JourneyAlert via journey.departmentId).
+ *
+ * Aplica normalización de aliases Exit + bump 90d para tipos onboarding.
+ * Fase 2: factorDecaimiento = 1.0 siempre.
+ */
+export async function loadDepartmentExternalAlerts(
+  departmentId: string,
+  accountId: string
+): Promise<ExternalAlert[]> {
+  const out: ExternalAlert[] = [];
+
+  // Exit alerts — departmentId directo.
+  const exitAlerts = await prisma.exitAlert.findMany({
+    where: {
+      accountId,
+      departmentId,
+      status: { in: ['pending', 'acknowledged'] },
+    },
+    select: { id: true, alertType: true, status: true },
+  });
+  for (const a of exitAlerts) {
+    const canonical = normalizeExitAlertType(a.alertType);
+    const pesoBase = PESO_BASE_ALERTA[canonical] ?? 0;
+    out.push({
+      id: a.id,
+      alertType: canonical,
+      producto: 'exit',
+      pesoBase,
+      factorDecaimiento: 1.0,
+      pesoEfectivo: pesoBase * 1.0,
+      status: a.status,
+      resolvedAt: null,
+    });
+  }
+
+  // Onboarding alerts — via journey.departmentId.
+  const journeyAlerts = await prisma.journeyAlert.findMany({
+    where: {
+      accountId,
+      status: { in: ['pending', 'acknowledged'] },
+      journey: { departmentId },
+    },
+    select: { id: true, alertType: true, status: true },
+  });
+
+  // Bump counts solo si hay journeyAlerts bumpables (evita query si no aplica).
+  const hasBumpables = journeyAlerts.some((a) =>
+    (BUMPABLE_ONBOARDING_TYPES as ReadonlyArray<string>).includes(a.alertType)
+  );
+  const bumpCounts = hasBumpables
+    ? await loadBumpableCounts90Days(departmentId, accountId)
+    : {};
+
+  for (const a of journeyAlerts) {
+    const baseRaw = PESO_BASE_ALERTA[a.alertType] ?? 0;
+    const pesoBase = applyBumpIfApplicable(
+      a.alertType,
+      baseRaw,
+      bumpCounts[a.alertType] ?? 0
+    );
+    out.push({
+      id: a.id,
+      alertType: a.alertType,
+      producto: 'onboarding',
+      pesoBase,
+      factorDecaimiento: 1.0,
+      pesoEfectivo: pesoBase * 1.0,
+      status: a.status,
+      resolvedAt: null,
+    });
+  }
+
+  return out;
+}
+
 /**
  * Patch cross-dept del Caso A4 después de buildGlobalConvergencia.
  * Para cada dept en algún grupo criticalByManager:
@@ -709,6 +962,12 @@ export async function runConvergencia(
       isaByDeptId.set(a.departmentId, a.isaScore);
     }
 
+    // Motor B Fase 2 — alertas externas pending/acknowledged per dept.
+    const externalAlerts = await loadDepartmentExternalAlerts(
+      a.departmentId,
+      accountId
+    );
+
     departments.push(
       buildDepartmentConvergencia({
         departmentId: a.departmentId,
@@ -721,6 +980,7 @@ export async function runConvergencia(
         dimensionScores,
         patronesOutput: patronesLLM,
         teatroCumplimiento: !!a.teatroCumplimiento,
+        externalAlerts,
       })
     );
   }
