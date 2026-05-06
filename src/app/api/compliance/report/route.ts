@@ -204,16 +204,23 @@ export async function GET(request: NextRequest) {
     // ═══════════════════════════════════════════════════════════════════
     // Filtrado jerárquico (solo lectura de datos ya computados).
     // ═══════════════════════════════════════════════════════════════════
-    const deptPayloads: Array<DepartmentPayload & { departmentId: string }> =
-      deptAnalyses
-        .filter((a) => a.departmentId !== null && a.resultPayload !== null)
-        .map((a) => {
-          const p = a.resultPayload as unknown as DepartmentPayload;
-          return { ...p, departmentId: a.departmentId as string };
-        })
-        .filter((p) =>
-          visibleDeptIds ? visibleDeptIds.has(p.departmentId) : true
-        );
+    const deptPayloads: Array<
+      DepartmentPayload & { departmentId: string; teatroCumplimiento: boolean | null }
+    > = deptAnalyses
+      .filter((a) => a.departmentId !== null && a.resultPayload !== null)
+      .map((a) => {
+        const p = a.resultPayload as unknown as DepartmentPayload;
+        // teatroCumplimiento vive como columna top-level en ComplianceAnalysis
+        // (NO dentro del JSON resultPayload). Se propaga desde la fila Prisma.
+        return {
+          ...p,
+          departmentId: a.departmentId as string,
+          teatroCumplimiento: a.teatroCumplimiento,
+        };
+      })
+      .filter((p) =>
+        visibleDeptIds ? visibleDeptIds.has(p.departmentId) : true
+      );
 
     const filteredAlerts = alerts.filter((a) => {
       if (!a.departmentId) return userContext.role !== 'AREA_MANAGER';
@@ -292,6 +299,7 @@ export async function GET(request: NextRequest) {
             isaScore: isa,
             deltaVsAnterior,
             patrones: buildDeptPatronesSlice(p.patrones),
+            teatroCumplimiento: p.teatroCumplimiento ?? undefined,
           };
         }),
         skippedByPrivacy: filteredSkipped,

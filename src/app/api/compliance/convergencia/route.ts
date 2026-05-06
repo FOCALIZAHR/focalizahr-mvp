@@ -13,7 +13,10 @@ import {
   getChildDepartmentIds,
 } from '@/lib/services/AuthorizationService';
 import { runConvergencia } from '@/lib/services/compliance/ConvergenciaEngine';
-import { createAlertsFromConvergencia } from '@/lib/services/compliance/ComplianceAlertService';
+import {
+  createAlertsFromConvergencia,
+  buildAlertContextsFromDb,
+} from '@/lib/services/compliance/ComplianceAlertService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,7 +64,12 @@ export async function POST(request: NextRequest) {
     }
 
     const engineResult = await runConvergencia(campaignId, targetAccountId);
-    const alerts = await createAlertsFromConvergencia(targetAccountId, engineResult);
+    const deptContexts = await buildAlertContextsFromDb(campaignId, targetAccountId);
+    const alerts = await createAlertsFromConvergencia(
+      targetAccountId,
+      engineResult,
+      deptContexts
+    );
 
     return NextResponse.json({
       success: true,

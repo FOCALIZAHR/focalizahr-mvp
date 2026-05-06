@@ -20,9 +20,14 @@ import {
   buildDepartmentConvergencia,
   buildGlobalConvergencia,
   loadDepartmentExternalSignals,
+  detectCasosMotorA,
+  applyA4ToDepartments,
 } from './ConvergenciaEngine';
 import type { DepartmentConvergencia } from './ConvergenciaEngine';
-import { createAlertsFromConvergencia } from './ComplianceAlertService';
+import {
+  createAlertsFromConvergencia,
+  type DeptAlertContext,
+} from './ComplianceAlertService';
 import { buildReportNarratives } from './ComplianceNarrativeEngine';
 import { calculateISA } from './ISAService';
 import type {
@@ -246,13 +251,20 @@ export async function processNextDepartmentJob(campaignId: string): Promise<bool
       deptInfo?.accumulatedExoScore ?? null
     );
 
-    const convergencia = buildDepartmentConvergencia({
+    // Primer pass: convergencia legacy + Motor A skipped (isaScore=null).
+    // El ISA se computa abajo y necesita riskSignalsCount/activeSources del pass.
+    // Después se recalcula Motor A con el ISA real.
+    const convergenciaPreISA = buildDepartmentConvergencia({
       departmentId: job.departmentId,
       departmentName: deptInfo?.displayName ?? 'Sin nombre',
       managerId: deptInfo?.parentId ?? null,
       safetyScore: safetyDetail.safetyScore,
       patrones: llmResult.data.patrones,
       externalSignals,
+      isaScore: null,
+      dimensionScores: safetyDetail.dimensionScores,
+      patronesOutput: llmResult.data,
+      teatroCumplimiento: teatro,
     });
 
     // ISA — cálculo final que integra los 3 componentes (voz estructurada,
@@ -261,10 +273,22 @@ export async function processNextDepartmentJob(campaignId: string): Promise<bool
       safetyScore: safetyDetail.safetyScore,
       patrones: llmResult.data.patrones,
       confianzaLLM: llmResult.data.confianza_analisis,
-      convergenciaSignals: convergencia.riskSignalsCount,
-      activeSources: convergencia.activeSources.length,
+      convergenciaSignals: convergenciaPreISA.riskSignalsCount,
+      activeSources: convergenciaPreISA.activeSources.length,
       teatroCumplimiento: teatro,
     });
+
+    // Motor A v2 — recalcular casos A1, A2, A3, A5 con ISA real. A4 (cross-dept)
+    // se patchea cuando todos los DEPARTMENT jobs cierran (processOrgMetaIfReady).
+    const convergencia: typeof convergenciaPreISA = {
+      ...convergenciaPreISA,
+      convergenciaInterna: detectCasosMotorA(
+        isaScore,
+        safetyDetail.dimensionScores,
+        llmResult.data,
+        teatro
+      ),
+    };
 
     const payload: DepartmentResultPayload = {
       patrones: llmResult.data,
@@ -274,6 +298,14 @@ export async function processNextDepartmentJob(campaignId: string): Promise<bool
       textCount: textos.length,
       parentDepartmentName: deptInfo?.parent?.displayName ?? null,
     };
+
+    // ISA del ciclo anterior del MISMO depto — snapshot al cerrar.
+    // Reemplaza el lookup runtime en /report (route.ts:166-189).
+    const previousIsa = await loadPreviousDeptIsaScore(
+      job.departmentId,
+      job.accountId,
+      campaignId
+    );
 
     await prisma.complianceAnalysis.update({
       where: { id: job.id },
@@ -286,6 +318,7 @@ export async function processNextDepartmentJob(campaignId: string): Promise<bool
         alertaSesgoGenero: llmResult.data.alerta_sesgo_genero,
         teatroCumplimiento: teatro,
         isaScore,
+        previousIsaScore: previousIsa,
         resultPayload: payload as unknown as object,
       },
     });
@@ -409,7 +442,23 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
       })
       .filter((c): c is DepartmentConvergencia => c !== null);
 
-    const globals = buildGlobalConvergencia(deptConvergencias);
+    // Motor A v2 — para A4 cross-dept, buildGlobalConvergencia agrupa por
+    // managerId con delta ISA. Construir el lookup id → isaScore desde los rows.
+    const isaByDeptId = new Map<string, number>();
+    for (const d of completedDepts) {
+      if (d.departmentId && d.isaScore !== null) {
+        isaByDeptId.set(d.departmentId, d.isaScore);
+      }
+    }
+
+    const globals = buildGlobalConvergencia(deptConvergencias, isaByDeptId);
+
+    // Patch A4 cross-dept: setea enCriticalByManagerGroup + 'A4' en convergenciaInterna
+    // para deptos que entraron a un grupo de delta ISA >= 30.
+    const deptConvergenciasConA4 = applyA4ToDepartments(
+      deptConvergencias,
+      globals.criticalByManager
+    );
 
     // Agregados globales + delta previa.
     const { orgSafetyScore, skippedByPrivacy } = await computeOrgAggregates(
@@ -421,6 +470,66 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
       orgJob.accountId
     );
 
+    // Construir contextos extendidos per-dept para el alert service v2.
+    // Spec sec 4 — el service necesita dimensionScores, patronesOutput,
+    // ISAs y origenVertical para evaluar las condiciones de cada alerta.
+    // El spec usa "vertical" como abreviación; el tipo OrigenOrganizacional
+    // del LLM define 'vertical_descendente'.
+    const origenVertical =
+      llmResult.data.origen_organizacional === 'vertical_descendente';
+
+    // Alertas resolved/dismissed del ciclo anterior por dept (para senal_ignorada Fase 1).
+    const previousCampaign = await prisma.campaign.findFirst({
+      where: {
+        accountId: orgJob.accountId,
+        id: { not: campaignId },
+        status: 'completed',
+        campaignType: { slug: 'pulso-ambientes-sanos' },
+      },
+      orderBy: { endDate: 'desc' },
+      select: { id: true },
+    });
+
+    const closedCountByDept = new Map<string, number>();
+    if (previousCampaign) {
+      const closedAlerts = await prisma.complianceAlert.findMany({
+        where: {
+          campaignId: previousCampaign.id,
+          status: { in: ['resolved', 'dismissed'] },
+        },
+        select: { departmentId: true },
+      });
+      for (const a of closedAlerts) {
+        if (!a.departmentId) continue;
+        closedCountByDept.set(
+          a.departmentId,
+          (closedCountByDept.get(a.departmentId) ?? 0) + 1
+        );
+      }
+    }
+
+    const deptContexts = new Map<string, DeptAlertContext>();
+    for (const d of completedDepts) {
+      if (!d.departmentId) continue;
+      const safetyDetail = extractDeptSafetyDetail(d.resultPayload);
+      const patronesOutput = extractDeptPatrones(d.resultPayload);
+      deptContexts.set(d.departmentId, {
+        isaScore: d.isaScore,
+        previousIsaScore: d.previousIsaScore,
+        dimensionScores: safetyDetail?.dimensionScores ?? {
+          P2_seguridad: null,
+          P3_disenso: null,
+          P4_microagresiones: null,
+          P5_equidad: null,
+          P7_liderazgo: null,
+          P8_agotamiento: null,
+        },
+        patronesOutput,
+        origenVertical,
+        previousCycleAlertsClosed: closedCountByDept.get(d.departmentId) ?? 0,
+      });
+    }
+
     // Alerts actuales (antes de que se generen las nuevas por Convergencia).
     // Las narrativas necesitan la lista de alertas; las crearemos luego por
     // ConvergenciaAlertService — para las narrativas usamos un snapshot preliminar
@@ -428,12 +537,16 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
     // Decisión pragmática: crear alertas PRIMERO (idempotente), luego leer y
     // construir narrativas. Orden: alerts → narratives → save ORG.
     try {
-      await createAlertsFromConvergencia(orgJob.accountId, {
-        campaignId,
-        accountId: orgJob.accountId,
-        departments: deptConvergencias,
-        ...globals,
-      });
+      await createAlertsFromConvergencia(
+        orgJob.accountId,
+        {
+          campaignId,
+          accountId: orgJob.accountId,
+          departments: deptConvergenciasConA4,
+          ...globals,
+        },
+        deptContexts
+      );
     } catch (convergErr) {
       console.error(
         '[ComplianceOrchestrator] Creación de alertas post-meta falló:',
@@ -684,4 +797,48 @@ async function loadPreviousOrgScore(
     previousOrgScore: prevOrg?.safetyScore ?? null,
     previousCampaignLabel: `Semestre ${sem} ${d.getFullYear()}`,
   };
+}
+
+/**
+ * ISA del ciclo anterior del MISMO departamento. Mismo patrón que
+ * loadPreviousOrgScore() pero a nivel depto.
+ *
+ * Persiste como snapshot en ComplianceAnalysis.previousIsaScore al cerrar
+ * el row DEPARTMENT — reemplaza el lookup runtime en /report (route.ts).
+ *
+ * Estrategia:
+ *   1. Resolver endDate del ciclo actual.
+ *   2. Buscar el ComplianceAnalysis DEPARTMENT más reciente del MISMO
+ *      (accountId, departmentId) en una campaña Ambiente Sano cerrada con
+ *      endDate < ciclo actual.
+ *   3. Retornar su isaScore (o null si no hay historial).
+ */
+async function loadPreviousDeptIsaScore(
+  departmentId: string,
+  accountId: string,
+  currentCampaignId: string
+): Promise<number | null> {
+  const currentCampaign = await prisma.campaign.findUnique({
+    where: { id: currentCampaignId },
+    select: { endDate: true },
+  });
+  if (!currentCampaign) return null;
+
+  const previous = await prisma.complianceAnalysis.findFirst({
+    where: {
+      accountId,
+      departmentId,
+      scope: 'DEPARTMENT',
+      status: 'COMPLETED',
+      campaign: {
+        status: 'completed',
+        endDate: { lt: currentCampaign.endDate },
+        campaignType: { slug: 'pulso-ambientes-sanos' },
+      },
+    },
+    orderBy: { campaign: { endDate: 'desc' } },
+    select: { isaScore: true },
+  });
+
+  return previous?.isaScore ?? null;
 }

@@ -3563,6 +3563,12 @@ model ComplianceAnalysis {
   // Por depto: ISA del depto. Por ORG: ISA organizacional (promedio ponderado).
   isaScore Int? @map("isa_score")
 
+  // ISA del ciclo anterior del MISMO departamento, persistido al cerrar este row.
+  // Mismo patrón que orgPayload.global.previousOrgScore pero a nivel depto.
+  // Solo se popula en rows scope='DEPARTMENT' — null para ORG.
+  // Permite delta vs ciclo anterior sin lookup runtime en /report.
+  previousIsaScore Int? @map("previous_isa_score")
+
   // Output del LLM (campos top-level para queries; resto en payload)
   senalDominante     String?  @map("senal_dominante")
   confianzaAnalisis  String?  @map("confianza_analisis")

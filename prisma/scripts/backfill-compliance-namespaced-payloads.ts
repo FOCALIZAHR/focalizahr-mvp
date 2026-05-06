@@ -184,6 +184,10 @@ async function main() {
       row.department.accumulatedExoScore
     );
 
+    // Motor A v2 — backfill recibe los inputs pero como `isaScore` no se
+    // recomputa acá (script idempotente para namespacing solamente), Motor A
+    // queda en empty para rows sin ISA. Si el row ya tiene isaScore en BD,
+    // se pasa para que A1/A5 puedan activarse.
     const convergencia = buildDepartmentConvergencia({
       departmentId: row.departmentId,
       departmentName: row.department.displayName,
@@ -191,6 +195,10 @@ async function main() {
       safetyScore: safetyDetail.safetyScore,
       patrones: patrones.patrones ?? [],
       externalSignals: external,
+      isaScore: row.isaScore,
+      dimensionScores: safetyDetail.dimensionScores,
+      patronesOutput: patrones,
+      teatroCumplimiento: !!row.teatroCumplimiento,
     });
 
     const newPayload = { patrones, safetyDetail, convergencia };

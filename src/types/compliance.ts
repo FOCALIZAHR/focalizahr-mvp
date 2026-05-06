@@ -194,6 +194,13 @@ export interface ComplianceReportDepartment extends DepartmentSafetyScore {
    * leer defensivamente con `dept.patrones?.patron_dominante`.
    */
   patrones?: ComplianceReportDepartmentPatrones;
+  /**
+   * Flag per-dept: el dept tiene métricas numéricas altas (safetyScore ≥ 4.0)
+   * pero el LLM detectó al menos un patrón de intensidad ≥ 0.6 — los números
+   * dicen una cosa, las respuestas proyectivas dicen otra. Detectado por
+   * `detectTeatroCumplimiento()`. Optional: campañas legacy pueden no traerlo.
+   */
+  teatroCumplimiento?: boolean;
 }
 
 export interface ComplianceReportAlert {
