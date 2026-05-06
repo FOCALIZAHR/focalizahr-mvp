@@ -58,6 +58,37 @@ const EMPTY_DIMENSIONS: DepartmentSafetyScore['dimensionScores'] = {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
+// Defaults defensivos — backward compat con campañas legacy
+// ════════════════════════════════════════════════════════════════════════════
+//
+// El JSON persistido en `result_payload.convergencia` para campañas cerradas
+// ANTES de los commits 2b08d38/872856f/5089e54 NO tiene los sub-objetos
+// `convergenciaInterna` / `convergenciaExterna` / `nivelFinal`.
+//
+// route.ts hace passthrough crudo. La defensa vive acá:
+// `mergeDepartmentData` aplica defaults si los sub-objetos faltan.
+// El backfill (script C) regenera los JSON legacy — pero hasta que corra,
+// estos defaults previenen el crash del frontend.
+
+const EMPTY_INTERNA: ConvergenciaInternaResult = {
+  casosActivos: [],
+  nivelConvergencia: 'ninguna',
+  teatroDetectado: false,
+  silencioDetectado: false,
+  enCriticalByManagerGroup: false,
+};
+
+const EMPTY_EXTERNA: ConvergenciaExternaResult = {
+  exoSignal: 0,
+  eisSignal: 0,
+  pesoAlertas: 0,
+  scoreTotal: 0,
+  tieneAlertaCritica: false,
+  fallaCicloDeVida: false,
+  alertasConsideradas: [],
+};
+
+// ════════════════════════════════════════════════════════════════════════════
 // derivePreviousIsa
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -134,16 +165,28 @@ export function mergeDepartmentData(
     reportDept?.isaScore ?? null,
     reportDept?.deltaVsAnterior ?? null
   );
-  const a4Partner = convergencia.convergenciaInterna.enCriticalByManagerGroup
+
+  // Defensive: campañas legacy cerradas pre-Fase-1/2/3 no tienen los
+  // sub-objetos en el JSON persistido. route.ts hace passthrough crudo →
+  // aplicamos defaults vacíos acá. El backfill (script C) regenera los JSON
+  // legacy con valores reales, pero hasta entonces estos defaults previenen
+  // el crash del frontend y dejan el dept fuera de la lista de convergentes.
+  const interna: ConvergenciaInternaResult =
+    convergencia.convergenciaInterna ?? EMPTY_INTERNA;
+  const externa: ConvergenciaExternaResult =
+    convergencia.convergenciaExterna ?? EMPTY_EXTERNA;
+  const nivelFinal: NivelFinal = convergencia.nivelFinal ?? 'ninguna';
+
+  const a4Partner = interna.enCriticalByManagerGroup
     ? findA4Partner(report, convergencia.departmentId)
     : undefined;
 
   return {
     departmentId: convergencia.departmentId,
     departmentName: convergencia.departmentName,
-    convergenciaInterna: convergencia.convergenciaInterna,
-    convergenciaExterna: convergencia.convergenciaExterna,
-    nivelFinal: convergencia.nivelFinal,
+    convergenciaInterna: interna,
+    convergenciaExterna: externa,
+    nivelFinal,
     isaScore: reportDept?.isaScore ?? null,
     deltaVsAnterior: reportDept?.deltaVsAnterior ?? null,
     previousIsaScore,
