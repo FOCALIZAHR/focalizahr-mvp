@@ -22,6 +22,7 @@ import {
   loadDepartmentExternalSignals,
   loadDepartmentExternalAlerts,
   computeConvergenciaExterna,
+  computeNivelFinal,
   detectCasosMotorA,
   applyA4ToDepartments,
 } from './ConvergenciaEngine';
@@ -290,13 +291,19 @@ export async function processNextDepartmentJob(campaignId: string): Promise<bool
 
     // Motor A v2 — recalcular casos A1, A2, A3, A5 con ISA real. A4 (cross-dept)
     // se patchea cuando todos los DEPARTMENT jobs cierran (processOrgMetaIfReady).
+    // nivelFinal se recomputa con la nueva convergenciaInterna (Bloque 0 Fase 4).
+    const nuevaInternaPostISA = detectCasosMotorA(
+      isaScore,
+      safetyDetail.dimensionScores,
+      llmResult.data,
+      teatro
+    );
     const convergencia: typeof convergenciaPreISA = {
       ...convergenciaPreISA,
-      convergenciaInterna: detectCasosMotorA(
-        isaScore,
-        safetyDetail.dimensionScores,
-        llmResult.data,
-        teatro
+      convergenciaInterna: nuevaInternaPostISA,
+      nivelFinal: computeNivelFinal(
+        nuevaInternaPostISA,
+        convergenciaPreISA.convergenciaExterna
       ),
     };
 

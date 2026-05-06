@@ -1,24 +1,30 @@
 'use client';
 
-// SectionConvergencia (C3 "Las Señales") — state machine top-level.
+// SectionConvergencia (C3 "Las Señales") — orquestador rebuild v2.
+// Plan: PLAN_UI_C3_SECCION_CONVERGENCIA_v2.md.
 //
-// 3 sub-vistas según `classifyConvergencia(report)`:
-//   - una_sola_fuente → <VisionParcial />        (1 fuente activa)
-//   - parciales       → <SenalesParciales />     (2+ fuentes, sin convergencia crítica)
-//   - confirmada      → <ConvergenciaConfirmada /> (convergente/critico O criticalByManager poblado)
+// Una sola vista: header editorial (state machine 5 estados) + lista de bandas
+// con acordeón inline. Cero state machine de 3 vistas (eso era el rebuild
+// anterior — reemplazado).
 //
-// Tokens canónicos compliance: chrome propio por sub-vista (sin SectionShell),
-// igual al patrón de C2 SectionPatrones.
-//
-// Consumer: ComplianceStage.tsx pasa `hook` — mantenido como prop público para
-// compat con el switch del orchestrator. El componente extrae `report` y
-// despacha al sub-componente correspondiente.
+// El payload del report ya trae todo lo necesario:
+//   - report.data.convergencia.departments[i] (Motor A/B/nivelFinal)
+//   - report.data.departments[i] (isaScore, dimensionScores, deltaVsAnterior)
+//   - report.data.alerts (filtradas por departmentId)
+// Helper mergeDepartmentData cruza los 3 arrays en MergedDept.
 
+import { useMemo, useState } from 'react';
 import type { UseComplianceDataReturn } from '@/hooks/useComplianceData';
-import VisionParcial from './VisionParcial';
-import SenalesParciales from './SenalesParciales';
-import ConvergenciaConfirmada from './ConvergenciaConfirmada';
-import { classifyConvergencia } from './_shared/helpers';
+import ConvergenciaOrgHeader from './ConvergenciaOrgHeader';
+import BandaDepartamento from './BandaDepartamento';
+import ConvergenciaEmptyState from './ConvergenciaEmptyState';
+import {
+  mergeDepartmentData,
+  classifyHeaderState,
+  byUrgencia,
+  getEmptyStateVariant,
+  type MergedDept,
+} from './_shared/helpers';
 
 interface Props {
   hook: UseComplianceDataReturn;
@@ -26,20 +32,51 @@ interface Props {
 
 export default function SectionConvergencia({ hook }: Props) {
   const report = hook.report;
+  const [expandedDeptId, setExpandedDeptId] = useState<string | null>(null);
 
-  // Defensive: report null o departments vacío → la sección no aplica.
-  // (El Rail puede rutear acá pero sin data no hay nada que mostrar.)
+  // Cruza los 3 arrays + filtra deptos con convergencia + ordena por urgencia.
+  // useMemo evita recomputar en cada render del padre.
+  const deptosConConvergencia: MergedDept[] = useMemo(() => {
+    if (!report) return [];
+    return report.data.convergencia.departments
+      .filter((d) => d.convergenciaInterna.nivelConvergencia !== 'ninguna')
+      .map((d) => mergeDepartmentData(report, d))
+      .sort(byUrgencia);
+  }, [report]);
+
   if (!report) return null;
-  if (report.data.convergencia.departments.length === 0) return null;
 
-  const condicion = classifyConvergencia(report);
-
-  switch (condicion) {
-    case 'una_sola_fuente':
-      return <VisionParcial report={report} />;
-    case 'parciales':
-      return <SenalesParciales report={report} />;
-    case 'confirmada':
-      return <ConvergenciaConfirmada report={report} />;
+  // Empty state — 3 variantes según contexto del ciclo
+  if (deptosConConvergencia.length === 0) {
+    return <ConvergenciaEmptyState variant={getEmptyStateVariant(report)} />;
   }
+
+  const headerState = classifyHeaderState(deptosConConvergencia);
+  const hayCriticaSistema = deptosConConvergencia.some(
+    (d) => d.nivelFinal === 'critica_sistema'
+  );
+
+  const handleToggle = (deptId: string) => {
+    setExpandedDeptId(expandedDeptId === deptId ? null : deptId);
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      <ConvergenciaOrgHeader
+        state={headerState}
+        deptos={deptosConConvergencia}
+        hayCriticaSistema={hayCriticaSistema}
+      />
+      <div className="flex flex-col gap-3">
+        {deptosConConvergencia.map((dept) => (
+          <BandaDepartamento
+            key={dept.departmentId}
+            dept={dept}
+            isExpanded={expandedDeptId === dept.departmentId}
+            onToggle={() => handleToggle(dept.departmentId)}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }

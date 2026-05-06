@@ -161,6 +161,22 @@ export interface ConvergenciaExternaResult {
   alertasConsideradas: ExternalAlert[];
 }
 
+/**
+ * Síntesis cross-motor del nivel de convergencia per-dept (spec apéndice).
+ * Combina Motor A (convergenciaInterna) + Motor B (convergenciaExterna) en
+ * un solo eje semántico para la UI.
+ *
+ * Precedencia (mayor a menor severidad):
+ *   critica_sistema → amplificada → confirmada → externa_solo → interna_solo → ninguna
+ */
+export type NivelFinal =
+  | 'ninguna'
+  | 'interna_solo'      // Motor A activo, Motor B sin score
+  | 'externa_solo'      // Motor A 'ninguna', Motor B con score
+  | 'confirmada'        // Motor A simple/multiple + Motor B con score
+  | 'amplificada'       // Motor A 'critica' OR fallaCicloDeVida
+  | 'critica_sistema';  // criticalByManager OR (Motor A critica AND alerta crítica)
+
 export interface DepartmentConvergencia {
   departmentId: string;
   departmentName: string;
@@ -185,6 +201,12 @@ export interface DepartmentConvergencia {
 
   /** Motor B Fase 2 — convergencia externa con Exit + Onboarding. */
   convergenciaExterna: ConvergenciaExternaResult;
+
+  /**
+   * Síntesis cross-motor — eje único para UI. Recomputado cuando cambia
+   * `convergenciaInterna` (segundo pass del orchestrator post-ISA + patch A4).
+   */
+  nivelFinal: NivelFinal;
 }
 
 /**
@@ -426,6 +448,12 @@ export function buildDepartmentConvergencia(
     isaScore
   );
 
+  // Síntesis cross-motor. En primer pass del orchestrator (isaScore=null) la
+  // convergenciaInterna está vacía, pero la externa ya está completa — el
+  // nivelFinal será correcto para los flags Motor B. El orchestrator
+  // recompute después en el segundo pass cuando reemplaza convergenciaInterna.
+  const nivelFinal = computeNivelFinal(convergenciaInterna, convergenciaExterna);
+
   return {
     departmentId,
     departmentName,
@@ -440,6 +468,7 @@ export function buildDepartmentConvergencia(
     senalIgnorada: externalSignals.senalIgnorada,
     convergenciaInterna,
     convergenciaExterna,
+    nivelFinal,
   };
 }
 
@@ -874,6 +903,65 @@ export async function loadDepartmentExternalAlerts(
   return out;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Síntesis cross-motor — nivelFinal
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Combina Motor A + Motor B en el eje único `NivelFinal`.
+ * Función pura — exportable para reuso en orchestrator (segundo pass)
+ * y `applyA4ToDepartments` (cuando A4 patchea convergenciaInterna).
+ *
+ * Precedencia (mayor severidad primero):
+ *   1. critica_sistema: enCriticalByManagerGroup OR (nivelConv='critica' AND tieneAlertaCritica)
+ *   2. amplificada:     nivelConv='critica' OR fallaCicloDeVida
+ *   3. confirmada:      nivelConv ∈ {simple, multiple} AND scoreTotal>0
+ *   4. externa_solo:    nivelConv='ninguna' AND scoreTotal>0
+ *   5. interna_solo:    nivelConv ∈ {simple, multiple, critica} AND scoreTotal=0
+ *   6. ninguna:         resto
+ */
+export function computeNivelFinal(
+  interna: ConvergenciaInternaResult,
+  externa: ConvergenciaExternaResult
+): NivelFinal {
+  const nivelConv = interna.nivelConvergencia;
+  const scoreExt = externa.scoreTotal;
+
+  // 1. critica_sistema — máxima severidad
+  if (
+    interna.enCriticalByManagerGroup ||
+    (nivelConv === 'critica' && externa.tieneAlertaCritica)
+  ) {
+    return 'critica_sistema';
+  }
+
+  // 2. amplificada — Motor A crítico o ciclo de vida comprometido
+  if (nivelConv === 'critica' || externa.fallaCicloDeVida) {
+    return 'amplificada';
+  }
+
+  // 3. confirmada — ambos motores con señales
+  if (
+    (nivelConv === 'simple' || nivelConv === 'multiple') &&
+    scoreExt > 0
+  ) {
+    return 'confirmada';
+  }
+
+  // 4. externa_solo — solo Motor B
+  if (nivelConv === 'ninguna' && scoreExt > 0) {
+    return 'externa_solo';
+  }
+
+  // 5. interna_solo — solo Motor A
+  if (nivelConv !== 'ninguna' && scoreExt === 0) {
+    return 'interna_solo';
+  }
+
+  // 6. ninguna
+  return 'ninguna';
+}
+
 /**
  * Patch cross-dept del Caso A4 después de buildGlobalConvergencia.
  * Para cada dept en algún grupo criticalByManager:
@@ -899,14 +987,17 @@ export function applyA4ToDepartments(
     const casos = yaActivo
       ? d.convergenciaInterna.casosActivos
       : [...d.convergenciaInterna.casosActivos, 'A4' as CasoMotorA];
+    const nuevaInterna: ConvergenciaInternaResult = {
+      ...d.convergenciaInterna,
+      casosActivos: casos,
+      nivelConvergencia: computeNivelConvergencia(casos),
+      enCriticalByManagerGroup: true,
+    };
     return {
       ...d,
-      convergenciaInterna: {
-        ...d.convergenciaInterna,
-        casosActivos: casos,
-        nivelConvergencia: computeNivelConvergencia(casos),
-        enCriticalByManagerGroup: true,
-      },
+      convergenciaInterna: nuevaInterna,
+      // Recomputar síntesis cross-motor — A4 puede gatillar critica_sistema.
+      nivelFinal: computeNivelFinal(nuevaInterna, d.convergenciaExterna),
     };
   });
 }

@@ -1,196 +1,290 @@
-// Helpers puros para SectionConvergencia (C3 "Las Señales").
-// Sin I/O, sin React, sin acceso a hook — funciones de transformación de data
-// del report shape para alimentar las 3 sub-vistas.
+// Helpers puros para SectionConvergencia v2 (rebuild final).
+// Plan: .claude/tasks/PLAN_UI_C3_SECCION_CONVERGENCIA_v2.md
 
 import type {
   ComplianceReportResponse,
   ComplianceReportAlert,
-  ComplianceReportDepartment,
   DepartmentConvergencia,
 } from '@/types/compliance';
-import type { ComplianceSource } from '@/config/complianceAlertConfig';
+import type {
+  ConvergenciaInternaResult,
+  ConvergenciaExternaResult,
+  NivelFinal,
+  CasoMotorA,
+} from '@/lib/services/compliance/ConvergenciaEngine';
+import type { DepartmentSafetyScore } from '@/lib/services/SafetyScoreService';
 
 // ════════════════════════════════════════════════════════════════════════════
-// CLASIFICACIÓN DEL STATE MACHINE
+// Tipo unificado MergedDept
 // ════════════════════════════════════════════════════════════════════════════
-
-export type ConvergenciaCondicion =
-  | 'una_sola_fuente'   // Condición 1: solo Ambiente Sano (típico)
-  | 'parciales'         // Condición 2: 2+ fuentes, sin convergencia crítica
-  | 'confirmada';       // Condición 3: convergencia crítica O criticalByManager
 
 /**
- * Clasifica la sub-vista a renderizar.
- *
- * Orden de evaluación:
- *   1. activeSources <= 1 → 'una_sola_fuente'
- *   2. hay deptos en nivel convergente/critico O criticalByManager poblado
- *      → 'confirmada'
- *   3. resto → 'parciales'
- *
- * Edge case AREA_MANAGER: el backend filtra criticalByManager a []. Si el
- * AREA_MANAGER no tiene deptos en nivel crítico en su scope, el state machine
- * cae a 'parciales' — nunca ve la Tarjeta de Liderazgo. Comportamiento
- * correcto y privacy-safe.
+ * Departamento con todos los datos cruzados que la UI necesita.
+ * Combina:
+ *   - report.data.convergencia.departments[i] (Motor A/B/nivelFinal)
+ *   - report.data.departments[i] (isaScore, dimensionScores, deltaVsAnterior)
+ *   - report.data.alerts filtradas por departmentId
+ *   - previousIsaScore derivado (isaScore - deltaVsAnterior)
+ *   - a4Partner si dept está en grupo criticalByManager
  */
-export function classifyConvergencia(
-  report: ComplianceReportResponse
-): ConvergenciaCondicion {
-  const { activeSources, departments, criticalByManager } =
-    report.data.convergencia;
-
-  if (activeSources.length <= 1) return 'una_sola_fuente';
-
-  const hayConvergenciaCritica = departments.some(
-    (d) => d.level === 'convergente' || d.level === 'critico'
-  );
-  if (hayConvergenciaCritica || criticalByManager.length > 0) {
-    return 'confirmada';
-  }
-
-  return 'parciales';
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// CRITICAL BY MANAGER — agrupación con privacy hardened
-// ════════════════════════════════════════════════════════════════════════════
-
-export interface CriticalGroup {
-  /** SOLO para usar como key React. NUNCA renderizar al usuario. */
-  managerId: string;
-  /** Nombres de deptos resueltos. Único output visible. */
-  departmentNames: string[];
-}
-
-/**
- * Resuelve criticalByManager (que viene con departmentIds) a CriticalGroup
- * con departmentNames lookup'd. Privacy: managerId solo se usa como React
- * key — nunca aparece en el UI.
- *
- * Filtra grupos donde no se pudo resolver al menos 2 nombres
- * (defensive: en teoría buildGlobalConvergencia ya garantiza >=2).
- */
-export function deriveCriticalGroups(
-  criticalByManager: ComplianceReportResponse['data']['convergencia']['criticalByManager'],
-  departments: DepartmentConvergencia[]
-): CriticalGroup[] {
-  const nameById = new Map(
-    departments.map((d) => [d.departmentId, d.departmentName])
-  );
-
-  return criticalByManager
-    .map((g) => ({
-      managerId: g.managerId,
-      departmentNames: g.departmentIds
-        .map((id) => nameById.get(id))
-        .filter((n): n is string => typeof n === 'string'),
-    }))
-    .filter((g) => g.departmentNames.length >= 2);
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// FLAGS OCULTOS — silencio / deterioro / señal ignorada / teatro
-// ════════════════════════════════════════════════════════════════════════════
-
-export type FlagOcultoKey = 'silencio' | 'deterioro' | 'ignorada' | 'teatro';
-
-export interface DeptHiddenFlags {
+export interface MergedDept {
   departmentId: string;
   departmentName: string;
-  flags: FlagOcultoKey[];
+  convergenciaInterna: ConvergenciaInternaResult;
+  convergenciaExterna: ConvergenciaExternaResult;
+  nivelFinal: NivelFinal;
+  isaScore: number | null;
+  deltaVsAnterior: number | null;
+  previousIsaScore: number | null;
+  dimensionScores: DepartmentSafetyScore['dimensionScores'];
+  teatroCumplimiento: boolean;
+  complianceAlerts: ComplianceReportAlert[];
+  a4Partner?: A4PartnerInfo;
 }
 
-/**
- * Extrae los flags ocultos por dept en orden estable. Solo deptos con
- * al menos 1 flag entran al resultado.
- *
- * Inputs:
- *   - convergenciaDepts: trae silencioDetected, deterioroPulso, senalIgnorada
- *   - reportDepts: trae teatroCumplimiento (vive en column top-level de
- *     ComplianceAnalysis, expuesto vía route.ts en `departments[i]`)
- *
- * Match por departmentId. Si un dept aparece en una lista pero no en la otra,
- * los flags faltantes simplemente no se evalúan (defensive).
- */
-export function deriveDeptHiddenFlags(
-  convergenciaDepts: DepartmentConvergencia[],
-  reportDepts: ComplianceReportDepartment[]
-): DeptHiddenFlags[] {
-  const teatroById = new Map(
-    reportDepts
-      .filter((d) => d.teatroCumplimiento === true)
-      .map((d) => [d.departmentId, true])
-  );
+export interface A4PartnerInfo {
+  departmentName: string;
+  isaScore: number;
+  deltaIsa: number;
+}
 
-  const out: DeptHiddenFlags[] = [];
-  for (const d of convergenciaDepts) {
-    const flags: FlagOcultoKey[] = [];
-    if (d.silencioDetected) flags.push('silencio');
-    if (d.deterioroPulso) flags.push('deterioro');
-    if (d.senalIgnorada) flags.push('ignorada');
-    if (teatroById.has(d.departmentId)) flags.push('teatro');
-    if (flags.length === 0) continue;
-    out.push({
-      departmentId: d.departmentId,
-      departmentName: d.departmentName,
-      flags,
-    });
-  }
-  return out;
+const EMPTY_DIMENSIONS: DepartmentSafetyScore['dimensionScores'] = {
+  P2_seguridad: null,
+  P3_disenso: null,
+  P4_microagresiones: null,
+  P5_equidad: null,
+  P7_liderazgo: null,
+  P8_agotamiento: null,
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// derivePreviousIsa
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Deriva el ISA del ciclo anterior desde isaScore actual + deltaVsAnterior.
+ * Defensive: si delta o isa son null → null. Si previous calculado es
+ * negativo o > 100 (degenerado), también null.
+ */
+export function derivePreviousIsa(
+  isaScore: number | null,
+  deltaVsAnterior: number | null
+): number | null {
+  if (isaScore === null || deltaVsAnterior === null) return null;
+  const previous = isaScore - deltaVsAnterior;
+  if (previous < 0 || previous > 100) return null;
+  return previous;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// ALERTAS — split por SLA + severity mapping
+// findA4Partner — busca el partner con mayor delta ISA en el grupo criticalByManager
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Para un dept en grupo criticalByManager, encuentra el partner con mayor
+ * delta ISA. Decisión arquitectónica (decisión 3): mostrar solo el partner
+ * más distinto visualmente — la narrativa A4 menciona "otro departamento" en singular.
+ */
+export function findA4Partner(
+  report: ComplianceReportResponse,
+  departmentId: string
+): A4PartnerInfo | undefined {
+  const groups = report.data.convergencia.criticalByManager;
+  const myGroup = groups.find((g) => g.departmentIds.includes(departmentId));
+  if (!myGroup || myGroup.departmentIds.length < 2) return undefined;
+
+  // Lookup ISA de cada dept del grupo
+  const myDept = report.data.departments.find((d) => d.departmentId === departmentId);
+  if (!myDept || myDept.isaScore === null) return undefined;
+
+  let bestPartner: A4PartnerInfo | undefined;
+  let bestDelta = 0;
+  for (const otherId of myGroup.departmentIds) {
+    if (otherId === departmentId) continue;
+    const otherDept = report.data.departments.find((d) => d.departmentId === otherId);
+    if (!otherDept || otherDept.isaScore === null) continue;
+    const delta = Math.abs(myDept.isaScore - otherDept.isaScore);
+    if (delta > bestDelta) {
+      bestDelta = delta;
+      bestPartner = {
+        departmentName: otherDept.departmentName,
+        isaScore: otherDept.isaScore,
+        deltaIsa: delta,
+      };
+    }
+  }
+  return bestPartner;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// mergeDepartmentData — construye MergedDept desde los 3 arrays del payload
+// ════════════════════════════════════════════════════════════════════════════
+
+export function mergeDepartmentData(
+  report: ComplianceReportResponse,
+  convergencia: DepartmentConvergencia
+): MergedDept {
+  const reportDept = report.data.departments.find(
+    (d) => d.departmentId === convergencia.departmentId
+  );
+  const alerts = report.data.alerts.filter(
+    (a) => a.departmentId === convergencia.departmentId
+  );
+  const previousIsaScore = derivePreviousIsa(
+    reportDept?.isaScore ?? null,
+    reportDept?.deltaVsAnterior ?? null
+  );
+  const a4Partner = convergencia.convergenciaInterna.enCriticalByManagerGroup
+    ? findA4Partner(report, convergencia.departmentId)
+    : undefined;
+
+  return {
+    departmentId: convergencia.departmentId,
+    departmentName: convergencia.departmentName,
+    convergenciaInterna: convergencia.convergenciaInterna,
+    convergenciaExterna: convergencia.convergenciaExterna,
+    nivelFinal: convergencia.nivelFinal,
+    isaScore: reportDept?.isaScore ?? null,
+    deltaVsAnterior: reportDept?.deltaVsAnterior ?? null,
+    previousIsaScore,
+    dimensionScores: reportDept?.dimensionScores ?? EMPTY_DIMENSIONS,
+    teatroCumplimiento: reportDept?.teatroCumplimiento ?? false,
+    complianceAlerts: alerts,
+    a4Partner,
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Header state machine — 5 estados
+// ════════════════════════════════════════════════════════════════════════════
+
+export type HeaderState =
+  | 'critical_by_manager'   // Estado 1 — precedencia
+  | 'falla_ciclo_vida'      // Estado 2
+  | 'teatro_detectado'      // Estado 3
+  | 'convergencia_multiple' // Estado 4
+  | 'sin_convergencia';     // Estado 5
+
+/**
+ * Clasifica el estado del header según los flags agregados de los deptos.
+ * Orden de evaluación (decisión 6): criticalByManager > fallaCicloDeVida >
+ * teatro > múltiple > sin convergencia.
+ */
+export function classifyHeaderState(deptos: MergedDept[]): HeaderState {
+  if (deptos.some((d) => d.convergenciaInterna.enCriticalByManagerGroup)) {
+    return 'critical_by_manager';
+  }
+  if (deptos.some((d) => d.convergenciaExterna.fallaCicloDeVida)) {
+    return 'falla_ciclo_vida';
+  }
+  if (deptos.some((d) => d.convergenciaInterna.teatroDetectado)) {
+    return 'teatro_detectado';
+  }
+  const conConvergenciaCount = deptos.filter(
+    (d) => d.convergenciaInterna.nivelConvergencia !== 'ninguna'
+  ).length;
+  if (conConvergenciaCount >= 2) {
+    return 'convergencia_multiple';
+  }
+  return 'sin_convergencia';
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// byUrgencia — sort de bandas por urgencia descendente
+// ════════════════════════════════════════════════════════════════════════════
+
+const NIVEL_RANK: Record<ConvergenciaInternaResult['nivelConvergencia'], number> = {
+  ninguna: 0,
+  simple: 1,
+  multiple: 2,
+  critica: 3,
+};
+
+/**
+ * Comparator para ordenar deptos. Tie-break:
+ *   1. nivelConvergencia (critica > multiple > simple > ninguna)
+ *   2. tieneAlertaCritica (true antes que false)
+ *   3. scoreTotal (mayor primero)
+ *   4. departmentName (alfabético, fallback determinista)
+ */
+export function byUrgencia(a: MergedDept, b: MergedDept): number {
+  const nivelDiff =
+    NIVEL_RANK[b.convergenciaInterna.nivelConvergencia] -
+    NIVEL_RANK[a.convergenciaInterna.nivelConvergencia];
+  if (nivelDiff !== 0) return nivelDiff;
+
+  const critA = a.convergenciaExterna.tieneAlertaCritica ? 1 : 0;
+  const critB = b.convergenciaExterna.tieneAlertaCritica ? 1 : 0;
+  if (critA !== critB) return critB - critA;
+
+  const scoreDiff =
+    b.convergenciaExterna.scoreTotal - a.convergenciaExterna.scoreTotal;
+  if (scoreDiff !== 0) return scoreDiff;
+
+  return a.departmentName.localeCompare(b.departmentName);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Empty state variant
+// ════════════════════════════════════════════════════════════════════════════
+
+export type EmptyStateVariant =
+  | 'sin_ciclo'           // No hay análisis completado
+  | 'sin_convergencia'    // Hay deptos analizados pero ninguno con convergencia
+  | 'solo_motor_a';       // Activo Motor A pero sin productos externos contratados
+
+/**
+ * Determina cuál variante de empty state mostrar.
+ * - sin_ciclo: convergencia.departments vacío.
+ * - solo_motor_a: 1 sola fuente activa (ambiente_sano) + cero alertas externas.
+ * - sin_convergencia: hay deptos con multi-fuente pero ninguno tiene convergencia grave.
+ */
+export function getEmptyStateVariant(
+  report: ComplianceReportResponse
+): EmptyStateVariant {
+  const conv = report.data.convergencia;
+  if (conv.departments.length === 0) return 'sin_ciclo';
+  if (conv.activeSources.length <= 1) return 'solo_motor_a';
+  return 'sin_convergencia';
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Alert SLA helpers
 // ════════════════════════════════════════════════════════════════════════════
 
 export interface AlertSlaSplit {
-  /** Alertas activas con SLA en plazo. */
   enTiempo: ComplianceReportAlert[];
-  /** Alertas con SLA vencido — registro permanente. */
   vencidas: ComplianceReportAlert[];
-  /** Alertas sin dueDate (no aplican SLA — informativas). */
   sinSLA: ComplianceReportAlert[];
 }
 
 /**
- * Particiona alertas por estado de SLA. Usa `slaStatus` del backend si está
- * presente; fallback a comparar `dueDate` con now si solo viene la fecha.
- *
- * Filtra alertas resolved/dismissed (no se muestran en convergencia).
+ * Particiona alertas por estado de SLA. Filtra resolved/dismissed.
  */
 export function splitAlertsBySLA(
   alerts: ComplianceReportAlert[],
   now: Date = new Date()
 ): AlertSlaSplit {
   const out: AlertSlaSplit = { enTiempo: [], vencidas: [], sinSLA: [] };
-
   for (const a of alerts) {
     if (a.status === 'resolved' || a.status === 'dismissed') continue;
-
     if (!a.dueDate) {
       out.sinSLA.push(a);
       continue;
     }
-
     if (a.slaStatus === 'overdue') {
       out.vencidas.push(a);
       continue;
     }
-
     const due = new Date(a.dueDate);
-    if (due.getTime() < now.getTime()) {
-      out.vencidas.push(a);
-    } else {
-      out.enTiempo.push(a);
-    }
+    if (due.getTime() < now.getTime()) out.vencidas.push(a);
+    else out.enTiempo.push(a);
   }
-
   return out;
 }
 
 /**
- * Mapea severity del backend al level del motor de decisiones (C1).
- * Reusable por si SectionConvergencia gatilla upsertDecision sobre alertas.
+ * Mapea severity del backend al level de upsertDecision.
  */
 export function severityToLevel(
   severity: string
@@ -201,24 +295,7 @@ export function severityToLevel(
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// FUENTES INACTIVAS — para Visión Parcial (Condición 1)
+// Re-export tipos del engine para que los componentes solo importen de helpers
 // ════════════════════════════════════════════════════════════════════════════
 
-const TODAS_LAS_FUENTES: ComplianceSource[] = [
-  'ambiente_sano',
-  'exit',
-  'onboarding',
-  'pulso',
-];
-
-/**
- * Devuelve la lista de fuentes que NO están activas en este ciclo.
- * El sistema NO diferencia "no contratado" vs "contratado sin data" — ambos
- * colapsan al mismo branch (decisión de scope confirmada con user).
- */
-export function deriveInactiveSources(
-  activeSources: ComplianceSource[]
-): ComplianceSource[] {
-  const activeSet = new Set(activeSources);
-  return TODAS_LAS_FUENTES.filter((s) => !activeSet.has(s));
-}
+export type { CasoMotorA, NivelFinal };
