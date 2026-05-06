@@ -40,6 +40,7 @@ import type {
 } from './complianceTypes';
 import type { DepartmentSafetyScore } from '@/lib/services/SafetyScoreService';
 import type { ComplianceAlertType } from '@/config/complianceAlertConfig';
+import { getHistoricalWeight } from '@/config/compliance/convergenciaWeights';
 
 // Shape del ComplianceAnalysis.resultPayload por scope (namespaces explícitos).
 interface DepartmentResultPayload {
@@ -499,20 +500,28 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
       select: { id: true },
     });
 
+    // Fase 3 — count + peso decaído de alertas Compliance del ciclo anterior.
     const closedCountByDept = new Map<string, number>();
+    const closedWeightByDept = new Map<string, number>();
     if (previousCampaign) {
       const closedAlerts = await prisma.complianceAlert.findMany({
         where: {
           campaignId: previousCampaign.id,
           status: { in: ['resolved', 'dismissed'] },
         },
-        select: { departmentId: true },
+        select: { departmentId: true, status: true, resolvedAt: true },
       });
+      const nowDt = new Date();
       for (const a of closedAlerts) {
         if (!a.departmentId) continue;
         closedCountByDept.set(
           a.departmentId,
           (closedCountByDept.get(a.departmentId) ?? 0) + 1
+        );
+        const w = 1 * getHistoricalWeight(a.status, a.resolvedAt, nowDt);
+        closedWeightByDept.set(
+          a.departmentId,
+          (closedWeightByDept.get(a.departmentId) ?? 0) + w
         );
       }
     }
@@ -539,21 +548,24 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
       const safetyDetail = extractDeptSafetyDetail(d.resultPayload);
       const patronesOutput = extractDeptPatrones(d.resultPayload);
 
-      // Motor B Fase 2 — alertas externas + resumen.
+      // Motor B Fase 2 + Fase 3 — alertas externas con histórico decaído.
       const externalAlertsCtx = await loadDepartmentExternalAlerts(
         d.departmentId,
-        orgJob.accountId
+        orgJob.accountId,
+        { includeHistorical: true }
       );
       const goldCtx = goldByDeptIdCtx.get(d.departmentId);
+      // Motor B (scoreTotal/tieneAlertaCritica/fallaCicloDeVida): solo activas.
+      const activeAlertsCtx = externalAlertsCtx.filter((a) => a.factorDecaimiento === 1.0);
       const externaCtx = computeConvergenciaExterna(
         goldCtx?.accumulatedExoScore ?? null,
         goldCtx?.accumulatedEISScore ?? null,
-        externalAlertsCtx,
+        activeAlertsCtx,
         d.isaScore
       );
       let liderazgoConcentracionPesoCtx = 0;
       let toxicExitDetectedPesoCtx = 0;
-      for (const a of externalAlertsCtx) {
+      for (const a of activeAlertsCtx) {
         if (a.alertType === 'liderazgo_concentracion') {
           liderazgoConcentracionPesoCtx = Math.max(
             liderazgoConcentracionPesoCtx,
@@ -567,6 +579,45 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
           );
         }
       }
+
+      // Fase 3 — peso decaído de alertas externas históricas (resolved/dismissed
+      // últimos 6 meses, factorDecaimiento < 1.0).
+      const historicalAlertsLast6mWeightCtx = externalAlertsCtx
+        .filter((a) => a.factorDecaimiento < 1.0)
+        .reduce((sum, a) => sum + a.pesoEfectivo, 0);
+
+      // Fase 3 — Motor A en ciclo anterior. Lee del JSON resultPayload
+      // del row DEPARTMENT más reciente del mismo dept en campaña previa
+      // Ambiente Sano cerrada. Defensive: false si no existe o no tiene
+      // sub-objeto convergenciaInterna (campañas pre-Fase-1).
+      const motorACicloAnteriorTuvoCasosCtx = await (async () => {
+        const currCamp = await prisma.campaign.findUnique({
+          where: { id: campaignId },
+          select: { endDate: true },
+        });
+        if (!currCamp) return false;
+        const prev = await prisma.complianceAnalysis.findFirst({
+          where: {
+            accountId: orgJob.accountId,
+            departmentId: d.departmentId,
+            scope: 'DEPARTMENT',
+            status: 'COMPLETED',
+            campaign: {
+              status: 'completed',
+              endDate: { lt: currCamp.endDate },
+              campaignType: { slug: 'pulso-ambientes-sanos' },
+            },
+          },
+          orderBy: { campaign: { endDate: 'desc' } },
+          select: { resultPayload: true },
+        });
+        if (!prev?.resultPayload) return false;
+        const payload = prev.resultPayload as {
+          convergencia?: { convergenciaInterna?: { casosActivos?: string[] } };
+        };
+        const casos = payload.convergencia?.convergenciaInterna?.casosActivos ?? [];
+        return casos.length > 0;
+      })();
 
       deptContexts.set(d.departmentId, {
         isaScore: d.isaScore,
@@ -587,6 +638,10 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
         fallaCicloDeVida: externaCtx.fallaCicloDeVida,
         liderazgoConcentracionPeso: liderazgoConcentracionPesoCtx,
         toxicExitDetectedPeso: toxicExitDetectedPesoCtx,
+        previousCycleAlertsClosedWeight: closedWeightByDept.get(d.departmentId) ?? 0,
+        historicalAlertsLast6mWeight: historicalAlertsLast6mWeightCtx,
+        motorACicloAnteriorTuvoCasos: motorACicloAnteriorTuvoCasosCtx,
+        hayAlertaMasSeveraActivaHoy: false, // se evalúa runtime en alert service
       });
     }
 

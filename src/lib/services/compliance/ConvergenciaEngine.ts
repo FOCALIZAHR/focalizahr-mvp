@@ -29,6 +29,8 @@ import {
   EIS_SIGNAL_THRESHOLDS,
   FALLA_CICLO_VIDA_ISA_MAX,
   normalizeExitAlertType,
+  getHistoricalWeight,
+  HISTORICAL_LOOKBACK_MONTHS,
 } from '@/config/compliance/convergenciaWeights';
 
 const AMBIENTE_SANO_SLUG = 'pulso-ambientes-sanos';
@@ -748,39 +750,73 @@ async function loadBumpableCounts90Days(
 }
 
 /**
- * Carga alertas externas pending/acknowledged para un dept.
+ * Carga alertas externas para un dept.
  * Exit (ExitAlert.departmentId directo) + Onboarding (JourneyAlert via journey.departmentId).
  *
  * Aplica normalización de aliases Exit + bump 90d para tipos onboarding.
- * Fase 2: factorDecaimiento = 1.0 siempre.
+ *
+ * Modo Fase 2 (default `includeHistorical: false`):
+ *   - Solo carga status pending|acknowledged.
+ *   - factorDecaimiento = 1.0 siempre.
+ *
+ * Modo Fase 3 (`includeHistorical: true`):
+ *   - Carga también resolved|dismissed con `resolvedAt >= now - HISTORICAL_LOOKBACK_MONTHS`.
+ *   - factorDecaimiento computado por `getHistoricalWeight(status, resolvedAt)`:
+ *     1.0 (active) / 0.6 (<3m) / 0.3 (3-6m) / 0.1 (>6m).
+ *   - pesoEfectivo = pesoBase × factorDecaimiento.
  */
 export async function loadDepartmentExternalAlerts(
   departmentId: string,
-  accountId: string
+  accountId: string,
+  opts?: { includeHistorical?: boolean }
 ): Promise<ExternalAlert[]> {
   const out: ExternalAlert[] = [];
+  const includeHistorical = opts?.includeHistorical === true;
+  const now = new Date();
+
+  // Cutoff para histórico — 6 meses atrás. Antigüedad mayor cae a factor 0.1.
+  const historicalCutoff = new Date(now);
+  historicalCutoff.setMonth(historicalCutoff.getMonth() - HISTORICAL_LOOKBACK_MONTHS);
+
+  const statusFilter = includeHistorical
+    ? { in: ['pending', 'acknowledged', 'resolved', 'dismissed'] }
+    : { in: ['pending', 'acknowledged'] };
 
   // Exit alerts — departmentId directo.
   const exitAlerts = await prisma.exitAlert.findMany({
     where: {
       accountId,
       departmentId,
-      status: { in: ['pending', 'acknowledged'] },
+      status: statusFilter,
+      ...(includeHistorical
+        ? {
+            OR: [
+              { status: { in: ['pending', 'acknowledged'] } },
+              {
+                status: { in: ['resolved', 'dismissed'] },
+                resolvedAt: { gte: historicalCutoff },
+              },
+            ],
+          }
+        : {}),
     },
-    select: { id: true, alertType: true, status: true },
+    select: { id: true, alertType: true, status: true, resolvedAt: true },
   });
   for (const a of exitAlerts) {
     const canonical = normalizeExitAlertType(a.alertType);
     const pesoBase = PESO_BASE_ALERTA[canonical] ?? 0;
+    const factorDecaimiento = includeHistorical
+      ? getHistoricalWeight(a.status, a.resolvedAt, now)
+      : 1.0;
     out.push({
       id: a.id,
       alertType: canonical,
       producto: 'exit',
       pesoBase,
-      factorDecaimiento: 1.0,
-      pesoEfectivo: pesoBase * 1.0,
+      factorDecaimiento,
+      pesoEfectivo: pesoBase * factorDecaimiento,
       status: a.status,
-      resolvedAt: null,
+      resolvedAt: a.resolvedAt,
     });
   }
 
@@ -788,10 +824,21 @@ export async function loadDepartmentExternalAlerts(
   const journeyAlerts = await prisma.journeyAlert.findMany({
     where: {
       accountId,
-      status: { in: ['pending', 'acknowledged'] },
+      status: statusFilter,
       journey: { departmentId },
+      ...(includeHistorical
+        ? {
+            OR: [
+              { status: { in: ['pending', 'acknowledged'] } },
+              {
+                status: { in: ['resolved', 'dismissed'] },
+                resolvedAt: { gte: historicalCutoff },
+              },
+            ],
+          }
+        : {}),
     },
-    select: { id: true, alertType: true, status: true },
+    select: { id: true, alertType: true, status: true, resolvedAt: true },
   });
 
   // Bump counts solo si hay journeyAlerts bumpables (evita query si no aplica).
@@ -809,15 +856,18 @@ export async function loadDepartmentExternalAlerts(
       baseRaw,
       bumpCounts[a.alertType] ?? 0
     );
+    const factorDecaimiento = includeHistorical
+      ? getHistoricalWeight(a.status, a.resolvedAt, now)
+      : 1.0;
     out.push({
       id: a.id,
       alertType: a.alertType,
       producto: 'onboarding',
       pesoBase,
-      factorDecaimiento: 1.0,
-      pesoEfectivo: pesoBase * 1.0,
+      factorDecaimiento,
+      pesoEfectivo: pesoBase * factorDecaimiento,
       status: a.status,
-      resolvedAt: null,
+      resolvedAt: a.resolvedAt,
     });
   }
 

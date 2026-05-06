@@ -29,6 +29,7 @@ import {
   loadDepartmentExternalAlerts,
   computeConvergenciaExterna,
 } from './ConvergenciaEngine';
+import { getHistoricalWeight } from '@/config/compliance/convergenciaWeights';
 import type { PatronAnalysisOutput } from './complianceTypes';
 import type { DepartmentSafetyScore } from '@/lib/services/SafetyScoreService';
 
@@ -57,9 +58,9 @@ export interface DeptAlertContext {
    */
   origenVertical: boolean;
   /**
-   * Alertas resolved/dismissed del ciclo anterior (mismo dept).
-   * Para senal_ignorada Fase 1: count > 0 → señal de "se cerró el ticket
-   * sin resolver la causa". Decaimiento histórico es Fase 3.
+   * Alertas resolved/dismissed del ciclo anterior (mismo dept) — count.
+   * Conservado para diagnóstico/narrativa. La decisión de senal_ignorada
+   * v2 usa `previousCycleAlertsClosedWeight` (Fase 3).
    */
   previousCycleAlertsClosed: number;
   // ─── Motor B Fase 2 — convergencia externa ────────────────────────
@@ -73,6 +74,33 @@ export interface DeptAlertContext {
   liderazgoConcentracionPeso: number;
   /** Peso efectivo máximo de alertas tipo `toxic_exit_detected` (rama E). */
   toxicExitDetectedPeso: number;
+  // ─── Fase 3 — memoria histórica ───────────────────────────────────
+  /**
+   * Suma de pesoEfectivo de alertas resolved/dismissed del ciclo ANTERIOR
+   * de Ambiente Sano para este dept (con decaimiento histórico).
+   * senal_ignorada v2 se activa si > 0.
+   */
+  previousCycleAlertsClosedWeight: number;
+  /**
+   * Suma de pesoEfectivo de alertas externas (Exit + Onboarding)
+   * resolved/dismissed en últimos 6 meses para este dept.
+   * deterioro_sostenido v2 exige >= 0.9 (o motorACicloAnteriorTuvoCasos).
+   */
+  historicalAlertsLast6mWeight: number;
+  /**
+   * Boolean: el ciclo anterior de Ambiente Sano del mismo dept tuvo casos
+   * Motor A activos (`convergenciaInterna.casosActivos.length > 0` en JSON).
+   * Defensive: false si campaña pre-Fase-1 sin sub-objeto persistido.
+   */
+  motorACicloAnteriorTuvoCasos: boolean;
+  /**
+   * Flag computado al final del flujo de createDepartmentAlerts.
+   * True si el dept ya tiene `liderazgo_toxico` o `riesgo_convergente`
+   * activa (creada en este pass o pre-existente). Usado por
+   * deterioro_sostenido v2 para evitar duplicación con alertas más severas.
+   * NO se popula en buildAlertContextsFromDb — se evalúa en runtime.
+   */
+  hayAlertaMasSeveraActivaHoy: boolean;
 }
 
 // Threshold para `liderazgo_toxico` C (origen vertical + miedo/silencio fuerte).
@@ -182,6 +210,25 @@ async function createDepartmentAlerts(
     patrones.find((p) => p.nombre === nombre)?.intensidad ?? 0;
   const sesgoGenero = ctx.patronesOutput?.alerta_sesgo_genero === true;
 
+  // Fase 3 — tracking de alertas más severas activadas en este pass.
+  // deterioro_sostenido v2 NO debe duplicarse con liderazgo_toxico ni
+  // riesgo_convergente. Tras crear/skipear cada una, marcamos el flag.
+  let createdSeveraInThisRun = false;
+
+  // Pre-existentes activas (no creadas en este pass) — el spec dice
+  // "ninguna alerta más severa activa hoy" sin distinguir origen.
+  const preExisting = await prisma.complianceAlert.findFirst({
+    where: {
+      accountId,
+      campaignId,
+      departmentId: dept.departmentId,
+      alertType: { in: ['liderazgo_toxico', 'riesgo_convergente'] },
+      status: { in: ['pending', 'acknowledged'] },
+    },
+    select: { id: true },
+  });
+  const preExistingSevera = !!preExisting;
+
   // ─── 1. riesgo_convergente ─────────────────────────────────────────
   // Spec sec 4 Fase 2:
   //   Rama A: (ISA<50 OR teatro) AND (
@@ -240,6 +287,8 @@ async function createDepartmentAlerts(
         created++;
         bump(byType, 'riesgo_convergente');
       } else skipped++;
+      // Fase 3: marcar para evitar deterioro_sostenido en el mismo dept.
+      createdSeveraInThisRun = true;
     } catch (e) {
       errors.push(`riesgo_convergente ${dept.departmentId}: ${(e as Error).message}`);
     }
@@ -349,16 +398,31 @@ async function createDepartmentAlerts(
         created++;
         bump(byType, 'liderazgo_toxico');
       } else skipped++;
+      // Fase 3: marcar para evitar deterioro_sostenido en el mismo dept.
+      createdSeveraInThisRun = true;
     } catch (e) {
       errors.push(`liderazgo_toxico ${dept.departmentId}: ${(e as Error).message}`);
     }
   }
 
-  // ─── 4. deterioro_sostenido — lógica legacy (Pulso cae 3 períodos) ──
-  // Spec v2 redefine sobre previousIsaScore + alertas históricas (Fase 3).
-  // En Fase 1 mantenemos la lógica actual: sigue siendo correcta para clientes
-  // con Pulso activo, y Fase 3 reemplaza completo.
-  if (dept.deterioroPulso) {
+  // ─── 4. deterioro_sostenido v2 — Fase 3 (memoria histórica) ────────
+  // Spec sec 4 reemplaza completamente la lógica legacy Pulso (que está
+  // fuera del producto en esta versión del spec). Condición:
+  //   isaActual < 65
+  //   AND previousIsaScore != null
+  //   AND isaActual <= previousIsaScore (no mejoró o empeoró)
+  //   AND (sum pesoEfectivo alertas resolved últimos 6m >= 0.9
+  //        OR Motor A tuvo casos en ciclo anterior)
+  //   AND ninguna alerta más severa activa hoy (liderazgo_toxico|riesgo_convergente)
+  const hayMasSevera = createdSeveraInThisRun || preExistingSevera;
+  if (
+    isa !== null &&
+    isa < 65 &&
+    ctx.previousIsaScore !== null &&
+    isa <= ctx.previousIsaScore &&
+    (ctx.historicalAlertsLast6mWeight >= 0.9 || ctx.motorACicloAnteriorTuvoCasos) &&
+    !hayMasSevera
+  ) {
     const cfg = COMPLIANCE_ALERT_TYPES.deterioro_sostenido;
     try {
       const outcome = await upsertAlertOnce({
@@ -367,11 +431,20 @@ async function createDepartmentAlerts(
         departmentId: dept.departmentId,
         alertType: 'deterioro_sostenido',
         title: formatTemplate(cfg.titleTemplate, { department: dept.departmentName }),
-        description: formatTemplate(cfg.descriptionTemplate, { periodsCount: 3 }),
-        triggerSources: ['pulso'],
-        triggerScore: dept.signals.pulso?.value ?? null,
+        description: formatTemplate(cfg.descriptionTemplate, { periodsCount: 2 }),
+        triggerSources: ['ambiente_sano'],
+        triggerScore: isa,
         signalsCount: 1,
-        context: { deterioroPulso: true },
+        context: {
+          isaActual: isa,
+          isaPrevio: ctx.previousIsaScore,
+          historicalAlertsLast6mWeight: ctx.historicalAlertsLast6mWeight,
+          motorACicloAnteriorTuvoCasos: ctx.motorACicloAnteriorTuvoCasos,
+          rama:
+            ctx.historicalAlertsLast6mWeight >= 0.9
+              ? 'historico_alertas'
+              : 'motor_a_previo',
+        },
       });
       if (outcome === 'created') {
         created++;
@@ -382,15 +455,15 @@ async function createDepartmentAlerts(
     }
   }
 
-  // ─── 5. senal_ignorada — Fase 1 limitada ──────────────────────────
-  // Spec sec 4: previousIsaScore != null AND isa actual <= previous AND
-  //             alertas resolved en ciclo anterior > 0.
-  // Decaimiento histórico de pesos = Fase 3.
+  // ─── 5. senal_ignorada v2 — Fase 3 (peso decaído) ──────────────────
+  // Spec sec 4: previousIsaScore != null AND isaActual <= previous AND
+  //             sum(pesoEfectivo alertas resolved cicloAnterior) > 0.
+  // Reemplaza count Fase 1 con peso decaído — alertas viejas pesan menos.
   if (
     ctx.previousIsaScore !== null &&
     ctx.isaScore !== null &&
     ctx.isaScore <= ctx.previousIsaScore &&
-    ctx.previousCycleAlertsClosed > 0
+    ctx.previousCycleAlertsClosedWeight > 0
   ) {
     const cfg = COMPLIANCE_ALERT_TYPES.senal_ignorada;
     try {
@@ -408,6 +481,7 @@ async function createDepartmentAlerts(
           isaActual: ctx.isaScore,
           isaPrevio: ctx.previousIsaScore,
           alertasCerradasCicloAnterior: ctx.previousCycleAlertsClosed,
+          pesoDecaidoCicloAnterior: ctx.previousCycleAlertsClosedWeight,
         },
       });
       if (outcome === 'created') {
@@ -479,6 +553,78 @@ async function createLiderazgoToxicoAlerts(
 }
 
 /**
+ * Lee del JSON persistido del ciclo anterior si Motor A tuvo casos activos.
+ * Defensive: campañas pre-Fase-1 no tienen `convergenciaInterna` en el sub-objeto
+ * → retorna false sin error.
+ */
+async function loadMotorACicloAnterior(
+  departmentId: string,
+  accountId: string,
+  currentCampaignId: string
+): Promise<boolean> {
+  const currentCampaign = await prisma.campaign.findUnique({
+    where: { id: currentCampaignId },
+    select: { endDate: true },
+  });
+  if (!currentCampaign) return false;
+
+  const previous = await prisma.complianceAnalysis.findFirst({
+    where: {
+      accountId,
+      departmentId,
+      scope: 'DEPARTMENT',
+      status: 'COMPLETED',
+      campaign: {
+        status: 'completed',
+        endDate: { lt: currentCampaign.endDate },
+        campaignType: { slug: 'pulso-ambientes-sanos' },
+      },
+    },
+    orderBy: { campaign: { endDate: 'desc' } },
+    select: { resultPayload: true },
+  });
+
+  if (!previous?.resultPayload) return false;
+  const payload = previous.resultPayload as {
+    convergencia?: { convergenciaInterna?: { casosActivos?: string[] } };
+  };
+  const casos = payload.convergencia?.convergenciaInterna?.casosActivos ?? [];
+  return casos.length > 0;
+}
+
+/**
+ * Calcula el peso decaído de las alertas Compliance (propias de Ambiente Sano)
+ * resolved/dismissed del ciclo ANTERIOR para un dept.
+ * Para senal_ignorada v2.
+ */
+async function loadPreviousCycleClosedWeight(
+  departmentId: string,
+  accountId: string,
+  previousCampaignId: string
+): Promise<number> {
+  const closedAlerts = await prisma.complianceAlert.findMany({
+    where: {
+      campaignId: previousCampaignId,
+      accountId,
+      departmentId,
+      status: { in: ['resolved', 'dismissed'] },
+    },
+    select: { alertType: true, status: true, resolvedAt: true },
+  });
+
+  // Las alertas Compliance no tienen entrada en PESO_BASE_ALERTA (esa tabla
+  // es para alertas externas Exit/Onboarding). Para señal ignorada usamos
+  // peso base = 1 por alerta cerrada × factor decaimiento.
+  // Spec: "alertas que fueron resolved o dismissed" sin peso explícito —
+  // tratamos cada una como peso 1 con decaimiento.
+  const now = new Date();
+  return closedAlerts.reduce(
+    (sum, a) => sum + 1 * getHistoricalWeight(a.status, a.resolvedAt, now),
+    0
+  );
+}
+
+/**
  * Carga el Map de DeptAlertContext desde BD para un ciclo dado.
  * Reusable por orchestrator (al cerrar ORG) y endpoint manual de re-run.
  *
@@ -518,20 +664,31 @@ export async function buildAlertContextsFromDb(
     select: { id: true },
   });
 
+  // Alertas Compliance (propias) resolved/dismissed del ciclo anterior —
+  // count para diagnóstico + peso decaído para senal_ignorada v2.
   const closedCountByDept = new Map<string, number>();
+  const closedWeightByDept = new Map<string, number>();
   if (previousCampaign) {
     const closedAlerts = await prisma.complianceAlert.findMany({
       where: {
         campaignId: previousCampaign.id,
         status: { in: ['resolved', 'dismissed'] },
       },
-      select: { departmentId: true },
+      select: { departmentId: true, status: true, resolvedAt: true },
     });
+    const now = new Date();
     for (const a of closedAlerts) {
       if (!a.departmentId) continue;
       closedCountByDept.set(
         a.departmentId,
         (closedCountByDept.get(a.departmentId) ?? 0) + 1
+      );
+      // Spec: alertas Compliance no están en PESO_BASE_ALERTA (esa tabla es
+      // para externas). Tratamos cada cerrada como peso base 1 × decay.
+      const w = 1 * getHistoricalWeight(a.status, a.resolvedAt, now);
+      closedWeightByDept.set(
+        a.departmentId,
+        (closedWeightByDept.get(a.departmentId) ?? 0) + w
       );
     }
   }
@@ -559,21 +716,26 @@ export async function buildAlertContextsFromDb(
     };
 
     // Motor B Fase 2 — cargar alertas externas + computar resumen.
+    // Fase 3: incluir histórico (resolved/dismissed con decaimiento).
     const externalAlerts = await loadDepartmentExternalAlerts(
       d.departmentId,
-      accountId
+      accountId,
+      { includeHistorical: true }
     );
     const gold = goldByDeptId.get(d.departmentId);
+    // Para Motor B (scoreTotal/tieneAlertaCritica/fallaCicloDeVida) solo
+    // cuentan las activas (factor 1.0). Filtramos antes de computar.
+    const activeAlerts = externalAlerts.filter((a) => a.factorDecaimiento === 1.0);
     const externa = computeConvergenciaExterna(
       gold?.accumulatedExoScore ?? null,
       gold?.accumulatedEISScore ?? null,
-      externalAlerts,
+      activeAlerts,
       d.isaScore
     );
-    // Pesos individuales para ramas D y E del liderazgo_toxico.
+    // Pesos individuales para ramas D y E del liderazgo_toxico (solo activas).
     let liderazgoConcentracionPeso = 0;
     let toxicExitDetectedPeso = 0;
-    for (const a of externalAlerts) {
+    for (const a of activeAlerts) {
       if (a.alertType === 'liderazgo_concentracion') {
         liderazgoConcentracionPeso = Math.max(
           liderazgoConcentracionPeso,
@@ -584,6 +746,18 @@ export async function buildAlertContextsFromDb(
         toxicExitDetectedPeso = Math.max(toxicExitDetectedPeso, a.pesoEfectivo);
       }
     }
+
+    // Fase 3 — peso decaído de alertas externas resolved/dismissed últimos 6m.
+    const historicalAlertsLast6mWeight = externalAlerts
+      .filter((a) => a.factorDecaimiento < 1.0)
+      .reduce((sum, a) => sum + a.pesoEfectivo, 0);
+
+    // Fase 3 — Motor A en ciclo anterior (lectura del JSON persistido).
+    const motorACicloAnteriorTuvoCasos = await loadMotorACicloAnterior(
+      d.departmentId,
+      accountId,
+      campaignId
+    );
 
     map.set(d.departmentId, {
       isaScore: d.isaScore,
@@ -604,6 +778,10 @@ export async function buildAlertContextsFromDb(
       fallaCicloDeVida: externa.fallaCicloDeVida,
       liderazgoConcentracionPeso,
       toxicExitDetectedPeso,
+      previousCycleAlertsClosedWeight: closedWeightByDept.get(d.departmentId) ?? 0,
+      historicalAlertsLast6mWeight,
+      motorACicloAnteriorTuvoCasos,
+      hayAlertaMasSeveraActivaHoy: false, // se evalúa runtime en createDepartmentAlerts
     });
   }
   return map;

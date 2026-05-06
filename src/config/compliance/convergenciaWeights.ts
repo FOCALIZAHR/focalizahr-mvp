@@ -133,3 +133,75 @@ const EXIT_ALIAS_TO_CANONICAL: Record<string, string> = {
 export function normalizeExitAlertType(alertType: string): string {
   return EXIT_ALIAS_TO_CANONICAL[alertType] ?? alertType;
 }
+
+// ════════════════════════════════════════════════════════════════════
+// FASE 3 — Decaimiento histórico (spec sec 3.3)
+// ════════════════════════════════════════════════════════════════════
+
+/**
+ * Factor de decaimiento por antigüedad de `resolvedAt`. Las alertas
+ * pending/acknowledged tienen factor 1.0 (Fase 2). Las resolved/dismissed
+ * decaen por meses transcurridos.
+ */
+export const HISTORICAL_DECAY_FACTORS = {
+  ACTIVE: 1.0,      // pending | acknowledged
+  RECENT: 0.6,      // < 3 meses desde resolvedAt — "miguita reciente"
+  HISTORIC: 0.3,    // 3-6 meses — "miguita histórica"
+  BACKGROUND: 0.1,  // > 6 meses — "contexto de fondo"
+} as const;
+
+export const HISTORICAL_DECAY_MONTHS_RECENT = 3;
+export const HISTORICAL_DECAY_MONTHS_HISTORIC = 6;
+
+/**
+ * Cutoff para cargar alertas históricas en queries.
+ * Spec: alertas resolved en últimos 6 meses cuentan para `deterioro_sostenido`.
+ * Para mayor antigüedad el factor cae a 0.1 ("contexto de fondo") — no
+ * vale la pena el costo de query.
+ */
+export const HISTORICAL_LOOKBACK_MONTHS = 6;
+
+/**
+ * Diferencia en meses calendario entre 2 fechas. Ajuste por día del mes
+ * (si el día destino es menor que el día origen, resta 1).
+ *
+ * Ejemplos:
+ *   monthsBetween(2026-01-15, 2026-03-15) = 2
+ *   monthsBetween(2026-01-15, 2026-03-10) = 1  (no llegó a completar 2 meses)
+ *   monthsBetween(2026-01-15, 2026-04-20) = 3
+ */
+export function monthsBetween(from: Date, to: Date): number {
+  const yearDiff = to.getFullYear() - from.getFullYear();
+  const monthDiff = to.getMonth() - from.getMonth();
+  const dayAdjust = to.getDate() < from.getDate() ? -1 : 0;
+  return yearDiff * 12 + monthDiff + dayAdjust;
+}
+
+/**
+ * Calcula factorDecaimiento según status + antigüedad.
+ * Spec sec 3.3:
+ *   pending|acknowledged → 1.0
+ *   resolved/dismissed < 3m → 0.6
+ *   resolved/dismissed 3-6m → 0.3
+ *   resolved/dismissed > 6m → 0.1
+ *
+ * Si status no es activo y `resolvedAt` es null (edge case), usa BACKGROUND.
+ */
+export function getHistoricalWeight(
+  status: string,
+  resolvedAt: Date | null,
+  now: Date = new Date()
+): number {
+  if (status === 'pending' || status === 'acknowledged') {
+    return HISTORICAL_DECAY_FACTORS.ACTIVE;
+  }
+  if (!resolvedAt) return HISTORICAL_DECAY_FACTORS.BACKGROUND;
+  const months = monthsBetween(resolvedAt, now);
+  if (months < HISTORICAL_DECAY_MONTHS_RECENT) {
+    return HISTORICAL_DECAY_FACTORS.RECENT;
+  }
+  if (months <= HISTORICAL_DECAY_MONTHS_HISTORIC) {
+    return HISTORICAL_DECAY_FACTORS.HISTORIC;
+  }
+  return HISTORICAL_DECAY_FACTORS.BACKGROUND;
+}
