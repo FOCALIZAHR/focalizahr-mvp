@@ -141,7 +141,7 @@ export interface CierreNarrative {
 // ═══════════════════════════════════════════════════════════════════
 
 const DIMENSION_LABELS: Record<string, string> = {
-  P2_seguridad: 'Clima de confianza para reportar',
+  P2_seguridad: 'Seguridad para reportar',
   P3_disenso: 'Espacio para el desacuerdo',
   P4_microagresiones: 'Respeto en las interacciones diarias',
   P5_equidad: 'Equidad en la asignación de recursos',
@@ -464,13 +464,13 @@ function buildConvergencia(
       let contradiccion: string | undefined;
       if (safety && !safety.isRisk && exit?.isRisk) {
         contradiccion =
-          'El clima actual se ve sano, pero las salidas recientes cuentan una historia distinta.';
+          'Ambiente Sano registra condiciones sanas en el período actual, pero quienes se fueron en ese mismo período cuentan una historia distinta.';
       } else if (safety?.isRisk && exo && !exo.isRisk) {
         contradiccion =
           'Los ingresos nuevos no perciben el problema que el equipo actual sí reporta. O el deterioro es reciente, o el ingreso aún no lo ha tocado.';
       } else if (pulso?.isRisk && safety && !safety.isRisk) {
         contradiccion =
-          'El clima medido en pulsos recientes cae de forma sostenida, aunque el diagnóstico actual lo matiza.';
+          'Los ciclos recientes de medición muestran una caída sostenida, aunque el diagnóstico actual la matiza.';
       }
 
       // Cuerpo según nivel
