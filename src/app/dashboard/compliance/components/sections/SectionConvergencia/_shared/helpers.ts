@@ -38,6 +38,10 @@ export interface MergedDept {
   previousIsaScore: number | null;
   dimensionScores: DepartmentSafetyScore['dimensionScores'];
   teatroCumplimiento: boolean;
+  /** Legacy v1: alerta previa Exit/Onboarding sin acción registrada. */
+  senalIgnorada: boolean;
+  /** Legacy v1: clima Pulso descendente 3+ ciclos consecutivos. */
+  deterioroPulso: boolean;
   complianceAlerts: ComplianceReportAlert[];
   a4Partner?: A4PartnerInfo;
 }
@@ -192,6 +196,8 @@ export function mergeDepartmentData(
     previousIsaScore,
     dimensionScores: reportDept?.dimensionScores ?? EMPTY_DIMENSIONS,
     teatroCumplimiento: reportDept?.teatroCumplimiento ?? false,
+    senalIgnorada: convergencia.senalIgnorada ?? false,
+    deterioroPulso: convergencia.deterioroPulso ?? false,
     complianceAlerts: alerts,
     a4Partner,
   };

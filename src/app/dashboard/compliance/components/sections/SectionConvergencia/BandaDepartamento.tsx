@@ -13,6 +13,7 @@ import SelloForense from './SelloForense';
 import AmplificadorChip from './AmplificadorChip';
 import AlertaComplianceChip from './AlertaComplianceChip';
 import { AMPLIFICADOR_LABELS, resolveAlertLabel } from './_shared/ALERT_LABELS';
+import { getCombinatoriaNarrative } from './_shared/CombinatoriaDictionary';
 import type { MergedDept } from './_shared/helpers';
 
 interface Props {
@@ -50,6 +51,7 @@ export default function BandaDepartamento({
   const isA5 = interna.casosActivos.includes('A5');
 
   const borderClass = getBorderClass(interna.nivelConvergencia);
+  const combinatoriaNarrative = getCombinatoriaNarrative(dept);
 
   return (
     <div
@@ -149,6 +151,13 @@ export default function BandaDepartamento({
                 />
                 <span>El problema atraviesa todo el ciclo del empleado</span>
               </div>
+            ) : null}
+
+            {/* Frase de combinatoria — síntesis del cruce de fuentes */}
+            {combinatoriaNarrative !== null ? (
+              <p className="text-sm font-light text-slate-300 leading-[1.6] mt-2">
+                {combinatoriaNarrative}
+              </p>
             ) : null}
 
             {/* Alertas Compliance activas */}
