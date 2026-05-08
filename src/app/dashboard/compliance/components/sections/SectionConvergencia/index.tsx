@@ -20,7 +20,6 @@ import BandaDepartamento from './BandaDepartamento';
 import ConvergenciaEmptyState from './ConvergenciaEmptyState';
 import {
   mergeDepartmentData,
-  classifyHeaderState,
   byUrgencia,
   getEmptyStateVariant,
   type MergedDept,
@@ -66,11 +65,6 @@ export default function SectionConvergencia({ hook }: Props) {
     return <ConvergenciaEmptyState variant={getEmptyStateVariant(report)} />;
   }
 
-  const headerState = classifyHeaderState(deptosConConvergencia);
-  const hayCriticaSistema = deptosConConvergencia.some(
-    (d) => d.nivelFinal === 'critica_sistema'
-  );
-
   const handleToggle = (deptId: string) => {
     setExpandedDeptId(expandedDeptId === deptId ? null : deptId);
   };
@@ -78,9 +72,11 @@ export default function SectionConvergencia({ hook }: Props) {
   return (
     <div className="flex flex-col gap-6">
       <ConvergenciaOrgHeader
-        state={headerState}
         deptos={deptosConConvergencia}
-        hayCriticaSistema={hayCriticaSistema}
+        totalDeptosAnalizados={report.data.departments.length}
+        esProblemaCultural={report.data.metaAnalysis?.es_problema_cultural ?? false}
+        criticalByManagerCount={report.data.convergencia.criticalByManager.length}
+        patronCulturalDominante={report.data.metaAnalysis?.patron_cultural_dominante ?? 'ninguno'}
         sintesisEjecutiva={report.narratives.sintesisEjecutiva}
       />
       <div className="flex flex-col gap-3">

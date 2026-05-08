@@ -198,41 +198,6 @@ export function mergeDepartmentData(
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// Header state machine — 5 estados
-// ════════════════════════════════════════════════════════════════════════════
-
-export type HeaderState =
-  | 'critical_by_manager'   // Estado 1 — precedencia
-  | 'falla_ciclo_vida'      // Estado 2
-  | 'teatro_detectado'      // Estado 3
-  | 'convergencia_multiple' // Estado 4
-  | 'sin_convergencia';     // Estado 5
-
-/**
- * Clasifica el estado del header según los flags agregados de los deptos.
- * Orden de evaluación (decisión 6): criticalByManager > fallaCicloDeVida >
- * teatro > múltiple > sin convergencia.
- */
-export function classifyHeaderState(deptos: MergedDept[]): HeaderState {
-  if (deptos.some((d) => d.convergenciaInterna.enCriticalByManagerGroup)) {
-    return 'critical_by_manager';
-  }
-  if (deptos.some((d) => d.convergenciaExterna.fallaCicloDeVida)) {
-    return 'falla_ciclo_vida';
-  }
-  if (deptos.some((d) => d.convergenciaInterna.teatroDetectado)) {
-    return 'teatro_detectado';
-  }
-  const conConvergenciaCount = deptos.filter(
-    (d) => d.convergenciaInterna.nivelConvergencia !== 'ninguna'
-  ).length;
-  if (conConvergenciaCount >= 2) {
-    return 'convergencia_multiple';
-  }
-  return 'sin_convergencia';
-}
-
-// ════════════════════════════════════════════════════════════════════════════
 // byUrgencia — sort de bandas por urgencia descendente
 // ════════════════════════════════════════════════════════════════════════════
 

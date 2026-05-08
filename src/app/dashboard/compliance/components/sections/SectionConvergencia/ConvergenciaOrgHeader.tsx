@@ -1,89 +1,224 @@
 'use client';
 
-// Componente Nivel 1 — header editorial 60/40 con state machine de 5 estados.
-// Plan sec "Componente 1 — ConvergenciaOrgHeader".
+// Header C3 — paradigma "certezas ejecutivas".
 //
-// Tesla line dinámica:
-//   - sin_convergencia      → cyan default
-//   - convergencia_multiple → cyan default
-//   - teatro_detectado      → amber warning
-//   - falla_ciclo_vida      → amber warning
-//   - critical_by_manager   → cyan default (con UI especial agrupando deptos)
-//   - nivelFinal critica_sistema → rojo con animate-pulse (ÚNICO uso sancionado de rojo)
+// Layout:
+//   1. Tesla line — color según worst nivelFinal cross-deptos.
+//   2. Síntesis ejecutiva — veredicto + lego del LLM (con fallback genérico).
+//   3. Panel de Triage — 3 chips estratégicos:
+//        ¿Localizado o cultural? · ¿Hay nombre? · ¿Hay patrón?
+//
+// Cero state machine, cero hero number, cero word-split. La narrativa
+// editorial vivía en STATE_MACHINE_COPY — la reemplazamos por la síntesis
+// LLM (`sintesisEjecutiva`) más los 3 chips de diagnóstico.
 
-import { GitBranch, Infinity as InfinityIcon, Activity, EyeOff, Eye, type LucideIcon } from 'lucide-react';
-
-import { STATE_MACHINE_COPY } from './_shared/STATE_MACHINE_COPY';
-import { CRITICAL_BY_MANAGER_COPY } from './_shared/CRITICAL_BY_MANAGER_COPY';
-import type { HeaderState, MergedDept } from './_shared/helpers';
+import type { MergedDept } from './_shared/helpers';
+import type { NivelFinal } from '@/lib/services/compliance/ConvergenciaEngine';
 import type { SintesisEjecutivaOutput } from '@/lib/services/compliance/SintesisConvergenciaLLMService';
+import type { PatronNombre } from '@/lib/services/compliance/complianceTypes';
+import { PATRON_LABELS } from '@/lib/services/compliance/ComplianceNarrativeEngine';
 
 interface Props {
-  state: HeaderState;
+  /** Deptos con convergencia (filter ya aplicado por el padre). */
   deptos: MergedDept[];
-  /** True si algún dept tiene nivelFinal === 'critica_sistema'. Tesla rojo + pulse. */
-  hayCriticaSistema: boolean;
-  /**
-   * Síntesis ejecutiva LLM por campaña — reemplaza veredicto y lego_narrativo
-   * del STATE_MACHINE_COPY hardcoded cuando existe. Generada por
-   * SintesisConvergenciaLLMService al cerrar el ciclo. Optional: fallback
-   * a STATE_MACHINE_COPY para campañas legacy o casos donde el LLM falló.
-   */
+  /** Total deptos analizados — denominador del CHIP 1. */
+  totalDeptosAnalizados: number;
+  /** Flag org-level del meta-LLM. */
+  esProblemaCultural: boolean;
+  /** Count de grupos. AREA_MANAGER siempre recibe 0 por privacy. */
+  criticalByManagerCount: number;
+  /** Slug del patrón cultural — `'ninguno' | PatronNombre`. */
+  patronCulturalDominante: string;
+  /** LLM síntesis — undefined cae a fallback genérico (decisión 2b). */
   sintesisEjecutiva?: SintesisEjecutivaOutput;
 }
 
-const STATE_ICON: Record<HeaderState, LucideIcon> = {
-  critical_by_manager: GitBranch,
-  falla_ciclo_vida: InfinityIcon,
-  teatro_detectado: EyeOff,
-  convergencia_multiple: Activity,
-  sin_convergencia: Eye,
+// ════════════════════════════════════════════════════════════════════════════
+// Tesla line — mapeo nivelFinal → color
+// ════════════════════════════════════════════════════════════════════════════
+
+const NIVEL_FINAL_RANK: Record<NivelFinal, number> = {
+  ninguna: 0,
+  interna_solo: 1,
+  externa_solo: 2,
+  confirmada: 3,
+  amplificada: 4,
+  critica_sistema: 5,
 };
 
-export default function ConvergenciaOrgHeader({
-  state,
-  deptos,
-  hayCriticaSistema,
-  sintesisEjecutiva,
-}: Props) {
-  const copy = STATE_MACHINE_COPY[state];
-  const Icon = STATE_ICON[state];
+interface TeslaConfig {
+  gradient: string;
+  glow: string;
+  pulse: boolean;
+}
 
-  // titularLine1/titularLine2/contexto/cierre permanecen deterministas (STATE_MACHINE_COPY).
-  // Solo veredicto y lego se sustituyen con la síntesis LLM si existe.
-  const veredictoText = sintesisEjecutiva?.veredicto ?? copy.veredicto;
-  const legoText = sintesisEjecutiva?.lego_narrativo ?? copy.lego;
+function computeWorstNivelFinal(deptos: MergedDept[]): NivelFinal {
+  let worst: NivelFinal = 'ninguna';
+  for (const d of deptos) {
+    if (NIVEL_FINAL_RANK[d.nivelFinal] > NIVEL_FINAL_RANK[worst]) {
+      worst = d.nivelFinal;
+    }
+  }
+  return worst;
+}
 
-  // Tesla line dinámica
-  const teslaConfig = (() => {
-    if (hayCriticaSistema) {
-      return {
-        gradient:
-          'linear-gradient(90deg, transparent, #EF4444 40%, #EF4444 60%, transparent)',
-        glow: '0 0 12px rgba(239,68,68,0.55)',
-        pulse: true,
-      };
-    }
-    if (state === 'teatro_detectado' || state === 'falla_ciclo_vida') {
-      return {
-        gradient:
-          'linear-gradient(90deg, transparent, #F59E0B 40%, #FCD34D 60%, transparent)',
-        glow: '0 0 10px rgba(245,158,11,0.35)',
-        pulse: false,
-      };
-    }
+function teslaForNivelFinal(nivel: NivelFinal): TeslaConfig {
+  if (nivel === 'critica_sistema') {
     return {
       gradient:
-        'linear-gradient(90deg, transparent, #22D3EE 40%, #A78BFA 60%, transparent)',
-      glow: '0 0 10px rgba(34,211,238,0.35)',
+        'linear-gradient(90deg, transparent, #EF4444 40%, #EF4444 60%, transparent)',
+      glow: '0 0 12px rgba(239,68,68,0.55)',
+      pulse: true,
+    };
+  }
+  if (nivel === 'amplificada') {
+    return {
+      gradient:
+        'linear-gradient(90deg, transparent, #F59E0B 40%, #FCD34D 60%, transparent)',
+      glow: '0 0 10px rgba(245,158,11,0.35)',
       pulse: false,
     };
-  })();
+  }
+  return {
+    gradient:
+      'linear-gradient(90deg, transparent, #22D3EE 40%, #A78BFA 60%, transparent)',
+    glow: '0 0 10px rgba(34,211,238,0.35)',
+    pulse: false,
+  };
+}
 
-  // Hero number — count de deptos con convergencia (≠ ninguna)
-  const deptosConvergentes = deptos.filter(
-    (d) => d.convergenciaInterna.nivelConvergencia !== 'ninguna'
+// ════════════════════════════════════════════════════════════════════════════
+// Fallback genérico (decisión 2b) — sin reintroducir state machine.
+// ════════════════════════════════════════════════════════════════════════════
+
+const FALLBACK_VEREDICTO =
+  'El cierre de este ciclo no incluyó síntesis ejecutiva.';
+const FALLBACK_LEGO =
+  'Las señales agregadas se resumen en el panel inferior.';
+
+// ════════════════════════════════════════════════════════════════════════════
+// Resolución de chips
+// ════════════════════════════════════════════════════════════════════════════
+
+type ChipHeroColor = 'amber' | 'purple' | 'neutral';
+
+interface ChipData {
+  eyebrow: string;
+  hero: string;
+  heroColor: ChipHeroColor;
+  caption: string;
+}
+
+function resolveChip1(
+  esCultural: boolean,
+  convergentes: number,
+  total: number,
+): ChipData {
+  return esCultural
+    ? {
+        eyebrow: '¿Localizado o cultural?',
+        hero: 'Riesgo sistémico',
+        heroColor: 'amber',
+        caption: `Afecta ${convergentes} de ${total} áreas`,
+      }
+    : {
+        eyebrow: '¿Localizado o cultural?',
+        hero: 'Foco localizado',
+        heroColor: 'neutral',
+        caption: `Afecta ${convergentes} de ${total} áreas`,
+      };
+}
+
+function resolveChip2(count: number): ChipData {
+  return count > 0
+    ? {
+        eyebrow: '¿Hay nombre?',
+        hero: 'Patrón de liderazgo',
+        heroColor: 'purple',
+        caption: 'Mismo mando, realidades distintas',
+      }
+    : {
+        eyebrow: '¿Hay nombre?',
+        hero: 'Sin patrón jerárquico',
+        heroColor: 'neutral',
+        caption: 'Fricción distribuida',
+      };
+}
+
+function resolveChip3(slug: string): ChipData {
+  // Sentinel 'ninguno' o slug no reconocido → "Múltiples focos" (decisión 4).
+  if (slug === 'ninguno' || !(slug in PATRON_LABELS)) {
+    return {
+      eyebrow: '¿Hay patrón?',
+      hero: 'Múltiples focos',
+      heroColor: 'neutral',
+      caption: 'Sin patrón único',
+    };
+  }
+  return {
+    eyebrow: '¿Hay patrón?',
+    hero: PATRON_LABELS[slug as PatronNombre],
+    heroColor: 'purple',
+    caption: 'Patrón dominante',
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Subcomponente — chip de triage
+// ════════════════════════════════════════════════════════════════════════════
+
+function ChipTriage({ data }: { data: ChipData }) {
+  const heroClass =
+    data.heroColor === 'amber'
+      ? 'text-amber-400'
+      : data.heroColor === 'purple'
+        ? 'text-purple-400'
+        : 'text-slate-200';
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/50 px-5 py-4 flex flex-col gap-1.5">
+      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+        {data.eyebrow}
+      </span>
+      <p className={`text-base font-light leading-tight ${heroClass}`}>
+        {data.hero}
+      </p>
+      <p className="text-xs font-light text-slate-500 leading-snug">
+        {data.caption}
+      </p>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Componente principal
+// ════════════════════════════════════════════════════════════════════════════
+
+export default function ConvergenciaOrgHeader({
+  deptos,
+  totalDeptosAnalizados,
+  esProblemaCultural,
+  criticalByManagerCount,
+  patronCulturalDominante,
+  sintesisEjecutiva,
+}: Props) {
+  const worstNivel = computeWorstNivelFinal(deptos);
+  const tesla = teslaForNivelFinal(worstNivel);
+
+  const deptosConvergentesCount = deptos.filter(
+    (d) => d.nivelFinal !== 'ninguna',
   ).length;
+
+  const veredictoText = sintesisEjecutiva?.veredicto ?? FALLBACK_VEREDICTO;
+  const legoText = sintesisEjecutiva?.lego_narrativo ?? FALLBACK_LEGO;
+
+  const chip1 = resolveChip1(
+    esProblemaCultural,
+    deptosConvergentesCount,
+    totalDeptosAnalizados,
+  );
+  const chip2 = resolveChip2(criticalByManagerCount);
+  const chip3 = resolveChip3(patronCulturalDominante);
 
   return (
     <div
@@ -93,53 +228,21 @@ export default function ConvergenciaOrgHeader({
         border: '0.5px solid #1e293b',
       }}
     >
-      {/* Tesla line — color según estado */}
+      {/* 1. Tesla line */}
       <div
         className={`absolute top-0 left-0 right-0 h-px pointer-events-none ${
-          teslaConfig.pulse ? 'animate-pulse' : ''
+          tesla.pulse ? 'animate-pulse' : ''
         }`}
         style={{
-          background: teslaConfig.gradient,
-          boxShadow: teslaConfig.glow,
+          background: tesla.gradient,
+          boxShadow: tesla.glow,
         }}
         aria-hidden="true"
       />
 
-      {/* MAIN 60/40 */}
-      <div className="grid grid-cols-1 md:grid-cols-[60fr_40fr]">
-        {/* LEFT 60% — narrativa editorial */}
-        <div
-          className="flex flex-col gap-5 px-7 py-8 md:pl-7 md:pr-8"
-          style={{ borderRight: '0.5px solid #1e293b' }}
-        >
-          {/* Contexto tag */}
-          <div className="flex items-center gap-2">
-            <Icon
-              className="w-4 h-4 text-slate-500"
-              strokeWidth={1.5}
-              aria-hidden="true"
-            />
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
-              {copy.contexto}
-            </span>
-          </div>
-
-          {/* Titular editorial 44px word-split */}
-          <div className="leading-[1.1]">
-            <span
-              className="block text-[44px] font-extralight"
-              style={{ color: '#f1f5f9' }}
-            >
-              {copy.titularLine1}
-            </span>
-            <span
-              className="block text-[44px] font-extralight fhr-title-gradient"
-            >
-              {copy.titularLine2}
-            </span>
-          </div>
-
-          {/* Veredicto cursiva con border-l — usa síntesis LLM si existe */}
+      <div className="px-7 py-8 flex flex-col gap-7">
+        {/* 2. Síntesis ejecutiva */}
+        <div className="flex flex-col gap-5">
           <p
             className="text-[13px] italic font-light leading-[1.6] pl-3"
             style={{
@@ -149,61 +252,22 @@ export default function ConvergenciaOrgHeader({
           >
             {veredictoText}
           </p>
-
-          {/* Lego narrativo — usa síntesis LLM si existe */}
           <p
             className="text-sm font-light leading-[1.8]"
             style={{ color: '#cbd5e1' }}
           >
             {legoText}
           </p>
-
-          {/* Cierre de urgencia — solo si existe */}
-          {copy.cierre ? (
-            <p
-              className="text-sm font-light leading-[1.7] pt-2"
-              style={{
-                color: '#94a3b8',
-                borderTop: '0.5px solid #1e293b',
-              }}
-            >
-              {copy.cierre}
-            </p>
-          ) : null}
         </div>
 
-        {/* RIGHT 40% — UI contextual según estado */}
-        <div className="flex flex-col gap-3 px-7 py-8 justify-center">
-          {state === 'sin_convergencia' ? null : (
-            <>
-              <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-500">
-                {state === 'critical_by_manager'
-                  ? 'Departamentos del grupo'
-                  : 'Departamentos convergentes'}
-              </span>
-              <div className="flex items-baseline gap-3">
-                <span
-                  className="text-[64px] font-extralight tabular-nums leading-none"
-                  style={{ color: '#A78BFA' }}
-                >
-                  {deptosConvergentes}
-                </span>
-                <span className="text-xs font-light text-slate-500">
-                  {deptosConvergentes === 1 ? 'departamento' : 'departamentos'}
-                </span>
-              </div>
-
-              {/* Privacy note solo en estado criticalByManager */}
-              {state === 'critical_by_manager' ? (
-                <p
-                  className="text-[11px] font-light leading-[1.6] mt-2"
-                  style={{ color: '#475569' }}
-                >
-                  {CRITICAL_BY_MANAGER_COPY.privacyNote}
-                </p>
-              ) : null}
-            </>
-          )}
+        {/* 3. Panel de triage */}
+        <div
+          className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-6"
+          style={{ borderTop: '0.5px solid #1e293b' }}
+        >
+          <ChipTriage data={chip1} />
+          <ChipTriage data={chip2} />
+          <ChipTriage data={chip3} />
         </div>
       </div>
     </div>
