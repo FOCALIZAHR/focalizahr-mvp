@@ -29,6 +29,15 @@ interface Props {
    * artefacto4_alertas degradan a chip sin consecuencia.
    */
   narrativaByAlertType?: Map<string, string>;
+  /**
+   * Narrativa estructural per-banda — Motor 1 (`buildConvergencia`).
+   * Lookup desde `report.narratives.artefacto3_convergencia` por
+   * `departmentId`. Se renderiza en colapsado arriba de la combinatoria
+   * conductual (Motor 6). Optional: si Motor 1 no produjo nada para este
+   * dept (filtrado por nivelFinal='ninguna' o legacy sin payload), la
+   * fila no renderiza.
+   */
+  narrativaEstructural?: string;
 }
 
 // Borde lateral según nivel — peso, no color (spec).
@@ -44,6 +53,7 @@ export default function BandaDepartamento({
   isExpanded,
   onToggle,
   narrativaByAlertType,
+  narrativaEstructural,
 }: Props) {
   const interna = dept.convergenciaInterna;
   const externa = dept.convergenciaExterna;
@@ -153,7 +163,16 @@ export default function BandaDepartamento({
               </div>
             ) : null}
 
-            {/* Frase de combinatoria — síntesis del cruce de fuentes */}
+            {/* Narrativa estructural — Motor 1 (buildConvergencia).
+                Fundamento del diagnóstico: qué fuentes coinciden + caso. */}
+            {narrativaEstructural ? (
+              <p className="text-sm font-light text-slate-300 leading-[1.6] mt-2">
+                {narrativaEstructural}
+              </p>
+            ) : null}
+
+            {/* Frase de combinatoria — Motor 6 (getCombinatoriaNarrative).
+                Interpretación conductual del patrón. */}
             {combinatoriaNarrative !== null ? (
               <p className="text-sm font-light text-slate-300 leading-[1.6] mt-2">
                 {combinatoriaNarrative}

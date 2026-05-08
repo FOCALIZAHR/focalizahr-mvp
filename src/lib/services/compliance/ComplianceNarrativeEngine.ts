@@ -486,21 +486,31 @@ function buildContradiccion(
 // ─── Body v2 — narrativa por nivelFinal ──────────────────────────────────
 // 5 ramas (la 6ª, 'ninguna', queda filtrada antes de entrar acá).
 // Cada texto es literal — auditado contra las 6 Reglas de Oro.
+//
+// Modelo narrativo: voces (los que están / los que se fueron / los que
+// entraron) en lugar de productos (AS / Exit / Onboarding). Más humano,
+// menos jerga comercial. El placeholder [DEPT] se sustituye runtime con
+// el nombre del depto — funciona en cualquier posición de la oración.
+//
+// Estilo: NO abrir con "Ambiente Sano [verbo]…" para no duplicar el
+// patrón de Motor 6 (CombinatoriaDictionary), que se renderiza debajo
+// en la misma banda colapsada.
 function buildBodyV2(d: DepartmentConvergencia): string {
+  const dept = d.departmentName;
   switch (d.nivelFinal) {
     case 'critica_sistema':
-      return `${d.departmentName} Ambiente Sano, Exit Intelligence y el análisis con IA señalan el mismo departamento. El patrón se repite bajo la misma línea de mando. Postergar la conversación ya tiene un costo.`;
+      return `En ${dept}, los que están, los que se fueron y los que entraron dicen lo mismo. Y el patrón aparece en otros departamentos del mismo líder. Postergar la conversación ya tiene un costo.`;
     case 'amplificada':
-      return `${d.departmentName} Ambiente Sano detectó señales. Exit Intelligence y Onboarding Journey las amplifican con datos de quienes entraron y salieron. El análisis con IA cruza las tres fuentes y el patrón se sostiene.`;
+      return `Tres voces independientes leen lo mismo en ${dept} — los que están, los que se fueron y los que acaban de entrar. Ninguna sabe lo que dijo la otra. Cuando llegan al mismo punto, el patrón deja de ser debatible.`;
     case 'confirmada':
-      return `${d.departmentName} Ambiente Sano detectó señales en este departamento. Exit Intelligence lo confirma desde afuera — los que se fueron dijeron lo mismo. Dos fuentes que no comparten datos llegaron al mismo lugar. Eso no es repetición — es confirmación.`;
+      return `Lo que dicen los que están en ${dept} y lo que dijeron los que se fueron coincide. Dos voces que no comparten datos llegaron al mismo lugar. Eso no es repetición — es confirmación.`;
     case 'externa_solo':
-      return `${d.departmentName} Ambiente Sano no registró señal en este departamento. Exit Intelligence u Onboarding Journey sí lo hicieron. La encuesta no lo capturó — pero otra fuente no lo pasó por alto.`;
+      return `${dept} no registró señal en la encuesta. Los que se fueron o los que entraron la documentaron desde afuera. La voz interna no habló — las otras, sí.`;
     case 'interna_solo':
-      return `${d.departmentName} Las mediciones de Ambiente Sano y el análisis con IA de las respuestas abiertas del mismo estudio señalan el mismo lugar — de manera independiente. Sin datos de Exit ni Onboarding que lo confirmen todavía — pero dos lecturas del mismo estudio diciendo lo mismo alcanza para nombrar lo que encontró.`;
+      return `${dept} se confirma a sí mismo. Los números de la encuesta y lo que las personas escribieron señalan lo mismo — sin coordinarse, sin conocerse como fuente. Una sola voz, pero con dos canales diciendo lo mismo, ya alcanza para nombrarlo.`;
     default:
       // 'ninguna' fue filtrado antes de entrar acá; defensa runtime.
-      return `${d.departmentName} sin convergencia detectable este ciclo.`;
+      return `${dept} sin convergencia detectable este ciclo.`;
   }
 }
 
@@ -520,14 +530,19 @@ function buildBodyV1(d: DepartmentConvergencia): string {
 
 // ─── Sufijo casos forenses — appended cuando hay casosActivos ──────────────
 // Solo aplica en modo v2. Reusa CASO_LABELS de casoLabels.ts (single source).
+//
+// 1 caso → "Caso registrado: X."
+// 2+ casos → trunca al primero (orden natural del engine A1 < A2 < ... < A5)
+//            y suma "+N más". Evita oraciones largas en banda colapsada;
+//            el detalle real vive en el acordeón expandido per-caso.
 function describeCasos(casos: CasoMotorA[]): string {
   if (casos.length === 0) return '';
   if (casos.length === 1) {
     return `Caso registrado: ${CASO_LABELS[casos[0]]}.`;
   }
-  const labels = casos.map((c) => CASO_LABELS[c]);
-  const last = labels.pop()!;
-  return `Casos registrados: ${labels.join(', ')} y ${last}.`;
+  const principal = CASO_LABELS[casos[0]];
+  const restantes = casos.length - 1;
+  return `Caso principal: ${principal}. (+${restantes} más)`;
 }
 
 function buildConvergencia(

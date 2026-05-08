@@ -58,6 +58,17 @@ export default function SectionConvergencia({ hook }: Props) {
     );
   }, [report]);
 
+  // Lookup departmentId → narrativa estructural desde
+  // `narratives.artefacto3_convergencia` (Motor 1 — buildConvergencia).
+  // Renderizada en banda colapsada arriba de la combinatoria conductual
+  // (Motor 6). Las dos narrativas conviven en paralelo.
+  const narrativaEstructuralByDeptId = useMemo(() => {
+    if (!report) return new Map<string, string>();
+    return new Map(
+      report.narratives.artefacto3_convergencia.map((n) => [n.departmentId, n.narrativa])
+    );
+  }, [report]);
+
   if (!report) return null;
 
   // Empty state — 3 variantes según contexto del ciclo
@@ -89,6 +100,7 @@ export default function SectionConvergencia({ hook }: Props) {
             isExpanded={expandedDeptId === dept.departmentId}
             onToggle={() => handleToggle(dept.departmentId)}
             narrativaByAlertType={narrativaByAlertType}
+            narrativaEstructural={narrativaEstructuralByDeptId.get(dept.departmentId)}
           />
         ))}
       </div>
