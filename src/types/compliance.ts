@@ -243,6 +243,13 @@ export interface ComplianceReportResponse {
      *  mismo denominador que `orgSafetyScore`. Respeta privacy threshold n≥5.
      *  `null` si el OrgPayload fue persistido antes del deploy de este campo. */
     totalRespondents: number | null;
+    /** P2 — Universo total de departamentos: todos los deptos del account
+     *  con al menos una persona activa (independiente del threshold de
+     *  privacidad). Es el denominador correcto del CHIP 1 ("Afecta X de Y
+     *  áreas"). Para AREA_MANAGER se filtra por la jerarquía visible.
+     *  Optional para defender payloads pre-deploy del campo (cae a
+     *  `departments.length` en el frontend). */
+    totalDeptosUniverso?: number;
     departments: ComplianceReportDepartment[];
     skippedByPrivacy: SafetyScoreSkip[];
     metaAnalysis: MetaAnalysisOutput | null;

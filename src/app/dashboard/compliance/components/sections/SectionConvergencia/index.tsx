@@ -73,7 +73,9 @@ export default function SectionConvergencia({ hook }: Props) {
     <div className="flex flex-col gap-6">
       <ConvergenciaOrgHeader
         deptos={deptosConConvergencia}
-        totalDeptosAnalizados={report.data.departments.length}
+        totalDeptosUniverso={
+          report.data.totalDeptosUniverso ?? report.data.departments.length
+        }
         esProblemaCultural={report.data.metaAnalysis?.es_problema_cultural ?? false}
         criticalByManagerCount={report.data.convergencia.criticalByManager.length}
         patronCulturalDominante={report.data.metaAnalysis?.patron_cultural_dominante ?? 'ninguno'}

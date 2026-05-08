@@ -148,7 +148,7 @@ export async function GET(request: NextRequest) {
       visibleDeptIds = new Set([userContext.departmentId, ...children]);
     }
 
-    const [orgAnalysis, deptAnalyses, alerts, previousDeptISAs] = await Promise.all([
+    const [orgAnalysis, deptAnalyses, alerts, previousDeptISAs, totalDeptosUniverso] = await Promise.all([
       prisma.complianceAnalysis.findFirst({
         where: { campaignId, scope: 'ORG', status: 'COMPLETED' },
       }),
@@ -176,6 +176,21 @@ export async function GET(request: NextRequest) {
         },
         select: { departmentId: true, isaScore: true, campaign: { select: { endDate: true } } },
         orderBy: { campaign: { endDate: 'desc' } },
+      }),
+      // P2 — Universo de análisis: todos los deptos del account con al menos una
+      // persona activa. Filtra `Department.isActive` y `Employee.isActive`.
+      // El threshold de privacidad (5) NO se aplica acá — el universo es más
+      // amplio que lo que entra al análisis AS específico (un dept con 1-4
+      // personas sigue contando para el universo, aunque no aparezca en AS).
+      // Para AREA_MANAGER se filtra por la jerarquía visible (mismo set que
+      // visibleDeptIds) para que el chip refleje su scope, no el global.
+      prisma.department.count({
+        where: {
+          accountId: userContext.accountId,
+          isActive: true,
+          employees: { some: { isActive: true } },
+          ...(visibleDeptIds ? { id: { in: Array.from(visibleDeptIds) } } : {}),
+        },
       }),
     ]);
 
@@ -290,6 +305,7 @@ export async function GET(request: NextRequest) {
         orgISA: orgPayload.global.orgISA ?? null,
         totalTextResponses: orgPayload.global.totalTextResponses ?? null,
         totalRespondents: orgPayload.global.totalRespondents ?? null,
+        totalDeptosUniverso,
         departments: deptPayloads.map((p) => {
           const isa = p.isa ?? null;
           const prevIsa = previousIsaByDept.get(p.safetyDetail.departmentId) ?? null;

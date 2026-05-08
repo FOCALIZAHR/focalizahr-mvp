@@ -21,8 +21,13 @@ import { PATRON_LABELS } from '@/lib/services/compliance/ComplianceNarrativeEngi
 interface Props {
   /** Deptos con convergencia (filter ya aplicado por el padre). */
   deptos: MergedDept[];
-  /** Total deptos analizados — denominador del CHIP 1. */
-  totalDeptosAnalizados: number;
+  /**
+   * P2 — Universo total de departamentos del account con al menos una
+   * persona activa (filtra `Department.isActive` y `Employee.isActive`,
+   * sin threshold de privacidad). Es el denominador del CHIP 1
+   * ("Afecta X de Y áreas"). Para AREA_MANAGER se filtra por jerarquía.
+   */
+  totalDeptosUniverso: number;
   /** Flag org-level del meta-LLM. */
   esProblemaCultural: boolean;
   /** Count de grupos. AREA_MANAGER siempre recibe 0 por privacy. */
@@ -114,18 +119,21 @@ function resolveChip1(
   convergentes: number,
   total: number,
 ): ChipData {
+  // Pluralización por denominador (Y) — más estable que pluralizar por X.
+  const palabraArea = total === 1 ? 'área' : 'áreas';
+  const caption = `Afecta ${convergentes} de ${total} ${palabraArea}`;
   return esCultural
     ? {
         eyebrow: '¿Localizado o cultural?',
         hero: 'Riesgo sistémico',
         heroColor: 'amber',
-        caption: `Afecta ${convergentes} de ${total} áreas`,
+        caption,
       }
     : {
         eyebrow: '¿Localizado o cultural?',
         hero: 'Foco localizado',
         heroColor: 'neutral',
-        caption: `Afecta ${convergentes} de ${total} áreas`,
+        caption,
       };
 }
 
@@ -196,7 +204,7 @@ function ChipTriage({ data }: { data: ChipData }) {
 
 export default function ConvergenciaOrgHeader({
   deptos,
-  totalDeptosAnalizados,
+  totalDeptosUniverso,
   esProblemaCultural,
   criticalByManagerCount,
   patronCulturalDominante,
@@ -209,13 +217,23 @@ export default function ConvergenciaOrgHeader({
     (d) => d.nivelFinal !== 'ninguna',
   ).length;
 
+  // Invariante esperada: convergentes ≤ universo. Si se viola (datos sucios
+  // o desactivación de empleado entre ciclos), no distorsionamos la UI —
+  // logueamos para investigación. La caption renderiza los números crudos.
+  if (deptosConvergentesCount > totalDeptosUniverso) {
+    console.warn(
+      '[ConvergenciaOrgHeader] convergentes > universo — posible inconsistencia de datos:',
+      { deptosConvergentesCount, totalDeptosUniverso },
+    );
+  }
+
   const veredictoText = sintesisEjecutiva?.veredicto ?? FALLBACK_VEREDICTO;
   const legoText = sintesisEjecutiva?.lego_narrativo ?? FALLBACK_LEGO;
 
   const chip1 = resolveChip1(
     esProblemaCultural,
     deptosConvergentesCount,
-    totalDeptosAnalizados,
+    totalDeptosUniverso,
   );
   const chip2 = resolveChip2(criticalByManagerCount);
   const chip3 = resolveChip3(patronCulturalDominante);
