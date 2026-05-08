@@ -27,8 +27,10 @@ import type {
 import type {
   DepartmentConvergencia,
   ConvergenciaGlobals,
+  CasoMotorA,
 } from './ConvergenciaEngine';
 import type { SintesisEjecutivaOutput } from './SintesisConvergenciaLLMService';
+import { CASO_LABELS } from './casoLabels';
 import {
   resolveDimensionNarrative,
   type ComplianceDimensionKey,
@@ -447,49 +449,105 @@ function buildAlertasGenero(
 // ARTEFACTO 3 — CONVERGENCIA (con "contradicción protagonista")
 // ═══════════════════════════════════════════════════════════════════
 
+// ─── Detección de modo ────────────────────────────────────────────────────
+// Motor v2 está disponible cuando el JSON persistido incluye `nivelFinal`
+// (síntesis cross-motor) Y `convergenciaInterna.casosActivos` (array Motor A).
+// Campañas legacy pre-Fase-1/2/3 no traen esos campos — caen al fallback v1.
+function isMotorV2(d: DepartmentConvergencia): boolean {
+  return (
+    typeof d.nivelFinal === 'string' &&
+    Array.isArray(d.convergenciaInterna?.casosActivos)
+  );
+}
+
+// ─── Contradicción protagonista (Regla #1, sin cambios) ────────────────────
+// Lee `signals.*` (legacy raíz, sigue poblándose). Aplica solo a empresas
+// con multi-fuente. Cero cambios funcionales — preserva el comportamiento.
+function buildContradiccion(
+  d: DepartmentConvergencia
+): string | undefined {
+  const safety = d.signals.ambiente_sano;
+  const exit = d.signals.exit;
+  const exo = d.signals.onboarding;
+  const pulso = d.signals.pulso;
+
+  if (safety && !safety.isRisk && exit?.isRisk) {
+    return 'Ambiente Sano registra condiciones sanas en el período actual, pero quienes se fueron en ese mismo período cuentan una historia distinta.';
+  }
+  if (safety?.isRisk && exo && !exo.isRisk) {
+    return 'Los ingresos nuevos no perciben el problema que el equipo actual sí reporta. O el deterioro es reciente, o el ingreso aún no lo ha tocado.';
+  }
+  if (pulso?.isRisk && safety && !safety.isRisk) {
+    return 'Los ciclos recientes de medición muestran una caída sostenida, aunque el diagnóstico actual la matiza.';
+  }
+  return undefined;
+}
+
+// ─── Body v2 — narrativa por nivelFinal ──────────────────────────────────
+// 5 ramas (la 6ª, 'ninguna', queda filtrada antes de entrar acá).
+// Cada texto es literal — auditado contra las 6 Reglas de Oro.
+function buildBodyV2(d: DepartmentConvergencia): string {
+  switch (d.nivelFinal) {
+    case 'critica_sistema':
+      return `${d.departmentName} Ambiente Sano, Exit Intelligence y el análisis con IA señalan el mismo departamento. El patrón se repite bajo la misma línea de mando. Postergar la conversación ya tiene un costo.`;
+    case 'amplificada':
+      return `${d.departmentName} Ambiente Sano detectó señales. Exit Intelligence y Onboarding Journey las amplifican con datos de quienes entraron y salieron. El análisis con IA cruza las tres fuentes y el patrón se sostiene.`;
+    case 'confirmada':
+      return `${d.departmentName} Ambiente Sano detectó señales en este departamento. Exit Intelligence lo confirma desde afuera — los que se fueron dijeron lo mismo. Dos fuentes que no comparten datos llegaron al mismo lugar. Eso no es repetición — es confirmación.`;
+    case 'externa_solo':
+      return `${d.departmentName} Ambiente Sano no registró señal en este departamento. Exit Intelligence u Onboarding Journey sí lo hicieron. La encuesta no lo capturó — pero otra fuente no lo pasó por alto.`;
+    case 'interna_solo':
+      return `${d.departmentName} Las mediciones de Ambiente Sano y el análisis con IA de las respuestas abiertas del mismo estudio señalan el mismo lugar — de manera independiente. Sin datos de Exit ni Onboarding que lo confirmen todavía — pero dos lecturas del mismo estudio diciendo lo mismo alcanza para nombrar lo que encontró.`;
+    default:
+      // 'ninguna' fue filtrado antes de entrar acá; defensa runtime.
+      return `${d.departmentName} sin convergencia detectable este ciclo.`;
+  }
+}
+
+// ─── Body v1 — fallback legacy (campañas pre-Motor v2) ─────────────────────
+function buildBodyV1(d: DepartmentConvergencia): string {
+  if (d.level === 'critico') {
+    return `${d.departmentName} concentra el riesgo del semestre: la lectura base está bajo el umbral y otras fuentes lo confirman.`;
+  }
+  if (d.level === 'convergente') {
+    return `${d.departmentName} muestra señales concurrentes en ${d.riskSignalsCount} instrumentos. La convergencia, no la magnitud individual, es lo que ordena la prioridad.`;
+  }
+  if (d.level === 'medio') {
+    return `${d.departmentName} aparece en dos instrumentos distintos. No es crítico, pero el patrón se insinúa.`;
+  }
+  return `${d.departmentName} registra una señal aislada. Ameritaría monitoreo, no acción inmediata.`;
+}
+
+// ─── Sufijo casos forenses — appended cuando hay casosActivos ──────────────
+// Solo aplica en modo v2. Reusa CASO_LABELS de casoLabels.ts (single source).
+function describeCasos(casos: CasoMotorA[]): string {
+  if (casos.length === 0) return '';
+  if (casos.length === 1) {
+    return `Caso registrado: ${CASO_LABELS[casos[0]]}.`;
+  }
+  const labels = casos.map((c) => CASO_LABELS[c]);
+  const last = labels.pop()!;
+  return `Casos registrados: ${labels.join(', ')} y ${last}.`;
+}
+
 function buildConvergencia(
   deptos: DepartmentConvergencia[]
 ): ConvergenciaNarrative[] {
   return deptos
-    .filter((d) => d.level !== 'sin_riesgo')
+    .filter((d) =>
+      isMotorV2(d) ? d.nivelFinal !== 'ninguna' : d.level !== 'sin_riesgo'
+    )
     .map((d) => {
-      const parts: string[] = [];
+      const v2 = isMotorV2(d);
+      const body = v2 ? buildBodyV2(d) : buildBodyV1(d);
+      const contradiccion = buildContradiccion(d);
 
-      const safety = d.signals.ambiente_sano;
-      const exit = d.signals.exit;
-      const exo = d.signals.onboarding;
-      const pulso = d.signals.pulso;
+      const parts: string[] = [body];
 
-      // Contradicción protagonista (Regla #1)
-      let contradiccion: string | undefined;
-      if (safety && !safety.isRisk && exit?.isRisk) {
-        contradiccion =
-          'Ambiente Sano registra condiciones sanas en el período actual, pero quienes se fueron en ese mismo período cuentan una historia distinta.';
-      } else if (safety?.isRisk && exo && !exo.isRisk) {
-        contradiccion =
-          'Los ingresos nuevos no perciben el problema que el equipo actual sí reporta. O el deterioro es reciente, o el ingreso aún no lo ha tocado.';
-      } else if (pulso?.isRisk && safety && !safety.isRisk) {
-        contradiccion =
-          'Los ciclos recientes de medición muestran una caída sostenida, aunque el diagnóstico actual la matiza.';
-      }
-
-      // Cuerpo según nivel
-      if (d.level === 'critico') {
-        parts.push(
-          `${d.departmentName} concentra el riesgo del semestre: la lectura base está bajo el umbral y otras fuentes lo confirman.`
-        );
-      } else if (d.level === 'convergente') {
-        parts.push(
-          `${d.departmentName} muestra señales concurrentes en ${d.riskSignalsCount} instrumentos. La convergencia, no la magnitud individual, es lo que ordena la prioridad.`
-        );
-      } else if (d.level === 'medio') {
-        parts.push(
-          `${d.departmentName} aparece en dos instrumentos distintos. No es crítico, pero el patrón se insinúa.`
-        );
-      } else {
-        parts.push(
-          `${d.departmentName} registra una señal aislada. Ameritaría monitoreo, no acción inmediata.`
-        );
+      // Sufijo casos forenses solo en v2 cuando hay casosActivos.
+      // externa_solo no tiene casos (Motor A 'ninguna') — sufijo vacío.
+      if (v2 && d.convergenciaInterna.casosActivos.length > 0) {
+        parts.push(describeCasos(d.convergenciaInterna.casosActivos));
       }
 
       if (contradiccion) parts.push(contradiccion);
@@ -497,7 +555,7 @@ function buildConvergencia(
       return {
         departmentId: d.departmentId,
         departmentName: d.departmentName,
-        nivel: d.level,
+        nivel: v2 ? d.nivelFinal : d.level,
         narrativa: parts.join(' '),
         contradiccionProtagonista: contradiccion,
       };
