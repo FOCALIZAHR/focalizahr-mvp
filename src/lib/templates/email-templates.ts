@@ -211,11 +211,11 @@ const TEMPLATE_AMBIENTE_SANO_HTML = createEmailHTML(`
   ${EmailHero({
     title: 'Ambiente de Trabajo Saludable',
     subtitle: 'Hola {participant_name}, tu bienestar es nuestra prioridad',
-    badge: 'Ley Karin'
+    badge: '{legal_badge}'
   })}
-  
+
   ${EmailContentSection({
-    greeting: 'Como parte de nuestro compromiso con un ambiente laboral saludable y en cumplimiento de la Ley Karin, queremos conocer tu percepción sobre nuestro entorno de trabajo.',
+    greeting: '{legal_greeting}',
     paragraphs: [
       'Esta encuesta es completamente confidencial y nos ayudará a identificar áreas de mejora para garantizar un espacio laboral seguro y respetuoso para todos.',
       'Evaluaremos aspectos fundamentales del ambiente laboral:'
@@ -589,9 +589,16 @@ export const PREMIUM_EMAIL_TEMPLATES: Record<string, EmailTemplate> = {
     id: 'ambiente_sano_invitation',
     campaignTypeSlug: 'pulso-ambientes-sanos',
     subject: 'Ambiente de Trabajo Saludable - {company_name}',
-    previewText: 'Tu bienestar es nuestra prioridad - Evaluación Ley Karin',
+    previewText: '{legal_preview}',
     htmlContent: TEMPLATE_AMBIENTE_SANO_HTML,
-    variables: ['participant_name', 'company_name', 'survey_url'],
+    variables: [
+      'participant_name',
+      'company_name',
+      'survey_url',
+      'legal_badge',
+      'legal_greeting',
+      'legal_preview',
+    ],
     tone: 'Serio, respetuoso, protector',
     estimatedTime: '5-7 minutos'
   },

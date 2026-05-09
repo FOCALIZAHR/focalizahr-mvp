@@ -16,6 +16,7 @@ import { verifyJWT } from '@/lib/auth';
 import { Resend } from 'resend';
 // ✅ NUEVO IMPORT - Templates Premium Centralizados
 import { renderEmailTemplate } from '@/lib/templates/email-templates';
+import { getLegalEmailLabels } from '@/config/compliance/legalBadgeConfig';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -48,7 +49,7 @@ async function queueCampaignEmails(campaignId: string): Promise<{
     const campaignData = await prisma.campaign.findUnique({
       where: { id: campaignId },
       include: {
-        account: { select: { companyName: true, adminEmail: true } },
+        account: { select: { companyName: true, adminEmail: true, country: true } },
         campaignType: { select: { name: true, slug: true, estimatedDuration: true } },
         participants: { 
           where: { hasResponded: false },
@@ -69,7 +70,12 @@ async function queueCampaignEmails(campaignId: string): Promise<{
     }
 
     const { account, campaignType, participants } = campaignData;
-    
+
+    // P0bis — Resolver labels legales por país una sola vez por campaña.
+    // Backward compat: Account.country tiene default 'CL', clientes existentes
+    // obtienen exactamente los mismos textos que el hardcoded anterior.
+    const legalLabels = getLegalEmailLabels(account.country);
+
     // ✅ PRESERVADO: Lógica tracking participantes sin email
     let queuedCount = 0;
     let skippedNoEmailCount = 0;
@@ -122,7 +128,10 @@ async function queueCampaignEmails(campaignId: string): Promise<{
             {
               participant_name: participant.name || 'Estimado/a colaborador/a',
               company_name: account.companyName,
-              survey_url: fullSurveyUrl
+              survey_url: fullSurveyUrl,
+              legal_badge: legalLabels.badge,
+              legal_greeting: legalLabels.greeting,
+              legal_preview: legalLabels.preview,
             }
           );
           

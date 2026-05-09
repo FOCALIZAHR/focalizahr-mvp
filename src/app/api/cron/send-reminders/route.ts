@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Resend } from 'resend';
 import { renderEmailTemplate } from '@/lib/templates/email-templates';
+import { getLegalEmailLabels } from '@/config/compliance/legalBadgeConfig';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -75,7 +76,7 @@ async function processReminders(): Promise<{
         sendReminders: true  // ✅ CAMBIO 1: Respetar configuración de campaña
       },
       include: {
-        account: { select: { companyName: true } },
+        account: { select: { companyName: true, country: true } },
         campaignType: { select: { name: true, slug: true } },
         participants: {
           where: { hasResponded: false },
@@ -233,7 +234,7 @@ async function sendReminder(
   },
   campaign: {
     id: string;
-    account: { companyName: string };
+    account: { companyName: string; country: string };
     campaignType: { slug: string };
   },
   reminderType: 'reminder1' | 'reminder2',
@@ -242,13 +243,19 @@ async function sendReminder(
   const surveyUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   const fullSurveyUrl = `${surveyUrl}/encuesta/${participant.uniqueToken}`;
 
+  // P0bis — Resolver labels legales por país (default 'CL' = idéntico al hardcoded anterior).
+  const legalLabels = getLegalEmailLabels(campaign.account.country);
+
   // Usar template base pero con subject customizado para recordatorios
   const { html } = renderEmailTemplate(
     campaign.campaignType.slug,
     {
       participant_name: participant.name || 'Estimado/a colaborador/a',
       company_name: campaign.account.companyName,
-      survey_url: fullSurveyUrl
+      survey_url: fullSurveyUrl,
+      legal_badge: legalLabels.badge,
+      legal_greeting: legalLabels.greeting,
+      legal_preview: legalLabels.preview,
     }
   );
 
@@ -382,8 +389,8 @@ async function processAutomationQueue(): Promise<{
         },
         campaign: {
           include: {
-            account: { 
-              select: { companyName: true } 
+            account: {
+              select: { companyName: true, country: true }
             }
           }
         }
@@ -423,12 +430,21 @@ async function processAutomationQueue(): Promise<{
         // 3️⃣ RENDERIZAR: Usar sistema centralizado
         const surveyUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/encuesta/${participant.uniqueToken}`;
         
+        // P0bis — Resolver labels legales por país. Defensivo para futuro:
+        // si EmailAutomation queue dispara templates AS, los placeholders
+        // {legal_*} ya quedan resueltos. Onboarding templates no tienen estos
+        // placeholders — las variables extras se ignoran sin efecto.
+        const legalLabels = getLegalEmailLabels(campaign.account.country);
+
         const { subject, html } = renderEmailTemplate(
           templateId,  // 'onboarding-day-1', 'onboarding-day-7', etc.
           {
             participant_name: participant.name || 'Estimado/a colaborador/a',
             company_name: campaign.account.companyName,
-            survey_url: surveyUrl
+            survey_url: surveyUrl,
+            legal_badge: legalLabels.badge,
+            legal_greeting: legalLabels.greeting,
+            legal_preview: legalLabels.preview,
           }
         );
 
