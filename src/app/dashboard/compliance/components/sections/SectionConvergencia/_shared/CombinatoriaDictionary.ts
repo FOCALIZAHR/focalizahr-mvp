@@ -59,8 +59,25 @@ export function getCombinatoriaNarrative(dept: MergedDept): string | null {
     return 'Ambiente Sano detectó señales de riesgo. Los nuevos talentos lo confirman antes de cumplir 30 días. El problema es visible desde afuera.';
   }
 
-  // Regla 7 — Resignación aprendida (clima crítico sin alertas externas)
+  // Regla 7 — Resignación aprendida (ambiente crítico sin alertas externas).
+  // Subvariantes por caso A (P1b mayo 2026): el insight de "resignación" es
+  // invariante, pero la evidencia concreta del ambiente bajo cambia según
+  // el caso forense. Prioridad: A3 > A1 > default (severidad subjetiva — A3
+  // implica exposición legal explícita por sesgo de género).
+  // A2 deliberadamente NO tiene subvariante propia — cae al default.
+  // A4 (criticalByManager) y A5 (ISA alto) no pueden coexistir con esta regla.
+  //
+  // Nota: orden de prioridad por severidad ≠ orden de Motor 1 (lexicográfico
+  // en `describeCasos`). Inconsistencia conocida pero diferida — solo se hace
+  // visible en deptos con casos múltiples, ausente en QA actual. Ver memoria
+  // `project_motor1_motor6_orden_casos_inconsistencia.md`.
   if (isa !== null && isa < 50 && eis === 0 && exo === 0) {
+    if (casos.includes('A3')) {
+      return 'Hay sesgo de género visible en este departamento, y aun así nadie se va. La gente afectada aprendió a mimetizarse en lugar de irse — porque irse no garantiza llegar a otro lugar mejor. La resignación no se distribuye igual entre todos.';
+    }
+    if (casos.includes('A1')) {
+      return 'El equipo confirma con números y con lo que escribió que el ambiente está deteriorado, y aun así nadie se va. Cuando hablar y quedarse conviven en el mismo silencio, el equipo ya internalizó que reportar no cambia nada.';
+    }
     return 'Ambiente Sano registra condiciones críticas, pero nadie se va. Que nadie renuncie en un ambiente hostil no es lealtad — es resignación aprendida o falta de opciones.';
   }
 
