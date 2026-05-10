@@ -48,6 +48,28 @@ export const SOURCE_LABEL_NARRATIVE: Record<ComplianceSource, string> = {
 };
 
 /**
+ * Etiquetas en modelo "voces" — para narrativas que cuentan QUIÉN reporta
+ * en lugar del nombre comercial del producto. Evita el patrón
+ * problemático de paralelizar nombres comerciales (Exit Intelligence,
+ * Onboarding Journey) con componentes internos de Ambiente Sano.
+ *
+ * Ver memoria `feedback_ia_es_componente_ambiente_sano.md`.
+ *
+ * Uso: motores de narrativa que escriben oraciones humanas
+ * (`buildConvergenciaCruce`, `buildAlertas` cuando aplique).
+ *
+ * Convención: lowercase + verbo plural (las voces son sujetos plurales).
+ * Si el voice es sujeto al inicio de la oración, capitalizar la primera
+ * letra runtime con `voice.charAt(0).toUpperCase() + voice.slice(1)`.
+ */
+export const SOURCE_VOICE_NARRATIVE: Record<ComplianceSource, string> = {
+  ambiente_sano: 'los que están',
+  exit:          'los que se fueron',
+  onboarding:    'los que entraron',
+  pulso:         'los pulsos recientes',
+};
+
+/**
  * Texto del fallback "el cliente no tiene contratado este instrumento".
  *
  * NOTA: el sistema NO diferencia "no contratado" vs "contratado pero sin data

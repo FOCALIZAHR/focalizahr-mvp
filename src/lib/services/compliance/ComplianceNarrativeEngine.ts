@@ -35,7 +35,7 @@ import {
   resolveDimensionNarrative,
   type ComplianceDimensionKey,
 } from '@/config/narratives/ComplianceNarrativeDictionary';
-import { SOURCE_LABEL_NARRATIVE } from '@/config/compliance/sourceLabels';
+import { SOURCE_LABEL_NARRATIVE, SOURCE_VOICE_NARRATIVE } from '@/config/compliance/sourceLabels';
 
 // ═══════════════════════════════════════════════════════════════════
 // TIPOS DE SALIDA
@@ -661,21 +661,18 @@ function buildConvergenciaCruce(
     if (!par) return undefined;
     const [f1, f2] = par;
     return (
-      `${c.dept.departmentName} concentra señales en ${SOURCE_LABEL_NARRATIVE[f1]} y ${SOURCE_LABEL_NARRATIVE[f2]}. ` +
-      `El resto de la organización opera sin convergencia detectable. ` +
-      `La excepción tiene origen identificado.`
+      `En ${c.dept.departmentName}, dos canales coinciden — ${SOURCE_VOICE_NARRATIVE[f1]} y ${SOURCE_VOICE_NARRATIVE[f2]} leen lo mismo. ` +
+      `El resto de la organización opera sin coincidencias entre canales. La excepción tiene nombre.`
     );
   }
 
   // CASO 5 — Señal única (0 coincidentes, 1 aislado).
   if (coincidentes.length === 0 && aislados.length === 1) {
     const a = aislados[0];
-    const otraFuente = activeSourcesGlobal.find((s) => s !== a.sourceUnica);
-    if (!otraFuente) return undefined;
     return (
-      `Solo ${SOURCE_LABEL_NARRATIVE[a.sourceUnica]} está marcando riesgo, en ${a.dept.departmentName}. ` +
-      `${SOURCE_LABEL_NARRATIVE[otraFuente]} no lo confirma. ` +
-      `La señal existe, la confirmación cross-instrumento todavía no.`
+      `En ${a.dept.departmentName}, solo un canal reporta riesgo: ${SOURCE_VOICE_NARRATIVE[a.sourceUnica]}. ` +
+      `Los demás no lo confirman todavía. ` +
+      `El hecho está documentado por una vía; la confirmación cruzada queda pendiente.`
     );
   }
 
@@ -685,21 +682,24 @@ function buildConvergenciaCruce(
     const primero = aislados[0];
     const segundo = aislados.find((a) => a.sourceUnica !== primero.sourceUnica);
     if (!segundo) {
-      // Todos los aislados marcan la misma fuente — degradar a "señal fragmentada en una sola dimensión".
+      // Todos los aislados marcan la misma fuente — degradar a "fragmentada en un solo canal".
       return (
-        `${aislados.length} departamentos muestran señal en ${SOURCE_LABEL_NARRATIVE[primero.sourceUnica]}, ninguna otra fuente lo confirma. ` +
-        `O cada fuente captura una dimensión diferente del mismo problema. ` +
+        `En ${aislados.length} departamentos, solo ${SOURCE_VOICE_NARRATIVE[primero.sourceUnica]} están reportando. Los demás canales no lo registran. ` +
+        `O cada canal está captando una dimensión distinta del mismo problema. ` +
         `O todavía no hay un problema estructural. ` +
-        `La diferencia importa — un patrón consolidado no se mueve solo.`
+        `La diferencia importa: un patrón consolidado no se mueve solo.`
       );
     }
+    const v1 = SOURCE_VOICE_NARRATIVE[primero.sourceUnica];
+    const v2 = SOURCE_VOICE_NARRATIVE[segundo.sourceUnica];
+    const v1Cap = v1.charAt(0).toUpperCase() + v1.slice(1);
+    const v2Cap = v2.charAt(0).toUpperCase() + v2.slice(1);
     return (
-      `${activeSourcesGlobal.length} fuentes activas, ninguna confirma a la otra. ` +
-      `${SOURCE_LABEL_NARRATIVE[primero.sourceUnica]} marca ${primero.dept.departmentName}, ` +
-      `${SOURCE_LABEL_NARRATIVE[segundo.sourceUnica]} marca ${segundo.dept.departmentName} — distintos. ` +
-      `O cada fuente captura una dimensión diferente del mismo problema. ` +
+      `Hay ${activeSourcesGlobal.length} canales activos en la organización y ninguno confirma al otro. ` +
+      `${v1Cap} señalan ${primero.dept.departmentName}. ${v2Cap} señalan ${segundo.dept.departmentName} — distintos. ` +
+      `O cada canal está captando una dimensión distinta del mismo problema. ` +
       `O todavía no hay un problema estructural. ` +
-      `La diferencia importa — un patrón consolidado no se mueve solo.`
+      `La diferencia importa: un patrón consolidado no se mueve solo.`
     );
   }
 
@@ -711,11 +711,9 @@ function buildConvergenciaCruce(
     const coincidentNames = coincidentes.map((c) => c.dept.departmentName);
     const divergente = aislados[0];
     return (
-      `${SOURCE_LABEL_NARRATIVE[f1]} y ${SOURCE_LABEL_NARRATIVE[f2]} coinciden en ${formatDeptList(coincidentNames)} — la convergencia se concentra ahí. ` +
-      `Pero divergen en ${divergente.dept.departmentName}: ${SOURCE_LABEL_NARRATIVE[divergente.sourceUnica]} marca riesgo y la otra no lo confirma. ` +
-      `La lectura todavía no es uniforme. ` +
-      `O el deterioro empezó por una sola dimensión y aún no contagió. ` +
-      `O las fuentes están midiendo realidades distintas del mismo equipo.`
+      `En ${formatDeptList(coincidentNames)}, dos canales independientes leen lo mismo: ${SOURCE_VOICE_NARRATIVE[f1]} y ${SOURCE_VOICE_NARRATIVE[f2]}. ` +
+      `Pero en ${divergente.dept.departmentName}, solo ${SOURCE_VOICE_NARRATIVE[divergente.sourceUnica]} reportan riesgo y los demás no lo confirman. ` +
+      `La lectura todavía no es uniforme — o el deterioro empezó por un canal y aún no contagió, o cada canal está captando una cara distinta del mismo equipo.`
     );
   }
 
@@ -727,9 +725,8 @@ function buildConvergenciaCruce(
     const N = coincidentes.length;
     const palabra = N === 1 ? 'departamento' : 'departamentos';
     return (
-      `Las fuentes activas convergen en ${N} ${palabra}. ` +
-      `${SOURCE_LABEL_NARRATIVE[f1]} y ${SOURCE_LABEL_NARRATIVE[f2]} apuntan al mismo lugar. ` +
-      `Cuando dos lentes independientes coinciden, el hallazgo deja de ser una señal — se convierte en un dato.`
+      `En ${N} ${palabra}, ${SOURCE_VOICE_NARRATIVE[f1]} y ${SOURCE_VOICE_NARRATIVE[f2]} leen lo mismo — sin compartir datos, sin coordinarse. ` +
+      `Cuando dos lentes independientes coinciden, el hallazgo deja de ser percepción: pasa a ser hecho.`
     );
   }
 
@@ -774,26 +771,23 @@ function buildCriticalByManagerNarrative(
   if (grupos.length === 1) {
     const g = grupos[0];
     return (
-      `${g.deptNames.length} departamentos concentran señales críticas bajo la misma línea de mando: ${formatDeptList(g.deptNames)}. ` +
-      `El riesgo no es geográfico — es jerárquico. ` +
-      `O hay un sesgo en cómo se gestionan los equipos. ` +
+      `${g.deptNames.length} áreas críticas dependen de la misma línea de mando: ${formatDeptList(g.deptNames)}. ` +
+      `El problema no es geográfico — es jerárquico. ` +
+      `O hay un sesgo en cómo se gestionan los equipos bajo ese liderazgo. ` +
       `O hay una decisión estructural que nadie ha cuestionado. ` +
-      `O la cultura sofoca las señales antes de que escalen al sistema. ` +
-      `El sistema no nombra responsables — agrupa los datos. ` +
-      `La inferencia es trabajo del lector. ` +
-      `Y cada ciclo sin esa inferencia es uno más sin corrección.`
+      `O algo está sofocando las preocupaciones antes de que se reporten. ` +
+      `Cada ciclo sin abordar esa lectura es uno más sin corrección.`
     );
   }
 
   // CASO 2 — Múltiples líneas de mando.
   const totalDeptos = grupos.reduce((sum, g) => sum + g.deptNames.length, 0);
   return (
-    `${grupos.length} líneas de mando distintas concentran riesgo crítico, cubriendo ${totalDeptos} departamentos. ` +
+    `${grupos.length} líneas de mando distintas concentran riesgo crítico, cubriendo ${totalDeptos} áreas. ` +
     `No es un caso aislado — es un patrón estructural en la capa intermedia de gestión. ` +
-    `O la organización no exige el mismo estándar de liderazgo cross-equipo. ` +
-    `O hay un perfil compartido entre estas líneas de mando que no detecta riesgos a tiempo. ` +
-    `La convergencia bajo distintos responsables descarta la teoría del caso individual. ` +
-    `La señal apunta al sistema, no a las personas.`
+    `O la organización no exige el mismo estándar de liderazgo entre equipos. ` +
+    `O hay un perfil compartido entre estos líderes que deja pasar las preocupaciones tempranas. ` +
+    `Cuando el patrón se repite bajo distintos responsables, la causa deja de ser individual.`
   );
 }
 
@@ -814,11 +808,11 @@ function buildAlertas(alertas: AlertaInput[]): AlertaNarrative[] {
   return alertas.map((a) => {
     // Regla #1 (Teatro) — si está activo, desplaza la narrativa.
     const contextoBase = a.teatroCumplimiento
-      ? 'Los números dicen que está bien. Las respuestas proyectivas dicen que no. La distancia es la alerta.'
+      ? 'Los números dicen que está bien. El lenguaje espontáneo dice que no. La distancia es la alerta.'
       : a.signalsCount && a.signalsCount >= 3
-        ? 'Tres o más instrumentos coinciden en la misma gerencia. La concurrencia eleva la señal por encima del ruido.'
+        ? 'Tres o más canales coinciden sobre la misma gerencia. Cuando varias vías llegan al mismo hallazgo al mismo tiempo, deja de ser ruido.'
         : a.severity === 'critical'
-          ? 'El indicador base cruzó el umbral que en otros ciclos precedió salidas concentradas o denuncias formales.'
+          ? 'El indicador cruzó el umbral que en otros ciclos precedió salidas concentradas o procesos formales abiertos.'
           : 'El indicador aparece sin soporte cruzado todavía. Amerita monitoreo, no intervención.';
 
     const consecuencia =
