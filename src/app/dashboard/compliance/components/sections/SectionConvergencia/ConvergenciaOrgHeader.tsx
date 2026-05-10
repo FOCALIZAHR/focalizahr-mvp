@@ -36,6 +36,19 @@ interface Props {
   patronCulturalDominante: string;
   /** LLM síntesis — undefined cae a fallback genérico (decisión 2b). */
   sintesisEjecutiva?: SintesisEjecutivaOutput;
+  /**
+   * Motor 2 — narrativa org-level del cruce cross-instrumento. Renderiza
+   * como 3er párrafo en la síntesis (después de veredicto + lego). Optional:
+   * `undefined` cuando hay <2 fuentes activas o no hay material narrativo.
+   */
+  cruceNarrativa?: string;
+  /**
+   * Motor 3 — narrativa org-level del patrón liderazgo cuando varios deptos
+   * críticos comparten managerId. Renderiza debajo del grid con eyebrow
+   * "MISMO MANDO, ÁREAS DISTINTAS". Optional: route.ts la suprime para
+   * AREA_MANAGER y queda `undefined` si no hay grupos.
+   */
+  criticalByManagerNarrativa?: string;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -209,6 +222,8 @@ export default function ConvergenciaOrgHeader({
   criticalByManagerCount,
   patronCulturalDominante,
   sintesisEjecutiva,
+  cruceNarrativa,
+  criticalByManagerNarrativa,
 }: Props) {
   const worstNivel = computeWorstNivelFinal(deptos);
   const tesla = teslaForNivelFinal(worstNivel);
@@ -276,6 +291,15 @@ export default function ConvergenciaOrgHeader({
           >
             {legoText}
           </p>
+          {/* Motor 2 — cruce cross-instrumento (3er párrafo). */}
+          {cruceNarrativa ? (
+            <p
+              className="text-sm font-light leading-[1.8]"
+              style={{ color: '#cbd5e1' }}
+            >
+              {cruceNarrativa}
+            </p>
+          ) : null}
         </div>
 
         {/* 3. Panel de triage */}
@@ -287,6 +311,21 @@ export default function ConvergenciaOrgHeader({
           <ChipTriage data={chip2} />
           <ChipTriage data={chip3} />
         </div>
+
+        {/* Motor 3 — patrón liderazgo cross-dept (debajo del grid). */}
+        {criticalByManagerNarrativa ? (
+          <div className="flex flex-col gap-3 pt-6" style={{ borderTop: '0.5px solid #1e293b' }}>
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+              Mismo mando, áreas distintas
+            </span>
+            <p
+              className="text-sm font-light leading-[1.8]"
+              style={{ color: '#cbd5e1' }}
+            >
+              {criticalByManagerNarrativa}
+            </p>
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -15,6 +15,7 @@
 
 import { useMemo, useState } from 'react';
 import type { UseComplianceDataReturn } from '@/hooks/useComplianceData';
+import type { AlertaNarrative } from '@/lib/services/compliance/ComplianceNarrativeEngine';
 import ConvergenciaOrgHeader from './ConvergenciaOrgHeader';
 import BandaDepartamento from './BandaDepartamento';
 import ConvergenciaEmptyState from './ConvergenciaEmptyState';
@@ -48,13 +49,14 @@ export default function SectionConvergencia({ hook }: Props) {
       .sort(byUrgencia);
   }, [report]);
 
-  // Lookup alertType → narrativa.consecuencia desde
+  // Lookup alertType → AlertaNarrative completa desde
   // `narratives.artefacto4_alertas`. Construido una sola vez y prop-drilled
-  // a cada banda → cada chip de alerta. Reemplaza el "SLA Nh" eliminado.
+  // a cada banda → chips colapsados (consecuencia) y Bloque 5 expandido
+  // (titulo + contexto + intervencion). Reemplaza el "SLA Nh" eliminado.
   const narrativaByAlertType = useMemo(() => {
-    if (!report) return new Map<string, string>();
+    if (!report) return new Map<string, AlertaNarrative>();
     return new Map(
-      report.narratives.artefacto4_alertas.map((n) => [n.alertType, n.consecuencia])
+      report.narratives.artefacto4_alertas.map((n) => [n.alertType, n]),
     );
   }, [report]);
 
@@ -91,6 +93,8 @@ export default function SectionConvergencia({ hook }: Props) {
         criticalByManagerCount={report.data.convergencia.criticalByManager.length}
         patronCulturalDominante={report.data.metaAnalysis?.patron_cultural_dominante ?? 'ninguno'}
         sintesisEjecutiva={report.narratives.sintesisEjecutiva}
+        cruceNarrativa={report.narratives.cruceNarrativa}
+        criticalByManagerNarrativa={report.narratives.criticalByManagerNarrativa}
       />
       <div className="flex flex-col gap-3">
         {deptosConConvergencia.map((dept) => (

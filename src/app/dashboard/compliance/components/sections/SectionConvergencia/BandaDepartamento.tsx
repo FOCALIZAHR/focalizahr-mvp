@@ -15,20 +15,21 @@ import AlertaComplianceChip from './AlertaComplianceChip';
 import { AMPLIFICADOR_LABELS, resolveAlertLabel } from './_shared/ALERT_LABELS';
 import { getCombinatoriaNarrative } from './_shared/CombinatoriaDictionary';
 import type { MergedDept } from './_shared/helpers';
+import type { AlertaNarrative } from '@/lib/services/compliance/ComplianceNarrativeEngine';
 
 interface Props {
   dept: MergedDept;
   isExpanded: boolean;
   onToggle: () => void;
   /**
-   * Map de alertType → narrativa.consecuencia desde
-   * `report.narratives.artefacto4_alertas`. Construido una vez en el padre
-   * con `useMemo` y prop-drilled a cada banda. Permite que cada
-   * `<AlertaComplianceChip>` muestre el texto ejecutivo del engine en lugar
-   * del "SLA Nh" que se eliminó. Optional: campañas legacy sin
-   * artefacto4_alertas degradan a chip sin consecuencia.
+   * Map de alertType → AlertaNarrative completa (titulo + contexto +
+   * consecuencia + intervencion) desde `report.narratives.artefacto4_alertas`.
+   * Construido una vez en el padre con `useMemo` y prop-drilled.
+   * Uso: chip colapsado consume `.consecuencia`; Bloque 5 expandido consume
+   * los 4 campos. Optional: campañas legacy sin artefacto4_alertas degradan
+   * a chip/bloque sin contenido.
    */
-  narrativaByAlertType?: Map<string, string>;
+  narrativaByAlertType?: Map<string, AlertaNarrative>;
   /**
    * Narrativa estructural per-banda — Motor 1 (`buildConvergencia`).
    * Lookup desde `report.narratives.artefacto3_convergencia` por
@@ -186,7 +187,7 @@ export default function BandaDepartamento({
                   <AlertaComplianceChip
                     key={a.id}
                     alert={a}
-                    consecuencia={narrativaByAlertType?.get(a.alertType)}
+                    consecuencia={narrativaByAlertType?.get(a.alertType)?.consecuencia}
                   />
                 ))}
               </div>
@@ -235,13 +236,13 @@ export default function BandaDepartamento({
         </div>
       </button>
 
-      {/* CUERPO EXPANDIDO — 4 bloques inline */}
+      {/* CUERPO EXPANDIDO — bloques inline */}
       {isExpanded ? (
         <div
           className="px-5 pb-5 pt-1"
           style={{ borderTop: '0.5px solid #1e293b' }}
         >
-          <BloquesExpandidos dept={dept} />
+          <BloquesExpandidos dept={dept} narrativaByAlertType={narrativaByAlertType} />
         </div>
       ) : null}
     </div>
@@ -249,10 +250,16 @@ export default function BandaDepartamento({
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// Bloques expandidos (1-4) — solo se renderizan al click
+// Bloques expandidos (2-5) — solo se renderizan al click
 // ════════════════════════════════════════════════════════════════════════════
 
-function BloquesExpandidos({ dept }: { dept: MergedDept }) {
+function BloquesExpandidos({
+  dept,
+  narrativaByAlertType,
+}: {
+  dept: MergedDept;
+  narrativaByAlertType?: Map<string, AlertaNarrative>;
+}) {
   const interna = dept.convergenciaInterna;
   const externa = dept.convergenciaExterna;
   const dims = dept.dimensionScores;
@@ -261,15 +268,15 @@ function BloquesExpandidos({ dept }: { dept: MergedDept }) {
 
   // Bloque 2 — narrativas Motor A por caso activo (Spec sec "Bloque 2")
   const narrativasCasos: Record<string, string> = {
-    A1: `El score (${isaScore ?? '—'}) y el texto libre señalan lo mismo de manera independiente. Dos fuentes que no se conocen llegaron a la misma conclusión. Eso no es coincidencia.`,
-    A2: `El ISA es ${isaScore ?? '—'}. El texto libre lo contradice. O el equipo aprendió a responder lo que se espera. O hay algo que no está llegando a la encuesta. El sistema no puede distinguir cuál — pero detectó la brecha.`,
-    A3: `El análisis del texto libre detectó lenguaje con sesgo en este departamento. La seguridad psicológica está en ${
+    A1: `El score (${isaScore ?? '—'}) y lo que las personas escribieron señalan lo mismo de manera independiente. Dos lecturas que no se conocen llegaron a la misma conclusión. Eso no es coincidencia.`,
+    A2: `El ISA es ${isaScore ?? '—'}. Lo que las personas escribieron lo contradice. O el equipo aprendió a responder lo que se espera. O hay algo que no está llegando a la encuesta. La brecha existe — aunque las causas no sean visibles todavía.`,
+    A3: `El lenguaje que circula en este departamento tiene sesgo. La seguridad psicológica está en ${
       dims.P2_seguridad?.toFixed(1) ?? '—'
     }/5. Cuando el lenguaje normaliza la exclusión, el ambiente que lo permite ya existe.`,
     A4: dept.a4Partner
       ? `ISA ${isaScore ?? '—'}. Otro departamento bajo el mismo liderazgo tiene ISA ${dept.a4Partner.isaScore}. La diferencia es de ${dept.a4Partner.deltaIsa} puntos. Con equipos distintos y el mismo mando, la variable constante es el liderazgo.`
       : `ISA ${isaScore ?? '—'}. Este departamento forma parte de un grupo bajo el mismo liderazgo con dispersión de ISA. Con equipos distintos y el mismo mando, la variable constante es el liderazgo.`,
-    A5: `ISA ${isaScore ?? '—'} — clasificación Sano. El texto libre dice otra cosa. El silencio activo tiene intensidad alta. Esto no es un score bajo — es un score que no refleja lo que ocurre. Es el escenario más difícil de gestionar.`,
+    A5: `ISA ${isaScore ?? '—'} — clasificación Sano. Lo que las personas escribieron dice otra cosa. Esto no es un score bajo — es un score que no refleja lo que ocurre. Es el escenario más difícil de gestionar.`,
   };
 
   return (
@@ -380,6 +387,40 @@ function BloquesExpandidos({ dept }: { dept: MergedDept }) {
           </div>
         </div>
       ) : null}
+
+      {/* Bloque 5 — Narrativa expandida de alertas (Motor 4 — buildAlertas).
+          Por cada ComplianceAlert del dept que tenga AlertaNarrative en el
+          map, render titulo + contexto + intervencion. La consecuencia ya
+          se mostró en el chip colapsado, no se repite. */}
+      {(() => {
+        if (!narrativaByAlertType || dept.complianceAlerts.length === 0) return null;
+        const alertasConNarrativa = dept.complianceAlerts
+          .map((a) => ({ alert: a, narrativa: narrativaByAlertType.get(a.alertType) }))
+          .filter((x): x is { alert: typeof x.alert; narrativa: AlertaNarrative } =>
+            x.narrativa !== undefined,
+          );
+        if (alertasConNarrativa.length === 0) return null;
+        return (
+          <div className="flex flex-col gap-4">
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+              Alertas activas — análisis ejecutivo
+            </span>
+            {alertasConNarrativa.map(({ alert, narrativa }) => (
+              <div key={alert.id} className="flex flex-col gap-2">
+                <p className="text-sm font-normal text-slate-200 leading-[1.5]">
+                  {narrativa.titulo}
+                </p>
+                <p className="text-sm font-light leading-[1.7]" style={{ color: '#cbd5e1' }}>
+                  {narrativa.contexto}
+                </p>
+                <p className="text-sm font-light leading-[1.7] text-slate-400">
+                  {narrativa.intervencion}
+                </p>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 }
