@@ -291,23 +291,15 @@ export function buildInterventionPlan(triggers: TriggerInput[]): InterventionPla
 // ═══════════════════════════════════════════════════════════════════
 
 function buildConsolidatedJustification(
-  interventionId: string,
-  resolvesTriggers: TriggerInput[],
-  allTriggers: TriggerInput[]
+  _interventionId: string,
+  _resolvesTriggers: TriggerInput[],
+  _allTriggers: TriggerInput[]
 ): string {
-  const inv = INTERVENTION_CATALOG[interventionId];
-  const isCritical = allTriggers.some((t) => t.riskLevel === 'critico');
-  const labels = resolvesTriggers.map((t) => t.label).join(' y ');
-  const pct = Math.round((resolvesTriggers.length / allTriggers.length) * 100);
-
-  return (
-    `Recomendación consolidada: ${inv.titulo} resuelve el ${pct}% de las causas raíz ` +
-    `de sus focos actuales (${labels}). ` +
-    (isCritical
-      ? 'El nivel crítico exige una sola acción estructural — mayor adherencia y resultado más rápido. '
-      : 'Ejecutar una sola intervención garantiza mayor adherencia. ') +
-    `Evidencia: ${inv.evidencia}. Plazo: ${inv.plazo}.`
-  );
+  // Placeholder neutro — el copy ejecutivo anterior concatenaba labels
+  // heterogéneos (frase larga de dimensión + título de alerta + nombre de
+  // depto) con `join(' y ')`, lo que producía frases mal formadas. Pendiente
+  // un formateador con humanizeLabel(label, type) + lista castellana.
+  return 'Intervención recomendada basada en los hallazgos de este departamento.';
 }
 
 function buildIndividualJustification(trigger: TriggerInput): string {
