@@ -1,9 +1,8 @@
 'use client';
 
 // Header C3 — paradigma "State Machine determinista".
-// Sesión 2026-05-10: reemplaza la síntesis LLM (sintesisEjecutiva) por copy
-// editorial fijo de 5 estados. El engine continúa generando sintesisEjecutiva
-// — deprecación va en commit aparte (out-of-scope).
+// El copy viene de STATE_MACHINE_COPY (5 estados editoriales fijos). La
+// síntesis ejecutiva LLM fue deprecada — ver ComplianceAnalysisOrchestrator.
 //
 // Layout (en orden vertical):
 //   1. Tesla line — color según worst nivelFinal (ortogonal al estado).

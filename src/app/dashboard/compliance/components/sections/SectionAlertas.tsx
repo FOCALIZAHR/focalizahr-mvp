@@ -14,6 +14,7 @@ import {
   formatDateShort,
   formatSLACountdown,
 } from '@/app/dashboard/compliance/lib/format';
+import { getLegalBadgeText } from '@/config/compliance/legalBadgeConfig';
 import type { UseComplianceDataReturn } from '@/hooks/useComplianceData';
 
 export default function SectionAlertas({ hook }: { hook: UseComplianceDataReturn }) {
@@ -46,7 +47,7 @@ export default function SectionAlertas({ hook }: { hook: UseComplianceDataReturn
           Situaciones que requieren respuesta antes del cierre del ciclo.
         </h2>
         <p className="text-sm text-slate-500 font-light mt-2 leading-relaxed">
-          Prevenir formalización bajo Ley Karin 21.643. Documentar actuación,
+          {getLegalBadgeText(report.company.country)}. Documentar actuación,
           plazo y evidencia.
         </p>
       </div>

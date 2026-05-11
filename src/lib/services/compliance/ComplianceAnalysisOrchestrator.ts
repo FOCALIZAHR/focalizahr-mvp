@@ -31,13 +31,6 @@ import {
   createAlertsFromConvergencia,
   type DeptAlertContext,
 } from './ComplianceAlertService';
-import {
-  generateSintesisEjecutiva,
-  type AnalyzeSintesisInput,
-  type DeptoTopInput,
-  type AlertaHistoricaTipo,
-} from './SintesisConvergenciaLLMService';
-import type { NivelFinal } from './ConvergenciaEngine';
 import { buildReportNarratives } from './ComplianceNarrativeEngine';
 import { calculateISA } from './ISAService';
 import type {
@@ -721,38 +714,6 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
       previousCampaignLabel,
     });
 
-    // ─── Síntesis ejecutiva LLM (header de C3) ─────────────────────────
-    // Tercera llamada LLM del módulo. Lee alertas frescas + convergencia A4
-    // y produce el texto del header (veredicto + lego_narrativo).
-    // Decisión 4: degradación silenciosa — si el LLM falla, sintesisEjecutiva
-    // queda undefined y el frontend cae a STATE_MACHINE_COPY.
-    const sintesisInput = buildSintesisInput(
-      deptConvergenciasConA4,
-      completedDepts,
-      freshAlerts.map((a) => ({
-        alertType: a.alertType as ComplianceAlertType,
-        departmentId: a.departmentId,
-        status: a.status,
-      }))
-    );
-    const sintesisEjecutiva =
-      sintesisInput.top_departamentos.length > 0
-        ? await (async () => {
-            const r = await generateSintesisEjecutiva(sintesisInput);
-            if (!r.success) {
-              console.warn(
-                '[ComplianceOrchestrator] Síntesis ejecutiva LLM falló:',
-                r.error
-              );
-              return undefined;
-            }
-            return r.data;
-          })()
-        : undefined;
-    const narrativesWithSintesis = sintesisEjecutiva
-      ? { ...narratives, sintesisEjecutiva }
-      : narratives;
-
     // orgISA: promedio ponderado de isaScore por depto (ponderado por
     // respondentCount). Sobre los DEPTs ya COMPLETED con resultPayload
     // namespaced que incluye .isa. Si ningún depto tiene ISA, quedará null.
@@ -799,7 +760,7 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
         totalTextResponses,
         totalRespondents,
       },
-      narratives: narrativesWithSintesis,
+      narratives,
     };
 
     await prisma.complianceAnalysis.update({
@@ -1004,111 +965,3 @@ async function loadPreviousDeptIsaScore(
   return previous?.isaScore ?? null;
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// Helper síntesis ejecutiva LLM — construye el input para
-// generateSintesisEjecutiva. Inline porque solo este caller lo usa.
-// ════════════════════════════════════════════════════════════════════════════
-
-const NIVEL_FINAL_RANK: Record<NivelFinal, number> = {
-  ninguna: 0,
-  interna_solo: 1,
-  externa_solo: 2,
-  confirmada: 3,
-  amplificada: 4,
-  critica_sistema: 5,
-};
-
-interface FreshAlertSummary {
-  alertType: ComplianceAlertType;
-  departmentId: string | null;
-  status: string;
-}
-
-function buildSintesisInput(
-  deptConvergenciasConA4: DepartmentConvergencia[],
-  completedDepts: Array<{
-    departmentId: string | null;
-    department: { displayName: string } | null;
-    resultPayload: unknown;
-    isaScore: number | null;
-  }>,
-  freshAlerts: FreshAlertSummary[]
-): AnalyzeSintesisInput {
-  // Estado dominante = nivelFinal más severo entre todos los deptos.
-  let estadoDominante: NivelFinal = 'ninguna';
-  for (const d of deptConvergenciasConA4) {
-    if (NIVEL_FINAL_RANK[d.nivelFinal] > NIVEL_FINAL_RANK[estadoDominante]) {
-      estadoDominante = d.nivelFinal;
-    }
-  }
-
-  // Top departamentos: ordenar por severidad nivelFinal desc, tie-break por
-  // casosActivos.length desc, luego scoreTotal desc, luego nombre alfabético.
-  const sorted = [...deptConvergenciasConA4].sort((a, b) => {
-    const rankDiff = NIVEL_FINAL_RANK[b.nivelFinal] - NIVEL_FINAL_RANK[a.nivelFinal];
-    if (rankDiff !== 0) return rankDiff;
-    const casosDiff =
-      b.convergenciaInterna.casosActivos.length -
-      a.convergenciaInterna.casosActivos.length;
-    if (casosDiff !== 0) return casosDiff;
-    const scoreDiff =
-      b.convergenciaExterna.scoreTotal - a.convergenciaExterna.scoreTotal;
-    if (scoreDiff !== 0) return scoreDiff;
-    return a.departmentName.localeCompare(b.departmentName);
-  });
-
-  const top = sorted.slice(0, 3);
-
-  const top_departamentos: DeptoTopInput[] = top.map((d) => {
-    // Lookup row del DEPARTMENT para isaScore + LLM patron dominante
-    const row = completedDepts.find((r) => r.departmentId === d.departmentId);
-    const llmPayload = extractDeptPatrones(row?.resultPayload);
-    // senal_dominante puede ser 'ambiente_sano' / 'datos_insuficientes' /
-    // un patrón clínico. Solo enviar el patrón clínico — los valores
-    // especiales se omiten (null).
-    const senalDom = llmPayload?.senal_dominante;
-    const patronClinico =
-      senalDom && senalDom !== 'ambiente_sano' && senalDom !== 'datos_insuficientes'
-        ? senalDom
-        : null;
-
-    // Alertas activas del dept (compliance alerts pending|acknowledged)
-    const alertasActivas = freshAlerts
-      .filter(
-        (a) =>
-          a.departmentId === d.departmentId &&
-          (a.status === 'pending' || a.status === 'acknowledged')
-      )
-      .map((a) => a.alertType);
-
-    // Alertas históricas — flags derivados del payload + alertas externas
-    const historicas: AlertaHistoricaTipo[] = [];
-    if (d.convergenciaInterna.teatroDetectado) historicas.push('teatroCumplimiento');
-    if (d.convergenciaExterna.fallaCicloDeVida) historicas.push('fallaCicloDeVida');
-    // ley_karin: alguna alerta tipo ley_karin en alertas externas (Exit) del dept
-    const tieneLeyKarin = d.convergenciaExterna.alertasConsideradas.some(
-      (a) => a.alertType === 'ley_karin'
-    );
-    if (tieneLeyKarin) historicas.push('ley_karin');
-    // senal_ignorada: alerta compliance del mismo dept con type 'senal_ignorada'
-    const tieneSenalIgnorada = freshAlerts.some(
-      (a) =>
-        a.departmentId === d.departmentId && a.alertType === 'senal_ignorada'
-    );
-    if (tieneSenalIgnorada) historicas.push('senal_ignorada');
-
-    return {
-      nombre: d.departmentName,
-      isaScore: row?.isaScore ?? null,
-      casosActivos: d.convergenciaInterna.casosActivos,
-      alertasActivas,
-      alertasHistoricas: historicas,
-      patron_cultural_dominante: patronClinico,
-    };
-  });
-
-  return {
-    estado_dominante: estadoDominante,
-    top_departamentos,
-  };
-}
