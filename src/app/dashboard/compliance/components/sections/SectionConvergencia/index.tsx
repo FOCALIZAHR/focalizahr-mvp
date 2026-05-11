@@ -89,10 +89,8 @@ export default function SectionConvergencia({ hook }: Props) {
         totalDeptosUniverso={
           report.data.totalDeptosUniverso ?? report.data.departments.length
         }
-        esProblemaCultural={report.data.metaAnalysis?.es_problema_cultural ?? false}
         criticalByManagerCount={report.data.convergencia.criticalByManager.length}
         patronCulturalDominante={report.data.metaAnalysis?.patron_cultural_dominante ?? 'ninguno'}
-        sintesisEjecutiva={report.narratives.sintesisEjecutiva}
         cruceNarrativa={report.narratives.cruceNarrativa}
         criticalByManagerNarrativa={report.narratives.criticalByManagerNarrativa}
       />

@@ -1,20 +1,26 @@
 'use client';
 
-// Header C3 — paradigma "certezas ejecutivas".
+// Header C3 — paradigma "State Machine determinista".
+// Sesión 2026-05-10: reemplaza la síntesis LLM (sintesisEjecutiva) por copy
+// editorial fijo de 5 estados. El engine continúa generando sintesisEjecutiva
+// — deprecación va en commit aparte (out-of-scope).
 //
-// Layout:
-//   1. Tesla line — color según worst nivelFinal cross-deptos.
-//   2. Síntesis ejecutiva — veredicto + lego del LLM (con fallback genérico).
-//   3. Panel de Triage — 3 chips estratégicos:
-//        ¿Localizado o cultural? · ¿Hay nombre? · ¿Hay patrón?
-//
-// Cero state machine, cero hero number, cero word-split. La narrativa
-// editorial vivía en STATE_MACHINE_COPY — la reemplazamos por la síntesis
-// LLM (`sintesisEjecutiva`) más los 3 chips de diagnóstico.
+// Layout (en orden vertical):
+//   1. Tesla line — color según worst nivelFinal (ortogonal al estado).
+//   2. Contexto eyebrow + Titular word-split + Veredicto + Lego + Cierre —
+//      todo del State Machine (STATE_MACHINE_COPY).
+//   3. Cuerpo específico — cruceNarrativa (Motor 2) + criticalByManagerNarrativa
+//      (Motor 3). Orden fijo Motor 2 → Motor 3 (decisión 4 de la sesión).
+//   4. 3 chips de triage — sin captions; Chip 1 con threshold del scope.
 
-import type { MergedDept } from './_shared/helpers';
+import {
+  classifyHeaderState,
+  classifyConvergenciaScope,
+  type ConvergenciaScope,
+  type MergedDept,
+} from './_shared/helpers';
+import { STATE_MACHINE_COPY } from './_shared/STATE_MACHINE_COPY';
 import type { NivelFinal } from '@/lib/services/compliance/ConvergenciaEngine';
-import type { SintesisEjecutivaOutput } from '@/lib/services/compliance/SintesisConvergenciaLLMService';
 import type { PatronNombre } from '@/lib/services/compliance/complianceTypes';
 import { PATRON_LABELS } from '@/lib/services/compliance/ComplianceNarrativeEngine';
 
@@ -23,36 +29,30 @@ interface Props {
   deptos: MergedDept[];
   /**
    * P2 — Universo total de departamentos del account con al menos una
-   * persona activa (filtra `Department.isActive` y `Employee.isActive`,
-   * sin threshold de privacidad). Es el denominador del CHIP 1
-   * ("Afecta X de Y áreas"). Para AREA_MANAGER se filtra por jerarquía.
+   * persona activa. Denominador del Chip 1. Para AREA_MANAGER se filtra
+   * por jerarquía.
    */
   totalDeptosUniverso: number;
-  /** Flag org-level del meta-LLM. */
-  esProblemaCultural: boolean;
   /** Count de grupos. AREA_MANAGER siempre recibe 0 por privacy. */
   criticalByManagerCount: number;
   /** Slug del patrón cultural — `'ninguno' | PatronNombre`. */
   patronCulturalDominante: string;
-  /** LLM síntesis — undefined cae a fallback genérico (decisión 2b). */
-  sintesisEjecutiva?: SintesisEjecutivaOutput;
   /**
    * Motor 2 — narrativa org-level del cruce cross-instrumento. Renderiza
-   * como 3er párrafo en la síntesis (después de veredicto + lego). Optional:
-   * `undefined` cuando hay <2 fuentes activas o no hay material narrativo.
+   * en el cuerpo específico cuando produce. Optional: undefined si hay
+   * <2 fuentes activas o sin material narrativo.
    */
   cruceNarrativa?: string;
   /**
-   * Motor 3 — narrativa org-level del patrón liderazgo cuando varios deptos
-   * críticos comparten managerId. Renderiza debajo del grid con eyebrow
-   * "MISMO MANDO, ÁREAS DISTINTAS". Optional: route.ts la suprime para
-   * AREA_MANAGER y queda `undefined` si no hay grupos.
+   * Motor 3 — narrativa org-level del patrón de liderazgo. Renderiza en
+   * el cuerpo específico debajo de Motor 2. Optional: route.ts la suprime
+   * para AREA_MANAGER, undefined si no hay grupos criticalByManager.
    */
   criticalByManagerNarrativa?: string;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// Tesla line — mapeo nivelFinal → color
+// Tesla line — mapeo nivelFinal → color (sin cambios, ortogonal al estado)
 // ════════════════════════════════════════════════════════════════════════════
 
 const NIVEL_FINAL_RANK: Record<NivelFinal, number> = {
@@ -106,16 +106,7 @@ function teslaForNivelFinal(nivel: NivelFinal): TeslaConfig {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// Fallback genérico (decisión 2b) — sin reintroducir state machine.
-// ════════════════════════════════════════════════════════════════════════════
-
-const FALLBACK_VEREDICTO =
-  'El cierre de este ciclo no incluyó síntesis ejecutiva.';
-const FALLBACK_LEGO =
-  'Las señales agregadas se resumen en el panel inferior.';
-
-// ════════════════════════════════════════════════════════════════════════════
-// Resolución de chips
+// Chips de triage — sub-líneas removidas (sesión 2026-05-10)
 // ════════════════════════════════════════════════════════════════════════════
 
 type ChipHeroColor = 'amber' | 'purple' | 'neutral';
@@ -124,69 +115,36 @@ interface ChipData {
   eyebrow: string;
   hero: string;
   heroColor: ChipHeroColor;
-  caption: string;
 }
 
-function resolveChip1(
-  esCultural: boolean,
-  convergentes: number,
-  total: number,
-): ChipData {
-  // Pluralización por denominador (Y) — más estable que pluralizar por X.
-  const palabraArea = total === 1 ? 'área' : 'áreas';
-  const caption = `Afecta ${convergentes} de ${total} ${palabraArea}`;
-  return esCultural
-    ? {
-        eyebrow: '¿Localizado o cultural?',
-        hero: 'Riesgo sistémico',
-        heroColor: 'amber',
-        caption,
-      }
-    : {
-        eyebrow: '¿Localizado o cultural?',
-        hero: 'Foco localizado',
-        heroColor: 'neutral',
-        caption,
-      };
+const SCOPE_HERO: Record<ConvergenciaScope, { hero: string; color: ChipHeroColor }> = {
+  localizado: { hero: 'Localizado', color: 'neutral' },
+  distribuido: { hero: 'Distribuido', color: 'purple' },
+  sistemico: { hero: 'Sistémico', color: 'amber' },
+};
+
+function resolveChip1(convergentes: number, total: number): ChipData {
+  const scope = classifyConvergenciaScope(convergentes, total);
+  const { hero, color } = SCOPE_HERO[scope];
+  return { eyebrow: '¿Localizado o cultural?', hero, heroColor: color };
 }
 
 function resolveChip2(count: number): ChipData {
   return count > 0
-    ? {
-        eyebrow: '¿Hay nombre?',
-        hero: 'Patrón de liderazgo',
-        heroColor: 'purple',
-        caption: 'Mismo mando, realidades distintas',
-      }
-    : {
-        eyebrow: '¿Hay nombre?',
-        hero: 'Sin patrón jerárquico',
-        heroColor: 'neutral',
-        caption: 'Fricción distribuida',
-      };
+    ? { eyebrow: '¿Hay nombre?', hero: 'Patrón de liderazgo', heroColor: 'purple' }
+    : { eyebrow: '¿Hay nombre?', hero: 'Sin patrón jerárquico', heroColor: 'neutral' };
 }
 
 function resolveChip3(slug: string): ChipData {
-  // Sentinel 'ninguno' o slug no reconocido → "Múltiples focos" (decisión 4).
   if (slug === 'ninguno' || !(slug in PATRON_LABELS)) {
-    return {
-      eyebrow: '¿Hay patrón?',
-      hero: 'Múltiples focos',
-      heroColor: 'neutral',
-      caption: 'Sin patrón único',
-    };
+    return { eyebrow: '¿Hay patrón?', hero: 'Múltiples focos', heroColor: 'neutral' };
   }
   return {
     eyebrow: '¿Hay patrón?',
     hero: PATRON_LABELS[slug as PatronNombre],
     heroColor: 'purple',
-    caption: 'Patrón dominante',
   };
 }
-
-// ════════════════════════════════════════════════════════════════════════════
-// Subcomponente — chip de triage
-// ════════════════════════════════════════════════════════════════════════════
 
 function ChipTriage({ data }: { data: ChipData }) {
   const heroClass =
@@ -204,9 +162,6 @@ function ChipTriage({ data }: { data: ChipData }) {
       <p className={`text-base font-light leading-tight ${heroClass}`}>
         {data.hero}
       </p>
-      <p className="text-xs font-light text-slate-500 leading-snug">
-        {data.caption}
-      </p>
     </div>
   );
 }
@@ -218,10 +173,8 @@ function ChipTriage({ data }: { data: ChipData }) {
 export default function ConvergenciaOrgHeader({
   deptos,
   totalDeptosUniverso,
-  esProblemaCultural,
   criticalByManagerCount,
   patronCulturalDominante,
-  sintesisEjecutiva,
   cruceNarrativa,
   criticalByManagerNarrativa,
 }: Props) {
@@ -233,8 +186,7 @@ export default function ConvergenciaOrgHeader({
   ).length;
 
   // Invariante esperada: convergentes ≤ universo. Si se viola (datos sucios
-  // o desactivación de empleado entre ciclos), no distorsionamos la UI —
-  // logueamos para investigación. La caption renderiza los números crudos.
+  // o desactivación de empleado entre ciclos), logueamos para investigación.
   if (deptosConvergentesCount > totalDeptosUniverso) {
     console.warn(
       '[ConvergenciaOrgHeader] convergentes > universo — posible inconsistencia de datos:',
@@ -242,16 +194,15 @@ export default function ConvergenciaOrgHeader({
     );
   }
 
-  const veredictoText = sintesisEjecutiva?.veredicto ?? FALLBACK_VEREDICTO;
-  const legoText = sintesisEjecutiva?.lego_narrativo ?? FALLBACK_LEGO;
+  // State Machine — clasificación con precedencia + lookup de copy aprobado.
+  const state = classifyHeaderState(deptos);
+  const copy = STATE_MACHINE_COPY[state];
 
-  const chip1 = resolveChip1(
-    esProblemaCultural,
-    deptosConvergentesCount,
-    totalDeptosUniverso,
-  );
+  const chip1 = resolveChip1(deptosConvergentesCount, totalDeptosUniverso);
   const chip2 = resolveChip2(criticalByManagerCount);
   const chip3 = resolveChip3(patronCulturalDominante);
+
+  const hasCuerpoEspecifico = Boolean(cruceNarrativa || criticalByManagerNarrativa);
 
   return (
     <div
@@ -261,7 +212,7 @@ export default function ConvergenciaOrgHeader({
         border: '0.5px solid #1e293b',
       }}
     >
-      {/* 1. Tesla line */}
+      {/* 1. Tesla line — gobernada por worstNivelFinal, no por el estado del header */}
       <div
         className={`absolute top-0 left-0 right-0 h-px pointer-events-none ${
           tesla.pulse ? 'animate-pulse' : ''
@@ -274,8 +225,24 @@ export default function ConvergenciaOrgHeader({
       />
 
       <div className="px-7 py-8 flex flex-col gap-7">
-        {/* 2. Síntesis ejecutiva */}
+        {/* 2. State Machine — contexto + titular + veredicto + lego + cierre */}
         <div className="flex flex-col gap-5">
+          {/* Contexto eyebrow */}
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+            {copy.contexto}
+          </span>
+
+          {/* Titular word-split (mobile-first: 3xl → 44px en md+) */}
+          <div className="flex flex-col gap-0">
+            <h2 className="text-3xl md:text-[44px] font-extralight text-white tracking-tight leading-tight">
+              {copy.titularLine1}
+            </h2>
+            <p className="text-3xl md:text-[44px] font-extralight tracking-tight leading-tight fhr-title-gradient">
+              {copy.titularLine2}
+            </p>
+          </div>
+
+          {/* Veredicto italic */}
           <p
             className="text-[13px] italic font-light leading-[1.6] pl-3"
             style={{
@@ -283,26 +250,59 @@ export default function ConvergenciaOrgHeader({
               borderLeft: '1px solid #1e293b',
             }}
           >
-            {veredictoText}
+            {copy.veredicto}
           </p>
+
+          {/* Lego */}
           <p
             className="text-sm font-light leading-[1.8]"
             style={{ color: '#cbd5e1' }}
           >
-            {legoText}
+            {copy.lego}
           </p>
-          {/* Motor 2 — cruce cross-instrumento (3er párrafo). */}
-          {cruceNarrativa ? (
+
+          {/* Cierre (Regla 6) — párrafo aparte, italic para marcar el cierre */}
+          {copy.cierre ? (
             <p
-              className="text-sm font-light leading-[1.8]"
+              className="text-sm italic font-light leading-[1.8]"
               style={{ color: '#cbd5e1' }}
             >
-              {cruceNarrativa}
+              {copy.cierre}
             </p>
           ) : null}
         </div>
 
-        {/* 3. Panel de triage */}
+        {/* 3. Cuerpo específico — Motor 2 (cruce) → Motor 3 (criticalByManager) */}
+        {hasCuerpoEspecifico ? (
+          <div
+            className="flex flex-col gap-5 pt-6"
+            style={{ borderTop: '0.5px solid #1e293b' }}
+          >
+            {cruceNarrativa ? (
+              <p
+                className="text-sm font-light leading-[1.8]"
+                style={{ color: '#cbd5e1' }}
+              >
+                {cruceNarrativa}
+              </p>
+            ) : null}
+            {criticalByManagerNarrativa ? (
+              <div className="flex flex-col gap-3">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+                  Mismo mando, áreas distintas
+                </span>
+                <p
+                  className="text-sm font-light leading-[1.8]"
+                  style={{ color: '#cbd5e1' }}
+                >
+                  {criticalByManagerNarrativa}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* 4. Panel de triage — 3 chips sin captions */}
         <div
           className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-6"
           style={{ borderTop: '0.5px solid #1e293b' }}
@@ -311,21 +311,6 @@ export default function ConvergenciaOrgHeader({
           <ChipTriage data={chip2} />
           <ChipTriage data={chip3} />
         </div>
-
-        {/* Motor 3 — patrón liderazgo cross-dept (debajo del grid). */}
-        {criticalByManagerNarrativa ? (
-          <div className="flex flex-col gap-3 pt-6" style={{ borderTop: '0.5px solid #1e293b' }}>
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
-              Mismo mando, áreas distintas
-            </span>
-            <p
-              className="text-sm font-light leading-[1.8]"
-              style={{ color: '#cbd5e1' }}
-            >
-              {criticalByManagerNarrativa}
-            </p>
-          </div>
-        ) : null}
       </div>
     </div>
   );

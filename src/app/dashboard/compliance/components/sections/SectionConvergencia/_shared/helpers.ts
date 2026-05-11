@@ -13,6 +13,7 @@ import type {
   CasoMotorA,
 } from '@/lib/services/compliance/ConvergenciaEngine';
 import type { DepartmentSafetyScore } from '@/lib/services/SafetyScoreService';
+import type { HeaderState } from './STATE_MACHINE_COPY';
 
 // ════════════════════════════════════════════════════════════════════════════
 // Tipo unificado MergedDept
@@ -260,6 +261,65 @@ export function getEmptyStateVariant(
   if (conv.departments.length === 0) return 'sin_ciclo';
   if (conv.activeSources.length <= 1) return 'solo_motor_a';
   return 'sin_convergencia';
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Header State Machine — clasificador con precedencia
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Clasifica el estado del header según precedencia (plan v2 §328–335):
+ *   1. Algún dept con `enCriticalByManagerGroup` → Estado 1
+ *   2. Algún dept con `fallaCicloDeVida`         → Estado 2
+ *   3. Algún dept con `teatroDetectado`          → Estado 3
+ *   4. ≥2 deptos con convergencia (sin los anteriores) → Estado 4
+ *   5. Resto / fallback                          → Estado 5
+ *
+ * Backward compat (decisión 7): los predicados usan `?.` + `=== true` para
+ * que payloads pre-deploy con flags `undefined` caigan silenciosamente a
+ * Estado 5 en lugar de crashear. `mergeDepartmentData` ya aplica defaults
+ * vía EMPTY_INTERNA/EMPTY_EXTERNA, pero esta función es defensiva por
+ * separado — si un caller futuro bypassa el merge, no rompe.
+ */
+export function classifyHeaderState(deptos: MergedDept[]): HeaderState {
+  if (deptos.some((d) => d.convergenciaInterna?.enCriticalByManagerGroup === true)) {
+    return 1;
+  }
+  if (deptos.some((d) => d.convergenciaExterna?.fallaCicloDeVida === true)) {
+    return 2;
+  }
+  if (deptos.some((d) => d.convergenciaInterna?.teatroDetectado === true)) {
+    return 3;
+  }
+  if (deptos.length >= 2) return 4;
+  return 5;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Convergencia scope — threshold del Chip 1
+// ════════════════════════════════════════════════════════════════════════════
+
+export type ConvergenciaScope = 'localizado' | 'distribuido' | 'sistemico';
+
+/**
+ * Clasifica el alcance de la convergencia organizacional según % de deptos
+ * convergentes sobre el universo total (decisión del user, sesión 2026-05-10):
+ *   <30%   → localizado
+ *   30-60% → distribuido
+ *   >60%   → sistemico
+ *
+ * Defensive: `total <= 0` cae a `localizado` (no debería ocurrir en runtime —
+ * `index.tsx` ya garantiza ≥1 dept antes de renderizar el header).
+ */
+export function classifyConvergenciaScope(
+  convergentes: number,
+  total: number,
+): ConvergenciaScope {
+  if (total <= 0) return 'localizado';
+  const pct = (convergentes / total) * 100;
+  if (pct >= 60) return 'sistemico';
+  if (pct >= 30) return 'distribuido';
+  return 'localizado';
 }
 
 // ════════════════════════════════════════════════════════════════════════════
