@@ -16,7 +16,7 @@ import {
 } from '@/lib/services/AuthorizationService';
 import { INTERVENTION_CATALOG } from '@/lib/services/compliance/InterventionEngine';
 
-type TriggerType = 'dimension_low' | 'patron' | 'alert';
+type TriggerType = 'dimension_low' | 'patron' | 'alert' | 'convergencia';
 
 interface CreateInput {
   campaignId: string;
@@ -28,7 +28,12 @@ interface CreateInput {
 }
 
 function isTriggerType(value: unknown): value is TriggerType {
-  return value === 'dimension_low' || value === 'patron' || value === 'alert';
+  return (
+    value === 'dimension_low' ||
+    value === 'patron' ||
+    value === 'alert' ||
+    value === 'convergencia'
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════

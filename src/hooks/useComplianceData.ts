@@ -204,6 +204,32 @@ function extractTriggers(report: ComplianceReportResponse | null): TriggerInput[
     });
   }
 
+  // ─── 4) Convergencia (C3) — 1 trigger por dept con nivelFinal != 'ninguna' ─
+  // Cierra el loop ejecutivo de C3: cada banda con convergencia genera un
+  // trigger que el InterventionEngine consolida cross-depto si dos+ comparten
+  // intervención. riskLevel se deriva de nivelFinal (severidad del Motor A+B).
+  for (const conv of report.data.convergencia.departments) {
+    const nivel = conv.nivelFinal;
+    if (nivel === 'ninguna') continue;
+    const riskLevel: DimensionRiskLevel =
+      nivel === 'critica_sistema' || nivel === 'amplificada'
+        ? 'critico'
+        : nivel === 'confirmada'
+          ? 'bajo'
+          : 'medio';
+    triggers.push({
+      type: 'convergencia',
+      ref: `convergencia:${conv.departmentId}`,
+      label: conv.departmentName,
+      riskLevel,
+      meta: {
+        departmentId: conv.departmentId,
+        nivelFinal: nivel,
+        casosActivos: conv.convergenciaInterna?.casosActivos ?? [],
+      },
+    });
+  }
+
   return triggers;
 }
 

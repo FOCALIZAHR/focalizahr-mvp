@@ -11,13 +11,14 @@ import type {
   Recommendation,
   CompliancePlanAction,
   Intervention,
+  TriggerType,
 } from '@/types/compliance';
 
 interface RecommendationCardProps {
   recommendation: Recommendation;
   planActions: CompliancePlanAction[];
   onRegister: (input: {
-    triggerType: 'dimension_low' | 'patron' | 'alert';
+    triggerType: TriggerType;
     triggerRef: string;
     triggerLabel: string;
     chosenOption: number;

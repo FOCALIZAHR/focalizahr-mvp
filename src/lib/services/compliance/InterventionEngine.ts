@@ -170,11 +170,15 @@ export const ALERT_INTERVENTIONS: Record<ComplianceAlertType | 'default', string
   senal_ignorada: DEFAULT_TRIPLETA,
 };
 
+// Convergencia (C3) — un trigger por depto con nivelFinal != 'ninguna'.
+// Fase 1: default tripleta. Refinable por nivelFinal en Deep Research v2.
+export const CONVERGENCIA_INTERVENTIONS: string[] = DEFAULT_TRIPLETA;
+
 // ═══════════════════════════════════════════════════════════════════
 // CAPA 3 — Motor de consolidación
 // ═══════════════════════════════════════════════════════════════════
 
-export type TriggerType = 'dimension_low' | 'patron' | 'alert';
+export type TriggerType = 'dimension_low' | 'patron' | 'alert' | 'convergencia';
 
 export interface TriggerInput {
   type: TriggerType;
@@ -211,6 +215,9 @@ function getInterventionsForTrigger(t: TriggerInput): string[] {
   if (t.type === 'patron') {
     const nombre = t.ref as PatronNombre;
     return PATRON_INTERVENTIONS[nombre] ?? PATRON_INTERVENTIONS.default;
+  }
+  if (t.type === 'convergencia') {
+    return CONVERGENCIA_INTERVENTIONS;
   }
   // alert
   const alertType = (t.meta?.alertType as ComplianceAlertType | undefined) ?? null;

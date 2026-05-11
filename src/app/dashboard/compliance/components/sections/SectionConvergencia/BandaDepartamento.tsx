@@ -12,10 +12,16 @@ import { ChevronDown, GitBranch, Infinity as InfinityIcon } from 'lucide-react';
 import SelloForense from './SelloForense';
 import AmplificadorChip from './AmplificadorChip';
 import AlertaComplianceChip from './AlertaComplianceChip';
+import RecommendationCard from '../_shared/RecommendationCard';
 import { AMPLIFICADOR_LABELS, resolveAlertLabel } from './_shared/ALERT_LABELS';
 import { getCombinatoriaNarrative } from './_shared/CombinatoriaDictionary';
 import type { MergedDept } from './_shared/helpers';
 import type { AlertaNarrative } from '@/lib/services/compliance/ComplianceNarrativeEngine';
+import type {
+  Recommendation,
+  CompliancePlanAction,
+} from '@/types/compliance';
+import type { RegisterPlanActionInput } from '@/hooks/useComplianceData';
 
 interface Props {
   dept: MergedDept;
@@ -39,6 +45,18 @@ interface Props {
    * fila no renderiza.
    */
   narrativaEstructural?: string;
+  /**
+   * Bloque 6 expandido — recomendaciones del InterventionEngine. La banda
+   * filtra las que tocan a este depto (trigger 'convergencia' con
+   * ref=convergencia:{deptId}, sea individual o consolidated cross-depto).
+   * Cierra el loop ejecutivo: el CEO registra la intervención sin salir
+   * del depto que está leyendo.
+   */
+  recommendations: Recommendation[];
+  planActions: CompliancePlanAction[];
+  onRegister: (input: RegisterPlanActionInput) => Promise<void>;
+  onClear: (triggerRef: string) => Promise<void>;
+  isSavingPlanAction: boolean;
 }
 
 // Borde lateral según nivel — peso, no color (spec).
@@ -55,6 +73,11 @@ export default function BandaDepartamento({
   onToggle,
   narrativaByAlertType,
   narrativaEstructural,
+  recommendations,
+  planActions,
+  onRegister,
+  onClear,
+  isSavingPlanAction,
 }: Props) {
   const interna = dept.convergenciaInterna;
   const externa = dept.convergenciaExterna;
@@ -242,7 +265,15 @@ export default function BandaDepartamento({
           className="px-5 pb-5 pt-1"
           style={{ borderTop: '0.5px solid #1e293b' }}
         >
-          <BloquesExpandidos dept={dept} narrativaByAlertType={narrativaByAlertType} />
+          <BloquesExpandidos
+            dept={dept}
+            narrativaByAlertType={narrativaByAlertType}
+            recommendations={recommendations}
+            planActions={planActions}
+            onRegister={onRegister}
+            onClear={onClear}
+            isSavingPlanAction={isSavingPlanAction}
+          />
         </div>
       ) : null}
     </div>
@@ -256,9 +287,19 @@ export default function BandaDepartamento({
 function BloquesExpandidos({
   dept,
   narrativaByAlertType,
+  recommendations,
+  planActions,
+  onRegister,
+  onClear,
+  isSavingPlanAction,
 }: {
   dept: MergedDept;
   narrativaByAlertType?: Map<string, AlertaNarrative>;
+  recommendations: Recommendation[];
+  planActions: CompliancePlanAction[];
+  onRegister: (input: RegisterPlanActionInput) => Promise<void>;
+  onClear: (triggerRef: string) => Promise<void>;
+  isSavingPlanAction: boolean;
 }) {
   const interna = dept.convergenciaInterna;
   const externa = dept.convergenciaExterna;
@@ -418,6 +459,47 @@ function BloquesExpandidos({
                 </p>
               </div>
             ))}
+          </div>
+        );
+      })()}
+
+      {/* Bloque 6 — Recomendación InterventionEngine (P0.1, S4).
+          Filtra recommendations que tocan a este depto vía trigger
+          'convergencia:{deptId}'. Una banda puede mostrar:
+            - 1 card individual (3 opciones del catálogo)
+            - 1 card consolidated (cuando una intervención cubre 2+ deptos
+              y el depto está en resolvesTriggers).
+          Click en "Registrar acción" persiste en CompliancePlanAction y
+          alimenta el Plan Global de C4. */}
+      {(() => {
+        const myRef = `convergencia:${dept.departmentId}`;
+        const myRecs = recommendations.filter((r) => {
+          if (r.type === 'consolidated') {
+            return (r.resolvesTriggers ?? []).some(
+              (t) => t.type === 'convergencia' && t.ref === myRef,
+            );
+          }
+          return r.trigger?.type === 'convergencia' && r.trigger.ref === myRef;
+        });
+        if (myRecs.length === 0) return null;
+        return (
+          <div className="flex flex-col gap-3">
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+              Intervención recomendada
+            </span>
+            <div className="flex flex-col gap-4">
+              {myRecs.map((r, i) => (
+                <RecommendationCard
+                  key={`conv-${dept.departmentId}-${i}`}
+                  recommendation={r}
+                  planActions={planActions}
+                  onRegister={onRegister}
+                  onClear={onClear}
+                  isSaving={isSavingPlanAction}
+                  accent="cyan"
+                />
+              ))}
+            </div>
           </div>
         );
       })()}

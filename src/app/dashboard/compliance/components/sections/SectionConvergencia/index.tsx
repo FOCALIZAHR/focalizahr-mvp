@@ -103,6 +103,11 @@ export default function SectionConvergencia({ hook }: Props) {
             onToggle={() => handleToggle(dept.departmentId)}
             narrativaByAlertType={narrativaByAlertType}
             narrativaEstructural={narrativaEstructuralByDeptId.get(dept.departmentId)}
+            recommendations={hook.interventionPlan.recommendations}
+            planActions={hook.planActions}
+            onRegister={hook.registerPlanAction}
+            onClear={hook.clearPlanAction}
+            isSavingPlanAction={hook.isSavingPlanAction}
           />
         ))}
       </div>

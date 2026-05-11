@@ -53,6 +53,8 @@ export type {
 
 export type { ISARiskLevel } from '@/lib/services/compliance/ISAService';
 
+import type { TriggerType } from '@/lib/services/compliance/InterventionEngine';
+
 export type {
   Intervention,
   TriggerType,
@@ -106,7 +108,7 @@ export interface CompliancePlanAction {
   id: string;
   campaignId: string;
   accountId: string;
-  triggerType: 'dimension_low' | 'patron' | 'alert';
+  triggerType: TriggerType;
   triggerRef: string;
   triggerLabel: string;
   chosenOption: number; // 0 | 1 | 2
