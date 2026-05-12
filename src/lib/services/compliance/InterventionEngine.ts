@@ -40,20 +40,20 @@ export const INTERVENTION_CATALOG: Record<string, Intervention> = {
   },
   PSYCH_SAFETY_MODELING: {
     id: 'PSYCH_SAFETY_MODELING',
-    titulo: 'Liderazgo empático — modelar vulnerabilidad',
+    titulo: 'Liderazgo que reconoce errores en voz alta',
     mecanismo:
-      'El líder admite errores propios públicamente y solicita feedback correctivo de su equipo',
+      'El líder admite sus propios fallos antes que los del equipo. Cada problema se trata como pregunta, no como juicio. Los pulsos confirman si esa apertura se convirtió en hábito o sigue siendo discurso.',
     evidencia: 'BCG — 28.000 empleados',
-    plazo: '8-10 meses',
+    plazo: '12 a 24 meses para que arraigue. Las primeras señales aparecen al sexto mes.',
     metrica: 'Elimina brecha de deserción en grupos diversos',
   },
   BYSTANDER_INTERVENTION: {
     id: 'BYSTANDER_INTERVENTION',
-    titulo: 'Intervención activa de espectadores',
+    titulo: 'Aliados activos en la sala',
     mecanismo:
-      'Entrena al colectivo (no a la víctima) a desescalar activamente y validar públicamente',
+      'Entrena al grupo — no a quien recibe el daño — a interrumpir el comentario despectivo en el momento. Sin escándalo, sin discurso. Una frase que reordena la conversación y deja claro qué no se acepta aquí.',
     evidencia: 'MDPI Microaggressions 2024',
-    plazo: '3-6 meses',
+    plazo: '12 meses sostenidos. Los talleres de un día no funcionan.',
     metrica: 'Reducción de incidentes percibidos en 3-6 meses',
   },
   HIGH_FREQ_PULSES: {
@@ -67,11 +67,11 @@ export const INTERVENTION_CATALOG: Record<string, Intervention> = {
   },
   DISSENT_INSTITUTIONALIZATION: {
     id: 'DISSENT_INSTITUTIONALIZATION',
-    titulo: 'Institucionalizar el disenso',
+    titulo: 'Disentir y comprometerse',
     mecanismo:
-      'Asignar rotativamente el rol de "abogado del diablo" en reuniones críticas',
+      'Cada decisión importante exige que alguien la cuestione antes de aprobarse. Una vez decidida, todos ejecutan — pero la objeción quedó registrada. Se separa la fase de debate de la fase de ejecución.',
     evidencia: 'McKinsey Risk Culture 2024',
-    plazo: '2-3 ciclos trimestrales',
+    plazo: '6 a 12 meses para desaprender la aversión al conflicto.',
     metrica: 'Elimina ceguera sistémica ante errores evidentes',
   },
   PROSOCIAL_ACTIVITIES: {
@@ -85,20 +85,20 @@ export const INTERVENTION_CATALOG: Record<string, Intervention> = {
   },
   ALGORITHMIC_TRANSPARENCY: {
     id: 'ALGORITHMIC_TRANSPARENCY',
-    titulo: 'Transparencia algorítmica en promociones',
+    titulo: 'Un responsable claro por decisión',
     mecanismo:
-      'Calibración colegiada del desempeño — el avance no depende del sesgo de un solo supervisor',
+      'Cada decisión relevante tiene un nombre y apellido al lado. Ni comités difusos, ni autoría compartida cuando algo funciona — ni huérfana cuando algo falla. Las reglas son las mismas para todos y se aplican igual.',
     evidencia: 'Columbia SPS — Organizational Justice',
-    plazo: '3-6 meses',
+    plazo: '10 a 12 meses para que la percepción de injusticia se revierta.',
     metrica: 'r = -0.436 entre inequidad percibida e intención de rotación',
   },
   RELATIONAL_REDESIGN: {
     id: 'RELATIONAL_REDESIGN',
-    titulo: 'Rediseño del ecosistema relacional',
+    titulo: 'Auditoría del trabajo, no del esfuerzo',
     mecanismo:
-      'Grupos de apoyo de pares, círculos de diálogo facilitado y rutinas post-incidente',
+      'El equipo revisa junto qué tareas duplica, qué reuniones sobran, qué dependencias bloquean. La conversación se traslada de "quién falla" a "qué está mal diseñado". El conflicto deja de ser entre personas y pasa a ser sobre el sistema.',
     evidencia: 'Teoría Relacional-Cultural — PMC 2024',
-    plazo: '3-6 meses',
+    plazo: '1 a 12 meses según la severidad del cuadro.',
     metrica: 'Recuperación estadística medible en encuestas de pulso',
   },
 };
