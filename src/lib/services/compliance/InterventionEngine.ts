@@ -213,7 +213,11 @@ function getInterventionsForTrigger(t: TriggerInput): string[] {
     return matrix[t.riskLevel] ?? matrix.medio;
   }
   if (t.type === 'patron') {
-    const nombre = t.ref as PatronNombre;
+    // ref convención: `patron:{nombre}` (paridad con convergencia/alert/dim).
+    // Fallback a meta.nombre para callers que pasen el nombre directo en meta.
+    const nombre =
+      (t.meta?.nombre as PatronNombre | undefined) ??
+      (t.ref.replace(/^patron:/, '') as PatronNombre);
     return PATRON_INTERVENTIONS[nombre] ?? PATRON_INTERVENTIONS.default;
   }
   if (t.type === 'convergencia') {

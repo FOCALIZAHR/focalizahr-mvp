@@ -44,6 +44,7 @@ import { getGenderEscalationProtocol } from '@/config/compliance/genderEscalatio
 
 import { ORIGEN_LABELS } from './SectionDimensiones/_shared/constants';
 import { formatCyclePeriod } from './SectionDimensiones/_shared/helpers';
+import RecommendationCard from './_shared/RecommendationCard';
 
 import type {
   ComplianceReportDepartment,
@@ -51,6 +52,8 @@ import type {
   GenderAlertDetail,
   MetaAnalysisOutput,
   PatronNarrative,
+  Recommendation,
+  CompliancePlanAction,
 } from '@/types/compliance';
 import type { UseComplianceDataReturn } from '@/hooks/useComplianceData';
 
@@ -263,6 +266,48 @@ export default function SectionPatrones({
   hook: UseComplianceDataReturn;
 }) {
   const report = hook.report;
+
+  // Lookup PatronNarrative[] por departmentName — un dept puede aparecer en
+  // más de un patrón org-level si el LLM detectó varios. PatronNarrative.
+  // departments[] son nombres (no IDs), así que el lookup es por name.
+  const narrativasPatronByDeptName = useMemo(() => {
+    const m = new Map<string, PatronNarrative[]>();
+    if (!report) return m;
+    for (const p of report.narratives.artefacto2_patrones) {
+      for (const deptName of p.departments) {
+        const arr = m.get(deptName) ?? [];
+        arr.push(p);
+        m.set(deptName, arr);
+      }
+    }
+    return m;
+  }, [report]);
+
+  // Lookup narrativa estructural (Motor 1 — buildConvergencia) por
+  // departmentId. Reutiliza el patrón de SectionConvergencia: indexamos
+  // por id (el shape ya lo expone), no por name.
+  const narrativaConvergenciaByDeptId = useMemo(() => {
+    const m = new Map<string, string>();
+    if (!report) return m;
+    for (const n of report.narratives.artefacto3_convergencia) {
+      m.set(n.departmentId, n.narrativa);
+    }
+    return m;
+  }, [report]);
+
+  // Recomendaciones del InterventionEngine que provienen de triggers patron.
+  // Cierra el loop ejecutivo en C2: el CEO lee el patrón → registra la
+  // intervención sin salir de la sección. Aparece UNA vez a nivel section
+  // (org-level), debajo del Nivel 1 Card.
+  const patronRecs = useMemo(() => {
+    return hook.interventionPlan.recommendations.filter((r) => {
+      if (r.type === 'consolidated') {
+        return (r.resolvesTriggers ?? []).some((t) => t.type === 'patron');
+      }
+      return r.trigger?.type === 'patron';
+    });
+  }, [hook.interventionPlan.recommendations]);
+
   if (!report) return null;
 
   const patrones = report.narratives.artefacto2_patrones;
@@ -309,7 +354,38 @@ export default function SectionPatrones({
         />
       )}
 
-      {departments.length > 0 ? <Nivel2Bandas departments={departments} /> : null}
+      {/* RecommendationCard org-level — solo cuando hay patrón detectado.
+          Si el motor consolidó este trigger con otros (dim/alert/convergencia)
+          aparecerá como consolidated; caso contrario va individual con 3
+          opciones. Click en "Registrar" persiste en CompliancePlanAction. */}
+      {hasPatron && patronRecs.length > 0 ? (
+        <div className="flex flex-col gap-3">
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+            Intervención recomendada
+          </span>
+          <div className="flex flex-col gap-4">
+            {patronRecs.map((r, i) => (
+              <RecommendationCard
+                key={`patron-${i}`}
+                recommendation={r}
+                planActions={hook.planActions}
+                onRegister={hook.registerPlanAction}
+                onClear={hook.clearPlanAction}
+                isSaving={hook.isSavingPlanAction}
+                accent="cyan"
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {departments.length > 0 ? (
+        <Nivel2Bandas
+          departments={departments}
+          narrativasPatronByDeptName={narrativasPatronByDeptName}
+          narrativaConvergenciaByDeptId={narrativaConvergenciaByDeptId}
+        />
+      ) : null}
     </div>
   );
 }
@@ -946,8 +1022,23 @@ function FragmentoBox({ text }: { text: string }) {
 
 function Nivel2Bandas({
   departments,
+  narrativasPatronByDeptName,
+  narrativaConvergenciaByDeptId,
 }: {
   departments: ComplianceReportDepartment[];
+  /**
+   * Lookup PatronNarrative[] org-level por departmentName. La banda usa
+   * estos para mostrar — al expandir — qué patrones org tocan al dept y
+   * con qué fragmentos. Lookup por name porque PatronNarrative.departments
+   * son strings (no IDs).
+   */
+  narrativasPatronByDeptName: Map<string, PatronNarrative[]>;
+  /**
+   * Lookup narrativa Motor 1 (`buildConvergencia`) por departmentId. La
+   * banda la muestra al expandir cuando existe — agrega contexto
+   * estructural (qué fuentes coinciden + caso A1-A5) al patrón conductual.
+   */
+  narrativaConvergenciaByDeptId: Map<string, string>;
 }) {
   const buckets = useMemo(() => bucketDepartments(departments), [departments]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -991,6 +1082,12 @@ function Nivel2Bandas({
           isExpanded={expandedId === dept.departmentId}
           isLast={lastBandaId === dept.departmentId}
           onToggle={() => toggle(dept.departmentId)}
+          narrativasPatronOrg={
+            narrativasPatronByDeptName.get(dept.departmentName) ?? []
+          }
+          narrativaConvergencia={narrativaConvergenciaByDeptId.get(
+            dept.departmentId,
+          )}
         />
       ))}
 
@@ -1022,11 +1119,25 @@ function BandaPatron({
   isExpanded,
   isLast,
   onToggle,
+  narrativasPatronOrg,
+  narrativaConvergencia,
 }: {
   dept: ComplianceReportDepartment;
   isExpanded: boolean;
   isLast: boolean;
   onToggle: () => void;
+  /**
+   * Patrones org-level (artefacto2_patrones) que tocan a este dept. Render
+   * al expandir como bloque "Patrón organizacional vinculado". Vacío =
+   * el dept tiene patron_dominante por-depto pero no aparece en agregados
+   * org. Filtrar duplicados con el dominante para no repetir copy.
+   */
+  narrativasPatronOrg: PatronNarrative[];
+  /**
+   * Narrativa estructural Motor 1 (artefacto3_convergencia) si el dept
+   * tiene convergencia activa. Aparece al expandir como contexto adicional.
+   */
+  narrativaConvergencia?: string;
 }) {
   const dominante = dept.patrones?.patron_dominante;
   if (!dominante) return null;
@@ -1044,6 +1155,13 @@ function BandaPatron({
   const confInfo = confianza ? deptConfidenceLabel(confianza) : null;
 
   const respondentCount = dept.respondentCount ?? 0;
+
+  // Filtrar patrones org-level distintos al dominante por-depto: cuando
+  // coinciden el copy es redundante (ya está en el chevron del header).
+  // Quedan los patrones org-level adicionales que también tocan a este dept.
+  const otrosPatronesOrg = narrativasPatronOrg.filter(
+    (p) => p.nombre !== dominante.nombre,
+  );
 
   return (
     <>
@@ -1128,12 +1246,44 @@ function BandaPatron({
       {/* Banda expandida */}
       {isExpanded ? (
         <div
-          className="flex flex-col gap-2 px-7 pb-4"
+          className="flex flex-col gap-3 px-7 pb-4"
           style={{
             background: 'rgba(10,15,28,0.7)',
             borderBottom: isLast ? 'none' : '0.5px solid #0d1520',
           }}
         >
+          {/* Narrativa estructural — Motor 1 (artefacto3_convergencia).
+              Fundamento: qué fuentes coinciden + caso A1-A5. Aparece arriba
+              porque encuadra el patrón conductual antes de la evidencia. */}
+          {narrativaConvergencia ? (
+            <p
+              className="text-sm font-light leading-[1.7] pt-1"
+              style={{ color: '#cbd5e1' }}
+            >
+              {narrativaConvergencia}
+            </p>
+          ) : null}
+
+          {/* Otros patrones org-level que tocan a este dept (artefacto2).
+              Si el patrón org coincide con el dominante por-depto, ya está
+              implícito en el header — no se repite. */}
+          {otrosPatronesOrg.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+                Patrón organizacional vinculado
+              </span>
+              {otrosPatronesOrg.map((p) => (
+                <p
+                  key={p.nombre}
+                  className="text-sm font-light leading-[1.6]"
+                  style={{ color: '#cbd5e1' }}
+                >
+                  {p.descripcion}
+                </p>
+              ))}
+            </div>
+          ) : null}
+
           {fragmentosExtra.map((f, i) => (
             <div
               key={i}

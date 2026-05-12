@@ -181,10 +181,30 @@ function extractTriggers(report: ComplianceReportResponse | null): TriggerInput[
     });
   }
 
-  // ─── 2) Patrones LLM ───────────────────────────────────────────────
-  // El endpoint /report actual no expone patrones por depto en la salida
-  // executive. Se extenderá en Sesión 7 (SectionPatrones) para habilitar
-  // triggers de type 'patron'. Por ahora queda vacío.
+  // ─── 2) Patrones LLM (S5 — C2 cierra el loop) ──────────────────────
+  // Un trigger por patrón org-level detectado en `artefacto2_patrones[]`.
+  // riskLevel derivado de la intensidad (0..1): ≥0.6 critico, ≥0.3 bajo,
+  // <0.3 medio. El motor PATRON_INTERVENTIONS resuelve por nombre vía
+  // `meta.nombre` (con fallback al strip del prefix de ref).
+  for (const patron of report.narratives.artefacto2_patrones) {
+    const riskLevel: DimensionRiskLevel =
+      patron.intensidad >= 0.6
+        ? 'critico'
+        : patron.intensidad >= 0.3
+          ? 'bajo'
+          : 'medio';
+    triggers.push({
+      type: 'patron',
+      ref: `patron:${patron.nombre}`,
+      label: patron.nombreLegible,
+      riskLevel,
+      meta: {
+        nombre: patron.nombre,
+        intensidad: patron.intensidad,
+        departments: patron.departments,
+      },
+    });
+  }
 
   // ─── 3) Alertas activas ────────────────────────────────────────────
   for (const alert of report.data.alerts) {
