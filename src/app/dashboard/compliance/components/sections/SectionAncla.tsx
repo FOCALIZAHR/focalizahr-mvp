@@ -17,6 +17,7 @@ import {
   isaLevelToLegacyRisk,
   displayScore,
   displayDelta,
+  classifyForDisplay,
 } from '@/app/dashboard/compliance/lib/format';
 import { getISARiskLevel } from '@/lib/services/compliance/ISAService';
 import type { UseComplianceDataReturn } from '@/hooks/useComplianceData';
@@ -101,6 +102,10 @@ export default function SectionAncla({ hook }: { hook: UseComplianceDataReturn }
               </p>
               <SafetyGauge
                 score={displayScore(dept.safetyScore)}
+                suffix={(() => {
+                  const { label } = classifyForDisplay(dept.safetyScore);
+                  return label !== '—' ? `de 100 · ${label}` : undefined;
+                })()}
                 riskLevel={
                   dept.isaScore !== null
                     ? isaLevelToLegacyRisk(getISARiskLevel(dept.isaScore))
@@ -269,8 +274,8 @@ function nodeValueFor(
   // disponible en convergencia, pero el detalle numérico de cada uno se
   // construye por fuente en Sesión 7 (convergencia) y alertas.
   if (source === 'ambiente_sano') {
-    const display = displayScore(dept.safetyScore);
-    return display !== null ? String(display) : '—';
+    const { display, label } = classifyForDisplay(dept.safetyScore);
+    return display !== null ? `${display} · ${label}` : '—';
   }
   return 'Activo';
 }

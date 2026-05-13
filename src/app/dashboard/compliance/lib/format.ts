@@ -2,6 +2,47 @@
 // Helpers de presentación del dashboard Compliance.
 
 import type { ISARiskLevel } from '@/lib/services/compliance/ISAService';
+import {
+  classifyDimensionLevel,
+  type ComplianceDimensionLevel,
+} from '@/config/narratives/ComplianceNarrativeDictionary';
+
+/**
+ * Labels ejecutivos del nivel de una dimensión — capitalizados con tilde
+ * para render directo al CEO. Coherente con ISA_NARRATIVES badges.
+ */
+export const LEVEL_LABELS: Record<ComplianceDimensionLevel, string> = {
+  sano: 'Sano',
+  atencion: 'Atención',
+  riesgo: 'Riesgo',
+  critico: 'Crítico',
+};
+
+/**
+ * Convierte un rawScore (1-5) a sus 3 piezas listas para render:
+ *   - display (0-100, entero)
+ *   - level   (canónico 4 valores, o null si sin dato)
+ *   - label   (ejecutivo capitalizado, o '—' si sin dato)
+ *
+ * Single source of truth para el formato canónico "N · Label" que el CEO
+ * ve en gauges, narrativas y nodos. Usar en cualquier superficie donde el
+ * score absoluto se renderiza acompañado de su clasificación.
+ *
+ * Deltas (vs ciclo anterior, brechas, deltas vs org) NO usan este helper —
+ * un delta es magnitud, no nivel.
+ */
+export function classifyForDisplay(rawScore: number | null | undefined): {
+  display: number | null;
+  level: ComplianceDimensionLevel | null;
+  label: string;
+} {
+  if (rawScore === null || rawScore === undefined || Number.isNaN(rawScore)) {
+    return { display: null, level: null, label: '—' };
+  }
+  const display = displayScore(rawScore);
+  const level = classifyDimensionLevel(rawScore);
+  return { display, level, label: LEVEL_LABELS[level] };
+}
 
 /**
  * Convierte un score backend (escala 0-5) al display score (escala 0-100).
