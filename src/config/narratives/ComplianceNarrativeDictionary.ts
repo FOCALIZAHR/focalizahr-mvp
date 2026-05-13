@@ -372,17 +372,16 @@ export const COMPLIANCE_DIMENSION_DICTIONARY: Record<
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
- * Score 0–5 → nivel granular del diccionario (4 niveles del PDF).
+ * Score 0–5 → nivel granular del diccionario (4 niveles canónicos).
  * Umbrales:
  *   ≥ 4.0  → sano       (Alto)
  *   3.0–3.9 → atencion  (Medio)
  *   2.0–2.9 → riesgo    (Bajo)
  *   < 2.0  → critico    (Crítico)
  *
- * Nota: el umbral 'sano' del frontend actual es ≥ 3.5 (classifyDimension del
- * engine). Aquí se mantiene 4.0 para fidelidad con el PDF — el helper
- * `toUiLevel` reconcilia con el contrato del frontend al colapsar 'critico'.
- * El engine es quien decide qué clasificador usar al construir DimensionNarrative.
+ * Fuente única de verdad de los thresholds del módulo Compliance.
+ * Equivalencias 0-100 (vía displayScore = raw * 20):
+ *   ≥ 80 → sano · ≥ 60 → atencion · ≥ 40 → riesgo · < 40 → critico.
  */
 export function classifyDimensionLevel(score: number): ComplianceDimensionLevel {
   if (score >= 4.0) return 'sano';

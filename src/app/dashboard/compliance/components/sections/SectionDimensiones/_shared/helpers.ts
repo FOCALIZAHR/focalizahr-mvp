@@ -6,7 +6,9 @@
 // Reglas:
 //   - Backend mantiene escala 1-5; helpers convierten a 0-100 SOLO para
 //     presentación (`displayScore`).
-//   - Threshold de "depto crítico" = displayScore < 50 (= rawScore < 3.0).
+//   - Fórmula canónica: display = Math.round(raw * 20). Alineada con
+//     ISAService (safetyScore/5*100) para coherencia cross-módulo.
+//   - Threshold de "depto crítico" = displayScore < 40 (= rawScore < 2.0).
 //   - Brecha de género: |male - female| ≥ 0.5 en escala 1-5 (gb del backend).
 //   - Estos helpers NO leen del hook ni hacen fetch — son puros, fáciles de testear.
 // ════════════════════════════════════════════════════════════════════════════
@@ -51,8 +53,15 @@ export interface GenderGap {
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
- * Convierte un score backend (escala 1-5) al display score (escala 0-100).
- * Mapping: 1→0, 2→25, 3→50, 4→75, 5→100. Resultado clampeado a [0, 100].
+ * Convierte un score backend (escala 0-5) al display score (escala 0-100).
+ * Mapping: 0→0, 1→20, 2→40, 3→60, 4→80, 5→100. Resultado clampeado a [0, 100].
+ *
+ * Fórmula canónica del dashboard Compliance (alineada con ISAService:
+ * safetyScore/5*100 = raw*20). Equivalencias con classifyDimensionLevel:
+ *   raw ≥ 4.0 → display ≥ 80 → sano
+ *   raw ≥ 3.0 → display ≥ 60 → atencion
+ *   raw ≥ 2.0 → display ≥ 40 → riesgo
+ *   raw < 2.0 → display < 40 → critico
  *
  * Devuelve null si el input es null/undefined — los componentes deciden
  * cómo renderizar el caso "sin dato" (nunca convertir null en 0).
@@ -60,7 +69,7 @@ export interface GenderGap {
 export function displayScore(rawScore: number | null | undefined): number | null {
   if (rawScore === null || rawScore === undefined) return null;
   if (Number.isNaN(rawScore)) return null;
-  const value = Math.round((rawScore - 1) * 25);
+  const value = Math.round(rawScore * 20);
   if (value < 0) return 0;
   if (value > 100) return 100;
   return value;
@@ -94,7 +103,8 @@ export function computeOrgWeightedScore(
 /**
  * Cuenta departamentos con score normalizado por debajo del threshold de
  * "depto crítico" para una dimensión específica. Convierte cada score 1-5
- * → 0-100 y compara contra `SCORE_THRESHOLDS.CRITICAL_DEPT` (default 50).
+ * → 0-100 y compara contra `SCORE_THRESHOLDS.CRITICAL_DEPT` (default 40,
+ * = raw < 2.0 = nivel critico de classifyDimensionLevel).
  *
  * Solo cuenta deptos con dato — los `null` en `dimensionScores[dimKey]` se ignoran.
  */

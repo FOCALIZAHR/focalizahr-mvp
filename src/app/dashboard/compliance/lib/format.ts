@@ -12,11 +12,6 @@ export function formatIntensityPercent(intensity0to1: number): string {
   return `${pct}%`;
 }
 
-export function formatScore(value: number | null, digits = 1): string {
-  if (value === null || value === undefined) return '—';
-  return value.toFixed(digits);
-}
-
 /** ISA 0-100 como entero. Retorna "—" si null. */
 export function formatISA(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';

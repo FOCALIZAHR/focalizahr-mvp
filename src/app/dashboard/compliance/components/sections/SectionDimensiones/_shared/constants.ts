@@ -22,14 +22,14 @@ import type {
 // ────────────────────────────────────────────────────────────────────────────
 
 export const SCORE_THRESHOLDS = {
-  /** ≥ 75: sano */
-  SANO: 75,
-  /** ≥ 50: atención */
-  ATENCION: 50,
-  /** ≥ 25: riesgo */
-  RIESGO: 25,
-  /** Acto 4: dept con score < 50 cuenta como crítico (decisión confirmada) */
-  CRITICAL_DEPT: 50,
+  /** ≥ 80 display (≥ raw 4.0): sano. Alineado con classifyDimensionLevel + ISAService. */
+  SANO: 80,
+  /** ≥ 60 display (≥ raw 3.0): atención */
+  ATENCION: 60,
+  /** ≥ 40 display (≥ raw 2.0): riesgo */
+  RIESGO: 40,
+  /** Acto 4: dept con score < 40 display (= raw < 2.0) cuenta como crítico. */
+  CRITICAL_DEPT: 40,
   /** Brecha de género: |male - female| ≥ 0.5 (escala 0-5 backend) → mostrar */
   GENDER_GAP_MIN: 0.5,
 } as const;
@@ -61,7 +61,7 @@ export interface IsaNarrative {
 
 export const ISA_NARRATIVES: Record<IsaLevel, IsaNarrative> = {
   sano: {
-    range: [75, 100],
+    range: [80, 100],
     badge: 'Sano',
     badgeClass: 'fhr-badge-success',
     teslaColor: '#10B981',
@@ -69,7 +69,7 @@ export const ISA_NARRATIVES: Record<IsaLevel, IsaNarrative> = {
       'Las condiciones están dadas. El talento tiene razones para quedarse y el ambiente no genera fricción legal. Esto no se mantiene solo — se cuida.',
   },
   atencion: {
-    range: [50, 74],
+    range: [60, 79],
     badge: 'Atención',
     badgeClass: 'fhr-badge-warning',
     teslaColor: '#F59E0B',
@@ -77,7 +77,7 @@ export const ISA_NARRATIVES: Record<IsaLevel, IsaNarrative> = {
       'Hay señales que todavía no se convirtieron en problema. Ese margen existe hoy. No es permanente.',
   },
   riesgo: {
-    range: [25, 49],
+    range: [40, 59],
     badge: 'Riesgo',
     badgeClass: 'fhr-badge-warning',
     teslaColor: '#F59E0B',
@@ -85,7 +85,7 @@ export const ISA_NARRATIVES: Record<IsaLevel, IsaNarrative> = {
       'El deterioro ya tiene historia. Estas condiciones no aparecieron de la noche a la mañana y no desaparecen solas. Cada ciclo sin acción las consolida.',
   },
   critico: {
-    range: [0, 24],
+    range: [0, 39],
     badge: 'Crítico',
     badgeClass: 'fhr-badge-error',
     teslaColor: '#EF4444',
