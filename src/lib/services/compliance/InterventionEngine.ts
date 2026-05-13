@@ -14,6 +14,7 @@
 
 import type { ComplianceAlertType } from '@/config/complianceAlertConfig';
 import type { PatronNombre } from './complianceTypes';
+import type { NivelFinal } from './ConvergenciaEngine';
 
 // ═══════════════════════════════════════════════════════════════════
 // CAPA 1 — Catálogo de intervenciones
@@ -115,64 +116,95 @@ export type DimensionMatrix = Record<
   Record<DimensionRiskLevel, string[]>
 >;
 
+// Matriz rebalanceada (2026-05-12): HIGH_FREQ_PULSES reducido de 17 a 2 buckets
+// (P2 medio y P5 medio — único uso justificado: detección temprana en nivel leve).
+// opt 0 ahora refleja la intervención específica al fenómeno, no la genérica.
 export const DIMENSION_INTERVENTIONS: DimensionMatrix = {
   P2_seguridad: {
-    medio: ['HIGH_FREQ_PULSES', 'PSYCH_SAFETY_MODELING', 'FAST_FEEDBACK'],
-    bajo: ['FAST_FEEDBACK', 'PSYCH_SAFETY_MODELING', 'HIGH_FREQ_PULSES'],
-    critico: ['FAST_FEEDBACK', 'BYSTANDER_INTERVENTION', 'HIGH_FREQ_PULSES'],
+    medio: ['HIGH_FREQ_PULSES', 'PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION'],
+    bajo: ['PSYCH_SAFETY_MODELING', 'FAST_FEEDBACK', 'DISSENT_INSTITUTIONALIZATION'],
+    critico: ['PSYCH_SAFETY_MODELING', 'BYSTANDER_INTERVENTION', 'DISSENT_INSTITUTIONALIZATION'],
   },
   P3_disenso: {
-    medio: ['HIGH_FREQ_PULSES', 'DISSENT_INSTITUTIONALIZATION', 'FAST_FEEDBACK'],
-    bajo: ['DISSENT_INSTITUTIONALIZATION', 'FAST_FEEDBACK', 'HIGH_FREQ_PULSES'],
-    critico: ['DISSENT_INSTITUTIONALIZATION', 'BYSTANDER_INTERVENTION', 'HIGH_FREQ_PULSES'],
+    medio: ['DISSENT_INSTITUTIONALIZATION', 'FAST_FEEDBACK', 'PSYCH_SAFETY_MODELING'],
+    bajo: ['DISSENT_INSTITUTIONALIZATION', 'BYSTANDER_INTERVENTION', 'PSYCH_SAFETY_MODELING'],
+    critico: ['DISSENT_INSTITUTIONALIZATION', 'PSYCH_SAFETY_MODELING', 'BYSTANDER_INTERVENTION'],
   },
   P4_microagresiones: {
-    medio: ['HIGH_FREQ_PULSES', 'BYSTANDER_INTERVENTION', 'FAST_FEEDBACK'],
-    bajo: ['BYSTANDER_INTERVENTION', 'HIGH_FREQ_PULSES', 'FAST_FEEDBACK'],
-    critico: ['BYSTANDER_INTERVENTION', 'HIGH_FREQ_PULSES', 'RELATIONAL_REDESIGN'],
+    medio: ['BYSTANDER_INTERVENTION', 'RELATIONAL_REDESIGN', 'FAST_FEEDBACK'],
+    bajo: ['BYSTANDER_INTERVENTION', 'RELATIONAL_REDESIGN', 'PSYCH_SAFETY_MODELING'],
+    critico: ['BYSTANDER_INTERVENTION', 'RELATIONAL_REDESIGN', 'PSYCH_SAFETY_MODELING'],
   },
   P5_equidad: {
     medio: ['HIGH_FREQ_PULSES', 'ALGORITHMIC_TRANSPARENCY', 'PROSOCIAL_ACTIVITIES'],
-    bajo: ['ALGORITHMIC_TRANSPARENCY', 'PROSOCIAL_ACTIVITIES', 'HIGH_FREQ_PULSES'],
-    critico: ['PROSOCIAL_ACTIVITIES', 'ALGORITHMIC_TRANSPARENCY', 'HIGH_FREQ_PULSES'],
+    bajo: ['ALGORITHMIC_TRANSPARENCY', 'PROSOCIAL_ACTIVITIES', 'FAST_FEEDBACK'],
+    critico: ['ALGORITHMIC_TRANSPARENCY', 'PROSOCIAL_ACTIVITIES', 'BYSTANDER_INTERVENTION'],
   },
   P7_liderazgo: {
-    medio: ['FAST_FEEDBACK', 'HIGH_FREQ_PULSES', 'PSYCH_SAFETY_MODELING'],
-    bajo: ['FAST_FEEDBACK', 'PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION'],
-    critico: ['FAST_FEEDBACK', 'BYSTANDER_INTERVENTION', 'HIGH_FREQ_PULSES'],
+    medio: ['FAST_FEEDBACK', 'PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION'],
+    bajo: ['PSYCH_SAFETY_MODELING', 'FAST_FEEDBACK', 'DISSENT_INSTITUTIONALIZATION'],
+    critico: ['PSYCH_SAFETY_MODELING', 'BYSTANDER_INTERVENTION', 'DISSENT_INSTITUTIONALIZATION'],
   },
   P8_agotamiento: {
-    medio: ['HIGH_FREQ_PULSES', 'RELATIONAL_REDESIGN', 'FAST_FEEDBACK'],
-    bajo: ['RELATIONAL_REDESIGN', 'HIGH_FREQ_PULSES', 'BYSTANDER_INTERVENTION'],
-    critico: ['RELATIONAL_REDESIGN', 'BYSTANDER_INTERVENTION', 'HIGH_FREQ_PULSES'],
+    medio: ['RELATIONAL_REDESIGN', 'FAST_FEEDBACK', 'BYSTANDER_INTERVENTION'],
+    bajo: ['RELATIONAL_REDESIGN', 'BYSTANDER_INTERVENTION', 'FAST_FEEDBACK'],
+    critico: ['RELATIONAL_REDESIGN', 'BYSTANDER_INTERVENTION', 'PSYCH_SAFETY_MODELING'],
   },
 };
 
-// Placeholders para patrones y alertas. El TASK indica que Deep Research v2
-// los actualizará; por ahora default común.
+// DEFAULT_TRIPLETA — fallback defensivo SOLO cuando un trigger tiene
+// type/meta corrupta o ID no reconocido. En un sistema sano nunca se ejecuta.
+// Mapping específico vive en PATRON / ALERT / CONVERGENCIA_INTERVENTIONS.
 const DEFAULT_TRIPLETA = ['HIGH_FREQ_PULSES', 'BYSTANDER_INTERVENTION', 'FAST_FEEDBACK'];
 
+// Mapping rebalanceado (2026-05-12) — cada patron a su intervención específica
+// según playbook validado. Antes: 5 patrones compartían DEFAULT_TRIPLETA.
 export const PATRON_INTERVENTIONS: Record<PatronNombre | 'default', string[]> = {
-  default: DEFAULT_TRIPLETA,
-  silencio_organizacional: DEFAULT_TRIPLETA,
-  hostilidad_normalizada: DEFAULT_TRIPLETA,
-  favoritismo_implicito: DEFAULT_TRIPLETA,
-  resignacion_aprendida: DEFAULT_TRIPLETA,
-  miedo_represalias: DEFAULT_TRIPLETA,
+  default: ['HIGH_FREQ_PULSES', 'PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION'],
+  silencio_organizacional: ['HIGH_FREQ_PULSES', 'PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION'],
+  hostilidad_normalizada:  ['BYSTANDER_INTERVENTION', 'PSYCH_SAFETY_MODELING', 'RELATIONAL_REDESIGN'],
+  favoritismo_implicito:   ['ALGORITHMIC_TRANSPARENCY', 'PROSOCIAL_ACTIVITIES', 'DISSENT_INSTITUTIONALIZATION'],
+  resignacion_aprendida:   ['RELATIONAL_REDESIGN', 'FAST_FEEDBACK', 'DISSENT_INSTITUTIONALIZATION'],
+  miedo_represalias:       ['PSYCH_SAFETY_MODELING', 'HIGH_FREQ_PULSES', 'DISSENT_INSTITUTIONALIZATION'],
 };
 
+// Mapping rebalanceado (2026-05-12) — cada alertType a su intervención específica.
+// Antes: 5 alertTypes compartían DEFAULT_TRIPLETA.
 export const ALERT_INTERVENTIONS: Record<ComplianceAlertType | 'default', string[]> = {
-  default: DEFAULT_TRIPLETA,
-  riesgo_convergente: DEFAULT_TRIPLETA,
-  liderazgo_toxico: DEFAULT_TRIPLETA,
-  silencio_organizacional: DEFAULT_TRIPLETA,
-  deterioro_sostenido: DEFAULT_TRIPLETA,
-  senal_ignorada: DEFAULT_TRIPLETA,
+  default: ['PSYCH_SAFETY_MODELING', 'RELATIONAL_REDESIGN', 'HIGH_FREQ_PULSES'],
+  riesgo_convergente:      ['PSYCH_SAFETY_MODELING', 'RELATIONAL_REDESIGN', 'HIGH_FREQ_PULSES'],
+  liderazgo_toxico:        ['PSYCH_SAFETY_MODELING', 'FAST_FEEDBACK', 'BYSTANDER_INTERVENTION'],
+  silencio_organizacional: ['HIGH_FREQ_PULSES', 'PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION'],
+  deterioro_sostenido:     ['RELATIONAL_REDESIGN', 'FAST_FEEDBACK', 'HIGH_FREQ_PULSES'],
+  senal_ignorada:          ['PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION', 'HIGH_FREQ_PULSES'],
 };
 
 // Convergencia (C3) — un trigger por depto con nivelFinal != 'ninguna'.
-// Fase 1: default tripleta. Refinable por nivelFinal en Deep Research v2.
-export const CONVERGENCIA_INTERVENTIONS: string[] = DEFAULT_TRIPLETA;
+// Mapping rebalanceado (2026-05-12) por nivelFinal. Antes: tripleta única
+// DEFAULT_TRIPLETA para todos los deptos sin discriminar criticidad.
+// Override teatro (casos A2/A5) se aplica en getInterventionsForTrigger
+// con TEATRO_TRIPLETA antes del lookup por nivelFinal.
+export const CONVERGENCIA_INTERVENTIONS: Record<Exclude<NivelFinal, 'ninguna'>, string[]> = {
+  critica_sistema: ['PSYCH_SAFETY_MODELING', 'BYSTANDER_INTERVENTION', 'RELATIONAL_REDESIGN'],
+  amplificada:     ['RELATIONAL_REDESIGN', 'PSYCH_SAFETY_MODELING', 'HIGH_FREQ_PULSES'],
+  confirmada:      ['BYSTANDER_INTERVENTION', 'PSYCH_SAFETY_MODELING', 'HIGH_FREQ_PULSES'],
+  externa_solo:    ['HIGH_FREQ_PULSES', 'FAST_FEEDBACK', 'DISSENT_INSTITUTIONALIZATION'],
+  interna_solo:    ['FAST_FEEDBACK', 'HIGH_FREQ_PULSES', 'RELATIONAL_REDESIGN'],
+};
+
+// Override teatro — casos A2 (escenografía narrativa) o A5 (desincronía
+// scores↔texto) detectados en convergencia interna. Cuando el equipo
+// "responde lo que se espera leer", la primera medida es estructurar el
+// disenso, no esperar que el liderazgo modele apertura (porque
+// precisamente eso es lo que la gente está fingiendo).
+const TEATRO_TRIPLETA = ['DISSENT_INSTITUTIONALIZATION', 'PSYCH_SAFETY_MODELING', 'HIGH_FREQ_PULSES'];
+
+// Override A3 — sesgo de género detectado intra-dept por Motor A.
+// PSYCH_SAFETY_MODELING es el único ítem del catálogo con evidencia directa
+// de cierre de brecha de género (BCG 28k empleados). BYSTANDER + ALG completan
+// el protocolo: aliados activos para microagresiones + reglas equitativas para
+// asignación. Cae después de teatro (A2/A5) por si los scores son ruido.
+const SESGO_GENERO_TRIPLETA = ['PSYCH_SAFETY_MODELING', 'BYSTANDER_INTERVENTION', 'ALGORITHMIC_TRANSPARENCY'];
 
 // ═══════════════════════════════════════════════════════════════════
 // CAPA 3 — Motor de consolidación
@@ -221,7 +253,26 @@ function getInterventionsForTrigger(t: TriggerInput): string[] {
     return PATRON_INTERVENTIONS[nombre] ?? PATRON_INTERVENTIONS.default;
   }
   if (t.type === 'convergencia') {
-    return CONVERGENCIA_INTERVENTIONS;
+    // Stack de overrides (orden de prioridad):
+    //   1. teatro (A2/A5) — deseabilidad social → estructurar disenso
+    //   2. A3 (sesgo de género) — hallazgo forense específico
+    //   3. nivelFinal — lookup por severidad cross-fuente
+    //   4. fallback (confirmada) — defensivo si nivel no matchea
+    // A1 (doble confirmación) y A4 (variable de liderazgo) NO requieren
+    // override: están implícitos en nivelFinal='confirmada' y
+    // nivelFinal='critica_sistema' respectivamente.
+    const casos = (t.meta?.casosActivos as string[] | undefined) ?? [];
+    if (casos.includes('A2') || casos.includes('A5')) {
+      return TEATRO_TRIPLETA;
+    }
+    if (casos.includes('A3')) {
+      return SESGO_GENERO_TRIPLETA;
+    }
+    const nivel = t.meta?.nivelFinal as NivelFinal | undefined;
+    if (nivel && nivel !== 'ninguna' && nivel in CONVERGENCIA_INTERVENTIONS) {
+      return CONVERGENCIA_INTERVENTIONS[nivel as Exclude<NivelFinal, 'ninguna'>];
+    }
+    return CONVERGENCIA_INTERVENTIONS.confirmada;
   }
   // alert
   const alertType = (t.meta?.alertType as ComplianceAlertType | undefined) ?? null;
