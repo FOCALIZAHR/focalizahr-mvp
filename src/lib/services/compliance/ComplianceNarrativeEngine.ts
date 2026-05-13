@@ -85,7 +85,7 @@ export interface AnclaNarrative {
 export interface DimensionNarrative {
   dimensionKey: string;
   dimensionNombre: string;
-  nivel: 'sano' | 'atencion' | 'riesgo';
+  nivel: 'sano' | 'atencion' | 'riesgo' | 'critico';
   narrativa: string;
 }
 
@@ -320,12 +320,12 @@ function buildDimensiones(scores: DepartmentSafetyScore[]): DimensionNarrative[]
     }
 
     const orgScore = weighted / totalWeight;
-    const { uiLevel, narrativa } = resolveDimensionNarrative(key, orgScore);
+    const { level, narrativa } = resolveDimensionNarrative(key, orgScore);
 
     return {
       dimensionKey: key,
       dimensionNombre: DIMENSION_LABELS[key],
-      nivel: uiLevel,
+      nivel: level,
       narrativa,
     };
   });

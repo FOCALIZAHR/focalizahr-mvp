@@ -29,14 +29,10 @@ export type ComplianceDimensionKey =
   | 'P8_agotamiento';
 
 /**
- * 4 niveles internos del diccionario (granularidad del PDF).
- * El frontend consume 3 niveles (DimensionNarrative.nivel) — el helper
- * `toUiLevel` colapsa 'critico' en 'riesgo' para preservar el contrato.
+ * 4 niveles canónicos del diccionario (alineados con DimensionNarrative.nivel
+ * del wire y con los thresholds de displayScore: 80/60/40/<40).
  */
 export type ComplianceDimensionLevel = 'sano' | 'atencion' | 'riesgo' | 'critico';
-
-/** Nivel expuesto al frontend (DimensionNarrative.nivel). */
-export type ComplianceDimensionUiLevel = 'sano' | 'atencion' | 'riesgo';
 
 export interface ComplianceDimensionNarrative {
   /** Headline tono CEO — máximo 8 palabras, frase con punto. */
@@ -390,11 +386,6 @@ export function classifyDimensionLevel(score: number): ComplianceDimensionLevel 
   return 'critico';
 }
 
-/** Colapsa nivel granular (4) → nivel UI (3) preservando el contrato del tipo. */
-export function toUiLevel(level: ComplianceDimensionLevel): ComplianceDimensionUiLevel {
-  return level === 'critico' ? 'riesgo' : level;
-}
-
 // ────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ────────────────────────────────────────────────────────────────────────────
@@ -409,19 +400,19 @@ export function getDimensionNarrative(
 
 /**
  * Resuelve narrativa lista para consumo del engine: dado un score org promedio
- * para una dimensión, devuelve `{ uiLevel, narrativa }` ya concatenada.
+ * para una dimensión, devuelve `{ level, narrativa }` ya concatenada.
  *
- * `uiLevel` se mapea al contrato existente DimensionNarrative.nivel (3 niveles).
+ * `level` es el nivel canónico de 4 (DimensionNarrative.nivel).
  * `narrativa` es `${headline} ${body}` — una sola string lista para renderizar.
  */
 export function resolveDimensionNarrative(
   dimKey: ComplianceDimensionKey,
   score: number,
-): { uiLevel: ComplianceDimensionUiLevel; narrativa: string } {
+): { level: ComplianceDimensionLevel; narrativa: string } {
   const level = classifyDimensionLevel(score);
   const { headline, body } = COMPLIANCE_DIMENSION_DICTIONARY[dimKey][level];
   return {
-    uiLevel: toUiLevel(level),
+    level,
     narrativa: `${headline} ${body}`,
   };
 }
