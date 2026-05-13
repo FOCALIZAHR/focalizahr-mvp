@@ -51,9 +51,9 @@ import {
   ResumenPanel,
   type DetailPanelDept,
 } from './DecisionConsole.DetailPanel';
-import { ISA_NARRATIVES, type ActoLevelKey } from './_shared/constants';
+import { ISA_NARRATIVES } from './_shared/constants';
 import {
-  classifyActoLevel,
+  classifyDimensionWithFocos,
   computeOrgWeightedScore,
   countCriticalDepts,
   displayScore,
@@ -83,33 +83,27 @@ export interface DecisionConsoleProps {
 // MAPPINGS — niveles internos
 // ════════════════════════════════════════════════════════════════════════════
 
-const TESLA_COLOR_BY_LEVEL: Record<ActoLevelKey, string> = {
+const TESLA_COLOR_BY_LEVEL: Record<ComplianceDimensionLevel, string> = {
   critico: ISA_NARRATIVES.critico.teslaColor,
   riesgo: ISA_NARRATIVES.riesgo.teslaColor,
   atencion: ISA_NARRATIVES.atencion.teslaColor,
   sano: ISA_NARRATIVES.sano.teslaColor,
-  sano_con_focos: ISA_NARRATIVES.sano.teslaColor,
 };
 
-function actoLevelToDictionaryLevel(
-  level: ActoLevelKey
-): ComplianceDimensionLevel {
-  return level === 'sano_con_focos' ? 'sano' : level;
-}
-
-function actoLevelToDecisionLevel(
-  level: ActoLevelKey
+/** El nivel 'sano' (con o sin focos) no aplica al campo decision.level. */
+function dimensionLevelToDecisionLevel(
+  level: ComplianceDimensionLevel
 ): 'atencion' | 'riesgo' | 'critico' | undefined {
-  if (level === 'sano' || level === 'sano_con_focos') return undefined;
-  return level;
+  return level === 'sano' ? undefined : level;
 }
 
+/** Clasifica un dept por su rawScore — fuente única classifyDimensionLevel. */
 function deptRawToDecisionLevel(
   rawScore: number
 ): 'atencion' | 'riesgo' | 'critico' {
-  if (rawScore < 2.0) return 'critico';
-  if (rawScore < 3.0) return 'riesgo';
-  return 'atencion';
+  const level = classifyDimensionLevel(rawScore);
+  // 'sano' no debería aparecer en lista de deptos críticos; fallback defensivo.
+  return level === 'sano' ? 'atencion' : level;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -125,7 +119,10 @@ interface DimContext {
   orgScore: number;
   /** Score 1-5 (raw, para sort y level). */
   orgRaw: number;
-  level: ActoLevelKey;
+  /** Nivel canónico (4 valores). El caso "sano + focos" se deriva con hasFocos. */
+  level: ComplianceDimensionLevel;
+  /** True si esta dim tiene deptos por debajo del umbral crítico. */
+  hasFocos: boolean;
   /** True si la dim entra al grupo "Crítico · requiere decisión". */
   isCritical: boolean;
   criticalDeptsCount: number;
@@ -166,14 +163,14 @@ export const DecisionConsole = memo(function DecisionConsole({
       const orgScore = displayScore(orgRaw);
       if (orgScore === null || orgRaw === null) continue;
 
-      const dimLevel = classifyDimensionLevel(orgRaw);
       const criticalDeptsRaw = getCriticalDepts(dimKey, departments);
       const criticalCount = criticalDeptsRaw.length;
-      const actoLevel = classifyActoLevel(dimLevel, criticalCount);
+      const { level: dimLevel, hasFocos } = classifyDimensionWithFocos(
+        orgRaw,
+        criticalCount
+      );
 
-      const dictLevelOrg = actoLevelToDictionaryLevel(actoLevel);
-      const orgDictEntry =
-        COMPLIANCE_DIMENSION_DICTIONARY[dimKey][dictLevelOrg];
+      const orgDictEntry = COMPLIANCE_DIMENSION_DICTIONARY[dimKey][dimLevel];
 
       const criticalDepts: DetailPanelDept[] = [];
       const deptPlanesSugeridos: Record<string, string> = {};
@@ -201,18 +198,19 @@ export const DecisionConsole = memo(function DecisionConsole({
 
       // "Crítico" del bundle = la dim entra al grupo de la izq que lleva
       // el rail cyan. Aplica si la dim es crítico/riesgo a nivel org, o si
-      // tiene focos departamentales (incluye 'sano_con_focos').
+      // tiene focos departamentales (level='sano' + hasFocos).
       const isCritical =
-        actoLevel === 'critico' ||
-        actoLevel === 'riesgo' ||
-        actoLevel === 'sano_con_focos';
+        dimLevel === 'critico' ||
+        dimLevel === 'riesgo' ||
+        (dimLevel === 'sano' && hasFocos);
 
       result.push({
         dimensionKey: n.dimensionKey as ComplianceDimensionKey,
         dimensionName: n.dimensionNombre,
         orgScore,
         orgRaw,
-        level: actoLevel,
+        level: dimLevel,
+        hasFocos,
         isCritical,
         criticalDeptsCount: criticalCount,
         criticalDepts,
@@ -358,7 +356,7 @@ export const DecisionConsole = memo(function DecisionConsole({
         triggerRef: dim.orgTriggerRef,
         triggerLabel: dim.dimensionName,
         dimensionKey: dim.dimensionKey,
-        level: actoLevelToDecisionLevel(dim.level),
+        level: dimensionLevelToDecisionLevel(dim.level),
         addedAt: now,
       });
     }

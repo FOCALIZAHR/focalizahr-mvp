@@ -27,7 +27,6 @@ import {
   ORIGEN_LABELS,
   ORIGEN_ORG_SCOPE_NOTE,
   SCORE_THRESHOLDS,
-  type ActoLevelKey,
 } from './constants';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -324,48 +323,40 @@ export function getOrgOrigenLabel(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// CLASIFICACIÓN — nivel del Acto (incluye 'sano_con_focos')
+// CLASIFICACIÓN — nivel canónico + flag de focos departamentales
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
- * Mapea (nivel de la dimensión a nivel org, # deptos críticos) → ActoLevelKey.
+ * Clasificación canónica de una dimensión: nivel (4 valores) + flag hasFocos.
  *
  * Regla de negocio: una dimensión SANA a nivel ORG puede tener focos
  * departamentales — ese es el contraste más importante del producto.
- * Cuando eso pasa, el Patrón G usa la frase y la recomendación de
- * 'sano_con_focos' (no la de 'sano').
+ * Cuando eso pasa, el consumer rama por `(level === 'sano' && hasFocos)`
+ * para usar el copy de `ACTO1_FRASE_SANO_CON_FOCOS` y
+ * `RECOMMENDATION_SANO_CON_FOCOS`.
  *
  * En cualquier otro nivel (atencion / riesgo / critico), los focos amplifican
  * la urgencia pero no cambian la clasificación — el motor ya está hablando
  * en clave de problema.
- */
-export function classifyActoLevel(
-  level: ComplianceDimensionLevel,
-  criticalDeptsCount: number
-): ActoLevelKey {
-  if (level === 'sano' && criticalDeptsCount > 0) return 'sano_con_focos';
-  return level;
-}
-
-/**
- * Atajo: dado el orgScore en escala 1-5 y la lista de deptos para esa dim,
- * devuelve directo el ActoLevelKey.
  *
  * IMPORTANTE — escala de entrada: 1-5 RAW (no 0-100 display).
  * `classifyDimensionLevel` del diccionario usa thresholds en 1-5:
  *   ≥ 4.0 → sano · ≥ 3.0 → atencion · ≥ 2.0 → riesgo · < 2.0 → critico.
- * Pasarle un display score (0-100) clasifica todo como 'sano' incorrectamente.
  *
  * Si el orgScore es null (sin datos), devuelve 'atencion' como fallback
  * conservador — la UI aguas arriba debería filtrar antes que esto se llame.
  */
-export function classifyDimensionActoLevel(
+export function classifyDimensionWithFocos(
   orgRawScore: number | null,
   criticalDeptsCount: number
-): ActoLevelKey {
-  if (orgRawScore === null) return 'atencion';
-  const level = classifyDimensionLevel(orgRawScore);
-  return classifyActoLevel(level, criticalDeptsCount);
+): { level: ComplianceDimensionLevel; hasFocos: boolean } {
+  if (orgRawScore === null) {
+    return { level: 'atencion', hasFocos: criticalDeptsCount > 0 };
+  }
+  return {
+    level: classifyDimensionLevel(orgRawScore),
+    hasFocos: criticalDeptsCount > 0,
+  };
 }
 
 

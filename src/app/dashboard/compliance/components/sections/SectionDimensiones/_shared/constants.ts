@@ -147,18 +147,20 @@ export function getEditorialTitle(
 // ────────────────────────────────────────────────────────────────────────────
 // ACTO 1 (Patrón G) — frase del motor por nivel
 // ────────────────────────────────────────────────────────────────────────────
-// Niveles del diccionario (4) + 'sano_con_focos' que es un caso especial:
-// la org está sana en agregado, pero existen deptos bajo umbral en esa dim.
+// Taxonomía única: 4 niveles canónicos de ComplianceDimensionLevel.
+// El caso "sano con focos departamentales" se trata como flag (hasFocos: true
+// + level === 'sano') no como nivel separado — copy específico en
+// ACTO1_FRASE_SANO_CON_FOCOS abajo.
 
-export type ActoLevelKey = ComplianceDimensionLevel | 'sano_con_focos';
-
-export const ACTO1_FRASES: Record<ActoLevelKey, string> = {
+export const ACTO1_FRASES: Record<ComplianceDimensionLevel, string> = {
   critico: 'El resentimiento se volvió estructural.',
   riesgo: 'Las señales llevan más de un ciclo acumulándose.',
   atencion: 'Hay algo que todavía no se nombra.',
   sano: 'El equilibrio es el resultado, no el punto de partida.',
-  sano_con_focos: 'El promedio protege. Los focos exponen.',
 };
+
+/** Override de Acto 1 cuando level === 'sano' Y hay deptos críticos. */
+export const ACTO1_FRASE_SANO_CON_FOCOS = 'El promedio protege. Los focos exponen.';
 
 // ────────────────────────────────────────────────────────────────────────────
 // ACTO 3 (Patrón G) — recomendaciones por NIVEL (no por dimensión × nivel)
@@ -178,7 +180,7 @@ export interface LevelRecommendation {
   protocol: boolean;
 }
 
-export const RECOMMENDATIONS_BY_LEVEL: Record<ActoLevelKey, LevelRecommendation> = {
+export const RECOMMENDATIONS_BY_LEVEL: Record<ComplianceDimensionLevel, LevelRecommendation> = {
   critico: {
     urgency: 'Intervención inmediata',
     timeframe: '0-15 días',
@@ -199,11 +201,13 @@ export const RECOMMENDATIONS_BY_LEVEL: Record<ActoLevelKey, LevelRecommendation>
     timeframe: 'Próximo ciclo',
     protocol: false,
   },
-  sano_con_focos: {
-    urgency: 'La organización está bien. El problema está concentrado.',
-    timeframe: 'Acción focalizada en deptos críticos',
-    protocol: false,
-  },
+};
+
+/** Override cuando level === 'sano' Y hay deptos críticos (hasFocos). */
+export const RECOMMENDATION_SANO_CON_FOCOS: LevelRecommendation = {
+  urgency: 'La organización está bien. El problema está concentrado.',
+  timeframe: 'Acción focalizada en deptos críticos',
+  protocol: false,
 };
 
 // ────────────────────────────────────────────────────────────────────────────

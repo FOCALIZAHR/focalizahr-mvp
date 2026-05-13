@@ -27,7 +27,10 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Lightbulb } from 'lucide-react';
 
-import type { ComplianceDimensionKey } from '@/config/narratives/ComplianceNarrativeDictionary';
+import type {
+  ComplianceDimensionKey,
+  ComplianceDimensionLevel,
+} from '@/config/narratives/ComplianceNarrativeDictionary';
 import type { ComplianceReportResponse } from '@/types/compliance';
 import type { ComplianceDecisionItem } from '@/hooks/useComplianceData';
 
@@ -36,9 +39,9 @@ import {
   PLAN_CONSOLIDADO_FRANCOTIRADOR,
   PLAN_CONSOLIDADO_TODO_SANO,
   RECOMMENDATIONS_BY_LEVEL,
+  RECOMMENDATION_SANO_CON_FOCOS,
   SCORE_THRESHOLDS,
   getEditorialTitle,
-  type ActoLevelKey,
 } from './_shared/constants';
 import type { GenderGap, OrgOrigenLabel } from './_shared/helpers';
 import { decodeTriggerRef } from './_shared/triggerRef';
@@ -56,23 +59,30 @@ function getScoreColor(score: number): string {
   return 'text-red-400';
 }
 
-/** Mensaje contextual del bloque de planes según nivel. */
-function getContextualMessage(level: ActoLevelKey): string {
+/** Mensaje contextual del bloque de planes según nivel + flag de focos. */
+function getContextualMessage(
+  level: ComplianceDimensionLevel,
+  hasFocos: boolean
+): string {
+  if (level === 'sano') {
+    return hasFocos
+      ? 'La organización está bien. El problema está aquí — en estos equipos.'
+      : 'Sin acciones requeridas. La dimensión está sana y sin focos.';
+  }
   switch (level) {
-    case 'sano_con_focos':
-      return 'La organización está bien. El problema está aquí — en estos equipos.';
     case 'critico':
     case 'riesgo':
       return 'Esta dimensión requiere acción a nivel organización y en los focos específicos.';
     case 'atencion':
       return 'Monitoreo reforzado en el próximo ciclo. La acción a nivel organización sostiene el margen.';
-    case 'sano':
-      return 'Sin acciones requeridas. La dimensión está sana y sin focos.';
   }
 }
 
 /** Stat compacto al costado del score — refleja el contexto del nivel. */
-function getScoreStat(level: ActoLevelKey, criticalDeptsCount: number): string {
+function getScoreStat(
+  level: ComplianceDimensionLevel,
+  criticalDeptsCount: number
+): string {
   if (criticalDeptsCount > 0) {
     const plural = criticalDeptsCount === 1 ? 'área' : 'áreas';
     return `${criticalDeptsCount} ${plural} arrastra${criticalDeptsCount === 1 ? '' : 'n'} el promedio.`;
@@ -85,7 +95,6 @@ function getScoreStat(level: ActoLevelKey, criticalDeptsCount: number): string {
     case 'atencion':
       return 'Sobre el umbral mínimo, dentro de la zona de atención.';
     case 'sano':
-    case 'sano_con_focos':
       return 'Sobre el umbral saludable.';
   }
 }
@@ -106,8 +115,11 @@ export interface DetailPanelProps {
   dimensionName: string;
   /** Score 0-100 (display) a nivel ORG. */
   orgScore: number;
-  /** Nivel del acto (incluye 'sano_con_focos'). */
-  level: ActoLevelKey;
+  /**
+   * Nivel canónico de 4 valores. El caso "sano + focos" se deriva
+   * internamente con `criticalDepts.length > 0` (hasFocos).
+   */
+  level: ComplianceDimensionLevel;
   /** Período del ciclo formateado (`Q1 2026`) para el eyebrow. Null = skip slot. */
   cyclePeriod: string | null;
   /** Narrativa clínica del motor. */
@@ -179,9 +191,14 @@ export const DetailPanel = memo(function DetailPanel({
   country,
 }: DetailPanelProps) {
   const scoreColor = getScoreColor(orgScore);
-  const levelRec = RECOMMENDATIONS_BY_LEVEL[level];
   const legalText = getLegalBadgeText(country);
   const hasFocos = criticalDepts.length > 0;
+  // Caso especial: dimensión sana org pero con deptos críticos — el plan
+  // requiere acción focalizada, no mantenimiento del nivel actual.
+  const levelRec =
+    level === 'sano' && hasFocos
+      ? RECOMMENDATION_SANO_CON_FOCOS
+      : RECOMMENDATIONS_BY_LEVEL[level];
   const editorial = getEditorialTitle(dimensionKey, dimensionName);
 
   // Numeración dinámica de secciones — Lectura siempre 01; Departamentos solo
@@ -440,7 +457,7 @@ export const DetailPanel = memo(function DetailPanel({
           {/* ─── 04 · Tu plan ─── */}
           <Section num={sectionNums.plan} title="Tu plan">
             <p className="text-sm text-slate-500 font-light leading-relaxed mb-3.5 max-w-[680px]">
-              {getContextualMessage(level)} Edita o reemplaza la propuesta. Lo
+              {getContextualMessage(level, hasFocos)} Edita o reemplaza la propuesta. Lo
               que firmes aquí queda en el expediente.
             </p>
 
