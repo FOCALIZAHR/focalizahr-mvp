@@ -1,19 +1,21 @@
 'use client';
 
 // src/app/dashboard/compliance/components/shared/SafetyGauge.tsx
-// Gauge de arco SVG animado para Safety Score (0-5). Número hero al centro
-// (font-extralight, NUNCA cyan). Arco coloreado según nivel de riesgo.
+// Gauge de arco SVG animado para Safety Score (escala display 0-100).
+// Número hero al centro (font-extralight, NUNCA cyan). Arco coloreado según
+// nivel de riesgo.
 //
-// Patrón: similar al ExecutiveGauge del executive-hub, adaptado a escala 0-5.
+// Patrón: similar al ExecutiveGauge del executive-hub. El caller convierte
+// raw 1-5 → 0-100 con displayScore() del módulo Dimensiones antes de pasar.
 
 import { motion } from 'framer-motion';
 
 interface SafetyGaugeProps {
-  /** Score 0-5 (o null si no disponible) */
+  /** Score 0-100 display (o null si no disponible) */
   score: number | null;
   /** Diámetro en px — default 240 (lg) */
   size?: number;
-  /** Label opcional debajo del número (ej. "/ 5,0") */
+  /** Label opcional debajo del número (ej. "/ 100"). Default: sin suffix. */
   suffix?: string;
   /** Nivel para color del arco */
   riskLevel?: 'safe' | 'risk' | 'critical';
@@ -50,7 +52,7 @@ function describeArc(
 export default function SafetyGauge({
   score,
   size = 240,
-  suffix = '/ 5,0',
+  suffix,
   riskLevel = 'safe',
 }: SafetyGaugeProps) {
   const cx = size / 2;
@@ -59,7 +61,7 @@ export default function SafetyGauge({
   const r = size / 2 - strokeWidth;
 
   const color = COLORS_BY_LEVEL[riskLevel] ?? COLORS_BY_LEVEL.safe;
-  const normalized = score === null ? 0 : Math.max(0, Math.min(1, score / 5));
+  const normalized = score === null ? 0 : Math.max(0, Math.min(1, score / 100));
 
   // Arco base (gris tenue, barrido completo)
   const basePath = describeArc(cx, cy, r, ARC_START_DEG, ARC_START_DEG + ARC_SWEEP_DEG);
@@ -115,7 +117,7 @@ export default function SafetyGauge({
             className="font-extralight text-white tabular-nums"
             style={{ fontSize: size * 0.3 }}
           >
-            {score !== null ? score.toFixed(1) : '—'}
+            {score !== null ? score : '—'}
           </span>
           {suffix && (
             <span

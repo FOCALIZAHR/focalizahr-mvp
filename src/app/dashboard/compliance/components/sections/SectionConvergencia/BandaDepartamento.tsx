@@ -15,6 +15,7 @@ import AlertaComplianceChip from './AlertaComplianceChip';
 import RecommendationCard from '../_shared/RecommendationCard';
 import { AMPLIFICADOR_LABELS, resolveAlertLabel } from './_shared/ALERT_LABELS';
 import { getCombinatoriaNarrative } from './_shared/CombinatoriaDictionary';
+import { displayScore } from '@/app/dashboard/compliance/lib/format';
 import type { MergedDept } from './_shared/helpers';
 import type { AlertaNarrative } from '@/lib/services/compliance/ComplianceNarrativeEngine';
 import type {
@@ -312,8 +313,8 @@ function BloquesExpandidos({
     A1: `El score (${isaScore ?? '—'}) y lo que las personas escribieron señalan lo mismo de manera independiente. Dos lecturas que no se conocen llegaron a la misma conclusión. Eso no es coincidencia.`,
     A2: `El ISA es ${isaScore ?? '—'}. Lo que las personas escribieron lo contradice. O el equipo aprendió a responder lo que se espera. O hay algo que no está llegando a la encuesta. La brecha existe — aunque las causas no sean visibles todavía.`,
     A3: `El lenguaje que circula en este departamento tiene sesgo. La seguridad psicológica está en ${
-      dims.P2_seguridad?.toFixed(1) ?? '—'
-    }/5. Cuando el lenguaje normaliza la exclusión, el ambiente que lo permite ya existe.`,
+      displayScore(dims.P2_seguridad) ?? '—'
+    }. Cuando el lenguaje normaliza la exclusión, el ambiente que lo permite ya existe.`,
     A4: dept.a4Partner
       ? `ISA ${isaScore ?? '—'}. Otro departamento bajo el mismo liderazgo tiene ISA ${dept.a4Partner.isaScore}. La diferencia es de ${dept.a4Partner.deltaIsa} puntos. Con equipos distintos y el mismo mando, la variable constante es el liderazgo.`
       : `ISA ${isaScore ?? '—'}. Este departamento forma parte de un grupo bajo el mismo liderazgo con dispersión de ISA. Con equipos distintos y el mismo mando, la variable constante es el liderazgo.`,

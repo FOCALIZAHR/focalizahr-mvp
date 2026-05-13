@@ -46,6 +46,7 @@ import {
 import type { GenderGap, OrgOrigenLabel } from './_shared/helpers';
 import { decodeTriggerRef } from './_shared/triggerRef';
 import { getLegalBadgeText } from '@/config/compliance/legalBadgeConfig';
+import { displayDelta } from '@/app/dashboard/compliance/lib/format';
 
 // ════════════════════════════════════════════════════════════════════════════
 // HELPERS DE PRESENTACIÓN
@@ -361,7 +362,7 @@ export const DetailPanel = memo(function DetailPanel({
                 <p className="text-slate-300 text-sm font-light leading-relaxed">
                   Brecha de{' '}
                   <span className="text-purple-400 font-medium">
-                    {genderGap.gap.toFixed(1)} puntos
+                    {displayDelta(genderGap.gap) ?? '—'} puntos
                   </span>{' '}
                   entre {genderGap.grupoAfectado} y sus pares en{' '}
                   <span className="text-cyan-400 font-medium">

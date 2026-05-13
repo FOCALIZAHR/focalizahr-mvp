@@ -3,6 +3,40 @@
 
 import type { ISARiskLevel } from '@/lib/services/compliance/ISAService';
 
+/**
+ * Convierte un score backend (escala 0-5) al display score (escala 0-100).
+ * Mapping: 0→0, 1→20, 2→40, 3→60, 4→80, 5→100. Resultado clampeado a [0, 100].
+ *
+ * Fórmula canónica del dashboard Compliance (alineada con ISAService:
+ * safetyScore/5*100 = raw*20). Equivalencias con classifyDimensionLevel:
+ *   raw ≥ 4.0 → display ≥ 80 → sano
+ *   raw ≥ 3.0 → display ≥ 60 → atencion
+ *   raw ≥ 2.0 → display ≥ 40 → riesgo
+ *   raw < 2.0 → display < 40 → critico
+ *
+ * Devuelve null si el input es null/undefined — los componentes deciden
+ * cómo renderizar el caso "sin dato" (nunca convertir null en 0).
+ */
+export function displayScore(rawScore: number | null | undefined): number | null {
+  if (rawScore === null || rawScore === undefined) return null;
+  if (Number.isNaN(rawScore)) return null;
+  const value = Math.round(rawScore * 20);
+  if (value < 0) return 0;
+  if (value > 100) return 100;
+  return value;
+}
+
+/**
+ * Convierte un delta (diferencia entre dos raw scores 0-5) al delta display.
+ * `displayDelta(a - b) = displayScore(a) - displayScore(b) = (a - b) * 20`.
+ * Usado para render de "vs ciclo anterior", brechas de género, etc.
+ */
+export function displayDelta(rawDelta: number | null | undefined): number | null {
+  if (rawDelta === null || rawDelta === undefined) return null;
+  if (Number.isNaN(rawDelta)) return null;
+  return Math.round(rawDelta * 20);
+}
+
 export function formatPercent(value: number, digits = 0): string {
   return `${Math.round(value * 10 ** digits) / 10 ** digits}%`;
 }

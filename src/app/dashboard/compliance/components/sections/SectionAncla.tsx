@@ -15,6 +15,8 @@ import {
   formatISA,
   formatDelta,
   isaLevelToLegacyRisk,
+  displayScore,
+  displayDelta,
 } from '@/app/dashboard/compliance/lib/format';
 import { getISARiskLevel } from '@/lib/services/compliance/ISAService';
 import type { UseComplianceDataReturn } from '@/hooks/useComplianceData';
@@ -98,7 +100,7 @@ export default function SectionAncla({ hook }: { hook: UseComplianceDataReturn }
                 {dept.departmentName}
               </p>
               <SafetyGauge
-                score={dept.safetyScore}
+                score={displayScore(dept.safetyScore)}
                 riskLevel={
                   dept.isaScore !== null
                     ? isaLevelToLegacyRisk(getISARiskLevel(dept.isaScore))
@@ -192,7 +194,7 @@ function TrackA({
         value={vsOrgISA !== null ? `${formatDelta(vsOrgISA)} pts` : '—'}
         hint={
           vsOrgSafety !== null
-            ? `${vsOrgSafety >= 0 ? '+' : ''}${vsOrgSafety.toFixed(1)} vs score org`
+            ? `${formatDelta(displayDelta(vsOrgSafety))} vs score org`
             : undefined
         }
       />
@@ -207,7 +209,7 @@ function TrackA({
       {generoGap !== null && (
         <TrackRow
           label="Brecha por género (M − F)"
-          value={`${generoGap >= 0 ? '+' : ''}${generoGap.toFixed(1)}`}
+          value={formatDelta(displayDelta(generoGap))}
           hint={
             Math.abs(generoGap) >= 0.5
               ? 'Diferencia apreciable — revisar'
@@ -266,6 +268,9 @@ function nodeValueFor(
   // (safetyScore). Los demás nodos muestran "Activo" cuando la fuente está
   // disponible en convergencia, pero el detalle numérico de cada uno se
   // construye por fuente en Sesión 7 (convergencia) y alertas.
-  if (source === 'ambiente_sano') return dept.safetyScore.toFixed(1);
+  if (source === 'ambiente_sano') {
+    const display = displayScore(dept.safetyScore);
+    return display !== null ? String(display) : '—';
+  }
   return 'Activo';
 }
