@@ -112,22 +112,20 @@ export default function SafetyGauge({
 
       {/* Número + suffix al centro */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-        <div className="flex items-end gap-1 leading-none">
+        <span
+          className="font-extralight text-white tabular-nums leading-none"
+          style={{ fontSize: size * 0.3 }}
+        >
+          {score !== null ? score : '—'}
+        </span>
+        {suffix && (
           <span
-            className="font-extralight text-white tabular-nums"
-            style={{ fontSize: size * 0.3 }}
+            className="text-slate-500 font-light mt-2 text-center leading-tight"
+            style={{ fontSize: size * 0.09 }}
           >
-            {score !== null ? score : '—'}
+            {suffix}
           </span>
-          {suffix && (
-            <span
-              className="text-slate-500 font-light pb-1"
-              style={{ fontSize: size * 0.09 }}
-            >
-              {suffix}
-            </span>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

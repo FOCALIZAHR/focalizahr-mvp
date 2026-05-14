@@ -12,14 +12,11 @@ import {
   NODO_REQUIRES,
 } from '@/app/dashboard/compliance/lib/labels';
 import {
-  formatISA,
   formatDelta,
   isaLevelToLegacyRisk,
-  displayScore,
   displayDelta,
-  classifyForDisplay,
 } from '@/app/dashboard/compliance/lib/format';
-import { getISARiskLevel } from '@/lib/services/compliance/ISAService';
+import { getISARiskLevel, ISA_LABELS } from '@/lib/services/compliance/ISAService';
 import type { UseComplianceDataReturn } from '@/hooks/useComplianceData';
 import type { ComplianceSource } from '@/types/compliance';
 
@@ -45,7 +42,6 @@ export default function SectionAncla({ hook }: { hook: UseComplianceDataReturn }
     convergenciaDept?.activeSources ?? ['ambiente_sano']
   );
 
-  const orgSafetyScore = report.data.orgSafetyScore;
   const orgISA = report.data.orgISA;
   const anclaTitular = report.narratives.ancla.titular;
   const anclaDescripcion = report.narratives.ancla.descripcion;
@@ -101,11 +97,12 @@ export default function SectionAncla({ hook }: { hook: UseComplianceDataReturn }
                 {dept.departmentName}
               </p>
               <SafetyGauge
-                score={displayScore(dept.safetyScore)}
-                suffix={(() => {
-                  const { label } = classifyForDisplay(dept.safetyScore);
-                  return label !== '—' ? `de 100 · ${label}` : undefined;
-                })()}
+                score={dept.isaScore}
+                suffix={
+                  dept.isaScore !== null
+                    ? `de 100 · ${ISA_LABELS[getISARiskLevel(dept.isaScore)].label}`
+                    : undefined
+                }
                 riskLevel={
                   dept.isaScore !== null
                     ? isaLevelToLegacyRisk(getISARiskLevel(dept.isaScore))
@@ -113,29 +110,16 @@ export default function SectionAncla({ hook }: { hook: UseComplianceDataReturn }
                 }
                 size={220}
               />
-              <div className="flex items-baseline gap-1 mt-3">
-                <span className="text-3xl font-extralight text-white tabular-nums">
-                  {formatISA(dept.isaScore)}
-                </span>
-                <span className="text-slate-600 text-[10px] uppercase tracking-widest font-light">
-                  índice del área
-                </span>
-              </div>
             </div>
 
             {/* Track A — datos de contexto */}
-            <TrackA
-              dept={dept}
-              orgSafetyScore={orgSafetyScore}
-              orgISA={orgISA}
-            />
+            <TrackA dept={dept} orgISA={orgISA} />
           </div>
 
           {/* 4 nodos Masa y Gravedad */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-10">
             {NODO_ORDER.map((source) => {
               const isActive = activeSourcesDept.has(source);
-              const nodeValue = nodeValueFor(source, dept, convergenciaDept);
               return (
                 <div
                   key={source}
@@ -150,7 +134,7 @@ export default function SectionAncla({ hook }: { hook: UseComplianceDataReturn }
                     {NODO_LABELS[source]}
                   </p>
                   <p className="text-2xl font-extralight text-white tabular-nums mt-1">
-                    {isActive ? nodeValue : '—'}
+                    {isActive ? 'Activo' : '—'}
                   </p>
                   {!isActive && NODO_REQUIRES[source] && (
                     <p className="text-[9px] text-slate-600 mt-1 italic leading-tight">
@@ -179,15 +163,11 @@ export default function SectionAncla({ hook }: { hook: UseComplianceDataReturn }
 
 function TrackA({
   dept,
-  orgSafetyScore,
   orgISA,
 }: {
   dept: NonNullable<UseComplianceDataReturn['selectedDepartment']>;
-  orgSafetyScore: number | null;
   orgISA: number | null;
 }) {
-  const vsOrgSafety =
-    orgSafetyScore !== null ? dept.safetyScore - orgSafetyScore : null;
   const vsOrgISA =
     orgISA !== null && dept.isaScore !== null ? dept.isaScore - orgISA : null;
   const generoGap = computeGenderGap(dept);
@@ -197,11 +177,6 @@ function TrackA({
       <TrackRow
         label="Respecto a la organización"
         value={vsOrgISA !== null ? `${formatDelta(vsOrgISA)} pts` : '—'}
-        hint={
-          vsOrgSafety !== null
-            ? `${formatDelta(displayDelta(vsOrgSafety))} vs score org`
-            : undefined
-        }
       />
       <TrackRow
         label="Comparado con el ciclo anterior"
@@ -264,18 +239,3 @@ function computeGenderGap(
   return gb.male.score - gb.female.score;
 }
 
-function nodeValueFor(
-  source: ComplianceSource,
-  dept: NonNullable<UseComplianceDataReturn['selectedDepartment']>,
-  _convergencia: ReturnType<typeof Object> extends infer _R ? unknown : unknown
-): string {
-  // De momento solo 'ambiente_sano' tiene métrica nativa expuesta en el report
-  // (safetyScore). Los demás nodos muestran "Activo" cuando la fuente está
-  // disponible en convergencia, pero el detalle numérico de cada uno se
-  // construye por fuente en Sesión 7 (convergencia) y alertas.
-  if (source === 'ambiente_sano') {
-    const { display, label } = classifyForDisplay(dept.safetyScore);
-    return display !== null ? `${display} · ${label}` : '—';
-  }
-  return 'Activo';
-}
