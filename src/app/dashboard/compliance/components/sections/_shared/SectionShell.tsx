@@ -2,9 +2,11 @@
 
 // src/app/dashboard/compliance/components/sections/_shared/SectionShell.tsx
 // Shell común de una sección: card premium + Tesla Line por sección + CTA
-// "Siguiente" al pie (si corresponde). Centraliza el token canónico:
-//   relative overflow-hidden bg-[#0F172A]/90 backdrop-blur-2xl
-//   border border-slate-800 rounded-[20px]
+// "Siguiente" al pie (si corresponde). Tokens canónicos FocalizaHR
+// (post-Gate 5d):
+//   relative overflow-hidden bg-slate-900/60 backdrop-blur-sm
+//   border border-slate-800/40 rounded-2xl
+// Padding canónico de cards: px-6 py-14 md:px-10 md:py-20.
 
 import { ArrowRight } from 'lucide-react';
 import TeslaLine from '../../shared/TeslaLine';
@@ -36,7 +38,7 @@ export default function SectionShell({
     teslaColorOverride !== undefined ? teslaColorOverride : TESLA_BY_SECTION[sectionId];
 
   return (
-    <div className="relative overflow-hidden bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[20px] p-6 md:p-10 w-full">
+    <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl px-6 py-14 md:px-10 md:py-20 w-full">
       {teslaColor && <TeslaLine color={teslaColor} />}
 
       <div>{children}</div>
