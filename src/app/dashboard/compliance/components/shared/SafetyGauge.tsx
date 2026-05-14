@@ -17,14 +17,33 @@ interface SafetyGaugeProps {
   size?: number;
   /** Label opcional debajo del número (ej. "/ 100"). Default: sin suffix. */
   suffix?: string;
-  /** Nivel para color del arco */
-  riskLevel?: 'safe' | 'risk' | 'critical';
+  /** Nivel para color del arco — paleta anti-semáforo Decisión #1 AS v1.0 */
+  riskLevel?: 'safe' | 'observation' | 'risk' | 'critical';
 }
 
+// Paleta anti-semáforo: cyan / slate-400 / amber / amber-glow. Crítico
+// comparte color con riesgo, pero intensifica el glow (no introduce rojo).
 const COLORS_BY_LEVEL: Record<string, string> = {
   safe: '#22D3EE',
+  observation: '#94A3B8',
   risk: '#F59E0B',
   critical: '#F59E0B',
+};
+
+// Intensidad del glow del arco activo según nivel. Crítico = más radio y opacidad.
+const GLOW_BY_LEVEL: Record<string, string> = {
+  safe: '88',
+  observation: '66',
+  risk: '88',
+  critical: 'cc',
+};
+
+// Radio del glow exterior (blur background detrás del arco).
+const BACKGROUND_GLOW_OPACITY: Record<string, number> = {
+  safe: 0.2,
+  observation: 0.1,
+  risk: 0.2,
+  critical: 0.32,
 };
 
 // Ángulo del arco: barrido 270° (desde -135° hasta +135°), deja 90° vacío abajo.
@@ -61,6 +80,8 @@ export default function SafetyGauge({
   const r = size / 2 - strokeWidth;
 
   const color = COLORS_BY_LEVEL[riskLevel] ?? COLORS_BY_LEVEL.safe;
+  const glowAlpha = GLOW_BY_LEVEL[riskLevel] ?? GLOW_BY_LEVEL.safe;
+  const bgGlowOpacity = BACKGROUND_GLOW_OPACITY[riskLevel] ?? BACKGROUND_GLOW_OPACITY.safe;
   const normalized = score === null ? 0 : Math.max(0, Math.min(1, score / 100));
 
   // Arco base (gris tenue, barrido completo)
@@ -79,10 +100,10 @@ export default function SafetyGauge({
       className="relative flex items-center justify-center"
       style={{ width: size, height: size }}
     >
-      {/* Glow sutil detrás */}
+      {/* Glow sutil detrás (intensidad varía por nivel — crítico más intenso) */}
       <div
-        className="absolute inset-0 rounded-full blur-2xl opacity-20 pointer-events-none"
-        style={{ backgroundColor: color }}
+        className="absolute inset-0 rounded-full blur-2xl pointer-events-none"
+        style={{ backgroundColor: color, opacity: bgGlowOpacity }}
       />
 
       <svg width={size} height={size} className="relative">
@@ -105,7 +126,9 @@ export default function SafetyGauge({
             initial={{ pathLength: 0, opacity: 0 }}
             animate={{ pathLength: 1, opacity: 1 }}
             transition={{ duration: 1.2, ease: 'easeOut' }}
-            style={{ filter: `drop-shadow(0 0 8px ${color}88)` }}
+            style={{
+              filter: `drop-shadow(0 0 ${riskLevel === 'critical' ? 14 : 8}px ${color}${glowAlpha})`,
+            }}
           />
         )}
       </svg>

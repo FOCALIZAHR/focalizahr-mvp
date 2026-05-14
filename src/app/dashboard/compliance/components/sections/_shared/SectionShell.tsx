@@ -6,7 +6,7 @@
 // (post-Gate 5d):
 //   relative overflow-hidden bg-slate-900/60 backdrop-blur-sm
 //   border border-slate-800/40 rounded-2xl
-// Padding canónico de cards: px-6 py-14 md:px-10 md:py-20.
+// Padding moderado (validación visual 2A): px-6 py-8 md:px-10 md:py-12.
 
 import { ArrowRight } from 'lucide-react';
 import TeslaLine from '../../shared/TeslaLine';
@@ -38,7 +38,7 @@ export default function SectionShell({
     teslaColorOverride !== undefined ? teslaColorOverride : TESLA_BY_SECTION[sectionId];
 
   return (
-    <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl px-6 py-14 md:px-10 md:py-20 w-full">
+    <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl px-6 py-8 md:px-10 md:py-12 w-full">
       {teslaColor && <TeslaLine color={teslaColor} />}
 
       <div>{children}</div>

@@ -4,9 +4,9 @@
 // SECTION DIMENSIONES — State Machine (Patrón G canon)
 // SectionDimensiones/index.tsx
 // ════════════════════════════════════════════════════════════════════════════
-// Container Patrón G canónico (guided-intelligence.md §1):
-//   bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[20px]
-//   h-[700px] overflow-hidden
+// Container Patrón G canónico FocalizaHR (post-Gate 5d Sub-2B):
+//   bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl
+//   h-[calc(100vh-110px)] md:h-[calc(100vh-150px)] overflow-hidden
 //
 // Motor de 2 estados (guided-intelligence.md §2):
 //   'isa'     → ISAPortada      (impact hook con número WHITE protagonista)
@@ -77,9 +77,9 @@ export default function SectionDimensiones({ hook }: SectionDimensionesProps) {
     <div
       className="
         relative overflow-hidden
-        bg-[#0F172A]/90 backdrop-blur-2xl
-        border border-slate-800
-        rounded-[20px]
+        bg-slate-900/60 backdrop-blur-sm
+        border border-slate-800/40
+        rounded-2xl
         h-[calc(100vh-110px)] md:h-[calc(100vh-150px)]
       "
     >

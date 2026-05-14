@@ -13,7 +13,7 @@ import {
 } from '@/app/dashboard/compliance/lib/labels';
 import {
   formatDelta,
-  isaLevelToLegacyRisk,
+  isaLevelToGaugeColor,
   displayDelta,
 } from '@/app/dashboard/compliance/lib/format';
 import { getISARiskLevel, ISA_LABELS } from '@/lib/services/compliance/ISAService';
@@ -105,7 +105,7 @@ export default function SectionAncla({ hook }: { hook: UseComplianceDataReturn }
                 }
                 riskLevel={
                   dept.isaScore !== null
-                    ? isaLevelToLegacyRisk(getISARiskLevel(dept.isaScore))
+                    ? isaLevelToGaugeColor(getISARiskLevel(dept.isaScore))
                     : 'safe'
                 }
                 size={220}
@@ -147,7 +147,7 @@ export default function SectionAncla({ hook }: { hook: UseComplianceDataReturn }
           </div>
         </>
       ) : (
-        <div className="text-center py-16 border border-dashed border-slate-800 rounded-[20px]">
+        <div className="text-center py-16 border border-dashed border-slate-800/40 rounded-2xl">
           <p className="text-slate-500 text-sm font-light">
             Selecciona un departamento para ver su composición.
           </p>

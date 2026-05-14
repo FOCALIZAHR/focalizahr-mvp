@@ -519,8 +519,8 @@ export const DetailPanel = memo(function DetailPanel({
         className="
           shrink-0 flex items-center gap-4 md:gap-6
           px-5 py-4 md:px-16
-          bg-[#0F172A]/90 backdrop-blur-xl
-          border-t border-slate-800/60
+          bg-slate-900/60 backdrop-blur-sm
+          border-t border-slate-800/40
         "
       >
         <div className="flex-1 flex flex-col gap-0.5 min-w-0">
@@ -931,7 +931,7 @@ function ResumenDimSection({ group }: { group: ResumenGroup }) {
       >
         {group.dimensionName}
       </h3>
-      <ul className="rounded-2xl border border-slate-800/60 bg-[#0F172A]/60 p-5 divide-y divide-slate-800/40">
+      <ul className="rounded-2xl border border-slate-800/40 bg-slate-900/60 p-5 divide-y divide-slate-800/40">
         {group.rows.map((row) => (
           <li
             key={row.triggerRef}

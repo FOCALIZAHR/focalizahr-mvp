@@ -440,13 +440,7 @@ function Nivel1Card({
   if (cyclePeriod) statusValueParts.push(cyclePeriod);
 
   return (
-    <div
-      className="relative overflow-hidden rounded-[20px]"
-      style={{
-        background: '#0F172A',
-        border: '0.5px solid #1e293b',
-      }}
-    >
+    <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 backdrop-blur-sm border border-slate-800/40">
       {/* Tesla line — gradient purple→cyan */}
       <div
         className="absolute top-0 left-0 right-0 h-px pointer-events-none"
@@ -683,13 +677,7 @@ function Nivel1SinPatrones({
   const statusEyebrow = isA ? 'Estado' : 'Señal';
 
   return (
-    <div
-      className="relative overflow-hidden rounded-[20px]"
-      style={{
-        background: '#0F172A',
-        border: '0.5px solid #1e293b',
-      }}
-    >
+    <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 backdrop-blur-sm border border-slate-800/40">
       {/* Tesla line — variante por escenario */}
       <div
         className="absolute top-0 left-0 right-0 h-px pointer-events-none"
@@ -910,7 +898,7 @@ function StatHero({ valor, label }: { valor: number; label: string }) {
 function PillDeptSano({ name }: { name: string }) {
   return (
     <span
-      className="inline-flex px-2.5 py-[3px] rounded-[20px] text-[10px] font-bold tracking-[0.1em] uppercase"
+      className="inline-flex px-2.5 py-[3px] rounded-full text-[10px] font-bold tracking-[0.1em] uppercase"
       style={{
         background: 'rgba(52,211,153,0.06)',
         border: '0.5px solid rgba(52,211,153,0.15)',
@@ -925,7 +913,7 @@ function PillDeptSano({ name }: { name: string }) {
 function PillDeptCiego({ name }: { name: string }) {
   return (
     <span
-      className="inline-flex px-2.5 py-[3px] rounded-[20px] text-[10px] font-bold tracking-[0.1em] uppercase"
+      className="inline-flex px-2.5 py-[3px] rounded-full text-[10px] font-bold tracking-[0.1em] uppercase"
       style={{
         background: 'rgba(71,85,105,0.15)',
         border: '0.5px solid rgba(71,85,105,0.3)',
@@ -981,7 +969,7 @@ function Pill({
 
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-2.5 py-[3px] rounded-[20px] text-[11px] font-light"
+      className="inline-flex items-center gap-1.5 px-2.5 py-[3px] rounded-full text-[11px] font-light"
       style={styles}
     >
       {children}
@@ -1055,13 +1043,7 @@ function Nivel2Bandas({
   const lastBandaId = allBandasIds[allBandasIds.length - 1];
 
   return (
-    <div
-      className="rounded-[20px] overflow-hidden"
-      style={{
-        background: '#0F172A',
-        border: '0.5px solid #1e293b',
-      }}
-    >
+    <div className="rounded-2xl overflow-hidden bg-slate-900/60 backdrop-blur-sm border border-slate-800/40">
       {/* Section header */}
       <div
         className="px-7 py-3.5"
@@ -1365,7 +1347,7 @@ function BandaCiego({
 
       <div>
         <span
-          className="inline-flex px-2.5 py-[3px] rounded-[20px] text-[10px] font-bold tracking-[0.1em] uppercase"
+          className="inline-flex px-2.5 py-[3px] rounded-full text-[10px] font-bold tracking-[0.1em] uppercase"
           style={{
             background: 'rgba(71,85,105,0.15)',
             border: '0.5px solid rgba(71,85,105,0.3)',
@@ -1417,7 +1399,7 @@ function BandaSano({
 
       <div>
         <span
-          className="inline-flex px-2.5 py-[3px] rounded-[20px] text-[10px] font-bold tracking-[0.1em] uppercase"
+          className="inline-flex px-2.5 py-[3px] rounded-full text-[10px] font-bold tracking-[0.1em] uppercase"
           style={{
             background: 'rgba(52,211,153,0.06)',
             border: '0.5px solid rgba(52,211,153,0.15)',

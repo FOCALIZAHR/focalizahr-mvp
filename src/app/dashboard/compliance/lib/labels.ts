@@ -163,10 +163,13 @@ export const TESLA_BY_SECTION: Record<ComplianceSectionId, string | null> = {
   cierre:       null,       // SIN Tesla Line (cierre es pausa narrativa)
 };
 
-/** Tesla Line de Síntesis según nivel de riesgo ISA. */
+/** Tesla Line de Síntesis según nivel de riesgo ISA.
+ *  Paleta anti-semáforo (Decisión #1 Plan de Cierre AS v1.0):
+ *  cyan / slate-400 / amber / amber. Crítico se distingue por glow
+ *  intensificado, no por color distinto. */
 export const TESLA_SINTESIS: Record<ISARiskLevel, string> = {
   saludable:   '#22D3EE', // cyan
-  observacion: '#64748B', // slate
+  observacion: '#94A3B8', // slate-400 (no slate-500 — más visible en estado neutral)
   riesgo:      '#F59E0B', // amber
   critico:     '#F59E0B', // amber (no rojo — intensidad, no semáforo)
 };
