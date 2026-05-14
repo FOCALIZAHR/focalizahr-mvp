@@ -88,7 +88,7 @@ export default function SectionCierre({ hook }: { hook: UseComplianceDataReturn 
       {/* Cards cruzadas — solo si el cliente NO tiene ese producto activo */}
       <div className="mt-10 space-y-4">
         {!activeSources.has('exit') && (
-          <div className="relative overflow-hidden p-5 bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[20px]">
+          <div className="relative overflow-hidden p-5 bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl">
             <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
               Qué falta leer
             </p>
@@ -100,7 +100,7 @@ export default function SectionCierre({ hook }: { hook: UseComplianceDataReturn 
           </div>
         )}
         {!activeSources.has('onboarding') && (
-          <div className="relative overflow-hidden p-5 bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[20px]">
+          <div className="relative overflow-hidden p-5 bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl">
             <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
               Qué falta leer
             </p>

@@ -66,8 +66,8 @@ export default function RecommendationCard({
     return (
       <div
         className={cn(
-          'relative overflow-hidden p-6 bg-[#0F172A]/90 backdrop-blur-2xl border rounded-[20px]',
-          chosen ? borderAccent : 'border-slate-800'
+          'relative overflow-hidden p-6 bg-slate-900/60 backdrop-blur-sm border rounded-2xl',
+          chosen ? borderAccent : 'border-slate-800/40'
         )}
       >
         <div
@@ -186,7 +186,7 @@ export default function RecommendationCard({
   if (rec.type === 'individual' && rec.options && rec.trigger) {
     const chosen = existingActions[0];
     return (
-      <div className="relative overflow-hidden p-6 bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[20px]">
+      <div className="relative overflow-hidden p-6 bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl">
         <div
           className="absolute top-0 left-0 right-0 h-[2px] pointer-events-none"
           style={{

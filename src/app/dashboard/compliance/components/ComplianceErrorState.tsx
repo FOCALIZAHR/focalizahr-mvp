@@ -15,7 +15,7 @@ export default function ComplianceErrorState({
   onRetry,
 }: ComplianceErrorStateProps) {
   return (
-    <div className="relative overflow-hidden bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[20px] p-10 w-full text-center">
+    <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl p-10 w-full text-center">
       <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-4" />
       <h2 className="text-lg font-light text-slate-200 mb-2">Error al cargar</h2>
       <p className="text-sm text-slate-500 font-light mb-6">{error}</p>

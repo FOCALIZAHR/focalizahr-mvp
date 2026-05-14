@@ -53,7 +53,7 @@ export default function SectionAlertas({ hook }: { hook: UseComplianceDataReturn
       </div>
 
       {alerts.length === 0 ? (
-        <div className="relative overflow-hidden p-8 bg-[#0F172A]/60 border border-slate-800 rounded-[20px] text-center">
+        <div className="relative overflow-hidden p-8 bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl text-center">
           <p className="text-slate-400 font-light text-sm leading-relaxed">
             Sin alertas activas este ciclo.
           </p>
@@ -70,7 +70,7 @@ export default function SectionAlertas({ hook }: { hook: UseComplianceDataReturn
             return (
               <div
                 key={a.id}
-                className="relative overflow-hidden p-5 bg-amber-950/10 border border-amber-500/20 rounded-[20px]"
+                className="relative overflow-hidden p-5 bg-amber-950/10 border border-amber-500/20 rounded-2xl"
               >
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />

@@ -58,7 +58,7 @@ export default function ComplianceOrchestrator({
       : 'items-start';
 
   return (
-    <div className="min-h-screen w-full bg-[#0F172A] text-white flex flex-col font-sans">
+    <div className="min-h-screen w-full bg-slate-950 text-white flex flex-col font-sans">
 
       {/* Stage — el header global se eliminó; selector + PDFs viven en el Rail */}
       <div className={cn(

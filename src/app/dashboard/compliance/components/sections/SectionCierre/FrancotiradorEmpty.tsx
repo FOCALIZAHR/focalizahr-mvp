@@ -20,7 +20,7 @@ export default function FrancotiradorEmpty({
   onNavigateToSimulador,
 }: FrancotiradorEmptyProps) {
   return (
-    <div className="relative overflow-hidden p-6 md:p-8 bg-[#0F172A]/60 border border-slate-800 rounded-[20px]">
+    <div className="relative overflow-hidden p-6 md:p-8 bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl">
       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-4 text-center">
         {FRANCOTIRADOR_COPY.eyebrow}
       </p>

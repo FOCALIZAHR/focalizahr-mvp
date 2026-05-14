@@ -76,7 +76,7 @@ export default function DepartmentParticipationRanking({
 
   if (isLoading) {
     return (
-      <div className="relative overflow-hidden bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[20px] p-6 animate-pulse">
+      <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl p-6 animate-pulse">
         <div className="h-4 w-48 bg-slate-800 rounded" />
         <div className="space-y-3 mt-6">
           {[0, 1, 2].map((i) => (
@@ -89,7 +89,7 @@ export default function DepartmentParticipationRanking({
 
   if (error) {
     return (
-      <div className="relative overflow-hidden bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[20px] p-6">
+      <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl p-6">
         <p className="text-xs text-slate-500 font-light">
           No pudimos cargar el ranking por ahora.
         </p>
@@ -102,7 +102,7 @@ export default function DepartmentParticipationRanking({
   }
 
   return (
-    <div className="relative overflow-hidden bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[20px] p-6">
+    <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl p-6">
       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-4">
         Participación por departamento
       </p>

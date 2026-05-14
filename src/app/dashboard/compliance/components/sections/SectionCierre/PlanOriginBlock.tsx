@@ -7,9 +7,8 @@
 // Renderiza UN bloque consolidado por origen ejecutivo (C1/C2/C3/Alertas).
 // Componente dumb — recibe origen + actions ya ordenadas, sin lógica de filtrado.
 //
-// Tokens canónicos del módulo compliance (deuda reconocida, ver
-// .claude/rules/frontend-design.md): bg-[#0F172A]/60 + rounded-[20px]
-// alineado con el resto de SectionCierre histórico.
+// Tokens canónicos FocalizaHR (post-Gate 5d Sub-2C):
+// bg-slate-900/60 + backdrop-blur-sm + border-slate-800/40 + rounded-2xl.
 
 import { Check } from 'lucide-react';
 import type { CompliancePlanAction } from '@/types/compliance';
@@ -45,7 +44,7 @@ export default function PlanOriginBlock({ origin, actions }: PlanOriginBlockProp
         </span>
       </div>
 
-      <div className="relative overflow-hidden p-5 bg-[#0F172A]/60 border border-slate-800 rounded-[20px] divide-y divide-slate-800/40">
+      <div className="relative overflow-hidden p-5 bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl divide-y divide-slate-800/40">
         {actions.map((action) => (
           <div
             key={action.id}

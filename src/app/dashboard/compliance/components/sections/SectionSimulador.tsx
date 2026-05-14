@@ -40,7 +40,7 @@ export default function SectionSimulador({ hook }: { hook: UseComplianceDataRetu
       </div>
 
       {recsThisSection.length === 0 ? (
-        <div className="relative overflow-hidden p-8 bg-[#0F172A]/60 border border-slate-800 rounded-[20px] text-center">
+        <div className="relative overflow-hidden p-8 bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl text-center">
           <p className="text-slate-400 font-light text-sm leading-relaxed">
             El análisis no requiere intervenciones estructurales para este ciclo.
           </p>

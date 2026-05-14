@@ -54,7 +54,7 @@ export default function ComplianceEmptyState() {
         {BLOQUES.map((bloque) => (
           <div
             key={bloque.stat}
-            className="relative overflow-hidden w-full p-6 bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[20px]"
+            className="relative overflow-hidden w-full p-6 bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl"
           >
             <div
               className="absolute top-0 left-0 right-0 h-[2px] pointer-events-none"

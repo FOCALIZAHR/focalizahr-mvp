@@ -26,7 +26,7 @@ export default function ComplianceActiveState({
   return (
     <div className="flex flex-col gap-6 w-full">
       {/* Hero — participación */}
-      <div className="relative overflow-hidden p-8 text-center bg-[#0F172A]/90 backdrop-blur-2xl border border-slate-800 rounded-[20px]">
+      <div className="relative overflow-hidden p-8 text-center bg-slate-900/60 backdrop-blur-sm border border-slate-800/40 rounded-2xl">
         <div
           className="absolute top-0 left-0 right-0 h-[2px] pointer-events-none"
           style={{

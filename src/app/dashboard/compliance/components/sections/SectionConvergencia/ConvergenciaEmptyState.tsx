@@ -2,7 +2,8 @@
 
 // Empty state con 3 variantes (sin_ciclo, sin_convergencia, solo_motor_a).
 // Plan sec "Componente 4 — ConvergenciaEmptyState".
-// Tokens canónicos compliance: rounded-[20px], bg-#0F172A, border 0.5px.
+// Tokens canónicos FocalizaHR (post-Gate 5d Sub-2C):
+// rounded-2xl + bg-slate-900/60 + backdrop-blur-sm + border-slate-800/40.
 
 import { EMPTY_STATE_COPY } from './_shared/EMPTY_STATE_COPY';
 import type { EmptyStateVariant } from './_shared/helpers';
@@ -16,13 +17,7 @@ export default function ConvergenciaEmptyState({ variant }: Props) {
   const Icon = copy.icon;
 
   return (
-    <div
-      className="relative overflow-hidden rounded-[20px]"
-      style={{
-        background: '#0F172A',
-        border: '0.5px solid #1e293b',
-      }}
-    >
+    <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 backdrop-blur-sm border border-slate-800/40">
       {/* Tesla slate sutil — sin glow */}
       <div
         className="absolute top-0 left-0 right-0 h-px pointer-events-none"

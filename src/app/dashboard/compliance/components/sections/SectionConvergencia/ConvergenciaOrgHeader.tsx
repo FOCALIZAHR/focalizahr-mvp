@@ -204,13 +204,7 @@ export default function ConvergenciaOrgHeader({
   const hasCuerpoEspecifico = Boolean(cruceNarrativa || criticalByManagerNarrativa);
 
   return (
-    <div
-      className="relative overflow-hidden rounded-[20px]"
-      style={{
-        background: '#0F172A',
-        border: '0.5px solid #1e293b',
-      }}
-    >
+    <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 backdrop-blur-sm border border-slate-800/40">
       {/* 1. Tesla line — gobernada por worstNivelFinal, no por el estado del header */}
       <div
         className={`absolute top-0 left-0 right-0 h-px pointer-events-none ${
