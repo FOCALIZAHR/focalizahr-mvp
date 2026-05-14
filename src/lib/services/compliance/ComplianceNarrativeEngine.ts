@@ -12,7 +12,7 @@
 //   6. El cierre ancla la urgencia.
 //
 // Vocabulario PROHIBIDO en artefactos (solo en alertas internas):
-//   - "acoso", "hostigamiento", "denuncia", "Ley Karin"
+//   - "acoso", "hostigamiento", "denuncia", "Ley Karin" (CL · o normativa equivalente por país)
 //   - "seguridad psicológica", "psicosocial"
 //   - "Safety Score", "EXO", "LLM", "convergencia"
 //   - "se recomienda", "deberías", "es necesario"

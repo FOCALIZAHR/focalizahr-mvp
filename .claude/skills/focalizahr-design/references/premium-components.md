@@ -75,6 +75,29 @@ function TeslaLine({ color = 'default', isActive = true }) {
 | Error/Crítico | Rojo | `#EF4444` |
 | Premium/Destacado | Purple | `#A78BFA` |
 
+### ⚠️ Tensión con anti-semáforo — cuándo aplica este mapping
+
+Este mapping verde/amarillo/rojo aplica **únicamente** a:
+
+- **Línea Tesla dinámica** según estado de una entidad operativa (campaña completa, evaluación enviada, error de carga). Indicador secundario, no protagonista de la pantalla.
+- **Botones de acción** con semántica clara (`SuccessButton`, `DangerButton`) donde el botón es la acción, no un score.
+
+**NO aplica a indicadores primarios de score/severidad** (gauges hero, badges de banda en cards, color del número protagonista). En esos casos prevalece la regla de `anti-patterns.md` ("Zero semáforos rojo/verde/amarillo como indicadores primarios") y la regla general del producto:
+
+> *La severidad la canta UNA cosa — el color del número. Todo lo demás permanece uniforme entre cards.*
+
+Para gauges con bandas de score/severidad, usar paleta FocalizaHR core respetando anti-semáforo:
+- Banda sana: `#22D3EE` cyan (paleta primaria FocalizaHR)
+- Banda observación/neutra: `#94A3B8` slate-400 (neutral, no verde)
+- Banda riesgo: `#F59E0B` amber (alarma sutil)
+- Banda crítica: `#F59E0B` amber con glow intensificado (mismo color, distinto peso visual)
+
+**No introducir verde ni rojo como bandas de score primario.** El verde y rojo se reservan para confirmaciones operativas (botones, Tesla lines de estado), no para diagnóstico de severidad.
+
+**Referencia de aplicación canónica:** `SafetyGauge.tsx` (gauge ISA en SectionAncla) post-Gate 5d.
+
+*Esta nota se agregó 2026-05-14 tras detectar la contradicción durante el cierre Ambiente Sano v1.0.*
+
 ---
 
 ## 🔮 GLASSMORPHISM

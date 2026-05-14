@@ -498,7 +498,7 @@ export const PATRONES_LLM: {
     favoritismo_implicito:
       'La organización percibe que las decisiones clave no responden al desempeño. El esfuerzo extra pierde sentido cuando las reglas no aplican igual para todos. El talento de alto rendimiento nota esta asimetría primero. Y los mejores siempre tienen otras opciones.',
     resignacion_aprendida:
-      'La frustración inicial ya dio paso a la apatía. El equipo asume que el reporte no produce ningún cambio real. Las encuestas se perciben como un trámite. El sistema dejó de intentar.',
+      'La frustración inicial ya dio paso a la apatía. El equipo asume que el reporte no produce ningún cambio real. Las encuestas se perciben como un trámite. La gente dejó de intentar.',
     miedo_represalias:
       'El equipo opera bajo la certeza de que habrá consecuencias personales si se expone una verdad incómoda. Los conflictos ya escalaron lo suficiente como para que callar sea la única jugada segura. La lealtad observada no se basa en el compromiso. Se sostiene en el riesgo.',
   },
@@ -563,7 +563,7 @@ export const PATRONES_SIN_DATOS: Record<PatronesSinDatosEscenario, PatronesSinDa
 
   ESCENARIO_B: {
     titular: {
-      primera: 'El sistema no registra texto.',
+      primera: 'Nadie escribió nada.',
       segunda: 'El silencio también es un dato.',
     },
     veredicto:

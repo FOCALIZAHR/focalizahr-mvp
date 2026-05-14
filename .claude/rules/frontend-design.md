@@ -112,6 +112,41 @@ Para badges de focos/info en cards: tag ghost neutro
 
 ---
 
+## Contrato Visual `N · Label`
+
+Cuando un score 0-100 se acompaña de un label de banda (Safety, ISA, dimensión), el formato canónico es:
+
+```
+N · Label
+```
+
+Donde:
+- **N** = número entero del score (0-100). Nunca decimales, nunca raw 1-5, nunca "/100" pegado.
+- **·** = middle dot Unicode `U+00B7` (no `-`, no `:`, no `|`).
+- **Label** = etiqueta de banda canónica del dominio. Para Safety/dimensiones: `Sano / Atención / Riesgo / Crítico`. Para ISA: `Saludable / En observación / En riesgo / Crítico`.
+
+### Aplicación por superficie
+
+| Superficie | Tratamiento |
+|---|---|
+| Gauge suffix | `"de 100 · Label"` debajo del número hero (centrado, flex-col, `mt-2`) |
+| Card de grid | `"{N} · {Label}"` como métrica única en la card |
+| Narrativa inline | `"{Label} ({N} de 100)"` — el label primero, el número entre paréntesis |
+| Delta (no absoluto) | Solo `+N` o `-N` con signo, sin label (es delta, no score) |
+
+### Anti-patrones
+
+- ❌ `"43/100 Riesgo"` — slash + ausencia de middle dot
+- ❌ `"43 - Riesgo"` — hyphen en lugar de middle dot
+- ❌ `"de 100 · En Observación"` — labels en title case (mantener case canónico)
+- ❌ Score con decimales o raw 1-5 visible al usuario
+
+### Referencia canónica
+
+`SafetyGauge.tsx` (suffix) y `SectionAncla.tsx` (gauge label) post-Gate 5c implementan el contrato. Replicar el patrón al introducir nuevas superficies "N · Label".
+
+---
+
 ## Mobile-First — Verificación Obligatoria
 
 Antes de reportar un componente como terminado:
