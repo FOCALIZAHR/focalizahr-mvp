@@ -275,6 +275,17 @@ function buildAncla(
     };
   }
 
+  // Caso positivo — sin teatro y con score agregado saludable. La rama
+  // default ("dónde se concentra la señal") asume que hay señal que
+  // concentrar; cuando la organización está sana, el trabajo es de
+  // blindaje, no de corrección.
+  if (orgSafetyScore >= 4.0) {
+    return {
+      titular: 'El ambiente sostiene condiciones saludables en todas las gerencias.',
+      descripcion: `Lectura agregada de ${departmentsCount} gerencias. Ninguna entra en zona de revisión. El trabajo del ciclo es sostener lo que funciona, no corregir.`,
+    };
+  }
+
   return {
     titular: 'El mapa del semestre muestra dónde se concentra la señal.',
     descripcion: `Lectura agregada de ${departmentsCount} gerencias. La distribución importa más que el promedio.`,
