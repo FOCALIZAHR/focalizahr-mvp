@@ -195,10 +195,19 @@ export async function processNextDepartmentJob(campaignId: string): Promise<bool
       return true;
     }
 
+    // R-12 adaptado: leer Account.country y propagar al LLM service para
+    // adaptar el system prompt (CL → Ley Karin + modismos; otros →
+    // marco neutro). Param explícito desde orchestrator (Decisión #4).
+    const account = await prisma.account.findUnique({
+      where: { id: job.accountId },
+      select: { country: true },
+    });
+
     const llmResult = await analyzeDepartmentPatterns({
       departmentName: department?.displayName ?? 'Sin nombre',
       respondentCount: job.respondentCount ?? textos.length,
       respuestas: textos,
+      country: account?.country ?? null,
     });
 
     if (!llmResult.success) {

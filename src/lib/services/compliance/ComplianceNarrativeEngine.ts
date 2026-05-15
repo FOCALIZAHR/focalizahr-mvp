@@ -522,15 +522,36 @@ function buildBodyV1(d: DepartmentConvergencia): string {
 // Solo aplica en modo v2. Reusa CASO_LABELS de casoLabels.ts (single source).
 //
 // 1 caso → "Caso registrado: X."
-// 2+ casos → trunca al primero (orden natural del engine A1 < A2 < ... < A5)
-//            y suma "+N más". Evita oraciones largas en banda colapsada;
-//            el detalle real vive en el acordeón expandido per-caso.
+// 2+ casos → "Caso principal" es el más grave por severidad clínica
+//            (Decisión #3 Plan de Cierre AS v1.0). Ranking: A3>A2>A1>A4>A5.
+//            Alinea con Motor 6 (CombinatoriaDictionary Regla 7) que ya
+//            usa el mismo criterio. Evita inconsistencia "principal A1 +
+//            narrativa de A3" en deptos multi-caso.
+//
+// Por qué A3 primero: sesgo de género tiene mayor exposición legal
+// (Ley Karin / equivalente). Es lo más grave para llegar al CEO primero.
+// A2 acumulación interna y A1 doble confirmación siguen. A4/A5 son
+// patrones de menor exposición (gemelo opuesto, score miente).
+const CASO_SEVERITY_RANK: Record<CasoMotorA, number> = {
+  A3: 5,
+  A2: 4,
+  A1: 3,
+  A4: 2,
+  A5: 1,
+};
+
+function casoMasGrave(casos: CasoMotorA[]): CasoMotorA {
+  return [...casos].sort(
+    (a, b) => (CASO_SEVERITY_RANK[b] ?? 0) - (CASO_SEVERITY_RANK[a] ?? 0)
+  )[0];
+}
+
 function describeCasos(casos: CasoMotorA[]): string {
   if (casos.length === 0) return '';
   if (casos.length === 1) {
     return `Caso registrado: ${CASO_LABELS[casos[0]]}.`;
   }
-  const principal = CASO_LABELS[casos[0]];
+  const principal = CASO_LABELS[casoMasGrave(casos)];
   const restantes = casos.length - 1;
   return `Caso principal: ${principal}. (+${restantes} más)`;
 }

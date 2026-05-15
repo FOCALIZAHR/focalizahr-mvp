@@ -108,7 +108,25 @@ const TOOL: AnthropicTool = {
   },
 };
 
-const SYSTEM_PROMPT = `Eres el motor analítico de FocalizaHR Ambiente Sano, un sistema experto en psicología organizacional y prevención de riesgos psicosociales en el contexto laboral de Chile (Ley Karin).
+// Marco normativo y modismos por país. CL mantiene "Ley Karin" + modismos
+// chilenos (default histórico). Otros países usan marco neutro genérico
+// (R-12 adaptado Plan de Cierre AS v1.0 — IF país + fallback, NO modismos
+// específicos por país). Documentación completa de modismos per-país
+// queda como deuda futura (R-12 expandido post-v1.0).
+function getCountryMarco(country: string | null): string {
+  if (country === 'CL') return 'contexto laboral de Chile (Ley Karin)';
+  return 'contexto laboral aplicable a la normativa de prevención de riesgos psicosociales del país';
+}
+
+function getCountryContextBlock(country: string | null): string {
+  if (country === 'CL') {
+    return `1. CONTEXTO CHILENO: Entiende modismos como "hacer la cama", "mandar a la cresta", "hacerse el larry", "ley del hielo", "chaqueteo", "jefe florero". Interpreta su gravedad subyacente en contexto corporativo.`;
+  }
+  return `1. CONTEXTO LOCAL: Interpreta modismos, eufemismos y expresiones idiomáticas locales del país en su gravedad subyacente en contexto corporativo. Si una frase es coloquial pero apunta a hostilidad, exclusión o miedo, su carga clínica prevalece sobre la literalidad.`;
+}
+
+function buildSystemPrompt(country: string | null): string {
+  return `Eres el motor analítico de FocalizaHR Ambiente Sano, un sistema experto en psicología organizacional y prevención de riesgos psicosociales en el ${getCountryMarco(country)}.
 
 Tu filosofía es: "Iluminar el riesgo, no probar el delito". Haces diagnósticos epidemiológicos de departamentos, NO juicios de individuos.
 
@@ -135,7 +153,7 @@ LENTE DE GÉNERO (Obligatorio evaluar):
 Busca activamente paternalismo ("las chiquillas", "las niñitas"), desestimación ("le dan color", "es histérica"), evaluación diferencial ("ella es conflictiva" vs "él es asertivo"), o menciones a roles de cuidado/apariencia. Si detectas esto, activa la alerta de género INDEPENDIENTEMENTE de los 5 patrones. Si activas la alerta, DEBES separar la cita literal en evidencia_genero (máximo 8 palabras) y tu justificación clínica/legal en analisis_genero. No mezcles las dos cosas en un solo campo.
 
 REGLAS ESTRICTAS:
-1. CONTEXTO CHILENO: Entiende modismos como "hacer la cama", "mandar a la cresta", "hacerse el larry", "ley del hielo", "chaqueteo", "jefe florero". Interpreta su gravedad subyacente en contexto corporativo.
+${getCountryContextBlock(country)}
 2. CALIBRACIÓN DE INTENSIDAD (BUCKETS ESTRICTOS):
 Tienes prohibido inventar decimales. DEBES asignar la intensidad eligiendo ÚNICAMENTE uno de estos 5 valores exactos:
 - 0.2 (Leve): Menciones aisladas, lenguaje suave o ambiguo.
@@ -171,6 +189,7 @@ Si aplicas Lexical Override basado en pocas frases (1-2 de 5 personas):
 → descripcion debe incluir: "Un relato breve pero severo sugiere..."
 
 7. SEÑAL DOMINANTE: Asigna el nombre del patrón con mayor intensidad. Si patrones vacío → "ambiente_sano". Si confianza insuficiente → "datos_insuficientes".`;
+}
 
 // Few-shot: 1 departamento tóxico + 1 departamento sano.
 // Enseña al modelo a no inventar patrones donde no los hay.
@@ -291,6 +310,10 @@ export interface AnalyzeDepartmentInput {
   departmentName: string;
   respondentCount: number;
   respuestas: string[];
+  /** Código país del account (Account.country). null = fallback neutro
+   *  (R-12 adaptado Plan de Cierre AS v1.0). CL preserva marco "Ley Karin"
+   *  + modismos chilenos. Otros países usan marco neutro genérico. */
+  country: string | null;
 }
 
 export async function analyzeDepartmentPatterns(
@@ -306,7 +329,7 @@ export async function analyzeDepartmentPatterns(
   );
 
   const result = await callAnthropicWithTool<PatronAnalysisOutput>({
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt: buildSystemPrompt(input.country),
     userPrompt,
     tool: TOOL,
     fewShot: [
