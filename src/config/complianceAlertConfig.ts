@@ -16,7 +16,8 @@ export type ComplianceAlertType =
   | 'liderazgo_toxico'
   | 'silencio_organizacional'
   | 'deterioro_sostenido'
-  | 'senal_ignorada';
+  | 'senal_ignorada'
+  | 'silencio_con_voz_externa';
 
 export type ComplianceSeverity = 'critical' | 'high' | 'medium' | 'low' | 'informativa';
 
@@ -79,6 +80,20 @@ export const COMPLIANCE_ALERT_TYPES: Record<ComplianceAlertType, ComplianceAlert
     titleTemplate: 'Señal de onboarding correlacionada con salida en {department}',
     descriptionTemplate:
       'Se detectaron salidas posteriores a journeys con EXO bajo (< 60). La correlación indica que señales tempranas no se tradujeron en intervención.',
+  },
+  // Sexta alerta (doc maestro CONVERGENCIA_AMBIENTE_SANO_v3 §6.2).
+  // Departamento sin cobertura de Ambiente Sano (dotación insuficiente,
+  // sin respuestas, o participación < 50%) PERO con señales externas
+  // activas. La simétrica de senal_ignorada: "ni medimos, pero el síntoma
+  // está documentado en otra fuente". NO requiere ambiente_sano.
+  silencio_con_voz_externa: {
+    type: 'silencio_con_voz_externa',
+    severity: 'high',
+    slaHours: 72,
+    requiredSources: ['exit', 'onboarding'],
+    titleTemplate: 'Señales sin medición en {department}',
+    descriptionTemplate:
+      '{department} no completó esta medición. En el mismo período, otras fuentes documentaron señales activas. La ausencia de voz, cruzada con voz externa documentada, no es un problema de campo — es el hallazgo.',
   },
 };
 

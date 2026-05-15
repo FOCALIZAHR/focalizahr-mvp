@@ -177,6 +177,10 @@ export const ALERT_INTERVENTIONS: Record<ComplianceAlertType | 'default', string
   silencio_organizacional: ['HIGH_FREQ_PULSES', 'PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION'],
   deterioro_sostenido:     ['RELATIONAL_REDESIGN', 'FAST_FEEDBACK', 'HIGH_FREQ_PULSES'],
   senal_ignorada:          ['PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION', 'HIGH_FREQ_PULSES'],
+  // Tripleta PROVISIONAL — sin HIGH_FREQ_PULSES como primario (la narrativa
+  // de la sexta dice "no una encuesta de seguimiento"). Validar con playbook
+  // completo junto a las deudas R-13/14/15/16 del catálogo de intervenciones.
+  silencio_con_voz_externa: ['PSYCH_SAFETY_MODELING', 'FAST_FEEDBACK', 'RELATIONAL_REDESIGN'],
 };
 
 // Convergencia (C3) — un trigger por depto con nivelFinal != 'ninguna'.

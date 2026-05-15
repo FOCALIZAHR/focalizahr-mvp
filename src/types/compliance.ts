@@ -261,8 +261,24 @@ export interface ComplianceReportResponse {
       criticalByManager: Array<{ managerId: string; departmentIds: string[] }>;
     };
     alerts: ComplianceReportAlert[];
+    /** Sexta alerta — deptos sin voz confiable en Ambiente Sano (sin cobertura
+     *  o participación < 50%) pero con señales externas activas. Renderizados
+     *  como banda dedicada en SectionConvergencia (BandaSilencioVozExterna).
+     *  No están en `departments[]` porque no tienen ComplianceAnalysis.
+     *  Optional para defender payloads pre-deploy del campo. */
+    silencioVozExterna?: SilencioVozExternaItem[];
   };
   legalNotice: string;
+}
+
+/** Item de la sexta alerta para la banda dedicada en SectionConvergencia. */
+export interface SilencioVozExternaItem {
+  departmentId: string | null;
+  departmentName: string | null;
+  /** Narrativa ejecutiva ya interpolada con el nombre del depto. */
+  narrativa: string;
+  /** Cantidad de señales externas de peso medio o superior que la dispararon. */
+  signalsCount: number;
 }
 
 export interface ComplianceCampaignsResponse {

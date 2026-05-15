@@ -833,3 +833,123 @@ export async function createAlertsFromConvergencia(
 
   return { created, skipped, errors, byType };
 }
+
+// ════════════════════════════════════════════════════════════════════
+// SEXTA ALERTA — silencio_con_voz_externa
+// Doc maestro CONVERGENCIA_AMBIENTE_SANO_v3 §6.2.
+// ════════════════════════════════════════════════════════════════════
+
+/** Umbral de participación AS bajo el cual un depto cubierto se considera
+ *  "sin voz real" (Decisión #2 Plan de Cierre — Morrison & Milliken,
+ *  <60% = Cultura del Silencio; 50% conservador). */
+const SILENCIO_PARTICIPATION_THRESHOLD = 50;
+
+/** Peso mínimo de alerta externa activa para gatillar la sexta.
+ *  Escala PESO_BASE_ALERTA es 1-3; "medio o superior" del spec §6.2 = ≥ 2. */
+const SILENCIO_PESO_MIN = 2.0;
+
+/**
+ * Crea alertas `silencio_con_voz_externa` para departamentos del universo
+ * de la empresa que NO tienen voz confiable en Ambiente Sano (sin cobertura
+ * o participación < 50%) PERO tienen señales externas activas de peso medio
+ * o superior.
+ *
+ * Flujo separado de `createAlertsFromConvergencia` porque su universo son
+ * los deptos NO cubiertos por el Motor A+B — no tienen `ComplianceAnalysis`
+ * ni `DepartmentConvergencia`.
+ *
+ * Idempotente vía `upsertAlertOnce`. El orchestrator lo invoca en
+ * `processOrgMetaIfReady` después de las 5 alertas estándar.
+ */
+export async function createSilencioConVozExternaAlerts(
+  accountId: string,
+  campaignId: string
+): Promise<{ created: number; skipped: number; errors: string[] }> {
+  let created = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  // 1. Universo: deptos activos con ≥1 empleado activo (mismo criterio P2).
+  const universo = await prisma.department.findMany({
+    where: {
+      accountId,
+      isActive: true,
+      employees: { some: { isActive: true } },
+    },
+    select: { id: true, displayName: true },
+  });
+
+  // 2. Deptos cubiertos por AS en esta campaña.
+  const cubiertos = await prisma.complianceAnalysis.findMany({
+    where: { campaignId, scope: 'DEPARTMENT' },
+    select: { departmentId: true },
+  });
+  const cubiertosSet = new Set(
+    cubiertos.map((c) => c.departmentId).filter((id): id is string => !!id)
+  );
+
+  // 3. Participación AS per-depto (responded / invited × 100).
+  const partRows = await prisma.participant.groupBy({
+    by: ['departmentId', 'hasResponded'],
+    where: { campaignId },
+    _count: { _all: true },
+  });
+  const partByDept = new Map<string, { invited: number; responded: number }>();
+  for (const row of partRows) {
+    if (!row.departmentId) continue;
+    const entry = partByDept.get(row.departmentId) ?? { invited: 0, responded: 0 };
+    entry.invited += row._count._all;
+    if (row.hasResponded) entry.responded += row._count._all;
+    partByDept.set(row.departmentId, entry);
+  }
+
+  // 4. Candidatos: no-cubiertos + cubiertos con participación < umbral.
+  const candidatos = universo.filter((dept) => {
+    if (!cubiertosSet.has(dept.id)) return true; // sin cobertura → candidato
+    const part = partByDept.get(dept.id);
+    if (!part || part.invited === 0) return false;
+    const rate = (part.responded / part.invited) * 100;
+    return rate < SILENCIO_PARTICIPATION_THRESHOLD;
+  });
+
+  // 5. Por candidato: cargar externas activas + decidir.
+  for (const dept of candidatos) {
+    try {
+      const externalAlerts = await loadDepartmentExternalAlerts(dept.id, accountId, {
+        includeHistorical: false,
+      });
+      const senalesMedias = externalAlerts.filter(
+        (a) => a.factorDecaimiento === 1.0 && a.pesoEfectivo >= SILENCIO_PESO_MIN
+      );
+      if (senalesMedias.length === 0) continue;
+
+      const config = COMPLIANCE_ALERT_TYPES.silencio_con_voz_externa;
+      const outcome = await upsertAlertOnce({
+        accountId,
+        campaignId,
+        departmentId: dept.id,
+        alertType: 'silencio_con_voz_externa',
+        title: formatTemplate(config.titleTemplate, { department: dept.displayName }),
+        description: formatTemplate(config.descriptionTemplate, {
+          department: dept.displayName,
+        }),
+        triggerSources: ['exit', 'onboarding'],
+        triggerScore: null,
+        signalsCount: senalesMedias.length,
+        context: {
+          motivo: cubiertosSet.has(dept.id) ? 'participacion_baja' : 'sin_cobertura',
+        },
+      });
+      if (outcome === 'created') created++;
+      else skipped++;
+    } catch (e) {
+      errors.push(
+        `silencio_con_voz_externa/${dept.id}: ${
+          e instanceof Error ? e.message : String(e)
+        }`
+      );
+    }
+  }
+
+  return { created, skipped, errors };
+}

@@ -127,6 +127,7 @@ export const ALERTA_LABELS: Record<ComplianceAlertType, string> = {
   deterioro_sostenido:     'Deterioro prolongado',
   silencio_organizacional: 'Retención de información detectada',
   senal_ignorada:          'Señal previa no gestionada',
+  silencio_con_voz_externa: 'Señales sin medición',
 };
 
 // ═══════════════════════════════════════════════════════════════════

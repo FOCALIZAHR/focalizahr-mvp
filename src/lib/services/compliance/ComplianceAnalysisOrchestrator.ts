@@ -29,6 +29,7 @@ import {
 import type { DepartmentConvergencia } from './ConvergenciaEngine';
 import {
   createAlertsFromConvergencia,
+  createSilencioConVozExternaAlerts,
   type DeptAlertContext,
 } from './ComplianceAlertService';
 import { buildReportNarratives } from './ComplianceNarrativeEngine';
@@ -682,6 +683,18 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
       console.error(
         '[ComplianceOrchestrator] Creación de alertas post-meta falló:',
         convergErr instanceof Error ? convergErr.message : convergErr
+      );
+    }
+
+    // Sexta alerta — silencio_con_voz_externa. Flujo separado: itera sobre
+    // el universo de deptos (no solo los cubiertos por Motor A+B). Aislado
+    // en su propio try para que un fallo acá no tumbe las 5 estándar.
+    try {
+      await createSilencioConVozExternaAlerts(orgJob.accountId, campaignId);
+    } catch (silencioErr) {
+      console.error(
+        '[ComplianceOrchestrator] Creación de silencio_con_voz_externa falló:',
+        silencioErr instanceof Error ? silencioErr.message : silencioErr
       );
     }
 

@@ -341,6 +341,17 @@ export async function GET(request: NextRequest) {
           slaStatus: a.slaStatus,
           createdAt: a.createdAt,
         })),
+        // Sexta alerta — deptos sin voz en AS pero con señales externas.
+        // Banda dedicada en SectionConvergencia (BandaSilencioVozExterna).
+        // Estos deptos NO están en `departments[]` (sin ComplianceAnalysis).
+        silencioVozExterna: filteredAlerts
+          .filter((a) => a.alertType === 'silencio_con_voz_externa')
+          .map((a) => ({
+            departmentId: a.departmentId,
+            departmentName: a.department?.displayName ?? null,
+            narrativa: a.description,
+            signalsCount: a.signalsCount ?? 0,
+          })),
       },
       legalNotice:
         'Análisis de gestión preventiva — No constituye investigación formal.',

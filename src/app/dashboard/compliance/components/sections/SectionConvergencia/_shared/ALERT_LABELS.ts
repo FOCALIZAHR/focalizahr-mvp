@@ -14,6 +14,7 @@ export const ALERT_LABELS: Record<ComplianceAlertType, string> = {
   silencio_organizacional: 'Silencio organizacional',
   deterioro_sostenido: 'Deterioro sostenido',
   senal_ignorada: 'Señal sin gestión',
+  silencio_con_voz_externa: 'Señales sin medición',
 };
 
 /**

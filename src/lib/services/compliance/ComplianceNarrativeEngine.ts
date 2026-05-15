@@ -164,6 +164,8 @@ const INTERVENCIONES: Record<ComplianceAlertType, string> = {
     'Cuando el deterioro es estructural, los pulse surveys mensuales con acción visible en 30 días tienen evidencia sólida (SMD = 0.85). Las encuestas sin acción posterior amplifican el problema.',
   senal_ignorada:
     'Capacitación del Comité Paritario y de jefaturas directas en lectura de señales tempranas. La alerta Onboarding–Exit correlacionada es predictora: actuar en el mes 1 evita la salida en el mes 4.',
+  silencio_con_voz_externa:
+    'Una conversación directa con la jefatura del área, no una encuesta de seguimiento. El objetivo es entender por qué el departamento no participó — la baja respuesta es el primer dato, no un problema de campo.',
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -817,6 +819,26 @@ interface AlertaInput {
 
 function buildAlertas(alertas: AlertaInput[]): AlertaNarrative[] {
   return alertas.map((a) => {
+    // Sexta alerta — narrativa propia del doc maestro §6.2. No sigue la
+    // lógica genérica de contexto/consecuencia por severity: el hallazgo
+    // es la ausencia de voz cruzada con voz externa documentada.
+    if (a.alertType === 'silencio_con_voz_externa') {
+      const dep = a.departmentName ?? 'Este departamento';
+      return {
+        alertType: a.alertType,
+        titulo: a.title,
+        contexto:
+          `${dep} no completó esta medición. En el mismo período, ` +
+          `otras fuentes documentaron señales activas.`,
+        consecuencia:
+          'O las personas no sintieron que valía la pena responder. O el ' +
+          'departamento atravesaba algo que hizo imposible la participación. ' +
+          'O había suficiente miedo a hablar como para no usar ni el canal ' +
+          'anónimo. Cualquiera de las tres lecturas merece una conversación.',
+        intervencion: INTERVENCIONES[a.alertType],
+      };
+    }
+
     // Regla #1 (Teatro) — si está activo, desplaza la narrativa.
     const contextoBase = a.teatroCumplimiento
       ? 'Los números dicen que está bien. El lenguaje espontáneo dice que no. La distancia es la alerta.'

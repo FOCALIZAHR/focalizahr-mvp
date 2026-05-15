@@ -18,6 +18,7 @@ import type { UseComplianceDataReturn } from '@/hooks/useComplianceData';
 import type { AlertaNarrative } from '@/lib/services/compliance/ComplianceNarrativeEngine';
 import ConvergenciaOrgHeader from './ConvergenciaOrgHeader';
 import BandaDepartamento from './BandaDepartamento';
+import BandaSilencioVozExterna from './BandaSilencioVozExterna';
 import ConvergenciaEmptyState from './ConvergenciaEmptyState';
 import {
   mergeDepartmentData,
@@ -73,8 +74,13 @@ export default function SectionConvergencia({ hook }: Props) {
 
   if (!report) return null;
 
-  // Empty state — 3 variantes según contexto del ciclo
-  if (deptosConConvergencia.length === 0) {
+  // Sexta alerta — deptos sin voz en AS pero con señales externas.
+  // Banda dedicada, no requiere MergedDept (componente aislado).
+  const silencioItems = report.data.silencioVozExterna ?? [];
+
+  // Empty state — solo si NO hay convergencia NI sexta alerta. Si hay
+  // deptos en silencio_con_voz_externa, hay contenido que mostrar.
+  if (deptosConConvergencia.length === 0 && silencioItems.length === 0) {
     return <ConvergenciaEmptyState variant={getEmptyStateVariant(report)} />;
   }
 
@@ -108,6 +114,15 @@ export default function SectionConvergencia({ hook }: Props) {
             onRegister={hook.registerPlanAction}
             onClear={hook.clearPlanAction}
             isSavingPlanAction={hook.isSavingPlanAction}
+          />
+        ))}
+        {/* Sexta alerta — bandas de deptos sin voz en AS, con señales externas.
+            Van al final: son la casilla "silencio con voz externa", distinta
+            de las bandas de convergencia estándar. */}
+        {silencioItems.map((item, i) => (
+          <BandaSilencioVozExterna
+            key={item.departmentId ?? `silencio-${i}`}
+            item={item}
           />
         ))}
       </div>
