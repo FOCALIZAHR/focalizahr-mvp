@@ -100,10 +100,16 @@ export default function SafetyGauge({
       className="relative flex items-center justify-center"
       style={{ width: size, height: size }}
     >
-      {/* Glow sutil detrás (intensidad varía por nivel — crítico más intenso) */}
+      {/* Halo FocalizaHR — siempre cyan→purple radial gradient (identidad).
+          La opacidad varía por nivel para que crítico tenga halo más intenso,
+          pero el color es identidad fija del producto (no per-estado). */}
       <div
         className="absolute inset-0 rounded-full blur-2xl pointer-events-none"
-        style={{ backgroundColor: color, opacity: bgGlowOpacity }}
+        style={{
+          background:
+            'radial-gradient(circle, #22D3EE 0%, #A78BFA 60%, transparent 100%)',
+          opacity: bgGlowOpacity,
+        }}
       />
 
       <svg width={size} height={size} className="relative">
@@ -136,8 +142,8 @@ export default function SafetyGauge({
       {/* Número + suffix al centro */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <span
-          className="font-extralight text-white tabular-nums leading-none"
-          style={{ fontSize: size * 0.3 }}
+          className="font-extralight text-white tabular-nums tracking-tight"
+          style={{ fontSize: size * 0.3, lineHeight: 0.9 }}
         >
           {score !== null ? score : '—'}
         </span>

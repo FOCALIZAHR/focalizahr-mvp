@@ -46,17 +46,44 @@ export default function SectionAncla({ hook }: { hook: UseComplianceDataReturn }
   const anclaTitular = report.narratives.ancla.titular;
   const anclaDescripcion = report.narratives.ancla.descripcion;
 
+  // Word-split del nombre del depto seleccionado (identidad FocalizaHR).
+  // - 1 palabra → línea única con fhr-title-gradient.
+  // - 2+ palabras → primera blanca, resto con fhr-title-gradient.
+  const deptTitle = dept ? splitDeptName(dept.departmentName) : null;
+
   return (
     <SectionShell sectionId="ancla" onNext={hook.navigateNext}>
-      {/* Narrativa general del acto */}
-      <div className="mb-8">
+      {/* Header word-split híbrido (skill focalizahr-design canónico).
+          Eyebrow estático + nombre depto con identidad + narrativa de motor
+          como descripción. */}
+      <div className="mb-10">
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-3">
           Por departamento
         </p>
-        <h2 className="text-xl md:text-2xl font-light text-white leading-snug">
+        {deptTitle ? (
+          deptTitle.rest === null ? (
+            <h2 className="text-3xl font-extralight fhr-title-gradient tracking-tight leading-tight">
+              {deptTitle.primary}
+            </h2>
+          ) : (
+            <>
+              <h2 className="text-3xl font-extralight text-white tracking-tight leading-tight">
+                {deptTitle.primary}
+              </h2>
+              <p className="text-xl font-light tracking-tight leading-tight fhr-title-gradient mt-1">
+                {deptTitle.rest}
+              </p>
+            </>
+          )
+        ) : (
+          <h2 className="text-3xl font-extralight text-white tracking-tight leading-tight">
+            Selecciona un departamento
+          </h2>
+        )}
+        <p className="text-base font-light text-slate-400 leading-relaxed mt-4 max-w-2xl">
           {anclaTitular}
-        </h2>
-        <p className="text-sm text-slate-500 font-light mt-2 leading-relaxed">
+        </p>
+        <p className="text-sm font-light text-slate-500 leading-relaxed mt-2 max-w-2xl">
           {anclaDescripcion}
         </p>
       </div>
@@ -93,9 +120,6 @@ export default function SectionAncla({ hook }: { hook: UseComplianceDataReturn }
           <div className="grid md:grid-cols-2 gap-8 items-center">
             {/* Gauge del depto */}
             <div className="flex flex-col items-center">
-              <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-3">
-                {dept.departmentName}
-              </p>
               <SafetyGauge
                 score={dept.isaScore}
                 suffix={
@@ -237,5 +261,14 @@ function computeGenderGap(
   const gb = dept.genderBreakdown;
   if (!gb || !gb.male || !gb.female) return null;
   return gb.male.score - gb.female.score;
+}
+
+/** Word-split del nombre de un depto para aplicar identidad FocalizaHR.
+ *  1 palabra → línea única con gradient.
+ *  2+ palabras → primera blanca, resto con gradient. */
+function splitDeptName(name: string): { primary: string; rest: string | null } {
+  const words = name.trim().split(/\s+/);
+  if (words.length <= 1) return { primary: name, rest: null };
+  return { primary: words[0], rest: words.slice(1).join(' ') };
 }
 
