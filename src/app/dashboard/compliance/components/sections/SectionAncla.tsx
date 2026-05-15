@@ -216,8 +216,8 @@ function TrackA({
           value={formatDelta(displayDelta(generoGap))}
           hint={
             Math.abs(generoGap) >= 0.5
-              ? 'Diferencia apreciable — revisar'
-              : undefined
+              ? 'Diferencia apreciable — revisar. Basado en respuestas estructuradas.'
+              : 'Basado en respuestas estructuradas.'
           }
         />
       )}
