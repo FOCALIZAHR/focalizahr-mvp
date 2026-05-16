@@ -27,35 +27,48 @@ export interface Intervention {
   evidencia: string;
   plazo: string;
   metrica: string;
+  cierre?: string; // consecuencia inevitable si no se actúa
 }
 
 export const INTERVENTION_CATALOG: Record<string, Intervention> = {
   FAST_FEEDBACK: {
     id: 'FAST_FEEDBACK',
-    titulo: 'Fast Feedback semanal',
+    titulo: 'El líder que escucha antes de evaluar',
     mecanismo:
-      'Sesiones de 10-15 min enfocadas en remover obstáculos futuros, no auditar errores pasados',
-    evidencia: 'Gallup 2024 — 13.490 profesionales',
-    plazo: '3-6 meses',
-    metrica: '3.6x más motivación vs feedback anual',
+      'El manager cita a cada persona de su equipo 15 minutos por semana. La agenda la conduce el colaborador: qué me bloqueó, qué necesito. El manager no evalúa — remueve obstáculos. La conversación reemplaza el silencio acumulado que termina en renuncia.',
+    evidencia: 'Gallup 2024 — 13.490 profesionales activos',
+    plazo:
+      'Las primeras señales aparecen entre la semana 4 y la 8. El patrón se consolida entre el mes 3 y el 6.',
+    metrica:
+      'El equipo reporta menos bloqueos sin resolver y más conversaciones reales con su jefe. Gallup mide ese cambio como 3,6 veces más motivación sostenida. FocalizaHR lo confirma en el siguiente ciclo de medición.',
+    cierre:
+      'Un equipo sin canal semanal no deja de tener problemas. Los acumula en silencio. Cuando ese silencio aparece en los datos, la decisión ya estaba tomada.',
   },
   PSYCH_SAFETY_MODELING: {
     id: 'PSYCH_SAFETY_MODELING',
-    titulo: 'Liderazgo que reconoce errores en voz alta',
+    titulo: 'El líder que se equivoca primero',
     mecanismo:
-      'El líder admite sus propios fallos antes que los del equipo. Cada problema se trata como pregunta, no como juicio. Los pulsos confirman si esa apertura se convirtió en hábito o sigue siendo discurso.',
-    evidencia: 'BCG — 28.000 empleados',
-    plazo: '12 a 24 meses para que arraigue. Las primeras señales aparecen al sexto mes.',
-    metrica: 'Elimina brecha de deserción en grupos diversos',
+      'El líder admite sus propios errores antes de señalar los del equipo. Cada problema se trata como pregunta, no como juicio. No es vulnerabilidad por principio — es una señal deliberada de que equivocarse no tiene consecuencias. El equipo calibra su comportamiento en función de lo que ve, no de lo que escucha.',
+    evidencia: 'Edmondson (1999) — Administrative Science Quarterly. BCG (2023) — 28.000 empleados.',
+    plazo:
+      'Las primeras señales aparecen al sexto mes. Arraiga entre los 12 y 24 meses.',
+    metrica:
+      'El equipo reporta que puede señalar un error sin anticipar una consecuencia negativa. FocalizaHR lo confirma cuando P2_seguridad mejora en el siguiente ciclo.',
+    cierre:
+      'Un líder que nunca se equivoca en público tiene un equipo que tampoco. Eso no es excelencia — es una organización que gestiona apariencias en lugar de resultados.',
   },
   BYSTANDER_INTERVENTION: {
     id: 'BYSTANDER_INTERVENTION',
-    titulo: 'Aliados activos en la sala',
+    titulo: 'Quien ve y no actúa también decide',
     mecanismo:
-      'Entrena al grupo — no a quien recibe el daño — a interrumpir el comentario despectivo en el momento. Sin escándalo, sin discurso. Una frase que reordena la conversación y deja claro qué no se acepta aquí.',
-    evidencia: 'MDPI Microaggressions 2024',
-    plazo: '12 meses sostenidos. Los talleres de un día no funcionan.',
-    metrica: 'Reducción de incidentes percibidos en 3-6 meses',
+      'Se entrena al equipo — no a quien recibe el daño — a interrumpir el comentario despectivo en el momento. Sin escándalo, sin discurso. Una frase que reordena la conversación y deja claro qué no se acepta. El colectivo se convierte en el estándar, no el manual de conducta.',
+    evidencia: 'Ashburn-Nardo et al. (2008) — Journal of Social Issues',
+    plazo:
+      'Cambios perceptibles entre el mes 3 y el 6. Consolidación real a los 12 meses.',
+    metrica:
+      'El equipo reporta menos situaciones donde nadie intervino ante un comentario inapropiado. FocalizaHR lo confirma cuando P4_microagresiones mejora y el patrón hostilidad_normalizada deja de aparecer.',
+    cierre:
+      'Lo que nadie interrumpe, todos aprueban. El silencio colectivo no es neutralidad — es el mecanismo por el que una conducta se vuelve cultura.',
   },
   HIGH_FREQ_PULSES: {
     id: 'HIGH_FREQ_PULSES',
@@ -68,39 +81,92 @@ export const INTERVENTION_CATALOG: Record<string, Intervention> = {
   },
   DISSENT_INSTITUTIONALIZATION: {
     id: 'DISSENT_INSTITUTIONALIZATION',
-    titulo: 'Disentir y comprometerse',
+    titulo: 'La objeción que salva la decisión',
     mecanismo:
-      'Cada decisión importante exige que alguien la cuestione antes de aprobarse. Una vez decidida, todos ejecutan — pero la objeción quedó registrada. Se separa la fase de debate de la fase de ejecución.',
-    evidencia: 'McKinsey Risk Culture 2024',
+      'Antes de aprobar cualquier decisión importante, alguien tiene el rol explícito de cuestionarla. No es crítica personal — es protocolo. Una vez decidido, todos ejecutan. La objeción quedó registrada. Se separa la fase de debate de la fase de ejecución.',
+    evidencia: 'Nemeth et al. (2001) — European Journal of Social Psychology',
     plazo: '6 a 12 meses para desaprender la aversión al conflicto.',
-    metrica: 'Elimina ceguera sistémica ante errores evidentes',
+    metrica:
+      'El equipo reporta que las decisiones importantes se cuestionan antes de ejecutarse — y que eso no genera conflicto. FocalizaHR lo confirma cuando P3_disenso mejora y silencio_organizacional reduce su intensidad.',
+    cierre:
+      'Un equipo que nunca disiente no está de acuerdo. Está en silencio. La diferencia se nota cuando el error ya ocurrió.',
   },
   PROSOCIAL_ACTIVITIES: {
     id: 'PROSOCIAL_ACTIVITIES',
-    titulo: 'Actividades de impacto social a corto plazo',
+    titulo: 'Hacer algo afuera para entender lo de adentro',
     mecanismo:
-      'Voluntariado corporativo patrocinado como proxy cognitivo de justicia interna',
-    evidencia: 'MIT/Informs — banco LATAM, experimento aleatorizado',
-    plazo: '6-12 meses',
-    metrica: 'Reducción causal de rotación medida al año',
+      'La empresa patrocina actividades de impacto social concreto y de corto plazo — no eventos de team building. El equipo trabaja junto en algo con resultado visible fuera de la organización. Eso activa una percepción de justicia y propósito que las políticas internas no logran instalar por decreto.',
+    evidencia: 'Burbano et al. (2021) — Management Science — experimento aleatorizado banco LATAM',
+    plazo: '6 a 12 meses para impacto observable en retención.',
+    metrica:
+      'El equipo reporta mayor sentido de propósito y percepción de que la empresa actúa con coherencia. FocalizaHR lo confirma cuando P5_equidad mejora. La métrica de negocio es rotación voluntaria al año.',
+    cierre:
+      'Una empresa que solo habla de sus valores pero no los demuestra fuera de sus paredes no tiene valores — tiene decoración. El equipo ya sabe la diferencia.',
   },
   DECISION_ACCOUNTABILITY: {
     id: 'DECISION_ACCOUNTABILITY',
-    titulo: 'Un responsable claro por decisión',
+    titulo: 'Cada decisión tiene un nombre',
     mecanismo:
-      'Cada decisión relevante tiene un nombre y apellido al lado. Ni comités difusos, ni autoría compartida cuando algo funciona — ni huérfana cuando algo falla. Las reglas son las mismas para todos y se aplican igual.',
-    evidencia: 'Columbia SPS — Organizational Justice',
-    plazo: '10 a 12 meses para que la percepción de injusticia se revierta.',
-    metrica: 'r = -0.436 entre inequidad percibida e intención de rotación',
+      'Cada decisión relevante tiene un responsable identificado — no un comité, no un consenso difuso. Ese nombre aparece cuando la decisión funciona y cuando no funciona. Las reglas son las mismas para todos y se aplican igual independiente de quién decide.',
+    evidencia: 'Colquitt et al. (2001) — Journal of Applied Psychology',
+    plazo: '10 a 12 meses para revertir percepción de injusticia instalada.',
+    metrica:
+      'El equipo percibe que las decisiones de avance y reconocimiento tienen lógica visible y consistente. FocalizaHR lo confirma cuando P5_equidad mejora y favoritismo_implicito deja de aparecer.',
+    cierre:
+      'Cuando las reglas no son visibles, cada decisión se interpreta como favoritismo. Los que tienen dónde ir, se van. Los que no, se quedan y lo comentan.',
   },
   WORK_REDESIGN: {
     id: 'WORK_REDESIGN',
-    titulo: 'Auditoría del trabajo, no del esfuerzo',
+    titulo: 'El problema no es la gente — es cómo está diseñado el trabajo',
     mecanismo:
-      'El equipo revisa junto qué tareas duplica, qué reuniones sobran, qué dependencias bloquean. La conversación se traslada de "quién falla" a "qué está mal diseñado". El conflicto deja de ser entre personas y pasa a ser sobre el sistema.',
-    evidencia: 'Teoría Relacional-Cultural — PMC 2024',
-    plazo: '1 a 12 meses según la severidad del cuadro.',
-    metrica: 'Recuperación estadística medible en encuestas de pulso',
+      'El equipo revisa junto qué tareas se duplican, qué reuniones sobran, qué dependencias bloquean. La conversación se traslada de quién falla a qué está mal diseñado. El conflicto deja de ser entre personas y pasa a ser sobre el sistema.',
+    evidencia: 'Leiter & Maslach (2009) — Journal of Organizational Behavior',
+    plazo:
+      'Primeras señales entre el mes 1 y el 3. Consolidación entre 6 y 12 meses.',
+    metrica:
+      'El equipo reporta menos bloqueos sistémicos y más claridad sobre qué les corresponde hacer. FocalizaHR lo confirma cuando P8_agotamiento mejora y resignacion_aprendida reduce su intensidad.',
+    cierre:
+      'Un equipo agotado no es un equipo poco comprometido. Es un equipo al que le fallaron las condiciones. La diferencia importa porque la solución es completamente distinta.',
+  },
+  LEADERSHIP_ACCOUNTABILITY: {
+    id: 'LEADERSHIP_ACCOUNTABILITY',
+    titulo: 'Liderazgo medido, no asumido',
+    mecanismo:
+      'El comportamiento del líder se evalúa con los mismos datos que su equipo: reuniones fuera de horario, calidad del feedback, rotación bajo su gestión. Su evaluación y su avance quedan amarrados a esos indicadores — no solo al resultado financiero del trimestre.',
+    evidencia:
+      'Derue et al. (2011) — Journal of Organizational Behavior — meta-análisis 335 evaluaciones de liderazgo.',
+    plazo: '8 a 10 meses con acompañamiento estructurado.',
+    metrica:
+      'Rotación bajo gestión del líder disminuye. El equipo reporta más conversaciones reales con su jefe. FocalizaHR lo confirma cuando P7_liderazgo mejora en el siguiente ciclo.',
+    cierre:
+      'Un líder que solo rinde cuentas por el número del trimestre optimiza para el número del trimestre. Lo que le pase a su equipo en el proceso no aparece en ningún reporte — hasta que aparece en la rotación.',
+  },
+  OPPORTUNITY_GOVERNANCE: {
+    id: 'OPPORTUNITY_GOVERNANCE',
+    titulo: 'Reglas claras para repartir oportunidades',
+    mecanismo:
+      'La asignación de proyectos visibles, mentorías y promociones sigue un mapa documentado — no la cercanía con el jefe. Quién decide qué queda escrito antes de que aparezca la oportunidad. El líder ya no puede elegir favoritos sin que otros lo revisen.',
+    evidencia:
+      'Colquitt et al. (2001) — Journal of Applied Psychology — meta-análisis 183 estudios.',
+    plazo:
+      'Prevención temprana — si no se instala antes del primer año del equipo, el patrón ya está normalizado.',
+    metrica:
+      'El equipo percibe que las oportunidades se distribuyen con lógica visible. FocalizaHR lo confirma cuando P5_equidad mejora y favoritismo_implicito deja de aparecer.',
+    cierre:
+      'Cuando las reglas no son visibles, cada oportunidad que se asigna se interpreta como favoritismo. Los que tienen dónde ir, se van. Los que no, se quedan y lo comentan.',
+  },
+  BEHAVIORAL_TRIANGULATION: {
+    id: 'BEHAVIORAL_TRIANGULATION',
+    titulo: 'Cruzar lo que se dice con lo que se hace',
+    mecanismo:
+      'Las respuestas de la encuesta se contrastan con datos de comportamiento real: rotación, denuncias previas, ausentismo, patrones de comunicación. Cuando ambos relatos coinciden, el dato es confiable. Cuando no, hay algo que la encuesta no está mostrando.',
+    evidencia:
+      'Perceptyx — escalas rigurosas vs tiende-a-acordar: 8-12 puntos de sesgo enmascarado. PMC 2024 — Machine Learning person-fit indices para detección de deseabilidad social.',
+    plazo: 'Inmediato. Desde el primer ciclo de medición.',
+    metrica:
+      'Convergencia entre score declarado y comportamiento real — rotación, ausentismo.',
+    cierre:
+      'Los números dicen que está bien. Nadie en la organización lo cree. Cuando esa brecha lleva ciclos sin nombrarse, la encuesta dejó de ser una herramienta — se convirtió en el problema.',
   },
 };
 
@@ -136,14 +202,14 @@ export const DIMENSION_INTERVENTIONS: DimensionMatrix = {
     critico: ['BYSTANDER_INTERVENTION', 'WORK_REDESIGN', 'PSYCH_SAFETY_MODELING'],
   },
   P5_equidad: {
-    medio: ['HIGH_FREQ_PULSES', 'DECISION_ACCOUNTABILITY', 'PROSOCIAL_ACTIVITIES'],
-    bajo: ['DECISION_ACCOUNTABILITY', 'PROSOCIAL_ACTIVITIES', 'FAST_FEEDBACK'],
-    critico: ['DECISION_ACCOUNTABILITY', 'PROSOCIAL_ACTIVITIES', 'BYSTANDER_INTERVENTION'],
+    medio: ['HIGH_FREQ_PULSES', 'DECISION_ACCOUNTABILITY', 'OPPORTUNITY_GOVERNANCE'],
+    bajo: ['OPPORTUNITY_GOVERNANCE', 'DECISION_ACCOUNTABILITY', 'PROSOCIAL_ACTIVITIES'],
+    critico: ['OPPORTUNITY_GOVERNANCE', 'DECISION_ACCOUNTABILITY', 'PROSOCIAL_ACTIVITIES'],
   },
   P7_liderazgo: {
-    medio: ['FAST_FEEDBACK', 'PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION'],
-    bajo: ['PSYCH_SAFETY_MODELING', 'FAST_FEEDBACK', 'DISSENT_INSTITUTIONALIZATION'],
-    critico: ['PSYCH_SAFETY_MODELING', 'BYSTANDER_INTERVENTION', 'DISSENT_INSTITUTIONALIZATION'],
+    medio: ['FAST_FEEDBACK', 'PSYCH_SAFETY_MODELING', 'LEADERSHIP_ACCOUNTABILITY'],
+    bajo: ['PSYCH_SAFETY_MODELING', 'LEADERSHIP_ACCOUNTABILITY', 'FAST_FEEDBACK'],
+    critico: ['LEADERSHIP_ACCOUNTABILITY', 'PSYCH_SAFETY_MODELING', 'BYSTANDER_INTERVENTION'],
   },
   P8_agotamiento: {
     medio: ['WORK_REDESIGN', 'FAST_FEEDBACK', 'BYSTANDER_INTERVENTION'],
@@ -163,7 +229,7 @@ export const PATRON_INTERVENTIONS: Record<PatronNombre | 'default', string[]> = 
   default: ['HIGH_FREQ_PULSES', 'PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION'],
   silencio_organizacional: ['HIGH_FREQ_PULSES', 'PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION'],
   hostilidad_normalizada:  ['BYSTANDER_INTERVENTION', 'PSYCH_SAFETY_MODELING', 'WORK_REDESIGN'],
-  favoritismo_implicito:   ['DECISION_ACCOUNTABILITY', 'PROSOCIAL_ACTIVITIES', 'DISSENT_INSTITUTIONALIZATION'],
+  favoritismo_implicito:   ['OPPORTUNITY_GOVERNANCE', 'DECISION_ACCOUNTABILITY', 'PROSOCIAL_ACTIVITIES'],
   resignacion_aprendida:   ['WORK_REDESIGN', 'FAST_FEEDBACK', 'DISSENT_INSTITUTIONALIZATION'],
   miedo_represalias:       ['PSYCH_SAFETY_MODELING', 'HIGH_FREQ_PULSES', 'DISSENT_INSTITUTIONALIZATION'],
 };
@@ -205,7 +271,7 @@ export const CONVERGENCIA_INTERVENTIONS: Record<Exclude<NivelFinal, 'ninguna'>, 
 // "responde lo que se espera leer", la primera medida es estructurar el
 // disenso, no esperar que el liderazgo modele apertura (porque
 // precisamente eso es lo que la gente está fingiendo).
-const TEATRO_TRIPLETA = ['DISSENT_INSTITUTIONALIZATION', 'PSYCH_SAFETY_MODELING', 'HIGH_FREQ_PULSES'];
+const TEATRO_TRIPLETA = ['BEHAVIORAL_TRIANGULATION', 'DISSENT_INSTITUTIONALIZATION', 'PSYCH_SAFETY_MODELING'];
 
 // Override A3 — sesgo de género detectado intra-dept por Motor A.
 // PSYCH_SAFETY_MODELING es el único ítem del catálogo con evidencia directa
