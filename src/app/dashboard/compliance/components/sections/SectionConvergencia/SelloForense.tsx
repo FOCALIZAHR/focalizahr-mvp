@@ -15,12 +15,11 @@ interface Props {
 
 export default function SelloForense({ caso }: Props) {
   const entry = SELLOS_FORENSES_LABELS[caso];
-  const glosario = SELLO_GLOSARIO[caso];
   const Icon = entry.icon;
   return (
     <TooltipContext
-      title={glosario.title}
-      explanation={glosario.explanation}
+      title={entry.label}
+      explanation={SELLO_GLOSARIO[caso]}
       variant="pattern"
       position="bottom"
       usePortal

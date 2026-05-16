@@ -18,5 +18,5 @@ export const CASO_LABELS: Record<CasoMotorA, string> = {
   A2: 'Teatro detectado',
   A3: 'Sesgo de género',
   A4: 'Variable de liderazgo',
-  A5: 'Silencio bajo ISA alto',
+  A5: 'Silencio bajo promedio alto',
 };

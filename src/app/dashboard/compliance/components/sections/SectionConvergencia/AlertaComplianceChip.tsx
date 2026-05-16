@@ -36,7 +36,9 @@ function isOverdue(alert: ComplianceReportAlert): boolean {
 export default function AlertaComplianceChip({ alert, consecuencia }: Props) {
   const overdue = isOverdue(alert);
   // Glosario contextual — defensive: alertType desconocido → sin tooltip.
+  // El title del tooltip espeja el label real del chip (resolveAlertLabel).
   const glosario = ALERTA_GLOSARIO[alert.alertType as ComplianceAlertType];
+  const glosarioTitle = resolveAlertLabel(alert.alertType);
 
   if (overdue) {
     // SLA vencido — texto tachado en slate, sin rojo. Accountability sin alarmar.
@@ -50,8 +52,8 @@ export default function AlertaComplianceChip({ alert, consecuencia }: Props) {
     );
     return glosario ? (
       <TooltipContext
-        title={glosario.title}
-        explanation={glosario.explanation}
+        title={glosarioTitle}
+        explanation={glosario}
         variant="pattern"
         position="bottom"
         usePortal
@@ -77,8 +79,8 @@ export default function AlertaComplianceChip({ alert, consecuencia }: Props) {
     <div className="inline-flex flex-col items-start gap-1 max-w-full">
       {glosario ? (
         <TooltipContext
-          title={glosario.title}
-          explanation={glosario.explanation}
+          title={glosarioTitle}
+          explanation={glosario}
           variant="pattern"
           position="bottom"
           usePortal
