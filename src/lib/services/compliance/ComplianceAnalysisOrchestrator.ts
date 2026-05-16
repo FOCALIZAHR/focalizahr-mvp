@@ -30,6 +30,7 @@ import type { DepartmentConvergencia } from './ConvergenciaEngine';
 import {
   createAlertsFromConvergencia,
   createSilencioConVozExternaAlerts,
+  createParticipacionAnomalaAlerts,
   type DeptAlertContext,
 } from './ComplianceAlertService';
 import { buildReportNarratives } from './ComplianceNarrativeEngine';
@@ -695,6 +696,17 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
       console.error(
         '[ComplianceOrchestrator] Creación de silencio_con_voz_externa falló:',
         silencioErr instanceof Error ? silencioErr.message : silencioErr
+      );
+    }
+
+    // Séptima alerta — participacion_anomala. Outlier estadístico de
+    // participación. Try aislado, mismo criterio que la sexta.
+    try {
+      await createParticipacionAnomalaAlerts(orgJob.accountId, campaignId);
+    } catch (partErr) {
+      console.error(
+        '[ComplianceOrchestrator] Creación de participacion_anomala falló:',
+        partErr instanceof Error ? partErr.message : partErr
       );
     }
 

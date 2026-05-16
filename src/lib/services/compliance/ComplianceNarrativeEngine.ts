@@ -166,6 +166,8 @@ const INTERVENCIONES: Record<ComplianceAlertType, string> = {
     'Capacitación del Comité Paritario y de jefaturas directas en lectura de señales tempranas. La alerta Onboarding–Exit correlacionada es predictora: actuar en el mes 1 evita la salida en el mes 4.',
   silencio_con_voz_externa:
     'Una conversación directa con la jefatura del área, no una encuesta de seguimiento. El objetivo es entender por qué el departamento no participó — la baja respuesta es el primer dato, no un problema de campo.',
+  participacion_anomala:
+    'Una conversación directa con la jefatura del área para entender la baja respuesta. El número es el punto de partida, no el diagnóstico.',
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -846,6 +848,26 @@ function buildAlertas(alertas: AlertaInput[]): AlertaNarrative[] {
           'departamento atravesaba algo que hizo imposible la participación. ' +
           'O había suficiente miedo a hablar como para no usar ni el canal ' +
           'anónimo. Cualquiera de las tres lecturas merece una conversación.',
+        intervencion: INTERVENCIONES[a.alertType],
+      };
+    }
+
+    // Séptima alerta — outlier de participación. Narrativa propia: el
+    // hallazgo es el contraste depto vs empresa, sin cruce de fuentes.
+    if (a.alertType === 'participacion_anomala') {
+      const dep = a.departmentName ?? 'Este departamento';
+      return {
+        alertType: a.alertType,
+        titulo: a.title,
+        contexto:
+          `La empresa respondió esta medición. ${dep} se quedó muy por ` +
+          `debajo del resto del mapa.`,
+        consecuencia:
+          'O la convocatoria no llegó como debía. O el equipo dejó de ' +
+          'creer que responder cambia algo. O hay algo en esa área que ' +
+          'vuelve incómodo participar, incluso de forma anónima. Las tres ' +
+          'lecturas piden la misma respuesta — una conversación, no un ' +
+          'recordatorio.',
         intervencion: INTERVENCIONES[a.alertType],
       };
     }

@@ -835,6 +835,71 @@ export async function createAlertsFromConvergencia(
 }
 
 // ════════════════════════════════════════════════════════════════════
+// HELPER COMPARTIDO — participación de deptos (sexta + séptima alerta)
+// ════════════════════════════════════════════════════════════════════
+
+interface DeptParticipation {
+  /** Universo de deptos activos con ≥1 empleado activo (criterio P2). */
+  universo: Array<{ id: string; displayName: string; empleadosActivos: number }>;
+  /** Deptos con ComplianceAnalysis DEPARTMENT en la campaña. */
+  cubiertosSet: Set<string>;
+  /** Participación AS per-depto (invited / responded). */
+  partByDept: Map<string, { invited: number; responded: number }>;
+}
+
+/**
+ * Computa el universo de deptos + cobertura AS + participación per-depto.
+ * Reusado por la sexta (`silencio_con_voz_externa`) y la séptima
+ * (`participacion_anomala`) alertas.
+ */
+async function computeDepartmentParticipation(
+  accountId: string,
+  campaignId: string
+): Promise<DeptParticipation> {
+  const universoRaw = await prisma.department.findMany({
+    where: {
+      accountId,
+      isActive: true,
+      employees: { some: { isActive: true } },
+    },
+    select: {
+      id: true,
+      displayName: true,
+      _count: { select: { employees: { where: { isActive: true } } } },
+    },
+  });
+  const universo = universoRaw.map((d) => ({
+    id: d.id,
+    displayName: d.displayName,
+    empleadosActivos: d._count.employees,
+  }));
+
+  const cubiertos = await prisma.complianceAnalysis.findMany({
+    where: { campaignId, scope: 'DEPARTMENT' },
+    select: { departmentId: true },
+  });
+  const cubiertosSet = new Set(
+    cubiertos.map((c) => c.departmentId).filter((id): id is string => !!id)
+  );
+
+  const partRows = await prisma.participant.groupBy({
+    by: ['departmentId', 'hasResponded'],
+    where: { campaignId },
+    _count: { _all: true },
+  });
+  const partByDept = new Map<string, { invited: number; responded: number }>();
+  for (const row of partRows) {
+    if (!row.departmentId) continue;
+    const entry = partByDept.get(row.departmentId) ?? { invited: 0, responded: 0 };
+    entry.invited += row._count._all;
+    if (row.hasResponded) entry.responded += row._count._all;
+    partByDept.set(row.departmentId, entry);
+  }
+
+  return { universo, cubiertosSet, partByDept };
+}
+
+// ════════════════════════════════════════════════════════════════════
 // SEXTA ALERTA — silencio_con_voz_externa
 // Doc maestro CONVERGENCIA_AMBIENTE_SANO_v3 §6.2.
 // ════════════════════════════════════════════════════════════════════
@@ -869,39 +934,9 @@ export async function createSilencioConVozExternaAlerts(
   let skipped = 0;
   const errors: string[] = [];
 
-  // 1. Universo: deptos activos con ≥1 empleado activo (mismo criterio P2).
-  const universo = await prisma.department.findMany({
-    where: {
-      accountId,
-      isActive: true,
-      employees: { some: { isActive: true } },
-    },
-    select: { id: true, displayName: true },
-  });
-
-  // 2. Deptos cubiertos por AS en esta campaña.
-  const cubiertos = await prisma.complianceAnalysis.findMany({
-    where: { campaignId, scope: 'DEPARTMENT' },
-    select: { departmentId: true },
-  });
-  const cubiertosSet = new Set(
-    cubiertos.map((c) => c.departmentId).filter((id): id is string => !!id)
-  );
-
-  // 3. Participación AS per-depto (responded / invited × 100).
-  const partRows = await prisma.participant.groupBy({
-    by: ['departmentId', 'hasResponded'],
-    where: { campaignId },
-    _count: { _all: true },
-  });
-  const partByDept = new Map<string, { invited: number; responded: number }>();
-  for (const row of partRows) {
-    if (!row.departmentId) continue;
-    const entry = partByDept.get(row.departmentId) ?? { invited: 0, responded: 0 };
-    entry.invited += row._count._all;
-    if (row.hasResponded) entry.responded += row._count._all;
-    partByDept.set(row.departmentId, entry);
-  }
+  // 1-3. Universo + cobertura + participación per-depto (helper compartido).
+  const { universo, cubiertosSet, partByDept } =
+    await computeDepartmentParticipation(accountId, campaignId);
 
   // 4. Candidatos: no-cubiertos + cubiertos con participación < umbral.
   const candidatos = universo.filter((dept) => {
@@ -945,6 +980,109 @@ export async function createSilencioConVozExternaAlerts(
     } catch (e) {
       errors.push(
         `silencio_con_voz_externa/${dept.id}: ${
+          e instanceof Error ? e.message : String(e)
+        }`
+      );
+    }
+  }
+
+  return { created, skipped, errors };
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SÉPTIMA ALERTA — participacion_anomala
+// Outlier estadístico de participación: un depto que respondió muy por
+// debajo del resto de la empresa. Sin cruce externo.
+// ════════════════════════════════════════════════════════════════════
+
+/** Dotación mínima del depto para que la baja participación sea señal. */
+const PARTICIPACION_ANOMALA_N_MIN = 10;
+/** Participación absoluta bajo la cual el depto es candidato. */
+const PARTICIPACION_ANOMALA_RATE_MAX = 60;
+/** Media de participación de la empresa bajo la cual NO se dispara —
+ *  si la empresa entera participó mal, un depto bajo es la norma. */
+const PARTICIPACION_ANOMALA_EMPRESA_MIN = 50;
+
+/**
+ * Crea alertas `participacion_anomala` para departamentos que son outlier
+ * estadístico de participación: dotación ≥ 10, participación < 60%, y
+ * participación por debajo de (media empresa − 1 desviación estándar).
+ * Guard: solo si la media de la empresa ≥ 50%.
+ *
+ * Idempotente vía `upsertAlertOnce`. El orchestrator lo invoca en
+ * `processOrgMetaIfReady` después de la sexta alerta.
+ */
+export async function createParticipacionAnomalaAlerts(
+  accountId: string,
+  campaignId: string
+): Promise<{ created: number; skipped: number; errors: string[] }> {
+  let created = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  const { universo, partByDept } = await computeDepartmentParticipation(
+    accountId,
+    campaignId
+  );
+
+  // Tasa per-depto — solo deptos con invitados en la campaña.
+  const rateByDept = new Map<string, number>();
+  for (const dept of universo) {
+    const part = partByDept.get(dept.id);
+    if (!part || part.invited === 0) continue;
+    rateByDept.set(dept.id, (part.responded / part.invited) * 100);
+  }
+  const rates = [...rateByDept.values()];
+  if (rates.length === 0) return { created, skipped, errors };
+
+  // Media + desviación estándar poblacional de las tasas.
+  const media = rates.reduce((s, r) => s + r, 0) / rates.length;
+  const variance =
+    rates.reduce((s, r) => s + (r - media) ** 2, 0) / rates.length;
+  const sd = Math.sqrt(variance);
+
+  // Guard: empresa con participación general baja → ningún depto es outlier.
+  if (media < PARTICIPACION_ANOMALA_EMPRESA_MIN) {
+    return { created, skipped, errors };
+  }
+  const umbralOutlier = media - sd;
+
+  for (const dept of universo) {
+    const rate = rateByDept.get(dept.id);
+    if (rate === undefined) continue;
+    const esOutlier =
+      dept.empleadosActivos >= PARTICIPACION_ANOMALA_N_MIN &&
+      rate < PARTICIPACION_ANOMALA_RATE_MAX &&
+      rate < umbralOutlier;
+    if (!esOutlier) continue;
+
+    try {
+      const config = COMPLIANCE_ALERT_TYPES.participacion_anomala;
+      const outcome = await upsertAlertOnce({
+        accountId,
+        campaignId,
+        departmentId: dept.id,
+        alertType: 'participacion_anomala',
+        title: formatTemplate(config.titleTemplate, {
+          department: dept.displayName,
+        }),
+        description: formatTemplate(config.descriptionTemplate, {
+          department: dept.displayName,
+        }),
+        triggerSources: ['ambiente_sano'],
+        triggerScore: Math.round(rate),
+        signalsCount: null,
+        context: {
+          participationRate: Math.round(rate),
+          mediaEmpresa: Math.round(media),
+          empleadosActivos: dept.empleadosActivos,
+        },
+      });
+      if (outcome === 'created') created++;
+      else skipped++;
+    } catch (e) {
+      errors.push(
+        `participacion_anomala/${dept.id}: ${
           e instanceof Error ? e.message : String(e)
         }`
       );

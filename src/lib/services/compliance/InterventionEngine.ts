@@ -84,8 +84,8 @@ export const INTERVENTION_CATALOG: Record<string, Intervention> = {
     plazo: '6-12 meses',
     metrica: 'Reducción causal de rotación medida al año',
   },
-  ALGORITHMIC_TRANSPARENCY: {
-    id: 'ALGORITHMIC_TRANSPARENCY',
+  DECISION_ACCOUNTABILITY: {
+    id: 'DECISION_ACCOUNTABILITY',
     titulo: 'Un responsable claro por decisión',
     mecanismo:
       'Cada decisión relevante tiene un nombre y apellido al lado. Ni comités difusos, ni autoría compartida cuando algo funciona — ni huérfana cuando algo falla. Las reglas son las mismas para todos y se aplican igual.',
@@ -93,8 +93,8 @@ export const INTERVENTION_CATALOG: Record<string, Intervention> = {
     plazo: '10 a 12 meses para que la percepción de injusticia se revierta.',
     metrica: 'r = -0.436 entre inequidad percibida e intención de rotación',
   },
-  RELATIONAL_REDESIGN: {
-    id: 'RELATIONAL_REDESIGN',
+  WORK_REDESIGN: {
+    id: 'WORK_REDESIGN',
     titulo: 'Auditoría del trabajo, no del esfuerzo',
     mecanismo:
       'El equipo revisa junto qué tareas duplica, qué reuniones sobran, qué dependencias bloquean. La conversación se traslada de "quién falla" a "qué está mal diseñado". El conflicto deja de ser entre personas y pasa a ser sobre el sistema.',
@@ -131,14 +131,14 @@ export const DIMENSION_INTERVENTIONS: DimensionMatrix = {
     critico: ['DISSENT_INSTITUTIONALIZATION', 'PSYCH_SAFETY_MODELING', 'BYSTANDER_INTERVENTION'],
   },
   P4_microagresiones: {
-    medio: ['BYSTANDER_INTERVENTION', 'RELATIONAL_REDESIGN', 'FAST_FEEDBACK'],
-    bajo: ['BYSTANDER_INTERVENTION', 'RELATIONAL_REDESIGN', 'PSYCH_SAFETY_MODELING'],
-    critico: ['BYSTANDER_INTERVENTION', 'RELATIONAL_REDESIGN', 'PSYCH_SAFETY_MODELING'],
+    medio: ['BYSTANDER_INTERVENTION', 'WORK_REDESIGN', 'FAST_FEEDBACK'],
+    bajo: ['BYSTANDER_INTERVENTION', 'WORK_REDESIGN', 'PSYCH_SAFETY_MODELING'],
+    critico: ['BYSTANDER_INTERVENTION', 'WORK_REDESIGN', 'PSYCH_SAFETY_MODELING'],
   },
   P5_equidad: {
-    medio: ['HIGH_FREQ_PULSES', 'ALGORITHMIC_TRANSPARENCY', 'PROSOCIAL_ACTIVITIES'],
-    bajo: ['ALGORITHMIC_TRANSPARENCY', 'PROSOCIAL_ACTIVITIES', 'FAST_FEEDBACK'],
-    critico: ['ALGORITHMIC_TRANSPARENCY', 'PROSOCIAL_ACTIVITIES', 'BYSTANDER_INTERVENTION'],
+    medio: ['HIGH_FREQ_PULSES', 'DECISION_ACCOUNTABILITY', 'PROSOCIAL_ACTIVITIES'],
+    bajo: ['DECISION_ACCOUNTABILITY', 'PROSOCIAL_ACTIVITIES', 'FAST_FEEDBACK'],
+    critico: ['DECISION_ACCOUNTABILITY', 'PROSOCIAL_ACTIVITIES', 'BYSTANDER_INTERVENTION'],
   },
   P7_liderazgo: {
     medio: ['FAST_FEEDBACK', 'PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION'],
@@ -146,9 +146,9 @@ export const DIMENSION_INTERVENTIONS: DimensionMatrix = {
     critico: ['PSYCH_SAFETY_MODELING', 'BYSTANDER_INTERVENTION', 'DISSENT_INSTITUTIONALIZATION'],
   },
   P8_agotamiento: {
-    medio: ['RELATIONAL_REDESIGN', 'FAST_FEEDBACK', 'BYSTANDER_INTERVENTION'],
-    bajo: ['RELATIONAL_REDESIGN', 'BYSTANDER_INTERVENTION', 'FAST_FEEDBACK'],
-    critico: ['RELATIONAL_REDESIGN', 'BYSTANDER_INTERVENTION', 'PSYCH_SAFETY_MODELING'],
+    medio: ['WORK_REDESIGN', 'FAST_FEEDBACK', 'BYSTANDER_INTERVENTION'],
+    bajo: ['WORK_REDESIGN', 'BYSTANDER_INTERVENTION', 'FAST_FEEDBACK'],
+    critico: ['WORK_REDESIGN', 'BYSTANDER_INTERVENTION', 'PSYCH_SAFETY_MODELING'],
   },
 };
 
@@ -162,25 +162,29 @@ const DEFAULT_TRIPLETA = ['HIGH_FREQ_PULSES', 'BYSTANDER_INTERVENTION', 'FAST_FE
 export const PATRON_INTERVENTIONS: Record<PatronNombre | 'default', string[]> = {
   default: ['HIGH_FREQ_PULSES', 'PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION'],
   silencio_organizacional: ['HIGH_FREQ_PULSES', 'PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION'],
-  hostilidad_normalizada:  ['BYSTANDER_INTERVENTION', 'PSYCH_SAFETY_MODELING', 'RELATIONAL_REDESIGN'],
-  favoritismo_implicito:   ['ALGORITHMIC_TRANSPARENCY', 'PROSOCIAL_ACTIVITIES', 'DISSENT_INSTITUTIONALIZATION'],
-  resignacion_aprendida:   ['RELATIONAL_REDESIGN', 'FAST_FEEDBACK', 'DISSENT_INSTITUTIONALIZATION'],
+  hostilidad_normalizada:  ['BYSTANDER_INTERVENTION', 'PSYCH_SAFETY_MODELING', 'WORK_REDESIGN'],
+  favoritismo_implicito:   ['DECISION_ACCOUNTABILITY', 'PROSOCIAL_ACTIVITIES', 'DISSENT_INSTITUTIONALIZATION'],
+  resignacion_aprendida:   ['WORK_REDESIGN', 'FAST_FEEDBACK', 'DISSENT_INSTITUTIONALIZATION'],
   miedo_represalias:       ['PSYCH_SAFETY_MODELING', 'HIGH_FREQ_PULSES', 'DISSENT_INSTITUTIONALIZATION'],
 };
 
 // Mapping rebalanceado (2026-05-12) — cada alertType a su intervención específica.
 // Antes: 5 alertTypes compartían DEFAULT_TRIPLETA.
 export const ALERT_INTERVENTIONS: Record<ComplianceAlertType | 'default', string[]> = {
-  default: ['PSYCH_SAFETY_MODELING', 'RELATIONAL_REDESIGN', 'HIGH_FREQ_PULSES'],
-  riesgo_convergente:      ['PSYCH_SAFETY_MODELING', 'RELATIONAL_REDESIGN', 'HIGH_FREQ_PULSES'],
+  default: ['PSYCH_SAFETY_MODELING', 'WORK_REDESIGN', 'HIGH_FREQ_PULSES'],
+  riesgo_convergente:      ['PSYCH_SAFETY_MODELING', 'WORK_REDESIGN', 'HIGH_FREQ_PULSES'],
   liderazgo_toxico:        ['PSYCH_SAFETY_MODELING', 'FAST_FEEDBACK', 'BYSTANDER_INTERVENTION'],
   silencio_organizacional: ['HIGH_FREQ_PULSES', 'PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION'],
-  deterioro_sostenido:     ['RELATIONAL_REDESIGN', 'FAST_FEEDBACK', 'HIGH_FREQ_PULSES'],
+  deterioro_sostenido:     ['WORK_REDESIGN', 'FAST_FEEDBACK', 'HIGH_FREQ_PULSES'],
   senal_ignorada:          ['PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION', 'HIGH_FREQ_PULSES'],
   // Tripleta PROVISIONAL — sin HIGH_FREQ_PULSES como primario (la narrativa
   // de la sexta dice "no una encuesta de seguimiento"). Validar con playbook
   // completo junto a las deudas R-13/14/15/16 del catálogo de intervenciones.
-  silencio_con_voz_externa: ['PSYCH_SAFETY_MODELING', 'FAST_FEEDBACK', 'RELATIONAL_REDESIGN'],
+  silencio_con_voz_externa: ['PSYCH_SAFETY_MODELING', 'FAST_FEEDBACK', 'WORK_REDESIGN'],
+  // Tripleta PROVISIONAL — validar con playbook (misma deuda que
+  // silencio_con_voz_externa). La séptima alerta es outlier de participación:
+  // el foco es reconstruir la confianza en que responder sirve.
+  participacion_anomala: ['PSYCH_SAFETY_MODELING', 'FAST_FEEDBACK', 'DISSENT_INSTITUTIONALIZATION'],
 };
 
 // Convergencia (C3) — un trigger por depto con nivelFinal != 'ninguna'.
@@ -189,11 +193,11 @@ export const ALERT_INTERVENTIONS: Record<ComplianceAlertType | 'default', string
 // Override teatro (casos A2/A5) se aplica en getInterventionsForTrigger
 // con TEATRO_TRIPLETA antes del lookup por nivelFinal.
 export const CONVERGENCIA_INTERVENTIONS: Record<Exclude<NivelFinal, 'ninguna'>, string[]> = {
-  critica_sistema: ['PSYCH_SAFETY_MODELING', 'BYSTANDER_INTERVENTION', 'RELATIONAL_REDESIGN'],
-  amplificada:     ['RELATIONAL_REDESIGN', 'PSYCH_SAFETY_MODELING', 'HIGH_FREQ_PULSES'],
+  critica_sistema: ['PSYCH_SAFETY_MODELING', 'BYSTANDER_INTERVENTION', 'WORK_REDESIGN'],
+  amplificada:     ['WORK_REDESIGN', 'PSYCH_SAFETY_MODELING', 'HIGH_FREQ_PULSES'],
   confirmada:      ['BYSTANDER_INTERVENTION', 'PSYCH_SAFETY_MODELING', 'HIGH_FREQ_PULSES'],
   externa_solo:    ['HIGH_FREQ_PULSES', 'FAST_FEEDBACK', 'DISSENT_INSTITUTIONALIZATION'],
-  interna_solo:    ['FAST_FEEDBACK', 'HIGH_FREQ_PULSES', 'RELATIONAL_REDESIGN'],
+  interna_solo:    ['FAST_FEEDBACK', 'HIGH_FREQ_PULSES', 'WORK_REDESIGN'],
 };
 
 // Override teatro — casos A2 (escenografía narrativa) o A5 (desincronía
@@ -208,7 +212,7 @@ const TEATRO_TRIPLETA = ['DISSENT_INSTITUTIONALIZATION', 'PSYCH_SAFETY_MODELING'
 // de cierre de brecha de género (BCG 28k empleados). BYSTANDER + ALG completan
 // el protocolo: aliados activos para microagresiones + reglas equitativas para
 // asignación. Cae después de teatro (A2/A5) por si los scores son ruido.
-const SESGO_GENERO_TRIPLETA = ['PSYCH_SAFETY_MODELING', 'BYSTANDER_INTERVENTION', 'ALGORITHMIC_TRANSPARENCY'];
+const SESGO_GENERO_TRIPLETA = ['PSYCH_SAFETY_MODELING', 'BYSTANDER_INTERVENTION', 'DECISION_ACCOUNTABILITY'];
 
 // ═══════════════════════════════════════════════════════════════════
 // CAPA 3 — Motor de consolidación

@@ -15,6 +15,7 @@ export const ALERT_LABELS: Record<ComplianceAlertType, string> = {
   deterioro_sostenido: 'Deterioro sostenido',
   senal_ignorada: 'Señal sin gestión',
   silencio_con_voz_externa: 'Señales sin medición',
+  participacion_anomala: 'Participación rezagada',
 };
 
 /**

@@ -44,4 +44,6 @@ export const ALERTA_GLOSARIO: Record<ComplianceAlertType, string> = {
     'Ya hubo alertas en este departamento. Se gestionaron — pero el cuadro no cambió. El síntoma se atendió; la causa sigue.',
   silencio_con_voz_externa:
     'Este departamento no respondió el estudio. Otras fuentes, en el mismo período, sí hablaron. Que no haya respuesta no significa que no haya nada que decir.',
+  participacion_anomala:
+    'La empresa respondió. Este departamento se quedó muy atrás. Cuando un área participa tanto menos que el resto, la brecha misma es el hallazgo.',
 };

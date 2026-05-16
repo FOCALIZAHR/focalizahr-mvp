@@ -17,7 +17,8 @@ export type ComplianceAlertType =
   | 'silencio_organizacional'
   | 'deterioro_sostenido'
   | 'senal_ignorada'
-  | 'silencio_con_voz_externa';
+  | 'silencio_con_voz_externa'
+  | 'participacion_anomala';
 
 export type ComplianceSeverity = 'critical' | 'high' | 'medium' | 'low' | 'informativa';
 
@@ -94,6 +95,19 @@ export const COMPLIANCE_ALERT_TYPES: Record<ComplianceAlertType, ComplianceAlert
     titleTemplate: 'Señales sin medición en {department}',
     descriptionTemplate:
       '{department} no completó esta medición. En el mismo período, otras fuentes documentaron señales activas. La ausencia de voz, cruzada con voz externa documentada, no es un problema de campo — es el hallazgo.',
+  },
+  // Séptima alerta (post-v1.0). Outlier de participación: un departamento
+  // que respondió muy por debajo del resto de la empresa. Sin cruce externo
+  // — es un contraste estadístico depto vs empresa. Severidad media,
+  // informativa (sin SLA).
+  participacion_anomala: {
+    type: 'participacion_anomala',
+    severity: 'medium',
+    slaHours: null,
+    requiredSources: ['ambiente_sano'],
+    titleTemplate: 'Participación rezagada en {department}',
+    descriptionTemplate:
+      'La empresa respondió esta medición. {department} se quedó muy por debajo del resto. Cuando una sola área participa tanto menos, la baja respuesta deja de ser un dato de campo.',
   },
 };
 
