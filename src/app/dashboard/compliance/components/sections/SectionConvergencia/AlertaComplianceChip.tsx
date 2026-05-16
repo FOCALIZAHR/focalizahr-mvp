@@ -11,7 +11,10 @@
 
 import { Shield } from 'lucide-react';
 import { resolveAlertLabel } from './_shared/ALERT_LABELS';
+import { ALERTA_GLOSARIO } from '@/app/dashboard/compliance/lib/glosario';
+import { TooltipContext } from '@/components/ui/TooltipContext';
 import type { ComplianceReportAlert } from '@/types/compliance';
+import type { ComplianceAlertType } from '@/config/complianceAlertConfig';
 
 interface Props {
   alert: ComplianceReportAlert;
@@ -32,10 +35,12 @@ function isOverdue(alert: ComplianceReportAlert): boolean {
 
 export default function AlertaComplianceChip({ alert, consecuencia }: Props) {
   const overdue = isOverdue(alert);
+  // Glosario contextual — defensive: alertType desconocido → sin tooltip.
+  const glosario = ALERTA_GLOSARIO[alert.alertType as ComplianceAlertType];
 
   if (overdue) {
     // SLA vencido — texto tachado en slate, sin rojo. Accountability sin alarmar.
-    return (
+    const chip = (
       <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-slate-900/60 border border-slate-700/50">
         <Shield className="w-3 h-3 text-slate-600" strokeWidth={1.5} />
         <span className="text-[11px] font-mono text-slate-600 line-through tracking-wide">
@@ -43,17 +48,46 @@ export default function AlertaComplianceChip({ alert, consecuencia }: Props) {
         </span>
       </div>
     );
+    return glosario ? (
+      <TooltipContext
+        title={glosario.title}
+        explanation={glosario.explanation}
+        variant="pattern"
+        position="bottom"
+        usePortal
+      >
+        {chip}
+      </TooltipContext>
+    ) : (
+      chip
+    );
   }
 
   // Activa: label + consecuencia ejecutiva. Cero "SLA Nh" — el CEO no gestiona timers.
+  const chip = (
+    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-slate-900/60 border border-slate-700/50">
+      <Shield className="w-3 h-3 text-slate-500" strokeWidth={1.5} />
+      <span className="text-[11px] font-mono text-slate-300">
+        {resolveAlertLabel(alert.alertType)}
+      </span>
+    </div>
+  );
+
   return (
-    <div className="inline-flex flex-col gap-1 max-w-full">
-      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm bg-slate-900/60 border border-slate-700/50 self-start">
-        <Shield className="w-3 h-3 text-slate-500" strokeWidth={1.5} />
-        <span className="text-[11px] font-mono text-slate-300">
-          {resolveAlertLabel(alert.alertType)}
-        </span>
-      </div>
+    <div className="inline-flex flex-col items-start gap-1 max-w-full">
+      {glosario ? (
+        <TooltipContext
+          title={glosario.title}
+          explanation={glosario.explanation}
+          variant="pattern"
+          position="bottom"
+          usePortal
+        >
+          {chip}
+        </TooltipContext>
+      ) : (
+        chip
+      )}
       {consecuencia ? (
         <p className="text-[11px] font-light leading-[1.5] text-slate-500 pl-1">
           {consecuencia}
