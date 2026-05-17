@@ -143,7 +143,7 @@ Donde:
 
 ### Referencia canónica
 
-`SafetyGauge.tsx` (suffix) y `SectionAncla.tsx` (gauge label) post-Gate 5c implementan el contrato. Replicar el patrón al introducir nuevas superficies "N · Label".
+`IndicatorGauge.tsx` (suffix) y `SectionAncla.tsx` (gauge label) post-Gate 5c implementan el contrato. Replicar el patrón al introducir nuevas superficies "N · Label".
 
 ---
 

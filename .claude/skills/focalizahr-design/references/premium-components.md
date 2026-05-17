@@ -94,7 +94,7 @@ Para gauges con bandas de score/severidad, usar paleta FocalizaHR core respetand
 
 **No introducir verde ni rojo como bandas de score primario.** El verde y rojo se reservan para confirmaciones operativas (botones, Tesla lines de estado), no para diagnóstico de severidad.
 
-**Referencia de aplicación canónica:** `SafetyGauge.tsx` (gauge ISA en SectionAncla) post-Gate 5d.
+**Referencia de aplicación canónica:** `IndicatorGauge.tsx` (gauge ISA en SectionAncla) post-Gate 5d.
 
 *Esta nota se agregó 2026-05-14 tras detectar la contradicción durante el cierre Ambiente Sano v1.0.*
 

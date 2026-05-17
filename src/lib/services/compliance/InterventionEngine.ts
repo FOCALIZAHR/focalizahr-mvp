@@ -243,14 +243,20 @@ export const ALERT_INTERVENTIONS: Record<ComplianceAlertType | 'default', string
   silencio_organizacional: ['HIGH_FREQ_PULSES', 'PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION'],
   deterioro_sostenido:     ['WORK_REDESIGN', 'FAST_FEEDBACK', 'HIGH_FREQ_PULSES'],
   senal_ignorada:          ['PSYCH_SAFETY_MODELING', 'DISSENT_INSTITUTIONALIZATION', 'HIGH_FREQ_PULSES'],
-  // Tripleta PROVISIONAL — sin HIGH_FREQ_PULSES como primario (la narrativa
-  // de la sexta dice "no una encuesta de seguimiento"). Validar con playbook
-  // completo junto a las deudas R-13/14/15/16 del catálogo de intervenciones.
+  // Tripleta validada (Sesión 9, 2026-05-16) — análisis razonado contra el
+  // catálogo post-playbook v1. PSYCH_SAFETY_MODELING primaria (lectura "miedo",
+  // la más severa); FAST_FEEDBACK (falta de canal de escucha); WORK_REDESIGN
+  // (condiciones). HIGH_FREQ_PULSES excluido: la narrativa dice "no una encuesta
+  // de seguimiento". BEHAVIORAL_TRIANGULATION excluido: el gatillo de la alerta
+  // ya es una triangulación automática.
   silencio_con_voz_externa: ['PSYCH_SAFETY_MODELING', 'FAST_FEEDBACK', 'WORK_REDESIGN'],
-  // Tripleta PROVISIONAL — validar con playbook (misma deuda que
-  // silencio_con_voz_externa). La séptima alerta es outlier de participación:
-  // el foco es reconstruir la confianza en que responder sirve.
-  participacion_anomala: ['PSYCH_SAFETY_MODELING', 'FAST_FEEDBACK', 'DISSENT_INSTITUTIONALIZATION'],
+  // Tripleta validada (Sesión 9, 2026-05-16) — análisis razonado contra el
+  // catálogo post-playbook v1. Misma familia "no-participación" que la sexta:
+  // tripleta idéntica. PSYCH_SAFETY_MODELING primaria (lectura "miedo");
+  // FAST_FEEDBACK (desconfianza en que responder sirve); WORK_REDESIGN
+  // (lectura "condiciones" — un depto que no responde puede estar colapsado
+  // por carga, no solo asustado).
+  participacion_anomala: ['PSYCH_SAFETY_MODELING', 'FAST_FEEDBACK', 'WORK_REDESIGN'],
 };
 
 // Convergencia (C3) — un trigger por depto con nivelFinal != 'ninguna'.

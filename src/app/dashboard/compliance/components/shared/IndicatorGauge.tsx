@@ -1,7 +1,7 @@
 'use client';
 
-// src/app/dashboard/compliance/components/shared/SafetyGauge.tsx
-// Gauge de arco SVG animado para Safety Score (escala display 0-100).
+// src/app/dashboard/compliance/components/shared/IndicatorGauge.tsx
+// Gauge de arco SVG animado para indicadores 0-100 (Safety, ISA, etc.).
 // Número hero al centro (font-extralight, NUNCA cyan). Arco coloreado según
 // nivel de riesgo.
 //
@@ -10,7 +10,7 @@
 
 import { motion } from 'framer-motion';
 
-interface SafetyGaugeProps {
+interface IndicatorGaugeProps {
   /** Score 0-100 display (o null si no disponible) */
   score: number | null;
   /** Diámetro en px — default 240 (lg) */
@@ -68,12 +68,12 @@ function describeArc(
   return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 0 ${end.x} ${end.y}`;
 }
 
-export default function SafetyGauge({
+export default function IndicatorGauge({
   score,
   size = 240,
   suffix,
   riskLevel = 'safe',
-}: SafetyGaugeProps) {
+}: IndicatorGaugeProps) {
   const cx = size / 2;
   const cy = size / 2;
   const strokeWidth = size * 0.06;

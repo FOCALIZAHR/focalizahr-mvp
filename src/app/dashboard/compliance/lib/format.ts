@@ -195,7 +195,7 @@ export function pickHighestRisk<
   return ordered[0];
 }
 
-/** Mapea ISARiskLevel → riskLevel del SafetyGauge (paleta anti-semáforo
+/** Mapea ISARiskLevel → riskLevel del IndicatorGauge (paleta anti-semáforo
  *  Decisión #1 Plan de Cierre AS v1.0): cyan / slate / amber / amber-glow. */
 export function isaLevelToGaugeColor(
   level: ISARiskLevel

@@ -6,7 +6,7 @@
 
 import { cn } from '@/lib/utils';
 import SectionShell from './_shared/SectionShell';
-import SafetyGauge from '../shared/SafetyGauge';
+import IndicatorGauge from '../shared/IndicatorGauge';
 import {
   NODO_LABELS,
   NODO_REQUIRES,
@@ -120,7 +120,7 @@ export default function SectionAncla({ hook }: { hook: UseComplianceDataReturn }
           <div className="grid md:grid-cols-2 gap-8 items-center">
             {/* Gauge del depto */}
             <div className="flex flex-col items-center">
-              <SafetyGauge
+              <IndicatorGauge
                 score={dept.isaScore}
                 suffix={
                   dept.isaScore !== null
