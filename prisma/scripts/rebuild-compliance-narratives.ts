@@ -1,6 +1,6 @@
 // prisma/scripts/rebuild-compliance-narratives.ts
-// Reconstruye SOLO el subcampo `narratives` del ORG resultPayload, usando los
-// dept payloads ya persistidos. Cero LLM. Idempotente.
+// Reconstruye `narratives` + `global.isaComponents` del ORG resultPayload,
+// usando los dept payloads ya persistidos. Cero LLM. Idempotente.
 //
 // Caso de uso: el diccionario ComplianceNarrativeDictionary se actualizó pero
 // las narrativas viejas quedaron cacheadas en BD. Sin recálculo de patrones.
@@ -26,6 +26,11 @@ import type {
   ComplianceSource,
 } from '../../src/config/complianceAlertConfig';
 import type { ConvergenciaGlobals } from '../../src/lib/services/compliance/ConvergenciaEngine';
+import {
+  calculateISAWithComponents,
+  aggregateOrgIsaComponents,
+} from '../../src/lib/services/compliance/ISAService';
+import type { ISAResult } from '../../src/lib/services/compliance/ISAService';
 
 const prisma = new PrismaClient();
 
@@ -51,6 +56,7 @@ interface OrgPayloadShape {
     orgSafetyScore: number | null;
     orgISA?: number | null;
     totalTextResponses?: number;
+    isaComponents?: ISAResult['components'] | null;
     skippedByPrivacy: unknown[];
     activeSourcesGlobal: ComplianceSource[];
     criticalByManager: ConvergenciaGlobals['criticalByManager'];
@@ -113,6 +119,10 @@ async function main() {
     teatroCumplimiento: boolean;
   }> = [];
   const convergencias: DepartmentConvergencia[] = [];
+  const deptIsaInputs: Array<{
+    resultPayload: { isaComponents: ISAResult['components'] };
+    respondentCount: number | null;
+  }> = [];
 
   for (const d of deptRows) {
     const p = d.resultPayload;
@@ -120,6 +130,21 @@ async function main() {
 
     safetyScores.push(p.safetyDetail);
     convergencias.push(p.convergencia);
+
+    // isaComponents por-depto — recomputado determinista (sin LLM) desde el
+    // payload persistido, para agregar al isaComponents org-level.
+    const isaComp = calculateISAWithComponents({
+      safetyScore: p.safetyDetail.safetyScore,
+      patrones: p.patrones.patrones,
+      confianzaLLM: p.patrones.confianza_analisis,
+      convergenciaSignals: p.convergencia.riskSignalsCount,
+      activeSources: p.convergencia.activeSources.length,
+      teatroCumplimiento: !!d.teatroCumplimiento,
+    }).components;
+    deptIsaInputs.push({
+      resultPayload: { isaComponents: isaComp },
+      respondentCount: d.respondentCount,
+    });
     // Lectura defensiva: payloads pre-deploy del campo no tienen parentDepartmentName.
     const parentDepartmentName =
       typeof (p as Record<string, unknown>).parentDepartmentName === 'string'
@@ -174,6 +199,10 @@ async function main() {
     previousOrgScore: orgPayload.global.previousOrgScore,
     previousCampaignLabel: orgPayload.global.previousCampaignLabel,
   });
+
+  // isaComponents org-level — recomputado determinista (sin LLM) desde los
+  // payloads por-depto. Necesario para el Acto Ancla de la Cascada.
+  const orgIsaComponents = aggregateOrgIsaComponents(deptIsaInputs, activeSourcesGlobal);
 
   // ── 6) Diff de narrativas dimensionales ──────────────────────────────────
   const oldDims: DimensionNarrative[] = orgPayload.narratives.artefacto1_dimensiones;
@@ -233,6 +262,30 @@ async function main() {
   if (cruceChanged) changedCount++;
   if (cbmChanged) changedCount++;
 
+  // ── 6.C) Diff — narratives.cascada + global.isaComponents (Cascada Ejecutiva) ──
+  const cascadaChanged =
+    JSON.stringify(orgPayload.narratives.cascada ?? null) !==
+    JSON.stringify(fresh.cascada ?? null);
+  const oldIsaComp = orgPayload.global.isaComponents ?? null;
+  const isaCompChanged =
+    JSON.stringify(oldIsaComp) !== JSON.stringify(orgIsaComponents);
+
+  console.log('━'.repeat(80));
+  console.log('  DIFF — narratives.cascada');
+  console.log('━'.repeat(80));
+  console.log(`${cascadaChanged ? '🔄' : '✓ '}  ANTES:   ${orgPayload.narratives.cascada ? 'presente' : '∅'}`);
+  console.log(`    DESPUÉS: ${fresh.cascada ? 'presente' : '∅'}`);
+  console.log('');
+  console.log('━'.repeat(80));
+  console.log('  DIFF — global.isaComponents');
+  console.log('━'.repeat(80));
+  console.log(`${isaCompChanged ? '🔄' : '✓ '}  ANTES:   ${oldIsaComp ? JSON.stringify(oldIsaComp) : '∅'}`);
+  console.log(`    DESPUÉS: ${orgIsaComponents ? JSON.stringify(orgIsaComponents) : '∅'}`);
+  console.log('');
+
+  if (cascadaChanged) changedCount++;
+  if (isaCompChanged) changedCount++;
+
   // ── 7) Apply o salir ─────────────────────────────────────────────────────
   if (!apply) {
     console.log('💡 Dry-run. Re-ejecuta con --apply para escribir en BD.');
@@ -246,6 +299,7 @@ async function main() {
 
   const newPayload: OrgPayloadShape = {
     ...orgPayload,
+    global: { ...orgPayload.global, isaComponents: orgIsaComponents },
     narratives: fresh,
   };
 
