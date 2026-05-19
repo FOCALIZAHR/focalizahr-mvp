@@ -40,6 +40,8 @@ export interface AnclaComponent {
   tooltip?: string
   /** Sufijo del número — default "%" (pasar "" para conteos absolutos como FTE) */
   suffix?: string
+  /** Nodo estático sin micro-barra proporcional (ancla científica). Número en blanco. */
+  isStatic?: boolean
 }
 
 export interface AnclaInteligenteProps {
@@ -55,6 +57,12 @@ export interface AnclaInteligenteProps {
   onBack?: () => void
   /** Texto del CTA — default "Ver diagnóstico completo" */
   ctaLabel?: string
+  /** Override del color del arco del gauge (hex). Default: tier por score. */
+  gaugeColor?: string
+  /** Sufijo del número del gauge. Default '%'. Pasar '' para índices 0-100. */
+  scoreSuffix?: string
+  /** Nota de ponderación renderizada bajo los nodos. */
+  weightNote?: string
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -103,9 +111,12 @@ export default memo(function AnclaInteligente({
   onContinue,
   onBack,
   ctaLabel = 'Ver diagnóstico completo',
+  gaugeColor,
+  scoreSuffix = '%',
+  weightNote,
 }: AnclaInteligenteProps) {
   const scoreTier = getTier(score)
-  const scoreColor = TIER_HEX[scoreTier]
+  const scoreColor = gaugeColor ?? TIER_HEX[scoreTier]
   const strokeDashoffset = GAUGE_CIRC - (score / 100) * GAUGE_CIRC
 
   // Precomputar tiers de cada nodo
@@ -193,7 +204,9 @@ export default memo(function AnclaInteligente({
                 className="text-[96px] font-semibold text-white leading-none tabular-nums tracking-tight"
               >
                 {score}
-                <span className="text-3xl text-slate-500 font-light">%</span>
+                {scoreSuffix && (
+                  <span className="text-3xl text-slate-500 font-light">{scoreSuffix}</span>
+                )}
               </motion.span>
               <motion.span
                 initial={{ opacity: 0 }}
@@ -258,6 +271,7 @@ export default memo(function AnclaInteligente({
           <div
             className={cn(
               'grid gap-4 pt-20',
+              nodes.length === 2 && 'grid-cols-2',
               nodes.length === 3 && 'grid-cols-3',
               nodes.length === 4 && 'grid-cols-2 md:grid-cols-4',
               nodes.length === 5 && 'grid-cols-2 md:grid-cols-5'
@@ -277,10 +291,12 @@ export default memo(function AnclaInteligente({
                   transition={{ duration: 0.4, delay: 1.4 + idx * 0.15 }}
                   className="text-center"
                 >
-                  {/* Número grande — white por defecto, purple solo en crisis (<20) */}
+                  {/* Número grande — white por defecto; purple en crisis (<20);
+                      white forzado en nodo estático (ancla científica) */}
                   <p
                     className={cn(
                       'text-3xl md:text-4xl font-extralight font-mono tabular-nums leading-none',
+                      node.isStatic ? 'text-white' :
                       isGhost ? 'text-slate-500' :
                       node.tier === 'purple' ? 'text-violet-400' : 'text-white'
                     )}
@@ -291,22 +307,24 @@ export default memo(function AnclaInteligente({
                     )}
                   </p>
 
-                  {/* Micro-barra 2px */}
+                  {/* Micro-barra 2px — el relleno se omite en nodos estáticos */}
                   <div className="h-[2px] bg-slate-800/60 rounded-full mt-2.5 overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${barWidth}%` }}
-                      transition={{
-                        duration: 0.8,
-                        delay: 1.6 + idx * 0.15,
-                        ease: [0.16, 1, 0.3, 1],
-                      }}
-                      className="h-full rounded-full"
-                      style={{
-                        backgroundColor: isGhost ? '#475569' : nodeColor,
-                        opacity: isGhost ? 0.3 : 1,
-                      }}
-                    />
+                    {!node.isStatic && (
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${barWidth}%` }}
+                        transition={{
+                          duration: 0.8,
+                          delay: 1.6 + idx * 0.15,
+                          ease: [0.16, 1, 0.3, 1],
+                        }}
+                        className="h-full rounded-full"
+                        style={{
+                          backgroundColor: isGhost ? '#475569' : nodeColor,
+                          opacity: isGhost ? 0.3 : 1,
+                        }}
+                      />
+                    )}
                   </div>
 
                   {/* Label + tooltip opcional (i) con sustento científico */}
@@ -333,6 +351,18 @@ export default memo(function AnclaInteligente({
             })}
           </div>
         </div>
+
+        {/* ═══ NOTA DE PONDERACIÓN (opcional) ═══ */}
+        {weightNote && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, delay: 1.4 + nodes.length * 0.15 + 0.15 }}
+            className="text-center text-[10px] uppercase tracking-wider text-slate-500 font-light mt-8"
+          >
+            {weightNote}
+          </motion.p>
+        )}
 
         {/* ═══ CTA ÚNICO ═══ */}
         <motion.div

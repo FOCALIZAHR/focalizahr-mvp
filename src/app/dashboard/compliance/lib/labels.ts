@@ -18,6 +18,7 @@ import type { ISARiskLevel } from '@/lib/services/compliance/ISAService';
 import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
+  Telescope,
   Building2,
   Grid3X3,
   BarChart3,
@@ -40,7 +41,8 @@ export interface ComplianceSectionMeta {
 }
 
 export const COMPLIANCE_SECTIONS: readonly ComplianceSectionMeta[] = [
-  { id: 'sintesis',     railLabel: 'Síntesis',          icon: LayoutDashboard, nextLabel: 'Por departamento' },
+  { id: 'sintesis',     railLabel: 'Síntesis',          icon: LayoutDashboard, nextLabel: 'Diagnóstico' },
+  { id: 'cascada',      railLabel: 'Diagnóstico',       icon: Telescope,       nextLabel: 'Por departamento' },
   { id: 'ancla',        railLabel: 'Por departamento',  icon: Building2,       nextLabel: 'Vista global' },
   { id: 'heatmap',      railLabel: 'Vista global',      icon: Grid3X3,         nextLabel: 'Dimensiones' },
   { id: 'dimensiones',  railLabel: 'Dimensiones',       icon: BarChart3,       nextLabel: 'Patrones' },
@@ -155,6 +157,7 @@ export const SOURCE_REQUIRES = NODO_REQUIRES;
 /** Color canónico por sección. `null` = sin Tesla Line (Cierre) o dinámico (Síntesis). */
 export const TESLA_BY_SECTION: Record<ComplianceSectionId, string | null> = {
   sintesis:     null,       // dinámico según ISA riskLevel → TESLA_SINTESIS
+  cascada:      '#22D3EE',  // cyan — diagnóstico ejecutivo
   ancla:        '#22D3EE',  // cyan
   heatmap:      '#64748B',  // slate — descriptiva, no juicio
   dimensiones:  '#22D3EE',  // cyan

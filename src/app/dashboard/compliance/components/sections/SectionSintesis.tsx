@@ -93,8 +93,17 @@ export default function SectionSintesis({ hook }: { hook: UseComplianceDataRetur
         )}
       </div>
 
-      {/* CTA a depto de mayor riesgo */}
-      {deptMenorISA && (
+      {/* CTA — al diagnóstico ejecutivo si existe; si no, al depto de mayor riesgo */}
+      {report.narratives.cascada ? (
+        <div className="flex justify-center mt-10">
+          <button
+            onClick={() => hook.selectSection('cascada')}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 hover:border-cyan-500/50 transition-all text-sm font-light"
+          >
+            Ver diagnóstico completo →
+          </button>
+        </div>
+      ) : deptMenorISA ? (
         <div className="flex justify-center mt-10">
           <button
             onClick={() => {
@@ -106,7 +115,7 @@ export default function SectionSintesis({ hook }: { hook: UseComplianceDataRetur
             Ver {deptMenorISA.departmentName} →
           </button>
         </div>
-      )}
+      ) : null}
     </SectionShell>
   );
 }

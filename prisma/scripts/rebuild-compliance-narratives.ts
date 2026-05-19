@@ -50,6 +50,7 @@ interface OrgPayloadShape {
   global: {
     orgSafetyScore: number | null;
     orgISA?: number | null;
+    totalTextResponses?: number;
     skippedByPrivacy: unknown[];
     activeSourcesGlobal: ComplianceSource[];
     criticalByManager: ConvergenciaGlobals['criticalByManager'];
@@ -151,6 +152,8 @@ async function main() {
 
   const fresh = buildReportNarratives({
     orgSafetyScore: orgPayload.global.orgSafetyScore,
+    orgISA: orgPayload.global.orgISA ?? null,
+    totalTextResponses: orgPayload.global.totalTextResponses ?? null,
     scores: safetyScores,
     departmentAnalyses,
     meta: orgPayload.meta,
@@ -162,6 +165,7 @@ async function main() {
       title: a.title,
       departmentName: a.department?.displayName ?? null,
       severity: a.severity,
+      status: a.status,
       signalsCount: a.signalsCount,
       teatroCumplimiento:
         deptRows.find((d) => d.departmentId === a.departmentId)

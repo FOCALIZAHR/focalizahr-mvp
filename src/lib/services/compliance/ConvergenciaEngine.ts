@@ -667,6 +667,9 @@ function buildCriticalByManagerWithDelta(
       maxIsa,
     });
   }
+  // Orden determinista: peor grupo primero (minIsa más bajo).
+  // Habilita que buildCierreFrancotirador (B3) rankee con criticalByManager[0].
+  groups.sort((a, b) => a.minIsa - b.minIsa);
   return groups;
 }
 

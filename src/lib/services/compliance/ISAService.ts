@@ -33,11 +33,32 @@ export interface ISAInput {
 }
 
 /**
- * Calcula el ISA (0-100). Redondea al entero más cercano.
- * NO prescribe — retorna puntaje. La interpretación de nivel es separada
- * (ver getISARiskLevel).
+ * Resultado del ISA con desglose de componentes y pesos aplicados.
+ * `score` es el ISA final (0-100); `components` expone de qué está hecho
+ * — consumido por la Cascada Ejecutiva (Acto Ancla).
  */
-export function calculateISA(input: ISAInput): number {
+export interface ISAResult {
+  /** ISA final 0-100, redondeado. Mismo valor que retorna calculateISA(). */
+  score: number;
+  components: {
+    /** Voz estructurada 0-100 (siempre existe). Redondeada. */
+    vozEstructurada: number;
+    /** Voz libre 0-100, o null si confianzaLLM = 'insuficiente_data'. Redondeada. */
+    vozLibre: number | null;
+    /** Convergencia 0-100, o null si activeSources < 2. */
+    convergencia: number | null;
+    /** Pesos aplicados según disponibilidad (60/25/15 · 70/30/0 · 100/0/0). */
+    pesos: { estructurada: number; libre: number; convergencia: number };
+    /** true si se aplicó la penalización 0.7 por Teatro de Cumplimiento. */
+    teatroPenalty: boolean;
+  };
+}
+
+/**
+ * Calcula el ISA con desglose de componentes y pesos.
+ * Fuente única de verdad de la fórmula — calculateISA() delega aquí.
+ */
+export function calculateISAWithComponents(input: ISAInput): ISAResult {
   // Componente 1 — Voz estructurada (Likert 0-5 → 0-100).
   let vozEstructurada = (input.safetyScore / 5) * 100;
   if (input.teatroCumplimiento) {
@@ -67,15 +88,37 @@ export function calculateISA(input: ISAInput): number {
 
   // Pesos dinámicos según disponibilidad.
   let isa: number;
+  let pesos: { estructurada: number; libre: number; convergencia: number };
   if (convergencia !== null && vozLibre !== null) {
     isa = vozEstructurada * 0.6 + vozLibre * 0.25 + convergencia * 0.15;
+    pesos = { estructurada: 60, libre: 25, convergencia: 15 };
   } else if (vozLibre !== null) {
     isa = vozEstructurada * 0.7 + vozLibre * 0.3;
+    pesos = { estructurada: 70, libre: 30, convergencia: 0 };
   } else {
     isa = vozEstructurada;
+    pesos = { estructurada: 100, libre: 0, convergencia: 0 };
   }
 
-  return Math.round(isa);
+  return {
+    score: Math.round(isa),
+    components: {
+      vozEstructurada: Math.round(vozEstructurada),
+      vozLibre: vozLibre !== null ? Math.round(vozLibre) : null,
+      convergencia,
+      pesos,
+      teatroPenalty: input.teatroCumplimiento,
+    },
+  };
+}
+
+/**
+ * Calcula el ISA (0-100). Redondea al entero más cercano.
+ * NO prescribe — retorna puntaje. La interpretación de nivel es separada
+ * (ver getISARiskLevel). Delega en calculateISAWithComponents().
+ */
+export function calculateISA(input: ISAInput): number {
+  return calculateISAWithComponents(input).score;
 }
 
 // ═══════════════════════════════════════════════════════════════════

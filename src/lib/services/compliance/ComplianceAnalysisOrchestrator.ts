@@ -34,7 +34,9 @@ import {
   type DeptAlertContext,
 } from './ComplianceAlertService';
 import { buildReportNarratives } from './ComplianceNarrativeEngine';
-import { calculateISA } from './ISAService';
+import { calculateISAWithComponents } from './ISAService';
+import type { ISAResult } from './ISAService';
+import type { ComplianceSource } from '@/types/compliance';
 import type {
   MetaAnalysisDepartmentInput,
   PatronAnalysisOutput,
@@ -51,6 +53,7 @@ interface DepartmentResultPayload {
   safetyDetail: DepartmentSafetyScore;
   convergencia: DepartmentConvergencia;
   isa: number; // ISA del depto (0-100)
+  isaComponents?: ISAResult['components']; // desglose del ISA del depto (Acto Ancla)
   textCount?: number; // Respuestas P1 válidas que entraron al LLM (post-trim).
   /**
    * Nombre del departamento padre (gerencia) al momento del cierre del job.
@@ -61,6 +64,58 @@ interface DepartmentResultPayload {
 }
 
 const AMBIENTE_SANO_SLUG = 'pulso-ambientes-sanos';
+
+/**
+ * Agrega los isaComponents por-depto en un isaComponents org-level.
+ * Cada componente = promedio ponderado por respondentCount sobre los deptos
+ * donde el componente no es null (Opción A — TASK Cascada Ejecutiva B2).
+ * Pesos org derivados de la disponibilidad org-level (mismo árbol que
+ * calculateISAWithComponents); teatroPenalty true si algún depto lo tuvo.
+ * Retorna null si ningún depto tiene componentes (campañas legacy).
+ */
+function aggregateOrgIsaComponents(
+  completedDepts: Array<{ resultPayload: unknown; respondentCount: number | null }>,
+  activeSourcesGlobal: ComplianceSource[],
+): ISAResult['components'] | null {
+  let estrW = 0, estrS = 0, libreW = 0, libreS = 0, convW = 0, convS = 0;
+  let teatroPenalty = false;
+  let anyComponents = false;
+
+  for (const d of completedDepts) {
+    const payload = d.resultPayload as Record<string, unknown> | null;
+    const comp = payload?.isaComponents as ISAResult['components'] | undefined;
+    if (!comp) continue;
+    anyComponents = true;
+    const w = d.respondentCount ?? 0;
+    if (w <= 0) continue;
+    estrS += comp.vozEstructurada * w;
+    estrW += w;
+    if (comp.vozLibre !== null) {
+      libreS += comp.vozLibre * w;
+      libreW += w;
+    }
+    if (comp.convergencia !== null) {
+      convS += comp.convergencia * w;
+      convW += w;
+    }
+    if (comp.teatroPenalty) teatroPenalty = true;
+  }
+  if (!anyComponents) return null;
+
+  const vozEstructurada = estrW > 0 ? Math.round(estrS / estrW) : 0;
+  const vozLibre = libreW > 0 ? Math.round(libreS / libreW) : null;
+  const convergencia = convW > 0 ? Math.round(convS / convW) : null;
+
+  let pesos: { estructurada: number; libre: number; convergencia: number };
+  if (activeSourcesGlobal.length >= 2 && convergencia !== null && vozLibre !== null) {
+    pesos = { estructurada: 60, libre: 25, convergencia: 15 };
+  } else if (vozLibre !== null) {
+    pesos = { estructurada: 70, libre: 30, convergencia: 0 };
+  } else {
+    pesos = { estructurada: 100, libre: 0, convergencia: 0 };
+  }
+  return { vozEstructurada, vozLibre, convergencia, pesos, teatroPenalty };
+}
 const PRIVACY_THRESHOLD = 5;
 const P1_QUESTION_ORDER = 1;
 const MAX_RETRIES = 3;
@@ -291,7 +346,7 @@ export async function processNextDepartmentJob(campaignId: string): Promise<bool
 
     // ISA — cálculo final que integra los 3 componentes (voz estructurada,
     // voz libre LLM, convergencia). Ver ISAService.ts para fórmula completa.
-    const isaScore = calculateISA({
+    const isaResult = calculateISAWithComponents({
       safetyScore: safetyDetail.safetyScore,
       patrones: llmResult.data.patrones,
       confianzaLLM: llmResult.data.confianza_analisis,
@@ -299,6 +354,7 @@ export async function processNextDepartmentJob(campaignId: string): Promise<bool
       activeSources: convergenciaPreISA.activeSources.length,
       teatroCumplimiento: teatro,
     });
+    const isaScore = isaResult.score;
 
     // Motor A v2 — recalcular casos A1, A2, A3, A5 con ISA real. A4 (cross-dept)
     // se patchea cuando todos los DEPARTMENT jobs cierran (processOrgMetaIfReady).
@@ -323,6 +379,7 @@ export async function processNextDepartmentJob(campaignId: string): Promise<bool
       safetyDetail,
       convergencia,
       isa: isaScore,
+      isaComponents: isaResult.components,
       textCount: textos.length,
       parentDepartmentName: deptInfo?.parent?.displayName ?? null,
     };
@@ -726,31 +783,10 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
       .map((d) => extractDeptSafetyDetail(d.resultPayload))
       .filter((s): s is DepartmentSafetyScore => s !== null);
 
-    const narratives = buildReportNarratives({
-      orgSafetyScore,
-      scores: safetyScoresForNarratives,
-      departmentAnalyses: deptAnalysesForNarratives,
-      meta: llmResult.data,
-      convergencias: deptConvergencias,
-      activeSourcesGlobal: globals.activeSourcesGlobal,
-      criticalByManager: globals.criticalByManager,
-      alertas: freshAlerts.map((a) => ({
-        alertType: a.alertType as ComplianceAlertType,
-        title: a.title,
-        departmentName: a.department?.displayName ?? null,
-        severity: a.severity,
-        signalsCount: a.signalsCount,
-        teatroCumplimiento:
-          completedDepts.find((d) => d.departmentId === a.departmentId)
-            ?.teatroCumplimiento ?? false,
-      })),
-      previousOrgScore,
-      previousCampaignLabel,
-    });
-
     // orgISA: promedio ponderado de isaScore por depto (ponderado por
     // respondentCount). Sobre los DEPTs ya COMPLETED con resultPayload
     // namespaced que incluye .isa. Si ningún depto tiene ISA, quedará null.
+    // Se computa ANTES de buildReportNarratives — la Cascada Ejecutiva lo necesita.
     let orgISA: number | null = null;
     {
       let totalWeight = 0;
@@ -767,6 +803,12 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
       if (totalWeight > 0) orgISA = Math.round(weightedSum / totalWeight);
     }
 
+    // isaComponents org-level — desglose del Acto Ancla de la Cascada.
+    const orgIsaComponents = aggregateOrgIsaComponents(
+      completedDepts,
+      globals.activeSourcesGlobal,
+    );
+
     // Sumas org-level: text responses (denominador "voz libre") + respondents
     // (denominador safety, mismo que orgSafetyScore). Lectura defensiva: depts
     // persistidos antes del deploy de textCount cuentan 0.
@@ -781,11 +823,37 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
       totalRespondents += safetyDetail?.respondentCount ?? 0;
     }
 
+    const narratives = buildReportNarratives({
+      orgSafetyScore,
+      orgISA,
+      totalTextResponses,
+      scores: safetyScoresForNarratives,
+      departmentAnalyses: deptAnalysesForNarratives,
+      meta: llmResult.data,
+      convergencias: deptConvergencias,
+      activeSourcesGlobal: globals.activeSourcesGlobal,
+      criticalByManager: globals.criticalByManager,
+      alertas: freshAlerts.map((a) => ({
+        alertType: a.alertType as ComplianceAlertType,
+        title: a.title,
+        departmentName: a.department?.displayName ?? null,
+        severity: a.severity,
+        status: a.status,
+        signalsCount: a.signalsCount,
+        teatroCumplimiento:
+          completedDepts.find((d) => d.departmentId === a.departmentId)
+            ?.teatroCumplimiento ?? false,
+      })),
+      previousOrgScore,
+      previousCampaignLabel,
+    });
+
     const orgPayload = {
       meta: llmResult.data,
       global: {
         orgSafetyScore,
         orgISA,
+        isaComponents: orgIsaComponents,
         skippedByPrivacy,
         activeSourcesGlobal: globals.activeSourcesGlobal,
         criticalByManager: globals.criticalByManager,

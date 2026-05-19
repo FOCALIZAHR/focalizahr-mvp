@@ -28,6 +28,7 @@ import type {
   ComplianceReportDepartmentPatrones,
 } from '@/types/compliance';
 import { PATRON_LABELS } from '@/lib/services/compliance/ComplianceNarrativeEngine';
+import type { ISAResult } from '@/lib/services/compliance/ISAService';
 
 type ReportType = 'executive' | 'semestral';
 
@@ -43,6 +44,7 @@ interface OrgPayload {
   global: {
     orgSafetyScore: number | null;
     orgISA?: number | null;
+    isaComponents?: ISAResult['components'] | null;
     skippedByPrivacy: SafetyScoreSkip[];
     activeSourcesGlobal: ComplianceSource[];
     criticalByManager: Array<{ managerId: string; departmentIds: string[] }>;
@@ -298,11 +300,12 @@ export async function GET(request: NextRequest) {
       // describiendo la agrupación cross-dept aunque la data esté vacía.
       narratives:
         userContext.role === 'AREA_MANAGER'
-          ? { ...orgPayload.narratives, criticalByManagerNarrativa: undefined }
+          ? { ...orgPayload.narratives, criticalByManagerNarrativa: undefined, cascada: undefined }
           : orgPayload.narratives,
       data: {
         orgSafetyScore: orgPayload.global.orgSafetyScore,
         orgISA: orgPayload.global.orgISA ?? null,
+        isaComponents: orgPayload.global.isaComponents ?? null,
         totalTextResponses: orgPayload.global.totalTextResponses ?? null,
         totalRespondents: orgPayload.global.totalRespondents ?? null,
         totalDeptosUniverso,

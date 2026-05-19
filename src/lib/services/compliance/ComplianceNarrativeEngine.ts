@@ -23,11 +23,14 @@ import type {
   MetaAnalysisOutput,
   PatronAnalysisOutput,
   PatronNombre,
+  OrigenOrganizacional,
 } from './complianceTypes';
 import type {
   DepartmentConvergencia,
   ConvergenciaGlobals,
+  CriticalByManagerGroup,
   CasoMotorA,
+  NivelFinal,
 } from './ConvergenciaEngine';
 import { CASO_LABELS } from './casoLabels';
 import {
@@ -66,6 +69,17 @@ export interface ReportNarratives {
   criticalByManagerNarrativa?: string;
   artefacto4_alertas: AlertaNarrative[];
   cierre: CierreNarrative;
+  /**
+   * Narrativas de la Cascada Ejecutiva (5 actos). `undefined` cuando orgISA
+   * es null (campañas legacy/sin ISA). route.ts la suprime para AREA_MANAGER.
+   */
+  cascada?: {
+    acto1: Acto1AmbienteNarrative;
+    acto2: Acto2PatronNarrative;
+    acto3: Acto3SenalesNarrative;
+    acto4: Acto4AlertasNarrative;
+    sintesis: SintesisFrancotirador;
+  };
 }
 
 export interface PortadaNarrative {
@@ -826,6 +840,7 @@ interface AlertaInput {
   title: string;
   departmentName: string | null;
   severity: string;
+  status: string;
   signalsCount: number | null;
   teatroCumplimiento?: boolean;
 }
@@ -928,11 +943,477 @@ function buildCierre(riesgoDeptos: number, teatroCount: number): CierreNarrative
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// CASCADA EJECUTIVA — narrativas de actos (TASK Cascada Ejecutiva)
+// ═══════════════════════════════════════════════════════════════════
+
+/** Narrativa del Acto 1 "El Ambiente" — qué significa el ISA para el negocio. */
+export interface Acto1AmbienteNarrative {
+  /** Número ancla — SIEMPRE el orgISA (Regla del Río). */
+  numeroAncla: number;
+  subtitulo: string;
+  estado: 'teatro' | 'riesgo_concentrado' | 'sin_riesgo';
+  parrafoGancho: string;
+  coachingTip: string;
+}
+
+/**
+ * Acto 1 de la Cascada — traduce el orgISA a lectura de negocio.
+ * 3 estados por prioridad: teatro > riesgo concentrado > sin riesgo.
+ */
+export function buildActo1Ambiente(
+  orgISA: number,
+  riesgoDeptos: number,
+  totalDeptos: number,
+  teatroCount: number,
+): Acto1AmbienteNarrative {
+  // Estado A — Teatro de cumplimiento detectado.
+  if (teatroCount > 0) {
+    return {
+      numeroAncla: orgISA,
+      subtitulo: `${teatroCount} ${teatroCount === 1 ? 'gerencia' : 'gerencias'} con señal contradictoria`,
+      estado: 'teatro',
+      parrafoGancho:
+        `${teatroCount} ${teatroCount === 1 ? 'gerencia opera' : 'gerencias operan'} con números saludables este ciclo. ` +
+        `Lo que su gente escribió cuando nadie estaba mirando dice otra cosa. ` +
+        `O las personas responden lo que se espera de ellas. ` +
+        `O el ambiente real vive en las respuestas abiertas, no en las métricas.`,
+      coachingTip:
+        'La contradicción no es un error del sistema. Es la señal más informativa del ciclo.',
+    };
+  }
+
+  // Estado B — Riesgo concentrado en algunas gerencias.
+  if (riesgoDeptos > 0) {
+    return {
+      numeroAncla: orgISA,
+      subtitulo: `${riesgoDeptos} de ${totalDeptos} gerencias en zona de revisión`,
+      estado: 'riesgo_concentrado',
+      parrafoGancho:
+        `${riesgoDeptos} de ${totalDeptos} gerencias concentran el riesgo del ciclo. ` +
+        `El número del ciclo cierra en ${orgISA} — pero un promedio oculta dónde vive el problema. ` +
+        `O el deterioro está localizado y la cifra global lo disfraza. ` +
+        `O hay gerencias que sostienen lo que otras no pueden.`,
+      coachingTip:
+        'Un problema concentrado tiene dirección. Eso es una ventaja — si se usa.',
+    };
+  }
+
+  // Estado C — Sin gerencias en riesgo.
+  return {
+    numeroAncla: orgISA,
+    subtitulo: 'todas las gerencias sobre el umbral',
+    estado: 'sin_riesgo',
+    parrafoGancho:
+      'Todas las gerencias operan sobre el umbral este ciclo. ' +
+      'Eso no es el punto de llegada. ' +
+      'Es la condición mínima para que el negocio funcione sin desgaste invisible.',
+    coachingTip:
+      'La estabilidad no se mantiene sola. El próximo ciclo confirmará si fue una tendencia o un resultado aislado.',
+  };
+}
+
+/** Narrativa del Acto 2 "La Voz" — qué dice la gente con sus palabras. */
+export interface Acto2PatronNarrative {
+  numeroAncla: number;
+  subtitulo: string;
+  estado:
+    | 'teatro' | 'patron_vertical' | 'patron_sistemico'
+    | 'patron_cultural' | 'patron_general' | 'sin_patrones'
+    | 'datos_insuficientes';
+  /** Fragmentos reales censurados (max 2) del patrón dominante. */
+  fragmentos: string[];
+  parrafoGancho: string;
+  coachingTip: string;
+}
+
+/**
+ * Acto 2 de la Cascada — cruza el patrón dominante de la voz libre con el
+ * meta-análisis de origen. 7 estados por prioridad:
+ * teatro > datos insuficientes > vertical > sistémico > cultural >
+ * patrón general > sin patrones.
+ */
+export function buildActo2Patron(
+  patrones: PatronNarrative[],
+  metaAnalysis: MetaAnalysisOutput | null,
+  teatroCount: number,
+  totalDeptos: number,
+  totalTextResponses: number | null,
+): Acto2PatronNarrative {
+  // Estado A — Teatro: las métricas y las palabras se contradicen.
+  if (teatroCount > 0) {
+    return {
+      numeroAncla: teatroCount,
+      subtitulo: `${teatroCount} ${teatroCount === 1 ? 'gerencia' : 'gerencias'} con contradicción detectada`,
+      estado: 'teatro',
+      fragmentos: [],
+      parrafoGancho:
+        `${teatroCount} ${teatroCount === 1 ? 'gerencia opera' : 'gerencias operan'} con números saludables. ` +
+        `Las respuestas abiertas de su gente dicen otra cosa. ` +
+        `Cuando las métricas y las palabras se contradicen, las palabras tienen razón.`,
+      coachingTip:
+        'El silencio no es ausencia de problema. A veces es su forma más avanzada.',
+    };
+  }
+
+  // Estado F — Sin masa suficiente de voz libre para el análisis.
+  if (metaAnalysis === null || totalTextResponses === null || totalTextResponses === 0) {
+    return {
+      numeroAncla: 0,
+      subtitulo: 'respuestas abiertas insuficientes',
+      estado: 'datos_insuficientes',
+      fragmentos: [],
+      parrafoGancho:
+        'Las respuestas abiertas no tienen masa suficiente para el análisis este ciclo. ' +
+        'La voz no habló.',
+      coachingTip: '',
+    };
+  }
+
+  const dominante = patrones.length > 0 ? patrones[0] : null;
+  const enGerencias = (n: number) => `${n} ${n === 1 ? 'gerencia' : 'gerencias'}`;
+
+  // Estado B — Patrón dominante con origen vertical (liderazgo).
+  if (dominante && metaAnalysis.origen_organizacional === 'vertical_descendente') {
+    return {
+      numeroAncla: patrones.length,
+      subtitulo: `${dominante.nombreLegible} — origen en el liderazgo`,
+      estado: 'patron_vertical',
+      fragmentos: dominante.fragmentos.slice(0, 2),
+      parrafoGancho:
+        `${dominante.nombreLegible} aparece en ${enGerencias(dominante.departments.length)}. ` +
+        `La señal viene de quien tiene autoridad, no de entre pares. ` +
+        `O el liderazgo lo genera sin saberlo. ` +
+        `O lo tolera sin verlo. ` +
+        `El efecto es el mismo en ambos casos.`,
+      coachingTip:
+        'Un patrón que viene de arriba no se resuelve desde abajo.',
+    };
+  }
+
+  // Estado C — Patrón dominante de origen sistémico (procesos).
+  if (dominante && metaAnalysis.origen_organizacional === 'sistemico_procesos') {
+    return {
+      numeroAncla: patrones.length,
+      subtitulo: `${dominante.nombreLegible} — origen en los procesos`,
+      estado: 'patron_sistemico',
+      fragmentos: dominante.fragmentos.slice(0, 2),
+      parrafoGancho:
+        `${dominante.nombreLegible} aparece en ${enGerencias(dominante.departments.length)}. ` +
+        `El origen no son las personas — son los procesos que las rodean. ` +
+        `Cambiar personas sin cambiar el diseño reproduce el mismo resultado.`,
+      coachingTip:
+        'Si el problema es sistémico, la conversación no es con las personas — es sobre cómo está organizado el trabajo.',
+    };
+  }
+
+  // Estado D — Es un problema cultural (rasgo instalado).
+  if (dominante && metaAnalysis.es_problema_cultural) {
+    const n = dominante.departments.length;
+    const masDeLaMitad = n > totalDeptos / 2;
+    return {
+      numeroAncla: patrones.length,
+      subtitulo: `${dominante.nombreLegible} — rasgo cultural instalado`,
+      estado: 'patron_cultural',
+      fragmentos: dominante.fragmentos.slice(0, 2),
+      parrafoGancho:
+        `${dominante.nombreLegible} no está en una gerencia. ` +
+        `Está en ${n} de ${totalDeptos} gerencias${masDeLaMitad ? ' — más de la mitad' : ''}. ` +
+        `O es una característica instalada, no un incidente. ` +
+        `O lleva suficientes ciclos como para haberse normalizado.`,
+      coachingTip:
+        'Un rasgo cultural no se corrige con una intervención. Se corrige con una decisión sostenida en el tiempo.',
+    };
+  }
+
+  // Estado G — Hay patrón dominante, pero el origen no apunta a una sola fuente.
+  if (dominante) {
+    return {
+      numeroAncla: patrones.length,
+      subtitulo: `${dominante.nombreLegible} — origen no concluyente`,
+      estado: 'patron_general',
+      fragmentos: dominante.fragmentos.slice(0, 2),
+      parrafoGancho:
+        `${dominante.nombreLegible} aparece en ${enGerencias(dominante.departments.length)}. ` +
+        `La señal no apunta a una sola fuente — ni al liderazgo, ni a los procesos. ` +
+        `O el patrón se mueve entre equipos. ` +
+        `O todavía no tiene la masa suficiente para mostrar su origen.`,
+      coachingTip:
+        'Un patrón sin un origen único no se resuelve con una sola conversación.',
+    };
+  }
+
+  // Estado E — Sin patrones de alerta; la voz libre confirma las métricas.
+  return {
+    numeroAncla: 0,
+    subtitulo: 'sin señales en las respuestas abiertas',
+    estado: 'sin_patrones',
+    fragmentos: [],
+    parrafoGancho:
+      'Las respuestas abiertas de este ciclo no muestran señales de alerta. ' +
+      'Lo que su gente escribió es consistente con lo que marcó. ' +
+      'Es la señal más difícil de obtener — y la más valiosa.',
+    coachingTip:
+      'Cuando la voz libre confirma las métricas, la organización no tiene nada que ocultar.',
+  };
+}
+
+/** Narrativa del Acto 3 "Las Señales" — el costo confirmado por fuentes independientes. */
+export interface Acto3SenalesNarrative {
+  /** Número ancla — gerencias del tier del estado dominante. */
+  numeroAncla: number;
+  subtitulo: string;
+  estado: 'convergencia' | 'senal_aislada' | 'sin_senales';
+  parrafoGancho: string;
+  coachingTip: string;
+}
+
+/**
+ * Acto 3 de la Cascada — qué señales confirman fuentes independientes.
+ * 3 estados por severidad del nivelFinal presente entre las gerencias.
+ */
+export function buildActo3Senales(
+  departments: DepartmentConvergencia[],
+): Acto3SenalesNarrative {
+  const enGerencias = (n: number) => `${n} ${n === 1 ? 'gerencia' : 'gerencias'}`;
+  const CONFIRMADAS: NivelFinal[] = ['confirmada', 'amplificada', 'critica_sistema'];
+  const UNA_FUENTE: NivelFinal[] = ['interna_solo', 'externa_solo'];
+
+  const confirmadas = departments.filter((d) => CONFIRMADAS.includes(d.nivelFinal)).length;
+  const unaFuente = departments.filter((d) => UNA_FUENTE.includes(d.nivelFinal)).length;
+
+  // Estado A — Convergencia: fuentes independientes confirman la misma señal.
+  if (confirmadas > 0) {
+    return {
+      numeroAncla: confirmadas,
+      subtitulo: `${enGerencias(confirmadas)} con señales que varias fuentes confirman`,
+      estado: 'convergencia',
+      parrafoGancho:
+        `${enGerencias(confirmadas)} ${confirmadas === 1 ? 'muestra' : 'muestran'} señales que más de una fuente confirma. ` +
+        `Lo que dice la encuesta interna, lo que reportan quienes se fueron y quienes recién entraron — todo apunta al mismo lugar. ` +
+        `Cuando fuentes independientes coinciden, deja de ser una percepción. Es un hecho con costo.`,
+      coachingTip:
+        'Una señal que una sola fuente detecta puede ser ruido. Una que varias confirman, ya no.',
+    };
+  }
+
+  // Estado B — Señal de una sola fuente, aún sin confirmación cruzada.
+  if (unaFuente > 0) {
+    return {
+      numeroAncla: unaFuente,
+      subtitulo: `${enGerencias(unaFuente)} con señal de una sola fuente`,
+      estado: 'senal_aislada',
+      parrafoGancho:
+        `${enGerencias(unaFuente)} ${unaFuente === 1 ? 'tiene' : 'tienen'} una señal activa este ciclo. ` +
+        `Una fuente la marca con claridad — pero todavía no hay una segunda que la confirme. ` +
+        `O es un problema que recién empieza a dejar rastro. ` +
+        `O es una señal aislada que el próximo ciclo dirá si crece.`,
+      coachingTip:
+        'Una señal sin confirmar no se ignora. Se vigila.',
+    };
+  }
+
+  // Estado C — Sin señales cruzadas.
+  return {
+    numeroAncla: 0,
+    subtitulo: 'sin señales cruzadas este ciclo',
+    estado: 'sin_senales',
+    parrafoGancho:
+      'Ninguna gerencia muestra señales cruzadas este ciclo. ' +
+      'Lo que detecta la encuesta interna no aparece en las otras fuentes — ni en quienes se fueron, ni en quienes entraron. ' +
+      'Es la lectura más tranquila que puede entregar un ciclo.',
+    coachingTip:
+      'La ausencia de señales cruzadas no es suerte. Es el resultado de lo que se hizo bien.',
+  };
+}
+
+/** Narrativa del Acto 4 "Las Alertas" — el riesgo futuro si no se actúa. */
+export interface Acto4AlertasNarrative {
+  /** Número ancla — alertas activas (no resueltas ni descartadas). */
+  numeroAncla: number;
+  subtitulo: string;
+  estado: 'critica' | 'activa' | 'sin_alertas';
+  parrafoGancho: string;
+  coachingTip: string;
+}
+
+/**
+ * Acto 4 de la Cascada — qué alertas siguen abiertas y qué pasa si no se actúa.
+ * "Activa" = status distinto de 'resolved' y 'dismissed' (canónico del módulo).
+ */
+export function buildActo4Alertas(alertas: AlertaInput[]): Acto4AlertasNarrative {
+  const activas = alertas.filter(
+    (a) => a.status !== 'resolved' && a.status !== 'dismissed',
+  );
+  const criticas = activas.filter((a) => a.severity === 'critical');
+  const enAlertas = (n: number) => `${n} ${n === 1 ? 'alerta activa' : 'alertas activas'}`;
+
+  // Estado A — Hay alertas críticas sin resolver.
+  if (criticas.length > 0) {
+    return {
+      numeroAncla: activas.length,
+      subtitulo: `${criticas.length} ${criticas.length === 1 ? 'alerta crítica' : 'alertas críticas'} sin resolver`,
+      estado: 'critica',
+      parrafoGancho:
+        `Este ciclo cierra con ${activas.length} ${activas.length === 1 ? 'alerta abierta' : 'alertas abiertas'} — ` +
+        `${criticas.length} en nivel crítico. ` +
+        `Una alerta crítica no es un pendiente administrativo — es una señal que ya cruzó el umbral. ` +
+        `O se resuelve antes del próximo ciclo. ` +
+        `O deja de ser una alerta y pasa a ser un hecho.`,
+      coachingTip:
+        'Lo que hoy es una alerta, sin decisión, mañana es un caso.',
+    };
+  }
+
+  // Estado B — Alertas activas, ninguna en nivel crítico.
+  if (activas.length > 0) {
+    return {
+      numeroAncla: activas.length,
+      subtitulo: enAlertas(activas.length),
+      estado: 'activa',
+      parrafoGancho:
+        `${enAlertas(activas.length)} este ciclo, ninguna en nivel crítico. ` +
+        `Es la ventana en la que una señal todavía se gestiona sin costo. ` +
+        `O se atienden mientras son manejables. ` +
+        `O escalan hasta que dejan de serlo.`,
+      coachingTip:
+        'El momento más barato para actuar sobre una alerta es ahora. Siempre.',
+    };
+  }
+
+  // Estado C — Sin alertas activas.
+  return {
+    numeroAncla: 0,
+    subtitulo: 'sin alertas activas este ciclo',
+    estado: 'sin_alertas',
+    parrafoGancho:
+      'Ninguna alerta quedó abierta este ciclo. ' +
+      'No es que el sistema no haya buscado — buscó y no encontró nada que escalara. ' +
+      'Es el resultado de un ambiente que se gestionó a tiempo.',
+    coachingTip:
+      'Cerrar el ciclo sin alertas no baja la guardia. La confirma.',
+  };
+}
+
+/** Síntesis "El Francotirador" — una gerencia · una raíz · una decisión. */
+export interface SintesisFrancotirador {
+  estado: 'cultural' | 'localizado' | 'sistemico' | 'positivo';
+  /** "Este no es un problema de X. Es un problema de Y." */
+  classification: string;
+  /** Por qué esa clasificación importa. */
+  implication: string;
+  /** Cierre — "El próximo ciclo confirmará...". */
+  accountability: string;
+  /** Label del CTA al plan. */
+  ctaLabel: string;
+}
+
+/** Traducción del origen organizacional a lenguaje ejecutivo. */
+const ORIGEN_LABELS: Record<OrigenOrganizacional, string> = {
+  vertical_descendente: 'viene de quien tiene autoridad',
+  horizontal_pares: 'está entre equipos, no en el liderazgo',
+  sistemico_procesos: 'es de diseño, no de personas',
+  mixto: 'no tiene una sola fuente',
+  indeterminado: 'aún no tiene dirección clara',
+};
+
+/**
+ * Síntesis de la Cascada — colapsa criticalByManager + origen + riesgo en
+ * "una gerencia · una raíz · una decisión". 4 estados por prioridad:
+ * positivo > cultural > localizado > sistémico.
+ * `criticalByManager` debe venir ordenado por minIsa ASC (B4) — [0] = peor grupo.
+ */
+export function buildCierreFrancotirador(
+  criticalByManager: CriticalByManagerGroup[],
+  metaAnalysis: MetaAnalysisOutput | null,
+  departments: DepartmentConvergencia[],
+  riesgoDeptos: number,
+): SintesisFrancotirador {
+  const origen = ORIGEN_LABELS[metaAnalysis?.origen_organizacional ?? 'indeterminado'];
+  const deptNamesById = new Map(
+    departments.map((d) => [d.departmentId, d.departmentName]),
+  );
+  const resolveNames = (ids: string[]): string[] =>
+    ids.map((id) => deptNamesById.get(id)).filter((n): n is string => typeof n === 'string');
+
+  // Estado D — Positivo: sin gerencias en riesgo ni concentración bajo un mando.
+  if (riesgoDeptos === 0 && criticalByManager.length === 0) {
+    return {
+      estado: 'positivo',
+      classification: 'Este ciclo no registra gerencias en zona crítica.',
+      implication:
+        'El mandato no es celebrar. ' +
+        'Es sostener las condiciones que produjeron este resultado.',
+      accountability: 'El próximo ciclo confirmará si fue una tendencia.',
+      ctaLabel: 'Ir al plan',
+    };
+  }
+
+  // Estado A — Cultural: el patrón cruza la organización.
+  if (metaAnalysis?.es_problema_cultural === true) {
+    const peorGrupo = criticalByManager[0] ?? null;
+    const nombres = peorGrupo ? resolveNames(peorGrupo.departmentIds) : [];
+    const classification =
+      nombres.length > 0
+        ? `Este no es un problema de ${formatDeptList(nombres)}. ` +
+          'Es el patrón que ahí se manifiesta primero.'
+        : 'Este no es un problema de una gerencia puntual. ' +
+          'Es un patrón que ya cruza la organización.';
+    return {
+      estado: 'cultural',
+      classification,
+      implication:
+        `El origen ${origen}. ` +
+        'Intervenir solo en un lugar es tratar el síntoma.',
+      accountability:
+        'El próximo ciclo confirmará si estas decisiones fueron al fondo o a la superficie.',
+      ctaLabel: 'Ir al plan',
+    };
+  }
+
+  // Estado B — Localizado: el riesgo se concentra bajo una línea de mando.
+  if (criticalByManager.length > 0) {
+    const nombres = resolveNames(criticalByManager[0].departmentIds);
+    const concentra =
+      nombres.length > 0
+        ? `${formatDeptList(nombres)} concentran el riesgo bajo una misma línea de mando.`
+        : 'Un grupo de gerencias concentra el riesgo bajo una misma línea de mando.';
+    return {
+      estado: 'localizado',
+      classification:
+        'Este no es un problema cultural. Es un problema con dirección identificada.',
+      implication:
+        `${concentra} El origen ${origen}. ` +
+        'El problema tiene nombre. La decisión también.',
+      accountability:
+        'El próximo ciclo confirmará si estas decisiones fueron efectivas.',
+      ctaLabel: 'Ir al plan',
+    };
+  }
+
+  // Estado C — Sistémico: hay riesgo, pero sin línea de mando común.
+  return {
+    estado: 'sistemico',
+    classification:
+      'Este no es un problema de liderazgo. Es un problema de diseño.',
+    implication:
+      `${riesgoDeptos} ${riesgoDeptos === 1 ? 'gerencia' : 'gerencias'} en zona de revisión este ciclo sin línea de mando común. ` +
+      'O el problema es sistémico. ' +
+      'O todavía no tiene masa suficiente para identificar el patrón.',
+    accountability: 'El próximo ciclo dirá cuál de las dos.',
+    ctaLabel: 'Ir al plan',
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // COMPOSICIÓN
 // ═══════════════════════════════════════════════════════════════════
 
 export interface BuildNarrativesInput {
   orgSafetyScore: number | null;
+  /** ISA org-level (promedio ponderado). null si ningún depto tiene ISA. */
+  orgISA: number | null;
+  /** Suma de respuestas P1 (voz libre) org-level. null en payloads legacy. */
+  totalTextResponses: number | null;
   scores: DepartmentSafetyScore[];
   departmentAnalyses: Array<{
     departmentName: string;
@@ -964,6 +1445,7 @@ export function buildReportNarratives(input: BuildNarrativesInput): ReportNarrat
   const deptNamesById = new Map(
     input.convergencias.map((c) => [c.departmentId, c.departmentName])
   );
+  const patrones = buildPatrones(input.departmentAnalyses);
 
   return {
     portada: buildPortada(
@@ -977,7 +1459,7 @@ export function buildReportNarratives(input: BuildNarrativesInput): ReportNarrat
     ),
     ancla: buildAncla(input.orgSafetyScore, departmentsCount, teatroCount),
     artefacto1_dimensiones: buildDimensiones(input.scores),
-    artefacto2_patrones: buildPatrones(input.departmentAnalyses),
+    artefacto2_patrones: patrones,
     alertasGenero: buildAlertasGenero(input.departmentAnalyses),
     artefacto3_convergencia: buildConvergencia(input.convergencias),
     cruceNarrativa: buildConvergenciaCruce(
@@ -990,5 +1472,15 @@ export function buildReportNarratives(input: BuildNarrativesInput): ReportNarrat
     ),
     artefacto4_alertas: buildAlertas(input.alertas),
     cierre: buildCierre(riesgoDeptos, teatroCount),
+    cascada:
+      input.orgISA !== null
+        ? {
+            acto1: buildActo1Ambiente(input.orgISA, riesgoDeptos, departmentsCount, teatroCount),
+            acto2: buildActo2Patron(patrones, input.meta, teatroCount, departmentsCount, input.totalTextResponses),
+            acto3: buildActo3Senales(input.convergencias),
+            acto4: buildActo4Alertas(input.alertas),
+            sintesis: buildCierreFrancotirador(input.criticalByManager, input.meta, input.convergencias, riesgoDeptos),
+          }
+        : undefined,
   };
 }

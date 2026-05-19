@@ -8,6 +8,7 @@
 import { motion } from 'framer-motion';
 import type { UseComplianceDataReturn } from '@/hooks/useComplianceData';
 import SectionSintesis from './sections/SectionSintesis';
+import SectionCascada from './sections/SectionCascada';
 import SectionAncla from './sections/SectionAncla';
 import SectionHeatmap from './sections/SectionHeatmap';
 import SectionDimensiones from './sections/SectionDimensiones';
@@ -24,6 +25,7 @@ interface ComplianceStageProps {
 function renderSection(hook: UseComplianceDataReturn) {
   switch (hook.activeSection) {
     case 'sintesis':     return <SectionSintesis     hook={hook} />;
+    case 'cascada':      return <SectionCascada      hook={hook} />;
     case 'ancla':        return <SectionAncla        hook={hook} />;
     case 'heatmap':      return <SectionHeatmap      hook={hook} />;
     case 'dimensiones':  return <SectionDimensiones  hook={hook} />;

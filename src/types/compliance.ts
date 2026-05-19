@@ -16,6 +16,8 @@ export type {
   RiskLevel,
 } from '@/lib/services/SafetyScoreService';
 
+import type { ISAResult } from '@/lib/services/compliance/ISAService';
+
 export type {
   DepartmentConvergencia,
   ConvergenciaSignal,
@@ -71,6 +73,7 @@ export type {
 /** Secciones del Rail en orden canónico (9). */
 export type ComplianceSectionId =
   | 'sintesis'
+  | 'cascada'
   | 'ancla'
   | 'heatmap'
   | 'dimensiones'
@@ -238,6 +241,8 @@ export interface ComplianceReportResponse {
   data: {
     orgSafetyScore: number | null;
     orgISA: number | null;
+    /** Desglose del ISA org-level para el Acto Ancla. null en campañas legacy. */
+    isaComponents: ISAResult['components'] | null;
     /** Suma de respuestas P1 (proyectiva) válidas que entraron al LLM por depto.
      *  `null` si el OrgPayload fue persistido antes del deploy de este campo. */
     totalTextResponses: number | null;
