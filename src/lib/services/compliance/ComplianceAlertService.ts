@@ -838,7 +838,7 @@ export async function createAlertsFromConvergencia(
 // HELPER COMPARTIDO — participación de deptos (sexta + séptima alerta)
 // ════════════════════════════════════════════════════════════════════
 
-interface DeptParticipation {
+export interface DeptParticipation {
   /** Universo de deptos activos con ≥1 empleado activo (criterio P2). */
   universo: Array<{ id: string; displayName: string; empleadosActivos: number }>;
   /** Deptos con ComplianceAnalysis DEPARTMENT en la campaña. */
@@ -850,9 +850,9 @@ interface DeptParticipation {
 /**
  * Computa el universo de deptos + cobertura AS + participación per-depto.
  * Reusado por la sexta (`silencio_con_voz_externa`) y la séptima
- * (`participacion_anomala`) alertas.
+ * (`participacion_anomala`) alertas, y por `CoverageAnalysisService`.
  */
-async function computeDepartmentParticipation(
+export async function computeDepartmentParticipation(
   accountId: string,
   campaignId: string
 ): Promise<DeptParticipation> {

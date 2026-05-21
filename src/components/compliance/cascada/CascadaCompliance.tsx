@@ -6,6 +6,7 @@
 // Acto Ancla (card) + 5 actos (bare). Cada acto trae su propio ActSeparator.
 
 import { useRef } from 'react';
+import ActoCobertura from './ActoCobertura';
 import AnclaISA from './AnclaISA';
 import ActoAmbiente from './ActoAmbiente';
 import ActoVoz from './ActoVoz';
@@ -31,6 +32,9 @@ export default function CascadaCompliance({ data, onNavigate }: CascadaComplianc
 
   return (
     <div className="space-y-24 pb-12">
+      {/* Acto 0 — La Cobertura. Encuadra el universo antes del ISA. */}
+      <ActoCobertura data={data} />
+
       {/* Acto Ancla — card contenida */}
       <AnclaISA data={data} onContinue={scrollToActos} />
 

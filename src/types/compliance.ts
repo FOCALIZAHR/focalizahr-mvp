@@ -19,6 +19,16 @@ export type {
 import type { ISAResult } from '@/lib/services/compliance/ISAService';
 
 export type {
+  CoverageAnalysisResult,
+  CoverageDeptItem,
+  CoverageBranch,
+  CoverageAnalyzedStatus,
+  SilencioVozExternaItem as CoverageSilencioVozExternaItem,
+  ParticipacionAnomalaItem as CoverageParticipacionAnomalaItem,
+} from '@/lib/services/compliance/CoverageAnalysisService';
+import type { CoverageAnalysisResult } from '@/lib/services/compliance/CoverageAnalysisService';
+
+export type {
   DepartmentConvergencia,
   ConvergenciaSignal,
   ConvergenciaLevel,
@@ -257,6 +267,9 @@ export interface ComplianceReportResponse {
      *  Optional para defender payloads pre-deploy del campo (cae a
      *  `departments.length` en el frontend). */
     totalDeptosUniverso?: number;
+    /** Análisis de cobertura/participación org-level — input del Acto 0 de
+     *  la Cascada Ejecutiva. Computado en runtime (no persistido). */
+    coverage: CoverageAnalysisResult;
     departments: ComplianceReportDepartment[];
     skippedByPrivacy: SafetyScoreSkip[];
     metaAnalysis: MetaAnalysisOutput | null;

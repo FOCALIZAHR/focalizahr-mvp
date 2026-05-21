@@ -29,6 +29,7 @@ import type {
 } from '@/types/compliance';
 import { PATRON_LABELS } from '@/lib/services/compliance/ComplianceNarrativeEngine';
 import type { ISAResult } from '@/lib/services/compliance/ISAService';
+import { computeCoverageAnalysis } from '@/lib/services/compliance/CoverageAnalysisService';
 
 type ReportType = 'executive' | 'semestral';
 
@@ -150,7 +151,7 @@ export async function GET(request: NextRequest) {
       visibleDeptIds = new Set([userContext.departmentId, ...children]);
     }
 
-    const [orgAnalysis, deptAnalyses, alerts, previousDeptISAs, totalDeptosUniverso] = await Promise.all([
+    const [orgAnalysis, deptAnalyses, alerts, previousDeptISAs, totalDeptosUniverso, coverage] = await Promise.all([
       prisma.complianceAnalysis.findFirst({
         where: { campaignId, scope: 'ORG', status: 'COMPLETED' },
       }),
@@ -194,6 +195,13 @@ export async function GET(request: NextRequest) {
           ...(visibleDeptIds ? { id: { in: Array.from(visibleDeptIds) } } : {}),
         },
       }),
+      // Análisis de cobertura/participación — runtime (no persistido), input del
+      // Acto 0 "La Cobertura" de la Cascada Ejecutiva.
+      computeCoverageAnalysis(
+        campaignId,
+        userContext.accountId,
+        visibleDeptIds ?? undefined,
+      ),
     ]);
 
     // De los posibles múltiples rows (historial), tomar el más reciente por depto.
@@ -309,6 +317,7 @@ export async function GET(request: NextRequest) {
         totalTextResponses: orgPayload.global.totalTextResponses ?? null,
         totalRespondents: orgPayload.global.totalRespondents ?? null,
         totalDeptosUniverso,
+        coverage,
         departments: deptPayloads.map((p) => {
           const isa = p.isa ?? null;
           const prevIsa = previousIsaByDept.get(p.safetyDetail.departmentId) ?? null;
