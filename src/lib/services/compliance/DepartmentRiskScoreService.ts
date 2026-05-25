@@ -18,6 +18,12 @@
 // agnósticos a la presencia de AS.
 
 import { prisma } from '@/lib/prisma';
+import {
+  PESO_BASE_ALERTA,
+  BUMPABLE_ONBOARDING_TYPES,
+  applyBumpIfApplicable,
+  normalizeExitAlertType,
+} from '@/config/compliance/convergenciaWeights';
 
 // ════════════════════════════════════════════════════════════════════════════
 // GATE 1 — Bridge de denuncia (ventana 12 meses)
@@ -75,3 +81,137 @@ export async function loadDenunciaCountsByDept(
 
   return out;
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// GATE 2 — pesoAlertas + alertas[] para TODOS los deptos del universo
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Item de alerta externa expuesto al payload del score.
+ * Strict subset de `ExternalAlert` de ConvergenciaEngine — solo los 3 campos
+ * que necesita la descomposición del riesgo. `id`, `pesoBase`,
+ * `factorDecaimiento`, `status`, `resolvedAt` no se exponen.
+ */
+export interface ExternalAlertSummary {
+  alertType: string;
+  producto: 'exit' | 'onboarding';
+  pesoEfectivo: number;
+}
+
+/** Ventana de 90 días para el bump de alertas Onboarding bumpables. */
+const BUMP_90D_LOOKBACK_MS = 90 * 24 * 3600 * 1000;
+
+/** Threshold del bump 90d (≥N casos del mismo tipo activan el bump). */
+const BUMP_90D_THRESHOLD = 2;
+
+/**
+ * Carga `ExternalAlertSummary[]` por depto en 2 queries totales (exit + onboarding),
+ * más una groupBy de bump 90d cuando hay onboarding bumpable presente.
+ *
+ * Modo Fase 2: solo alertas activas (`pending|acknowledged`), `factorDecaimiento = 1.0`.
+ * Equivalencia: replica la lógica de `loadDepartmentExternalAlerts` per-dept
+ * pero en bulk para el universo entero — incluye deptos sin ComplianceAnalysis
+ * (los del silencio), que hoy no se cargan en ningún lado.
+ *
+ * @param accountId  Cuenta dueña.
+ * @param deptIds    Universo de deptos a consultar.
+ * @param now        Reloj inyectable (testing). Default: new Date().
+ */
+export async function loadAlertasByDeptBulk(
+  accountId: string,
+  deptIds: string[],
+  now: Date = new Date(),
+): Promise<Map<string, ExternalAlertSummary[]>> {
+  const out = new Map<string, ExternalAlertSummary[]>();
+  for (const id of deptIds) out.set(id, []);
+
+  if (deptIds.length === 0) return out;
+
+  const activeStatus = { in: ['pending', 'acknowledged'] };
+
+  // Query 1 — Exit alerts activas, filtradas al universo.
+  const exitAlerts = await prisma.exitAlert.findMany({
+    where: {
+      accountId,
+      departmentId: { in: deptIds },
+      status: activeStatus,
+    },
+    select: { departmentId: true, alertType: true },
+  });
+
+  // Query 2 — Onboarding alerts activas vía journey.departmentId.
+  const journeyAlerts = await prisma.journeyAlert.findMany({
+    where: {
+      accountId,
+      status: activeStatus,
+      journey: { departmentId: { in: deptIds } },
+    },
+    select: {
+      alertType: true,
+      journey: { select: { departmentId: true } },
+    },
+  });
+
+  // Bump 90d — solo si hay onboarding bumpable activo. Una sola groupBy por
+  // (journey.departmentId, alertType) para todo el universo.
+  const hasBumpables = journeyAlerts.some((a) =>
+    (BUMPABLE_ONBOARDING_TYPES as ReadonlyArray<string>).includes(a.alertType),
+  );
+
+  // Map<deptId, Map<alertType, count>> para lookup O(1) por dept+type.
+  const bumpCountByDept = new Map<string, Map<string, number>>();
+  if (hasBumpables) {
+    const cutoff = new Date(now.getTime() - BUMP_90D_LOOKBACK_MS);
+    const bumpRows = await prisma.journeyAlert.findMany({
+      where: {
+        accountId,
+        alertType: { in: BUMPABLE_ONBOARDING_TYPES as unknown as string[] },
+        createdAt: { gte: cutoff },
+        journey: { departmentId: { in: deptIds } },
+      },
+      select: {
+        alertType: true,
+        journey: { select: { departmentId: true } },
+      },
+    });
+    for (const r of bumpRows) {
+      const deptId = r.journey?.departmentId;
+      if (!deptId) continue;
+      const byType = bumpCountByDept.get(deptId) ?? new Map<string, number>();
+      byType.set(r.alertType, (byType.get(r.alertType) ?? 0) + 1);
+      bumpCountByDept.set(deptId, byType);
+    }
+  }
+
+  // Componer Exit summaries.
+  for (const a of exitAlerts) {
+    if (!a.departmentId) continue;
+    const canonical = normalizeExitAlertType(a.alertType);
+    const pesoBase = PESO_BASE_ALERTA[canonical] ?? 0;
+    // Fase 2: factorDecaimiento = 1.0 → pesoEfectivo = pesoBase.
+    const bucket = out.get(a.departmentId);
+    if (!bucket) continue;
+    bucket.push({ alertType: canonical, producto: 'exit', pesoEfectivo: pesoBase });
+  }
+
+  // Componer Onboarding summaries (con bump 90d).
+  for (const a of journeyAlerts) {
+    const deptId = a.journey?.departmentId;
+    if (!deptId) continue;
+    const baseRaw = PESO_BASE_ALERTA[a.alertType] ?? 0;
+    const count90 = bumpCountByDept.get(deptId)?.get(a.alertType) ?? 0;
+    const pesoBase = applyBumpIfApplicable(a.alertType, baseRaw, count90);
+    const bucket = out.get(deptId);
+    if (!bucket) continue;
+    bucket.push({
+      alertType: a.alertType,
+      producto: 'onboarding',
+      pesoEfectivo: pesoBase,
+    });
+  }
+
+  return out;
+}
+
+// Re-export para tests externos que quieran el threshold del bump.
+export { BUMP_90D_THRESHOLD };
