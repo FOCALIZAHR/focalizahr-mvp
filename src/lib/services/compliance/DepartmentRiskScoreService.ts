@@ -215,3 +215,38 @@ export async function loadAlertasByDeptBulk(
 
 // Re-export para tests externos que quieran el threshold del bump.
 export { BUMP_90D_THRESHOLD };
+
+// ════════════════════════════════════════════════════════════════════════════
+// GATE 3 — Confiabilidad C = W_C · s²
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Peso máximo del driver confiabilidad. Diseño cerrado. */
+const W_C = 50;
+
+/**
+ * Driver 1 — confiabilidad del dato (silencio interno).
+ * `C = W_C · s²` donde `s = 1 − participación`. Convexa: el último que calla
+ * pesa más que el primero.
+ *
+ * Bucket "no invitado": cuando el dept no entró al universo de la campaña,
+ * `participationRate` es `null` y el driver NO aplica — devolvemos
+ * `{value:0, applies:false}` para que la composición lo nombre como tal
+ * en la explicación.
+ *
+ * @param participationRate  0-100, o `null` si el dept no fue invitado.
+ *                            Viene tal cual de `CoverageDeptItem.participationRate`.
+ */
+export function computeConfiabilidad(
+  participationRate: number | null,
+): { value: number; applies: boolean } {
+  if (participationRate === null) {
+    return { value: 0, applies: false };
+  }
+  const p = participationRate / 100;
+  const s = 1 - p;
+  const C = W_C * s * s;
+  return { value: C, applies: true };
+}
+
+// Re-export para tests externos.
+export { W_C };
