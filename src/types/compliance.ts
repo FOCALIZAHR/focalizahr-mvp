@@ -285,6 +285,10 @@ export interface ComplianceReportResponse {
      *  No están en `departments[]` porque no tienen ComplianceAnalysis.
      *  Optional para defender payloads pre-deploy del campo. */
     silencioVozExterna?: SilencioVozExternaItem[];
+    /** Score de riesgo por dept — todo el universo activo del account
+     *  (con_isa + sub_threshold + no_invitado), no solo los con AS.
+     *  Runtime, no persistido. Optional para defender payloads pre-deploy. */
+    riskScores?: DepartmentRiskScore[];
   };
   legalNotice: string;
 }
@@ -297,6 +301,61 @@ export interface SilencioVozExternaItem {
   narrativa: string;
   /** Cantidad de señales externas de peso medio o superior que la dispararon. */
   signalsCount: number;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Score de riesgo por departamento (Paso 2 — runtime, no persistido).
+// Diseño cerrado en .claude/tasks/SCORE_RIESGO_DEPARTAMENTO_DISENO_CERRADO.md.
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Item de alerta externa expuesto en la descomposición del riesgo.
+ *  Es el origen de `pesoAlertas`; el render usa esto para narrar el desglose. */
+export interface DepartmentRiskAlertItem {
+  alertType: string;
+  producto: 'exit' | 'onboarding';
+  pesoEfectivo: number;
+}
+
+/** Bucket del dept para la lectura del score:
+ *  - `con_isa`: tiene ComplianceAnalysis COMPLETED (≥5 respondieron).
+ *  - `sub_threshold`: invitado pero <5 respondieron (`skipped_privacy` o `no_response`).
+ *  - `no_invitado`: no entró al universo de la campaña — el driver confiabilidad NO aplica. */
+export type DepartmentRiskBucket = 'con_isa' | 'sub_threshold' | 'no_invitado';
+
+/** Por qué el `score` vale lo que vale:
+ *  - `suma`: `score = inferido` (la suma de drivers gana).
+ *  - `piso_aplicado`: `score = piso_denuncia` (la inferencia daba menos, la denuncia decide). */
+export type DepartmentRiskReason = 'suma' | 'piso_aplicado';
+
+/** Score de riesgo por dept con descomposición auditable.
+ *  El render NUNCA muestra el `score` sin nombrar los `drivers` que lo componen. */
+export interface DepartmentRiskScore {
+  departmentId: string;
+  departmentName: string;
+  /** 0-100, redondeado. */
+  score: number;
+  bucket: DepartmentRiskBucket;
+  drivers: {
+    /** C = 50·s². `0` si el driver no aplica (no invitado). */
+    confiabilidad: number;
+    /** A = 50·pesoAlertas/(pesoAlertas+3). */
+    voz_externa: number;
+    /** `75` si denuncias_12m ≥ 1; `0` si no. Nunca anónimo en la explicación. */
+    piso_denuncia: number;
+  };
+  reason: DepartmentRiskReason;
+  inputs: {
+    /** 0-100, o `null` si el dept no fue invitado. */
+    participacion: number | null;
+    /** Σ pesoEfectivo de alertas activas. Siempre ≥ 0. */
+    pesoAlertas: number;
+    /** Σ issueCount en ventana 12m. `null` ≠ `0`:
+     *  null = sin métrica cargada (frontend no debe leer "sin denuncias");
+     *  0 = cargada, sin denuncias. */
+    denuncias_12m: number | null;
+  };
+  /** Origen de `pesoAlertas` — para narrar el desglose en el render. */
+  alertas: DepartmentRiskAlertItem[];
 }
 
 export interface ComplianceCampaignsResponse {

@@ -250,3 +250,93 @@ export function computeConfiabilidad(
 
 // Re-export para tests externos.
 export { W_C };
+
+// ════════════════════════════════════════════════════════════════════════════
+// GATE 4 — Composición del score + descomposición
+// ════════════════════════════════════════════════════════════════════════════
+
+import type { CoverageDeptItem } from './CoverageAnalysisService';
+import type {
+  DepartmentRiskScore,
+  DepartmentRiskBucket,
+} from '@/types/compliance';
+
+/** Peso máximo del driver voz externa. Diseño cerrado. */
+const W_A = 50;
+/** Constante Hill para normalización de pesoAlertas. Diseño cerrado. */
+const K_A = 3;
+/** Valor del piso de denuncia. Diseño cerrado (entrada a banda crítica). */
+const PISO_DENUNCIA = 75;
+
+/** Mapeo `CoverageDeptItem.analyzed` → bucket del score. */
+function bucketFromAnalyzed(
+  analyzed: CoverageDeptItem['analyzed'],
+): DepartmentRiskBucket {
+  if (analyzed === 'completed') return 'con_isa';
+  if (analyzed === 'not_invited') return 'no_invitado';
+  // 'skipped_privacy' | 'no_response' → invitado, sin ISA al lado
+  return 'sub_threshold';
+}
+
+/**
+ * Computa el score de riesgo por dept para todo el universo (los items que
+ * vengan en `coverageItems` — ya filtrados por RBAC en el caller).
+ *
+ * Fórmula:
+ *   C       = 50·s²  (s = 1 − participación/100), 0 si no invitado
+ *   A_norm  = pesoAlertas / (pesoAlertas + 3)
+ *   A       = 50·A_norm
+ *   inferido = min(C + A, 100)
+ *   piso     = 75 si denuncias_12m ≥ 1
+ *   score    = round(max(inferido, piso))
+ */
+export async function computeDepartmentRiskScores(params: {
+  accountId: string;
+  coverageItems: CoverageDeptItem[];
+  now?: Date;
+}): Promise<DepartmentRiskScore[]> {
+  const { accountId, coverageItems } = params;
+  const now = params.now ?? new Date();
+  const deptIds = coverageItems.map((d) => d.departmentId);
+
+  const [denunciasByDept, alertasByDept] = await Promise.all([
+    loadDenunciaCountsByDept(accountId, deptIds, now),
+    loadAlertasByDeptBulk(accountId, deptIds, now),
+  ]);
+
+  return coverageItems.map((item): DepartmentRiskScore => {
+    const alertas = alertasByDept.get(item.departmentId) ?? [];
+    const pesoAlertas = alertas.reduce((s, a) => s + a.pesoEfectivo, 0);
+    const denuncias12m = denunciasByDept.get(item.departmentId) ?? null;
+
+    const confiab = computeConfiabilidad(item.participationRate);
+    const A_norm = pesoAlertas > 0 ? pesoAlertas / (pesoAlertas + K_A) : 0;
+    const A = W_A * A_norm;
+
+    const inferido = Math.min(confiab.value + A, 100);
+    const piso = denuncias12m !== null && denuncias12m >= 1 ? PISO_DENUNCIA : 0;
+    const scoreRaw = Math.max(inferido, piso);
+
+    return {
+      departmentId: item.departmentId,
+      departmentName: item.departmentName,
+      score: Math.round(scoreRaw),
+      bucket: bucketFromAnalyzed(item.analyzed),
+      drivers: {
+        confiabilidad: Math.round(confiab.value),
+        voz_externa: Math.round(A),
+        piso_denuncia: piso,
+      },
+      reason: piso > inferido ? 'piso_aplicado' : 'suma',
+      inputs: {
+        participacion: item.participationRate,
+        pesoAlertas,
+        denuncias_12m: denuncias12m,
+      },
+      alertas,
+    };
+  });
+}
+
+// Re-export para tests externos.
+export { W_A, K_A, PISO_DENUNCIA };

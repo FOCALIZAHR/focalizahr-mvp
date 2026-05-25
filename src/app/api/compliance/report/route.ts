@@ -30,6 +30,7 @@ import type {
 import { PATRON_LABELS } from '@/lib/services/compliance/ComplianceNarrativeEngine';
 import type { ISAResult } from '@/lib/services/compliance/ISAService';
 import { computeCoverageAnalysis } from '@/lib/services/compliance/CoverageAnalysisService';
+import { computeDepartmentRiskScores } from '@/lib/services/compliance/DepartmentRiskScoreService';
 
 type ReportType = 'executive' | 'semestral';
 
@@ -204,6 +205,14 @@ export async function GET(request: NextRequest) {
       ),
     ]);
 
+    // Score de riesgo por dept — runtime, cubre TODO el universo del coverage
+    // (con_isa + sub_threshold + no_invitado). RBAC heredado: deptosCobertura
+    // ya viene filtrado por visibleDeptIds desde computeCoverageAnalysis.
+    const riskScores = await computeDepartmentRiskScores({
+      accountId: userContext.accountId,
+      coverageItems: coverage.deptosCobertura,
+    });
+
     // De los posibles múltiples rows (historial), tomar el más reciente por depto.
     const previousIsaByDept = new Map<string, number>();
     for (const row of previousDeptISAs) {
@@ -318,6 +327,7 @@ export async function GET(request: NextRequest) {
         totalRespondents: orgPayload.global.totalRespondents ?? null,
         totalDeptosUniverso,
         coverage,
+        riskScores,
         departments: deptPayloads.map((p) => {
           const isa = p.isa ?? null;
           const prevIsa = previousIsaByDept.get(p.safetyDetail.departmentId) ?? null;
