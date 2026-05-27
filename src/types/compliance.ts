@@ -301,6 +301,20 @@ export interface SilencioVozExternaItem {
   narrativa: string;
   /** Cantidad de señales externas de peso medio o superior que la dispararon. */
   signalsCount: number;
+  /** Narrativa del DepartmentRiskScore — poblada cuando el dept resuelve a
+   *  state === 'HUMO' o 'FUEGO'. PUNTO_CIEGO/CONFIABLE/null quedan undefined
+   *  y la banda cae al legacy `narrativa`. */
+  riskNarrativa?: string;
+  /** Chip — composición del score. En HUMO viajan los 3 valores y suman:
+   *  `score = confiabilidad + alertasExternas`. En FUEGO sólo viaja `score`:
+   *  el piso por denuncia hace que el desglose deje de aplicar, y exponer
+   *  drivers parciales engañaría al lector. La banda renderiza solo los
+   *  campos presentes — eso comunica el estado sin exponerlo al wire. */
+  riskChip?: {
+    score: number;
+    confiabilidad?: number;
+    alertasExternas?: number;
+  };
 }
 
 // ════════════════════════════════════════════════════════════════════════════

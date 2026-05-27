@@ -43,6 +43,7 @@
 import type {
   DepartmentRiskScore,
   DepartmentRiskAlertItem,
+  SilencioVozExternaItem,
 } from '@/types/compliance';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -194,4 +195,63 @@ export function resolveDepartmentRiskNarrative(
   // 5. con_isa + pesoAlertas > 0 sin denuncia → no hay string en este motor.
   //    La voz adecuada vive en convergencia/contradicción protagonista.
   return null;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CABLEADO — sexta alerta (Gate 2)
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Adjunta `riskNarrativa` + `riskChip` a cada item de `silencioVozExterna`
+ * cuando el `DepartmentRiskScore` correspondiente resuelve a un estado
+ * publicable en esta banda.
+ *
+ * Estados publicados:
+ *   - HUMO  → riskNarrativa A/B/A-legal + chip completo (score + 2 drivers).
+ *             `score = confiabilidad + alertasExternas` (verificable).
+ *   - FUEGO → riskNarrativa de denuncia + chip SOLO con `score`. El piso por
+ *             denuncia hace que `score ≠ confiabilidad + voz_externa` — el
+ *             desglose deja de aplicar, así que no se expone para no engañar.
+ *
+ * No publicados (la banda cae al legacy):
+ *   - PUNTO_CIEGO, CONFIABLE, null. PUNTO_CIEGO no puede llegar acá (la sexta
+ *     alerta exige señales externas → pesoAlertas > 0). CONFIABLE y null
+ *     exigen `bucket === 'con_isa'`, incompatible con el universo de la sexta
+ *     alerta (deptos sin ComplianceAnalysis).
+ *
+ * Defensivo:
+ *   - `item.departmentId === null` → no se intenta el lookup.
+ *   - Score no encontrado en el universo → item sin tocar.
+ *   - `resolveDepartmentRiskNarrative` retorna `null` → item sin tocar.
+ */
+export function attachRiskNarrativeToSilencioItems(
+  items: SilencioVozExternaItem[],
+  riskScores: DepartmentRiskScore[],
+): SilencioVozExternaItem[] {
+  const byDeptId = new Map(riskScores.map((r) => [r.departmentId, r]));
+  return items.map((item) => {
+    if (!item.departmentId) return item;
+    const score = byDeptId.get(item.departmentId);
+    if (!score) return item;
+    const narrative = resolveDepartmentRiskNarrative(score);
+    if (!narrative) return item;
+
+    if (narrative.state === 'HUMO') {
+      return {
+        ...item,
+        riskNarrativa: narrative.narrativa,
+        riskChip: narrative.chip,
+      };
+    }
+
+    if (narrative.state === 'FUEGO') {
+      return {
+        ...item,
+        riskNarrativa: narrative.narrativa,
+        riskChip: { score: narrative.chip.score },
+      };
+    }
+
+    return item;
+  });
 }

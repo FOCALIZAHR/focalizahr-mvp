@@ -31,6 +31,7 @@ import { PATRON_LABELS } from '@/lib/services/compliance/ComplianceNarrativeEngi
 import type { ISAResult } from '@/lib/services/compliance/ISAService';
 import { computeCoverageAnalysis } from '@/lib/services/compliance/CoverageAnalysisService';
 import { computeDepartmentRiskScores } from '@/lib/services/compliance/DepartmentRiskScoreService';
+import { attachRiskNarrativeToSilencioItems } from '@/lib/services/compliance/DepartmentRiskNarrativeDictionary';
 
 type ReportType = 'executive' | 'semestral';
 
@@ -366,14 +367,21 @@ export async function GET(request: NextRequest) {
         // Sexta alerta — deptos sin voz en AS pero con señales externas.
         // Banda dedicada en SectionConvergencia (BandaSilencioVozExterna).
         // Estos deptos NO están en `departments[]` (sin ComplianceAnalysis).
-        silencioVozExterna: filteredAlerts
-          .filter((a) => a.alertType === 'silencio_con_voz_externa')
-          .map((a) => ({
-            departmentId: a.departmentId,
-            departmentName: a.department?.displayName ?? null,
-            narrativa: a.description,
-            signalsCount: a.signalsCount ?? 0,
-          })),
+        //
+        // Gate 2 voz del score: `attachRiskNarrativeToSilencioItems` agrega
+        // riskNarrativa + riskChip a los items que resuelven a HUMO. FUEGO y
+        // otros estados quedan sin esos campos (la banda cae al legacy).
+        silencioVozExterna: attachRiskNarrativeToSilencioItems(
+          filteredAlerts
+            .filter((a) => a.alertType === 'silencio_con_voz_externa')
+            .map((a) => ({
+              departmentId: a.departmentId,
+              departmentName: a.department?.displayName ?? null,
+              narrativa: a.description,
+              signalsCount: a.signalsCount ?? 0,
+            })),
+          riskScores,
+        ),
       },
       legalNotice:
         'Análisis de gestión preventiva — No constituye investigación formal.',
