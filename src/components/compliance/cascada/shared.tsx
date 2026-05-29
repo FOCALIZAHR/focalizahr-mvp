@@ -4,10 +4,11 @@
 // Clon verbatim de GoalsCorrelation/cascada/shared.tsx (patrón canónico).
 // ════════════════════════════════════════════════════════════════════════════
 
-import { memo } from 'react'
+import { memo, useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, HelpCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { legalBadgeForCountry } from '@/lib/services/compliance/CoverageNarrativeDictionary'
 
 // ════════════════════════════════════════════════════════════════════════════
 // ANIMATION — whileInView (scroll-triggered, once)
@@ -79,3 +80,56 @@ export const SubtleLink = memo(function SubtleLink({
     </button>
   )
 })
+
+// ════════════════════════════════════════════════════════════════════════════
+// TOOLTIP UNIVERSAL — onClick toggle (mobile tap) + hover (desktop)
+// ════════════════════════════════════════════════════════════════════════════
+
+export function Tooltip({
+  content,
+  children,
+}: {
+  content: string
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <span className="relative inline-flex items-baseline align-middle">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        className="inline-flex items-baseline cursor-help"
+        aria-label="Más información"
+      >
+        {children}
+      </button>
+      {open && (
+        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 shadow-xl z-50 pointer-events-none">
+          <span className="block text-xs font-light text-slate-300 leading-relaxed normal-case tracking-normal">
+            {content}
+          </span>
+        </span>
+      )}
+    </span>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// LEGAL BADGE PILL — Flag amber para deptos con exposición jurídica
+// (Ley Karin en CL, equivalente normativo por país).
+// Texto + tooltip dinámicos vía legalBadgeForCountry.
+// ════════════════════════════════════════════════════════════════════════════
+
+export function LegalBadgePill({ country }: { country: string | null | undefined }) {
+  const config = legalBadgeForCountry(country)
+  return (
+    <Tooltip content={config.tooltip}>
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-[9px] uppercase tracking-wider text-amber-300">
+        {config.label}
+        <HelpCircle className="w-2.5 h-2.5" strokeWidth={1.5} />
+      </span>
+    </Tooltip>
+  )
+}

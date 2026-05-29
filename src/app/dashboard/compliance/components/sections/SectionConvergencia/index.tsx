@@ -18,7 +18,7 @@ import type { UseComplianceDataReturn } from '@/hooks/useComplianceData';
 import type { AlertaNarrative } from '@/lib/services/compliance/ComplianceNarrativeEngine';
 import ConvergenciaOrgHeader from './ConvergenciaOrgHeader';
 import BandaDepartamento from './BandaDepartamento';
-import BandaSilencioVozExterna from './BandaSilencioVozExterna';
+import BandaSilencioExterna from './BandaSilencioExterna';
 import ConvergenciaEmptyState from './ConvergenciaEmptyState';
 import {
   mergeDepartmentData,
@@ -75,8 +75,11 @@ export default function SectionConvergencia({ hook }: Props) {
   if (!report) return null;
 
   // Sexta alerta — deptos sin voz en AS pero con señales externas.
-  // Banda dedicada, no requiere MergedDept (componente aislado).
+  // Banda compacta restaurada después de Gate 3, con voz del motor.
+  // (Acto 0 ya muestra estos mismos deptos con narrativa más rica; acá viven
+  // como celda de la typología v3.1 de Señales cruzadas.)
   const silencioItems = report.data.silencioVozExterna ?? [];
+  const riskScores = report.data.riskScores ?? [];
 
   // Empty state — solo si NO hay convergencia NI sexta alerta. Si hay
   // deptos en silencio_con_voz_externa, hay contenido que mostrar.
@@ -116,15 +119,14 @@ export default function SectionConvergencia({ hook }: Props) {
             isSavingPlanAction={hook.isSavingPlanAction}
           />
         ))}
-        {/* Sexta alerta — bandas de deptos sin voz en AS, con señales externas.
-            Van al final: son la casilla "silencio con voz externa", distinta
-            de las bandas de convergencia estándar. */}
-        {silencioItems.map((item, i) => (
-          <BandaSilencioVozExterna
-            key={item.departmentId ?? `silencio-${i}`}
-            item={item}
+        {/* Sexta alerta — celda de typología "silencio que ya habla" */}
+        {silencioItems.length > 0 && (
+          <BandaSilencioExterna
+            items={silencioItems}
+            riskScores={riskScores}
+            country={report.company.country}
           />
-        ))}
+        )}
       </div>
     </div>
   );

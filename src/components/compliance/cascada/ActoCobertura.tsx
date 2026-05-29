@@ -22,9 +22,15 @@
 
 import { memo, useState, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ActSeparator, SubtleLink, fadeIn, fadeInDelay } from './shared';
+import {
+  ActSeparator,
+  SubtleLink,
+  Tooltip,
+  LegalBadgePill,
+  fadeIn,
+  fadeInDelay,
+} from './shared';
 import ActoCoberturaModal from './ActoCoberturaModal';
 import {
   ACT_LABEL,
@@ -40,7 +46,14 @@ import {
   type CoveragePayload,
   type NarrativeToken,
 } from '@/lib/services/compliance/CoverageNarrativeDictionary';
-import type { ComplianceReportResponse } from '@/types/compliance';
+import {
+  resolveDepartmentRiskNarrative,
+  type DepartmentRiskNarrative,
+} from '@/lib/services/compliance/DepartmentRiskNarrativeDictionary';
+import type {
+  ComplianceReportResponse,
+  DepartmentRiskScore,
+} from '@/types/compliance';
 
 interface ActoCoberturaProps {
   data: ComplianceReportResponse;
@@ -50,6 +63,7 @@ export default memo(function ActoCobertura({ data }: ActoCoberturaProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const coverage = data.data.coverage;
   const country = data.company.country;
+  const riskScores: DepartmentRiskScore[] = data.data.riskScores ?? [];
 
   if (coverage.totalDeptos === 0) return null;
 
@@ -63,6 +77,45 @@ export default memo(function ActoCobertura({ data }: ActoCoberturaProps) {
     pctVoz,
     pctSilencio,
   };
+
+  // ─── Motor de voz del score: clasifica deptos por estado ──────────────────
+  // El motor enriquece 3 piezas del Acto 0:
+  //   FUEGO       → cards al tope del sub-hallazgo (si hay denuncia real)
+  //                 o línea positiva (si métrica cargada con 0 confirmados)
+  //                 o nada (si denuncias_12m=null en todos — null ≠ 0)
+  //   HUMO        → cards en el cuerpo del sub-hallazgo, reemplazan la lista
+  //                 anterior. Cross-ref con silencioConVozExterna por dept id.
+  //   PUNTO_CIEGO → línea compacta DESPUÉS del sub-hallazgo con nombres.
+  //   CONFIABLE   → no renderiza en este ciclo (diluiría el punch del hero).
+  //   null        → no aparece acá (su voz vive en SectionConvergencia).
+  const fuegoCards: Array<{ rs: DepartmentRiskScore; narrative: DepartmentRiskNarrative }> = [];
+  const humoByDeptId = new Map<string, DepartmentRiskNarrative>();
+  const puntoCiegoNames: string[] = [];
+  let denunciaNullCount = 0;
+  let denunciaLoadedZero = 0;
+  let denunciaLoadedReal = 0;
+  for (const rs of riskScores) {
+    const d = rs.inputs.denuncias_12m;
+    if (d === null) denunciaNullCount += 1;
+    else if (d === 0) denunciaLoadedZero += 1;
+    else if (d >= 1) denunciaLoadedReal += 1;
+    const n = resolveDepartmentRiskNarrative(rs);
+    if (!n) continue;
+    if (n.state === 'FUEGO') fuegoCards.push({ rs, narrative: n });
+    else if (n.state === 'HUMO') humoByDeptId.set(rs.departmentId, n);
+    else if (n.state === 'PUNTO_CIEGO') puntoCiegoNames.push(rs.departmentName);
+  }
+  fuegoCards.sort((a, b) => b.rs.score - a.rs.score);
+  puntoCiegoNames.sort((a, b) => a.localeCompare(b, 'es'));
+
+  // FUEGO display mode (3 casos distinguidos por estado de la métrica):
+  //   'cards'         → algún dept con denuncias_12m ≥ 1 → narrativa rica
+  //   'positive_line' → métrica cargada en algún dept con 0 confirmados, sin reales
+  //   'hidden'        → denuncias_12m=null en TODOS los deptos (métrica no cargada)
+  let fuegoMode: 'cards' | 'positive_line' | 'hidden';
+  if (denunciaLoadedReal > 0) fuegoMode = 'cards';
+  else if (denunciaNullCount === riskScores.length) fuegoMode = 'hidden';
+  else fuegoMode = 'positive_line';
 
   // Hero dinámico — silence vs voice dominant.
   const silenceDominant = silencio >= coverage.deptosConVoz && silencio > 0;
@@ -89,8 +142,14 @@ export default memo(function ActoCobertura({ data }: ActoCoberturaProps) {
     coverage.silencioConVozExterna.length,
   );
 
+  // Sub-hallazgo "El silencio que ya habla" — visible si:
+  //   - hay frase de cruce (rama A), o
+  //   - hay items de silencio con voz externa (HUMO cards), o
+  //   - hay material de FUEGO para nombrar (cards o línea positiva).
   const showSubhallazgo =
-    yaHabla.fraseCruce !== null || yaHabla.lineas.length > 0;
+    yaHabla.fraseCruce !== null ||
+    yaHabla.lineas.length > 0 ||
+    fuegoMode !== 'hidden';
 
   // Render helper de tokens — comparte la lógica para todos los bloques.
   const renderTokens = (tokens: NarrativeToken[]): ReactNode =>
@@ -152,12 +211,31 @@ export default memo(function ActoCobertura({ data }: ActoCoberturaProps) {
           </p>
         </motion.div>
 
-        {/* Sub-hallazgo "EL SILENCIO QUE YA HABLA" */}
+        {/* Sub-hallazgo "EL SILENCIO QUE YA HABLA" — enriquecido con motor de voz */}
         {showSubhallazgo && (
           <motion.div {...fadeIn} className="max-w-2xl mx-auto mt-8">
             <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
               {SILENCIO_YA_HABLA_EYEBROW}
             </p>
+
+            {/* FUEGO — al tope cuando hay denuncia real */}
+            {fuegoMode === 'cards' && (
+              <div className="space-y-3 mb-4">
+                {fuegoCards.map(({ rs, narrative }) => (
+                  <TerritorioCard
+                    key={rs.departmentId}
+                    deptName={rs.departmentName}
+                    narrative={narrative}
+                    country={country}
+                  />
+                ))}
+              </div>
+            )}
+            {fuegoMode === 'positive_line' && (
+              <p className="text-sm font-light text-slate-400 leading-relaxed mb-4 italic">
+                0 denuncias formales confirmadas este ciclo.
+              </p>
+            )}
 
             {yaHabla.fraseCruce && (
               <p className="text-base font-light text-slate-400 leading-relaxed mb-4">
@@ -171,19 +249,25 @@ export default memo(function ActoCobertura({ data }: ActoCoberturaProps) {
               </p>
             )}
 
-            {yaHabla.lineas.length > 0 && (
-              <ul className="space-y-2 mb-3 list-none">
-                {yaHabla.lineas.map((linea, idx) => (
-                  <li
-                    key={idx}
-                    className="text-base font-light text-slate-400 leading-relaxed"
-                  >
-                    <SourceBadge tipo={linea.tipoSenal} />
-                    {' '}
-                    {renderTokens(linea.tokens)}
-                  </li>
-                ))}
-              </ul>
+            {/* HUMO — cards per dept, reemplazo de la lista de <li> anterior.
+                Cross-ref por departmentId: solo entran items cuyo riskScore
+                resuelve a HUMO via el motor. Si el cross-ref falla → skip. */}
+            {coverage.silencioConVozExterna.length > 0 && (
+              <div className="space-y-3 mb-3">
+                {coverage.silencioConVozExterna.map((item) => {
+                  if (!item.departmentId) return null;
+                  const narrative = humoByDeptId.get(item.departmentId);
+                  if (!narrative) return null;
+                  return (
+                    <TerritorioCard
+                      key={item.departmentId}
+                      deptName={item.departmentName ?? 'Departamento sin nombre'}
+                      narrative={narrative}
+                      country={country}
+                    />
+                  );
+                })}
+              </div>
             )}
 
             {yaHabla.cierreSenales && (
@@ -191,6 +275,21 @@ export default memo(function ActoCobertura({ data }: ActoCoberturaProps) {
                 {renderTokens(yaHabla.cierreSenales)}
               </p>
             )}
+          </motion.div>
+        )}
+
+        {/* PUNTO_CIEGO — línea compacta DESPUÉS del sub-hallazgo */}
+        {puntoCiegoNames.length > 0 && (
+          <motion.div {...fadeIn} className="max-w-2xl mx-auto mt-4">
+            <p className="text-sm font-light text-slate-500 leading-relaxed">
+              El resto del silencio ({puntoCiegoNames.length}{' '}
+              {puntoCiegoNames.length === 1 ? 'área' : 'áreas'}) opera sin
+              señales externas:{' '}
+              <span className="text-slate-400">
+                {puntoCiegoNames.join(', ')}
+              </span>
+              .
+            </p>
           </motion.div>
         )}
 
@@ -222,69 +321,82 @@ export default memo(function ActoCobertura({ data }: ActoCoberturaProps) {
 
 // ════════════════════════════════════════════════════════════════════════════
 // PRIMITIVOS LOCALES — clonan el patrón de tooltips del PLTalent briefing
+// (Tooltip y LegalBadgePill se exportan desde ./shared para reuso cross-cascada
+// y SectionConvergencia.)
 // ════════════════════════════════════════════════════════════════════════════
 
 /**
- * Tooltip universal — onClick toggle (mobile tap) + hover (desktop).
- * Clon del patrón TOOLTIP_ITEMS de PLTalentExecutiveBriefing.tsx (líneas 67-72,
- * 266-294). El contenedor es inline-flex para no romper el flujo de texto.
+ * TerritorioCard — card per dept para FUEGO y HUMO dentro del sub-hallazgo.
+ * Estados:
+ *   FUEGO  → border ámbar pleno, chip solo con `Riesgo {score}`, LegalBadgePill.
+ *   HUMO   → border ámbar atenuado, chip bimodal con Riesgo · Confiabilidad ·
+ *            Alertas externas. LegalBadgePill SOLO cuando rama === 'A-legal'.
+ * Estilo: card compacto rounded-12 con border-l ámbar (anti-semáforo: ámbar
+ * para los dos territorios de alerta, distinguidos por opacidad).
  */
-function Tooltip({
-  content,
-  children,
+function TerritorioCard({
+  deptName,
+  narrative,
+  country,
 }: {
-  content: string;
-  children: ReactNode;
+  deptName: string;
+  narrative: DepartmentRiskNarrative;
+  country: string | null | undefined;
 }) {
-  const [open, setOpen] = useState(false);
+  const isFuego = narrative.state === 'FUEGO';
+  const isHumo = narrative.state === 'HUMO';
+  const isALegal = isHumo && narrative.rama === 'A-legal';
+  const showLegalPill = isFuego || isALegal;
+  const showDrivers = isHumo;
+  const borderClass = isFuego
+    ? 'border-l-2 border-amber-400/90'
+    : 'border-l-2 border-amber-400/50';
   return (
-    <span className="relative inline-flex items-baseline align-middle">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        className="inline-flex items-baseline cursor-help"
-        aria-label="Más información"
-      >
-        {children}
-      </button>
-      {open && (
-        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 shadow-xl z-50 pointer-events-none">
-          <span className="block text-xs font-light text-slate-300 leading-relaxed normal-case tracking-normal">
-            {content}
+    <div
+      className={cn('relative overflow-hidden rounded-[12px]', borderClass)}
+      style={{
+        background: '#0F172A',
+        borderTop: '0.5px solid #1e293b',
+        borderRight: '0.5px solid #1e293b',
+        borderBottom: '0.5px solid #1e293b',
+      }}
+    >
+      <div className="px-4 py-3 flex flex-col gap-2">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-[14px] font-medium text-cyan-300">
+            {deptName}
           </span>
-        </span>
-      )}
-    </span>
-  );
-}
-
-/** Pill con label de fuente (ONBOARDING / EXIT) + ícono de info + tooltip. */
-function SourceBadge({ tipo }: { tipo: 'exit' | 'onboarding' | 'otra' }) {
-  if (tipo === 'otra') return null;
-  const label = tipo === 'exit' ? 'EXIT' : 'ONBOARDING';
-  const content = tipo === 'exit' ? SOURCE_TOOLTIPS.exit : SOURCE_TOOLTIPS.onboarding;
-  return (
-    <Tooltip content={content}>
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-slate-700 bg-slate-900/60 text-[9px] uppercase tracking-wider text-slate-400">
-        {label}
-        <HelpCircle className="w-2.5 h-2.5" strokeWidth={1.5} />
-      </span>
-    </Tooltip>
-  );
-}
-
-/** Pill amber con label legal por país + ícono + tooltip. */
-function LegalBadgePill({ country }: { country: string | null | undefined }) {
-  const config = legalBadgeForCountry(country);
-  return (
-    <Tooltip content={config.tooltip}>
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-[9px] uppercase tracking-wider text-amber-300">
-        {config.label}
-        <HelpCircle className="w-2.5 h-2.5" strokeWidth={1.5} />
-      </span>
-    </Tooltip>
+          {showLegalPill && <LegalBadgePill country={country} />}
+        </div>
+        <p className="text-[13px] font-light text-slate-400 leading-relaxed">
+          {narrative.narrativa}
+        </p>
+        <div className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 self-start px-2.5 py-1 rounded-sm bg-slate-900/60 border border-slate-700/60">
+          <span className="text-[11px] font-mono text-slate-300">
+            Riesgo{' '}
+            <span className="text-purple-300 tabular-nums">
+              {narrative.chip.score}
+            </span>
+          </span>
+          {showDrivers && (
+            <>
+              <span className="text-[11px] font-mono text-slate-300">
+                Confiabilidad{' '}
+                <span className="text-purple-400 tabular-nums">
+                  {narrative.chip.confiabilidad}
+                </span>
+              </span>
+              <span className="text-[11px] font-mono text-slate-300">
+                Alertas externas{' '}
+                <span className="text-purple-400 tabular-nums">
+                  {narrative.chip.alertasExternas}
+                </span>
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
