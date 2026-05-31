@@ -856,11 +856,20 @@ export async function computeDepartmentParticipation(
   accountId: string,
   campaignId: string
 ): Promise<DeptParticipation> {
+  // UNIVERSO = scope de la CAMPAÑA, no de la cuenta. Decisión arquitectónica
+  // 2026-05-31: deptos no invitados a esta campaña son OTRO MUNDO, no parte
+  // del análisis de ESTA campaña. Supersede el universo company-wide v3
+  // (que contaminaba coverage, riskScores, classifyD4, gerencia_muda_*).
+  //
+  // Filtro: `participants: { some: { campaignId } }` exige que el depto tenga
+  // al menos un participante en la campaña. Mantiene `accountId` (tenant)
+  // y `isActive` (no contar deptos archivados).
   const universoRaw = await prisma.department.findMany({
     where: {
       accountId,
       isActive: true,
       employees: { some: { isActive: true } },
+      participants: { some: { campaignId } },
     },
     select: {
       id: true,
@@ -906,8 +915,10 @@ export async function computeDepartmentParticipation(
 
 /** Umbral de participación AS bajo el cual un depto cubierto se considera
  *  "sin voz real" (Decisión #2 Plan de Cierre — Morrison & Milliken,
- *  <60% = Cultura del Silencio; 50% conservador). */
-const SILENCIO_PARTICIPATION_THRESHOLD = 50;
+ *  <60% = Cultura del Silencio; 50% conservador).
+ *  Exportado como umbral canónico compartido — consumido por el deriver de
+ *  Beat 1 (`deriveBeat1Slots`). Unidad: percentage (0-100), NO fracción. */
+export const SILENCIO_PARTICIPATION_THRESHOLD = 50;
 
 /** Peso mínimo de alerta externa activa para gatillar la sexta.
  *  Escala PESO_BASE_ALERTA es 1-3; "medio o superior" del spec §6.2 = ≥ 2. */

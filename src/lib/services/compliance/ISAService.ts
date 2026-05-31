@@ -179,6 +179,12 @@ export function aggregateOrgIsaComponents(
 
 export type ISARiskLevel = 'saludable' | 'observacion' | 'riesgo' | 'critico';
 
+// FUENTE ÚNICA de las bandas ISA. Todo clasificador delega aquí — NO hardcodear cortes.
+// Cortes (display 0-100 = Likert reescalado, (raw/5)*100): 80 = raw 4.0 ("de acuerdo") /
+//   60 = raw 3.0 (neutral) / 40 = raw 2.0. Un promedio ≥4.0 = lectura favorable (convención clima).
+// PENDIENTE — revisión metodológica: es convención Likert, NO validada para instrumento
+//   psicosocial Ley Karin. Evaluar contra banda SUSESO-ISTAS21 (tertiles). Si cambia,
+//   se cambia ACÁ y todo el módulo lo hereda.
 export function getISARiskLevel(isa: number): ISARiskLevel {
   if (isa >= 80) return 'saludable';
   if (isa >= 60) return 'observacion';

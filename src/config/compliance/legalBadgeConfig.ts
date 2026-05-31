@@ -25,6 +25,36 @@ export function getLegalBadgeText(country: string | null | undefined): string {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// MARCO LEGAL — nombre limpio para PROSA narrativa (sin "Riesgo" ni alarma)
+// ════════════════════════════════════════════════════════════════════════════
+// Distinto de LEGAL_BADGE_BY_COUNTRY (que tiene el chip ámbar con "Riesgo...").
+// Acá vive el NOMBRE del marco para inyectar en oraciones tipo "bajo {marco}"
+// — debe leer natural en prosa, sin tono de alarma.
+//
+// Consumidor: ortogonal Ley Karin en Beat 1 (ActoAmbiente.tsx).
+//   CL  → "bajo Ley Karin"
+//   PE/CO/MX/default → "bajo la normativa laboral vigente"
+// ════════════════════════════════════════════════════════════════════════════
+
+export const LEGAL_MARCO_NAME_BY_COUNTRY: Record<string, string> = {
+  CL: 'Ley Karin',
+  // Resto cae al default — la prosa lee "bajo la normativa laboral vigente",
+  // consistente con el wording del email greeting (LEGAL_EMAIL_LABELS.default).
+  default: 'la normativa laboral vigente',
+};
+
+/** Nombre limpio del marco legal para uso EN PROSA. Lee natural en
+ *  "...bajo {marco}..." sin agregar tono de alarma. NO mezclar con
+ *  `getLegalBadgeText` (ese trae "Riesgo..." para el chip UI). */
+export function getLegalMarcoName(country: string | null | undefined): string {
+  if (!country) return LEGAL_MARCO_NAME_BY_COUNTRY.default;
+  return (
+    LEGAL_MARCO_NAME_BY_COUNTRY[country.toUpperCase()] ??
+    LEGAL_MARCO_NAME_BY_COUNTRY.default
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // LEGAL EMAIL LABELS — variantes por país para emails de Ambiente Sano
 // ════════════════════════════════════════════════════════════════════════════
 // 3 variantes (badge corto, greeting completo, preview text) per país.
