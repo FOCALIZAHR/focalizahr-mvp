@@ -101,6 +101,12 @@ export interface ExternalAlertSummary {
 /** Ventana de 90 días para el bump de alertas Onboarding bumpables. */
 const BUMP_90D_LOOKBACK_MS = 90 * 24 * 3600 * 1000;
 
+/** Meses hacia atrás para la ventana de alertas externas (exit + onboarding).
+ *  Criterio por FECHA, no por estado: toda alerta creada en los últimos 12
+ *  meses cuenta, sin importar status ni alertType. Mismo patrón que
+ *  `DENUNCIA_WINDOW_MONTHS` del Gate 1. */
+const ALERTAS_WINDOW_MONTHS = 12;
+
 /** Threshold del bump 90d (≥N casos del mismo tipo activan el bump). */
 const BUMP_90D_THRESHOLD = 2;
 
@@ -108,7 +114,8 @@ const BUMP_90D_THRESHOLD = 2;
  * Carga `ExternalAlertSummary[]` por depto en 2 queries totales (exit + onboarding),
  * más una groupBy de bump 90d cuando hay onboarding bumpable presente.
  *
- * Modo Fase 2: solo alertas activas (`pending|acknowledged`), `factorDecaimiento = 1.0`.
+ * Ventana por FECHA: alertas creadas en los últimos 12 meses, sin importar
+ * estado ni alertType (`factorDecaimiento = 1.0`).
  * Equivalencia: replica la lógica de `loadDepartmentExternalAlerts` per-dept
  * pero en bulk para el universo entero — incluye deptos sin ComplianceAnalysis
  * (los del silencio), que hoy no se cargan en ningún lado.
@@ -127,23 +134,25 @@ export async function loadAlertasByDeptBulk(
 
   if (deptIds.length === 0) return out;
 
-  const activeStatus = { in: ['pending', 'acknowledged'] };
+  // Ventana de 12 meses por fecha de creación (no por estado).
+  const cutoff12m = new Date(now);
+  cutoff12m.setMonth(cutoff12m.getMonth() - ALERTAS_WINDOW_MONTHS);
 
-  // Query 1 — Exit alerts activas, filtradas al universo.
+  // Query 1 — Exit alerts de los últimos 12 meses, filtradas al universo.
   const exitAlerts = await prisma.exitAlert.findMany({
     where: {
       accountId,
       departmentId: { in: deptIds },
-      status: activeStatus,
+      createdAt: { gte: cutoff12m },
     },
     select: { departmentId: true, alertType: true },
   });
 
-  // Query 2 — Onboarding alerts activas vía journey.departmentId.
+  // Query 2 — Onboarding alerts de los últimos 12 meses vía journey.departmentId.
   const journeyAlerts = await prisma.journeyAlert.findMany({
     where: {
       accountId,
-      status: activeStatus,
+      createdAt: { gte: cutoff12m },
       journey: { departmentId: { in: deptIds } },
     },
     select: {
