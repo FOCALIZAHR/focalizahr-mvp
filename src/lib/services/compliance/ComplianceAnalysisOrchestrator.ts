@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma';
 import {
   calculateSafetyScoreForDepartment,
   calculateSafetyScores,
+  PRIVACY_THRESHOLD,
 } from '@/lib/services/SafetyScoreService';
 import { analyzeDepartmentPatterns } from './PatronesLLMService';
 import { analyzeOrgMetaPatterns } from './MetaAnalisisLLMService';
@@ -63,7 +64,8 @@ interface DepartmentResultPayload {
 }
 
 const AMBIENTE_SANO_SLUG = 'pulso-ambientes-sanos';
-const PRIVACY_THRESHOLD = 5;
+// PRIVACY_THRESHOLD importado desde SafetyScoreService (home canónica).
+// Misma semántica: piso mínimo de unidades identificables antes de exponer/procesar.
 const P1_QUESTION_ORDER = 1;
 const MAX_RETRIES = 3;
 

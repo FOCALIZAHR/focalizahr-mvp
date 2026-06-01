@@ -921,8 +921,10 @@ export async function computeDepartmentParticipation(
 export const SILENCIO_PARTICIPATION_THRESHOLD = 50;
 
 /** Peso mínimo de alerta externa activa para gatillar la sexta.
- *  Escala PESO_BASE_ALERTA es 1-3; "medio o superior" del spec §6.2 = ≥ 2. */
-const SILENCIO_PESO_MIN = 2.0;
+ *  Escala PESO_BASE_ALERTA es 1-3; "medio o superior" del spec §6.2 = ≥ 2.
+ *  Exportado — reusado por el motor puro `detectSilencioConVozExterna`
+ *  (sexta + OTRO MUNDO) y por el filtro en DB de `computeOtroMundo`. */
+export const SILENCIO_PESO_MIN = 2.0;
 
 /**
  * Crea alertas `silencio_con_voz_externa` para departamentos del universo

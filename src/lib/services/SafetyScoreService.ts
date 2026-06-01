@@ -60,7 +60,12 @@ const AMBIENTE_SANO_SLUG = 'pulso-ambientes-sanos';
 
 const INVERSE_QUESTIONS = new Set([4, 8]);
 const SAFETY_QUESTION_ORDERS = [2, 3, 4, 5, 7, 8];
-const PRIVACY_THRESHOLD = 5;
+/** Piso de privacidad: mínimo de unidades identificables (respondentes/textos)
+ *  bajo el cual no se expone/procesa información. Canónica del módulo
+ *  Ambiente Sano — consumida también por `ComplianceAnalysisOrchestrator`
+ *  (piso de respuestas P1 antes de mandar al LLM) y por el motor de la
+ *  sexta alerta (`detectSilencioConVozExterna`). NO duplicar el 5. */
+export const PRIVACY_THRESHOLD = 5;
 const RISK_THRESHOLD = 3.0;
 const CRITICAL_THRESHOLD = 2.5;
 

@@ -265,10 +265,8 @@ export { W_C };
 // ════════════════════════════════════════════════════════════════════════════
 
 import type { CoverageDeptItem } from './CoverageAnalysisService';
-import type {
-  DepartmentRiskScore,
-  DepartmentRiskBucket,
-} from '@/types/compliance';
+import type { DepartmentRiskScore } from '@/types/compliance';
+import { bucketFromAnalyzed } from './buckets';
 
 /** Peso máximo del driver voz externa. Diseño cerrado. */
 const W_A = 50;
@@ -277,15 +275,9 @@ const K_A = 3;
 /** Valor del piso de denuncia. Diseño cerrado (entrada a banda crítica). */
 const PISO_DENUNCIA = 75;
 
-/** Mapeo `CoverageDeptItem.analyzed` → bucket del score. */
-function bucketFromAnalyzed(
-  analyzed: CoverageDeptItem['analyzed'],
-): DepartmentRiskBucket {
-  if (analyzed === 'completed') return 'con_isa';
-  if (analyzed === 'not_invited') return 'no_invitado';
-  // 'skipped_privacy' | 'no_response' → invitado, sin ISA al lado
-  return 'sub_threshold';
-}
+// `bucketFromAnalyzed` vive en `./buckets` como fuente única del mapeo
+// canónico analyzed→bucket. Consumidores: este service + el motor de la
+// sexta/OTRO MUNDO (`detectSilencioConVozExterna`).
 
 /**
  * Computa el score de riesgo por dept para todo el universo (los items que

@@ -22,6 +22,8 @@
 
 import { prisma } from '@/lib/prisma';
 import { computeDepartmentParticipation } from './ComplianceAlertService';
+import { loadAlertasByDeptBulk } from './DepartmentRiskScoreService';
+import type { SilencioCandidate } from './detectSilencioConVozExterna';
 
 // ════════════════════════════════════════════════════════════════════════════
 // CONSTANTES PROVISIONALES
@@ -393,4 +395,129 @@ export async function computeCoverageAnalysis(
     avgEisParticipantes: round1(eisP),
     avgEisNoParticipantes: round1(eisNP),
   };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// OTRO MUNDO — Fuente paralela company-scope (deptos no invitados a la campaña)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Spec: `.claude/tasks/MODELO_SEXTA_OTRO_MUNDO_AMBIENTE_SANO.md` §6 (d).
+//
+// Por qué existe esto: post-fix cf0be7c, el universo campaign-scope
+// (`computeDepartmentParticipation`) NUNCA incluye deptos con `invited === 0`.
+// La rama `analyzed='not_invited'` quedó como código muerto en el path de
+// campaña — `coverage.deptosCobertura[]` y `riskScores[]` no traen OTRO MUNDO.
+// Para detectar el punto ciego ("hay señal externa en deptos que ni siquiera
+// participaron del estudio") necesitamos una fuente PARALELA company-scope.
+//
+// Diseño:
+//   1. Universo company-scope (deptos activos con empleados activos).
+//   2. Setdiff vs universo campaign-scope (reuso de `computeDepartmentParticipation`).
+//   3. Carga de externas con `loadAlertasByDeptBulk` — el MISMO loader que
+//      alimenta `riskScores[].alertas[]` y por lo tanto la SEXTA post-refactor.
+//      UN solo loader compartido → paso b unifica la ventana desde un único
+//      punto, sin múltiples superficies.
+//   4. Retorno de `SilencioCandidate[]` con `analyzed: 'not_invited'`. El
+//      filtro `pesoEfectivo >= umbral` lo hace el MOTOR puro
+//      (`detectSilencioConVozExterna`) — fuente única del filtrado de peso.
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Loader default del universo company-scope. Exportado solo para que el
+ *  test pueda referenciar su shape; los consumidores reales usan
+ *  `computeOtroMundo` que ya lo invoca por default. */
+async function defaultLoadCompanyDeptos(
+  accountId: string,
+): Promise<Array<{ id: string; displayName: string }>> {
+  // Mismas reglas que `computeDepartmentParticipation` excepto el filtro
+  // `participants: { some: { campaignId } }` — esa es justo la diferencia.
+  return prisma.department.findMany({
+    where: {
+      accountId,
+      isActive: true,
+      employees: { some: { isActive: true } },
+    },
+    select: { id: true, displayName: true },
+  });
+}
+
+/** Dependencias inyectables de `computeOtroMundo`. **Solo testing.** En
+ *  producción usar la firma de 3 args (los defaults apuntan a los loaders
+ *  canónicos). */
+export interface ComputeOtroMundoDeps {
+  loadCampaignUniverse: typeof computeDepartmentParticipation;
+  loadCompanyDeptos: typeof defaultLoadCompanyDeptos;
+  loadAlertasByDept: typeof loadAlertasByDeptBulk;
+}
+
+/**
+ * Identifica deptos del account que NO fueron invitados a la campaña pero
+ * tienen señal externa activa. Output listo para alimentar al motor puro
+ * `detectSilencioConVozExterna(candidatos, 'no_invitado', umbralPeso)`.
+ *
+ * RBAC: NO filtra por scope — el gate por rol vive en el caller (`route.ts`).
+ * OTRO MUNDO es CEO/admin-only (patrón Beat 5); para AREA_MANAGER el caller
+ * NO invoca esta función (return `[]` directo).
+ *
+ * @param accountId  Cuenta del caller.
+ * @param campaignId Campaña contra la que se calcula el setdiff.
+ * @param now        Reloj inyectable (testing). Default: new Date().
+ * @param __deps     **Solo testing** — overrides de loaders. NO usar en
+ *                   producción; los defaults son los loaders canónicos.
+ */
+export async function computeOtroMundo(
+  accountId: string,
+  campaignId: string,
+  now: Date = new Date(),
+  __deps?: Partial<ComputeOtroMundoDeps>,
+): Promise<SilencioCandidate[]> {
+  const loadCampaignUniverse =
+    __deps?.loadCampaignUniverse ?? computeDepartmentParticipation;
+  const loadCompanyDeptos =
+    __deps?.loadCompanyDeptos ?? defaultLoadCompanyDeptos;
+  const loadAlertasByDept =
+    __deps?.loadAlertasByDept ?? loadAlertasByDeptBulk;
+
+  // 1. Universo campaign-scope (fuente única, ya filtrado por participants).
+  const { universo: campaignUniverse } = await loadCampaignUniverse(
+    accountId,
+    campaignId,
+  );
+  const campaignDeptIds = new Set(campaignUniverse.map((d) => d.id));
+
+  // 2. Universo company-scope (deptos activos con empleados activos).
+  const companyDepts = await loadCompanyDeptos(accountId);
+
+  // 3. Setdiff: deptos en company que NO están en la campaña.
+  const noInvitadoDepts = companyDepts.filter(
+    (d) => !campaignDeptIds.has(d.id),
+  );
+  if (noInvitadoDepts.length === 0) return [];
+
+  const noInvitadoDeptIds = noInvitadoDepts.map((d) => d.id);
+
+  // 4. Carga bulk reusando el loader canónico — mismo que alimenta
+  //    `riskScores[].alertas[]` (consumido por SEXTA tras Paso 5). UN solo
+  //    loader compartido para ambas superficies. `ExternalAlertSummary` es
+  //    estructuralmente idéntico a `DepartmentRiskAlertItem` (mismo shape).
+  const alertasByDept = await loadAlertasByDept(
+    accountId,
+    noInvitadoDeptIds,
+    now,
+  );
+
+  // 5. Emitir SilencioCandidate[] — solo deptos con ≥1 alerta cargada.
+  //    El filtro fino `pesoEfectivo >= umbral` lo decide el motor puro.
+  const result: SilencioCandidate[] = [];
+  for (const dept of noInvitadoDepts) {
+    const alertas = alertasByDept.get(dept.id) ?? [];
+    if (alertas.length === 0) continue;
+    result.push({
+      departmentId: dept.id,
+      departmentName: dept.displayName,
+      analyzed: 'not_invited',
+      alertas,
+    });
+  }
+
+  return result;
 }
