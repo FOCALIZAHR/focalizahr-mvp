@@ -108,7 +108,7 @@ export const NARRATIVE_TEMPLATES: Record<LenteId, string> = {
 
   l2_zombie: `Tiene {N_PERSONAS} personas que rinden excelente hoy en cargos con {EXPOSICION_PROMEDIO}% de probabilidad de automatización. La evidencia de sus competencias dice que no podrán re-entrenarse. Sus mejores ejecutores de hoy son su mayor pasivo mañana.`,
 
-  l3_adopcion: `{AREA} concentra el {PCT_POTENCIAL}% del potencial de ahorro vía automatización de su empresa. Pero su clima organizacional es {CLIMA}/5 — el más bajo. La tecnología no resuelve la falta de liderazgo. La amplifica.`,
+  l3_adopcion: `{AREA} concentra el {PCT_POTENCIAL}% de tu costo de trabajo expuesto a la IA, el más alto de tu empresa. Y su clima es el más bajo: {CLIMA}/5. Automatizar, reconvertir o potenciar ese trabajo: cualquier camino empieza acá. Y cualquiera pesa más donde el clima ya está bajo. El cambio prende o muere según el terreno que lo recibe. Tu mayor oportunidad, en tu terreno más difícil.`,
 
   l4_fantasma: `Tiene {N_PARES} pares de cargos con títulos distintos que comparten más del {OVERLAP}% de sus tareas operativas. El {PCT_AUTOMATIZABLE}% de esas tareas compartidas serán automatizadas. Está pagando doble por trabajo que ya es redundante y pronto será irrelevante.`,
 

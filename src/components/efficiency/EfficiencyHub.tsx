@@ -34,6 +34,7 @@ import { LENTES_META } from '@/lib/services/efficiency/EfficiencyNarrativeEngine
 // Componentes específicos por lente
 import { L1CostoInercia } from './lentes/L1CostoInercia'
 import { L2TalentoZombie } from './lentes/L2TalentoZombie'
+import { L3RiesgoAdopcion } from './lentes/L3RiesgoAdopcion'
 import { L4ArquitecturaLiderazgo } from './lentes/L4ArquitecturaLiderazgo'
 import { L5BrechaProductividad } from './lentes/L5BrechaProductividad'
 import { L7L8MapaTalento } from './lentes/L7L8MapaTalento'
@@ -49,6 +50,7 @@ import type { LenteComponentProps } from './lentes/_LentePlaceholder'
 const LENTE_COMPONENTS: Partial<Record<LenteId, React.FC<LenteComponentProps>>> = {
   l1_inercia: L1CostoInercia,
   l2_zombie: L2TalentoZombie,
+  l3_adopcion: L3RiesgoAdopcion,
   l4_fantasma: L4ArquitecturaLiderazgo,
   l5_brecha: L5BrechaProductividad,
   l7_fuga: L7L8MapaTalento,
@@ -62,6 +64,7 @@ const LENTE_COMPONENTS: Partial<Record<LenteId, React.FC<LenteComponentProps>>> 
 const LENTES_CON_LAYOUT: Set<LenteId> = new Set([
   'l1_inercia',
   'l2_zombie',
+  'l3_adopcion',
   'l4_fantasma',
   'l5_brecha',
   'l9_pasivo',
@@ -217,6 +220,7 @@ export function EfficiencyHub() {
                         ws.activeLenteId && ws.clearLente(ws.activeLenteId)
                       }
                       gerenciasExcluidas={ws.gerenciasExcluidas}
+                      toggleGerenciaExclusion={ws.toggleGerenciaExclusion}
                       allLentes={ws.data.lentes}
                       onNextLente={ws.nextLenteInFamilia}
                       proximoLenteTitulo={proximoLenteTitulo}

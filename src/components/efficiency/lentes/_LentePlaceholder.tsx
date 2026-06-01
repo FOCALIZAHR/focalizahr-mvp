@@ -35,6 +35,10 @@ export interface LenteComponentProps {
   onRemove: (key: string) => void
   onClearLente: () => void
   gerenciasExcluidas: Set<string>
+  /** Toggle de exclusión por departmentId. Usado por L3 (Riesgo de Adopción)
+   *  para que el CEO cure el Set desde el Quirófano. Otros lentes lo dejan
+   *  pasar sin invocarlo. */
+  toggleGerenciaExclusion?: (departmentId: string) => void
   allLentes?: Record<LenteId, LenteAPI>
   onNextLente?: () => void
   proximoLenteTitulo?: string
