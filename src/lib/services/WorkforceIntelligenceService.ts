@@ -250,6 +250,7 @@ export interface SeveranceLiabilityResult {
 
 export interface RetentionEntry {
   employeeId: string
+  departmentId: string
   employeeName: string
   position: string
   departmentName: string
@@ -1077,6 +1078,7 @@ export class WorkforceIntelligenceService {
 
         return {
           employeeId: e.employeeId,
+          departmentId: e.departmentId,
           employeeName: e.employeeName,
           position: e.position,
           departmentName: e.departmentName,

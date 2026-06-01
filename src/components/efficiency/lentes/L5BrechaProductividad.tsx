@@ -96,6 +96,7 @@ interface TalentNarrativeBrief {
 
 interface PersonL5 {
   employeeId: string
+  departmentId: string
   employeeName: string
   position: string
   departmentName: string
@@ -260,7 +261,7 @@ export function L5BrechaProductividad({
   const personsSorted = useMemo(() => {
     if (!detalle?.persons) return []
     return [...detalle.persons]
-      .filter(p => !gerenciasExcluidas.has(p.departmentName))
+      .filter(p => !gerenciasExcluidas.has(p.departmentId))
       .sort((a, b) => a.retentionScore - b.retentionScore)
       .slice(0, 15)
   }, [detalle, gerenciasExcluidas])
