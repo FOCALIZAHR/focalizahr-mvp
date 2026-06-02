@@ -26,7 +26,11 @@ import { AlertTriangle, Check, Circle, MapPin } from 'lucide-react'
 import { LenteLayout } from './LenteLayout'
 import { LenteCard } from './LenteCard'
 import type { LenteComponentProps } from './_LentePlaceholder'
-import { formatPct } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
+import {
+  formatPct,
+  climaFuenteLabel,
+  type ClimaFuente,
+} from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
 
 // ════════════════════════════════════════════════════════════════════════════
 // HELPERS DE FORMATO (clonados de L9)
@@ -139,12 +143,15 @@ export function L3RiesgoAdopcion({
 
   // Hero number sale del resolver (string ya formateado, p.ej. "42%")
   const heroValue = lente.datos.PCT_POTENCIAL ?? '0%'
-  const heroUnit = `de tu costo de trabajo expuesto a la IA, el más alto de tu empresa. Clima: ${lente.datos.CLIMA ?? '0'}/5, el más bajo.`
+  // Caption del hero usa el label corto de la fuente real del peor depto
+  // (hoy: "Compromiso"; cuando exista clima: "Pulso de clima" / "Clima").
+  const peorFuenteLabel = climaFuenteLabel(detalle.peor?.climaFuente as ClimaFuente | null)
+  const heroUnit = `de tu costo de trabajo expuesto a la IA, el más alto de tu empresa. ${peorFuenteLabel.corto}: ${lente.datos.CLIMA ?? '0'}/5, el más bajo.`
 
   // Totalizador del Quirófano
   const totalizadorMetricas: Array<{ label: string; value: string; tint?: 'default' | 'accent' | 'emerald' | 'warning' }> = [
     {
-      label: 'Gerencias en espera',
+      label: 'Departamentos en espera',
       value: String(gerenciasEnEspera.length),
       tint: 'accent',
     },
@@ -154,24 +161,27 @@ export function L3RiesgoAdopcion({
       tint: 'warning',
     },
     {
-      label: 'Clima promedio en espera',
+      label: 'Resultado promedio en espera',
       value:
-        climaPromedioEspera !== null ? `${formatClima(climaPromedioEspera)}/5` : '—',
+        climaPromedioEspera !== null ? `${formatClima(climaPromedioEspera)}/5` : 'n/d',
     },
   ]
 
   // Checkpoint informativo (NO carrito). Solo si hay exclusiones.
   const checkpointSummary = hasInteraction
     ? {
-        items: gerenciasEnEspera.map(g => ({
-          label: formatLabel(g.departmentName),
-          detail: `${formatClima(g.climaScale5)}/5 clima`,
-          value: `${formatPct(g.pctPotencial)} potencial`,
-        })),
+        items: gerenciasEnEspera.map(g => {
+          const fuente = climaFuenteLabel(g.climaFuente as ClimaFuente | null)
+          return {
+            label: formatLabel(g.departmentName),
+            detail: `${fuente.corto} ${formatClima(g.climaScale5)}/5`,
+            value: `${formatPct(g.pctPotencial)} potencial`,
+          }
+        }),
         totalLabel: `${gerenciasEnEspera.length} ${
-          gerenciasEnEspera.length === 1 ? 'gerencia' : 'gerencias'
+          gerenciasEnEspera.length === 1 ? 'departamento' : 'departamentos'
         } en espera: el terreno primero`,
-        totalValue: `${formatPct(oportunidadEnPausa)} de la oportunidad, en pausa hasta que el clima coopere`,
+        totalValue: `${formatPct(oportunidadEnPausa)} de la oportunidad, en pausa hasta que el terreno mejore`,
       }
     : undefined
 
@@ -180,8 +190,8 @@ export function L3RiesgoAdopcion({
       familiaAccent={L3_ACCENT}
       heroValue={heroValue}
       heroUnit={heroUnit}
-      narrativaPuente="Cada gerencia combina distinto la oportunidad y el terreno. Donde el clima está más bajo, forzar el cambio no lo acelera. Lo frena. La pregunta no es si actuar, sino dónde el terreno todavía no está listo para recibirlo."
-      ctaSimularLabel="Revisar gerencias"
+      narrativaPuente="Cada departamento combina distinto la oportunidad y el terreno. Donde el terreno es más frágil, forzar el cambio no lo acelera. Lo frena. La pregunta no es si actuar, sino dónde todavía no está listo para recibirlo."
+      ctaSimularLabel="Revisar departamentos"
       ctaQuirofanoEyebrow="EXPEDIENTE DE TERRENO"
       hasInteraction={hasInteraction}
       checkpointSummary={checkpointSummary}
@@ -234,7 +244,7 @@ function HallazgoScatter({ ranking }: { ranking: EntradaRanking[] }) {
   const yOf = (clima: number) =>
     PAD_T + (1 - Math.max(0, Math.min(5, clima)) / 5) * yRange
 
-  // Cuadrante peligroso: exp > 0.5 + clima < CLIMA_CRITICO. Bg sutil.
+  // Cuadrante peligroso: exp > 0.5 + resultado < CLIMA_CRITICO. Bg sutil.
   const dangerX = xOf(0.5)
   const dangerY = yOf(CLIMA_CRITICO)
   const dangerW = SCATTER_W - PAD_R - dangerX
@@ -250,12 +260,12 @@ function HallazgoScatter({ ranking }: { ranking: EntradaRanking[] }) {
         EL TERRENO
       </p>
       <h3 className="text-xl md:text-2xl font-extralight text-white mb-4 leading-tight">
-        Cada gerencia,{' '}
+        Cada departamento,{' '}
         <span className="fhr-title-gradient">su combinación</span>
       </h3>
       <p className="text-sm text-slate-400 font-light leading-relaxed max-w-2xl mb-6">
-        Cada punto es una gerencia. Cuanto más a la derecha, más trabajo
-        expuesto a la IA. Cuanto más abajo, peor el clima para sostener
+        Cada punto es un departamento. Cuanto más a la derecha, más trabajo
+        expuesto a la IA. Cuanto más abajo, peor el terreno para sostener
         un cambio. El cuadrante inferior derecho es donde la oportunidad
         cae sobre el terreno menos preparado.
       </p>
@@ -266,7 +276,7 @@ function HallazgoScatter({ ranking }: { ranking: EntradaRanking[] }) {
           width="100%"
           className="max-w-full"
           role="img"
-          aria-label="Distribución de gerencias por exposición a IA y clima organizacional"
+          aria-label="Distribución de departamentos por exposición a IA y terreno organizacional"
         >
           {/* Cuadrante peligroso */}
           <rect
@@ -341,7 +351,7 @@ function HallazgoScatter({ ranking }: { ranking: EntradaRanking[] }) {
             fontSize={10}
             fontFamily="ui-sans-serif, system-ui"
           >
-            buen clima
+            buen terreno
           </text>
           <text
             x={12}
@@ -350,10 +360,10 @@ function HallazgoScatter({ ranking }: { ranking: EntradaRanking[] }) {
             fontSize={10}
             fontFamily="ui-sans-serif, system-ui"
           >
-            clima bajo
+            terreno bajo
           </text>
 
-          {/* Dots por gerencia */}
+          {/* Dots por departamento */}
           {ranking.map(g => {
             const cx = xOf(g.avgExposure)
             const cy = yOf(g.climaScale5)
@@ -375,7 +385,8 @@ function HallazgoScatter({ ranking }: { ranking: EntradaRanking[] }) {
                 />
                 <title>
                   {formatLabel(g.departmentName)} · exposición{' '}
-                  {formatPct(g.avgExposure * 100)} · clima{' '}
+                  {formatPct(g.avgExposure * 100)} ·{' '}
+                  {climaFuenteLabel(g.climaFuente as ClimaFuente | null).narrativa}{' '}
                   {formatClima(g.climaScale5)}/5 · potencial{' '}
                   {formatPct(g.pctPotencial)}
                 </title>
@@ -413,36 +424,39 @@ function ExpedienteLateral({
         </p>
         <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
           {criticasCount === 1
-            ? 'Gerencia en zona crítica'
-            : 'Gerencias en zona crítica'}
+            ? 'Departamento en zona crítica'
+            : 'Departamentos en zona crítica'}
         </p>
       </div>
 
-      {peor && (
-        <>
-          <div className="h-px bg-slate-800/40" aria-hidden />
-          <div>
-            <p className="text-[10px] uppercase tracking-widest text-slate-500 font-medium mb-2">
-              La más expuesta sobre el terreno más bajo
-            </p>
-            <p className="text-sm font-light text-white leading-snug">
-              {formatLabel(peor.departmentName)}
-            </p>
-            <p className="text-xs text-slate-400 font-light mt-1.5 tabular-nums">
-              Clima {formatClima(peor.climaScale5)}/5 ·{' '}
-              {formatPct(peor.pctPotencial)} del potencial
-            </p>
-          </div>
-        </>
-      )}
+      {peor && (() => {
+        const fuente = climaFuenteLabel(peor.climaFuente as ClimaFuente | null)
+        return (
+          <>
+            <div className="h-px bg-slate-800/40" aria-hidden />
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-medium mb-2">
+                El más expuesto sobre el terreno más bajo
+              </p>
+              <p className="text-sm font-light text-white leading-snug">
+                {formatLabel(peor.departmentName)}
+              </p>
+              <p className="text-xs text-slate-400 font-light mt-1.5 tabular-nums">
+                {fuente.corto} {formatClima(peor.climaScale5)}/5 ·{' '}
+                {formatPct(peor.pctPotencial)} del potencial
+              </p>
+            </div>
+          </>
+        )
+      })()}
 
-      {usandoFallback && (
+      {peor && (peor.climaFuente === 'engagement_aae' || usandoFallback) && (
         <>
           <div className="h-px bg-slate-800/40" aria-hidden />
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-3.5 h-3.5 text-slate-500 flex-shrink-0 mt-0.5" />
             <p className="text-[11px] font-light text-slate-400 leading-snug">
-              Clima estimado desde engagement (sin pulso de clima dedicado).
+              {climaFuenteLabel(peor.climaFuente as ClimaFuente | null).largo}
             </p>
           </div>
         </>
@@ -452,7 +466,7 @@ function ExpedienteLateral({
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// ACTO 3 — QUIRÓFANO: lista de gerencias con toggle En ruta / En espera
+// ACTO 3 — QUIRÓFANO: lista de departamentos con toggle En ruta / En espera
 // ════════════════════════════════════════════════════════════════════════════
 
 interface QuirofanoGerenciasProps {
@@ -478,18 +492,17 @@ function QuirofanoGerencias({
             transition={{ duration: 0.25 }}
             className="text-sm md:text-base font-light text-slate-300 italic leading-relaxed max-w-3xl"
           >
-            Dejar una gerencia en espera la saca de las decisiones de cambio
-            de los demás lentes. No la castigas, la proteges hasta que el
-            terreno la sostenga. Las de clima más crítico ya vienen marcadas.
-            Tú confirmas o ajustas.
+            Dejar un departamento en espera lo saca de las decisiones de cambio
+            de los demás lentes. No lo castigas, lo proteges hasta que el
+            terreno lo sostenga. Tú confirmas o ajustas.
           </motion.p>
         </AnimatePresence>
       </div>
 
-      {/* Lista de gerencias */}
+      {/* Lista de departamentos */}
       <ul className="space-y-2.5" role="list">
         {ranking.map(g => (
-          <GerenciaRow
+          <DepartamentoRow
             key={g.departmentId}
             entrada={g}
             enEspera={gerenciasExcluidas.has(g.departmentId)}
@@ -501,7 +514,7 @@ function QuirofanoGerencias({
   )
 }
 
-function GerenciaRow({
+function DepartamentoRow({
   entrada,
   enEspera,
   onToggle,
@@ -510,6 +523,7 @@ function GerenciaRow({
   enEspera: boolean
   onToggle: ((departmentId: string) => void) | undefined
 }) {
+  const fuente = climaFuenteLabel(entrada.climaFuente as ClimaFuente | null)
   const handleClick = () => {
     if (!onToggle) return
     onToggle(entrada.departmentId)
@@ -522,6 +536,7 @@ function GerenciaRow({
         onClick={handleClick}
         aria-pressed={enEspera}
         disabled={!onToggle}
+        title={`${fuente.corto}: ${fuente.largo}`}
         className={`w-full text-left rounded-[20px] backdrop-blur-2xl transition-colors p-4 md:p-5 ${
           enEspera
             ? 'border border-solid border-amber-400/60 bg-amber-500/10'
@@ -546,8 +561,8 @@ function GerenciaRow({
                 )}
               </p>
               <p className="text-[11px] text-slate-400 font-light mt-1 tabular-nums">
-                Exposición {formatPct(entrada.avgExposure * 100)} · Clima{' '}
-                {formatClima(entrada.climaScale5)}/5 ·{' '}
+                Exposición {formatPct(entrada.avgExposure * 100)} ·{' '}
+                {fuente.corto} {formatClima(entrada.climaScale5)}/5 ·{' '}
                 {formatPct(entrada.pctPotencial)} del potencial ·{' '}
                 {entrada.headcount}{' '}
                 {entrada.headcount === 1 ? 'persona' : 'personas'}

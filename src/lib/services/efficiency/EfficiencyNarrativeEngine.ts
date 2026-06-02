@@ -22,6 +22,50 @@ export type LenteId =
 
 export type FamiliaId = 'capital_en_riesgo' | 'ruta_ejecucion' | 'costo_esperar'
 
+// ════════════════════════════════════════════════════════════════════════════
+// CLIMA — fuente y labels (capa de honestidad de fuente para L3)
+// ════════════════════════════════════════════════════════════════════════════
+// El producto de clima aún no está terminado. Hoy toda fuente cae a
+// fallback `engagement_aae` (proxy de compromiso, NO clima). Este helper
+// permite que la UI nombre la fuente real del número y que el motor
+// inyecte un token FUENTE en la narrativa.
+
+export type ClimaFuente = 'pulso' | 'experiencia' | 'engagement_aae'
+
+interface ClimaFuenteLabel {
+  /** Forma corta capitalizada para tags y caption. */
+  corto: string
+  /** Forma para narrativa (minúscula, encaja en oración). */
+  narrativa: string
+  /** Descriptor largo para tooltip o nota inline. */
+  largo: string
+}
+
+export const CLIMA_FUENTE_LABELS: Record<ClimaFuente, ClimaFuenteLabel> = {
+  pulso: {
+    corto: 'Pulso de clima',
+    narrativa: 'pulso de clima',
+    largo: 'pulso de clima',
+  },
+  experiencia: {
+    corto: 'Clima',
+    narrativa: 'clima',
+    largo: 'clima (experiencia)',
+  },
+  engagement_aae: {
+    corto: 'Compromiso',
+    narrativa: 'compromiso',
+    largo: 'promedio de compromiso individual (evaluación de talento). Sin medición de clima.',
+  },
+}
+
+/** Devuelve los labels (corto, narrativa, largo) para una fuente de clima.
+ *  Si la fuente es null o desconocida, default al fallback `engagement_aae`. */
+export function climaFuenteLabel(fuente: ClimaFuente | null | undefined): ClimaFuenteLabel {
+  if (!fuente) return CLIMA_FUENTE_LABELS.engagement_aae
+  return CLIMA_FUENTE_LABELS[fuente] ?? CLIMA_FUENTE_LABELS.engagement_aae
+}
+
 export interface LenteMeta {
   id: LenteId
   familia: FamiliaId
@@ -89,7 +133,7 @@ export const LENTES_META: Record<LenteId, LenteMeta> = {
     id: 'l3_adopcion',
     familia: 'costo_esperar',
     titulo: 'Riesgo de adopción',
-    subtitulo: 'Invertir donde el clima no cooperará',
+    subtitulo: 'Invertir donde el terreno no cooperará',
   },
   l9_pasivo: {
     id: 'l9_pasivo',
@@ -108,7 +152,7 @@ export const NARRATIVE_TEMPLATES: Record<LenteId, string> = {
 
   l2_zombie: `Tiene {N_PERSONAS} personas que rinden excelente hoy en cargos con {EXPOSICION_PROMEDIO}% de probabilidad de automatización. La evidencia de sus competencias dice que no podrán re-entrenarse. Sus mejores ejecutores de hoy son su mayor pasivo mañana.`,
 
-  l3_adopcion: `{AREA} concentra el {PCT_POTENCIAL}% de tu costo de trabajo expuesto a la IA, el más alto de tu empresa. Y su clima es el más bajo: {CLIMA}/5. Automatizar, reconvertir o potenciar ese trabajo: cualquier camino empieza acá. Y cualquiera pesa más donde el clima ya está bajo. El cambio prende o muere según el terreno que lo recibe. Tu mayor oportunidad, en tu terreno más difícil.`,
+  l3_adopcion: `{AREA} concentra el {PCT_POTENCIAL}% de tu costo de trabajo expuesto a la IA, el más alto de tu empresa. Y sus resultados en {FUENTE} son los más bajos: {CLIMA}/5. Automatizar, reconvertir o potenciar ese trabajo: cualquier camino empieza acá. Y cualquiera pesa más donde esas condiciones ya están abajo. El cambio prende o muere según el terreno que lo recibe. Tu mayor oportunidad, en tu terreno más difícil.`,
 
   l4_fantasma: `Tiene {N_PARES} pares de cargos con títulos distintos que comparten más del {OVERLAP}% de sus tareas operativas. El {PCT_AUTOMATIZABLE}% de esas tareas compartidas serán automatizadas. Está pagando doble por trabajo que ya es redundante y pronto será irrelevante.`,
 

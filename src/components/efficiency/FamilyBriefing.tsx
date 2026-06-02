@@ -107,7 +107,7 @@ export const FAMILIA_META: Record<FamiliaId, FamiliaMeta> = {
       }
     },
     conectores: [
-      'El clima bloquea la intervención — y mientras se espera a que mejore, el pasivo laboral crece.',
+      'El terreno bloquea la intervención. Y mientras se espera a que mejore, el pasivo laboral crece.',
     ],
   },
 }
@@ -154,13 +154,13 @@ const LENTE_COPY: Record<LenteId, LenteCopy> = {
   l3_adopcion: {
     titulo: 'Riesgo de adopción',
     queHay:
-      'Gerencias donde el clima no acompañará la inversión. La resistencia encarece cualquier cambio.',
+      'Departamentos donde el terreno no acompañará la inversión. La resistencia encarece cualquier cambio.',
     getQueEncontro: lente => {
-      const d = lente.detalle as { ranking?: unknown[] } | null
-      const n = d?.ranking?.length ?? 0
-      return `${formatInt(n)} ${n === 1 ? 'gerencia' : 'gerencias'} bajo el umbral de clima 2.5 / 5`
+      const area = (lente.datos.AREA as string) ?? 'el departamento con mayor potencial'
+      const fuente = (lente.datos.FUENTE as string) ?? 'compromiso'
+      return `${area}: tu mayor costo expuesto, con el ${fuente} más bajo.`
     },
-    queDecides: 'Intervenir clima antes de desplegar, o aceptar menor retorno.',
+    queDecides: 'Intervenir el terreno antes de desplegar, o aceptar menor retorno.',
   },
   l4_fantasma: {
     titulo: 'Arquitectura de Liderazgo',

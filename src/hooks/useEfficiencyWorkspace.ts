@@ -279,7 +279,12 @@ export function useEfficiencyWorkspace(): UseEfficiencyWorkspaceReturn {
           for (const g of ranking) {
             const climaScale5 = (g.climaScale5 as number) ?? 5
             const deptId = g.departmentId as string | null
-            if (climaScale5 < CLIMA_CRITICO_THRESHOLD && deptId) {
+            const usandoFallback = g.usandoFallback as boolean | undefined
+            // No auto-excluir sobre proxy (compromiso AAE). Solo cuando hay
+            // medición real de clima (pulso o experiencia). Hoy todo cae al
+            // fallback, así que el Set queda vacío al cargar — comportamiento
+            // correcto bajo la nueva semántica.
+            if (climaScale5 < CLIMA_CRITICO_THRESHOLD && deptId && usandoFallback === false) {
               iniciales.add(deptId)
             }
           }

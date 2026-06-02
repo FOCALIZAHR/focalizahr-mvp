@@ -36,6 +36,8 @@ import {
   formatPct,
   formatInt,
   formatDec,
+  climaFuenteLabel,
+  type ClimaFuente,
   type LenteId,
   type FamiliaId,
 } from './EfficiencyNarrativeEngine'
@@ -116,6 +118,30 @@ interface ClimaPorDept {
   usandoFallback: boolean
 }
 
+/**
+ * Resuelve clima por departamento con jerarquía de fuentes.
+ *
+ * ╭─────────────────────────────────────────────────────────────────╮
+ * │ ARQUITECTURA OBJETIVO (NO CONSTRUIR EN ESTE LOTE)               │
+ * ├─────────────────────────────────────────────────────────────────┤
+ * │ Hoy: producto de clima sin terminar → toda fuente cae al        │
+ * │ fallback `engagement_aae` (proxy, NO clima).                    │
+ * │                                                                  │
+ * │ Cuando el producto exista:                                      │
+ * │   1. Leer clima a NIVEL DEPARTAMENTO (no `level: 2` gerencia,   │
+ * │      que es el nivel equivocado actual de las queries pulso /   │
+ * │      experiencia).                                              │
+ * │   2. Cadena objetivo de fuentes:                                │
+ * │        clima del departamento (medición directa)                │
+ * │        → clima de la gerencia (fallback por privacidad n<5)     │
+ * │        → compromiso (último recurso, sin clima)                 │
+ * │   3. Idea ISA / Ambiente Sano como posible tier de fallback     │
+ * │      futuro entre experiencia y compromiso, con:                │
+ * │        - transparencia de fuente en UI                          │
+ * │        - como fallback, NO reemplazo del clima primario         │
+ * │        - respeta umbral de privacidad (n<5 suprime la fila)     │
+ * ╰─────────────────────────────────────────────────────────────────╯
+ */
 async function resolverClimaPorDepartamento(
   ctx: DiagnosticContext
 ): Promise<Map<string, ClimaPorDept>> {
@@ -391,9 +417,10 @@ export async function resolverLente(
         hayData,
         usandoFallback: peor?.usandoFallback,
         datos: {
-          AREA: peor?.departmentName ?? 'la gerencia con mayor potencial',
+          AREA: peor?.departmentName ?? 'el departamento con mayor potencial',
           PCT_POTENCIAL: formatPct(peor?.pctPotencial ?? 0),
           CLIMA: peor ? (Math.round(peor.climaScale5 * 10) / 10).toFixed(1) : '0',
+          FUENTE: climaFuenteLabel(peor?.climaFuente as ClimaFuente | null).narrativa,
         },
         detalle: {
           ranking: ordenados,
