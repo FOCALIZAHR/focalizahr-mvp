@@ -32,6 +32,13 @@ import {
 import { getHistoricalWeight } from '@/config/compliance/convergenciaWeights';
 import type { PatronAnalysisOutput } from './complianceTypes';
 import type { DepartmentSafetyScore } from '@/lib/services/SafetyScoreService';
+import { loadAlertasByDeptBulk } from './DepartmentRiskScoreService';
+import { bucketFromAnalyzed, deriveAnalyzed } from './buckets';
+import {
+  detectSilencioConVozExterna,
+  type SilencioCandidate,
+} from './detectSilencioConVozExterna';
+import type { CoverageAnalyzedStatus } from './CoverageAnalysisService';
 
 export interface AlertCreationResult {
   created: number;
@@ -928,13 +935,24 @@ export const SILENCIO_PESO_MIN = 2.0;
 
 /**
  * Crea alertas `silencio_con_voz_externa` para departamentos del universo
- * de la empresa que NO tienen voz confiable en Ambiente Sano (sin cobertura
- * o participación < 50%) PERO tienen señales externas activas de peso medio
- * o superior.
+ * **campaign-scope** que tienen señal externa activa de peso ≥ `SILENCIO_PESO_MIN`
+ * y caen en el bucket `sub_threshold` (`analyzed ∈ {skipped_privacy, no_response}`).
  *
- * Flujo separado de `createAlertsFromConvergencia` porque su universo son
- * los deptos NO cubiertos por el Motor A+B — no tienen `ComplianceAnalysis`
- * ni `DepartmentConvergencia`.
+ * Modelo de detección (spec MODELO_SEXTA_OTRO_MUNDO_AMBIENTE_SANO §1):
+ *   - `completed`        → EXCLUIDO (tiene ISA visible — está en el análisis normal).
+ *   - `skipped_privacy`  → SEXTA, sabor A (invitado, alguien respondió pero n<5 o
+ *                          análisis no completó).
+ *   - `no_response`      → SEXTA, sabor B (invitado, cero respuestas).
+ *   - `not_invited`      → fuera del universo campaign-scope post-cf0be7c; cae a
+ *                          OTRO MUNDO en `computeOtroMundo` (route.ts), no acá.
+ *
+ * Mata la rama anterior "cubierto + participación <50%": esos deptos tienen
+ * ISA visible (entran al análisis normal), no son sexta.
+ *
+ * Detección delegada al motor puro `detectSilencioConVozExterna`. Carga de
+ * externas via `loadAlertasByDeptBulk` (mismo loader que `riskScores[].alertas[]`
+ * y `computeOtroMundo` — SEXTA y OTRO MUNDO comparten ventana, paso b unifica
+ * desde un solo punto).
  *
  * Idempotente vía `upsertAlertOnce`. El orchestrator lo invoca en
  * `processOrgMetaIfReady` después de las 5 alertas estándar.
@@ -947,52 +965,114 @@ export async function createSilencioConVozExternaAlerts(
   let skipped = 0;
   const errors: string[] = [];
 
-  // 1-3. Universo + cobertura + participación per-depto (helper compartido).
-  const { universo, cubiertosSet, partByDept } =
-    await computeDepartmentParticipation(accountId, campaignId);
+  // 1. Universo campaign-scope + participación per-depto.
+  const { universo, partByDept } = await computeDepartmentParticipation(
+    accountId,
+    campaignId
+  );
 
-  // 4. Candidatos: no-cubiertos + cubiertos con participación < umbral.
-  const candidatos = universo.filter((dept) => {
-    if (!cubiertosSet.has(dept.id)) return true; // sin cobertura → candidato
-    const part = partByDept.get(dept.id);
-    if (!part || part.invited === 0) return false;
-    const rate = (part.responded / part.invited) * 100;
-    return rate < SILENCIO_PARTICIPATION_THRESHOLD;
+  if (universo.length === 0) return { created, skipped, errors };
+
+  // 2. Status del análisis per dept (input para `deriveAnalyzed`).
+  const universoIds = universo.map((d) => d.id);
+  const analyses = await prisma.complianceAnalysis.findMany({
+    where: {
+      campaignId,
+      scope: 'DEPARTMENT',
+      departmentId: { in: universoIds },
+    },
+    select: { departmentId: true, status: true },
   });
+  const analysisStatusByDept = new Map<string, string>(
+    analyses
+      .filter((a) => a.departmentId)
+      .map((a) => [a.departmentId as string, a.status])
+  );
 
-  // 5. Por candidato: cargar externas activas + decidir.
-  for (const dept of candidatos) {
-    try {
-      const externalAlerts = await loadDepartmentExternalAlerts(dept.id, accountId, {
-        includeHistorical: false,
+  // 3. Derivar `analyzed` 4-way (util canónico, mismo que `computeCoverageAnalysis`
+  //    usa via `buckets.deriveAnalyzed`) y filtrar a `sub_threshold`. Los
+  //    `completed` quedan fuera — entran al análisis normal, no son sexta.
+  //    `not_invited` no debería ocurrir acá (universo campaign-scope) pero
+  //    `bucketFromAnalyzed` lo descarta defensivamente del filtro.
+  const subThresholdDepts: Array<{
+    id: string;
+    displayName: string;
+    analyzed: CoverageAnalyzedStatus;
+  }> = [];
+  for (const dept of universo) {
+    const part = partByDept.get(dept.id);
+    const invited = part?.invited ?? 0;
+    const responded = part?.responded ?? 0;
+    const status = analysisStatusByDept.get(dept.id);
+
+    const analyzed = deriveAnalyzed({ status, invited, responded });
+
+    if (bucketFromAnalyzed(analyzed) === 'sub_threshold') {
+      subThresholdDepts.push({
+        id: dept.id,
+        displayName: dept.displayName,
+        analyzed,
       });
-      const senalesMedias = externalAlerts.filter(
-        (a) => a.factorDecaimiento === 1.0 && a.pesoEfectivo >= SILENCIO_PESO_MIN
-      );
-      if (senalesMedias.length === 0) continue;
+    }
+  }
 
-      const config = COMPLIANCE_ALERT_TYPES.silencio_con_voz_externa;
+  if (subThresholdDepts.length === 0) {
+    return { created, skipped, errors };
+  }
+
+  // 4. Carga bulk de externas — mismo loader que `riskScores[].alertas[]` y
+  //    `computeOtroMundo`. UN solo loader compartido para todas las superficies.
+  const alertasByDept = await loadAlertasByDeptBulk(
+    accountId,
+    subThresholdDepts.map((d) => d.id)
+  );
+
+  // 5. Componer SilencioCandidate[] y delegar al motor puro. El motor filtra
+  //    `pesoEfectivo >= SILENCIO_PESO_MIN` y emite el sub-sabor por `analyzed`.
+  const candidatos: SilencioCandidate[] = subThresholdDepts.map((d) => ({
+    departmentId: d.id,
+    departmentName: d.displayName,
+    analyzed: d.analyzed,
+    alertas: alertasByDept.get(d.id) ?? [],
+  }));
+
+  const detected = detectSilencioConVozExterna(
+    candidatos,
+    'sub_threshold',
+    SILENCIO_PESO_MIN
+  );
+
+  // 6. Persistir cada item detectado. `context.sabor` reemplaza al viejo
+  //    `context.motivo` ('participacion_baja' | 'sin_cobertura'): el sabor
+  //    A/B viene del motor anclado a `analyzed`, no a participación. Nadie
+  //    río abajo lee `context.motivo` (grep verificado).
+  const config = COMPLIANCE_ALERT_TYPES.silencio_con_voz_externa;
+  for (const item of detected) {
+    try {
       const outcome = await upsertAlertOnce({
         accountId,
         campaignId,
-        departmentId: dept.id,
+        departmentId: item.departmentId,
         alertType: 'silencio_con_voz_externa',
-        title: formatTemplate(config.titleTemplate, { department: dept.displayName }),
+        title: formatTemplate(config.titleTemplate, {
+          department: item.departmentName,
+        }),
         description: formatTemplate(config.descriptionTemplate, {
-          department: dept.displayName,
+          department: item.departmentName,
         }),
         triggerSources: ['exit', 'onboarding'],
         triggerScore: null,
-        signalsCount: senalesMedias.length,
+        signalsCount: item.signalsCount,
         context: {
-          motivo: cubiertosSet.has(dept.id) ? 'participacion_baja' : 'sin_cobertura',
+          // 'A' = skipped_privacy (n<5 respondentes) | 'B' = no_response.
+          sabor: item.saborSub,
         },
       });
       if (outcome === 'created') created++;
       else skipped++;
     } catch (e) {
       errors.push(
-        `silencio_con_voz_externa/${dept.id}: ${
+        `silencio_con_voz_externa/${item.departmentId}: ${
           e instanceof Error ? e.message : String(e)
         }`
       );

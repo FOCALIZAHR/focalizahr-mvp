@@ -23,6 +23,7 @@
 import { prisma } from '@/lib/prisma';
 import { computeDepartmentParticipation } from './ComplianceAlertService';
 import { loadAlertasByDeptBulk } from './DepartmentRiskScoreService';
+import { deriveAnalyzed } from './buckets';
 import type { SilencioCandidate } from './detectSilencioConVozExterna';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -262,11 +263,7 @@ export async function computeCoverageAnalysis(
     const gold = goldByDept.get(dept.id);
     const externalAlertCount = exitAlertsByDept.get(dept.id)?.length ?? 0;
 
-    let analyzed: CoverageAnalyzedStatus;
-    if (status === 'COMPLETED') analyzed = 'completed';
-    else if (invited === 0) analyzed = 'not_invited';
-    else if (responded === 0) analyzed = 'no_response';
-    else analyzed = 'skipped_privacy';
+    const analyzed = deriveAnalyzed({ status, invited, responded });
 
     return {
       departmentId: dept.id,
