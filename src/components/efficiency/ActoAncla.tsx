@@ -162,7 +162,7 @@ function buildNodos(data: DiagnosticData): NodoData[] {
     tier: 'slate',
     barWidth: Math.max(0, Math.min(100, exposicionPctOrg)),
     tooltip:
-      'focalizaScore Eloundou — promedio ponderado de la exposición IA de cada cargo de la dotación analizada.',
+      'focalizaScore Eloundou: promedio ponderado de la exposición IA de cada cargo de la dotación analizada.',
   })
 
   return cargos

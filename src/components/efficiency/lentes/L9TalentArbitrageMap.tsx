@@ -474,7 +474,7 @@ function ScatterTooltip({
       <div className="space-y-1 text-[11px]">
         <TooltipRow
           label="Retention score"
-          value={p.retentionScore !== null ? Math.round(p.retentionScore).toString() : '—'}
+          value={p.retentionScore !== null ? Math.round(p.retentionScore).toString() : 'n/d'}
         />
         <TooltipRow
           label="Meses finiquito"

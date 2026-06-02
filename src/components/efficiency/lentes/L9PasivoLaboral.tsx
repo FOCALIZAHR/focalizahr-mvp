@@ -213,7 +213,7 @@ function narrativaZona(
 ): string {
   switch (zona) {
     case 'talent_trap':
-      return `${first} sigue en nómina pero el aporte ya no justifica el cargo. El finiquito acumulado lo vuelve caro de mover. Cada mes que pasa, el costo de salida sube — y la productividad sigue ausente.`
+      return `${first} sigue en nómina pero el aporte ya no justifica el cargo. El finiquito acumulado lo vuelve caro de mover. Cada mes que pasa, el costo de salida sube, y la productividad sigue ausente.`
     case 'ventana_decision':
       return `${first} aún no genera un impacto financiero crítico. Postergar solo sirve para pagar un finiquito más caro en el futuro cercano.`
   }
@@ -223,7 +223,7 @@ function narrativaZona(
 function narrativaTiming(timing: Timing, first: string): string {
   switch (timing) {
     case 'hoy':
-      return `Actuar hoy fija el costo. No hay saltos pendientes — el finiquito es el que ves ahora.`
+      return `Actuar hoy fija el costo. No hay saltos pendientes: el finiquito es el que ves ahora.`
     case 'q1':
       return `Mantener a ${first} 3 meses más. Si pasa un aniversario en ese período, el finiquito sube un sueldo entero.`
     case 'q2':
@@ -446,7 +446,7 @@ export function L9PasivoLaboral({
       familiaAccent={L9_ACCENT}
       heroValue={formatCLP(detalle.costoEsperaTotal)}
       heroUnit={`crecerá tu pasivo laboral en 12 meses si nada cambia · ${formatCLP(costoEsperaDecidibles)} de ese aumento recae sobre ${personsDecidibles.length} ${personsDecidibles.length === 1 ? 'persona cuyo desempeño no lo justifica' : 'personas cuyo desempeño no lo justifica'}`}
-      narrativaPuente="El pasivo laboral no es estático — crece por escalones con cada aniversario. Cada persona tiene su propio reloj. Ver caso por caso permite anticipar los saltos antes de que se conviertan en costo."
+      narrativaPuente="El pasivo laboral no es estático: crece por escalones con cada aniversario. Cada persona tiene su propio reloj. Ver caso por caso permite anticipar los saltos antes de que se conviertan en costo."
       ctaSimularLabel="Ver casos"
       ctaQuirofanoEyebrow="EXPEDIENTE DE TIMING"
       hasInteraction={hasInteraction}
@@ -473,7 +473,7 @@ export function L9PasivoLaboral({
           },
           {
             label: 'Payback',
-            value: paybackMeses !== null ? `${paybackMeses}m` : '—',
+            value: paybackMeses !== null ? `${paybackMeses}m` : 'n/d',
           },
         ],
       }}
@@ -495,7 +495,7 @@ export function L9PasivoLaboral({
               </p>
               <p className="text-sm md:text-base font-light text-emerald-100 leading-relaxed">
                 Las personas más costosas de tu nómina están en zonas
-                estratégicas — Cimientos de oro o Agilidad total. Ninguna
+                estratégicas: Cimientos de oro o Agilidad total. Ninguna
                 requiere decisión de salida hoy. El pasivo es saludable.
               </p>
             </div>
@@ -545,7 +545,7 @@ const ZONA_CARDS_ORDER: ZonaCardConfig[] = [
     zona: 'cimientos_oro',
     tono: 'estrategico',
     descripcion:
-      'El pasivo es alto — y a primera vista parece liberarlo. Pero el valor que entrega lo justifica. Perderlo cuesta más que mantenerlo.',
+      'El pasivo es alto, y a primera vista parece liberarlo. Pero el valor que entrega lo justifica. Perderlo cuesta más que mantenerlo.',
   },
   {
     zona: 'agilidad_total',
@@ -1155,7 +1155,7 @@ function SeccionIdentidad({ persona }: { persona: PersonL9 }) {
                   details={[
                     'Combina cumplimiento de metas (40%), dominio del cargo (30%) y potencial de adaptación (30%).',
                     'Sube si la persona ocupa un cargo crítico o es sucesora natural.',
-                    'Se amplifica por la exposición a IA del cargo — a mayor exposición + score alto, más valioso retener.',
+                    'Se amplifica por la exposición a IA del cargo: a mayor exposición + score alto, más valioso retener.',
                     'Tiers: menos de 40 prescindible · 40-80 neutro · 80-120 valioso · más de 120 intocable.',
                   ]}
                 >

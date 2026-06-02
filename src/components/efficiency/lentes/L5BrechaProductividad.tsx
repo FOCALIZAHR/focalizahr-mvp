@@ -403,7 +403,7 @@ export function L5BrechaProductividad({
           },
           {
             label: 'Payback',
-            value: paybackMeses !== null ? `${paybackMeses}m` : '—',
+            value: paybackMeses !== null ? `${paybackMeses}m` : 'n/d',
           },
         ],
       }}
@@ -880,7 +880,7 @@ function SeccionIdentidad({ persona }: { persona: PersonL5 }) {
               details={[
                 'Combina cumplimiento de metas (40%), dominio del cargo (30%) y adaptabilidad (30%).',
                 'Sube si la persona ocupa un cargo crítico o es sucesora natural.',
-                'Se amplifica por la exposición a IA del cargo — a mayor exposición + score alto, más valioso retener.',
+                'Se amplifica por la exposición a IA del cargo: a mayor exposición + score alto, más valioso retener.',
                 'Bajo 40 indica una situación que requiere definición organizacional.',
               ]}
             >
@@ -999,7 +999,7 @@ function AlertaContexto({
     text = (
       <>
         {firstName} cumple el <span className="tabular-nums font-medium">{metasPct}%</span>{' '}
-        de sus metas pero su evaluador está clasificado como severo — califica bajo el
+        de sus metas pero su evaluador está clasificado como severo: califica bajo el
         promedio de la empresa. El score bajo puede reflejar asfixia de talento, no bajo
         rendimiento.
       </>
@@ -1008,8 +1008,8 @@ function AlertaContexto({
     variant = 'slate'
     text = (
       <>
-        {firstName} tiene score bajo y su evaluador es severo. Ambas señales convergen
-        — el dato es consistente.
+        {firstName} tiene score bajo y su evaluador es severo. Ambas señales convergen,
+        el dato es consistente.
       </>
     )
   } else if (evaluatorStatus === 'INDULGENTE' && metas < 50) {

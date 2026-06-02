@@ -55,7 +55,7 @@ function getL4FueraDeRango(detalle: unknown): number {
 }
 
 function headlineMetric(lente?: LenteAPI): string {
-  if (!lente || !lente.hayData) return '—'
+  if (!lente || !lente.hayData) return 'n/d'
   // Priorizar datos canónicos por lente
   switch (lente.id) {
     case 'l1_inercia':
@@ -71,7 +71,7 @@ function headlineMetric(lente?: LenteAPI): string {
     case 'l9_pasivo':
       return formatCLP(getNumber(lente.detalle, 'costoEsperaTotal'))
     default:
-      return '—'
+      return 'n/d'
   }
 }
 
@@ -117,7 +117,7 @@ export default function EfficiencyToolbar({ data }: EfficiencyToolbarProps) {
         ? formatCLP(getNumber(l1.detalle, 'totalMonthly'))
         : l4?.hayData
         ? `${getArrayLen(l4.detalle, 'pairs')}`
-        : '—'
+        : 'n/d'
     const capitalBreakdown: ToolBreakdown[] = [
       {
         label: 'Costo de no decidir',
@@ -131,7 +131,7 @@ export default function EfficiencyToolbar({ data }: EfficiencyToolbarProps) {
           ? `${getArrayLen(l4.detalle, 'pairs')} ${
               getArrayLen(l4.detalle, 'pairs') === 1 ? 'par' : 'pares'
             }`
-          : '—',
+          : 'n/d',
       },
     ]
 
@@ -140,7 +140,7 @@ export default function EfficiencyToolbar({ data }: EfficiencyToolbarProps) {
       ? formatCLP(getNumber(l5.detalle, 'total'))
       : l2?.hayData
       ? `${getNumber(l2.detalle, 'count')}`
-      : '—'
+      : 'n/d'
     const rutaBreakdown: ToolBreakdown[] = [
       {
         label: 'Talento estancado',
@@ -149,7 +149,7 @@ export default function EfficiencyToolbar({ data }: EfficiencyToolbarProps) {
           ? `${getNumber(l2.detalle, 'count')} ${
               getNumber(l2.detalle, 'count') === 1 ? 'persona' : 'personas'
             }`
-          : '—',
+          : 'n/d',
       },
       {
         label: 'Brecha productividad',
@@ -163,14 +163,14 @@ export default function EfficiencyToolbar({ data }: EfficiencyToolbarProps) {
           ? `${getNumber(l7.detalle, 'count')} ${
               getNumber(l7.detalle, 'count') === 1 ? 'persona' : 'personas'
             }`
-          : '—',
+          : 'n/d',
       },
     ]
 
     // Tool 3 — Costo de esperar (L9 + L3)
     const esperarMetric = l9?.hayData
       ? formatCLP(getNumber(l9.detalle, 'costoEsperaTotal'))
-      : '—'
+      : 'n/d'
     const rankingLen = l3?.hayData ? getArrayLen(l3.detalle, 'ranking') : 0
     const esperarBreakdown: ToolBreakdown[] = [
       {
@@ -183,7 +183,7 @@ export default function EfficiencyToolbar({ data }: EfficiencyToolbarProps) {
         value: rankingLen,
         formatted: l3?.hayData
           ? `${rankingLen} ${rankingLen === 1 ? 'gerencia' : 'gerencias'}`
-          : '—',
+          : 'n/d',
       },
     ]
 

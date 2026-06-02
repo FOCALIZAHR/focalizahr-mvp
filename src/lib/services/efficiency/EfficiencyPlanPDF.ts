@@ -56,9 +56,9 @@ const FAMILIA_COLOR: Record<FamiliaId, [number, number, number]> = {
 }
 
 const TESIS_LABEL: Record<string, string> = {
-  eficiencia: 'Eficiencia — reducir costo y capturar capacidad liberada',
-  crecimiento: 'Crecimiento — reinvertir ahorro en expandir el negocio',
-  evolucion: 'Evolución — rediseñar para el próximo ciclo',
+  eficiencia: 'Eficiencia: reducir costo y capturar capacidad liberada',
+  crecimiento: 'Crecimiento: reinvertir ahorro en expandir el negocio',
+  evolucion: 'Evolución: rediseñar para el próximo ciclo',
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -227,7 +227,7 @@ export function generateEfficiencyPlanPDF(data: EfficiencyPlanPDFData): Buffer {
   doc.setFontSize(10)
   doc.setTextColor(60, 60, 60)
   doc.text(
-    'Decisiones del plan — agrupadas por familia (sin nombres de personas)',
+    'Decisiones del plan, agrupadas por familia (sin nombres de personas)',
     20,
     yPos
   )
@@ -301,7 +301,7 @@ export function generateEfficiencyPlanPDF(data: EfficiencyPlanPDFData): Buffer {
       doc.setFontSize(8)
       doc.setTextColor(110, 110, 110)
       doc.text(
-        `— ${LENTES_META[lenteId]?.titulo ?? lenteId}`,
+        `${LENTES_META[lenteId]?.titulo ?? lenteId}`,
         22,
         yPos
       )
@@ -329,7 +329,7 @@ export function generateEfficiencyPlanPDF(data: EfficiencyPlanPDFData): Buffer {
     doc.setFontSize(7)
     doc.setTextColor(150, 150, 150)
     doc.text(
-      `FocalizaHR · Plan ${data.planId.slice(0, 8)} · Generado ${new Date().toLocaleString('es-CL')} · Confidencial — solo directorio`,
+      `FocalizaHR · Plan ${data.planId.slice(0, 8)} · Generado ${new Date().toLocaleString('es-CL')} · Confidencial · solo directorio`,
       pageWidth / 2,
       doc.internal.pageSize.getHeight() - 8,
       { align: 'center' }

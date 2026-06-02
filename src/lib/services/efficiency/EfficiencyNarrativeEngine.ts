@@ -148,7 +148,7 @@ export const LENTES_META: Record<LenteId, LenteMeta> = {
 // ════════════════════════════════════════════════════════════════════════════
 
 export const NARRATIVE_TEMPLATES: Record<LenteId, string> = {
-  l1_inercia: `Su empresa tiene {N_FTES} FTEs equivalentes atrapados en tareas que la IA ya puede ejecutar. Eso es {CLP_MES} por mes que no está capturando — {CLP_ANIO} al año. No invertir en tecnología es, en la práctica, la decisión financiera más cara que puede tomar hoy.`,
+  l1_inercia: `Su empresa tiene {N_FTES} FTEs equivalentes atrapados en tareas que la IA ya puede ejecutar. Eso es {CLP_MES} por mes que no está capturando: {CLP_ANIO} al año. No invertir en tecnología es, en la práctica, la decisión financiera más cara que puede tomar hoy.`,
 
   l2_zombie: `Tiene {N_PERSONAS} personas que rinden excelente hoy en cargos con {EXPOSICION_PROMEDIO}% de probabilidad de automatización. La evidencia de sus competencias dice que no podrán re-entrenarse. Sus mejores ejecutores de hoy son su mayor pasivo mañana.`,
 
@@ -156,15 +156,15 @@ export const NARRATIVE_TEMPLATES: Record<LenteId, string> = {
 
   l4_fantasma: `Tiene {N_PARES} pares de cargos con títulos distintos que comparten más del {OVERLAP}% de sus tareas operativas. El {PCT_AUTOMATIZABLE}% de esas tareas compartidas serán automatizadas. Está pagando doble por trabajo que ya es redundante y pronto será irrelevante.`,
 
-  l5_brecha: `{N_PERSONAS} personas tienen un salario estimado sobre el percentil {PERCENTIL} de su nivel con un dominio del cargo bajo el {UMBRAL}%. El costo mensual excedente acumulado es {CLP_MES}. No es un error de RRHH — es el resultado de postergar decisiones que tienen costo calculado.`,
+  l5_brecha: `{N_PERSONAS} personas tienen un salario estimado sobre el percentil {PERCENTIL} de su nivel con un dominio del cargo bajo el {UMBRAL}%. El costo mensual excedente acumulado es {CLP_MES}. No es un error de RRHH: es el resultado de postergar decisiones que tienen costo calculado.`,
 
-  l6_seniority: `En {N_FAMILIAS} familias de cargo, un talento Junior con alta adaptabilidad equipado con las herramientas correctas generaría el mismo output operativo que el perfil Senior actual. Ahorro estructural proyectado: {CLP_AHORRO}/mes — {PCT_AHORRO}% de esa línea de nómina.`,
+  l6_seniority: `En {N_FAMILIAS} familias de cargo, un talento Junior con alta adaptabilidad equipado con las herramientas correctas generaría el mismo output operativo que el perfil Senior actual. Ahorro estructural proyectado: {CLP_AHORRO}/mes, {PCT_AHORRO}% de esa línea de nómina.`,
 
   l7_fuga: `Tiene {N_PERSONAS} personas en el cuadrante de mayor valor cuya productividad se va a multiplicar con IA. Si la compensación no refleja ese nuevo valor antes de que el mercado lo haga, los perderá. Costo de reemplazo estimado: {CLP_REEMPLAZO}.`,
 
-  l8_retencion: `El sistema cruzó metas, rendimiento y adaptabilidad futura e identificó {N_PRESCINDIBLES} personas prescindibles por valor relativo. No por política ni antigüedad — por evidencia de tres fuentes independientes. La lista roja está lista.`,
+  l8_retencion: `El sistema cruzó metas, rendimiento y adaptabilidad futura e identificó {N_PRESCINDIBLES} personas prescindibles por valor relativo. No por política ni antigüedad: por evidencia de tres fuentes independientes. La lista roja está lista.`,
 
-  l9_pasivo: `Tu pasivo laboral acumulado es {CLP_FINIQUITOS} si hoy se desvincula a toda la dotación con derecho a indemnización ({N_ELEGIBLES} personas con más de un año). En 12 meses, ese pasivo crece a {CLP_Q4} — un incremento de {CLP_COSTO_ESPERA} solo por antigüedad adicional. Cada mes que postergas una decisión de reestructura, ese número sube.`,
+  l9_pasivo: `Tu pasivo laboral acumulado es {CLP_FINIQUITOS} si hoy se desvincula a toda la dotación con derecho a indemnización ({N_ELEGIBLES} personas con más de un año). En 12 meses, ese pasivo crece a {CLP_Q4}, un incremento de {CLP_COSTO_ESPERA} solo por antigüedad adicional. Cada mes que postergas una decisión de reestructura, ese número sube.`,
 }
 
 // ════════════════════════════════════════════════════════════════════════════

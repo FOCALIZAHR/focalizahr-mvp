@@ -223,12 +223,12 @@ function narrativaIPIporSlider(ipi: IPI, pct: number): string {
       return 'La IA ya ejecuta estas tareas. A este nivel solo activás una parte de lo que ya está disponible.'
     if (pct <= 70)
       return 'Activación directa: la IA ejecuta autónomamente. Decisión de cuándo, no de cómo.'
-    return 'Captura máxima en tareas donde la IA ya opera sola. Sin fricción humana — la capacidad está allí esperando ser liberada.'
+    return 'Captura máxima en tareas donde la IA ya opera sola. Sin fricción humana: la capacidad está allí esperando ser liberada.'
   }
 
   if (ipi === 'asistencia') {
     if (pct <= 30)
-      return 'La IA copilotea. A este nivel, pocos flujos cambian — adopción voluntaria basta.'
+      return 'La IA copilotea. A este nivel, pocos flujos cambian: adopción voluntaria basta.'
     if (pct <= 70)
       return 'Las personas del área necesitan operar con IA. Capacitación es prerequisito, no opcional.'
     return 'Captura alta en modo asistencia: el cambio es cultural y de procesos. Capacitación es el cuello de botella real, no la tecnología.'
@@ -239,7 +239,7 @@ function narrativaIPIporSlider(ipi: IPI, pct: number): string {
     return 'Exposición baja. La IA acompaña tareas, todavía no las ejecuta sola.'
   if (pct <= 70)
     return 'Exposición baja. Capturar más depende de madurez tecnológica futura, no de activación hoy.'
-  return 'Exposición baja con captura forzada. Los datos no sustentan este nivel — revisar si el supuesto es realista.'
+  return 'Exposición baja con captura forzada. Los datos no sustentan este nivel. Revisar si el supuesto es realista.'
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -423,11 +423,11 @@ export function L1CostoInercia({
 // donde el espacio es limitado.
 const IPI_NARRATIVA_HALLAZGO: Record<IPI, string> = {
   delegacion:
-    'La IA ejecuta estas tareas de principio a fin. Tu única decisión es cuándo activarla — binaria: sí o no. Cero reentrenamiento humano.',
+    'La IA ejecuta estas tareas de principio a fin. Tu única decisión es cuándo activarla, binaria: sí o no. Cero reentrenamiento humano.',
   asistencia:
     'La IA copilotea, no reemplaza. Las personas del área deben aprender a operar con IA. El límite de captura es la capacitación, no la tecnología.',
   aprendizaje:
-    'La IA todavía no ejecuta estas tareas sola — las acompaña. Cada mes de uso la entrena con los datos de tu empresa. Activación temprana acumula ventaja.',
+    'La IA todavía no ejecuta estas tareas sola: las acompaña. Cada mes de uso la entrena con los datos de tu empresa. Activación temprana acumula ventaja.',
 }
 
 function HallazgoMapa({ rows }: { rows: Row[] }) {

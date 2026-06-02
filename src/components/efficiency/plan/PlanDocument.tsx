@@ -327,7 +327,7 @@ export function PlanDocument({
             <input
               value={planNombre === 'Plan sin nombre' ? '' : planNombre}
               onChange={e => onPlanNombreChange(e.target.value || 'Plan sin nombre')}
-              placeholder="Ponle un nombre a este plan — ej. Q2 Automatización & Talento"
+              placeholder="Ponle un nombre a este plan, ej. Q2 Automatización & Talento"
               className="w-full bg-transparent text-2xl md:text-3xl font-extralight text-white leading-tight border-0 focus:outline-none placeholder:text-slate-500/70 pb-1 border-b border-dashed border-slate-700/60 hover:border-cyan-500/40 focus:border-cyan-500 transition-colors pr-9"
               style={{ letterSpacing: '-0.01em' }}
               aria-label="Nombre del plan"
@@ -375,7 +375,7 @@ export function PlanDocument({
             onChange={e => setNarrativaLocal(e.target.value)}
             rows={Math.max(4, Math.min(12, narrativaLocal.split('\n').length + 1))}
             className="w-full text-base text-slate-200 font-light leading-relaxed bg-slate-900/50 backdrop-blur-xl border border-slate-800/70 rounded-xl p-5 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-colors resize-none"
-            placeholder="Párrafo de apertura para el directorio — generado automáticamente, edítalo si quieres."
+            placeholder="Párrafo de apertura para el directorio: generado automáticamente, edítalo si quieres."
           />
         </section>
 
@@ -519,9 +519,9 @@ export function PlanDocument({
             }
             title={
               estado === 'archivado'
-                ? 'Plan archivado — restaurar para generar Business Case'
+                ? 'Plan archivado. Restaurar para generar Business Case.'
                 : todasAprobadas
-                ? 'Todas las decisiones aprobadas — listo para el directorio'
+                ? 'Todas las decisiones aprobadas. Listo para el directorio.'
                 : `Faltan ${totalDecisiones - aprobadas} de ${totalDecisiones} decisiones por aprobar`
             }
           >
@@ -596,7 +596,7 @@ function fraseFamilia(familia: FamiliaId, items: DecisionItem[]): string {
     case 'capital_en_riesgo':
       return `En capital en riesgo, el plan interviene en ${lista.toLowerCase()} para recuperar capacidad comprometida en cargos de alta exposición a IA.`
     case 'ruta_ejecucion':
-      return `En ruta de ejecución, actúa sobre ${lista.toLowerCase()} — ${n} decisión${n === 1 ? '' : 'es'} sobre a quién reentrenar, reubicar o acompañar en la transición.`
+      return `En ruta de ejecución, actúa sobre ${lista.toLowerCase()}: ${n} decisión${n === 1 ? '' : 'es'} sobre a quién reentrenar, reubicar o acompañar en la transición.`
     case 'costo_esperar':
       return `En costo de esperar, formaliza ${lista.toLowerCase()} con costos auditables, evitando que cada mes de postergación siga encareciendo la decisión.`
     default:
@@ -611,7 +611,7 @@ function fraseTesis(tesis: Tesis): string {
     case 'crecimiento':
       return 'La tesis es de crecimiento: el ahorro liberado se reinvierte en expandir el negocio. El directorio debe leer la inversión como capital de aceleración, no como recorte.'
     case 'evolucion':
-      return 'La tesis es de evolución: el plan rediseña la organización para el próximo ciclo — el ahorro es un efecto secundario, no el objetivo principal.'
+      return 'La tesis es de evolución: el plan rediseña la organización para el próximo ciclo. El ahorro es un efecto secundario, no el objetivo principal.'
   }
 }
 

@@ -224,7 +224,7 @@ export function L7L8MapaTalento({
       ahorroMes: r.salary,
       finiquito: 0, // L9 calcula finiquitos con detalle
       fteEquivalente: 1,
-      narrativa: `${lente.narrativa}\n\nConfirmado en la lista de transición — retentionScore ${Math.round(r.retentionScore)}.`,
+      narrativa: `${lente.narrativa}\n\nConfirmado en la lista de transición: retentionScore ${Math.round(r.retentionScore)}.`,
       aprobado: false,
     }
     onUpsert(item)
@@ -251,11 +251,11 @@ export function L7L8MapaTalento({
         metricaLabel={`personas analizadas · ${l8?.intocablesCount ?? 0} intocables · ${decision.length} candidatos a transición`}
       >
         Este lente fusiona dos miradas sobre el mismo espectro humano: a quiénes
-        blindar y a quiénes soltar. El ADN es el mismo — solo cambia el extremo.
+        blindar y a quiénes soltar. El ADN es el mismo, solo cambia el extremo.
       </LenteCard.Portada>
 
       {/* ═══ ZONA PROTECCIÓN ═══ */}
-      <LenteCard.Evidencia titulo="Zona Protección — talento que no se puede perder">
+      <LenteCard.Evidencia titulo="Zona Protección: talento que no se puede perder">
         {proteccion.length === 0 ? (
           <p className="text-xs text-slate-500 font-light">
             El sistema no identificó talento aumentado en riesgo de fuga con
@@ -272,7 +272,7 @@ export function L7L8MapaTalento({
             >
               <p className="text-xs text-slate-300 font-light leading-relaxed">
                 Dos señales apuntan en la misma dirección: dominan su cargo y
-                lo que hacen se vuelve más valioso con IA — no más reemplazable.{' '}
+                lo que hacen se vuelve más valioso con IA, no más reemplazable.{' '}
                 <span className="text-cyan-300">El mercado ya identifica estos perfiles</span>.
                 Si la compensación no refleja ese nuevo valor, el reconocimiento
                 se convierte en un subsidio a la competencia.
@@ -348,7 +348,7 @@ export function L7L8MapaTalento({
       </LenteCard.Evidencia>
 
       {/* ═══ ZONA DECISIÓN ═══ */}
-      <LenteCard.Evidencia titulo="Zona Decisión — ranking validable de prescindibles">
+      <LenteCard.Evidencia titulo="Zona Decisión: ranking validable de prescindibles">
         {decision.length === 0 ? (
           <p className="text-xs text-slate-500 font-light">
             Sin candidatos en la lista de transición. El motor ya excluyó
@@ -417,7 +417,7 @@ export function L7L8MapaTalento({
 
       {/* ═══ ZONA CRÍTICA ═══ */}
       {critica.length > 0 && (
-        <LenteCard.Interaccion titulo="Zona Crítica — alerta operacional (no captura decisión)">
+        <LenteCard.Interaccion titulo="Zona Crítica: alerta operacional (no captura decisión)">
           <div
             className="p-4 rounded-lg border space-y-3"
             style={{
@@ -430,7 +430,7 @@ export function L7L8MapaTalento({
               <p className="text-xs text-slate-300 font-light leading-relaxed">
                 {critica.length} cargo{critica.length === 1 ? '' : 's'} crítico{critica.length === 1 ? '' : 's'} con alta
                 exposición IA y sin sucesor identificado. Si la persona sale antes
-                de que el cargo se transforme, el riesgo no es financiero — es operacional.
+                de que el cargo se transforme, el riesgo no es financiero: es operacional.
               </p>
             </div>
             <div className="space-y-1.5">

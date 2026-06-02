@@ -66,7 +66,7 @@ export const FAMILIA_META: Record<FamiliaId, FamiliaMeta> = {
       }
     },
     conectores: [
-      'Pero la inercia no vive solo en cargos saturados — también en duplicaciones de rol que la organización paga dos veces.',
+      'Pero la inercia no vive solo en cargos saturados, también en duplicaciones de rol que la organización paga dos veces.',
     ],
   },
 

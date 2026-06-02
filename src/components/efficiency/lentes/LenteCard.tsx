@@ -190,7 +190,7 @@ function Evidencia({ titulo = 'La evidencia', children }: EvidenciaProps) {
     <section className="mb-8">
       <SectionSeparator />
       <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-4">
-        — {titulo}
+        {titulo}
       </p>
       <div className="space-y-4">{children}</div>
     </section>
@@ -211,7 +211,7 @@ function Interaccion({ titulo = 'La decisión', children }: InteraccionProps) {
     <section>
       <SectionSeparator />
       <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-4">
-        — {titulo}
+        {titulo}
       </p>
       <div>{children}</div>
     </section>

@@ -125,7 +125,7 @@ const ACCION_META: Record<AccionL4, AccionMeta> = {
   },
   mantener: {
     label: 'Mantener',
-    description: 'Estructura saludable — sin acción inmediata.',
+    description: 'Estructura saludable. Sin acción inmediata.',
     color: '#10B981',
     icon: Check,
     ahorroFactor: 0,
@@ -157,7 +157,7 @@ function narrativaDinamica(total: number, tomadas: number): string {
   if (tomadas === 0)
     return 'Cada jefatura tiene un arquetipo y un rango. Cuando el span se aleja del arquetipo, el costo se descoloca. La decisión es tuya.'
   if (tomadas < Math.ceil(total / 2))
-    return `${tomadas} de ${total} decididas. Cada capa es un caso distinto — no hay consolidación genérica.`
+    return `${tomadas} de ${total} decididas. Cada capa es un caso distinto. No hay consolidación genérica.`
   if (tomadas < total)
     return 'Más de la mitad del expediente cerrado. Los pendientes esperan tu criterio.'
   return `${total} decisiones tomadas. Lo siguiente es conversar con cada jefatura antes de ejecutar.`
@@ -299,7 +299,7 @@ export function L4ArquitecturaLiderazgo({
             return {
               label: `${formatDisplayName(m.managerName)} · ${formatLabel(m.cargo)}`,
               detail: meta.label,
-              value: ahorro > 0 ? `${formatCLP(ahorro)}/mes` : '—',
+              value: ahorro > 0 ? `${formatCLP(ahorro)}/mes` : 'n/d',
             }
           }),
         totalLabel: `${tomadas} ${tomadas === 1 ? 'decisión' : 'decisiones'} en tu plan`,
@@ -316,7 +316,7 @@ export function L4ArquitecturaLiderazgo({
       familiaAccent={L4_ACCENT}
       heroValue={detalle.org.heroValue}
       heroUnit={detalle.org.heroUnit}
-      narrativaPuente="La estructura no es un organigrama — es la forma en que el costo de gestión se distribuye en tu empresa. Ver caso por caso permite separar las capas que valen lo que cuestan de las que no."
+      narrativaPuente="La estructura no es un organigrama: es la forma en que el costo de gestión se distribuye en tu empresa. Ver caso por caso permite separar las capas que valen lo que cuestan de las que no."
       ctaSimularLabel="Ver managers fuera de rango"
       ctaQuirofanoEyebrow="EXPEDIENTE DE LIDERAZGO"
       hasInteraction={hasInteraction}
@@ -696,7 +696,7 @@ function TabGerencia({ data }: { data: OrgSpanIntelligence }) {
                   explanation="Cuántos reportes directos tiene cada jefe en promedio."
                   details={[
                     'Lo óptimo varía según el tipo de cargo',
-                    'Fuente: Peter Drucker · Harvard Business Review — Span of Management Theory',
+                    'Fuente: Peter Drucker · Harvard Business Review · Span of Management Theory',
                   ]}
                 >
                   Span prom.
@@ -709,7 +709,7 @@ function TabGerencia({ data }: { data: OrgSpanIntelligence }) {
                   details={[
                     'Estándar LATAM PYME: 8–14%',
                     'Sobre 20% es estructura sobre-jerarquizada',
-                    'Fuente: McKinsey + Bain — Span of Control Studies',
+                    'Fuente: McKinsey + Bain · Span of Control Studies',
                   ]}
                 >
                   Densidad
@@ -828,7 +828,7 @@ function TabArquetipo({ data }: { data: OrgSpanIntelligence }) {
                     'Supervisor: jefes (5–10)',
                     'Facilitator: supervisores (8–14)',
                     'Coordinator: operativos (10–20)',
-                    'Fuente: McKinsey & Company — "How to identify the right spans of control for your organization"',
+                    'Fuente: McKinsey & Company · "How to identify the right spans of control for your organization"',
                   ]}
                 >
                   Nivel · Arquetipo
@@ -843,7 +843,7 @@ function TabArquetipo({ data }: { data: OrgSpanIntelligence }) {
                   details={[
                     'Lo óptimo varía según el tipo de cargo',
                     'Color cyan: dentro del rango óptimo',
-                    'Color amber: fuera del rango — revisar arquetipo',
+                    'Color amber: fuera del rango. Revisar arquetipo.',
                     'Fuente: Peter Drucker · Harvard Business Review',
                   ]}
                 >
@@ -1068,7 +1068,7 @@ function TabPiramide({ data }: { data: OrgSpanIntelligence }) {
                     </span>
                   </TooltipContext>
                 ) : (
-                  <span className="text-slate-700">—</span>
+                  <span className="text-slate-700">n/d</span>
                 )}
               </div>
             </div>
@@ -1596,7 +1596,7 @@ function SeccionPerfilEvaluativo({
                 explanation="Cómo evalúa el manager a su equipo según la distribución de scores."
                 details={[
                   'ÓPTIMA: distribución equilibrada, criterio calibrado.',
-                  'CENTRAL: agrupa a todos en puntajes medios — falta diferenciación.',
+                  'CENTRAL: agrupa a todos en puntajes medios. Falta diferenciación.',
                   'SEVERA: promedio bajo, estándares exigentes.',
                   'INDULGENTE: promedio alto, poca diferenciación por arriba.',
                 ]}

@@ -187,7 +187,7 @@ function narrativaDinamica(total: number, tomadas: number): string {
   if (tomadas === 0)
     return 'Estas personas hoy rinden, pero sus posiciones son frágiles frente a la automatización IA. El instinto es proteger la trayectoria, pero el finiquito va creciendo y los competidores ya están incorporando la IA. Cada caso espera una definición para detener el impacto operacional y financiero.'
   if (tomadas < Math.ceil(total / 2))
-    return `${tomadas} de ${total} decididas. Cada persona es un caso distinto — no hay plantilla.`
+    return `${tomadas} de ${total} decididas. Cada persona es un caso distinto. No hay plantilla.`
   if (tomadas < total)
     return 'Más de la mitad del expediente cerrado. Los pendientes esperan tu criterio.'
   return 'Cada persona tiene una ruta. Lo siguiente es ejecutar.'
