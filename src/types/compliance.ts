@@ -26,7 +26,17 @@ export type {
   SilencioVozExternaItem as CoverageSilencioVozExternaItem,
   ParticipacionAnomalaItem as CoverageParticipacionAnomalaItem,
 } from '@/lib/services/compliance/CoverageAnalysisService';
-import type { CoverageAnalysisResult } from '@/lib/services/compliance/CoverageAnalysisService';
+import type {
+  CoverageAnalysisResult,
+  CoverageAnalyzedStatus,
+} from '@/lib/services/compliance/CoverageAnalysisService';
+
+/** Item OTRO MUNDO — depto NO invitado a la campaña con señal externa
+ *  activa de peso ≥ umbral. Re-export del shape del motor puro
+ *  (`SilencioDetected` filtrado a `bucketTarget='no_invitado'`). El render
+ *  ignora `saborSub` (siempre `null` para OTRO MUNDO). */
+export type { SilencioDetected as OtroMundoItem } from '@/lib/services/compliance/detectSilencioConVozExterna';
+import type { SilencioDetected as OtroMundoItem } from '@/lib/services/compliance/detectSilencioConVozExterna';
 
 export type {
   DepartmentConvergencia,
@@ -279,12 +289,17 @@ export interface ComplianceReportResponse {
       criticalByManager: Array<{ managerId: string; departmentIds: string[] }>;
     };
     alerts: ComplianceReportAlert[];
-    /** Sexta alerta — deptos sin voz confiable en Ambiente Sano (sin cobertura
-     *  o participación < 50%) pero con señales externas activas. Renderizados
-     *  como banda dedicada en SectionConvergencia (BandaSilencioVozExterna).
-     *  No están en `departments[]` porque no tienen ComplianceAnalysis.
+    /** Sexta alerta — deptos del universo campaign-scope en bucket
+     *  `sub_threshold` (analyzed ∈ {skipped_privacy, no_response}) con señal
+     *  externa activa. Modelo post-cf0be7c (spec MODELO_SEXTA_OTRO_MUNDO §1):
+     *  los `completed` ya tienen ISA visible (entran al análisis normal).
      *  Optional para defender payloads pre-deploy del campo. */
     silencioVozExterna?: SilencioVozExternaItem[];
+    /** OTRO MUNDO — deptos NO invitados a la campaña con señal externa activa.
+     *  Fuente paralela company-scope (`computeOtroMundo`) — el punto ciego que
+     *  el universo campaign-scope no captura. RBAC: `AREA_MANAGER` recibe `[]`
+     *  (gate por rol, patrón Beat 5). Runtime, no persistido. */
+    otroMundo?: OtroMundoItem[];
     /** Score de riesgo por dept — todo el universo activo del account
      *  (con_isa + sub_threshold + no_invitado), no solo los con AS.
      *  Runtime, no persistido. Optional para defender payloads pre-deploy. */
@@ -293,7 +308,7 @@ export interface ComplianceReportResponse {
   legalNotice: string;
 }
 
-/** Item de la sexta alerta para la banda dedicada en SectionConvergencia. */
+/** Item de la sexta alerta para la banda dedicada en `ActoCobertura`. */
 export interface SilencioVozExternaItem {
   departmentId: string | null;
   departmentName: string | null;
@@ -301,6 +316,14 @@ export interface SilencioVozExternaItem {
   narrativa: string;
   /** Cantidad de señales externas de peso medio o superior que la dispararon. */
   signalsCount: number;
+  /** Estado del depto frente al análisis AS (4-way). Habilita el sub-split
+   *  A/B en render sin re-llamar al motor en cliente:
+   *   - `skipped_privacy` → sabor A (invitado, alguien respondió pero n<5)
+   *   - `no_response`     → sabor B (invitado, cero respuestas)
+   *   - otros valores son defensive — la sexta solo dispara para sub_threshold.
+   *  `null` si el JOIN con coverage.deptosCobertura no encuentra el depto
+   *  (defensive — no debería ocurrir post Paso 4). */
+  analyzed: CoverageAnalyzedStatus | null;
 }
 
 // ════════════════════════════════════════════════════════════════════════════

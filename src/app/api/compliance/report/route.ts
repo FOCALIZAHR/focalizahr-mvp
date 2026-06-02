@@ -29,8 +29,13 @@ import type {
 } from '@/types/compliance';
 import { PATRON_LABELS } from '@/lib/services/compliance/ComplianceNarrativeEngine';
 import type { ISAResult } from '@/lib/services/compliance/ISAService';
-import { computeCoverageAnalysis } from '@/lib/services/compliance/CoverageAnalysisService';
+import {
+  computeCoverageAnalysis,
+  computeOtroMundo,
+} from '@/lib/services/compliance/CoverageAnalysisService';
 import { computeDepartmentRiskScores } from '@/lib/services/compliance/DepartmentRiskScoreService';
+import { detectSilencioConVozExterna } from '@/lib/services/compliance/detectSilencioConVozExterna';
+import { SILENCIO_PESO_MIN } from '@/lib/services/compliance/ComplianceAlertService';
 
 type ReportType = 'executive' | 'semestral';
 
@@ -268,6 +273,30 @@ export async function GET(request: NextRequest) {
       : orgPayload.global.skippedByPrivacy;
 
     // ═══════════════════════════════════════════════════════════════════
+    // SEXTA + OTRO MUNDO (spec MODELO_SEXTA_OTRO_MUNDO_AMBIENTE_SANO).
+    //
+    // SEXTA: ya persistida en `data.alerts[]` por el orchestrator (Paso 4).
+    //        Enriquecemos cada item con `analyzed` (JOIN con coverage) para
+    //        que el render decida sub-sabor A/B sin re-llamar al motor.
+    //
+    // OTRO MUNDO: runtime. Patrón Beat 5 — AREA_MANAGER recibe `[]` (no se
+    //             computa ni se expone). Para el resto, motor puro sobre la
+    //             fuente paralela company-scope `computeOtroMundo`.
+    // ═══════════════════════════════════════════════════════════════════
+    const analyzedByDept = new Map(
+      coverage.deptosCobertura.map((d) => [d.departmentId, d.analyzed]),
+    );
+
+    const otroMundo =
+      userContext.role === 'AREA_MANAGER'
+        ? []
+        : detectSilencioConVozExterna(
+            await computeOtroMundo(userContext.accountId, campaignId),
+            'no_invitado',
+            SILENCIO_PESO_MIN,
+          );
+
+    // ═══════════════════════════════════════════════════════════════════
     // Shape de respuesta.
     // ═══════════════════════════════════════════════════════════════════
 
@@ -363,10 +392,10 @@ export async function GET(request: NextRequest) {
           slaStatus: a.slaStatus,
           createdAt: a.createdAt,
         })),
-        // Sexta alerta — deptos sin voz en AS pero con señales externas.
-        // El payload sigue exponiendo esta lista (la sexta alerta sigue en
-        // `data.alerts[]`). La voz del score de estos deptos ahora vive en
-        // SectionMapaTerritorios (Gate 3), que lee `data.riskScores` directo.
+        // Sexta alerta — deptos en bucket sub_threshold con señal externa
+        // (modelo post-Paso 4). `analyzed` enriquece desde coverage para que
+        // el render decida sub-sabor A (skipped_privacy) / B (no_response)
+        // sin re-llamar al motor en cliente.
         silencioVozExterna: filteredAlerts
           .filter((a) => a.alertType === 'silencio_con_voz_externa')
           .map((a) => ({
@@ -374,7 +403,14 @@ export async function GET(request: NextRequest) {
             departmentName: a.department?.displayName ?? null,
             narrativa: a.description,
             signalsCount: a.signalsCount ?? 0,
+            analyzed: a.departmentId
+              ? analyzedByDept.get(a.departmentId) ?? null
+              : null,
           })),
+        // OTRO MUNDO — `[]` para AREA_MANAGER (gate por rol, no se computa
+        // siquiera). Para el resto, items del motor puro sobre la fuente
+        // paralela company-scope. Copy final = paso c.
+        otroMundo,
       },
       legalNotice:
         'Análisis de gestión preventiva — No constituye investigación formal.',
