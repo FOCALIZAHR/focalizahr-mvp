@@ -242,18 +242,47 @@ export function buildGerenciaRollup(
 
   // 3. Group by parentGerenciaId (null/undefined → standalone bucket)
   const byGroup = new Map<string, GroupBucket>();
+
+  // 3a. Pre-pass — ids de gerencia que aparecen como ancestro de algún hijo
+  //     invitado. Si una gerencia level=2 fue invitada DIRECTAMENTE Y también
+  //     es ancestro de otros invitados, su riskScore (parentGerenciaId=null,
+  //     porque route.ts:228-230 setea null para todo level=2) se funde en
+  //     el bucket compartido — no emite standalone duplicado.
+  //     Caso real cmob0e56: "Gerencia Comercial" salía 2 veces (standalone +
+  //     grupo de sus hijos); con este pre-pass sale 1 vez fusionada.
+  const ancestorIds = new Set<string>();
+  for (const rs of filteredRs) {
+    if (rs.parentGerenciaId != null) ancestorIds.add(rs.parentGerenciaId);
+  }
+
   for (const rs of filteredRs) {
     const hasG =
       rs.parentGerenciaId != null && rs.parentGerenciaName != null;
-    const groupId = hasG
-      ? (rs.parentGerenciaId as string)
-      : `${STANDALONE_PREFIX}${rs.departmentId}`;
-    const groupName = hasG
-      ? (rs.parentGerenciaName as string)
-      : rs.departmentName;
+    const isOwnAncestor = !hasG && ancestorIds.has(rs.departmentId);
+
+    let groupId: string;
+    let groupName: string;
+    let standalone: boolean;
+    if (hasG) {
+      groupId = rs.parentGerenciaId as string;
+      groupName = rs.parentGerenciaName as string;
+      standalone = false;
+    } else if (isOwnAncestor) {
+      // Dept invitado directo cuya descendencia también está en la campaña:
+      // se funde en el grupo común bajo su propio id (mismo groupId que el
+      // bucket donde caen sus hijos via parentGerenciaId).
+      groupId = rs.departmentId;
+      groupName = rs.departmentName;
+      standalone = false;
+    } else {
+      groupId = `${STANDALONE_PREFIX}${rs.departmentId}`;
+      groupName = rs.departmentName;
+      standalone = true;
+    }
+
     let bucket = byGroup.get(groupId);
     if (!bucket) {
-      bucket = { groupId, groupName, standalone: !hasG, children: [] };
+      bucket = { groupId, groupName, standalone, children: [] };
       byGroup.set(groupId, bucket);
     }
     bucket.children.push({

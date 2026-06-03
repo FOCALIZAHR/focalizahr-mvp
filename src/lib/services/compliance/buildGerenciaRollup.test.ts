@@ -622,6 +622,68 @@ test('11b. leyKarin sin señales → signalsCount: 0', () => {
   assert.equal(r.leyKarin.deptosConSenal, 0);
 });
 
+// ═══════════════════════════════════════════════════════════════════
+// CASE 12 — Dedup: gerencia level=2 invitada directa + hijos con su id
+//   como parentGerenciaId → 1 rollup fundido, NO standalone duplicado.
+//   Caso real cmob0e56: "Gerencia Comercial" salía 2 veces.
+// ═══════════════════════════════════════════════════════════════════
+
+test('12. dedup: dept level=2 invitado directo + hijos con su id como parent → 1 rollup fundido', () => {
+  const parentId = 'g-comercial';
+  const parentName = 'Gerencia Comercial';
+  const riskScores: DepartmentRiskScore[] = [
+    // Dept level=2 invitado directo, sin parentGerenciaId resoluble.
+    // route.ts:228-230 setea null para todo level=2 — replicado acá.
+    mkRiskScore({
+      departmentId: parentId,
+      departmentName: parentName,
+      parentGerenciaId: null,
+      parentGerenciaName: null,
+    }),
+    // Hijos level=3 cuyo parentGerenciaId === id del level=2.
+    mkRiskScore({
+      departmentId: 'd-comercial',
+      departmentName: 'Comercial',
+      parentGerenciaId: parentId,
+      parentGerenciaName: parentName,
+    }),
+    mkRiskScore({
+      departmentId: 'd-ventas',
+      departmentName: 'Ventas Nacional',
+      parentGerenciaId: parentId,
+      parentGerenciaName: parentName,
+    }),
+  ];
+  const rollups = buildGerenciaRollup(makeReport({ riskScores }));
+
+  assert.equal(rollups.length, 1);
+  assert.equal(rollups[0].groupId, parentId);
+  assert.equal(rollups[0].standalone, false);
+  assert.equal(rollups[0].groupName, parentName);
+  assert.equal(rollups[0].totalChildren, 3);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// CASE 13 — Regresión: gerencia level=2 sin hijos invitados → sigue
+//   standalone. Asegura que el dedup NO descarta el caso genuino.
+// ═══════════════════════════════════════════════════════════════════
+
+test('13. dedup: dept level=2 sin hijos invitados → sigue standalone', () => {
+  const riskScores: DepartmentRiskScore[] = [
+    mkRiskScore({
+      departmentId: 'g-solo',
+      departmentName: 'Gerencia Sola',
+      parentGerenciaId: null,
+      parentGerenciaName: null,
+    }),
+  ];
+  const rollups = buildGerenciaRollup(makeReport({ riskScores }));
+
+  assert.equal(rollups.length, 1);
+  assert.equal(rollups[0].standalone, true);
+  assert.ok(rollups[0].groupId.startsWith('__dept__:'));
+});
+
 test('8. gerencia entera no invitada → participationRate: null', () => {
   const riskScores: DepartmentRiskScore[] = [
     mkRiskScore({
