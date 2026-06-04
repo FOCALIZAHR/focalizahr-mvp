@@ -29,6 +29,10 @@ import type {
   NivelFinal,
 } from '@/lib/services/compliance/ConvergenciaEngine';
 import type { GenderAlertDetail } from '@/lib/services/compliance/ComplianceNarrativeEngine';
+import {
+  LEY_KARIN_ALERT_TYPES,
+  SENALES_AMBIENTE,
+} from '@/config/compliance/convergenciaWeights';
 
 // ═══════════════════════════════════════════════════════════════════
 // PUBLIC TYPES
@@ -150,6 +154,17 @@ export interface GerenciaRollup {
     signalsCount: number;
     deptosConSenal: number;
   };
+
+  // ─── ORTOGONAL: SEÑALES DE AMBIENTE (clima — superset de leyKarin) ──
+  /** Σ y conteo de alertas Exit cuyo `alertType ∈ SENALES_AMBIENTE`
+   *  (`ley_karin + ley_karin_indicios + toxic_exit_detected + liderazgo_concentracion`).
+   *  Excluye onboarding/retención y satisfacción genérica. Usado por el
+   *  deriver del Beat 1 (`pickMuda`) como criterio del "empezando por" entre
+   *  las gerencias sin voz. Espejo de `leyKarin` con el set expandido. */
+  senalesAmbiente: {
+    signalsCount: number;
+    deptosConSenal: number;
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -183,8 +198,13 @@ interface RollupChild {
   silencioVE: SilencioVozExternaItem | undefined;
 }
 
-/** Alertas Exit con scope Ley Karin (alias del motor — exitAlertConfig.ts:580/594). */
-const LEY_KARIN_ALERT_TYPES = new Set(['ley_karin', 'ley_karin_indicios']);
+/** Alertas Exit con scope Ley Karin — fuente única en convergenciaWeights.
+ *  Set wrapper para mantener O(1) lookup en `computeLeyKarin`. */
+const LEY_KARIN_ALERT_TYPES_SET = new Set(LEY_KARIN_ALERT_TYPES);
+
+/** Alertas Exit con scope SEÑALES DE AMBIENTE — fuente única en
+ *  convergenciaWeights. Set wrapper para O(1) lookup en `computeSenalesAmbiente`. */
+const SENALES_AMBIENTE_SET = new Set(SENALES_AMBIENTE);
 
 interface GroupBucket {
   groupId: string;
@@ -318,6 +338,7 @@ export function buildGerenciaRollup(
         generoByDeptName,
       ),
       leyKarin: computeLeyKarin(group.children),
+      senalesAmbiente: computeSenalesAmbiente(group.children),
     });
   }
 
@@ -531,7 +552,28 @@ function computeLeyKarin(
   for (const { rs } of children) {
     let perDept = 0;
     for (const a of rs.alertas) {
-      if (a.producto === 'exit' && LEY_KARIN_ALERT_TYPES.has(a.alertType)) {
+      if (a.producto === 'exit' && LEY_KARIN_ALERT_TYPES_SET.has(a.alertType)) {
+        perDept++;
+      }
+    }
+    if (perDept > 0) deptosConSenal++;
+    signalsCount += perDept;
+  }
+  return { signalsCount, deptosConSenal };
+}
+
+/** Espejo de `computeLeyKarin` con el set expandido `SENALES_AMBIENTE`.
+ *  Filtra alertas Exit cuyo `alertType` está en el set de clima/ambiente
+ *  (Karin + toxic_exit + liderazgo). Excluye onboarding/retención. */
+function computeSenalesAmbiente(
+  children: RollupChild[],
+): GerenciaRollup['senalesAmbiente'] {
+  let signalsCount = 0;
+  let deptosConSenal = 0;
+  for (const { rs } of children) {
+    let perDept = 0;
+    for (const a of rs.alertas) {
+      if (a.producto === 'exit' && SENALES_AMBIENTE_SET.has(a.alertType)) {
         perDept++;
       }
     }

@@ -53,6 +53,33 @@ export const ALERTAS_CRITICAS: ReadonlyArray<string> = [
 export const ALERTA_CRITICA_PESO_MIN = 0.9;
 
 /**
+ * Tipos de alerta Exit canónicos del scope Ley Karin (alias normalizados).
+ * Usado por `buildGerenciaRollup.leyKarin` para contar señales jurídicas
+ * específicas y como base de `SENALES_AMBIENTE`.
+ */
+export const LEY_KARIN_ALERT_TYPES: ReadonlyArray<string> = [
+  'ley_karin',
+  'ley_karin_indicios',
+];
+
+/**
+ * Señales de AMBIENTE/CLIMA — el criterio del "empezando por" del Beat 1
+ * (Apertura). NO es el filtro de la sexta alerta (esa sigue con peso ≥ 2 sin
+ * discriminar producto; propósitos distintos).
+ *
+ * Inclusión: clima jurídico (Ley Karin) + clima tóxico documentado en
+ * encuestas de salida + concentración de salidas por liderazgo.
+ * Exclusión: onboarding/retención (ABANDONO_DIA_1, DESENGANCHE_CULTURAL,
+ * RIESGO_FUGA, etc.), satisfacción genérica (nps_critico), patrones sin
+ * detector activo (department_exit_pattern).
+ */
+export const SENALES_AMBIENTE: ReadonlyArray<string> = [
+  ...LEY_KARIN_ALERT_TYPES,
+  'toxic_exit_detected',
+  'liderazgo_concentracion',
+];
+
+/**
  * Bump por casos en últimos 90 días (Fase 2).
  * Si hay 2+ casos del mismo alertType en el mismo dept, el peso base sube.
  */

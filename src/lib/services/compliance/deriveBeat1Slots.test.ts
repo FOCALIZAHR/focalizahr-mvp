@@ -23,7 +23,6 @@ import assert from 'node:assert/strict';
 
 import { deriveBeat1Slots } from './deriveBeat1Slots';
 import type { GerenciaRollup } from './buildGerenciaRollup';
-import { SILENCIO_PARTICIPATION_THRESHOLD } from '@/lib/services/compliance/ComplianceAlertService';
 
 // ═══════════════════════════════════════════════════════════════════
 // FACTORY — rollup minimal con overrides anidados
@@ -80,6 +79,8 @@ function mkRollup(
     deptosEnRiesgo: overrides.deptosEnRiesgo ?? 0,
     genero: overrides.genero ?? { hasAlerta: false, evidenciaGenero: null },
     leyKarin: overrides.leyKarin ?? { signalsCount: 0, deptosConSenal: 0 },
+    senalesAmbiente:
+      overrides.senalesAmbiente ?? { signalsCount: 0, deptosConSenal: 0 },
   };
 }
 
@@ -206,47 +207,54 @@ test('3. sanas_count: solo getISARiskLevel === "saludable" (≥80); 79 NO cuenta
 // CASE 4 — gerencia_muda_1: importa la constante canónica (sin literal)
 // ═══════════════════════════════════════════════════════════════════
 
-test('4. muda_1: corte canónico < SILENCIO_PARTICIPATION_THRESHOLD (importado)', () => {
-  const thresholdFraction = SILENCIO_PARTICIPATION_THRESHOLD / 100; // 0.5
-  const justBelow = thresholdFraction - 0.001; // 0.499 → muda
-  const justAt = thresholdFraction; // 0.5  → NO muda (estricto <)
-  const above = thresholdFraction + 0.2; // 0.7  → NO muda
-
+test('4. muda_1: corte canónico = "ningún hijo con_isa" (bucket-aligned)', () => {
+  // Post-refactor 2026-06-03: "sin voz" se alinea al bucket del motor, NO
+  // a participación <50%. Un rollup es muda PRIMARY si TODOS sus hijos están
+  // en sub_threshold (ningún con_isa). gB tiene 1 con_isa → NO muda
+  // (regla mixto: ≥1 con_isa = con voz). gC sin sub_threshold → tampoco.
   const rollups: GerenciaRollup[] = [
+    // gA: 2 hijos, ambos sub_threshold → sin voz
     mkRollup({
       groupId: 'gA',
       groupName: 'A',
+      totalChildren: 2,
       silencio: {
-        invited: 100,
-        responded: Math.round(justBelow * 100),
-        empleadosActivos: 100,
-        participationRate: justBelow,
+        invited: 10,
+        responded: 0,
+        empleadosActivos: 10,
+        participationRate: 0,
         coverageRate: 1,
         deptosNoInvitados: 0,
-        deptosSubThreshold: 0,
+        deptosSubThreshold: 2,
       },
     }),
+    // gB: 2 hijos, 1 con_isa + 1 sub_threshold → CON VOZ (regla mixto)
     mkRollup({
       groupId: 'gB',
       groupName: 'B',
+      totalChildren: 2,
+      isa: { weighted: 50, min: 50, max: 50, deptosConIsa: 1 },
       silencio: {
-        invited: 100,
-        responded: 50,
-        empleadosActivos: 100,
-        participationRate: justAt,
+        invited: 20,
+        responded: 5,
+        empleadosActivos: 20,
+        participationRate: 0.25,
         coverageRate: 1,
         deptosNoInvitados: 0,
-        deptosSubThreshold: 0,
+        deptosSubThreshold: 1,
       },
     }),
+    // gC: 1 hijo con_isa → con voz
     mkRollup({
       groupId: 'gC',
       groupName: 'C',
+      totalChildren: 1,
+      isa: { weighted: 70, min: 70, max: 70, deptosConIsa: 1 },
       silencio: {
-        invited: 100,
-        responded: 70,
-        empleadosActivos: 100,
-        participationRate: above,
+        invited: 10,
+        responded: 7,
+        empleadosActivos: 10,
+        participationRate: 0.7,
         coverageRate: 1,
         deptosNoInvitados: 0,
         deptosSubThreshold: 0,
@@ -255,10 +263,9 @@ test('4. muda_1: corte canónico < SILENCIO_PARTICIPATION_THRESHOLD (importado)'
   ];
   const s = deriveBeat1Slots(rollups, ctx());
 
-  // Solo gA cae bajo el umbral; gB en el boundary queda fuera (estricto <).
   assert.equal(s.gerencia_muda_1?.groupId, 'gA');
-  assert.equal(s.gerencia_muda_1?.participationRate, justBelow);
   assert.equal(s.gerencia_muda_1?.reason, 'low_participation');
+  assert.equal(s.gerencias_mudas_count, 1);
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -293,11 +300,13 @@ test('5. muda_1: no invitada (coverageRate === 0) → fallback reason="no_invita
 // CASE 5b — Precedencia: low_participation gana sobre no_invitada
 // ═══════════════════════════════════════════════════════════════════
 
-test('5b. muda_1: low_participation tiene PRECEDENCIA sobre no_invitada', () => {
+test('5b. muda_1: sub_threshold (primary) tiene PRECEDENCIA sobre no_invitada (fallback)', () => {
   const rollups: GerenciaRollup[] = [
+    // gA: 1 hijo sub_threshold → sin voz PRIMARY
     mkRollup({
       groupId: 'gA',
       groupName: 'A',
+      totalChildren: 1,
       silencio: {
         invited: 10,
         responded: 3,
@@ -305,12 +314,14 @@ test('5b. muda_1: low_participation tiene PRECEDENCIA sobre no_invitada', () => 
         participationRate: 0.3,
         coverageRate: 1,
         deptosNoInvitados: 0,
-        deptosSubThreshold: 0,
+        deptosSubThreshold: 1,
       },
     }),
+    // gB: no invitada (coverageRate=0) → FALLBACK
     mkRollup({
       groupId: 'gB',
       groupName: 'B',
+      totalChildren: 1,
       silencio: {
         invited: 0,
         responded: 0,
@@ -323,7 +334,7 @@ test('5b. muda_1: low_participation tiene PRECEDENCIA sobre no_invitada', () => 
     }),
   ];
   const s = deriveBeat1Slots(rollups, ctx());
-  // Primary (low_participation) gana; fallback no_invitada solo si primary vacío.
+  // Primary (sub_threshold) gana; fallback no_invitada solo si primary vacío.
   assert.equal(s.gerencia_muda_1?.groupId, 'gA');
   assert.equal(s.gerencia_muda_1?.reason, 'low_participation');
 });
@@ -332,39 +343,145 @@ test('5b. muda_1: low_participation tiene PRECEDENCIA sobre no_invitada', () => 
 // CASE 6 — gerencia_muda_1: múltiples mudas → elige la de MENOR participación
 // ═══════════════════════════════════════════════════════════════════
 
-test('6. muda_1: varias bajo umbral → elige la de menor participationRate', () => {
+test('6. muda_1: varias sin voz → elige la de más SEÑALES DE AMBIENTE', () => {
+  // Nuevo orden post-2026-06-03: entre las sin voz, lidera la que tiene más
+  // señales de clima/ambiente (Karin + toxic_exit + liderazgo). Tiebreak por
+  // riesgo.maxScore. Tiebreak final alfabético. NO por participación.
   const rollups: GerenciaRollup[] = [
+    // gA: 1 señal de ambiente
     mkRollup({
       groupId: 'gA',
       groupName: 'A',
+      totalChildren: 1,
       silencio: {
-        invited: 100,
-        responded: 40,
-        empleadosActivos: 100,
-        participationRate: 0.4,
-        coverageRate: 1,
-        deptosNoInvitados: 0,
-        deptosSubThreshold: 0,
+        invited: 10, responded: 0, empleadosActivos: 10,
+        participationRate: 0, coverageRate: 1,
+        deptosNoInvitados: 0, deptosSubThreshold: 1,
       },
+      senalesAmbiente: { signalsCount: 1, deptosConSenal: 1 },
+      riesgo: { maxScore: 50, worstDept: null },
     }),
+    // gB: 2 señales de ambiente → GANA
     mkRollup({
       groupId: 'gB',
       groupName: 'B',
+      totalChildren: 1,
       silencio: {
-        invited: 100,
-        responded: 20,
-        empleadosActivos: 100,
-        participationRate: 0.2,
-        coverageRate: 1,
-        deptosNoInvitados: 0,
-        deptosSubThreshold: 0,
+        invited: 10, responded: 0, empleadosActivos: 10,
+        participationRate: 0, coverageRate: 1,
+        deptosNoInvitados: 0, deptosSubThreshold: 1,
       },
+      senalesAmbiente: { signalsCount: 2, deptosConSenal: 1 },
+      riesgo: { maxScore: 40, worstDept: null },
+    }),
+    // gC: 0 señales pero mayor riesgo → no debería ganar (precedencia ambiente)
+    mkRollup({
+      groupId: 'gC',
+      groupName: 'C',
+      totalChildren: 1,
+      silencio: {
+        invited: 10, responded: 0, empleadosActivos: 10,
+        participationRate: 0, coverageRate: 1,
+        deptosNoInvitados: 0, deptosSubThreshold: 1,
+      },
+      senalesAmbiente: { signalsCount: 0, deptosConSenal: 0 },
+      riesgo: { maxScore: 90, worstDept: null },
     }),
   ];
   const s = deriveBeat1Slots(rollups, ctx());
   assert.equal(s.gerencia_muda_1?.groupId, 'gB');
-  assert.equal(s.gerencia_muda_1?.participationRate, 0.2);
   assert.equal(s.gerencia_muda_1?.reason, 'low_participation');
+});
+
+test('6b. muda_1: empate en señales de ambiente → tiebreak por riesgo.maxScore', () => {
+  const rollups: GerenciaRollup[] = [
+    mkRollup({
+      groupId: 'gA', groupName: 'A',
+      totalChildren: 1,
+      silencio: {
+        invited: 10, responded: 0, empleadosActivos: 10,
+        participationRate: 0, coverageRate: 1,
+        deptosNoInvitados: 0, deptosSubThreshold: 1,
+      },
+      senalesAmbiente: { signalsCount: 1, deptosConSenal: 1 },
+      riesgo: { maxScore: 60, worstDept: null },
+    }),
+    mkRollup({
+      groupId: 'gB', groupName: 'B',
+      totalChildren: 1,
+      silencio: {
+        invited: 10, responded: 0, empleadosActivos: 10,
+        participationRate: 0, coverageRate: 1,
+        deptosNoInvitados: 0, deptosSubThreshold: 1,
+      },
+      senalesAmbiente: { signalsCount: 1, deptosConSenal: 1 },
+      riesgo: { maxScore: 80, worstDept: null }, // gana
+    }),
+  ];
+  const s = deriveBeat1Slots(rollups, ctx());
+  assert.equal(s.gerencia_muda_1?.groupId, 'gB');
+});
+
+test('6c. muda_1: empate en señales y riesgo → tiebreak alfabético', () => {
+  const rollups: GerenciaRollup[] = [
+    mkRollup({
+      groupId: 'gZ', groupName: 'Zeta',
+      totalChildren: 1,
+      silencio: {
+        invited: 10, responded: 0, empleadosActivos: 10,
+        participationRate: 0, coverageRate: 1,
+        deptosNoInvitados: 0, deptosSubThreshold: 1,
+      },
+      senalesAmbiente: { signalsCount: 0, deptosConSenal: 0 },
+      riesgo: { maxScore: 50, worstDept: null },
+    }),
+    mkRollup({
+      groupId: 'gA', groupName: 'Alfa',
+      totalChildren: 1,
+      silencio: {
+        invited: 10, responded: 0, empleadosActivos: 10,
+        participationRate: 0, coverageRate: 1,
+        deptosNoInvitados: 0, deptosSubThreshold: 1,
+      },
+      senalesAmbiente: { signalsCount: 0, deptosConSenal: 0 },
+      riesgo: { maxScore: 50, worstDept: null },
+    }),
+  ];
+  const s = deriveBeat1Slots(rollups, ctx());
+  assert.equal(s.gerencia_muda_1?.groupId, 'gA');
+});
+
+test('6d. regresión mixto: rollup con ≥1 con_isa NO cuenta como muda', () => {
+  // Caso cmob0e56 escalado: rollup con 1 hijo con_isa + 1 sub_threshold
+  // (ej. Tecnología = TI con_isa + Desarrollo Software sub_threshold).
+  // Por la regla del mixto, NO cuenta como sin voz aunque su participación
+  // global esté bajo 50%.
+  const rollups: GerenciaRollup[] = [
+    mkRollup({
+      groupId: 'gMixto', groupName: 'Mixto',
+      totalChildren: 2,
+      isa: { weighted: 49, min: 49, max: 49, deptosConIsa: 1 },
+      silencio: {
+        invited: 15, responded: 5, empleadosActivos: 15,
+        participationRate: 0.33, // <50% pero da igual
+        coverageRate: 1,
+        deptosNoInvitados: 0,
+        deptosSubThreshold: 1, // 1 sub_threshold + 1 con_isa
+      },
+    }),
+    mkRollup({
+      groupId: 'gMudo', groupName: 'Mudo',
+      totalChildren: 1,
+      silencio: {
+        invited: 5, responded: 0, empleadosActivos: 5,
+        participationRate: 0, coverageRate: 1,
+        deptosNoInvitados: 0, deptosSubThreshold: 1,
+      },
+    }),
+  ];
+  const s = deriveBeat1Slots(rollups, ctx());
+  assert.equal(s.gerencias_mudas_count, 1); // solo gMudo
+  assert.equal(s.gerencia_muda_1?.groupId, 'gMudo');
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -604,17 +721,19 @@ test('13c. gerencias_universo_total: cuenta TODAS las invitadas (incluyendo las 
     mkRollup({
       groupId: 'gA',
       groupName: 'A',
+      totalChildren: 1,
       isa: { weighted: 85, min: 85, max: 85, deptosConIsa: 1 },
     }),
-    // Muda low_participation
+    // Muda sub_threshold (todos hijos sin con_isa)
     mkRollup({
       groupId: 'gB',
       groupName: 'B',
+      totalChildren: 1,
       isa: { weighted: null, min: null, max: null, deptosConIsa: 0 },
       silencio: {
-        invited: 10, responded: 3, empleadosActivos: 10,
-        participationRate: 0.3, coverageRate: 1,
-        deptosNoInvitados: 0, deptosSubThreshold: 0,
+        invited: 10, responded: 0, empleadosActivos: 10,
+        participationRate: 0, coverageRate: 1,
+        deptosNoInvitados: 0, deptosSubThreshold: 1,
       },
     }),
     // Muda no_invitada (defensa de invariante — no debería aparecer con el
@@ -622,6 +741,7 @@ test('13c. gerencias_universo_total: cuenta TODAS las invitadas (incluyendo las 
     mkRollup({
       groupId: 'gC',
       groupName: 'C',
+      totalChildren: 1,
       isa: { weighted: null, min: null, max: null, deptosConIsa: 0 },
       silencio: {
         invited: 0, responded: 0, empleadosActivos: 5,
@@ -631,41 +751,41 @@ test('13c. gerencias_universo_total: cuenta TODAS las invitadas (incluyendo las 
     }),
   ];
   const s = deriveBeat1Slots(rollups, ctx());
-  // Comparación clave: el universo es 3 (todas las gerencias). Las medidas
-  // son solo 1 (gA). Las mudas son 2 (gB + gC). El denominador de SILENCIO
-  // debe ser 3 (universo), no 1 (medidas) — si fuera 1, "2 de 1 sin voz"
-  // sería absurdo (más mudas que medidas).
   assert.equal(s.gerencias_universo_total, 3);
   assert.equal(s.gerencias_medidas_total, 1);
   assert.equal(s.gerencias_mudas_count, 2);
 });
 
-test('13b. gerencias_mudas_count: cuenta low_participation + no_invitada combinadas', () => {
+test('13b. gerencias_mudas_count: cuenta sub_threshold (primary) + no_invitada (fallback)', () => {
   const rollups: GerenciaRollup[] = [
-    // low_participation
+    // sub_threshold (ningún hijo con_isa, ≥1 sub_threshold)
     mkRollup({
       groupId: 'gA',
       groupName: 'A',
+      totalChildren: 1,
       silencio: {
-        invited: 10, responded: 3, empleadosActivos: 10,
-        participationRate: 0.3, coverageRate: 1,
-        deptosNoInvitados: 0, deptosSubThreshold: 0,
+        invited: 10, responded: 0, empleadosActivos: 10,
+        participationRate: 0, coverageRate: 1,
+        deptosNoInvitados: 0, deptosSubThreshold: 1,
       },
     }),
     // no_invitada
     mkRollup({
       groupId: 'gB',
       groupName: 'B',
+      totalChildren: 1,
       silencio: {
         invited: 0, responded: 0, empleadosActivos: 5,
         participationRate: null, coverageRate: 0,
         deptosNoInvitados: 1, deptosSubThreshold: 0,
       },
     }),
-    // above threshold — NO muda
+    // CON VOZ (1 hijo con_isa) — NO muda aunque participación sea baja
     mkRollup({
       groupId: 'gC',
       groupName: 'C',
+      totalChildren: 1,
+      isa: { weighted: 60, min: 60, max: 60, deptosConIsa: 1 },
       silencio: {
         invited: 10, responded: 7, empleadosActivos: 10,
         participationRate: 0.7, coverageRate: 1,
@@ -674,7 +794,7 @@ test('13b. gerencias_mudas_count: cuenta low_participation + no_invitada combina
     }),
   ];
   const s = deriveBeat1Slots(rollups, ctx());
-  // gA (low_part) + gB (no_inv) = 2. gC sobre umbral, no cuenta.
+  // gA (sub_threshold) + gB (no_invitada) = 2. gC tiene voz, no cuenta.
   assert.equal(s.gerencias_mudas_count, 2);
 });
 

@@ -623,6 +623,84 @@ test('11b. leyKarin sin señales → signalsCount: 0', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
+// CASE 11c — senalesAmbiente: superset de leyKarin
+//   Set canónico = ley_karin + ley_karin_indicios + toxic_exit_detected +
+//   liderazgo_concentracion. Cubre clima jurídico + salida tóxica + liderazgo.
+//   Excluye onboarding/retención y satisfacción genérica.
+// ═══════════════════════════════════════════════════════════════════
+
+test('11c. senalesAmbiente: cuenta los 4 alertTypes del set canónico (exit-only)', () => {
+  const riskScores: DepartmentRiskScore[] = [
+    mkRiskScore({
+      departmentId: 'd1',
+      parentGerenciaId: 'gA',
+      parentGerenciaName: 'A',
+      alertas: [
+        { alertType: 'ley_karin', producto: 'exit', pesoEfectivo: 3 },
+        { alertType: 'ley_karin_indicios', producto: 'exit', pesoEfectivo: 2 },
+        { alertType: 'toxic_exit_detected', producto: 'exit', pesoEfectivo: 3 },
+        { alertType: 'liderazgo_concentracion', producto: 'exit', pesoEfectivo: 2 },
+        // FUERA del set — debe ignorarse:
+        { alertType: 'nps_critico', producto: 'exit', pesoEfectivo: 1 },
+        { alertType: 'department_exit_pattern', producto: 'exit', pesoEfectivo: 2 },
+        { alertType: 'ABANDONO_DIA_1', producto: 'onboarding', pesoEfectivo: 2 },
+        { alertType: 'DESENGANCHE_CULTURAL', producto: 'onboarding', pesoEfectivo: 3 },
+        // producto onboarding incluso si el alertType matchea por error → fuera:
+        { alertType: 'ley_karin', producto: 'onboarding', pesoEfectivo: 1 },
+      ],
+    }),
+  ];
+  const r = buildGerenciaRollup(makeReport({ riskScores }))[0];
+  // 4 dentro del set, producto exit: ley_karin + ley_karin_indicios +
+  // toxic_exit_detected + liderazgo_concentracion = 4.
+  assert.equal(r.senalesAmbiente.signalsCount, 4);
+  assert.equal(r.senalesAmbiente.deptosConSenal, 1);
+});
+
+test('11d. senalesAmbiente: el caso que el proxy leyKarin fallaba — toxic_exit SIN ley_karin', () => {
+  // Antes del campo `senalesAmbiente`, el deriver Beat 1 usaba el proxy
+  // `leyKarin.signalsCount`. Un rollup con SOLO toxic_exit_detected o
+  // liderazgo_concentracion (sin ley_karin) daba leyKarin=0 → caía al
+  // fallback de maxScore en lugar del primary "más señales de ambiente".
+  // Este caso confirma que el campo canónico lo cubre.
+  const riskScores: DepartmentRiskScore[] = [
+    mkRiskScore({
+      departmentId: 'd1',
+      parentGerenciaId: 'gA',
+      parentGerenciaName: 'A',
+      alertas: [
+        { alertType: 'toxic_exit_detected', producto: 'exit', pesoEfectivo: 3 },
+        { alertType: 'liderazgo_concentracion', producto: 'exit', pesoEfectivo: 2 },
+      ],
+    }),
+  ];
+  const r = buildGerenciaRollup(makeReport({ riskScores }))[0];
+  assert.equal(r.leyKarin.signalsCount, 0); // ← el proxy fallaba acá
+  assert.equal(r.senalesAmbiente.signalsCount, 2); // ← el campo canónico SÍ los cuenta
+  assert.equal(r.senalesAmbiente.deptosConSenal, 1);
+});
+
+test('11e. senalesAmbiente: solo onboarding/retención/satisfacción → signalsCount: 0', () => {
+  const riskScores: DepartmentRiskScore[] = [
+    mkRiskScore({
+      departmentId: 'd1',
+      parentGerenciaId: 'gA',
+      parentGerenciaName: 'A',
+      alertas: [
+        { alertType: 'ABANDONO_DIA_1', producto: 'onboarding', pesoEfectivo: 3 },
+        { alertType: 'DESENGANCHE_CULTURAL', producto: 'onboarding', pesoEfectivo: 3 },
+        { alertType: 'RIESGO_FUGA', producto: 'onboarding', pesoEfectivo: 2 },
+        { alertType: 'nps_critico', producto: 'exit', pesoEfectivo: 1 },
+        { alertType: 'department_exit_pattern', producto: 'exit', pesoEfectivo: 2 },
+      ],
+    }),
+  ];
+  const r = buildGerenciaRollup(makeReport({ riskScores }))[0];
+  assert.equal(r.senalesAmbiente.signalsCount, 0);
+  assert.equal(r.senalesAmbiente.deptosConSenal, 0);
+});
+
+// ═══════════════════════════════════════════════════════════════════
 // CASE 12 — Dedup: gerencia level=2 invitada directa + hijos con su id
 //   como parentGerenciaId → 1 rollup fundido, NO standalone duplicado.
 //   Caso real cmob0e56: "Gerencia Comercial" salía 2 veces.

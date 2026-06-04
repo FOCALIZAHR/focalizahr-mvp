@@ -9,18 +9,25 @@
 //
 // Umbrales: SIN literales mágicos.
 //   - ISA "sana"        → getISARiskLevel(weighted) === 'saludable' (≥80)
-//   - silencio "muda"   → SILENCIO_PARTICIPATION_THRESHOLD (= 50, en %)
+//   - silencio "muda"   → rollup donde NINGÚN hijo es bucket=con_isa.
+//                         Alineado al motor del score (no a participación <50%);
+//                         coherente con Beat 2 Triage. `SILENCIO_PARTICIPATION_THRESHOLD`
+//                         sigue siendo el corte de la sexta alerta per-dept.
+//   - "empezando por"   → entre las mudas, primero las que tienen ≥1 alerta
+//                         ∈ SENALES_AMBIENTE (clima jurídico + salida tóxica
+//                         + concentración liderazgo). Excluye onboarding/retención.
 //
 // El deriver NO narra, NO clasifica el mundo (eso lo hace classifyD4 en
 // ActoAmbiente.tsx hoy) y NO decide qué slot mostrar. Solo expone todos
 // los slots posibles; Beat 1 elige según mundo + sabor.
 //
-// Spec: chat plan-mode aprobado 2026-05-30.
+// Spec: chat plan-mode aprobado 2026-05-30 (deriver) + 2026-06-03 (countMudas align bucket + SENALES_AMBIENTE).
 // ═══════════════════════════════════════════════════════════════════
 
 import { getISARiskLevel } from '@/lib/services/compliance/ISAService';
 import type { ISARiskLevel } from '@/lib/services/compliance/ISAService';
-import { SILENCIO_PARTICIPATION_THRESHOLD } from '@/lib/services/compliance/ComplianceAlertService';
+// SENALES_AMBIENTE vive en convergenciaWeights y se aplica en buildGerenciaRollup
+// (computa `r.senalesAmbiente.signalsCount`). El deriver solo lo lee del rollup.
 import type { GerenciaRollup } from './buildGerenciaRollup';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -48,9 +55,11 @@ export interface SlotGerenciaMuda extends SlotGerencia {
   /** 0-1 (fracción). null cuando reason === 'no_invitada' (no hubo invitaciones
    *  → no hay tasa que medir). */
   participationRate: number | null;
-  /** 'low_participation': participationRate * 100 < SILENCIO_PARTICIPATION_THRESHOLD.
-   *  'no_invitada':       coverageRate === 0 (fallback — gerencia con empleados
-   *                       activos donde nadie fue invitado a la campaña). */
+  /** 'low_participation': rollup "sin voz" — ningún hijo en bucket `con_isa`,
+   *                       y al menos uno `sub_threshold` (invitado, sin análisis
+   *                       completed). Shape conservado para back-compat downstream.
+   *  'no_invitada':       coverageRate === 0 (fallback — rollup entero con
+   *                       empleados activos donde nadie fue invitado). */
   reason: 'low_participation' | 'no_invitada';
 }
 
@@ -243,36 +252,44 @@ function pickWorstIsa(rollups: GerenciaRollup[]): SlotGerenciaIsa | null {
 }
 
 function pickMuda(rollups: GerenciaRollup[]): SlotGerenciaMuda | null {
-  // PRIMARY — gerencias cubiertas pero con participación bajo el umbral.
-  // participationRate * 100 < THRESHOLD (canónico, sexta alerta).
-  const lowPart = rollups.filter(
-    (r) =>
-      r.silencio.participationRate !== null &&
-      (r.silencio.participationRate as number) * 100 <
-        SILENCIO_PARTICIPATION_THRESHOLD,
-  );
-  if (lowPart.length > 0) {
-    // Menor participación primero; tiebreak alfabético.
-    lowPart.sort((a, b) => {
-      const ap = a.silencio.participationRate as number;
-      const bp = b.silencio.participationRate as number;
-      if (ap !== bp) return ap - bp;
+  // PRIMARY — rollups "sin voz" (ningún hijo con_isa). Mismo corte que countMudas.
+  const sinVoz = rollups.filter((r) => {
+    const deptosConIsa =
+      r.totalChildren -
+      r.silencio.deptosSubThreshold -
+      r.silencio.deptosNoInvitados;
+    return deptosConIsa === 0 && r.silencio.deptosSubThreshold > 0;
+  });
+
+  if (sinVoz.length > 0) {
+    // Orden dentro de las sin voz:
+    //   1) Más SEÑALES DE AMBIENTE (clima: Karin + toxic_exit + liderazgo).
+    //      Lee del agregado canónico `senalesAmbiente.signalsCount` del rollup.
+    //   2) Tiebreak: mayor riesgo.maxScore.
+    //   3) Tiebreak final: alfabético.
+    sinVoz.sort((a, b) => {
+      const aAmb = a.senalesAmbiente.signalsCount;
+      const bAmb = b.senalesAmbiente.signalsCount;
+      if (aAmb !== bAmb) return bAmb - aAmb;
+      if (b.riesgo.maxScore !== a.riesgo.maxScore) {
+        return b.riesgo.maxScore - a.riesgo.maxScore;
+      }
       return a.groupName.localeCompare(b.groupName);
     });
-    const r = lowPart[0];
+    const r = sinVoz[0];
     return {
       groupId: r.groupId,
       groupName: r.groupName,
       standalone: r.standalone,
-      participationRate: r.silencio.participationRate as number,
+      // Para "sin voz" el participationRate del rollup puede ser 0 (todos
+      // invitados con responded=0) o null (rollup entero no_invitado).
+      // Preservamos lo que reporte el rollup.
+      participationRate: r.silencio.participationRate,
       reason: 'low_participation',
     };
   }
 
-  // FALLBACK — gerencias con empleados activos pero NUNCA invitadas
-  // (coverageRate === 0 → invited === 0 && empleadosActivos > 0). Silencio
-  // total — semántica equivalente a la sexta alerta canónica que también
-  // incluye "sin cobertura" como candidato (ComplianceAlertService L943).
+  // FALLBACK — rollup entero no invitado (coverageRate === 0). Sin cambio.
   const noInvitadas = rollups.filter(
     (r) => r.silencio.coverageRate === 0,
   );
@@ -421,16 +438,30 @@ function computePersonResponseRate(rollups: GerenciaRollup[]): number | null {
   return Math.round((responded / invited) * 100);
 }
 
-/** Cuenta gerencias mudas (mismo criterio que pickMuda: low_participation
- *  O no_invitada). NO descarta gerencias en el primer match — cuenta todas. */
+/** Cuenta gerencias-rollup "sin voz" — alineado al bucket del motor del score.
+ *
+ *  Regla mixto (explícita): un rollup es "con voz" si ≥1 hijo es `con_isa`
+ *  (AS completed, ISA visible). Es "sin voz" solo si TODOS sus hijos están
+ *  en `sub_threshold` (ningún análisis completó) o si la gerencia entera
+ *  está `no_invitada` (coverageRate === 0).
+ *
+ *  Espejo del invariante que el motor usa downstream: si hay ≥1 con_isa, el
+ *  rollup tiene métrica defendible — Beat 2 lo muestra con ISA y banda válida.
+ *  La participación <50% deja de ser corte de exclusión (sigue siendo input
+ *  del driver continuo `confiabilidad`). Coherente con la sexta alerta que
+ *  sigue mirando participación per-dept (NO per-rollup).
+ */
 function countMudas(rollups: GerenciaRollup[]): number {
-  return rollups.filter(
-    (r) =>
-      r.silencio.coverageRate === 0 ||
-      (r.silencio.participationRate !== null &&
-        (r.silencio.participationRate as number) * 100 <
-          SILENCIO_PARTICIPATION_THRESHOLD),
-  ).length;
+  return rollups.filter((r) => {
+    const deptosConIsa =
+      r.totalChildren -
+      r.silencio.deptosSubThreshold -
+      r.silencio.deptosNoInvitados;
+    return (
+      deptosConIsa === 0 &&
+      (r.silencio.deptosSubThreshold > 0 || r.silencio.coverageRate === 0)
+    );
+  }).length;
 }
 
 function toSlotIsa(r: GerenciaRollup): SlotGerenciaIsa {
