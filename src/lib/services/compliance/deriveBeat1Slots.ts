@@ -130,6 +130,12 @@ export interface Beat1Slots {
    *  "Solo {coverage}% del equipo respondió" donde "del equipo" = personas.
    *  null si nadie fue invitado (universo == 0 personas). */
   personResponseRate: number | null;
+  /** Σ rollup.silencio.invited — total de personas invitadas a la campaña.
+   *  Crudo para narrativas tipo "10 personas de las 50" (Apertura). */
+  totalInvited: number;
+  /** Σ rollup.silencio.responded — total de personas que respondieron.
+   *  Crudo, par del slot `totalInvited`. */
+  totalResponded: number;
   /** Banda ISA org-level — derivada vía getISARiskLevel canónico. Slot del
    *  mundo NÚMERO BAJO ("El ISA cae en zona de {banda}"). */
   banda: ISARiskLevel;
@@ -204,6 +210,8 @@ export function deriveBeat1Slots(
     gerencias_mudas_count: countMudas(rollups),
     gerencias_universo_total: rollups.length,
     personResponseRate: computePersonResponseRate(rollups),
+    totalInvited: rollups.reduce((s, r) => s + r.silencio.invited, 0),
+    totalResponded: rollups.reduce((s, r) => s + r.silencio.responded, 0),
     banda: getISARiskLevel(ctx.orgISA),
     coverage_gap_pct: ctx.coverageGapPct,
 

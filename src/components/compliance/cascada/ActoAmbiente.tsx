@@ -217,54 +217,45 @@ function copyFor(
     case 'silencio': {
       subtitulo = 'EL SILENCIO ES EL DATO';
 
-      // Traducción: "Solo {coverage}% del equipo respondió. El {ISA} se apoya
-      // en esa minoría — y {gerencias_mudas_count} de {gerencias_total}
-      // gerencias quedaron sin voz, empezando por {gerencia_muda_1}."
-      // {gerencias_total} = slots.gerencias_universo_total (TODAS las invitadas),
-      // NO gerencias_medidas_total (excluye mudas → undercount el denominador).
-      // TODO BIEN sigue con gerencias_medidas_total (subset medidas es correcto
-      // para "X de Y respondieron con consistencia").
+      // Copy verbatim — chat aprobado 2026-06-04. Bindings (no hard-codes):
+      //   {ISA}      = orgISA
+      //   {nResp}    = slots.totalResponded
+      //   {nInv}     = slots.totalInvited
+      //   {conVoz}   = slots.gerencias_universo_total − slots.gerencias_mudas_count
+      //   {mudas}    = slots.gerencias_mudas_count
+      //   {total}    = slots.gerencias_universo_total
+      //   {gMuda}    = mudaName (formatDepartmentName(gerencia_muda_1.groupName))
+      const nResp = slots.totalResponded;
+      const nInv = slots.totalInvited;
       const mudasCount = slots.gerencias_mudas_count;
       const gerenciasTotal = slots.gerencias_universo_total;
-      const isaCore = `El ISA ${orgISA} se apoya en esa minoría`;
-      let tail: string;
-      if (mudasCount > 0) {
-        const verb = mudasCount === 1 ? 'gerencia quedó' : 'gerencias quedaron';
-        // Denominador solo si gerencias_total > 0 (degradación honesta —
-        // no afirmar "N de 0").
-        const countPart =
-          gerenciasTotal > 0
-            ? `${mudasCount} de ${gerenciasTotal} ${verb}`
-            : `${mudasCount} ${verb}`;
-        tail = mudaName
-          ? ` — y ${countPart} sin voz, empezando por ${mudaName}.`
-          : ` — y ${countPart} sin voz.`;
-      } else if (mudaName) {
-        tail = `, empezando por ${mudaName}.`;
-      } else {
-        tail = '.';
-      }
-      traduccion = `Solo ${coveragePct}% del equipo respondió. ${isaCore}${tail}`;
+      const conVoz = gerenciasTotal - mudasCount;
 
-      // Pero: "En {gerencia_muda_1} nadie habló por dentro — pero los que se
-      // fueron ya dejaron {exit_alerts_count} señales." Usa exit_alerts_count
-      // (org-level 12m desde el fix backend 2026-05-31). Omite si falta
-      // gerencia_muda_1 O si el conteo es 0.
-      if (mudaName && slots.exit_alerts_count > 0) {
-        const n = slots.exit_alerts_count;
-        const senalPlural = n === 1 ? 'señal' : 'señales';
+      // Párrafo 1 — traducción.
+      traduccion =
+        `El ambiente marca ${orgISA}. Pero ese número lo escribieron ${nResp} personas de las ${nInv} — ` +
+        `y todas concentradas en ${conVoz} de las ${gerenciasTotal} gerencias. ` +
+        `De las otras ${mudasCount} no entró una sola respuesta al cálculo. ` +
+        `El ${orgISA} no mide a la empresa: mide a quienes hablaron.`;
+
+      // Párrafo 2 — "pero" (hallazgo + nombre de la muda con señal de ambiente).
+      // Si no hay mudaName (defensivo — no debería ocurrir en este mundo),
+      // se degrada a la versión sin nombre.
+      if (mudaName) {
         pero =
-          `Un silencio de esta magnitud rara vez es desinterés. ` +
-          `En ${mudaName} nadie habló por dentro — pero los que se fueron ya dejaron ${n} ${senalPlural}. ` +
-          `Por dentro callan; por fuera, ya están hablando.`;
+          `El hallazgo, entonces, no es el ${orgISA}. Es que ${mudasCount} de ${gerenciasTotal} gerencias callaron por completo. ` +
+          `Y una de ellas —${mudaName}— no dejó números, pero sí un rastro: ` +
+          `una señal de salida de gente que ya se fue. ` +
+          `Un indicio, no una prueba; pero es el tipo de silencio que se entiende mirándolo, no pidiendo más respuestas.`;
       } else {
-        pero = null;
+        pero =
+          `El hallazgo, entonces, no es el ${orgISA}. Es que ${mudasCount} de ${gerenciasTotal} gerencias callaron por completo.`;
       }
 
-      // Cierre verbatim — sin "empezando por {gerencia_muda_1}" (el nombre
-      // ya apareció en la traducción; repetirlo en el cierre es redundante).
+      // Párrafo 3 — cierre (la pregunta).
       cierre =
-        'No se resuelve pidiendo más respuestas. Se resuelve entendiendo por qué nadie quiso dar la suya.';
+        `La pregunta que abre este informe no es cómo subir el ${orgISA}. ` +
+        `Es por qué ${mudasCount} de ${gerenciasTotal} gerencias no dijeron nada.`;
       break;
     }
 
