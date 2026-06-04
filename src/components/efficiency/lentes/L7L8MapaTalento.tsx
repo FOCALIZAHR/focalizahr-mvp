@@ -271,11 +271,7 @@ export function L7L8MapaTalento({
               }}
             >
               <p className="text-xs text-slate-300 font-light leading-relaxed">
-                Dos señales apuntan en la misma dirección: dominan su cargo y
-                lo que hacen se vuelve más valioso con IA, no más reemplazable.{' '}
-                <span className="text-cyan-300">El mercado ya identifica estos perfiles</span>.
-                Si la compensación no refleja ese nuevo valor, el reconocimiento
-                se convierte en un subsidio a la competencia.
+                Dos señales apuntan a lo mismo. Son de su mejor gente y están en los cargos que la IA está transformando, justo donde el mercado mira. El reconocimiento que llega después de la oferta de afuera ya no retiene, solo despide.
               </p>
             </div>
 

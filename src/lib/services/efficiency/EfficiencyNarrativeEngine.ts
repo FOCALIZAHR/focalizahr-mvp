@@ -118,7 +118,7 @@ export const LENTES_META: Record<LenteId, LenteMeta> = {
     id: 'l7_fuga',
     familia: 'ruta_ejecucion',
     titulo: 'Talento en riesgo',
-    subtitulo: 'Quien se volverá 3x productivo con IA',
+    subtitulo: 'Tu mejor gente en los cargos que la IA está transformando',
   },
   l8_retencion: {
     id: 'l8_retencion',
@@ -160,7 +160,7 @@ export const NARRATIVE_TEMPLATES: Record<LenteId, string> = {
 
   l6_seniority: `En {N_FAMILIAS} familias de cargo, un talento Junior con alta adaptabilidad equipado con las herramientas correctas generaría el mismo output operativo que el perfil Senior actual. Ahorro estructural proyectado: {CLP_AHORRO}/mes, {PCT_AHORRO}% de esa línea de nómina.`,
 
-  l7_fuga: `Tiene {N_PERSONAS} personas en el cuadrante de mayor valor cuya productividad se va a multiplicar con IA. Si la compensación no refleja ese nuevo valor antes de que el mercado lo haga, los perderá. Costo de reemplazo estimado: {CLP_REEMPLAZO}.`,
+  l7_fuga: `Tiene {N_PERSONAS} de su mejor gente justo en los cargos que la IA está transformando. Son las primeras que el mercado va a querer. Si el reconocimiento llega después que la oferta de afuera, llega tarde. Costo de reemplazo estimado: {CLP_REEMPLAZO}.`,
 
   l8_retencion: `El sistema cruzó metas, rendimiento y adaptabilidad futura e identificó {N_PRESCINDIBLES} personas prescindibles por valor relativo. No por política ni antigüedad: por evidencia de tres fuentes independientes. La lista roja está lista.`,
 

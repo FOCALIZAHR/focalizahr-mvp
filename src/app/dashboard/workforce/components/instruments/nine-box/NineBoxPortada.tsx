@@ -22,6 +22,9 @@ import type { RetentionEntry } from '@/lib/services/WorkforceIntelligenceService
 import { normalizePosition } from './nine-box-utils'
 
 /** Umbral "alta exposición" — alineado con foco del producto en β=0.5+. */
+// DEUDA CONOCIDA: HIGH_EXPOSURE_THRESHOLD local en 0.6 sigue el patrón viejo.
+// El módulo migró a effExposure > 0.5 (focalizaScore). Revisar y alinear si
+// este instrumento debe usar el umbral canónico.
 const HIGH_EXPOSURE_THRESHOLD = 0.6
 
 interface NineBoxPortadaProps {

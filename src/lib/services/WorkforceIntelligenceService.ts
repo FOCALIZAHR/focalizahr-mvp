@@ -532,8 +532,13 @@ export class WorkforceIntelligenceService {
   // ──────────────────────────────────────────────────────────────────────
 
   static detectAugmentedFlightRisk(enriched: EnrichedEmployee[]): AugmentedFlightRiskResult {
+    // Migrado a focalizaScore con threshold 0.5 (decisión Abril 2026).
+    // El gate previo (augmentationShare > 0.6) era imposible de cruzar: la share
+    // Anthropic comprimida tiene techo real ~0.167, dejando L7 vacío y el
+    // subconteo de flightRisk en cero en 5 superficies. Alineado con
+    // detectTalentZombies y calculateSeveranceLiability.
     const atRisk = enriched.filter(e =>
-      e.augmentationShare > 0.6 &&
+      effExposure(e) > 0.5 &&
       e.potentialEngagement === 3 &&
       (e.riskQuadrant === 'MOTOR_EQUIPO' || e.mobilityQuadrant === 'AMBICIOSO_PREMATURO')
     )
@@ -676,6 +681,9 @@ export class WorkforceIntelligenceService {
   // ──────────────────────────────────────────────────────────────────────
 
   static detectSeniorityCompression(enriched: EnrichedEmployee[]): SeniorityCompressionResult {
+    // DEUDA CONOCIDA: usa augmentationShare > 0.6, misma share Anthropic comprimida
+    // (techo real ~0.167) que dejaba L7 muerto. Este detector es L6, fuera de scope
+    // del fix de L7. Al retomar L6: migrar a effExposure > 0.5 como detectAugmentedFlightRisk.
     const highExposure = enriched.filter(e => e.jobZone >= 3 && e.jobZone <= 4 && e.augmentationShare > 0.6)
 
     // Agrupar por SOC + depto
