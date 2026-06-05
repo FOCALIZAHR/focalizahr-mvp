@@ -19,6 +19,7 @@ import { formatDepartmentName, stripWrappingQuotes } from '@/lib/utils/formatNam
 import { ActSeparator, fadeIn, fadeInDelay } from './shared';
 import { getISARiskLevel } from '@/lib/services/compliance/ISAService';
 import type { ISARiskLevel } from '@/lib/services/compliance/ISAService';
+import { classifyDimensionLevel } from '@/config/narratives/ComplianceNarrativeDictionary';
 import { getLegalMarcoName } from '@/config/compliance/legalBadgeConfig';
 import { buildGerenciaRollup } from '@/lib/services/compliance/buildGerenciaRollup';
 import { deriveBeat1Slots } from '@/lib/services/compliance/deriveBeat1Slots';
@@ -154,12 +155,13 @@ const BANDA_LABEL: Record<ISARiskLevel, string> = {
   critico: 'crítico',
 };
 
-function copyFor(
+export function copyFor(
   d4: D4Output,
   slots: Beat1Slots,
   orgISA: number,
   coveragePct: number,
   country: string | null | undefined,
+  p2CritEnConIsa: boolean,
 ): BeatCopy {
   // Nombres formateados (null cuando el slot no aplica).
   const mudaName = slots.gerencia_muda_1
@@ -215,47 +217,58 @@ function copyFor(
 
   switch (d4.mundo) {
     case 'silencio': {
-      subtitulo = 'EL SILENCIO ES EL DATO';
-
-      // Copy verbatim — chat aprobado 2026-06-04. Bindings (no hard-codes):
-      //   {ISA}      = orgISA
-      //   {nResp}    = slots.totalResponded
-      //   {nInv}     = slots.totalInvited
-      //   {conVoz}   = slots.gerencias_universo_total − slots.gerencias_mudas_count
-      //   {mudas}    = slots.gerencias_mudas_count
-      //   {total}    = slots.gerencias_universo_total
-      //   {gMuda}    = mudaName (formatDepartmentName(gerencia_muda_1.groupName))
+      // Bindings comunes a las dos ramas — arábigos directos del slot
+      // (consistente con Paso 2 commiteado en 2e7f727):
+      //   {ISA}    = orgISA
+      //   {nResp}  = slots.totalResponded
+      //   {nInv}   = slots.totalInvited
+      //   {conVoz} = slots.gerencias_universo_total − slots.gerencias_mudas_count
+      //   {mudas}  = slots.gerencias_mudas_count
+      //   {total}  = slots.gerencias_universo_total
       const nResp = slots.totalResponded;
       const nInv = slots.totalInvited;
       const mudasCount = slots.gerencias_mudas_count;
       const gerenciasTotal = slots.gerencias_universo_total;
       const conVoz = gerenciasTotal - mudasCount;
 
-      // Párrafo 1 — traducción.
-      traduccion =
-        `El ambiente marca ${orgISA}. Pero ese número lo escribieron ${nResp} personas de las ${nInv} — ` +
-        `y todas concentradas en ${conVoz} de las ${gerenciasTotal} gerencias. ` +
-        `De las otras ${mudasCount} no entró una sola respuesta al cálculo. ` +
-        `El ${orgISA} no mide a la empresa: mide a quienes hablaron.`;
-
-      // Párrafo 2 — "pero" (hallazgo + nombre de la muda con señal de ambiente).
-      // Si no hay mudaName (defensivo — no debería ocurrir en este mundo),
-      // se degrada a la versión sin nombre.
-      if (mudaName) {
-        pero =
-          `El hallazgo, entonces, no es el ${orgISA}. Es que ${mudasCount} de ${gerenciasTotal} gerencias callaron por completo. ` +
-          `Y una de ellas —${mudaName}— no dejó números, pero sí un rastro: ` +
-          `una señal de salida de gente que ya se fue. ` +
-          `Un indicio, no una prueba; pero es el tipo de silencio que se entiende mirándolo, no pidiendo más respuestas.`;
+      if (slots.banda === 'riesgo' && p2CritEnConIsa) {
+        // ── CELDA PUENTE — banda=riesgo + P2 crítico en TODOS los con_isa ──
+        // Copy verbatim aprobado 2026-06-05. 4 párrafos como prosa corrida
+        // (sin callouts border-l-2): se concentran en `traduccion` separados
+        // por `\n\n`. El render hace split-and-map para producir 4 <p>
+        // planos con space-y-4. `pero` y `cierre` quedan vacíos para omitir
+        // los callouts visuales.
+        subtitulo = '[EL QUE ELIJA VICTOR]';
+        traduccion =
+          `Este estudio no puede declarar sano el ambiente de la empresa. ` +
+          `Y lo que sí alcanzó a medir no tranquiliza: en las ${conVoz} gerencias que respondieron, ` +
+          `casi ninguna dimensión del ambiente llegó a un nivel sano.\n\n` +
+          `La que aparece crítica en ambas áreas es, precisamente, la que mide si la gente cree ` +
+          `que puede hablar sin consecuencias. Quienes respondieron ya sienten que hablar cuesta.\n\n` +
+          `Y ese ${orgISA} son apenas ${nResp} personas de las ${nInv}, en ${conVoz} de las ${gerenciasTotal} gerencias. ` +
+          `De las otras ${mudasCount} no entró una sola respuesta. ` +
+          `Leído junto a lo anterior, el silencio cambia de sentido: si los que hablaron dicen que ` +
+          `hablar no es seguro, el de los demás deja de parecer desinterés.\n\n` +
+          `Por eso el informe no puede cerrar el tema como resuelto: lo medido apunta a riesgo, ` +
+          `y lo callado pesa en la misma dirección. Ese ambiente no mejora persiguiendo el número, ` +
+          `sino atendiendo lo que lo causa: por qué hablar, donde se pudo escuchar, se siente inseguro, ` +
+          `y por qué la mayoría no respondió.`;
+        pero = null;
+        cierre = '';
       } else {
-        pero =
-          `El hallazgo, entonces, no es el ${orgISA}. Es que ${mudasCount} de ${gerenciasTotal} gerencias callaron por completo.`;
+        // ── RESPALDO — placeholder estructural (refinable cuando aparezca caso real) ──
+        // Cubre el resto del mundo silencio: otra banda, o banda=riesgo sin
+        // P2 crítico en todos los con_isa.
+        subtitulo = 'EL SILENCIO ES EL DATO';
+        const bandaLabel = BANDA_LABEL[slots.banda];
+        traduccion =
+          `Donde se pudo medir, el ambiente da ${bandaLabel}. ` +
+          `Pero esa lectura son ${nResp} de ${nInv} personas, en ${conVoz} de ${gerenciasTotal} gerencias — ` +
+          `del resto no entró respuesta. Vale para quienes hablaron; ` +
+          `el silencio de los demás impide leerlo como el cuadro de toda la empresa.`;
+        pero = null;
+        cierre = '';
       }
-
-      // Párrafo 3 — cierre (la pregunta).
-      cierre =
-        `La pregunta que abre este informe no es cómo subir el ${orgISA}. ` +
-        `Es por qué ${mudasCount} de ${gerenciasTotal} gerencias no dijeron nada.`;
       break;
     }
 
@@ -423,6 +436,21 @@ export default memo(function ActoAmbiente({ data }: ActoProps) {
     hasDenunciaFormal,
   });
 
+  // ─── Selector CELDA PUENTE — banda=riesgo + P2 crítico en TODOS los con_isa ─
+  // `departments` ya viene filtrado por route.ts:289 a deptos con resultPayload
+  // COMPLETED (= con_isa). El `.every()` y la frase "ambas áreas" del copy
+  // asumen exactamente 2 deptos con_isa (cmob0e56). Si un ciclo futuro entra
+  // silencio+riesgo+P2-crítico con 3+ con_isa, la palabra "ambas" queda mal.
+  // NO generalizar ahora — refinar el copy cuando aparezca el caso real.
+  const p2CritEnConIsa =
+    departments.length > 0 &&
+    departments.every((d) => {
+      const p2 = d.dimensionScores?.P2_seguridad;
+      return (
+        p2 !== null && p2 !== undefined && classifyDimensionLevel(p2) === 'critico'
+      );
+    });
+
   // ─── Beat 1 slots desde el rollup compartido (single source) ──────────
   const rollups = useMemo(() => buildGerenciaRollup(data), [data]);
   const slots = useMemo(
@@ -438,7 +466,7 @@ export default memo(function ActoAmbiente({ data }: ActoProps) {
   // (universo vacío de invitados — defensivo), fallback a 0.
   const cobInt = slots.personResponseRate ?? 0;
 
-  const copy = copyFor(d4, slots, isaInt, cobInt, country);
+  const copy = copyFor(d4, slots, isaInt, cobInt, country, p2CritEnConIsa);
   // Coloreo: 'todo-bien' y 'bien-con-focos' = tono sano (cyan). Otros usan
   // la intensidad clásica (alta/critico → purple, medio/alto → amber).
   const sano = d4.mundo === 'todo-bien' || d4.mundo === 'bien-con-focos';
@@ -466,10 +494,18 @@ export default memo(function ActoAmbiente({ data }: ActoProps) {
         </motion.div>
 
         <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-4">
-          {/* Traducción */}
-          <p className="text-base md:text-lg font-light text-slate-300 leading-relaxed text-center">
-            {copy.traduccion}
-          </p>
+          {/* Traducción — `\n\n` produce párrafos planos (prosa corrida sin
+              callout). Sin separadores: 1 <p> (backward-compat con todos los
+              mundos existentes). Hoy solo CELDA PUENTE del case 'silencio'
+              usa multi-párrafo. */}
+          {copy.traduccion.split('\n\n').map((para, i) => (
+            <p
+              key={i}
+              className="text-base md:text-lg font-light text-slate-300 leading-relaxed text-center"
+            >
+              {para}
+            </p>
+          ))}
 
           {/* El "pero" — null = omitir (degradación graceful) */}
           {copy.pero !== null && (
@@ -480,12 +516,16 @@ export default memo(function ActoAmbiente({ data }: ActoProps) {
             </div>
           )}
 
-          {/* Cierre (itálica) — siempre presente, voz del mundo. */}
-          <div className={cn('border-l-2 pl-4 mt-6', borderTier)}>
-            <p className="text-sm italic font-light text-slate-300 leading-relaxed">
-              {copy.cierre}
-            </p>
-          </div>
+          {/* Cierre (itálica) — `''` = omitir el callout (CELDA PUENTE /
+              RESPALDO concentran todo en traduccion). Otros mundos siempre
+              tienen cierre con contenido. */}
+          {copy.cierre.length > 0 && (
+            <div className={cn('border-l-2 pl-4 mt-6', borderTier)}>
+              <p className="text-sm italic font-light text-slate-300 leading-relaxed">
+                {copy.cierre}
+              </p>
+            </div>
+          )}
 
           {/* ORTOGONAL: género — línea adicional después del cierre. Anexada
               cuando hay alerta resoluble con cita literal. NO reemplaza al
