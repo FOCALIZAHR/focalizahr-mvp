@@ -304,6 +304,14 @@ export interface ComplianceReportResponse {
      *  (con_isa + sub_threshold + no_invitado), no solo los con AS.
      *  Runtime, no persistido. Optional para defender payloads pre-deploy. */
     riskScores?: DepartmentRiskScore[];
+    /** Semilla del hilo único Beat 1 ↔ Beat 6 — Gate 3+. Optional para
+     *  defender payloads legacy. Cuando presente, el frontend nuevo lo
+     *  consume; cuando ausente, cae a la lógica client-side legacy. */
+    beat1Seed?: import('@/types/ambiente-cascada').Beat1Seed;
+    /** Síntesis ejecutiva del Beat 6 — output del AmbienteSynthesisEngine.
+     *  Gate 3+. `null` significa que el Engine corrió pero no aplica (caso
+     *  patológico GENERIC con orgISA=null). Optional para legacy. */
+    synthesis?: import('@/types/ambiente-cascada').AmbienteSynthesis | null;
   };
   legalNotice: string;
 }

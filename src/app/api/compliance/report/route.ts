@@ -36,6 +36,8 @@ import {
 import { computeDepartmentRiskScores } from '@/lib/services/compliance/DepartmentRiskScoreService';
 import { detectSilencioConVozExterna } from '@/lib/services/compliance/detectSilencioConVozExterna';
 import { SILENCIO_PESO_MIN } from '@/lib/services/compliance/ComplianceAlertService';
+import { AmbienteRiskOrchestrator } from '@/lib/services/compliance/AmbienteRiskOrchestrator';
+import { AmbienteSynthesisEngine } from '@/lib/services/compliance/AmbienteSynthesisEngine';
 
 type ReportType = 'executive' | 'semestral';
 
@@ -329,9 +331,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Executive
-    return NextResponse.json({
-      success: true,
-      type: 'executive',
+    const executiveResponse = {
+      success: true as const,
+      type: 'executive' as const,
       generatedAt: new Date().toISOString(),
       campaign: {
         id: campaign.id,
@@ -414,6 +416,34 @@ export async function GET(request: NextRequest) {
       },
       legalNotice:
         'Análisis de gestión preventiva — No constituye investigación formal.',
+    };
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Gate 3 — Wire AmbienteRiskOrchestrator + AmbienteSynthesisEngine.
+    // El orchestrator wrappea el response actual y emite beat1Seed (capa
+    // server-side única para Beat 1 y Beat 6). El engine emite synthesis
+    // (Beat 6 motor diferencial — slots de copy vacíos hasta Gate 2.5).
+    //
+    // No reemplaza nada del response existente — solo agrega 2 keys
+    // opcionales bajo `data` que Beat 6 (Gate 4) y la UI nueva consumen.
+    // ═══════════════════════════════════════════════════════════════════
+    const orchestratorPayload = AmbienteRiskOrchestrator.buildAmbientePayload(
+      executiveResponse as Parameters<
+        typeof AmbienteRiskOrchestrator.buildAmbientePayload
+      >[0],
+    );
+    const synthesis = AmbienteSynthesisEngine.generate({
+      beat1Seed: orchestratorPayload.beat1Seed,
+      data: orchestratorPayload.data,
+    });
+
+    return NextResponse.json({
+      ...executiveResponse,
+      data: {
+        ...executiveResponse.data,
+        beat1Seed: orchestratorPayload.beat1Seed,
+        synthesis,
+      },
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Error desconocido';

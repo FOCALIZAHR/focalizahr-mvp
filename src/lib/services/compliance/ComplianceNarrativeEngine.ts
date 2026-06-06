@@ -1322,6 +1322,17 @@ const ORIGEN_LABELS: Record<OrigenOrganizacional, string> = {
  * positivo > cultural > localizado > sistémico.
  * `criticalByManager` debe venir ordenado por minIsa ASC (B4) — [0] = peor grupo.
  */
+/**
+ * @deprecated Gate 3 (2026-06-06). Reemplazado por `AmbienteSynthesisEngine`.
+ * Esta función sobrevive sólo para no romper consumidores legacy de la key
+ * `ReportNarratives.cascada.sintesis` mientras Beat 6 UI migra a leer
+ * `payload.synthesis` (Gate 4). Eliminar en Gate 8 junto con la key
+ * `cascada.sintesis` completa.
+ *
+ * El categorizador if/else de 4 estados (positivo/cultural/localizado/sistemico)
+ * NO implementa el patrón Talento detect→score→priority→diferencial — por eso
+ * el hilo Beat 1 ↔ Beat 6 quedaba roto. Ver plan §3.1.2 + §3.5.
+ */
 export function buildCierreFrancotirador(
   criticalByManager: CriticalByManagerGroup[],
   metaAnalysis: MetaAnalysisOutput | null,
