@@ -39,8 +39,8 @@ import type {
 import type {
   ReportNarratives,
   DepartmentRiskScore,
+  ComplianceReportDepartment,
 } from '@/types/compliance';
-import type { DepartmentSafetyScore } from '@/lib/services/SafetyScoreService';
 import type { ISAResult } from '@/lib/services/compliance/ISAService';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -120,8 +120,10 @@ export interface AmbienteRiskData {
   teatroCount: number;
 
   // ─── Per-dept (Beat 2 Triage + Beat 3 Anatomía) ────────────────────────────
-  /** 6 dimensiones P2/P3/P4/P5/P7/P8, filtradas por privacy (n<5 → skipped). */
-  scoresPerDept: DepartmentSafetyScore[];
+  /** Per-dept extendido: safety + dimScores + isaScore + deltaVsAnterior +
+   *  teatroCumplimiento (extiende DepartmentSafetyScore con las llaves que el
+   *  endpoint ya emite). Filtrado por privacy (n<5 → skipped). */
+  scoresPerDept: ComplianceReportDepartment[];
   /** Score 0-100 + drivers (confiabilidad/voz_externa/piso_denuncia) + bucket. */
   riskScoresPerDept: DepartmentRiskScore[];
 
