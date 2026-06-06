@@ -27,100 +27,21 @@ import type { Beat1Slots } from '@/lib/services/compliance/deriveBeat1Slots';
 import type { ComplianceReportResponse } from '@/types/compliance';
 
 // ════════════════════════════════════════════════════════════════════════════
-// CLASIFICADOR D4 — 5 mundos exhaustivos + intensidad ortogonal
+// CLASIFICADOR D4 — IMPORT, no re-declaración
 // ════════════════════════════════════════════════════════════════════════════
-// Spec: .claude/tasks/ESPEC_APERTURA_AMBIENTE_SANO.md §2
+// Gate 1 (2026-06-06) movió la lógica D4 a server-side
+// (`@/lib/services/compliance/deriveBeat1Slots`). Razón: el bug "Beat 1
+// client-classify + Beat 6 server-synthesize discrepan" se elimina con UNA
+// sola autoridad sobre el mundo. Beat 1 y Beat 6 leen `beat1Seed.mundoDominante`.
 //
-// Selector cascada — cada rama es condición POSITIVA, cero else-significativo.
-// Primera condición verdadera gana. La última (NÚMERO BAJO) es positiva
-// también: cubre exactamente "ISA < 80 ∧ gap < 50 ∧ teatro = 0" (lo que queda
-// después de 1-4). Ramas 1-4 son mutuamente excluyentes por construcción,
-// 5 captura el complemento positivo.
-//
-// Género SALE del trigger: es ortogonal (cláusula anexa al mundo que salga,
-// no compite). Ley Karin lo mismo.
+// Re-export de `classifyD4` para no romper consumidores existentes (tests).
+// Mismo input/output (más una `trace` adicional que los consumidores ignoran).
 
-type Mundo =
-  | 'silencio'         // gap ≥ 50
-  | 'contradiccion'    // teatro ≥ 1 ∧ gap < 50
-  | 'todo-bien'        // ISA ≥ 80 ∧ riesgoDeptos = 0 ∧ gap < 30
-  | 'bien-con-focos'   // ISA ≥ 80 ∧ (riesgoDeptos ≥ 1 ∨ gap ∈ [30,50))
-  | 'numero-bajo';     // resto positivo (ISA < 80)
+import { classifyD4 } from '@/lib/services/compliance/deriveBeat1Slots';
+import type { ClassifyD4Output } from '@/lib/services/compliance/deriveBeat1Slots';
+import type { Mundo, Intensidad } from '@/types/ambiente-cascada';
 
-type Intensidad = 'leve' | 'medio' | 'alto' | 'critico';
-
-interface D4Output {
-  mundo: Mundo;
-  intensidad: Intensidad;
-  hasDenunciaFormal: boolean;
-}
-
-const INTENSIDAD_ORDER: Intensidad[] = ['leve', 'medio', 'alto', 'critico'];
-
-function intensidadFromISA(orgISA: number): Intensidad {
-  if (orgISA >= 80) return 'leve';
-  if (orgISA >= 60) return 'medio';
-  if (orgISA >= 40) return 'alto';
-  return 'critico';
-}
-
-function bumpIntensidad(base: Intensidad): Intensidad {
-  const i = INTENSIDAD_ORDER.indexOf(base);
-  if (i < 0) return base;
-  const next = Math.min(i + 1, INTENSIDAD_ORDER.length - 1);
-  return INTENSIDAD_ORDER[next];
-}
-
-export function classifyD4(input: {
-  orgISA: number;
-  riesgoDeptos: number;
-  coverageGapPct: number;
-  teatroCount: number;
-  hasDenunciaFormal: boolean;
-}): D4Output {
-  const { orgISA, riesgoDeptos, coverageGapPct, teatroCount, hasDenunciaFormal } = input;
-
-  let mundo: Mundo;
-
-  // 1. SILENCIO — gap dominante. Gana al teatro (no se afirma contradicción
-  //    confiable sobre la minoría que respondió). Fork resuelto a favor de
-  //    SILENCIO por orden de evaluación.
-  if (coverageGapPct >= 50) {
-    mundo = 'silencio';
-  }
-  // 2. CONTRADICCIÓN — números vs respuestas abiertas. Implícito gap < 50.
-  else if (teatroCount >= 1) {
-    mundo = 'contradiccion';
-  }
-  // 3. TODO BIEN — ISA saludable + sin focos de riesgo + cobertura plena.
-  else if (
-    getISARiskLevel(orgISA) === 'saludable' &&
-    riesgoDeptos === 0 &&
-    coverageGapPct < 30
-  ) {
-    mundo = 'todo-bien';
-  }
-  // 4. BIEN CON FOCOS — ISA saludable pero hay foco de riesgo o cobertura
-  //    parcial. Los dos sabores los resuelve el deriver/copyFor según
-  //    gerencia_foco_1 (sabor riesgo) vs ausencia (sabor cobertura).
-  else if (
-    getISARiskLevel(orgISA) === 'saludable' &&
-    (riesgoDeptos >= 1 || (coverageGapPct >= 30 && coverageGapPct < 50))
-  ) {
-    mundo = 'bien-con-focos';
-  }
-  // 5. NÚMERO BAJO — complemento positivo: ISA < 80 ∧ gap < 50 ∧ teatro = 0.
-  //    El `else` cierra la partición — cero else-como-significado: la única
-  //    combinación que queda es esta.
-  else {
-    mundo = 'numero-bajo';
-  }
-
-  const intensidadBase = intensidadFromISA(orgISA);
-  const intensidad = hasDenunciaFormal ? bumpIntensidad(intensidadBase) : intensidadBase;
-
-  return { mundo, intensidad, hasDenunciaFormal };
-}
+export { classifyD4 };
 
 // ════════════════════════════════════════════════════════════════════════════
 // COPY POR MUNDO — VERBATIM de .claude/tasks/ESPEC_APERTURA_AMBIENTE_SANO.md
@@ -155,8 +76,13 @@ const BANDA_LABEL: Record<ISARiskLevel, string> = {
   critico: 'crítico',
 };
 
+// `copyFor` solo necesita el subset {mundo, intensidad, hasDenunciaFormal} del
+// classifier — el `trace` es para audit, no para narrar. Subset explícito para
+// que callers (incluidos tests) puedan construir el d4 sin la traza.
+type D4ForCopy = Pick<ClassifyD4Output, 'mundo' | 'intensidad' | 'hasDenunciaFormal'>;
+
 export function copyFor(
-  d4: D4Output,
+  d4: D4ForCopy,
   slots: Beat1Slots,
   orgISA: number,
   coveragePct: number,

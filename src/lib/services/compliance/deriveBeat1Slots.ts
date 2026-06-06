@@ -480,3 +480,119 @@ function toSlotIsa(r: GerenciaRollup): SlotGerenciaIsa {
     isaWeighted: r.isa.weighted as number,
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// CLASIFICADOR D4 — 5 mundos exhaustivos + intensidad ortogonal
+// ═══════════════════════════════════════════════════════════════════
+//
+// Spec: .claude/tasks/ESPEC_APERTURA_AMBIENTE_SANO.md §2
+//
+// Cascada de condiciones POSITIVAS, cero else-significativo. Primera
+// condición verdadera gana. La última (NÚMERO BAJO) es positiva también:
+// cubre exactamente "ISA < 80 ∧ gap < 50 ∧ teatro = 0" (lo que queda
+// después de 1-4). Ramas 1-4 son mutuamente excluyentes por construcción,
+// 5 captura el complemento positivo.
+//
+// Género y Ley Karin SALEN del trigger: son cláusulas ortogonales anexas
+// al mundo que salga, no compiten.
+//
+// MOVIDO desde ActoAmbiente.tsx (client) a este servicio (server) en Gate 1.
+// Razón: el bug "Beat 1 client-classify + Beat 6 server-synthesize discrepan"
+// se elimina con UNA sola autoridad sobre el mundo. Beat 1 y Beat 6 leen
+// `Beat1Seed.mundoDominante` server-side.
+// ═══════════════════════════════════════════════════════════════════
+
+import type { Mundo, Intensidad, ClassifyD4Trace } from '@/types/ambiente-cascada';
+
+const INTENSIDAD_ORDER: Intensidad[] = ['leve', 'medio', 'alto', 'critico'];
+
+/** ISA → intensidad base (sin bump por denuncia). */
+export function intensidadFromISA(orgISA: number): Intensidad {
+  if (orgISA >= 80) return 'leve';
+  if (orgISA >= 60) return 'medio';
+  if (orgISA >= 40) return 'alto';
+  return 'critico';
+}
+
+/** Bump +1 en la escala (saturado al máximo). Usado cuando hay denuncia
+ *  formal cargada (ortogonal: sube la intensidad sin cambiar el mundo). */
+export function bumpIntensidad(base: Intensidad): Intensidad {
+  const i = INTENSIDAD_ORDER.indexOf(base);
+  if (i < 0) return base;
+  const next = Math.min(i + 1, INTENSIDAD_ORDER.length - 1);
+  return INTENSIDAD_ORDER[next];
+}
+
+export interface ClassifyD4Input {
+  orgISA: number;
+  riesgoDeptos: number;
+  coverageGapPct: number;
+  teatroCount: number;
+  hasDenunciaFormal: boolean;
+}
+
+export interface ClassifyD4Output {
+  mundo: Mundo;
+  intensidad: Intensidad;
+  hasDenunciaFormal: boolean;
+  /** Traza auditable de qué rama disparó — la usa el Engine de síntesis para
+   *  detectar discordancias dominante↔mundo. */
+  trace: ClassifyD4Trace;
+}
+
+/** Clasifica el "mundo" del Beat 1 a partir de 4 inputs canónicos. Pure
+ *  function — sin side effects, sin queries. */
+export function classifyD4(input: ClassifyD4Input): ClassifyD4Output {
+  const { orgISA, riesgoDeptos, coverageGapPct, teatroCount, hasDenunciaFormal } = input;
+
+  let mundo: Mundo;
+  let branchHit: string;
+
+  // 1. SILENCIO — gap dominante. Gana al teatro (no se afirma contradicción
+  //    confiable sobre la minoría que respondió).
+  if (coverageGapPct >= 50) {
+    mundo = 'silencio';
+    branchHit = 'silencio: gap >= 50';
+  }
+  // 2. CONTRADICCIÓN — números vs respuestas abiertas. Implícito gap < 50.
+  else if (teatroCount >= 1) {
+    mundo = 'contradiccion';
+    branchHit = 'contradiccion: teatro >= 1 ∧ gap < 50';
+  }
+  // 3. TODO BIEN — ISA saludable + sin focos de riesgo + cobertura plena.
+  else if (orgISA >= 80 && riesgoDeptos === 0 && coverageGapPct < 30) {
+    mundo = 'todo-bien';
+    branchHit = 'todo-bien: ISA >= 80 ∧ riesgoDeptos = 0 ∧ gap < 30';
+  }
+  // 4. BIEN CON FOCOS — ISA saludable pero hay foco de riesgo o cobertura
+  //    parcial. Los dos sabores los resuelve el deriver/copyFor según
+  //    gerencia_foco_1 (sabor riesgo) vs ausencia (sabor cobertura).
+  else if (
+    orgISA >= 80 &&
+    (riesgoDeptos >= 1 || (coverageGapPct >= 30 && coverageGapPct < 50))
+  ) {
+    mundo = 'bien-con-focos';
+    branchHit = 'bien-con-focos: ISA >= 80 ∧ (riesgo >= 1 ∨ gap ∈ [30,50))';
+  }
+  // 5. NÚMERO BAJO — complemento positivo: ISA < 80 ∧ gap < 50 ∧ teatro = 0.
+  else {
+    mundo = 'numero-bajo';
+    branchHit = 'numero-bajo: ISA < 80 ∧ gap < 50 ∧ teatro = 0';
+  }
+
+  const intensidadBase = intensidadFromISA(orgISA);
+  const intensidad = hasDenunciaFormal ? bumpIntensidad(intensidadBase) : intensidadBase;
+
+  return {
+    mundo,
+    intensidad,
+    hasDenunciaFormal,
+    trace: {
+      orgISA,
+      riesgoDeptos,
+      coverageGapPct,
+      teatroCount,
+      branchHit,
+    },
+  };
+}
