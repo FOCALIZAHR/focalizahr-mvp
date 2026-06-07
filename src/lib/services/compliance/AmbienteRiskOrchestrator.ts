@@ -22,12 +22,19 @@
 
 import { buildGerenciaRollup } from './buildGerenciaRollup';
 import { classifyD4, deriveBeat1Slots } from './deriveBeat1Slots';
+import {
+  DIMENSION_CEO_LABELS,
+  type ComplianceDimensionKey,
+} from '@/config/narratives/ComplianceNarrativeDictionary';
 import type { ComplianceReportResponse } from '@/types/compliance';
 import type {
   AmbienteRiskPayload,
   AmbienteRiskData,
   AmbienteRiskNarratives,
   Beat1Seed,
+  FactoresTitulares,
+  FactorTitular,
+  ExtremosTitulares,
 } from '@/types/ambiente-cascada';
 
 export class AmbienteRiskOrchestrator {
@@ -179,12 +186,133 @@ export class AmbienteRiskOrchestrator {
       coverageGapPct: data.coverageGapPct,
     });
 
+    // Gate 5 (§3.6) — titulares de factores y extremos para que Beat 1 nombre
+    // veredicto + factores + extremos como cláusulas del mismo argumento.
+    const factoresTitulares = this.buildFactoresTitulares(data);
+    const extremosTitulares = this.buildExtremosTitulares(data);
+
     return {
       mundoDominante: classified.mundo,
       intensidad: classified.intensidad,
       hasDenunciaFormal: classified.hasDenunciaFormal,
       beat1Slots,
+      factoresTitulares,
+      extremosTitulares,
       classifyD4Trace: classified.trace,
+    };
+  }
+
+  // ────────────────────────────────────────────────────────────────────────
+  // BEAT 1 TITULARES — factores (top 2 dims por banda) + extremos (gerencias)
+  // ────────────────────────────────────────────────────────────────────────
+
+  /** Promedia las 6 dimensiones org-level ponderando por respondentCount.
+   *  Retorna las que tienen dato (entre 0 y 6); las dims sin masa quedan fuera. */
+  private static buildOrgDimensionAverages(
+    data: AmbienteRiskData,
+  ): FactorTitular[] {
+    const DIM_KEYS: ComplianceDimensionKey[] = [
+      'P2_seguridad',
+      'P3_disenso',
+      'P4_microagresiones',
+      'P5_equidad',
+      'P7_liderazgo',
+      'P8_agotamiento',
+    ];
+
+    const result: FactorTitular[] = [];
+    for (const key of DIM_KEYS) {
+      let weightedSum = 0;
+      let totalWeight = 0;
+      for (const dept of data.scoresPerDept) {
+        const v = dept.dimensionScores?.[key];
+        const w = dept.respondentCount ?? 0;
+        if (typeof v === 'number' && w > 0) {
+          weightedSum += v * w;
+          totalWeight += w;
+        }
+      }
+      if (totalWeight > 0) {
+        result.push({
+          dimensionKey: key,
+          labelCEO: DIMENSION_CEO_LABELS[key],
+          valor: weightedSum / totalWeight,
+        });
+      }
+    }
+    return result;
+  }
+
+  /** Factores titulares según banda ISA (regla del MAPA, §3.6):
+   *  - Banda alta (ISA ≥ 80): top 2 fortalezas. `debilidades=[]`,
+   *    `fortalezaRelativa=null`.
+   *  - Banda observación/baja (ISA < 80): bottom 2 debilidades. `fortalezas=[]`,
+   *    `fortalezaRelativa` = la mejor relativa. */
+  private static buildFactoresTitulares(
+    data: AmbienteRiskData,
+  ): FactoresTitulares {
+    const averages = this.buildOrgDimensionAverages(data);
+    const orgISA = data.orgISA;
+
+    if (averages.length === 0 || orgISA === null) {
+      return { fortalezas: [], debilidades: [], fortalezaRelativa: null };
+    }
+
+    // Banda alta — solo fortalezas.
+    if (orgISA >= 80) {
+      const sortedDesc = [...averages].sort((a, b) => b.valor - a.valor);
+      return {
+        fortalezas: sortedDesc.slice(0, 2),
+        debilidades: [],
+        fortalezaRelativa: null,
+      };
+    }
+
+    // Banda observación o baja — debilidades + fortaleza relativa.
+    const sortedAsc = [...averages].sort((a, b) => a.valor - b.valor);
+    const debilidades = sortedAsc.slice(0, 2);
+    // Fortaleza relativa = la mejor del set (no necesariamente "buena", solo
+    // la menos mala). Solo si hay ≥3 dims medidas (con 1-2 no aporta).
+    const fortalezaRelativa =
+      averages.length >= 3 ? sortedAsc[sortedAsc.length - 1] : null;
+
+    return {
+      fortalezas: [],
+      debilidades,
+      fortalezaRelativa,
+    };
+  }
+
+  /** Extremos titulares — mejor/peor gerencia por ISA, solo si ≥2 con ISA. */
+  private static buildExtremosTitulares(
+    data: AmbienteRiskData,
+  ): ExtremosTitulares {
+    const conIsa = data.rollupsPerGerencia.filter(
+      (r) => r.isa.weighted !== null,
+    );
+    if (conIsa.length < 2) {
+      return { mejor: null, peor: null };
+    }
+
+    // Mayor ISA, tiebreak alfabético.
+    const sortedDesc = [...conIsa].sort((a, b) => {
+      const diff = (b.isa.weighted as number) - (a.isa.weighted as number);
+      if (diff !== 0) return diff;
+      return a.groupName.localeCompare(b.groupName);
+    });
+    const best = sortedDesc[0];
+
+    // Menor ISA, tiebreak alfabético.
+    const sortedAsc = [...conIsa].sort((a, b) => {
+      const diff = (a.isa.weighted as number) - (b.isa.weighted as number);
+      if (diff !== 0) return diff;
+      return a.groupName.localeCompare(b.groupName);
+    });
+    const worst = sortedAsc[0];
+
+    return {
+      mejor: { gerenciaName: best.groupName, isa: best.isa.weighted as number },
+      peor: { gerenciaName: worst.groupName, isa: worst.isa.weighted as number },
     };
   }
 }

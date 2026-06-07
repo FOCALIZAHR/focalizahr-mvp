@@ -98,6 +98,12 @@ function mkBeat1Seed(over: Partial<Beat1Seed> = {}): Beat1Seed {
       gerencia_ley_karin_1: null,
       ...(over.beat1Slots ?? {}),
     },
+    factoresTitulares: over.factoresTitulares ?? {
+      fortalezas: [],
+      debilidades: [],
+      fortalezaRelativa: null,
+    },
+    extremosTitulares: over.extremosTitulares ?? { mejor: null, peor: null },
     classifyD4Trace: {
       orgISA: 49,
       riesgoDeptos: 0,

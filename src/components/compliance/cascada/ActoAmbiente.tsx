@@ -354,13 +354,25 @@ export default memo(function ActoAmbiente({ data }: ActoProps) {
     (rs) => (rs.inputs.denuncias_12m ?? 0) >= 1,
   );
 
-  const d4 = classifyD4({
-    orgISA,
-    riesgoDeptos,
-    coverageGapPct,
-    teatroCount,
-    hasDenunciaFormal,
-  });
+  // ─── Gate 5 (§3.6): preferir payload.beat1Seed server-side. Fallback al
+  //     cálculo client-side preserva back-compat con campañas legacy donde
+  //     el orchestrator no se ejecutó (pre-Gate 3) o consumers que aún
+  //     pasan ComplianceReportResponse sin la key beat1Seed. ──────────────
+  const seedFromPayload = data.data.beat1Seed;
+
+  const d4 = seedFromPayload
+    ? {
+        mundo: seedFromPayload.mundoDominante,
+        intensidad: seedFromPayload.intensidad,
+        hasDenunciaFormal: seedFromPayload.hasDenunciaFormal,
+      }
+    : classifyD4({
+        orgISA,
+        riesgoDeptos,
+        coverageGapPct,
+        teatroCount,
+        hasDenunciaFormal,
+      });
 
   // ─── Selector CELDA PUENTE — banda=riesgo + P2 crítico en TODOS los con_isa ─
   // `departments` ya viene filtrado por route.ts:289 a deptos con resultPayload
@@ -377,11 +389,14 @@ export default memo(function ActoAmbiente({ data }: ActoProps) {
       );
     });
 
-  // ─── Beat 1 slots desde el rollup compartido (single source) ──────────
+  // ─── Beat 1 slots: del payload si está, o recálculo client (back-compat) ─
   const rollups = useMemo(() => buildGerenciaRollup(data), [data]);
   const slots = useMemo(
-    () => deriveBeat1Slots(rollups, { orgISA, coverageGapPct }),
-    [rollups, orgISA, coverageGapPct],
+    () =>
+      seedFromPayload
+        ? seedFromPayload.beat1Slots
+        : deriveBeat1Slots(rollups, { orgISA, coverageGapPct }),
+    [seedFromPayload, rollups, orgISA, coverageGapPct],
   );
 
   // Cifras presentational (regla del COPY doc: ISA sin decimales, % enteros).

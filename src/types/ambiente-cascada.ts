@@ -71,6 +71,52 @@ export interface ClassifyD4Trace {
   branchHit: string;
 }
 
+/** Dimensión del instrumento (P2/P3/P4/P5/P7/P8). */
+export type ComplianceDimensionKey =
+  | 'P2_seguridad'
+  | 'P3_disenso'
+  | 'P4_microagresiones'
+  | 'P5_equidad'
+  | 'P7_liderazgo'
+  | 'P8_agotamiento';
+
+/** Titular de un factor de dimensión — usado en `factoresTitulares` para que
+ *  Beat 1 nombre las 2 fortalezas o 2 debilidades en lenguaje CEO. */
+export interface FactorTitular {
+  dimensionKey: ComplianceDimensionKey;
+  /** Label CEO (de `DIMENSION_CEO_LABELS`). NUNCA el key técnico (P2/P3). */
+  labelCEO: string;
+  /** Score 1-5 promedio org-level ponderado por respondentCount. */
+  valor: number;
+}
+
+/** Titular de un extremo de gerencia — usado en `extremosTitulares` para Beat 1. */
+export interface ExtremoTitular {
+  gerenciaName: string;
+  /** ISA 0-100 ponderado de la gerencia. */
+  isa: number;
+}
+
+/** Titulares de factores y extremos — propios de Beat 1 según §3.6.
+ *  La regla del MAPA:
+ *  - Banda alta (ISA ≥ 80): 0-2 fortalezas (top dims), `debilidades=[]`,
+ *    `fortalezaRelativa=null`.
+ *  - Banda baja (ISA < 60): 0-2 debilidades (bottom dims), `fortalezas=[]`,
+ *    `fortalezaRelativa` = la mejor dim relativa.
+ *  - Banda observación (60-79): mismo que banda baja (advierte, no celebra).
+ *  Si no hay safety scores org-level → todos los campos vacíos. */
+export interface FactoresTitulares {
+  fortalezas: FactorTitular[];
+  debilidades: FactorTitular[];
+  fortalezaRelativa: FactorTitular | null;
+}
+
+/** Mejor / peor gerencia por ISA — solo si ≥2 gerencias con ISA medido. */
+export interface ExtremosTitulares {
+  mejor: ExtremoTitular | null;
+  peor: ExtremoTitular | null;
+}
+
 /** Semilla del hilo único. Beat 1 (UI) y AmbienteSynthesisEngine (Beat 6)
  *  leen LA MISMA autoridad — eliminado el bug "classifyD4 client-side +
  *  cierre server-side discrepan". */
@@ -79,6 +125,12 @@ export interface Beat1Seed {
   intensidad: Intensidad;
   hasDenunciaFormal: boolean;
   beat1Slots: Beat1Slots;
+  /** Gate 5 (§3.6) — titulares de factores (fortalezas/debilidades de 6 dims)
+   *  para que Beat 1 nombre el diagnóstico ISA completo: veredicto + factores
+   *  + extremos. Beats 2 y 3 desarrollan el detalle (zoom progresivo). */
+  factoresTitulares: FactoresTitulares;
+  /** Gate 5 (§3.6) — extremos titulares (mejor/peor gerencia) si ≥2 con ISA. */
+  extremosTitulares: ExtremosTitulares;
   classifyD4Trace: ClassifyD4Trace;
 }
 

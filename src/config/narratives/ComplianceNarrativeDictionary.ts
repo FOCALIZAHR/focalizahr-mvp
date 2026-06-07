@@ -34,6 +34,23 @@ export type ComplianceDimensionKey =
  */
 export type ComplianceDimensionLevel = 'sano' | 'atencion' | 'riesgo' | 'critico';
 
+/**
+ * Labels CEO de cada dimensión (en lenguaje de negocio, NO el key técnico).
+ * Usados por `Beat1Seed.factoresTitulares` (Gate 5) para que Beat 1 nombre
+ * fortalezas/debilidades en español ejecutivo, no como "P2_seguridad".
+ *
+ * Auditados contra los comentarios del propio dictionary (`P2 — Seguridad
+ * psicológica · Clima de confianza para reportar`, etc.).
+ */
+export const DIMENSION_CEO_LABELS: Record<ComplianceDimensionKey, string> = {
+  P2_seguridad: 'Seguridad psicológica',
+  P3_disenso: 'Manejo del disenso',
+  P4_microagresiones: 'Respeto cotidiano',
+  P5_equidad: 'Equidad de reglas',
+  P7_liderazgo: 'Calidad de liderazgo',
+  P8_agotamiento: 'Sostenibilidad relacional',
+};
+
 export interface ComplianceDimensionNarrative {
   /** Headline tono CEO — máximo 8 palabras, frase con punto. */
   headline: string;

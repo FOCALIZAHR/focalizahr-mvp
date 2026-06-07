@@ -54,7 +54,7 @@ function mkCmob0e56Response(): ComplianceReportResponse {
       artefacto4_alertas: [],
       cierre: { titular: '', body: '' },
       cascada: undefined,
-    } as ComplianceReportResponse['narratives'],
+    } as unknown as ComplianceReportResponse['narratives'],
     data: {
       orgSafetyScore: 2.8,
       orgISA: 49,
@@ -88,8 +88,8 @@ function mkCmob0e56Response(): ComplianceReportResponse {
             participationRate: 90,
             respondentCount: 9,
           },
-        ] as ComplianceReportResponse['data']['coverage']['deptosCobertura'],
-      } as ComplianceReportResponse['data']['coverage'],
+        ] as unknown as ComplianceReportResponse['data']['coverage']['deptosCobertura'],
+      } as unknown as ComplianceReportResponse['data']['coverage'],
       departments: [
         {
           departmentId: 'd-tech',
@@ -221,7 +221,75 @@ test('3. AREA_MANAGER scope (criticalByManager=[]) preserva silencio', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// 4. Empty response → graceful degradation (no throw)
+// 4. Beat 1 titulares — factoresTitulares según banda ISA (Gate 5)
+// ═══════════════════════════════════════════════════════════════════
+
+test('4. cmob0e56 (ISA 49, banda baja) → factoresTitulares emite 2 debilidades + fortaleza relativa', () => {
+  const response = mkCmob0e56Response();
+  const payload = AmbienteRiskOrchestrator.buildAmbientePayload(response);
+
+  // Banda baja (ISA < 60) → debilidades + fortalezaRelativa, sin fortalezas.
+  assert.equal(payload.beat1Seed.factoresTitulares.fortalezas.length, 0);
+  assert.equal(payload.beat1Seed.factoresTitulares.debilidades.length, 2);
+  assert.ok(payload.beat1Seed.factoresTitulares.fortalezaRelativa !== null);
+
+  // En el fixture: P2_seguridad=1.8 (la peor) y P4_microagresiones=2.0 (segunda).
+  const debs = payload.beat1Seed.factoresTitulares.debilidades;
+  assert.equal(debs[0].dimensionKey, 'P2_seguridad');
+  assert.equal(debs[0].labelCEO, 'Seguridad psicológica');
+  assert.equal(debs[1].dimensionKey, 'P4_microagresiones');
+
+  // Fortaleza relativa = la mejor (P8_agotamiento=3.5).
+  assert.equal(
+    payload.beat1Seed.factoresTitulares.fortalezaRelativa!.dimensionKey,
+    'P8_agotamiento',
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// 5. Beat 1 titulares — banda alta (ISA ≥ 80) emite fortalezas, NO debilidades
+// ═══════════════════════════════════════════════════════════════════
+
+test('5. Banda alta (ISA 85, todas dims sanas) → 2 fortalezas + sin debilidades', () => {
+  const response = mkCmob0e56Response();
+  response.data.orgISA = 85;
+  response.data.departments[0].dimensionScores = {
+    P2_seguridad: 4.8,
+    P3_disenso: 4.5,
+    P4_microagresiones: 4.6,
+    P5_equidad: 4.7,
+    P7_liderazgo: 4.3,
+    P8_agotamiento: 4.4,
+  };
+
+  const payload = AmbienteRiskOrchestrator.buildAmbientePayload(response);
+
+  assert.equal(payload.beat1Seed.factoresTitulares.fortalezas.length, 2);
+  assert.equal(payload.beat1Seed.factoresTitulares.debilidades.length, 0);
+  assert.equal(payload.beat1Seed.factoresTitulares.fortalezaRelativa, null);
+
+  // P2_seguridad (4.8) gana, P5_equidad (4.7) segundo.
+  const forts = payload.beat1Seed.factoresTitulares.fortalezas;
+  assert.equal(forts[0].dimensionKey, 'P2_seguridad');
+  assert.equal(forts[1].dimensionKey, 'P5_equidad');
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// 6. Beat 1 titulares — extremosTitulares solo si ≥2 gerencias con ISA
+// ═══════════════════════════════════════════════════════════════════
+
+test('6. Una sola gerencia con ISA → extremosTitulares vacío (no se afirma "la mejor")', () => {
+  const response = mkCmob0e56Response();
+  // El fixture tiene solo 1 dept con isaScore (TI). Eso resulta en 1 rollup
+  // con ISA. La regla del MAPA: extremos NO se afirman con menos de 2.
+  const payload = AmbienteRiskOrchestrator.buildAmbientePayload(response);
+
+  assert.equal(payload.beat1Seed.extremosTitulares.mejor, null);
+  assert.equal(payload.beat1Seed.extremosTitulares.peor, null);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// 7. Empty response → graceful degradation (no throw)
 // ═══════════════════════════════════════════════════════════════════
 
 test('4. Response con shape mínimo vacío → no throw, emite GENERIC', () => {
@@ -249,7 +317,7 @@ test('4. Response con shape mínimo vacío → no throw, emite GENERIC', () => {
       artefacto4_alertas: [],
       cierre: { titular: '', body: '' },
       cascada: undefined,
-    } as ComplianceReportResponse['narratives'],
+    } as unknown as ComplianceReportResponse['narratives'],
     data: {
       orgSafetyScore: null,
       orgISA: null,
@@ -264,7 +332,7 @@ test('4. Response con shape mínimo vacío → no throw, emite GENERIC', () => {
         silencioConVozExterna: [],
         participacionAnomala: [],
         deptosCobertura: [],
-      } as ComplianceReportResponse['data']['coverage'],
+      } as unknown as ComplianceReportResponse['data']['coverage'],
       departments: [],
       skippedByPrivacy: [],
       metaAnalysis: null,
