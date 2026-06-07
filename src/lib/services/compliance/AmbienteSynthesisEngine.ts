@@ -30,6 +30,10 @@ import type {
   Amplificador,
 } from '@/types/ambiente-cascada';
 import type { NivelFinal } from '@/lib/services/compliance/ConvergenciaEngine';
+import {
+  SYNTHESIS_DICTIONARY,
+  AMPLIFIER_CLAUSES,
+} from './AmbienteSynthesisDictionary';
 
 // ════════════════════════════════════════════════════════════════════════════
 // UMBRALES — todos exportados para auditabilidad y tests
@@ -489,16 +493,23 @@ export class AmbienteSynthesisEngine {
       amplificadores.push({ tipo: 'CONVERGENCIA_ONBOARDING', deptos: soloOnb });
 
     // ─── SEXTA_ALERTA ─────────────────────────────────────────────────────
-    // Se incluye si hay sub_threshold con voz externa Y dominante no es SILENCIO_SIN_VOZ
-    // (donde la sexta ya está implícita en el dominante).
+    // Se incluye si hay sub_threshold con voz externa Y dominante no es
+    // SILENCIO_SIN_VOZ (donde la sexta ya está implícita en el dominante).
+    // `deptos` lleva NAMES legibles (no IDs) — los consume la cláusula de
+    // narrativa en AmbienteSynthesisDictionary.
     if (
       data.silencioConVozExterna &&
       data.silencioConVozExterna.length > 0 &&
       dominanteType !== 'SILENCIO_SIN_VOZ'
     ) {
-      const deptos = (data.silencioConVozExterna as Array<{ departmentId: string | null }>)
-        .map((s) => s.departmentId)
-        .filter((id): id is string => typeof id === 'string');
+      const deptos = (
+        data.silencioConVozExterna as Array<{
+          departmentId: string | null;
+          departmentName: string | null;
+        }>
+      )
+        .map((s) => s.departmentName ?? s.departmentId)
+        .filter((n): n is string => typeof n === 'string');
       if (deptos.length > 0) {
         amplificadores.push({ tipo: 'SEXTA_ALERTA', deptos });
       }
@@ -506,9 +517,14 @@ export class AmbienteSynthesisEngine {
 
     // ─── OTRO_MUNDO ───────────────────────────────────────────────────────
     if (data.otroMundo && data.otroMundo.length > 0) {
-      const deptos = (data.otroMundo as Array<{ departmentId: string | null }>)
-        .map((s) => s.departmentId)
-        .filter((id): id is string => typeof id === 'string');
+      const deptos = (
+        data.otroMundo as Array<{
+          departmentId: string | null;
+          departmentName: string | null;
+        }>
+      )
+        .map((s) => s.departmentName ?? s.departmentId)
+        .filter((n): n is string => typeof n === 'string');
       if (deptos.length > 0) {
         amplificadores.push({ tipo: 'OTRO_MUNDO', deptos });
       }
@@ -538,16 +554,22 @@ export class AmbienteSynthesisEngine {
       ],
     };
 
+    // Lookup de copy verbatim del Dictionary (Gate 2.5). Donde el Dictionary
+    // emite '', el Engine pasa '' transparente — la UI oculta esos slots.
+    const dictEntry = SYNTHESIS_DICTIONARY[dominante.type];
+    const implication = this.composeImplication(
+      dictEntry.implicationBase,
+      amplificadores,
+    );
+
     return {
       diagnosticType: dominante.type,
       trigger: dominante.trigger,
 
-      // Slots de copy — Gate 2.5 los llena con verbatim Victor desde
-      // `AmbienteSynthesisDictionary.ts`. Hasta entonces, "" explícito.
-      classification: '',
-      implication: '',
-      path: '',
-      accountability: '',
+      classification: dictEntry.classification,
+      implication,
+      path: dictEntry.path,
+      accountability: dictEntry.accountability,
 
       supportingData,
       amplificadoresActivos: amplificadores,
@@ -556,7 +578,44 @@ export class AmbienteSynthesisEngine {
         nivelFinal: convergencia.nivelFinal,
         fuentes: convergencia.fuentes,
       },
+      // Opcional — FUEGO_LEGAL solamente.
+      ...(dictEntry.legalNote ? { legalNote: dictEntry.legalNote } : {}),
     };
+  }
+
+  /** Compone `implication = base + cláusulas[].join(' ')` (§3.5.7).
+   *  Orden de cláusulas: AMBOS → EXIT → ONBOARDING → TEATRO → SEXTA → OTRO_MUNDO. */
+  private static composeImplication(
+    base: string,
+    amplificadores: Amplificador[],
+  ): string {
+    if (amplificadores.length === 0) return base;
+
+    const ORDER: Array<Amplificador['tipo']> = [
+      'CONVERGENCIA_AMBOS',
+      'CONVERGENCIA_EXIT',
+      'CONVERGENCIA_ONBOARDING',
+      'TEATRO_EN_DEPTO',
+      'SEXTA_ALERTA',
+      'OTRO_MUNDO',
+    ];
+
+    const byType = new Map<Amplificador['tipo'], Amplificador>();
+    for (const a of amplificadores) byType.set(a.tipo, a);
+
+    const clauses: string[] = [];
+    for (const tipo of ORDER) {
+      const a = byType.get(tipo);
+      if (!a) continue;
+      const fn = AMPLIFIER_CLAUSES[tipo];
+      if (!fn) continue; // Cláusula aún no entregada por Victor — se omite.
+      const text = fn(a.deptos);
+      if (text) clauses.push(text);
+    }
+
+    if (clauses.length === 0) return base;
+    if (!base) return clauses.join(' ');
+    return `${base} ${clauses.join(' ')}`;
   }
 
   // ──────────────────────────────────────────────────────────────────────────

@@ -505,21 +505,134 @@ test('13. amplificadoresActivos: SEXTA_ALERTA solo si dominante ≠ SILENCIO_SIN
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// 14. Slots de copy emiten "" en Gate 2 (Gate 2.5 los llena)
+// 14. Gate 2.5 parche mecánico — 9 slots REUSE traen verbatim Victor
 // ═══════════════════════════════════════════════════════════════════
 
-test('14. Gate 2: slots de copy emiten "" — Gate 2.5 los llena con verbatim Victor', () => {
+test('14a. TODO_BIEN consume 3 slots REUSE verbatim del Dictionary', () => {
   const data = mkData({ orgISA: 85, riesgoDeptosCount: 0, teatroCount: 0 });
   const beat1Seed = mkBeat1Seed({ mundoDominante: 'todo-bien' });
 
   const result = AmbienteSynthesisEngine.generate({ beat1Seed, data });
 
-  assert.equal(result.classification, '', 'classification debe ser "" hasta Gate 2.5.');
-  assert.equal(result.implication, '', 'implication debe ser "" hasta Gate 2.5.');
-  assert.equal(result.path, '', 'path debe ser "" hasta Gate 2.5.');
-  assert.equal(result.accountability, '', 'accountability debe ser "" hasta Gate 2.5.');
-  // supportingData sí está poblado — son datos crudos, no copy.
-  assert.ok(result.supportingData.primaryMetric.length > 0);
+  // REUSE verbatim de buildCierreFrancotirador.positivo
+  assert.equal(
+    result.classification,
+    'Este ciclo no registra gerencias en zona crítica.',
+  );
+  assert.equal(
+    result.implication,
+    'El mandato no es celebrar. Es sostener las condiciones que produjeron este resultado.',
+  );
+  assert.equal(
+    result.accountability,
+    'El próximo ciclo confirmará si fue una tendencia.',
+  );
+  // path queda '' hasta Gate 2.5 completo.
+  assert.equal(result.path, '');
+});
+
+test('14b. CONCENTRACION_MANDO + SISTEMICO_SIN_MANDO traen classification/accountability REUSE', () => {
+  // CONCENTRACION_MANDO
+  const data1 = mkData({
+    orgISA: 55,
+    riesgoDeptosCount: 5,
+    criticalByManager: [
+      { managerId: 'm', departmentIds: ['d1', 'd2', 'd3', 'd4'] },
+    ],
+  });
+  const r1 = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'numero-bajo' }),
+    data: data1,
+  });
+  assert.equal(
+    r1.classification,
+    'Este no es un problema cultural. Es un problema con dirección identificada.',
+  );
+  assert.equal(
+    r1.accountability,
+    'El próximo ciclo confirmará si estas decisiones fueron efectivas.',
+  );
+  // implicationBase queda '' hasta resolver interpolación.
+  assert.equal(r1.implication, '');
+
+  // SISTEMICO_SIN_MANDO
+  const data2 = mkData({
+    orgISA: 55,
+    riesgoDeptosCount: 4,
+    criticalByManager: [],
+  });
+  const r2 = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'numero-bajo' }),
+    data: data2,
+  });
+  assert.equal(
+    r2.classification,
+    'Este no es un problema de liderazgo. Es un problema de diseño.',
+  );
+  assert.equal(r2.accountability, 'El próximo ciclo dirá cuál de las dos.');
+});
+
+test('14c. GENERIC trae path patológico fijo §3.5.8 — NO inventa "sin dirección clara"', () => {
+  const data = mkData({ orgISA: null });
+  const beat1Seed = mkBeat1Seed({ mundoDominante: 'numero-bajo' });
+
+  const result = AmbienteSynthesisEngine.generate({ beat1Seed, data });
+
+  assert.equal(result.diagnosticType, 'GENERIC');
+  assert.equal(
+    result.path,
+    'El próximo ciclo confirmará si hay una dirección clara.',
+  );
+  assert.notEqual(
+    result.implication,
+    'el origen no tiene dirección clara',
+    'NUNCA emite la frase del bug del Francotirador legacy.',
+  );
+});
+
+test('14d. Tipos sin copy aún (FUEGO_LEGAL, SILENCIO, etc.) emiten "" — Engine pasa transparente', () => {
+  const data = mkData({
+    orgISA: 49,
+    coverageGapPct: 82,
+    riesgoDeptosCount: 2,
+  });
+  const beat1Seed = mkBeat1Seed({ mundoDominante: 'silencio' });
+
+  const result = AmbienteSynthesisEngine.generate({ beat1Seed, data });
+
+  assert.equal(result.diagnosticType, 'SILENCIO_SIN_VOZ');
+  // Sin copy en Dictionary aún — slots vacíos. UI los oculta.
+  assert.equal(result.classification, '');
+  assert.equal(result.path, '');
+});
+
+test('14e. Cláusulas amplificadoras REUSE — SEXTA_ALERTA + CONVERGENCIA_AMBOS', () => {
+  // Construyo escenario BIEN_CON_FOCOS + SEXTA_ALERTA para verificar la cláusula.
+  const data = mkData({
+    orgISA: 85,
+    coverageGapPct: 10,
+    riesgoDeptosCount: 2,
+    silencioConVozExterna: [
+      { departmentId: 'd-comercial', departmentName: 'Comercial' },
+      { departmentId: 'd-tech', departmentName: 'TI' },
+    ],
+  });
+  const result = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'bien-con-focos' }),
+    data,
+  });
+
+  // El dominante BIEN_CON_FOCOS aún no tiene implicationBase (Victor escribe);
+  // pero la cláusula SEXTA debe llegar al implication final.
+  assert.equal(result.diagnosticType, 'BIEN_CON_FOCOS');
+  assert.ok(
+    result.implication.includes('Comercial') && result.implication.includes('TI'),
+    'La cláusula SEXTA debe nombrar los deptos: ' + result.implication,
+  );
+  assert.ok(
+    result.implication.includes('otras fuentes documentaron señales activas'),
+    'REUSE verbatim de buildAlertas.silencio_con_voz_externa.contexto: ' + result.implication,
+  );
 });
 
 // Sanity check: thresholds exportados son los del plan.
