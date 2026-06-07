@@ -70,15 +70,22 @@ export interface ReportNarratives {
   artefacto4_alertas: AlertaNarrative[];
   cierre: CierreNarrative;
   /**
-   * Narrativas de la Cascada Ejecutiva (5 actos). `undefined` cuando orgISA
-   * es null (campañas legacy/sin ISA). route.ts la suprime para AREA_MANAGER.
+   * Narrativas de la Cascada Ejecutiva (4 actos legacy). `undefined` cuando
+   * orgISA es null (campañas legacy/sin ISA). route.ts la suprime para
+   * AREA_MANAGER.
+   *
+   * Gate 8 (2026-06-07): `sintesis` removida — Beat 6 ahora consume
+   * `payload.synthesis` del AmbienteSynthesisEngine. Los acto1-4 sobreviven
+   * como deuda menor: nadie en la UI los consume tras la reorganización
+   * de Gate 6 (los nuevos beats leen riskScores/dimensionScores/etc directo),
+   * pero la composición sigue calculándolos. Borrarlos en un commit
+   * de hygiene posterior.
    */
   cascada?: {
     acto1: Acto1AmbienteNarrative;
     acto2: Acto2PatronNarrative;
     acto3: Acto3SenalesNarrative;
     acto4: Acto4AlertasNarrative;
-    sintesis: SintesisFrancotirador;
   };
 }
 
@@ -1294,126 +1301,16 @@ export function buildActo4Alertas(alertas: AlertaInput[]): Acto4AlertasNarrative
   };
 }
 
-/** Síntesis "El Francotirador" — una gerencia · una raíz · una decisión. */
-export interface SintesisFrancotirador {
-  estado: 'cultural' | 'localizado' | 'sistemico' | 'positivo';
-  /** "Este no es un problema de X. Es un problema de Y." */
-  classification: string;
-  /** Por qué esa clasificación importa. */
-  implication: string;
-  /** Cierre — "El próximo ciclo confirmará...". */
-  accountability: string;
-  /** Label del CTA al plan. */
-  ctaLabel: string;
-}
-
-/** Traducción del origen organizacional a lenguaje ejecutivo. */
-const ORIGEN_LABELS: Record<OrigenOrganizacional, string> = {
-  vertical_descendente: 'viene de quien tiene autoridad',
-  horizontal_pares: 'está entre equipos, no en el liderazgo',
-  sistemico_procesos: 'es de diseño, no de personas',
-  mixto: 'no tiene una sola fuente',
-  indeterminado: 'aún no tiene dirección clara',
-};
-
-/**
- * Síntesis de la Cascada — colapsa criticalByManager + origen + riesgo en
- * "una gerencia · una raíz · una decisión". 4 estados por prioridad:
- * positivo > cultural > localizado > sistémico.
- * `criticalByManager` debe venir ordenado por minIsa ASC (B4) — [0] = peor grupo.
- */
-/**
- * @deprecated Gate 3 (2026-06-06). Reemplazado por `AmbienteSynthesisEngine`.
- * Esta función sobrevive sólo para no romper consumidores legacy de la key
- * `ReportNarratives.cascada.sintesis` mientras Beat 6 UI migra a leer
- * `payload.synthesis` (Gate 4). Eliminar en Gate 8 junto con la key
- * `cascada.sintesis` completa.
- *
- * El categorizador if/else de 4 estados (positivo/cultural/localizado/sistemico)
- * NO implementa el patrón Talento detect→score→priority→diferencial — por eso
- * el hilo Beat 1 ↔ Beat 6 quedaba roto. Ver plan §3.1.2 + §3.5.
- */
-export function buildCierreFrancotirador(
-  criticalByManager: CriticalByManagerGroup[],
-  metaAnalysis: MetaAnalysisOutput | null,
-  departments: DepartmentConvergencia[],
-  riesgoDeptos: number,
-): SintesisFrancotirador {
-  const origen = ORIGEN_LABELS[metaAnalysis?.origen_organizacional ?? 'indeterminado'];
-  const deptNamesById = new Map(
-    departments.map((d) => [d.departmentId, d.departmentName]),
-  );
-  const resolveNames = (ids: string[]): string[] =>
-    ids.map((id) => deptNamesById.get(id)).filter((n): n is string => typeof n === 'string');
-
-  // Estado D — Positivo: sin gerencias en riesgo ni concentración bajo un mando.
-  if (riesgoDeptos === 0 && criticalByManager.length === 0) {
-    return {
-      estado: 'positivo',
-      classification: 'Este ciclo no registra gerencias en zona crítica.',
-      implication:
-        'El mandato no es celebrar. ' +
-        'Es sostener las condiciones que produjeron este resultado.',
-      accountability: 'El próximo ciclo confirmará si fue una tendencia.',
-      ctaLabel: 'Ir al plan',
-    };
-  }
-
-  // Estado A — Cultural: el patrón cruza la organización.
-  if (metaAnalysis?.es_problema_cultural === true) {
-    const peorGrupo = criticalByManager[0] ?? null;
-    const nombres = peorGrupo ? resolveNames(peorGrupo.departmentIds) : [];
-    const classification =
-      nombres.length > 0
-        ? `Este no es un problema de ${formatDeptList(nombres)}. ` +
-          'Es el patrón que ahí se manifiesta primero.'
-        : 'Este no es un problema de una gerencia puntual. ' +
-          'Es un patrón que ya cruza la organización.';
-    return {
-      estado: 'cultural',
-      classification,
-      implication:
-        `El origen ${origen}. ` +
-        'Intervenir solo en un lugar es tratar el síntoma.',
-      accountability:
-        'El próximo ciclo confirmará si estas decisiones fueron al fondo o a la superficie.',
-      ctaLabel: 'Ir al plan',
-    };
-  }
-
-  // Estado B — Localizado: el riesgo se concentra bajo una línea de mando.
-  if (criticalByManager.length > 0) {
-    const nombres = resolveNames(criticalByManager[0].departmentIds);
-    const concentra =
-      nombres.length > 0
-        ? `${formatDeptList(nombres)} concentran el riesgo bajo una misma línea de mando.`
-        : 'Un grupo de gerencias concentra el riesgo bajo una misma línea de mando.';
-    return {
-      estado: 'localizado',
-      classification:
-        'Este no es un problema cultural. Es un problema con dirección identificada.',
-      implication:
-        `${concentra} El origen ${origen}. ` +
-        'El problema tiene nombre. La decisión también.',
-      accountability:
-        'El próximo ciclo confirmará si estas decisiones fueron efectivas.',
-      ctaLabel: 'Ir al plan',
-    };
-  }
-
-  // Estado C — Sistémico: hay riesgo, pero sin línea de mando común.
-  return {
-    estado: 'sistemico',
-    classification:
-      'Este no es un problema de liderazgo. Es un problema de diseño.',
-    implication:
-      `${riesgoDeptos} ${riesgoDeptos === 1 ? 'gerencia' : 'gerencias'} en zona de revisión este ciclo sin línea de mando común. ` +
-      'O el problema es sistémico. ' +
-      'O todavía no tiene masa suficiente para identificar el patrón.',
-    accountability: 'El próximo ciclo dirá cuál de las dos.',
-    ctaLabel: 'Ir al plan',
-  };
-}
+// Síntesis "El Francotirador" — removida en Gate 8 (2026-06-07).
+// Reemplazada por `AmbienteSynthesisEngine` (motor diferencial Talento-grade
+// — detect → score → priority → diferencial). El categorizador if/else legacy
+// de 4 estados (positivo/cultural/localizado/sistemico) NO podía mantener el
+// hilo único Beat 1 ↔ Beat 6 — ese era el bug que rompió la cascada 4 meses.
+//
+// Detalle de la migración: plan §3.1.2 + §3.5.
+// Beat 6 UI consume `payload.synthesis` del Engine vía
+// `ActoSintesis.tsx` (Gate 8). El render se oculta hasta que Gate 2.5
+// (copy verbatim Victor) llene el Dictionary.
 
 // ═══════════════════════════════════════════════════════════════════
 // COMPOSICIÓN
@@ -1490,7 +1387,8 @@ export function buildReportNarratives(input: BuildNarrativesInput): ReportNarrat
             acto2: buildActo2Patron(patrones, input.meta, teatroCount, departmentsCount, input.totalTextResponses),
             acto3: buildActo3Senales(input.convergencias),
             acto4: buildActo4Alertas(input.alertas),
-            sintesis: buildCierreFrancotirador(input.criticalByManager, input.meta, input.convergencias, riesgoDeptos),
+            // sintesis: removida en Gate 8. Beat 6 consume `payload.synthesis`
+            // del AmbienteSynthesisEngine vía ActoSintesis.tsx.
           }
         : undefined,
   };
