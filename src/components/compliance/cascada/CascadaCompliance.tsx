@@ -56,8 +56,8 @@ export default function CascadaCompliance({ data, onNavigate }: CascadaComplianc
         <ActoTriage data={data} />
         {/* Beat 3 — La Anatomía (Gate 6) */}
         <ActoAnatomia data={data} />
-        {/* Beat 4 — La Voz (legacy patrones LLM hasta Gate 7 → citas + género) */}
-        <ActoVoz data={data} onVerDetalle={() => onNavigate('patrones')} />
+        {/* Beat 4 — La Voz (Gate 7: citas literales + cláusula género) */}
+        <ActoVoz data={data} />
         {/* Beat 5 — El Nombre (Gate 6, oculto para AREA_MANAGER) */}
         <ActoNombre data={data} />
         {/* Beat 6 — La Decisión (legacy buildCierreFrancotirador hasta Gate 4) */}
