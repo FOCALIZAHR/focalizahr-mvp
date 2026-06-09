@@ -208,6 +208,13 @@ export interface AmbienteRiskData {
    *  base de CONCENTRACION_MANDO (vía ORIGEN_LABELS). null si no hubo
    *  meta-análisis (cae a 'indeterminado'). */
   origenOrganizacional?: OrigenOrganizacional | null;
+
+  /** Nivel 2 — señal externa específica de la SEXTA por departmentId, derivada
+   *  del join con `coverage.silencioConVozExterna` (tipoSenal + exitAlertType).
+   *  Exit-dominante → alertType específico; onboarding-dominante → solo producto
+   *  (`exitAlertType` es exit-only en coverage). El Engine la lee para el
+   *  amplificador SEXTA_ALERTA. Ausente → la cláusula cae a su copy genérica. */
+  sextaSignalsByDept?: Map<string, AmplificadorSenal>;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -279,8 +286,8 @@ export type Amplificador =
   | { tipo: 'CONVERGENCIA_EXIT'; deptos: string[]; senal?: AmplificadorSenal }
   | { tipo: 'CONVERGENCIA_ONBOARDING'; deptos: string[]; senal?: AmplificadorSenal }
   | { tipo: 'CONVERGENCIA_AMBOS'; deptos: string[]; senal?: AmplificadorSenal }
-  | { tipo: 'SEXTA_ALERTA'; deptos: string[] }
-  | { tipo: 'OTRO_MUNDO'; deptos: string[] };
+  | { tipo: 'SEXTA_ALERTA'; deptos: string[]; senal?: AmplificadorSenal }
+  | { tipo: 'OTRO_MUNDO'; deptos: string[]; senal?: AmplificadorSenal };
 
 export interface AmbienteSynthesis {
   diagnosticType: DiagnosticType;

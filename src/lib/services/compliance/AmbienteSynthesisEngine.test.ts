@@ -35,6 +35,7 @@ import type {
   AmbienteRiskData,
   Beat1Seed,
   Mundo,
+  AmplificadorSenal,
 } from '@/types/ambiente-cascada';
 import type {
   DepartmentRiskScore,
@@ -1004,6 +1005,112 @@ test('17c. Payload legacy sin alertasConsideradas → senal undefined, cláusula
       'los que se fueron ya lo dijeron en la encuesta de salida (Exit)',
     ),
     'fallback a copy genérica: ' + result.implication,
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// 18. Nivel 2 — SEXTA (join coverage) + OTRO_MUNDO (detector) surfacean señal
+// ═══════════════════════════════════════════════════════════════════
+
+test('18a. SEXTA_ALERTA exit-dominante (Ley Karin) → señal específica; producto exit', () => {
+  const sextaSignalsByDept = new Map<string, AmplificadorSenal>([
+    ['d-legal', { producto: 'exit', alertType: 'ley_karin', severidad: 3, esCritica: true }],
+    ['d-rrhh', { producto: 'onboarding', alertType: '', severidad: 0, esCritica: false }],
+  ]);
+  const data = mkData({
+    orgISA: 85,
+    riesgoDeptosCount: 2,
+    silencioConVozExterna: [
+      { departmentId: 'd-legal', departmentName: 'Legal' },
+      { departmentId: 'd-rrhh', departmentName: 'RRHH' },
+    ],
+    sextaSignalsByDept,
+  });
+  const result = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'bien-con-focos' }),
+    data,
+    convergenciaSignal: mkConvergencia({ direccion: 'ninguna' }),
+  });
+
+  const sexta = result.amplificadoresActivos.find((a) => a.tipo === 'SEXTA_ALERTA');
+  assert.ok(sexta?.senal, 'SEXTA trae senal del join coverage');
+  // Ley Karin (exit) gana el dominante del amplificador (el caso grave es exit).
+  assert.equal(sexta!.senal!.alertType, 'ley_karin');
+  assert.equal(sexta!.senal!.producto, 'exit');
+  assert.equal(sexta!.senal!.esCritica, true);
+});
+
+test('18b. SEXTA onboarding-dominante → solo producto, sin alertType (límite aceptado)', () => {
+  const data = mkData({
+    orgISA: 85,
+    riesgoDeptosCount: 2,
+    silencioConVozExterna: [{ departmentId: 'd-rrhh', departmentName: 'RRHH' }],
+    sextaSignalsByDept: new Map<string, AmplificadorSenal>([
+      ['d-rrhh', { producto: 'onboarding', alertType: '', severidad: 0, esCritica: false }],
+    ]),
+  });
+  const result = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'bien-con-focos' }),
+    data,
+    convergenciaSignal: mkConvergencia({ direccion: 'ninguna' }),
+  });
+
+  const sexta = result.amplificadoresActivos.find((a) => a.tipo === 'SEXTA_ALERTA');
+  assert.ok(sexta?.senal);
+  assert.equal(sexta!.senal!.producto, 'onboarding');
+  assert.equal(sexta!.senal!.alertType, '', 'onboarding-dominante: producto sí, alertType no');
+});
+
+test('18c. OTRO_MUNDO surfacea senalDominante del detector (mayor severidad gana)', () => {
+  const data = mkData({
+    orgISA: 85,
+    riesgoDeptosCount: 2,
+    otroMundo: [
+      {
+        departmentId: 'd-x',
+        departmentName: 'Bodega',
+        senalDominante: { producto: 'exit', alertType: 'toxic_exit_detected', severidad: 3, esCritica: true },
+      },
+      {
+        departmentId: 'd-y',
+        departmentName: 'Despacho',
+        senalDominante: { producto: 'onboarding', alertType: 'RIESGO_FUGA', severidad: 2, esCritica: false },
+      },
+    ],
+  });
+  const result = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'bien-con-focos' }),
+    data,
+    convergenciaSignal: mkConvergencia({ direccion: 'ninguna' }),
+  });
+
+  const otro = result.amplificadoresActivos.find((a) => a.tipo === 'OTRO_MUNDO');
+  assert.ok(otro?.senal, 'OTRO_MUNDO trae senal');
+  // Sin Ley Karin → mayor severidad (toxic_exit_detected, 3).
+  assert.equal(otro!.senal!.alertType, 'toxic_exit_detected');
+  assert.equal(otro!.senal!.producto, 'exit');
+  assert.equal(otro!.senal!.severidad, 3);
+});
+
+test('18d. SEXTA sin sextaSignalsByDept → senal undefined, cláusula genérica (piso)', () => {
+  const data = mkData({
+    orgISA: 85,
+    riesgoDeptosCount: 2,
+    silencioConVozExterna: [{ departmentId: 'd-a', departmentName: 'Ventas' }],
+    // sextaSignalsByDept ausente (legacy / sin coverage rich)
+  });
+  const result = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'bien-con-focos' }),
+    data,
+    convergenciaSignal: mkConvergencia({ direccion: 'ninguna' }),
+  });
+
+  const sexta = result.amplificadoresActivos.find((a) => a.tipo === 'SEXTA_ALERTA');
+  assert.ok(sexta, 'el amplificador igual aparece');
+  assert.equal(sexta!.senal, undefined, 'sin señal → undefined');
+  assert.ok(
+    result.implication.includes('otras fuentes documentaron señales activas'),
+    'fallback a copy genérica validada: ' + result.implication,
   );
 });
 

@@ -501,6 +501,19 @@ export class AmbienteSynthesisEngine {
       };
     };
 
+    /** Dominante de un amplificador a partir de señales ya resueltas (SEXTA via
+     *  join coverage, OTRO_MUNDO via detector). Mismo pick: Ley Karin primero,
+     *  si no la de mayor severidad. `undefined` si no hay señales. */
+    const pickDominantSenal = (
+      senales: AmplificadorSenal[],
+    ): AmplificadorSenal | undefined => {
+      if (senales.length === 0) return undefined;
+      return (
+        senales.find((s) => s.alertType === 'ley_karin') ??
+        senales.reduce((best, s) => (s.severidad > best.severidad ? s : best))
+      );
+    };
+
     // ─── TEATRO_EN_DEPTO ──────────────────────────────────────────────────
     // Se incluye si hay deptos en teatro Y el dominante no es ya teatro.
     if (data.teatroCount > 0 && dominanteType !== 'CONTRADICCION_TEATRO') {
@@ -565,31 +578,46 @@ export class AmbienteSynthesisEngine {
       data.silencioConVozExterna.length > 0 &&
       dominanteType !== 'SILENCIO_SIN_VOZ'
     ) {
-      const deptos = (
-        data.silencioConVozExterna as Array<{
-          departmentId: string | null;
-          departmentName: string | null;
-        }>
-      )
+      const items = data.silencioConVozExterna as Array<{
+        departmentId: string | null;
+        departmentName: string | null;
+      }>;
+      const deptos = items
         .map((s) => s.departmentName ?? s.departmentId)
         .filter((n): n is string => typeof n === 'string');
       if (deptos.length > 0) {
-        amplificadores.push({ tipo: 'SEXTA_ALERTA', deptos });
+        // Nivel 2 — señal específica via join con la sexta del coverage.
+        const senales = items
+          .map((s) => (s.departmentId ? data.sextaSignalsByDept?.get(s.departmentId) : undefined))
+          .filter((x): x is AmplificadorSenal => x !== undefined);
+        amplificadores.push({
+          tipo: 'SEXTA_ALERTA',
+          deptos,
+          senal: pickDominantSenal(senales),
+        });
       }
     }
 
     // ─── OTRO_MUNDO ───────────────────────────────────────────────────────
     if (data.otroMundo && data.otroMundo.length > 0) {
-      const deptos = (
-        data.otroMundo as Array<{
-          departmentId: string | null;
-          departmentName: string | null;
-        }>
-      )
+      const items = data.otroMundo as Array<{
+        departmentId: string | null;
+        departmentName: string | null;
+        senalDominante?: AmplificadorSenal;
+      }>;
+      const deptos = items
         .map((s) => s.departmentName ?? s.departmentId)
         .filter((n): n is string => typeof n === 'string');
       if (deptos.length > 0) {
-        amplificadores.push({ tipo: 'OTRO_MUNDO', deptos });
+        // Nivel 2 — el detector ya dejó senalDominante por dept.
+        const senales = items
+          .map((s) => s.senalDominante)
+          .filter((x): x is AmplificadorSenal => x !== undefined);
+        amplificadores.push({
+          tipo: 'OTRO_MUNDO',
+          deptos,
+          senal: pickDominantSenal(senales),
+        });
       }
     }
 

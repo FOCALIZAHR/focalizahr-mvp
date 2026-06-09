@@ -26,6 +26,10 @@ import {
   DIMENSION_CEO_LABELS,
   type ComplianceDimensionKey,
 } from '@/config/narratives/ComplianceNarrativeDictionary';
+import {
+  PESO_BASE_ALERTA,
+  ALERTAS_CRITICAS,
+} from '@/config/compliance/convergenciaWeights';
 import type { ComplianceReportResponse } from '@/types/compliance';
 import type {
   AmbienteRiskPayload,
@@ -35,6 +39,7 @@ import type {
   FactoresTitulares,
   FactorTitular,
   ExtremosTitulares,
+  AmplificadorSenal,
 } from '@/types/ambiente-cascada';
 
 export class AmbienteRiskOrchestrator {
@@ -111,6 +116,27 @@ export class AmbienteRiskOrchestrator {
       denunciasByDept.set(r.departmentId, r.inputs.denuncias_12m);
     }
 
+    // Nivel 2 — señal específica de la SEXTA por dept, join con la sexta del
+    // coverage (`tipoSenal` + `exitAlertType`, ya computado en runtime).
+    // Exit-dominante → alertType específico + severidad por PESO_BASE_ALERTA.
+    // Onboarding-dominante → solo producto (coverage llena exitAlertType solo
+    // para tipoSenal='exit'). 'otra' → se omite (sin señal nominable).
+    const sextaSignalsByDept = new Map<string, AmplificadorSenal>();
+    for (const item of d.coverage?.silencioConVozExterna ?? []) {
+      let senal: AmplificadorSenal | undefined;
+      if (item.tipoSenal === 'exit' && item.exitAlertType) {
+        senal = {
+          producto: 'exit',
+          alertType: item.exitAlertType,
+          severidad: PESO_BASE_ALERTA[item.exitAlertType] ?? 0,
+          esCritica: ALERTAS_CRITICAS.includes(item.exitAlertType),
+        };
+      } else if (item.tipoSenal === 'onboarding') {
+        senal = { producto: 'onboarding', alertType: '', severidad: 0, esCritica: false };
+      }
+      if (senal) sextaSignalsByDept.set(item.departmentId, senal);
+    }
+
     return {
       // Org-level
       orgISA: d.orgISA ?? null,
@@ -150,6 +176,9 @@ export class AmbienteRiskOrchestrator {
       // Origen organizacional del meta-análisis — resuelve {origen} en la base
       // de CONCENTRACION_MANDO (Gate 2.5). null si no hubo meta-análisis.
       origenOrganizacional: d.metaAnalysis?.origen_organizacional ?? null,
+
+      // Nivel 2 — señal específica de la SEXTA por dept (join coverage).
+      sextaSignalsByDept,
     };
   }
 

@@ -21,6 +21,7 @@
 import type { CoverageAnalyzedStatus } from '@/lib/services/compliance/CoverageAnalysisService';
 import type { DepartmentRiskAlertItem } from '@/types/compliance';
 import { bucketFromAnalyzed } from './buckets';
+import { ALERTAS_CRITICAS } from '@/config/compliance/convergenciaWeights';
 
 /** Universo target del motor. `con_isa` está siempre excluido (ya entra al
  *  análisis normal vía riskScores con score y banda). */
@@ -51,6 +52,21 @@ export interface SilencioDetected {
   signalsCount: number;
   /** Mayor `pesoEfectivo` entre las señales que pasaron el umbral. */
   pesoMaximo: number;
+  /** Señal externa dominante entre las que pasaron el umbral — el dato
+   *  específico que el colapso a conteo había perdido (Nivel 2). Pick: Ley
+   *  Karin con `pesoEfectivo > 0` gana primero, si no el de mayor `pesoEfectivo`
+   *  (espejo de `resolveDepartmentRiskNarrative` 2a). Estructuralmente
+   *  compatible con `AmplificadorSenal` (cascada AS). `undefined` solo si no
+   *  hubo señales válidas (defensive — el item solo se emite con ≥1). */
+  senalDominante?: {
+    producto: 'exit' | 'onboarding';
+    /** alertType canónico (`ley_karin`, `DESENGANCHE_CULTURAL`, …). Dato, no copy. */
+    alertType: string;
+    /** `pesoEfectivo` del dominante (proxy de severidad). */
+    severidad: number;
+    /** `alertType ∈ ALERTAS_CRITICAS`. */
+    esCritica: boolean;
+  };
 }
 
 /** Mapea `analyzed` (4-way) al sub-sabor de la SEXTA.
@@ -92,6 +108,15 @@ export function detectSilencioConVozExterna(
       0,
     );
 
+    // Dominante: Ley Karin con peso > 0 primero, si no el de mayor pesoEfectivo.
+    const dom =
+      senalesValidas.find(
+        (a) => a.alertType === 'ley_karin' && a.pesoEfectivo > 0,
+      ) ??
+      senalesValidas.reduce((best, a) =>
+        a.pesoEfectivo > best.pesoEfectivo ? a : best,
+      );
+
     out.push({
       departmentId: candidato.departmentId,
       departmentName: candidato.departmentName,
@@ -102,6 +127,12 @@ export function detectSilencioConVozExterna(
           : null,
       signalsCount: senalesValidas.length,
       pesoMaximo,
+      senalDominante: {
+        producto: dom.producto,
+        alertType: dom.alertType,
+        severidad: dom.pesoEfectivo,
+        esCritica: ALERTAS_CRITICAS.includes(dom.alertType),
+      },
     });
   }
 

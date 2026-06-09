@@ -274,3 +274,44 @@ test('11. signalsCount cuenta sólo señales ≥ umbral; pesoMaximo es el max', 
   assert.equal(result[0].signalsCount, 2);
   assert.equal(result[0].pesoMaximo, 3.0);
 });
+
+test('12. senalDominante: Ley Karin gana sobre mayor peso; si no, el de mayor pesoEfectivo', () => {
+  // Ley Karin priority — gana aunque otra señal pese más.
+  const karin = detectSilencioConVozExterna(
+    [
+      mkCandidato({
+        departmentId: 'd-k',
+        analyzed: 'no_response',
+        alertas: [
+          mkAlerta({ alertType: 'ley_karin', producto: 'exit', pesoEfectivo: 2.0 }),
+          mkAlerta({ alertType: 'DESENGANCHE_CULTURAL', producto: 'onboarding', pesoEfectivo: 3.0 }),
+        ],
+      }),
+    ],
+    'sub_threshold',
+    UMBRAL,
+  );
+  assert.equal(karin[0].senalDominante?.alertType, 'ley_karin');
+  assert.equal(karin[0].senalDominante?.producto, 'exit');
+  assert.equal(karin[0].senalDominante?.esCritica, true);
+
+  // Sin Ley Karin → el de mayor pesoEfectivo.
+  const maxPeso = detectSilencioConVozExterna(
+    [
+      mkCandidato({
+        departmentId: 'd-m',
+        analyzed: 'not_invited',
+        alertas: [
+          mkAlerta({ alertType: 'nps_critico', producto: 'exit', pesoEfectivo: 2.0 }),
+          mkAlerta({ alertType: 'DESENGANCHE_CULTURAL', producto: 'onboarding', pesoEfectivo: 3.0 }),
+        ],
+      }),
+    ],
+    'no_invitado',
+    UMBRAL,
+  );
+  assert.equal(maxPeso[0].senalDominante?.alertType, 'DESENGANCHE_CULTURAL');
+  assert.equal(maxPeso[0].senalDominante?.producto, 'onboarding');
+  assert.equal(maxPeso[0].senalDominante?.severidad, 3.0);
+  assert.equal(maxPeso[0].senalDominante?.esCritica, true); // DESENGANCHE_CULTURAL ∈ ALERTAS_CRITICAS
+});
