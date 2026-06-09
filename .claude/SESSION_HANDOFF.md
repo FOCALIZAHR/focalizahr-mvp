@@ -36,6 +36,11 @@ La cascada `Ambiente Sano` fue rearmada de raíz contra el plan §3 (espejo del 
 - Tests: Engine 26 + Orchestrator 7 = 33 verde; 4-file cascada 69/69; tsc 43 baseline.
 - **Pendiente del badge FUEGO** (diferido): label NEUTRO "Denuncia formal registrada" (o "· {count}"), tooltips por count en `COPY_GATE_2_5_PENDIENTE.md §TIPO 1`. NO usa `legalBadgeForCountry` (ese es de la sexta alerta). Entra cuando se diseñe el render de Beat 6 (Gate 9 o posterior).
 
+### Gate 9 + enriquecimiento de señal (2026-06-09)
+
+- **Gate 9 audit** (`055583d`): Beat 6 (`ActoSintesis`) ahora renderiza `risks` (hipótesis "O" de FUEGO_LEGAL/CONCENTRACION_MANDO). Hilo único ✅, diseño coherente (tokens limpios, sin los prohibidos del módulo compliance), Beat 3 sin leak de P-keys. **PENDIENTE copy (surface-only, espera chat de narrativa):** chips `AMPLIFIER_LABEL` con jerga — `"Teatro detectado"` (jerga), `"Silencio con voz externa"`/`"No invitados con rastro externo"` (borderline). NO cablear hasta copy aprobada.
+- **Enriquecimiento señal específica** (Nivel 1 `3f8b437` + Nivel 2 `a294b77`): el refactor a `amplificadoresActivos` había colapsado la señal a "otras señales". Recuperada vía `Amplificador.senal? { producto, alertType, severidad, esCritica }`. Pick = Ley Karin priority, si no mayor `pesoEfectivo` (espejo `resolveDepartmentRiskNarrative` 2a). **Un dominante por amplificador** (no per-depto). Nameable: CONVERGENCIA exit+onb, OTRO_MUNDO exit+onb, SEXTA exit-dominante específico, SEXTA onboarding-dominante solo producto (límite aceptado: el caso grave Ley Karin es siempre exit). **NO persiste** `senalDominante` (schema+backfill diferido). **SIN copy** — el chat de narrativa escribe los strings (ley_karin NO literal en prosa → indicio + `legalBadgeForCountry`) y revalida con gerentes. Invariante: falta dato → cláusula genérica validada (nunca bajo el piso).
+
 7 commits en una sesión, 78/78 tests verde sostenido, tsc 43 errores (idéntico baseline — los pre-existentes en `buildGerenciaRollup.ts:275` etc. son deuda anterior).
 
 ## Archivos clave creados / modificados
