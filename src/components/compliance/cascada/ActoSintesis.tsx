@@ -30,12 +30,12 @@ interface ActoSintesisProps {
 
 /** Mapa de etiquetas humanas de los amplificadores (para el chip de evidencia). */
 const AMPLIFIER_LABEL: Record<Amplificador['tipo'], string> = {
-  TEATRO_EN_DEPTO: 'Teatro detectado',
+  TEATRO_EN_DEPTO: 'Medición sana, comentarios no',
   CONVERGENCIA_EXIT: 'Exit confirma',
   CONVERGENCIA_ONBOARDING: 'Onboarding confirma',
   CONVERGENCIA_AMBOS: 'Exit + Onboarding confirman',
-  SEXTA_ALERTA: 'Silencio con voz externa',
-  OTRO_MUNDO: 'No invitados con rastro externo',
+  SEXTA_ALERTA: 'No respondió, pero hay señales afuera',
+  OTRO_MUNDO: 'Fuera del estudio, con señales',
 };
 
 export default memo(function ActoSintesis({ data, onIrAlPlan }: ActoSintesisProps) {

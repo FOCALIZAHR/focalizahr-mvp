@@ -29,7 +29,11 @@
 // emite `risks` cuando existen.
 // ════════════════════════════════════════════════════════════════════════════
 
-import type { DiagnosticType, Amplificador } from '@/types/ambiente-cascada';
+import type {
+  DiagnosticType,
+  Amplificador,
+  AmplificadorSenal,
+} from '@/types/ambiente-cascada';
 import type { OrigenOrganizacional } from '@/lib/services/compliance/complianceTypes';
 
 type AmplificadorTipo = Amplificador['tipo'];
@@ -231,55 +235,113 @@ export const SYNTHESIS_DICTIONARY: Record<DiagnosticType, SynthesisCopyEntry> = 
 };
 
 // ════════════════════════════════════════════════════════════════════════════
-// AMPLIFIER_CLAUSES — composicionales (§3.5.7)
+// SIGNAL_FRAGMENTS — fragmento de señal por alertType canónico (copy v2 Victor)
 // ════════════════════════════════════════════════════════════════════════════
-// El Engine las invoca con la lista de deptos del amplificador y concatena el
-// resultado al `implicationBase` del dominante. Las claves NO presentes emiten
-// nada (Engine las filtra). Cada cláusula resuelve su propia lista {deptos} vía
-// formatDeptList — leíble tras CUALQUIER base.
+// Se inserta detrás de "Exit ya dejó …" / "Onboarding ya marcó …" — leen como
+// objeto directo (regla de concordancia §COPY v2). Keyear por canónico, NO alias.
+// Tipos muertos (department_exit_pattern, DESENGANCHE_CULTURAL) sin entrada: no
+// se emiten nunca. Los de peso 1 (nps_critico, onboarding_correlation,
+// CONFUSION_ROL) solo llegan a CONVERGENCIA — escritos igual, no estorban.
 
-// NOTA firma (Nivel 1): la cláusula recibe el `Amplificador` completo, no solo
-// `deptos`. Hoy todas usan `amp.deptos` (copy genérica validada — el piso de
-// claridad). Cuando el chat de narrativa escriba la copy específica, leerá
-// `amp.senal` (producto + alertType + severidad) para nombrar la señal — con
-// fallback a esta forma genérica si `senal` está ausente. Nunca bajo el piso.
+export const SIGNAL_FRAGMENTS: Record<string, string> = {
+  // EXIT (5 vivos)
+  ley_karin: 'un indicio de ambiente no seguro',
+  toxic_exit_detected: 'un patrón de salidas conflictivas',
+  liderazgo_concentracion: 'un patrón de salidas concentradas bajo una misma línea de mando',
+  nps_critico: 'detractores de la empresa',
+  onboarding_correlation: 'un patrón de salidas que arrancan desde una mala entrada',
+  // ONBOARDING (4 vivos)
+  ABANDONO_DIA_1: 'abandonos en los primeros días',
+  RIESGO_FUGA: 'riesgo de fuga en los que recién entraron',
+  CONFUSION_ROL: 'confusión de rol en los que recién entraron',
+  BIENVENIDA_FALLIDA: 'una bienvenida que no funcionó',
+};
+
+/** Señal del amplificador (los miembros con `senal?`; TEATRO no la tiene). */
+function senalOf(amp: Amplificador): AmplificadorSenal | undefined {
+  return 'senal' in amp ? amp.senal : undefined;
+}
+
+/** Fragmento mapeado del alertType, o undefined → la cláusula usa su fallback. */
+function fragmentOf(senal: AmplificadorSenal | undefined): string | undefined {
+  return senal ? SIGNAL_FRAGMENTS[senal.alertType] : undefined;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// AMPLIFIER_CLAUSES — composicionales (§3.5.7) · copy v2 verbatim
+// ════════════════════════════════════════════════════════════════════════════
+// Cada cláusula recibe el `Amplificador` completo. Lee `amp.senal` (producto +
+// alertType) para nombrar la señal específica vía SIGNAL_FRAGMENTS; si falta el
+// dato (o alertType no mapeado) cae al fallback genérico validado — el piso de
+// claridad nunca se rompe. El Engine concatena el resultado al implicationBase.
+
 export const AMPLIFIER_CLAUSES: Partial<
   Record<AmplificadorTipo, (amp: Amplificador) => string>
 > = {
-  // CONVERGENCIA_AMBOS — núcleo REUSE de buildConvergenciaCruce.converge_limpia.
-  // Frase generalizable: no necesita interpolar la lista de deptos.
-  CONVERGENCIA_AMBOS: () =>
-    'Cuando dos lentes independientes coinciden, el hallazgo deja de ser percepción: pasa a ser hecho.',
+  // CONVERGENCIA_AMBOS — fallback neutro: el Engine entrega el dominante GLOBAL
+  // (por peso podría ser onboarding), no el exit-dominante del grupo que la
+  // versión específica requiere → se usa el neutro (§COPY v2 nota técnica).
+  CONVERGENCIA_AMBOS: (amp) => {
+    if (amp.deptos.length === 0) return '';
+    return `En ${formatDeptList(amp.deptos)}, Exit y Onboarding confirman el mismo riesgo. Cuando dos fuentes independientes coinciden, deja de ser percepción.`;
+  },
 
-  // CONVERGENCIA_EXIT — los que se fueron ya lo dijeron en Exit.
+  // CONVERGENCIA_EXIT — "Exit ya dejó {señal}." / fallback "lo confirma Exit."
   CONVERGENCIA_EXIT: (amp) => {
     if (amp.deptos.length === 0) return '';
-    return `En ${formatDeptList(amp.deptos)}, los que se fueron ya lo dijeron en la encuesta de salida (Exit).`;
+    const deptos = formatDeptList(amp.deptos);
+    const frag = fragmentOf(senalOf(amp));
+    return frag
+      ? `En ${deptos}, Exit ya dejó ${frag}.`
+      : `En ${deptos}, lo confirma Exit.`;
   },
 
-  // CONVERGENCIA_ONBOARDING — los que recién entraron ya lo señalaron.
+  // CONVERGENCIA_ONBOARDING — "Onboarding ya marcó {señal}." / fallback.
   CONVERGENCIA_ONBOARDING: (amp) => {
     if (amp.deptos.length === 0) return '';
-    return `En ${formatDeptList(amp.deptos)}, los que recién entraron ya lo señalaron en Onboarding.`;
+    const deptos = formatDeptList(amp.deptos);
+    const frag = fragmentOf(senalOf(amp));
+    return frag
+      ? `En ${deptos}, Onboarding ya marcó ${frag}.`
+      : `En ${deptos}, lo confirma Onboarding.`;
   },
 
-  // TEATRO_EN_DEPTO — métricas dicen sano, las palabras no.
+  // TEATRO_EN_DEPTO — frase fija (no consume señal externa).
   TEATRO_EN_DEPTO: (amp) => {
     if (amp.deptos.length === 0) return '';
-    return `En ${formatDeptList(amp.deptos)} las métricas dicen sano y las palabras no.`;
+    return `En ${formatDeptList(amp.deptos)}, el estudio midió un ambiente sano. Las respuestas abiertas apuntan a lo contrario.`;
   },
 
-  // SEXTA_ALERTA — condensación REUSE de buildAlertas.silencio_con_voz_externa.contexto.
+  // SEXTA_ALERTA — exit-dominante nombra señal; onboarding-dominante solo
+  // producto (límite coverage); sin dato → fallback.
   SEXTA_ALERTA: (amp) => {
     if (amp.deptos.length === 0) return '';
-    const list = formatDeptList(amp.deptos);
-    return `En ${list}, otras fuentes documentaron señales activas en el mismo período.`;
+    const senal = senalOf(amp);
+    if (senal?.producto === 'exit') {
+      const frag = fragmentOf(senal);
+      if (frag) {
+        return `Este departamento no contestó la encuesta, pero Exit ya dejó ${frag}.`;
+      }
+    }
+    if (senal?.producto === 'onboarding') {
+      return 'Este departamento no contestó la encuesta, pero Onboarding ya muestra señales.';
+    }
+    return 'Este departamento no contestó la encuesta, pero otras fuentes ya muestran señales.';
   },
 
-  // OTRO_MUNDO — deptos que ni entraron a la medición, ya dejaron rastro afuera.
+  // OTRO_MUNDO — exit y onboarding nombran señal (el detector trae el alertType
+  // de ambos); sin dato → fallback.
   OTRO_MUNDO: (amp) => {
     if (amp.deptos.length === 0) return '';
-    return `En ${formatDeptList(amp.deptos)}, que ni siquiera entraron a la medición, ya quedó rastro por fuera.`;
+    const senal = senalOf(amp);
+    const frag = fragmentOf(senal);
+    if (senal?.producto === 'exit' && frag) {
+      return `Estos departamentos no entraron en este estudio de ambiente, pero Exit ya dejó ${frag}.`;
+    }
+    if (senal?.producto === 'onboarding' && frag) {
+      return `Estos departamentos no entraron en este estudio de ambiente, pero Onboarding ya marcó ${frag}.`;
+    }
+    return 'Estos departamentos no entraron en este estudio de ambiente, pero otras fuentes ya muestran señales que podrían indicar un riesgo.';
   },
 };
 

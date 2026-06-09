@@ -742,13 +742,12 @@ test('14e. Cláusulas amplificadoras REUSE — SEXTA_ALERTA + CONVERGENCIA_AMBOS
   // El dominante BIEN_CON_FOCOS aún no tiene implicationBase (Victor escribe);
   // pero la cláusula SEXTA debe llegar al implication final.
   assert.equal(result.diagnosticType, 'BIEN_CON_FOCOS');
+  // Sin sextaSignalsByDept → cláusula SEXTA fallback v2 (piso de claridad).
   assert.ok(
-    result.implication.includes('Comercial') && result.implication.includes('TI'),
-    'La cláusula SEXTA debe nombrar los deptos: ' + result.implication,
-  );
-  assert.ok(
-    result.implication.includes('otras fuentes documentaron señales activas'),
-    'REUSE verbatim de buildAlertas.silencio_con_voz_externa.contexto: ' + result.implication,
+    result.implication.includes(
+      'Este departamento no contestó la encuesta, pero otras fuentes ya muestran señales',
+    ),
+    'fallback SEXTA v2: ' + result.implication,
   );
 });
 
@@ -843,25 +842,49 @@ test('16d. BIEN_CON_FOCOS: interpola {riesgoDeptos}/{totalDeptos}/{orgISA}', () 
   );
 });
 
-test('16e. Cláusulas amplificadoras Gate 2.5 — verbatim con nombres + guard vacío', () => {
-  assert.equal(
-    AMPLIFIER_CLAUSES.TEATRO_EN_DEPTO!({ tipo: 'TEATRO_EN_DEPTO', deptos: ['Ventas', 'TI'] }),
-    'En Ventas y TI las métricas dicen sano y las palabras no.',
-  );
+test('16e. Cláusulas amplificadoras v2 — fragmento específico + fallback genérico + guard', () => {
+  // Sin senal → fallback (piso de claridad).
   assert.equal(
     AMPLIFIER_CLAUSES.CONVERGENCIA_EXIT!({ tipo: 'CONVERGENCIA_EXIT', deptos: ['Ventas'] }),
-    'En Ventas, los que se fueron ya lo dijeron en la encuesta de salida (Exit).',
+    'En Ventas, lo confirma Exit.',
   );
   assert.equal(
     AMPLIFIER_CLAUSES.CONVERGENCIA_ONBOARDING!({
       tipo: 'CONVERGENCIA_ONBOARDING',
       deptos: ['Soporte'],
     }),
-    'En Soporte, los que recién entraron ya lo señalaron en Onboarding.',
+    'En Soporte, lo confirma Onboarding.',
+  );
+  // Con senal → fragmento específico verbatim.
+  assert.equal(
+    AMPLIFIER_CLAUSES.CONVERGENCIA_EXIT!({
+      tipo: 'CONVERGENCIA_EXIT',
+      deptos: ['Ventas'],
+      senal: { producto: 'exit', alertType: 'ley_karin', severidad: 3, esCritica: true },
+    }),
+    'En Ventas, Exit ya dejó un indicio de ambiente no seguro.',
   );
   assert.equal(
-    AMPLIFIER_CLAUSES.OTRO_MUNDO!({ tipo: 'OTRO_MUNDO', deptos: ['Bodega'] }),
-    'En Bodega, que ni siquiera entraron a la medición, ya quedó rastro por fuera.',
+    AMPLIFIER_CLAUSES.CONVERGENCIA_ONBOARDING!({
+      tipo: 'CONVERGENCIA_ONBOARDING',
+      deptos: ['Soporte'],
+      senal: { producto: 'onboarding', alertType: 'RIESGO_FUGA', severidad: 2, esCritica: false },
+    }),
+    'En Soporte, Onboarding ya marcó riesgo de fuga en los que recién entraron.',
+  );
+  // TEATRO fijo (no consume señal).
+  assert.equal(
+    AMPLIFIER_CLAUSES.TEATRO_EN_DEPTO!({ tipo: 'TEATRO_EN_DEPTO', deptos: ['Ventas', 'TI'] }),
+    'En Ventas y TI, el estudio midió un ambiente sano. Las respuestas abiertas apuntan a lo contrario.',
+  );
+  // OTRO_MUNDO onboarding-dominante nombra señal.
+  assert.equal(
+    AMPLIFIER_CLAUSES.OTRO_MUNDO!({
+      tipo: 'OTRO_MUNDO',
+      deptos: ['Bodega'],
+      senal: { producto: 'onboarding', alertType: 'ABANDONO_DIA_1', severidad: 3, esCritica: false },
+    }),
+    'Estos departamentos no entraron en este estudio de ambiente, pero Onboarding ya marcó abandonos en los primeros días.',
   );
   assert.equal(
     AMPLIFIER_CLAUSES.OTRO_MUNDO!({ tipo: 'OTRO_MUNDO', deptos: [] }),
@@ -887,7 +910,9 @@ test('16f. TEATRO_EN_DEPTO en implication resuelve NAME (no ID) vía buildAmplif
 
   assert.equal(result.diagnosticType, 'SISTEMICO_SIN_MANDO');
   assert.ok(
-    result.implication.includes('En TI las métricas dicen sano y las palabras no.'),
+    result.implication.includes(
+      'En TI, el estudio midió un ambiente sano. Las respuestas abiertas apuntan a lo contrario.',
+    ),
     'cláusula TEATRO_EN_DEPTO con nombre resuelto: ' + result.implication,
   );
   assert.ok(
@@ -942,6 +967,16 @@ test('17a. CONVERGENCIA_EXIT / ONBOARDING surfacean su señal dominante', () => 
   assert.equal(onb!.senal!.alertType, 'RIESGO_FUGA');
   assert.equal(onb!.senal!.severidad, 2);
   assert.equal(onb!.senal!.esCritica, false);
+
+  // Fragmento específico cableado (copy v2) en la implicación.
+  assert.ok(
+    result.implication.includes('Exit ya dejó un patrón de salidas conflictivas'),
+    'fragmento exit toxic_exit_detected: ' + result.implication,
+  );
+  assert.ok(
+    result.implication.includes('Onboarding ya marcó riesgo de fuga en los que recién entraron'),
+    'fragmento onboarding RIESGO_FUGA: ' + result.implication,
+  );
 });
 
 test('17b. Ley Karin gana el dominante aunque otro producto pese más (AMBOS)', () => {
@@ -970,6 +1005,12 @@ test('17b. Ley Karin gana el dominante aunque otro producto pese más (AMBOS)', 
   );
   assert.equal(ambos!.senal!.producto, 'exit');
   assert.equal(ambos!.senal!.esCritica, true);
+
+  // AMBOS usa fallback neutro (Engine entrega dominante global, no exit-dom del grupo).
+  assert.ok(
+    result.implication.includes('Exit y Onboarding confirman el mismo riesgo'),
+    'AMBOS fallback neutro v2: ' + result.implication,
+  );
 });
 
 test('17c. Payload legacy sin alertasConsideradas → senal undefined, cláusula genérica (piso)', () => {
@@ -999,11 +1040,9 @@ test('17c. Payload legacy sin alertasConsideradas → senal undefined, cláusula
   const exit = result.amplificadoresActivos.find((a) => a.tipo === 'CONVERGENCIA_EXIT');
   assert.ok(exit, 'el amplificador igual aparece (eisSignal>0)');
   assert.equal(exit!.senal, undefined, 'sin alertas → senal undefined');
-  // Invariante piso de claridad: cláusula genérica validada sigue presente.
+  // Invariante piso de claridad: cláusula fallback validada sigue presente.
   assert.ok(
-    result.implication.includes(
-      'los que se fueron ya lo dijeron en la encuesta de salida (Exit)',
-    ),
+    result.implication.includes('En Legacy, lo confirma Exit.'),
     'fallback a copy genérica: ' + result.implication,
   );
 });
@@ -1038,6 +1077,14 @@ test('18a. SEXTA_ALERTA exit-dominante (Ley Karin) → señal específica; produ
   assert.equal(sexta!.senal!.alertType, 'ley_karin');
   assert.equal(sexta!.senal!.producto, 'exit');
   assert.equal(sexta!.senal!.esCritica, true);
+
+  // Fragmento exit específico en la implicación (copy v2).
+  assert.ok(
+    result.implication.includes(
+      'Este departamento no contestó la encuesta, pero Exit ya dejó un indicio de ambiente no seguro',
+    ),
+    'SEXTA exit-dominante nombra señal: ' + result.implication,
+  );
 });
 
 test('18b. SEXTA onboarding-dominante → solo producto, sin alertType (límite aceptado)', () => {
@@ -1059,6 +1106,14 @@ test('18b. SEXTA onboarding-dominante → solo producto, sin alertType (límite 
   assert.ok(sexta?.senal);
   assert.equal(sexta!.senal!.producto, 'onboarding');
   assert.equal(sexta!.senal!.alertType, '', 'onboarding-dominante: producto sí, alertType no');
+
+  // SEXTA onboarding-dominante → solo producto (sin fragmento), copy v2.
+  assert.ok(
+    result.implication.includes(
+      'Este departamento no contestó la encuesta, pero Onboarding ya muestra señales',
+    ),
+    'SEXTA onboarding-dominante solo producto: ' + result.implication,
+  );
 });
 
 test('18c. OTRO_MUNDO surfacea senalDominante del detector (mayor severidad gana)', () => {
@@ -1090,6 +1145,14 @@ test('18c. OTRO_MUNDO surfacea senalDominante del detector (mayor severidad gana
   assert.equal(otro!.senal!.alertType, 'toxic_exit_detected');
   assert.equal(otro!.senal!.producto, 'exit');
   assert.equal(otro!.senal!.severidad, 3);
+
+  // Fragmento exit específico en la implicación (copy v2).
+  assert.ok(
+    result.implication.includes(
+      'Estos departamentos no entraron en este estudio de ambiente, pero Exit ya dejó un patrón de salidas conflictivas',
+    ),
+    'OTRO_MUNDO exit-dominante nombra señal: ' + result.implication,
+  );
 });
 
 test('18d. SEXTA sin sextaSignalsByDept → senal undefined, cláusula genérica (piso)', () => {
@@ -1109,7 +1172,9 @@ test('18d. SEXTA sin sextaSignalsByDept → senal undefined, cláusula genérica
   assert.ok(sexta, 'el amplificador igual aparece');
   assert.equal(sexta!.senal, undefined, 'sin señal → undefined');
   assert.ok(
-    result.implication.includes('otras fuentes documentaron señales activas'),
+    result.implication.includes(
+      'Este departamento no contestó la encuesta, pero otras fuentes ya muestran señales',
+    ),
     'fallback a copy genérica validada: ' + result.implication,
   );
 });
