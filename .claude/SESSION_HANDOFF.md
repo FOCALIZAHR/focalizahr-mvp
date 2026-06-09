@@ -19,11 +19,22 @@ La cascada `Ambiente Sano` fue rearmada de raíz contra el plan §3 (espejo del 
 | Gate 3 — Wire API: payload emite `synthesis` + `beat1Seed` | ✅ | `ab8c762` |
 | Gate 5 — Beat 1 lee `beat1Seed` + titulares de factores/extremos | ✅ | `40958ca` |
 | Gate 6 — Beats 2 (Triage) / 3 (Anatomía) / 5 (Nombre) + reordenar | ✅ | `b0bfca8` |
-| Gate 2.5 (parcial mecánico) — 9 slots REUSE + 2 cláusulas núcleo | 🟡 | `f932d6f` |
+| Gate 2.5 (parcial mecánico) — 9 slots REUSE + 2 cláusulas núcleo | ✅ | `f932d6f` |
 | Gate 7 — Beat 4 Voz honesta (citas literales + género, sin patrones LLM) | ✅ | `5e0cff8` |
 | Gate 8 — Limpieza legacy + migración Beat 6 al Engine (Gate 4 efectivo) | ✅ | `f19f5c1` |
-| **Gate 2.5 completo (~22 strings de copy)** | ⏸️ | **Victor entrega aparte** |
-| **Gate 9 — Audit McKinsey ácido** | ⏸️ | después de Gate 2.5 |
+| **Gate 2.5 completo — copy verbatim COPY_GATE_2_5_PENDIENTE.md** | ✅ | `b852cfe` |
+| **Gate 9 — Audit McKinsey ácido** | ⏸️ | siguiente |
+
+### Gate 2.5 cerrado (2026-06-08, commit `b852cfe`)
+
+- Cableada copy final de `COPY_GATE_2_5_PENDIENTE.md` (NO del inventario, desactualizado en FUEGO/SILENCIO/TEATRO). 8 tipos × 4 slots + 4 cláusulas nuevas + `risks` (FUEGO_LEGAL, CONCENTRACION_MANDO).
+- **Interpolación opción A**: `implicationBase` con placeholders `{deptos}{nombres}{origen}{riesgoDeptos}{totalDeptos}{orgISA}` + `interpolate()` en el Engine (NO functions). `{origen}` threaded vía `metaAnalysis.origen_organizacional` → `ORIGEN_LABELS` (recreado en el Dictionary; Orchestrator lo pobla en `data.origenOrganizacional`). `{nombres}`/`{deptos}` resuelven id→name.
+- **FUEGO_LEGAL** type-agnóstico: "Denuncia formal registrada" sin nombrar la ley, sin plazos, sin `legalNote`. Badge FUEGO **DIFERIDO** (Beat 6 oculto) — no construido.
+- **TEATRO base count-free** (decisión Victor 2026-06-08): el contrato sellado de 6 placeholders no incluye `teatroCount`; el cuánto/cuáles lo cargan classification + cláusula. Robusto al caso convergencia-contradice (teatroCount=0).
+- **Fix colateral**: `buildAmplificadores` ahora emite NAMES (no IDs) en `TEATRO_EN_DEPTO` y `CONVERGENCIA_*` (antes solo SEXTA/OTRO_MUNDO resolvían nombre). Con las cláusulas vacías no importaba; ahora rinden copy real.
+- Beat 6 deja de ocultarse para los 8 tipos reales; solo GENERIC sigue silencioso (`classification===''`).
+- Tests: Engine 26 + Orchestrator 7 = 33 verde; 4-file cascada 69/69; tsc 43 baseline.
+- **Pendiente del badge FUEGO** (diferido): label NEUTRO "Denuncia formal registrada" (o "· {count}"), tooltips por count en `COPY_GATE_2_5_PENDIENTE.md §TIPO 1`. NO usa `legalBadgeForCountry` (ese es de la sexta alerta). Entra cuando se diseñe el render de Beat 6 (Gate 9 o posterior).
 
 7 commits en una sesión, 78/78 tests verde sostenido, tsc 43 errores (idéntico baseline — los pre-existentes en `buildGerenciaRollup.ts:275` etc. son deuda anterior).
 
