@@ -24,10 +24,39 @@ tensión con precisión quirúrgica.
 
 ## Las 6 Reglas de Oro
 
+> La Regla 0 es el cimiento estructural sobre el que descansan las 6
+> reglas operativas. Define cómo se ordena la narrativa; las demás
+> definen qué dice.
+
+### REGLA 0 — La estructura siempre es una pirámide (Minto)
+Toda narrativa va de la respuesta hacia los datos, nunca al revés.
+Arriba: la conclusión que resuelve la pregunta del CEO en una frase
+(el headline). Debajo: los argumentos que la sostienen. Al fondo:
+el dato que los respalda. Si el headline no resuelve el problema
+por sí solo, la pirámide está mal armada — no importa qué tan
+buenos sean los datos debajo.
+
+El CEO no quiere ver cómo llegaste. Quiere la respuesta, y luego
+—solo si la necesita— por qué.
+
+```
+✅ Headline = la cima. Resuelve la pregunta en ≤8 palabras.
+✅ Description = los argumentos que sostienen la cima.
+✅ El dato aparece al final, como respaldo, nunca como apertura.
+❌ Abrir con datos y dejar la conclusión para el final.
+```
+
 ### REGLA 1 — La contradicción es el protagonista
 El hallazgo de FocalizaHR siempre es que dos fuentes independientes dicen
 cosas distintas. La narrativa empieza con esa contradicción — no con los
 datos por separado.
+
+**Cuando las dos fuentes coinciden** (convergencia, no contradicción),
+el protagonista sigue siendo la señal cruzada: dos fuentes
+independientes confirman el mismo riesgo. La narrativa empieza igual
+— con la señal que emerge del cruce, no con cada fuente por separado.
+Contradicción y convergencia son las dos caras de la misma regla:
+el hallazgo nace del cruce, nunca del dato aislado.
 
 ```
 ✅ "Dos fuentes independientes se contradicen."
