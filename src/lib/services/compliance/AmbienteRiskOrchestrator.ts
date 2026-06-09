@@ -146,6 +146,10 @@ export class AmbienteRiskOrchestrator {
       silencioConVozExterna: d.silencioVozExterna,
       otroMundo: d.otroMundo,
       denunciasByDept,
+
+      // Origen organizacional del meta-análisis — resuelve {origen} en la base
+      // de CONCENTRACION_MANDO (Gate 2.5). null si no hubo meta-análisis.
+      origenOrganizacional: d.metaAnalysis?.origen_organizacional ?? null,
     };
   }
 

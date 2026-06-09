@@ -33,6 +33,8 @@ import type { NivelFinal } from '@/lib/services/compliance/ConvergenciaEngine';
 import {
   SYNTHESIS_DICTIONARY,
   AMPLIFIER_CLAUSES,
+  ORIGEN_LABELS,
+  formatDeptList,
 } from './AmbienteSynthesisDictionary';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -453,12 +455,27 @@ export class AmbienteSynthesisEngine {
   ): Amplificador[] {
     const amplificadores: Amplificador[] = [];
 
+    // id→name para que TODAS las cláusulas rindan NAMES legibles (no IDs). El
+    // mapa cubre convergencias + per-dept + riskScores.
+    const idToName = new Map<string, string>();
+    for (const c of data.convergencias) {
+      if (c.departmentName) idToName.set(c.departmentId, c.departmentName);
+    }
+    for (const s of data.scoresPerDept) {
+      if (s.departmentName) idToName.set(s.departmentId, s.departmentName);
+    }
+    for (const r of data.riskScoresPerDept) {
+      if (r.departmentName) idToName.set(r.departmentId, r.departmentName);
+    }
+    const namesFor = (ids: string[]): string[] =>
+      ids.map((id) => idToName.get(id) ?? id);
+
     // ─── TEATRO_EN_DEPTO ──────────────────────────────────────────────────
     // Se incluye si hay deptos en teatro Y el dominante no es ya teatro.
     if (data.teatroCount > 0 && dominanteType !== 'CONTRADICCION_TEATRO') {
       const teatroDeptos = data.scoresPerDept
         .filter((s) => s.teatroCumplimiento === true)
-        .map((s) => s.departmentId);
+        .map((s) => s.departmentName ?? s.departmentId);
       if (teatroDeptos.length > 0) {
         amplificadores.push({ tipo: 'TEATRO_EN_DEPTO', deptos: teatroDeptos });
       }
@@ -487,10 +504,12 @@ export class AmbienteSynthesisEngine {
     for (const d of onbDeptos) {
       if (!exitDeptos.has(d)) soloOnb.push(d);
     }
-    if (ambos.length > 0) amplificadores.push({ tipo: 'CONVERGENCIA_AMBOS', deptos: ambos });
-    if (soloExit.length > 0) amplificadores.push({ tipo: 'CONVERGENCIA_EXIT', deptos: soloExit });
+    if (ambos.length > 0)
+      amplificadores.push({ tipo: 'CONVERGENCIA_AMBOS', deptos: namesFor(ambos) });
+    if (soloExit.length > 0)
+      amplificadores.push({ tipo: 'CONVERGENCIA_EXIT', deptos: namesFor(soloExit) });
     if (soloOnb.length > 0)
-      amplificadores.push({ tipo: 'CONVERGENCIA_ONBOARDING', deptos: soloOnb });
+      amplificadores.push({ tipo: 'CONVERGENCIA_ONBOARDING', deptos: namesFor(soloOnb) });
 
     // ─── SEXTA_ALERTA ─────────────────────────────────────────────────────
     // Se incluye si hay sub_threshold con voz externa Y dominante no es
@@ -557,10 +576,13 @@ export class AmbienteSynthesisEngine {
     // Lookup de copy verbatim del Dictionary (Gate 2.5). Donde el Dictionary
     // emite '', el Engine pasa '' transparente — la UI oculta esos slots.
     const dictEntry = SYNTHESIS_DICTIONARY[dominante.type];
-    const implication = this.composeImplication(
-      dictEntry.implicationBase,
-      amplificadores,
-    );
+
+    // Interpolar la base con el contexto del dominante (opción A: placeholders
+    // {...} resueltos por interpolate, NO functions). Las cláusulas de
+    // amplificadores resuelven su propia lista de deptos.
+    const context = this.buildInterpolationContext(dominante, input.data);
+    const baseInterpolated = this.interpolate(dictEntry.implicationBase, context);
+    const implication = this.composeImplication(baseInterpolated, amplificadores);
 
     return {
       diagnosticType: dominante.type,
@@ -578,9 +600,70 @@ export class AmbienteSynthesisEngine {
         nivelFinal: convergencia.nivelFinal,
         fuentes: convergencia.fuentes,
       },
-      // Opcional — FUEGO_LEGAL solamente.
+      // Opcionales — CONCENTRACION_MANDO + FUEGO_LEGAL.
+      ...(dictEntry.risks && dictEntry.risks.length > 0
+        ? { risks: dictEntry.risks }
+        : {}),
+      // FUEGO_LEGAL legalNote queda '' por decisión (no se nombra la ley) → no se emite.
       ...(dictEntry.legalNote ? { legalNote: dictEntry.legalNote } : {}),
     };
+  }
+
+  /** Construye el contexto de interpolación (opción A) con las 6 claves selladas.
+   *  {deptos}/{nombres} resuelven IDs → nombres legibles vía convergencias +
+   *  riskScores. {origen} traduce el origen organizacional vía ORIGEN_LABELS. */
+  private static buildInterpolationContext(
+    dominante: DiagnosticScore,
+    data: AmbienteRiskData,
+  ): Record<string, string> {
+    const idToName = new Map<string, string>();
+    for (const c of data.convergencias) {
+      if (c.departmentName) idToName.set(c.departmentId, c.departmentName);
+    }
+    for (const r of data.riskScoresPerDept) {
+      if (r.departmentName) idToName.set(r.departmentId, r.departmentName);
+    }
+    const resolveNames = (ids: string[]): string[] =>
+      ids
+        .map((id) => idToName.get(id))
+        .filter((n): n is string => typeof n === 'string');
+
+    // {deptos} — FUEGO_LEGAL: gerencias con denuncia formal (dominante.data.deptos = IDs).
+    const fuegoIds = Array.isArray(dominante.data.deptos)
+      ? (dominante.data.deptos as string[])
+      : [];
+    const deptos = formatDeptList(resolveNames(fuegoIds));
+
+    // {nombres} — CONCENTRACION_MANDO: gerencias bajo el mando crítico. Fallback
+    // defensivo plural-consistente cuando los nombres no resuelven (prod siempre
+    // resuelve vía convergencias).
+    const mandoNames = resolveNames(data.criticalByManager[0]?.departmentIds ?? []);
+    const nombres =
+      mandoNames.length > 0 ? formatDeptList(mandoNames) : 'Las gerencias señaladas';
+
+    // {origen} — label ejecutivo del origen organizacional (cae a 'indeterminado').
+    const origen = ORIGEN_LABELS[data.origenOrganizacional ?? 'indeterminado'];
+
+    return {
+      deptos,
+      nombres,
+      origen,
+      riesgoDeptos: String(data.riesgoDeptosCount),
+      totalDeptos: String(data.departmentsCount),
+      orgISA: data.orgISA !== null ? String(data.orgISA) : '',
+    };
+  }
+
+  /** Reemplaza `{key}` por `context[key]`. Las llaves desconocidas se dejan
+   *  intactas (audit-friendly). No-op sobre string vacío. */
+  private static interpolate(
+    template: string,
+    context: Record<string, string>,
+  ): string {
+    if (!template) return template;
+    return template.replace(/\{(\w+)\}/g, (match, key: string) =>
+      key in context ? context[key] : match,
+    );
   }
 
   /** Compone `implication = base + cláusulas[].join(' ')` (§3.5.7).

@@ -36,6 +36,7 @@ import type {
   NivelFinal,
   DepartmentConvergencia,
 } from '@/lib/services/compliance/ConvergenciaEngine';
+import type { OrigenOrganizacional } from '@/lib/services/compliance/complianceTypes';
 import type {
   ReportNarratives,
   DepartmentRiskScore,
@@ -202,6 +203,11 @@ export interface AmbienteRiskData {
   // ─── Denuncias / Karin (Beat 1 ortogonal + tipo FUEGO_LEGAL del Engine) ────
   /** Conteo de denuncias_12m por departmentId. null = no medido. */
   denunciasByDept?: Map<string, number | null>;
+
+  /** Origen organizacional del meta-análisis LLM — resuelve `{origen}` en la
+   *  base de CONCENTRACION_MANDO (vía ORIGEN_LABELS). null si no hubo
+   *  meta-análisis (cae a 'indeterminado'). */
+  origenOrganizacional?: OrigenOrganizacional | null;
 }
 
 // ════════════════════════════════════════════════════════════════════════════

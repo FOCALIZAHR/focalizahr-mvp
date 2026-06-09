@@ -30,11 +30,16 @@ import {
   THRESHOLDS,
   type ConvergenciaSignal,
 } from './AmbienteSynthesisEngine';
+import { AMPLIFIER_CLAUSES } from './AmbienteSynthesisDictionary';
 import type {
   AmbienteRiskData,
   Beat1Seed,
   Mundo,
 } from '@/types/ambiente-cascada';
+import type {
+  DepartmentRiskScore,
+  ComplianceReportDepartment,
+} from '@/types/compliance';
 
 // ═══════════════════════════════════════════════════════════════════
 // FACTORIES — fixtures mínimos con overrides
@@ -113,6 +118,47 @@ function mkBeat1Seed(over: Partial<Beat1Seed> = {}): Beat1Seed {
     },
     ...over,
   };
+}
+
+/** DepartmentRiskScore mínimo para resolución id→name + gatillo FUEGO opcional. */
+function mkRisk(
+  departmentId: string,
+  departmentName: string,
+  pisoDenuncia = 0,
+): DepartmentRiskScore {
+  return {
+    departmentId,
+    departmentName,
+    score: 50,
+    bucket: 'con_isa',
+    drivers: { confiabilidad: 10, voz_externa: 0, piso_denuncia: pisoDenuncia },
+    reason: 'suma',
+    inputs: {
+      participacion: 70,
+      pesoAlertas: 0,
+      denuncias_12m: pisoDenuncia > 0 ? 1 : 0,
+    },
+    alertas: [],
+  } as unknown as DepartmentRiskScore;
+}
+
+/** ComplianceReportDepartment mínimo para resolución id→name + flag teatro. */
+function mkDept(
+  departmentId: string,
+  departmentName: string,
+  teatroCumplimiento = false,
+): ComplianceReportDepartment {
+  return {
+    departmentId,
+    departmentName,
+    safetyScore: 3,
+    riskLevel: 'normal',
+    respondentCount: 8,
+    dimensionScores: {},
+    isaScore: 60,
+    deltaVsAnterior: null,
+    teatroCumplimiento,
+  } as unknown as ComplianceReportDepartment;
 }
 
 function mkConvergencia(
@@ -527,17 +573,27 @@ test('14a. TODO_BIEN consume 3 slots REUSE verbatim del Dictionary', () => {
     result.accountability,
     'El próximo ciclo confirmará si fue una tendencia.',
   );
-  // path queda '' hasta Gate 2.5 completo.
-  assert.equal(result.path, '');
+  // path Gate 2.5 (ADAPT de buildCierre.sin_riesgo).
+  assert.equal(
+    result.path,
+    'Sostener no es no hacer nada. Es seguir escuchando cuando nada lo exige.',
+  );
 });
 
 test('14b. CONCENTRACION_MANDO + SISTEMICO_SIN_MANDO traen classification/accountability REUSE', () => {
-  // CONCENTRACION_MANDO
+  // CONCENTRACION_MANDO — nombres resueltos vía riskScoresPerDept + origen del meta.
   const data1 = mkData({
     orgISA: 55,
     riesgoDeptosCount: 5,
     criticalByManager: [
       { managerId: 'm', departmentIds: ['d1', 'd2', 'd3', 'd4'] },
+    ],
+    origenOrganizacional: 'vertical_descendente',
+    riskScoresPerDept: [
+      mkRisk('d1', 'Ventas'),
+      mkRisk('d2', 'Soporte'),
+      mkRisk('d3', 'Logística'),
+      mkRisk('d4', 'Cobranza'),
     ],
   });
   const r1 = AmbienteSynthesisEngine.generate({
@@ -552,8 +608,15 @@ test('14b. CONCENTRACION_MANDO + SISTEMICO_SIN_MANDO traen classification/accoun
     r1.accountability,
     'El próximo ciclo confirmará si estas decisiones fueron efectivas.',
   );
-  // implicationBase queda '' hasta resolver interpolación.
-  assert.equal(r1.implication, '');
+  // implicationBase interpolada: {nombres} (lista) + {origen} (label ejecutivo).
+  assert.equal(
+    r1.implication,
+    'Ventas, Soporte, Logística y Cobranza concentran el riesgo bajo una misma línea de mando. ' +
+      'El origen viene de quien tiene autoridad. El problema tiene nombre. La decisión también.',
+  );
+  // risks Gate 2.5 — 3 hipótesis "O".
+  assert.ok(r1.risks && r1.risks.length === 3, 'CONCENTRACION_MANDO emite 3 risks.');
+  assert.equal(r1.risks![0].label, 'Sesgo del liderazgo');
 
   // SISTEMICO_SIN_MANDO
   const data2 = mkData({
@@ -570,6 +633,16 @@ test('14b. CONCENTRACION_MANDO + SISTEMICO_SIN_MANDO traen classification/accoun
     'Este no es un problema de liderazgo. Es un problema de diseño.',
   );
   assert.equal(r2.accountability, 'El próximo ciclo dirá cuál de las dos.');
+  // implicationBase interpolada con {riesgoDeptos} (plural fijo del gatillo ≥3).
+  assert.equal(
+    r2.implication,
+    '4 gerencias en zona de revisión este ciclo sin línea de mando común. ' +
+      'O el problema es sistémico. O todavía no tiene masa suficiente para identificar el patrón.',
+  );
+  assert.equal(
+    r2.path,
+    'No hay un solo responsable que explique esto. Está repartido, y por eso ningún foco aislado lo cierra.',
+  );
 });
 
 test('14c. GENERIC trae path patológico fijo §3.5.8 — NO inventa "sin dirección clara"', () => {
@@ -590,7 +663,7 @@ test('14c. GENERIC trae path patológico fijo §3.5.8 — NO inventa "sin direcc
   );
 });
 
-test('14d. Tipos sin copy aún (FUEGO_LEGAL, SILENCIO, etc.) emiten "" — Engine pasa transparente', () => {
+test('14d. SILENCIO_SIN_VOZ trae copy completa Gate 2.5 (classification + base + path + accountability)', () => {
   const data = mkData({
     orgISA: 49,
     coverageGapPct: 82,
@@ -601,9 +674,19 @@ test('14d. Tipos sin copy aún (FUEGO_LEGAL, SILENCIO, etc.) emiten "" — Engin
   const result = AmbienteSynthesisEngine.generate({ beat1Seed, data });
 
   assert.equal(result.diagnosticType, 'SILENCIO_SIN_VOZ');
-  // Sin copy en Dictionary aún — slots vacíos. UI los oculta.
-  assert.equal(result.classification, '');
-  assert.equal(result.path, '');
+  assert.equal(
+    result.classification,
+    'Esto no es un problema de participación. Es silencio que ya dejó señal por fuera.',
+  );
+  assert.ok(
+    result.implication.startsWith('La mayoría no respondió.'),
+    'implication SILENCIO verbatim: ' + result.implication,
+  );
+  assert.ok(result.path.startsWith('El número no sube persiguiendo respuestas.'));
+  assert.equal(
+    result.accountability,
+    'El próximo ciclo confirmará si estas decisiones fueron al fondo o a la superficie.',
+  );
 });
 
 test('14e. Cláusulas amplificadoras REUSE — SEXTA_ALERTA + CONVERGENCIA_AMBOS', () => {
@@ -633,6 +716,153 @@ test('14e. Cláusulas amplificadoras REUSE — SEXTA_ALERTA + CONVERGENCIA_AMBOS
     result.implication.includes('otras fuentes documentaron señales activas'),
     'REUSE verbatim de buildAlertas.silencio_con_voz_externa.contexto: ' + result.implication,
   );
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// 16. Gate 2.5 COMPLETO — copy verbatim + interpolación por tipo
+// ═══════════════════════════════════════════════════════════════════
+
+test('16a. FUEGO_LEGAL: {deptos} interpola nombre + risks emitidos + sin legalNote', () => {
+  const data = mkData({
+    orgISA: 49,
+    coverageGapPct: 82,
+    riesgoDeptosCount: 2,
+    riskScoresPerDept: [mkRisk('d-comercial', 'Comercial', 75)],
+  });
+  const result = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'silencio', hasDenunciaFormal: true }),
+    data,
+  });
+
+  assert.equal(result.diagnosticType, 'FUEGO_LEGAL');
+  assert.ok(
+    result.implication.startsWith(
+      'En Comercial, en los últimos 12 meses, hubo al menos una denuncia formal.',
+    ),
+    'implication FUEGO interpola {deptos}=Comercial: ' + result.implication,
+  );
+  assert.ok(result.risks && result.risks.length === 3, 'FUEGO emite 3 risks.');
+  assert.equal(result.risks![0].label, 'Rara vez se queda en uno');
+  // legalNote queda '' por decisión → no se emite (sin nombrar la ley).
+  assert.equal(result.legalNote, undefined);
+});
+
+test('16b. CONTRADICCION_TEATRO: base count-free (sin "N gerencias operan")', () => {
+  const data = mkData({ orgISA: 65, coverageGapPct: 10, teatroCount: 2 });
+  const result = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'contradiccion' }),
+    data,
+  });
+
+  assert.equal(result.diagnosticType, 'CONTRADICCION_TEATRO');
+  assert.ok(
+    result.implication.includes('Hay gerencias que operan con números saludables'),
+    'base TEATRO count-free: ' + result.implication,
+  );
+  assert.ok(
+    !/\d\s*gerencias?\s*opera/.test(result.implication),
+    'la base NO debe llevar conteo: ' + result.implication,
+  );
+});
+
+test('16c. OBSERVACION_SIN_FOCO: copy completa Gate 2.5', () => {
+  const data = mkData({ orgISA: 70, coverageGapPct: 10, riesgoDeptosCount: 0, teatroCount: 0 });
+  const result = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'numero-bajo' }),
+    data,
+  });
+
+  assert.equal(result.diagnosticType, 'OBSERVACION_SIN_FOCO');
+  assert.equal(
+    result.classification,
+    'Esto no es un foco que apagar. Es un ambiente que avisa antes de tener uno.',
+  );
+  assert.ok(result.implication.startsWith('El número no está en rojo'));
+  assert.ok(result.path.startsWith('Acá no hay un foco que perseguir.'));
+  assert.equal(
+    result.accountability,
+    'El próximo ciclo dirá si este ambiente medio se sostiene o se mueve.',
+  );
+});
+
+test('16d. BIEN_CON_FOCOS: interpola {riesgoDeptos}/{totalDeptos}/{orgISA}', () => {
+  const data = mkData({
+    orgISA: 85,
+    coverageGapPct: 10,
+    riesgoDeptosCount: 2,
+    departmentsCount: 6,
+    teatroCount: 0,
+  });
+  const result = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'bien-con-focos' }),
+    data,
+  });
+
+  assert.equal(result.diagnosticType, 'BIEN_CON_FOCOS');
+  assert.ok(
+    result.implication.startsWith('2 de 6 gerencias concentran el riesgo del ciclo.'),
+    'interpola riesgoDeptos=2 / totalDeptos=6: ' + result.implication,
+  );
+  assert.ok(
+    result.implication.includes('El número global cierra en 85,'),
+    'interpola orgISA=85: ' + result.implication,
+  );
+});
+
+test('16e. Cláusulas amplificadoras Gate 2.5 — verbatim con nombres + guard vacío', () => {
+  assert.equal(
+    AMPLIFIER_CLAUSES.TEATRO_EN_DEPTO!(['Ventas', 'TI']),
+    'En Ventas y TI las métricas dicen sano y las palabras no.',
+  );
+  assert.equal(
+    AMPLIFIER_CLAUSES.CONVERGENCIA_EXIT!(['Ventas']),
+    'En Ventas, los que se fueron ya lo dijeron en la encuesta de salida (Exit).',
+  );
+  assert.equal(
+    AMPLIFIER_CLAUSES.CONVERGENCIA_ONBOARDING!(['Soporte']),
+    'En Soporte, los que recién entraron ya lo señalaron en Onboarding.',
+  );
+  assert.equal(
+    AMPLIFIER_CLAUSES.OTRO_MUNDO!(['Bodega']),
+    'En Bodega, que ni siquiera entraron a la medición, ya quedó rastro por fuera.',
+  );
+  assert.equal(AMPLIFIER_CLAUSES.OTRO_MUNDO!([]), '', 'guard lista vacía → ""');
+});
+
+test('16f. TEATRO_EN_DEPTO en implication resuelve NAME (no ID) vía buildAmplificadores', () => {
+  // SISTEMICO dominante (orgISA<60, riesgoDeptos≥3, sin mando) + teatro en 1 dept.
+  const data = mkData({
+    orgISA: 55,
+    coverageGapPct: 10,
+    riesgoDeptosCount: 3,
+    teatroCount: 1,
+    criticalByManager: [],
+    scoresPerDept: [mkDept('d-ti', 'TI', true)],
+  });
+  const result = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'numero-bajo' }),
+    data,
+  });
+
+  assert.equal(result.diagnosticType, 'SISTEMICO_SIN_MANDO');
+  assert.ok(
+    result.implication.includes('En TI las métricas dicen sano y las palabras no.'),
+    'cláusula TEATRO_EN_DEPTO con nombre resuelto: ' + result.implication,
+  );
+  assert.ok(
+    !result.implication.includes('d-ti'),
+    'NO debe filtrar el ID crudo: ' + result.implication,
+  );
+});
+
+test('16g. GENERIC: classification + accountability vacíos (no narra)', () => {
+  const result = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'numero-bajo' }),
+    data: mkData({ orgISA: null }),
+  });
+  assert.equal(result.diagnosticType, 'GENERIC');
+  assert.equal(result.classification, '');
+  assert.equal(result.accountability, '');
 });
 
 // Sanity check: thresholds exportados son los del plan.
