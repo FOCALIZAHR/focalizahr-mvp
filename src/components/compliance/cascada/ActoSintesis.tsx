@@ -56,6 +56,23 @@ export default memo(function ActoSintesis({ data, onIrAlPlan }: ActoSintesisProp
             {synth.implication}
           </p>
         )}
+
+        {/* Hipótesis "O" McKinsey — FUEGO_LEGAL / CONCENTRACION_MANDO emiten
+            `risks` (causas/consecuencias posibles, sin juicio). Lista neutra. */}
+        {synth.risks && synth.risks.length > 0 && (
+          <ul className="text-left max-w-xl mx-auto space-y-2">
+            {synth.risks.map((r) => (
+              <li
+                key={r.label}
+                className="flex gap-2 text-sm font-light text-slate-400 leading-relaxed"
+              >
+                <span className="select-none text-slate-600">—</span>
+                <span>{r.narrative}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
         {synth.path.length > 0 && (
           <div className="border-l-2 border-cyan-500/30 pl-4 text-left max-w-xl mx-auto">
             <p className="text-base font-light text-slate-400 leading-relaxed">
