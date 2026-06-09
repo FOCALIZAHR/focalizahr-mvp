@@ -254,13 +254,31 @@ export type DiagnosticType =
   | 'TODO_BIEN'
   | 'GENERIC';
 
+/** Señal externa dominante de un amplificador — el dato específico que el
+ *  refactor a `amplificadoresActivos` había colapsado. Un dominante por
+ *  amplificador (Ley Karin priority, si no el de mayor `pesoEfectivo`). La
+ *  copy específica la escribe el chat de narrativa; el `alertType` NUNCA se
+ *  renderiza literal — va por framing de indicio + `legalBadgeForCountry`. */
+export interface AmplificadorSenal {
+  producto: 'exit' | 'onboarding';
+  /** alertType canónico (`ley_karin`, `toxic_exit_detected`,
+   *  `DESENGANCHE_CULTURAL`, …) — `PESO_BASE_ALERTA`. Dato, no copy. */
+  alertType: string;
+  /** `pesoEfectivo` del dominante (1-3, proxy de severidad). */
+  severidad: number;
+  /** `alertType ∈ ALERTAS_CRITICAS` (ley_karin / toxic_exit / DESENGANCHE). */
+  esCritica: boolean;
+}
+
 /** Amplificadores coexistentes con el dominante — síntomas presentes que la
- *  narrativa de cierre nombra (cláusula composicional por tipo, NO permutar). */
+ *  narrativa de cierre nombra (cláusula composicional por tipo, NO permutar).
+ *  `senal?` (Nivel 1, CONVERGENCIA_*) surfacea la señal externa dominante;
+ *  ausente en payloads legacy → la cláusula cae a su copy genérica validada. */
 export type Amplificador =
   | { tipo: 'TEATRO_EN_DEPTO'; deptos: string[] }
-  | { tipo: 'CONVERGENCIA_EXIT'; deptos: string[] }
-  | { tipo: 'CONVERGENCIA_ONBOARDING'; deptos: string[] }
-  | { tipo: 'CONVERGENCIA_AMBOS'; deptos: string[] }
+  | { tipo: 'CONVERGENCIA_EXIT'; deptos: string[]; senal?: AmplificadorSenal }
+  | { tipo: 'CONVERGENCIA_ONBOARDING'; deptos: string[]; senal?: AmplificadorSenal }
+  | { tipo: 'CONVERGENCIA_AMBOS'; deptos: string[]; senal?: AmplificadorSenal }
   | { tipo: 'SEXTA_ALERTA'; deptos: string[] }
   | { tipo: 'OTRO_MUNDO'; deptos: string[] };
 

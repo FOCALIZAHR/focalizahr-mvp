@@ -28,7 +28,9 @@ import type {
   Mundo,
   DiagnosticType,
   Amplificador,
+  AmplificadorSenal,
 } from '@/types/ambiente-cascada';
+import { ALERTAS_CRITICAS } from '@/config/compliance/convergenciaWeights';
 import type { NivelFinal } from '@/lib/services/compliance/ConvergenciaEngine';
 import {
   SYNTHESIS_DICTIONARY,
@@ -470,6 +472,35 @@ export class AmbienteSynthesisEngine {
     const namesFor = (ids: string[]): string[] =>
       ids.map((id) => idToName.get(id) ?? id);
 
+    // id→convergencia para recuperar `alertasConsideradas` (Nivel 1: señal
+    // específica que el colapso a amplificadoresActivos había perdido).
+    const convByDept = new Map(data.convergencias.map((c) => [c.departmentId, c]));
+
+    /** Señal externa dominante entre un grupo de deptos. Replica el pick del
+     *  motor legacy (`resolveDepartmentRiskNarrative` 2a + `splitPesoPorProducto`):
+     *  Ley Karin con peso > 0 gana primero; si no, el de mayor `pesoEfectivo`.
+     *  `producto` opcional filtra (exit-only / onb-only); sin filtro = AMBOS.
+     *  `undefined` si no hay alertas (legacy / sin data) → la cláusula cae a
+     *  su copy genérica (invariante: nunca bajo el piso de claridad). */
+    const dominantSignal = (
+      deptIds: string[],
+      producto?: 'exit' | 'onboarding',
+    ): AmplificadorSenal | undefined => {
+      const candidatos = deptIds
+        .flatMap((id) => convByDept.get(id)?.convergenciaExterna?.alertasConsideradas ?? [])
+        .filter((a) => a.pesoEfectivo > 0 && (!producto || a.producto === producto));
+      if (candidatos.length === 0) return undefined;
+      const dominante =
+        candidatos.find((a) => a.alertType === 'ley_karin') ??
+        candidatos.reduce((best, a) => (a.pesoEfectivo > best.pesoEfectivo ? a : best));
+      return {
+        producto: dominante.producto,
+        alertType: dominante.alertType,
+        severidad: dominante.pesoEfectivo,
+        esCritica: ALERTAS_CRITICAS.includes(dominante.alertType),
+      };
+    };
+
     // ─── TEATRO_EN_DEPTO ──────────────────────────────────────────────────
     // Se incluye si hay deptos en teatro Y el dominante no es ya teatro.
     if (data.teatroCount > 0 && dominanteType !== 'CONTRADICCION_TEATRO') {
@@ -505,11 +536,24 @@ export class AmbienteSynthesisEngine {
       if (!exitDeptos.has(d)) soloOnb.push(d);
     }
     if (ambos.length > 0)
-      amplificadores.push({ tipo: 'CONVERGENCIA_AMBOS', deptos: namesFor(ambos) });
+      amplificadores.push({
+        tipo: 'CONVERGENCIA_AMBOS',
+        deptos: namesFor(ambos),
+        // AMBOS: dominante entre ambos productos (Ley Karin priority).
+        senal: dominantSignal(ambos),
+      });
     if (soloExit.length > 0)
-      amplificadores.push({ tipo: 'CONVERGENCIA_EXIT', deptos: namesFor(soloExit) });
+      amplificadores.push({
+        tipo: 'CONVERGENCIA_EXIT',
+        deptos: namesFor(soloExit),
+        senal: dominantSignal(soloExit, 'exit'),
+      });
     if (soloOnb.length > 0)
-      amplificadores.push({ tipo: 'CONVERGENCIA_ONBOARDING', deptos: namesFor(soloOnb) });
+      amplificadores.push({
+        tipo: 'CONVERGENCIA_ONBOARDING',
+        deptos: namesFor(soloOnb),
+        senal: dominantSignal(soloOnb, 'onboarding'),
+      });
 
     // ─── SEXTA_ALERTA ─────────────────────────────────────────────────────
     // Se incluye si hay sub_threshold con voz externa Y dominante no es
@@ -692,7 +736,9 @@ export class AmbienteSynthesisEngine {
       if (!a) continue;
       const fn = AMPLIFIER_CLAUSES[tipo];
       if (!fn) continue; // Cláusula aún no entregada por Victor — se omite.
-      const text = fn(a.deptos);
+      // Se pasa el amplificador completo: la cláusula lee `deptos` (copy
+      // genérica actual) y, cuando el chat de narrativa lo cablee, `senal`.
+      const text = fn(a);
       if (text) clauses.push(text);
     }
 

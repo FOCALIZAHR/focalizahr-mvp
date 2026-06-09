@@ -40,6 +40,7 @@ import type {
   DepartmentRiskScore,
   ComplianceReportDepartment,
 } from '@/types/compliance';
+import type { DepartmentConvergencia } from '@/lib/services/compliance/ConvergenciaEngine';
 
 // ═══════════════════════════════════════════════════════════════════
 // FACTORIES — fixtures mínimos con overrides
@@ -159,6 +160,38 @@ function mkDept(
     deltaVsAnterior: null,
     teatroCumplimiento,
   } as unknown as ComplianceReportDepartment;
+}
+
+/** Alerta externa mínima (subset de ExternalAlert que el dominante consume). */
+type ExternalAlertLite = {
+  alertType: string;
+  producto: 'exit' | 'onboarding';
+  pesoEfectivo: number;
+};
+
+/** DepartmentConvergencia mínima con `alertasConsideradas` para Nivel 1. */
+function mkConv(
+  departmentId: string,
+  departmentName: string,
+  opts: { exit?: ExternalAlertLite[]; onb?: ExternalAlertLite[] } = {},
+): DepartmentConvergencia {
+  const exitAlerts = opts.exit ?? [];
+  const onbAlerts = opts.onb ?? [];
+  return {
+    departmentId,
+    departmentName,
+    managerId: null,
+    convergenciaExterna: {
+      exoSignal: onbAlerts.length ? 2 : 0,
+      eisSignal: exitAlerts.length ? 2 : 0,
+      pesoAlertas: 0,
+      scoreTotal: 0,
+      tieneAlertaCritica: false,
+      fallaCicloDeVida: false,
+      alertasConsideradas: [...exitAlerts, ...onbAlerts],
+    },
+    nivelFinal: 'externa_solo',
+  } as unknown as DepartmentConvergencia;
 }
 
 function mkConvergencia(
@@ -811,22 +844,29 @@ test('16d. BIEN_CON_FOCOS: interpola {riesgoDeptos}/{totalDeptos}/{orgISA}', () 
 
 test('16e. Cláusulas amplificadoras Gate 2.5 — verbatim con nombres + guard vacío', () => {
   assert.equal(
-    AMPLIFIER_CLAUSES.TEATRO_EN_DEPTO!(['Ventas', 'TI']),
+    AMPLIFIER_CLAUSES.TEATRO_EN_DEPTO!({ tipo: 'TEATRO_EN_DEPTO', deptos: ['Ventas', 'TI'] }),
     'En Ventas y TI las métricas dicen sano y las palabras no.',
   );
   assert.equal(
-    AMPLIFIER_CLAUSES.CONVERGENCIA_EXIT!(['Ventas']),
+    AMPLIFIER_CLAUSES.CONVERGENCIA_EXIT!({ tipo: 'CONVERGENCIA_EXIT', deptos: ['Ventas'] }),
     'En Ventas, los que se fueron ya lo dijeron en la encuesta de salida (Exit).',
   );
   assert.equal(
-    AMPLIFIER_CLAUSES.CONVERGENCIA_ONBOARDING!(['Soporte']),
+    AMPLIFIER_CLAUSES.CONVERGENCIA_ONBOARDING!({
+      tipo: 'CONVERGENCIA_ONBOARDING',
+      deptos: ['Soporte'],
+    }),
     'En Soporte, los que recién entraron ya lo señalaron en Onboarding.',
   );
   assert.equal(
-    AMPLIFIER_CLAUSES.OTRO_MUNDO!(['Bodega']),
+    AMPLIFIER_CLAUSES.OTRO_MUNDO!({ tipo: 'OTRO_MUNDO', deptos: ['Bodega'] }),
     'En Bodega, que ni siquiera entraron a la medición, ya quedó rastro por fuera.',
   );
-  assert.equal(AMPLIFIER_CLAUSES.OTRO_MUNDO!([]), '', 'guard lista vacía → ""');
+  assert.equal(
+    AMPLIFIER_CLAUSES.OTRO_MUNDO!({ tipo: 'OTRO_MUNDO', deptos: [] }),
+    '',
+    'guard lista vacía → ""',
+  );
 });
 
 test('16f. TEATRO_EN_DEPTO en implication resuelve NAME (no ID) vía buildAmplificadores', () => {
@@ -863,6 +903,108 @@ test('16g. GENERIC: classification + accountability vacíos (no narra)', () => {
   assert.equal(result.diagnosticType, 'GENERIC');
   assert.equal(result.classification, '');
   assert.equal(result.accountability, '');
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// 17. Nivel 1 — CONVERGENCIA_* surfacea señal dominante (alertType+producto+severidad)
+// ═══════════════════════════════════════════════════════════════════
+
+test('17a. CONVERGENCIA_EXIT / ONBOARDING surfacean su señal dominante', () => {
+  const data = mkData({
+    orgISA: 85,
+    coverageGapPct: 10,
+    riesgoDeptosCount: 2,
+    convergencias: [
+      mkConv('d-ventas', 'Ventas', {
+        exit: [{ alertType: 'toxic_exit_detected', producto: 'exit', pesoEfectivo: 3 }],
+      }),
+      mkConv('d-soporte', 'Soporte', {
+        onb: [{ alertType: 'RIESGO_FUGA', producto: 'onboarding', pesoEfectivo: 2 }],
+      }),
+    ],
+  });
+  const result = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'bien-con-focos' }),
+    data,
+    convergenciaSignal: mkConvergencia({ direccion: 'ninguna' }),
+  });
+
+  const exit = result.amplificadoresActivos.find((a) => a.tipo === 'CONVERGENCIA_EXIT');
+  assert.ok(exit?.senal, 'CONVERGENCIA_EXIT trae senal');
+  assert.equal(exit!.senal!.producto, 'exit');
+  assert.equal(exit!.senal!.alertType, 'toxic_exit_detected');
+  assert.equal(exit!.senal!.severidad, 3);
+  assert.equal(exit!.senal!.esCritica, true);
+
+  const onb = result.amplificadoresActivos.find((a) => a.tipo === 'CONVERGENCIA_ONBOARDING');
+  assert.ok(onb?.senal, 'CONVERGENCIA_ONBOARDING trae senal');
+  assert.equal(onb!.senal!.alertType, 'RIESGO_FUGA');
+  assert.equal(onb!.senal!.severidad, 2);
+  assert.equal(onb!.senal!.esCritica, false);
+});
+
+test('17b. Ley Karin gana el dominante aunque otro producto pese más (AMBOS)', () => {
+  const data = mkData({
+    orgISA: 85,
+    riesgoDeptosCount: 2,
+    convergencias: [
+      mkConv('d-x', 'Comercial', {
+        exit: [{ alertType: 'ley_karin', producto: 'exit', pesoEfectivo: 1 }],
+        onb: [{ alertType: 'DESENGANCHE_CULTURAL', producto: 'onboarding', pesoEfectivo: 3 }],
+      }),
+    ],
+  });
+  const result = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'bien-con-focos' }),
+    data,
+    convergenciaSignal: mkConvergencia({ direccion: 'ninguna' }),
+  });
+
+  const ambos = result.amplificadoresActivos.find((a) => a.tipo === 'CONVERGENCIA_AMBOS');
+  assert.ok(ambos?.senal, 'CONVERGENCIA_AMBOS trae senal');
+  assert.equal(
+    ambos!.senal!.alertType,
+    'ley_karin',
+    'Ley Karin priority gana sobre peso mayor (espejo resolveDepartmentRiskNarrative 2a)',
+  );
+  assert.equal(ambos!.senal!.producto, 'exit');
+  assert.equal(ambos!.senal!.esCritica, true);
+});
+
+test('17c. Payload legacy sin alertasConsideradas → senal undefined, cláusula genérica (piso)', () => {
+  const legacyConv = {
+    departmentId: 'd-leg',
+    departmentName: 'Legacy',
+    managerId: null,
+    convergenciaExterna: {
+      exoSignal: 0,
+      eisSignal: 2,
+      pesoAlertas: 0,
+      scoreTotal: 0,
+      tieneAlertaCritica: false,
+      fallaCicloDeVida: false,
+      alertasConsideradas: [], // legacy: sin detalle
+    },
+    nivelFinal: 'externa_solo',
+  } as unknown as DepartmentConvergencia;
+
+  const data = mkData({ orgISA: 85, riesgoDeptosCount: 2, convergencias: [legacyConv] });
+  const result = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'bien-con-focos' }),
+    data,
+    convergenciaSignal: mkConvergencia({ direccion: 'ninguna' }),
+  });
+
+  const exit = result.amplificadoresActivos.find((a) => a.tipo === 'CONVERGENCIA_EXIT');
+  assert.ok(exit, 'el amplificador igual aparece (eisSignal>0)');
+  assert.equal(exit!.senal, undefined, 'sin alertas → senal undefined');
+  // Invariante piso de claridad: cláusula genérica validada sigue presente.
+  assert.ok(
+    result.implication.includes(
+      'los que se fueron ya lo dijeron en la encuesta de salida (Exit)',
+    ),
+    'fallback a copy genérica: ' + result.implication,
+  );
 });
 
 // Sanity check: thresholds exportados son los del plan.

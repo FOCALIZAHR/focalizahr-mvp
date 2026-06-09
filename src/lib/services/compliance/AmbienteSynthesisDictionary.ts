@@ -238,8 +238,13 @@ export const SYNTHESIS_DICTIONARY: Record<DiagnosticType, SynthesisCopyEntry> = 
 // nada (Engine las filtra). Cada cláusula resuelve su propia lista {deptos} vía
 // formatDeptList — leíble tras CUALQUIER base.
 
+// NOTA firma (Nivel 1): la cláusula recibe el `Amplificador` completo, no solo
+// `deptos`. Hoy todas usan `amp.deptos` (copy genérica validada — el piso de
+// claridad). Cuando el chat de narrativa escriba la copy específica, leerá
+// `amp.senal` (producto + alertType + severidad) para nombrar la señal — con
+// fallback a esta forma genérica si `senal` está ausente. Nunca bajo el piso.
 export const AMPLIFIER_CLAUSES: Partial<
-  Record<AmplificadorTipo, (deptos: string[]) => string>
+  Record<AmplificadorTipo, (amp: Amplificador) => string>
 > = {
   // CONVERGENCIA_AMBOS — núcleo REUSE de buildConvergenciaCruce.converge_limpia.
   // Frase generalizable: no necesita interpolar la lista de deptos.
@@ -247,34 +252,34 @@ export const AMPLIFIER_CLAUSES: Partial<
     'Cuando dos lentes independientes coinciden, el hallazgo deja de ser percepción: pasa a ser hecho.',
 
   // CONVERGENCIA_EXIT — los que se fueron ya lo dijeron en Exit.
-  CONVERGENCIA_EXIT: (deptos) => {
-    if (deptos.length === 0) return '';
-    return `En ${formatDeptList(deptos)}, los que se fueron ya lo dijeron en la encuesta de salida (Exit).`;
+  CONVERGENCIA_EXIT: (amp) => {
+    if (amp.deptos.length === 0) return '';
+    return `En ${formatDeptList(amp.deptos)}, los que se fueron ya lo dijeron en la encuesta de salida (Exit).`;
   },
 
   // CONVERGENCIA_ONBOARDING — los que recién entraron ya lo señalaron.
-  CONVERGENCIA_ONBOARDING: (deptos) => {
-    if (deptos.length === 0) return '';
-    return `En ${formatDeptList(deptos)}, los que recién entraron ya lo señalaron en Onboarding.`;
+  CONVERGENCIA_ONBOARDING: (amp) => {
+    if (amp.deptos.length === 0) return '';
+    return `En ${formatDeptList(amp.deptos)}, los que recién entraron ya lo señalaron en Onboarding.`;
   },
 
   // TEATRO_EN_DEPTO — métricas dicen sano, las palabras no.
-  TEATRO_EN_DEPTO: (deptos) => {
-    if (deptos.length === 0) return '';
-    return `En ${formatDeptList(deptos)} las métricas dicen sano y las palabras no.`;
+  TEATRO_EN_DEPTO: (amp) => {
+    if (amp.deptos.length === 0) return '';
+    return `En ${formatDeptList(amp.deptos)} las métricas dicen sano y las palabras no.`;
   },
 
   // SEXTA_ALERTA — condensación REUSE de buildAlertas.silencio_con_voz_externa.contexto.
-  SEXTA_ALERTA: (deptos) => {
-    if (deptos.length === 0) return '';
-    const list = formatDeptList(deptos);
+  SEXTA_ALERTA: (amp) => {
+    if (amp.deptos.length === 0) return '';
+    const list = formatDeptList(amp.deptos);
     return `En ${list}, otras fuentes documentaron señales activas en el mismo período.`;
   },
 
   // OTRO_MUNDO — deptos que ni entraron a la medición, ya dejaron rastro afuera.
-  OTRO_MUNDO: (deptos) => {
-    if (deptos.length === 0) return '';
-    return `En ${formatDeptList(deptos)}, que ni siquiera entraron a la medición, ya quedó rastro por fuera.`;
+  OTRO_MUNDO: (amp) => {
+    if (amp.deptos.length === 0) return '';
+    return `En ${formatDeptList(amp.deptos)}, que ni siquiera entraron a la medición, ya quedó rastro por fuera.`;
   },
 };
 
