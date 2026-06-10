@@ -3,7 +3,8 @@
 // ════════════════════════════════════════════════════════════════════════════
 // WORKFORCE RAIL — Fixed bottom collapsible bar (50px ↔ 240px)
 // Patron clonado de InsightsRail.tsx (Executive Hub)
-// 4 cards: Diagnostico, Estructura, Benchmarks, Simulador
+// Cards activas: Diagnostico, Nine-Box, Descriptor Simulator, Estructura, Presupuesto.
+// Benchmarks y Simulador (3 tesis) ocultos hasta tener metrica/spec (fuera de alcance v1).
 // src/app/dashboard/workforce/components/WorkforceRail.tsx
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -21,8 +22,7 @@ const WORKFORCE_CARDS: WorkforceCardType[] = [
   'nine-box-live',
   'descriptor-simulator',
   'estructura',
-  'benchmarks',
-  'simulador',
+  // 'benchmarks' y 'simulador' ocultos: requieren metrica exposure_ia / spec 3 tesis (fuera de alcance v1)
   'presupuesto',
 ]
 

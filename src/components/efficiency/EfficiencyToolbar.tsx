@@ -116,7 +116,7 @@ export default function EfficiencyToolbar({ data }: EfficiencyToolbarProps) {
       l1?.hayData
         ? formatCLP(getNumber(l1.detalle, 'totalMonthly'))
         : l4?.hayData
-        ? `${getArrayLen(l4.detalle, 'pairs')}`
+        ? `${getL4FueraDeRango(l4.detalle)}`
         : 'n/d'
     const capitalBreakdown: ToolBreakdown[] = [
       {
@@ -125,11 +125,11 @@ export default function EfficiencyToolbar({ data }: EfficiencyToolbarProps) {
         formatted: headlineMetric(l1),
       },
       {
-        label: 'Cargos sin impacto',
+        label: 'Líderes fuera de rango',
         value: headlineValue(l4),
         formatted: l4?.hayData
-          ? `${getArrayLen(l4.detalle, 'pairs')} ${
-              getArrayLen(l4.detalle, 'pairs') === 1 ? 'par' : 'pares'
+          ? `${getL4FueraDeRango(l4.detalle)} ${
+              getL4FueraDeRango(l4.detalle) === 1 ? 'líder' : 'líderes'
             }`
           : 'n/d',
       },

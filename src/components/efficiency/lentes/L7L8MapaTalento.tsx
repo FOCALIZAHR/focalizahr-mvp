@@ -22,6 +22,7 @@ import { Shield, Check, AlertTriangle, Crown } from 'lucide-react'
 import { LenteCard } from './LenteCard'
 import type { LenteComponentProps } from './_LentePlaceholder'
 import { formatCLP } from '@/lib/services/efficiency/EfficiencyNarrativeEngine'
+import { formatDisplayName } from '@/lib/utils/formatName'
 import {
   decisionKey,
   type DecisionItem,
@@ -127,6 +128,8 @@ export function L7L8MapaTalento({
   // Estado zona decisión: personas confirmadas en la lista
   const [confirmados, setConfirmados] = useState<Set<string>>(new Set())
   const [excepciones, setExcepciones] = useState<Record<string, string>>({})
+  const [editingExcepcion, setEditingExcepcion] = useState<string | null>(null)
+  const [excepcionDraft, setExcepcionDraft] = useState('')
 
   useEffect(() => {
     const blindInit: Record<string, TipoBlindaje | null> = {}
@@ -184,7 +187,7 @@ export function L7L8MapaTalento({
       id: p.employeeId,
       lenteId: 'l7_fuga',
       tipo: 'persona',
-      nombre: `${p.employeeName} · blindaje-${tipo}`,
+      nombre: `${formatDisplayName(p.employeeName)} · blindaje-${tipo}`,
       gerencia: p.departmentName,
       ahorroMes: 0, // blindaje no genera ahorro — evita reemplazo
       finiquito: inversion, // inversión one-time
@@ -219,7 +222,7 @@ export function L7L8MapaTalento({
       id: r.employeeId,
       lenteId: 'l8_retencion',
       tipo: 'persona',
-      nombre: `${r.employeeName} · confirmado`,
+      nombre: `${formatDisplayName(r.employeeName)} · confirmado`,
       gerencia: r.departmentName,
       ahorroMes: r.salary,
       finiquito: 0, // L9 calcula finiquitos con detalle
@@ -288,7 +291,7 @@ export function L7L8MapaTalento({
                         <div className="flex items-center gap-2">
                           <Shield className="w-3.5 h-3.5 text-cyan-400" />
                           <p className="text-sm font-medium text-white">
-                            {p.employeeName}
+                            {formatDisplayName(p.employeeName)}
                           </p>
                         </div>
                         <p className="text-xs text-slate-400 font-light mt-0.5">
@@ -360,14 +363,14 @@ export function L7L8MapaTalento({
                   key={r.employeeId}
                   className={`p-3 rounded-md border transition-colors ${
                     confirmed
-                      ? 'bg-red-500/5 border-red-500/40'
+                      ? 'bg-slate-800/70 border-slate-600'
                       : 'bg-slate-900/60 border-slate-800/60'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white">
-                        {r.employeeName}
+                        {formatDisplayName(r.employeeName)}
                         <span className="ml-2 text-xs text-slate-500 font-light">
                           · {r.position}
                         </span>
@@ -380,12 +383,42 @@ export function L7L8MapaTalento({
                           Excepción: {excepciones[r.employeeId]}
                         </p>
                       )}
+                      {editingExcepcion === r.employeeId && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <input
+                            autoFocus
+                            value={excepcionDraft}
+                            onChange={e => setExcepcionDraft(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' && excepcionDraft.trim()) {
+                                handleExcepcion(r, excepcionDraft.trim())
+                                setEditingExcepcion(null)
+                              }
+                              if (e.key === 'Escape') setEditingExcepcion(null)
+                            }}
+                            placeholder="Razón de la excepción…"
+                            className="flex-1 bg-slate-800/60 border border-slate-700 rounded px-2 py-1 text-[11px] text-slate-200 placeholder:text-slate-600 focus:border-cyan-500/50 focus:outline-none"
+                          />
+                          <button
+                            onClick={() => {
+                              if (excepcionDraft.trim())
+                                handleExcepcion(r, excepcionDraft.trim())
+                              setEditingExcepcion(null)
+                            }}
+                            className="text-[10px] text-cyan-300 hover:text-cyan-200 transition-colors px-2 py-1"
+                          >
+                            Guardar
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button
                         onClick={() => {
-                          const razon = prompt('Razón de la excepción:')
-                          if (razon) handleExcepcion(r, razon)
+                          setExcepcionDraft(excepciones[r.employeeId] ?? '')
+                          setEditingExcepcion(
+                            editingExcepcion === r.employeeId ? null : r.employeeId
+                          )
                         }}
                         className="text-[10px] text-slate-500 hover:text-amber-300 transition-colors px-2 py-1 rounded border border-slate-700 hover:border-amber-500/50"
                       >
@@ -395,7 +428,7 @@ export function L7L8MapaTalento({
                         onClick={() => handleConfirmar(r)}
                         className={`inline-flex items-center gap-1 text-[10px] font-medium px-3 py-1 rounded border transition-colors ${
                           confirmed
-                            ? 'border-red-400 bg-red-500/20 text-red-200'
+                            ? 'border-cyan-400 bg-cyan-500/15 text-cyan-200'
                             : 'border-slate-700 bg-slate-800/60 text-slate-300 hover:text-white hover:border-slate-600'
                         }`}
                       >
@@ -417,12 +450,12 @@ export function L7L8MapaTalento({
           <div
             className="p-4 rounded-lg border space-y-3"
             style={{
-              background: 'rgba(239, 68, 68, 0.05)',
-              borderColor: 'rgba(239, 68, 68, 0.35)',
+              background: 'rgba(15, 23, 42, 0.6)',
+              borderColor: 'rgba(30, 41, 59, 0.6)',
             }}
           >
             <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-slate-300 font-light leading-relaxed">
                 {critica.length} cargo{critica.length === 1 ? '' : 's'} crítico{critica.length === 1 ? '' : 's'} con alta
                 exposición IA y sin sucesor identificado. Si la persona sale antes
@@ -441,7 +474,7 @@ export function L7L8MapaTalento({
                   <span className="text-slate-400">{r.departmentName}</span>
                   <span className="text-slate-500 ml-auto">
                     Exposición{' '}
-                    <span className="text-red-300">
+                    <span className="text-amber-300">
                       {Math.round((r.focalizaScore ?? r.observedExposure) * 100)}%
                     </span>
                   </span>

@@ -154,7 +154,7 @@ export const NARRATIVE_TEMPLATES: Record<LenteId, string> = {
 
   l3_adopcion: `{AREA} concentra el {PCT_POTENCIAL}% de tu costo de trabajo expuesto a la IA, el más alto de tu empresa. Y sus resultados en {FUENTE} son los más bajos: {CLIMA}/5. Automatizar, reconvertir o potenciar ese trabajo: cualquier camino empieza acá. Y cualquiera pesa más donde esas condiciones ya están abajo. El cambio prende o muere según el terreno que lo recibe. Tu mayor oportunidad, en tu terreno más difícil.`,
 
-  l4_fantasma: `Tiene {N_PARES} pares de cargos con títulos distintos que comparten más del {OVERLAP}% de sus tareas operativas. El {PCT_AUTOMATIZABLE}% de esas tareas compartidas serán automatizadas. Está pagando doble por trabajo que ya es redundante y pronto será irrelevante.`,
+  l4_fantasma: `De tus {N_MANAGERS} jefaturas, {N_FUERA_RANGO} operan fuera del rango óptimo de control. Tu densidad gerencial es {DENSIDAD} y el costo de esas capas subóptimas llega a {CLP_CAPAS_SUBOPTIMAS} al mes. No es un problema de personas: es estructura que acumula costo sin agregar control.`,
 
   l5_brecha: `{N_PERSONAS} personas tienen un salario estimado sobre el percentil {PERCENTIL} de su nivel con un dominio del cargo bajo el {UMBRAL}%. El costo mensual excedente acumulado es {CLP_MES}. No es un error de RRHH: es el resultado de postergar decisiones que tienen costo calculado.`,
 
