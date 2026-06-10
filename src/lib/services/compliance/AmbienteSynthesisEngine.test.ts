@@ -1205,19 +1205,19 @@ test('19a. FUEGO_LEGAL expone issueCount (Σ denuncias) en synth; otros tipos no
   assert.equal(todoBien.issueCount, undefined);
 });
 
-test('19b. buildFuegoBadge — copy verbatim §TIPO 1 por count (label NEUTRO + tooltip)', () => {
-  const one = buildFuegoBadge(1, 'Ventas');
+test('19b. buildFuegoBadge — label NEUTRO + tooltip org-level por count', () => {
+  const one = buildFuegoBadge(1);
   assert.equal(one.label, 'Denuncia formal registrada');
   assert.equal(
     one.tooltip,
-    'En Ventas, al menos una denuncia formal en los últimos 12 meses. El solo hecho eleva la prioridad de revisión del área.',
+    'Una denuncia formal registrada en los últimos 12 meses. El solo hecho eleva la prioridad de revisión.',
   );
 
-  const many = buildFuegoBadge(3, 'Ventas y Soporte');
+  const many = buildFuegoBadge(3);
   assert.equal(many.label, 'Denuncia formal · 3');
   assert.equal(
     many.tooltip,
-    'En Ventas y Soporte no hay una sola denuncia formal: ya se acumulan 3 en los últimos 12 meses. La acumulación eleva la prioridad de revisión del área.',
+    'Ya se acumulan 3 denuncias formales en los últimos 12 meses. La acumulación eleva la prioridad de revisión.',
   );
 });
 

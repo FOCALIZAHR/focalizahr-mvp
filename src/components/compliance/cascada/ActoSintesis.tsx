@@ -20,10 +20,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, HelpCircle } from 'lucide-react';
 import { PrimaryButton } from '@/components/ui/PremiumButton';
 import { ActSeparator, fadeIn, Tooltip } from './shared';
-import {
-  buildFuegoBadge,
-  formatDeptList,
-} from '@/lib/services/compliance/AmbienteSynthesisDictionary';
+import { buildFuegoBadge } from '@/lib/services/compliance/AmbienteSynthesisDictionary';
 import type { ComplianceReportResponse } from '@/types/compliance';
 import type { Amplificador } from '@/types/ambiente-cascada';
 
@@ -48,25 +45,18 @@ export default memo(function ActoSintesis({ data, onIrAlPlan }: ActoSintesisProp
   // Guard: sin synthesis o sin classification (Gate 2.5 sin copy aún) → oculto.
   if (!synth || synth.classification.trim().length === 0) return null;
 
-  // Badge FUEGO_LEGAL — neutro, gateado por tipo. Count autoritativo de synth
-  // (backend); fallback a Σ denuncias_12m≥1 desde riskScores (patrón ActoAmbiente).
-  // departamento resuelto en el render desde riskScores (display, no count).
+  // Badge FUEGO_LEGAL — neutro, gateado por tipo, org-level. Count autoritativo
+  // de synth (backend); fallback a Σ denuncias_12m≥1 desde riskScores (patrón
+  // ActoAmbiente). El tooltip es org-level — no resuelve departamento.
   const fuegoBadge =
     synth.diagnosticType === 'FUEGO_LEGAL'
       ? (() => {
-          const fuego = (data.data.riskScores ?? []).filter(
-            (rs) => (rs.inputs.denuncias_12m ?? 0) >= 1,
-          );
           const count =
             synth.issueCount ??
-            fuego.reduce((s, rs) => s + (rs.inputs.denuncias_12m ?? 0), 0);
-          if (count <= 0) return null;
-          const departamento = formatDeptList(
-            fuego
-              .map((rs) => rs.departmentName)
-              .filter((n): n is string => typeof n === 'string'),
-          );
-          return buildFuegoBadge(count, departamento);
+            (data.data.riskScores ?? [])
+              .filter((rs) => (rs.inputs.denuncias_12m ?? 0) >= 1)
+              .reduce((s, rs) => s + (rs.inputs.denuncias_12m ?? 0), 0);
+          return count > 0 ? buildFuegoBadge(count) : null;
         })()
       : null;
 

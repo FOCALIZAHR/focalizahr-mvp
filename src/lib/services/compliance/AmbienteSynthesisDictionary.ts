@@ -258,23 +258,20 @@ export const SIGNAL_FRAGMENTS: Record<string, string> = {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
-// FUEGO BADGE — badge propio de FUEGO_LEGAL (copy v2 §TIPO 1, verbatim).
+// FUEGO BADGE — badge propio de FUEGO_LEGAL (copy §TIPO 1, org-level).
 // NEUTRO: reconoce el hecho registrado sin nombrar la ley, sin plazos, sin tipo
 // ni estado. NO usa legalBadgeForCountry (ese es del indicio/sexta — no tocar).
-// `count` = total de denuncias formales (synth.issueCount). `departamento` = los
-// deptos en fuego, resuelto en el render desde riskScores.
+// `count` = total de denuncias formales (synth.issueCount). El tooltip es
+// org-level (el badge se pinta una vez en la síntesis) — sin nombrar departamento.
 // ════════════════════════════════════════════════════════════════════════════
 
-export function buildFuegoBadge(
-  count: number,
-  departamento: string,
-): { label: string; tooltip: string } {
+export function buildFuegoBadge(count: number): { label: string; tooltip: string } {
   const label =
     count >= 2 ? `Denuncia formal · ${count}` : 'Denuncia formal registrada';
   const tooltip =
     count >= 2
-      ? `En ${departamento} no hay una sola denuncia formal: ya se acumulan ${count} en los últimos 12 meses. La acumulación eleva la prioridad de revisión del área.`
-      : `En ${departamento}, al menos una denuncia formal en los últimos 12 meses. El solo hecho eleva la prioridad de revisión del área.`;
+      ? `Ya se acumulan ${count} denuncias formales en los últimos 12 meses. La acumulación eleva la prioridad de revisión.`
+      : 'Una denuncia formal registrada en los últimos 12 meses. El solo hecho eleva la prioridad de revisión.';
   return { label, tooltip };
 }
 
