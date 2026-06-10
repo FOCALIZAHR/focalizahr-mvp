@@ -165,12 +165,20 @@ export class AmbienteSynthesisEngine {
     // Score: 100 + nFuego*10. Dominante por construcción (siempre lidera).
     const fuegoDeptos = data.riskScoresPerDept.filter((r) => r.drivers.piso_denuncia > 0);
     if (fuegoDeptos.length > 0) {
+      // issueCount = total de denuncias formales registradas (Σ denuncias_12m,
+      // que es Σ DepartmentMetric.issueCount en la ventana 12m). Alimenta el
+      // badge de Beat 6. piso_denuncia>0 ⇒ denuncias_12m≥1, así que el null no llega.
+      const issueCount = fuegoDeptos.reduce(
+        (s, r) => s + (r.inputs.denuncias_12m ?? 0),
+        0,
+      );
       scores.push({
         type: 'FUEGO_LEGAL',
         score: 100 + fuegoDeptos.length * 10,
         trigger: `${fuegoDeptos.length} dept(s) con denuncia formal cargada`,
         data: {
           deptos: fuegoDeptos.map((r) => r.departmentId),
+          issueCount,
         },
       });
     }
@@ -678,6 +686,10 @@ export class AmbienteSynthesisEngine {
         : {}),
       // FUEGO_LEGAL legalNote queda '' por decisión (no se nombra la ley) → no se emite.
       ...(dictEntry.legalNote ? { legalNote: dictEntry.legalNote } : {}),
+      // FUEGO_LEGAL — count de denuncias para el badge de Beat 6.
+      ...(typeof dominante.data.issueCount === 'number'
+        ? { issueCount: dominante.data.issueCount }
+        : {}),
     };
   }
 

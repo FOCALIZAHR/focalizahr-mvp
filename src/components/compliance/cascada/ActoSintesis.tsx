@@ -17,9 +17,13 @@
 
 import { memo } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, HelpCircle } from 'lucide-react';
 import { PrimaryButton } from '@/components/ui/PremiumButton';
-import { ActSeparator, fadeIn } from './shared';
+import { ActSeparator, fadeIn, Tooltip } from './shared';
+import {
+  buildFuegoBadge,
+  formatDeptList,
+} from '@/lib/services/compliance/AmbienteSynthesisDictionary';
 import type { ComplianceReportResponse } from '@/types/compliance';
 import type { Amplificador } from '@/types/ambiente-cascada';
 
@@ -44,10 +48,42 @@ export default memo(function ActoSintesis({ data, onIrAlPlan }: ActoSintesisProp
   // Guard: sin synthesis o sin classification (Gate 2.5 sin copy aún) → oculto.
   if (!synth || synth.classification.trim().length === 0) return null;
 
+  // Badge FUEGO_LEGAL — neutro, gateado por tipo. Count autoritativo de synth
+  // (backend); fallback a Σ denuncias_12m≥1 desde riskScores (patrón ActoAmbiente).
+  // departamento resuelto en el render desde riskScores (display, no count).
+  const fuegoBadge =
+    synth.diagnosticType === 'FUEGO_LEGAL'
+      ? (() => {
+          const fuego = (data.data.riskScores ?? []).filter(
+            (rs) => (rs.inputs.denuncias_12m ?? 0) >= 1,
+          );
+          const count =
+            synth.issueCount ??
+            fuego.reduce((s, rs) => s + (rs.inputs.denuncias_12m ?? 0), 0);
+          if (count <= 0) return null;
+          const departamento = formatDeptList(
+            fuego
+              .map((rs) => rs.departmentName)
+              .filter((n): n is string => typeof n === 'string'),
+          );
+          return buildFuegoBadge(count, departamento);
+        })()
+      : null;
+
   return (
     <>
       <ActSeparator label="La Decisión" color="cyan" />
       <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-6 text-center">
+        {fuegoBadge && (
+          <div className="flex justify-center">
+            <Tooltip content={fuegoBadge.tooltip}>
+              <span className="inline-flex items-center gap-1 rounded-full border border-slate-700/40 px-2.5 py-0.5 text-[10px] font-light text-slate-400">
+                {fuegoBadge.label}
+                <HelpCircle className="h-2.5 w-2.5" strokeWidth={1.5} />
+              </span>
+            </Tooltip>
+          </div>
+        )}
         <p className="text-xl md:text-2xl font-extralight text-white leading-relaxed">
           {synth.classification}
         </p>

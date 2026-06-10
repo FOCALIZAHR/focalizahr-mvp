@@ -30,7 +30,7 @@ import {
   THRESHOLDS,
   type ConvergenciaSignal,
 } from './AmbienteSynthesisEngine';
-import { AMPLIFIER_CLAUSES } from './AmbienteSynthesisDictionary';
+import { AMPLIFIER_CLAUSES, buildFuegoBadge } from './AmbienteSynthesisDictionary';
 import type {
   AmbienteRiskData,
   Beat1Seed,
@@ -1176,6 +1176,48 @@ test('18d. SEXTA sin sextaSignalsByDept → senal undefined, cláusula genérica
       'Este departamento no contestó la encuesta, pero otras fuentes ya muestran señales',
     ),
     'fallback a copy genérica validada: ' + result.implication,
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// 19. FUEGO badge — issueCount por synth + buildFuegoBadge (copy §TIPO 1)
+// ═══════════════════════════════════════════════════════════════════
+
+test('19a. FUEGO_LEGAL expone issueCount (Σ denuncias) en synth; otros tipos no', () => {
+  const data = mkData({
+    orgISA: 49,
+    coverageGapPct: 30,
+    riskScoresPerDept: [mkRisk('d1', 'Ventas', 75), mkRisk('d2', 'Soporte', 75)],
+  });
+  const result = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'numero-bajo', hasDenunciaFormal: true }),
+    data,
+  });
+  assert.equal(result.diagnosticType, 'FUEGO_LEGAL');
+  assert.equal(result.issueCount, 2, 'Σ denuncias_12m de los 2 deptos en fuego');
+
+  // Tipo no-FUEGO no expone issueCount (gate del badge).
+  const todoBien = AmbienteSynthesisEngine.generate({
+    beat1Seed: mkBeat1Seed({ mundoDominante: 'todo-bien' }),
+    data: mkData({ orgISA: 85, riesgoDeptosCount: 0, teatroCount: 0 }),
+  });
+  assert.equal(todoBien.diagnosticType, 'TODO_BIEN');
+  assert.equal(todoBien.issueCount, undefined);
+});
+
+test('19b. buildFuegoBadge — copy verbatim §TIPO 1 por count (label NEUTRO + tooltip)', () => {
+  const one = buildFuegoBadge(1, 'Ventas');
+  assert.equal(one.label, 'Denuncia formal registrada');
+  assert.equal(
+    one.tooltip,
+    'En Ventas, al menos una denuncia formal en los últimos 12 meses. El solo hecho eleva la prioridad de revisión del área.',
+  );
+
+  const many = buildFuegoBadge(3, 'Ventas y Soporte');
+  assert.equal(many.label, 'Denuncia formal · 3');
+  assert.equal(
+    many.tooltip,
+    'En Ventas y Soporte no hay una sola denuncia formal: ya se acumulan 3 en los últimos 12 meses. La acumulación eleva la prioridad de revisión del área.',
   );
 });
 

@@ -257,6 +257,27 @@ export const SIGNAL_FRAGMENTS: Record<string, string> = {
   BIENVENIDA_FALLIDA: 'una bienvenida que no funcionó',
 };
 
+// ════════════════════════════════════════════════════════════════════════════
+// FUEGO BADGE — badge propio de FUEGO_LEGAL (copy v2 §TIPO 1, verbatim).
+// NEUTRO: reconoce el hecho registrado sin nombrar la ley, sin plazos, sin tipo
+// ni estado. NO usa legalBadgeForCountry (ese es del indicio/sexta — no tocar).
+// `count` = total de denuncias formales (synth.issueCount). `departamento` = los
+// deptos en fuego, resuelto en el render desde riskScores.
+// ════════════════════════════════════════════════════════════════════════════
+
+export function buildFuegoBadge(
+  count: number,
+  departamento: string,
+): { label: string; tooltip: string } {
+  const label =
+    count >= 2 ? `Denuncia formal · ${count}` : 'Denuncia formal registrada';
+  const tooltip =
+    count >= 2
+      ? `En ${departamento} no hay una sola denuncia formal: ya se acumulan ${count} en los últimos 12 meses. La acumulación eleva la prioridad de revisión del área.`
+      : `En ${departamento}, al menos una denuncia formal en los últimos 12 meses. El solo hecho eleva la prioridad de revisión del área.`;
+  return { label, tooltip };
+}
+
 /** Señal del amplificador (los miembros con `senal?`; TEATRO no la tiene). */
 function senalOf(amp: Amplificador): AmplificadorSenal | undefined {
   return 'senal' in amp ? amp.senal : undefined;

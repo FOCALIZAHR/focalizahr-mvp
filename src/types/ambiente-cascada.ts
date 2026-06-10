@@ -318,6 +318,10 @@ export interface AmbienteSynthesis {
   risks?: Array<{ label: string; narrative: string }>;
   /** FUEGO_LEGAL solamente — análogo conceptual de Talento.financialNote. */
   legalNote?: string;
+  /** FUEGO_LEGAL solamente — total de denuncias formales registradas (Σ
+   *  `denuncias_12m` de los deptos en fuego) que disparó el tipo. Alimenta el
+   *  badge neutro "Denuncia formal registrada · {n}" en Beat 6. */
+  issueCount?: number;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
