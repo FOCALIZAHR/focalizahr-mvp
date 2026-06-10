@@ -39,9 +39,70 @@ import type { ComplianceReportResponse } from '@/types/compliance';
 
 import { classifyD4 } from '@/lib/services/compliance/deriveBeat1Slots';
 import type { ClassifyD4Output } from '@/lib/services/compliance/deriveBeat1Slots';
-import type { Mundo, Intensidad } from '@/types/ambiente-cascada';
+import type {
+  Mundo,
+  Intensidad,
+  FactoresTitulares,
+  ExtremosTitulares,
+} from '@/types/ambiente-cascada';
 
 export { classifyD4 };
+
+// ════════════════════════════════════════════════════════════════════════════
+// TITULARES (Gate 5b) — render del bloque de factores + extremos del Beat 1.
+// Copy verbatim `.claude/tasks/COPY_TITULARES_BEAT1.md`. Dos sub-bloques
+// independientes, cada uno con su rama vacía (null → no se renderiza):
+//   A. Factores: UNA voz según banda. Banda alta (fortalezas presentes) celebra;
+//      banda baja (debilidades presentes) advierte + fortalezaRelativa si existe.
+//      Solo labelCEO — sin el `valor` 1-5 (no rompe el contrato N·Label).
+//   B. Extremos: mejor/peor gerencia con ISA 0-100 (entero). Solo si ≥2 gerencias
+//      con ISA (mejor && peor); si <2 → null.
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Sub-bloque A — una sola voz según qué array pobló el Orchestrator (banda). */
+export function buildFactoresLine(f: FactoresTitulares): string | null {
+  // Banda alta — fortalezas (celebra lo que sostiene).
+  if (f.fortalezas.length >= 2) {
+    return `Este ambiente se apoya en ${f.fortalezas[0].labelCEO} y ${f.fortalezas[1].labelCEO}. Es lo más sólido que hoy tiene.`;
+  }
+  if (f.fortalezas.length === 1) {
+    return `Este ambiente se apoya sobre todo en ${f.fortalezas[0].labelCEO}. Es lo más sólido que hoy tiene.`;
+  }
+  // Banda baja / observación — debilidades (advierte) + relativa si existe.
+  if (f.debilidades.length >= 2) {
+    const base = `Lo más frágil del ambiente: ${f.debilidades[0].labelCEO} y ${f.debilidades[1].labelCEO}.`;
+    return f.fortalezaRelativa
+      ? `${base} Lo que menos ha cedido: ${f.fortalezaRelativa.labelCEO} — y es desde ahí, no desde cero.`
+      : base;
+  }
+  if (f.debilidades.length === 1) {
+    const base = `Lo más frágil del ambiente: ${f.debilidades[0].labelCEO}.`;
+    return f.fortalezaRelativa
+      ? `${base} Lo que menos ha cedido: ${f.fortalezaRelativa.labelCEO}.`
+      : base;
+  }
+  // Sin factores (sin safety scores org-level / ISA null) → no se renderiza.
+  return null;
+}
+
+/** Sub-bloque B — extremos con ISA 0-100 entero. null si <2 gerencias con ISA. */
+export function buildExtremosLine(e: ExtremosTitulares): string | null {
+  if (e.mejor && e.peor) {
+    return `El ambiente no es parejo: ${e.mejor.gerenciaName} es el área más sólida (ISA ${Math.round(e.mejor.isa)}) y ${e.peor.gerenciaName} la más frágil (ISA ${Math.round(e.peor.isa)}).`;
+  }
+  return null;
+}
+
+/** Compone los dos sub-bloques. Cada uno independiente (uno puede ser null). */
+export function buildTitularesBeat1(input: {
+  factores: FactoresTitulares;
+  extremos: ExtremosTitulares;
+}): { factores: string | null; extremos: string | null } {
+  return {
+    factores: buildFactoresLine(input.factores),
+    extremos: buildExtremosLine(input.extremos),
+  };
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // COPY POR MUNDO — VERBATIM de .claude/tasks/ESPEC_APERTURA_AMBIENTE_SANO.md
@@ -408,6 +469,15 @@ export default memo(function ActoAmbiente({ data }: ActoProps) {
   const cobInt = slots.personResponseRate ?? 0;
 
   const copy = copyFor(d4, slots, isaInt, cobInt, country, p2CritEnConIsa);
+
+  // Titulares (Gate 5b) — solo desde el payload server-side (back-compat: el
+  // recálculo client legacy no los computa → bloque ausente).
+  const titulares = seedFromPayload
+    ? buildTitularesBeat1({
+        factores: seedFromPayload.factoresTitulares,
+        extremos: seedFromPayload.extremosTitulares,
+      })
+    : { factores: null, extremos: null };
   // Coloreo: 'todo-bien' y 'bien-con-focos' = tono sano (cyan). Otros usan
   // la intensidad clásica (alta/critico → purple, medio/alto → amber).
   const sano = d4.mundo === 'todo-bien' || d4.mundo === 'bien-con-focos';
@@ -489,6 +559,24 @@ export default memo(function ActoAmbiente({ data }: ActoProps) {
               <p className="text-sm font-light text-slate-300 leading-relaxed">
                 {copy.leyKarinLine}
               </p>
+            </div>
+          )}
+
+          {/* TITULARES (Gate 5b) — bloque adicional: factores (voz por banda) +
+              extremos (mejor/peor). Cada sub-bloque con rama vacía: si null, no
+              se renderiza (sin línea de relleno). Tono sub-narrativa, neutro. */}
+          {(titulares.factores || titulares.extremos) && (
+            <div className="mt-8 pt-6 border-t border-slate-800/40 space-y-3">
+              {titulares.factores && (
+                <p className="text-sm font-light text-slate-400 leading-relaxed text-center">
+                  {titulares.factores}
+                </p>
+              )}
+              {titulares.extremos && (
+                <p className="text-sm font-light text-slate-400 leading-relaxed text-center">
+                  {titulares.extremos}
+                </p>
+              )}
             </div>
           )}
         </motion.div>

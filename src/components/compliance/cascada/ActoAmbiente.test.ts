@@ -21,8 +21,24 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { classifyD4, copyFor } from './ActoAmbiente';
+import {
+  classifyD4,
+  copyFor,
+  buildFactoresLine,
+  buildExtremosLine,
+  buildTitularesBeat1,
+} from './ActoAmbiente';
 import type { Beat1Slots } from '@/lib/services/compliance/deriveBeat1Slots';
+import type {
+  FactoresTitulares,
+  ExtremosTitulares,
+  FactorTitular,
+} from '@/types/ambiente-cascada';
+
+/** FactorTitular mínimo — el line builder solo lee labelCEO. */
+function mkFactor(labelCEO: string): FactorTitular {
+  return { dimensionKey: 'P2_seguridad', labelCEO, valor: 3 };
+}
 
 // ─── Mundo 1: SILENCIO ──────────────────────────────────────────────
 
@@ -294,4 +310,135 @@ test('11b. silencio RESPALDO: banda=riesgo pero p2CritEnConIsa=false → RESPALD
 
   assert.equal(c.subtitulo, 'EL SILENCIO ES EL DATO');
   assert.ok(c.traduccion.includes('Donde se pudo medir, el ambiente da riesgo'));
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// TITULARES (Gate 5b) — buildFactoresLine / buildExtremosLine / compose
+// ═══════════════════════════════════════════════════════════════════
+
+test('T1. Factores banda alta — 2 fortalezas', () => {
+  const f: FactoresTitulares = {
+    fortalezas: [mkFactor('Seguridad psicológica'), mkFactor('Respeto cotidiano')],
+    debilidades: [],
+    fortalezaRelativa: null,
+  };
+  assert.equal(
+    buildFactoresLine(f),
+    'Este ambiente se apoya en Seguridad psicológica y Respeto cotidiano. Es lo más sólido que hoy tiene.',
+  );
+});
+
+test('T2. Factores banda alta — 1 fortaleza', () => {
+  const f: FactoresTitulares = {
+    fortalezas: [mkFactor('Seguridad psicológica')],
+    debilidades: [],
+    fortalezaRelativa: null,
+  };
+  assert.equal(
+    buildFactoresLine(f),
+    'Este ambiente se apoya sobre todo en Seguridad psicológica. Es lo más sólido que hoy tiene.',
+  );
+});
+
+test('T3. Factores banda baja — 2 debilidades + fortalezaRelativa', () => {
+  const f: FactoresTitulares = {
+    fortalezas: [],
+    debilidades: [mkFactor('Equidad de reglas'), mkFactor('Calidad de liderazgo')],
+    fortalezaRelativa: mkFactor('Respeto cotidiano'),
+  };
+  assert.equal(
+    buildFactoresLine(f),
+    'Lo más frágil del ambiente: Equidad de reglas y Calidad de liderazgo. Lo que menos ha cedido: Respeto cotidiano — y es desde ahí, no desde cero.',
+  );
+});
+
+test('T4. Factores banda baja — 2 debilidades sin relativa', () => {
+  const f: FactoresTitulares = {
+    fortalezas: [],
+    debilidades: [mkFactor('Equidad de reglas'), mkFactor('Calidad de liderazgo')],
+    fortalezaRelativa: null,
+  };
+  assert.equal(
+    buildFactoresLine(f),
+    'Lo más frágil del ambiente: Equidad de reglas y Calidad de liderazgo.',
+  );
+});
+
+test('T5. Factores banda baja — 1 debilidad sin relativa', () => {
+  const f: FactoresTitulares = {
+    fortalezas: [],
+    debilidades: [mkFactor('Equidad de reglas')],
+    fortalezaRelativa: null,
+  };
+  assert.equal(buildFactoresLine(f), 'Lo más frágil del ambiente: Equidad de reglas.');
+});
+
+test('T5b. Factores banda baja — 1 debilidad + relativa', () => {
+  const f: FactoresTitulares = {
+    fortalezas: [],
+    debilidades: [mkFactor('Equidad de reglas')],
+    fortalezaRelativa: mkFactor('Respeto cotidiano'),
+  };
+  assert.equal(
+    buildFactoresLine(f),
+    'Lo más frágil del ambiente: Equidad de reglas. Lo que menos ha cedido: Respeto cotidiano.',
+  );
+});
+
+test('T6. Factores vacíos → null (rama vacía, no se renderiza)', () => {
+  assert.equal(
+    buildFactoresLine({ fortalezas: [], debilidades: [], fortalezaRelativa: null }),
+    null,
+  );
+});
+
+test('T7. Extremos mejor+peor con ISA entero (redondea)', () => {
+  const e: ExtremosTitulares = {
+    mejor: { gerenciaName: 'Comercial', isa: 84.4 },
+    peor: { gerenciaName: 'Operaciones', isa: 57.6 },
+  };
+  assert.equal(
+    buildExtremosLine(e),
+    'El ambiente no es parejo: Comercial es el área más sólida (ISA 84) y Operaciones la más frágil (ISA 58).',
+  );
+});
+
+test('T8. Extremos <2 gerencias (ambos null) → null', () => {
+  assert.equal(buildExtremosLine({ mejor: null, peor: null }), null);
+});
+
+test('T9. buildTitularesBeat1 compone ambos sub-bloques independientes', () => {
+  const ambos = buildTitularesBeat1({
+    factores: {
+      fortalezas: [],
+      debilidades: [mkFactor('Equidad de reglas')],
+      fortalezaRelativa: null,
+    },
+    extremos: {
+      mejor: { gerenciaName: 'Comercial', isa: 84 },
+      peor: { gerenciaName: 'Operaciones', isa: 58 },
+    },
+  });
+  assert.ok(ambos.factores?.startsWith('Lo más frágil'));
+  assert.ok(ambos.extremos?.startsWith('El ambiente no es parejo'));
+
+  // Solo factores presente → extremos null (sub-bloques independientes).
+  const soloFactores = buildTitularesBeat1({
+    factores: {
+      fortalezas: [mkFactor('Seguridad psicológica')],
+      debilidades: [],
+      fortalezaRelativa: null,
+    },
+    extremos: { mejor: null, peor: null },
+  });
+  assert.ok(soloFactores.factores);
+  assert.equal(soloFactores.extremos, null);
+
+  // Ambos vacíos → bloque ausente entero.
+  const vacio = buildTitularesBeat1({
+    factores: { fortalezas: [], debilidades: [], fortalezaRelativa: null },
+    extremos: { mejor: null, peor: null },
+  });
+  assert.equal(vacio.factores, null);
+  assert.equal(vacio.extremos, null);
 });
