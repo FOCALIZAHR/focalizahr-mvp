@@ -442,3 +442,124 @@ test('T9. buildTitularesBeat1 compone ambos sub-bloques independientes', () => {
   assert.equal(vacio.factores, null);
   assert.equal(vacio.extremos, null);
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// APERTURA-TITULAR v4 — oráculo verbatim contra §2 (caso real cmob0e56)
+// ═══════════════════════════════════════════════════════════════════
+
+import {
+  buildAperturaTitular,
+  mov3ToText,
+  type AperturaInput,
+} from './ActoAmbiente';
+import type { OrgDimension } from '@/lib/services/compliance/orgDimensions';
+import { ISA_NARRATIVES } from '@/app/dashboard/compliance/components/sections/SectionDimensiones/_shared/constants';
+
+function mkRealCaseInput(over: Partial<AperturaInput> = {}): AperturaInput {
+  // 6 dims medidas, P2 crítico, dimsSano=0 → "casi ninguna".
+  const dims: OrgDimension[] = [
+    { key: 'P2_seguridad', valor: 1.8, level: 'critico' },
+    { key: 'P3_disenso', valor: 2.5, level: 'riesgo' },
+    { key: 'P4_microagresiones', valor: 2.2, level: 'riesgo' },
+    { key: 'P5_equidad', valor: 3.2, level: 'atencion' },
+    { key: 'P7_liderazgo', valor: 1.9, level: 'critico' },
+    { key: 'P8_agotamiento', valor: 3.5, level: 'atencion' },
+  ];
+  return {
+    orgISA: 49,
+    isaLevel: 'riesgo',
+    isaNarrative: ISA_NARRATIVES.riesgo.narrative,
+    pct: 20,
+    silencio: true,
+    indicioCount: 1,
+    denunciaCount: 0,
+    legalBadgeLabel: 'riesgo Ley Karin',
+    dims,
+    ...over,
+  };
+}
+
+test('A1. Caso real — hero label + movimiento 1 verbatim §2', () => {
+  const t = buildAperturaTitular(mkRealCaseInput());
+  assert.equal(t.heroLabel, 'EL AMBIENTE NO LLEGA A SANO');
+  assert.equal(
+    `${t.mov1.veredicto} ${t.mov1.narrative}`,
+    'El ambiente de la empresa no llega a sano: el índice cerró en 49 de 100. ' +
+      'El deterioro ya tiene historia. Estas condiciones no aparecieron de la noche a la mañana y no desaparecen solas. Cada ciclo sin acción las consolida.',
+  );
+});
+
+test('A2. Caso real — movimiento 2 (el pero, silencio + indicio count=1) verbatim §2', () => {
+  const t = buildAperturaTitular(mkRealCaseInput());
+  assert.equal(t.meta.senal, 'indicio');
+  assert.equal(
+    t.mov2,
+    'Pero esa salud de 49 describe al 20% que respondió — sobre el resto de la empresa, el estudio todavía no tiene voz. ' +
+      'Y en una de las áreas, el último año dejó un indicio de riesgo Ley Karin: el solo hecho eleva la prioridad de revisión.',
+  );
+});
+
+test('A3. Caso real — movimiento 3 (el foco, P2 crítico + silencio → coda) verbatim §2', () => {
+  const t = buildAperturaTitular(mkRealCaseInput());
+  assert.ok(t.mov3, 'mov3 presente');
+  assert.equal(t.meta.mov3SinCoincidencia, false);
+  assert.equal(t.mov3!.dimCEO, 'Seguridad psicológica');
+  assert.equal(
+    mov3ToText(t.mov3!),
+    'De las seis dimensiones que mide el estudio, casi ninguna alcanzó el nivel que protege a la gente. ' +
+      'Y una de las que está en nivel crítico es justo Seguridad psicológica — lo que el equipo cree que pasaría si habla. ' +
+      'Si los que respondieron ya dicen que hablar no es seguro, que tantos hayan callado deja de parecer desinterés: empieza a parecer lo mismo.',
+  );
+});
+
+test('A4. Caso real — cierre verbatim §2', () => {
+  const t = buildAperturaTitular(mkRealCaseInput());
+  assert.equal(
+    t.cierre,
+    'Un ambiente no mejora persiguiendo el número. Mejora cuando se atiende lo que lo causa.',
+  );
+});
+
+test('A5. Guard mov3 — sin silencio, NO coda (termina en aposición)', () => {
+  const t = buildAperturaTitular(mkRealCaseInput({ silencio: false, pct: 80 }));
+  assert.ok(t.mov3);
+  assert.equal(t.mov3!.coda, null);
+});
+
+test('A6. Variante 2 (solo silencio, sin señal) verbatim §3', () => {
+  const t = buildAperturaTitular(
+    mkRealCaseInput({ indicioCount: 0, denunciaCount: 0 }),
+  );
+  assert.equal(t.meta.senal, null);
+  assert.equal(
+    t.mov2,
+    'Ese 49 describe al 20% que respondió — sobre el resto de la empresa, el estudio todavía no tiene voz.',
+  );
+});
+
+test('A7. Variante 4 (limpio: sin silencio, sin señal) verbatim §3', () => {
+  const t = buildAperturaTitular(
+    mkRealCaseInput({ silencio: false, pct: 90, indicioCount: 0 }),
+  );
+  assert.equal(
+    t.mov2,
+    'Y ese 49 llega con la voz de la mayoría: respondió el 90% de la empresa, y el último año no registra señales alrededor. Esta vez la foto es de toda la organización.',
+  );
+});
+
+test('A8. Precedencia denuncia > indicio + flag coexistencia (no compone frase doble)', () => {
+  const t = buildAperturaTitular(mkRealCaseInput({ indicioCount: 2, denunciaCount: 1 }));
+  assert.equal(t.meta.senal, 'denuncia');
+  assert.equal(t.meta.coexistencia, true);
+});
+
+test('A9. mov3 sin-coincidencia — dim crítica ≠ P2 → flag + sin coda', () => {
+  const dims: OrgDimension[] = [
+    { key: 'P2_seguridad', valor: 3.5, level: 'atencion' }, // P2 NO crítico
+    { key: 'P7_liderazgo', valor: 1.7, level: 'critico' }, // la crítica es otra
+  ];
+  const t = buildAperturaTitular(mkRealCaseInput({ dims }));
+  assert.equal(t.meta.mov3SinCoincidencia, true);
+  assert.equal(t.mov3!.coda, null);
+  assert.equal(t.mov3!.dimCEO, 'Calidad de liderazgo'); // la más baja
+});

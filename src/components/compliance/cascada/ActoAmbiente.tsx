@@ -19,12 +19,26 @@ import { formatDepartmentName, stripWrappingQuotes } from '@/lib/utils/formatNam
 import { ActSeparator, fadeIn, fadeInDelay } from './shared';
 import { getISARiskLevel } from '@/lib/services/compliance/ISAService';
 import type { ISARiskLevel } from '@/lib/services/compliance/ISAService';
-import { classifyDimensionLevel } from '@/config/narratives/ComplianceNarrativeDictionary';
+import { DIMENSION_CEO_LABELS } from '@/config/narratives/ComplianceNarrativeDictionary';
+import { DIMENSION_LABELS } from '@/app/dashboard/compliance/lib/labels';
 import { getLegalMarcoName } from '@/config/compliance/legalBadgeConfig';
+import { legalBadgeForCountry } from '@/lib/services/compliance/CoverageNarrativeDictionary';
+import { buildFuegoBadge } from '@/lib/services/compliance/AmbienteSynthesisDictionary';
+import {
+  computeOrgDimensions,
+  type OrgDimension,
+} from '@/lib/services/compliance/orgDimensions';
 import { buildGerenciaRollup } from '@/lib/services/compliance/buildGerenciaRollup';
 import { deriveBeat1Slots } from '@/lib/services/compliance/deriveBeat1Slots';
 import type { Beat1Slots } from '@/lib/services/compliance/deriveBeat1Slots';
 import type { ComplianceReportResponse } from '@/types/compliance';
+// Cableado 1 (HANDOFF §4): la cascada importa el veredicto/narrativa de ISA por
+// nivel (hoy solo lo usaba el dashboard).
+import {
+  ISA_NARRATIVES,
+  classifyIsa,
+  type IsaLevel,
+} from '@/app/dashboard/compliance/components/sections/SectionDimensiones/_shared/constants';
 
 // ════════════════════════════════════════════════════════════════════════════
 // CLASIFICADOR D4 — IMPORT, no re-declaración
@@ -163,39 +177,10 @@ export function copyFor(
   const focoName = slots.gerencia_foco_1
     ? formatDepartmentName(slots.gerencia_foco_1.groupName)
     : null;
-  const generoName = slots.gerencia_genero_1
-    ? formatDepartmentName(slots.gerencia_genero_1.groupName)
-    : null;
-  const leyKarinName = slots.gerencia_ley_karin_1
-    ? formatDepartmentName(slots.gerencia_ley_karin_1.groupName)
-    : null;
-
-  // ─── ORTOGONAL: GÉNERO — voz "los que están", puntual (sin conteo) ──────
-  // Sanitización: evidenciaGenero puede venir del motor LLM YA entre comillas
-  // ('"no deberían..."'); el template las re-envuelve y produce comillas
-  // dobles ('""no deberían...""'). stripWrappingQuotes recorta sólo el par
-  // envolvente — el cuerpo del literal queda intacto.
-  const generoCitaRaw = slots.gerencia_genero_1?.evidenciaGenero ?? null;
-  const generoCita = generoCitaRaw ? stripWrappingQuotes(generoCitaRaw) : null;
-  const generoLine =
-    generoName && generoCita && generoCita.length > 0
-      ? `En ${generoName}, el análisis con IA encontró una expresión con sesgo de género: "${generoCita}". Una sola cita — pero el tipo de frase que, cuando se repite, cambia el cuadro completo.`
-      : null;
-
-  // ─── ORTOGONAL: LEY KARIN — voz "los que se fueron", histórica cross-Exit ─
-  // El nombre del marco se resuelve country-aware vía getLegalMarcoName:
-  //   CL → "Ley Karin" · PE/CO/MX/default → "la normativa laboral vigente"
-  // El slot identifier sigue siendo `gerencia_ley_karin_1` porque la SEÑAL es
-  // alertType `ley_karin*` (técnico, no displayed). El display lee según país.
-  let leyKarinLine: string | null = null;
-  if (leyKarinName && slots.gerencia_ley_karin_1) {
-    const n = slots.gerencia_ley_karin_1.signalsCount;
-    const sustantivo = n === 1 ? 'indicio' : 'indicios';
-    const marco = getLegalMarcoName(country);
-    leyKarinLine =
-      `En ${leyKarinName}, los que se fueron dejaron ${n} ${sustantivo} bajo ${marco} en sus encuestas de salida en los últimos 12 meses. ` +
-      `Lo que escribieron al irse vale como pista — la pregunta es si lo que pasa hoy en esa gerencia todavía habla en esa dirección.`;
-  }
+  // Ortogonales (género · Ley Karin) — SE CONSERVAN (HANDOFF §1). Extraídas a
+  // `buildOrtogonales` para que la Apertura nueva las reuse sin recalcular el
+  // switch de mundos de `copyFor`.
+  const { generoLine, leyKarinLine } = buildOrtogonales(slots, country);
 
   let subtitulo: string;
   let traduccion: string;
@@ -343,6 +328,260 @@ export function copyFor(
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// ORTOGONALES — género · Ley Karin (CONSERVADAS, HANDOFF §1)
+// ════════════════════════════════════════════════════════════════════════════
+// Extraídas de copyFor sin cambiar su copy. Voz "los que están" (género) y
+// "los que se fueron" (Karin histórica cross-Exit). NO reemplazan el cuerpo;
+// son líneas adicionales bajo el titular.
+
+export function buildOrtogonales(
+  slots: Beat1Slots,
+  country: string | null | undefined,
+): { generoLine: string | null; leyKarinLine: string | null } {
+  const generoName = slots.gerencia_genero_1
+    ? formatDepartmentName(slots.gerencia_genero_1.groupName)
+    : null;
+  const leyKarinName = slots.gerencia_ley_karin_1
+    ? formatDepartmentName(slots.gerencia_ley_karin_1.groupName)
+    : null;
+
+  // GÉNERO — sanitización de comillas envolventes del literal LLM.
+  const generoCitaRaw = slots.gerencia_genero_1?.evidenciaGenero ?? null;
+  const generoCita = generoCitaRaw ? stripWrappingQuotes(generoCitaRaw) : null;
+  const generoLine =
+    generoName && generoCita && generoCita.length > 0
+      ? `En ${generoName}, el análisis con IA encontró una expresión con sesgo de género: "${generoCita}". Una sola cita — pero el tipo de frase que, cuando se repite, cambia el cuadro completo.`
+      : null;
+
+  // LEY KARIN — marco country-aware (CL → "Ley Karin"; default → normativa local).
+  let leyKarinLine: string | null = null;
+  if (leyKarinName && slots.gerencia_ley_karin_1) {
+    const n = slots.gerencia_ley_karin_1.signalsCount;
+    const sustantivo = n === 1 ? 'indicio' : 'indicios';
+    const marco = getLegalMarcoName(country);
+    leyKarinLine =
+      `En ${leyKarinName}, los que se fueron dejaron ${n} ${sustantivo} bajo ${marco} en sus encuestas de salida en los últimos 12 meses. ` +
+      `Lo que escribieron al irse vale como pista — la pregunta es si lo que pasa hoy en esa gerencia todavía habla en esa dirección.`;
+  }
+
+  return { generoLine, leyKarinLine };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// APERTURA-TITULAR v4 — el cuerpo nuevo del Beat 1 (HANDOFF §2-3)
+// ════════════════════════════════════════════════════════════════════════════
+// Titular de 3 movimientos: veredicto + pero + foco. Copy verbatim aprobado por
+// Victor (2026-06-11). REEMPLAZA el cuerpo narrativo (switch de mundos de
+// copyFor); copyFor sigue vivo (tests + classifyD4 motor), solo deja de
+// seleccionar el copy del acto.
+//
+// Provisionales horneados (GO Victor 2026-06-11, defaults 1-5) — todos
+// flaggeados en `meta`, ninguno afecta el render del caso real:
+//   - silencio = personResponseRate < 50 (mayoría)
+//   - precedencia denuncia > indicio; coexistencia NO compone frase (flag TODO)
+//   - {n} en palabra (numEs); sano-phrase "casi ninguna" si dimsSano ≤ 1
+//   - veredicto: solo `riesgo` aprobado; otros 3 niveles provisional (pendiente)
+//   - sin-coincidencia mov3 (dim crítica ≠ P2): copy de conexión pendiente
+
+/** Veredicto por nivel ISA. Solo `riesgo` aprobado verbatim (§2); los otros 3
+ *  son provisionales hasta el pulido de Victor (§5) — `veredictoPendiente` lo
+ *  marca; no renderizan en el caso real. */
+const VEREDICTO_BY_LEVEL: Record<IsaLevel, string> = {
+  riesgo: 'no llega a sano', // §2 APROBADO
+  sano: 'es sano', // PENDIENTE pulido
+  atencion: 'no termina de afianzarse', // PENDIENTE pulido
+  critico: 'está en zona crítica', // PENDIENTE pulido
+};
+
+const NUM_ES = ['cero', 'una', 'dos', 'tres', 'cuatro', 'cinco', 'seis'] as const;
+/** Número → palabra (1-6, el universo de dimensiones). Fallback a dígito. */
+function numEs(n: number): string {
+  return NUM_ES[n] ?? String(n);
+}
+
+/** Minúscula inicial — `DIMENSION_LABELS` es label standalone ("Lo que…");
+ *  en aposición mid-sentence ("— lo que…") va en minúscula (verbatim §2). */
+function lowerFirst(s: string): string {
+  return s.length > 0 ? s.charAt(0).toLowerCase() + s.slice(1) : s;
+}
+
+export interface AperturaInput {
+  orgISA: number; // entero
+  isaLevel: IsaLevel; // classifyIsa(orgISA)
+  isaNarrative: string; // ISA_NARRATIVES[isaLevel].narrative
+  pct: number; // personResponseRate entero
+  silencio: boolean; // pct < 50
+  indicioCount: number; // Σ rollups[].leyKarin.signalsCount
+  denunciaCount: number; // Σ denuncias_12m no-null
+  legalBadgeLabel: string; // legalBadgeForCountry(country).label
+  dims: OrgDimension[]; // computeOrgDimensions(departments)
+}
+
+export interface AperturaTitular {
+  heroLabel: string;
+  /** veredicto = bold; narrative = ISA_NARRATIVES verbatim. */
+  mov1: { veredicto: string; narrative: string };
+  /** El pero — null si no aplica (defensivo). */
+  mov2: string | null;
+  /** El foco — dimCEO en cyan/semibold; coda solo con silencio + P2. */
+  mov3: { pre: string; dimCEO: string; dimDesc: string; coda: string | null } | null;
+  cierre: string;
+  meta: {
+    silencio: boolean;
+    senal: 'indicio' | 'denuncia' | null;
+    /** indicio + denuncia ambos presentes → denuncia manda, frase NO se compone. */
+    coexistencia: boolean;
+    veredictoPendiente: boolean;
+    mov3SinCoincidencia: boolean;
+  };
+}
+
+/** Parte de señal del "pero" en variante 1 (silencio + señal). */
+function senalParteV1(
+  senal: 'indicio' | 'denuncia',
+  indicioCount: number,
+  denunciaCount: number,
+  legalBadge: string,
+): string {
+  if (senal === 'denuncia') {
+    // Molde cableado (org-level). Best-effort de composición — flag.
+    return buildFuegoBadge(denunciaCount).tooltip;
+  }
+  if (indicioCount >= 2) {
+    // §5 molde count≥2 + conector "Y" (best-effort) — flag.
+    return `Y ya se acumulan ${indicioCount} indicios de ${legalBadge} en el último año — la acumulación eleva la prioridad de revisión.`;
+  }
+  // §2 verbatim (count=1).
+  return `Y en una de las áreas, el último año dejó un indicio de ${legalBadge}: el solo hecho eleva la prioridad de revisión.`;
+}
+
+/** Parte de señal del "pero" en variante 3 (sin silencio + señal). Best-effort. */
+function senalParteV3(
+  senal: 'indicio' | 'denuncia',
+  indicioCount: number,
+  denunciaCount: number,
+  legalBadge: string,
+): string {
+  if (senal === 'denuncia') {
+    const n = denunciaCount;
+    const s = n === 1 ? 'denuncia formal' : 'denuncias formales';
+    return `Lo que el número no muestra: ${n} ${s} en el último año. El hecho solo ya eleva la prioridad de revisión.`;
+  }
+  const n = indicioCount;
+  const s = n === 1 ? 'indicio' : 'indicios';
+  return `Lo que el número no muestra: ${n} ${s} de ${legalBadge} en el último año. El hecho solo ya eleva la prioridad de revisión.`;
+}
+
+/** Construye el titular de 3 movimientos. Pure. */
+export function buildAperturaTitular(input: AperturaInput): AperturaTitular {
+  const {
+    orgISA,
+    isaLevel,
+    isaNarrative,
+    pct,
+    silencio,
+    indicioCount,
+    denunciaCount,
+    legalBadgeLabel,
+    dims,
+  } = input;
+
+  // ── Movimiento 1 — Veredicto ──
+  const veredicto = VEREDICTO_BY_LEVEL[isaLevel];
+  const heroLabel = `EL AMBIENTE ${veredicto.toUpperCase()}`;
+  const mov1 = {
+    veredicto: `El ambiente de la empresa ${veredicto}: el índice cerró en ${orgISA} de 100.`,
+    narrative: isaNarrative,
+  };
+
+  // ── Señal legal — precedencia denuncia > indicio; jamás se suman ──
+  const senal: 'indicio' | 'denuncia' | null =
+    denunciaCount > 0 ? 'denuncia' : indicioCount > 0 ? 'indicio' : null;
+  const coexistencia = denunciaCount > 0 && indicioCount > 0;
+
+  // ── Movimiento 2 — El pero (4 variantes por silencio × señal) ──
+  let mov2: string | null;
+  if (silencio && senal) {
+    // Variante 1 (caso real).
+    const sil = `Pero esa salud de ${orgISA} describe al ${pct}% que respondió — sobre el resto de la empresa, el estudio todavía no tiene voz.`;
+    mov2 = `${sil} ${senalParteV1(senal, indicioCount, denunciaCount, legalBadgeLabel)}`;
+  } else if (silencio && !senal) {
+    // Variante 2.
+    mov2 = `Ese ${orgISA} describe al ${pct}% que respondió — sobre el resto de la empresa, el estudio todavía no tiene voz.`;
+  } else if (!silencio && senal) {
+    // Variante 3.
+    mov2 = `El ${orgISA} llega con la voz de la mayoría: respondió el ${pct}% de la empresa. ${senalParteV3(senal, indicioCount, denunciaCount, legalBadgeLabel)}`;
+  } else {
+    // Variante 4 (limpio).
+    mov2 = `Y ese ${orgISA} llega con la voz de la mayoría: respondió el ${pct}% de la empresa, y el último año no registra señales alrededor. Esta vez la foto es de toda la organización.`;
+  }
+
+  // ── Movimiento 3 — El foco ──
+  let mov3: AperturaTitular['mov3'] = null;
+  let mov3SinCoincidencia = false;
+  if (dims.length > 0) {
+    const n = dims.length;
+    const sano = dims.filter((d) => d.level === 'sano').length;
+    const sanoPhrase =
+      sano <= 1
+        ? 'casi ninguna alcanzó el nivel que protege a la gente' // §2 aprobado
+        : `solo ${numEs(sano)} de ${numEs(n)} alcanzaron el nivel que protege a la gente`; // PENDIENTE generalización
+    const pre = `De las ${numEs(n)} dimensiones que mide el estudio, ${sanoPhrase}.`;
+
+    const p2 = dims.find((d) => d.key === 'P2_seguridad');
+    const p2Crit = p2 ? p2.level === 'critico' || p2.level === 'riesgo' : false;
+
+    if (p2Crit) {
+      // Dimensión nombrada = P2 (Seguridad psicológica). Coda solo con silencio.
+      mov3 = {
+        pre,
+        dimCEO: DIMENSION_CEO_LABELS.P2_seguridad,
+        dimDesc: lowerFirst(DIMENSION_LABELS.P2_seguridad),
+        coda: silencio
+          ? 'Si los que respondieron ya dicen que hablar no es seguro, que tantos hayan callado deja de parecer desinterés: empieza a parecer lo mismo.'
+          : null,
+      };
+    } else {
+      // Sin-coincidencia: la dim crítica no es P2 → copy de conexión PENDIENTE (§5).
+      const crit = [...dims].sort((a, b) => a.valor - b.valor)[0];
+      mov3SinCoincidencia = true;
+      mov3 = {
+        pre,
+        dimCEO: DIMENSION_CEO_LABELS[crit.key],
+        dimDesc: lowerFirst(DIMENSION_LABELS[crit.key] ?? ''),
+        coda: null,
+      };
+    }
+  }
+
+  return {
+    heroLabel,
+    mov1,
+    mov2,
+    mov3,
+    cierre:
+      'Un ambiente no mejora persiguiendo el número. Mejora cuando se atiende lo que lo causa.',
+    meta: {
+      silencio,
+      senal,
+      coexistencia,
+      veredictoPendiente: isaLevel !== 'riesgo',
+      mov3SinCoincidencia,
+    },
+  };
+}
+
+/** Reconstruye el texto completo del movimiento 3 con el conector que el render
+ *  intercala alrededor de la dimensión (oráculo de verbatim para los tests).
+ *  El render JSX usa exactamente este conector. */
+export function mov3ToText(m: NonNullable<AperturaTitular['mov3']>): string {
+  return (
+    `${m.pre} Y una de las que está en nivel crítico es justo ${m.dimCEO} — ${m.dimDesc}.` +
+    (m.coda !== null ? ` ${m.coda}` : '')
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // COLOR HERO POR INTENSIDAD
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -364,12 +603,6 @@ function sepColor(sano: boolean, intensidad: Intensidad): 'cyan' | 'amber' | 'pu
   if (sano) return 'cyan';
   if (intensidad === 'critico') return 'purple';
   return 'amber';
-}
-
-function borderColor(sano: boolean, intensidad: Intensidad): string {
-  if (sano) return 'border-cyan-500/30';
-  if (intensidad === 'critico') return 'border-purple-500/30';
-  return 'border-amber-500/30';
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -435,21 +668,6 @@ export default memo(function ActoAmbiente({ data }: ActoProps) {
         hasDenunciaFormal,
       });
 
-  // ─── Selector CELDA PUENTE — banda=riesgo + P2 crítico en TODOS los con_isa ─
-  // `departments` ya viene filtrado por route.ts:289 a deptos con resultPayload
-  // COMPLETED (= con_isa). El `.every()` y la frase "ambas áreas" del copy
-  // asumen exactamente 2 deptos con_isa (cmob0e56). Si un ciclo futuro entra
-  // silencio+riesgo+P2-crítico con 3+ con_isa, la palabra "ambas" queda mal.
-  // NO generalizar ahora — refinar el copy cuando aparezca el caso real.
-  const p2CritEnConIsa =
-    departments.length > 0 &&
-    departments.every((d) => {
-      const p2 = d.dimensionScores?.P2_seguridad;
-      return (
-        p2 !== null && p2 !== undefined && classifyDimensionLevel(p2) === 'critico'
-      );
-    });
-
   // ─── Beat 1 slots: del payload si está, o recálculo client (back-compat) ─
   const rollups = useMemo(() => buildGerenciaRollup(data), [data]);
   const slots = useMemo(
@@ -460,30 +678,40 @@ export default memo(function ActoAmbiente({ data }: ActoProps) {
     [seedFromPayload, rollups, orgISA, coverageGapPct],
   );
 
-  // Cifras presentational (regla del COPY doc: ISA sin decimales, % enteros).
+  // Cifras presentational (ISA sin decimales, % enteros).
   const isaInt = Math.round(orgISA);
-  // {coverage} en la copy = TASA DE PERSONAS de la campaña (responded/invited),
-  // NO `coverage.pctCobertura` (dept-level). La narrativa dice "del equipo
-  // respondió" — son personas, no áreas. Si `personResponseRate` es null
-  // (universo vacío de invitados — defensivo), fallback a 0.
-  const cobInt = slots.personResponseRate ?? 0;
+  // {pct} = TASA DE PERSONAS (responded/invited), person-level. NO pctCobertura.
+  const pct = slots.personResponseRate ?? 0;
 
-  const copy = copyFor(d4, slots, isaInt, cobInt, country, p2CritEnConIsa);
+  // ─── Apertura-Titular v4 (HANDOFF §2-4) — reemplaza el cuerpo de copyFor ─
+  // Cableado 2: count org de indicios Karin = Σ rollups[].leyKarin.signalsCount.
+  const indicioCount = rollups.reduce((s, r) => s + r.leyKarin.signalsCount, 0);
+  // Cableado 3: count org de denuncias formales = Σ denuncias_12m, respetando
+  // null ≠ 0 (métrica no cargada NO cuenta como 0).
+  const denunciaCount = riskScores.reduce((s, rs) => {
+    const d = rs.inputs.denuncias_12m;
+    return d !== null && d !== undefined ? s + d : s;
+  }, 0);
+  const isaLevel = classifyIsa(isaInt);
+  const titular = buildAperturaTitular({
+    orgISA: isaInt,
+    isaLevel,
+    isaNarrative: ISA_NARRATIVES[isaLevel].narrative,
+    pct,
+    silencio: pct < 50, // default 1 (GO Victor): "la voz de la mayoría"
+    indicioCount,
+    denunciaCount,
+    legalBadgeLabel: legalBadgeForCountry(country).label,
+    dims: computeOrgDimensions(departments),
+  });
 
-  // Titulares (Gate 5b) — solo desde el payload server-side (back-compat: el
-  // recálculo client legacy no los computa → bloque ausente).
-  const titulares = seedFromPayload
-    ? buildTitularesBeat1({
-        factores: seedFromPayload.factoresTitulares,
-        extremos: seedFromPayload.extremosTitulares,
-      })
-    : { factores: null, extremos: null };
-  // Coloreo: 'todo-bien' y 'bien-con-focos' = tono sano (cyan). Otros usan
-  // la intensidad clásica (alta/critico → purple, medio/alto → amber).
+  // Ortogonales conservadas (género · Ley Karin) — HANDOFF §1.
+  const { generoLine, leyKarinLine } = buildOrtogonales(slots, country);
+
+  // Color del hero — CONSERVADO (color por nivel vía intensidad/sano).
   const sano = d4.mundo === 'todo-bien' || d4.mundo === 'bien-con-focos';
   const heroColor = heroColorClass(d4.intensidad, sano);
   const sepTier = sepColor(sano, d4.intensidad);
-  const borderTier = borderColor(sano, d4.intensidad);
 
   return (
     <>
@@ -500,83 +728,60 @@ export default memo(function ActoAmbiente({ data }: ActoProps) {
             {isaInt}
           </p>
           <p className="text-xs text-slate-500 mt-3 uppercase tracking-wider">
-            {copy.subtitulo}
+            {titular.heroLabel}
           </p>
         </motion.div>
 
         <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-4">
-          {/* Traducción — `\n\n` produce párrafos planos (prosa corrida sin
-              callout). Sin separadores: 1 <p> (backward-compat con todos los
-              mundos existentes). Hoy solo CELDA PUENTE del case 'silencio'
-              usa multi-párrafo. */}
-          {copy.traduccion.split('\n\n').map((para, i) => (
-            <p
-              key={i}
-              className="text-base md:text-lg font-light text-slate-300 leading-relaxed text-center"
-            >
-              {para}
+          {/* Movimiento 1 — Veredicto (frase bold + narrativa de nivel verbatim). */}
+          <p className="text-base md:text-lg font-light text-slate-300 leading-relaxed text-center">
+            <span className="font-medium text-white">{titular.mov1.veredicto}</span>{' '}
+            {titular.mov1.narrative}
+          </p>
+
+          {/* Movimiento 2 — El pero (acota ALCANCE, nunca validez). */}
+          {titular.mov2 !== null && (
+            <p className="text-base md:text-lg font-light text-slate-300 leading-relaxed text-center">
+              {titular.mov2}
             </p>
-          ))}
-
-          {/* El "pero" — null = omitir (degradación graceful) */}
-          {copy.pero !== null && (
-            <div className={cn('border-l-2 pl-4 mt-6', borderTier)}>
-              <p className="text-sm font-light text-slate-300 leading-relaxed">
-                {copy.pero}
-              </p>
-            </div>
           )}
 
-          {/* Cierre (itálica) — `''` = omitir el callout (CELDA PUENTE /
-              RESPALDO concentran todo en traduccion). Otros mundos siempre
-              tienen cierre con contenido. */}
-          {copy.cierre.length > 0 && (
-            <div className={cn('border-l-2 pl-4 mt-6', borderTier)}>
-              <p className="text-sm italic font-light text-slate-300 leading-relaxed">
-                {copy.cierre}
-              </p>
-            </div>
+          {/* Movimiento 3 — El foco (dimensión foco en cyan/semibold). */}
+          {titular.mov3 !== null && (
+            <p className="text-base md:text-lg font-light text-slate-300 leading-relaxed text-center">
+              {titular.mov3.pre}
+              {' Y una de las que está en nivel crítico es justo '}
+              <span className="font-semibold text-cyan-400">
+                {titular.mov3.dimCEO}
+              </span>
+              {' — '}
+              {titular.mov3.dimDesc}.
+              {titular.mov3.coda !== null && <>{' '}{titular.mov3.coda}</>}
+            </p>
           )}
 
-          {/* ORTOGONAL: género — línea adicional después del cierre. Anexada
-              cuando hay alerta resoluble con cita literal. NO reemplaza al
-              cierre. Border slate neutro (no hereda el tier del mundo). */}
-          {copy.generoLine !== null && (
+          {/* Cierre (itálica). */}
+          <p className="text-sm italic font-light text-slate-400 leading-relaxed text-center mt-2">
+            {titular.cierre}
+          </p>
+
+          {/* ORTOGONAL: género — CONSERVADA (HANDOFF §1). Línea adicional, no
+              reemplaza el titular. Border slate neutro. */}
+          {generoLine !== null && (
             <div className="border-l-2 pl-4 mt-6 border-slate-700/40">
               <p className="text-sm font-light text-slate-300 leading-relaxed">
-                {copy.generoLine}
+                {generoLine}
               </p>
             </div>
           )}
 
-          {/* ORTOGONAL: Ley Karin — anexada cuando hay ≥1 indicio cross-Exit
-              12m. Voz "los que se fueron", histórica. Sin LegalBadgePill —
-              el chip "RIESGO LEY KARIN" en ámbar contradice el tono histórico
-              ("dejaron en sus encuestas de salida", pasado). El texto ya nombra
-              "bajo Ley Karin", y género tampoco lleva badge → parejos. */}
-          {copy.leyKarinLine !== null && (
+          {/* ORTOGONAL: Ley Karin — CONSERVADA (HANDOFF §1). Voz "los que se
+              fueron", histórica. Narrativa existente verbatim (per-gerencia). */}
+          {leyKarinLine !== null && (
             <div className="border-l-2 pl-4 mt-6 border-slate-700/40">
               <p className="text-sm font-light text-slate-300 leading-relaxed">
-                {copy.leyKarinLine}
+                {leyKarinLine}
               </p>
-            </div>
-          )}
-
-          {/* TITULARES (Gate 5b) — bloque adicional: factores (voz por banda) +
-              extremos (mejor/peor). Cada sub-bloque con rama vacía: si null, no
-              se renderiza (sin línea de relleno). Tono sub-narrativa, neutro. */}
-          {(titulares.factores || titulares.extremos) && (
-            <div className="mt-8 pt-6 border-t border-slate-800/40 space-y-3">
-              {titulares.factores && (
-                <p className="text-sm font-light text-slate-400 leading-relaxed text-center">
-                  {titulares.factores}
-                </p>
-              )}
-              {titulares.extremos && (
-                <p className="text-sm font-light text-slate-400 leading-relaxed text-center">
-                  {titulares.extremos}
-                </p>
-              )}
             </div>
           )}
         </motion.div>
