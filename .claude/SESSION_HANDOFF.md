@@ -8,7 +8,20 @@
 
 La cascada `Ambiente Sano` fue rearmada de raíz contra el plan §3 (espejo del PRINCIPIO de Talento, modelo de salida propio AS). El bug que rompió la cascada 4 meses (Beat 1 planta silencio → Beat 6 cierra "sin dirección clara") está resuelto **arquitectónicamente**: una sola autoridad server-side sobre el mundo D4 (`classifyD4` en `deriveBeat1Slots.ts`), `Beat1Seed` lo serializa, Beat 1 y Beat 6 lo consumen.
 
-**Arquitectura + Gate 2.5 copy + Gate 9 audit + enriquecimiento de señal + badge FUEGO + titulares Beat 1 (Gate 5b): TODO cerrado y commiteado.** Lo único en fase abierta: el **titular de la Apertura (cierre-sobre-ISA)**, que está en diseño sin código — ver sección "Apertura / cierre-sobre-ISA" abajo para lo que falta implementar.
+**Arquitectura + Gate 2.5 copy + Gate 9 audit + enriquecimiento de señal + badge FUEGO + titulares Beat 1 (Gate 5b) + Apertura-Titular v4 (Gate 1) + Gate 1.5 (A) léxico ISA + paquete de copy §A/B/C: TODO cerrado y commiteado.** Próximo gate: **Triage (zoom del pero)**, no abierto.
+
+## ESTADO AL CIERRE (2026-06-11)
+
+- **Working tree limpio · tsc 0 · tests 170/170** (compliance services + ActoAmbiente).
+- **NADA a medio gate.** Todos los gates de la sesión están completos, verdes y commiteados. La Apertura quedó con copy 100% aprobado (sin provisionales); las variantes sin caso en esta campaña están candadas por test.
+- **Commits de la sesión** (`b852cfe`→`b139842`): Gate 2.5 copy (`b852cfe`,`9b91e75`) · Gate 9 risks (`055583d`) · Nivel 1/2 señal (`3f8b437`,`a294b77`,`2b44aa1`) · copy v2 amplificadores (`b0e2fa9`) · badge FUEGO (`cc8a74f`,`af22c2f`) · titulares 5b (`c56c94e`) · handoff (`33438ae`) · Apertura v4 Gate 1 (`2de4221`,`c8f25b2`) · Gate 1.5 A léxico ISA (`6ac821e`) · paquete copy §A/B/C (`b139842`). (`9121b1a`/`a5582e5` = otra sesión paralela; bajaron el baseline 43→0.)
+- **Próximo gate listo para arrancar — Triage (zoom del pero):** tiene `buildExtremosLine` exportada en `ActoAmbiente` (migra acá per §1) + helper `orgDimensions.ts` + la **regla puente del léxico** (importar solo `classifyIsa`).
+
+### Hallazgos que no estaban en ningún doc (persistidos acá)
+- **Clasificador canónico por objeto (no confundir):** para narrativa de **dimensión** → `classifyDimensionLevel` (4 niveles, crítico **<2.0**, `ComplianceNarrativeDictionary:399`). Para banda de **departamento/safetyScore** → `classifyRisk` (3 niveles, critical **<2.5**, `SafetyScoreService:115`). En la frontera 2.0–2.5 la palabra miente si se usa el equivocado. La Apertura mov3 usa `classifyDimensionLevel` (correcto).
+- **Tres familias de labels de dimensión** (Triage las va a necesitar): `DIMENSION_CEO_LABELS` ("Seguridad psicológica" — nombre ejecutivo, `ComplianceNarrativeDictionary:45`) · `DIMENSION_LABELS` ("Lo que el equipo cree que pasaría si habla" — aposición descriptiva, `labels.ts:72`) · `DIMENSION_SHORT` (heatmap). El código NO las fusiona. La aposición lowercasea la inicial de `DIMENSION_LABELS` (mid-sentence).
+- **`personResponseRate`** (`beat1Slots`, person-level responded/invited) ≠ **`coverage.pctCobertura`** (dept-level). La Apertura y el "silencio" usan `personResponseRate`; Triage usa coverage. Umbral "silencio" horneado = `< 50` (default GO Victor).
+- **Counts org se derivan** (no hay campo org): indicios = Σ `rollups[].leyKarin.signalsCount`; denuncias = Σ `riskScores[].inputs.denuncias_12m` (respetando `null≠0`).
 
 ## Estado de la cadena
 
