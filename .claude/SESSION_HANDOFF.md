@@ -42,7 +42,24 @@ La cascada `Ambiente Sano` fue rearmada de raíz contra el plan §3 (espejo del 
 | **Badge FUEGO Beat 6 (count synth + tooltip org-level)** | ✅ | `cc8a74f` · `af22c2f` |
 | **Titulares Beat 1 (Gate 5b)** | ✅ | `c56c94e` |
 | **Apertura-Titular v4 — Beat 1 (Gate 1)** | ✅ | `2de4221` |
-| **Triage — zoom del pero (próximo gate, lo abre Victor)** | ⏸️ | siguiente |
+| **Gate 1.5 (A) léxico ISA + copy §A/B/C** | ✅ | `6ac821e` · `b139842` |
+| **Gate 2 Triage — investigación 0a-0e + datos reales** | ✅ (read-only, sin cablear) | `<este>` |
+| **Gate 2a Triage — el acto (grupos narrativos)** | ⏸️ | siguiente (builder+oráculos+render) |
+| **Gate 2b Triage — modal "ver más"** | ⏸️ | tras visto del 2a |
+
+### Gate 2 (Triage) — investigación + datos reales (read-only, NADA cableado)
+
+Sesión de investigación pura (contrato `HANDOFF_GATE_2_TRIAGE.md`). **No se cableó código.** Resultados volcados a (gitignored, locales):
+- **`.claude/tasks/GATE2_INVESTIGACION.md`** — respuestas 0a-0e verificadas por símbolo + las **6 lecturas verbatim** del `DepartmentRiskNarrativeDictionary` (FUEGO/HUMO-A-legal/HUMO-A/HUMO-B/PUNTO_CIEGO/CONFIABLE) + modelo confirmado + nota hero≠intro.
+- **`.claude/tasks/GATE2_DATOS_REALES.md`** — rollup REAL de cmob0e56 por gerencia (extraído read-only de la DB con `scripts/gate2-triage-rollup-cmob0e56.ts`): GERENCIA DE PERSONAS·85·HUMO/B · Gerencia Comercial·75·HUMO/A-legal (el indicio Karin) · 4× PUNTO_CIEGO. Hero=82% (coverageGapPct), intro=20% (personResponseRate). Sin FUEGO, sin CONFIABLE.
+
+**Hallazgos clave (load-bearing para 2a):**
+- **Modelo CONFIRMADO (Victor):** gerencia = **peor dept** (`buildGerenciaRollup.riesgo.maxScore` + lectura/drivers del `worstDept`, lookup en `riskScores[]`). No hay score-con-drivers por gerencia. **Exigencia de render:** si `nChildren>1` → anotar `{Gerencia} · {score} — vía {worstDept}`; 1 dept/standalone → sin anotación.
+- **`resolveDepartmentRiskNarrative` (per-dept) se REUSA verbatim** en 2a (con adaptación singular↔plural aprobada). El dictionary NO trae títulos de lectura → kickers del mockup quedan propuestos para visto de Victor.
+- **hero ≠ intro:** hero del Triage = `coverageGapPct` (dept-level, 82%); intro conectora = `personResponseRate` (person-level, 20%, el del titular). Dos % distintos.
+- **Caveat 2a:** usar `buildGerenciaRollup(response)` directo para la lista autoritativa (el script de datos usó agrupación simplificada → duplica "Gerencia Comercial"; el rollup real las consolida en 75·HUMO/A-legal).
+
+**Tasks a medio gate:** Gate 2a = builder puro + oráculos verbatim (copy §2a-3 + narrativas adaptadas) + pantalla del caso real para visto de Victor. No abrir 2b sin 2a aprobado. `buildExtremosLine` (exportada en `ActoAmbiente`) migra al Triage con guard (en el caso real NO se emite).
 
 ### Apertura-Titular v4 cerrada (2026-06-11, `2de4221`, contrato `HANDOFF_APERTURA_TITULAR_V4.md`)
 
