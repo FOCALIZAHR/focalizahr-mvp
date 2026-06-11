@@ -43,9 +43,21 @@ La cascada `Ambiente Sano` fue rearmada de raíz contra el plan §3 (espejo del 
 | **Titulares Beat 1 (Gate 5b)** | ✅ | `c56c94e` |
 | **Apertura-Titular v4 — Beat 1 (Gate 1)** | ✅ | `2de4221` |
 | **Gate 1.5 (A) léxico ISA + copy §A/B/C** | ✅ | `6ac821e` · `b139842` |
-| **Gate 2 Triage — investigación 0a-0e + datos reales** | ✅ (read-only, sin cablear) | `<este>` |
-| **Gate 2a Triage — el acto (grupos narrativos)** | ⏸️ | siguiente (builder+oráculos+render) |
-| **Gate 2b Triage — modal "ver más"** | ⏸️ | tras visto del 2a |
+| **Gate 2 Triage — investigación 0a-0e + datos reales** | ✅ (read-only, sin cablear) | `10421c1` |
+| **Gate 2a Triage — el acto (grupos narrativos)** | ✅ (visto Victor) | `8dbfb2c` |
+| **Gate 2b Triage — modal "ver más"** | ⏸️ | siguiente (tras visto del 2a) |
+
+### Gate 2a (Triage) — cerrado (2026-06-11, `8dbfb2c`)
+
+`buildTriageGroups` (pure, exportado) + `ActoTriage` reescrito a GRUPOS por lectura del `DepartmentRiskNarrativeDictionary`, nivel GERENCIA (rollup autoritativo). 12 oráculos verbatim + drift-guard. tsc 0, suites cascada 112/112.
+
+**Decisiones Victor cableadas:**
+- **"vía sí misma" suprimido**: el merge de ancestro hace que el worstDept SEA la gerencia (Comercial). Guard: `nChildren>1 && worstDept.id !== groupId`. Consolida Comercial en una línea `75·HUMO/A-legal`.
+- **Kickers de lectura PROPUESTOS** (el dictionary no trae títulos) en `LECTURA_KICKER`: FUEGO="Denuncia formal registrada" (reusa label de `buildFuegoBadge`), A-legal="Señal legal tras el silencio", A="Fuga de talento en gestación", B="Fricción en la entrada", PUNTO_CIEGO="Gestión sin radar", CONFIABLE="Métrica validada".
+- **Sexta + OTRO MUNDO**: dedupe contra entidades nombradas en grupos (`worstDeptId` ∪ `gerenciaId` no-`__dept__:`). Banda vacía tras dedupe → no se emite. **Caso real: ambas Sexta (Comercial + Subgerencia Cultura y DO) nombradas → Sexta off; OTRO MUNDO sin items → off.** El acto real muestra SOLO los 3 grupos.
+
+**Pendiente para 2b (NO abierto):** los links "Ver…→" están **inertes** (`SubtleLink` sin `onClick`). El modal 2b los cablea. Contrato 2b en `HANDOFF_GATE_2_TRIAGE.md §GATE 2b`. El builder ya expone `instances[].worstDeptId` y `gerenciaId` para que 2b liste departamentos del rollup. `NARRATIVA_PLURAL` + kickers viven en `buildTriageGroups.ts` (no en el dictionary auditado).
+**Deuda menor:** las plurales (`NARRATIVA_PLURAL`) y kickers son "adaptación/propuesta" — si Victor afina copy, se tocan ahí. Script read-only del render real: `scripts/gate2a-triage-render-cmob0e56.ts`.
 
 ### Gate 2 (Triage) — investigación + datos reales (read-only, NADA cableado)
 
