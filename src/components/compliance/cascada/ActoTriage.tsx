@@ -1,29 +1,30 @@
 'use client';
 
 // src/components/compliance/cascada/ActoTriage.tsx
-// Beat 2 de la Cascada — "El Triage".
+// Beat 2 de la Cascada — "El Triage" · GATE 2a (grupos narrativos).
 //
-// Hero CONDICIONAL a cobertura (MAPA §12, decisión Victor 2026-06-02):
-//   - silencio-hero si gap ≥ 50: lidera "{gap}% en silencio"
-//   - peligro-hero si la mayoría habló (gap < 50): lidera "{nFuego} en fuego"
+// El zoom del "pero" del titular: pone nombre a lo que la Apertura apuntó.
+// Nivel narrativo = GERENCIA (rollup autoritativo de buildGerenciaRollup).
+// La narrativa pertenece al TIPO, no a la gerencia: misma lectura → se narra
+// UNA vez con todas las instancias nombradas; lecturas distintas → grupos
+// hermanos bajo la misma familia. Sin cards: kickers, tipografía, líneas, aire.
 //
-// Ranking debajo: cards per-dept ordenadas FUEGO → HUMO → PUNTO_CIEGO → CONFIABLE.
-// Cada card consume `resolveDepartmentRiskNarrative()` (VERBATIM Victor — copy del
-// DepartmentRiskNarrativeDictionary aprobado). Excepción de vocabulario autorizada
-// para "denuncia"/"Ley Karin" en FUEGO y HUMO-A-legal.
+// Toda la lógica vive en `buildTriageGroups` (pure, testeada). El componente
+// solo pinta. Excepción de vocabulario ("denuncia"/"Ley Karin") autorizada en
+// FUEGO y HUMO/A-legal — narrativas verbatim del dictionary.
 //
-// Bandas Sexta + OTRO MUNDO se renderizan como componentes neutros si hay items
-// (sin hero propio — son contexto del triage).
+// Bandas Sexta + OTRO MUNDO se conservan debajo como contexto neutro (existían
+// pre-2a). [DEUDA 2a — visto Victor: confirmar si se mantienen junto a grupos.]
+// Links de grupo abren el modal 2b — INERTES hasta que 2b se construya.
 
 import { memo, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { ActSeparator, fadeIn, fadeInDelay } from './shared';
+import { ActSeparator, SubtleLink, fadeIn, fadeInDelay } from './shared';
 import {
-  resolveDepartmentRiskNarrative,
-  type DepartmentRiskNarrative,
-  type DepartmentRiskNarrativeState,
-} from '@/lib/services/compliance/DepartmentRiskNarrativeDictionary';
+  buildTriageGroups,
+  type TriageFamily,
+} from '@/lib/services/compliance/buildTriageGroups';
 import { formatDepartmentName } from '@/lib/utils/formatName';
 import type { ComplianceReportResponse } from '@/types/compliance';
 
@@ -31,146 +32,131 @@ interface ActoTriageProps {
   data: ComplianceReportResponse;
 }
 
-// ── Orden canónico de severidad para el ranking ──
-const STATE_ORDER: Record<DepartmentRiskNarrativeState, number> = {
-  FUEGO: 0,
-  HUMO: 1,
-  PUNTO_CIEGO: 2,
-  CONFIABLE: 3,
-};
-
-const STATE_LABEL: Record<DepartmentRiskNarrativeState, string> = {
-  FUEGO: 'EN FUEGO',
-  HUMO: 'EN HUMO',
-  PUNTO_CIEGO: 'PUNTO CIEGO',
-  CONFIABLE: 'CONFIABLE',
-};
-
-const STATE_BORDER: Record<DepartmentRiskNarrativeState, string> = {
-  FUEGO: 'border-red-500/40',
-  HUMO: 'border-amber-500/30',
-  PUNTO_CIEGO: 'border-slate-500/30',
-  CONFIABLE: 'border-cyan-500/30',
-};
-
-const STATE_CHIP: Record<DepartmentRiskNarrativeState, string> = {
+// Color por familia — único portador de severidad (número + composición).
+// El resto permanece uniforme (anti-semáforo: sin bordes/bg de color).
+const FAMILY_TEXT: Record<TriageFamily, string> = {
   FUEGO: 'text-red-400',
   HUMO: 'text-amber-400',
   PUNTO_CIEGO: 'text-slate-400',
   CONFIABLE: 'text-cyan-400',
 };
 
-interface TriageItem {
-  departmentId: string;
-  departmentName: string;
-  narrative: DepartmentRiskNarrative;
+/** Quita la flecha textual del link — SubtleLink ya pinta el ícono. */
+function linkLabel(link: string): string {
+  return link.replace(/\s*→$/, '');
 }
 
 export default memo(function ActoTriage({ data }: ActoTriageProps) {
-  const items = useMemo<TriageItem[]>(() => {
-    const riskScores = data.data.riskScores ?? [];
-    const acc: TriageItem[] = [];
-    for (const rs of riskScores) {
-      const narrative = resolveDepartmentRiskNarrative(rs);
-      if (!narrative) continue; // con_isa + alertas sin denuncia → cubierto upstream.
-      acc.push({
-        departmentId: rs.departmentId,
-        departmentName: rs.departmentName,
-        narrative,
-      });
-    }
-    // Orden severidad → alfabético dentro del estado.
-    acc.sort((a, b) => {
-      const sa = STATE_ORDER[a.narrative.state];
-      const sb = STATE_ORDER[b.narrative.state];
-      if (sa !== sb) return sa - sb;
-      return a.departmentName.localeCompare(b.departmentName);
-    });
-    return acc;
-  }, [data]);
+  const acto = useMemo(() => buildTriageGroups(data), [data]);
 
-  // Hero condicional según cobertura (MAPA §12).
-  const coverageGapPct = 100 - (data.data.coverage?.pctCobertura ?? 100);
-  const isSilencioHero = coverageGapPct >= 50;
+  // Sexta + OTRO MUNDO ya deduplicadas contra los grupos (decisión Victor).
+  const sextaItems = acto.sexta;
+  const otroMundoItems = acto.otroMundo;
 
-  const nFuego = items.filter((i) => i.narrative.state === 'FUEGO').length;
-  const nHumo = items.filter((i) => i.narrative.state === 'HUMO').length;
-  const nPuntoCiego = items.filter((i) => i.narrative.state === 'PUNTO_CIEGO').length;
-
-  const sextaItems = data.data.silencioVozExterna ?? [];
-  const otroMundoItems = data.data.otroMundo ?? [];
-
-  if (items.length === 0 && sextaItems.length === 0 && otroMundoItems.length === 0) {
+  if (
+    acto.groups.length === 0 &&
+    sextaItems.length === 0 &&
+    otroMundoItems.length === 0
+  ) {
     return null;
   }
 
-  // Hero
-  const heroNumber = isSilencioHero ? `${coverageGapPct}%` : `${nFuego}`;
-  const heroLabel = isSilencioHero
-    ? coverageGapPct === 100 ? 'en silencio total' : 'sin voz medible'
-    : nFuego === 1 ? 'área en fuego' : 'áreas en fuego';
-  const heroColor = isSilencioHero || nFuego > 0 ? 'text-violet-400' : 'text-amber-400';
+  // Color del hero / separador — silencio o presencia de fuego ⇒ violeta.
+  const coverageGapPct = 100 - (data.data.coverage?.pctCobertura ?? 100);
+  const isPeligro = coverageGapPct >= 50 || acto.counts.fuego > 0;
+  const heroColor = isPeligro ? 'text-violet-400' : 'text-amber-400';
 
   return (
     <>
-      <ActSeparator label="El Triage" color={isSilencioHero || nFuego > 0 ? 'purple' : 'amber'} />
+      <ActSeparator label="El Triage" color={isPeligro ? 'purple' : 'amber'} />
       <div>
-        <motion.div {...fadeInDelay} className="text-center mb-10">
+        {/* Hero — coverageGapPct (dept-level). */}
+        <motion.div {...fadeInDelay} className="text-center mb-8">
           <p className={cn('text-7xl md:text-8xl font-extralight tracking-tight', heroColor)}>
-            {heroNumber}
+            {acto.hero.number}
           </p>
           <p className="text-xs text-slate-500 mt-3 uppercase tracking-wider">
-            {heroLabel}
+            {acto.hero.label}
           </p>
-          {/* Subtítulo: composición del triage */}
-          {(nFuego > 0 || nHumo > 0 || nPuntoCiego > 0) && (
-            <p className="text-xs text-slate-500 mt-2 tracking-wider">
-              {[
-                nFuego > 0 ? `${nFuego} en fuego` : null,
-                nHumo > 0 ? `${nHumo} en humo` : null,
-                nPuntoCiego > 0 ? `${nPuntoCiego} punto ciego` : null,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </p>
+          {acto.hero.sub && (
+            <p className="text-xs text-slate-500 mt-2 tracking-wider">{acto.hero.sub}</p>
           )}
         </motion.div>
 
-        {/* Ranking per-dept */}
-        {items.length > 0 && (
-          <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-4">
-            {items.map((item) => (
-              <div
-                key={item.departmentId}
-                className={cn(
-                  'border-l-2 pl-4 rounded-r-sm py-1',
-                  STATE_BORDER[item.narrative.state],
-                )}
-              >
-                <div className="flex items-baseline justify-between gap-4">
-                  <p className="text-sm font-medium text-slate-200">
-                    {formatDepartmentName(item.departmentName)}
-                  </p>
-                  <p
-                    className={cn(
-                      'text-[10px] uppercase tracking-widest font-semibold',
-                      STATE_CHIP[item.narrative.state],
-                    )}
-                  >
-                    {STATE_LABEL[item.narrative.state]}
-                  </p>
-                </div>
-                <p className="text-sm font-light text-slate-300 leading-relaxed mt-1">
-                  {item.narrative.narrativa}
+        {/* Intro conectora — personResponseRate (person-level). */}
+        <motion.p
+          {...fadeIn}
+          className="max-w-2xl mx-auto text-center text-base font-light text-slate-400 leading-relaxed mb-10"
+        >
+          {acto.intro}
+        </motion.p>
+
+        {/* Grupos por lectura — sin cards. */}
+        {acto.groups.length > 0 && (
+          <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-10">
+            {acto.groups.map((g) => (
+              <div key={g.key}>
+                {/* Kicker: {FAMILIA} · {lectura} + count si >1. */}
+                <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-3">
+                  {g.kicker}
+                  {g.count > 1 && (
+                    <span className="text-slate-600"> · {g.count}</span>
+                  )}
                 </p>
+
+                {/* Instancias: {Gerencia} · {score} — composición (color familia). */}
+                <div className="space-y-1.5 mb-4">
+                  {g.instances.map((inst) => (
+                    <p
+                      key={inst.gerenciaId}
+                      className="text-sm leading-relaxed tabular-nums"
+                    >
+                      <span className="font-medium text-slate-200">
+                        {formatDepartmentName(inst.gerenciaName)}
+                      </span>
+                      <span className={cn('font-light', FAMILY_TEXT[g.family])}>
+                        {' · '}
+                        {inst.score}
+                        {inst.composicion.length > 0 && ` — ${inst.composicion}`}
+                      </span>
+                      {inst.viaWorstDept && (
+                        <span className="font-light text-slate-500">
+                          {' — vía '}
+                          {formatDepartmentName(inst.viaWorstDept)}
+                        </span>
+                      )}
+                    </p>
+                  ))}
+                </div>
+
+                {/* Narrativa del tipo — UNA vez (verbatim / plural adaptado). */}
+                <p className="text-sm font-light text-slate-300 leading-relaxed">
+                  {g.narrativa}
+                </p>
+
+                {/* Link al modal 2b — INERTE hasta 2b. */}
+                <div className="mt-3">
+                  {/* onClick intencionalmente ausente: el modal 2b lo cablea. */}
+                  <SubtleLink>{linkLabel(g.link)}</SubtleLink>
+                </div>
               </div>
             ))}
           </motion.div>
         )}
 
-        {/* Sexta + OTRO MUNDO — componentes neutros, sin hero */}
+        {/* Extremos — "no es parejo" (guard: no se emite en el caso real). */}
+        {acto.extremosLine && (
+          <motion.p
+            {...fadeIn}
+            className="max-w-2xl mx-auto text-center text-sm font-light text-slate-400 leading-relaxed mt-10"
+          >
+            {acto.extremosLine}
+          </motion.p>
+        )}
+
+        {/* Sexta + OTRO MUNDO — contexto neutro conservado (pre-2a). */}
         {(sextaItems.length > 0 || otroMundoItems.length > 0) && (
-          <motion.div {...fadeIn} className="max-w-2xl mx-auto mt-8 space-y-3">
+          <motion.div {...fadeIn} className="max-w-2xl mx-auto mt-10 space-y-3">
             {sextaItems.length > 0 && (
               <div className="border-t border-slate-800/40 pt-4">
                 <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
@@ -191,9 +177,6 @@ export default memo(function ActoTriage({ data }: ActoTriageProps) {
                 <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
                   Otro mundo (no invitados con rastro externo)
                 </p>
-                {/* OtroMundoItem es metadata neutra (sin narrativa pre-cocinada).
-                    Renderizamos descriptor fáctico: nombre + #señales. Cuando
-                    Victor entregue la cláusula OTRO_MUNDO (Gate 2.5), se reemplaza. */}
                 {otroMundoItems.map((o, i) => (
                   <p
                     key={`otromundo-${o.departmentId ?? i}`}
