@@ -547,7 +547,7 @@ test('A7. Variante 4 (limpio: sin silencio, sin señal) verbatim §3', () => {
   );
 });
 
-test('A8. Precedencia denuncia > indicio + flag coexistencia (no compone frase doble)', () => {
+test('A8. Precedencia denuncia > indicio en meta.senal + flag coexistencia (§C: separados)', () => {
   const t = buildAperturaTitular(mkRealCaseInput({ indicioCount: 2, denunciaCount: 1 }));
   assert.equal(t.meta.senal, 'denuncia');
   assert.equal(t.meta.coexistencia, true);
@@ -562,4 +562,108 @@ test('A9. mov3 sin-coincidencia — dim crítica ≠ P2 → flag + sin coda', ()
   assert.equal(t.meta.mov3SinCoincidencia, true);
   assert.equal(t.mov3!.coda, null);
   assert.equal(t.mov3!.dimCEO, 'Calidad de liderazgo'); // la más baja
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// PAQUETE DE COPY §A/B/C (APROBADO Victor 2026-06-11) — oráculo verbatim
+// Variantes sin caso en esta campaña: candado por test, no por pantalla.
+// ═══════════════════════════════════════════════════════════════════
+
+test('CP-A·Sano — veredicto + hero §A', () => {
+  const t = buildAperturaTitular(
+    mkRealCaseInput({ isaLevel: 'sano', isaNarrative: ISA_NARRATIVES.sano.narrative, orgISA: 85 }),
+  );
+  assert.equal(t.heroLabel, 'UN AMBIENTE QUE HOY PROTEGE');
+  assert.equal(
+    t.mov1.veredicto,
+    'El ambiente de la empresa llega a sano: el índice cerró en 85 de 100.',
+  );
+});
+
+test('CP-A·Atención — veredicto + hero §A', () => {
+  const t = buildAperturaTitular(
+    mkRealCaseInput({ isaLevel: 'atencion', isaNarrative: ISA_NARRATIVES.atencion.narrative, orgISA: 70 }),
+  );
+  assert.equal(t.heroLabel, 'SANO, PERO CON SEÑALES');
+  assert.equal(
+    t.mov1.veredicto,
+    'El ambiente de la empresa se sostiene, pero con señales: el índice cerró en 70 de 100.',
+  );
+});
+
+test('CP-A·Crítico — veredicto + hero §A (label corregido por Victor)', () => {
+  const t = buildAperturaTitular(
+    mkRealCaseInput({ isaLevel: 'critico', isaNarrative: ISA_NARRATIVES.critico.narrative, orgISA: 30 }),
+  );
+  assert.equal(t.heroLabel, 'EL AMBIENTE NO ES SANO, COMIENZA A SER TÓXICO');
+  assert.equal(
+    t.mov1.veredicto,
+    'El ambiente de la empresa está en nivel crítico: el índice cerró en 30 de 100.',
+  );
+});
+
+test('CP-B — mov3 sin-coincidencia (dim crítica ≠ P2): termina en aposición, sin coda', () => {
+  const dims: OrgDimension[] = [
+    { key: 'P2_seguridad', valor: 3.5, level: 'atencion' },
+    { key: 'P7_liderazgo', valor: 1.7, level: 'critico' },
+  ];
+  const t = buildAperturaTitular(mkRealCaseInput({ dims }));
+  assert.equal(t.meta.mov3SinCoincidencia, true);
+  assert.equal(
+    mov3ToText(t.mov3!),
+    'De las dos dimensiones que mide el estudio, casi ninguna alcanzó el nivel que protege a la gente. ' +
+      'Y una de las que está en nivel crítico es justo Calidad de liderazgo — calidad del liderazgo directo.',
+  );
+});
+
+test('CP-C·denuncia count=1 — el pero (variante 1)', () => {
+  const t = buildAperturaTitular(mkRealCaseInput({ indicioCount: 0, denunciaCount: 1 }));
+  assert.equal(t.meta.senal, 'denuncia');
+  assert.equal(
+    t.mov2,
+    'Pero esa salud de 49 describe al 20% que respondió — sobre el resto de la empresa, el estudio todavía no tiene voz. ' +
+      'Y en una de las áreas hubo al menos una denuncia formal en los últimos 12 meses: el solo hecho eleva la prioridad de revisión.',
+  );
+});
+
+test('CP-C·denuncia count≥2', () => {
+  const t = buildAperturaTitular(mkRealCaseInput({ indicioCount: 0, denunciaCount: 3 }));
+  assert.ok(
+    t.mov2!.endsWith(
+      'Y las denuncias formales no son una: ya se acumulan 3 en los últimos 12 meses — la acumulación eleva la prioridad de revisión.',
+    ),
+    t.mov2!,
+  );
+});
+
+test('CP-C·indicios count≥2', () => {
+  const t = buildAperturaTitular(mkRealCaseInput({ indicioCount: 4, denunciaCount: 0 }));
+  assert.ok(
+    t.mov2!.endsWith(
+      'Y los indicios no son uno: ya se acumulan 4 de riesgo Ley Karin en el último año — la acumulación eleva la prioridad de revisión.',
+    ),
+    t.mov2!,
+  );
+});
+
+test('CP-C·coexistencia — separados, JAMÁS sumados', () => {
+  const t = buildAperturaTitular(mkRealCaseInput({ indicioCount: 1, denunciaCount: 1 }));
+  assert.equal(t.meta.coexistencia, true);
+  assert.ok(
+    t.mov2!.endsWith(
+      'Y el último año dejó las dos cosas: 1 denuncia formal y 1 indicio de riesgo Ley Karin. Cada hecho por separado ya eleva la prioridad de revisión.',
+    ),
+    t.mov2!,
+  );
+});
+
+test('CP-C·variante solo-señal (sin silencio) — slot plural', () => {
+  const t = buildAperturaTitular(
+    mkRealCaseInput({ silencio: false, pct: 80, indicioCount: 2, denunciaCount: 0 }),
+  );
+  assert.equal(
+    t.mov2,
+    'El 49 llega con la voz de la mayoría: respondió el 80% de la empresa. ' +
+      'Lo que el número no muestra: 2 indicios de riesgo Ley Karin en el último año. El hecho solo ya eleva la prioridad de revisión.',
+  );
 });

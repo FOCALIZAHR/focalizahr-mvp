@@ -40,6 +40,20 @@ La cascada `Ambiente Sano` fue rearmada de raíz contra el plan §3 (espejo del 
 - **Migración de `ActoAnatomia:66-95` al helper `orgDimensions.ts`** (hoy duplica el cómputo). **Dueño:** el **gate de Anatomía** — se ejecuta ahí, no antes (toca el cuerpo del `useMemo`, no es un import). Idem `AmbienteRiskOrchestrator.buildOrgDimensionAverages`.
 - **`buildExtremosLine`** (exportada en `ActoAmbiente`) **migra a Triage** per §1 — disponible para el próximo gate.
 
+### Gate 1.5 (A) — léxico ISA único en pantalla (2026-06-11)
+
+Léxico canónico unificado al de `classifyIsa`/`ISA_NARRATIVES` (**Sano / Atención / Riesgo / Crítico**). Solo se cambiaron los 3 strings de `ISA_LABELS.label` en `ISAService.ts` (`Saludable→Sano`, `En observación→Atención`, `En riesgo→Riesgo`). KEYS del union (`saludable`/`observacion`) y `getISARiskLevel` **intactos** — cero lógica tocada. `SectionAncla`/`SectionSintesis` auto-actualizan. Pantalla del Ancla (dashboard `SectionAncla`, "de 100 · Sano") mostrada + GO Victor.
+
+**REGLA PUENTE (vigente hasta el gate de limpieza de la cascada):** todo código NUEVO de la cascada (**Triage en adelante**) importa SOLO `classifyIsa` para nivel ISA. `getISARiskLevel` queda **congelado** para los consumidores existentes (gauge color maps, `deriveBeat1Slots.banda`, `ComplianceRail`) — no se le agregan consumidores nuevos.
+
+- **(B) Fuente única de FUNCIÓN — DIFERIDA con dueño = gate de limpieza de la cascada** (junto con `copyFor`). Deprecar `getISARiskLevel` exige tocar lógica (re-keyear los mapas de color del gauge `ISA_GAUGE_HEX`/`TESLA_SINTESIS`/`isaLevelToGaugeColor` + comparación `=== 'saludable'` y slot `banda` en `deriveBeat1Slots`) → gatilla la parada #2 del handoff. No antes de ese gate.
+- **Corrección criterio de listo (#1):** la pantalla de visto del léxico ISA es **`SectionAncla` (dashboard)**, NO el Ancla de la cascada — `AnclaISA` (cascada) usa `getISARiskLevel` solo para el COLOR del gauge, no muestra palabra de banda.
+- **Inconsistencia aparte (#2, fuera de scope):** `DecisionConsole:500` muestra "En observación" — es léxico de **dimensión** (`classifyDimensionLevel`, excluido del Gate 1.5). Sin tocar; anotada.
+
+### Apertura-Titular — paquete de copy §A/B/C cableado (2026-06-11)
+
+Reemplazados los provisionales de Gate 1 por el copy aprobado: veredicto + hero por los **4 niveles** ISA (`VEREDICTO_BY_LEVEL` + `HERO_LABEL_BY_LEVEL`; crítico = "EL AMBIENTE NO ES SANO, COMIENZA A SER TÓXICO", corrección Victor); mov3 sin-coincidencia (§B); composiciones del pero incl. **coexistencia** denuncia+indicio nombrados POR SEPARADO / jamás sumados (§C). Removido el flag `veredictoPendiente` (sin provisionales). Oráculo verbatim por cada texto nuevo (+9 tests). Variantes sin caso en esta campaña: candado por test, no por pantalla.
+
 ### Gate 2.5 cerrado (2026-06-08, commit `b852cfe`)
 
 - Cableada copy final de `COPY_GATE_2_5_PENDIENTE.md` (NO del inventario, desactualizado en FUEGO/SILENCIO/TEATRO). 8 tipos × 4 slots + 4 cláusulas nuevas + `risks` (FUEGO_LEGAL, CONCENTRACION_MANDO).

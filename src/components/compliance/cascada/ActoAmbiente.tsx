@@ -23,7 +23,6 @@ import { DIMENSION_CEO_LABELS } from '@/config/narratives/ComplianceNarrativeDic
 import { DIMENSION_LABELS } from '@/app/dashboard/compliance/lib/labels';
 import { getLegalMarcoName } from '@/config/compliance/legalBadgeConfig';
 import { legalBadgeForCountry } from '@/lib/services/compliance/CoverageNarrativeDictionary';
-import { buildFuegoBadge } from '@/lib/services/compliance/AmbienteSynthesisDictionary';
 import {
   computeOrgDimensions,
   type OrgDimension,
@@ -375,22 +374,29 @@ export function buildOrtogonales(
 // copyFor); copyFor sigue vivo (tests + classifyD4 motor), solo deja de
 // seleccionar el copy del acto.
 //
-// Provisionales horneados (GO Victor 2026-06-11, defaults 1-5) — todos
-// flaggeados en `meta`, ninguno afecta el render del caso real:
-//   - silencio = personResponseRate < 50 (mayoría)
-//   - precedencia denuncia > indicio; coexistencia NO compone frase (flag TODO)
-//   - {n} en palabra (numEs); sano-phrase "casi ninguna" si dimsSano ≤ 1
-//   - veredicto: solo `riesgo` aprobado; otros 3 niveles provisional (pendiente)
-//   - sin-coincidencia mov3 (dim crítica ≠ P2): copy de conexión pendiente
+// Copy 100% APROBADO (paquete §A/B/C, Victor 2026-06-11) — ya no hay
+// provisionales: veredicto + hero por los 4 niveles, sin-coincidencia mov3 (§B),
+// composiciones del pero incl. coexistencia separada/jamás sumada (§C).
+// Defaults de selector vigentes (GO Victor): silencio = personResponseRate < 50;
+// {n} en palabra (numEs); sano-phrase "casi ninguna" si dimsSano ≤ 1.
 
-/** Veredicto por nivel ISA. Solo `riesgo` aprobado verbatim (§2); los otros 3
- *  son provisionales hasta el pulido de Victor (§5) — `veredictoPendiente` lo
- *  marca; no renderizan en el caso real. */
+/** Fragmento de veredicto por nivel ISA (entra en "El ambiente de la empresa
+ *  {veredicto}: …"). APROBADO Victor 2026-06-11 (paquete de copy §A). */
 const VEREDICTO_BY_LEVEL: Record<IsaLevel, string> = {
-  riesgo: 'no llega a sano', // §2 APROBADO
-  sano: 'es sano', // PENDIENTE pulido
-  atencion: 'no termina de afianzarse', // PENDIENTE pulido
-  critico: 'está en zona crítica', // PENDIENTE pulido
+  sano: 'llega a sano',
+  atencion: 'se sostiene, pero con señales',
+  riesgo: 'no llega a sano',
+  critico: 'está en nivel crítico',
+};
+
+/** Label del hero por nivel — string propio aprobado (NO derivable del
+ *  veredicto). §A; crítico = corrección de Victor (reemplaza "EL AMBIENTE YA
+ *  EXPULSA"). */
+const HERO_LABEL_BY_LEVEL: Record<IsaLevel, string> = {
+  sano: 'UN AMBIENTE QUE HOY PROTEGE',
+  atencion: 'SANO, PERO CON SEÑALES',
+  riesgo: 'EL AMBIENTE NO LLEGA A SANO',
+  critico: 'EL AMBIENTE NO ES SANO, COMIENZA A SER TÓXICO',
 };
 
 const NUM_ES = ['cero', 'una', 'dos', 'tres', 'cuatro', 'cinco', 'seis'] as const;
@@ -429,27 +435,42 @@ export interface AperturaTitular {
   meta: {
     silencio: boolean;
     senal: 'indicio' | 'denuncia' | null;
-    /** indicio + denuncia ambos presentes → denuncia manda, frase NO se compone. */
+    /** indicio + denuncia ambos presentes → se nombran por separado (§C), jamás sumados. */
     coexistencia: boolean;
-    veredictoPendiente: boolean;
+    /** mov3 nombra una dim crítica ≠ P2 → termina en la aposición, sin coda (§B). */
     mov3SinCoincidencia: boolean;
   };
 }
 
-/** Parte de señal del "pero" en variante 1 (silencio + señal). */
+/** Parte de señal del "pero" en variante 1 (silencio + señal). Copy §C APROBADO.
+ *  Coexistencia: denuncia + indicio nombrados POR SEPARADO, jamás sumados. */
 function senalParteV1(
-  senal: 'indicio' | 'denuncia',
   indicioCount: number,
   denunciaCount: number,
   legalBadge: string,
 ): string {
-  if (senal === 'denuncia') {
-    // Molde cableado (org-level). Best-effort de composición — flag.
-    return buildFuegoBadge(denunciaCount).tooltip;
+  const tieneDen = denunciaCount > 0;
+  const tieneInd = indicioCount > 0;
+
+  // Coexistencia — las dos cosas, separadas, JAMÁS sumadas (§C).
+  if (tieneDen && tieneInd) {
+    const den = `${denunciaCount} ${denunciaCount === 1 ? 'denuncia formal' : 'denuncias formales'}`;
+    const ind = `${indicioCount} ${indicioCount === 1 ? 'indicio' : 'indicios'} de ${legalBadge}`;
+    return `Y el último año dejó las dos cosas: ${den} y ${ind}. Cada hecho por separado ya eleva la prioridad de revisión.`;
   }
+
+  // Denuncia formal sola (§C).
+  if (tieneDen) {
+    if (denunciaCount >= 2) {
+      return `Y las denuncias formales no son una: ya se acumulan ${denunciaCount} en los últimos 12 meses — la acumulación eleva la prioridad de revisión.`;
+    }
+    return 'Y en una de las áreas hubo al menos una denuncia formal en los últimos 12 meses: el solo hecho eleva la prioridad de revisión.';
+  }
+
+  // Indicio Karin solo.
   if (indicioCount >= 2) {
-    // §5 molde count≥2 + conector "Y" (best-effort) — flag.
-    return `Y ya se acumulan ${indicioCount} indicios de ${legalBadge} en el último año — la acumulación eleva la prioridad de revisión.`;
+    // §C count≥2.
+    return `Y los indicios no son uno: ya se acumulan ${indicioCount} de ${legalBadge} en el último año — la acumulación eleva la prioridad de revisión.`;
   }
   // §2 verbatim (count=1).
   return `Y en una de las áreas, el último año dejó un indicio de ${legalBadge}: el solo hecho eleva la prioridad de revisión.`;
@@ -487,10 +508,9 @@ export function buildAperturaTitular(input: AperturaInput): AperturaTitular {
   } = input;
 
   // ── Movimiento 1 — Veredicto ──
-  const veredicto = VEREDICTO_BY_LEVEL[isaLevel];
-  const heroLabel = `EL AMBIENTE ${veredicto.toUpperCase()}`;
+  const heroLabel = HERO_LABEL_BY_LEVEL[isaLevel];
   const mov1 = {
-    veredicto: `El ambiente de la empresa ${veredicto}: el índice cerró en ${orgISA} de 100.`,
+    veredicto: `El ambiente de la empresa ${VEREDICTO_BY_LEVEL[isaLevel]}: el índice cerró en ${orgISA} de 100.`,
     narrative: isaNarrative,
   };
 
@@ -504,7 +524,7 @@ export function buildAperturaTitular(input: AperturaInput): AperturaTitular {
   if (silencio && senal) {
     // Variante 1 (caso real).
     const sil = `Pero esa salud de ${orgISA} describe al ${pct}% que respondió — sobre el resto de la empresa, el estudio todavía no tiene voz.`;
-    mov2 = `${sil} ${senalParteV1(senal, indicioCount, denunciaCount, legalBadgeLabel)}`;
+    mov2 = `${sil} ${senalParteV1(indicioCount, denunciaCount, legalBadgeLabel)}`;
   } else if (silencio && !senal) {
     // Variante 2.
     mov2 = `Ese ${orgISA} describe al ${pct}% que respondió — sobre el resto de la empresa, el estudio todavía no tiene voz.`;
@@ -542,7 +562,8 @@ export function buildAperturaTitular(input: AperturaInput): AperturaTitular {
           : null,
       };
     } else {
-      // Sin-coincidencia: la dim crítica no es P2 → copy de conexión PENDIENTE (§5).
+      // Sin-coincidencia: la dim crítica no es P2 → termina en la aposición,
+      // sin coda de silencio. Copy §B APROBADO (misma estructura que el render).
       const crit = [...dims].sort((a, b) => a.valor - b.valor)[0];
       mov3SinCoincidencia = true;
       mov3 = {
@@ -565,7 +586,6 @@ export function buildAperturaTitular(input: AperturaInput): AperturaTitular {
       silencio,
       senal,
       coexistencia,
-      veredictoPendiente: isaLevel !== 'riesgo',
       mov3SinCoincidencia,
     },
   };
