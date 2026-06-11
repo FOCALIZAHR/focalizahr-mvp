@@ -28,7 +28,17 @@ La cascada `Ambiente Sano` fue rearmada de raíz contra el plan §3 (espejo del 
 | **Copy v2 amplificadores (cláusulas con señal específica)** | ✅ | `b0e2fa9` |
 | **Badge FUEGO Beat 6 (count synth + tooltip org-level)** | ✅ | `cc8a74f` · `af22c2f` |
 | **Titulares Beat 1 (Gate 5b)** | ✅ | `c56c94e` |
-| **Apertura / cierre-sobre-ISA (titular)** | ⏸️ | diseño — sin código |
+| **Apertura-Titular v4 — Beat 1 (Gate 1)** | ✅ | `2de4221` |
+| **Triage — zoom del pero (próximo gate, lo abre Victor)** | ⏸️ | siguiente |
+
+### Apertura-Titular v4 cerrada (2026-06-11, `2de4221`, contrato `HANDOFF_APERTURA_TITULAR_V4.md`)
+
+`ActoAmbiente` reemplazó el cuerpo (`copyFor` switch de mundos) por el titular de 3 movimientos (veredicto + pero + foco), copy verbatim aprobado. `buildAperturaTitular` puro + 9 tests oráculo contra §2. 4 cableados §4 hechos; dims org-level extraídas a `orgDimensions.ts`. Provisionales flaggeados en `meta` (no afectan el caso real). Pendiente §5: veredicto de los 3 niveles ISA no-`riesgo`, variante sin-coincidencia mov3.
+
+**Deudas reconocidas CON DUEÑO (no huérfanas):**
+- **`copyFor` vivo sin llamadores en runtime** (solo lo usan sus tests). Se dejó por reversibilidad. **Dueño/trigger:** gate de limpieza de la cascada una vez que los 3 movimientos estén estables en todos los niveles ISA → remover `copyFor` + sus tests de mundos. NO antes (es el fallback histórico).
+- **Migración de `ActoAnatomia:66-95` al helper `orgDimensions.ts`** (hoy duplica el cómputo). **Dueño:** el **gate de Anatomía** — se ejecuta ahí, no antes (toca el cuerpo del `useMemo`, no es un import). Idem `AmbienteRiskOrchestrator.buildOrgDimensionAverages`.
+- **`buildExtremosLine`** (exportada en `ActoAmbiente`) **migra a Triage** per §1 — disponible para el próximo gate.
 
 ### Gate 2.5 cerrado (2026-06-08, commit `b852cfe`)
 
