@@ -294,9 +294,14 @@ const PISO_DENUNCIA = 75;
 export async function computeDepartmentRiskScores(params: {
   accountId: string;
   coverageItems: CoverageDeptItem[];
+  /** Mapeo dept→gerencia(level 2) ya resuelto y filtrado por RBAC en el caller.
+   *  `undefined` para entradas no presentes → `parentGerenciaId/Name` quedan
+   *  como `null` en el output (semántica de "es gerencia o sin ancestro").
+   *  El servicio NO realiza la consulta — la jerarquía vive en el caller. */
+  gerenciaByDeptId?: Map<string, { id: string; name: string } | null>;
   now?: Date;
 }): Promise<DepartmentRiskScore[]> {
-  const { accountId, coverageItems } = params;
+  const { accountId, coverageItems, gerenciaByDeptId } = params;
   const now = params.now ?? new Date();
   const deptIds = coverageItems.map((d) => d.departmentId);
 
@@ -318,6 +323,8 @@ export async function computeDepartmentRiskScores(params: {
     const piso = denuncias12m !== null && denuncias12m >= 1 ? PISO_DENUNCIA : 0;
     const scoreRaw = Math.max(inferido, piso);
 
+    const gerencia = gerenciaByDeptId?.get(item.departmentId) ?? null;
+
     return {
       departmentId: item.departmentId,
       departmentName: item.departmentName,
@@ -335,6 +342,8 @@ export async function computeDepartmentRiskScores(params: {
         denuncias_12m: denuncias12m,
       },
       alertas,
+      parentGerenciaId: gerencia?.id ?? null,
+      parentGerenciaName: gerencia?.name ?? null,
     };
   });
 }

@@ -387,6 +387,16 @@ export interface DepartmentRiskScore {
   };
   /** Origen de `pesoAlertas` — para narrar el desglose en el render. */
   alertas: DepartmentRiskAlertItem[];
+  /** Gerencia (level 2) que contiene este dept. Semántica del 3-estado:
+   *  - campo ausente (undefined) → payload pre-deploy, frontend no debe asumir.
+   *  - poblado con `null` → el dept ES gerencia (level 2), o es holding (level 1),
+   *    o no resolvió ancestro level 2 dentro del set visible (RBAC).
+   *  - poblado con valor → dept hijo, agrupable bajo esa gerencia.
+   *  Filtrado por `visibleDeptIds`: nunca expone una gerencia fuera del scope
+   *  del caller (privacy hardened para AREA_MANAGER). */
+  parentGerenciaId?: string | null;
+  /** Display name de la gerencia ancestro. Espejo de parentGerenciaId. */
+  parentGerenciaName?: string | null;
 }
 
 export interface ComplianceCampaignsResponse {

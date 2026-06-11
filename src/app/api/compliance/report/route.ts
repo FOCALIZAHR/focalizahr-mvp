@@ -215,9 +215,54 @@ export async function GET(request: NextRequest) {
     // Score de riesgo por dept — runtime, cubre TODO el universo del coverage
     // (con_isa + sub_threshold + no_invitado). RBAC heredado: deptosCobertura
     // ya viene filtrado por visibleDeptIds desde computeCoverageAnalysis.
+    //
+    // Map dept→gerencia(level 2) para el rollup del Triage en la cascada.
+    // Bloque verbatim de PerformanceRatingService.getCalibrationStatsByGerencia
+    // (`src/lib/services/PerformanceRatingService.ts:1704-1741`). Privacy:
+    // visibleDeptIds filtra el output — si la gerencia ancestro no está en el
+    // scope del caller, el dept se renderiza como unidad propia.
+    const allDeptsHierarchy = await prisma.department.findMany({
+      where: { accountId: userContext.accountId, isActive: true },
+      select: {
+        id: true,
+        displayName: true,
+        level: true,
+        parentId: true,
+      },
+    });
+    const deptById = new Map(allDeptsHierarchy.map((d) => [d.id, d]));
+    const gerenciaByDeptId = new Map<string, { id: string; name: string } | null>();
+    for (const dept of allDeptsHierarchy) {
+      if (dept.level === 2) {
+        gerenciaByDeptId.set(dept.id, null); // es gerencia — no se agrupa bajo sí misma
+      } else if (dept.level === 1) {
+        gerenciaByDeptId.set(dept.id, null); // holding — no se agrupa
+      } else {
+        let current = dept;
+        let maxIterations = 10;
+        let resolved: { id: string; name: string } | null = null;
+        while (current.parentId && current.level > 2 && maxIterations-- > 0) {
+          const parent = deptById.get(current.parentId);
+          if (!parent) break;
+          if (parent.level === 2) {
+            resolved = { id: parent.id, name: parent.displayName };
+            break;
+          }
+          current = parent;
+        }
+        // Privacy: si la gerencia ancestro no está visible para el caller,
+        // se renderiza como unidad propia (no se filtra el dept del set).
+        if (resolved && visibleDeptIds && !visibleDeptIds.has(resolved.id)) {
+          resolved = null;
+        }
+        gerenciaByDeptId.set(dept.id, resolved);
+      }
+    }
+
     const riskScores = await computeDepartmentRiskScores({
       accountId: userContext.accountId,
       coverageItems: coverage.deptosCobertura,
+      gerenciaByDeptId,
     });
 
     // De los posibles múltiples rows (historial), tomar el más reciente por depto.
