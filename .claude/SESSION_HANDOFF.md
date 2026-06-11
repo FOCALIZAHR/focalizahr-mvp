@@ -1,6 +1,6 @@
 # Session Handoff — Cascada Ambiente Sano cerrada arquitectónicamente
 
-**Fecha cierre:** 2026-06-08
+**Fecha cierre:** 2026-06-11 (arquitectura: 2026-06-08)
 **Plan maestro:** `.claude/plans/lee-claude-tasks-plan-cascada-que-y-cond-eventual-hejlsberg.md` (v2, aprobado 2026-06-06)
 **Inventario copy pendiente:** `.claude/tasks/INVENTARIO_COPY_GATE_2_5.md` (entregable para Victor)
 
@@ -8,7 +8,7 @@
 
 La cascada `Ambiente Sano` fue rearmada de raíz contra el plan §3 (espejo del PRINCIPIO de Talento, modelo de salida propio AS). El bug que rompió la cascada 4 meses (Beat 1 planta silencio → Beat 6 cierra "sin dirección clara") está resuelto **arquitectónicamente**: una sola autoridad server-side sobre el mundo D4 (`classifyD4` en `deriveBeat1Slots.ts`), `Beat1Seed` lo serializa, Beat 1 y Beat 6 lo consumen.
 
-**Mi parte (arquitectura) cerrada y commiteada. Lo que falta: ~22 strings de copy (Victor entrega aparte) + Gate 9 audit ácido (después).**
+**Arquitectura + Gate 2.5 copy + Gate 9 audit + enriquecimiento de señal + badge FUEGO + titulares Beat 1 (Gate 5b): TODO cerrado y commiteado.** Lo único en fase abierta: el **titular de la Apertura (cierre-sobre-ISA)**, que está en diseño sin código — ver sección "Apertura / cierre-sobre-ISA" abajo para lo que falta implementar.
 
 ## Estado de la cadena
 
@@ -23,7 +23,12 @@ La cascada `Ambiente Sano` fue rearmada de raíz contra el plan §3 (espejo del 
 | Gate 7 — Beat 4 Voz honesta (citas literales + género, sin patrones LLM) | ✅ | `5e0cff8` |
 | Gate 8 — Limpieza legacy + migración Beat 6 al Engine (Gate 4 efectivo) | ✅ | `f19f5c1` |
 | **Gate 2.5 completo — copy verbatim COPY_GATE_2_5_PENDIENTE.md** | ✅ | `b852cfe` |
-| **Gate 9 — Audit McKinsey ácido** | ⏸️ | siguiente |
+| **Gate 9 — Audit McKinsey ácido + risks render Beat 6** | ✅ | `055583d` |
+| **Enriquecimiento señal específica (Nivel 1 + 2)** | ✅ | `3f8b437` · `a294b77` |
+| **Copy v2 amplificadores (cláusulas con señal específica)** | ✅ | `b0e2fa9` |
+| **Badge FUEGO Beat 6 (count synth + tooltip org-level)** | ✅ | `cc8a74f` · `af22c2f` |
+| **Titulares Beat 1 (Gate 5b)** | ✅ | `c56c94e` |
+| **Apertura / cierre-sobre-ISA (titular)** | ⏸️ | diseño — sin código |
 
 ### Gate 2.5 cerrado (2026-06-08, commit `b852cfe`)
 
@@ -41,7 +46,26 @@ La cascada `Ambiente Sano` fue rearmada de raíz contra el plan §3 (espejo del 
 - **Gate 9 audit** (`055583d`): Beat 6 (`ActoSintesis`) ahora renderiza `risks` (hipótesis "O" de FUEGO_LEGAL/CONCENTRACION_MANDO). Hilo único ✅, diseño coherente (tokens limpios, sin los prohibidos del módulo compliance), Beat 3 sin leak de P-keys. **PENDIENTE copy (surface-only, espera chat de narrativa):** chips `AMPLIFIER_LABEL` con jerga — `"Teatro detectado"` (jerga), `"Silencio con voz externa"`/`"No invitados con rastro externo"` (borderline). NO cablear hasta copy aprobada.
 - **Enriquecimiento señal específica** (Nivel 1 `3f8b437` + Nivel 2 `a294b77`): el refactor a `amplificadoresActivos` había colapsado la señal a "otras señales". Recuperada vía `Amplificador.senal? { producto, alertType, severidad, esCritica }`. Pick = Ley Karin priority, si no mayor `pesoEfectivo` (espejo `resolveDepartmentRiskNarrative` 2a). **Un dominante por amplificador** (no per-depto). Nameable: CONVERGENCIA exit+onb, OTRO_MUNDO exit+onb, SEXTA exit-dominante específico, SEXTA onboarding-dominante solo producto (límite aceptado: el caso grave Ley Karin es siempre exit). **NO persiste** `senalDominante` (schema+backfill diferido). **SIN copy** — el chat de narrativa escribe los strings (ley_karin NO literal en prosa → indicio + `legalBadgeForCountry`) y revalida con gerentes. Invariante: falta dato → cláusula genérica validada (nunca bajo el piso).
 
-7 commits en una sesión, 78/78 tests verde sostenido, tsc 43 errores (idéntico baseline — los pre-existentes en `buildGerenciaRollup.ts:275` etc. son deuda anterior).
+### Cierre copy + badge FUEGO + titulares (2026-06-09/11)
+
+- **Copy v2 amplificadores** (`b0e2fa9`): cableadas las cláusulas con **señal específica** desde `COPY_AMPLIFICADORES_SENAL_ESPECIFICA_v2.md`. `SIGNAL_FRAGMENTS` (9 fragmentos vivos: 5 exit + 4 onb, keyed por alertType canónico). Cláusulas con fallback genérico validado (piso de claridad). AMBOS = fallback neutro (Engine entrega dominante global). TEATRO frase fija. **Chips `AMPLIFIER_LABEL` validados** con gerentes: "Medición sana, comentarios no" / "No respondió, pero hay señales afuera" / "Fuera del estudio, con señales" → la jerga que el Gate 9 marcó queda resuelta.
+- **Badge FUEGO** (`cc8a74f` + fix tooltip org-level `af22c2f`): la pieza diferida del Gate 2.5 entra. `synth.issueCount` (Σ denuncias_12m de deptos en fuego) expuesto por el Engine. `buildFuegoBadge(count)` (Dictionary) — label NEUTRO "Denuncia formal registrada" / "Denuncia formal · {n}" + tooltip **org-level** por count (sin nombrar ley, sin departamento, sin plazos). Slot en `ActoSintesis` gateado por `diagnosticType==='FUEGO_LEGAL'`. NO toca `legalBadgeForCountry`.
+- **Titulares Beat 1 (Gate 5b)** (`c56c94e`): `ActoAmbiente` renderiza `beat1Seed.{factoresTitulares, extremosTitulares}` (copy `COPY_TITULARES_BEAT1.md`). Dos sub-bloques independientes con rama vacía: A factores (voz por banda, sin número 1-5), B extremos (mejor/peor con ISA 0-100). `buildFactoresLine`/`buildExtremosLine`/`buildTitularesBeat1` puros y exportados.
+
+**Baseline cambió: tsc 43 → 0.** El commit `9121b1a` (otra sesión paralela) restauró el productor del rollup por gerencia (`parentGerencia*` en `DepartmentRiskScoreService` + tipo + resolución jerarquía en `route.ts`), eliminando la deuda pre-existente de `buildGerenciaRollup`. **El baseline limpio ahora es 0, no 43.** Mis archivos sin errores; suites cascada **80/80** verde al cierre.
+
+### Apertura / cierre-sobre-ISA — fase diseño (sin código, 2026-06-10/11)
+
+Inventario read-only hecho para diseñar el titular. **Falta implementar** si la Apertura lo necesita:
+- `ISA_NARRATIVES` (`SectionDimensiones/_shared/constants.ts:62`, dashboard) **no está cableado a la cascada** — import nuevo o copy propia.
+- **`dimFoco`** (dimensión raíz no-la-más-baja) **no existe** en `src/`. `InterventionEngine.buildInterventionPlan` consume triggers de dimensión, no entrega una dim raíz.
+- **No hay molde count-based para indicios** — solo `buildFuegoBadge` (denuncia). Indicios = `legalBadgeForCountry` (fijo por país, no count).
+- Count org de indicios/denuncias **se deriva** (sumar `rollupsPerGerencia[].leyKarin.signalsCount` / `riskScores[].inputs.denuncias_12m`) — no hay campo org.
+- **Clasificador canónico para "dimensión crítica" = `classifyDimensionLevel` (<2.0, 4 niveles)**, NO `classifyRisk` (<2.5, 3 niveles, ese es del safetyScore del departamento). No confundir: en 2.0-2.5 la palabra mentiría.
+
+---
+
+12 commits de cascada en total, 80/80 tests verde sostenido, **tsc 0 (baseline limpio post-`9121b1a`)**.
 
 ## Archivos clave creados / modificados
 
