@@ -196,16 +196,20 @@ export const ISA_LABELS: Record<
   ISARiskLevel,
   { label: string; descripcion: string }
 > = {
+  // Gate 1.5 (A) — léxico canónico unificado al de classifyIsa / ISA_NARRATIVES
+  // (Sano / Atención / Riesgo / Crítico). Solo cambian los `label` visibles; las
+  // KEYS del union (saludable/observacion) y `getISARiskLevel` quedan intactas
+  // (consumidores de banda/gauge/lógica sin tocar — opción A "evitando riesgos").
   saludable: {
-    label: 'Saludable',
+    label: 'Sano',
     descripcion: 'El ambiente funciona. Monitorear.',
   },
   observacion: {
-    label: 'En observación',
+    label: 'Atención',
     descripcion: 'Hay señales. No ignorar.',
   },
   riesgo: {
-    label: 'En riesgo',
+    label: 'Riesgo',
     descripcion: 'Problemas confirmados. Actuar.',
   },
   critico: {
