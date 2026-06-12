@@ -67,11 +67,9 @@ export interface TriageInstance {
   silencio: number;
   /** Driver voz_externa del peor dept → se narra como "señales". */
   senales: number;
-  /** Composición breve del score, términos en cero omitidos:
-   *  "silencio 50 + señales 25" · "silencio 50" · "" (defensivo). */
-  composicion: string;
   /** Nombre crudo del peor dept SOLO si la gerencia tiene >1 hijo. null si
-   *  standalone / 1 hijo (la gerencia ES el dept que define el score). */
+   *  standalone / 1 hijo (la gerencia ES el dept que define el score).
+   *  En el acto 2c se narra como "el foco" (Gate 2c §1). */
   viaWorstDept: string | null;
   /** Id del peor dept (el que define el score). Para dedupe de Sexta/OTRO MUNDO. */
   worstDeptId: string;
@@ -91,6 +89,11 @@ export interface TriageGroup {
   /** `{familyLabel} · {lecturaKicker}` — el kicker uppercase del grupo. */
   kicker: string;
   count: number;
+  /** Gate 2c §2 — true si count>1 y TODAS las instancias comparten el mismo
+   *  score. El render factoriza el número al kicker y lista solo nombres. */
+  homogeneous: boolean;
+  /** Score compartido cuando homogeneous; null si no. */
+  sharedScore: number | null;
   instances: TriageInstance[];
   /** Narrativa del TIPO, UNA vez. Singular = verbatim del dictionary; plural =
    *  adaptación gramatical APROBADA (solo número), ver NARRATIVA_PLURAL. */
@@ -185,21 +188,29 @@ export function lecturaKeyOf(n: DepartmentRiskNarrative): TriageLecturaKey {
   return n.state as TriageLecturaKey;
 }
 
-/** Composición breve del score — términos en cero omitidos. */
-export function buildComposicion(silencio: number, senales: number): string {
-  const parts: string[] = [];
-  if (silencio > 0) parts.push(`silencio ${silencio}`);
-  if (senales > 0) parts.push(`señales ${senales}`);
-  return parts.join(' + ');
+/** Línea de instancia (acto, grupo NO homogéneo). Gate 2c §1: idioma de gerente
+ *  — unidad y escala siempre presentes; la composición aritmética vive SOLO en
+ *  el modal. "el foco" reemplaza a "vía". El render reconstruye esto con sus
+ *  tramos coloreados (nombre title-cased en display). */
+export function triageInstanceLine(inst: TriageInstance): string {
+  let line = `${inst.gerenciaName} · riesgo ${inst.score} de 100`;
+  if (inst.viaWorstDept) line += ` — el foco: ${inst.viaWorstDept}`;
+  return line;
 }
 
-/** Texto completo de la línea de instancia (oráculo de verbatim para tests).
- *  El render JSX reconstruye exactamente esto con sus tramos coloreados. */
-export function triageInstanceLine(inst: TriageInstance): string {
-  let line = `${inst.gerenciaName} · ${inst.score}`;
-  if (inst.composicion.length > 0) line += ` — ${inst.composicion}`;
-  if (inst.viaWorstDept) line += ` — vía ${inst.viaWorstDept}`;
-  return line;
+/** Nombre de instancia para la línea corrida del grupo homogéneo (Gate 2c §2):
+ *  solo el nombre, con `(foco: {worstDept})` cuando aplique. Sin score (va al
+ *  kicker factorizado). */
+export function triageInstanceName(inst: TriageInstance): string {
+  return inst.viaWorstDept
+    ? `${inst.gerenciaName} (foco: ${inst.viaWorstDept})`
+    : inst.gerenciaName;
+}
+
+/** Kicker factorizado del grupo homogéneo (Gate 2c §2):
+ *  `{kicker} · {n} gerencias · riesgo {score} de 100 cada una`. */
+export function triageFactoredKicker(group: TriageGroup): string {
+  return `${group.kicker} · ${group.count} gerencias · riesgo ${group.sharedScore} de 100 cada una`;
 }
 
 /** Intro conectora APROBADA (copy §2a-3). {pct} = personResponseRate. */
@@ -215,11 +226,11 @@ export function buildTriageIntro(
   );
 }
 
-/** Link del grupo al modal 2b. */
+/** Link del grupo al modal 2b (Gate 2c §3 — texto corto). */
 function buildGroupLink(count: number): string {
   return count > 1
     ? `Ver las ${count} y sus departamentos →`
-    : 'Ver gerencia y sus departamentos →';
+    : 'Ver departamentos →';
 }
 
 /** Línea "no es parejo" — migrada del Beat 1 (`buildExtremosLine`) con guard
@@ -271,8 +282,7 @@ export function buildTriageGroups(data: ComplianceReportResponse): TriageActo {
       score: rollup.riesgo.maxScore,
       silencio,
       senales,
-      composicion: buildComposicion(silencio, senales),
-      // "vía" SOLO cuando el peor dept es un hijo genuino — no la gerencia
+      // "vía/foco" SOLO cuando el peor dept es un hijo genuino — no la gerencia
       // misma. En el merge de ancestro (Comercial: gerencia level-2 invitada
       // directa Y con hijos) el worstDept ES la gerencia (groupId === deptId);
       // anotar "vía Gerencia Comercial" sería "vía sí misma". Se suprime.
@@ -299,6 +309,8 @@ export function buildTriageGroups(data: ComplianceReportResponse): TriageActo {
     const familyLabel = FAMILY_LABEL[family];
     const lecturaKicker = LECTURA_KICKER[key];
     const count = instances.length;
+    const homogeneous =
+      count > 1 && instances.every((i) => i.score === instances[0].score);
     groups.push({
       key,
       family,
@@ -306,6 +318,8 @@ export function buildTriageGroups(data: ComplianceReportResponse): TriageActo {
       lecturaKicker,
       kicker: `${familyLabel} · ${lecturaKicker}`,
       count,
+      homogeneous,
+      sharedScore: homogeneous ? instances[0].score : null,
       instances,
       narrativa: count > 1 ? NARRATIVA_PLURAL[key] : instances[0].narrativaVerbatim,
       link: buildGroupLink(count),
@@ -323,9 +337,12 @@ export function buildTriageGroups(data: ComplianceReportResponse): TriageActo {
   }
 
   // ── Hero (coverageGapPct, dept-level) ───────────────────────────────────
+  // Gate 2c §4: el sub-label aclara que el universo es el MAPA dept-level
+  // (distinto del {pct} person-level de la intro).
   const coverageGapPct = 100 - (data.data.coverage?.pctCobertura ?? 100);
-  const heroLabel =
-    coverageGapPct === 100 ? 'en silencio total' : 'sin voz medible';
+  const heroLabel = `del mapa de gerencias, ${
+    coverageGapPct === 100 ? 'en silencio total' : 'sin voz medible'
+  }`;
   const subParts = [
     counts.fuego > 0 ? `${counts.fuego} en fuego` : null,
     counts.humo > 0 ? `${counts.humo} en humo` : null,

@@ -113,14 +113,16 @@ export function formatDepartmentName(name: string): string {
   return trimmed
     .split(/\s+/)
     .map((word, idx) => {
+      const lower = word.toLowerCase()
+      // Preposiciones en minúscula si no es la primera palabra. GANA sobre el
+      // heurístico de acrónimo: "DE"/"LA"/"EL" en mayúscula NO son acrónimos
+      // ("GERENCIA DE PERSONAS" → "Gerencia de Personas", no "Gerencia DE Personas").
+      if (idx > 0 && PREPOSITIONS_LC.has(lower)) {
+        return lower
+      }
       // Preservar acrónimos cortos en mayúscula (TI, RRHH, IT, ...).
       if (word.length >= 1 && word.length <= 4 && ACRONYM_RE.test(word)) {
         return word
-      }
-      const lower = word.toLowerCase()
-      // Preposiciones en minúscula si no es la primera palabra.
-      if (idx > 0 && PREPOSITIONS_LC.has(lower)) {
-        return lower
       }
       // Title case por palabra (preserva tildes ya escritas en el lower-cased input).
       return lower.charAt(0).toUpperCase() + lower.slice(1)

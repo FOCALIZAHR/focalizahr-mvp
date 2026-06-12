@@ -9,11 +9,9 @@
 import { prisma } from '@/lib/prisma';
 import { computeCoverageAnalysis } from '@/lib/services/compliance/CoverageAnalysisService';
 import { computeDepartmentRiskScores } from '@/lib/services/compliance/DepartmentRiskScoreService';
-import {
-  buildTriageGroups,
-  triageInstanceLine,
-} from '@/lib/services/compliance/buildTriageGroups';
+import { buildTriageGroups } from '@/lib/services/compliance/buildTriageGroups';
 import { buildTriageModal } from '@/lib/services/compliance/buildTriageModal';
+import { formatDepartmentName } from '@/lib/utils/formatName';
 import { computeOtroMundo } from '@/lib/services/compliance/CoverageAnalysisService';
 import { detectSilencioConVozExterna } from '@/lib/services/compliance/detectSilencioConVozExterna';
 import { SILENCIO_PESO_MIN } from '@/lib/services/compliance/ComplianceAlertService';
@@ -108,10 +106,28 @@ async function main() {
   if (acto.hero.sub) console.log(`   ${acto.hero.sub}`);
   console.log(`\n${L}\nINTRO:\n  ${acto.intro}\n${L}\n`);
 
+  // Display = nombres title-cased (Rule 6, render real); el resto del oráculo igual.
+  const fmt = formatDepartmentName;
   for (const g of acto.groups) {
-    console.log(`▸ ${g.kicker}${g.count > 1 ? `   (${g.count})` : ''}`);
-    for (const inst of g.instances) {
-      console.log(`    ${triageInstanceLine(inst)}`);
+    if (g.homogeneous) {
+      console.log(
+        `▸ ${g.kicker} · ${g.count} gerencias · riesgo ${g.sharedScore} de 100 cada una`,
+      );
+      console.log(
+        `    ${g.instances
+          .map((i) =>
+            i.viaWorstDept
+              ? `${fmt(i.gerenciaName)} (foco: ${fmt(i.viaWorstDept)})`
+              : fmt(i.gerenciaName),
+          )
+          .join(', ')}`,
+      );
+    } else {
+      console.log(`▸ ${g.kicker}`);
+      for (const i of g.instances) {
+        const foco = i.viaWorstDept ? ` — el foco: ${fmt(i.viaWorstDept)}` : '';
+        console.log(`    ${fmt(i.gerenciaName)} · riesgo ${i.score} de 100${foco}`);
+      }
     }
     console.log(`    «${g.narrativa}»`);
     console.log(`    ${g.link}\n`);

@@ -199,18 +199,24 @@ test('A3. buildSenalesText — slot legal en prosa; denuncia ≠ indicio, JAMÁS
   assert.equal(buildSenalesText(mkRiskScore({ departmentId: 'z' }), 'CL'), null);
 });
 
-test('A4. buildDeclararonText — con_isa formato canónico "ISA {n} · {Nivel}"', () => {
+test('A4. buildDeclararonText — abre con participación (§2c-5); con_isa "ISA {n} · {Nivel}"', () => {
   const conIsa = mkRiskScore({ departmentId: 'ci', bucket: 'con_isa' });
-  const rollup = { isa: { weighted: 72 } } as unknown as GerenciaRollup;
+  const rollup = {
+    isa: { weighted: 72 },
+    silencio: { participationRate: 0.65 },
+  } as unknown as GerenciaRollup;
   assert.equal(
     buildDeclararonText(conIsa, rollup),
-    'El equipo sí dejó lectura interna: ISA 72 · Atención.',
+    'Participación: 65% — ISA 72 · Atención',
   );
-  // sub_threshold → "Nada medible…"
+  // sub_threshold con participación 0 → "Participación: 0% — Nada medible…"
   const sub = mkRiskScore({ departmentId: 's', bucket: 'sub_threshold' });
   assert.equal(
-    buildDeclararonText(sub, { isa: { weighted: null } } as unknown as GerenciaRollup),
-    'Nada medible este ciclo: el equipo no alcanzó el mínimo de respuestas para una lectura interna.',
+    buildDeclararonText(sub, {
+      isa: { weighted: null },
+      silencio: { participationRate: 0 },
+    } as unknown as GerenciaRollup),
+    'Participación: 0% — Nada medible este ciclo: el equipo no alcanzó el mínimo de respuestas para una lectura interna.',
   );
 });
 
@@ -234,7 +240,7 @@ test('B1. individual — estructura §2b completa + veredicto singular', () => {
   );
   assert.equal(
     b.declararon,
-    'Nada medible este ciclo: el equipo no alcanzó el mínimo de respuestas para una lectura interna.',
+    'Participación: 0% — Nada medible este ciclo: el equipo no alcanzó el mínimo de respuestas para una lectura interna.',
   );
   assert.equal(
     b.senales,

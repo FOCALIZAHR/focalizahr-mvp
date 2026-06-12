@@ -19,8 +19,9 @@
 
 import { memo, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ActSeparator, SubtleLink, fadeIn, fadeInDelay } from './shared';
+import { ActSeparator, fadeIn, fadeInDelay } from './shared';
 import {
   buildTriageGroups,
   type TriageFamily,
@@ -95,55 +96,75 @@ export default memo(function ActoTriage({ data }: ActoTriageProps) {
           {acto.intro}
         </motion.p>
 
-        {/* Grupos por lectura — sin cards. */}
+        {/* Grupos por lectura — sin cards. Más aire ENTRE grupos (§3). */}
         {acto.groups.length > 0 && (
-          <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-10">
+          <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-14">
             {acto.groups.map((g) => (
               <div key={g.key}>
-                {/* Kicker: {FAMILIA} · {lectura} + count si >1. */}
-                <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-3">
-                  {g.kicker}
-                  {g.count > 1 && (
-                    <span className="text-slate-600"> · {g.count}</span>
+                {/* Kicker — color de familia, peso 500, un punto más grande (§3).
+                    Homogéneo: número factorizado al kicker (§2). */}
+                <p
+                  className={cn(
+                    'text-xs uppercase tracking-widest font-medium mb-3',
+                    FAMILY_TEXT[g.family],
                   )}
+                >
+                  {g.homogeneous
+                    ? `${g.kicker} · ${g.count} gerencias · riesgo ${g.sharedScore} de 100 cada una`
+                    : g.kicker}
                 </p>
 
-                {/* Instancias: {Gerencia} · {score} — composición (color familia). */}
-                <div className="space-y-1.5 mb-4">
-                  {g.instances.map((inst) => (
-                    <p
-                      key={inst.gerenciaId}
-                      className="text-sm leading-relaxed tabular-nums"
-                    >
-                      <span className="font-medium text-slate-200">
-                        {formatDepartmentName(inst.gerenciaName)}
-                      </span>
-                      <span className={cn('font-light', FAMILY_TEXT[g.family])}>
-                        {' · '}
-                        {inst.score}
-                        {inst.composicion.length > 0 && ` — ${inst.composicion}`}
-                      </span>
-                      {inst.viaWorstDept && (
-                        <span className="font-light text-slate-500">
-                          {' — vía '}
-                          {formatDepartmentName(inst.viaWorstDept)}
+                {/* Instancias (§1/§2) */}
+                {g.homogeneous ? (
+                  // Línea corrida de nombres — el score ya está en el kicker.
+                  <p className="text-sm font-light text-slate-300 leading-relaxed mb-4">
+                    {g.instances
+                      .map((inst) =>
+                        inst.viaWorstDept
+                          ? `${formatDepartmentName(inst.gerenciaName)} (foco: ${formatDepartmentName(inst.viaWorstDept)})`
+                          : formatDepartmentName(inst.gerenciaName),
+                      )
+                      .join(', ')}
+                  </p>
+                ) : (
+                  <div className="space-y-1.5 mb-4">
+                    {g.instances.map((inst) => (
+                      <p
+                        key={inst.gerenciaId}
+                        className="text-sm leading-relaxed tabular-nums"
+                      >
+                        <span className="font-medium text-slate-200">
+                          {formatDepartmentName(inst.gerenciaName)}
                         </span>
-                      )}
-                    </p>
-                  ))}
-                </div>
+                        <span className={cn('font-light', FAMILY_TEXT[g.family])}>
+                          {' · riesgo '}
+                          {inst.score}
+                          {' de 100'}
+                        </span>
+                        {inst.viaWorstDept && (
+                          <span className="font-light text-slate-500">
+                            {' — el foco: '}
+                            {formatDepartmentName(inst.viaWorstDept)}
+                          </span>
+                        )}
+                      </p>
+                    ))}
+                  </div>
+                )}
 
                 {/* Narrativa del tipo — UNA vez (verbatim / plural adaptado). */}
                 <p className="text-sm font-light text-slate-300 leading-relaxed">
                   {g.narrativa}
                 </p>
 
-                {/* Link al modal 2b. */}
-                <div className="mt-3">
-                  <SubtleLink onClick={() => setOpenKey(g.key)}>
-                    {linkLabel(g.link)}
-                  </SubtleLink>
-                </div>
+                {/* Link al modal 2b — atenuado (slate), flecha cyan (§3). */}
+                <button
+                  onClick={() => setOpenKey(g.key)}
+                  className="group mt-3 inline-flex items-center gap-1.5 text-sm font-light text-slate-400 hover:text-slate-300 transition-colors"
+                >
+                  {linkLabel(g.link)}
+                  <ArrowRight className="w-3.5 h-3.5 text-cyan-400 group-hover:translate-x-0.5 transition-transform" />
+                </button>
               </div>
             ))}
           </motion.div>

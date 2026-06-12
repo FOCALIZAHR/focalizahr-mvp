@@ -22,8 +22,9 @@ import assert from 'node:assert/strict';
 import {
   buildTriageGroups,
   buildTriageIntro,
-  buildComposicion,
   triageInstanceLine,
+  triageInstanceName,
+  triageFactoredKicker,
   buildTriageExtremosLine,
 } from './buildTriageGroups';
 import {
@@ -200,17 +201,6 @@ test('B. drift-guard: lecturas singulares verbatim del dictionary no cambiaron',
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// C — buildComposicion (omisión de términos en cero)
-// ═══════════════════════════════════════════════════════════════════
-
-test('C. buildComposicion — omite términos en cero', () => {
-  assert.equal(buildComposicion(50, 25), 'silencio 50 + señales 25');
-  assert.equal(buildComposicion(50, 0), 'silencio 50');
-  assert.equal(buildComposicion(0, 25), 'señales 25');
-  assert.equal(buildComposicion(0, 0), '');
-});
-
-// ═══════════════════════════════════════════════════════════════════
 // D — FIXTURE SINTÉTICO (topología del caso real)
 // ═══════════════════════════════════════════════════════════════════
 
@@ -334,16 +324,17 @@ test('D2. HUMO/A-legal — merge de ancestro suprime "vía" + narrativa singular
   )!;
   assert.equal(g.kicker, 'EN HUMO · Señal legal tras el silencio');
   assert.equal(g.count, 1);
+  assert.equal(g.homogeneous, false); // count 1 → no factoriza
   assert.equal(
     triageInstanceLine(g.instances[0]),
-    'Gerencia Comercial · 75 — silencio 50 + señales 25',
+    'Gerencia Comercial · riesgo 75 de 100',
   );
   assert.equal(g.instances[0].viaWorstDept, null);
   assert.equal(
     g.narrativa,
     'El equipo guarda silencio masivo en los canales oficiales, pero quien se fue dejó una señal de Ley Karin. Esto no es rotación: es un riesgo jurídico en formación, del tipo que suele preceder a una denuncia formal. Actuar sobre la señal ahora es lo que separa la prevención de un pasivo legal activo.',
   );
-  assert.equal(g.link, 'Ver gerencia y sus departamentos →');
+  assert.equal(g.link, 'Ver departamentos →');
 });
 
 test('D3. HUMO/B — hijo genuino emite "vía" + narrativa singular', () => {
@@ -353,24 +344,28 @@ test('D3. HUMO/B — hijo genuino emite "vía" + narrativa singular', () => {
   assert.equal(g.kicker, 'EN HUMO · Fricción en la entrada');
   assert.equal(
     triageInstanceLine(g.instances[0]),
-    'GERENCIA DE PERSONAS · 85 — silencio 50 + señales 35 — vía Subgerencia de Cultura y DO',
+    'GERENCIA DE PERSONAS · riesgo 85 de 100 — el foco: Subgerencia de Cultura y DO',
   );
   assert.equal(g.instances[0].viaWorstDept, 'Subgerencia de Cultura y DO');
 });
 
-test('D4. PUNTO_CIEGO — plural + omisión "señales 0" + vía mixto + orden', () => {
+test('D4. PUNTO_CIEGO — homogéneo (mismo score) factoriza + línea corrida', () => {
   const g = buildTriageGroups(realLikeReport()).groups.find(
     (x) => x.key === 'PUNTO_CIEGO',
   )!;
   assert.equal(g.count, 2);
   assert.equal(g.kicker, 'PUNTO CIEGO · Gestión sin radar');
-  // Orden: ambos score 50 → alfabético (Finanzas antes que Operaciones).
+  // Ambos score 50 → homogéneo: el número se factoriza al kicker (§2).
+  assert.equal(g.homogeneous, true);
+  assert.equal(g.sharedScore, 50);
+  assert.equal(
+    triageFactoredKicker(g),
+    'PUNTO CIEGO · Gestión sin radar · 2 gerencias · riesgo 50 de 100 cada una',
+  );
+  // Instancias = solo nombres, con (foco: …) cuando aplique. Orden alfabético.
   assert.deepEqual(
-    g.instances.map((i) => triageInstanceLine(i)),
-    [
-      'Gerencia de Finanzas · 50 — silencio 50',
-      'Gerencia de Operaciones · 50 — silencio 50 — vía Seguridad',
-    ],
+    g.instances.map((i) => triageInstanceName(i)),
+    ['Gerencia de Finanzas', 'Gerencia de Operaciones (foco: Seguridad)'],
   );
   // Narrativa PLURAL (count>1) — adaptación gramatical aprobada.
   assert.equal(
@@ -380,10 +375,29 @@ test('D4. PUNTO_CIEGO — plural + omisión "señales 0" + vía mixto + orden', 
   assert.equal(g.link, 'Ver las 2 y sus departamentos →');
 });
 
+test('D4b. PUNTO_CIEGO — scores distintos → NO factoriza (líneas normales)', () => {
+  // Operaciones worst sube a 60 → scores difieren (Finanzas 50 vs Operaciones 60).
+  const base = realLikeReport();
+  const rs = base.data.riskScores!;
+  const seg = rs.find((r) => r.departmentId === 'ops-seg')!;
+  seg.score = 60;
+  const g = buildTriageGroups(base).groups.find((x) => x.key === 'PUNTO_CIEGO')!;
+  assert.equal(g.homogeneous, false);
+  assert.equal(g.sharedScore, null);
+  // Orden por score desc: Operaciones (60) antes que Finanzas (50).
+  assert.deepEqual(
+    g.instances.map((i) => triageInstanceLine(i)),
+    [
+      'Gerencia de Operaciones · riesgo 60 de 100 — el foco: Seguridad',
+      'Gerencia de Finanzas · riesgo 50 de 100',
+    ],
+  );
+});
+
 test('D5. hero + intro + extremos guard', () => {
   const acto = buildTriageGroups(realLikeReport());
   assert.equal(acto.hero.number, '82%');
-  assert.equal(acto.hero.label, 'sin voz medible');
+  assert.equal(acto.hero.label, 'del mapa de gerencias, sin voz medible');
   assert.equal(acto.hero.sub, '2 en humo · 2 punto ciego');
   // conVoz=2 (Comercial+Personas), total=4 gerencias (Comercial, Personas,
   // Finanzas, Operaciones), mudas=2; pct = 10/50 = 20%.

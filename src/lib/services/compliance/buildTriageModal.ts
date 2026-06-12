@@ -154,19 +154,23 @@ export function buildDriversText(
   return parts.join(' ');
 }
 
-/** §2b-4 — lo declarado. ISA al lado SOLO en con_isa (regla de buckets). */
+/** §2b-4 — lo declarado. Gate 2c §5: abre con `Participación: {pct}% — `
+ *  (pct = participación de la gerencia, rollup-level). ISA al lado SOLO en
+ *  con_isa (regla de buckets). */
 export function buildDeclararonText(
   worstRs: DepartmentRiskScore,
   rollup: GerenciaRollup,
 ): string {
+  const pct = Math.round((rollup.silencio.participationRate ?? 0) * 100);
+  const prefijo = `Participación: ${pct}% — `;
   if (worstRs.bucket === 'con_isa' && rollup.isa.weighted !== null) {
     const isa = Math.round(rollup.isa.weighted);
     const band = ISA_NARRATIVES[classifyIsa(isa)].badge;
-    // Formato canónico N · Label (decisión Victor #copy). FLAG: sin caso real
-    // que lo ejercite — revisar cuando aparezca una gerencia con_isa.
-    return `El equipo sí dejó lectura interna: ISA ${isa} · ${band}.`;
+    // Formato canónico N · Label. FLAG: sin caso real que lo ejercite —
+    // revisar cuando aparezca una gerencia con_isa.
+    return `${prefijo}ISA ${isa} · ${band}`;
   }
-  return DECLARARON_NADA;
+  return `${prefijo}${DECLARARON_NADA}`;
 }
 
 /** §2b-5 — lo que dicen las señales. Slot legal canónico; denuncia ≠ indicio,
