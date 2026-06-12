@@ -22,10 +22,8 @@
 
 import { buildGerenciaRollup } from './buildGerenciaRollup';
 import { classifyD4, deriveBeat1Slots } from './deriveBeat1Slots';
-import {
-  DIMENSION_CEO_LABELS,
-  type ComplianceDimensionKey,
-} from '@/config/narratives/ComplianceNarrativeDictionary';
+import { computeOrgDimensions } from './orgDimensions';
+import { DIMENSION_CEO_LABELS } from '@/config/narratives/ComplianceNarrativeDictionary';
 import {
   PESO_BASE_ALERTA,
   ALERTAS_CRITICAS,
@@ -244,36 +242,14 @@ export class AmbienteRiskOrchestrator {
   private static buildOrgDimensionAverages(
     data: AmbienteRiskData,
   ): FactorTitular[] {
-    const DIM_KEYS: ComplianceDimensionKey[] = [
-      'P2_seguridad',
-      'P3_disenso',
-      'P4_microagresiones',
-      'P5_equidad',
-      'P7_liderazgo',
-      'P8_agotamiento',
-    ];
-
-    const result: FactorTitular[] = [];
-    for (const key of DIM_KEYS) {
-      let weightedSum = 0;
-      let totalWeight = 0;
-      for (const dept of data.scoresPerDept) {
-        const v = dept.dimensionScores?.[key];
-        const w = dept.respondentCount ?? 0;
-        if (typeof v === 'number' && w > 0) {
-          weightedSum += v * w;
-          totalWeight += w;
-        }
-      }
-      if (totalWeight > 0) {
-        result.push({
-          dimensionKey: key,
-          labelCEO: DIMENSION_CEO_LABELS[key],
-          valor: weightedSum / totalWeight,
-        });
-      }
-    }
-    return result;
+    // Gate 3 §8 — migrado al helper compartido `computeOrgDimensions` (fuente
+    // única; mismo cómputo: ponderado por respondentCount, omite Σw=0). Solo se
+    // adapta la shape de salida al contrato del consumidor (FactorTitular).
+    return computeOrgDimensions(data.scoresPerDept).map((d) => ({
+      dimensionKey: d.key,
+      labelCEO: DIMENSION_CEO_LABELS[d.key],
+      valor: d.valor,
+    }));
   }
 
   /** Factores titulares según banda ISA (regla del MAPA, §3.6):
