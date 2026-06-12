@@ -46,6 +46,19 @@ La cascada `Ambiente Sano` fue rearmada de raíz contra el plan §3 (espejo del 
 | **Gate 2 Triage — investigación 0a-0e + datos reales** | ✅ (read-only, sin cablear) | `10421c1` |
 | **Gate 2a Triage — el acto (grupos narrativos)** | ✅ (visto Victor) | `8dbfb2c` |
 | **Gate 2b Triage — modal "ver más"** | ✅ (visto Victor) | `b16f75b` |
+| **Gate 2c Triage — pulido acto + modal** | ✅ (visto Victor) | `f37a0a2` |
+
+### Gate 2c (Triage) — cerrado (2026-06-12, `f37a0a2`)
+
+Pulido sobre 2a/2b, sin rediseño (contrato `HANDOFF_GATE_2C_PULIDO_TRIAGE.md`). 6 reglas:
+- **§1 idioma de gerente**: instancia `{Gerencia} · riesgo {n} de 100`; "vía" → `— el foco: {dept}`. La composición aritmética "silencio + señales" SALE del acto (solo en el modal). `buildComposicion` + el campo `composicion` eliminados.
+- **§2 grupo homogéneo** (mismo score): número factorizado al kicker (`triageFactoredKicker`) + nombres en línea corrida (`triageInstanceName` con `(foco: …)`). `TriageGroup.homogeneous`/`sharedScore`. Scores distintos → líneas normales.
+- **§3** kicker color de familia + peso 500 + tamaño; link corto atenuado (slate + flecha cyan); más aire entre grupos.
+- **§4** hero sub-label `del mapa de gerencias, sin voz medible`.
+- **§5** modal: `LO QUE DECLARARON` abre con `Participación: {pct}% — ` (pct = `rollup.silencio.participationRate`).
+- **§6** `formatDepartmentName` (util compartido): preposición en mayúscula (idx>0) NO es acrónimo → "GERENCIA DE PERSONAS" → "Gerencia de Personas". **Bug del util**, fix con dueño = Victor. 6 consumidores, mejora pura. **Test candado** `formatName.test.ts` (5 casos).
+
+Oráculos verbatim actualizados. tsc 0, suites compliance 145/145 + formatName 5/5. **La cadena del Triage (2 → 2a → 2b → 2c) queda cerrada.**
 
 ### Gate 2b (Triage) — cerrado (2026-06-11, `b16f75b`)
 
