@@ -1,7 +1,11 @@
 // scripts/audit-emdashes-cascada.ts
 // READ-ONLY — Inventario de em-dashes (—, U+2014) en COPY VISIBLE de la cascada
-// Ambiente Sano + dictionaries de compliance. Excluye líneas de comentario
-// (// , * , /* ). No modifica nada. Regla nueva: ningún "—" en texto visible.
+// Ambiente Sano + dictionaries de compliance. No modifica nada.
+//
+// Regla afinada (Victor 2026-06-12): prohibido el em-dash COMO PUNTUACIÓN DE
+// PROSA en texto visible; como GLIFO DE SIN-DATO ('—' standalone) se permite.
+// El inventario excluye: comentarios · glifos standalone ('—'/"—"/>—<) ·
+// trazas internas de audit (campo `trigger:`, no visible).
 //
 // Run: npx tsx scripts/audit-emdashes-cascada.ts
 
@@ -99,7 +103,13 @@ for (const rel of FILES) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (!line.includes(EM)) continue;
-    const cleaned = isCommentLine(line) ? '' : stripInlineComments(line);
+    let cleaned = isCommentLine(line) ? '' : stripInlineComments(line);
+    // Glifo de sin-dato standalone ('—' / "—" / >—<) → PERMITIDO, se quita.
+    for (const lit of ["'" + EM + "'", '"' + EM + '"', '>' + EM + '<']) {
+      cleaned = cleaned.split(lit).join('');
+    }
+    // Traza interna de audit (campo trigger:) → NO visible, se excluye.
+    if (cleaned.includes('trigger:')) cleaned = '';
     if (!cleaned.includes(EM)) {
       totalComment += line.split(EM).length - 1;
       continue;
@@ -117,5 +127,5 @@ console.log('INVENTARIO DE EM-DASHES (—) EN COPY VISIBLE — cascada + diction
 console.log('═══════════════════════════════════════════════════════════════');
 console.log(out.join('\n'));
 console.log('\n───────────────────────────────────────────────────────────────');
-console.log(`TOTAL em-dashes en copy visible (no-comentario): ${totalCopy}`);
-console.log(`(Excluidos en comentarios: ${totalComment})`);
+console.log(`TOTAL em-dashes en PROSA visible (a barrer): ${totalCopy}`);
+console.log(`(Excluidos: comentarios + glifos sin-dato + trazas = ${totalComment})`);

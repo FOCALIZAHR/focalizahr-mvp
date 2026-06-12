@@ -57,9 +57,11 @@ Beat 3 completo. Sub-gates: **3a** fundación pura (`dimFoco` doble filtro grave
 
 **Copy verbatim fuente única = `HANDOFF_GATE_3_ANATOMIA.md`** (§4.1 formas, §4.6 cierre, §5 causa raíz). DESPAREJO-plural: "las dos que más caen por debajo de la línea" (corrección Victor, verdadera N≥2).
 
-### GATE SIGUIENTE — barrido de em-dashes (—) en copy visible
+### GATE SIGUIENTE — barrido de em-dashes (—) en prosa visible
 
-**Regla nueva del producto: ningún `—` en texto visible.** Inventario read-only entregado: `.claude/tasks/INVENTARIO_EMDASHES_CASCADA.txt` (script `scripts/audit-emdashes-cascada.ts`) — **51 ocurrencias en copy visible, 10 archivos** (excluye comentarios). La tabla de reemplazos editoriales la entrega el chat de arquitectura; ese barrido es el gate siguiente. Borderline a confirmar: `AmbienteSynthesisEngine.ts:408` (`trigger` = traza de audit, probablemente NO visible) y los literales `'—'` de separador/placeholder (`buildTriageModal.ts:232`, `ActoSintesis.tsx:95`).
+**Regla afinada (Victor 2026-06-12): prohibido el em-dash COMO PUNTUACIÓN DE PROSA en texto visible; como GLIFO DE SIN-DATO (`'—'` standalone) se permite.** Inventario read-only: `.claude/tasks/INVENTARIO_EMDASHES_CASCADA.txt` (script `scripts/audit-emdashes-cascada.ts`) — **48 ocurrencias de prosa a barrer, ~9 archivos** (excluye comentarios + glifos sin-dato + trazas internas). La tabla de reemplazos editoriales la entrega el chat de arquitectura; ese barrido es el gate siguiente.
+
+**Borderline ya resueltos (Victor):** `AmbienteSynthesisEngine.ts:408` (`trigger` audit) EXCLUIDO · `buildTriageModal.ts:232` (`'—'` sin-dato) SE QUEDA · `ActoSintesis.tsx:95` separador → **middot `·` ya aplicado** (`b2d21da`+) · `AmbienteSynthesisDictionary.ts:83` (par parentético `—x—`) ENTRA a la tabla.
 
 ### Gate 2c (Triage) — cerrado (2026-06-12, `f37a0a2`)
 

@@ -92,7 +92,7 @@ export default memo(function ActoSintesis({ data, onIrAlPlan }: ActoSintesisProp
                 key={r.label}
                 className="flex gap-2 text-sm font-light text-slate-400 leading-relaxed"
               >
-                <span className="select-none text-slate-600">—</span>
+                <span className="select-none text-slate-600">·</span>
                 <span>{r.narrative}</span>
               </li>
             ))}
