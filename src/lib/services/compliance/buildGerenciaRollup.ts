@@ -60,6 +60,11 @@ export interface GerenciaRollup {
    *  resoluble). En ese caso groupId tiene prefijo `__dept__:`. */
   standalone: boolean;
   totalChildren: number;
+  /** departmentId de cada hijo del grupo, en orden de aparición. Para que el
+   *  Triage 2b liste "SUS DEPARTAMENTOS" sin re-derivar la agrupación
+   *  (merge de ancestro / standalone). Incluye el dept de la gerencia-misma
+   *  en el caso de merge de ancestro — el consumidor lo excluye si quiere. */
+  childDeptIds: string[];
 
   // ─── ISA gerencial ──────────────────────────────────────────
   isa: {
@@ -322,6 +327,7 @@ export function buildGerenciaRollup(
       groupName: group.groupName,
       standalone: group.standalone,
       totalChildren: group.children.length,
+      childDeptIds: group.children.map((c) => c.rs.departmentId),
       isa: computeIsa(group.children),
       silencio: computeSilencio(group.children),
       exit: computeExit(group.children),

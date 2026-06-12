@@ -17,14 +17,16 @@
 // pre-2a). [DEUDA 2a — visto Victor: confirmar si se mantienen junto a grupos.]
 // Links de grupo abren el modal 2b — INERTES hasta que 2b se construya.
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { ActSeparator, SubtleLink, fadeIn, fadeInDelay } from './shared';
 import {
   buildTriageGroups,
   type TriageFamily,
+  type TriageLecturaKey,
 } from '@/lib/services/compliance/buildTriageGroups';
+import TriageDetailModal from './TriageDetailModal';
 import { formatDepartmentName } from '@/lib/utils/formatName';
 import type { ComplianceReportResponse } from '@/types/compliance';
 
@@ -48,6 +50,8 @@ function linkLabel(link: string): string {
 
 export default memo(function ActoTriage({ data }: ActoTriageProps) {
   const acto = useMemo(() => buildTriageGroups(data), [data]);
+  // Modal "ver más" 2b — qué lectura está abierta (null = cerrado).
+  const [openKey, setOpenKey] = useState<TriageLecturaKey | null>(null);
 
   // Sexta + OTRO MUNDO ya deduplicadas contra los grupos (decisión Victor).
   const sextaItems = acto.sexta;
@@ -134,10 +138,11 @@ export default memo(function ActoTriage({ data }: ActoTriageProps) {
                   {g.narrativa}
                 </p>
 
-                {/* Link al modal 2b — INERTE hasta 2b. */}
+                {/* Link al modal 2b. */}
                 <div className="mt-3">
-                  {/* onClick intencionalmente ausente: el modal 2b lo cablea. */}
-                  <SubtleLink>{linkLabel(g.link)}</SubtleLink>
+                  <SubtleLink onClick={() => setOpenKey(g.key)}>
+                    {linkLabel(g.link)}
+                  </SubtleLink>
                 </div>
               </div>
             ))}
@@ -196,6 +201,15 @@ export default memo(function ActoTriage({ data }: ActoTriageProps) {
           </motion.div>
         )}
       </div>
+
+      {/* Modal "ver más" 2b */}
+      {openKey && (
+        <TriageDetailModal
+          data={data}
+          lecturaKey={openKey}
+          onClose={() => setOpenKey(null)}
+        />
+      )}
     </>
   );
 });

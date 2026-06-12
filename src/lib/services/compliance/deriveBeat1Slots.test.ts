@@ -36,6 +36,7 @@ function mkRollup(
     groupName: overrides.groupName,
     standalone: overrides.standalone ?? false,
     totalChildren: overrides.totalChildren ?? 1,
+    childDeptIds: overrides.childDeptIds ?? [],
     isa: overrides.isa ?? {
       weighted: null,
       min: null,

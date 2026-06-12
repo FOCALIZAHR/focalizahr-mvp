@@ -13,6 +13,7 @@ import {
   buildTriageGroups,
   triageInstanceLine,
 } from '@/lib/services/compliance/buildTriageGroups';
+import { buildTriageModal } from '@/lib/services/compliance/buildTriageModal';
 import { computeOtroMundo } from '@/lib/services/compliance/CoverageAnalysisService';
 import { detectSilencioConVozExterna } from '@/lib/services/compliance/detectSilencioConVozExterna';
 import { SILENCIO_PESO_MIN } from '@/lib/services/compliance/ComplianceAlertService';
@@ -125,6 +126,31 @@ async function main() {
   console.log(`Sexta tras dedupe (${acto.sexta.length}): ${acto.sexta.map((s) => s.departmentName).join(' · ') || '— (banda NO se emite)'}`);
   console.log(`OTRO MUNDO RAW (${otroMundo.length}): ${otroMundo.map((o) => `${o.departmentName} [${o.departmentId}]`).join(' · ') || '—'}`);
   console.log(`OTRO MUNDO tras dedupe (${acto.otroMundo.length}): ${acto.otroMundo.map((o) => o.departmentName).join(' · ') || '— (banda NO se emite)'}`);
+
+  // ── GATE 2b — los dos modales reales ──────────────────────────────────────
+  for (const key of ['HUMO/A-legal', 'PUNTO_CIEGO'] as const) {
+    const modal = buildTriageModal(data, key);
+    console.log(`\n╔══ MODAL 2b · ${key} (mode: ${modal?.mode}) ══╗`);
+    if (!modal) { console.log('  (null)'); continue; }
+    console.log(`  ▸ ${modal.kicker}`);
+    if (modal.mode === 'grupo') {
+      console.log(`  veredicto (1×): «${modal.veredicto}»`);
+    }
+    for (const b of modal.blocks) {
+      console.log(`  ── ${b.gerenciaName} · ${b.score} de riesgo — ${b.scoreNarrada}`);
+      if (b.drivers) console.log(`     drivers: ${b.drivers}`);
+      if (b.declararon) console.log(`     LO QUE DECLARARON: ${b.declararon}`);
+      if (b.senales) console.log(`     LO QUE LAS SEÑALES DICEN: ${b.senales}`);
+      if (modal.mode === 'individual') console.log(`     veredicto: «${modal.veredicto}»`);
+      if (b.departamentos.length > 0) {
+        console.log('     SUS DEPARTAMENTOS:');
+        for (const d of b.departamentos) console.log(`       ${d.departmentName} · ${d.score} ${d.familyLabel}`);
+      } else {
+        console.log('     SUS DEPARTAMENTOS: — (sin sub-departamentos)');
+      }
+    }
+    console.log(`  pie: «${modal.pie}»`);
+  }
 }
 
 main()

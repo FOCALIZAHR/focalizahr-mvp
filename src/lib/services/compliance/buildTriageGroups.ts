@@ -120,7 +120,7 @@ export interface TriageActo {
 // CONSTANTES — labels, orden editorial, kickers provisionales, plurales
 // ════════════════════════════════════════════════════════════════════════════
 
-const FAMILY_LABEL: Record<TriageFamily, string> = {
+export const FAMILY_LABEL: Record<TriageFamily, string> = {
   FUEGO: 'EN FUEGO',
   HUMO: 'EN HUMO',
   PUNTO_CIEGO: 'PUNTO CIEGO',
@@ -141,7 +141,7 @@ const LECTURA_ORDER: Record<TriageLecturaKey, number> = {
 /** Títulos de lectura PROVISIONALES (el dictionary no los trae). Propuestos
  *  para visto de Victor. Derivados del cuerpo de cada narrativa (excepto los
  *  dos del mockup: A-legal y B). */
-const LECTURA_KICKER: Record<TriageLecturaKey, string> = {
+export const LECTURA_KICKER: Record<TriageLecturaKey, string> = {
   FUEGO: 'Denuncia formal registrada', // reusa label aprobado de buildFuegoBadge
   'HUMO/A-legal': 'Señal legal tras el silencio', // mockup
   'HUMO/A': 'Fuga de talento en gestación',
@@ -178,7 +178,7 @@ const NARRATIVA_PLURAL: Record<TriageLecturaKey, string> = {
 // ════════════════════════════════════════════════════════════════════════════
 
 /** Clave de lectura desde la narrativa per-dept. HUMO → `HUMO/${rama}`. */
-function lecturaKeyOf(n: DepartmentRiskNarrative): TriageLecturaKey {
+export function lecturaKeyOf(n: DepartmentRiskNarrative): TriageLecturaKey {
   if (n.state === 'HUMO') {
     return `HUMO/${n.rama ?? 'A'}` as TriageLecturaKey;
   }
