@@ -57,7 +57,15 @@ Beat 3 completo. Sub-gates: **3a** fundación pura (`dimFoco` doble filtro grave
 
 **Copy verbatim fuente única = `HANDOFF_GATE_3_ANATOMIA.md`** (§4.1 formas, §4.6 cierre, §5 causa raíz). DESPAREJO-plural: "las dos que más caen por debajo de la línea" (corrección Victor, verdadera N≥2).
 
-### GATE SIGUIENTE — barrido de em-dashes (—) en prosa visible
+### Barrido de em-dashes (—) en prosa visible — CERRADO (`4e404b9`)
+
+48 reemplazos verbatim de `TABLA_EMDASHES_BARRIDO.md` aplicados (10 archivos). Auditoría en **0** (`scripts/audit-emdashes-cascada.ts` queda como verificación permanente — debe seguir en 0). tsc 0, 205/205. **Regla del producto vigente:** ningún `—` como puntuación de prosa en texto visible; glifo de sin-dato (`'—'` standalone) permitido. Decisiones: conector mov3 (render L777 + oráculo `mov3ToText` L599) = `:` en AMBOS (invariante render=oráculo; el mapeo `·/:` de la tabla era inconsistente). `ComplianceNarrativeDictionary.ts:218` ("cuando entre") = **flag de typo preexistente para Victor**, NO tocado.
+
+### PRÓXIMO BEAT — La Voz (Beat 4) — DISEÑO PENDIENTE
+
+NO abrir todavía: el diseño de La Voz viene del chat de arquitectura. El `ActoVoz.tsx` actual (Gate 7) es el estado legacy a reemplazar cuando llegue el diseño.
+
+### (histórico) Inventario de em-dashes — insumo del barrido ya cerrado
 
 **Regla afinada (Victor 2026-06-12): prohibido el em-dash COMO PUNTUACIÓN DE PROSA en texto visible; como GLIFO DE SIN-DATO (`'—'` standalone) se permite.** Inventario read-only: `.claude/tasks/INVENTARIO_EMDASHES_CASCADA.txt` (script `scripts/audit-emdashes-cascada.ts`) — **48 ocurrencias de prosa a barrer, ~9 archivos** (excluye comentarios + glifos sin-dato + trazas internas). La tabla de reemplazos editoriales la entrega el chat de arquitectura; ese barrido es el gate siguiente.
 
