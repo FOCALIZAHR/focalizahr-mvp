@@ -47,6 +47,19 @@ La cascada `Ambiente Sano` fue rearmada de raíz contra el plan §3 (espejo del 
 | **Gate 2a Triage — el acto (grupos narrativos)** | ✅ (visto Victor) | `8dbfb2c` |
 | **Gate 2b Triage — modal "ver más"** | ✅ (visto Victor) | `b16f75b` |
 | **Gate 2c Triage — pulido acto + modal** | ✅ (visto Victor) | `f37a0a2` |
+| **Gate 3a Anatomía — fundación dimFoco + display** | ✅ (puro) | `ffcd73e` |
+| **Gate 3b Anatomía — el acto** | ✅ (visto Victor) | `5b78834` |
+| **Gate 3c Anatomía — modal + shell común** | ✅ (visto Victor) | `adc15a5` |
+
+### Gate 3 (Anatomía) — cerrado (2026-06-12, `ffcd73e`/`5b78834`/`adc15a5`)
+
+Beat 3 completo. Sub-gates: **3a** fundación pura (`dimFoco` doble filtro gravedad→precedencia P2>P7>P3>P5>P4>P8 + `toDisplay100` 1–5→0–100, ambos en `orgDimensions.ts`); **3b** el acto (`buildAnatomia`: selector de forma DESPAREJO/+singular/TODO BAJO/TODO SANO + foco llano cyan + ⓘ + causa raíz §5 + listado por gravedad/precedencia + escala + cierre; `ActoAnatomia` reescrito, paleta §7 **violet eliminado**, hero del hallazgo; §8 migración Orchestrator+ActoAnatomia → `computeOrgDimensions`); **3c** modal (`buildAnatomiaModal` headline+body verbatim del motor; `AnatomiaDetailModal` con barra 3px+tick 75, headline cursiva; **`CascadaModalShell` extraído** — shell común heredado por Triage+Anatomía modales). Caso real cmob0e56 = TODO BAJO, foco P2. tsc 0, compliance 205/205.
+
+**Copy verbatim fuente única = `HANDOFF_GATE_3_ANATOMIA.md`** (§4.1 formas, §4.6 cierre, §5 causa raíz). DESPAREJO-plural: "las dos que más caen por debajo de la línea" (corrección Victor, verdadera N≥2).
+
+### GATE SIGUIENTE — barrido de em-dashes (—) en copy visible
+
+**Regla nueva del producto: ningún `—` en texto visible.** Inventario read-only entregado: `.claude/tasks/INVENTARIO_EMDASHES_CASCADA.txt` (script `scripts/audit-emdashes-cascada.ts`) — **51 ocurrencias en copy visible, 10 archivos** (excluye comentarios). La tabla de reemplazos editoriales la entrega el chat de arquitectura; ese barrido es el gate siguiente. Borderline a confirmar: `AmbienteSynthesisEngine.ts:408` (`trigger` = traza de audit, probablemente NO visible) y los literales `'—'` de separador/placeholder (`buildTriageModal.ts:232`, `ActoSintesis.tsx:95`).
 
 ### Gate 2c (Triage) — cerrado (2026-06-12, `f37a0a2`)
 
