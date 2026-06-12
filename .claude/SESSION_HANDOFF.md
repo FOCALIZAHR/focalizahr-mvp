@@ -45,7 +45,19 @@ La cascada `Ambiente Sano` fue rearmada de raíz contra el plan §3 (espejo del 
 | **Gate 1.5 (A) léxico ISA + copy §A/B/C** | ✅ | `6ac821e` · `b139842` |
 | **Gate 2 Triage — investigación 0a-0e + datos reales** | ✅ (read-only, sin cablear) | `10421c1` |
 | **Gate 2a Triage — el acto (grupos narrativos)** | ✅ (visto Victor) | `8dbfb2c` |
-| **Gate 2b Triage — modal "ver más"** | ⏸️ | siguiente (tras visto del 2a) |
+| **Gate 2b Triage — modal "ver más"** | ✅ (visto Victor) | `b16f75b` |
+
+### Gate 2b (Triage) — cerrado (2026-06-11, `b16f75b`)
+
+`buildTriageModal` (pure) + `TriageDetailModal` (portal, chrome clonado de `GoalsFindingModal`). Los `SubtleLink` del 2a abren el modal. Modo **individual** (1 gerencia, §2b completo) vs **grupo** (N gerencias, veredicto del tipo 1× + bloques compactos). Sin cards/grids/barras. `buildGerenciaRollup` ahora expone `childDeptIds` (SUS DEPARTAMENTOS sin re-derivar la agrupación; excluye la gerencia-misma del merge de ancestro). 7 oráculos del modal. tsc 0, suites cascada 119/119.
+
+**Decisiones Victor:**
+- **Tensión CONFIABLE sin filtrar/suavizar** — el reveal honesto del modelo "peor dept": muestra justo las áreas que sí respondieron. **Verificado read-only (`scripts/gate2b-verify-conisa-source.ts`): EQUIPOS MEDICOS·5resp + TI·5resp son COMPLETED en ESTA campaña cmob0e56, NO mezclan campañas.** Son las 2 gerencias (Operaciones+Tecnología) del "2 de 6" del intro 2a (= 20% personResponseRate). Sin bug.
+- **Drivers VISIBLES** como texto fino bajo el score (§2b-3); el **ⓘ del score** = línea de escala `SCORE_SCALE_INFO` ("Riesgo 0–100: cuánto hay que mirar esta área, y por qué.").
+- **Slot legal en PROSA** (`legalProseMarco`): CL "bajo Ley Karin" / resto "de riesgo de cumplimiento". "Es un indicio, no una denuncia." aprobada. (legalBadgeForCountry es badge, no prosa.)
+- **Copy aprobado**: §2b-4 "Nada medible este ciclo…", §2b-2 "{n} puntos de silencio, {n} de señales del año", rama con_isa "ISA {n} · {Nivel}" (oráculo + **flag**: sin caso real que la ejercite).
+
+**Deuda menor:** la rama con_isa de `LO QUE DECLARARON` no se ejercita en cmob0e56 (ninguna gerencia con_isa) — revisar copy cuando aparezca caso real. Bloques de grupo no muestran ⓘ/drivers/declararon/señales (compactos, por diseño).
 
 ### Gate 2a (Triage) — cerrado (2026-06-11, `8dbfb2c`)
 
