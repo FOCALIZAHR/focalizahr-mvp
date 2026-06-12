@@ -11,7 +11,7 @@ import {
   dimFoco,
   toDisplay100,
 } from '@/lib/services/compliance/orgDimensions';
-import { buildAnatomia } from '@/lib/services/compliance/buildAnatomia';
+import { buildAnatomia, buildAnatomiaModal } from '@/lib/services/compliance/buildAnatomia';
 import {
   DIMENSION_CEO_LABELS,
 } from '@/config/narratives/ComplianceNarrativeDictionary';
@@ -88,6 +88,22 @@ async function main() {
   console.log(`\n   ${acto.scaleLine}`);
   console.log(`   ${acto.modalLink}`);
   console.log(`   «${acto.cierre}»`);
+
+  // ── MODAL 3c ──────────────────────────────────────────────────────────────
+  const modal = buildAnatomiaModal(dims)!;
+  console.log('\n╔══ GATE 3c · ANATOMÍA — MODAL "Ver el detalle" ══╗\n');
+  console.log(`  ${modal.header}`);
+  console.log(`  ${modal.scaleLine}\n`);
+  for (const g of modal.grupos) {
+    console.log(`  ▸ ${g.kicker}`);
+    for (const d of g.dims) {
+      console.log(`    ${d.labelCEO}  ${d.display}   [${'█'.repeat(Math.round(d.display / 5))}${'·'.repeat(20 - Math.round(d.display / 5))}|75]`);
+      console.log(`      ${d.labelLower}`);
+      console.log(`      «${d.headline}» (cursiva)`);
+      console.log(`      ${d.body}`);
+    }
+    console.log('');
+  }
 }
 
 main()

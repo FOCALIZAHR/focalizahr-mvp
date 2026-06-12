@@ -20,9 +20,11 @@ import {
 } from './orgDimensions';
 import {
   DIMENSION_CEO_LABELS,
+  getDimensionNarrative,
   type ComplianceDimensionKey,
   type ComplianceDimensionLevel,
 } from '@/config/narratives/ComplianceNarrativeDictionary';
+import { DIMENSION_LABELS } from '@/app/dashboard/compliance/lib/labels';
 
 // ════════════════════════════════════════════════════════════════════════════
 // COPY — verbatim del handoff §4.1 / §4.6 / §5 + nota llana §4.1
@@ -263,6 +265,74 @@ export function buildAnatomia(
     modalLink: `Ver el detalle de las ${total} dimensiones →`,
     cierre,
   };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// MODAL "Ver el detalle" — GATE 3c (§6)
+// ════════════════════════════════════════════════════════════════════════════
+// Mismo lenguaje cascada. Agrupado por nivel; por dimensión:
+//   {CEO label} · {display} de 100 — {DIMENSION_LABELS en minúscula}
+//   + resolveDimensionNarrative(dim, score) VERBATIM (headline + body del motor).
+// La escala se declara UNA vez (header).
+
+const MODAL_SCALE_LINE =
+  'Escala de 0 a 100 · sano desde 75 · ordenadas por gravedad y precedencia';
+
+export interface AnatomiaModalDim {
+  key: ComplianceDimensionKey;
+  labelCEO: string;
+  display: number; // 0-100
+  /** DIMENSION_LABELS con inicial en minúscula (aposición → subtítulo fino). */
+  labelLower: string;
+  /** Headline del motor VERBATIM (cursiva diferenciada en el render). */
+  headline: string;
+  /** Body del motor VERBATIM. */
+  body: string;
+}
+
+export interface AnatomiaModalGrupo {
+  level: ComplianceDimensionLevel;
+  kicker: string;
+  dims: AnatomiaModalDim[];
+}
+
+export interface AnatomiaModal {
+  /** Header §6 — verbatim ("Las seis dimensiones"; el instrumento es 6-dim). */
+  header: string;
+  scaleLine: string;
+  grupos: AnatomiaModalGrupo[];
+}
+
+/** Minúscula inicial — DIMENSION_LABELS es standalone ("Lo que…"); en aposición
+ *  va en minúscula. Mismo patrón que la Apertura (lowerFirst). */
+function lowerFirst(s: string): string {
+  return s.length > 0 ? s.charAt(0).toLowerCase() + s.slice(1) : s;
+}
+
+export function buildAnatomiaModal(dims: OrgDimension[]): AnatomiaModal | null {
+  if (dims.length === 0) return null;
+  const byLevel = new Map<ComplianceDimensionLevel, AnatomiaModalDim[]>();
+  for (const d of dims) {
+    const list = byLevel.get(d.level) ?? [];
+    const narr = getDimensionNarrative(d.key, d.level);
+    list.push({
+      key: d.key,
+      labelCEO: DIMENSION_CEO_LABELS[d.key],
+      display: toDisplay100(d.valor),
+      labelLower: lowerFirst(DIMENSION_LABELS[d.key] ?? ''),
+      headline: narr.headline,
+      body: narr.body,
+    });
+    byLevel.set(d.level, list);
+  }
+  const grupos: AnatomiaModalGrupo[] = [];
+  for (const level of ['critico', 'riesgo', 'atencion', 'sano'] as ComplianceDimensionLevel[]) {
+    const items = byLevel.get(level);
+    if (!items || items.length === 0) continue;
+    items.sort((a, b) => precIndex(a.key) - precIndex(b.key));
+    grupos.push({ level, kicker: LEVEL_KICKER[level], dims: items });
+  }
+  return { header: 'Las seis dimensiones', scaleLine: MODAL_SCALE_LINE, grupos };
 }
 
 // Re-export para el render (highlight del foco) y oráculos.

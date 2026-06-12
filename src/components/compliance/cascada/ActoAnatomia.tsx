@@ -12,12 +12,13 @@
 // Paleta §7 (auditada, sin semáforo, sin rojo, purple SOLO IA):
 //   crítico orange-600 · riesgo amber-500 · atención slate-400 · sano cyan-400.
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { ActSeparator, Tooltip, fadeIn, fadeInDelay } from './shared';
 import { computeOrgDimensions } from '@/lib/services/compliance/orgDimensions';
 import { buildAnatomia, FOCO_INFO } from '@/lib/services/compliance/buildAnatomia';
+import AnatomiaDetailModal from './AnatomiaDetailModal';
 import type { ComplianceDimensionLevel } from '@/config/narratives/ComplianceNarrativeDictionary';
 import type { ComplianceReportResponse } from '@/types/compliance';
 
@@ -34,6 +35,7 @@ const LEVEL_TEXT: Record<ComplianceDimensionLevel, string> = {
 };
 
 export default memo(function ActoAnatomia({ data }: ActoAnatomiaProps) {
+  const [modalOpen, setModalOpen] = useState(false);
   const acto = useMemo(() => {
     const dims = computeOrgDimensions(data.data.departments ?? []);
     const orgISA = Math.round(data.data.orgISA ?? 0);
@@ -124,9 +126,9 @@ export default memo(function ActoAnatomia({ data }: ActoAnatomiaProps) {
             {acto.scaleLine}
           </p>
 
-          {/* Link al modal 3c — INERTE hasta 3c. */}
-          {/* onClick lo cabla el modal 3c. */}
+          {/* Link al modal 3c. */}
           <button
+            onClick={() => setModalOpen(true)}
             className="group inline-flex items-center gap-1.5 text-sm font-light text-slate-400 hover:text-slate-300 transition-colors mb-6"
             type="button"
           >
@@ -140,6 +142,11 @@ export default memo(function ActoAnatomia({ data }: ActoAnatomiaProps) {
           </p>
         </motion.div>
       </div>
+
+      {/* Modal "Ver el detalle" 3c */}
+      {modalOpen && (
+        <AnatomiaDetailModal data={data} onClose={() => setModalOpen(false)} />
+      )}
     </>
   );
 });

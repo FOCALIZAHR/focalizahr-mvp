@@ -12,12 +12,10 @@
 //   - individual (1 gerencia): estructura §2b completa.
 //   - grupo (N gerencias): veredicto del tipo UNA vez + bloques compactos.
 
-import { memo, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { motion } from 'framer-motion';
-import { X } from 'lucide-react';
+import { memo } from 'react';
 import { cn } from '@/lib/utils';
 import { Tooltip } from './shared';
+import CascadaModalShell from './CascadaModalShell';
 import { formatDepartmentName } from '@/lib/utils/formatName';
 import {
   buildTriageModal,
@@ -106,75 +104,30 @@ export default memo(function TriageDetailModal({
   lecturaKey,
   onClose,
 }: TriageDetailModalProps) {
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
-
   const modal = buildTriageModal(data, lecturaKey);
   if (!modal) return null;
 
-  const teslaColor = FAMILY_HEX[modal.family];
   const isIndividual = modal.mode === 'individual';
   const headBlock = modal.blocks[0];
 
-  const content = (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
-        onClick={onClose}
-      />
+  const header = (
+    <>
+      {isIndividual ? (
+        <p className="text-lg font-light text-slate-100 truncate">
+          {formatDepartmentName(headBlock.gerenciaName)}
+        </p>
+      ) : (
+        <p className="text-lg font-light text-slate-100">El detalle del grupo</p>
+      )}
+      <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
+        {modal.kicker}
+      </p>
+    </>
+  );
 
-      {/* Panel */}
-      <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 20 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        className="relative w-full max-w-lg max-h-[82vh] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/95 backdrop-blur-xl shadow-2xl"
-      >
-        {/* Tesla line — color por familia */}
-        <div
-          className="absolute top-0 left-0 right-0 h-[2px] z-10"
-          style={{
-            background: `linear-gradient(90deg, transparent, ${teslaColor}, transparent)`,
-            boxShadow: `0 0 20px ${teslaColor}`,
-          }}
-        />
-
-        {/* Header */}
-        <div className="flex items-start justify-between p-6 pb-0">
-          <div className="min-w-0">
-            {isIndividual ? (
-              <p className="text-lg font-light text-slate-100 truncate">
-                {formatDepartmentName(headBlock.gerenciaName)}
-              </p>
-            ) : (
-              <p className="text-lg font-light text-slate-100">El detalle del grupo</p>
-            )}
-            <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">
-              {modal.kicker}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-slate-600 hover:text-slate-400 transition-colors p-1 flex-shrink-0"
-            aria-label="Cerrar"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Content — scrollable */}
-        <div className="p-6 pt-4 overflow-y-auto max-h-[calc(82vh-92px)]">
-          {isIndividual ? (
+  return (
+    <CascadaModalShell teslaColor={FAMILY_HEX[modal.family]} header={header} onClose={onClose}>
+      {isIndividual ? (
             // ── MODAL INDIVIDUAL — estructura §2b completa ──
             <div className="space-y-5">
               <ScoreLine block={headBlock} family={modal.family} withInfo />
@@ -243,14 +196,10 @@ export default memo(function TriageDetailModal({
             </div>
           )}
 
-          {/* Pie cursiva (§2b-8) */}
-          <p className="text-[11px] italic font-light text-slate-500 leading-relaxed mt-6 pt-4 border-t border-slate-800/30">
-            {modal.pie}
-          </p>
-        </div>
-      </motion.div>
-    </div>
+      {/* Pie cursiva (§2b-8) */}
+      <p className="text-[11px] italic font-light text-slate-500 leading-relaxed mt-6 pt-4 border-t border-slate-800/30">
+        {modal.pie}
+      </p>
+    </CascadaModalShell>
   );
-
-  return createPortal(content, document.body);
 });

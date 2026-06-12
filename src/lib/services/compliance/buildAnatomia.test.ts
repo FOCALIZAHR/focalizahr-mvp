@@ -11,8 +11,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildAnatomia } from './buildAnatomia';
-import { classifyDimensionLevel } from '@/config/narratives/ComplianceNarrativeDictionary';
+import { buildAnatomia, buildAnatomiaModal } from './buildAnatomia';
+import {
+  classifyDimensionLevel,
+  getDimensionNarrative,
+} from '@/config/narratives/ComplianceNarrativeDictionary';
 import type { ComplianceDimensionKey } from '@/config/narratives/ComplianceNarrativeDictionary';
 import type { OrgDimension } from './orgDimensions';
 
@@ -153,4 +156,43 @@ test('B3. TODO SANO — sin foco, sin causa raíz', () => {
 
 test('B4. vacío → null', () => {
   assert.equal(buildAnatomia([], 0), null);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// C — MODAL §6 (buildAnatomiaModal)
+// ═══════════════════════════════════════════════════════════════════
+
+test('C1. modal — header + escala una vez + agrupado por nivel/precedencia', () => {
+  const dims = [
+    dim('P2_seguridad', 1.8),
+    dim('P5_equidad', 1.4),
+    dim('P3_disenso', 2.2),
+    dim('P4_microagresiones', 2.6),
+    dim('P8_agotamiento', 2.0),
+    dim('P7_liderazgo', 3.0),
+  ];
+  const m = buildAnatomiaModal(dims)!;
+  assert.equal(m.header, 'Las seis dimensiones');
+  assert.equal(
+    m.scaleLine,
+    'Escala de 0 a 100 · sano desde 75 · ordenadas por gravedad y precedencia',
+  );
+  assert.deepEqual(m.grupos.map((g) => g.kicker), ['EN CRÍTICO', 'EN RIESGO', 'EN ATENCIÓN']);
+  // Crítico: P2 (prec 0) antes que P5 (prec 3).
+  assert.deepEqual(m.grupos[0].dims.map((d) => d.key), ['P2_seguridad', 'P5_equidad']);
+});
+
+test('C2. modal — línea por dimensión: CEO · display de 100 — label en minúscula', () => {
+  const m = buildAnatomiaModal([dim('P2_seguridad', 1.8)])!;
+  const p2 = m.grupos[0].dims[0];
+  assert.equal(p2.labelCEO, 'Seguridad psicológica');
+  assert.equal(p2.display, 20);
+  assert.equal(p2.labelLower, 'lo que el equipo cree que pasaría si habla');
+});
+
+test('C3. modal — headline + body VERBATIM del motor (separados)', () => {
+  const m = buildAnatomiaModal([dim('P2_seguridad', 1.8)])!;
+  const expected = getDimensionNarrative('P2_seguridad', 'critico');
+  assert.equal(m.grupos[0].dims[0].headline, expected.headline);
+  assert.equal(m.grupos[0].dims[0].body, expected.body);
 });
