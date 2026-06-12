@@ -163,7 +163,7 @@ export const LECTURA_KICKER: Record<TriageLecturaKey, string> = {
 // ────────────────────────────────────────────────────────────────────────────
 const NARRATIVA_PLURAL: Record<TriageLecturaKey, string> = {
   FUEGO:
-    'El riesgo en estas áreas ya no es algo por anticipar: una denuncia formal por Ley Karin fijó el nivel al máximo e invalidó la lectura oficial. El sistema entero existe para evitar llegar acá — en estas áreas el límite ya se cruzó.',
+    'El riesgo en estas áreas ya no es algo por anticipar: una denuncia formal por Ley Karin fijó el nivel al máximo e invalidó la lectura oficial. El sistema entero existe para evitar llegar acá: en estas áreas el límite ya se cruzó.',
   'HUMO/A-legal':
     'Estos equipos guardan silencio masivo en los canales oficiales, pero quienes se fueron dejaron una señal de Ley Karin. Esto no es rotación: es un riesgo jurídico en formación, del tipo que suele preceder a una denuncia formal. Actuar sobre la señal ahora es lo que separa la prevención de un pasivo legal activo.',
   'HUMO/A':
@@ -194,7 +194,7 @@ export function lecturaKeyOf(n: DepartmentRiskNarrative): TriageLecturaKey {
  *  tramos coloreados (nombre title-cased en display). */
 export function triageInstanceLine(inst: TriageInstance): string {
   let line = `${inst.gerenciaName} · riesgo ${inst.score} de 100`;
-  if (inst.viaWorstDept) line += ` — el foco: ${inst.viaWorstDept}`;
+  if (inst.viaWorstDept) line += ` · el foco: ${inst.viaWorstDept}`;
   return line;
 }
 
@@ -222,7 +222,7 @@ export function buildTriageIntro(
 ): string {
   return (
     `El ${pct}% que respondió se concentra en ${conVoz} de las ${total} gerencias. ` +
-    `En las otras ${mudas} el índice no llega — y ahí, las señales externas son la única lectura disponible.`
+    `En las otras ${mudas} el índice no llega, y ahí las señales externas son la única lectura disponible.`
   );
 }
 

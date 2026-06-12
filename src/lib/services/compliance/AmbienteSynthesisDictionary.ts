@@ -80,7 +80,7 @@ export const SYNTHESIS_DICTIONARY: Record<DiagnosticType, SynthesisCopyEntry> = 
     classification: 'Esto no es una lectura de clima. Es un hecho registrado.',
     implicationBase:
       'En {deptos}, en los últimos 12 meses, hubo al menos una denuncia formal. ' +
-      'No sabemos cómo terminó —puede haberse acreditado, puede que no, incluso podría no sostenerse—. ' +
+      'No sabemos cómo terminó: puede haberse acreditado, puede que no, incluso podría no sostenerse. ' +
       'Pero que exista ya cambia el peso de todo lo demás. No es percepción. Es un registro. ' +
       'Y un registro pide mirar ese punto aparte, antes de saber cómo termina.',
     path:

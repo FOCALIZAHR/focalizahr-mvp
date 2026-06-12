@@ -52,13 +52,13 @@ const CAUSA_RAIZ: Record<ComplianceDimensionKey, string> = {
   P7_liderazgo:
     'El deterioro tiene un cuello de botella estructural: la relación con la jefatura directa. Se prioriza esta condición porque, mientras no cambie, cualquier intervención en el equipo se queda en la superficie.',
   P3_disenso:
-    'Esta condición se vuelve urgente porque la dirección está operando a ciegas: cuando discrepar se paga caro, el talento deja de advertir las fallas tempranas — y las malas noticias llegan cuando ya son caras.',
+    'Esta condición se vuelve urgente porque la dirección está operando a ciegas: cuando discrepar se paga caro, el talento deja de advertir las fallas tempranas, y las malas noticias llegan cuando ya son caras.',
   P5_equidad:
     'La prioridad es la fractura del contrato de confianza: el equipo percibe un sistema amañado donde el mérito no define las oportunidades. Cuando la equidad cae a este punto, lo que sigue es un equipo que cumple lo mínimo y deja de proponer.',
   P4_microagresiones:
     'El trato hostil aparece normalizado en el día a día. Esto dejó de ser un problema de clima: es el tipo de condición que, sostenida, antecede a los hechos que terminan en revisión formal. Y el desgaste que produce acelera la fuga del talento que más cuesta reponer.',
   P8_agotamiento:
-    'El foco no es el volumen de trabajo: es el costo de interactuar en este equipo. El desgaste relacional en este nivel es el que antecede al ausentismo y a las licencias — y no se recupera con descanso, porque la causa no es la carga.',
+    'El foco no es el volumen de trabajo: es el costo de interactuar en este equipo. El desgaste relacional en este nivel es el que antecede al ausentismo y a las licencias, y no se recupera con descanso, porque la causa no es la carga.',
 };
 
 /** Kicker por nivel (§4.3). "EN SANO" inferido (el handoff lista los 3 graves;
@@ -227,7 +227,7 @@ export function buildAnatomia(
     case 'TODO_BAJO': {
       titular = 'No hay una grieta: el piso está parejo y bajo.';
       parrafos = [
-        'Ninguna condición sostiene al resto — todas caen por debajo de la línea. El problema no está localizado, es transversal.',
+        'Ninguna condición sostiene al resto: todas caen por debajo de la línea. El problema no está localizado, es transversal.',
       ];
       focoParrafo = { pre: 'Aun así, una pesa más que las demás: ', foco: focoLlana, post: '.' };
       cierre = 'Cuando todo cede a la vez, perseguir el promedio es lo más fácil y lo más inútil.';

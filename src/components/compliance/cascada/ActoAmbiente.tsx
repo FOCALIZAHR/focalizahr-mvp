@@ -85,7 +85,7 @@ export function buildFactoresLine(f: FactoresTitulares): string | null {
   if (f.debilidades.length >= 2) {
     const base = `Lo más frágil del ambiente: ${f.debilidades[0].labelCEO} y ${f.debilidades[1].labelCEO}.`;
     return f.fortalezaRelativa
-      ? `${base} Lo que menos ha cedido: ${f.fortalezaRelativa.labelCEO} — y es desde ahí, no desde cero.`
+      ? `${base} Lo que menos ha cedido: ${f.fortalezaRelativa.labelCEO}, y es desde ahí, no desde cero.`
       : base;
   }
   if (f.debilidades.length === 1) {
@@ -234,7 +234,7 @@ export function copyFor(
         const bandaLabel = BANDA_LABEL[slots.banda];
         traduccion =
           `Donde se pudo medir, el ambiente da ${bandaLabel}. ` +
-          `Pero esa lectura son ${nResp} de ${nInv} personas, en ${conVoz} de ${gerenciasTotal} gerencias — ` +
+          `Pero esa lectura son ${nResp} de ${nInv} personas, en ${conVoz} de ${gerenciasTotal} gerencias: ` +
           `del resto no entró respuesta. Vale para quienes hablaron; ` +
           `el silencio de los demás impide leerlo como el cuadro de toda la empresa.`;
         pero = null;
@@ -269,16 +269,16 @@ export function copyFor(
           ? ` ${sanas} de ${total} ${total === 1 ? 'gerencia respondió' : 'gerencias respondieron'} con consistencia entre cerradas y abiertas.`
           : '';
       traduccion =
-        `El ISA ${orgISA} no es un promedio que esconde — es un piso que se sostiene.` +
+        `El ISA ${orgISA} no es un promedio que esconde: es un piso que se sostiene.` +
         sanasPart +
         ` Cobertura del ${coveragePct}%.`;
 
       pero = topName
-        ? `Esa coincidencia es lo más difícil de fabricar — los equipos sanos lo son cuando nadie los mira. ${topName} es el caso de referencia. Un ambiente que se cuida solo cuando lo miden no escribe así.`
-        : 'Esa coincidencia es lo más difícil de fabricar — los equipos sanos lo son cuando nadie los mira. Un ambiente que se cuida solo cuando lo miden no escribe así.';
+        ? `Esa coincidencia es lo más difícil de fabricar: los equipos sanos lo son cuando nadie los mira. ${topName} es el caso de referencia. Un ambiente que se cuida solo cuando lo miden no escribe así.`
+        : 'Esa coincidencia es lo más difícil de fabricar: los equipos sanos lo son cuando nadie los mira. Un ambiente que se cuida solo cuando lo miden no escribe así.';
 
       cierre = topName
-        ? `Un buen ambiente no se sostiene solo. Este es el momento de proteger lo que funciona — empezando por entender qué hace ${topName} distinto del resto.`
+        ? `Un buen ambiente no se sostiene solo. Este es el momento de proteger lo que funciona, empezando por entender qué hace ${topName} distinto del resto.`
         : 'Un buen ambiente no se sostiene solo. Este es el momento de proteger lo que funciona.';
       break;
     }
@@ -301,7 +301,7 @@ export function copyFor(
 
       // El "pero" es el mismo en ambos sabores (verbatim spec).
       pero =
-        'Un buen número general tranquiliza — y por eso es peligroso. ' +
+        'Un buen número general tranquiliza, y por eso es peligroso. ' +
         'Hace que el foco pase desapercibido justo donde más importa. ' +
         'La organización está sana; la gerencia, no.';
       break;
@@ -313,7 +313,7 @@ export function copyFor(
       const bandaLabel = BANDA_LABEL[slots.banda];
       traduccion =
         `El ISA ${orgISA} cae en zona de ${bandaLabel}. ` +
-        'No hay problema de cobertura ni contradicción que lo explique — la organización respondió, y respondió esto.';
+        'No hay problema de cobertura ni contradicción que lo explique: la organización respondió, y respondió esto.';
       pero =
         'Cuando el número es bajo y nada lo disimula, la causa no está en la medición. ' +
         'Está en el ambiente mismo. Es más incómodo de leer, y es más honesto.';
@@ -349,7 +349,7 @@ export function buildOrtogonales(
   const generoCita = generoCitaRaw ? stripWrappingQuotes(generoCitaRaw) : null;
   const generoLine =
     generoName && generoCita && generoCita.length > 0
-      ? `En ${generoName}, el análisis con IA encontró una expresión con sesgo de género: "${generoCita}". Una sola cita — pero el tipo de frase que, cuando se repite, cambia el cuadro completo.`
+      ? `En ${generoName}, el análisis con IA encontró una expresión con sesgo de género: "${generoCita}". Una sola cita, pero el tipo de frase que, cuando se repite, cambia el cuadro completo.`
       : null;
 
   // LEY KARIN — marco country-aware (CL → "Ley Karin"; default → normativa local).
@@ -360,7 +360,7 @@ export function buildOrtogonales(
     const marco = getLegalMarcoName(country);
     leyKarinLine =
       `En ${leyKarinName}, los que se fueron dejaron ${n} ${sustantivo} bajo ${marco} en sus encuestas de salida en los últimos 12 meses. ` +
-      `Lo que escribieron al irse vale como pista — la pregunta es si lo que pasa hoy en esa gerencia todavía habla en esa dirección.`;
+      `Lo que escribieron al irse vale como pista. La pregunta es si lo que pasa hoy en esa gerencia todavía habla en esa dirección.`;
   }
 
   return { generoLine, leyKarinLine };
@@ -462,7 +462,7 @@ function senalParteV1(
   // Denuncia formal sola (§C).
   if (tieneDen) {
     if (denunciaCount >= 2) {
-      return `Y las denuncias formales no son una: ya se acumulan ${denunciaCount} en los últimos 12 meses — la acumulación eleva la prioridad de revisión.`;
+      return `Y las denuncias formales no son una: ya se acumulan ${denunciaCount} en los últimos 12 meses. La acumulación eleva la prioridad de revisión.`;
     }
     return 'Y en una de las áreas hubo al menos una denuncia formal en los últimos 12 meses: el solo hecho eleva la prioridad de revisión.';
   }
@@ -470,7 +470,7 @@ function senalParteV1(
   // Indicio Karin solo.
   if (indicioCount >= 2) {
     // §C count≥2.
-    return `Y los indicios no son uno: ya se acumulan ${indicioCount} de ${legalBadge} en el último año — la acumulación eleva la prioridad de revisión.`;
+    return `Y los indicios no son uno: ya se acumulan ${indicioCount} de ${legalBadge} en el último año. La acumulación eleva la prioridad de revisión.`;
   }
   // §2 verbatim (count=1).
   return `Y en una de las áreas, el último año dejó un indicio de ${legalBadge}: el solo hecho eleva la prioridad de revisión.`;
@@ -523,11 +523,11 @@ export function buildAperturaTitular(input: AperturaInput): AperturaTitular {
   let mov2: string | null;
   if (silencio && senal) {
     // Variante 1 (caso real).
-    const sil = `Pero esa salud de ${orgISA} describe al ${pct}% que respondió — sobre el resto de la empresa, el estudio todavía no tiene voz.`;
+    const sil = `Pero esa salud de ${orgISA} describe al ${pct}% que respondió. Sobre el resto de la empresa, el estudio todavía no tiene voz.`;
     mov2 = `${sil} ${senalParteV1(indicioCount, denunciaCount, legalBadgeLabel)}`;
   } else if (silencio && !senal) {
     // Variante 2.
-    mov2 = `Ese ${orgISA} describe al ${pct}% que respondió — sobre el resto de la empresa, el estudio todavía no tiene voz.`;
+    mov2 = `Ese ${orgISA} describe al ${pct}% que respondió. Sobre el resto de la empresa, el estudio todavía no tiene voz.`;
   } else if (!silencio && senal) {
     // Variante 3.
     mov2 = `El ${orgISA} llega con la voz de la mayoría: respondió el ${pct}% de la empresa. ${senalParteV3(senal, indicioCount, denunciaCount, legalBadgeLabel)}`;
@@ -596,7 +596,7 @@ export function buildAperturaTitular(input: AperturaInput): AperturaTitular {
  *  El render JSX usa exactamente este conector. */
 export function mov3ToText(m: NonNullable<AperturaTitular['mov3']>): string {
   return (
-    `${m.pre} Y una de las que está en nivel crítico es justo ${m.dimCEO} — ${m.dimDesc}.` +
+    `${m.pre} Y una de las que está en nivel crítico es justo ${m.dimCEO}: ${m.dimDesc}.` +
     (m.coda !== null ? ` ${m.coda}` : '')
   );
 }
@@ -774,7 +774,7 @@ export default memo(function ActoAmbiente({ data }: ActoProps) {
               <span className="font-semibold text-cyan-400">
                 {titular.mov3.dimCEO}
               </span>
-              {' — '}
+              {': '}
               {titular.mov3.dimDesc}.
               {titular.mov3.coda !== null && <>{' '}{titular.mov3.coda}</>}
             </p>

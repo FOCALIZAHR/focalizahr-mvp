@@ -143,7 +143,7 @@ export default memo(function ActoTriage({ data }: ActoTriageProps) {
                         </span>
                         {inst.viaWorstDept && (
                           <span className="font-light text-slate-500">
-                            {' — el foco: '}
+                            {' · el foco: '}
                             {formatDepartmentName(inst.viaWorstDept)}
                           </span>
                         )}

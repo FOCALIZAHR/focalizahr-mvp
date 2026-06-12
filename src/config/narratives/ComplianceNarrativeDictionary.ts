@@ -78,7 +78,7 @@ export const COMPLIANCE_DIMENSION_DICTIONARY: Record<
       headline: 'El equipo dice lo que pasa antes de que pase.',
       body:
         'Los problemas suben cuando aún se pueden corregir. ' +
-        'Si el promedio se sostiene sobre 4.8, vale revisar si hay piloto automático — la cohesión excesiva se ve igual que la confianza desde la encuesta. ' +
+        'Si el promedio se sostiene sobre 4.8, vale revisar si hay piloto automático: la cohesión excesiva se ve igual que la confianza desde la encuesta. ' +
         'Esa diferencia se nota cuando aparece el primer riesgo real externo.',
       recomendacion:
         "Equipos con niveles máximos de confianza pueden desarrollar 'ceguera de taller' por exceso de cohesión. Empresas de alto rendimiento como Google (Project Aristotle) reconocen que mantener esta ventaja exige someter las decisiones a fricción externa controlada sin quebrar la confianza.",
@@ -130,7 +130,7 @@ export const COMPLIANCE_DIMENSION_DICTIONARY: Record<
       body:
         'Las ideas débiles mueren antes de consumir presupuesto. ' +
         'La gerencia separa su identidad de sus propuestas. ' +
-        'Si el acuerdo con la línea oficial supera el 90%, el riesgo es piloto automático — las culturas que escalan mantienen un 20% de fricción permanente.',
+        'Si el acuerdo con la línea oficial supera el 90%, el riesgo es piloto automático: las culturas que escalan mantienen un 20% de fricción permanente.',
       recomendacion:
         'El debate riguroso asegura el control de calidad y evita el desperdicio de capital. Amazon promueve esta fricción constructiva para asegurar que las iniciativas defectuosas mueran en fases tempranas de diseño.',
       planSugerido:
@@ -182,7 +182,7 @@ export const COMPLIANCE_DIMENSION_DICTIONARY: Record<
       headline: 'Los conflictos son técnicos, no personales.',
       body:
         'Nadie destina energía a defender su identidad en la oficina. ' +
-        'La tensión que existe es la del trabajo bien hecho — la sana. ' +
+        'La tensión que existe es la del trabajo bien hecho: la sana. ' +
         'El equipo opera con todo su ancho de banda disponible para el negocio.',
       recomendacion:
         'La ausencia de hostilidad permite que la totalidad del ancho de banda cognitivo del equipo se enfoque en el negocio. Investigaciones de BCG demuestran que estos ecosistemas retienen al talento altamente especializado frente a las ofertas de la competencia.',
@@ -194,7 +194,7 @@ export const COMPLIANCE_DIMENSION_DICTIONARY: Record<
       body:
         'Las "bromas" empiezan a tener un destinatario. El cinismo gana terreno frente al compromiso institucional. ' +
         'O la cultura está normalizando el menosprecio pasivo. O la presión externa empezó a buscar válvulas internas. ' +
-        'El desgaste sobre los grupos minoritarios ya está en marcha — y la rotación los seguirá.',
+        'El desgaste sobre los grupos minoritarios ya está en marcha, y la rotación los seguirá.',
       recomendacion:
         'El sarcasmo y las interrupciones selectivas desplazan gradualmente la agilidad y el compromiso de los equipos. Para evitar puntos ciegos, las empresas tecnológicas auditan los patrones de interacción diarios en el diseño de soluciones.',
       planSugerido:
@@ -215,7 +215,7 @@ export const COMPLIANCE_DIMENSION_DICTIONARY: Record<
       headline: 'El trato cruzó el umbral del trauma.',
       body:
         'Esto ya no es clima organizacional. Es un punto de quiebre operativo con exposición a demandas laborales. ' +
-        'La fiscalización por incumplimiento normativo deja de ser un escenario lejano — es lo que sigue cuando entre la primera denuncia formal. ' +
+        'La fiscalización por incumplimiento normativo deja de ser un escenario lejano: es lo que sigue cuando entre la primera denuncia formal. ' +
         'Cada semana que el indicador permanece aquí amplía el pasivo legal del directorio.',
       recomendacion:
         "La toxicidad sistémica destruye la viabilidad operativa y expone a la empresa a graves litigios reputacionales. Netflix resuelve esto eliminando de raíz a los perfiles que destruyen el tejido social, dado que su costo cultural anula cualquier aporte técnico.",
@@ -233,7 +233,7 @@ export const COMPLIANCE_DIMENSION_DICTIONARY: Record<
       body:
         'El equipo confía en cómo se reparten promociones, bonos y oportunidades. ' +
         'Cuando esa confianza existe, las personas dan más de lo que el contrato exige. ' +
-        'Esa entrega no se recupera con bonos cuando se pierde — se recupera reconstruyendo.',
+        'Esa entrega no se recupera con bonos cuando se pierde: se recupera reconstruyendo.',
       recomendacion:
         'Una meritocracia predecible garantiza que los colaboradores entreguen su máximo esfuerzo discrecional. Las estructuras de élite aseguran que las reglas de avance profesional sean inalterables y estén justificadas por el rendimiento comprobable.',
       planSugerido:
@@ -244,7 +244,7 @@ export const COMPLIANCE_DIMENSION_DICTIONARY: Record<
       body:
         'Las decisiones clave sobre asignaciones y bonos ya no se logran justificar ante el equipo. ' +
         'O los criterios cambian con la coyuntura. O la afinidad con la gerencia pesa más que los datos. ' +
-        'La duda sobre la meritocracia interna se está instalando — y una vez instalada no se desinstala con un comunicado.',
+        'La duda sobre la meritocracia interna se está instalando, y una vez instalada no se desinstala con un comunicado.',
       recomendacion:
         'La variabilidad opaca en las asignaciones de trabajo fomenta el escepticismo sobre el valor de la productividad real. La gestión moderna de recursos humanos mapea activamente cómo se reparte el trabajo invisible o administrativo para evitar sobrecargas sesgadas.',
       planSugerido:
@@ -254,7 +254,7 @@ export const COMPLIANCE_DIMENSION_DICTIONARY: Record<
       headline: 'El esfuerzo y la recompensa se desconectaron.',
       body:
         'Las normas se aplican con rigor a unos y con laxitud a otros. ' +
-        'El talento concluyó que trabajar duro es inútil — y migra al cumplimiento mínimo o a la búsqueda activa de empleo. ' +
+        'El talento concluyó que trabajar duro es inútil, y migra al cumplimiento mínimo o a la búsqueda activa de empleo. ' +
         'La cuenta de la fuga se factura un trimestre después, cuando ya no hay rebobinar.',
       recomendacion:
         "El favoritismo estructural desconecta el esfuerzo de la recompensa y acelera el 'quiet quitting' generalizado. Modelos como el de Google bloquean este sesgo retirando el poder unilateral de la jefatura directa sobre la carrera de un individuo.",
@@ -266,7 +266,7 @@ export const COMPLIANCE_DIMENSION_DICTIONARY: Record<
       body:
         'La organización ya no enfrenta solo rotación. Enfrenta riesgo de fraude interno, filtración de datos, sabotaje y paralizaciones. ' +
         'La hemorragia del talento no alineado con la camarilla gerencial es irreversible al ritmo actual. ' +
-        'La pérdida no se recupera contratando — se recupera reconstruyendo el contrato social interno.',
+        'La pérdida no se recupera contratando: se recupera reconstruyendo el contrato social interno.',
       recomendacion:
         'Un esquema de evaluación amañado genera resentimiento orgánico, fuga de cerebros y sabotaje de procesos. Apple aborda la falta de responsabilidad extirpando la ambigüedad que permite a ciertos gerentes apropiarse del éxito ajeno.',
       planSugerido:
@@ -293,7 +293,7 @@ export const COMPLIANCE_DIMENSION_DICTIONARY: Record<
       headline: 'El gestor solo aparece cuando algo se cae.',
       body:
         'La retroalimentación llega como un trámite punitivo de fin de año, no como un acelerador. ' +
-        'La motivación del equipo migró de intrínseca a estrictamente extrínseca — depende del salario, no del propósito. ' +
+        'La motivación del equipo migró de intrínseca a estrictamente extrínseca: depende del salario, no del propósito. ' +
         'O el líder no tiene formación en gestión de personas. O el sistema no le exige hacerla. ' +
         'En ambos casos el talento empieza a buscar el motor que aquí no encuentra.',
       recomendacion:
@@ -305,7 +305,7 @@ export const COMPLIANCE_DIMENSION_DICTIONARY: Record<
       headline: 'El líder es el cuello de botella.',
       body:
         'La confianza es nula. Cada acción operativa exige aprobación minuciosa. ' +
-        'El equipo desarrolla "incompetencia aprendida" — espera la decisión que nunca delegan. ' +
+        'El equipo desarrolla "incompetencia aprendida": espera la decisión que nunca delegan. ' +
         'La ansiedad somatizada y la pérdida de agilidad son dos caras del mismo problema. ' +
         'La señal precede la fuga del talento de alto desempeño por 90 a 120 días.',
       recomendacion:
@@ -317,8 +317,8 @@ export const COMPLIANCE_DIMENSION_DICTIONARY: Record<
       headline: 'El jefe es la principal amenaza para su equipo.',
       body:
         'Críticas públicas humillantes. Información retenida como herramienta de poder. ' +
-        'Este nivel cumple los criterios de vulneración de derechos fundamentales en cualquier marco laboral moderno — riesgo crítico de incumplimiento normativo. ' +
-        'La denuncia no es un riesgo abstracto — es la consecuencia esperada de mantener al líder en el cargo.',
+        'Este nivel cumple los criterios de vulneración de derechos fundamentales en cualquier marco laboral moderno: riesgo crítico de incumplimiento normativo. ' +
+        'La denuncia no es un riesgo abstracto: es la consecuencia esperada de mantener al líder en el cargo.',
       recomendacion:
         'La gerencia destructiva humilla y retiene información crítica para sostener su estatus, generando costos millonarios en retención. La consultoría estratégica reestructura drásticamente los incentivos para alinear los intereses financieros del líder con la supervivencia de su equipo.',
       planSugerido:
@@ -336,7 +336,7 @@ export const COMPLIANCE_DIMENSION_DICTIONARY: Record<
       body:
         'Las interacciones intra-equipo dan energía en lugar de extraerla. ' +
         'La alta confianza blinda al empleado contra el burnout incluso en periodos de sobrecarga técnica. ' +
-        'Esto no es un beneficio — es la última línea de defensa contra el desgaste.',
+        'Esto no es un beneficio: es la última línea de defensa contra el desgaste.',
       recomendacion:
         'Interacciones cohesionadas reducen drásticamente los costos de transacción política y blindan al talento durante las crisis de carga técnica. El análisis avanzado permite a las corporaciones identificar y cuidar a los individuos que actúan como motores de esta red social.',
       planSugerido:
@@ -357,7 +357,7 @@ export const COMPLIANCE_DIMENSION_DICTIONARY: Record<
       headline: 'Colaborar es más estresante que trabajar.',
       body:
         'El clima social pasó de soporte a lastre operativo. ' +
-        'El empleado termina la jornada sin capacidad ejecutiva restante — y no se recupera en su tiempo personal. ' +
+        'El empleado termina la jornada sin capacidad ejecutiva restante, y no se recupera en su tiempo personal. ' +
         'O el menosprecio pasivo se normalizó. O el liderazgo seca las reservas emocionales del equipo. ' +
         'La desconexión y el ausentismo prolongado son la consecuencia, no la sorpresa.',
       recomendacion:
@@ -369,7 +369,7 @@ export const COMPLIANCE_DIMENSION_DICTIONARY: Record<
       headline: 'El equipo evita activamente al equipo.',
       body:
         'Este es el umbral que precede al quiebre psiquiátrico individual. ' +
-        'La evasión activa de las interacciones grupales no es introversión — es trauma. ' +
+        'La evasión activa de las interacciones grupales no es introversión: es trauma. ' +
         'Las licencias prolongadas y la solicitud de atención psicológica de urgencia son el siguiente paso documentado. ' +
         'El costo del entorno tóxico ya cruzó el balance.',
       recomendacion:
@@ -532,9 +532,9 @@ export const PATRONES_LLM: {
 
   cierres: {
     cultural:
-      'La gerencia está tomando decisiones con información filtrada por toda la estructura. Cada decisión construida sobre datos incompletos tiene un costo oculto en el balance — hasta que una crisis lo hace visible.',
+      'La gerencia está tomando decisiones con información filtrada por toda la estructura. Cada decisión construida sobre datos incompletos tiene un costo oculto en el balance, hasta que una crisis lo hace visible.',
     localizado:
-      'Los focos localizados tienen una ventaja sobre los problemas culturales: tienen dirección y límites claros. El problema es que también tienen tiempo — y el tiempo siempre los consolida.',
+      'Los focos localizados tienen una ventaja sobre los problemas culturales: tienen dirección y límites claros. El problema es que también tienen tiempo, y el tiempo siempre los consolida.',
   },
 };
 

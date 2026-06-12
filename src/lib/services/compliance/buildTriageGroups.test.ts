@@ -136,7 +136,7 @@ test('A. intro conectora — verbatim caso real (20% · 2 de 6 · otras 4)', () 
   assert.equal(
     buildTriageIntro(20, 2, 6, 4),
     'El 20% que respondió se concentra en 2 de las 6 gerencias. ' +
-      'En las otras 4 el índice no llega — y ahí, las señales externas son la única lectura disponible.',
+      'En las otras 4 el índice no llega, y ahí las señales externas son la única lectura disponible.',
   );
 });
 
@@ -155,7 +155,7 @@ test('B. drift-guard: lecturas singulares verbatim del dictionary no cambiaron',
   );
   assert.equal(
     fuego?.narrativa,
-    'El riesgo en esta área ya no es algo por anticipar: una denuncia formal por Ley Karin fijó el nivel al máximo e invalidó la lectura oficial. El sistema entero existe para evitar llegar acá — en Comercial el límite ya se cruzó.',
+    'El riesgo en esta área ya no es algo por anticipar: una denuncia formal por Ley Karin fijó el nivel al máximo e invalidó la lectura oficial. El sistema entero existe para evitar llegar acá: en Comercial el límite ya se cruzó.',
   );
 
   // HUMO A-legal
@@ -344,7 +344,7 @@ test('D3. HUMO/B — hijo genuino emite "vía" + narrativa singular', () => {
   assert.equal(g.kicker, 'EN HUMO · Fricción en la entrada');
   assert.equal(
     triageInstanceLine(g.instances[0]),
-    'GERENCIA DE PERSONAS · riesgo 85 de 100 — el foco: Subgerencia de Cultura y DO',
+    'GERENCIA DE PERSONAS · riesgo 85 de 100 · el foco: Subgerencia de Cultura y DO',
   );
   assert.equal(g.instances[0].viaWorstDept, 'Subgerencia de Cultura y DO');
 });
@@ -388,7 +388,7 @@ test('D4b. PUNTO_CIEGO — scores distintos → NO factoriza (líneas normales)'
   assert.deepEqual(
     g.instances.map((i) => triageInstanceLine(i)),
     [
-      'Gerencia de Operaciones · riesgo 60 de 100 — el foco: Seguridad',
+      'Gerencia de Operaciones · riesgo 60 de 100 · el foco: Seguridad',
       'Gerencia de Finanzas · riesgo 50 de 100',
     ],
   );

@@ -166,7 +166,7 @@ test('A2. buildDriversText — verbatim §2b-3, condicional por driver', () => {
   );
   assert.equal(
     buildDriversText(0, 0, 'piso_aplicado'),
-    '75 directo: hubo denuncia formal en el año — el hecho solo pone al área en prioridad, diga lo que diga el resto.',
+    '75 directo: hubo denuncia formal en el año. El hecho solo pone al área en prioridad, diga lo que diga el resto.',
   );
 });
 
@@ -207,7 +207,7 @@ test('A4. buildDeclararonText — abre con participación (§2c-5); con_isa "ISA
   } as unknown as GerenciaRollup;
   assert.equal(
     buildDeclararonText(conIsa, rollup),
-    'Participación: 65% — ISA 72 · Atención',
+    'Participación: 65%. ISA 72 · Atención',
   );
   // sub_threshold con participación 0 → "Participación: 0% — Nada medible…"
   const sub = mkRiskScore({ departmentId: 's', bucket: 'sub_threshold' });
@@ -216,7 +216,7 @@ test('A4. buildDeclararonText — abre con participación (§2c-5); con_isa "ISA
       isa: { weighted: null },
       silencio: { participationRate: 0 },
     } as unknown as GerenciaRollup),
-    'Participación: 0% — Nada medible este ciclo: el equipo no alcanzó el mínimo de respuestas para una lectura interna.',
+    'Participación: 0%. Nada medible este ciclo: el equipo no alcanzó el mínimo de respuestas para una lectura interna.',
   );
 });
 
@@ -240,7 +240,7 @@ test('B1. individual — estructura §2b completa + veredicto singular', () => {
   );
   assert.equal(
     b.declararon,
-    'Participación: 0% — Nada medible este ciclo: el equipo no alcanzó el mínimo de respuestas para una lectura interna.',
+    'Participación: 0%. Nada medible este ciclo: el equipo no alcanzó el mínimo de respuestas para una lectura interna.',
   );
   assert.equal(
     b.senales,
@@ -253,7 +253,7 @@ test('B1. individual — estructura §2b completa + veredicto singular', () => {
   );
   assert.equal(
     m.pie,
-    'Las señales cuentan por fecha del hecho — últimos 12 meses, sin importar estado ni desenlace.',
+    'Las señales cuentan por fecha del hecho: últimos 12 meses, sin importar estado ni desenlace.',
   );
   // SUS DEPARTAMENTOS: excluye la gerencia-misma ('com'), muestra el hijo.
   assert.deepEqual(

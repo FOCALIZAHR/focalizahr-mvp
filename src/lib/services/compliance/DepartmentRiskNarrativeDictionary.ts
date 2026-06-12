@@ -79,7 +79,7 @@ export interface DepartmentRiskNarrative {
 // ════════════════════════════════════════════════════════════════════════════
 
 const FUEGO_TEMPLATE =
-  'El riesgo en esta área ya no es algo por anticipar: una denuncia formal por Ley Karin fijó el nivel al máximo e invalidó la lectura oficial. El sistema entero existe para evitar llegar acá — en [Área] el límite ya se cruzó.';
+  'El riesgo en esta área ya no es algo por anticipar: una denuncia formal por Ley Karin fijó el nivel al máximo e invalidó la lectura oficial. El sistema entero existe para evitar llegar acá: en [Área] el límite ya se cruzó.';
 
 const HUMO_A_LEGAL =
   'El equipo guarda silencio masivo en los canales oficiales, pero quien se fue dejó una señal de Ley Karin. Esto no es rotación: es un riesgo jurídico en formación, del tipo que suele preceder a una denuncia formal. Actuar sobre la señal ahora es lo que separa la prevención de un pasivo legal activo.';

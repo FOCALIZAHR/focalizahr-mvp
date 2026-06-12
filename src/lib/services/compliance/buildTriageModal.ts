@@ -56,11 +56,11 @@ const DRIVERS_SILENCIO =
 const DRIVERS_SENALES =
   'Las señales pesan porque son hechos del último año, dejados por quienes salieron o entraron.';
 const DRIVERS_PISO =
-  '75 directo: hubo denuncia formal en el año — el hecho solo pone al área en prioridad, diga lo que diga el resto.';
+  '75 directo: hubo denuncia formal en el año. El hecho solo pone al área en prioridad, diga lo que diga el resto.';
 
 // §2b-8 — APROBADO (verbatim).
 const PIE =
-  'Las señales cuentan por fecha del hecho — últimos 12 meses, sin importar estado ni desenlace.';
+  'Las señales cuentan por fecha del hecho: últimos 12 meses, sin importar estado ni desenlace.';
 
 // §2b-4 — APROBADO (Victor 2026-06-11).
 const DECLARARON_NADA =
@@ -162,7 +162,7 @@ export function buildDeclararonText(
   rollup: GerenciaRollup,
 ): string {
   const pct = Math.round((rollup.silencio.participationRate ?? 0) * 100);
-  const prefijo = `Participación: ${pct}% — `;
+  const prefijo = `Participación: ${pct}%. `;
   if (worstRs.bucket === 'con_isa' && rollup.isa.weighted !== null) {
     const isa = Math.round(rollup.isa.weighted);
     const band = ISA_NARRATIVES[classifyIsa(isa)].badge;

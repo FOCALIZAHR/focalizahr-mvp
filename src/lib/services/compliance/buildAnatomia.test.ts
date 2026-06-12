@@ -42,7 +42,7 @@ test('A1. caso real — forma TODO BAJO, foco P2, hero 0/6 ámbar', () => {
   assert.deepEqual(a.hero, { dimsEnSano: 0, total: 6, color: 'amber' });
   assert.equal(a.titular, 'No hay una grieta: el piso está parejo y bajo.');
   assert.deepEqual(a.parrafos, [
-    'Ninguna condición sostiene al resto — todas caen por debajo de la línea. El problema no está localizado, es transversal.',
+    'Ninguna condición sostiene al resto: todas caen por debajo de la línea. El problema no está localizado, es transversal.',
   ]);
   assert.deepEqual(a.focoParrafo, {
     pre: 'Aun así, una pesa más que las demás: ',

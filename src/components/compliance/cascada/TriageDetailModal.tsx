@@ -80,7 +80,7 @@ function ScoreLine({
           {block.score}
         </span>
         <span className="text-slate-400 font-light">
-          {' de riesgo — '}
+          {' de riesgo: '}
           {block.scoreNarrada}
         </span>
         {withInfo && (
