@@ -50,6 +50,9 @@ La cascada `Ambiente Sano` fue rearmada de raíz contra el plan §3 (espejo del 
 | **Gate 3a Anatomía — fundación dimFoco + display** | ✅ (puro) | `ffcd73e` |
 | **Gate 3b Anatomía — el acto** | ✅ (visto Victor) | `5b78834` |
 | **Gate 3c Anatomía — modal + shell común** | ✅ (visto Victor) | `adc15a5` |
+| **Barrido em-dashes (48) prosa visible** | ✅ | `4e404b9` |
+| **Gate 4 La Voz — acto material crudo** | ✅ (visto Victor) | `81a3df8` |
+| **Gate 5 El Nombre — concentración por rama** | ✅ (visto Victor) | `617bdce` |
 
 ### Gate 3 (Anatomía) — cerrado (2026-06-12, `ffcd73e`/`5b78834`/`adc15a5`)
 
@@ -65,7 +68,13 @@ Beat 3 completo. Sub-gates: **3a** fundación pura (`dimFoco` doble filtro grave
 
 `buildLaVoz` (pure) + `ActoVoz` reescrito — el acto del material crudo (citas verbatim, composición tipográfica sin cards/bullets/barras; purple exclusivo del kicker IA). Selector por **FAMILIA** `SILENCIO_FAMILY = {silencio_organizacional, resignacion_aprendida, miedo_represalias}` (lista explícita auditable + test) sobre `patron_dominante.nombre` ya persistido — no inventa clasificador. Citas sanitizadas (`stripWrappingQuotes` arregla el bug `""…""`), dedup, tope 6. Género a nivel **gerencia** (`parentDepartmentName`, anonimato + consistencia Apertura). 9 oráculos. tsc 0, 214/214, audit em-dashes 0 (`buildLaVoz.ts` agregado al auditor). Caso real cmob0e56 = forma silencio, 5 voces + 1 voz género (Gerencia de Tecnología).
 
-### Beat 5 (El Nombre) — INVESTIGACIÓN read-only (NO abrir; diseño viene de arquitectura)
+### Gate 5 (El Nombre) — CERRADO (`617bdce`, visto Victor 2026-06-12)
+
+`buildElNombre` (pure) + `ActoNombre` reescrito + `ElNombreModal` (CascadaModalShell, Tesla ámbar). El deterioro converge en una RAMA del organigrama; el informe NO nombra personas (nombra ramas como unidad organizacional). **Regla TRES LLAVES** re-ordenando en el builder (motor intacto): legal (denuncia>indicio, cruzado con riskScores[]) → tamaño → ISA promedio → managerId. Narrativa CASO 1 verbatim del motor (`buildCriticalByManagerNarrative` exportado, client-safe; em-dash barrido). Hero **ámbar** (violet MUERTO). Postura + cierre (número en letras). Factorización + modal nombran ramas secundarias como GERENCIA. **Sello privacy actualizado** (ConvergenciaEngine): managerId nombrable como gerencia, jamás persona. cmob0e56 NO emite (criticalByManager vacío) → assert. 9 oráculos, fixtures sintéticos (cmob0e56 no sirve). tsc 0, 223/223, audit 0.
+
+**Flags (en ESTADO_CASCADA):** (1) primera campaña real que emita El Nombre → revisión Victor (solo validado con fixtures). (2) `ComplianceNarrativeEngine` tiene 25 em-dashes legacy (no-cascada) → barrido módulo dashboard como gate propio; archivo fuera del auditor con comentario, los 2 cascada-visibles barridos.
+
+### Beat 5 — INVESTIGACIÓN previa (referencia histórica)
 
 **Qué existe HOY:** `ActoNombre.tsx` (Beat 5) **renderiza** (no es hueco) — diseño legacy: ancla violeta = `criticalByManager.length` + un párrafo `narratives.criticalByManagerNarrativa` verbatim. Guard: oculto si narrativa vacía (AREA_MANAGER) o `criticalByManager` vacío. **Nota palette:** usa violet/purple, que ahora es SOLO-IA por la regla §7 — a corregir en el rediseño.
 

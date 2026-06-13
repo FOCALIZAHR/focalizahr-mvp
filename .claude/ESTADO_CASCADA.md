@@ -1,7 +1,7 @@
 # ESTADO_CASCADA — Ambiente Sano · Cascada Ejecutiva
 > Documento de traspaso del chat de arquitectura. Se actualiza al cierre de cada gate.
 > Si este chat muere o compacta: chat nuevo + este archivo + los HANDOFF_GATE_*.md en `.claude/tasks/` = continuidad total.
-> Actualizado: 2026-06-12 · post-Gate 4 La Voz.
+> Actualizado: 2026-06-12 · post-Gate 5 El Nombre.
 
 ## Método de trabajo
 Chat de arquitectura (diseña en pantalla, audita copy, escribe handoffs) → Victor (visto en cada gate, copia handoffs a `.claude/tasks/`) → Claude Code (cablea con tests-oráculo verbatim, pantalla real, SIN COMMIT hasta visto) → commit. Un gate por vez; cola sin plan-documento. Sesiones de Code: misma sesión mientras dure el arco; ritual de cierre (git limpio + SESSION_HANDOFF + volcar lo no-persistido).
@@ -15,7 +15,7 @@ Chat de arquitectura (diseña en pantalla, audita copy, escribe handoffs) → Vi
 | 3 Anatomía (3a fundación / 3b acto / 3c modal) | ✅ cerrado | adc15a5 (3c) |
 | Barrido em-dashes (48) | ✅ cerrado | 4e404b9 (+b2a8a9e borderlines, b2d21da script) |
 | 4 La Voz | ✅ cerrado | 81a3df8 |
-| 5 El Nombre (línea de mando) | ⚪ cola · existe acto legacy + datos investigados (ver SESSION_HANDOFF) | — |
+| 5 El Nombre (línea de mando) | ✅ cerrado | 617bdce |
 | 6 La Decisión | ⚪ existe; pendiente test de integridad contra el titular | — |
 | Gate de limpieza final | ⚪ cola | — |
 
@@ -36,7 +36,7 @@ Chat de arquitectura (diseña en pantalla, audita copy, escribe handoffs) → Vi
 
 ## Flags abiertos (decisión de Victor)
 - ComplianceNarrativeDictionary L218 "cuando entre la primera denuncia formal": posible typo (entre→entra). NO tocado.
-- **Em-dash fuera de scope del barrido**: `ComplianceNarrativeEngine.buildCriticalByManagerNarrative` (copy del Beat 5) tiene 2 em-dashes ("no es geográfico — es jerárquico", "no es un caso aislado — es un patrón estructural"). El archivo NO estaba en la lista del auditor. Se barre cuando se rediseñe El Nombre (o un barrido extendido). Auditor sigue en 0 con el scope actual.
+- **Primera campaña real que emita El Nombre → revisión de Victor** (mismo patrón que la rama con_isa del modal Triage). cmob0e56 NO lo emite (criticalByManager vacío); la tres-llaves + factorización solo se validaron con fixtures sintéticos.
 - Copy DESPAREJO-plural corregido a "las dos que más caen por debajo de la línea" (N≥2): confirmar aplicado en commit 3b.
 - Rama con_isa del modal Triage sin caso real que la ejercite (oráculo A4 + flag).
 
@@ -44,6 +44,7 @@ Chat de arquitectura (diseña en pantalla, audita copy, escribe handoffs) → Vi
 - Gate de limpieza (final): remover copyFor/mundos viejos + fuente única classifyIsa (re-keyear mapas gauge + deriveBeat1Slots).
 - Motor (task propia): ConvergenciaEngine y ComplianceAlertService filtran por estado en vez de fecha.
 - Evolución La Voz: versión N-grande (LLM agrupa temas + citas representativas, batch persistido) cuando haya campañas con muchas voces.
+- **Barrido em-dashes módulo dashboard**: `ComplianceNarrativeEngine` tiene 25 em-dashes legacy (acto1-4 / cierre / origen, no-cascada) + posibles más en `src/app/dashboard/compliance/`. Gate propio cuando se toque ese módulo, NO de pasada. Los 2 em-dashes cascada-visibles (Beat 5) ya barridos; el archivo queda fuera del auditor (file-scope rompería el 0) con comentario.
 - ComplianceActiveState a Cinema Mode (cosmética vieja).
 
 ## Campaña de verificación
