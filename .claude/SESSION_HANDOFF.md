@@ -61,9 +61,21 @@ Beat 3 completo. Sub-gates: **3a** fundación pura (`dimFoco` doble filtro grave
 
 48 reemplazos verbatim de `TABLA_EMDASHES_BARRIDO.md` aplicados (10 archivos). Auditoría en **0** (`scripts/audit-emdashes-cascada.ts` queda como verificación permanente — debe seguir en 0). tsc 0, 205/205. **Regla del producto vigente:** ningún `—` como puntuación de prosa en texto visible; glifo de sin-dato (`'—'` standalone) permitido. Decisiones: conector mov3 (render L777 + oráculo `mov3ToText` L599) = `:` en AMBOS (invariante render=oráculo; el mapeo `·/:` de la tabla era inconsistente). `ComplianceNarrativeDictionary.ts:218` ("cuando entre") = **flag de typo preexistente para Victor**, NO tocado.
 
-### PRÓXIMO BEAT — La Voz (Beat 4) — DISEÑO PENDIENTE
+### Gate 4 (La Voz) — CERRADO (`81a3df8`, visto Victor 2026-06-12)
 
-NO abrir todavía: el diseño de La Voz viene del chat de arquitectura. El `ActoVoz.tsx` actual (Gate 7) es el estado legacy a reemplazar cuando llegue el diseño.
+`buildLaVoz` (pure) + `ActoVoz` reescrito — el acto del material crudo (citas verbatim, composición tipográfica sin cards/bullets/barras; purple exclusivo del kicker IA). Selector por **FAMILIA** `SILENCIO_FAMILY = {silencio_organizacional, resignacion_aprendida, miedo_represalias}` (lista explícita auditable + test) sobre `patron_dominante.nombre` ya persistido — no inventa clasificador. Citas sanitizadas (`stripWrappingQuotes` arregla el bug `""…""`), dedup, tope 6. Género a nivel **gerencia** (`parentDepartmentName`, anonimato + consistencia Apertura). 9 oráculos. tsc 0, 214/214, audit em-dashes 0 (`buildLaVoz.ts` agregado al auditor). Caso real cmob0e56 = forma silencio, 5 voces + 1 voz género (Gerencia de Tecnología).
+
+### Beat 5 (El Nombre) — INVESTIGACIÓN read-only (NO abrir; diseño viene de arquitectura)
+
+**Qué existe HOY:** `ActoNombre.tsx` (Beat 5) **renderiza** (no es hueco) — diseño legacy: ancla violeta = `criticalByManager.length` + un párrafo `narratives.criticalByManagerNarrativa` verbatim. Guard: oculto si narrativa vacía (AREA_MANAGER) o `criticalByManager` vacío. **Nota palette:** usa violet/purple, que ahora es SOLO-IA por la regla §7 — a corregir en el rediseño.
+
+**Qué nombra:** NO nombra una persona. `buildCriticalByManagerNarrative` (`ComplianceNarrativeEngine:799`) nombra los **departamentos** que comparten línea de mando ("{n} áreas críticas dependen de la misma línea de mando: {deptNames}…"). 2 variantes (1 línea / múltiples líneas).
+
+**De dónde sale la "línea de mando":** `ComplianceAnalysisOrchestrator:285` → `managerId: deptInfo.parentId` — el "manager" de compliance es el **departamento PADRE** (la gerencia), NO un Employee. `buildGlobalConvergencia` agrupa depts por ese parentId con `deltaIsa ≥ 30` (sub-deptos del mismo padre con climas muy dispares). `CriticalByManagerGroup = {managerId, departmentIds, deltaIsa, minIsa, maxIsa}`. **Privacy sellada (comentario del tipo): `managerId` solo como key, NUNCA renderizar; el frontend lee solo `departmentIds`.**
+
+**Datos de jefatura que SÍ persiste el sistema (no usados por compliance):** la línea jerárquica REAL vive en **`Employee`**: `managerId` (self-relation jefe→subordinados), `fullName`, `position`/`jobTitle`, `standardJobLevel` ('gerente_director'|'subgerente_subdirector'|'jefe'|…), `managerLevel` (1 CEO…5 IC). `Department` NO tiene managerId — solo `parentId`/`level`/`displayName` (la jerarquía estructural). → Si arquitectura quiere que El Nombre nombre una persona/cargo, **el dato existe (Employee)** pero NO está cableado a compliance y choca con la **privacy sellada** (nombrar un jefe individual en un informe Ambiente Sano = decisión de Victor, no gap de datos).
+
+**Caso real cmob0e56:** los 2 deptos con_isa (TI, Equipos Médicos) están en gerencias distintas → probablemente sin grupo `criticalByManager` → El Nombre no renderiza. (No verificado con dato; condicional.)
 
 ### (histórico) Inventario de em-dashes — insumo del barrido ya cerrado
 

@@ -1,7 +1,7 @@
 # ESTADO_CASCADA — Ambiente Sano · Cascada Ejecutiva
 > Documento de traspaso del chat de arquitectura. Se actualiza al cierre de cada gate.
 > Si este chat muere o compacta: chat nuevo + este archivo + los HANDOFF_GATE_*.md en `.claude/tasks/` = continuidad total.
-> Actualizado: 2026-06-12 · post-barrido em-dashes.
+> Actualizado: 2026-06-12 · post-Gate 4 La Voz.
 
 ## Método de trabajo
 Chat de arquitectura (diseña en pantalla, audita copy, escribe handoffs) → Victor (visto en cada gate, copia handoffs a `.claude/tasks/`) → Claude Code (cablea con tests-oráculo verbatim, pantalla real, SIN COMMIT hasta visto) → commit. Un gate por vez; cola sin plan-documento. Sesiones de Code: misma sesión mientras dure el arco; ritual de cierre (git limpio + SESSION_HANDOFF + volcar lo no-persistido).
@@ -14,8 +14,8 @@ Chat de arquitectura (diseña en pantalla, audita copy, escribe handoffs) → Vi
 | 2 Triage (acto+modal+pulido) | ✅ cerrado | 8dbfb2c, b16f75b, f37a0a2 |
 | 3 Anatomía (3a fundación / 3b acto / 3c modal) | ✅ cerrado | adc15a5 (3c) |
 | Barrido em-dashes (48) | ✅ cerrado | 4e404b9 (+b2a8a9e borderlines, b2d21da script) |
-| 4 La Voz | 🔵 diseño aprobado, handoff listo | HANDOFF_GATE_4_LA_VOZ.md |
-| 5 El Nombre (línea de mando) | ⚪ cola | — |
+| 4 La Voz | ✅ cerrado | 81a3df8 |
+| 5 El Nombre (línea de mando) | ⚪ cola · existe acto legacy + datos investigados (ver SESSION_HANDOFF) | — |
 | 6 La Decisión | ⚪ existe; pendiente test de integridad contra el titular | — |
 | Gate de limpieza final | ⚪ cola | — |
 
@@ -36,6 +36,7 @@ Chat de arquitectura (diseña en pantalla, audita copy, escribe handoffs) → Vi
 
 ## Flags abiertos (decisión de Victor)
 - ComplianceNarrativeDictionary L218 "cuando entre la primera denuncia formal": posible typo (entre→entra). NO tocado.
+- **Em-dash fuera de scope del barrido**: `ComplianceNarrativeEngine.buildCriticalByManagerNarrative` (copy del Beat 5) tiene 2 em-dashes ("no es geográfico — es jerárquico", "no es un caso aislado — es un patrón estructural"). El archivo NO estaba en la lista del auditor. Se barre cuando se rediseñe El Nombre (o un barrido extendido). Auditor sigue en 0 con el scope actual.
 - Copy DESPAREJO-plural corregido a "las dos que más caen por debajo de la línea" (N≥2): confirmar aplicado en commit 3b.
 - Rama con_isa del modal Triage sin caso real que la ejercite (oráculo A4 + flag).
 
