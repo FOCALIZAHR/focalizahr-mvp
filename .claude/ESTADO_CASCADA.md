@@ -1,7 +1,7 @@
 # ESTADO_CASCADA — Ambiente Sano · Cascada Ejecutiva
 > Documento de traspaso del chat de arquitectura. Se actualiza al cierre de cada gate.
 > Si este chat muere o compacta: chat nuevo + este archivo + los HANDOFF_GATE_*.md en `.claude/tasks/` = continuidad total.
-> Actualizado: 2026-06-12 · post-Gate 5 El Nombre.
+> Actualizado: 2026-06-13 · Gate 6 ítems 1+3 (ítem 2 diferido).
 
 ## Método de trabajo
 Chat de arquitectura (diseña en pantalla, audita copy, escribe handoffs) → Victor (visto en cada gate, copia handoffs a `.claude/tasks/`) → Claude Code (cablea con tests-oráculo verbatim, pantalla real, SIN COMMIT hasta visto) → commit. Un gate por vez; cola sin plan-documento. Sesiones de Code: misma sesión mientras dure el arco; ritual de cierre (git limpio + SESSION_HANDOFF + volcar lo no-persistido).
@@ -16,7 +16,7 @@ Chat de arquitectura (diseña en pantalla, audita copy, escribe handoffs) → Vi
 | Barrido em-dashes (48) | ✅ cerrado | 4e404b9 (+b2a8a9e borderlines, b2d21da script) |
 | 4 La Voz | ✅ cerrado | 81a3df8 |
 | 5 El Nombre (línea de mando) | ✅ cerrado | 617bdce |
-| 6 La Decisión | ⚪ existe; pendiente test de integridad contra el titular | — |
+| 6 La Decisión | 🟡 test integridad: mecánico ✅ + editorial → ítems 1+3 ✅, ítem 2 DIFERIDO | dfddacd · 7a8b21f |
 | Gate de limpieza final | ⚪ cola | — |
 
 ## Reglas selladas (NO renegociar sin Victor)
@@ -36,6 +36,7 @@ Chat de arquitectura (diseña en pantalla, audita copy, escribe handoffs) → Vi
 
 ## Flags abiertos (decisión de Victor)
 - ComplianceNarrativeDictionary L218 "cuando entre la primera denuncia formal": posible typo (entre→entra). NO tocado.
+- **Gate 6 ítem 2 (cierre de La Decisión — Regla del Río)**: DIFERIDO a decisión de autor de Victor, CON la Anatomía corregida en pantalla. Copy propuesto en `HANDOFF_GATE_6_LA_DECISION.md §2` (titular ampliado + puente al afluente de dimensiones). La Decisión queda VERBATIM hasta esa decisión. Cierra Beat 6.
 - **Primera campaña real que emita El Nombre → revisión de Victor** (mismo patrón que la rama con_isa del modal Triage). cmob0e56 NO lo emite (criticalByManager vacío); la tres-llaves + factorización solo se validaron con fixtures sintéticos.
 - Copy DESPAREJO-plural corregido a "las dos que más caen por debajo de la línea" (N≥2): confirmar aplicado en commit 3b.
 - Rama con_isa del modal Triage sin caso real que la ejercite (oráculo A4 + flag).
