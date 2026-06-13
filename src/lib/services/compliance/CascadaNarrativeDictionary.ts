@@ -46,9 +46,13 @@ export const CONVERGENCIA_TOOLTIP =
   'independientes confirman la misma señal, la probabilidad de error se ' +
   'reduce significativamente. Sin cruce de fuentes, cualquier señal puede ser ruido.';
 
-/** Sustento del nodo PREDICTOR — ancla científica. */
+/** Sustento del nodo PREDICTOR — ancla científica. Gate 6 ítem 3: agrega el
+ *  elemento (c) umbrales de interpretación (frase del medio, escala de la
+ *  cascada) y barre el em-dash. Verbatim arquitectura 2026-06-13. */
 export const PREDICTOR_TOOLTIP =
   'La cultura tóxica predice rotación 10 veces mejor que la compensación. ' +
-  'No es que la gente se va por sueldo — se va porque el ambiente la expulsa. ' +
-  'MIT Sloan Management Review, 2022. Muestra: 500 empresas, 170 factores ' +
-  'culturales analizados.';
+  'No es que la gente se va por sueldo: se va porque el ambiente la expulsa. ' +
+  'Se considera señal fuerte cuando el ambiente queda bajo el nivel sano; ' +
+  'bajo nivel crítico, es el predictor que manda sobre cualquier otro. ' +
+  'Fuente: MIT Sloan Management Review, 2022. Muestra: 500 empresas, ' +
+  '170 factores culturales analizados.';

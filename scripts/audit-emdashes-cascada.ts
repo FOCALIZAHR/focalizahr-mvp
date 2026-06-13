@@ -48,6 +48,7 @@ const FILES = [
   'src/lib/services/compliance/AmbienteSynthesisEngine.ts',
   // ── Dictionaries de compliance ──
   'src/config/narratives/ComplianceNarrativeDictionary.ts',
+  'src/lib/services/compliance/CascadaNarrativeDictionary.ts',
   'src/lib/services/compliance/DepartmentRiskNarrativeDictionary.ts',
   'src/lib/services/compliance/CoverageNarrativeDictionary.ts',
   'src/lib/services/compliance/AmbienteSynthesisDictionary.ts',
