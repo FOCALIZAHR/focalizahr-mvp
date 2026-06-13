@@ -77,15 +77,16 @@ export default memo(function ActoAnatomia({ data }: ActoAnatomiaProps) {
             </p>
           ))}
 
-          {/* Párrafo del foco — llana cyan semibold + ⓘ del foco. */}
+          {/* Párrafo del foco — llana cyan semibold INLINE + ⓘ del foco pegado.
+              Gate 6 fix: el foco va como <span> plano en el flujo de la oración;
+              SOLO el ⓘ se envuelve en Tooltip (el inline-flex del Tooltip
+              alrededor del texto lo desprendía de la frase). */}
           {acto.focoParrafo && (
             <p className="text-base font-light text-slate-400 leading-relaxed text-center mb-5">
               {acto.focoParrafo.pre}
+              <span className="font-semibold text-cyan-400">{acto.focoParrafo.foco}</span>
               <Tooltip content={FOCO_INFO}>
-                <span className="font-semibold text-cyan-400 cursor-help">
-                  {acto.focoParrafo.foco}
-                </span>
-                <span className="ml-0.5 text-[10px] text-slate-600 align-super">ⓘ</span>
+                <span className="ml-0.5 text-[10px] text-slate-600 align-super cursor-help">ⓘ</span>
               </Tooltip>
               {acto.focoParrafo.post}
             </p>
