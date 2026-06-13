@@ -1,133 +1,100 @@
 'use client';
 
 // src/components/compliance/cascada/ActoVoz.tsx
-// Beat 4 de la Cascada — "La Voz".
+// Beat 4 de la Cascada — "La Voz" · GATE 4.
 //
-// Gate 7 (2026-06-07) — REESCRITURA COMPLETA. Borra el contenido legacy del
-// archivo (patrones LLM con parrafoGancho elaborado). El nuevo contenido es:
-//   - Citas literales (fragmentos ≤8 palabras de respuestas abiertas P1).
-//   - Cláusula de género (alertasGenero) si hay alerta con cita.
+// El acto del material crudo: las citas tal como llegaron. Toda la lógica +
+// copy viven en `buildLaVoz` (pure, testeado); el componente solo pinta.
+// Composición tipográfica — sin cards, sin bullets, sin barras laterales.
+// Las citas hablan por sí mismas; este acto presenta y lee el alcance.
 //
-// La voz NO se interpreta acá. Las citas hablan por sí mismas. CERO menciones
-// de "marcador", "texto libre", "LLM", "patrón" — esa jerga vivía en el legacy.
-// El análisis de patrones ya alimenta Beat 2 (ranking del Triage); Beat 4 es
-// la lectura cruda de lo que la gente dijo.
-//
-// Privacy: las citas vienen pre-anonimizadas del orchestrator de cierre
-// (max 8 palabras, sin identificadores). No se exponen identidades.
+// Purple EXCLUSIVO del kicker de IA (voz con sesgo de género). Privacy: las
+// citas vienen pre-anonimizadas (≤8 palabras) y el género se señala a nivel
+// GERENCIA (anonimato en áreas chicas).
 
 import { memo, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { ActSeparator, fadeIn, fadeInDelay } from './shared';
 import { formatDepartmentName } from '@/lib/utils/formatName';
+import { buildLaVoz } from '@/lib/services/compliance/buildLaVoz';
 import type { ComplianceReportResponse } from '@/types/compliance';
-import type { GenderAlertDetail } from '@/lib/services/compliance/ComplianceNarrativeEngine';
-
-const MAX_CITAS = 6;
 
 interface ActoVozProps {
   data: ComplianceReportResponse;
 }
 
 export default memo(function ActoVoz({ data }: ActoVozProps) {
-  // Citas literales — agregadas de los fragmentos de cada depto. Dedup + tope.
-  const citas = useMemo<string[]>(() => {
-    const departments = data.data.departments ?? [];
-    const all: string[] = [];
-    for (const dept of departments) {
-      const frags = dept.patrones?.patron_dominante?.fragmentos ?? [];
-      for (const f of frags) {
-        const clean = f.trim();
-        if (clean.length > 0) all.push(clean);
-      }
-    }
-    // Dedup case-insensitive + máximo MAX_CITAS para no saturar el render.
-    const seen = new Set<string>();
-    const uniq: string[] = [];
-    for (const c of all) {
-      const key = c.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      uniq.push(c);
-      if (uniq.length >= MAX_CITAS) break;
-    }
-    return uniq;
-  }, [data]);
+  const acto = useMemo(() => buildLaVoz(data), [data]);
+  if (!acto) return null;
 
-  // Cláusula género — solo alertas con cita literal no vacía.
-  const generos = useMemo<GenderAlertDetail[]>(() => {
-    const raw = (data.narratives.alertasGenero ?? []) as GenderAlertDetail[];
-    return raw.filter(
-      (g) => typeof g.evidenciaGenero === 'string' && g.evidenciaGenero.trim().length > 0,
-    );
-  }, [data]);
-
-  // Guard: si no hay nada que mostrar, el beat se omite (anti-default-as-meaning).
-  if (citas.length === 0 && generos.length === 0) return null;
-
-  const heroNumber = citas.length;
-  const heroLabel =
-    citas.length === 0
-      ? 'sin voces recogidas este ciclo'
-      : citas.length === 1
-      ? 'voz recogida'
-      : 'voces recogidas';
+  const heroLabel = acto.n === 1 ? 'voz recogida' : 'voces recogidas';
 
   return (
     <>
       <ActSeparator label="La Voz" color="cyan" />
       <div>
+        {/* Hero — cantidad de voces. */}
         <motion.div {...fadeInDelay} className="text-center mb-10">
-          <p className="text-7xl md:text-8xl font-extralight tracking-tight text-white">
-            {heroNumber}
+          <p className="text-7xl md:text-8xl font-extralight tracking-tight text-cyan-400 tabular-nums">
+            {acto.n}
           </p>
           <p className="text-xs text-slate-500 mt-3 uppercase tracking-wider">
             {heroLabel}
           </p>
         </motion.div>
 
-        <motion.div {...fadeIn} className="max-w-2xl mx-auto space-y-6">
-          {/* Lista de citas — la gente hablando, sin interpretar. */}
-          {citas.length > 0 && (
-            <div className="space-y-3">
-              {citas.map((cita, i) => (
-                <div
-                  key={`cita-${i}`}
-                  className="border-l-2 border-slate-700/40 pl-4"
-                >
-                  <p className="text-sm italic font-light text-slate-300 leading-relaxed">
-                    &ldquo;{cita}&rdquo;
-                  </p>
-                </div>
+        <motion.div {...fadeIn} className="max-w-2xl mx-auto">
+          {/* Narrativa (selector silencio / neutra) — destacado peso 400 blanco. */}
+          <p className="text-base md:text-lg font-light text-slate-400 leading-relaxed text-center mb-8">
+            {acto.narrativa.pre}
+            {acto.narrativa.destacado && (
+              <span className="font-normal text-white">{acto.narrativa.destacado}</span>
+            )}
+            {acto.narrativa.post}
+          </p>
+
+          {/* Citas — composición centrada, cursiva fina, comillas tipográficas,
+              separadas por middot. NO lista, NO bullets, NO barras. */}
+          {acto.citas.length > 0 && (
+            <p className="text-sm italic font-light text-slate-400 leading-loose text-center">
+              {acto.citas.map((cita, i) => (
+                <span key={`cita-${i}`}>
+                  {i > 0 && <span className="not-italic text-slate-600"> · </span>}
+                  &ldquo;{cita}&rdquo;
+                </span>
               ))}
-            </div>
+            </p>
           )}
 
-          {/* Cláusula género — si hay alertas con cita literal. */}
-          {generos.length > 0 && (
-            <div className="border-t border-slate-800/40 pt-4">
-              <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
-                {generos.length === 1
-                  ? 'Voz con sesgo de género'
-                  : 'Voces con sesgo de género'}
+          {/* Voz con sesgo de género — sección condicional, kicker IA purple. */}
+          {acto.generos.length > 0 && (
+            <div className="mt-12 pt-8 border-t border-slate-800/40">
+              <p className="text-[10px] uppercase tracking-widest text-purple-400 text-center mb-6">
+                {acto.generos.length === 1 ? 'Voz' : 'Voces'} con sesgo de género · análisis IA
               </p>
-              <div className="space-y-3">
-                {generos.map((g, i) => (
-                  <div
-                    key={`genero-${g.departmentName}-${i}`}
-                    className="border-l-2 border-amber-500/30 pl-4"
-                  >
-                    <p className="text-xs text-slate-500">
-                      {formatDepartmentName(g.departmentName)}
+              <div className="space-y-5">
+                {acto.generos.map((g, i) => (
+                  <div key={`genero-${i}`} className="text-center">
+                    <p className="text-xs font-light text-slate-500">
+                      {formatDepartmentName(g.gerencia)}
                     </p>
-                    <p className="text-sm italic font-light text-slate-300 leading-relaxed mt-1">
-                      &ldquo;{g.evidenciaGenero}&rdquo;
+                    <p className="text-base md:text-lg italic font-light text-slate-200 leading-relaxed mt-1">
+                      &ldquo;{g.cita}&rdquo;
                     </p>
                   </div>
                 ))}
               </div>
+              {/* Lectura de alcance — verbatim, una vez. */}
+              <p className="text-sm font-light text-slate-400 leading-relaxed text-center mt-6 max-w-xl mx-auto">
+                {acto.lecturaAlcance}
+              </p>
             </div>
           )}
+
+          {/* Cierre cursiva. */}
+          <p className="text-sm italic font-light text-slate-400 leading-relaxed text-center mt-10">
+            {acto.cierre}
+          </p>
         </motion.div>
       </div>
     </>

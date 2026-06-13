@@ -38,6 +38,7 @@ const FILES = [
   'src/lib/services/compliance/buildTriageGroups.ts',
   'src/lib/services/compliance/buildTriageModal.ts',
   'src/lib/services/compliance/buildAnatomia.ts',
+  'src/lib/services/compliance/buildLaVoz.ts',
   'src/lib/services/compliance/deriveBeat1Slots.ts',
   'src/lib/services/compliance/AmbienteSynthesisEngine.ts',
   // ── Dictionaries de compliance ──
