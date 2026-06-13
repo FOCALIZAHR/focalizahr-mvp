@@ -634,7 +634,7 @@ function buildConvergencia(
  *   2 nombres → "TI y Equipos Médicos"
  *   3+ nombres → "TI, Equipos Médicos y N más"
  */
-function formatDeptList(names: string[]): string {
+export function formatDeptList(names: string[]): string {
   if (names.length === 0) return '';
   if (names.length === 1) return names[0];
   if (names.length === 2) return `${names[0]} y ${names[1]}`;
@@ -796,7 +796,7 @@ function buildConvergenciaCruce(
  *
  * 2 ramas (ver plan sec 2.2).
  */
-function buildCriticalByManagerNarrative(
+export function buildCriticalByManagerNarrative(
   criticalByManager: ConvergenciaGlobals['criticalByManager'],
   deptNamesById: Map<string, string>
 ): string | undefined {
@@ -819,7 +819,7 @@ function buildCriticalByManagerNarrative(
     const g = grupos[0];
     return (
       `${g.deptNames.length} áreas críticas dependen de la misma línea de mando: ${formatDeptList(g.deptNames)}. ` +
-      `El problema no es geográfico — es jerárquico. ` +
+      `El problema no es geográfico: es jerárquico. ` +
       `O hay un sesgo en cómo se gestionan los equipos bajo ese liderazgo. ` +
       `O hay una decisión estructural que nadie ha cuestionado. ` +
       `O algo está sofocando las preocupaciones antes de que se reporten. ` +
@@ -831,7 +831,7 @@ function buildCriticalByManagerNarrative(
   const totalDeptos = grupos.reduce((sum, g) => sum + g.deptNames.length, 0);
   return (
     `${grupos.length} líneas de mando distintas concentran riesgo crítico, cubriendo ${totalDeptos} áreas. ` +
-    `No es un caso aislado — es un patrón estructural en la capa intermedia de gestión. ` +
+    `No es un caso aislado: es un patrón estructural en la capa intermedia de gestión. ` +
     `O la organización no exige el mismo estándar de liderazgo entre equipos. ` +
     `O hay un perfil compartido entre estos líderes que deja pasar las preocupaciones tempranas. ` +
     `Cuando el patrón se repite bajo distintos responsables, la causa deja de ser individual.`

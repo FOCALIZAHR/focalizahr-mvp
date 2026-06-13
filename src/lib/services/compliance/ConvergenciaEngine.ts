@@ -210,8 +210,11 @@ export interface DepartmentConvergencia {
 }
 
 /**
- * Grupo criticalByManager con métricas de delta ISA. Privacy: managerId solo
- * como key, nunca renderizar al user. El frontend lee solo departmentIds.
+ * Grupo criticalByManager con métricas de delta ISA. Privacy (actualizada
+ * 2026-06-12, Gate 5): `managerId` jamás como ID crudo ni resuelto a una
+ * PERSONA; como UNIDAD ORGANIZACIONAL (displayName del Department padre) es
+ * nombrable, igual que en el resto de la cascada (el Triage ya resuelve el
+ * mismo parentId a nombre de gerencia). Los datos de Employee no se cablean.
  */
 export interface CriticalByManagerGroup {
   managerId: string;
@@ -633,7 +636,8 @@ export function detectCasosMotorA(
  *   - Por managerId con >= 2 deptos: calcula minIsa, maxIsa, deltaIsa.
  *   - Filtra: deltaIsa >= 30 AND minIsa < 50 → grupo válido.
  *
- * Privacy: managerId solo como key. departmentIds[] es lo único renderizable.
+ * Privacy (Gate 5): managerId nombrable como UNIDAD ORGANIZACIONAL (displayName
+ * del Department padre), jamás como persona. departmentIds[] siempre renderizable.
  */
 function buildCriticalByManagerWithDelta(
   departments: DepartmentConvergencia[],
