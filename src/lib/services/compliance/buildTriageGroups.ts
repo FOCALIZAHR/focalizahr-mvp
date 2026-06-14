@@ -123,11 +123,15 @@ export interface TriageActo {
 // CONSTANTES — labels, orden editorial, kickers provisionales, plurales
 // ════════════════════════════════════════════════════════════════════════════
 
+// Label VISIBLE en lenguaje de negocio (Gate 6 §2). El NOMBRE de motor
+// (FUEGO/HUMO/PUNTO_CIEGO/CONFIABLE) sigue siendo la key interna — orden y
+// color — pero la jerga nunca llega a la superficie. PUNTO CIEGO se conserva
+// (es metáfora de negocio, no nombre de motor).
 export const FAMILY_LABEL: Record<TriageFamily, string> = {
-  FUEGO: 'EN FUEGO',
-  HUMO: 'EN HUMO',
+  FUEGO: 'RIESGO CONFIRMADO',
+  HUMO: 'RIESGO EN FORMACIÓN',
   PUNTO_CIEGO: 'PUNTO CIEGO',
-  CONFIABLE: 'CONFIABLE',
+  CONFIABLE: 'LECTURA VÁLIDA',
 };
 
 /** Orden editorial: fuego → humo (A-legal → A → B por peligro) → punto ciego →
@@ -343,11 +347,15 @@ export function buildTriageGroups(data: ComplianceReportResponse): TriageActo {
   const heroLabel = `del mapa de gerencias, ${
     coverageGapPct === 100 ? 'en silencio total' : 'sin voz medible'
   }`;
+  // Sub-hero en lenguaje de negocio (Gate 6 §sub-hero, decisión Victor): el
+  // tally no puede usar jerga de motor ("en humo"/"punto ciego"). humo→"en
+  // riesgo" y puntoCiego→"sin lectura" son verbatim de Victor; fuego/confiable
+  // derivan de las labels de familia ya aprobadas (no ocurren en el caso real).
   const subParts = [
-    counts.fuego > 0 ? `${counts.fuego} en fuego` : null,
-    counts.humo > 0 ? `${counts.humo} en humo` : null,
-    counts.puntoCiego > 0 ? `${counts.puntoCiego} punto ciego` : null,
-    counts.confiable > 0 ? `${counts.confiable} confiable` : null,
+    counts.fuego > 0 ? `${counts.fuego} en riesgo confirmado` : null,
+    counts.humo > 0 ? `${counts.humo} en riesgo` : null,
+    counts.puntoCiego > 0 ? `${counts.puntoCiego} sin lectura` : null,
+    counts.confiable > 0 ? `${counts.confiable} con lectura válida` : null,
   ].filter(Boolean) as string[];
 
   // ── Intro (personResponseRate + partición responded de gerencias) ───────

@@ -77,11 +77,15 @@ export default memo(function ActoSintesis({ data, onIrAlPlan }: ActoSintesisProp
         <p className="text-xl md:text-2xl font-extralight text-white leading-relaxed">
           {synth.classification}
         </p>
-        {synth.implication.length > 0 && (
-          <p className="text-base font-light italic text-slate-300 leading-relaxed">
-            {synth.implication}
-          </p>
-        )}
+        {synth.implication.length > 0 &&
+          synth.implication.split('\n\n').map((parrafo, i) => (
+            <p
+              key={`impl-${i}`}
+              className="text-base font-light italic text-slate-300 leading-relaxed"
+            >
+              {parrafo}
+            </p>
+          ))}
 
         {/* Hipótesis "O" McKinsey — FUEGO_LEGAL / CONCENTRACION_MANDO emiten
             `risks` (causas/consecuencias posibles, sin juicio). Lista neutra. */}

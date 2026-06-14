@@ -108,12 +108,22 @@ export const SYNTHESIS_DICTIONARY: Record<DiagnosticType, SynthesisCopyEntry> = 
 
   // ─── TIPO 2 — SILENCIO_SIN_VOZ ──────────────────────────────────────────
   SILENCIO_SIN_VOZ: {
+    // Gate 6 FINAL §1 — título ampliado: recoge los DOS afluentes (Regla del
+    // Río): el ambiente (dimensiones) Y el silencio (cobertura/voz externa).
     classification:
-      'Esto no es un problema de participación. Es silencio que ya dejó señal por fuera.',
+      'Esto no es un problema de participación. Es un ambiente que no protege, y un silencio que ya dejó señal por fuera.',
+    // Cuerpo: párrafo del silencio (verbatim) + puente al afluente de dimensiones
+    // (\n\n → párrafo aparte en el render). El puente nombra el 0-dimensiones
+    // de la Anatomía y lo une al silencio como un solo diagnóstico.
     implicationBase:
       'La mayoría no respondió. Parece desinterés, hasta que se mira quién sí habló: ' +
       'los que hablaron dicen que hablar no es seguro. Ahí el silencio del resto cambia de sentido. ' +
-      'No es que no tengan nada que decir. Es que el lugar para decirlo no les parece seguro.',
+      'No es que no tengan nada que decir. Es que el lugar para decirlo no les parece seguro.' +
+      '\n\n' +
+      'Y lo que sí se midió no tranquiliza: de las seis condiciones que sostienen un buen ambiente, ' +
+      'ninguna llegó a nivel sano. La que manda es la más difícil: que hablar se sienta seguro. ' +
+      'Es la misma raíz por la que tantos callan. El silencio de afuera y la fragilidad de adentro ' +
+      'no son dos problemas: son el mismo, visto desde dos lados.',
     path:
       'El número no sube persiguiendo respuestas. ' +
       'Sube entendiendo por qué, para los que callan, hablar todavía no se siente seguro.',

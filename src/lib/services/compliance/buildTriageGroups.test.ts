@@ -322,7 +322,7 @@ test('D2. HUMO/A-legal — merge de ancestro suprime "vía" + narrativa singular
   const g = buildTriageGroups(realLikeReport()).groups.find(
     (x) => x.key === 'HUMO/A-legal',
   )!;
-  assert.equal(g.kicker, 'EN HUMO · Señal legal tras el silencio');
+  assert.equal(g.kicker, 'RIESGO EN FORMACIÓN · Señal legal tras el silencio');
   assert.equal(g.count, 1);
   assert.equal(g.homogeneous, false); // count 1 → no factoriza
   assert.equal(
@@ -341,7 +341,7 @@ test('D3. HUMO/B — hijo genuino emite "vía" + narrativa singular', () => {
   const g = buildTriageGroups(realLikeReport()).groups.find(
     (x) => x.key === 'HUMO/B',
   )!;
-  assert.equal(g.kicker, 'EN HUMO · Fricción en la entrada');
+  assert.equal(g.kicker, 'RIESGO EN FORMACIÓN · Fricción en la entrada');
   assert.equal(
     triageInstanceLine(g.instances[0]),
     'GERENCIA DE PERSONAS · riesgo 85 de 100 · el foco: Subgerencia de Cultura y DO',
@@ -398,7 +398,7 @@ test('D5. hero + intro + extremos guard', () => {
   const acto = buildTriageGroups(realLikeReport());
   assert.equal(acto.hero.number, '82%');
   assert.equal(acto.hero.label, 'del mapa de gerencias, sin voz medible');
-  assert.equal(acto.hero.sub, '2 en humo · 2 punto ciego');
+  assert.equal(acto.hero.sub, '2 en riesgo · 2 sin lectura');
   // conVoz=2 (Comercial+Personas), total=4 gerencias (Comercial, Personas,
   // Finanzas, Operaciones), mudas=2; pct = 10/50 = 20%.
   assert.equal(

@@ -708,14 +708,23 @@ test('14d. SILENCIO_SIN_VOZ trae copy completa Gate 2.5 (classification + base +
   const result = AmbienteSynthesisEngine.generate({ beat1Seed, data });
 
   assert.equal(result.diagnosticType, 'SILENCIO_SIN_VOZ');
+  // Gate 6 FINAL: título ampliado (recoge ambos afluentes).
   assert.equal(
     result.classification,
-    'Esto no es un problema de participación. Es silencio que ya dejó señal por fuera.',
+    'Esto no es un problema de participación. Es un ambiente que no protege, y un silencio que ya dejó señal por fuera.',
   );
+  // Cuerpo: párrafo del silencio (verbatim) + puente al afluente de dimensiones.
   assert.ok(
     result.implication.startsWith('La mayoría no respondió.'),
     'implication SILENCIO verbatim: ' + result.implication,
   );
+  assert.ok(
+    result.implication.includes(
+      'de las seis condiciones que sostienen un buen ambiente, ninguna llegó a nivel sano',
+    ),
+    'puente Regla del Río ausente: ' + result.implication,
+  );
+  assert.ok(result.implication.includes('son el mismo, visto desde dos lados.'));
   assert.ok(result.path.startsWith('El número no sube persiguiendo respuestas.'));
   assert.equal(
     result.accountability,

@@ -227,7 +227,7 @@ test('A4. buildDeclararonText — abre con participación (§2c-5); con_isa "ISA
 test('B1. individual — estructura §2b completa + veredicto singular', () => {
   const m = buildTriageModal(report(), 'HUMO/A-legal')!;
   assert.equal(m.mode, 'individual');
-  assert.equal(m.kicker, 'EN HUMO · Señal legal tras el silencio');
+  assert.equal(m.kicker, 'RIESGO EN FORMACIÓN · Señal legal tras el silencio');
   assert.equal(m.blocks.length, 1);
   const b = m.blocks[0];
   assert.equal(b.gerenciaName, 'Gerencia Comercial');
@@ -292,7 +292,7 @@ test('C1. grupo — veredicto plural UNA vez + bloques compactos', () => {
   const ops = m.blocks.find((b) => b.gerenciaName === 'Gerencia de Operaciones')!;
   assert.deepEqual(
     ops.departamentos.map((d) => `${d.departmentName} · ${d.score} ${d.familyLabel}`),
-    ['Seguridad · 50 PUNTO CIEGO', 'Equipos · 20 CONFIABLE'],
+    ['Seguridad · 50 PUNTO CIEGO', 'Equipos · 20 LECTURA VÁLIDA'],
   );
 });
 
