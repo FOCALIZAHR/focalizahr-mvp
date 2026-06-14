@@ -17,8 +17,6 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { formatDepartmentName, stripWrappingQuotes } from '@/lib/utils/formatName';
 import { ActSeparator, fadeIn, fadeInDelay } from './shared';
-import { getISARiskLevel } from '@/lib/services/compliance/ISAService';
-import type { ISARiskLevel } from '@/lib/services/compliance/ISAService';
 import { DIMENSION_CEO_LABELS } from '@/config/narratives/ComplianceNarrativeDictionary';
 import { DIMENSION_LABELS } from '@/app/dashboard/compliance/lib/labels';
 import { getLegalMarcoName } from '@/config/compliance/legalBadgeConfig';
@@ -51,9 +49,7 @@ import {
 // Mismo input/output (más una `trace` adicional que los consumidores ignoran).
 
 import { classifyD4 } from '@/lib/services/compliance/deriveBeat1Slots';
-import type { ClassifyD4Output } from '@/lib/services/compliance/deriveBeat1Slots';
 import type {
-  Mundo,
   Intensidad,
   FactoresTitulares,
   ExtremosTitulares,
@@ -118,213 +114,11 @@ export function buildTitularesBeat1(input: {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// COPY POR MUNDO — VERBATIM de .claude/tasks/ESPEC_APERTURA_AMBIENTE_SANO.md
-// Estructura: Subtítulo · Traducción · El pero · Cierre (itálica) +
-//             Ortogonales (Género · Ley Karin) ANEXAS después del cierre.
-//   - `pero` y ortogonales son `string | null` — null → omitir (degradación).
-//   - Ortogonales NO reemplazan el cierre; son líneas adicionales.
-//   - Nombres de gerencia pasan por formatDepartmentName() (preserva acrónimos,
-//     respeta preposiciones).
-//   - {ISA} y {coverage} se renderizan enteros.
-//   - {banda} se traduce vía bandaLabel() ('observacion' → "observación", etc).
+// COPY POR MUNDO — copyFor (legacy) ELIMINADO en el gate de limpieza (§2):
+// muerto desde la Apertura-Titular v4 (buildAperturaTitular lo reemplazó). El
+// classifier classifyD4 sigue vivo (Orchestrator/Beat1Seed). Las ortogonales
+// (género · Ley Karin) viven en buildOrtogonales (abajo), que el render usa.
 // ════════════════════════════════════════════════════════════════════════════
-
-interface BeatCopy {
-  subtitulo: string;
-  traduccion: string;
-  /** null → omitir el bloque del "pero". */
-  pero: string | null;
-  /** Siempre presente. Render en itálica. */
-  cierre: string;
-  /** ORTOGONAL género — línea adicional después del cierre. null si no hay alerta. */
-  generoLine: string | null;
-  /** ORTOGONAL Ley Karin — línea adicional después del cierre. null si N === 0. */
-  leyKarinLine: string | null;
-}
-
-/** Traduce ISARiskLevel canónico al label de banda visible en NÚMERO BAJO. */
-const BANDA_LABEL: Record<ISARiskLevel, string> = {
-  saludable: 'saludable',
-  observacion: 'observación',
-  riesgo: 'riesgo',
-  critico: 'crítico',
-};
-
-// `copyFor` solo necesita el subset {mundo, intensidad, hasDenunciaFormal} del
-// classifier — el `trace` es para audit, no para narrar. Subset explícito para
-// que callers (incluidos tests) puedan construir el d4 sin la traza.
-type D4ForCopy = Pick<ClassifyD4Output, 'mundo' | 'intensidad' | 'hasDenunciaFormal'>;
-
-export function copyFor(
-  d4: D4ForCopy,
-  slots: Beat1Slots,
-  orgISA: number,
-  coveragePct: number,
-  country: string | null | undefined,
-  p2CritEnConIsa: boolean,
-): BeatCopy {
-  // Nombres formateados (null cuando el slot no aplica).
-  const mudaName = slots.gerencia_muda_1
-    ? formatDepartmentName(slots.gerencia_muda_1.groupName)
-    : null;
-  const teatroName = slots.gerencia_teatro_1
-    ? formatDepartmentName(slots.gerencia_teatro_1.groupName)
-    : null;
-  const topName = slots.gerencia_top_1
-    ? formatDepartmentName(slots.gerencia_top_1.groupName)
-    : null;
-  const focoName = slots.gerencia_foco_1
-    ? formatDepartmentName(slots.gerencia_foco_1.groupName)
-    : null;
-  // Ortogonales (género · Ley Karin) — SE CONSERVAN (HANDOFF §1). Extraídas a
-  // `buildOrtogonales` para que la Apertura nueva las reuse sin recalcular el
-  // switch de mundos de `copyFor`.
-  const { generoLine, leyKarinLine } = buildOrtogonales(slots, country);
-
-  let subtitulo: string;
-  let traduccion: string;
-  let pero: string | null;
-  let cierre: string;
-
-  switch (d4.mundo) {
-    case 'silencio': {
-      // Bindings comunes a las dos ramas — arábigos directos del slot
-      // (consistente con Paso 2 commiteado en 2e7f727):
-      //   {ISA}    = orgISA
-      //   {nResp}  = slots.totalResponded
-      //   {nInv}   = slots.totalInvited
-      //   {conVoz} = slots.gerencias_universo_total − slots.gerencias_mudas_count
-      //   {mudas}  = slots.gerencias_mudas_count
-      //   {total}  = slots.gerencias_universo_total
-      const nResp = slots.totalResponded;
-      const nInv = slots.totalInvited;
-      const mudasCount = slots.gerencias_mudas_count;
-      const gerenciasTotal = slots.gerencias_universo_total;
-      const conVoz = gerenciasTotal - mudasCount;
-
-      if (slots.banda === 'riesgo' && p2CritEnConIsa) {
-        // ── CELDA PUENTE — banda=riesgo + P2 crítico en TODOS los con_isa ──
-        // Copy verbatim aprobado 2026-06-05. 4 párrafos como prosa corrida
-        // (sin callouts border-l-2): se concentran en `traduccion` separados
-        // por `\n\n`. El render hace split-and-map para producir 4 <p>
-        // planos con space-y-4. `pero` y `cierre` quedan vacíos para omitir
-        // los callouts visuales.
-        subtitulo = '[EL QUE ELIJA VICTOR]';
-        traduccion =
-          `Este estudio no puede declarar sano el ambiente de la empresa. ` +
-          `Y lo que sí alcanzó a medir no tranquiliza: en las ${conVoz} gerencias que respondieron, ` +
-          `casi ninguna dimensión del ambiente llegó a un nivel sano.\n\n` +
-          `La que aparece crítica en ambas áreas es, precisamente, la que mide si la gente cree ` +
-          `que puede hablar sin consecuencias. Quienes respondieron ya sienten que hablar cuesta.\n\n` +
-          `Y ese ${orgISA} son apenas ${nResp} personas de las ${nInv}, en ${conVoz} de las ${gerenciasTotal} gerencias. ` +
-          `De las otras ${mudasCount} no entró una sola respuesta. ` +
-          `Leído junto a lo anterior, el silencio cambia de sentido: si los que hablaron dicen que ` +
-          `hablar no es seguro, el de los demás deja de parecer desinterés.\n\n` +
-          `Por eso el informe no puede cerrar el tema como resuelto: lo medido apunta a riesgo, ` +
-          `y lo callado pesa en la misma dirección. Ese ambiente no mejora persiguiendo el número, ` +
-          `sino atendiendo lo que lo causa: por qué hablar, donde se pudo escuchar, se siente inseguro, ` +
-          `y por qué la mayoría no respondió.`;
-        pero = null;
-        cierre = '';
-      } else {
-        // ── RESPALDO — placeholder estructural (refinable cuando aparezca caso real) ──
-        // Cubre el resto del mundo silencio: otra banda, o banda=riesgo sin
-        // P2 crítico en todos los con_isa.
-        subtitulo = 'EL SILENCIO ES EL DATO';
-        const bandaLabel = BANDA_LABEL[slots.banda];
-        traduccion =
-          `Donde se pudo medir, el ambiente da ${bandaLabel}. ` +
-          `Pero esa lectura son ${nResp} de ${nInv} personas, en ${conVoz} de ${gerenciasTotal} gerencias: ` +
-          `del resto no entró respuesta. Vale para quienes hablaron; ` +
-          `el silencio de los demás impide leerlo como el cuadro de toda la empresa.`;
-        pero = null;
-        cierre = '';
-      }
-      break;
-    }
-
-    case 'contradiccion': {
-      subtitulo = 'LOS NÚMEROS DICEN UNA COSA, LAS RESPUESTAS ABIERTAS OTRA';
-      traduccion =
-        'En las preguntas cerradas el equipo respondió bien. ' +
-        'En las respuestas abiertas, escribió lo contrario.';
-
-      pero = teatroName
-        ? `Responder bien una encuesta es fácil. Escribir lo que de verdad pasa, no. ${teatroName} es el caso más nítido: marca alto, pero lo que escribieron no acompaña. Cuando las dos no coinciden, creele a lo que escribieron.`
-        : null;
-
-      cierre =
-        'Un buen número apoyado en respuestas abiertas que dicen lo contrario no es un buen número. ' +
-        'Es un riesgo que todavía no se hizo visible.';
-      break;
-    }
-
-    case 'todo-bien': {
-      subtitulo = 'LOS NÚMEROS Y LAS RESPUESTAS ABIERTAS COINCIDEN';
-
-      const total = slots.gerencias_medidas_total;
-      const sanas = slots.gerencias_sanas_count;
-      const sanasPart =
-        total > 0
-          ? ` ${sanas} de ${total} ${total === 1 ? 'gerencia respondió' : 'gerencias respondieron'} con consistencia entre cerradas y abiertas.`
-          : '';
-      traduccion =
-        `El ISA ${orgISA} no es un promedio que esconde: es un piso que se sostiene.` +
-        sanasPart +
-        ` Cobertura del ${coveragePct}%.`;
-
-      pero = topName
-        ? `Esa coincidencia es lo más difícil de fabricar: los equipos sanos lo son cuando nadie los mira. ${topName} es el caso de referencia. Un ambiente que se cuida solo cuando lo miden no escribe así.`
-        : 'Esa coincidencia es lo más difícil de fabricar: los equipos sanos lo son cuando nadie los mira. Un ambiente que se cuida solo cuando lo miden no escribe así.';
-
-      cierre = topName
-        ? `Un buen ambiente no se sostiene solo. Este es el momento de proteger lo que funciona, empezando por entender qué hace ${topName} distinto del resto.`
-        : 'Un buen ambiente no se sostiene solo. Este es el momento de proteger lo que funciona.';
-      break;
-    }
-
-    case 'bien-con-focos': {
-      subtitulo = 'BIEN EN PROMEDIO, PERO NO PAREJO';
-
-      // Dos sabores: si hay gerencia_foco_1 → sabor riesgo. Si no → sabor
-      // cobertura (la rama 4 disparó por gap ∈ [30,50) sin foco).
-      if (focoName) {
-        // Sabor RIESGO
-        traduccion = `Como organización, el ISA ${orgISA} es favorable. Pero el promedio esconde a ${focoName}, que quedó en zona de riesgo.`;
-        cierre = `Un ambiente sano con un foco sin atender no sigue sano mucho tiempo. El lugar para mirar no es el promedio, es ${focoName}.`;
-      } else {
-        // Sabor COBERTURA — degradación graceful del cierre (sin foco que
-        // nombrar, omite el tail "es {gerencia_foco_1}").
-        traduccion = `Como organización, el ISA ${orgISA} es favorable. Pero la lectura no llega a toda la organización: ${slots.coverage_gap_pct}% de las áreas no respondió.`;
-        cierre = 'Un ambiente sano con un foco sin atender no sigue sano mucho tiempo. El lugar para mirar no es el promedio.';
-      }
-
-      // El "pero" es el mismo en ambos sabores (verbatim spec).
-      pero =
-        'Un buen número general tranquiliza, y por eso es peligroso. ' +
-        'Hace que el foco pase desapercibido justo donde más importa. ' +
-        'La organización está sana; la gerencia, no.';
-      break;
-    }
-
-    case 'numero-bajo':
-    default: {
-      subtitulo = 'EL NÚMERO ESTÁ BAJO, Y NO SE ESCONDE';
-      const bandaLabel = BANDA_LABEL[slots.banda];
-      traduccion =
-        `El ISA ${orgISA} cae en zona de ${bandaLabel}. ` +
-        'No hay problema de cobertura ni contradicción que lo explique: la organización respondió, y respondió esto.';
-      pero =
-        'Cuando el número es bajo y nada lo disimula, la causa no está en la medición. ' +
-        'Está en el ambiente mismo. Es más incómodo de leer, y es más honesto.';
-      cierre =
-        'Un número así no mejora porque el ciclo cierre. Mejora cuando alguien mira qué lo sostiene abajo.';
-      break;
-    }
-  }
-
-  return { subtitulo, traduccion, pero, cierre, generoLine, leyKarinLine };
-}
 
 // ════════════════════════════════════════════════════════════════════════════
 // ORTOGONALES — género · Ley Karin (CONSERVADAS, HANDOFF §1)

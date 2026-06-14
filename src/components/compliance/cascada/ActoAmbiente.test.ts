@@ -23,12 +23,10 @@ import assert from 'node:assert/strict';
 
 import {
   classifyD4,
-  copyFor,
   buildFactoresLine,
   buildExtremosLine,
   buildTitularesBeat1,
 } from './ActoAmbiente';
-import type { Beat1Slots } from '@/lib/services/compliance/deriveBeat1Slots';
 import type {
   FactoresTitulares,
   ExtremosTitulares,
@@ -221,95 +219,6 @@ test('9. Regresión cmob0e56 (orgISA=49, riesgoDeptos=2) → "numero-bajo"', () 
   // de la rama 5. Cambio narrativo intencional del spec — el mundo refleja
   // el dato (número bajo y nada lo disimula).
   assert.equal(d4.mundo, 'numero-bajo');
-});
-
-// ─── case 'silencio' — CELDA PUENTE + RESPALDO (chat 2026-06-05) ─────
-
-/** Factory de slots minimal para tests del case 'silencio'. */
-function mkSlotsSilencio(over: Partial<Beat1Slots> = {}): Beat1Slots {
-  return {
-    exit_alerts_count: 0,
-    gerencias_sanas_count: 0,
-    gerencias_medidas_total: 2,
-    gerencias_mudas_count: 4,
-    gerencias_universo_total: 6,
-    personResponseRate: 20,
-    totalInvited: 50,
-    totalResponded: 10,
-    banda: 'riesgo',
-    coverage_gap_pct: 82,
-    gerencia_top_1: null,
-    gerencia_alta_1: null,
-    gerencia_baja_1: null,
-    gerencia_muda_1: null,
-    gerencia_muda_con_externa_1: null,
-    gerencia_teatro_1: null,
-    gerencia_contradiccion_1: null,
-    gerencia_denuncia_1: null,
-    gerencia_foco_1: null,
-    gerencia_genero_1: null,
-    gerencia_ley_karin_1: null,
-    ...over,
-  };
-}
-
-test('10. silencio CELDA PUENTE: banda=riesgo + p2CritEnConIsa → 4 párrafos prosa corrida con bindings 49/10/50/6/4/2', () => {
-  const slots = mkSlotsSilencio();
-  const d4 = {
-    mundo: 'silencio' as const,
-    intensidad: 'alto' as const,
-    hasDenunciaFormal: false,
-  };
-  const c = copyFor(d4, slots, 49, 18, null, true);
-
-  assert.equal(c.subtitulo, '[EL QUE ELIJA VICTOR]');
-  // 4 párrafos separados por \n\n.
-  const paras = c.traduccion.split('\n\n');
-  assert.equal(paras.length, 4);
-  // Bindings cmob0e56: 49 (ISA, 3 ocurrencias), 10 (nResp), 50 (nInv),
-  // 6 (universo), 4 (mudas), 2 (conVoz = 6-4).
-  assert.ok(paras[0].includes('Este estudio no puede declarar sano'));
-  assert.ok(paras[0].includes('en las 2 gerencias que respondieron'));
-  assert.ok(paras[1].includes('la que mide si la gente cree'));
-  assert.ok(paras[2].includes('Y ese 49 son apenas 10 personas de las 50'));
-  assert.ok(paras[2].includes('en 2 de las 6 gerencias'));
-  assert.ok(paras[2].includes('De las otras 4 no entró una sola respuesta'));
-  assert.ok(paras[3].includes('no puede cerrar el tema como resuelto'));
-  // pero/cierre vacíos para omitir callouts.
-  assert.equal(c.pero, null);
-  assert.equal(c.cierre, '');
-});
-
-test('11. silencio RESPALDO: cualquier banda (o riesgo sin P2 crit) → línea estructural', () => {
-  const slots = mkSlotsSilencio({ banda: 'critico' });
-  const d4 = {
-    mundo: 'silencio' as const,
-    intensidad: 'critico' as const,
-    hasDenunciaFormal: false,
-  };
-  const c = copyFor(d4, slots, 35, 18, null, true);
-
-  assert.equal(c.subtitulo, 'EL SILENCIO ES EL DATO');
-  // Banda interpolada (BANDA_LABEL['critico'] === 'crítico') + 1 párrafo.
-  assert.equal(c.traduccion.split('\n\n').length, 1);
-  assert.ok(c.traduccion.includes('Donde se pudo medir, el ambiente da crítico'));
-  assert.ok(c.traduccion.includes('son 10 de 50 personas'));
-  assert.ok(c.traduccion.includes('en 2 de 6 gerencias'));
-  assert.equal(c.pero, null);
-  assert.equal(c.cierre, '');
-});
-
-test('11b. silencio RESPALDO: banda=riesgo pero p2CritEnConIsa=false → RESPALDO, no CELDA PUENTE', () => {
-  const slots = mkSlotsSilencio({ banda: 'riesgo' });
-  const d4 = {
-    mundo: 'silencio' as const,
-    intensidad: 'alto' as const,
-    hasDenunciaFormal: false,
-  };
-  const c = copyFor(d4, slots, 49, 18, null, false); // P2 NO crítico en todos los con_isa
-
-  assert.equal(c.subtitulo, 'EL SILENCIO ES EL DATO');
-  assert.ok(c.traduccion.includes('Donde se pudo medir, el ambiente da riesgo'));
 });
 
 // ═══════════════════════════════════════════════════════════════════
