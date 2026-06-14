@@ -1,7 +1,7 @@
 # ESTADO_CASCADA — Ambiente Sano · Cascada Ejecutiva
 > Documento de traspaso del chat de arquitectura. Se actualiza al cierre de cada gate.
 > Si este chat muere o compacta: chat nuevo + este archivo + los HANDOFF_GATE_*.md en `.claude/tasks/` = continuidad total.
-> Actualizado: 2026-06-14 · Gate 6 FINAL — cascada SELLADA (Beats 1→6).
+> Actualizado: 2026-06-14 · Gate de limpieza CERRADO — cascada SELLADA (Beats 1→6) + deuda técnica saldada.
 
 ## Método de trabajo
 Chat de arquitectura (diseña en pantalla, audita copy, escribe handoffs) → Victor (visto en cada gate, copia handoffs a `.claude/tasks/`) → Claude Code (cablea con tests-oráculo verbatim, pantalla real, SIN COMMIT hasta visto) → commit. Un gate por vez; cola sin plan-documento. Sesiones de Code: misma sesión mientras dure el arco; ritual de cierre (git limpio + SESSION_HANDOFF + volcar lo no-persistido).
@@ -17,16 +17,16 @@ Chat de arquitectura (diseña en pantalla, audita copy, escribe handoffs) → Vi
 | 4 La Voz | ✅ cerrado | 81a3df8 |
 | 5 El Nombre (línea de mando) | ✅ cerrado | 617bdce |
 | 6 La Decisión | ✅ CERRADO · test de integridad PASADO (mecánico + editorial) | 7deeb63 |
-| Gate de limpieza final | ⚪ cola (lo único que resta) | — |
+| Gate de limpieza final | ✅ CERRADO (§1 fuente única classifyIsa · §2 remover copyFor · §3 barrido em-dashes engine) | d94e094 (§1), f8583f1 (§2), 7711fbd (§3) |
 
-**🏁 LA CASCADA QUEDA SELLADA** (Beats 1→6). Solo resta el gate de limpieza final.
+**🏁 LA CASCADA QUEDA SELLADA** (Beats 1→6) y la deuda técnica de limpieza saldada.
 
 ## Reglas selladas (NO renegociar sin Victor)
 - **Em-dash prohibido** como puntuación de prosa visible; glifo sin-dato standalone permitido. Separador de la casa: middot "·". Verificación permanente: `npx tsx scripts/audit-emdashes-cascada.ts` → 0.
 - **dimFoco** = doble filtro: entre las dims del nivel más grave presente, gana la precedencia causal P2>P7>P3>P5>P4>P8. Helper junto a orgDimensions.ts.
 - **Display dimensiones 0–100**: (score−1)/4×100; sano ≥75; motor sigue 1–5. Toda la cascada habla "de 100".
 - **Paleta sin semáforo**: crítico #EA580C · riesgo #F59E0B · atención #94A3B8 · sano/protagonista #22D3EE · purple SOLO IA.
-- **Léxico ISA canónico** = classifyIsa (Sano/Atención/Riesgo/Crítico). Regla puente: cascada importa solo classifyIsa; getISARiskLevel congelado hasta limpieza.
+- **Léxico ISA canónico** = classifyIsa / IsaLevel (sano/atencion/riesgo/critico). Fuente única en todo el módulo (cascada + dashboard). `getISARiskLevel` + tipo `ISARiskLevel` ELIMINADOS en el gate de limpieza §1 (d94e094); cortes 80/60/40 viven en SCORE_THRESHOLDS.
 - **Clasificador de dimensión** = classifyDimensionLevel (crítico <2.0). NUNCA classifyRisk.
 - Denuncia (`denuncias_12m`, null≠0) ≠ indicio. Prosa legal: CL "un indicio bajo Ley Karin"; default "un indicio de riesgo de cumplimiento" (legalProseMarco). "Es un indicio, no una denuncia." aprobada.
 - Hechos cuentan por FECHA (12m), no por estado. Sin plazos, sin prescripción. El pero acota alcance, nunca validez.
@@ -44,10 +44,11 @@ Chat de arquitectura (diseña en pantalla, audita copy, escribe handoffs) → Vi
 - Rama con_isa del modal Triage sin caso real que la ejercite (oráculo A4 + flag).
 
 ## Deudas con dueño
-- Gate de limpieza (final): remover copyFor/mundos viejos + fuente única classifyIsa (re-keyear mapas gauge + deriveBeat1Slots).
+- ~~Gate de limpieza (final): remover copyFor/mundos viejos + fuente única classifyIsa~~ ✅ CERRADO (d94e094 §1 · f8583f1 §2 · 7711fbd §3).
+- ~~Barrido em-dashes módulo dashboard (`ComplianceNarrativeEngine`)~~ ✅ CERRADO §3 (7711fbd): 27 em-dashes barridos, archivo ya en el auditor permanente.
+- **DEUDA DE DISEÑO (chat propio): auditoría de paleta del módulo cascada/compliance contra la skill de diseño.** (a) Deriva de color acumulada: hay hex introducidos con el tiempo posiblemente desalineados de §7 — ej. el Ancla Científica muestra crítico→purple y atención→amber, que viola crítico=naranja/atención=slate/purple=solo-IA. (b) Los dos estados del gauge (campaña abierta=participación vs cerrada=ISA) pueden requerir paletas/lógica distintas. Verificar TODO contra focalizahr-design SKILL, no fix puntual. NO tocar sin gate dedicado.
 - Motor (task propia): ConvergenciaEngine y ComplianceAlertService filtran por estado en vez de fecha.
 - Evolución La Voz: versión N-grande (LLM agrupa temas + citas representativas, batch persistido) cuando haya campañas con muchas voces.
-- **Barrido em-dashes módulo dashboard**: `ComplianceNarrativeEngine` tiene 25 em-dashes legacy (acto1-4 / cierre / origen, no-cascada) + posibles más en `src/app/dashboard/compliance/`. Gate propio cuando se toque ese módulo, NO de pasada. Los 2 em-dashes cascada-visibles (Beat 5) ya barridos; el archivo queda fuera del auditor (file-scope rompería el 0) con comentario.
 - ComplianceActiveState a Cinema Mode (cosmética vieja).
 
 ## Campaña de verificación

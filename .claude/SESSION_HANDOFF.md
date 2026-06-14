@@ -1,4 +1,6 @@
-# Session Handoff — Cascada Ambiente Sano cerrada arquitectónicamente
+# Session Handoff — Cascada Ambiente Sano SELLADA + limpieza saldada
+
+> **Estado vivo (2026-06-14):** cascada SELLADA (Beats 1→6) y el **Gate de limpieza CERRADO** (3 sub-gates). Árbol limpio · tsc 0 · audit em-dashes 0 · suite compliance 226/226. Única deuda abierta del módulo = **auditoría de paleta** (chat propio, ver ESTADO_CASCADA "Deudas con dueño"). El resto de esta nota es histórico de la sesión de arquitectura.
 
 **Fecha cierre:** 2026-06-11 (arquitectura: 2026-06-08)
 **Plan maestro:** `.claude/plans/lee-claude-tasks-plan-cascada-que-y-cond-eventual-hejlsberg.md` (v2, aprobado 2026-06-06)
@@ -54,6 +56,9 @@ La cascada `Ambiente Sano` fue rearmada de raíz contra el plan §3 (espejo del 
 | **Gate 4 La Voz — acto material crudo** | ✅ (visto Victor) | `81a3df8` |
 | **Gate 5 El Nombre — concentración por rama** | ✅ (visto Victor) | `617bdce` |
 | **Gate 6 La Decisión — cierre + integridad** | ✅ (visto Victor) | `7deeb63` |
+| **Gate de limpieza §1 — fuente única classifyIsa (descongela getISARiskLevel/ISARiskLevel)** | ✅ (visto Victor · gauge 49 byte-idéntico) | `d94e094` |
+| **Gate de limpieza §2 — remover copyFor + tests de mundos legacy** | ✅ | `f8583f1` |
+| **Gate de limpieza §3 — barrido em-dashes ComplianceNarrativeEngine + al auditor** | ✅ | `7711fbd` |
 
 ### Gate 3 (Anatomía) — cerrado (2026-06-12, `ffcd73e`/`5b78834`/`adc15a5`)
 
