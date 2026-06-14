@@ -40,10 +40,10 @@ const FILES = [
   'src/lib/services/compliance/buildAnatomia.ts',
   'src/lib/services/compliance/buildLaVoz.ts',
   'src/lib/services/compliance/buildElNombre.ts',
-  // ComplianceNarrativeEngine: NO se agrega entero — tiene 25 em-dashes de copy
-  // LEGACY (acto1-4 / cierre / origen) que la cascada NO renderiza (deuda Gate 6).
-  // Los 2 em-dashes cascada-visibles (buildCriticalByManagerNarrative, Beat 5) YA
-  // están barridos. Flag para un barrido futuro del módulo dashboard.
+  // ComplianceNarrativeEngine: barrido completo en Gate limpieza §3 (2026-06-14).
+  // Incluía copy LEGACY (acto1-4 / cierre / origen) que la cascada NO renderiza;
+  // se normalizó igual para que el archivo entre al auditor con 0 deuda.
+  'src/lib/services/compliance/ComplianceNarrativeEngine.ts',
   'src/lib/services/compliance/deriveBeat1Slots.ts',
   'src/lib/services/compliance/AmbienteSynthesisEngine.ts',
   // ── Dictionaries de compliance ──

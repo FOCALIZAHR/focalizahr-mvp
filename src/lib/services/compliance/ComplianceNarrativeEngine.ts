@@ -186,7 +186,7 @@ const INTERVENCIONES: Record<ComplianceAlertType, string> = {
   senal_ignorada:
     'Capacitación del Comité Paritario y de jefaturas directas en lectura de señales tempranas. La alerta Onboarding–Exit correlacionada es predictora: actuar en el mes 1 evita la salida en el mes 4.',
   silencio_con_voz_externa:
-    'Una conversación directa con la jefatura del área, no una encuesta de seguimiento. El objetivo es entender por qué el departamento no participó — la baja respuesta es el primer dato, no un problema de campo.',
+    'Una conversación directa con la jefatura del área, no una encuesta de seguimiento. El objetivo es entender por qué el departamento no participó: la baja respuesta es el primer dato, no un problema de campo.',
   participacion_anomala:
     'Una conversación directa con la jefatura del área para entender la baja respuesta. El número es el punto de partida, no el diagnóstico.',
 };
@@ -527,13 +527,13 @@ function buildBodyV2(d: DepartmentConvergencia): string {
     case 'critica_sistema':
       return `En ${dept}, los que están, los que se fueron y los que entraron dicen lo mismo. Y el patrón aparece en otros departamentos del mismo líder. Postergar la conversación ya tiene un costo.`;
     case 'amplificada':
-      return `Tres voces independientes leen lo mismo en ${dept} — los que están, los que se fueron y los que acaban de entrar. Ninguna sabe lo que dijo la otra. Cuando llegan al mismo punto, el patrón deja de ser debatible.`;
+      return `Tres voces independientes leen lo mismo en ${dept}: los que están, los que se fueron y los que acaban de entrar. Ninguna sabe lo que dijo la otra. Cuando llegan al mismo punto, el patrón deja de ser debatible.`;
     case 'confirmada':
-      return `Lo que dicen los que están en ${dept} y lo que dijeron los que se fueron coincide. Dos voces que no comparten datos llegaron al mismo lugar. Eso no es repetición — es confirmación.`;
+      return `Lo que dicen los que están en ${dept} y lo que dijeron los que se fueron coincide. Dos voces que no comparten datos llegaron al mismo lugar. Eso no es repetición, es confirmación.`;
     case 'externa_solo':
-      return `${dept} no registró señal en la encuesta. Los que se fueron o los que entraron la documentaron desde afuera. La voz interna no habló — las otras, sí.`;
+      return `${dept} no registró señal en la encuesta. Los que se fueron o los que entraron la documentaron desde afuera. La voz interna no habló; las otras, sí.`;
     case 'interna_solo':
-      return `${dept} se confirma a sí mismo. Los números de la encuesta y lo que las personas escribieron señalan lo mismo — sin coordinarse, sin conocerse como fuente. Una sola voz, pero con dos canales diciendo lo mismo, ya alcanza para nombrarlo.`;
+      return `${dept} se confirma a sí mismo. Los números de la encuesta y lo que las personas escribieron señalan lo mismo, sin coordinarse, sin conocerse como fuente. Una sola voz, pero con dos canales diciendo lo mismo, ya alcanza para nombrarlo.`;
     default:
       // 'ninguna' fue filtrado antes de entrar acá; defensa runtime.
       return `${dept} sin convergencia detectable este ciclo.`;
@@ -708,7 +708,7 @@ function buildConvergenciaCruce(
     if (!par) return undefined;
     const [f1, f2] = par;
     return (
-      `En ${c.dept.departmentName}, dos canales coinciden — ${SOURCE_VOICE_NARRATIVE[f1]} y ${SOURCE_VOICE_NARRATIVE[f2]} leen lo mismo. ` +
+      `En ${c.dept.departmentName}, dos canales coinciden: ${SOURCE_VOICE_NARRATIVE[f1]} y ${SOURCE_VOICE_NARRATIVE[f2]} leen lo mismo. ` +
       `El resto de la organización opera sin coincidencias entre canales. La excepción tiene nombre.`
     );
   }
@@ -743,7 +743,7 @@ function buildConvergenciaCruce(
     const v2Cap = v2.charAt(0).toUpperCase() + v2.slice(1);
     return (
       `Hay ${activeSourcesGlobal.length} canales activos en la organización y ninguno confirma al otro. ` +
-      `${v1Cap} señalan ${primero.dept.departmentName}. ${v2Cap} señalan ${segundo.dept.departmentName} — distintos. ` +
+      `${v1Cap} señalan ${primero.dept.departmentName}. ${v2Cap} señalan ${segundo.dept.departmentName}, distintos. ` +
       `O cada canal está captando una dimensión distinta del mismo problema. ` +
       `O todavía no hay un problema estructural. ` +
       `La diferencia importa: un patrón consolidado no se mueve solo.`
@@ -760,7 +760,7 @@ function buildConvergenciaCruce(
     return (
       `En ${formatDeptList(coincidentNames)}, dos canales independientes leen lo mismo: ${SOURCE_VOICE_NARRATIVE[f1]} y ${SOURCE_VOICE_NARRATIVE[f2]}. ` +
       `Pero en ${divergente.dept.departmentName}, solo ${SOURCE_VOICE_NARRATIVE[divergente.sourceUnica]} reportan riesgo y los demás no lo confirman. ` +
-      `La lectura todavía no es uniforme — o el deterioro empezó por un canal y aún no contagió, o cada canal está captando una cara distinta del mismo equipo.`
+      `La lectura todavía no es uniforme: o el deterioro empezó por un canal y aún no contagió, o cada canal está captando una cara distinta del mismo equipo.`
     );
   }
 
@@ -772,7 +772,7 @@ function buildConvergenciaCruce(
     const N = coincidentes.length;
     const palabra = N === 1 ? 'departamento' : 'departamentos';
     return (
-      `En ${N} ${palabra}, ${SOURCE_VOICE_NARRATIVE[f1]} y ${SOURCE_VOICE_NARRATIVE[f2]} leen lo mismo — sin compartir datos, sin coordinarse. ` +
+      `En ${N} ${palabra}, ${SOURCE_VOICE_NARRATIVE[f1]} y ${SOURCE_VOICE_NARRATIVE[f2]} leen lo mismo, sin compartir datos, sin coordinarse. ` +
       `Cuando dos lentes independientes coinciden, el hallazgo deja de ser percepción: pasa a ser hecho.`
     );
   }
@@ -888,7 +888,7 @@ function buildAlertas(alertas: AlertaInput[]): AlertaNarrative[] {
           'O la convocatoria no llegó como debía. O el equipo dejó de ' +
           'creer que responder cambia algo. O hay algo en esa área que ' +
           'vuelve incómodo participar, incluso de forma anónima. Las tres ' +
-          'lecturas piden la misma respuesta — una conversación, no un ' +
+          'lecturas piden la misma respuesta: una conversación, no un ' +
           'recordatorio.',
         intervencion: INTERVENCIONES[a.alertType],
       };
@@ -997,11 +997,11 @@ export function buildActo1Ambiente(
       estado: 'riesgo_concentrado',
       parrafoGancho:
         `${riesgoDeptos} de ${totalDeptos} gerencias concentran el riesgo del ciclo. ` +
-        `El número del ciclo cierra en ${orgISA} — pero un promedio oculta dónde vive el problema. ` +
+        `El número del ciclo cierra en ${orgISA}, pero un promedio oculta dónde vive el problema. ` +
         `O el deterioro está localizado y la cifra global lo disfraza. ` +
         `O hay gerencias que sostienen lo que otras no pueden.`,
       coachingTip:
-        'Un problema concentrado tiene dirección. Eso es una ventaja — si se usa.',
+        'Un problema concentrado tiene dirección. Eso es una ventaja, si se usa.',
     };
   }
 
@@ -1083,7 +1083,7 @@ export function buildActo2Patron(
   if (dominante && metaAnalysis.origen_organizacional === 'vertical_descendente') {
     return {
       numeroAncla: patrones.length,
-      subtitulo: `${dominante.nombreLegible} — origen en el liderazgo`,
+      subtitulo: `${dominante.nombreLegible} · origen en el liderazgo`,
       estado: 'patron_vertical',
       fragmentos: dominante.fragmentos.slice(0, 2),
       parrafoGancho:
@@ -1101,15 +1101,15 @@ export function buildActo2Patron(
   if (dominante && metaAnalysis.origen_organizacional === 'sistemico_procesos') {
     return {
       numeroAncla: patrones.length,
-      subtitulo: `${dominante.nombreLegible} — origen en los procesos`,
+      subtitulo: `${dominante.nombreLegible} · origen en los procesos`,
       estado: 'patron_sistemico',
       fragmentos: dominante.fragmentos.slice(0, 2),
       parrafoGancho:
         `${dominante.nombreLegible} aparece en ${enGerencias(dominante.departments.length)}. ` +
-        `El origen no son las personas — son los procesos que las rodean. ` +
+        `El origen no son las personas, son los procesos que las rodean. ` +
         `Cambiar personas sin cambiar el diseño reproduce el mismo resultado.`,
       coachingTip:
-        'Si el problema es sistémico, la conversación no es con las personas — es sobre cómo está organizado el trabajo.',
+        'Si el problema es sistémico, la conversación no es con las personas, es sobre cómo está organizado el trabajo.',
     };
   }
 
@@ -1119,12 +1119,12 @@ export function buildActo2Patron(
     const masDeLaMitad = n > totalDeptos / 2;
     return {
       numeroAncla: patrones.length,
-      subtitulo: `${dominante.nombreLegible} — rasgo cultural instalado`,
+      subtitulo: `${dominante.nombreLegible} · rasgo cultural instalado`,
       estado: 'patron_cultural',
       fragmentos: dominante.fragmentos.slice(0, 2),
       parrafoGancho:
         `${dominante.nombreLegible} no está en una gerencia. ` +
-        `Está en ${n} de ${totalDeptos} gerencias${masDeLaMitad ? ' — más de la mitad' : ''}. ` +
+        `Está en ${n} de ${totalDeptos} gerencias${masDeLaMitad ? ', más de la mitad' : ''}. ` +
         `O es una característica instalada, no un incidente. ` +
         `O lleva suficientes ciclos como para haberse normalizado.`,
       coachingTip:
@@ -1136,12 +1136,12 @@ export function buildActo2Patron(
   if (dominante) {
     return {
       numeroAncla: patrones.length,
-      subtitulo: `${dominante.nombreLegible} — origen no concluyente`,
+      subtitulo: `${dominante.nombreLegible} · origen no concluyente`,
       estado: 'patron_general',
       fragmentos: dominante.fragmentos.slice(0, 2),
       parrafoGancho:
         `${dominante.nombreLegible} aparece en ${enGerencias(dominante.departments.length)}. ` +
-        `La señal no apunta a una sola fuente — ni al liderazgo, ni a los procesos. ` +
+        `La señal no apunta a una sola fuente: ni al liderazgo, ni a los procesos. ` +
         `O el patrón se mueve entre equipos. ` +
         `O todavía no tiene la masa suficiente para mostrar su origen.`,
       coachingTip:
@@ -1158,7 +1158,7 @@ export function buildActo2Patron(
     parrafoGancho:
       'Las respuestas abiertas de este ciclo no muestran señales de alerta. ' +
       'Lo que su gente escribió es consistente con lo que marcó. ' +
-      'Es la señal más difícil de obtener — y la más valiosa.',
+      'Es la señal más difícil de obtener, y la más valiosa.',
     coachingTip:
       'Cuando la voz libre confirma las métricas, la organización no tiene nada que ocultar.',
   };
@@ -1196,7 +1196,7 @@ export function buildActo3Senales(
       estado: 'convergencia',
       parrafoGancho:
         `${enGerencias(confirmadas)} ${confirmadas === 1 ? 'muestra' : 'muestran'} señales que más de una fuente confirma. ` +
-        `Lo que dice la encuesta interna, lo que reportan quienes se fueron y quienes recién entraron — todo apunta al mismo lugar. ` +
+        `Lo que dice la encuesta interna, lo que reportan quienes se fueron y quienes recién entraron: todo apunta al mismo lugar. ` +
         `Cuando fuentes independientes coinciden, deja de ser una percepción. Es un hecho con costo.`,
       coachingTip:
         'Una señal que una sola fuente detecta puede ser ruido. Una que varias confirman, ya no.',
@@ -1211,7 +1211,7 @@ export function buildActo3Senales(
       estado: 'senal_aislada',
       parrafoGancho:
         `${enGerencias(unaFuente)} ${unaFuente === 1 ? 'tiene' : 'tienen'} una señal activa este ciclo. ` +
-        `Una fuente la marca con claridad — pero todavía no hay una segunda que la confirme. ` +
+        `Una fuente la marca con claridad, pero todavía no hay una segunda que la confirme. ` +
         `O es un problema que recién empieza a dejar rastro. ` +
         `O es una señal aislada que el próximo ciclo dirá si crece.`,
       coachingTip:
@@ -1226,7 +1226,7 @@ export function buildActo3Senales(
     estado: 'sin_senales',
     parrafoGancho:
       'Ninguna gerencia muestra señales cruzadas este ciclo. ' +
-      'Lo que detecta la encuesta interna no aparece en las otras fuentes — ni en quienes se fueron, ni en quienes entraron. ' +
+      'Lo que detecta la encuesta interna no aparece en las otras fuentes: ni en quienes se fueron, ni en quienes entraron. ' +
       'Es la lectura más tranquila que puede entregar un ciclo.',
     coachingTip:
       'La ausencia de señales cruzadas no es suerte. Es el resultado de lo que se hizo bien.',
@@ -1261,9 +1261,9 @@ export function buildActo4Alertas(alertas: AlertaInput[]): Acto4AlertasNarrative
       subtitulo: `${criticas.length} ${criticas.length === 1 ? 'alerta crítica' : 'alertas críticas'} sin resolver`,
       estado: 'critica',
       parrafoGancho:
-        `Este ciclo cierra con ${activas.length} ${activas.length === 1 ? 'alerta abierta' : 'alertas abiertas'} — ` +
+        `Este ciclo cierra con ${activas.length} ${activas.length === 1 ? 'alerta abierta' : 'alertas abiertas'}, ` +
         `${criticas.length} en nivel crítico. ` +
-        `Una alerta crítica no es un pendiente administrativo — es una señal que ya cruzó el umbral. ` +
+        `Una alerta crítica no es un pendiente administrativo, es una señal que ya cruzó el umbral. ` +
         `O se resuelve antes del próximo ciclo. ` +
         `O deja de ser una alerta y pasa a ser un hecho.`,
       coachingTip:
@@ -1294,7 +1294,7 @@ export function buildActo4Alertas(alertas: AlertaInput[]): Acto4AlertasNarrative
     estado: 'sin_alertas',
     parrafoGancho:
       'Ninguna alerta quedó abierta este ciclo. ' +
-      'No es que el sistema no haya buscado — buscó y no encontró nada que escalara. ' +
+      'No es que el sistema no haya buscado: buscó y no encontró nada que escalara. ' +
       'Es el resultado de un ambiente que se gestionó a tiempo.',
     coachingTip:
       'Cerrar el ciclo sin alertas no baja la guardia. La confirma.',
