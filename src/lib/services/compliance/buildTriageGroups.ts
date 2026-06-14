@@ -18,8 +18,7 @@
 //   Si la gerencia tiene >1 depto hijo → la instancia anota el origen
 //   ("— vía {worstDept}"). 1 depto / standalone → sin anotación.
 //
-// REGLA PUENTE vigente: este código nuevo NO importa `getISARiskLevel`; el
-//   nivel ISA (si se necesitara) iría por `classifyIsa`. Acá el Triage no
+// Nivel ISA canónico = `classifyIsa` (fuente única). Acá el Triage no
 //   clasifica ISA — agrupa por la lectura del score de riesgo per-dept.
 //
 // Caveat resuelto: NO se usa la agrupación simplificada del script de datos

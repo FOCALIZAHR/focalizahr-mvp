@@ -14,7 +14,7 @@ import type {
   OrigenPercibido,
   ComplianceAlertType,
 } from '@/types/compliance';
-import type { ISARiskLevel } from '@/lib/services/compliance/ISAService';
+import type { IsaLevel } from '@/app/dashboard/compliance/components/sections/SectionDimensiones/_shared/constants';
 import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
@@ -63,7 +63,6 @@ export const SECTION_INDEX: Record<ComplianceSectionId, number> = COMPLIANCE_SEC
 // ═══════════════════════════════════════════════════════════════════
 
 export { ISA_LABELS } from '@/lib/services/compliance/ISAService';
-export type { ISARiskLevel } from '@/lib/services/compliance/ISAService';
 
 // ═══════════════════════════════════════════════════════════════════
 // Dimensiones (P2-P8) — labels ejecutivos, NUNCA "P2", "P3", etc.
@@ -172,11 +171,11 @@ export const TESLA_BY_SECTION: Record<ComplianceSectionId, string | null> = {
  *  Paleta anti-semáforo (Decisión #1 Plan de Cierre AS v1.0):
  *  cyan / slate-400 / amber / amber. Crítico se distingue por glow
  *  intensificado, no por color distinto. */
-export const TESLA_SINTESIS: Record<ISARiskLevel, string> = {
-  saludable:   '#22D3EE', // cyan
-  observacion: '#94A3B8', // slate-400 (no slate-500 — más visible en estado neutral)
-  riesgo:      '#F59E0B', // amber
-  critico:     '#F59E0B', // amber (no rojo — intensidad, no semáforo)
+export const TESLA_SINTESIS: Record<IsaLevel, string> = {
+  sano:     '#22D3EE', // cyan
+  atencion: '#94A3B8', // slate-400 (no slate-500 — más visible en estado neutral)
+  riesgo:   '#F59E0B', // amber
+  critico:  '#F59E0B', // amber (no rojo — intensidad, no semáforo)
 };
 
 // Paleta de referencia (fijos que usan componentes)

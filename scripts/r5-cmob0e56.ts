@@ -9,7 +9,7 @@
 import { prisma } from '@/lib/prisma'
 import { computeDepartmentParticipation } from '@/lib/services/compliance/ComplianceAlertService'
 import { computeCoverageAnalysis } from '@/lib/services/compliance/CoverageAnalysisService'
-import { getISARiskLevel } from '@/lib/services/compliance/ISAService'
+import { classifyIsa } from '@/app/dashboard/compliance/components/sections/SectionDimensiones/_shared/constants'
 
 // IDs del backup artefacto3-cmob0e56u0005f7g42l11urw0-2026-05-08
 const CAMPAIGN_ID = 'cmob0e56u0005f7g42l11urw0'
@@ -32,13 +32,13 @@ function classifyD4(input: {
   if (coverageGapPct >= 50) return 'silencio'
   if (teatroCount >= 1) return 'contradiccion'
   if (
-    getISARiskLevel(orgISA) === 'saludable' &&
+    classifyIsa(orgISA) === 'sano' &&
     riesgoDeptos === 0 &&
     coverageGapPct < 30
   )
     return 'todo-bien'
   if (
-    getISARiskLevel(orgISA) === 'saludable' &&
+    classifyIsa(orgISA) === 'sano' &&
     (riesgoDeptos >= 1 || (coverageGapPct >= 30 && coverageGapPct < 50))
   )
     return 'bien-con-focos'

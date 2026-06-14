@@ -1,7 +1,7 @@
 // src/app/dashboard/compliance/lib/format.ts
 // Helpers de presentación del dashboard Compliance.
 
-import type { ISARiskLevel } from '@/lib/services/compliance/ISAService';
+import type { IsaLevel } from '@/app/dashboard/compliance/components/sections/SectionDimensiones/_shared/constants';
 import {
   classifyDimensionLevel,
   type ComplianceDimensionLevel,
@@ -195,13 +195,13 @@ export function pickHighestRisk<
   return ordered[0];
 }
 
-/** Mapea ISARiskLevel → riskLevel del IndicatorGauge (paleta anti-semáforo
+/** Mapea IsaLevel → riskLevel del IndicatorGauge (paleta anti-semáforo
  *  Decisión #1 Plan de Cierre AS v1.0): cyan / slate / amber / amber-glow. */
 export function isaLevelToGaugeColor(
-  level: ISARiskLevel
+  level: IsaLevel
 ): 'safe' | 'observation' | 'risk' | 'critical' {
-  if (level === 'saludable') return 'safe';
-  if (level === 'observacion') return 'observation';
+  if (level === 'sano') return 'safe';
+  if (level === 'atencion') return 'observation';
   if (level === 'riesgo') return 'risk';
   return 'critical';
 }

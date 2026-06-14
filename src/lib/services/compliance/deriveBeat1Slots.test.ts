@@ -171,10 +171,10 @@ test('2b. dos gerencias con MISMO ISA → tiebreak alfabético', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// CASE 3 — gerencias_sanas_count usa getISARiskLevel (≥80) NO threshold suelto
+// CASE 3 — gerencias_sanas_count usa classifyIsa (≥80) NO threshold suelto
 // ═══════════════════════════════════════════════════════════════════
 
-test('3. sanas_count: solo getISARiskLevel === "saludable" (≥80); 79 NO cuenta', () => {
+test('3. sanas_count: solo classifyIsa === "sano" (≥80); 79 NO cuenta', () => {
   const rollups: GerenciaRollup[] = [
     mkRollup({
       groupId: 'g1',
@@ -816,11 +816,11 @@ test('14. ningún rollup con ISA medido → top/alta/baja null + counts en 0', (
 // CASE 15 — banda + coverage_gap_pct (passthrough del ctx)
 // ═══════════════════════════════════════════════════════════════════
 
-test('15. banda: derivada vía getISARiskLevel(ctx.orgISA) — boundaries 80/60/40', () => {
+test('15. banda: derivada vía classifyIsa(ctx.orgISA) — boundaries 80/60/40', () => {
   const s1 = deriveBeat1Slots([], ctx({ orgISA: 85 }));
-  assert.equal(s1.banda, 'saludable');
+  assert.equal(s1.banda, 'sano');
   const s2 = deriveBeat1Slots([], ctx({ orgISA: 60 }));
-  assert.equal(s2.banda, 'observacion');
+  assert.equal(s2.banda, 'atencion');
   const s3 = deriveBeat1Slots([], ctx({ orgISA: 40 }));
   assert.equal(s3.banda, 'riesgo');
   const s4 = deriveBeat1Slots([], ctx({ orgISA: 39 }));

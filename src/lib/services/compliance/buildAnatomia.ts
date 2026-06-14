@@ -8,8 +8,8 @@
 // cierre + §5 causa raíz) — fuente única ese handoff.
 //
 // El motor sigue en 1–5; la cascada habla "de 100" (toDisplay100). Nivel
-// canónico = classifyDimensionLevel (vía orgDimensions). Regla puente: nunca
-// getISARiskLevel acá.
+// canónico de dimensión = classifyDimensionLevel (vía orgDimensions); nivel
+// ISA = classifyIsa. Acá no se clasifica ISA.
 // ═══════════════════════════════════════════════════════════════════
 
 import {

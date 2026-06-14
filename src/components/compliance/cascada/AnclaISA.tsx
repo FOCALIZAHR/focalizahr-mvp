@@ -16,7 +16,10 @@ import {
   CONVERGENCIA_TOOLTIP,
   PREDICTOR_TOOLTIP,
 } from '@/lib/services/compliance/CascadaNarrativeDictionary';
-import { getISARiskLevel, type ISARiskLevel } from '@/lib/services/compliance/ISAService';
+import {
+  classifyIsa,
+  type IsaLevel,
+} from '@/app/dashboard/compliance/components/sections/SectionDimensiones/_shared/constants';
 import type { ComplianceReportResponse } from '@/types/compliance';
 
 interface AnclaISAProps {
@@ -25,9 +28,9 @@ interface AnclaISAProps {
 }
 
 /** Color del arco del gauge según el tier de riesgo del ISA. */
-const ISA_GAUGE_HEX: Record<ISARiskLevel, string> = {
-  saludable: '#22D3EE',
-  observacion: '#F59E0B',
+const ISA_GAUGE_HEX: Record<IsaLevel, string> = {
+  sano: '#22D3EE',
+  atencion: '#F59E0B',
   riesgo: '#F59E0B',
   critico: '#A78BFA',
 };
@@ -79,7 +82,7 @@ export default function AnclaISA({ data, onContinue }: AnclaISAProps) {
       score={orgISA}
       scoreLabel="ÍNDICE DE AMBIENTE"
       scoreSuffix=""
-      gaugeColor={ISA_GAUGE_HEX[getISARiskLevel(orgISA)]}
+      gaugeColor={ISA_GAUGE_HEX[classifyIsa(orgISA)]}
       components={nodes}
       weightNote={buildWeightNote(comp.pesos)}
       ctaLabel="Ver diagnóstico completo"

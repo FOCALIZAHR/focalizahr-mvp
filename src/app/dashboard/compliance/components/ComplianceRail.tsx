@@ -21,7 +21,7 @@ import {
   TESLA_SINTESIS,
   TESLA_COLOR_CYAN,
 } from '@/app/dashboard/compliance/lib/labels';
-import { getISARiskLevel } from '@/lib/services/compliance/ISAService';
+import { classifyIsa } from '@/app/dashboard/compliance/components/sections/SectionDimensiones/_shared/constants';
 import SectionRailCard from './SectionRailCard';
 import type {
   ComplianceCampaignSummary,
@@ -72,7 +72,7 @@ export default function ComplianceRail({
   const teslaColorFor = (id: ComplianceSectionId): string => {
     if (id === 'sintesis') {
       const isa = orgISA ?? 100;
-      return TESLA_SINTESIS[getISARiskLevel(isa)];
+      return TESLA_SINTESIS[classifyIsa(isa)];
     }
     return TESLA_BY_SECTION[id] ?? TESLA_COLOR_CYAN;
   };

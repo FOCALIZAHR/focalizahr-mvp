@@ -16,6 +16,9 @@
 // narrativas como hero del reporte.
 
 import type { PatronDetectado, ConfianzaAnalisis } from './complianceTypes';
+// Léxico ISA canónico: clasificador y nivel únicos viven en classifyIsa /
+// IsaLevel (constants del módulo). Import type-only → sin ciclo en runtime.
+import type { IsaLevel } from '@/app/dashboard/compliance/components/sections/SectionDimensiones/_shared/constants';
 
 export interface ISAInput {
   /** Safety Score Likert 0-5 (agregado P2-P8 ponderado). */
@@ -115,7 +118,7 @@ export function calculateISAWithComponents(input: ISAInput): ISAResult {
 /**
  * Calcula el ISA (0-100). Redondea al entero más cercano.
  * NO prescribe — retorna puntaje. La interpretación de nivel es separada
- * (ver getISARiskLevel). Delega en calculateISAWithComponents().
+ * (ver classifyIsa, fuente única). Delega en calculateISAWithComponents().
  */
 export function calculateISA(input: ISAInput): number {
   return calculateISAWithComponents(input).score;
@@ -174,37 +177,27 @@ export function aggregateOrgIsaComponents(
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Niveles de riesgo y etiquetas ejecutivas.
+// Etiquetas ejecutivas por nivel ISA.
 // ═══════════════════════════════════════════════════════════════════
-
-export type ISARiskLevel = 'saludable' | 'observacion' | 'riesgo' | 'critico';
-
-// FUENTE ÚNICA de las bandas ISA. Todo clasificador delega aquí — NO hardcodear cortes.
-// Cortes (display 0-100 = Likert reescalado, (raw/5)*100): 80 = raw 4.0 ("de acuerdo") /
-//   60 = raw 3.0 (neutral) / 40 = raw 2.0. Un promedio ≥4.0 = lectura favorable (convención clima).
-// PENDIENTE — revisión metodológica: es convención Likert, NO validada para instrumento
-//   psicosocial Ley Karin. Evaluar contra banda SUSESO-ISTAS21 (tertiles). Si cambia,
-//   se cambia ACÁ y todo el módulo lo hereda.
-export function getISARiskLevel(isa: number): ISARiskLevel {
-  if (isa >= 80) return 'saludable';
-  if (isa >= 60) return 'observacion';
-  if (isa >= 40) return 'riesgo';
-  return 'critico';
-}
+//
+// Clasificador y cortes: fuente única = classifyIsa / SCORE_THRESHOLDS
+// (constants del módulo). Cortes display 0-100: 80 (raw 4.0) / 60 (raw 3.0) /
+// 40 (raw 2.0). PENDIENTE — revisión metodológica: convención Likert, NO
+// validada para instrumento psicosocial Ley Karin. Si cambia, se cambia en
+// SCORE_THRESHOLDS y todo el módulo lo hereda.
+//
+// Gate de limpieza (2026-06-14): getISARiskLevel + ISARiskLevel descongelados;
+// el módulo entero usa classifyIsa / IsaLevel (sano/atencion/riesgo/critico).
 
 export const ISA_LABELS: Record<
-  ISARiskLevel,
+  IsaLevel,
   { label: string; descripcion: string }
 > = {
-  // Gate 1.5 (A) — léxico canónico unificado al de classifyIsa / ISA_NARRATIVES
-  // (Sano / Atención / Riesgo / Crítico). Solo cambian los `label` visibles; las
-  // KEYS del union (saludable/observacion) y `getISARiskLevel` quedan intactas
-  // (consumidores de banda/gauge/lógica sin tocar — opción A "evitando riesgos").
-  saludable: {
+  sano: {
     label: 'Sano',
     descripcion: 'El ambiente funciona. Monitorear.',
   },
-  observacion: {
+  atencion: {
     label: 'Atención',
     descripcion: 'Hay señales. No ignorar.',
   },

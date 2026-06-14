@@ -9,7 +9,7 @@ import {
   ISA_LABELS,
   TESLA_SINTESIS,
 } from '@/app/dashboard/compliance/lib/labels';
-import { getISARiskLevel } from '@/lib/services/compliance/ISAService';
+import { classifyIsa } from '@/app/dashboard/compliance/components/sections/SectionDimensiones/_shared/constants';
 import { formatISA } from '@/app/dashboard/compliance/lib/format';
 import { pickLowestISA } from '@/app/dashboard/compliance/lib/format';
 import type { UseComplianceDataReturn } from '@/hooks/useComplianceData';
@@ -19,7 +19,7 @@ export default function SectionSintesis({ hook }: { hook: UseComplianceDataRetur
   if (!report) return null;
 
   const orgISA = report.data.orgISA;
-  const risk = orgISA !== null ? getISARiskLevel(orgISA) : 'saludable';
+  const risk = orgISA !== null ? classifyIsa(orgISA) : 'sano';
   const teslaColor = TESLA_SINTESIS[risk];
   const isaLabel = ISA_LABELS[risk];
 

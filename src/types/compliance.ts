@@ -73,8 +73,6 @@ export type {
   ConfianzaAnalisis,
 } from '@/lib/services/compliance/complianceTypes';
 
-export type { ISARiskLevel } from '@/lib/services/compliance/ISAService';
-
 import type { TriggerType } from '@/lib/services/compliance/InterventionEngine';
 
 export type {

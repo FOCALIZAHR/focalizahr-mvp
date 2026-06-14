@@ -16,7 +16,8 @@ import {
   isaLevelToGaugeColor,
   displayDelta,
 } from '@/app/dashboard/compliance/lib/format';
-import { getISARiskLevel, ISA_LABELS } from '@/lib/services/compliance/ISAService';
+import { ISA_LABELS } from '@/lib/services/compliance/ISAService';
+import { classifyIsa } from '@/app/dashboard/compliance/components/sections/SectionDimensiones/_shared/constants';
 import type { UseComplianceDataReturn } from '@/hooks/useComplianceData';
 import type { ComplianceSource } from '@/types/compliance';
 
@@ -124,12 +125,12 @@ export default function SectionAncla({ hook }: { hook: UseComplianceDataReturn }
                 score={dept.isaScore}
                 suffix={
                   dept.isaScore !== null
-                    ? `de 100 · ${ISA_LABELS[getISARiskLevel(dept.isaScore)].label}`
+                    ? `de 100 · ${ISA_LABELS[classifyIsa(dept.isaScore)].label}`
                     : undefined
                 }
                 riskLevel={
                   dept.isaScore !== null
-                    ? isaLevelToGaugeColor(getISARiskLevel(dept.isaScore))
+                    ? isaLevelToGaugeColor(classifyIsa(dept.isaScore))
                     : 'safe'
                 }
                 size={220}

@@ -8,7 +8,7 @@
 // honesta, sin afirmar lo que no se midió.
 //
 // Umbrales: SIN literales mágicos.
-//   - ISA "sana"        → getISARiskLevel(weighted) === 'saludable' (≥80)
+//   - ISA "sana"        → classifyIsa(weighted) === 'sano' (≥80)
 //   - silencio "muda"   → rollup donde NINGÚN hijo es bucket=con_isa.
 //                         Alineado al motor del score (no a participación <50%);
 //                         coherente con Beat 2 Triage. `SILENCIO_PARTICIPATION_THRESHOLD`
@@ -24,8 +24,10 @@
 // Spec: chat plan-mode aprobado 2026-05-30 (deriver) + 2026-06-03 (countMudas align bucket + SENALES_AMBIENTE).
 // ═══════════════════════════════════════════════════════════════════
 
-import { getISARiskLevel } from '@/lib/services/compliance/ISAService';
-import type { ISARiskLevel } from '@/lib/services/compliance/ISAService';
+import {
+  classifyIsa,
+  type IsaLevel,
+} from '@/app/dashboard/compliance/components/sections/SectionDimensiones/_shared/constants';
 // SENALES_AMBIENTE vive en convergenciaWeights y se aplica en buildGerenciaRollup
 // (computa `r.senalesAmbiente.signalsCount`). El deriver solo lo lee del rollup.
 import type { GerenciaRollup } from './buildGerenciaRollup';
@@ -94,7 +96,7 @@ export interface SlotGerenciaLeyKarin extends SlotGerencia {
 
 /** Contexto org-level requerido por el deriver. */
 export interface DeriveBeat1Ctx {
-  /** ISA org-level (display 0-100). Banda derivada vía getISARiskLevel canónico. */
+  /** ISA org-level (display 0-100). Banda derivada vía classifyIsa canónico. */
   orgISA: number;
   /** Gap de cobertura org-level (0-100 entero) = 100 - pctCobertura. */
   coverageGapPct: number;
@@ -136,9 +138,9 @@ export interface Beat1Slots {
   /** Σ rollup.silencio.responded — total de personas que respondieron.
    *  Crudo, par del slot `totalInvited`. */
   totalResponded: number;
-  /** Banda ISA org-level — derivada vía getISARiskLevel canónico. Slot del
+  /** Banda ISA org-level — derivada vía classifyIsa canónico. Slot del
    *  mundo NÚMERO BAJO ("El ISA cae en zona de {banda}"). */
-  banda: ISARiskLevel;
+  banda: IsaLevel;
   /** Passthrough del ctx — slot del sabor "cobertura" de BIEN CON FOCOS
    *  ("{coverage_gap_pct}% de las áreas no respondió"). */
   coverage_gap_pct: number;
@@ -205,14 +207,14 @@ export function deriveBeat1Slots(
     gerencias_sanas_count: rollups.filter(
       (r) =>
         r.isa.weighted !== null &&
-        getISARiskLevel(r.isa.weighted) === 'saludable',
+        classifyIsa(r.isa.weighted) === 'sano',
     ).length,
     gerencias_mudas_count: countMudas(rollups),
     gerencias_universo_total: rollups.length,
     personResponseRate: computePersonResponseRate(rollups),
     totalInvited: rollups.reduce((s, r) => s + r.silencio.invited, 0),
     totalResponded: rollups.reduce((s, r) => s + r.silencio.responded, 0),
-    banda: getISARiskLevel(ctx.orgISA),
+    banda: classifyIsa(ctx.orgISA),
     coverage_gap_pct: ctx.coverageGapPct,
 
     gerencia_top_1: bestIsa,
