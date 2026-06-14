@@ -53,6 +53,7 @@ La cascada `Ambiente Sano` fue rearmada de raíz contra el plan §3 (espejo del 
 | **Barrido em-dashes (48) prosa visible** | ✅ | `4e404b9` |
 | **Gate 4 La Voz — acto material crudo** | ✅ (visto Victor) | `81a3df8` |
 | **Gate 5 El Nombre — concentración por rama** | ✅ (visto Victor) | `617bdce` |
+| **Gate 6 La Decisión — cierre + integridad** | ✅ (visto Victor) | `7deeb63` |
 
 ### Gate 3 (Anatomía) — cerrado (2026-06-12, `ffcd73e`/`5b78834`/`adc15a5`)
 
@@ -67,6 +68,14 @@ Beat 3 completo. Sub-gates: **3a** fundación pura (`dimFoco` doble filtro grave
 ### Gate 4 (La Voz) — CERRADO (`81a3df8`, visto Victor 2026-06-12)
 
 `buildLaVoz` (pure) + `ActoVoz` reescrito — el acto del material crudo (citas verbatim, composición tipográfica sin cards/bullets/barras; purple exclusivo del kicker IA). Selector por **FAMILIA** `SILENCIO_FAMILY = {silencio_organizacional, resignacion_aprendida, miedo_represalias}` (lista explícita auditable + test) sobre `patron_dominante.nombre` ya persistido — no inventa clasificador. Citas sanitizadas (`stripWrappingQuotes` arregla el bug `""…""`), dedup, tope 6. Género a nivel **gerencia** (`parentDepartmentName`, anonimato + consistencia Apertura). 9 oráculos. tsc 0, 214/214, audit em-dashes 0 (`buildLaVoz.ts` agregado al auditor). Caso real cmob0e56 = forma silencio, 5 voces + 1 voz género (Gerencia de Tecnología).
+
+### Gate 6 (La Decisión) — CERRADO · CASCADA SELLADA (`7deeb63`, visto Victor 2026-06-14)
+
+Cierre de la cascada. (1) **La Decisión recoge los DOS afluentes** (Regla del Río): título ampliado ("…Es un ambiente que no protege, y un silencio que ya dejó señal por fuera.") + puente al afluente de dimensiones (0-dimensiones de la Anatomía unido al silencio), párrafo aparte (`\n\n` split en `ActoSintesis`); cierre+CTA verbatim. (2) **Labels del Triage en lenguaje de negocio** (acto+modal): `FAMILY_LABEL` FUEGO→RIESGO CONFIRMADO · HUMO→RIESGO EN FORMACIÓN · PUNTO CIEGO (conserva) · CONFIABLE→LECTURA VÁLIDA; sub-hero traducido ("2 en riesgo · 4 sin lectura"); el motor mantiene los nombres internos (orden+color). (3) Em-dash residual = falsa alarma.
+
+**Test de integridad PASADO** (mecánico `cascadaHiloUnico.test.ts` `ca50db3` + editorial Gate 6 ítems 1/2/3). tsc 0, 229/229, audit 0.
+
+**🏁 Beats 1→6 sellados.** Solo resta el **gate de limpieza final** (deudas en ESTADO_CASCADA: remover copyFor/mundos legacy + fuente única classifyIsa; barrido em-dashes módulo dashboard; acto1-4 legacy).
 
 ### Gate 5 (El Nombre) — CERRADO (`617bdce`, visto Victor 2026-06-12)
 
