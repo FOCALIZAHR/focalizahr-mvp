@@ -46,7 +46,6 @@ export type {
 } from '@/lib/services/compliance/ConvergenciaEngine';
 
 export type {
-  PortadaNarrative,
   AnclaNarrative,
   DimensionNarrative,
   PatronNarrative,

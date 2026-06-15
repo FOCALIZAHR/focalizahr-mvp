@@ -1,17 +1,25 @@
 'use client';
 
 // src/app/dashboard/compliance/components/sections/SectionSintesis.tsx
-// El gancho. Hero ISA + narrativa portada + 3 chips + CTA a depto menor ISA.
-// Tesla Line dinámica según ISA riskLevel (TESLA_SINTESIS).
+// El gancho (Síntesis del ciclo). Rediseño Portada: StatusBadge + narrativa +
+// CTA único. Sin hero gigante repetido (ese número es del Acto Ancla), sin chips
+// de conteo (viven en SectionAlertas / SectionConvergencia), sin 2º CTA.
+//
+// Selector = synthesis.diagnosticType del AmbienteSynthesisEngine (el MISMO motor
+// que alimenta La Decisión). El gancho NO clasifica; solo dentro de los tipos
+// sanos parte por coverageGap (matriz 2 ejes). Copy verbatim en ganchoVariants.
 
+import { motion } from 'framer-motion';
+import { ArrowRight } from 'lucide-react';
 import SectionShell from './_shared/SectionShell';
-import {
-  ISA_LABELS,
-  TESLA_SINTESIS,
-} from '@/app/dashboard/compliance/lib/labels';
-import { classifyIsa } from '@/app/dashboard/compliance/components/sections/SectionDimensiones/_shared/constants';
-import { formatISA } from '@/app/dashboard/compliance/lib/format';
+import { PrimaryButton } from '@/components/ui/PremiumButton';
 import { pickLowestISA } from '@/app/dashboard/compliance/lib/format';
+import {
+  selectGanchoVariant,
+  interpolateGancho,
+  GANCHO_VARIANTS,
+  type GanchoVariantKey,
+} from '@/app/dashboard/compliance/lib/ganchoVariants';
 import type { UseComplianceDataReturn } from '@/hooks/useComplianceData';
 
 export default function SectionSintesis({ hook }: { hook: UseComplianceDataReturn }) {
@@ -19,127 +27,87 @@ export default function SectionSintesis({ hook }: { hook: UseComplianceDataRetur
   if (!report) return null;
 
   const orgISA = report.data.orgISA;
-  const risk = orgISA !== null ? classifyIsa(orgISA) : 'sano';
-  const teslaColor = TESLA_SINTESIS[risk];
-  const isaLabel = ISA_LABELS[risk];
+  const synthesis = report.data.synthesis;
+  // Umbral pleno/de-pocos = classifyD4 (fuente única). NO re-derivar.
+  const coverageGapPct = report.data.beat1Seed?.classifyD4Trace.coverageGapPct ?? 0;
 
-  const portada = report.narratives.portada;
-  const meta = report.data.metaAnalysis;
+  // Dev preview (visto): ?ganchoVariant=<key>[&ganchoISA=<n>] fuerza variante +
+  // número para revisión visual. Param ausente = comportamiento real de producción.
+  const sp =
+    typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const previewKey = sp?.get('ganchoVariant');
+  const previewISA = sp?.get('ganchoISA');
+  const isPreview = !!previewKey && previewKey in GANCHO_VARIANTS;
 
-  // Chips de contexto ejecutivo
-  const convergenteDepts = report.data.convergencia.departments.filter(
-    (c) => c.level === 'convergente' || c.level === 'critico'
-  ).length;
-  const alertasActivas = report.data.alerts.filter(
-    (a) => a.status !== 'resolved' && a.status !== 'dismissed'
-  ).length;
-  const teatroCount = meta?.teatro_detectado_count ?? 0;
+  const variantKey: GanchoVariantKey = isPreview
+    ? (previewKey as GanchoVariantKey)
+    : synthesis
+      ? selectGanchoVariant(synthesis.diagnosticType, coverageGapPct, orgISA)
+      : 'generic';
+  const variant = GANCHO_VARIANTS[variantKey];
+  const isGeneric = variantKey === 'generic';
 
+  const displayISA =
+    isPreview && previewISA !== null && previewISA !== '' ? Number(previewISA) : orgISA;
+
+  // CTA único "Ver evidencia" → Acto Ancla (AnclaISA = 1er beat de la cascada).
+  // Fallback a la vista por departamento cuando no hay cascada (AREA_MANAGER /
+  // campaña sin ISA). El Acto Ancla como pantalla aparte es otro gate.
   const deptMenorISA = pickLowestISA(report.data.departments);
+  const goEvidence = () => {
+    if (report.narratives.cascada) {
+      hook.selectSection('cascada');
+    } else if (deptMenorISA) {
+      hook.selectDepartment(deptMenorISA.departmentId);
+      hook.selectSection('ancla');
+    } else {
+      hook.selectSection('cascada');
+    }
+  };
 
   return (
-    <SectionShell
-      sectionId="sintesis"
-      teslaColorOverride={teslaColor}
-      onNext={hook.navigateNext}
-    >
-      {/* Hero ISA */}
-      <div className="text-center">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mb-4">
-          Síntesis del ciclo
-        </p>
-        <div className="flex items-center justify-center leading-none">
-          <span className="text-[96px] md:text-[120px] font-extralight tabular-nums text-white leading-none">
-            {formatISA(orgISA)}
-          </span>
-        </div>
-        <p className="text-slate-500 text-sm uppercase tracking-widest mt-2">
-          {isaLabel.label}
-        </p>
-        <p className="text-slate-600 text-xs mt-1 font-light italic">
-          {isaLabel.descripcion}
-        </p>
-      </div>
+    <SectionShell sectionId="sintesis" teslaColorOverride={variant.tone}>
+      <div className="flex flex-col items-center text-center">
+        {/* StatusBadge — la severidad la canta una sola cosa: el tono. */}
+        <span
+          className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] border"
+          style={{
+            backgroundColor: `${variant.tone}15`,
+            borderColor: `${variant.tone}40`,
+            color: variant.tone,
+          }}
+        >
+          {variant.badgeLabel}
+        </span>
 
-      {/* Narrativa portada + delta + hallazgo meta */}
-      <div className="mt-10 max-w-2xl mx-auto text-center">
-        <p className="text-slate-200 font-light text-lg md:text-xl leading-relaxed">
-          {portada.titular}
-        </p>
-        <p className="text-slate-500 font-light text-sm mt-3">
-          {portada.subtitular}
-        </p>
-        {portada.deltaLabel && (
-          <span className="text-slate-400 text-xs mt-3 block tabular-nums">
-            {portada.deltaLabel}
-          </span>
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="text-xl md:text-2xl font-extralight text-white leading-relaxed max-w-3xl mt-10"
+        >
+          {interpolateGancho(variant.titular, displayISA)}
+        </motion.p>
+        {variant.insight && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="text-base font-light italic text-slate-400 leading-relaxed max-w-xl mt-5"
+          >
+            {variant.insight}
+          </motion.p>
+        )}
+
+        {/* CTA único — suprimido en GENERIC (Mundo A: cascada no disponible). */}
+        {!isGeneric && (
+          <div className="mt-12">
+            <PrimaryButton icon={ArrowRight} iconPosition="right" onClick={goEvidence}>
+              Ver evidencia
+            </PrimaryButton>
+          </div>
         )}
       </div>
-
-      {/* 3 chips resumen */}
-      <div className="flex flex-wrap justify-center gap-3 mt-10">
-        <Chip
-          label={`${convergenteDepts} ${convergenteDepts === 1 ? 'señal convergente' : 'señales convergentes'}`}
-        />
-        <Chip
-          label={`${alertasActivas} ${alertasActivas === 1 ? 'alerta activa' : 'alertas activas'}`}
-          accent={alertasActivas > 0 ? 'amber' : 'slate'}
-        />
-        {teatroCount > 0 && (
-          <Chip
-            label={`Teatro detectado en ${teatroCount} ${teatroCount === 1 ? 'área' : 'áreas'}`}
-            accent="amber"
-          />
-        )}
-      </div>
-
-      {/* CTA — al diagnóstico ejecutivo si existe; si no, al depto de mayor riesgo */}
-      {report.narratives.cascada ? (
-        <div className="flex justify-center mt-10">
-          <button
-            onClick={() => hook.selectSection('cascada')}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 hover:border-cyan-500/50 transition-all text-sm font-light"
-          >
-            Ver diagnóstico completo →
-          </button>
-        </div>
-      ) : deptMenorISA ? (
-        <div className="flex justify-center mt-10">
-          <button
-            onClick={() => {
-              hook.selectDepartment(deptMenorISA.departmentId);
-              hook.selectSection('ancla');
-            }}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 hover:border-cyan-500/50 transition-all text-sm font-light"
-          >
-            Ver {deptMenorISA.departmentName} →
-          </button>
-        </div>
-      ) : null}
     </SectionShell>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// Subcomponentes
-// ═══════════════════════════════════════════════════════════════════
-
-function Chip({
-  label,
-  accent = 'slate',
-}: {
-  label: string;
-  accent?: 'slate' | 'amber';
-}) {
-  const styles =
-    accent === 'amber'
-      ? 'border-amber-500/30 text-amber-300 bg-amber-500/5'
-      : 'border-slate-700 text-slate-400 bg-slate-900/40';
-  return (
-    <span
-      className={`inline-flex items-center px-3 py-1.5 rounded-full border text-xs font-light ${styles}`}
-    >
-      {label}
-    </span>
   );
 }

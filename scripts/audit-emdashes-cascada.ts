@@ -53,6 +53,9 @@ const FILES = [
   'src/lib/services/compliance/CoverageNarrativeDictionary.ts',
   'src/lib/services/compliance/AmbienteSynthesisDictionary.ts',
   'src/app/dashboard/compliance/lib/labels.ts',
+  // Gancho (Síntesis): selector + copy de variantes + render.
+  'src/app/dashboard/compliance/lib/ganchoVariants.ts',
+  'src/app/dashboard/compliance/components/sections/SectionSintesis.tsx',
 ];
 
 /** Línea de comentario completa (incluye apertura de comentario JSX). */

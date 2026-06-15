@@ -44,7 +44,6 @@ import { SOURCE_LABEL_NARRATIVE, SOURCE_VOICE_NARRATIVE } from '@/config/complia
 // ═══════════════════════════════════════════════════════════════════
 
 export interface ReportNarratives {
-  portada: PortadaNarrative;
   ancla: AnclaNarrative;
   artefacto1_dimensiones: DimensionNarrative[];
   artefacto2_patrones: PatronNarrative[];
@@ -87,15 +86,6 @@ export interface ReportNarratives {
     acto3: Acto3SenalesNarrative;
     acto4: Acto4AlertasNarrative;
   };
-}
-
-export interface PortadaNarrative {
-  titular: string;
-  subtitular: string;
-  /** Score de la campaña anterior (misma slug + account), si existe. */
-  previousScore?: number | null;
-  /** Texto ejecutivo tipo "+0.3 vs Semestre 2 2025" o "Primera medición". */
-  deltaLabel?: string | null;
 }
 
 export interface AnclaNarrative {
@@ -202,76 +192,6 @@ function countBy<T, K extends string>(arr: T[], key: (x: T) => K): Record<K, num
     acc[k] = (acc[k] ?? 0) + 1;
   }
   return acc as Record<K, number>;
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// PORTADA
-// ═══════════════════════════════════════════════════════════════════
-
-function buildDeltaLabel(
-  current: number | null,
-  previous: number | null,
-  previousLabel: string | null
-): string | null {
-  if (current === null || previous === null || !previousLabel) return null;
-  const diff = current - previous;
-  const rounded = Math.round(diff * 10) / 10;
-  if (rounded === 0) return `Sin cambio vs ${previousLabel}`;
-  const sign = rounded > 0 ? '+' : '';
-  return `${sign}${rounded.toFixed(1)} vs ${previousLabel}`;
-}
-
-function buildPortada(
-  meta: MetaAnalysisOutput | null,
-  departmentsCount: number,
-  riesgoDeptos: number,
-  teatroCount: number,
-  currentOrgScore: number | null,
-  previousOrgScore: number | null,
-  previousCampaignLabel: string | null
-): PortadaNarrative {
-  const deltaLabel = buildDeltaLabel(currentOrgScore, previousOrgScore, previousCampaignLabel);
-  const previousScore = previousOrgScore ?? null;
-
-  if (meta?.hallazgo_narrativo_portada) {
-    return {
-      titular: meta.hallazgo_narrativo_portada,
-      subtitular:
-        riesgoDeptos > 0
-          ? `${riesgoDeptos} de ${departmentsCount} gerencias muestran señales que ameritan revisión.`
-          : 'Las señales agregadas sostienen un diagnóstico general saludable.',
-      previousScore,
-      deltaLabel,
-    };
-  }
-
-  if (teatroCount >= 2) {
-    return {
-      titular:
-        'Los números dicen una cosa; las respuestas, otra. La diferencia es la señal.',
-      subtitular: `${teatroCount} gerencias puntúan alto en las métricas duras pero su lenguaje sugiere contención.`,
-      previousScore,
-      deltaLabel,
-    };
-  }
-
-  if (riesgoDeptos === 0) {
-    return {
-      titular: 'La organización opera con márgenes saludables en el ambiente de trabajo.',
-      subtitular:
-        'Ninguna gerencia entra en zona de revisión crítica. El foco está en sostener lo que funciona.',
-      previousScore,
-      deltaLabel,
-    };
-  }
-
-  return {
-    titular: `${riesgoDeptos} gerencias concentran el riesgo del semestre.`,
-    subtitular:
-      'El análisis revela concentración, no dispersión. Eso ordena la prioridad.',
-    previousScore,
-    deltaLabel,
-  };
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1356,15 +1276,6 @@ export function buildReportNarratives(input: BuildNarrativesInput): ReportNarrat
   const patrones = buildPatrones(input.departmentAnalyses);
 
   return {
-    portada: buildPortada(
-      input.meta,
-      departmentsCount,
-      riesgoDeptos,
-      teatroCount,
-      input.orgSafetyScore,
-      input.previousOrgScore ?? null,
-      input.previousCampaignLabel ?? null
-    ),
     ancla: buildAncla(input.orgSafetyScore, departmentsCount, teatroCount),
     artefacto1_dimensiones: buildDimensiones(input.scores),
     artefacto2_patrones: patrones,

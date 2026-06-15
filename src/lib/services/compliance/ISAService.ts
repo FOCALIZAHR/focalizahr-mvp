@@ -203,10 +203,10 @@ export const ISA_LABELS: Record<
   },
   riesgo: {
     label: 'Riesgo',
-    descripcion: 'Problemas confirmados. Actuar.',
+    descripcion: 'Señales que ameritan revisión.',
   },
   critico: {
     label: 'Crítico',
-    descripcion: 'Convergencia de señales. Urgente.',
+    descripcion: 'Señales que convergen. Prioridad alta.',
   },
 };
