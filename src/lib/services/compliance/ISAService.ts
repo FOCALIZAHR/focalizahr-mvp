@@ -125,6 +125,39 @@ export function calculateISA(input: ISAInput): number {
 }
 
 /**
+ * Opción A (fallback-only) — resuelve el orgISA org-level.
+ * - bottomUp existe (promedio ponderado de ISAs por depto) → se usa tal cual.
+ *   NUNCA se sobrescribe: candado de la cascada sellada (el 49 no se mueve).
+ * - bottomUp null (ningún depto alcanzó n>=5) pero hay safety org (agregado
+ *   directo pooled, total >=5) → ISA safety-only (1-componente), `isaParcial`.
+ *   Sin voz libre ni convergencia (el análisis por-depto no corrió).
+ * - sin safety org → null.
+ * Pure.
+ */
+export function resolveOrgIsa(input: {
+  bottomUpIsa: number | null;
+  orgSafetyScore: number | null;
+}): { isa: number | null; isaParcial: boolean } {
+  if (input.bottomUpIsa !== null) {
+    return { isa: input.bottomUpIsa, isaParcial: false };
+  }
+  if (input.orgSafetyScore !== null) {
+    return {
+      isa: calculateISA({
+        safetyScore: input.orgSafetyScore,
+        patrones: [],
+        confianzaLLM: 'insuficiente_data',
+        convergenciaSignals: 0,
+        activeSources: 1,
+        teatroCumplimiento: false,
+      }),
+      isaParcial: true,
+    };
+  }
+  return { isa: null, isaParcial: false };
+}
+
+/**
  * Agrega isaComponents por-departamento en un isaComponents org-level.
  * Cada componente = promedio ponderado por respondentCount sobre los deptos
  * donde el componente no es null. Los pesos org se derivan de la

@@ -116,6 +116,11 @@ export const GANCHO_VARIANTS: Record<GanchoVariantKey, GanchoVariant> = {
   },
 };
 
+/** Caption del estado ISA parcial (Opción A): el orgISA es safety-only porque
+ *  ningún equipo reunió las 5 respuestas mínimas. Lenguaje de negocio (versión B). */
+export const ISA_PARCIAL_CAPTION =
+  'El número es global. El detalle por área queda fuera de alcance: ningún equipo reunió las 5 respuestas que se necesitan para leerlo sin exponer a nadie. El problema antes que el ambiente es la participación.';
+
 /**
  * Selecciona la variante del gancho. El motor ya clasificó el mundo
  * (`diagnosticType`); el corte pleno/de-pocos se aplica SOLO dentro de los

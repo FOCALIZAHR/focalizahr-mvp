@@ -53,6 +53,8 @@ interface OrgPayload {
   global: {
     orgSafetyScore: number | null;
     orgISA?: number | null;
+    /** Opción A (fallback-only): orgISA computado safety-only (ningún depto >=5). */
+    isaParcial?: boolean;
     isaComponents?: ISAResult['components'] | null;
     skippedByPrivacy: SafetyScoreSkip[];
     activeSourcesGlobal: ComplianceSource[];
@@ -398,6 +400,7 @@ export async function GET(request: NextRequest) {
       data: {
         orgSafetyScore: orgPayload.global.orgSafetyScore,
         orgISA: orgPayload.global.orgISA ?? null,
+        isaParcial: orgPayload.global.isaParcial ?? false,
         isaComponents: orgPayload.global.isaComponents ?? null,
         totalTextResponses: orgPayload.global.totalTextResponses ?? null,
         totalRespondents: orgPayload.global.totalRespondents ?? null,

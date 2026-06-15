@@ -104,7 +104,7 @@ export interface SafetyScoreResult {
   skipped: SafetyScoreSkip[];
 }
 
-interface ResponseRow {
+export interface ResponseRow {
   normalizedScore: number;
   questionOrder: number;
   participantId: string;
@@ -160,6 +160,18 @@ function computeAverageScore(averages: Map<number, number>): number | null {
     );
   }
   return sum / count;
+}
+
+/**
+ * orgSafetyScore agregado DIRECTO de todas las respuestas pooled (Opción A,
+ * fallback-only). Solo se usa cuando ningún depto alcanzó n>=5 (no hay desglose
+ * por área). Privacy: requiere respondentes únicos >= PRIVACY_THRESHOLD — el
+ * agregado org de >=5 personas no identifica a nadie. Pure.
+ */
+export function computePooledOrgScore(rows: ResponseRow[]): number | null {
+  const uniqueParticipants = new Set(rows.map((r) => r.participantId)).size;
+  if (uniqueParticipants < PRIVACY_THRESHOLD) return null;
+  return computeAverageScore(averageByQuestion(rows));
 }
 
 function buildDimensionScores(
@@ -393,6 +405,12 @@ export async function calculateSafetyScores(
       0
     );
     orgScore = totalRespondents > 0 ? weightedSum / totalRespondents : null;
+  } else {
+    // Opción A (fallback-only): ningún depto pasó el umbral por área (result
+    // vacío), pero el agregado org de todas las respuestas no identifica a nadie
+    // si total >=5. Pooled directo. El desglose por área (result/skipped) NO
+    // cambia — solo se libera el agregado org.
+    orgScore = computePooledOrgScore(rows);
   }
 
   return { orgScore, departments: result, skipped };

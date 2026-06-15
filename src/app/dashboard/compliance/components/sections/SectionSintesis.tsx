@@ -18,6 +18,7 @@ import {
   selectGanchoVariant,
   interpolateGancho,
   GANCHO_VARIANTS,
+  ISA_PARCIAL_CAPTION,
   type GanchoVariantKey,
 } from '@/app/dashboard/compliance/lib/ganchoVariants';
 import type { UseComplianceDataReturn } from '@/hooks/useComplianceData';
@@ -49,6 +50,11 @@ export default function SectionSintesis({ hook }: { hook: UseComplianceDataRetur
 
   const displayISA =
     isPreview && previewISA !== null && previewISA !== '' ? Number(previewISA) : orgISA;
+
+  // Opción A: ISA safety-only (ningún depto >=5) → se nombra la limitación.
+  // Preview dev: ?ganchoParcial=1 fuerza la caption para visto.
+  const isaParcial = report.data.isaParcial ?? false;
+  const showParcial = isPreview ? sp?.get('ganchoParcial') === '1' : isaParcial;
 
   // CTA único "Ver evidencia" → Acto Ancla (AnclaISA = 1er beat de la cascada).
   // Fallback a la vista por departamento cuando no hay cascada (AREA_MANAGER /
@@ -97,6 +103,14 @@ export default function SectionSintesis({ hook }: { hook: UseComplianceDataRetur
           >
             {variant.insight}
           </motion.p>
+        )}
+
+        {/* Opción A — ISA parcial (safety-only): nombrar la limitación, no
+            mostrar el número como si fuera lectura completa. */}
+        {showParcial && !isGeneric && (
+          <p className="text-xs font-light text-slate-500 leading-relaxed max-w-xl mt-5">
+            {ISA_PARCIAL_CAPTION}
+          </p>
         )}
 
         {/* CTA único — suprimido en GENERIC (Mundo A: cascada no disponible). */}

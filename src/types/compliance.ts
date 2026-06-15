@@ -258,6 +258,10 @@ export interface ComplianceReportResponse {
   data: {
     orgSafetyScore: number | null;
     orgISA: number | null;
+    /** Opción A (fallback-only): true cuando el orgISA se computó safety-only
+     *  (agregado directo, ningún depto >=5). Sin voz libre/convergencia. La UI
+     *  lo nombra ("número sobre baja participación"). */
+    isaParcial?: boolean;
     /** Desglose del ISA org-level para el Acto Ancla. null en campañas legacy. */
     isaComponents: ISAResult['components'] | null;
     /** Suma de respuestas P1 (proyectiva) válidas que entraron al LLM por depto.

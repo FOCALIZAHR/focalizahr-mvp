@@ -9,6 +9,7 @@ import {
   interpolateGancho,
   GANCHO_VARIANTS,
   GANCHO_GAP_DE_POCOS,
+  ISA_PARCIAL_CAPTION,
   type GanchoVariantKey,
 } from './ganchoVariants';
 import { ISA_LABELS } from '@/lib/services/compliance/ISAService';
@@ -97,6 +98,13 @@ test('GENERIC tiene copy de cobertura-por-área (no vacío, sin {n} ni {dimFoco}
   assert.ok(g.insight.length > 0, 'generic sin insight de cobertura');
   assert.ok(!g.titular.includes('{n}'), 'generic no debe incrustar {n}');
   assert.ok(!g.titular.includes('{dimFoco}'));
+});
+
+test('CAPTION isaParcial: versión B (negocio), sin em-dash, nombra participación', () => {
+  assert.ok(ISA_PARCIAL_CAPTION.length > 0, 'caption vacía');
+  assert.ok(!ISA_PARCIAL_CAPTION.includes('—'), 'caption con em-dash');
+  assert.ok(ISA_PARCIAL_CAPTION.includes('participación'), 'caption no nombra participación');
+  assert.ok(ISA_PARCIAL_CAPTION.includes('5 respuestas'), 'caption no nombra el umbral');
 });
 
 // ── Fix de léxico ISA (HANDOFF §6): indicio != confirmado ────────────────────

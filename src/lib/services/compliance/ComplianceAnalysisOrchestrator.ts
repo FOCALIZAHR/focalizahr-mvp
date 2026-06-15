@@ -35,7 +35,7 @@ import {
   type DeptAlertContext,
 } from './ComplianceAlertService';
 import { buildReportNarratives } from './ComplianceNarrativeEngine';
-import { calculateISAWithComponents, aggregateOrgIsaComponents } from './ISAService';
+import { calculateISAWithComponents, aggregateOrgIsaComponents, resolveOrgIsa } from './ISAService';
 import type { ISAResult } from './ISAService';
 import type {
   MetaAnalysisDepartmentInput,
@@ -732,11 +732,11 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
       .map((d) => extractDeptSafetyDetail(d.resultPayload))
       .filter((s): s is DepartmentSafetyScore => s !== null);
 
-    // orgISA: promedio ponderado de isaScore por depto (ponderado por
-    // respondentCount). Sobre los DEPTs ya COMPLETED con resultPayload
-    // namespaced que incluye .isa. Si ningún depto tiene ISA, quedará null.
+    // orgISA bottom-up: promedio ponderado de isaScore por depto (ponderado por
+    // respondentCount). Sobre los DEPTs ya COMPLETED con resultPayload namespaced
+    // que incluye .isa. Si ningún depto tiene ISA → null (lo resuelve Opción A).
     // Se computa ANTES de buildReportNarratives — la Cascada Ejecutiva lo necesita.
-    let orgISA: number | null = null;
+    let bottomUpIsa: number | null = null;
     {
       let totalWeight = 0;
       let weightedSum = 0;
@@ -749,8 +749,12 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
           totalWeight += weight;
         }
       }
-      if (totalWeight > 0) orgISA = Math.round(weightedSum / totalWeight);
+      if (totalWeight > 0) bottomUpIsa = Math.round(weightedSum / totalWeight);
     }
+    // Opción A (fallback-only): si el bottom-up es null (ningún depto >=5) pero
+    // hay safety org-level (pooled directo, total >=5), ISA safety-only parcial.
+    // El bottom-up existente NUNCA se sobrescribe → candado del 49 sellado.
+    const { isa: orgISA, isaParcial } = resolveOrgIsa({ bottomUpIsa, orgSafetyScore });
 
     // isaComponents org-level — desglose del Acto Ancla de la Cascada.
     const orgIsaComponents = aggregateOrgIsaComponents(
@@ -802,6 +806,7 @@ export async function processOrgMetaIfReady(campaignId: string): Promise<boolean
       global: {
         orgSafetyScore,
         orgISA,
+        isaParcial,
         isaComponents: orgIsaComponents,
         skippedByPrivacy,
         activeSourcesGlobal: globals.activeSourcesGlobal,
