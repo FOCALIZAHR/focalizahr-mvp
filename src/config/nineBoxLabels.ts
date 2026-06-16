@@ -93,7 +93,7 @@ export const NINE_BOX_CONFIG: Record<string, NineBoxPositionConfig> = {
   },
   underperformer: {
     label: 'Riesgo',
-    subtitle: 'Requiere atencion',
+    subtitle: 'Requiere atención',
     narrative: 'Bajo desempeño y bajo potencial. Conversacion urgente sobre continuidad.',
     zone: 'risk',
   },

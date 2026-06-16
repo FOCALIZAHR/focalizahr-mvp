@@ -112,7 +112,7 @@ function getCardNarrative(card: WorkforceCardType, data: WorkforceDiagnosticData
         }
       }
       return {
-        text: `${hallazgos} situaciones requieren decision`,
+        text: `${hallazgos} situaciones requieren decisión`,
         tooltip: `${pct}% exposicion organizacional · ${data.zombies.count} zombies, ${data.flightRisk.count} en riesgo de fuga`,
       }
     }
@@ -133,7 +133,7 @@ function getCardNarrative(card: WorkforceCardType, data: WorkforceDiagnosticData
     }
     case 'descriptor-simulator':
       return {
-        text: 'Simula el rediseno por cargo',
+        text: 'Simula el rediseño por cargo',
         tooltip:
           'Edita las tareas de un descriptor y ve en vivo cuanto rescatas, cuantas horas liberas y como cae la exposicion a IA',
       }
