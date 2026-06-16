@@ -2,6 +2,33 @@
 
 > **Estado vivo (2026-06-14):** cascada SELLADA (Beats 1→6) y el **Gate de limpieza CERRADO** (3 sub-gates). Árbol limpio · tsc 0 · audit em-dashes 0 · suite compliance 226/226. Única deuda abierta del módulo = **auditoría de paleta** (chat propio, ver ESTADO_CASCADA "Deudas con dueño"). El resto de esta nota es histórico de la sesión de arquitectura.
 
+---
+
+## 🆕 SESIÓN 2026-06-16 — Gancho cableado + Opción A + gate convergencia DECIDIDO (no cableado)
+
+**Commiteado esta sesión:**
+- `f54372e` — Gancho (Síntesis) reconectado a `synthesis.diagnosticType` (7 mundos + GENERIC), copy verbatim `ganchoVariants.ts`, `buildPortada` eliminado, léxico ISA corregido.
+- `bed9ec2` — Opción A: orgISA agregado directo (fallback-only) + `isaParcial` + caption de negocio. Candado del 49 (oráculo `opcionA-orgisa.test.ts`). Detalle en ESTADO_CASCADA "Deudas con dueño".
+
+**DECIDIDO esta sesión, cableado por sesión NUEVA con handoff (NO cablear acá):**
+
+**Gate convergencia "por hecho, no por estado" — 3 decisiones SELLADAS:**
+- **(a) estado FUERA** (status-agnóstico): `loadDepartmentExternalAlerts` deja de filtrar pending/acknowledged.
+- **(b) ventana 12m** unificada (= `ALERTAS_WINDOW_MONTHS`/`DENUNCIA_WINDOW_MONTHS`).
+- **(c) PESO COMPLETO, sin decay** (`getHistoricalWeight` no se aplica a la convergencia).
+- **Cableado mínimo:** scopear los 2 callers `ConvergenciaEngine.ts:1114` + `ComplianceAnalysisOrchestrator.ts:274` a fecha-12m status-agnóstico (espejo de `loadAlertasByDeptBulk`). NO tocar `HISTORICAL_LOOKBACK_MONTHS` (6m) — queda para senal_ignorada legacy.
+- **Riesgo medido:** cmob0e56 NO se mueve (5 ExitAlert cerradas en 12m, todas fuera de los 2 deptos analizados; `scripts/measure-cmob-closed-alerts.ts`). ISA inmune (`riskSignalsCount` score-based, `Orchestrator:302`, nunca `pesoEfectivo`). Severidad ×1.3 (`nivelFinal`) puede moverse al incluir cerradas, no en cmob0e56. Oráculos de los 8 mundos del synthesis = intactos (fixtures, no corren loaders).
+
+**PRINCIPIO SELLADO (el fundamento):**
+> *"El ISA es la verdad del ciclo, medido fresco. El score de riesgo lo pone a prueba: cuenta el hecho completo (12m, sin estado, sin decay) para traer toda la evidencia que cuestiona al ISA. La mejora se demuestra con ISA nuevo, no se asume con decay. Medir le gana a suponer; olvidar no es resolver."*
+
+**DEUDA NUEVA (gate propio, potente) — `senalIgnorada` proxy débil → señal real:**
+- Hoy `senalIgnorada` (`ConvergenciaEngine.ts:282-291`) usa `onboardingEXOScore < 60` (proxy de score), NO la señal real `onboardingIgnoredAlerts > 0` (alerta de onboarding levantada e IGNORADA + la persona se fue).
+- La señal real YA existe y se computa: `ExitRegistrationService.ts:470-478` (matchea por nationalId, "ignorada" = alerta pending ∨ dismissed-sin-resolver), persistida en `ExitRecord.onboardingIgnoredAlerts` (`schema.prisma:1333`), usada en Exit Intelligence (`/api/exit/insights/onboarding-correlation`, `/api/exit/causes`). La convergencia compliance la ignora.
+- Subirla a la señal real = feature de Exit Intelligence con narrativa propia + lugar en la card de monitoreo futura. Render-only (no mueve ISA/severidad). **Gate propio.**
+
+---
+
 **Fecha cierre:** 2026-06-11 (arquitectura: 2026-06-08)
 **Plan maestro:** `.claude/plans/lee-claude-tasks-plan-cascada-que-y-cond-eventual-hejlsberg.md` (v2, aprobado 2026-06-06)
 **Inventario copy pendiente:** `.claude/tasks/INVENTARIO_COPY_GATE_2_5.md` (entregable para Victor)
