@@ -31,6 +31,7 @@ import {
   normalizeExitAlertType,
   getHistoricalWeight,
   HISTORICAL_LOOKBACK_MONTHS,
+  CONVERGENCIA_WINDOW_MONTHS,
 } from '@/config/compliance/convergenciaWeights';
 
 const AMBIENTE_SANO_SLUG = 'pulso-ambientes-sanos';
@@ -48,6 +49,13 @@ const EXO_RISK = 60;
 const EXO_CRITICAL = 30;
 const PULSO_CLIMA_RISK = 3.2;
 const SILENCE_PATTERN_INTENSITY = 0.5;
+
+// Ventana (meses) del proxy `senalIgnorada` (exits recientes con EXO bajo).
+// Sube de 6→12m por consistencia con CONVERGENCIA_WINDOW_MONTHS — cosmético,
+// render-only (no mueve ISA ni severidad; CombinatoriaDictionary.ts:48).
+// NOTA: este es el PROXY de score (onboardingEXOScore<60), no la señal real
+// `onboardingIgnoredAlerts` — subir a la señal real es gate propio aparte.
+const SENAL_IGNORADA_EXIT_WINDOW_MONTHS = 12;
 
 // ═══════════════════════════════════════════════════════════════════
 // MOTOR A v2 — Convergencia Interna (sin productos externos)
@@ -278,7 +286,7 @@ export async function loadDepartmentExternalSignals(
 
   // 2. Señal ignorada: exits recientes con EXO bajo en este depto.
   const recentCutoff = new Date();
-  recentCutoff.setMonth(recentCutoff.getMonth() - 6);
+  recentCutoff.setMonth(recentCutoff.getMonth() - SENAL_IGNORADA_EXIT_WINDOW_MONTHS);
   const recentLowExoExit = await prisma.exitRecord.findFirst({
     where: {
       accountId,
@@ -800,41 +808,92 @@ async function loadBumpableCounts90Days(
  *   - factorDecaimiento computado por `getHistoricalWeight(status, resolvedAt)`:
  *     1.0 (active) / 0.6 (<3m) / 0.3 (3-6m) / 0.1 (>6m).
  *   - pesoEfectivo = pesoBase × factorDecaimiento.
+ *
+ * Modo "por hecho" (`porHecho: true` — convergencia compliance):
+ *   - Status-AGNÓSTICO: toda alerta CREADA en `now - CONVERGENCIA_WINDOW_MONTHS`
+ *     cuenta, sin importar estado (pending/acknowledged/resolved/dismissed).
+ *   - factorDecaimiento = 1.0 SIEMPRE (peso completo, sin decay).
+ *   - Espejo per-dept de `loadAlertasByDeptBulk` (DepartmentRiskScoreService).
+ *   - Toma precedencia sobre `includeHistorical`.
  */
+
+/** Modo de carga de alertas externas. Fuente única de la selección estado/fecha. */
+export type ExternalAlertMode = 'fase2' | 'historical' | 'porHecho';
+
+/**
+ * Resuelve el modo desde las opciones. `porHecho` toma precedencia sobre
+ * `includeHistorical` (la convergencia por hecho ignora el histórico con decay).
+ * Pure — oracle-able sin Prisma.
+ */
+export function resolveExternalAlertMode(
+  opts?: { includeHistorical?: boolean; porHecho?: boolean }
+): ExternalAlertMode {
+  if (opts?.porHecho === true) return 'porHecho';
+  if (opts?.includeHistorical === true) return 'historical';
+  return 'fase2';
+}
+
+/**
+ * Construye el fragmento WHERE de selección (estado/fecha) común a exit +
+ * onboarding según el modo. Pure — oracle-able sin Prisma.
+ *   - fase2:      status pending|acknowledged (sin ventana de fecha).
+ *   - historical: status ∈ todos + OR(resolved/dismissed con resolvedAt ≥ 6m).
+ *   - porHecho:   status-AGNÓSTICO (sin key `status`) + createdAt ≥ 12m.
+ */
+export function buildExternalAlertModeWhere(
+  mode: ExternalAlertMode,
+  cutoffs: { factWindowCutoff: Date; historicalCutoff: Date }
+): Record<string, unknown> {
+  if (mode === 'porHecho') {
+    // Status fuera + ventana por createdAt. Sin decay (factor 1.0 en el caller).
+    return { createdAt: { gte: cutoffs.factWindowCutoff } };
+  }
+  if (mode === 'historical') {
+    return {
+      status: { in: ['pending', 'acknowledged', 'resolved', 'dismissed'] },
+      OR: [
+        { status: { in: ['pending', 'acknowledged'] } },
+        {
+          status: { in: ['resolved', 'dismissed'] },
+          resolvedAt: { gte: cutoffs.historicalCutoff },
+        },
+      ],
+    };
+  }
+  // fase2 (default) — solo activas, sin ventana de fecha.
+  return { status: { in: ['pending', 'acknowledged'] } };
+}
+
 export async function loadDepartmentExternalAlerts(
   departmentId: string,
   accountId: string,
-  opts?: { includeHistorical?: boolean }
+  opts?: { includeHistorical?: boolean; porHecho?: boolean }
 ): Promise<ExternalAlert[]> {
   const out: ExternalAlert[] = [];
-  const includeHistorical = opts?.includeHistorical === true;
+  const mode = resolveExternalAlertMode(opts);
+  const includeHistorical = mode === 'historical';
   const now = new Date();
 
   // Cutoff para histórico — 6 meses atrás. Antigüedad mayor cae a factor 0.1.
   const historicalCutoff = new Date(now);
   historicalCutoff.setMonth(historicalCutoff.getMonth() - HISTORICAL_LOOKBACK_MONTHS);
 
-  const statusFilter = includeHistorical
-    ? { in: ['pending', 'acknowledged', 'resolved', 'dismissed'] }
-    : { in: ['pending', 'acknowledged'] };
+  // Cutoff "por hecho" — ventana 12m por createdAt, status-agnóstico, sin decay.
+  const factWindowCutoff = new Date(now);
+  factWindowCutoff.setMonth(factWindowCutoff.getMonth() - CONVERGENCIA_WINDOW_MONTHS);
+
+  // Filtro de selección común a exit + onboarding según el modo activo.
+  const modeWhere = buildExternalAlertModeWhere(mode, {
+    factWindowCutoff,
+    historicalCutoff,
+  });
 
   // Exit alerts — departmentId directo.
   const exitAlerts = await prisma.exitAlert.findMany({
     where: {
       accountId,
       departmentId,
-      status: statusFilter,
-      ...(includeHistorical
-        ? {
-            OR: [
-              { status: { in: ['pending', 'acknowledged'] } },
-              {
-                status: { in: ['resolved', 'dismissed'] },
-                resolvedAt: { gte: historicalCutoff },
-              },
-            ],
-          }
-        : {}),
+      ...modeWhere,
     },
     select: { id: true, alertType: true, status: true, resolvedAt: true },
   });
@@ -860,19 +919,8 @@ export async function loadDepartmentExternalAlerts(
   const journeyAlerts = await prisma.journeyAlert.findMany({
     where: {
       accountId,
-      status: statusFilter,
       journey: { departmentId },
-      ...(includeHistorical
-        ? {
-            OR: [
-              { status: { in: ['pending', 'acknowledged'] } },
-              {
-                status: { in: ['resolved', 'dismissed'] },
-                resolvedAt: { gte: historicalCutoff },
-              },
-            ],
-          }
-        : {}),
+      ...modeWhere,
     },
     select: { id: true, alertType: true, status: true, resolvedAt: true },
   });
@@ -1110,10 +1158,13 @@ export async function runConvergencia(
       isaByDeptId.set(a.departmentId, a.isaScore);
     }
 
-    // Motor B Fase 2 — alertas externas pending/acknowledged per dept.
+    // Motor B — convergencia por hecho: alertas externas 12m status-agnóstico,
+    // peso completo (espejo de loadAlertasByDeptBulk). El ISA se mide fresco; el
+    // score de riesgo cuenta el hecho completo para ponerlo a prueba.
     const externalAlerts = await loadDepartmentExternalAlerts(
       a.departmentId,
-      accountId
+      accountId,
+      { porHecho: true }
     );
 
     departments.push(

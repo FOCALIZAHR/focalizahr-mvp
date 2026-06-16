@@ -189,6 +189,22 @@ export const HISTORICAL_DECAY_MONTHS_HISTORIC = 6;
 export const HISTORICAL_LOOKBACK_MONTHS = 6;
 
 /**
+ * Ventana (meses) de la convergencia "por hecho, no por estado".
+ * Toda alerta externa CREADA en este lapso cuenta para la convergencia
+ * compliance, sin importar su estado (pending/acknowledged/resolved/dismissed)
+ * ni decay de antigüedad (peso completo). Unifica con ALERTAS_WINDOW_MONTHS /
+ * DENUNCIA_WINDOW_MONTHS (DepartmentRiskScoreService, Gate 1).
+ *
+ * Distinta de HISTORICAL_LOOKBACK_MONTHS (6m): aquélla es del modo histórico
+ * legacy (resolved con decay) de `loadDepartmentExternalAlerts`, no de la
+ * convergencia por hecho.
+ *
+ * PRINCIPIO: el ISA es la verdad del ciclo medida fresca; el score de riesgo
+ * la pone a prueba contando el hecho completo (12m, sin estado, sin decay).
+ */
+export const CONVERGENCIA_WINDOW_MONTHS = 12;
+
+/**
  * Diferencia en meses calendario entre 2 fechas. Ajuste por día del mes
  * (si el día destino es menor que el día origen, resta 1).
  *

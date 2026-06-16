@@ -270,10 +270,13 @@ export async function processNextDepartmentJob(campaignId: string): Promise<bool
       deptInfo?.accumulatedExoScore ?? null
     );
 
-    // Motor B Fase 2 — alertas externas pending/acknowledged per dept.
+    // Motor B — convergencia por hecho: alertas externas 12m status-agnóstico,
+    // peso completo (espejo de loadAlertasByDeptBulk). El ISA se mide fresco; el
+    // score de riesgo cuenta el hecho completo para ponerlo a prueba.
     const externalAlerts = await loadDepartmentExternalAlerts(
       job.departmentId,
-      job.accountId
+      job.accountId,
+      { porHecho: true }
     );
 
     // Primer pass: convergencia legacy + Motor A skipped (isaScore=null).
