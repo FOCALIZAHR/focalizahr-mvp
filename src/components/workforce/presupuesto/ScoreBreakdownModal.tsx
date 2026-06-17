@@ -18,11 +18,19 @@ interface ScoreBreakdownModalProps {
 
 interface BarProps {
   label: string
-  value: number
+  value: number | null
   max: number
 }
 
 function Bar({ label, value, max }: BarProps) {
+  if (value === null) {
+    return (
+      <div className="flex items-baseline justify-between">
+        <span className="text-xs text-slate-400 font-light">{label}</span>
+        <span className="text-xs text-slate-500 font-light italic">sin evaluar</span>
+      </div>
+    )
+  }
   const pct = Math.min(100, (value / max) * 100)
   const color = value >= 80 ? '#22D3EE' : value >= 50 ? '#A78BFA' : '#64748B'
   return (
@@ -113,7 +121,7 @@ export default function ScoreBreakdownModal({
             <div className="px-5 pb-4">
               <p className="text-[11px] text-slate-400 font-light leading-relaxed">
                 Score alto = mas valioso de retener. Score bajo = candidato a salida.
-                Umbral de proteccion: 120.
+                Umbral de proteccion: 80.
               </p>
             </div>
 
@@ -142,58 +150,56 @@ export default function ScoreBreakdownModal({
               </p>
             </div>
 
-            {/* Amplificadores — con explicacion en parentesis */}
-            {(entry.scoreBreakdown.multiplierCritical > 1 ||
-              entry.scoreBreakdown.multiplierSuccessor > 1 ||
-              entry.scoreBreakdown.multiplierExposure > 1.05) && (
+            {/* Modificadores aditivos — con explicacion en parentesis */}
+            {(entry.scoreBreakdown.bonusCritico !== 0 ||
+              entry.scoreBreakdown.bonusSucesor !== 0 ||
+              entry.scoreBreakdown.penaltyExposicion !== 0) && (
               <div className="px-5 py-4 border-t border-slate-800/60">
                 <span className="text-[10px] uppercase tracking-widest text-slate-500 font-medium block mb-3">
-                  Amplificadores de criticidad
+                  Modificadores
                 </span>
                 <div className="space-y-3">
-                  {entry.scoreBreakdown.multiplierCritical > 1 && (
+                  {entry.scoreBreakdown.bonusCritico !== 0 && (
                     <div>
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-slate-300 font-medium">Posicion critica</span>
                         <span className="text-cyan-400 font-medium tabular-nums">
-                          ×{entry.scoreBreakdown.multiplierCritical}
+                          +{entry.scoreBreakdown.bonusCritico}
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 font-light mt-0.5 leading-relaxed">
-                        (Ocupa un cargo con plan de sucesion activo. Su salida
-                        interrumpe la continuidad del negocio — el sistema sube su
-                        score para evitar moverlo.)
+                        (Ocupa un cargo critico con plan de sucesion. Perderlo
+                        interrumpe la continuidad del negocio — suma al score.)
                       </p>
                     </div>
                   )}
-                  {entry.scoreBreakdown.multiplierSuccessor > 1 && (
+                  {entry.scoreBreakdown.bonusSucesor !== 0 && (
                     <div>
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-slate-300 font-medium">Sucesor natural</span>
                         <span className="text-cyan-400 font-medium tabular-nums">
-                          ×{entry.scoreBreakdown.multiplierSuccessor}
+                          +{entry.scoreBreakdown.bonusSucesor}
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 font-light mt-0.5 leading-relaxed">
-                        (El motor de talento lo identifica como futuro lider de otro
-                        cargo clave. Moverlo hoy pierde capital humano estrategico de
-                        manana.)
+                        (El motor de talento lo identifica como sucesor natural de
+                        otro cargo clave. Perderlo cuesta capital estrategico — suma
+                        al score.)
                       </p>
                     </div>
                   )}
-                  {entry.scoreBreakdown.multiplierExposure > 1.05 && (
+                  {entry.scoreBreakdown.penaltyExposicion !== 0 && (
                     <div>
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-slate-300 font-medium">Exposicion IA</span>
-                        <span className="text-purple-400 font-medium tabular-nums">
-                          ×{entry.scoreBreakdown.multiplierExposure}
+                        <span className="text-amber-400 font-medium tabular-nums">
+                          {entry.scoreBreakdown.penaltyExposicion}
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 font-light mt-0.5 leading-relaxed">
-                        (Mas alto = el cargo esta mas expuesto a automatizacion. Contra
-                        intuitivo: quien domina un rol con alta exposicion se vuelve
-                        mas estrategico — entiende la transicion y la lidera. Por eso
-                        sube su score, no baja.)
+                        (El cargo esta expuesto a automatizacion: parte de su valor
+                        migra a la IA. Resta al score — mas expuesto, menos critico
+                        retener el rol tal cual.)
                       </p>
                     </div>
                   )}
@@ -212,11 +218,11 @@ export default function ScoreBreakdownModal({
                 </span>
               </div>
               <p className="text-[10px] text-slate-500 font-light italic mt-2">
-                {entry.retentionScore >= 120
+                {entry.tier === 'intocable'
                   ? 'Intocable — no aparece como opcion de salida.'
-                  : entry.retentionScore >= 80
+                  : entry.tier === 'valioso'
                     ? 'Valioso — revisar cuidadosamente antes de moverlo.'
-                    : entry.retentionScore >= 40
+                    : entry.tier === 'neutro'
                       ? 'Neutro — decision discrecional.'
                       : 'Prescindible — candidato natural a salida.'}
               </p>

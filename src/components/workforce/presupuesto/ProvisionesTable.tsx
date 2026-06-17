@@ -184,26 +184,26 @@ function SeccionCard({
                     usePortal
                     title={`Score ${p.retentionScore}`}
                     explanation={
-                      p.retentionScore >= 120
+                      p.tier === 'intocable'
                         ? 'Intocable — el sistema lo protege.'
-                        : p.retentionScore >= 80
+                        : p.tier === 'valioso'
                           ? 'Valioso — revisa antes de mover.'
-                          : p.retentionScore >= 40
+                          : p.tier === 'neutro'
                             ? 'Neutro — decision discrecional.'
                             : 'Prescindible — candidato natural a salida.'
                     }
                     details={[
-                      `Cumplimiento metas: ${p.scoreBreakdown.goalsNorm}/100`,
-                      `Dominio del cargo: ${p.scoreBreakdown.roleFitNorm}/100`,
-                      `Adaptabilidad: ${p.scoreBreakdown.adaptNorm}/100`,
-                      ...(p.scoreBreakdown.multiplierCritical > 1
-                        ? [`Amplificador posicion critica ×${p.scoreBreakdown.multiplierCritical}`]
+                      `Cumplimiento metas: ${p.scoreBreakdown.goalsNorm !== null ? `${p.scoreBreakdown.goalsNorm}/100` : 'sin evaluar'}`,
+                      `Dominio del cargo: ${p.scoreBreakdown.roleFitNorm !== null ? `${p.scoreBreakdown.roleFitNorm}/100` : 'sin evaluar'}`,
+                      `Adaptabilidad: ${p.scoreBreakdown.adaptNorm !== null ? `${p.scoreBreakdown.adaptNorm}/100` : 'sin evaluar'}`,
+                      ...(p.scoreBreakdown.bonusCritico !== 0
+                        ? [`Posicion critica +${p.scoreBreakdown.bonusCritico}`]
                         : []),
-                      ...(p.scoreBreakdown.multiplierSuccessor > 1
-                        ? [`Amplificador sucesor natural ×${p.scoreBreakdown.multiplierSuccessor}`]
+                      ...(p.scoreBreakdown.bonusSucesor !== 0
+                        ? [`Sucesor natural +${p.scoreBreakdown.bonusSucesor}`]
                         : []),
-                      ...(p.scoreBreakdown.multiplierExposure > 1.05
-                        ? [`Amplificador exposicion IA ×${p.scoreBreakdown.multiplierExposure}`]
+                      ...(p.scoreBreakdown.penaltyExposicion !== 0
+                        ? [`Exposicion IA ${p.scoreBreakdown.penaltyExposicion}`]
                         : []),
                     ]}
                     actionable="Ver el desglose completo"

@@ -3,7 +3,7 @@
 // src/components/efficiency/lentes/L9TalentArbitrageMap.tsx
 // ════════════════════════════════════════════════════════════════════════════
 // Scatter donde cada punto es una persona:
-//   · Eje Y: retentionScore (0-120+)
+//   · Eje Y: retentionScore (0-100)
 //   · Eje X: mesesFiniquito (0-11) — años de servicio cap 11 (Chile)
 //   · Tamaño: costoNominal CLP del finiquito
 //

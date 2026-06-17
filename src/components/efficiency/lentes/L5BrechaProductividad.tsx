@@ -876,11 +876,11 @@ function SeccionIdentidad({ persona }: { persona: PersonL5 }) {
               usePortal
               showIcon
               title="Score retención"
-              explanation="Mide cuánto valor entrega esta persona y cuánto justifica retenerla, en escala 0 a 150+."
+              explanation="Mide cuánto valor entrega esta persona y cuánto justifica retenerla, en escala 0 a 100."
               details={[
-                'Combina cumplimiento de metas (40%), dominio del cargo (30%) y adaptabilidad (30%).',
-                'Sube si la persona ocupa un cargo crítico o es sucesora natural.',
-                'Se amplifica por la exposición a IA del cargo: a mayor exposición + score alto, más valioso retener.',
+                'Combina cumplimiento de metas (40%), dominio del cargo (30%) y adaptabilidad (30%), sobre los factores evaluados.',
+                'Suma puntos si la persona ocupa un cargo crítico (+12) o es sucesora natural (+8).',
+                'Resta puntos por la exposición a IA del cargo: a mayor exposición, parte del valor del rol migra a la IA.',
                 'Bajo 40 indica una situación que requiere definición organizacional.',
               ]}
             >

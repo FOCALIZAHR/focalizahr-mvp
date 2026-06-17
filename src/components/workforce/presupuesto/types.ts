@@ -105,12 +105,13 @@ export interface AlternativaEntry {
 }
 
 export interface ScoreBreakdown {
-  goalsNorm: number
-  roleFitNorm: number
-  adaptNorm: number
-  multiplierCritical: number
-  multiplierSuccessor: number
-  multiplierExposure: number
+  goalsNorm: number | null
+  roleFitNorm: number | null
+  adaptNorm: number | null
+  base: number
+  bonusCritico: number
+  bonusSucesor: number
+  penaltyExposicion: number
   hasCompleteData: boolean
 }
 

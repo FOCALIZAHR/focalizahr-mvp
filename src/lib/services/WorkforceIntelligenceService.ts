@@ -55,6 +55,7 @@ export interface EnrichedEmployee {
   potentialAspiration: number | null
   potentialAbility: number | null
   goalsRawPercent: number | null
+  hasRating: boolean             // tiene PerformanceRating en el ciclo vigente (gatea ranking vs pendientes)
   nineBoxPosition: string | null
   // Financial
   salary: number
@@ -283,11 +284,95 @@ export interface RetentionEntry {
   managerId: string | null
 }
 
+export interface PendienteEvaluacion {
+  employeeId: string
+  employeeName: string
+  position: string
+  departmentName: string
+  departmentId: string
+  acotadoGroup: string | null
+  standardCategory: string | null
+  salary: number
+  tenureMonths: number
+  finiquitoToday: number | null
+}
+
 export interface RetentionPriorityResult {
   ranking: RetentionEntry[]
+  // Partición aditiva: quien no tiene evaluación NO entra al ranking (no se le
+  // puede asignar score de retención) — sale por este campo para "evaluar primero".
+  pendientesEvaluacion: PendienteEvaluacion[]
   intocablesCount: number
   prescindiblesCount: number
+  pendientesCount: number
   confidence: 'high' | 'medium' | 'low'
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SCORE DE RETENCIÓN — fuente única (servicio + desglose del presupuesto)
+// ════════════════════════════════════════════════════════════════════════════
+// Significado: cuánto DUELE perder a la persona. Arriba = proteger; abajo = salida
+// menos dolorosa. Base = promedio ponderado de los factores PRESENTES (sin rellenos).
+// Modificadores ADITIVOS (no multiplicados), neto clamp [-20,+20]. Score clamp 0-100.
+
+export interface RetentionScoreBreakdown {
+  goalsNorm: number | null
+  roleFitNorm: number | null
+  adaptNorm: number | null
+  base: number
+  bonusCritico: number
+  bonusSucesor: number
+  penaltyExposicion: number   // <= 0
+  hasCompleteData: boolean
+  score: number
+  tier: 'intocable' | 'valioso' | 'neutro' | 'prescindible'
+}
+
+export function computeRetentionScore(input: {
+  goalsRawPercent: number | null
+  roleFitScore: number          // presente por contrato (el caller garantiza hasRating)
+  potentialAbility: number | null
+  isIncumbentOfCriticalPosition: boolean
+  mobilityQuadrant: string | null
+  effExposure: number           // 0-1
+}): RetentionScoreBreakdown {
+  const goalsNorm = input.goalsRawPercent !== null ? input.goalsRawPercent : null
+  const roleFitNorm = input.roleFitScore
+  const adaptNorm =
+    input.potentialAbility !== null ? (input.potentialAbility / 3) * 100 : null
+
+  // Base: promedio ponderado de los factores PRESENTES, renormalizado. Sin relleno de 50.
+  let sumVW = 0
+  let sumW = 0
+  if (goalsNorm !== null) { sumVW += goalsNorm * 0.4; sumW += 0.4 }
+  sumVW += roleFitNorm * 0.3; sumW += 0.3
+  if (adaptNorm !== null) { sumVW += adaptNorm * 0.3; sumW += 0.3 }
+  const base = sumW > 0 ? sumVW / sumW : 0
+
+  // Modificadores aditivos (no multiplicados)
+  const bonusCritico = input.isIncumbentOfCriticalPosition ? 12 : 0
+  const bonusSucesor = input.mobilityQuadrant === 'SUCESOR_NATURAL' ? 8 : 0
+  const penaltyExposicion = -Math.round(input.effExposure * 20)
+  const modNeto = Math.max(-20, Math.min(20, bonusCritico + bonusSucesor + penaltyExposicion))
+  const score = Math.max(0, Math.min(100, Math.round(base + modNeto)))
+
+  const tier: RetentionScoreBreakdown['tier'] =
+    score >= 80 ? 'intocable' :
+    score >= 60 ? 'valioso' :
+    score >= 40 ? 'neutro' : 'prescindible'
+
+  return {
+    goalsNorm: goalsNorm !== null ? Math.round(goalsNorm) : null,
+    roleFitNorm: Math.round(roleFitNorm),
+    adaptNorm: adaptNorm !== null ? Math.round(adaptNorm) : null,
+    base: Math.round(base),
+    bonusCritico,
+    bonusSucesor,
+    penaltyExposicion,
+    hasCompleteData: goalsNorm !== null && adaptNorm !== null,
+    score,
+    tier,
+  }
 }
 
 // v3.1 — Brecha de productividad
@@ -481,6 +566,7 @@ export class WorkforceIntelligenceService {
         potentialAspiration: rating?.potentialAspiration ?? null,
         potentialAbility: rating?.potentialAbility ?? null,
         goalsRawPercent: rating?.goalsRawPercent ?? null,
+        hasRating: rating != null,
         nineBoxPosition: rating?.nineBoxPosition ?? null,
         salary,
         monthlyGap: calculateMonthlyGap(salary, roleFitScore),
@@ -1058,31 +1144,20 @@ export class WorkforceIntelligenceService {
   // ──────────────────────────────────────────────────────────────────────
 
   static calculateRetentionPriority(enriched: EnrichedEmployee[]): RetentionPriorityResult {
-    const ranking: RetentionEntry[] = enriched
-      .filter(e => e.socCode !== null) // solo personas con mapeo
+    const mapped = enriched.filter(e => e.socCode !== null) // solo personas con mapeo
+    const scored = mapped.filter(e => e.hasRating)
+    const sinEvaluacion = mapped.filter(e => !e.hasRating)
+
+    const ranking: RetentionEntry[] = scored
       .map(e => {
-        const goalsNorm = e.goalsRawPercent ?? 50 // base 100
-        const roleFitNorm = e.roleFitScore         // base 100
-        // CORE-ADAPT proxy: potentialAbility (base 3, escala 1-3 pero tratamos como 1-5 si existe)
-        // Si no hay potentialAbility, usar 2.5 (neutro en base 5)
-        const adaptBase5 = e.potentialAbility !== null ? (e.potentialAbility / 3 * 5) : 2.5
-        const adaptNorm = (adaptBase5 / 5) * 100 // normalizar a base 100
-
-        let score = goalsNorm * 0.4 + roleFitNorm * 0.3 + adaptNorm * 0.3
-
-        // Multiplicadores
-        if (e.isIncumbentOfCriticalPosition) score *= 1.5
-        if (e.mobilityQuadrant === 'SUCESOR_NATURAL') score *= 1.3
-
-        // × exposure: mayor exposición + alto score = más valioso retener
-        // Migrado a focalizaScore (Eloundou) con fallback
-        score *= (1 + effExposure(e))
-
-        // Tier
-        const tier: RetentionEntry['tier'] =
-          score >= 120 ? 'intocable' :
-          score >= 80 ? 'valioso' :
-          score >= 40 ? 'neutro' : 'prescindible'
+        const b = computeRetentionScore({
+          goalsRawPercent: e.goalsRawPercent,
+          roleFitScore: e.roleFitScore,
+          potentialAbility: e.potentialAbility,
+          isIncumbentOfCriticalPosition: e.isIncumbentOfCriticalPosition,
+          mobilityQuadrant: e.mobilityQuadrant,
+          effExposure: effExposure(e),
+        })
 
         return {
           employeeId: e.employeeId,
@@ -1090,11 +1165,11 @@ export class WorkforceIntelligenceService {
           employeeName: e.employeeName,
           position: e.position,
           departmentName: e.departmentName,
-          retentionScore: Math.round(score * 100) / 100,
+          retentionScore: b.score,
           observedExposure: e.observedExposure,
           roleFitScore: e.roleFitScore,
           isCriticalPosition: e.isIncumbentOfCriticalPosition,
-          tier,
+          tier: b.tier,
           // v3.1 — preservar segment fields
           acotadoGroup: e.acotadoGroup,
           standardCategory: e.standardCategory,
@@ -1120,11 +1195,29 @@ export class WorkforceIntelligenceService {
       })
       .sort((a, b) => b.retentionScore - a.retentionScore)
 
+    // Quien no tiene evaluación va a la bandeja "pendientes de evaluar". Existe y
+    // cuesta plata (sigue contado en lo financiero, que viene de Employee, no del
+    // ranking), pero NO se le asigna score ni se sugiere para salida sin evaluar.
+    const pendientesEvaluacion: PendienteEvaluacion[] = sinEvaluacion.map(e => ({
+      employeeId: e.employeeId,
+      employeeName: e.employeeName,
+      position: e.position,
+      departmentName: e.departmentName,
+      departmentId: e.departmentId,
+      acotadoGroup: e.acotadoGroup,
+      standardCategory: e.standardCategory,
+      salary: e.salary,
+      tenureMonths: e.tenureMonths,
+      finiquitoToday: e.finiquitoToday,
+    }))
+
     return {
       ranking,
+      pendientesEvaluacion,
       intocablesCount: ranking.filter(r => r.tier === 'intocable').length,
       prescindiblesCount: ranking.filter(r => r.tier === 'prescindible').length,
-      confidence: enriched.some(e => e.goalsRawPercent !== null) ? 'high' : 'medium',
+      pendientesCount: pendientesEvaluacion.length,
+      confidence: ranking.some(r => r.metasCompliance !== null) ? 'high' : 'medium',
     }
   }
 
@@ -1203,7 +1296,7 @@ export class WorkforceIntelligenceService {
         inertiaCost: { byDepartment: [], byPosition: [], totalMonthly: 0, totalAnnual: 0, confidence: 'low' },
         liberatedFTEs: { byDepartment: [], totalFTEs: 0, totalMonthlySavings: 0, confidence: 'low' },
         severanceLiability: { totalSeverance: 0, monthlyFTESavings: 0, paybackMonths: 0, affectedCount: 0, confidence: 'low' },
-        retentionPriority: { ranking: [], intocablesCount: 0, prescindiblesCount: 0, confidence: 'low' },
+        retentionPriority: { ranking: [], pendientesEvaluacion: [], intocablesCount: 0, prescindiblesCount: 0, pendientesCount: 0, confidence: 'low' },
         productivityGap: { total: 0, affectedCount: 0, bySegment: [], confidence: 'low' },
         topAlerts: [],
         netROI: 0,

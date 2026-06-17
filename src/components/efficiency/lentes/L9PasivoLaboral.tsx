@@ -1151,12 +1151,12 @@ function SeccionIdentidad({ persona }: { persona: PersonL9 }) {
                   usePortal
                   showIcon
                   title="Score retención"
-                  explanation="Mide cuánto valor entrega esta persona y cuánto justifica retenerla, en escala 0 a 150+."
+                  explanation="Mide cuánto valor entrega esta persona y cuánto justifica retenerla, en escala 0 a 100."
                   details={[
-                    'Combina cumplimiento de metas (40%), dominio del cargo (30%) y potencial de adaptación (30%).',
-                    'Sube si la persona ocupa un cargo crítico o es sucesora natural.',
-                    'Se amplifica por la exposición a IA del cargo: a mayor exposición + score alto, más valioso retener.',
-                    'Tiers: menos de 40 prescindible · 40-80 neutro · 80-120 valioso · más de 120 intocable.',
+                    'Combina cumplimiento de metas (40%), dominio del cargo (30%) y potencial de adaptación (30%), sobre los factores evaluados.',
+                    'Suma puntos si la persona ocupa un cargo crítico (+12) o es sucesora natural (+8).',
+                    'Resta puntos por la exposición a IA del cargo: a mayor exposición, parte del valor del rol migra a la IA.',
+                    'Tiers: menos de 40 prescindible · 40-59 neutro · 60-79 valioso · 80 o más intocable.',
                   ]}
                 >
                   <span>Score retención {Math.round(persona.retentionScore)}</span>

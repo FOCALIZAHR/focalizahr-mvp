@@ -16,7 +16,7 @@ import {
   GLOBAL_ACCESS_ROLES,
 } from '@/lib/services/AuthorizationService'
 import { SalaryConfigService } from '@/lib/services/SalaryConfigService'
-import { WorkforceIntelligenceService } from '@/lib/services/WorkforceIntelligenceService'
+import { WorkforceIntelligenceService, computeRetentionScore } from '@/lib/services/WorkforceIntelligenceService'
 import {
   calculateFiniquitoConTopeCustomUF,
   calculateFiniquitoFuturo,
@@ -43,12 +43,13 @@ interface AlternativaEntry {
 }
 
 interface ScoreBreakdown {
-  goalsNorm: number
-  roleFitNorm: number
-  adaptNorm: number
-  multiplierCritical: number
-  multiplierSuccessor: number
-  multiplierExposure: number
+  goalsNorm: number | null
+  roleFitNorm: number | null
+  adaptNorm: number | null
+  base: number
+  bonusCritico: number
+  bonusSucesor: number
+  penaltyExposicion: number
   hasCompleteData: boolean
 }
 
@@ -285,35 +286,39 @@ export async function POST(request: NextRequest) {
     const ufValue = UF_VALUE_CLP
     const skippedSinSalario: string[] = []
 
-    // Calcula el desglose del score — identico a calculateRetentionPriority().
+    // Desglose del score — usa el MISMO computeRetentionScore que el servicio
+    // (fuente única, sin réplicas que se separen del número mostrado).
     const computeBreakdown = (r: (typeof ranking)[number] | undefined): ScoreBreakdown => {
       if (!r) {
+        // Persona fuera del ranking (presupuesto manual, sin evaluación).
         return {
-          goalsNorm: 50,
-          roleFitNorm: 50,
-          adaptNorm: 50,
-          multiplierCritical: 1,
-          multiplierSuccessor: 1,
-          multiplierExposure: 1,
+          goalsNorm: null,
+          roleFitNorm: null,
+          adaptNorm: null,
+          base: 0,
+          bonusCritico: 0,
+          bonusSucesor: 0,
+          penaltyExposicion: 0,
           hasCompleteData: false,
         }
       }
-      const goalsNorm = r.metasCompliance ?? 50
-      const roleFitNorm = r.roleFitScore
-      const adaptBase5 = r.potentialAbility !== null ? (r.potentialAbility / 3) * 5 : 2.5
-      const adaptNorm = (adaptBase5 / 5) * 100
-      const multiplierCritical = r.isCriticalPosition ? 1.5 : 1
-      const multiplierSuccessor = r.mobilityQuadrant === 'SUCESOR_NATURAL' ? 1.3 : 1
-      const eff = r.focalizaScore ?? r.observedExposure ?? 0
-      const multiplierExposure = 1 + eff
+      const b = computeRetentionScore({
+        goalsRawPercent: r.metasCompliance,
+        roleFitScore: r.roleFitScore,
+        potentialAbility: r.potentialAbility,
+        isIncumbentOfCriticalPosition: r.isCriticalPosition,
+        mobilityQuadrant: r.mobilityQuadrant,
+        effExposure: r.focalizaScore ?? r.observedExposure ?? 0,
+      })
       return {
-        goalsNorm: Math.round(goalsNorm),
-        roleFitNorm: Math.round(roleFitNorm),
-        adaptNorm: Math.round(adaptNorm),
-        multiplierCritical,
-        multiplierSuccessor,
-        multiplierExposure: Number(multiplierExposure.toFixed(2)),
-        hasCompleteData: r.metasCompliance !== null && r.potentialAbility !== null,
+        goalsNorm: b.goalsNorm,
+        roleFitNorm: b.roleFitNorm,
+        adaptNorm: b.adaptNorm,
+        base: b.base,
+        bonusCritico: b.bonusCritico,
+        bonusSucesor: b.bonusSucesor,
+        penaltyExposicion: b.penaltyExposicion,
+        hasCompleteData: b.hasCompleteData,
       }
     }
 
