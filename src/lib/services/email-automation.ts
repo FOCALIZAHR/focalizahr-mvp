@@ -3,6 +3,7 @@
 // CORRIGIDO: Solo service class, sin routes ni hooks
 
 import { Resend } from 'resend';
+import { FROM_EMAIL } from '@/lib/constants/email-sender';
 
 // Interfaces básicas
 interface EmailMetrics {
@@ -245,7 +246,7 @@ export class EmailAutomationService {
 
       // Envío real con Resend
       await this.resend.emails.send({
-        from: 'FocalizaHR <noreply@focalizahr.cl>',
+        from: FROM_EMAIL,
         to: data.participantEmail,
         subject: template.subject,
         html: htmlContent

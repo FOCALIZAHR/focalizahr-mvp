@@ -8,7 +8,7 @@
 // Extraido del envio que vivia inline en activate/route.ts. Aplica los
 // Protocolos v5 del cron de send-reminders:
 //   - Protocolo 1: capturar { data, error }. Exito solo si data existe.
-//   - Protocolo 3: from = RESEND_FROM_EMAIL (env validado al inicio).
+//   - Protocolo 3: from = FROM_EMAIL (SSOT en @/lib/constants/email-sender, lee RESEND_FROM_EMAIL).
 //
 // NO incluye delay 600ms (rate limit): el delay vive en el dispatcher.
 // NO renderiza templates: el caller pasa subject + html ya renderizados.
@@ -16,8 +16,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { Resend } from 'resend';
-
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'FocalizaHR <noreply@focalizahr.cl>';
+import { FROM_EMAIL } from '@/lib/constants/email-sender';
 
 // Lazy instance: evita crash al cargar el modulo si RESEND_API_KEY falta.
 // El error real surge al despachar (caller lo maneja como retry).

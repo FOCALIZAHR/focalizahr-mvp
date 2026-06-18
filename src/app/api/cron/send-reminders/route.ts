@@ -22,6 +22,7 @@ import { prisma } from '@/lib/prisma';
 import { Resend } from 'resend';
 import { renderEmailTemplate } from '@/lib/templates/email-templates';
 import { getLegalEmailLabels } from '@/config/compliance/legalBadgeConfig';
+import { FROM_EMAIL } from '@/lib/constants/email-sender';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -261,7 +262,7 @@ async function sendReminder(
 
   // 🔧 CAMBIO CRÍTICO 1: Capturar respuesta de Resend
   const { data, error } = await resend.emails.send({
-    from: 'FocalizaHR <noreply@focalizahr.cl>',
+    from: FROM_EMAIL,
     to: participant.email,
     subject: `${customSubject} - ${campaign.account.companyName}`,
     html,
@@ -450,7 +451,7 @@ async function processAutomationQueue(): Promise<{
 
         // 4️⃣ ENVIAR: Resend API
         const { data, error } = await resend.emails.send({
-          from: process.env.RESEND_FROM_EMAIL || 'FocalizaHR <noreply@focalizahr.cl>',
+          from: FROM_EMAIL,
           to: participant.email,
           subject,
           html,

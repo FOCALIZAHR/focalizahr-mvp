@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
 import { renderCalibrationInviteTemplate } from '@/lib/templates/calibration-invite-template'
+import { FROM_EMAIL } from '@/lib/constants/email-sender'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
           })
 
           const { error: resendError } = await resend.emails.send({
-            from: 'FocalizaHR <noreply@focalizahr.cl>',
+            from: FROM_EMAIL,
             to: participant.participantEmail,
             subject,
             html

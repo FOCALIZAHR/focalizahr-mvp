@@ -15,6 +15,7 @@ import { prisma } from '@/lib/prisma'
 import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationService'
 import { Resend } from 'resend'
 import { renderCalibrationInviteTemplate } from '@/lib/templates/calibration-invite-template'
+import { FROM_EMAIL } from '@/lib/constants/email-sender'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -104,7 +105,7 @@ export async function POST(
           })
 
           const { error: resendError } = await resend.emails.send({
-            from: 'FocalizaHR <noreply@focalizahr.cl>',
+            from: FROM_EMAIL,
             to: participant.participantEmail,
             subject,
             html

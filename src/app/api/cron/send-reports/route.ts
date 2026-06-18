@@ -15,6 +15,7 @@ import { prisma } from '@/lib/prisma'
 import { IndividualReportService } from '@/lib/services/IndividualReportService'
 import { renderEmailTemplate } from '@/lib/templates/email-templates'
 import { Resend } from 'resend'
+import { FROM_EMAIL } from '@/lib/constants/email-sender'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -121,7 +122,7 @@ export async function GET(request: NextRequest) {
 
           // Enviar email via Resend
           const { error } = await resend.emails.send({
-            from: process.env.RESEND_FROM_EMAIL!,
+            from: FROM_EMAIL,
             to: employee.email,
             subject,
             html

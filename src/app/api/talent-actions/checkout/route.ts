@@ -36,9 +36,9 @@ import {
 } from '@/lib/services/AuthorizationService'
 import { IntelligenceInsightService } from '@/lib/services/IntelligenceInsightService'
 import { renderTACAlertEmail } from '@/lib/templates/tac-alert-template'
+import { FROM_EMAIL } from '@/lib/constants/email-sender'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'FocalizaHR <noreply@focalizahr.cl>'
 
 const VALID_ACTIONS = ['NOTIFY_HRBP', 'SCHEDULE_COMMITTEE', 'FLAG_FOR_REVIEW']
 

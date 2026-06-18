@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
+import { FROM_EMAIL } from '@/lib/constants/email-sender'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
       // Alerta si < 50%
       if (completionRate < 50) {
         const { error } = await resend.emails.send({
-          from: process.env.RESEND_FROM_EMAIL!,
+          from: FROM_EMAIL,
           to: cycle.account.adminEmail,
           subject: `🚨 Alerta: Baja Tasa de Respuesta en ${cycle.name}`,
           html: `

@@ -25,9 +25,9 @@ import {
 import { IntelligenceInsightService } from '@/lib/services/IntelligenceInsightService'
 import { renderTACMassActionEmail } from '@/lib/templates/tac-alert-template'
 import { formatDisplayName } from '@/lib/utils/formatName'
+import { FROM_EMAIL } from '@/lib/constants/email-sender'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'FocalizaHR <noreply@focalizahr.cl>'
 
 const VALID_ACTIONS = [
   'RETENTION_ROUND', 'WORKLOAD_REVIEW', 'DIRECT_EVALUATION', 'TEAM_RECOGNITION'
