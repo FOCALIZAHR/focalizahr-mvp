@@ -243,6 +243,11 @@ model Account {
   compliancePlanActions    CompliancePlanAction[]
 
   // ═══════════════════════════════════════════════════
+  // COMUNICACIONES (Gate A v3.0 - cola unificada)
+  // ═══════════════════════════════════════════════════
+  communicationMessages    CommunicationMessage[]
+
+  // ═══════════════════════════════════════════════════
   // ACTION PLAN — modelo genérico multi-módulo
   // ═══════════════════════════════════════════════════
   actionPlans              ActionPlan[]
@@ -331,6 +336,9 @@ model Campaign {
   emailLogs        EmailLog[]
   emailAutomations EmailAutomation[]
 
+  // Gate A v3.0 - cola unificada de comunicaciones
+  communicationMessages CommunicationMessage[]
+
   // Vínculo con Performance (opcional)
   performanceCycle PerformanceCycle?
 
@@ -405,6 +413,9 @@ model Participant {
   emailLogs        EmailLog[]
   departmentRel    Department?       @relation(fields: [departmentId], references: [id])
   emailAutomations EmailAutomation[] // ✅ AGREGAR ESTA LÍNEA
+
+  // Gate A v3.0 - cola unificada de comunicaciones
+  communicationMessages CommunicationMessage[]
 
   // ✅ v3.2.2: NUEVAS RELACIONES INVERSAS ONBOARDING (CRÍTICO compilación)
   journeyStage1 JourneyOrchestration? @relation("Stage1")
@@ -1599,6 +1610,15 @@ model Employee {
   pendingReview       Boolean   @default(false) @map("pending_review")
   pendingReviewReason String?   @map("pending_review_reason")
 
+  // ═══════════════════════════════════════════════════
+  // 🆕 GATE A v3.0 - PREFERENCIAS DE CANAL DE COMUNICACION
+  // ═══════════════════════════════════════════════════
+  preferredChannel     String?   @map("preferred_channel")        // 'email' | 'whatsapp' | null
+  personalEmail        String?   @map("personal_email")           // fallback para empleados sin email corporativo
+  channelConsentAt     DateTime? @map("channel_consent_at")       // timestamp del opt-in explicito
+  channelConsentMethod String?   @map("channel_consent_method")   // 'self_service' | 'admin_loaded' | 'imported'
+  awaitingEmailCapture Boolean   @default(false) @map("awaiting_email_capture") // flag captura pendiente
+
   // Timestamps
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1632,6 +1652,9 @@ model Employee {
   successionPlans        SuccessionDevelopmentPlan[] @relation("SuccessionPlanEmployee")
   sponsoredSuccessionPlans SuccessionDevelopmentPlan[] @relation("SuccessionPlanSponsor")
 
+  // Gate A v3.0 - cola unificada de comunicaciones
+  communicationMessages  CommunicationMessage[]
+
   // Índices
   @@unique([accountId, nationalId], map: "idx_employees_account_national")
   @@index([accountId, status], map: "idx_employees_account_status")
@@ -1641,6 +1664,7 @@ model Employee {
   @@index([accountId, standardJobLevel], map: "idx_employees_job_level")
   @@index([accountId, performanceTrack], map: "idx_employees_performance_track")
   @@index([accountId, trackHasAnomaly], map: "idx_employees_track_anomaly")
+  @@index([phoneNumber], map: "idx_employees_phone_number")
   @@map("employees")
 }
 
@@ -3691,4 +3715,75 @@ model CompliancePlanAction {
   @@index([campaignId], map: "idx_plan_actions_campaign")
   @@index([accountId], map: "idx_plan_actions_account")
   @@map("compliance_plan_actions")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// GATE A v3.0 - SISTEMA DE COMUNICACIONES (Cola unificada + Dispatcher)
+// ════════════════════════════════════════════════════════════════════════════
+// Reemplaza el envio sincrono dentro de activate/route.ts por una cola con
+// dispatcher async. EmailLog NO se toca: coexiste; el dispatcher crea espejo
+// EmailLog cuando un messageType='invitation' pasa a SENT, para preservar
+// compatibilidad con send-reminders legacy (que lee EmailLog de invitation).
+// Spec: .claude/tasks/SPEC_GATE_A_COMUNICACIONES_v3.md
+// ════════════════════════════════════════════════════════════════════════════
+
+enum MessageChannel {
+  EMAIL
+  WHATSAPP
+}
+
+enum MessageStatus {
+  PENDING
+  SENDING
+  SENT
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
+model CommunicationMessage {
+  id            String   @id @default(cuid())
+  accountId     String   @map("account_id")
+
+  channel       MessageChannel
+  templateSlug  String   @map("template_slug")
+  variables     Json?
+
+  toEmail       String?  @map("to_email")
+  toPhone       String?  @map("to_phone")
+
+  participantId String?  @map("participant_id")
+  employeeId    String?  @map("employee_id")
+  campaignId    String?  @map("campaign_id")
+  goalId        String?  @map("goal_id")
+  messageType   String   @map("message_type")
+
+  status        MessageStatus @default(PENDING)
+  scheduledAt   DateTime  @default(now()) @map("scheduled_at")
+  sentAt        DateTime? @map("sent_at")
+  deliveredAt   DateTime? @map("delivered_at")
+  failedAt      DateTime? @map("failed_at")
+  retryCount    Int       @default(0) @map("retry_count")
+  errorMessage  String?   @map("error_message")
+  providerId    String?   @map("provider_id")
+  costUsd       Decimal?  @map("cost_usd") @db.Decimal(10, 6)
+
+  // Idempotencia: convencion '{messageType}:{participantId}' para campanas.
+  // Encolado masivo usa createMany + skipDuplicates para no abortar el batch.
+  dedupKey      String?   @unique @map("dedup_key")
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  // updatedAt necesario para crash recovery: mensajes en SENDING sin sentAt
+  // y con updatedAt > 10 min se rescatan a PENDING en el siguiente batch.
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  account       Account      @relation(fields: [accountId], references: [id])
+  participant   Participant? @relation(fields: [participantId], references: [id])
+  campaign      Campaign?    @relation(fields: [campaignId], references: [id])
+  employee      Employee?    @relation(fields: [employeeId], references: [id])
+
+  @@index([status, scheduledAt], map: "idx_message_dispatcher")
+  @@index([campaignId, channel, status])
+  @@index([accountId, createdAt])
+  @@map("communication_messages")
 }

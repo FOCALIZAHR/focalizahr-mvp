@@ -630,6 +630,20 @@ export const PERMISSIONS = {
   ],
 
   // ─────────────────────────────────────────────────────────────────────────
+  // COMUNICACIONES (Gate A v3.0 - cola unificada + dispatcher)
+  // ─────────────────────────────────────────────────────────────────────────
+  'communication:monitor': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER'
+  ],
+  'communication:force-dispatch': [
+    'FOCALIZAHR_ADMIN'
+    // Solo super admin puede forzar el dispatcher (boton de emergencia)
+  ],
+
+  // ─────────────────────────────────────────────────────────────────────────
   // COMPLIANCE (AMBIENTE SANO — Ley Karin)
   // ─────────────────────────────────────────────────────────────────────────
   'compliance:view': [
