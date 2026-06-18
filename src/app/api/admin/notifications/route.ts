@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Resend } from 'resend';
+import { FROM_EMAIL } from '@/lib/constants/email-sender';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -178,7 +179,7 @@ async function sendNotificationEmail(
     const template = emailTemplates[type];
     
     const emailResponse = await resend.emails.send({
-      from: 'FocalizaHR <noreply@focalizahr.com>',
+      from: FROM_EMAIL,
       to: recipientEmail,
       subject: template.subject,
       html: template.getHtml(data),
