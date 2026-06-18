@@ -17,6 +17,15 @@
 // maxDuration: 60s (limite max plan Vercel Hobby).
 // ════════════════════════════════════════════════════════════════════════════
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CAPA 3 PENDIENTE: este endpoint necesita un trigger periódico (~cada 5 min)
+// para procesar retries programadas (scheduledAt futuro). HOY no está configurado.
+// Al pasar a Vercel Pro: agregar a vercel.json crons:
+//   { "path": "/api/cron/message-dispatcher", "schedule": "*/5 * * * *" }
+// Vercel pinga con Authorization: Bearer CRON_SECRET, que este endpoint ya valida.
+// En Hobby NO se puede (cron */5 falla el deploy). Sin esto, las retries quedan
+// inertes (ver P6 del smoke test Gate A).
+// ─────────────────────────────────────────────────────────────────────────────
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
