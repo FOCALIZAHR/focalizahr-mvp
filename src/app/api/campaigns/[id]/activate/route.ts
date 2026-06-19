@@ -25,25 +25,31 @@ import { waitUntil } from '@vercel/functions';
 import { prisma } from '@/lib/prisma';
 import { verifyJWT } from '@/lib/auth';
 import { determineChannel } from '@/lib/services/channel-selector';
+import {
+  buildPhoneResolutionBatch,
+  resolvePhone,
+  type ParticipantForPhone,
+} from '@/lib/services/resolvePhone';
+import { WHATSAPP_INVITATION_SLUG } from '@/lib/templates/whatsapp-templates';
 
 // ════════════════════════════════════════════════════════════════════════════
-// HELPER: Encolar mensajes de invitacion en CommunicationMessage
+// HELPER: Encolar mensajes de invitacion en CommunicationMessage (Gate B v3.0)
 // ════════════════════════════════════════════════════════════════════════════
 // Por participante:
-//   - Determina canal via channel-selector (regla cero, nunca lanza)
-//   - Si canal = 'email': agrega a la lista de encolado
-//   - Si canal = 'whatsapp' o 'none': acumula en participantsWithoutEmail
-//     (en este gate solo encolamos EMAIL; WHATSAPP llega en Gate B)
+//   - Resuelve el telefono via resolvePhone (4 estrategias + excepcion Performance)
+//   - Determina canal via channel-selector (regla cero, nunca lanza) con el phone
+//     ya resuelto
+//   - 'email'    -> encola CommunicationMessage channel EMAIL (envio real Resend)
+//   - 'whatsapp' -> encola CommunicationMessage channel WHATSAPP, toPhone poblado
+//                   (despacho simulation en el dispatcher, sin envio real)
+//   - 'none'     -> NO encola, acumula en el cubo sinContacto
 // Encolado masivo: createMany + skipDuplicates para idempotencia via dedupKey.
 type EnqueueResult = {
-  queued: number;
-  skippedNoEmail: number;
-  participantsWithoutEmail: Array<{
-    nationalId: string;
-    phoneNumber: string | null;
-    name: string | null;
-    uniqueToken: string | null;
-  }>;
+  // Breakdown de 3 canales (spec seccion 5)
+  email: number;        // encolados channel EMAIL
+  whatsapp: number;     // encolados channel WHATSAPP
+  sinContacto: number;  // 'none', ni email ni phone validos
+  totalCargados: number; // = personas sin responder procesadas (email+whatsapp+sinContacto)
 };
 
 async function enqueueCampaignMessages(campaignId: string): Promise<EnqueueResult> {
@@ -61,6 +67,9 @@ async function enqueueCampaignMessages(campaignId: string): Promise<EnqueueResul
           nationalId: true,
           name: true,
           uniqueToken: true,
+          // Gate B: escalares para resolvePhone (sin includes; el batch hace el I/O)
+          employeeId: true,
+          evaluationAssignmentId: true,
         },
       },
     },
@@ -73,12 +82,27 @@ async function enqueueCampaignMessages(campaignId: string): Promise<EnqueueResul
   const { account, campaignType, participants } = campaignData;
   const surveyBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
+  // Contexto de resolucion de telefono: 3 queries batched, cero N+1.
+  const participantsForPhone: ParticipantForPhone[] = participants.map((p) => ({
+    id: p.id,
+    phoneNumber: p.phoneNumber,
+    nationalId: p.nationalId,
+    employeeId: p.employeeId,
+    evaluationAssignmentId: p.evaluationAssignmentId,
+  }));
+  const phoneCtx = await buildPhoneResolutionBatch(
+    participantsForPhone,
+    account.id,
+    prisma
+  );
+
   type MessageData = {
     accountId: string;
-    channel: 'EMAIL';
+    channel: 'EMAIL' | 'WHATSAPP';
     templateSlug: string;
     variables: Record<string, string>;
-    toEmail: string;
+    toEmail?: string;
+    toPhone?: string;
     participantId: string;
     campaignId: string;
     messageType: string;
@@ -87,52 +111,86 @@ async function enqueueCampaignMessages(campaignId: string): Promise<EnqueueResul
   };
 
   const messagesToCreate: MessageData[] = [];
-  const participantsWithoutEmail: EnqueueResult['participantsWithoutEmail'] = [];
+  let emailCount = 0;
+  let whatsappCount = 0;
+  let sinContactoCount = 0;
   const now = new Date();
 
   for (const p of participants) {
+    // Estrategia 1-3 + excepcion Performance (2b). Pobla el dato que el selector
+    // no busca. Performance se rutea SOLO por evaluationAssignmentId, nunca por
+    // nationalId (el WhatsApp iria al evaluado, no al evaluador).
+    const resolvedPhone = resolvePhone(
+      {
+        id: p.id,
+        phoneNumber: p.phoneNumber,
+        nationalId: p.nationalId,
+        employeeId: p.employeeId,
+        evaluationAssignmentId: p.evaluationAssignmentId,
+      },
+      phoneCtx
+    );
+
     const channel = determineChannel({
       email: p.email,
-      phoneNumber: p.phoneNumber,
-      // En Gate A los empleados/participantes aun no traen preferredChannel
-      // populado. Queda listo para Gate B sin tocar este endpoint.
+      phoneNumber: resolvedPhone,
+      // Consent (preferredChannel/channelConsentAt) se difiere a Gate C: hoy los
+      // participantes aun no lo traen poblado. La puerta queda lista en el selector.
     });
 
-    if (channel !== 'email') {
-      // 'whatsapp' o 'none' -> no se encola en este gate
-      participantsWithoutEmail.push({
-        nationalId: p.nationalId,
-        phoneNumber: p.phoneNumber,
-        name: p.name,
-        uniqueToken: p.uniqueToken,
+    if (channel === 'email') {
+      if (!p.email) {
+        // Defensa: determineChannel dijo email sin email valido (no deberia pasar).
+        sinContactoCount++;
+        continue;
+      }
+      messagesToCreate.push({
+        accountId: account.id,
+        channel: 'EMAIL',
+        templateSlug: campaignType.slug,
+        variables: {
+          participant_name: p.name || 'Estimado/a colaborador/a',
+          company_name: account.companyName,
+          survey_url: `${surveyBaseUrl}/encuesta/${p.uniqueToken}`,
+          // Snapshot del pais al momento de encolar para determinismo i18n.
+          country: account.country,
+        },
+        toEmail: p.email,
+        participantId: p.id,
+        campaignId,
+        messageType: 'invitation',
+        dedupKey: `invitation:${p.id}`,
+        scheduledAt: now,
       });
+      emailCount++;
       continue;
     }
 
-    // email no nulo garantizado por determineChannel === 'email'
-    if (!p.email) continue;
+    if (channel === 'whatsapp' && resolvedPhone) {
+      messagesToCreate.push({
+        accountId: account.id,
+        channel: 'WHATSAPP',
+        templateSlug: WHATSAPP_INVITATION_SLUG,
+        variables: {
+          participant_name: p.name || 'Estimado/a colaborador/a',
+          company_name: account.companyName,
+          survey_url: `${surveyBaseUrl}/encuesta/${p.uniqueToken}`,
+        },
+        toPhone: resolvedPhone,
+        participantId: p.id,
+        campaignId,
+        messageType: 'invitation',
+        // Mismo dedupKey que email: un participante resuelve a un solo canal,
+        // asi que la idempotencia por participante se mantiene intacta.
+        dedupKey: `invitation:${p.id}`,
+        scheduledAt: now,
+      });
+      whatsappCount++;
+      continue;
+    }
 
-    messagesToCreate.push({
-      accountId: account.id,
-      channel: 'EMAIL',
-      templateSlug: campaignType.slug,
-      variables: {
-        participant_name: p.name || 'Estimado/a colaborador/a',
-        company_name: account.companyName,
-        survey_url: `${surveyBaseUrl}/encuesta/${p.uniqueToken}`,
-        // Snapshot del pais al momento de encolar para determinismo i18n.
-        // Si el admin cambia el pais entre encolar y despachar, los labels
-        // legales quedan como estaban al momento de la invitacion.
-        country: account.country,
-      },
-      toEmail: p.email,
-      participantId: p.id,
-      campaignId,
-      messageType: 'invitation',
-      // Idempotencia: doble activacion no crea duplicados (skipDuplicates).
-      dedupKey: `invitation:${p.id}`,
-      scheduledAt: now,
-    });
+    // 'none' (o whatsapp sin phone resoluble, que no deberia ocurrir)
+    sinContactoCount++;
   }
 
   if (messagesToCreate.length > 0) {
@@ -143,9 +201,10 @@ async function enqueueCampaignMessages(campaignId: string): Promise<EnqueueResul
   }
 
   return {
-    queued: messagesToCreate.length,
-    skippedNoEmail: participantsWithoutEmail.length,
-    participantsWithoutEmail,
+    email: emailCount,
+    whatsapp: whatsappCount,
+    sinContacto: sinContactoCount,
+    totalCargados: emailCount + whatsappCount + sinContactoCount,
   };
 }
 
@@ -306,9 +365,13 @@ export async function PUT(
           status: 'active',
           activatedAt: new Date().toISOString(),
           // Semantica honesta: cuantos mensajes quedaron en cola, no cuantos
-          // se enviaron (el envio es async via dispatcher).
-          messagesQueued: enqueueResult.queued,
-          skippedNoEmail: enqueueResult.skippedNoEmail,
+          // se enviaron (el envio es async via dispatcher). Breakdown por canal.
+          messagesQueued: enqueueResult.email + enqueueResult.whatsapp,
+          breakdown: {
+            email: enqueueResult.email,
+            whatsapp: enqueueResult.whatsapp,
+            sinContacto: enqueueResult.sinContacto,
+          },
         },
         userInfo: {
           ip: request.headers.get('x-forwarded-for') || 'unknown',
@@ -322,15 +385,20 @@ export async function PUT(
     // ──────────────────────────────────────────────────────────────────────
     fireDispatcherFirstBatch();
 
+    const totalQueued = enqueueResult.email + enqueueResult.whatsapp;
+
     return NextResponse.json({
       success: true,
-      message: `Campaña activada. ${enqueueResult.queued} mensajes en cola.`,
+      message: `Campaña activada. ${totalQueued} mensajes en cola.`,
       data: {
         campaignId,
         status: 'active',
-        queued: enqueueResult.queued,
-        skippedNoEmail: enqueueResult.skippedNoEmail,
-        participantsWithoutEmail: enqueueResult.participantsWithoutEmail,
+        breakdown: {
+          email: enqueueResult.email,
+          whatsapp: enqueueResult.whatsapp,
+          sinContacto: enqueueResult.sinContacto,
+        },
+        totalCargados: enqueueResult.totalCargados,
       },
     });
   } catch (error) {

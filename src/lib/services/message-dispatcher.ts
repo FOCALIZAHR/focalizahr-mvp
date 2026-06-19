@@ -17,6 +17,8 @@
 
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/services/email-service';
+import { sendWhatsApp } from '@/lib/services/whatsapp-service';
+import { getWhatsAppTemplate } from '@/lib/templates/whatsapp-templates';
 import { renderEmailTemplate } from '@/lib/templates/email-templates';
 import { getLegalEmailLabels } from '@/config/compliance/legalBadgeConfig';
 import type { MessageChannel, MessageStatus } from '@prisma/client';
@@ -108,8 +110,50 @@ export async function runDispatcherBatch(): Promise<DispatcherBatchResult> {
 
     // 3b. Switch por canal
     if (msg.channel === 'WHATSAPP') {
-      await markFailed(msg.id, 'whatsapp not enabled in gate A');
-      failed++;
+      // Gate B: despacho WhatsApp en modo simulation (TWILIO_MODE=simulation).
+      // El servicio no envia nada real; loggea y retorna sim_... El espejo
+      // EmailLog NO aplica a WhatsApp (es solo para el canal email).
+      if (!msg.toPhone) {
+        await markFailed(msg.id, 'missing toPhone for WHATSAPP channel');
+        failed++;
+        continue;
+      }
+
+      const variables = (msg.variables ?? {}) as Record<string, unknown>;
+      const waVariables: Record<string, string> = {};
+      for (const [k, v] of Object.entries(variables)) {
+        if (v !== null && v !== undefined) waVariables[k] = String(v);
+      }
+
+      const waResult = await sendWhatsApp({
+        to: msg.toPhone,
+        templateId: getWhatsAppTemplate(msg.templateSlug)?.contentSid || msg.templateSlug,
+        variables: waVariables,
+      });
+
+      if (waResult.success) {
+        await markSent(msg.id, waResult.messageId, now, waResult.cost);
+        sent++;
+        // Mismo rate limit que email entre envios exitosos.
+        await delay(RATE_LIMIT_DELAY_MS);
+      } else {
+        // Mismo manejo de fallo que email: retry con backoff o FAILED terminal.
+        if (msg.retryCount < MAX_RETRY) {
+          const backoff = BACKOFF_MS[msg.retryCount] ?? BACKOFF_MS[BACKOFF_MS.length - 1];
+          await prisma.communicationMessage.update({
+            where: { id: msg.id },
+            data: {
+              status: 'PENDING',
+              retryCount: msg.retryCount + 1,
+              scheduledAt: new Date(now.getTime() + backoff),
+              errorMessage: waResult.error,
+            },
+          });
+        } else {
+          await markFailed(msg.id, waResult.error);
+          failed++;
+        }
+      }
       continue;
     }
 
@@ -237,7 +281,12 @@ export async function runDispatcherBatch(): Promise<DispatcherBatchResult> {
   return { processed, sent, failed, remaining };
 }
 
-async function markSent(id: string, providerId: string, sentAt: Date): Promise<void> {
+async function markSent(
+  id: string,
+  providerId: string,
+  sentAt: Date,
+  costUsd?: number
+): Promise<void> {
   await prisma.communicationMessage.update({
     where: { id },
     data: {
@@ -245,6 +294,8 @@ async function markSent(id: string, providerId: string, sentAt: Date): Promise<v
       sentAt,
       providerId,
       errorMessage: null,
+      // Solo el canal WhatsApp reporta costo; email lo deja en null.
+      ...(costUsd !== undefined ? { costUsd } : {}),
     },
   });
 }
