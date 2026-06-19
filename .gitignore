@@ -49,7 +49,12 @@ next-env.d.ts
 Thumbs.dbnul
 
 # Claude & Temporal fixes
-.claude/tasks/
+# Nota: se ignora el CONTENIDO (/*) en vez de podar el directorio, para que la
+# negacion de abajo surta efecto (una regla 'dir/' poda el dir y anula negaciones).
+.claude/tasks/*
+# Excepcion quirurgica: el maestro de comunicaciones v3 SI se trackea (rastro de
+# gates sellados). El resto de .claude/tasks/ sigue ignorado.
+!.claude/tasks/ARQUITECTURA_COMUNICACIONES_v3_MAESTRO.md
 .claude/settings.local.json
 .claude/skills/focalizahr-design.zip
 *.diff
