@@ -3785,5 +3785,7 @@ model CommunicationMessage {
   @@index([status, scheduledAt], map: "idx_message_dispatcher")
   @@index([campaignId, channel, status])
   @@index([accountId, createdAt])
+  // Gate C: lookup de status callback Twilio por providerId (MessageSid)
+  @@index([providerId])
   @@map("communication_messages")
 }

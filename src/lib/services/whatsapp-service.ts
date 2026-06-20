@@ -17,17 +17,33 @@
 // NO renderiza templates: recibe templateId (contentSid) + variables.
 // ════════════════════════════════════════════════════════════════════════════
 
-export type WhatsAppSendArgs = {
-  to: string;                          // telefono destino E.164 (ej: +56912345678)
-  templateId: string;                  // contentSid del template (HX... o placeholder)
-  variables: Record<string, string>;   // variables del Content Template
-};
+// Dos modos de envio (Gate C, spec 4.1 + 4.2):
+//   - TEMPLATE: contentSid + contentVariables (channel-onboarding, survey-invitation).
+//   - LIBRE: Body de texto plano dentro de la ventana 24h (request-email). Sin
+//     contentSid, sin aprobacion Meta.
+export type WhatsAppSendArgs =
+  | {
+      to: string;                          // telefono destino E.164 (ej: +56912345678)
+      templateId: string;                  // contentSid del template (HX...)
+      variables: Record<string, string>;   // variables posicionales del Content Template
+    }
+  | {
+      to: string;                          // telefono destino E.164
+      body: string;                        // mensaje libre (session message, ventana 24h)
+    };
 
 export type WhatsAppSendResult =
   | { success: true; messageId: string; cost: number }
   | { success: false; error: string };
 
 type TwilioMode = 'simulation' | 'sandbox' | 'production';
+
+// Discriminador: true si es envio por template (contentSid), false si mensaje libre.
+function isTemplateArgs(
+  args: WhatsAppSendArgs
+): args is { to: string; templateId: string; variables: Record<string, string> } {
+  return 'templateId' in args;
+}
 
 function getMode(): TwilioMode {
   const mode = (process.env.TWILIO_MODE || 'simulation').toLowerCase();
@@ -64,11 +80,11 @@ export async function sendWhatsApp(args: WhatsAppSendArgs): Promise<WhatsAppSend
   if (mode === 'simulation') {
     console.log(
       '[WhatsApp SIMULATION]',
-      JSON.stringify({
-        to: args.to,
-        template: args.templateId,
-        variables: args.variables,
-      })
+      JSON.stringify(
+        isTemplateArgs(args)
+          ? { to: args.to, template: args.templateId, variables: args.variables }
+          : { to: args.to, body: args.body }
+      )
     );
     return {
       success: true,
@@ -94,15 +110,24 @@ export async function sendWhatsApp(args: WhatsAppSendArgs): Promise<WhatsAppSend
     const twilio = twilioModule.default(accountSid, authToken);
     const cost = getCostUsd();
 
-    let lastError = 'unknown twilio error';
-    for (let attempt = 0; attempt <= REAL_BACKOFF_MS.length; attempt++) {
-      try {
-        const message = await twilio.messages.create({
+    // Payload segun modo: template (contentSid + contentVariables) o libre (body).
+    const createPayload = isTemplateArgs(args)
+      ? {
           from: `whatsapp:${fromNumber}`,
           to: `whatsapp:${args.to}`,
           contentSid: args.templateId,
           contentVariables: JSON.stringify(args.variables),
-        });
+        }
+      : {
+          from: `whatsapp:${fromNumber}`,
+          to: `whatsapp:${args.to}`,
+          body: args.body,
+        };
+
+    let lastError = 'unknown twilio error';
+    for (let attempt = 0; attempt <= REAL_BACKOFF_MS.length; attempt++) {
+      try {
+        const message = await twilio.messages.create(createPayload);
         return { success: true, messageId: message.sid, cost };
       } catch (err) {
         lastError = err instanceof Error ? err.message : 'twilio send error';

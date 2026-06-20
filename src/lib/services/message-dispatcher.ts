@@ -18,7 +18,7 @@
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/services/email-service';
 import { sendWhatsApp } from '@/lib/services/whatsapp-service';
-import { getWhatsAppTemplate } from '@/lib/templates/whatsapp-templates';
+import { getWhatsAppTemplate, buildContentVariables } from '@/lib/templates/whatsapp-templates';
 import { renderEmailTemplate } from '@/lib/templates/email-templates';
 import { getLegalEmailLabels } from '@/config/compliance/legalBadgeConfig';
 import type { MessageChannel, MessageStatus } from '@prisma/client';
@@ -119,16 +119,21 @@ export async function runDispatcherBatch(): Promise<DispatcherBatchResult> {
         continue;
       }
 
-      const variables = (msg.variables ?? {}) as Record<string, unknown>;
-      const waVariables: Record<string, string> = {};
-      for (const [k, v] of Object.entries(variables)) {
-        if (v !== null && v !== undefined) waVariables[k] = String(v);
+      // Gate C: Twilio/Meta exigen variables POSICIONALES ('1','2',...), no nombres.
+      // buildContentVariables mapea named -> posicional segun el orden del template.
+      const named = (msg.variables ?? {}) as Record<string, unknown>;
+      const template = getWhatsAppTemplate(msg.templateSlug);
+
+      if (!template) {
+        await markFailed(msg.id, `unknown whatsapp template: ${msg.templateSlug}`);
+        failed++;
+        continue;
       }
 
       const waResult = await sendWhatsApp({
         to: msg.toPhone,
-        templateId: getWhatsAppTemplate(msg.templateSlug)?.contentSid || msg.templateSlug,
-        variables: waVariables,
+        templateId: template.contentSid,
+        variables: buildContentVariables(template, named),
       });
 
       if (waResult.success) {

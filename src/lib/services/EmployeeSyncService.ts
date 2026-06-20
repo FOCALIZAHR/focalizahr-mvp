@@ -4,6 +4,11 @@ import { prisma } from '@/lib/prisma';
 import { Employee, EmployeeStatus, EmployeeChangeType, Prisma } from '@prisma/client';
 import { DepartmentAdapter } from './DepartmentAdapter';
 import { PositionAdapter, type PerformanceTrack } from './PositionAdapter';
+import { normalizePhone } from '@/lib/utils/normalizePhone';
+import {
+  enqueueChannelOnboarding,
+  type ChannelOnboardingCandidate,
+} from './channel-onboarding';
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS E INTERFACES
@@ -25,6 +30,8 @@ export interface EmployeeRow {
   resolvedManagerId?: string | null;
   resolvedDepartmentId?: string;
   resolvedHireDate?: Date;
+  // 📞 Gate C: telefono canonico (normalizePhone). null si no normalizable.
+  resolvedPhone?: string | null;
   // 🆕 Clasificación de cargo (PositionAdapter)
   resolvedJobLevel?: string | null;
   resolvedAcotadoGroup?: string | null;
@@ -52,6 +59,8 @@ export interface ImportResult {
   unmappedDepartments?: string[];
   errorDetails?: Array<{ nationalId: string; error: string }>;
   warningDetails?: Array<{ nationalId: string; warning: string }>;
+  // 📞 Gate C: channel-onboarding encolados (altas sin email corporativo + con phone)
+  onboardingEnqueued?: number;
   // 🆕 Estadísticas de clasificación de cargos
   classification?: {
     mapped: number;
@@ -360,7 +369,6 @@ function detectChanges(
   const fieldsToCompare: Array<{ field: keyof Employee; newField: keyof EmployeeRow }> = [
     { field: 'fullName', newField: 'fullName' },
     { field: 'email', newField: 'email' },
-    { field: 'phoneNumber', newField: 'phoneNumber' },
     { field: 'position', newField: 'position' },
     { field: 'jobTitle', newField: 'jobTitle' },
     { field: 'seniorityLevel', newField: 'seniorityLevel' },
@@ -372,6 +380,14 @@ function detectChanges(
     if (oldVal !== (newVal || null)) {
       changes.push({ field, oldValue: oldVal, newValue: newVal || null });
     }
+  }
+
+  // Telefono: comparar contra el valor CANONICO (resolvedPhone), no el raw, para
+  // no marcar cambio espurio cada import (Gate C). resolvedPhone se setea antes
+  // de llamar a detectChanges en el loop principal.
+  const newPhone = newData.resolvedPhone ?? null;
+  if (current.phoneNumber !== newPhone) {
+    changes.push({ field: 'phoneNumber', oldValue: current.phoneNumber, newValue: newPhone });
   }
 
   // Manager
@@ -604,6 +620,8 @@ export async function processEmployeeImport(
     const missing: Employee[] = [];
     const errors: ImportError[] = [];
     const cycleWarnings: CycleWarning[] = [];
+    // 📞 Gate C: telefonos que venian con dato pero no se pudieron normalizar.
+    const phoneWarnings: { nationalId: string; warning: string }[] = [];
 
     for (const [rut, fileEmp] of fileMap) {
       console.log(`[Import] 📋 Procesando: ${rut} (${fileEmp.fullName})`);
@@ -665,6 +683,18 @@ export async function processEmployeeImport(
       fileEmp.resolvedManagerId = managerId;
       fileEmp.resolvedDepartmentId = deptId;
       fileEmp.resolvedHireDate = parsedHireDate;
+
+      // 📞 Gate C: normalizar telefono a canonico (+56XXXXXXXXX). Si venia dato
+      // pero no calza patron chileno, NO se guarda raw: queda null + warning.
+      const phoneResult = normalizePhone(fileEmp.phoneNumber);
+      fileEmp.resolvedPhone = phoneResult.value;
+      if (fileEmp.phoneNumber && fileEmp.phoneNumber.trim() !== '' && !phoneResult.ok) {
+        phoneWarnings.push({
+          nationalId: rut,
+          warning: `Telefono no normalizable: "${fileEmp.phoneNumber}", no se guarda (revisar)`,
+        });
+        console.warn(`[Import] 📞 ${rut}: telefono no normalizable "${fileEmp.phoneNumber}" -> null`);
+      }
 
       // 🆕 Clasificar cargo usando PositionAdapter
       const classification = PositionAdapter.classifyPosition(fileEmp.position || '');
@@ -738,7 +768,9 @@ export async function processEmployeeImport(
         missingPercent,
         unmappedDepartments: unmappedDepts.length > 0 ? unmappedDepts : undefined,
         errorDetails: errors.length > 0 ? errors : undefined,
-        warningDetails: cycleWarnings.length > 0 ? cycleWarnings.map(w => ({ nationalId: w.nationalId, warning: w.warning })) : undefined
+        warningDetails: (cycleWarnings.length + phoneWarnings.length) > 0
+          ? [...cycleWarnings.map(w => ({ nationalId: w.nationalId, warning: w.warning })), ...phoneWarnings]
+          : undefined
       };
     }
 
@@ -753,7 +785,7 @@ export async function processEmployeeImport(
       nationalId: normalizeRut(emp.nationalId),
       fullName: emp.fullName,
       email: emp.email || null,
-      phoneNumber: emp.phoneNumber || null,
+      phoneNumber: emp.resolvedPhone ?? null,
       position: emp.position || null,
       jobTitle: emp.jobTitle || null,
       seniorityLevel: emp.seniorityLevel || null,
@@ -845,6 +877,9 @@ export async function processEmployeeImport(
       }
     }
 
+    // 📞 Gate C 4.3a: contador de channel-onboarding encolados al cargar maestro.
+    let onboardingEnqueued = 0;
+
     // ════════════════════════════════════════════════════════════════════════
     // FASE 2: Obtener IDs de empleados creados y crear historial
     // ════════════════════════════════════════════════════════════════════════
@@ -893,6 +928,39 @@ export async function processEmployeeImport(
           }, { timeout: BATCH_TIMEOUT });
         }
         console.log(`[Import] ✅ Historial nuevos: ${historyForNewEmployees.length} registros`);
+      }
+
+      // ══════════════════════════════════════════════════════════════════════
+      // 📞 Gate C 4.3a: disparador channel-onboarding al cargar maestro Employee
+      // Altas SIN email corporativo + CON telefono canonico -> encolar onboarding.
+      // channelConsentAt siempre null en altas nuevas, asi que basta !email && phone.
+      // dedupKey hace el encolado idempotente. NO se dispara el dispatcher aqui
+      // (decision Victor: solo encolar; el dispatcher despacha en su cadencia).
+      // ══════════════════════════════════════════════════════════════════════
+      const onboardingCandidates: ChannelOnboardingCandidate[] = [];
+      for (const emp of toCreate) {
+        const hasCorpEmail = !!(emp.email && emp.email.trim() !== '');
+        if (hasCorpEmail || !emp.resolvedPhone) continue;
+        const empId = rutToIdMap.get(normalizeRut(emp.nationalId));
+        if (!empId) continue;
+        onboardingCandidates.push({
+          employeeId: empId,
+          accountId,
+          toPhone: emp.resolvedPhone,
+          participantName: emp.fullName.trim().split(/\s+/)[0] || emp.fullName,
+          companyName: '', // se completa abajo con account.companyName
+        });
+      }
+
+      if (onboardingCandidates.length > 0) {
+        const account = await prisma.account.findUnique({
+          where: { id: accountId },
+          select: { companyName: true },
+        });
+        const companyName = account?.companyName || '';
+        for (const c of onboardingCandidates) c.companyName = companyName;
+        onboardingEnqueued = await enqueueChannelOnboarding(onboardingCandidates);
+        console.log(`[Import] 📞 channel-onboarding encolados: ${onboardingEnqueued}`);
       }
     }
 
@@ -952,7 +1020,7 @@ export async function processEmployeeImport(
             const updateData: Record<string, unknown> = {
               fullName: newData.fullName,
               email: newData.email || null,
-              phoneNumber: newData.phoneNumber || null,
+              phoneNumber: newData.resolvedPhone ?? null,
               position: newData.position || null,
               jobTitle: newData.jobTitle || null,
               seniorityLevel: newData.seniorityLevel || null,
@@ -1003,7 +1071,7 @@ export async function processEmployeeImport(
               data: {
                 fullName: newData.fullName,
                 email: newData.email || null,
-                phoneNumber: newData.phoneNumber || null,
+                phoneNumber: newData.resolvedPhone ?? null,
                 position: newData.position || null,
                 jobTitle: newData.jobTitle || null,
                 seniorityLevel: newData.seniorityLevel || null,
@@ -1257,7 +1325,10 @@ export async function processEmployeeImport(
       cycleWarnings: cycleWarnings.length,
       unmappedDepartments: unmappedDepts.length > 0 ? unmappedDepts : undefined,
       errorDetails: errors.length > 0 ? errors : undefined,
-      warningDetails: cycleWarnings.length > 0 ? cycleWarnings.map(w => ({ nationalId: w.nationalId, warning: w.warning })) : undefined,
+      warningDetails: (cycleWarnings.length + phoneWarnings.length) > 0
+        ? [...cycleWarnings.map(w => ({ nationalId: w.nationalId, warning: w.warning })), ...phoneWarnings]
+        : undefined,
+      onboardingEnqueued,
       classification: classificationStats
     };
 

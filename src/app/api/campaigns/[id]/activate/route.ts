@@ -31,6 +31,10 @@ import {
   type ParticipantForPhone,
 } from '@/lib/services/resolvePhone';
 import { WHATSAPP_INVITATION_SLUG } from '@/lib/templates/whatsapp-templates';
+import {
+  enqueueChannelOnboarding,
+  type ChannelOnboardingCandidate,
+} from '@/lib/services/channel-onboarding';
 
 // ════════════════════════════════════════════════════════════════════════════
 // HELPER: Encolar mensajes de invitacion en CommunicationMessage (Gate B v3.0)
@@ -111,6 +115,10 @@ async function enqueueCampaignMessages(campaignId: string): Promise<EnqueueResul
   };
 
   const messagesToCreate: MessageData[] = [];
+  // Gate C 4.3b: fallback de channel-onboarding al activar. Participantes que
+  // resuelven a whatsapp con Employee (employeeId) SIN channelConsentAt -> encolar
+  // onboarding (idempotente via dedupKey; no reenvia si 4.3a ya lo hizo).
+  const onboardingCandidates: ChannelOnboardingCandidate[] = [];
   let emailCount = 0;
   let whatsappCount = 0;
   let sinContactoCount = 0;
@@ -186,6 +194,23 @@ async function enqueueCampaignMessages(campaignId: string): Promise<EnqueueResul
         scheduledAt: now,
       });
       whatsappCount++;
+
+      // Gate C 4.3b: si el Employee detras del participante no tiene consent,
+      // encolar onboarding ANTES (orden, no supresion: la invitacion ya se encolo).
+      // Solo participantes con employeeId (hoy Ambiente Sano): el consent vive en
+      // el Employee. Standard sin employeeId se difiere a Gate D.
+      if (p.employeeId) {
+        const emp = phoneCtx.employeeById.get(p.employeeId);
+        if (emp && !emp.channelConsentAt) {
+          onboardingCandidates.push({
+            employeeId: p.employeeId,
+            accountId: account.id,
+            toPhone: resolvedPhone,
+            participantName: (p.name || '').trim().split(/\s+/)[0] || (p.name || 'colaborador'),
+            companyName: account.companyName,
+          });
+        }
+      }
       continue;
     }
 
@@ -198,6 +223,12 @@ async function enqueueCampaignMessages(campaignId: string): Promise<EnqueueResul
       data: messagesToCreate,
       skipDuplicates: true,
     });
+  }
+
+  // Gate C 4.3b: encolar onboarding pendiente (idempotente por dedupKey).
+  if (onboardingCandidates.length > 0) {
+    const onboardingEnqueued = await enqueueChannelOnboarding(onboardingCandidates);
+    console.log(`[Activate] channel-onboarding (4.3b) encolados: ${onboardingEnqueued}`);
   }
 
   return {
