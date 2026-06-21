@@ -90,7 +90,15 @@ export function middleware(request: NextRequest) {
     
     // Cron jobs (autenticación por Vercel Cron Secret)
     '/api/cron',
-    
+
+    // Webhooks externos: se whitelistean UNO A UNO por ruta EXACTA, nunca por
+    // prefijo '/api/webhooks', y SOLO cuando el handler valida su propia firma.
+    // El webhook de Twilio valida twilio.validateRequest (fail-closed) antes de
+    // leer o escribir en BD. Ejemplo de la regla: el dia que exista el webhook
+    // real de Resend con su firma, recien ahi se agrega '/api/webhooks/resend'
+    // exacto; no antes.
+    '/api/webhooks/twilio',
+
     // Static assets
     '/',
     '/favicon.ico'

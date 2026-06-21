@@ -94,14 +94,22 @@ export async function POST(request: NextRequest) {
     return new Response('Forbidden', { status: 403 });
   }
 
-  // 3. STATUS CALLBACK (delivered/read): presencia de MessageStatus.
-  const messageStatus = params.MessageStatus || params.SmsStatus;
-  if (messageStatus) {
-    await handleStatusCallback(params, messageStatus);
+  // 3. Discriminar status-callback vs inbound (spec 4.2). Twilio manda los mensajes
+  // INBOUND con SmsStatus=received, asi que la sola presencia de un status NO alcanza.
+  // Regla robusta: es status-callback SOLO si hay un estado de ENTREGA y NO hay
+  // contenido de usuario. El contenido de usuario (Body o boton) tiene PRIORIDAD:
+  // si viene, es inbound aunque traiga SmsStatus=received. Todo lo demas -> inbound.
+  const hasUserContent = !!(params.Body || params.ButtonPayload || params.ButtonText);
+  const deliveryStatus = (params.MessageStatus || params.SmsStatus || '').toLowerCase();
+  const DELIVERY_STATES = ['sent', 'delivered', 'read', 'failed', 'undelivered'];
+  const isStatusCallback = !hasUserContent && DELIVERY_STATES.includes(deliveryStatus);
+
+  if (isStatusCallback) {
+    await handleStatusCallback(params, deliveryStatus);
     return ok200();
   }
 
-  // 4. INBOUND (consent): respuesta del usuario.
+  // 4. INBOUND (consent): respuesta del usuario (incluye received con contenido).
   await handleInbound(params);
   return ok200();
 }
