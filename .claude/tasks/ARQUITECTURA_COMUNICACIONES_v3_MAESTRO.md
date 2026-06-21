@@ -392,7 +392,22 @@ TWILIO_WEBHOOK_VALIDATE=true
   resolucion telefono multi-estrategia + breakdown 3 canales. Performance NO conectado
   a la cola (sigue por ruta legacy `admin/performance-cycles/[id]`); B5 vivo diferido a
   backlog, obligatorio antes de integrar Performance a la cola en Gate D/E.
-- **GATE C** — pendiente — Twilio real + sandbox + webhook firmado + consent + captura opt-in
+- **GATE C** — SELLADO 10/10 — commit `96655cd` — 2026-06-20 — Twilio real
+  (sandbox) + webhook firmado fail-closed (firma invalida 403 sin tocar BD) +
+  consent opt-in nivel empresa con captura email con repregunta + multi-tenant
+  fail-safe + status callbacks + normalizePhone canonico Chile-first en Employee
+  master. Fixes del gate: middleware whitelist por ruta exacta + discriminador
+  inbound vs status-callback (restaura spec 4.2). Politicas canonicas: WhatsApp
+  en Performance siempre al evaluator via evaluationAssignmentId; cleanup por id
+  exacto + $transaction. BLOQUEANTE DE PRODUCCION (no de sello): copy
+  request-email sigue en placeholder Studio IA. Prerequisitos go-live:
+  aprobacion Meta del numero productivo, cutover Twilio a produccion. CRITICO
+  go-live: indice @@index([providerId]) en BD prod (hoy solo dev por db push),
+  sin el cada status callback de Twilio hace full scan con volumen real.
+  Diferido a Gate D: consent no-Employees, UX respuesta 0-matches, reconciliacion
+  variables survey-invitation, migracion CSV inline a normalizePhone, multipais
+  telefono, onboarding en rehires (4.3a solo cubre altas nuevas), tabla
+  WhatsAppConversation si colision cross-account frecuente.
 
 ---
 
