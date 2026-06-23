@@ -194,9 +194,10 @@ FocalizaHR · Tu respuesta es confidencial`,
 // ──────────────────────────────────────────────────────────────────────────
 // TEMPLATE 3 · survey-escalation (twilio/call-to-action) · GATE D
 // ──────────────────────────────────────────────────────────────────────────
-// Último recurso: el email no respondió -> WhatsApp. Copy LITERAL de la skill
-// focalizahr-whatsapp-templates §4.4 (la frase "Si decides no responder, también
-// está bien" desactiva el tono amenazante que Meta penaliza).
+// Último recurso: el email no respondió -> WhatsApp. Copy basado en skill
+// focalizahr-whatsapp-templates §4.4 con un ajuste documentado: "cierra manana"
+// -> "cierra pronto" por correctitud temporal contra la logica de D3 (la frase
+// "Si decides no responder, también está bien" desactiva el tono amenazante).
 // Mapping conceptual:
 //   {{1}} ← participant_name   {{2}} ← company_name   {{3}} ← survey_token (en la URL)
 // ──────────────────────────────────────────────────────────────────────────
@@ -316,11 +317,26 @@ async function main() {
   console.log('     | jq \'.contents[] | {sid, friendly_name, language}\'');
   console.log('');
 
-  const results = [
-    await createTemplate(TEMPLATE_CHANNEL_ONBOARDING, 'TEMPLATE 1'),
-    await createTemplate(TEMPLATE_SURVEY_INVITATION,  'TEMPLATE 2'),
-    await createTemplate(TEMPLATE_SURVEY_ESCALATION,  'TEMPLATE 3'),
+  // Mint SELECTIVO: `node create-whatsapp-templates.mjs survey-escalation` crea SOLO ese.
+  // Sin args -> los 3 (comportamiento original). Evita duplicar/pisar HX de Gate C.
+  const onlyArgs = process.argv.slice(2);
+  const registry = [
+    { tpl: TEMPLATE_CHANNEL_ONBOARDING, label: 'TEMPLATE 1', key: 'channel-onboarding' },
+    { tpl: TEMPLATE_SURVEY_INVITATION,  label: 'TEMPLATE 2', key: 'survey-invitation' },
+    { tpl: TEMPLATE_SURVEY_ESCALATION,  label: 'TEMPLATE 3', key: 'survey-escalation' },
   ];
+  const selected = onlyArgs.length > 0
+    ? registry.filter((r) => onlyArgs.includes(r.key) || onlyArgs.includes(r.tpl.friendly_name))
+    : registry;
+  if (selected.length === 0) {
+    console.error(`Ningun template coincide con: ${onlyArgs.join(', ')}. Validos: ${registry.map((r) => r.key).join(', ')}`);
+    process.exit(1);
+  }
+  console.log(`Creando ${selected.length} template(s): ${selected.map((r) => r.key).join(', ')}`);
+  const results = [];
+  for (const r of selected) {
+    results.push(await createTemplate(r.tpl, r.label));
+  }
 
   const success = results.filter(r => r.success);
   const failed = results.filter(r => !r.success);
