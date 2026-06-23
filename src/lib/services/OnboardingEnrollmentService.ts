@@ -332,8 +332,11 @@ export class OnboardingEnrollmentService {
    * - Si la persona YA existe en el maestro (cualquier estado), NO se toca su estado
    *   (no clobber): solo se completa el consent si está ausente.
    * - Se ejecuta ANTES del hop HTTP, así el consent es durable aunque el hop falle luego.
+   *
+   * Público (no solo interno): es una operación con identidad propia (captura de consent
+   * de canal de un pre-nómina) reusable por un alta manual / UI de pre-enroll a futuro.
    */
-  private static async upsertPreNominaEmployee(data: EnrollmentData): Promise<void> {
+  static async upsertPreNominaEmployee(data: EnrollmentData): Promise<void> {
     const nationalId = normalizeRut(data.nationalId);
     const now = new Date();
 
