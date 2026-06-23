@@ -22,7 +22,7 @@ SPEC_GATE_B a E (se crean al sellar el gate anterior)
 | 4 | Flujos configurables por campania | Diferido: hoy no hay caso de uso; la cola lo soporta a futuro | Futuro |
 | 5 | Tracking unificado por canal | UNA tabla CommunicationMessage para todo producto | A |
 | 6 | Escalabilidad (estado explicito, no reconstruir desde logs) | status + scheduledAt + retryCount en cada mensaje | A |
-| 7 | Comunicaciones ad-hoc (metas, PDF, reconocimientos) | Misma tabla con employeeId/goalId opcionales | E |
+| 7 | Comunicaciones ad-hoc (metas, PDF, reconocimientos) | Misma tabla con employeeId/goalId opcionales | F |
 | 8 | Canal corporativo completo para el 70% sin email | Regla Cero + consent + onboarding de canal | C |
 | 9 | NUEVO: resolver timeout 504 en activacion masiva | activate encola y responde inmediato | A |
 | 10 | NUEVO: funcionar en Vercel Hobby HOY | Triple disparador sin crons nuevos | A |
@@ -60,8 +60,8 @@ construirlo encima sin migrar datos cuando exista demanda.
 PRODUCTORES (escriben PENDING en communication_messages)
   activate/route.ts ............ invitaciones (GATE A email, GATE B mixto)
   send-reminders + escalacion .. survey-escalation whatsapp (GATE D)
-  GoalsService (event-driven) .. goal_assigned, goal_completed (GATE E)
-  scheduler at-risk ............ goal_at_risk, goal_progress (GATE E)
+  GoalsService (event-driven) .. goal_assigned, goal_completed (GATE F)
+  scheduler at-risk ............ goal_at_risk, goal_progress (GATE F)
   futuros: send-reports, calibracion, notificaciones admin
 
                     |
@@ -292,7 +292,13 @@ Done: escalacion dispara una sola vez por participante (doble ejecucion del
 cron = cero duplicados); campania exit con participantes solo-phone completa
 el ciclo.
 
-### GATE E: Metas y ad-hoc
+### GATE E: WhatsApp frontline operando (en preparacion)
+- El diferenciador operando: WhatsApp para la poblacion sin email corporativo
+  (recordatorios por WhatsApp del sin-email + migracion de productos standard a
+  carga desde el maestro Employee + Exit por la cola unificada). Detalle pendiente
+  de spec.
+
+### GATE F: Metas y ad-hoc
 - Event-driven (sin cron): cascadeGoal/createManagerGoal con meta INDIVIDUAL
   -> encolar goal_assigned en el momento; approveClosure -> goal_completed
 - Polling minimo: goal_at_risk y goal_progress semanal via scheduler externo
