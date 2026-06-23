@@ -24,9 +24,13 @@ export const enrollmentRequestSchema = z.object({
   hireDate: z.string().transform(val => new Date(val)),
   
   dateOfBirth: z.coerce.date().optional(),
-  
-  gender: z.enum(['MALE', 'FEMALE', 'NON_BINARY', 'PREFER_NOT_TO_SAY']).optional()
-  
+
+  gender: z.enum(['MALE', 'FEMALE', 'NON_BINARY', 'PREFER_NOT_TO_SAY']).optional(),
+
+  // 🆕 GATE D: canal declarado por el admin (consent día 1). Opcional: si se omite,
+  // el service lo infiere del contacto disponible (email -> 'email', si no -> 'whatsapp').
+  preferredChannel: z.enum(['email', 'whatsapp']).optional()
+
 }).refine(data => data.participantEmail || data.phoneNumber, {
   message: "Debe proporcionar email o teléfono para contacto"
 });

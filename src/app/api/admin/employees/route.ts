@@ -51,6 +51,10 @@ export async function GET(request: NextRequest) {
     // Filtros opcionales
     if (status) {
       where.status = status;
+    } else {
+      // GATE D: por defecto NO incluir pre-nómina (PENDING_ONBOARDING) en el
+      // listado/conteo de dotación. Solo aparece si se pide explícito (?status=).
+      where.status = { not: 'PENDING_ONBOARDING' };
     }
     if (departmentId) {
       where.departmentId = departmentId;

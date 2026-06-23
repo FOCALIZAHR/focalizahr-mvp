@@ -46,6 +46,17 @@ const WHATSAPP_TEMPLATES: Record<string, WhatsAppTemplate> = {
     contentSid: 'HXe75294cea427de80c8756167457b045c',
     variables: ['participant_name', 'company_name'],
   },
+  // GATE D: escalación de último recurso (email no respondió -> WhatsApp).
+  // {{1}}=participant_name, {{2}}=company_name, {{3}}=survey_token (en la URL del botón).
+  // Copy: skill focalizahr-whatsapp-templates §4.4. El Content template real lo crea
+  // create-whatsapp-templates.mjs; el HX abajo es PLACEHOLDER hasta correr el script y
+  // aprobar en Meta (go-live, mismo patrón que Gate C). El smoke D3-2 usa try-first con
+  // fallback a un template pre-aprobado de muestra si el sandbox rechaza el custom.
+  'survey-escalation': {
+    slug: 'survey-escalation',
+    contentSid: 'HX_PENDING_SURVEY_ESCALATION',
+    variables: ['participant_name', 'company_name', 'survey_token'],
+  },
 };
 
 /**
@@ -84,6 +95,9 @@ export const WHATSAPP_INVITATION_SLUG = 'campaign-invitation-whatsapp';
 
 // Slug canonico del onboarding de canal (consumido por el disparador 4.3a/4.3b).
 export const WHATSAPP_ONBOARDING_SLUG = 'channel-onboarding';
+
+// Slug canonico de la escalacion WhatsApp (consumido por processSurveyEscalations, Gate D).
+export const WHATSAPP_ESCALATION_SLUG = 'survey-escalation';
 
 // ════════════════════════════════════════════════════════════════════════════
 // REQUEST_EMAIL_BODY - Mensaje LIBRE (session message), NO es template Meta.

@@ -226,6 +226,39 @@ export interface ExitRegistrationResult {
   message?: string;
   error?: string;
   emailScheduledFor?: string;  // ← NUEVO: ISO date del email programado
+  code?: ExitRegistrationErrorCode;  // Gate D: discriminador de error (bloqueo por maestro)
+}
+
+/**
+ * Gate D: códigos de error del registro de salida.
+ * EMPLOYEE_NOT_IN_MASTER -> bloqueo duro: la persona no está en el maestro Employee
+ * (o cae fuera del scope de quien registra; indistinguible para no actuar de oráculo de RUT).
+ * La UI redirige al sync.
+ */
+export const EXIT_REGISTRATION_ERROR_CODES = {
+  EMPLOYEE_NOT_IN_MASTER: 'EMPLOYEE_NOT_IN_MASTER',
+} as const;
+
+export type ExitRegistrationErrorCode =
+  typeof EXIT_REGISTRATION_ERROR_CODES[keyof typeof EXIT_REGISTRATION_ERROR_CODES];
+
+/**
+ * Gate D: resultado del lookup de Employee para el flujo de exit.
+ * Lookup por EXISTENCIA (sin filtro de estado): encuentra cualquier Employee de la
+ * cuenta dentro del scope de quien registra, en el estado que sea (ACTIVE, INACTIVE,
+ * ON_LEAVE, PENDING_ONBOARDING, EXCLUDED). Datos para prepoblar el form adelgazado.
+ */
+export interface ExitEmployeeLookupResult {
+  employeeId: string;
+  nationalId: string;
+  fullName: string;
+  email: string | null;
+  phoneNumber: string | null;
+  position: string | null;
+  departmentId: string;
+  departmentName: string | null;
+  status: string;     // hint de estado (p.ej. ya INACTIVE) — no filtra, solo informa
+  isActive: boolean;
 }
 
 /**

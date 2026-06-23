@@ -100,7 +100,10 @@ const enrollmentSchema = z.object({
     .or(z.literal('')),
   
   gender: z.enum(['MALE', 'FEMALE', 'NON_BINARY', 'OTHER']).optional(),
-  
+
+  // 🆕 GATE D: canal de comunicación preferido (consent declarado por el admin).
+  preferredChannel: z.enum(['email', 'whatsapp']).optional().or(z.literal('')),
+
   birthDate: z.string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato: YYYY-MM-DD')
     .optional()
@@ -215,12 +218,15 @@ export default function EnrollmentPage() {
     setError(null);
     
     try {
+      // GATE D: omitir preferredChannel vacío (el backend lo infiere del contacto).
+      const payload = { ...data, preferredChannel: data.preferredChannel || undefined };
+
       const response = await fetch('/api/onboarding/enroll', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(payload)
       });
 
       const result = await response.json();
@@ -438,6 +444,24 @@ export default function EnrollmentPage() {
                   {hasContactMethod 
                     ? '✓ Canal de contacto proporcionado' 
                     : 'Debe proporcionar al menos email o teléfono para enviar encuestas'}
+                </p>
+              </div>
+
+              {/* Canal preferido (Gate D: consent día 1, declarado por el admin) */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Canal preferido de comunicación (Opcional)
+                </label>
+                <select
+                  {...register('preferredChannel')}
+                  className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition"
+                >
+                  <option value="">Inferir del contacto disponible</option>
+                  <option value="email">Email</option>
+                  <option value="whatsapp">WhatsApp</option>
+                </select>
+                <p className="text-xs text-slate-500 mt-1">
+                  Se registra como preferencia de canal del colaborador (consentimiento declarado).
                 </p>
               </div>
 

@@ -54,6 +54,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { ExitRegistrationService } from '@/lib/services/ExitRegistrationService';
+import { hasPermission } from '@/lib/services/AuthorizationService';
 import { EXIT_REASONS, type ExitReason } from '@/types/exit';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -84,18 +85,13 @@ export async function POST(request: NextRequest) {
     // PASO 2: AUTORIZACIÓN (más restrictiva para batch)
     // ════════════════════════════════════════════════════════════════════════
     
-    const allowedRoles = [
-      'FOCALIZAHR_ADMIN',
-      'ACCOUNT_OWNER',
-      'HR_ADMIN'
-    ];
-    
-    if (!allowedRoles.includes(userRole)) {
+    // RBAC centralizado (misma matriz: más restrictivo que individual, vía hasPermission)
+    if (!hasPermission(userRole, 'exit:register:batch')) {
       console.log(`❌ [Exit Batch] Unauthorized role: ${userRole}`);
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Sin permisos para registro masivo. Solo HR_ADMIN o superior.' 
+        {
+          success: false,
+          error: 'Sin permisos para registro masivo. Solo HR_ADMIN o superior.'
         },
         { status: 403 }
       );
@@ -238,7 +234,13 @@ export async function POST(request: NextRequest) {
     // PASO 5: PROCESAR REGISTROS VÁLIDOS
     // ════════════════════════════════════════════════════════════════════════
     
-    const result = await ExitRegistrationService.registerBatch(validatedItems);
+    // Scope jerárquico (Gate D D2): exit:register:batch es global -> null en la práctica.
+    const scopeDepartmentIds = await ExitRegistrationService.resolveScopeDepartmentIds({
+      role: userRole,
+      departmentId: request.headers.get('x-department-id')
+    });
+
+    const result = await ExitRegistrationService.registerBatch(validatedItems, { scopeDepartmentIds });
     
     // Agregar errores de validación al resultado
     const allResults = [

@@ -617,6 +617,9 @@ export async function processEmployeeImport(
     const toCreate: EmployeeRow[] = [];
     const toUpdate: { current: Employee; newData: EmployeeRow; changes: FieldChange[] }[] = [];
     const toRehire: { current: Employee; newData: EmployeeRow }[] = [];
+    // GATE D: pre-nómina (PENDING_ONBOARDING) o no-show reversible (EXCLUDED por no-show)
+    // que aparecen en la nómina -> ACTIVE preservando el consent.
+    const toActivate: { current: Employee; newData: EmployeeRow; fromStatus: 'PENDING_ONBOARDING' | 'EXCLUDED' }[] = [];
     const missing: Employee[] = [];
     const errors: ImportError[] = [];
     const cycleWarnings: CycleWarning[] = [];
@@ -707,6 +710,26 @@ export async function processEmployeeImport(
       const existing = allEmployeesMap.get(rut);
 
       if (existing) {
+        // GATE D: pre-nómina que aparece en la nómina -> ACTIVE preservando consent.
+        if (existing.status === 'PENDING_ONBOARDING') {
+          console.log(`[Import] 🎯 Pre-nómina -> ACTIVE: ${existing.fullName}`);
+          toActivate.push({ current: existing, newData: fileEmp, fromStatus: 'PENDING_ONBOARDING' });
+          continue;
+        }
+
+        // GATE D: EXCLUDED que reaparece.
+        if (existing.status === 'EXCLUDED') {
+          if (existing.noShowExcludedAt) {
+            // No-show reversible: el pre-nómina excluido reaparece -> reactivar a ACTIVE.
+            console.log(`[Import] 🔁 No-show reactivado -> ACTIVE: ${existing.fullName}`);
+            toActivate.push({ current: existing, newData: fileEmp, fromStatus: 'EXCLUDED' });
+          } else {
+            // Exclusión MANUAL: se respeta. No se reactiva ni se actualiza el estado.
+            console.log(`[Import] ⛔ EXCLUDED manual preservado (no reactivar): ${existing.fullName}`);
+          }
+          continue;
+        }
+
         // FIX ZOMBIES: Si está INACTIVE, es recontratación
         if (existing.status === 'INACTIVE') {
           console.log(`[Import] 🧟 ZOMBIE detectado: ${existing.fullName}`);
@@ -1102,6 +1125,87 @@ export async function processEmployeeImport(
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // FASE 5.5 (GATE D D1): ACTIVATE - pre-nómina / no-show reaparecen -> ACTIVE
+    // Preserva el consent (no toca preferredChannel/channelConsentAt/channelConsentMethod)
+    // y limpia el marcador noShowExcludedAt. Escribe historia de status.
+    // ════════════════════════════════════════════════════════════════════════
+    if (toActivate.length > 0) {
+      const activateBatches = chunkArray(toActivate, BATCH_SIZE);
+      console.log(`[Import] 📦 Activando ${toActivate.length} pre-nómina/no-show en ${activateBatches.length} lotes`);
+
+      const historyForActivations: Prisma.EmployeeHistoryCreateManyInput[] = [];
+
+      for (let i = 0; i < activateBatches.length; i++) {
+        const batch = activateBatches[i];
+        await prisma.$transaction(async (tx) => {
+          for (const { current, newData } of batch) {
+            await tx.employee.update({
+              where: { id: current.id },
+              data: {
+                fullName: newData.fullName,
+                email: newData.email || null,
+                phoneNumber: newData.resolvedPhone ?? null,
+                position: newData.position || null,
+                jobTitle: newData.jobTitle || null,
+                seniorityLevel: newData.seniorityLevel || null,
+                managerId: newData.resolvedManagerId || null,
+                departmentId: newData.resolvedDepartmentId!,
+                status: 'ACTIVE',
+                isActive: true,
+                noShowExcludedAt: null, // limpiar marcador de no-show al reactivar
+                terminatedAt: null,
+                terminationReason: null,
+                pendingReview: false,
+                pendingReviewReason: null,
+                lastImportId: importRecord.id,
+                lastSeenInImport: now,
+                standardJobLevel: newData.resolvedJobLevel || null,
+                acotadoGroup: newData.resolvedAcotadoGroup || null,
+                performanceTrack: newData.resolvedPerformanceTrack || 'COLABORADOR',
+                jobLevelMappedAt: newData.resolvedJobLevel ? now : null,
+                jobLevelMethod: newData.resolvedJobLevel ? 'auto' : null,
+                trackMappedAt: now
+                // consent NO se toca: preferredChannel/channelConsentAt/channelConsentMethod preservados
+              }
+            });
+          }
+        }, { timeout: BATCH_TIMEOUT });
+        console.log(`[Import] ✅ Lote ACTIVATE ${i + 1}/${activateBatches.length}: ${batch.length} empleados`);
+      }
+
+      for (const { current, newData, fromStatus } of toActivate) {
+        historyForActivations.push({
+          employeeId: current.id,
+          accountId,
+          // pre-nómina que se vuelve real = HIRE; no-show que regresa = REHIRE.
+          changeType: (fromStatus === 'PENDING_ONBOARDING' ? 'HIRE' : 'REHIRE') as EmployeeChangeType,
+          fieldName: 'status',
+          oldValue: fromStatus,
+          newValue: 'ACTIVE',
+          departmentId: newData.resolvedDepartmentId,
+          managerId: newData.resolvedManagerId,
+          position: newData.position || null,
+          changeSource: 'BULK_IMPORT',
+          importId: importRecord.id,
+          changeReason: fromStatus === 'PENDING_ONBOARDING'
+            ? 'Pre-nómina confirmada en la nómina (Gate D)'
+            : 'No-show de onboarding reactivado al reaparecer (Gate D)',
+          changedBy: userId || null,
+          effectiveDate: now
+        });
+      }
+
+      if (historyForActivations.length > 0) {
+        const historyBatches = chunkArray(historyForActivations, BATCH_SIZE);
+        for (let i = 0; i < historyBatches.length; i++) {
+          await prisma.$transaction(async (tx) => {
+            await tx.employeeHistory.createMany({ data: historyBatches[i], skipDuplicates: true });
+          }, { timeout: BATCH_TIMEOUT });
+        }
+      }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // FASE 6: MISSING - Marcar ausentes en batches para evitar connection pool timeout
     // ════════════════════════════════════════════════════════════════════════
     if (missing.length > 0) {
@@ -1143,6 +1247,80 @@ export async function processEmployeeImport(
       }
 
       console.log(`[Import] ✅ Total ${missing.length} ausentes procesados (${config.autoDeactivateMissing ? 'desactivados' : 'marcados para revisión'})`);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // FASE 6.5 (GATE D D1): NO-SHOW - pre-nómina que no aparece tras N ciclos -> EXCLUDED
+    // Solo en FULL (la ausencia es significativa solo con la nómina completa).
+    // Ciclo = corrida FULL completada. Reversible: si reaparece, FASE 5.5 lo reactiva.
+    // ════════════════════════════════════════════════════════════════════════
+    if (config.mode === 'FULL') {
+      const NO_SHOW_CYCLE_THRESHOLD = 3; // configurable por cuenta a futuro; default 3 corridas
+      const preNominasAusentes = allEmployees.filter(
+        (e) => e.status === 'PENDING_ONBOARDING' && !fileMap.has(e.nationalId)
+      );
+
+      if (preNominasAusentes.length > 0) {
+        // Ciclos FULL completados por cuenta (cada corrida deja fila). No se construye contador.
+        const priorFullImports = await prisma.employeeImport.findMany({
+          where: { accountId, importMode: 'FULL', status: 'COMPLETED' },
+          select: { completedAt: true }
+        });
+
+        const toNoShowExclude = preNominasAusentes.filter((emp) => {
+          const priorCycles = priorFullImports.filter(
+            (imp) => imp.completedAt && imp.completedAt > emp.createdAt
+          ).length;
+          const cyclesSurvived = priorCycles + 1; // + la corrida actual
+          return cyclesSurvived >= NO_SHOW_CYCLE_THRESHOLD;
+        });
+
+        if (toNoShowExclude.length > 0) {
+          const noShowChunks = chunkArray(toNoShowExclude, BATCH_SIZE);
+          const historyForNoShow: Prisma.EmployeeHistoryCreateManyInput[] = [];
+
+          for (let i = 0; i < noShowChunks.length; i++) {
+            const chunk = noShowChunks[i];
+            await prisma.$transaction(async (tx) => {
+              await tx.employee.updateMany({
+                where: { id: { in: chunk.map((e) => e.id) } },
+                data: {
+                  status: 'EXCLUDED',
+                  isActive: false,
+                  noShowExcludedAt: now // marcador: este EXCLUDED es no-show (reversible)
+                }
+              });
+            }, { timeout: BATCH_TIMEOUT });
+
+            for (const emp of chunk) {
+              historyForNoShow.push({
+                employeeId: emp.id,
+                accountId,
+                changeType: 'UPDATE' as EmployeeChangeType,
+                fieldName: 'status',
+                oldValue: 'PENDING_ONBOARDING',
+                newValue: 'EXCLUDED',
+                changeSource: 'BULK_IMPORT',
+                importId: importRecord.id,
+                changeReason: `No-show de onboarding (>=${NO_SHOW_CYCLE_THRESHOLD} ciclos sin aparecer en la nómina)`,
+                changedBy: userId || null,
+                effectiveDate: now
+              });
+            }
+          }
+
+          if (historyForNoShow.length > 0) {
+            const historyBatches = chunkArray(historyForNoShow, BATCH_SIZE);
+            for (let i = 0; i < historyBatches.length; i++) {
+              await prisma.$transaction(async (tx) => {
+                await tx.employeeHistory.createMany({ data: historyBatches[i], skipDuplicates: true });
+              }, { timeout: BATCH_TIMEOUT });
+            }
+          }
+
+          console.log(`[Import] 🚫 No-show: ${toNoShowExclude.length} pre-nómina marcados EXCLUDED`);
+        }
+      }
     }
 
     // ════════════════════════════════════════════════════════════════════════

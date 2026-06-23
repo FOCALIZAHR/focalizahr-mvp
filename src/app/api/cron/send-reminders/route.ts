@@ -23,6 +23,11 @@ import { Resend } from 'resend';
 import { renderEmailTemplate } from '@/lib/templates/email-templates';
 import { getLegalEmailLabels } from '@/config/compliance/legalBadgeConfig';
 import { FROM_EMAIL } from '@/lib/constants/email-sender';
+// GATE D D3: escalación WhatsApp anclada al último reminder (reuso Gate A/B/C tal cual).
+import { buildPhoneResolutionBatch, resolvePhone, type ParticipantForPhone } from '@/lib/services/resolvePhone';
+import { EscalationConfigService } from '@/lib/services/EscalationConfigService';
+import { WHATSAPP_ESCALATION_SLUG } from '@/lib/templates/whatsapp-templates';
+import { runDispatcherBatch } from '@/lib/services/message-dispatcher';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -556,6 +561,156 @@ async function processAutomationQueue(): Promise<{
 //
 // Este código RESUELVE el error de TypeScript con Promise.allSettled
 
+// ============================================================================
+// GATE D D3: ESCALACIÓN WHATSAPP (anclada al último reminder, hacia adelante)
+// ============================================================================
+// Construido ESPECÍFICO: cuelga del reminder2 (lastReminderSent) existente, NO toca
+// processReminders ni lo migra a la cola. Lee estado, encola CommunicationMessage
+// WHATSAPP con dedupKey, y dispara el dispatcher. Reusa resolvePhone (invariante
+// Performance intacta) y la cola/dispatcher de Gate A/B/C tal cual.
+//
+// Dispara SOLO a quien: no completó (hasResponded=false), tuvo al menos un reminder
+// (reminderCount>=1, lastReminderSent != null), y su consent certifica WhatsApp
+// (preferredChannel==='whatsapp' && channelConsentAt != null; channelConsentAt solo
+// es agnóstico de canal, por eso NO basta). Tope: lastReminder+offset <= endDate.
+// Idempotencia por dedupKey unique (doble corrida no duplica).
+async function processSurveyEscalations(): Promise<{
+  totalCandidates: number;
+  enqueued: number;
+  errors: string[];
+}> {
+  const errors: string[] = [];
+  let totalCandidates = 0;
+  let enqueued = 0;
+  const now = new Date();
+
+  try {
+    const campaigns = await prisma.campaign.findMany({
+      where: { status: 'active', sendReminders: true },
+      select: {
+        id: true,
+        accountId: true,
+        endDate: true,
+        account: { select: { companyName: true } }
+      }
+    });
+
+    for (const campaign of campaigns) {
+      const { days } = await EscalationConfigService.getEscalationDelayForCampaign(campaign.id);
+      const offsetMs = days * 24 * 60 * 60 * 1000;
+
+      // Elegible si lastReminderSent + offset <= now Y <= endDate (cadencia hacia adelante).
+      const cutoffByNow = now.getTime() - offsetMs;
+      const cutoffByEnd = new Date(campaign.endDate).getTime() - offsetMs;
+      const cutoff = new Date(Math.min(cutoffByNow, cutoffByEnd));
+
+      const candidates = await prisma.participant.findMany({
+        where: {
+          campaignId: campaign.id,
+          hasResponded: false,
+          reminderCount: { gte: 1 },
+          lastReminderSent: { not: null, lte: cutoff }
+        },
+        select: {
+          id: true,
+          name: true,
+          uniqueToken: true,
+          phoneNumber: true,
+          nationalId: true,
+          employeeId: true,
+          evaluationAssignmentId: true
+        }
+      });
+
+      if (candidates.length === 0) continue;
+      totalCandidates += candidates.length;
+
+      // Reuso Gate B: contexto de resolución de teléfono + consent (mismo fetch).
+      const forPhone: ParticipantForPhone[] = candidates.map((c) => ({
+        id: c.id,
+        phoneNumber: c.phoneNumber,
+        nationalId: c.nationalId,
+        employeeId: c.employeeId,
+        evaluationAssignmentId: c.evaluationAssignmentId
+      }));
+      const ctx = await buildPhoneResolutionBatch(forPhone, campaign.accountId, prisma);
+
+      const companyName = campaign.account?.companyName || '';
+      const messages: any[] = [];
+
+      for (const c of candidates) {
+        const phone = resolvePhone(
+          {
+            id: c.id,
+            phoneNumber: c.phoneNumber,
+            nationalId: c.nationalId,
+            employeeId: c.employeeId,
+            evaluationAssignmentId: c.evaluationAssignmentId
+          },
+          ctx
+        );
+        if (!phone) continue;
+
+        // Consent: del MISMO Employee que resuelve el teléfono.
+        // Performance (evaluationAssignmentId): el consent del evaluador NO está en el
+        // contexto -> fail-closed (no se escala). Diferido a Gate E (nota tipo B5).
+        if (c.evaluationAssignmentId) continue;
+
+        const contact = c.employeeId
+          ? ctx.employeeById.get(c.employeeId)
+          : ctx.employeeByNationalId.get(c.nationalId);
+
+        const consentsWhatsApp =
+          !!contact && contact.preferredChannel === 'whatsapp' && contact.channelConsentAt != null;
+        if (!consentsWhatsApp) continue;
+
+        const firstName = (c.name || '').trim().split(/\s+/)[0] || c.name || 'colaborador';
+
+        messages.push({
+          accountId: campaign.accountId,
+          channel: 'WHATSAPP' as const,
+          templateSlug: WHATSAPP_ESCALATION_SLUG,
+          messageType: 'survey_escalation',
+          toPhone: phone,
+          participantId: c.id,
+          campaignId: campaign.id,
+          variables: {
+            participant_name: firstName,
+            company_name: companyName,
+            survey_token: c.uniqueToken
+          },
+          // Idempotencia: una sola escalación por participante (unique).
+          dedupKey: `survey-escalation:${c.id}`,
+          scheduledAt: now
+        });
+      }
+
+      if (messages.length > 0) {
+        const result = await prisma.communicationMessage.createMany({
+          data: messages,
+          skipDuplicates: true // dedupKey unique: doble corrida no duplica
+        });
+        enqueued += result.count;
+        console.log(`[Escalation] Campaña ${campaign.id}: ${result.count} escalaciones encoladas (offset ${days}d)`);
+      }
+    }
+
+    // Disparo del dispatcher tras encolar (patrón Capa 1): drena la cola en esta corrida.
+    if (enqueued > 0) {
+      try {
+        const dispatch = await runDispatcherBatch();
+        console.log(`[Escalation] Dispatcher: ${dispatch.sent} enviados, ${dispatch.failed} fallidos, ${dispatch.remaining} pendientes`);
+      } catch (dispatchErr) {
+        errors.push(`Dispatcher tras escalación: ${dispatchErr instanceof Error ? dispatchErr.message : 'error'}`);
+      }
+    }
+  } catch (err) {
+    errors.push(err instanceof Error ? err.message : 'Error desconocido en escalaciones');
+  }
+
+  return { totalCandidates, enqueued, errors };
+}
+
 export async function GET(request: NextRequest) {
   try {
     console.log('🤖 [Cron] Iniciado:', new Date().toISOString());
@@ -571,10 +726,11 @@ export async function GET(request: NextRequest) {
 
     console.log('✅ [Cron] Autenticación exitosa');
 
-    // 🚀 EJECUTAR AMBAS LÓGICAS EN PARALELO
-    const [legacyResult, automationResult] = await Promise.allSettled([
-      processReminders(),       // 📨 Legacy: reminder1, reminder2
-      processAutomationQueue()  // 🆕 Nuevo: onboarding, etc.
+    // 🚀 EJECUTAR LAS TRES LÓGICAS EN PARALELO
+    const [legacyResult, automationResult, escalationResult] = await Promise.allSettled([
+      processReminders(),         // 📨 Legacy: reminder1, reminder2
+      processAutomationQueue(),   // 🆕 Onboarding journey, etc.
+      processSurveyEscalations()  // 🆕 GATE D D3: escalación WhatsApp
     ]);
 
     // 📊 CONSOLIDAR RESULTADOS CON TYPE GUARDS EXPLÍCITOS
@@ -596,11 +752,20 @@ export async function GET(request: NextRequest) {
           errors: [automationResult.reason?.message || 'Error desconocido']
         };
 
+    const whatsappEscalations = escalationResult.status === 'fulfilled'
+      ? escalationResult.value
+      : {
+          totalCandidates: 0,
+          enqueued: 0,
+          errors: [escalationResult.reason?.message || 'Error desconocido']
+        };
+
     // Estructura consolidada
     const results = {
       timestamp: new Date().toISOString(),
       legacyReminders,
-      automationQueue
+      automationQueue,
+      whatsappEscalations
     };
 
     // ✅ LOG FINAL - Ahora TypeScript conoce la estructura exacta
@@ -614,6 +779,11 @@ export async function GET(request: NextRequest) {
         processed: automationQueue.totalProcessed,
         sent: automationQueue.emailsSent,
         errors: automationQueue.errors.length
+      },
+      whatsappEscalations: {
+        candidates: whatsappEscalations.totalCandidates,
+        enqueued: whatsappEscalations.enqueued,
+        errors: whatsappEscalations.errors.length
       }
     });
 

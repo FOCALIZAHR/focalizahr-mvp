@@ -32,11 +32,12 @@ enum AccountStatus {
 // ════════════════════════════════════════════════════════════════════════════
 
 enum EmployeeStatus {
-  ACTIVE          // Activo en nómina
-  INACTIVE        // Desvinculado/terminado
-  ON_LEAVE        // Licencia/permiso extendido
-  PENDING_REVIEW  // Requiere revisión manual
-  EXCLUDED        // Excluido manualmente de estudios
+  ACTIVE              // Activo en nómina
+  INACTIVE            // Desvinculado/terminado
+  ON_LEAVE            // Licencia/permiso extendido
+  PENDING_REVIEW      // Requiere revisión manual
+  EXCLUDED            // Excluido manualmente de estudios (o no-show de onboarding, Gate D)
+  PENDING_ONBOARDING  // Pre-nómina (Gate D): creado al inscribir onboarding, porta consent de canal, isActive=false. No gobierna el journey.
 }
 
 enum EmployeeChangeType {
@@ -148,6 +149,9 @@ model Account {
 
   // Límite de metas individuales por empleado
   maxIndividualGoals       Int     @default(10) @map("max_individual_goals")
+
+  // Gate D v3.0: offset escalación WhatsApp (días después del último reminder). Política de cuenta.
+  whatsappEscalationDelayDays Int? @map("whatsapp_escalation_delay_days")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -289,6 +293,9 @@ model CampaignType {
   // Agregar DEBAJO:
   flowType    String  @default("standard") @map("flow_type")
 
+  // Gate D v3.0: offset escalación WhatsApp (días después del último reminder). Default del producto.
+  whatsappEscalationDelayDays Int? @map("whatsapp_escalation_delay_days")
+
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relaciones
@@ -316,6 +323,9 @@ model Campaign {
   // Configuración campaña:
   sendReminders    Boolean @default(true) @map("send_reminders")
   anonymousResults Boolean @default(true) @map("anonymous_results")
+
+  // Gate D v3.0: offset escalación WhatsApp (días después del último reminder). Override puntual.
+  whatsappEscalationDelayDays Int? @map("whatsapp_escalation_delay_days")
 
   // Metadatos:
   createdByName  String?   @map("created_by_name")
@@ -1303,6 +1313,10 @@ model ExitRecord {
   participantId String   @unique @map("participant_id")
   nationalId    String   @map("national_id")
 
+  // Gate D v3.0: vínculo directo al maestro Employee (bloqueo duro de exit).
+  // Denormalizado en paralelo a nationalId; Exit Intelligence consulta ExitRecord directo.
+  employeeId    String?  @map("employee_id")
+
   // ═══════════════════════════════════════════════════
   // DATOS EXCLUSIVOS DE EXIT
   // ═══════════════════════════════════════════════════
@@ -1356,6 +1370,7 @@ model ExitRecord {
   participant   Participant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
   account       Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
   department    Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  employee      Employee?    @relation(fields: [employeeId], references: [id])
   alerts        ExitAlert[]
 
   // ═══════════════════════════════════════════════════
@@ -1364,6 +1379,7 @@ model ExitRecord {
   @@index([accountId, exitDate], map: "idx_exit_records_account_date")
   @@index([departmentId, exitDate], map: "idx_exit_records_department_date")
   @@index([nationalId], map: "idx_exit_records_national_id")
+  @@index([employeeId], map: "idx_exit_records_employee_id")
   @@index([eis], map: "idx_exit_records_eis")
   @@index([eisClassification], map: "idx_exit_records_classification")
   @@index([hasLeyKarinAlert], map: "idx_exit_records_ley_karin")
@@ -1619,6 +1635,12 @@ model Employee {
   channelConsentMethod String?   @map("channel_consent_method")   // 'self_service' | 'admin_loaded' | 'imported'
   awaitingEmailCapture Boolean   @default(false) @map("awaiting_email_capture") // flag captura pendiente
 
+  // 🆕 GATE D v3.0 - marcador de no-show de onboarding.
+  // Set SOLO por la rutina de no-show (PENDING_ONBOARDING -> EXCLUDED tras >=3 ciclos
+  // sin aparecer). Limpiado al reactivar a ACTIVE. Distingue el EXCLUDED por no-show
+  // del EXCLUDED por exclusión manual (que NO se reactiva). Captura el episodio en curso.
+  noShowExcludedAt     DateTime? @map("no_show_excluded_at")
+
   // Timestamps
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1630,6 +1652,7 @@ model Employee {
   directReports Employee[]       @relation("ManagerSubordinates")
   history       EmployeeHistory[]
   participants  Participant[]
+  exitRecords   ExitRecord[]
 
   // Evaluaciones (se usarán en Performance)
   evaluationsAsEvaluatee EvaluationAssignment[] @relation("Evaluatee")

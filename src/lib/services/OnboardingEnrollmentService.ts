@@ -19,6 +19,7 @@
 import { prisma } from '@/lib/prisma';
 import { addDays, format } from 'date-fns';
 import { enrollmentRequestSchema, type EnrollmentRequest } from '@/lib/validations/onboarding-enrollment';
+import { normalizeRut } from '@/lib/services/EmployeeSyncService';
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -37,6 +38,9 @@ interface EnrollmentData {
   startDate?: Date;            // Fecha inicio journey (default = hireDate)
   dateOfBirth?: Date;    // ← Nuevo
   gender?: 'MALE' | 'FEMALE' | 'NON_BINARY' | 'PREFER_NOT_TO_SAY';  // ← Nuevo
+  // 🆕 GATE D v3.0: canal de comunicación declarado por el admin al inscribir (consent día 1).
+  // Si se omite, se infiere del contacto disponible (email -> 'email', si no -> 'whatsapp').
+  preferredChannel?: 'email' | 'whatsapp';
 }
 
 type EnrollmentResult = 
@@ -135,7 +139,12 @@ export class OnboardingEnrollmentService {
       }
       // PASO 1: Validaciones básicas
       this.validateEnrollmentData(data);
-      
+
+      // PASO 1.5 (GATE D D1): crear el Employee pre-nómina ANTES del hop HTTP.
+      // El consent se persiste primero; si esta captura falla, abortamos sin haber
+      // creado participants/journey (atomicidad: el consent nunca se pierde en silencio).
+      await this.upsertPreNominaEmployee(data);
+
       // PASO 2: Obtener o crear 4 campaignIds permanentes
       const campaigns = await this.getOrCreatePermanentCampaigns(data.accountId);
       
@@ -311,9 +320,73 @@ export class OnboardingEnrollmentService {
   }
   
   // ==========================================================================
+  // GATE D D1: EMPLOYEE PRE-NÓMINA (captura de consent día 1)
+  // ==========================================================================
+
+  /**
+   * Crea (o completa el consent de) un Employee pre-nómina al inscribir onboarding.
+   *
+   * - Estado PENDING_ONBOARDING, isActive=false. NO gobierna el journey (ese corre
+   *   sobre Participant + EmailAutomation, intacto). Su único rol: portar el consent.
+   * - Consent declarado por el admin: channelConsentMethod='admin_loaded', channelConsentAt=now.
+   * - Si la persona YA existe en el maestro (cualquier estado), NO se toca su estado
+   *   (no clobber): solo se completa el consent si está ausente.
+   * - Se ejecuta ANTES del hop HTTP, así el consent es durable aunque el hop falle luego.
+   */
+  private static async upsertPreNominaEmployee(data: EnrollmentData): Promise<void> {
+    const nationalId = normalizeRut(data.nationalId);
+    const now = new Date();
+
+    // Canal declarado por el admin; si no se indicó, inferir del contacto disponible.
+    const preferredChannel: 'email' | 'whatsapp' =
+      data.preferredChannel ?? (data.participantEmail ? 'email' : 'whatsapp');
+
+    const existing = await prisma.employee.findFirst({
+      where: { accountId: data.accountId, nationalId },
+      select: { id: true, channelConsentAt: true }
+    });
+
+    if (existing) {
+      // No clobber del estado del maestro. Solo completar consent si falta.
+      if (!existing.channelConsentAt) {
+        await prisma.employee.update({
+          where: { id: existing.id },
+          data: {
+            preferredChannel,
+            channelConsentAt: now,
+            channelConsentMethod: 'admin_loaded'
+          }
+        });
+      }
+      return;
+    }
+
+    await prisma.employee.create({
+      data: {
+        accountId: data.accountId,
+        nationalId,
+        fullName: data.fullName,
+        email: data.participantEmail || null,
+        phoneNumber: data.phoneNumber || null,
+        departmentId: data.departmentId,
+        position: data.position || null,
+        status: 'PENDING_ONBOARDING',
+        isActive: false,
+        hireDate: data.hireDate,
+        importSource: 'ONBOARDING_ENROLLMENT',
+        preferredChannel,
+        channelConsentAt: now,
+        channelConsentMethod: 'admin_loaded'
+      }
+    });
+
+    console.log(`[OnboardingEnrollment] ✅ Employee pre-nómina creado (PENDING_ONBOARDING) para RUT ${nationalId}`);
+  }
+
+  // ==========================================================================
   // VALIDATION METHODS
   // ==========================================================================
-  
+
   /**
    * Validar datos de enrollment (defensivo + business logic)
    */

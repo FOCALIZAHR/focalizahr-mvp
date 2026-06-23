@@ -41,7 +41,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { ExitRegistrationService } from '@/lib/services/ExitRegistrationService';
-import { EXIT_REASONS, TALENT_CLASSIFICATIONS, type ExitReason, type TalentClassification } from '@/types/exit';
+import { hasPermission } from '@/lib/services/AuthorizationService';
+import { EXIT_REASONS, TALENT_CLASSIFICATIONS, EXIT_REGISTRATION_ERROR_CODES, type ExitReason, type TalentClassification } from '@/types/exit';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HANDLER POST
@@ -78,19 +79,13 @@ export async function POST(request: NextRequest) {
     // PASO 2: AUTORIZACIÓN RBAC
     // ════════════════════════════════════════════════════════════════════════
     
-    const allowedRoles = [
-      'FOCALIZAHR_ADMIN',  // FocalizaHR team
-      'ACCOUNT_OWNER',     // Dueño empresa
-      'HR_ADMIN',          // RRHH principal
-      'HR_MANAGER'         // Jefe RRHH
-    ];
-    
-    if (!allowedRoles.includes(userRole)) {
+    // RBAC centralizado (misma matriz de roles, vía hasPermission)
+    if (!hasPermission(userRole, 'exit:register')) {
       console.log(`❌ [Exit Register] Unauthorized role: ${userRole}`);
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Sin permisos para registrar salidas. Contacte a su administrador.' 
+        {
+          success: false,
+          error: 'Sin permisos para registrar salidas. Contacte a su administrador.'
         },
         { status: 403 }
       );
@@ -186,6 +181,12 @@ export async function POST(request: NextRequest) {
     // PASO 4: LLAMAR AL SERVICE
     // ════════════════════════════════════════════════════════════════════════
     
+    // Scope jerárquico de quien registra (Gate D D2): rol global -> null.
+    const scopeDepartmentIds = await ExitRegistrationService.resolveScopeDepartmentIds({
+      role: userRole,
+      departmentId: request.headers.get('x-department-id')
+    });
+
     const result = await ExitRegistrationService.registerExit({
       accountId,
       departmentId: body.departmentId,
@@ -197,24 +198,26 @@ export async function POST(request: NextRequest) {
       exitDate,
       exitReason: body.exitReason || undefined,
       talentClassification: body.talentClassification || undefined
-    });
-    
+    }, { scopeDepartmentIds });
+
     // ════════════════════════════════════════════════════════════════════════
     // PASO 5: RESPUESTA
     // ════════════════════════════════════════════════════════════════════════
-    
+
     const duration = Date.now() - startTime;
-    
+
     if (result.success) {
       console.log(`✅ [Exit Register] Success in ${duration}ms:`, {
         exitRecordId: result.exitRecordId,
         participantId: result.participantId
       });
-      
+
       return NextResponse.json(result, { status: 201 });
     } else {
       console.log(`⚠️ [Exit Register] Failed in ${duration}ms:`, result.error);
-      return NextResponse.json(result, { status: 400 });
+      // Bloqueo por maestro (Gate D): 409 Conflict, la UI redirige al sync.
+      const status = result.code === EXIT_REGISTRATION_ERROR_CODES.EMPLOYEE_NOT_IN_MASTER ? 409 : 400;
+      return NextResponse.json(result, { status });
     }
     
   } catch (error: any) {

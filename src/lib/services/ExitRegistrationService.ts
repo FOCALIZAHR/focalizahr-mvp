@@ -26,12 +26,26 @@
 
 import { prisma } from '@/lib/prisma';
 import { generateUniqueToken } from '@/lib/auth';
-import { 
-  ExitRegistrationData, 
+import { normalizeRut } from '@/lib/services/EmployeeSyncService';
+import { GLOBAL_ACCESS_ROLES, getChildDepartmentIds } from '@/lib/services/AuthorizationService';
+import {
+  ExitRegistrationData,
   ExitRegistrationResult,
   OnboardingCorrelation,
-  BatchExitRegistrationResult
+  BatchExitRegistrationResult,
+  ExitEmployeeLookupResult,
+  EXIT_REGISTRATION_ERROR_CODES
 } from '@/types/exit';
+
+/**
+ * Gate D: opciones de scope para el bloqueo duro de exit.
+ * scopeDepartmentIds:
+ *   - null  -> rol global, sin filtro departamental (ve toda la cuenta)
+ *   - [...] -> AREA_MANAGER: su departamento + hijos. Fuera de scope = no-match.
+ */
+export interface ExitScopeOptions {
+  scopeDepartmentIds?: string[] | null;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SERVICIO PRINCIPAL
@@ -52,16 +66,47 @@ export class ExitRegistrationService {
    * 5. Crear Participant + ExitRecord en transacción
    * 6. Programar email de invitación
    */
-  static async registerExit(data: ExitRegistrationData): Promise<ExitRegistrationResult> {
+  static async registerExit(
+    data: ExitRegistrationData,
+    options?: ExitScopeOptions
+  ): Promise<ExitRegistrationResult> {
     try {
-      console.log('[ExitRegistration] Starting registration...', { 
+      console.log('[ExitRegistration] Starting registration...', {
         nationalId: data.nationalId,
-        accountId: data.accountId 
+        accountId: data.accountId
       });
-      
+
       // 1. Validar datos
       this.validateData(data);
-      
+
+      // 1b. BLOQUEO DURO (Gate D D2): la persona DEBE existir en el maestro Employee.
+      // Lookup por EXISTENCIA (sin filtro de estado), scopeado a la cuenta y al scope
+      // jerárquico de quien registra. Fuera de scope = no-match (no se revela existencia).
+      const employee = await this.findEmployeeForExit({
+        accountId: data.accountId,
+        nationalId: data.nationalId,
+        scopeDepartmentIds: options?.scopeDepartmentIds ?? null
+      });
+
+      if (!employee) {
+        console.log('[ExitRegistration] Bloqueo: RUT no está en el maestro (o fuera de scope):', data.nationalId);
+        return {
+          success: false,
+          code: EXIT_REGISTRATION_ERROR_CODES.EMPLOYEE_NOT_IN_MASTER,
+          error: 'Esta persona no está en tu maestro de colaboradores. Sincroniza el maestro y vuelve a registrar la salida.'
+        };
+      }
+
+      // Datos personales autoritativos = snapshot del maestro al momento del egreso.
+      const resolved = {
+        fullName: employee.fullName,
+        email: employee.email ?? data.email ?? null,
+        phoneNumber: employee.phoneNumber ?? data.phoneNumber ?? null,
+        position: employee.position ?? data.position ?? null,
+        departmentId: employee.departmentId,
+        employeeId: employee.employeeId
+      };
+
       // 2. Verificar si ya existe un ExitRecord activo para este RUT
       const existing = await prisma.exitRecord.findFirst({
         where: {
@@ -103,12 +148,13 @@ export class ExitRegistrationService {
           data: {
             campaignId: campaign.id,
             nationalId: data.nationalId,
-            name: data.fullName,
-            email: data.email || null,
-            phoneNumber: data.phoneNumber || null,
-            department: data.departmentId, // Campo string legacy
-            departmentId: data.departmentId, // FK real
-            position: data.position || null,
+            name: resolved.fullName,
+            email: resolved.email,
+            phoneNumber: resolved.phoneNumber,
+            department: resolved.departmentId, // Campo string legacy
+            departmentId: resolved.departmentId, // FK real
+            position: resolved.position,
+            employeeId: resolved.employeeId, // Gate D: vínculo al maestro
             uniqueToken: generateUniqueToken(), // ← Función del proyecto (64 chars hex)
             hasResponded: false
           }
@@ -125,9 +171,10 @@ export class ExitRegistrationService {
         const exitRecord = await tx.exitRecord.create({
           data: {
             accountId: data.accountId,
-            departmentId: data.departmentId,
+            departmentId: resolved.departmentId,
             participantId: participant.id,
             nationalId: data.nationalId,
+            employeeId: resolved.employeeId, // Gate D: vínculo directo al maestro
             exitDate: data.exitDate,
             exitReason: data.exitReason || null,
             talentClassification: data.talentClassification || null,
@@ -198,7 +245,8 @@ export class ExitRegistrationService {
    * ════════════════════════════════════════════════════════════════════════
    */
   static async registerBatch(
-    items: ExitRegistrationData[]
+    items: ExitRegistrationData[],
+    options?: ExitScopeOptions
   ): Promise<BatchExitRegistrationResult> {
     console.log('[ExitRegistration] Starting batch registration:', items.length);
     
@@ -242,8 +290,8 @@ export class ExitRegistrationService {
       const item = items[i];
       
       try {
-        const result = await this.registerExit(item);
-        
+        const result = await this.registerExit(item, options);
+
         if (result.success) {
           successCount++;
           results.push({
@@ -344,9 +392,153 @@ export class ExitRegistrationService {
   }
   
   // ═══════════════════════════════════════════════════════════════════════════
+  // LOOKUP DE MAESTRO (Gate D D2) — por EXISTENCIA, sin filtro de estado
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Busca un Employee del maestro por RUT, para el bloqueo duro del exit.
+   *
+   * REGLAS (selladas):
+   * - Por EXISTENCIA: SIN filtro de isActive/status. Encuentra ACTIVE, INACTIVE,
+   *   ON_LEAVE, PENDING_ONBOARDING y EXCLUDED. Un pre-nómina que renuncia y un
+   *   EXCLUDED que es un contratado real nunca sincronizado son exits válidos.
+   * - Multi-tenant: scopeado a accountId SIEMPRE.
+   * - RBAC scope: si scopeDepartmentIds != null, filtra por el departmentId PROPIO
+   *   del Employee dentro de ese set. Fuera de scope -> retorna null (se trata IGUAL
+   *   que no-match: NO se revela que el RUT existe, para no ser oráculo de RUT).
+   *
+   * @returns datos para prepoblar el form, o null si no existe / fuera de scope.
+   */
+  static async findEmployeeForExit(params: {
+    accountId: string;
+    nationalId: string;
+    scopeDepartmentIds?: string[] | null;
+  }): Promise<ExitEmployeeLookupResult | null> {
+    const { accountId, scopeDepartmentIds } = params;
+    const nationalId = normalizeRut(params.nationalId);
+
+    const where: any = { accountId, nationalId };
+    if (scopeDepartmentIds != null) {
+      where.departmentId = { in: scopeDepartmentIds };
+    }
+
+    const employee = await prisma.employee.findFirst({
+      where,
+      select: {
+        id: true,
+        nationalId: true,
+        fullName: true,
+        email: true,
+        phoneNumber: true,
+        position: true,
+        departmentId: true,
+        status: true,
+        isActive: true,
+        department: { select: { displayName: true } }
+      }
+    });
+
+    if (!employee) return null;
+
+    return {
+      employeeId: employee.id,
+      nationalId: employee.nationalId,
+      fullName: employee.fullName,
+      email: employee.email,
+      phoneNumber: employee.phoneNumber,
+      position: employee.position,
+      departmentId: employee.departmentId,
+      departmentName: employee.department?.displayName ?? null,
+      status: employee.status,
+      isActive: employee.isActive
+    };
+  }
+
+  /**
+   * Buscador por nombre o RUT para el flujo de exit. Mismo scope y reglas de
+   * existencia que findEmployeeForExit. Rankea activos primero para no inundar con
+   * bajas viejas, pero incluye inactivos (el que renunció hace poco sigue en INACTIVE
+   * solo tras un sync; mientras tanto está ACTIVE).
+   */
+  static async searchEmployeesForExit(params: {
+    accountId: string;
+    query: string;
+    scopeDepartmentIds?: string[] | null;
+    limit?: number;
+  }): Promise<ExitEmployeeLookupResult[]> {
+    const { accountId, scopeDepartmentIds } = params;
+    const query = params.query.trim();
+    const limit = Math.min(params.limit ?? 10, 25);
+
+    if (query.length < 2) return [];
+
+    const where: any = {
+      accountId,
+      OR: [
+        { fullName: { contains: query, mode: 'insensitive' } },
+        { nationalId: { contains: normalizeRut(query) } }
+      ]
+    };
+    if (scopeDepartmentIds != null) {
+      where.departmentId = { in: scopeDepartmentIds };
+    }
+
+    const employees = await prisma.employee.findMany({
+      where,
+      select: {
+        id: true,
+        nationalId: true,
+        fullName: true,
+        email: true,
+        phoneNumber: true,
+        position: true,
+        departmentId: true,
+        status: true,
+        isActive: true,
+        department: { select: { displayName: true } }
+      },
+      orderBy: [{ isActive: 'desc' }, { fullName: 'asc' }],
+      take: limit
+    });
+
+    return employees.map((e) => ({
+      employeeId: e.id,
+      nationalId: e.nationalId,
+      fullName: e.fullName,
+      email: e.email,
+      phoneNumber: e.phoneNumber,
+      position: e.position,
+      departmentId: e.departmentId,
+      departmentName: e.department?.displayName ?? null,
+      status: e.status,
+      isActive: e.isActive
+    }));
+  }
+
+  /**
+   * Resuelve el scope departamental del exit a partir del rol de quien registra.
+   * - Rol global -> null (sin filtro, ve toda la cuenta).
+   * - AREA_MANAGER -> su departamento + hijos (CTE recursivo cacheado).
+   * - Otro -> [] (fail-closed: nunca matchea, no se filtra al endpoint por hasPermission).
+   */
+  static async resolveScopeDepartmentIds(userContext: {
+    role: string | null;
+    departmentId: string | null;
+  }): Promise<string[] | null> {
+    if (GLOBAL_ACCESS_ROLES.includes(userContext.role as any)) {
+      return null;
+    }
+    if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
+      const children = await getChildDepartmentIds(userContext.departmentId);
+      return [userContext.departmentId, ...children];
+    }
+    return [];
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // MÉTODOS PRIVADOS
   // ═══════════════════════════════════════════════════════════════════════════
-  
+
   /**
    * Validar datos de entrada
    */
