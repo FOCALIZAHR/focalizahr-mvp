@@ -408,6 +408,44 @@ TWILIO_WEBHOOK_VALIDATE=true
   variables survey-invitation, migracion CSV inline a normalizePhone, multipais
   telefono, onboarding en rehires (4.3a solo cubre altas nuevas), tabla
   WhatsAppConversation si colision cross-account frecuente.
+- **GATE D** — SELLADO 20/20 + D3-2 — commits `8298bc5` (implementacion) +
+  `ffd6773` (extraccion processSurveyEscalations a servicio + visibilidad
+  testabilidad) + `3602315` (herramental templates: fix comentario + mint
+  selectivo) — 2026-06-23 — Exit anclado al maestro Employee (lookup por
+  existencia sin filtro de estado, scope RBAC sobre departmentId, fuera-de-scope
+  = no-match sin revelar existencia, bloqueo duro EMPLOYEE_NOT_IN_MASTER 409) +
+  Employee pre-nomina (PENDING_ONBOARDING, isActive=false, consent admin_loaded,
+  upsert sin clobber antes del hop) + escalacion WhatsApp (EscalationConfigService
+  cascada campaign>account>campaignType>default 2, anclada a lastReminderSent +
+  offset, tope endDate, gate consent preferredChannel=whatsapp && channelConsentAt,
+  dedupKey idempotente, reuso resolvePhone). Smoke 1a tanda 20/20 (D1-1..D3-5,
+  sin envio real) + D3-2 cadena WhatsApp DELIVERED con el HX custom real,
+  in-session por sandbox. Politicas canonicas: distincion no-show vs exclusion
+  manual por noShowExcludedAt (lo setea solo el no-show en sync FULL >=3 ciclos,
+  se limpia solo al reactivar, exclusion manual nunca se reactiva); escalacion
+  WhatsApp es business-initiated fuera de ventana 24h (template Meta obligatorio
+  en go-live), distinta del interactive twilio/* en ventana de sesion (sin Meta);
+  hop del enroll intacto (Employee pre-nomina por Prisma directo antes de los 4
+  fetch). Prerequisitos go-live de survey-escalation: copy "cierra pronto" ya
+  validado por la skill (entro DELIVERED en prueba real), pendiente mintear el HX
+  de PRODUCCION con ese copy + aprobacion Meta (se suma a channel-onboarding +
+  survey-invitation ya diferidos de C). Decision de consent abierta (ratificar
+  antes de Gate E): admin_loaded es consent-by-proxy declarado por el empleador al
+  inscribir, distinto del opt-in real whatsapp_button/whatsapp_text de C; el
+  codigo lo trata como habilitante de envio (el gate mira channelConsentAt, no
+  channelConsentMethod). Dos patas a cerrar antes de operar E: (Meta) secuencia
+  estricta, admin_loaded solo dispara la solicitud via template aprobado
+  (channel-onboarding), y un gate de codigo debe impedir enviar contenido
+  posterior (encuestas, escalacion, recordatorios) a quien solo tiene admin_loaded
+  sin respuesta (opt-in real = la persona respondio); (legal Chile, Ley 21.719) si
+  el consent declarado por el empleador sobre el dato de contacto personal del
+  empleado basta para enviar siquiera la primera solicitud, punto de abogado
+  independiente de Meta. D no se vio afectado por operar in-session. El upsert
+  pre-nomina preserva consent real previo (solo escribe si channelConsentAt
+  ausente, nunca degrada un opt-in real a admin_loaded). Diferido a Gate E:
+  WhatsApp frontline sin email corporativo (motor generico de cadena de toques +
+  recordatorio WhatsApp del sin-email + migracion productos standard a carga desde
+  maestro Employee). Diferido a Gate F: Metas.
 
 ---
 
