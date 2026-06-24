@@ -2,7 +2,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyJWT } from '@/lib/auth'
-import { hasPermission } from '@/lib/services/AuthorizationService'
 import { z } from 'zod'
 
 
@@ -316,17 +315,6 @@ export async function POST(request: NextRequest) {
           error: 'No autorizado'
         },
         { status: 401 }
-      )
-    }
-
-    // Gate RBAC (mínimo, sobre verifyJWT): crear campaña requiere campaigns:manage.
-    // NOTA: este endpoint NO está migrado a extractUserContext — sigue en verifyJWT
-    // (el cuerpo usa authResult.user.id y subscriptionTier). Deuda del proyecto de
-    // migración de auth, no confundir con un endpoint ya migrado.
-    if (!hasPermission(authResult.user.role ?? null, 'campaigns:manage')) {
-      return NextResponse.json(
-        { success: false, error: 'Sin permisos para crear campañas' },
-        { status: 403 }
       )
     }
 
