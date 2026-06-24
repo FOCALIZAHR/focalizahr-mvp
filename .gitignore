@@ -65,3 +65,6 @@ CLAUDE - RESPALDO.md
 data/onet/*.csv
 data/onet/onet/*.csv
 data/onet/onet/*.tsv
+
+# Output del script de creación de templates Twilio (local, no compartir)
+whatsapp-content-sids.json
