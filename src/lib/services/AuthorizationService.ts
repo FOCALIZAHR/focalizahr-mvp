@@ -225,6 +225,20 @@ export const PERMISSIONS = {
   ],
 
   // ─────────────────────────────────────────────────────────────────────────
+  // CAMPAÑAS (crear + generar participantes employee-based)
+  // Crear/gestionar campañas es operativo de RRHH. Espeja compliance:manage:
+  // el mismo set que ya autorizaba generar participantes de Ambiente Sano.
+  // CEO/AREA_MANAGER excluidos (lectura / gerente de línea).
+  // ─────────────────────────────────────────────────────────────────────────
+  'campaigns:manage': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'HR_OPERATOR'
+  ],
+
+  // ─────────────────────────────────────────────────────────────────────────
   // MÉTRICAS DEPARTAMENTALES (department-metrics/upload)
   // ─────────────────────────────────────────────────────────────────────────
   'metrics:upload': [
