@@ -167,8 +167,12 @@ const handleSubmit = async (responses: Array<{questionId: string, rating?: numbe
     console.log('✅ Respuestas enviadas exitosamente')
     setIsCompleted(true)
 
-    // Para evaluaciones de desempeño (employee-based), toast SIN redirección automática
-    if (flowType === 'employee-based') {
+    // Solo Performance 360° muestra el mensaje de "evaluación enviada".
+    // Los pulsos employee-based (Pulso, Experiencia, Ambiente Sano) son anónimos por
+    // link de email: van a la pantalla genérica de "gracias", sin redirect ni botón.
+    const isPerformanceEvaluation =
+      campaignType?.slug === 'performance-evaluation' || !!surveyData?.evaluationContext
+    if (isPerformanceEvaluation) {
       const evaluateeName = surveyData?.evaluationContext?.evaluateeName || surveyData?.participant.campaign.name || 'el colaborador'
       setPostSubmitMessage(`Tu evaluacion de ${evaluateeName} ha sido enviada exitosamente. Puedes cerrar esta ventana.`)
       toast.success(
@@ -236,7 +240,9 @@ const handleSubmit = async (responses: Array<{questionId: string, rating?: numbe
 
   // Estado completado
   if (isCompleted) {
-    const isEmployeeBased = surveyData?.participant.campaign.campaignType.flowType === 'employee-based'
+    const isPerformanceEvaluation =
+      surveyData?.participant.campaign.campaignType.slug === 'performance-evaluation' ||
+      !!surveyData?.evaluationContext
 
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
@@ -244,7 +250,7 @@ const handleSubmit = async (responses: Array<{questionId: string, rating?: numbe
           <CardHeader className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
             <CardTitle className="text-green-400">
-              {isEmployeeBased ? 'Evaluacion Enviada' : '¡Encuesta completada!'}
+              {isPerformanceEvaluation ? 'Evaluacion Enviada' : '¡Encuesta completada!'}
             </CardTitle>
             <CardDescription className="text-slate-300">
               {postSubmitMessage
@@ -255,7 +261,7 @@ const handleSubmit = async (responses: Array<{questionId: string, rating?: numbe
           </CardHeader>
           <CardContent className="text-center">
             <p className="text-slate-300 mb-4">
-              {isEmployeeBased
+              {isPerformanceEvaluation
                 ? 'Tu feedback es valioso para el desarrollo del equipo.'
                 : 'Tus respuestas han sido registradas exitosamente. Los resultados ayudarán a mejorar el ambiente laboral.'
               }
@@ -268,14 +274,14 @@ const handleSubmit = async (responses: Array<{questionId: string, rating?: numbe
             </Alert>
 
             {/* Redirect notice para Performance */}
-            {isEmployeeBased && postSubmitMessage && (
+            {isPerformanceEvaluation && postSubmitMessage && (
               <p className="text-xs text-slate-500 mb-4">
                 Redirigiendo al panel de evaluaciones...
               </p>
             )}
 
             {/* Botón Volver solo para Performance (employee-based) */}
-            {isEmployeeBased && (
+            {isPerformanceEvaluation && (
               <Button
                 onClick={() => router.push('/dashboard/evaluaciones')}
                 className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"

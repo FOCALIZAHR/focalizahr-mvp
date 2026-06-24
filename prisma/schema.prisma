@@ -1582,6 +1582,16 @@ model Employee {
   employmentType String? @map("employment_type")  // full-time|part-time|contractor
   managerLevel   Int?    @map("manager_level")    // 1=CEO, 2=Dir, 3=Ger, 4=Jefe, 5=IC
   costCenter     String? @map("cost_center")
+  location       String?
+
+  // ═══════════════════════════════════════════════════
+  // 🆕 DEMOGRAFÍA (Opcional - Analytics / PatternDetector)
+  // Spec ESPECIFICACION_EMPLOYEE_PERFORMANCE_v3_0_1. Habilita employee-based
+  // sin ceguera demográfica: el generator copia gender/dateOfBirth al Participant.
+  // ═══════════════════════════════════════════════════
+  gender           Gender?
+  dateOfBirth      DateTime? @map("date_of_birth")
+  compensationBand String?   @map("compensation_band")
 
   // ═══════════════════════════════════════════════════
   // 🆕 CLASIFICACIÓN CARGO (calculado por PositionAdapter)

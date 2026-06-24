@@ -137,7 +137,13 @@ export default function EmployeeSyncWizard({ accountId, onComplete, onCancel }: 
           managerRut: obj.managerrut || obj.jefe || obj.manager || obj.rutjefe || obj.supervisor || undefined,
           position: obj.position || obj.cargo || obj.puesto || undefined,
           jobTitle: obj.jobtitle || obj.titulo || obj.titulocargo || undefined,
-          seniorityLevel: obj.senioritylevel || obj.nivel || obj.nivelsenioridad || obj.seniority || undefined
+          seniorityLevel: obj.senioritylevel || obj.nivel || obj.nivelsenioridad || obj.seniority || undefined,
+
+          // DEMOGRAFÍA (Opcional - Analytics / PatternDetector)
+          gender: obj.gender || obj.genero || obj.sexo || undefined,
+          dateOfBirth: obj.dateofbirth || obj.fechanacimiento || obj.nacimiento || obj.fechadenacimiento || undefined,
+          location: obj.location || obj.ubicacion || obj.sede || obj.sucursal || undefined,
+          compensationBand: obj.compensationband || obj.banda || obj.bandasalarial || obj.bandacompensacion || undefined
         }
       }).filter(e => e.nationalId && e.fullName && e.departmentName)
 
@@ -257,11 +263,11 @@ export default function EmployeeSyncWizard({ accountId, onComplete, onCancel }: 
   }
 
   const downloadTemplate = () => {
-    const template = `nationalId,fullName,email,phoneNumber,departmentName,managerRut,position,jobTitle,seniorityLevel,hireDate,isActive
-12345678-9,Juan Perez,juan@empresa.cl,+56912345678,Gerencia General,,CEO,Chief Executive Officer,executive,2020-01-01,true
-11111111-1,Maria Garcia,maria@empresa.cl,+56987654321,Comercial,12345678-9,Gerente Comercial,Sales Manager,lead,2021-03-01,true
-22222222-2,Pedro Lopez,pedro@empresa.cl,,Ventas,11111111-1,Vendedor Senior,Sales Representative,senior,2022-06-15,true
-33333333-3,Ana Martinez,ana@empresa.cl,+56955555555,Administracion,,Ex-Asistente,Administrative Assistant,junior,2023-01-10,false`
+    const template = `nationalId,fullName,email,phoneNumber,departmentName,managerRut,position,jobTitle,seniorityLevel,hireDate,isActive,gender,dateOfBirth,location,compensationBand
+12345678-9,Juan Perez,juan@empresa.cl,+56912345678,Gerencia General,,CEO,Chief Executive Officer,executive,2020-01-01,true,M,1980-05-12,Santiago,Banda 1
+11111111-1,Maria Garcia,maria@empresa.cl,+56987654321,Comercial,12345678-9,Gerente Comercial,Sales Manager,lead,2021-03-01,true,F,1985-09-30,Santiago,Banda 2
+22222222-2,Pedro Lopez,pedro@empresa.cl,,Ventas,11111111-1,Vendedor Senior,Sales Representative,senior,2022-06-15,true,M,1990-02-20,Concepcion,Banda 3
+33333333-3,Ana Martinez,ana@empresa.cl,+56955555555,Administracion,,Ex-Asistente,Administrative Assistant,junior,2023-01-10,false,F,1995-11-08,Santiago,Banda 4`
 
     const blob = new Blob([template], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)

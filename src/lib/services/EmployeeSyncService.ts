@@ -1,7 +1,7 @@
 // src/lib/services/EmployeeSyncService.ts
 
 import { prisma } from '@/lib/prisma';
-import { Employee, EmployeeStatus, EmployeeChangeType, Prisma } from '@prisma/client';
+import { Employee, EmployeeStatus, EmployeeChangeType, Gender, Prisma } from '@prisma/client';
 import { DepartmentAdapter } from './DepartmentAdapter';
 import { PositionAdapter, type PerformanceTrack } from './PositionAdapter';
 import { normalizePhone } from '@/lib/utils/normalizePhone';
@@ -26,10 +26,18 @@ export interface EmployeeRow {
   seniorityLevel?: string;
   hireDate: string;
   isActive: boolean | string;
+  // 🆕 Demografía (Opcional - Analytics / PatternDetector). Raw del CSV.
+  gender?: string;
+  dateOfBirth?: string;
+  location?: string;
+  compensationBand?: string;
   // Campos calculados internamente
   resolvedManagerId?: string | null;
   resolvedDepartmentId?: string;
   resolvedHireDate?: Date;
+  // 🆕 Demografía normalizada
+  resolvedGender?: Gender | null;
+  resolvedDateOfBirth?: Date | null;
   // 📞 Gate C: telefono canonico (normalizePhone). null si no normalizable.
   resolvedPhone?: string | null;
   // 🆕 Clasificación de cargo (PositionAdapter)
@@ -357,6 +365,39 @@ export function parseDate(value: string | number | undefined | null): Date | nul
 }
 
 /**
+ * Normaliza género de texto libre del CSV al enum Gender.
+ * Vacío / no reconocido → null (campo opcional, no se fuerza).
+ */
+function normalizeGender(value: string | undefined | null): Gender | null {
+  if (!value || value.trim() === '') return null;
+  const v = value.trim().toLowerCase();
+  if (['m', 'masculino', 'male', 'hombre', 'h'].includes(v)) return 'MALE';
+  if (['f', 'femenino', 'female', 'mujer'].includes(v)) return 'FEMALE';
+  if (['nb', 'no binario', 'no-binario', 'nonbinary', 'non-binary', 'non binary', 'x'].includes(v)) return 'NON_BINARY';
+  if (['ns', 'nc', 'prefiero no decir', 'prefiero no responder', 'prefer not to say', 'no especifica'].includes(v)) return 'PREFER_NOT_TO_SAY';
+  console.warn(`[normalizeGender] ⚠️ Género no reconocido: "${value}" → NULL`);
+  return null;
+}
+
+/**
+ * Parsea fecha de nacimiento. A diferencia de hireDate, NO usa fallback-a-hoy:
+ * una fecha inválida o fuera de rango razonable (edad <14 o >100) → null,
+ * para no contaminar la demografía con valores espurios.
+ */
+function parseBirthDate(value: string | undefined | null): Date | null {
+  if (!value || value.trim() === '') return null;
+  const parsed = parseDate(value);
+  if (!parsed) return null;
+  const year = parsed.getFullYear();
+  const currentYear = new Date().getFullYear();
+  if (year < currentYear - 100 || year > currentYear - 14) {
+    console.warn(`[parseBirthDate] ⚠️ Año fuera de rango para nacimiento: ${year} → NULL`);
+    return null;
+  }
+  return parsed;
+}
+
+/**
  * Detecta cambios entre empleado actual y datos nuevos
  */
 function detectChanges(
@@ -418,6 +459,30 @@ function detectChanges(
       oldValue: current.status,
       newValue: newStatus
     });
+  }
+
+  // Demografía — comparar contra valores normalizados (resueltos antes del loop),
+  // no el raw, para no marcar cambios espurios por mayúsculas/espacios.
+  if (current.gender !== (newData.resolvedGender ?? null)) {
+    changes.push({ field: 'gender', oldValue: current.gender, newValue: newData.resolvedGender ?? null });
+  }
+  const newDob = newData.resolvedDateOfBirth ?? null;
+  const oldDobTime = current.dateOfBirth ? current.dateOfBirth.getTime() : null;
+  const newDobTime = newDob ? newDob.getTime() : null;
+  if (oldDobTime !== newDobTime) {
+    changes.push({
+      field: 'dateOfBirth',
+      oldValue: current.dateOfBirth ? current.dateOfBirth.toISOString().split('T')[0] : null,
+      newValue: newDob ? newDob.toISOString().split('T')[0] : null
+    });
+  }
+  const newLocation = newData.location?.trim() || null;
+  if (current.location !== newLocation) {
+    changes.push({ field: 'location', oldValue: current.location, newValue: newLocation });
+  }
+  const newBand = newData.compensationBand?.trim() || null;
+  if (current.compensationBand !== newBand) {
+    changes.push({ field: 'compensationBand', oldValue: current.compensationBand, newValue: newBand });
   }
 
   return changes;
@@ -699,6 +764,11 @@ export async function processEmployeeImport(
         console.warn(`[Import] 📞 ${rut}: telefono no normalizable "${fileEmp.phoneNumber}" -> null`);
       }
 
+      // 🆕 Demografía: normalizar antes de clasificar/diff (se usa en detectChanges
+      // y en todos los paths create/update/rehire/activate).
+      fileEmp.resolvedGender = normalizeGender(fileEmp.gender);
+      fileEmp.resolvedDateOfBirth = parseBirthDate(fileEmp.dateOfBirth);
+
       // 🆕 Clasificar cargo usando PositionAdapter
       const classification = PositionAdapter.classifyPosition(fileEmp.position || '');
       fileEmp.resolvedJobLevel = classification.standardJobLevel;
@@ -817,6 +887,11 @@ export async function processEmployeeImport(
       status: mapIsActiveToStatus(emp.isActive),
       isActive: mapIsActiveToStatus(emp.isActive) === 'ACTIVE',
       hireDate: emp.resolvedHireDate!,
+      // 🆕 Demografía (Analytics / PatternDetector)
+      gender: emp.resolvedGender ?? null,
+      dateOfBirth: emp.resolvedDateOfBirth ?? null,
+      location: emp.location?.trim() || null,
+      compensationBand: emp.compensationBand?.trim() || null,
       importSource: 'BULK_IMPORT' as const,
       lastImportId: importRecord.id,
       lastSeenInImport: now,
@@ -1051,6 +1126,11 @@ export async function processEmployeeImport(
               departmentId: newData.resolvedDepartmentId!,
               status: mapIsActiveToStatus(newData.isActive),
               isActive: mapIsActiveToStatus(newData.isActive) === 'ACTIVE',
+              // 🆕 Demografía (Analytics / PatternDetector)
+              gender: newData.resolvedGender ?? null,
+              dateOfBirth: newData.resolvedDateOfBirth ?? null,
+              location: newData.location?.trim() || null,
+              compensationBand: newData.compensationBand?.trim() || null,
               lastImportId: importRecord.id,
               lastSeenInImport: now
             };
@@ -1102,6 +1182,11 @@ export async function processEmployeeImport(
                 departmentId: newData.resolvedDepartmentId!,
                 status: 'ACTIVE',
                 isActive: true,
+                // 🆕 Demografía (Analytics / PatternDetector)
+                gender: newData.resolvedGender ?? null,
+                dateOfBirth: newData.resolvedDateOfBirth ?? null,
+                location: newData.location?.trim() || null,
+                compensationBand: newData.compensationBand?.trim() || null,
                 rehireDate: now,
                 tenureCount: newTenure,
                 terminatedAt: null,
@@ -1152,6 +1237,11 @@ export async function processEmployeeImport(
                 departmentId: newData.resolvedDepartmentId!,
                 status: 'ACTIVE',
                 isActive: true,
+                // 🆕 Demografía (Analytics / PatternDetector)
+                gender: newData.resolvedGender ?? null,
+                dateOfBirth: newData.resolvedDateOfBirth ?? null,
+                location: newData.location?.trim() || null,
+                compensationBand: newData.compensationBand?.trim() || null,
                 noShowExcludedAt: null, // limpiar marcador de no-show al reactivar
                 terminatedAt: null,
                 terminationReason: null,

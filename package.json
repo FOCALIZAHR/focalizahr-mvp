@@ -16,6 +16,8 @@
     "db:seed:retencion": "tsx prisma/seed-retencion.ts",
     "db:seed:ambiente-sano": "tsx prisma/seed-ambientes-sanos.ts",
     "migrate:ambiente-sano-flowtype": "tsx prisma/scripts/update-ambiente-sano-flowtype.ts",
+    "migrate:products-flowtype": "tsx prisma/scripts/migrate-products-flowtype.ts",
+    "backfill:products-rating-labels": "tsx prisma/scripts/backfill-products-rating-labels.ts",
     "migrate:ambiente-sano-labels": "tsx prisma/scripts/update-ambiente-sano-labels.ts",
     "backfill:compliance-total-invited": "tsx prisma/scripts/backfill-compliance-total-invited.ts",
     "backfill:compliance-participant-department": "tsx prisma/scripts/backfill-compliance-participant-department.ts",

@@ -599,15 +599,17 @@ export default function NewCampaignPage() {
       // Generar Participants directo desde Employee ACTIVE y redirigir.
       // ════════════════════════════════════════════════════════════════
       if (isEmployeeBasedFlow) {
-        console.log('🌿 Generando participants desde nómina (Ambiente Sano)...');
+        console.log('🌿 Generando participants desde nómina (employee-based)...');
 
-        const genResponse = await fetch('/api/compliance/generate-participants', {
+        // Endpoint genérico: sirve a Ambiente Sano, Pulso Express y Experiencia Full.
+        // El generator valida el slug contra su allow-list. campaignId va en el path.
+        const genResponse = await fetch(`/api/campaigns/${createdCampaign.id}/generate-participants`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ campaignId: createdCampaign.id })
+          body: JSON.stringify({})
         });
 
         const genData = await genResponse.json();

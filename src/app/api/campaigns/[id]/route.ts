@@ -49,7 +49,9 @@ export async function GET(
             name: true,
             description: true,
             questionCount: true,
-            estimatedDuration: true
+            estimatedDuration: true,
+            slug: true,
+            flowType: true
           }
         },
         participants: {

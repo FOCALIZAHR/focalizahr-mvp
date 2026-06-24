@@ -88,6 +88,32 @@ export default function CampaignParticipantsPage({ params }: CampaignParticipant
     );
   }
 
+  // Guard: las campañas employee-based generan participantes desde la nómina
+  // automáticamente. No corresponde la carga CSV (crearía Participants sin employeeId,
+  // contaminando el join al master). Bloquear el uploader por acceso vía URL directa.
+  if (campaign?.campaignType?.flowType === 'employee-based') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#1e293b] to-[#0f172a] flex items-center justify-center p-4">
+        <div className="max-w-md w-full text-center space-y-4">
+          <Users className="h-10 w-10 text-cyan-400 mx-auto" />
+          <p className="text-base text-white font-light">
+            Esta campaña carga participantes desde la nómina
+          </p>
+          <p className="text-sm text-gray-400 leading-relaxed">
+            {campaign.name} es un producto basado en empleados. Sus participantes se
+            generan automáticamente desde el maestro de empleados — no se cargan por CSV.
+          </p>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="text-sm text-gray-400 hover:text-cyan-400 transition-colors"
+          >
+            Volver al inicio
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#1e293b] to-[#0f172a]">
       

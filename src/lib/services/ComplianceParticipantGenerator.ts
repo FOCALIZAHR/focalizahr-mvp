@@ -1,31 +1,29 @@
 // src/lib/services/ComplianceParticipantGenerator.ts
 // Ambiente Sano (Compliance) - Generación de Participants desde Employee master data.
 //
-// Primer producto temporal que abandona el CSV-por-campaña y lee directamente de Employee.
-// Establece el patrón para futura migración de Pulso Express, Experiencia Full y Retención.
-//
-// Paralelo conceptual: EvaluationService.generateUpwardEvaluations (paso 1), sin paso 2
-// (no hay evaluator/evaluatee — todos participan directamente).
+// Desde la migración employee-based genérica, este archivo es un wrapper delgado sobre
+// `EmployeeBasedParticipantGenerator`: preserva el guard específico de Ambiente Sano (y su
+// mensaje de error, que /api/compliance/generate-participants traduce a 400) y delega la
+// generación real al servicio genérico. La lógica de copia de campos (incluida demografía
+// y phoneNumber) vive ahí, compartida con Pulso Express / Experiencia Full.
 
 import { prisma } from '@/lib/prisma';
-import { randomBytes } from 'crypto';
+import {
+  generateEmployeeBasedParticipants,
+  type GenerateParticipantsResult,
+} from './EmployeeBasedParticipantGenerator';
 
 const AMBIENTE_SANO_SLUG = 'pulso-ambientes-sanos';
 
-function generateUniqueToken(): string {
-  return randomBytes(32).toString('hex');
-}
-
-export interface GenerateParticipantsResult {
-  created: number;
-  skipped: number;
-  errors: string[];
-}
+export type { GenerateParticipantsResult };
 
 export async function generateComplianceParticipants(
   campaignId: string,
   accountId: string
 ): Promise<GenerateParticipantsResult> {
+  // Guard específico de Ambiente Sano: mantiene el contrato de error histórico que el
+  // endpoint de compliance traduce a HTTP 400 (`startsWith('ComplianceParticipantGenerator
+  // solo aplica')`). El generator genérico revalida contra el allow-list igualmente.
   const campaign = await prisma.campaign.findFirst({
     where: { id: campaignId, accountId },
     include: { campaignType: { select: { slug: true } } },
@@ -41,88 +39,5 @@ export async function generateComplianceParticipants(
     );
   }
 
-  const employees = await prisma.employee.findMany({
-    where: {
-      accountId,
-      status: 'ACTIVE',
-      isActive: true,
-    },
-    select: {
-      id: true,
-      nationalId: true,
-      fullName: true,
-      email: true,
-      departmentId: true,
-      department: { select: { displayName: true } },
-      position: true,
-      hireDate: true,
-    },
-  });
-
-  if (employees.length === 0) {
-    throw new Error('Debe cargar nómina primero');
-  }
-
-  const existing = await prisma.participant.findMany({
-    where: {
-      campaignId,
-      employeeId: { in: employees.map((e) => e.id) },
-    },
-    select: { employeeId: true },
-  });
-  const alreadyCreated = new Set(
-    existing.map((p) => p.employeeId).filter((id): id is string => id !== null)
-  );
-
-  let created = 0;
-  let skipped = 0;
-  const errors: string[] = [];
-
-  for (const employee of employees) {
-    if (alreadyCreated.has(employee.id)) {
-      skipped++;
-      continue;
-    }
-
-    if (!employee.email) {
-      skipped++;
-      errors.push(`${employee.fullName} (${employee.nationalId}): sin email`);
-      continue;
-    }
-
-    try {
-      await prisma.participant.create({
-        data: {
-          campaignId,
-          nationalId: employee.nationalId,
-          name: employee.fullName,
-          email: employee.email,
-          departmentId: employee.departmentId,
-          department: employee.department?.displayName ?? null,
-          position: employee.position,
-          employeeId: employee.id,
-          hireDate: employee.hireDate,
-          uniqueToken: generateUniqueToken(),
-          hasResponded: false,
-        },
-      });
-      created++;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      errors.push(`${employee.fullName} (${employee.nationalId}): ${msg}`);
-    }
-  }
-
-  // Sincronizar Campaign.totalInvited con el count real de la DB.
-  // Sigue el pattern del flujo standard (/api/campaigns/[id]/participants línea 384-391):
-  // el endpoint que carga Participants es dueño de setear el contador.
-  // Usar count() absoluto (no increment) es idempotente bajo re-ejecución y race:
-  // dos llamadas concurrentes convergen al mismo valor real.
-  const totalInvited = await prisma.participant.count({ where: { campaignId } });
-  await prisma.campaign.update({
-    where: { id: campaignId },
-    data: { totalInvited },
-  });
-
-  return { created, skipped, errors };
+  return generateEmployeeBasedParticipants(campaignId, accountId);
 }

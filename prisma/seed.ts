@@ -159,7 +159,9 @@ await prisma.account.deleteMany(); // <-- Esta línea soluciona el error y limpi
         responseType: 'rating_scale',
         isRequired: true,
         minValue: 1,
-        maxValue: 5
+        maxValue: 5,
+        minLabel: 'Muy en desacuerdo',
+        maxLabel: 'Muy de acuerdo'
       }
     })
   }
@@ -401,7 +403,9 @@ await prisma.account.deleteMany(); // <-- Esta línea soluciona el error y limpi
         responseType: 'rating_scale',
         isRequired: true,
         minValue: 1,
-        maxValue: 5
+        maxValue: 5,
+        minLabel: 'Muy en desacuerdo',
+        maxLabel: 'Muy de acuerdo'
       }
     })
   }

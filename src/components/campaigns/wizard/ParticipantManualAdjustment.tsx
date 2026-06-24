@@ -135,31 +135,58 @@ export default function ParticipantManualAdjustment({
           exit={{ opacity: 0, scale: 0.95 }}
           className="w-full max-w-5xl max-h-[90vh] bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col"
         >
-          {/* Header */}
+          {/* Header — título + tabs de estado (badges minimalistas) en una línea */}
           <div className="relative px-6 py-4 border-b border-slate-800 flex-shrink-0">
             <div className="fhr-top-line" />
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
                 <h2 className="text-lg font-light text-slate-200">Ajustar Participantes</h2>
                 <p className="text-sm text-slate-500">
                   Revisa y ajusta manualmente la lista de participantes
                 </p>
               </div>
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-slate-500" />
-              </button>
+
+              <div className="flex items-center gap-3 flex-shrink-0">
+                {/* Status Filter — badges minimalistas */}
+                <div className="flex flex-wrap items-center justify-end gap-1.5">
+                  {([
+                    { value: 'all', label: 'Todos', count: stats.total, active: 'bg-slate-700/60 text-white border-slate-600' },
+                    { value: 'included', label: 'Incluidos', count: stats.included, active: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40' },
+                    { value: 'excluded', label: 'Excluidos', count: stats.excluded, active: 'bg-amber-500/15 text-amber-300 border-amber-500/40' },
+                    { value: 'manual', label: 'Editados', count: stats.manual, active: 'bg-purple-500/15 text-purple-300 border-purple-500/40', icon: true },
+                  ] as { value: FilterStatus; label: string; count: number; active: string; icon?: boolean }[]).map(tab => (
+                    <button
+                      key={tab.value}
+                      onClick={() => { setFilterStatus(tab.value); handleFilterChange() }}
+                      className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all whitespace-nowrap ${
+                        filterStatus === tab.value
+                          ? tab.active
+                          : 'border-slate-700/50 text-slate-400 hover:text-white hover:border-slate-600'
+                      }`}
+                    >
+                      {tab.icon && <History className="w-3 h-3 inline mr-1 -mt-0.5" />}
+                      {tab.label}
+                      <span className="ml-1.5 tabular-nums opacity-60">{tab.count}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={onClose}
+                  className="p-2 hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0"
+                >
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Filters */}
-          <div className="px-6 py-4 border-b border-slate-800 flex-shrink-0">
-            <div className="flex flex-wrap gap-4">
+          {/* Filters — buscador + departamento en una sola línea */}
+          <div className="px-6 py-3 border-b border-slate-800 flex-shrink-0">
+            <div className="flex items-center gap-3">
               {/* Search */}
-              <div className="flex-1 min-w-[200px] relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <div className="flex-1 min-w-0 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
                 <input
                   type="text"
                   value={search}
@@ -169,61 +196,18 @@ export default function ParticipantManualAdjustment({
                 />
               </div>
 
-              {/* Department Filter */}
-              <select
-                value={filterDepartment}
-                onChange={(e) => { setFilterDepartment(e.target.value); handleFilterChange() }}
-                className="fhr-input w-48"
-              >
-                <option value="all">Todos los departamentos</option>
-                {departments.map(dept => (
-                  <option key={dept.id} value={dept.id}>{dept.displayName}</option>
-                ))}
-              </select>
-
-              {/* Status Filter */}
-              <div className="flex rounded-lg overflow-hidden border border-slate-700">
-                <button
-                  onClick={() => { setFilterStatus('all'); handleFilterChange() }}
-                  className={`px-4 py-2 text-sm font-medium transition-all ${
-                    filterStatus === 'all'
-                      ? 'bg-slate-700 text-white'
-                      : 'bg-slate-800 text-slate-400 hover:text-white'
-                  }`}
+              {/* Department Filter — contenedor de ancho fijo: acota el width:100% de .fhr-input */}
+              <div className="w-40 sm:w-56 flex-shrink-0">
+                <select
+                  value={filterDepartment}
+                  onChange={(e) => { setFilterDepartment(e.target.value); handleFilterChange() }}
+                  className="fhr-input w-full"
                 >
-                  Todos
-                </button>
-                <button
-                  onClick={() => { setFilterStatus('included'); handleFilterChange() }}
-                  className={`px-4 py-2 text-sm font-medium transition-all ${
-                    filterStatus === 'included'
-                      ? 'bg-cyan-500/20 text-cyan-400'
-                      : 'bg-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Incluidos
-                </button>
-                <button
-                  onClick={() => { setFilterStatus('excluded'); handleFilterChange() }}
-                  className={`px-4 py-2 text-sm font-medium transition-all ${
-                    filterStatus === 'excluded'
-                      ? 'bg-amber-500/20 text-amber-400'
-                      : 'bg-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Excluidos
-                </button>
-                <button
-                  onClick={() => { setFilterStatus('manual'); handleFilterChange() }}
-                  className={`px-4 py-2 text-sm font-medium transition-all ${
-                    filterStatus === 'manual'
-                      ? 'bg-purple-500/20 text-purple-400'
-                      : 'bg-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <History className="w-3 h-3 inline mr-1" />
-                  Editados
-                </button>
+                  <option value="all">Todos los departamentos</option>
+                  {departments.map(dept => (
+                    <option key={dept.id} value={dept.id}>{dept.displayName}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
