@@ -1642,8 +1642,19 @@ model Employee {
   preferredChannel     String?   @map("preferred_channel")        // 'email' | 'whatsapp' | null
   personalEmail        String?   @map("personal_email")           // fallback para empleados sin email corporativo
   channelConsentAt     DateTime? @map("channel_consent_at")       // timestamp del opt-in explicito
-  channelConsentMethod String?   @map("channel_consent_method")   // 'self_service' | 'admin_loaded' | 'imported'
+  channelConsentMethod String?   @map("channel_consent_method")   // proxy: 'admin_loaded'|'imported' · real opt-in: 'whatsapp_button'|'whatsapp_text'|'self_service' (ver isRealOptIn)
   awaitingEmailCapture Boolean   @default(false) @map("awaiting_email_capture") // flag captura pendiente
+
+  // ═══════════════════════════════════════════════════
+  // 🆕 GATE E.1 v3.0 - CONSENT OPERABLE (pedido/otorgado/revocado)
+  // ═══════════════════════════════════════════════════
+  // channelConsentRequestedAt: marca "solicitud enviada, esperando respuesta". Set al encolar
+  //   channel-onboarding (no clobber). Distingue "pedido sin respuesta" de "otorgado" (opt-in real).
+  // channelOptedOutAt/Method: revocación por STOP (WhatsApp). El gate da prioridad a esto sobre
+  //   channelConsentAt. NO borra el consent previo (auditoría: hubo consent, luego revocó).
+  channelConsentRequestedAt DateTime? @map("channel_consent_requested_at")
+  channelOptedOutAt         DateTime? @map("channel_opted_out_at")
+  channelOptedOutMethod     String?   @map("channel_opted_out_method") // 'whatsapp_stop' | 'admin'
 
   // 🆕 GATE D v3.0 - marcador de no-show de onboarding.
   // Set SOLO por la rutina de no-show (PENDING_ONBOARDING -> EXCLUDED tras >=3 ciclos

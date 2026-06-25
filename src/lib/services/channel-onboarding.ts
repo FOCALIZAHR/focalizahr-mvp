@@ -64,5 +64,14 @@ export async function enqueueChannelOnboarding(
     skipDuplicates: true,
   });
 
+  // Gate E.1 bloque 1: marcar "solicitud enviada, esperando respuesta" en el master.
+  // updateMany con guard channelConsentRequestedAt=null -> no clobber + idempotente:
+  // una segunda corrida no pisa el timestamp (ya está set) y el opt-in real nunca se toca.
+  const employeeIds = Array.from(new Set(candidates.map((c) => c.employeeId)));
+  await tx.employee.updateMany({
+    where: { id: { in: employeeIds }, channelConsentRequestedAt: null },
+    data: { channelConsentRequestedAt: now },
+  });
+
   return result.count;
 }

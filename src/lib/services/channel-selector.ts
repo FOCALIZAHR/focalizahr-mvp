@@ -42,6 +42,28 @@ function isValidPhone(value: string | null | undefined): boolean {
   return PHONE_REGEX.test(cleaned);
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// CONSENT: opt-in REAL vs proxy (Gate E.1 bloque 1)
+// ════════════════════════════════════════════════════════════════════════════
+// channelConsentAt se setea con la MISMA semántica por dos clases de método:
+//   - PROXY: 'admin_loaded' (empleador declara al inscribir) | 'imported'. NO es opt-in
+//     de la persona: solo habilita la PRIMERA solicitud (template channel-onboarding).
+//   - REAL: 'whatsapp_button' | 'whatsapp_text' | 'self_service'. La persona respondió:
+//     habilita contenido posterior (encuestas, escalación, recordatorios, invitaciones).
+// El gate (Gate E.1 bloque 2) clasifica con isRealOptIn; NO se inventa un valor nuevo.
+
+// Métodos que SÍ representan un opt-in explícito de la persona.
+export const REAL_OPT_IN_METHODS = ['whatsapp_button', 'whatsapp_text', 'self_service'] as const;
+
+/**
+ * ¿El método de consent es un opt-in REAL de la persona (no un proxy del empleador)?
+ * null / 'admin_loaded' / 'imported' / cualquier desconocido -> false (fail-closed).
+ */
+export function isRealOptIn(method: string | null | undefined): boolean {
+  if (!method) return false;
+  return (REAL_OPT_IN_METHODS as readonly string[]).includes(method);
+}
+
 /**
  * Determina el canal de comunicacion segun los datos disponibles del destinatario.
  *
