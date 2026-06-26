@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import s from './styles.module.css'
+import CicloTalentoSection from './components/CicloTalentoSection'
 
 export default function ConfidencialPreviewPage() {
   const rootRef = useRef<HTMLDivElement>(null)
@@ -155,10 +156,9 @@ export default function ConfidencialPreviewPage() {
       <section className={s.sectionCompact}>
         <div className={`${s.containerNarrow} ${s.reveal}`}>
           <span className={s.contextLabel}>Qué es</span>
-          <p className={`${s.proseLine} ${s.large}`}>No es software de Recursos Humanos.</p>
+          <p className={`${s.proseLine} ${s.large}`}>Hay plataformas para gestionar personas.</p>
           <p className={s.proseLine}>
-            Es la capa de inteligencia que se sienta arriba de los procesos de RRHH y los convierte en{' '}
-            <strong>decisiones del negocio</strong>.
+            FocalizaHR las conecta con el negocio.
           </p>
         </div>
       </section>
@@ -184,10 +184,12 @@ export default function ConfidencialPreviewPage() {
           </ul>
 
           <p className={s.blindspotsAnchor}>
-            Lo que se decide a ciegas, <span className={s.accent}>se decide mal</span>.
+            A ciegas no se decide. <span className={s.accent}>Se apuesta</span>.
           </p>
         </div>
       </section>
+
+      <CicloTalentoSection />
 
       {/* QUÉ HACE — Cinco voces */}
       <section className={s.section}>
