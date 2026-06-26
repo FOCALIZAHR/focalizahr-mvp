@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { InsightEngine } from '@/lib/services/InsightEngine';
+import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationService';
 import type { InsightItem } from '@/types/benchmark';
 
 // ============================================================================
@@ -49,7 +50,19 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       );
     }
-    
+
+    // ═══════════════════════════════════════════════════════════
+    // PASO 1b: Permiso — benchmark:view (comparación de mercado cara al cliente)
+    // Mismo header x-account-id que getAccountFromRequest → consistente.
+    // ═══════════════════════════════════════════════════════════
+    const userContext = extractUserContext(request);
+    if (!hasPermission(userContext.role, 'benchmark:view')) {
+      return NextResponse.json(
+        { error: 'Sin permisos' },
+        { status: 403 }
+      );
+    }
+
     // ═══════════════════════════════════════════════════════════
     // PASO 2: Parse y validar query params
     // ═══════════════════════════════════════════════════════════

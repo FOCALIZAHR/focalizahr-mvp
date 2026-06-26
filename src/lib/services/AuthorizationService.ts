@@ -634,6 +634,13 @@ export const PERMISSIONS = {
 
   // ─────────────────────────────────────────────────────────────────────────
   // EFFICIENCY INTELLIGENCE HUB
+  // Acceso ejecutivo + liderazgo de personas. Contiene simulación de despidos y
+  // cálculo de presupuestos de dotación → data sensible: solo CEO, liderazgo RRHH
+  // (HR_ADMIN/HR_MANAGER), dueño de la cuenta y superadmin.
+  // AREA_MANAGER NO se incluye a propósito (decisión Victor jun-2026). El filtrado
+  // jerárquico para AREA_MANAGER YA existe en api/efficiency/diagnostic/route.ts:
+  // para habilitar que un gerente vea SOLO su gerencia a cargo, basta agregar
+  // 'AREA_MANAGER' a esta lista.
   // ─────────────────────────────────────────────────────────────────────────
   'efficiency:view': [
     'FOCALIZAHR_ADMIN',
@@ -641,6 +648,23 @@ export const PERMISSIONS = {
     'HR_ADMIN',
     'HR_MANAGER',
     'CEO'
+  ],
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // BENCHMARK (comparación de mercado embebida en productos — CARA AL CLIENTE)
+  // Roles = los que ven los productos que muestran la comparación (Onboarding,
+  // Exit, etc.). Es la comparación que ve el cliente ("tu score vs mercado").
+  // NO confundir con la vista interna FocalizaHR de TODOS los benchmarks del
+  // mercado (futura, esa será solo FOCALIZAHR_ADMIN).
+  // ─────────────────────────────────────────────────────────────────────────
+  'benchmark:view': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'HR_OPERATOR',
+    'CEO',
+    'AREA_MANAGER'
   ],
 
   // ─────────────────────────────────────────────────────────────────────────
