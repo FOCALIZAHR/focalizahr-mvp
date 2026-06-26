@@ -1,21 +1,17 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'FocalizaHR — Ciclo de Talento',
-  description: 'Vista confidencial de uso exclusivo.',
+  title: 'Ciclo de Talento · FocalizaHR',
   robots: {
     index: false,
     follow: false,
-    nocache: true,
-    googleBot: {
-      index: false,
-      follow: false,
-      noimageindex: true,
-    },
+    noarchive: true,
+    nosnippet: true,
+    noimageindex: true,
   },
 }
 
-export default function CicloTalentoPreviewLayout({
+export default function CicloTalentoLayout({
   children,
 }: {
   children: React.ReactNode
