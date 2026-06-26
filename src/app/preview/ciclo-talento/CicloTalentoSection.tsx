@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import s from '../styles.module.css'
+import s from '../confidencial/styles.module.css'
 import c from './cicloTalento.module.css'
 
 export default function CicloTalentoSection() {
