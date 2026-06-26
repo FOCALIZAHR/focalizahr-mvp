@@ -1,0 +1,30 @@
+---
+name: project_pulso_experiencia_inventario_producto
+description: Inventario de producto del módulo Pulso/Experiencia (encuestas core) + Torre de Control FocalizaHR — motor fundacional de campañas/preguntas/normalización + monitoreo predictivo 3 niveles. Mapa base madre comercial (jun-2026).
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: 31b27aa2-9808-45bd-830d-e00bd7ceec87
+---
+
+Módulo Pulso/Experiencia (encuestas core) + Torre de Control mapeado como producto, 2026-06-25. Read-only, file:line abajo. Motor FUNDACIONAL: la maquinaria de campañas/participantes/preguntas/respuestas que alimenta TODOS los módulos (Onboarding/Exit/Performance/Ambiente Sano/Metas). Cimiento de la Inteligencia Predictiva Organizacional.
+
+**6 CAPACIDADES:**
+1. Framework campañas+tipos — CampaignType (schema:279-310): slug (pulso-express/experiencia-full/pulso-ambientes-sanos/onboarding/exit/performance), flowType (standard=CSV manual / employee-based=desde nómina), isPermanent (ciclos permanentes reutilizados). Campaign (313-365) draft→active→completed, sendReminders/anonymousResults/whatsappEscalationDelayDays/totalInvited/totalResponded.
+2. Motor preguntas flexible — Question (468-521). 7 tipos responseType: rating_scale/nps_scale/single_choice/multiple_choice/text_open/rating_matrix_conditional/competency_behavior. responseValueMapping (mapeo explícito respuesta→score), conditionalLogic (if-then matrix_from_selection/modify_text), audienceRule (filtra por track COLABORADOR/MANAGER/EJECUTIVO), choiceOptions, scaleLabels, competencyCode.
+3. Normalización persistida (PIEZA REUTILIZABLE CLAVE) — responseNormalizer.ts:1-136. calculateNormalizedScore: prioridad1 responseValueMapping+choiceResponse, prioridad2 automática (nps (rating/10)*5, rating directo si 1-5, choice lineal). Persiste Response.normalizedScore (524-551) 0-5 → habilita TODO analytics downstream (EIS/EXO/Safety/RoleFit/benchmarks). NO duplicar. requiresNormalization, getAlertThreshold (critical1.5/high2.0/medium2.5/low3.0).
+4. Generación employee-based — EmployeeBasedParticipantGenerator.ts:1-147. allow-list slugs (pulso-express/experiencia-full/pulso-ambientes-sanos). Desde Employee ACTIVE+isActive, copia demografía gender/dateOfBirth/location (Fase 0). Regla permanente⇒no employee-based. /api/campaigns/[id]/generate-participants (campaigns:manage).
+5. Survey público + post-procesos — /api/survey/[token] (sin auth, <500ms, filtra preguntas por track si performance evaluateeTrack) → submit guarda Responses batch createMany, calcula normalizedScore, POST-PROCESO Exit Intelligence (si exit/retencion slug) + PerformanceRating parcial (manager→employee upsert managerScore, marca EvaluationAssignment COMPLETED). +/save borrador.
+6. Torre de Control IA predictiva — useCampaignMonitor.ts (1214 líneas) orquesta monitor 3 niveles. Nivel1 Empresa CockpitHeaderBimodal (toggle dinámica real-time/predictiva proyección participación+confianza, countdown). Nivel2 Gerencias GerenciaPulseBimodal (competitivo si jerarquía). Nivel3 Departamentos DepartmentWowCarousel. Paneles: TopMoversPanel (aceleración), AnomalyDetectorPanel (<media-1SD z-score), LeadershipFingerprintPanel (jefes vs equipo), EngagementHeatmapCard, CrossStudyComparatorCard (vs previas), CampaignRhythmPanel (velocidad). PatternDetector (gender+dateOfBirth, NO location).
+
+**MODELOS PRISMA (6 core):** Campaign (313-365), CampaignType (279-310), Participant (368-465, 11 índices, +demografía gender/dateOfBirth/hireDate/location, standardJobLevel/acotadoGroup/empleadoId/evaluationAssignmentId), Question (468-521), Response (524-551, normalizedScore), CampaignResult (554-593, participationRate/overallScore/categoryScores/communicationInsights). normalizedScore persistido al submit; categoryScores/momentum DERIVADOS.
+
+**APIs (~18):** ~15 campaign (/api/campaigns CRUD, [id], check-name, validate, metrics, [id]/participants(+upload), generate-participants, activate(Gate A encola), status, analytics(NÚCLEO torre), process-results(duplicado no usado), gerencias, stats, preview) + 3 survey (/api/survey/[token] GET, submit POST, save POST sin auth). RBAC campaigns:manage, participants:write, filtrado jerárquico AREA_MANAGER buildParticipantAccessFilter. Servicios AuthorizationService/EmployeeBasedParticipantGenerator/channel-selector/resolvePhone/DepartmentAdapter/AggregationService(IA predictiva getGerenciaIntelligence daysRemaining)/ExitIntelligenceService/responseNormalizer/PatternDetector.
+
+**UI:** UnifiedSurveyComponent (+7 renderers RatingScale/NPSScale/TextOpen/SingleChoice/MultipleChoice/RatingMatrix/CompetencyBehavior, useSurveyEngine validación condicional+anti-fatiga, EvaluationReviewModal si performance). Torre de Control ~27 componentes monitor. Páginas /dashboard/campaigns (+/new wizard pasos 1-3B selector evaluación, /[id]/monitor 3 niveles, /[id]/results jerárquico PDF, /[id]/participants CSV validación RUT módulo-11). Hooks useCampaignMonitor/useSurveyEngine/useCampaignResults/Participants/Details.
+
+**DIFERENCIADORES:** (1) un motor muchos productos (mismo framework clima/onboarding/exit/performance/compliance, economía plataforma). (2) normalización unificada (cualquier escala comparable, habilita analytics+benchmarks sin re-implementar). (3) Torre Control predictiva (proyecta final+detecta anomalías en vivo, no solo cuenta). (4) employee-based (genera desde nómina sin carga manual).
+
+**NOTAS:** NO hay PulseEngine monolítico — análisis es composición de servicios (Analytics/Normalization/Benchmark/narrativas), momentum inline (delta vs período anterior). process-results duplicado con analytics (no usado). Activate=Gate A Comunicaciones (encola CommunicationMessage).
+
+CIMIENTO de todos los módulos survey-based. Ver [[feedback_reuse_normalization_system]] (no duplicar normalizedScore), [[project_employee_based_migration_pulso_experiencia]] (migración employee-based). Encola vía [[project_comunicaciones_inventario_producto]]. Alimenta [[project_exit_inventario_producto]], [[project_onboarding_inventario_producto]], [[project_performance_inventario_producto]], [[project_ambientesano_inventario_producto]].
