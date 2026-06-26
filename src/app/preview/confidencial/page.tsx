@@ -115,6 +115,30 @@ export default function ConfidencialPreviewPage() {
         Confidencial &nbsp;·&nbsp; Vista privada
       </div>
 
+      {/* DOT NAVIGATION LATERAL — elemento independiente */}
+      <nav className={s.dotNav} aria-label="Navegación de módulos">
+        <a href="#ciclo-talento" className={`${s.dotItem} ${s.dotActive}`}>
+          <span className={s.dotLabel}>Ciclo Talento</span>
+          <span className={s.dot} aria-hidden="true" />
+        </a>
+        <div className={s.dotItem} aria-hidden="true">
+          <span className={s.dotLabel}>Se revela en 40 días</span>
+          <span className={s.dot} />
+        </div>
+        <div className={s.dotItem} aria-hidden="true">
+          <span className={s.dotLabel}>Se revela en 40 días</span>
+          <span className={s.dot} />
+        </div>
+        <div className={s.dotItem} aria-hidden="true">
+          <span className={s.dotLabel}>Se revela en 40 días</span>
+          <span className={s.dot} />
+        </div>
+        <div className={s.dotItem} aria-hidden="true">
+          <span className={s.dotLabel}>Se revela en 40 días</span>
+          <span className={s.dot} />
+        </div>
+      </nav>
+
       {/* HERO */}
       <section className={s.hero}>
         <div className={s.container}>
