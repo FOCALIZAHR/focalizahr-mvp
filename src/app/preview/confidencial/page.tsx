@@ -117,7 +117,7 @@ export default function ConfidencialPreviewPage() {
 
       {/* DOT NAVIGATION LATERAL — elemento independiente */}
       <nav className={s.dotNav} aria-label="Navegación de módulos">
-        <a href="#ciclo-talento" className={`${s.dotItem} ${s.dotActive}`}>
+        <a href="/preview/ciclo-talento" className={`${s.dotItem} ${s.dotActive}`}>
           <span className={s.dotLabel}>Ciclo Talento</span>
           <span className={s.dot} aria-hidden="true" />
         </a>
