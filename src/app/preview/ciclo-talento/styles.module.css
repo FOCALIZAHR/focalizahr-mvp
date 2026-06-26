@@ -520,24 +520,24 @@
   gap: 12px;
 }
 .coverageBarName { font-size: 13px; color: var(--slate-300); font-weight: 300; }
-.coverageBarState {
-  font-size: 9.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
+.coverageBarPct {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--slate-400);
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
-.coverageStateVivo { color: var(--cyan); }
-.coverageStateCamino { color: var(--slate-500); }
 .coverageBarTrack {
   height: 6px;
   border-radius: 100px;
   background: rgba(148,163,184,0.08);
   overflow: hidden;
 }
-.coverageBarFill { height: 100%; border-radius: 100px; }
-.coverageFillVivo { background: linear-gradient(90deg, var(--cyan), rgba(34,211,238,0.5)); }
-.coverageFillCamino { background: rgba(100,116,139,0.4); }
+.coverageBarFill {
+  height: 100%;
+  border-radius: 100px;
+  background: linear-gradient(90deg, var(--cyan), rgba(34,211,238,0.5));
+}
 .coverageNote {
   margin-top: 8px;
   font-size: 12px;

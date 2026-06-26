@@ -10,7 +10,7 @@ const decisiones = [
 ]
 
 const etapas = [
-  { num: '01', name: 'Medir', key: false, hace: 'Evaluación 360 + metas, sin carga operativa.', resuelve: 'Pensado para llegar a toda la fuerza laboral. Hoy llega por correo corporativo; el resto, en camino.' },
+  { num: '01', name: 'Medir', key: false, hace: 'Evaluación 360 + metas, sin carga operativa.', resuelve: 'Llega a toda la fuerza laboral por correo corporativo, correo personal y WhatsApp — no solo a quien tiene correo de empresa.' },
   { num: '02', name: 'Mapear', key: true, hace: 'Cuatro matrices clasifican a cada persona.', resuelve: 'Toda la empresa mapeada desde el día uno, no solo la cúpula.' },
   { num: '03', name: 'Calibrar', key: false, hace: 'Gobernanza con justificación obligatoria.', resuelve: 'Cada decisión queda con rastro auditable y código QR.' },
   { num: '04', name: 'Suceder', key: true, hace: 'Sucesión que valida dominio y anticipa la cascada.', resuelve: 'Antes de promover, ves cuántas sillas se vacían.' },

@@ -2,9 +2,9 @@ import { Fragment, type ReactNode } from 'react'
 import s from '../styles.module.css'
 
 const cobertura = [
-  { name: 'Correo corporativo', state: 'VIVO', pct: 27, vivo: true },
-  { name: 'Correo personal', state: 'EN CAMINO', pct: 35, vivo: false },
-  { name: 'WhatsApp', state: 'EN CAMINO', pct: 38, vivo: false },
+  { name: 'Correo corporativo', pct: 27 },
+  { name: 'Correo personal', pct: 35 },
+  { name: 'WhatsApp', pct: 38 },
 ]
 
 type Diff = {
@@ -23,7 +23,7 @@ const diffs: Diff[] = [
     ceo: 'Mides la empresa entera, no la muestra sesgada de los jefes con correo. En una empresa de mil personas, eso suele ser solo el veinte o treinta por ciento. El otro setenta es operativo, y es donde se gana o se pierde el negocio.',
     rrhh: (
       <>
-        Hoy el sistema llega por correo corporativo a todos los que lo tienen. Cierras la primera mitad del problema. <strong>La otra mitad — los que no tienen correo — está en construcción</strong>.
+        El sistema llega por correo corporativo, correo personal y WhatsApp. Alcanzas a <strong>toda la fuerza laboral</strong>, no solo a la mitad que tiene correo de empresa.
       </>
     ),
     contrast: 'Publicitan tasas de participación altas, pero medidas sobre quienes tienen correo corporativo. La fuerza laboral operativa no aparece en esos números porque nunca entró al sistema.',
@@ -111,21 +111,16 @@ export function BloquePisoOperativo() {
                       <div key={b.name} className={s.coverageBar}>
                         <div className={s.coverageBarHead}>
                           <span className={s.coverageBarName}>{b.name}</span>
-                          <span className={`${s.coverageBarState} ${b.vivo ? s.coverageStateVivo : s.coverageStateCamino}`}>
-                            {b.state}
-                          </span>
+                          <span className={s.coverageBarPct}>{b.pct}%</span>
                         </div>
                         <div className={s.coverageBarTrack}>
-                          <div
-                            className={`${s.coverageBarFill} ${b.vivo ? s.coverageFillVivo : s.coverageFillCamino}`}
-                            style={{ width: `${b.pct}%` }}
-                          />
+                          <div className={s.coverageBarFill} style={{ width: `${b.pct}%` }} />
                         </div>
                       </div>
                     ))}
                   </div>
                   <p className={s.coverageNote}>
-                    La arquitectura multicanal está construida. La activación de WhatsApp y correo personal llega en el segundo semestre.
+                    Multicanal por diseño — correo corporativo, correo personal y WhatsApp — para alcanzar a toda la fuerza laboral, no solo a quien tiene correo de empresa.
                   </p>
                 </Fragment>
               )}
