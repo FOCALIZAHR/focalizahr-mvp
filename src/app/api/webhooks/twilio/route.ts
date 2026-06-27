@@ -24,12 +24,21 @@ import { prisma } from '@/lib/prisma';
 import { sendWhatsApp } from '@/lib/services/whatsapp-service';
 import { REQUEST_EMAIL_BODY } from '@/lib/templates/whatsapp-templates';
 import { normalizePhone } from '@/lib/utils/normalizePhone';
+import { appendConsentEvent, isConsentRevoked } from '@/lib/services/consent-derivation';
+import { ConsentOrigen, ConsentTipo } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs'; // twilio SDK + crypto requieren node runtime
 
 // Validacion email simple, suficiente para captura por WhatsApp.
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// GATE E.1 bloque 0: palabras de revocacion (opt-out). Match exacto contra el texto
+// normalizado a lowercase. Camino A (Twilio Advanced Opt-Out) ademas marca OptOutType,
+// que tiene prioridad; estas palabras son el cinturon manual por si el inbound llega
+// sin OptOutType. 'no' va aqui y se evalua ANTES de la eleccion de canal (wantsWhatsapp
+// matchea /\bs[ií]\b/, no colisiona; pero la rama STOP corre primero).
+const OPT_OUT_KEYWORDS = new Set(['stop', 'baja', 'cancelar', 'salir', 'no', 'unsubscribe', 'detener']);
 
 // 200 plano (sin TwiML): Twilio no reintenta y no inyectamos respuesta al usuario.
 function ok200(): Response {
@@ -150,7 +159,7 @@ async function handleInbound(params: Record<string, string>): Promise<void> {
   // Lookup multi-tenant por phone (SIN scope de accountId: detecta colision).
   const employees = await prisma.employee.findMany({
     where: { phoneNumber: fromNorm.value, isActive: true },
-    select: { id: true, accountId: true, awaitingEmailCapture: true, channelConsentAt: true },
+    select: { id: true, accountId: true, awaitingEmailCapture: true },
   });
 
   if (employees.length === 0) {
@@ -178,20 +187,64 @@ async function handleInbound(params: Record<string, string>): Promise<void> {
   const employee = employees[0];
   const body = (params.Body || '').trim();
   const choice = (params.ButtonPayload || params.ButtonText || body).toLowerCase();
+
+  // 0. STOP / OPT-OUT (Gate E.1 bloque 0). PRIORIDAD sobre todo, antes de captura de
+  // email y eleccion de canal. Camino A: Twilio Advanced Opt-Out marca OptOutType=STOP
+  // (y bloquea el numero del lado Twilio, error 21610); el cinturon manual son las
+  // palabras OPT_OUT_KEYWORDS por si el inbound llega sin OptOutType.
+  const isOptOut = params.OptOutType === 'STOP' || OPT_OUT_KEYWORDS.has(choice);
+  if (isOptOut) {
+    // Revocacion = EVENTO inmutable (origen TITULAR). Revoca C1 ENTERO: la funcion de
+    // derivacion (PASO 1) veta TODO canal personal ante este evento, sin importar fecha
+    // ni autorizaciones posteriores. El metodo solo registra POR DONDE llego. NO se
+    // borra el consent previo: la autorizacion anterior queda en el log (hubo consent,
+    // luego revoco, los dos hechos visibles). Se cancela cualquier captura pendiente.
+    await prisma.$transaction(async (tx) => {
+      await tx.employee.update({
+        where: { id: employee.id },
+        data: { awaitingEmailCapture: false },
+      });
+      await appendConsentEvent(
+        {
+          employeeId: employee.id,
+          accountId: employee.accountId,
+          origen: ConsentOrigen.TITULAR,
+          tipo: ConsentTipo.REVOCACION,
+          metodo: 'whatsapp_stop',
+        },
+        tx
+      );
+    });
+    console.log(`[TwilioWebhook] Opt-out (STOP) registrado para Employee ${employee.id}`);
+    return;
+  }
+
   const now = new Date();
 
   // 1. Si esta esperando captura de email, el Body es el email.
   if (employee.awaitingEmailCapture) {
     if (EMAIL_REGEX.test(body)) {
-      await prisma.employee.update({
-        where: { id: employee.id },
-        data: {
-          personalEmail: body,
-          preferredChannel: 'email',
-          channelConsentAt: now,
-          channelConsentMethod: 'whatsapp_text',
-          awaitingEmailCapture: false,
-        },
+      // Opt-in REAL del titular (eligio email personal por texto). Gate E.1: el consent
+      // es un EVENTO inmutable en ConsentEvent (fuente unica), no un campo de estado.
+      await prisma.$transaction(async (tx) => {
+        await tx.employee.update({
+          where: { id: employee.id },
+          data: {
+            personalEmail: body,
+            preferredChannel: 'email',
+            awaitingEmailCapture: false,
+          },
+        });
+        await appendConsentEvent(
+          {
+            employeeId: employee.id,
+            accountId: employee.accountId,
+            origen: ConsentOrigen.TITULAR,
+            tipo: ConsentTipo.AUTORIZACION,
+            metodo: 'whatsapp_text',
+          },
+          tx
+        );
       });
       console.log(`[TwilioWebhook] Email capturado para Employee ${employee.id}`);
     } else {
@@ -209,14 +262,25 @@ async function handleInbound(params: Record<string, string>): Promise<void> {
     choice.includes('email') || choice.includes('correo') || choice.includes('mail');
 
   if (wantsWhatsapp) {
-    await prisma.employee.update({
-      where: { id: employee.id },
-      data: {
-        channelConsentAt: now,
-        preferredChannel: 'whatsapp',
-        channelConsentMethod: 'whatsapp_button',
-        awaitingEmailCapture: false,
-      },
+    // Opt-in REAL del titular (eligio WhatsApp por boton). Gate E.1: evento inmutable.
+    await prisma.$transaction(async (tx) => {
+      await tx.employee.update({
+        where: { id: employee.id },
+        data: {
+          preferredChannel: 'whatsapp',
+          awaitingEmailCapture: false,
+        },
+      });
+      await appendConsentEvent(
+        {
+          employeeId: employee.id,
+          accountId: employee.accountId,
+          origen: ConsentOrigen.TITULAR,
+          tipo: ConsentTipo.AUTORIZACION,
+          metodo: 'whatsapp_button',
+        },
+        tx
+      );
     });
     console.log(`[TwilioWebhook] Consent WhatsApp para Employee ${employee.id}`);
     return;
@@ -248,6 +312,13 @@ async function sendRequestEmail(
   employeeId: string,
   accountId: string
 ): Promise<void> {
+  // Gate E.1 §7: el STOP es veto TOTAL. Si el titular revoco, ni el request-email se
+  // envia. Se consulta el log (isConsentRevoked), unica fuente del consent.
+  if (await isConsentRevoked(employeeId, accountId)) {
+    console.log(`[TwilioWebhook] request-email NO enviado: Employee ${employeeId} revoco (STOP)`);
+    return;
+  }
+
   const result = await sendWhatsApp({ to: toPhone, body: REQUEST_EMAIL_BODY });
   const now = new Date();
 

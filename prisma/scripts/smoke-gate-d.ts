@@ -20,6 +20,7 @@
 
 import 'dotenv/config';
 import { prisma } from '../../src/lib/prisma';
+import { ConsentOrigen, ConsentTipo } from '@prisma/client';
 import { ExitRegistrationService } from '../../src/lib/services/ExitRegistrationService';
 import { OnboardingEnrollmentService } from '../../src/lib/services/OnboardingEnrollmentService';
 import { EscalationConfigService } from '../../src/lib/services/EscalationConfigService';
@@ -90,24 +91,41 @@ async function main() {
     data: { name: 'Smoke Escalation Temp', slug: SMOKE_ESCALATION_TYPE_SLUG, isPermanent: false }
   });
 
-  const mkEmp = (body: number, over: any = {}) => prisma.employee.create({
-    data: {
-      accountId,
-      nationalId: normalizeRut(rut(body)),
-      fullName: over.fullName ?? `Emp ${body}`,
-      departmentId: over.departmentId ?? dPadre.id,
-      status: over.status ?? 'ACTIVE',
-      isActive: over.isActive ?? (over.status ? over.status === 'ACTIVE' : true),
-      hireDate: over.hireDate ?? new Date('2024-01-15'),
-      email: over.email ?? null,
-      phoneNumber: over.phoneNumber ?? null,
-      preferredChannel: over.preferredChannel ?? null,
-      channelConsentAt: over.channelConsentAt ?? null,
-      channelConsentMethod: over.channelConsentMethod ?? null,
-      noShowExcludedAt: over.noShowExcludedAt ?? null,
-      ...(over.createdAt ? { createdAt: over.createdAt } : {})
+  // Gate E.1: el consent vive en ConsentEvent (las columnas channelConsentAt/Method se
+  // eliminaron). mkEmp traduce el override over.channelConsentMethod a un evento:
+  // admin_loaded -> EMPRESA, opt-in real (whatsapp_button/text/self_service) -> TITULAR.
+  // Asi los fixtures de consent siguen alimentando la escalacion (que ahora deriva del log).
+  const mkEmp = async (body: number, over: any = {}) => {
+    const emp = await prisma.employee.create({
+      data: {
+        accountId,
+        nationalId: normalizeRut(rut(body)),
+        fullName: over.fullName ?? `Emp ${body}`,
+        departmentId: over.departmentId ?? dPadre.id,
+        status: over.status ?? 'ACTIVE',
+        isActive: over.isActive ?? (over.status ? over.status === 'ACTIVE' : true),
+        hireDate: over.hireDate ?? new Date('2024-01-15'),
+        email: over.email ?? null,
+        phoneNumber: over.phoneNumber ?? null,
+        preferredChannel: over.preferredChannel ?? null,
+        noShowExcludedAt: over.noShowExcludedAt ?? null,
+        ...(over.createdAt ? { createdAt: over.createdAt } : {})
+      }
+    });
+    if (over.channelConsentMethod) {
+      await prisma.consentEvent.create({
+        data: {
+          employeeId: emp.id,
+          accountId,
+          origen: over.channelConsentMethod === 'admin_loaded' ? ConsentOrigen.EMPRESA : ConsentOrigen.TITULAR,
+          tipo: ConsentTipo.AUTORIZACION,
+          metodo: over.channelConsentMethod,
+          ...(over.channelConsentAt ? { createdAt: over.channelConsentAt } : {})
+        }
+      });
     }
-  });
+    return emp;
+  };
 
   const SYNC_CFG = { mode: 'FULL' as const, missingThreshold: 1.1, autoDeactivateMissing: false, preserveManualExclusions: true };
   const fileRow = (body: number, deptName: string, extra: any = {}) => ({
@@ -130,11 +148,12 @@ async function main() {
     preferredChannel: 'whatsapp'
   } as any);
   const pre1 = await prisma.employee.findFirst({ where: { accountId, nationalId: normalizeRut(rut(20000001)) } });
-  assert('D1-1', 'pre-nomina creado con consent', !!pre1
+  // Gate E.1: el consent (admin_loaded) ya no vive en columna; lo valida E1-9/E1-8.
+  // D solo valida lo suyo: estado pre-nomina + canal.
+  assert('D1-1', 'pre-nomina creado (PENDING_ONBOARDING, canal)', !!pre1
     && pre1!.status === 'PENDING_ONBOARDING' && pre1!.isActive === false
-    && pre1!.channelConsentAt != null && pre1!.channelConsentMethod === 'admin_loaded'
     && pre1!.preferredChannel === 'whatsapp',
-    pre1 ? `status=${pre1.status} isActive=${pre1.isActive} consentAt=${!!pre1.channelConsentAt} method=${pre1.channelConsentMethod} chan=${pre1.preferredChannel}` : 'no creado');
+    pre1 ? `status=${pre1.status} isActive=${pre1.isActive} chan=${pre1.preferredChannel}` : 'no creado');
 
   // no-clobber: existente ACTIVE no se degrada
   await mkEmp(20000002, { status: 'ACTIVE' });
@@ -203,9 +222,11 @@ async function main() {
   await processEmployeeImport(accountId, [fileRow(20000003, 'Smoke Padre', { fullName: 'Pre Tres', email: 'pre3@smoke.invalid' })], SYNC_CFG, 'smoke');
   const c = await prisma.employee.findFirst({ where: { accountId, nationalId: normalizeRut(rut(20000003)) } });
   const cHist = await prisma.employeeHistory.findFirst({ where: { employeeId: c!.id, fieldName: 'status', newValue: 'ACTIVE', oldValue: 'PENDING_ONBOARDING' } });
-  assert('D1-2', 'sync: pre-nomina -> ACTIVE, consent preservado, history',
-    c!.status === 'ACTIVE' && c!.isActive === true && c!.channelConsentAt != null && c!.preferredChannel === 'whatsapp' && c!.channelConsentMethod === 'admin_loaded' && !!cHist,
-    `status=${c!.status} consentAt=${!!c!.channelConsentAt} chan=${c!.preferredChannel} history=${!!cHist}`);
+  // Gate E.1: el consent vive en ConsentEvent (no se borra por cambio de estado del
+  // Employee). D valida la transicion de estado + canal + history; el consent es E1-8.
+  assert('D1-2', 'sync: pre-nomina -> ACTIVE, canal preservado, history',
+    c!.status === 'ACTIVE' && c!.isActive === true && c!.preferredChannel === 'whatsapp' && !!cHist,
+    `status=${c!.status} chan=${c!.preferredChannel} history=${!!cHist}`);
 
   // ════════════════════════════════════════════════════════════════════════
   // D1-3a: no-show borde del umbral (>=3 marca, <3 NO marca)
@@ -235,9 +256,9 @@ async function main() {
   ], SYNC_CFG, 'smoke');
   const aBack = await prisma.employee.findFirst({ where: { accountId, nationalId: normalizeRut(rut(20000004)) } });
   const mManual = await prisma.employee.findFirst({ where: { accountId, nationalId: normalizeRut(rut(20000007)) } });
-  assert('D1-3b-revert', 'no-show reaparece -> ACTIVE + flag limpiado + consent preservado',
-    aBack!.status === 'ACTIVE' && aBack!.noShowExcludedAt == null && aBack!.channelConsentAt != null && aBack!.preferredChannel === 'whatsapp',
-    `A status=${aBack!.status} flag=${aBack!.noShowExcludedAt == null ? 'null' : 'SET'} consent=${!!aBack!.channelConsentAt}`);
+  assert('D1-3b-revert', 'no-show reaparece -> ACTIVE + flag limpiado + canal preservado',
+    aBack!.status === 'ACTIVE' && aBack!.noShowExcludedAt == null && aBack!.preferredChannel === 'whatsapp',
+    `A status=${aBack!.status} flag=${aBack!.noShowExcludedAt == null ? 'null' : 'SET'} chan=${aBack!.preferredChannel}`);
   assert('D1-3b-manual', 'EXCLUDED manual reaparece -> NO se reactiva', mManual!.status === 'EXCLUDED',
     `M status=${mManual!.status}`);
 

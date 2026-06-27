@@ -15,13 +15,23 @@
 
 export type ChannelContext = {
   preferredChannel?: string | null;
-  channelConsentAt?: Date | null;
   email?: string | null;
   personalEmail?: string | null;
   phoneNumber?: string | null;
+  // Gate E.1 bloque 2: booleano YA DERIVADO del log ConsentEvent (consent-derivation.ts).
+  // determineChannel NO consulta la tabla: recibe el booleano resuelto (sigue PURA).
+  // Gobierna SOLO el canal personal (WhatsApp). El email corporativo no lo mira.
+  canReceivePersonalContent?: boolean;
 };
 
 export type ChannelDecision = 'email' | 'whatsapp' | 'none';
+
+// Proposito del mensaje (Gate E.1 bloque 2). DEFAULT 'content' = fail-closed: todo
+// caller que no se actualice queda del lado seguro (no manda WhatsApp sin opt-in real).
+//   - 'content': encuestas, recordatorios, escalacion, invitaciones. Exige opt-in real.
+//   - 'solicitation': el template channel-onboarding que PIDE el consent. Permitido a
+//     quien aun no lo dio (admin_loaded / nada), sujeto a la decision legal 21.719.
+export type ChannelPurpose = 'content' | 'solicitation';
 
 // Validacion email: simple y suficiente para encolado.
 // El throw de Resend al despachar atrapa malformaciones residuales.
@@ -67,30 +77,42 @@ export function isRealOptIn(method: string | null | undefined): boolean {
 /**
  * Determina el canal de comunicacion segun los datos disponibles del destinatario.
  *
+ * Gate de consent (Gate E.1 bloque 2): el canal personal (WhatsApp) exige opt-in real
+ * cuando purpose='content' (default fail-closed). El email corporativo es herramienta
+ * de trabajo: se manda sin gate. determineChannel es PURA: recibe el booleano ya
+ * derivado en `ctx.canReceivePersonalContent`, no consulta ConsentEvent.
+ *
  * Orden de evaluacion:
- *   1. Si preferredChannel + channelConsentAt -> respetar preferencia
- *      (solo si el canal correspondiente tiene dato valido)
+ *   1. preferredChannel -> respetar preferencia (email si hay email; whatsapp solo si
+ *      pasa el gate de consent)
  *   2. Email valido (corporativo o personalEmail) -> 'email'
- *   3. Telefono valido -> 'whatsapp'
- *   4. Nada -> 'none'
+ *   3. Telefono valido Y gate de consent -> 'whatsapp'
+ *   4. Nada (o whatsapp sin consent) -> 'none'
  */
-export function determineChannel(ctx: ChannelContext): ChannelDecision {
+export function determineChannel(
+  ctx: ChannelContext,
+  options?: { purpose?: ChannelPurpose }
+): ChannelDecision {
+  const purpose: ChannelPurpose = options?.purpose ?? 'content'; // DEFAULT FAIL-CLOSED
   const hasEmail = isValidEmail(ctx.email) || isValidEmail(ctx.personalEmail);
   const hasPhone = isValidPhone(ctx.phoneNumber);
 
-  // 1. Preferencia explicita con consentimiento registrado
-  if (ctx.preferredChannel && ctx.channelConsentAt) {
-    if (ctx.preferredChannel === 'email' && hasEmail) return 'email';
-    if (ctx.preferredChannel === 'whatsapp' && hasPhone) return 'whatsapp';
-    // Si la preferencia no tiene dato valido, caer al fallback por canal disponible
-  }
+  // Gate de consent para canal PERSONAL (WhatsApp):
+  //   - 'solicitation': se permite (pide el consent).
+  //   - 'content': exige opt-in real derivado (canReceivePersonalContent === true).
+  const whatsappAllowed =
+    hasPhone && (purpose === 'solicitation' || ctx.canReceivePersonalContent === true);
+
+  // 1. Preferencia explicita. Email no requiere gate (corporativo). WhatsApp si.
+  if (ctx.preferredChannel === 'email' && hasEmail) return 'email';
+  if (ctx.preferredChannel === 'whatsapp' && whatsappAllowed) return 'whatsapp';
 
   // 2. Default email si esta disponible
   if (hasEmail) return 'email';
 
-  // 3. Fallback whatsapp
-  if (hasPhone) return 'whatsapp';
+  // 3. Fallback whatsapp (solo si pasa el gate de consent)
+  if (whatsappAllowed) return 'whatsapp';
 
-  // 4. Sin contacto valido
+  // 4. Sin canal valido / sin consent
   return 'none';
 }

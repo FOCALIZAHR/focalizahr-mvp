@@ -39,11 +39,10 @@ function emptyCtx(): PhoneResolutionContext {
 
 function emp(phoneNumber: string | null) {
   return {
+    id: 'emp-test-id',
     phoneNumber,
     personalEmail: null,
     preferredChannel: null,
-    channelConsentAt: null,
-    channelConsentMethod: null,
   };
 }
 

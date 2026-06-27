@@ -25,6 +25,7 @@ import { waitUntil } from '@vercel/functions';
 import { prisma } from '@/lib/prisma';
 import { verifyJWT } from '@/lib/auth';
 import { determineChannel } from '@/lib/services/channel-selector';
+import { deriveConsentBatch } from '@/lib/services/consent-derivation';
 import {
   buildPhoneResolutionBatch,
   resolvePhone,
@@ -100,6 +101,20 @@ async function enqueueCampaignMessages(campaignId: string): Promise<EnqueueResul
     prisma
   );
 
+  // Gate E.1 bloque 2 (EN BATCH): consent C1 derivado del log ConsentEvent para todos
+  // los Employees del lote, una sola query. El booleano resuelto se pasa a
+  // determineChannel (que sigue PURA). admin_loaded (proxy) -> false: no habilita
+  // contenido por WhatsApp, solo dispara la solicitud (channel-onboarding).
+  const consentEmployeeIds = [
+    ...phoneCtx.employeeById.values(),
+    ...phoneCtx.employeeByNationalId.values(),
+  ].map((contact) => contact.id);
+  const consentByEmployeeId = await deriveConsentBatch(
+    consentEmployeeIds,
+    account.id,
+    prisma
+  );
+
   type MessageData = {
     accountId: string;
     channel: 'EMAIL' | 'WHATSAPP';
@@ -139,12 +154,24 @@ async function enqueueCampaignMessages(campaignId: string): Promise<EnqueueResul
       phoneCtx
     );
 
-    const channel = determineChannel({
-      email: p.email,
-      phoneNumber: resolvedPhone,
-      // Consent (preferredChannel/channelConsentAt) se difiere a Gate C: hoy los
-      // participantes aun no lo traen poblado. La puerta queda lista en el selector.
-    });
+    // Employee detras del participante (directo por employeeId, o resuelto por
+    // nationalId). El consent vive en el Employee, no en el Participant.
+    const consentEmployeeId =
+      p.employeeId ?? phoneCtx.employeeByNationalId.get(p.nationalId)?.id ?? null;
+    const canReceivePersonalContent = consentEmployeeId
+      ? consentByEmployeeId.get(consentEmployeeId) ?? false
+      : false;
+
+    const channel = determineChannel(
+      {
+        email: p.email,
+        phoneNumber: resolvedPhone,
+        // Gate E.1 bloque 2: booleano derivado del log. La invitacion es CONTENIDO
+        // (purpose default 'content'): WhatsApp exige opt-in real.
+        canReceivePersonalContent,
+      },
+      { purpose: 'content' }
+    );
 
     if (channel === 'email') {
       if (!p.email) {
@@ -201,7 +228,11 @@ async function enqueueCampaignMessages(campaignId: string): Promise<EnqueueResul
       // el Employee. Standard sin employeeId se difiere a Gate D.
       if (p.employeeId) {
         const emp = phoneCtx.employeeById.get(p.employeeId);
-        if (emp && !emp.channelConsentAt) {
+        // Gate E.1: encolar la solicitud (channel-onboarding) a quien aun NO tiene
+        // opt-in real derivado (incluye admin_loaded proxy: es justo a quien hay que
+        // pedirle el consent real). Idempotente via dedupKey + channelConsentRequestedAt.
+        // El veto-total del STOP sobre la solicitation entra en bloque 0 (Paso 4, §7).
+        if (emp && !canReceivePersonalContent) {
           onboardingCandidates.push({
             employeeId: p.employeeId,
             accountId: account.id,

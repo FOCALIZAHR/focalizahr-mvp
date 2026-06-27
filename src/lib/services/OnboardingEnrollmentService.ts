@@ -20,6 +20,8 @@ import { prisma } from '@/lib/prisma';
 import { addDays, format } from 'date-fns';
 import { enrollmentRequestSchema, type EnrollmentRequest } from '@/lib/validations/onboarding-enrollment';
 import { normalizeRut } from '@/lib/services/EmployeeSyncService';
+import { appendConsentEvent } from '@/lib/services/consent-derivation';
+import { ConsentOrigen, ConsentTipo } from '@prisma/client';
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -338,7 +340,6 @@ export class OnboardingEnrollmentService {
    */
   static async upsertPreNominaEmployee(data: EnrollmentData): Promise<void> {
     const nationalId = normalizeRut(data.nationalId);
-    const now = new Date();
 
     // Canal declarado por el admin; si no se indicó, inferir del contacto disponible.
     const preferredChannel: 'email' | 'whatsapp' =
@@ -346,41 +347,70 @@ export class OnboardingEnrollmentService {
 
     const existing = await prisma.employee.findFirst({
       where: { accountId: data.accountId, nationalId },
-      select: { id: true, channelConsentAt: true }
+      select: { id: true }
     });
 
     if (existing) {
-      // No clobber del estado del maestro. Solo completar consent si falta.
-      if (!existing.channelConsentAt) {
-        await prisma.employee.update({
-          where: { id: existing.id },
-          data: {
-            preferredChannel,
-            channelConsentAt: now,
-            channelConsentMethod: 'admin_loaded'
-          }
+      // Gate E.1: el consent declarado por el admin es un EVENTO (EMPRESA/AUTORIZACION/
+      // admin_loaded), no un campo. No clobber + idempotente: solo se declara si el
+      // employee NO tiene NINGÚN ConsentEvent todavía. Si ya hay uno (proxy previo,
+      // opt-in real del titular, o incluso un STOP), no se re-declara ni se pisa el
+      // canal: el log es soberano y un opt-in real nunca se degrada a proxy.
+      const hasConsentEvent =
+        (await prisma.consentEvent.count({
+          where: { employeeId: existing.id, accountId: data.accountId }
+        })) > 0;
+
+      if (!hasConsentEvent) {
+        await prisma.$transaction(async (tx) => {
+          await tx.employee.update({
+            where: { id: existing.id },
+            data: { preferredChannel }
+          });
+          await appendConsentEvent(
+            {
+              employeeId: existing.id,
+              accountId: data.accountId,
+              origen: ConsentOrigen.EMPRESA,
+              tipo: ConsentTipo.AUTORIZACION,
+              metodo: 'admin_loaded'
+            },
+            tx
+          );
         });
       }
       return;
     }
 
-    await prisma.employee.create({
-      data: {
-        accountId: data.accountId,
-        nationalId,
-        fullName: data.fullName,
-        email: data.participantEmail || null,
-        phoneNumber: data.phoneNumber || null,
-        departmentId: data.departmentId,
-        position: data.position || null,
-        status: 'PENDING_ONBOARDING',
-        isActive: false,
-        hireDate: data.hireDate,
-        importSource: 'ONBOARDING_ENROLLMENT',
-        preferredChannel,
-        channelConsentAt: now,
-        channelConsentMethod: 'admin_loaded'
-      }
+    await prisma.$transaction(async (tx) => {
+      const created = await tx.employee.create({
+        data: {
+          accountId: data.accountId,
+          nationalId,
+          fullName: data.fullName,
+          email: data.participantEmail || null,
+          phoneNumber: data.phoneNumber || null,
+          departmentId: data.departmentId,
+          position: data.position || null,
+          status: 'PENDING_ONBOARDING',
+          isActive: false,
+          hireDate: data.hireDate,
+          importSource: 'ONBOARDING_ENROLLMENT',
+          preferredChannel
+        }
+      });
+      // La EMPRESA DECLARA que el colaborador la autorizó (admin_loaded). NUNCA "el
+      // colaborador autorizó": mantiene a FocalizaHR como Encargado (Ley 21.719).
+      await appendConsentEvent(
+        {
+          employeeId: created.id,
+          accountId: data.accountId,
+          origen: ConsentOrigen.EMPRESA,
+          tipo: ConsentTipo.AUTORIZACION,
+          metodo: 'admin_loaded'
+        },
+        tx
+      );
     });
 
     console.log(`[OnboardingEnrollment] ✅ Employee pre-nómina creado (PENDING_ONBOARDING) para RUT ${nationalId}`);

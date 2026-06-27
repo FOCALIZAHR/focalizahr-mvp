@@ -57,6 +57,16 @@ const WHATSAPP_TEMPLATES: Record<string, WhatsAppTemplate> = {
     contentSid: 'HX_PENDING_SURVEY_ESCALATION',
     variables: ['participant_name', 'company_name', 'survey_token'],
   },
+  // GATE E.1: recordatorio WhatsApp del frontline phone-only (ruta 3). Mismo molde
+  // que la escalacion. Copy: skill focalizahr-whatsapp-templates §4.3 (survey-reminder,
+  // UTILITY, tono recordatorio neutro). {{1}}=participant_name, {{2}}=company_name,
+  // {{3}}=days_remaining, {{4}}=survey_token (en la URL del boton). El HX es PLACEHOLDER
+  // hasta mintear y aprobar en Meta (go-live, mismo patron que escalacion).
+  'survey-reminder': {
+    slug: 'survey-reminder',
+    contentSid: 'HX_PENDING_SURVEY_REMINDER',
+    variables: ['participant_name', 'company_name', 'days_remaining', 'survey_token'],
+  },
 };
 
 /**
@@ -98,6 +108,9 @@ export const WHATSAPP_ONBOARDING_SLUG = 'channel-onboarding';
 
 // Slug canonico de la escalacion WhatsApp (consumido por processSurveyEscalations, Gate D).
 export const WHATSAPP_ESCALATION_SLUG = 'survey-escalation';
+
+// Slug canonico del recordatorio WhatsApp (consumido por processWhatsAppReminders, Gate E.1).
+export const WHATSAPP_REMINDER_SLUG = 'survey-reminder';
 
 // ════════════════════════════════════════════════════════════════════════════
 // REQUEST_EMAIL_BODY - Mensaje LIBRE (session message), NO es template Meta.

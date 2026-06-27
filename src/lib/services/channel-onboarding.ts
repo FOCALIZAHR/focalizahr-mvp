@@ -18,6 +18,7 @@
 import { prisma } from '@/lib/prisma';
 import type { PrismaClient, Prisma } from '@prisma/client';
 import { WHATSAPP_ONBOARDING_SLUG } from '@/lib/templates/whatsapp-templates';
+import { getRevokedEmployeeIds } from '@/lib/services/consent-derivation';
 
 // Cliente Prisma o cliente de transaccion: el encolado funciona dentro o fuera de tx.
 type PrismaLike = PrismaClient | Prisma.TransactionClient;
@@ -42,8 +43,24 @@ export async function enqueueChannelOnboarding(
 ): Promise<number> {
   if (candidates.length === 0) return 0;
 
+  // Gate E.1 bloque 0 (§7): el STOP es veto TOTAL. No se re-solicita consent a quien
+  // revoco. Se excluyen los revocados ANTES de encolar y de marcar channelConsentRequestedAt.
+  // Chokepoint unico: cubre los dos disparadores (4.3a sync + 4.3b activate). Por cuenta,
+  // porque la derivacion de consent SIEMPRE filtra por accountId (multi-tenant).
+  const revoked = new Set<string>();
+  const accountIds = Array.from(new Set(candidates.map((c) => c.accountId)));
+  for (const accountId of accountIds) {
+    const empIds = candidates
+      .filter((c) => c.accountId === accountId)
+      .map((c) => c.employeeId);
+    const r = await getRevokedEmployeeIds(empIds, accountId, tx);
+    r.forEach((id) => revoked.add(id));
+  }
+  const eligible = candidates.filter((c) => !revoked.has(c.employeeId));
+  if (eligible.length === 0) return 0;
+
   const now = new Date();
-  const data = candidates.map((c) => ({
+  const data = eligible.map((c) => ({
     accountId: c.accountId,
     channel: 'WHATSAPP' as const,
     templateSlug: WHATSAPP_ONBOARDING_SLUG,
@@ -67,7 +84,7 @@ export async function enqueueChannelOnboarding(
   // Gate E.1 bloque 1: marcar "solicitud enviada, esperando respuesta" en el master.
   // updateMany con guard channelConsentRequestedAt=null -> no clobber + idempotente:
   // una segunda corrida no pisa el timestamp (ya está set) y el opt-in real nunca se toca.
-  const employeeIds = Array.from(new Set(candidates.map((c) => c.employeeId)));
+  const employeeIds = Array.from(new Set(eligible.map((c) => c.employeeId)));
   await tx.employee.updateMany({
     where: { id: { in: employeeIds }, channelConsentRequestedAt: null },
     data: { channelConsentRequestedAt: now },

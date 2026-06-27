@@ -25,6 +25,9 @@ import { getLegalEmailLabels } from '@/config/compliance/legalBadgeConfig';
 import { FROM_EMAIL } from '@/lib/constants/email-sender';
 // GATE D D3: escalación WhatsApp (vive como servicio; el route solo la invoca).
 import { processSurveyEscalations } from '@/lib/services/survey-escalation';
+// GATE E.1 ruta 3: recordatorio WhatsApp del phone-only (servicio aislado; el route
+// solo lo invoca, igual que la escalación. NO se mete lógica WhatsApp en processReminders).
+import { processWhatsAppReminders } from '@/lib/services/whatsapp-reminders';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -573,11 +576,12 @@ export async function GET(request: NextRequest) {
 
     console.log('✅ [Cron] Autenticación exitosa');
 
-    // 🚀 EJECUTAR LAS TRES LÓGICAS EN PARALELO
-    const [legacyResult, automationResult, escalationResult] = await Promise.allSettled([
-      processReminders(),         // 📨 Legacy: reminder1, reminder2
+    // 🚀 EJECUTAR LAS LÓGICAS EN PARALELO
+    const [legacyResult, automationResult, escalationResult, whatsappReminderResult] = await Promise.allSettled([
+      processReminders(),         // 📨 Legacy: reminder1, reminder2 (email)
       processAutomationQueue(),   // 🆕 Onboarding journey, etc.
-      processSurveyEscalations()  // 🆕 GATE D D3: escalación WhatsApp
+      processSurveyEscalations(), // 🆕 GATE D D3: escalación WhatsApp
+      processWhatsAppReminders()  // 🆕 GATE E.1 ruta 3: recordatorio WhatsApp phone-only
     ]);
 
     // 📊 CONSOLIDAR RESULTADOS CON TYPE GUARDS EXPLÍCITOS
@@ -607,12 +611,21 @@ export async function GET(request: NextRequest) {
           errors: [escalationResult.reason?.message || 'Error desconocido']
         };
 
+    const whatsappReminders = whatsappReminderResult.status === 'fulfilled'
+      ? whatsappReminderResult.value
+      : {
+          totalCandidates: 0,
+          enqueued: 0,
+          errors: [whatsappReminderResult.reason?.message || 'Error desconocido']
+        };
+
     // Estructura consolidada
     const results = {
       timestamp: new Date().toISOString(),
       legacyReminders,
       automationQueue,
-      whatsappEscalations
+      whatsappEscalations,
+      whatsappReminders
     };
 
     // ✅ LOG FINAL - Ahora TypeScript conoce la estructura exacta
@@ -631,6 +644,11 @@ export async function GET(request: NextRequest) {
         candidates: whatsappEscalations.totalCandidates,
         enqueued: whatsappEscalations.enqueued,
         errors: whatsappEscalations.errors.length
+      },
+      whatsappReminders: {
+        candidates: whatsappReminders.totalCandidates,
+        enqueued: whatsappReminders.enqueued,
+        errors: whatsappReminders.errors.length
       }
     });
 

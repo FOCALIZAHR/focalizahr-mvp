@@ -45,11 +45,10 @@ type PrismaLike = PrismaClient | Prisma.TransactionClient;
  * resolveContactContext sin tocar buildPhoneResolutionBatch.
  */
 export type EmployeeContact = {
+  id: string;                       // Gate E.1: para derivar consent por employeeId (deriveConsentBatch)
   phoneNumber: string | null;
   personalEmail: string | null;
   preferredChannel: string | null;
-  channelConsentAt: Date | null;
-  channelConsentMethod: string | null;
 };
 
 /**
@@ -74,13 +73,14 @@ export type PhoneResolutionContext = {
   evaluatorByAssignmentId: Map<string, string | null>; // Estrategia 2b (assignment -> evaluador.phone)
 };
 
-// Select compartido: los 5 campos de canal del Employee master (Gate A).
+// Select compartido del Employee master. id incluido para que el caller derive el
+// consent por employeeId (Gate E.1, consent-derivation.ts). El consent YA NO se lee
+// del campo channelConsentAt/Method: se deriva del log ConsentEvent.
 const EMPLOYEE_CONTACT_SELECT = {
+  id: true,
   phoneNumber: true,
   personalEmail: true,
   preferredChannel: true,
-  channelConsentAt: true,
-  channelConsentMethod: true,
 } as const;
 
 // Trata null y string vacio/espacios como ausente, para que la cadena caiga a la
@@ -140,11 +140,10 @@ export async function buildPhoneResolutionBatch(
   if (employeeIds.length > 0) {
     const rows = await tx.employee.findMany({
       where: { id: { in: employeeIds }, accountId },
-      select: { id: true, ...EMPLOYEE_CONTACT_SELECT },
+      select: EMPLOYEE_CONTACT_SELECT,
     });
     for (const r of rows) {
-      const { id, ...contact } = r;
-      employeeById.set(id, contact);
+      employeeById.set(r.id, r);
     }
   }
 

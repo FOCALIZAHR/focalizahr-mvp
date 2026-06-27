@@ -16,6 +16,7 @@
 
 import 'dotenv/config';
 import { prisma } from '../../src/lib/prisma';
+import { ConsentOrigen, ConsentTipo } from '@prisma/client';
 import { processSurveyEscalations } from '../../src/lib/services/survey-escalation';
 import { normalizeRut } from '../../src/lib/services/EmployeeSyncService';
 import { SMOKE_COMPANY_NAME, SMOKE_ESCALATION_TYPE_SLUG } from './teardown-smoke-gate-d';
@@ -43,7 +44,13 @@ async function preconditionOk(excludeAccountId?: string): Promise<{ ok: boolean;
       reminderCount: { gte: 1 },
       lastReminderSent: { not: null },
       campaign: { status: 'active', sendReminders: true, ...(excludeAccountId ? { accountId: { not: excludeAccountId } } : {}) },
-      employee: { preferredChannel: 'whatsapp', channelConsentAt: { not: null } }
+      // Gate E.1: el consent se deriva del log. Candidato de escalacion = preferredChannel
+      // whatsapp + opt-in REAL (evento AUTORIZACION real). Conservador para el fail-closed
+      // (no excluye STOP: si acaso, sobre-flagea y FRENA, que es el lado seguro).
+      employee: {
+        preferredChannel: 'whatsapp',
+        consentEvents: { some: { tipo: ConsentTipo.AUTORIZACION, metodo: { in: ['whatsapp_button', 'whatsapp_text', 'self_service'] } } }
+      }
     }
   });
   if (foreignCandidates > 0) {
@@ -78,7 +85,15 @@ async function setup() {
       accountId: account.id, nationalId: normalizeRut(RUT), fullName: 'Victor Smoke',
       departmentId: dept.id, status: 'ACTIVE', isActive: true, hireDate: new Date('2024-01-15'),
       email: 'victor-smoke@example.invalid', phoneNumber: VICTOR_PHONE,
-      preferredChannel: 'whatsapp', channelConsentAt: new Date(), channelConsentMethod: 'whatsapp_button'
+      preferredChannel: 'whatsapp'
+    }
+  });
+  // Gate E.1: opt-in REAL como EVENTO (la columna se elimino). Asi la escalacion, que
+  // ahora deriva del log, considera elegible a este participante.
+  await prisma.consentEvent.create({
+    data: {
+      employeeId: emp.id, accountId: account.id,
+      origen: ConsentOrigen.TITULAR, tipo: ConsentTipo.AUTORIZACION, metodo: 'whatsapp_button'
     }
   });
   const camp = await prisma.campaign.create({

@@ -250,6 +250,7 @@ model Account {
   // COMUNICACIONES (Gate A v3.0 - cola unificada)
   // ═══════════════════════════════════════════════════
   communicationMessages    CommunicationMessage[]
+  consentEvents            ConsentEvent[]
 
   // ═══════════════════════════════════════════════════
   // ACTION PLAN — modelo genérico multi-módulo
@@ -1641,20 +1642,18 @@ model Employee {
   // ═══════════════════════════════════════════════════
   preferredChannel     String?   @map("preferred_channel")        // 'email' | 'whatsapp' | null
   personalEmail        String?   @map("personal_email")           // fallback para empleados sin email corporativo
-  channelConsentAt     DateTime? @map("channel_consent_at")       // timestamp del opt-in explicito
-  channelConsentMethod String?   @map("channel_consent_method")   // proxy: 'admin_loaded'|'imported' · real opt-in: 'whatsapp_button'|'whatsapp_text'|'self_service' (ver isRealOptIn)
   awaitingEmailCapture Boolean   @default(false) @map("awaiting_email_capture") // flag captura pendiente
 
   // ═══════════════════════════════════════════════════
-  // 🆕 GATE E.1 v3.0 - CONSENT OPERABLE (pedido/otorgado/revocado)
+  // 🆕 GATE E.1 v3.0 - CONSENT OPERABLE (fuente: tabla ConsentEvent)
   // ═══════════════════════════════════════════════════
-  // channelConsentRequestedAt: marca "solicitud enviada, esperando respuesta". Set al encolar
-  //   channel-onboarding (no clobber). Distingue "pedido sin respuesta" de "otorgado" (opt-in real).
-  // channelOptedOutAt/Method: revocación por STOP (WhatsApp). El gate da prioridad a esto sobre
-  //   channelConsentAt. NO borra el consent previo (auditoría: hubo consent, luego revocó).
+  // El consent C1 (otorgado/revocado) vive en la tabla ConsentEvent (log inmutable,
+  // fuente unica). Se DERIVA con consent-derivation.ts; NO hay columna de estado ni cache.
+  // channelConsentAt/Method y channelOptedOutAt/Method se ELIMINARON (Gate E.1 §2.5): un
+  // campo de consent es una segunda version de la verdad que puede contradecir al log y
+  // mandar WhatsApp a quien revoco.
+  // channelConsentRequestedAt SOBREVIVE: marca "solicitud enviada", no es acto de consent.
   channelConsentRequestedAt DateTime? @map("channel_consent_requested_at")
-  channelOptedOutAt         DateTime? @map("channel_opted_out_at")
-  channelOptedOutMethod     String?   @map("channel_opted_out_method") // 'whatsapp_stop' | 'admin'
 
   // 🆕 GATE D v3.0 - marcador de no-show de onboarding.
   // Set SOLO por la rutina de no-show (PENDING_ONBOARDING -> EXCLUDED tras >=3 ciclos
@@ -1698,6 +1697,9 @@ model Employee {
 
   // Gate A v3.0 - cola unificada de comunicaciones
   communicationMessages  CommunicationMessage[]
+
+  // Gate E.1 v3.0 - log de eventos de consent (fuente unica de verdad)
+  consentEvents          ConsentEvent[]
 
   // Índices
   @@unique([accountId, nationalId], map: "idx_employees_account_national")
@@ -1753,6 +1755,56 @@ model EmployeeHistory {
   @@index([accountId, changeType], map: "idx_employee_history_account_type")
   @@index([importId], map: "idx_employee_history_import")
   @@map("employee_history")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CONSENT EVENT - Log de eventos de consent (Gate E.1 v3.0)
+// ════════════════════════════════════════════════════════════════════════════
+// FUENTE UNICA DE VERDAD del consent de canales personales (C1). Cada acto de
+// consent es un evento INMUTABLE: solo insert, nunca update ni delete. El estado
+// para despachar se DERIVA leyendo estos eventos (consent-derivation.ts), nunca de
+// un campo de estado (un campo se pisa al cambiar; el log conserva la historia
+// entera, que es la evidencia de auditoria legal Ley 21.719).
+//
+// origen: EMPRESA (el empleador declara en la carga del maestro: admin_loaded) vs
+//   TITULAR (el acto del propio empleado: opt-in real por WhatsApp, o STOP). Los dos
+//   coexisten como eventos distintos; ninguno sobrescribe al otro.
+// tipo: AUTORIZACION habilita (si el metodo es opt-in real); REVOCACION (STOP) veta
+//   C1 ENTERO (todos los canales personales), sin importar fecha, terminal en E.1.
+// canalAlcance: nace 'general' (C1 es por persona, no por canal). El campo existe
+//   para el futuro; hoy siempre 'general'.
+// ════════════════════════════════════════════════════════════════════════════
+
+enum ConsentOrigen {
+  EMPRESA   // El empleador declara (admin_loaded). NO es opt-in real.
+  TITULAR   // El propio empleado (opt-in real por WhatsApp, o STOP).
+}
+
+enum ConsentTipo {
+  AUTORIZACION  // Habilita (solo si el metodo es opt-in real: isRealOptIn).
+  REVOCACION    // STOP. Veta C1 entero, terminal en E.1.
+}
+
+model ConsentEvent {
+  id         String        @id @default(cuid())
+  employeeId String        @map("employee_id")
+  accountId  String        @map("account_id")   // scope multi-tenant (la derivacion SIEMPRE filtra por esto)
+
+  origen     ConsentOrigen
+  tipo       ConsentTipo
+  metodo     String        // 'admin_loaded' | 'whatsapp_button' | 'whatsapp_text' | 'self_service' | 'whatsapp_stop'
+  canalAlcance String      @default("general") @map("canal_alcance") // C1 = general; nace con el campo para el futuro
+
+  createdAt  DateTime      @default(now()) @map("created_at")  // los eventos se ordenan por esto
+
+  // Relaciones
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  account  Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // Índices: la derivacion lee por (employeeId, accountId)
+  @@index([employeeId, accountId], map: "idx_consent_event_emp_account")
+  @@index([accountId], map: "idx_consent_event_account")
+  @@map("consent_events")
 }
 
 // ════════════════════════════════════════════════════════════════════════════

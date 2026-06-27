@@ -11,14 +11,16 @@
 // puede exportar handlers; ademas asi es testeable de forma aislada. El cron lo invoca.
 //
 // Dispara SOLO a quien: no completó (hasResponded=false), tuvo al menos un reminder
-// (reminderCount>=1, lastReminderSent != null), y su consent certifica WhatsApp
-// (preferredChannel==='whatsapp' && channelConsentAt != null; channelConsentAt solo
-// es agnóstico de canal, por eso NO basta). Tope: lastReminder+offset <= endDate.
+// (reminderCount>=1, lastReminderSent != null), eligió WhatsApp (preferredChannel===
+// 'whatsapp') y su consent C1 lo habilita por OPT-IN REAL. Gate E.1: ese consent se
+// DERIVA del log ConsentEvent (consent-derivation.ts), NO se lee de un campo: un
+// admin_loaded (proxy) ya NO basta. Tope: lastReminder+offset <= endDate.
 // Idempotencia por dedupKey unique (doble corrida no duplica).
 // ════════════════════════════════════════════════════════════════════════════
 
 import { prisma } from '@/lib/prisma';
 import { buildPhoneResolutionBatch, resolvePhone, type ParticipantForPhone } from '@/lib/services/resolvePhone';
+import { deriveConsentBatch } from '@/lib/services/consent-derivation';
 import { EscalationConfigService } from '@/lib/services/EscalationConfigService';
 import { WHATSAPP_ESCALATION_SLUG } from '@/lib/templates/whatsapp-templates';
 import { runDispatcherBatch } from '@/lib/services/message-dispatcher';
@@ -84,6 +86,19 @@ export async function processSurveyEscalations(): Promise<{
       }));
       const ctx = await buildPhoneResolutionBatch(forPhone, campaign.accountId, prisma);
 
+      // Gate E.1 bloque 2 (EN BATCH): consent C1 derivado del log ConsentEvent para
+      // TODOS los Employees del lote, una sola query. Se indexa por employeeId; el
+      // contact (de cualquiera de los dos maps) ya trae su id.
+      const employeeIdsForConsent = [
+        ...ctx.employeeById.values(),
+        ...ctx.employeeByNationalId.values(),
+      ].map((contact) => contact.id);
+      const consentByEmployeeId = await deriveConsentBatch(
+        employeeIdsForConsent,
+        campaign.accountId,
+        prisma
+      );
+
       const companyName = campaign.account?.companyName || '';
       const messages: any[] = [];
 
@@ -109,8 +124,11 @@ export async function processSurveyEscalations(): Promise<{
           ? ctx.employeeById.get(c.employeeId)
           : ctx.employeeByNationalId.get(c.nationalId);
 
+        // C2 (eligió WhatsApp) + C1 (opt-in real derivado del log). Las dos puertas.
         const consentsWhatsApp =
-          !!contact && contact.preferredChannel === 'whatsapp' && contact.channelConsentAt != null;
+          !!contact &&
+          contact.preferredChannel === 'whatsapp' &&
+          (consentByEmployeeId.get(contact.id) ?? false);
         if (!consentsWhatsApp) continue;
 
         const firstName = (c.name || '').trim().split(/\s+/)[0] || c.name || 'colaborador';

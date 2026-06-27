@@ -100,9 +100,12 @@ export async function generateEmployeeBasedParticipants(
       continue;
     }
 
-    if (!employee.email) {
+    // Gate E.1 §5 (grifo de entrada del frontline): acepta phone-only. El email es
+    // solo CANAL (nullable); la identidad es nationalId (@unique) y el acceso es por
+    // token aleatorio. Solo se skipea a quien no tiene NINGUN canal (ni email ni phone).
+    if (!employee.email && !employee.phoneNumber) {
       skipped++;
-      errors.push(`${employee.fullName} (${employee.nationalId}): sin email`);
+      errors.push(`${employee.fullName} (${employee.nationalId}): sin canal (ni email ni teléfono)`);
       continue;
     }
 
