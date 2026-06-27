@@ -292,11 +292,14 @@ Done: escalacion dispara una sola vez por participante (doble ejecucion del
 cron = cero duplicados); campania exit con participantes solo-phone completa
 el ciclo.
 
-### GATE E: WhatsApp frontline operando (en preparacion)
+### GATE E: WhatsApp frontline operando (E.1 sellado sandbox; ver Estado de Gates)
 - El diferenciador operando: WhatsApp para la poblacion sin email corporativo
   (recordatorios por WhatsApp del sin-email + migracion de productos standard a
   carga desde el maestro Employee + Exit por la cola unificada). Detalle pendiente
   de spec.
+- E.1 (consent operable + frontline phone-only end-to-end) SELLADO en sandbox
+  (commit `aebe5d9`, ver Estado de Gates). Pendiente go-live (Meta + STOP real +
+  cutover). E.2 (Exit + Onboarding a la cola + captacion stock) sin especificar.
 
 ### GATE F: Metas y ad-hoc
 - Event-driven (sin cron): cascadeGoal/createManagerGoal con meta INDIVIDUAL
@@ -452,6 +455,32 @@ TWILIO_WEBHOOK_VALIDATE=true
   WhatsApp frontline sin email corporativo (motor generico de cadena de toques +
   recordatorio WhatsApp del sin-email + migracion productos standard a carga desde
   maestro Employee). Diferido a Gate F: Metas.
+- **GATE E.1** — SELLADO (sandbox) — commit `aebe5d9` (implementacion) —
+  2026-06-27 — Consent C1 pasa de columnas de estado a LOG DE EVENTOS inmutable
+  (tabla ConsentEvent, fuente unica derivada con consent-derivation.ts: STOP
+  terminal, opt-in real habilita, fail-closed, scope multi-tenant, derivacion en
+  batch sin N+1). channel-selector queda PURO. Gate bloque 2 fail-closed en TRES
+  puntos (determineChannel purpose default 'content' + caller activate +
+  survey-escalation), todos contra la MISMA derivacion: admin_loaded (proxy) NO
+  habilita contenido, solo dispara la solicitud. Guard generator !email ->
+  !email && !phoneNumber (frontline phone-only entra a Pulso/Experiencia).
+  Seguimiento ruta 3 (processWhatsAppReminders): recordatorio WhatsApp del
+  phone-only como servicio aislado en la cola unificada, reusa
+  reminderCount/lastReminderSent (la escalacion existente lo recoge), 4o sibling
+  del cron send-reminders, template survey-reminder. Bloque 0 STOP: rama
+  OptOutType/keywords en el webhook -> evento REVOCACION (whatsapp_stop) que veta
+  C1 ENTERO; request-email respeta opt-out; chokepoint enqueueChannelOnboarding
+  excluye revocados. Reconciliacion (§2.5) completa: columnas channelConsentAt/
+  Method/OptedOutAt/Method ELIMINADAS (grep en cero), channelConsentRequestedAt
+  sobrevive; sin cache persistente. Tests: E1-9 derivacion 8/8 (incl. STOP
+  terminal y scope), gate bloque 2 8/8, integracion E1-2+E1-5 6/6 (proxy vetado
+  en las 3 vias, phone-only real recibe invitacion+recordatorio+escalacion).
+  Smokes Gate D migrados a ConsentEvent (17/0/3). tsc 0 + next build verde.
+  Sello PRODUCTIVO de bloque 0/2 diferido a go-live (Meta exige templates
+  aprobados channel-onboarding/survey-invitation/survey-reminder/survey-escalation
+  con HX reales + STOP real end-to-end + Twilio Advanced Opt-Out + cutover
+  produccion + pata legal Ley 21.719). Diferido a Gate E.2: Exit + Onboarding a la
+  cola + captacion del stock. Diferido a Gate F: Metas.
 
 ---
 
