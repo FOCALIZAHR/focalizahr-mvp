@@ -75,6 +75,19 @@ Cada ítem lleva: **Tipo** · **Esfuerzo** · **Prioridad**.
 
 ---
 
+## Hallazgos sin triage — pendientes de decisión de Arquitectura
+
+> Encontrados en barrido de higiene de seguridad. Reportados **SIN fix y SIN prioridad asignada** — Arquitectura decide qué hacer (mismo proceso que debió seguirse con la ruta `_ELIMINAR` desde el principio).
+
+### 🆕 SEC-TEST · Endpoints de test huérfanos sin RBAC — PENDIENTE DECISIÓN ARQUITECTURA
+**Estado:** 🆕 pendiente de decisión (NO resuelto, NO en curso). Descubierto 2026-07-01, adyacente al cierre de `_ELIMINAR` (`635d67c`).
+- **`src/app/api/test/participants/route.ts`** — `GET` ruteable, **sin RBAC ni accountId**. Consulta `prisma.campaign.findFirst({ where:{status:'draft'}, include:{account:true} })` (`:18`) → **fuga cross-tenant de lectura**: devuelve la primera campaña draft de *cualquier* cuenta + su `account` completo (`:72-76`). Autenticado-only (middleware exige JWT), read-only (el insert mock `:50-60` no se persiste), expone stack traces (`:93`). **Huérfano** (0 referencias; `grep 'api/test'` solo su cabecera). Misma clase que `_ELIMINAR`, alcance más chico.
+- **`src/app/api/test/route.ts`** — `GET` ruteable, sin RBAC, pero **no toca datos** (solo `generateUniqueToken`); leak menor de stack trace (`:56`). Huérfano.
+- **Páginas UI dev** (menor prioridad, no exponen datos por sí solas): `dashboard/DD_PREV`, `dashboard/pruebas`, `dashboard/succession-demo`, `dashboard/test-exit-metrics` (auth-gated); `src/app/test`, `src/app/test-analytics` (raíz, **sin auth**).
+- **Nota:** el patrón de sufijo de desactivación (`_ELIMINAR/_OLD/_DEPRECATED/…`) quedó **limpio** (0 carpetas). Esto es categoría adyacente: endpoints dev/test huérfanos.
+
+---
+
 ## P0 — Bloqueadores de go-live / seguridad crítica
 
 ### P0-1 · 🔒 Metas: 6 endpoints sin `hasPermission` (S, fix rápido)
