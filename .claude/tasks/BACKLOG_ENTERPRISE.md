@@ -36,7 +36,7 @@ Cada ítem lleva: **Tipo** · **Esfuerzo** · **Prioridad**.
 | **P0** | 4 | Seguridad RBAC Metas + go-live Comunicaciones/Benchmark CRON |
 | **P1** | 8 | Performance Torre Control, features rotas, claims comerciales, concurrencia onboarding (CONC-ONB-A) |
 | **P2** | 12 | Deuda arquitectónica + consistencia + data quality + concurrencia onboarding (CONC-ONB-B) |
-| **P3** | 10 | Oportunidades de producto (vista interna benchmark, histórico evaluador, etc.) |
+| **P3** | 11 | Oportunidades de producto (vista interna benchmark, histórico evaluador, etc.) + centralizar detección service-token (P3-11) |
 
 > Nota (2026-07-01): el paquete CONC-ONB se contabiliza como **CONC-ONB-A en P1** (vector de seguridad de clase P0, en resolución activa esta sesión) y **CONC-ONB-B en P2** (robustez, con gate de producción). Ambos comparten sección — ver "PAQUETE CONC-ONB" abajo.
 
@@ -259,6 +259,11 @@ Las cascadas (P&L, Ambiente Sano) asumen crisis. Falta el tono "blindaje" para o
 
 ### P3-10 · 🏗️ Calibración: PDF de auditoría no encriptado a nivel app (S)
 Hoy seguro por encryption-at-rest de Supabase, accesible por URL. Si se vende "documento encriptado", encriptar a nivel app. **Si no se vende ese claim → no hacer.**
+
+### P3-11 · 🏗️ Centralizar detección de `payload.type === 'service'` (M) — deuda de centralización
+Hoy la detección/reconocimiento del service token está **hardcodeada localmente**: `campaigns/[id]/participants/upload/route.ts:622-643` (skip del gate de rol humano) y `middleware.ts:192-198` (inyección de `x-account-id`). Hoy hay **un solo** endpoint con este patrón (para `OnboardingEnrollmentService`). Si el patrón de service token se replica a otro flujo/endpoint en el futuro, alguien tendría que **copiar ese mismo `if` a mano** ahí también, en vez de reutilizar algo centralizado.
+**Fix:** exponer un helper central (en `AuthorizationService` o el middleware) que resuelva/valide el service token, reutilizable por cualquier endpoint. Es el mismo tipo de deuda que el TODO existente de `AuthorizationService.ts` ya señala para roles humanos, solo que nunca se anotó para el caso de **servicio**.
+**No urge:** solo muerde si se replica el patrón. P2/P3 (baja urgencia).
 
 ---
 
