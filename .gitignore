@@ -58,6 +58,8 @@ Thumbs.dbnul
 # Excepcion quirurgica: el backlog enterprise (doc rector vivo, prioridades P0-P3
 # + plan de sesiones) SI se trackea para tener respaldo remoto e historial.
 !.claude/tasks/BACKLOG_ENTERPRISE.md
+# Excepcion quirurgica: reporte de seguridad SEC-TEST (handoff a Arquitectura) SI se trackea.
+!.claude/tasks/REPORTE_SEC_TEST_RUTAS.md
 .claude/settings.local.json
 .claude/skills/focalizahr-design.zip
 *.diff
