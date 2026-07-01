@@ -55,6 +55,9 @@ Thumbs.dbnul
 # Excepcion quirurgica: el maestro de comunicaciones v3 SI se trackea (rastro de
 # gates sellados). El resto de .claude/tasks/ sigue ignorado.
 !.claude/tasks/ARQUITECTURA_COMUNICACIONES_v3_MAESTRO.md
+# Excepcion quirurgica: el backlog enterprise (doc rector vivo, prioridades P0-P3
+# + plan de sesiones) SI se trackea para tener respaldo remoto e historial.
+!.claude/tasks/BACKLOG_ENTERPRISE.md
 .claude/settings.local.json
 .claude/skills/focalizahr-design.zip
 *.diff
