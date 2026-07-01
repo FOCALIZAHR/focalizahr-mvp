@@ -34,9 +34,11 @@ Cada ítem lleva: **Tipo** · **Esfuerzo** · **Prioridad**.
 | Prioridad | Cantidad | Foco |
 |---|---|---|
 | **P0** | 4 | Seguridad RBAC Metas + go-live Comunicaciones/Benchmark CRON |
-| **P1** | 7 | Performance Torre Control, features rotas, claims comerciales |
-| **P2** | 11 | Deuda arquitectónica + consistencia + data quality |
+| **P1** | 8 | Performance Torre Control, features rotas, claims comerciales, concurrencia onboarding (CONC-ONB-A) |
+| **P2** | 12 | Deuda arquitectónica + consistencia + data quality + concurrencia onboarding (CONC-ONB-B) |
 | **P3** | 10 | Oportunidades de producto (vista interna benchmark, histórico evaluador, etc.) |
+
+> Nota (2026-07-01): el paquete CONC-ONB se contabiliza como **CONC-ONB-A en P1** (vector de seguridad de clase P0, en resolución activa esta sesión) y **CONC-ONB-B en P2** (robustez, con gate de producción). Ambos comparten sección — ver "PAQUETE CONC-ONB" abajo.
 
 > Regla de salida sugerida: **cerrar todos los P0 + los P1 que sostienen el pitch que se va a usar** (acceso filtrado, Torre de Control, flujo de cierre de metas).
 
@@ -57,6 +59,7 @@ Cada ítem lleva: **Tipo** · **Esfuerzo** · **Prioridad**.
 | 4 | **Efficiency L4 + L6** (narrativa Span + umbral seniority) | P1-3, P2-4 | 🐞 | M | ⬜ |
 | 5 | **Torre de Control** (refactor `useCampaignMonitor` + derivados) | P1-1 | ⚡ | L | ⬜ |
 | 6 | **WhatsApp go-live** (Meta + `TWILIO_MODE=production`) | P0-4 | 🔒 | M | ⬜ · depende de externos (Meta) |
+| 7 | **Concurrencia Onboarding** (lock/transacción + `@@unique`, 3 puntos, 1 fix) | CONC-ONB-B | 🏗️ | M | ⬜ · 🚦 gate: antes de escalar Onboarding a múltiples admins concurrentes en prod |
 
 > Nota P2-3: el gate RBAC + remoción de debug logs de Succession entra en la Sesión 1. Lo **cross-área** (¿gerente ve toda la empresa?) es decisión → ver abajo.
 
@@ -138,6 +141,52 @@ Cada ítem lleva: **Tipo** · **Esfuerzo** · **Prioridad**.
 **Módulo:** Performance/Calibración. `close/route.ts:78-138`; modelo `CalibrationAdjustment` sin campo de aprobador.
 **Qué:** Los ajustes PENDING se aplican al cerrar sin firma del que preside. No hay trazabilidad de aprobación. Si el pitch dice "calibración con gobernanza", hoy es falso.
 **Fix:** Agregar `approvedBy`/`approvalStatus` al schema + gate antes de aplicar. Esfuerzo M (schema + flujo + UI). **Si NO se vende gobernanza de aprobación → baja a P2.**
+
+---
+
+## PAQUETE CONC-ONB · Concurrencia en OnboardingEnrollmentService (1 paquete, no tickets sueltos)
+
+> Agregado 2026-07-01 tras investigación read-only de race conditions en `OnboardingEnrollmentService.ts` (v3.2.2).
+> Se registra AGRUPADO a propósito: los puntos de la parte B comparten causa raíz (check-then-act sin
+> lock/transacción) y **se arreglan con una sola solución**. Separarlos arriesga que alguien tape uno y deje
+> los otros dos abiertos.
+> Verificado en investigación: el batch NO corre en paralelo (`enroll/batch/route.ts:175` es `for...await`,
+> `enrollParticipant` en `:208`; cero `Promise.all` en el repo) → el mecanismo "N intentos simultáneos por
+> batch" queda **REFUTADO**. El riesgo real es **concurrencia entre requests distintos**, no intra-batch.
+
+### CONC-ONB-A · 🔒 `currentAccountId` estático — cross-tenant (P0/P1) — SE ATACA PRIMERO Y APARTE
+
+**Módulo:** Onboarding + Auth. `OnboardingEnrollmentService.ts`.
+**Causa raíz PROPIA (distinta de la parte B):** estado estático de clase, no lock. `private static currentAccountId`
+(`:88`) se setea en `:114`, se lee en `getAuthToken()` `:712` varios `await` después, se limpia en `finally` `:320`.
+Dos `enrollParticipant` para **cuentas distintas** en el mismo proceso Node se pisan el accountId → una genera
+**service token de la cuenta equivocada** (`generateServiceToken` `:720`) → **fuga cross-tenant**; o lee `null` y
+lanza `"No accountId available"` (`:715`). Reproducible en `next dev` (proceso único) con 2 requests concurrentes.
+`vercel.json` sin bloque `functions`/runtime; en prod con concurrencia por instancia (Fluid Compute) también aplica.
+**Fix (propio, NO el de la parte B):** eliminar el estado estático — pasar `accountId` como parámetro a
+`getAuthToken(accountId)` / por closure, sin campo compartido. Esfuerzo S.
+**Prioridad:** P0/P1 — es el único con vector de seguridad multi-tenant. **No espera a la parte B.**
+**Estado:** en evaluación en esta misma sesión (2026-07-01).
+
+### CONC-ONB-B · 🏗️ Check-then-act sin lock/transacción — 3 puntos, 1 SOLO FIX (P1/P2)
+
+**Módulo:** Onboarding. `OnboardingEnrollmentService.ts`.
+**Causa raíz COMPARTIDA:** `findFirst → create` sin `$transaction` ni advisory lock, sin `@@unique` que respalde.
+Bajo dos requests concurrentes para la MISMA cuenta/persona, ambos leen "no existe" y ambos crean.
+Los **3 puntos** (arreglar juntos, no por separado):
+1. **Campañas permanentes** — `getOrCreatePermanentCampaigns` `:502` (`findFirst`) → `:514` (`create`). `Campaign`
+   sin `@@unique(accountId, campaignTypeId, status)` (`schema.prisma:361-365`, solo índices normales).
+2. **Dedup de journey** — `:116` (`findFirst`) → `:273` (`create` JourneyOrchestration). Doble enroll del mismo RUT
+   podría crear 2 journeys.
+3. **Dedup de Employee pre-nómina** — `upsertPreNominaEmployee` `:348` (`findFirst`) → `:386` (`create`).
+   Verificar si `Employee` tiene `@@unique(accountId, nationalId)`; si no, concurrencia → Employees duplicados.
+**Estado en BD (dev, 2026-07-01):** **0 duplicados reales dentro de una misma cuenta** (query read-only:
+las "2 por slug" de onboarding eran 1-por-cuenta en 2 cuentas distintas). Los `COUNT>1` de pulso/retención son
+campañas normales (varias activas del mismo tipo = por diseño). La vulnerabilidad existe pero **no se ha materializado**.
+**Fix (uno solo para los 3):** advisory lock de Postgres (`pg_advisory_xact_lock` por `accountId`) o `$transaction`
+con reintento sobre violación de unicidad, aplicado a los 3 puntos + agregar los `@@unique` que respalden. Esfuerzo M.
+**🚦 Gate explícito (no "algún día"):** **resolver ANTES de escalar Onboarding a múltiples admins concurrentes en
+producción.** Mientras el enroll lo opere 1 admin a la vez por cuenta, el riesgo es latente.
 
 ---
 
@@ -226,7 +275,7 @@ Hoy seguro por encryption-at-rest de Supabase, accesible por URL. Si se vende "d
 | **TAC** | P3-5 (cross-cycle) |
 | **P&L Talent** | (cubierto por Performance + clasificación P2-5) |
 | **Exit** | P2-2 (RBAC), P2-10 (SLA) |
-| **Onboarding** | P2-1 (RBAC), P2-10 (SLA), P3-7 (narrativa) |
+| **Onboarding** | P2-1 (RBAC), P2-10 (SLA), P3-7 (narrativa), CONC-ONB-A (cross-tenant token), CONC-ONB-B (check-then-act ×3) |
 | **Ambiente Sano** | P2-7 (ActionPlan), P2-8 (Motor 1/6), P2-9 (LLM CRON), P2-10 (SLA) |
 | **Benchmark** | P0-3 (CRON prod), P1-6 (RBAC), P3-1 (vista interna), P3-2 (metricTypes) |
 | **Comunicaciones** | P0-2 (Capa 3), P0-4 (WhatsApp go-live) |
