@@ -145,7 +145,7 @@ export class OnboardingEnrollmentService {
       // PASO 1.5 (GATE D D1): crear el Employee pre-nómina ANTES del hop HTTP.
       // El consent se persiste primero; si esta captura falla, abortamos sin haber
       // creado participants/journey (atomicidad: el consent nunca se pierde en silencio).
-      await this.upsertPreNominaEmployee(data);
+      const employeeId = await this.upsertPreNominaEmployee(data);
 
       // PASO 2: Obtener o crear 4 campaignIds permanentes
       const campaigns = await this.getOrCreatePermanentCampaigns(data.accountId);
@@ -299,6 +299,20 @@ export class OnboardingEnrollmentService {
       
       console.log('[OnboardingEnrollment] ✅ Emails scheduled successfully');
       
+      // GATE ONB-EMPID: Poblar Participant.employeeId (vínculo al maestro, igual
+      // que Exit — ExitRegistrationService.ts:162). Los 4 stages = misma persona =
+      // mismo employeeId. NO-crítico: si falla, degrada a participants sin
+      // employeeId (comportamiento previo); NO aborta el journey ya creado.
+      try {
+        await prisma.participant.updateMany({
+          where: { id: { in: participantIds } },
+          data: { employeeId },
+        });
+        console.log(`[OnboardingEnrollment] ✅ employeeId ${employeeId} propagado a ${participantIds.length} participants`);
+      } catch (backfillError) {
+        console.error('[OnboardingEnrollment] ⚠️ No se pudo poblar employeeId (no crítico):', backfillError);
+      }
+
       // PASO 8: Retornar resultado exitoso
       return {
         success: true,
@@ -338,7 +352,7 @@ export class OnboardingEnrollmentService {
    * Público (no solo interno): es una operación con identidad propia (captura de consent
    * de canal de un pre-nómina) reusable por un alta manual / UI de pre-enroll a futuro.
    */
-  static async upsertPreNominaEmployee(data: EnrollmentData): Promise<void> {
+  static async upsertPreNominaEmployee(data: EnrollmentData): Promise<string> {
     const nationalId = normalizeRut(data.nationalId);
 
     // Canal declarado por el admin; si no se indicó, inferir del contacto disponible.
@@ -379,11 +393,11 @@ export class OnboardingEnrollmentService {
           );
         });
       }
-      return;
+      return existing.id;
     }
 
-    await prisma.$transaction(async (tx) => {
-      const created = await tx.employee.create({
+    const created = await prisma.$transaction(async (tx) => {
+      const employee = await tx.employee.create({
         data: {
           accountId: data.accountId,
           nationalId,
@@ -403,7 +417,7 @@ export class OnboardingEnrollmentService {
       // colaborador autorizó": mantiene a FocalizaHR como Encargado (Ley 21.719).
       await appendConsentEvent(
         {
-          employeeId: created.id,
+          employeeId: employee.id,
           accountId: data.accountId,
           origen: ConsentOrigen.EMPRESA,
           tipo: ConsentTipo.AUTORIZACION,
@@ -411,9 +425,11 @@ export class OnboardingEnrollmentService {
         },
         tx
       );
+      return employee;
     });
 
     console.log(`[OnboardingEnrollment] ✅ Employee pre-nómina creado (PENDING_ONBOARDING) para RUT ${nationalId}`);
+    return created.id;
   }
 
   // ==========================================================================
