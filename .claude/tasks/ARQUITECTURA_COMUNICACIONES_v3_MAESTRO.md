@@ -481,6 +481,31 @@ TWILIO_WEBHOOK_VALIDATE=true
   con HX reales + STOP real end-to-end + Twilio Advanced Opt-Out + cutover
   produccion + pata legal Ley 21.719). Diferido a Gate E.2: Exit + Onboarding a la
   cola + captacion del stock. Diferido a Gate F: Metas.
+- **GATE E.2a** — SELLADO (sandbox) — commit `9620f1a` (implementacion) —
+  2026-06-29 — Exit enganchado a la cola unificada: el ex-empleado sin email
+  corporativo recibe la invitacion de encuesta de salida por WhatsApp. Reusa la
+  infraestructura de E.1 (cola, gate de consent via consent-derivation.ts,
+  resolvePhone) sin reconstruir. Decision central: messageType DEDICADO
+  'exit_invitation' (NO 'invitation'), que evita el chase por CONSTRUCCION: los
+  motores de recordatorio/escalacion consultan 'invitation' (EmailLog :228, ancla
+  WhatsApp :120) y no ven exit_invitation, asi que no persiguen al ex-empleado sin
+  tocar la logica de los motores. Exit = SOLO invitacion (sin recordatorios ni
+  escalacion). Enganche por BIFURCACION de canal (no reemplazo): email derivado ->
+  EmailAutomation intacto (camino viejo), WhatsApp derivado -> cola con
+  exit_invitation; el email no se migra. employeeId cableado a la firma de
+  scheduleInvitationEmail (ya persistido en Participant :157 / ExitRecord :177
+  desde D, solo faltaba pasarlo; null -> fail-closed con log, sin fallback por
+  nationalId). Gate de consent reusado: proxy admin_loaded no recibe WhatsApp, solo
+  opt-in real. Verificacion: 8/8 criterios (E2a-2 NO CHASE con reminderCount=0 el
+  critico) + 5 tests integracion PASS servicios reales en simulacion + tsc/build
+  verdes. Deuda cosmetica anotada: el texto de confirmacion de registerExit (:209)
+  dice "Email programado" mirando data.email en vez del canal derivado (no afecta
+  despacho, si confunde al admin sobre el canal real; arreglar cuando se toque).
+  Prerequisito go-live: submit + aprobacion Meta del template
+  exit-invitation-whatsapp. Prerequisito primer-cliente: DPA con garantia de
+  licitud + indemnidad. Diferido a E.2b: Onboarding a la cola (cadena completa,
+  enganche Participant <-> Employee pre-nomina del consent). Diferido a Gate F:
+  Metas.
 
 ---
 
