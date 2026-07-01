@@ -67,6 +67,18 @@ const WHATSAPP_TEMPLATES: Record<string, WhatsAppTemplate> = {
     contentSid: 'HX_PENDING_SURVEY_REMINDER',
     variables: ['participant_name', 'company_name', 'days_remaining', 'survey_token'],
   },
+  // GATE E.2a: invitacion a la encuesta de salida por WhatsApp (ex-empleado sin email).
+  // messageType DEDICADO 'exit_invitation' (no 'invitation'): los motores de recordatorio
+  // (whatsapp-reminders.ts:120) y escalacion, y el espejo EmailLog (message-dispatcher.ts:228),
+  // solo miran 'invitation', asi que Exit NO entra a su radar (no-chase por construccion).
+  // Copy: skill focalizahr-whatsapp-templates (invitacion encuesta de salida, tono FocalizaHR).
+  // {{1}}=participant_name, {{2}}=company_name, {{3}}=survey_url (en la URL del boton).
+  // El HX es PLACEHOLDER hasta mintear y aprobar en Meta (go-live, mismo patron que Gate C/D).
+  'exit-invitation-whatsapp': {
+    slug: 'exit-invitation-whatsapp',
+    contentSid: 'HX_PENDING_EXIT_INVITATION',
+    variables: ['participant_name', 'company_name', 'survey_url'],
+  },
 };
 
 /**
@@ -111,6 +123,9 @@ export const WHATSAPP_ESCALATION_SLUG = 'survey-escalation';
 
 // Slug canonico del recordatorio WhatsApp (consumido por processWhatsAppReminders, Gate E.1).
 export const WHATSAPP_REMINDER_SLUG = 'survey-reminder';
+
+// Slug canonico de la invitacion de salida por WhatsApp (consumido por ExitRegistrationService, Gate E.2a).
+export const WHATSAPP_EXIT_INVITATION_SLUG = 'exit-invitation-whatsapp';
 
 // ════════════════════════════════════════════════════════════════════════════
 // REQUEST_EMAIL_BODY - Mensaje LIBRE (session message), NO es template Meta.

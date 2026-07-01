@@ -28,6 +28,11 @@ import { prisma } from '@/lib/prisma';
 import { generateUniqueToken } from '@/lib/auth';
 import { normalizeRut } from '@/lib/services/EmployeeSyncService';
 import { GLOBAL_ACCESS_ROLES, getChildDepartmentIds } from '@/lib/services/AuthorizationService';
+// Gate E.2a: bifurcacion por canal de la invitacion de salida (email intacto / WhatsApp a la cola).
+import { determineChannel } from '@/lib/services/channel-selector';
+import { puedeRecibirContenidoPersonal } from '@/lib/services/consent-derivation';
+import { WHATSAPP_EXIT_INVITATION_SLUG } from '@/lib/templates/whatsapp-templates';
+import { runDispatcherBatch } from '@/lib/services/message-dispatcher';
 import {
   ExitRegistrationData,
   ExitRegistrationResult,
@@ -702,54 +707,153 @@ export class ExitRegistrationService {
   }
   
   /**
-   * Programar email de invitación
-   * 
-   * IMPORTANTE: Usa los campos correctos de EmailAutomation:
-   * - triggerType (NO emailType)
-   * - triggerAt (NO scheduledFor)
-   * - enabled: true (NO status: 'pending')
-   * - templateId
+   * Despachar la invitación de salida (Gate E.2a: BIFURCACIÓN POR CANAL).
+   *
+   * El camino EMAIL queda INTACTO (EmailAutomation como siempre, ver campos correctos
+   * abajo). El WhatsApp se agrega AL LADO via la cola unificada; el email NO se migra.
+   *
+   * determineChannel (gate de consent de E.1) decide:
+   *   - 'email'    -> EmailAutomation (camino viejo, sin tocar).
+   *   - 'whatsapp' -> CommunicationMessage messageType DEDICADO 'exit_invitation' (no
+   *                   'invitation': evita el chase por construcción) + dispatcher inline.
+   *   - 'none'     -> fail-closed, log, no se despacha por canal personal.
+   *
+   * Consent SINGLE (Exit procesa un egreso a la vez, no batch). Si employeeId es null
+   * -> fail-closed (no WhatsApp), SIN fallback por nationalId. El teléfono viene directo
+   * de Participant.phoneNumber (Estrategia 1, ya resuelto del maestro al registrar).
+   *
+   * IMPORTANTE (rama email): usa los campos correctos de EmailAutomation:
+   * - triggerType (NO emailType) / triggerAt (NO scheduledFor) / enabled / templateId
    */
   private static async scheduleInvitationEmail(
-    participant: { id: string; email: string | null; name: string | null },
+    participant: {
+      id: string;
+      email: string | null;
+      name: string | null;
+      employeeId: string | null;
+      phoneNumber: string | null;
+      nationalId: string;
+      uniqueToken: string | null;
+    },
     data: ExitRegistrationData,
     campaignId: string
   ): Promise<void> {
-    if (!participant.email) {
-      console.log('[ExitRegistration] No email provided, skipping invitation');
+    // Consent C1 derivado del log ConsentEvent (fuente única). Sin employeeId no se
+    // puede derivar -> fail-closed (borde, no sistemático: el dato normalmente está).
+    let canReceivePersonalContent = false;
+    if (participant.employeeId) {
+      canReceivePersonalContent = await puedeRecibirContenidoPersonal(
+        participant.employeeId,
+        data.accountId
+      );
+    } else {
+      console.log('[ExitRegistration] Sin employeeId: fail-closed, no WhatsApp (sin fallback por nationalId)', {
+        participantId: participant.id
+      });
+    }
+
+    // Teléfono directo del Participant (Estrategia 1, ya persistido del maestro).
+    const phoneNumber = participant.phoneNumber;
+
+    const channel = determineChannel(
+      {
+        email: participant.email,
+        phoneNumber,
+        canReceivePersonalContent,
+      },
+      { purpose: 'content' }
+    );
+
+    // ── Canal EMAIL: camino de SIEMPRE, intacto ──────────────────────────────
+    if (channel === 'email' && participant.email) {
+      // Programar para 1 día después de la fecha de salida
+      const scheduledDate = new Date(data.exitDate);
+      scheduledDate.setDate(scheduledDate.getDate() + 1);
+      scheduledDate.setHours(9, 0, 0, 0); // 9:00 AM
+
+      // Verificar que la fecha no sea en el pasado
+      const now = new Date();
+      if (scheduledDate < now) {
+        // Si ya pasó, programar para mañana a las 9 AM
+        scheduledDate.setTime(now.getTime());
+        scheduledDate.setDate(scheduledDate.getDate() + 1);
+        scheduledDate.setHours(9, 0, 0, 0);
+      }
+
+      // Crear registro en EmailAutomation con campos CORRECTOS
+      await prisma.emailAutomation.create({
+        data: {
+          campaignId,
+          participantId: participant.id,
+          triggerType: 'exit_invitation',  // ← Campo correcto
+          triggerAt: scheduledDate,         // ← Campo correcto
+          enabled: true,                    // ← Campo correcto
+          templateId: 'retencion-predictiva'         // ← Template de email
+        }
+      });
+
+      console.log('[ExitRegistration] Email scheduled:', {
+        participantId: participant.id,
+        email: participant.email,
+        scheduledFor: scheduledDate.toISOString()
+      });
       return;
     }
-    
-    // Programar para 1 día después de la fecha de salida
-    const scheduledDate = new Date(data.exitDate);
-    scheduledDate.setDate(scheduledDate.getDate() + 1);
-    scheduledDate.setHours(9, 0, 0, 0); // 9:00 AM
-    
-    // Verificar que la fecha no sea en el pasado
-    const now = new Date();
-    if (scheduledDate < now) {
-      // Si ya pasó, programar para mañana a las 9 AM
-      scheduledDate.setTime(now.getTime());
-      scheduledDate.setDate(scheduledDate.getDate() + 1);
-      scheduledDate.setHours(9, 0, 0, 0);
-    }
-    
-    // Crear registro en EmailAutomation con campos CORRECTOS
-    await prisma.emailAutomation.create({
-      data: {
-        campaignId,
+
+    // ── Canal WHATSAPP: NUEVO, a la cola con messageType dedicado ────────────
+    if (channel === 'whatsapp' && phoneNumber) {
+      const account = await prisma.account.findUnique({
+        where: { id: data.accountId },
+        select: { companyName: true }
+      });
+      const companyName = account?.companyName || '';
+      const surveyBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+      const firstName =
+        (participant.name || '').trim().split(/\s+/)[0] || participant.name || 'colaborador';
+      const now = new Date();
+
+      await prisma.communicationMessage.create({
+        data: {
+          accountId: data.accountId,
+          channel: 'WHATSAPP',
+          templateSlug: WHATSAPP_EXIT_INVITATION_SLUG,
+          messageType: 'exit_invitation', // DEDICADO: no 'invitation' (no-chase por construcción)
+          toPhone: phoneNumber,
+          participantId: participant.id,
+          campaignId,
+          variables: {
+            participant_name: firstName,
+            company_name: companyName,
+            survey_url: `${surveyBaseUrl}/encuesta/${participant.uniqueToken}`,
+          },
+          dedupKey: `exit_invitation:${participant.id}`, // idempotente por participante
+          scheduledAt: now,
+        }
+      });
+
+      console.log('[ExitRegistration] WhatsApp exit invitation enqueued:', {
         participantId: participant.id,
-        triggerType: 'exit_invitation',  // ← Campo correcto
-        triggerAt: scheduledDate,         // ← Campo correcto
-        enabled: true,                    // ← Campo correcto
-        templateId: 'retencion-predictiva'         // ← Template de email
+        toPhone: phoneNumber
+      });
+
+      // Dispatch inline: el ex-empleado recibe de inmediato; el cron es backstop.
+      try {
+        const dispatch = await runDispatcherBatch();
+        console.log('[ExitRegistration] Dispatcher:', {
+          sent: dispatch.sent,
+          failed: dispatch.failed,
+          remaining: dispatch.remaining
+        });
+      } catch (dispatchErr) {
+        console.error('[ExitRegistration] Dispatcher tras encolar exit invitation:', dispatchErr);
       }
-    });
-    
-    console.log('[ExitRegistration] Email scheduled:', {
+      return;
+    }
+
+    // ── Sin canal / fail-closed ──────────────────────────────────────────────
+    console.log('[ExitRegistration] No se despacha invitación (sin canal / consent):', {
       participantId: participant.id,
-      email: participant.email,
-      scheduledFor: scheduledDate.toISOString()
+      channel
     });
   }
 }
