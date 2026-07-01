@@ -84,9 +84,6 @@ interface ParticipantCSVData {
 
 export class OnboardingEnrollmentService {
   
-  // Variable temporal para pasar accountId a getAuthToken()
-  private static currentAccountId: string | null = null;
-  
   /**
    * ✅ MÉTODO PRINCIPAL: Inscribir empleado en journey completo
    * 
@@ -110,8 +107,6 @@ export class OnboardingEnrollmentService {
         fullName: data.fullName
       });
 
-      // ✅ NUEVO: Guardar accountId para usarlo en getAuthToken()
-      this.currentAccountId = data.accountId;
       // ✅ VALIDACIÓN DE DUPLICADOS - Verificar si ya existe journey activo
       const existingJourney = await prisma.journeyOrchestration.findFirst({
         where: {
@@ -199,7 +194,7 @@ export class OnboardingEnrollmentService {
           formData.append('file', blob, `onboarding_${data.nationalId}_stage${stage + 1}.csv`);
           
           // 🔑 OBTENER TOKEN AUTH
-          const token = await this.getAuthToken();
+          const token = await this.getAuthToken(data.accountId);
           
           // 🌐 LLAMADA HTTP A API EXISTENTE
           const response = await fetch(
@@ -320,18 +315,15 @@ export class OnboardingEnrollmentService {
         participantIds,
         message: `Journey creado exitosamente para ${data.fullName}. 4 encuestas programadas.`
       };
-      
+
     } catch (error) {
       console.error('[OnboardingEnrollment] ❌ Enrollment failed:', error);
-      
+
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Error desconocido en enrollment',
         error: error instanceof Error ? error.message : 'Error desconocido en enrollment'
       };
-    } finally {
-      // ✅ NUEVO: Limpiar accountId al terminar
-      this.currentAccountId = null;
     }
   }
   
@@ -723,10 +715,8 @@ private static normalizeGender(gender?: string): string {
    * Obtener token de autenticación para llamadas internas
    * Genera JWT de servicio válido por 5 minutos
    */
-  private static async getAuthToken(): Promise<string> {
+  private static async getAuthToken(accountId: string): Promise<string> {
     try {
-      const accountId = this.currentAccountId;
-      
       if (!accountId) {
         throw new Error('[ONBOARDING] No accountId available in context');
       }
