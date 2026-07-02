@@ -79,6 +79,36 @@ const WHATSAPP_TEMPLATES: Record<string, WhatsAppTemplate> = {
     contentSid: 'HX_PENDING_EXIT_INVITATION',
     variables: ['participant_name', 'company_name', 'survey_url'],
   },
+  // GATE E.2b: toques del journey de Onboarding por WhatsApp (frontline sin email).
+  // UN template POR ETAPA (dia 1/7/30/90): la cadencia del journey ancla en hitos, y el
+  // copy de cada toque es distinto (Compliance/Clarification/Culture/Connection). El
+  // messageType es UNO SOLO ('onboarding_touch', ver ExitRegistrationService/spec): no es
+  // 'invitation', asi que los motores de recordatorio/escalacion (whatsapp-reminders.ts:120,
+  // message-dispatcher.ts:228) NO lo ven -> no-chase cruzado por construccion. El toque se
+  // resuelve por canal en el cron (processAutomationQueue), consent fresco, NO al inscribir.
+  // {{1}}=participant_name, {{2}}=company_name, {{3}}=survey_url (en la URL del boton).
+  // Los HX son PLACEHOLDER: el copy real + submit a Meta van al track paralelo (go-live),
+  // mismo patron que Gate C/D/E.1/E.2a. El sello E.2b es en sandbox con placeholder.
+  'onboarding-day1-whatsapp': {
+    slug: 'onboarding-day1-whatsapp',
+    contentSid: 'HX_PENDING_ONBOARDING_DAY1',
+    variables: ['participant_name', 'company_name', 'survey_url'],
+  },
+  'onboarding-day7-whatsapp': {
+    slug: 'onboarding-day7-whatsapp',
+    contentSid: 'HX_PENDING_ONBOARDING_DAY7',
+    variables: ['participant_name', 'company_name', 'survey_url'],
+  },
+  'onboarding-day30-whatsapp': {
+    slug: 'onboarding-day30-whatsapp',
+    contentSid: 'HX_PENDING_ONBOARDING_DAY30',
+    variables: ['participant_name', 'company_name', 'survey_url'],
+  },
+  'onboarding-day90-whatsapp': {
+    slug: 'onboarding-day90-whatsapp',
+    contentSid: 'HX_PENDING_ONBOARDING_DAY90',
+    variables: ['participant_name', 'company_name', 'survey_url'],
+  },
 };
 
 /**
@@ -126,6 +156,18 @@ export const WHATSAPP_REMINDER_SLUG = 'survey-reminder';
 
 // Slug canonico de la invitacion de salida por WhatsApp (consumido por ExitRegistrationService, Gate E.2a).
 export const WHATSAPP_EXIT_INVITATION_SLUG = 'exit-invitation-whatsapp';
+
+// GATE E.2b: mapa templateId de la fila EmailAutomation (slug de la etapa del journey,
+// ver OnboardingEnrollmentService.scheduleOnboardingEmails) -> slug del template WhatsApp
+// de esa etapa. El cron (processAutomationQueue) lo usa para: (a) IDENTIFICAR que un job
+// es un toque de onboarding (solo estos bifurcan por canal; el resto -ej. Exit email-
+// queda 100% intacto), y (b) elegir el template WhatsApp correcto por etapa.
+export const WHATSAPP_ONBOARDING_TOUCH_SLUGS: Record<string, string> = {
+  'onboarding-day-1': 'onboarding-day1-whatsapp',
+  'onboarding-day-7': 'onboarding-day7-whatsapp',
+  'onboarding-day-30': 'onboarding-day30-whatsapp',
+  'onboarding-day-90': 'onboarding-day90-whatsapp',
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 // REQUEST_EMAIL_BODY - Mensaje LIBRE (session message), NO es template Meta.

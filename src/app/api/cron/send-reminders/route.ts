@@ -28,6 +28,13 @@ import { processSurveyEscalations } from '@/lib/services/survey-escalation';
 // GATE E.1 ruta 3: recordatorio WhatsApp del phone-only (servicio aislado; el route
 // solo lo invoca, igual que la escalación. NO se mete lógica WhatsApp en processReminders).
 import { processWhatsAppReminders } from '@/lib/services/whatsapp-reminders';
+// GATE E.2b: bifurcación de canal de los toques de onboarding (email intacto / WhatsApp
+// a la cola unificada). La decisión + enqueue + consume de UN job vive en un servicio
+// aislado (mismo molde que survey-escalation/whatsapp-reminders), importable y testeable;
+// el cron solo lo invoca en el loop. Reusa el gate de consent de E.1 y el patrón de E.2a.
+import { dispatchOnboardingTouch } from '@/lib/services/onboarding-touch-dispatch';
+import { WHATSAPP_ONBOARDING_TOUCH_SLUGS } from '@/lib/templates/whatsapp-templates';
+import { runDispatcherBatch } from '@/lib/services/message-dispatcher';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -369,10 +376,12 @@ async function sendReminder(
 async function processAutomationQueue(): Promise<{
   totalProcessed: number;
   emailsSent: number;
+  whatsappEnqueued: number;
   errors: string[];
 }> {
   const errors: string[] = [];
   let emailsSent = 0;
+  let whatsappEnqueued = 0;  // GATE E.2b: toques de onboarding encolados a WhatsApp
   const now = new Date();
 
   try {
@@ -386,11 +395,15 @@ async function processAutomationQueue(): Promise<{
       },
       include: {
         participant: {
-          select: { 
-            id: true, 
-            email: true, 
-            name: true, 
-            uniqueToken: true 
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            uniqueToken: true,
+            // GATE E.2b: datos para el gate de consent + resolución de canal WhatsApp.
+            employeeId: true,
+            phoneNumber: true,
+            nationalId: true
           }
         },
         campaign: {
@@ -406,7 +419,7 @@ async function processAutomationQueue(): Promise<{
 
     if (pendingEmails.length === 0) {
       console.log('✅ [AutomationQueue] Sin emails pendientes.');
-      return { totalProcessed: 0, emailsSent: 0, errors };
+      return { totalProcessed: 0, emailsSent: 0, whatsappEnqueued: 0, errors };
     }
 
     console.log(`📊 [AutomationQueue] Procesando ${pendingEmails.length} emails...`);
@@ -415,19 +428,81 @@ async function processAutomationQueue(): Promise<{
     for (const emailJob of pendingEmails) {
       const { participant, campaign, templateId } = emailJob;
 
-      // ⚠️ VALIDACIÓN: Datos completos
-      if (!participant || !campaign || !participant.email || !participant.uniqueToken) {
+      // ⚠️ VALIDACIÓN base: participante, campaña y token SIEMPRE requeridos.
+      // (El email deja de ser obligatorio AQUÍ: un toque de onboarding puede ir por
+      //  WhatsApp. La rama email valida su propia dirección abajo.)
+      if (!participant || !campaign || !participant.uniqueToken) {
         const errorMsg = `Datos incompletos Job ID: ${emailJob.id}`;
         console.error(`⚠️ [AutomationQueue] ${errorMsg}`);
         errors.push(errorMsg);
-        
+
         // Deshabilitar para no reintentar
         await prisma.emailAutomation.update({
           where: { id: emailJob.id },
-          data: { 
-            enabled: false, 
-            processedAt: now 
+          data: {
+            enabled: false,
+            processedAt: now
           }
+        });
+        continue;
+      }
+
+      // ── GATE E.2b: BIFURCACIÓN DE CANAL (SOLO toques de onboarding) ────────────
+      // Los jobs de onboarding (templateId onboarding-day-*) resuelven su canal AQUÍ,
+      // al despachar: consent FRESCO del log ConsentEvent, nunca congelado al inscribir
+      // (evita el borde 21.719: envío tras revocación). El resto de jobs de
+      // EmailAutomation (ej. invitación de Exit por email) NO entran a esta rama: siguen
+      // el camino email de SIEMPRE, intacto. Réplica del patrón de Exit (E.2a) en el cron.
+      const onboardingWaSlug = WHATSAPP_ONBOARDING_TOUCH_SLUGS[templateId];
+      if (onboardingWaSlug) {
+        // Decisión + enqueue + consume del toque en el servicio aislado (consent FRESCO).
+        const decision = await dispatchOnboardingTouch({
+          jobId: emailJob.id,
+          waSlug: onboardingWaSlug,
+          participant: {
+            id: participant.id,
+            email: participant.email,
+            name: participant.name,
+            uniqueToken: participant.uniqueToken,
+            employeeId: participant.employeeId,
+            phoneNumber: participant.phoneNumber,
+          },
+          campaign: {
+            id: campaign.id,
+            accountId: campaign.accountId,
+            companyName: campaign.account.companyName,
+          },
+          now,
+        });
+
+        if (decision.channel === 'whatsapp') {
+          if (decision.enqueued) whatsappEnqueued++;
+          console.log(`✅ [AutomationQueue] Onboarding WhatsApp (${onboardingWaSlug}) job ${emailJob.id} enqueued=${decision.enqueued}`);
+          continue;
+        }
+        if (decision.channel === 'none') {
+          console.log(`ℹ️ [AutomationQueue] Onboarding sin canal personal (none), no se despacha. Job ${emailJob.id}`);
+          continue;
+        }
+        // decision.channel === 'email' → cae al envío email de SIEMPRE (job NO consumido aún).
+      } else if (!participant.email) {
+        // Job NO-onboarding (ej. Exit email) sin email: comportamiento previo intacto.
+        const errorMsg = `Datos incompletos Job ID: ${emailJob.id}`;
+        console.error(`⚠️ [AutomationQueue] ${errorMsg}`);
+        errors.push(errorMsg);
+        await prisma.emailAutomation.update({
+          where: { id: emailJob.id },
+          data: { enabled: false, processedAt: now },
+        });
+        continue;
+      }
+
+      // En este punto el job va por EMAIL y la dirección está garantizada (narrowing TS).
+      const toEmail = participant.email;
+      if (!toEmail) {
+        await prisma.emailAutomation.update({
+          where: { id: emailJob.id },
+          data: { enabled: false, processedAt: now },
         });
         continue;
       }
@@ -457,7 +532,7 @@ async function processAutomationQueue(): Promise<{
         // 4️⃣ ENVIAR: Resend API
         const { data, error } = await resend.emails.send({
           from: FROM_EMAIL,
-          to: participant.email,
+          to: toEmail,
           subject,
           html,
           headers: { 'Content-Type': 'text/html; charset=UTF-8' }
@@ -524,9 +599,24 @@ async function processAutomationQueue(): Promise<{
       }
     }
 
+    // GATE E.2b: drenar la cola unificada si se encolaron toques WhatsApp (patrón de
+    // survey-escalation/whatsapp-reminders). processAutomationQueue no drenaba antes;
+    // sin esto, el WhatsApp de onboarding esperaría al próximo cron.
+    if (whatsappEnqueued > 0) {
+      try {
+        const dispatch = await runDispatcherBatch();
+        console.log(`📤 [AutomationQueue] Dispatcher: ${dispatch.sent} enviados, ${dispatch.failed} fallidos, ${dispatch.remaining} pendientes`);
+      } catch (dispatchErr) {
+        const errorMsg = `Dispatcher tras encolar onboarding: ${dispatchErr instanceof Error ? dispatchErr.message : 'error'}`;
+        console.error(`❌ [AutomationQueue] ${errorMsg}`);
+        errors.push(errorMsg);
+      }
+    }
+
     const summary = {
       totalProcessed: pendingEmails.length,
       emailsSent,
+      whatsappEnqueued,
       errors
     };
 
@@ -600,6 +690,7 @@ export async function GET(request: NextRequest) {
       : {
           totalProcessed: 0,
           emailsSent: 0,
+          whatsappEnqueued: 0,
           errors: [automationResult.reason?.message || 'Error desconocido']
         };
 
@@ -638,6 +729,7 @@ export async function GET(request: NextRequest) {
       automation: {
         processed: automationQueue.totalProcessed,
         sent: automationQueue.emailsSent,
+        whatsappEnqueued: automationQueue.whatsappEnqueued,
         errors: automationQueue.errors.length
       },
       whatsappEscalations: {

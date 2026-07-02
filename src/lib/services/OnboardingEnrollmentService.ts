@@ -22,6 +22,10 @@ import { enrollmentRequestSchema, type EnrollmentRequest } from '@/lib/validatio
 import { normalizeRut } from '@/lib/services/EmployeeSyncService';
 import { appendConsentEvent } from '@/lib/services/consent-derivation';
 import { ConsentOrigen, ConsentTipo } from '@prisma/client';
+// GATE E.2b: solicitud de consent de canal (channel-onboarding) para el pre-nómina que
+// usará WhatsApp. Reusa el chokepoint idempotente; NO reimplementa la garantía.
+import { enqueueChannelOnboarding, type ChannelOnboardingCandidate } from '@/lib/services/channel-onboarding';
+import { normalizePhone } from '@/lib/utils/normalizePhone';
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -306,6 +310,37 @@ export class OnboardingEnrollmentService {
         console.log(`[OnboardingEnrollment] ✅ employeeId ${employeeId} propagado a ${participantIds.length} participants`);
       } catch (backfillError) {
         console.error('[OnboardingEnrollment] ⚠️ No se pudo poblar employeeId (no crítico):', backfillError);
+      }
+
+      // GATE E.2b: SOLICITUD de consent de canal (channel-onboarding) para el pre-nómina
+      // que usará WhatsApp. Sin esto, el frontline phone-only nunca da opt-in real y sus
+      // toques del journey resuelven 'none' en el cron (E2b-2 no se cumpliría). Reusa el
+      // chokepoint idempotente enqueueChannelOnboarding (excluye STOP/revocados, no-clobber
+      // de channelConsentRequestedAt, dedupKey único por employee): la garantía vive dentro
+      // de esa función, NO se reimplementa aquí. NO dispara el dispatcher (patrón 4.3a/4.3b:
+      // solo encola; el dispatcher despacha en su cadencia). No-crítico: no aborta el journey.
+      // NO toca el rodeo HTTP de creación de participantes.
+      try {
+        const preferredChannel: 'email' | 'whatsapp' =
+          data.preferredChannel ?? (data.participantEmail ? 'email' : 'whatsapp');
+        const normalizedPhone = normalizePhone(data.phoneNumber);
+        if (preferredChannel === 'whatsapp' && normalizedPhone.ok && normalizedPhone.value) {
+          const account = await prisma.account.findUnique({
+            where: { id: data.accountId },
+            select: { companyName: true },
+          });
+          const candidate: ChannelOnboardingCandidate = {
+            employeeId,
+            accountId: data.accountId,
+            toPhone: normalizedPhone.value,
+            participantName: data.fullName.trim().split(/\s+/)[0] || data.fullName,
+            companyName: account?.companyName || '',
+          };
+          const enqueued = await enqueueChannelOnboarding([candidate]);
+          console.log(`[OnboardingEnrollment] 📞 channel-onboarding encolado: ${enqueued}`);
+        }
+      } catch (solicitationErr) {
+        console.error('[OnboardingEnrollment] ⚠️ No se pudo encolar channel-onboarding (no crítico):', solicitationErr);
       }
 
       // PASO 8: Retornar resultado exitoso
