@@ -507,6 +507,33 @@ TWILIO_WEBHOOK_VALIDATE=true
   enganche Participant <-> Employee pre-nomina del consent). Diferido a Gate F:
   Metas.
 
+- **GATE E.2b** — SELLADO (sandbox) — commit `1ce20d5` (implementacion) —
+  2026-07-02 — Onboarding journey enganchado MULTICANAL en el DESPACHO (cron
+  processAutomationQueue), no al inscribir: cada uno de los 4 toques (dia
+  1/7/30/90) resuelve su canal con consent FRESCO del log (evita el borde 21.719;
+  el envio tras revocacion nunca se congela). Replica el patron de Exit (E.2a) via
+  helper aislado dispatchOnboardingTouch (mismo molde que survey-escalation /
+  whatsapp-reminders): decide + encola + consume UN toque, sin query global ni
+  Resend. messageType DEDICADO 'onboarding_touch' (no-chase por CONSTRUCCION: los
+  motores de recordatorio/escalacion anclan en 'invitation' y no lo ven) + dedupKey
+  por toque (waSlug). Bifurcacion mutuamente excluyente: email intacto (camino
+  legacy, no se migra) / WhatsApp a la cola / none fail-closed + consume. Consent
+  via puedeRecibirContenidoPersonal (fail-closed sin employeeId, sin fallback por
+  nationalId). 4 templates WhatsApp por etapa (placeholder HX, submit Meta al track
+  paralelo). Wire enqueueChannelOnboarding en enrollParticipant (solicitud de
+  consent al pre-nomina phone-only) que cierra el hueco de enablement: sin el wire
+  el frontline nunca daba opt-in real y sus toques resolvian 'none'. NO toca el
+  rodeo HTTP de creacion (generateServiceToken / participants-upload). Verificacion:
+  smoke 8/8 PASS (E2b-2 wire real / E2b-3 proxy admin_loaded->none / E2b-5a-b
+  consent fresco + STOP / E2b-4 no-chase con reminderCount=0 / E2b-6 rodeo / E2b-7
+  email intacto / E2b-8 rama existing propaga employeeId a los 4 Participant) en
+  simulation, teardown por id exacto en $transaction (GUARD companyName) + tsc/build
+  verdes. GOTCHA: el modelo de alerta es JourneyAlert (no OnboardingAlert).
+  Prerequisito go-live: submit + aprobacion Meta de los 4 templates
+  onboarding-day{1,7,30,90}-whatsapp, y dispatcher (message-dispatcher) en
+  vercel.json para prod (tarea aparte). Diferido a Gate F: Metas (ultimo del roadmap
+  v3.0).
+
 ---
 
 FIN DEL DOCUMENTO MAESTRO v3.0
