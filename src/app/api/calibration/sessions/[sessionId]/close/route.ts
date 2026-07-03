@@ -5,10 +5,19 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationService'
+import { extractUserContext } from '@/lib/services/AuthorizationService'
 import { calculateAdjustmentType } from '@/config/performanceClassification'
 import { generateCalibrationAuditPDF } from '@/lib/services/CalibrationAuditPDF'
 import { uploadToSupabaseStorage } from '@/lib/services/uploadToSupabaseStorage'
+
+// DEUDA FUTURA (no implementar ahora): panel de administración de sesiones de
+// calibración para RRHH y vista de resultado final del ciclo para el CEO (solo
+// lectura, calibration:view). Además, las sesiones IN_PROGRESS no expiran hoy:
+// quedan abiertas hasta cierre manual (intencional en esta etapa). A futuro
+// evaluar un estado terminal para sesiones abandonadas (superan X días sin
+// cerrarse), distinto de CLOSED (que aplica ajustes = calibra). Requiere cron y
+// decisión sobre qué pasa con los ajustes pendientes. NO alterar el enum ahora:
+// se mantiene DRAFT / IN_PROGRESS / CLOSED / CANCELLED.
 
 export async function POST(
   request: NextRequest,
@@ -27,10 +36,17 @@ export async function POST(
       )
     }
 
-    // ═══ CHECK 2: hasPermission (NO arrays hardcodeados) ═══
-    if (!hasPermission(userContext.role, 'calibration:manage')) {
+    // ═══ CHECK 2 (PUERTA 2, rol de sesión): CERRAR solo lo conduce el FACILITATOR
+    // inscrito en ESTA sesión (aplica ajustes = calibra). Sin override RBAC: quien no
+    // es facilitador se inscribe primero vía el endpoint de invitar (Puerta 1
+    // calibration:manage). Patrón = AJUSTAR (lookup por participantEmail), pero
+    // exigiendo role === 'FACILITATOR' (conducir es solo del facilitador).
+    const participant = await prisma.calibrationParticipant.findUnique({
+      where: { sessionId_participantEmail: { sessionId, participantEmail: userEmail } }
+    })
+    if (!participant || participant.role !== 'FACILITATOR') {
       return NextResponse.json(
-        { success: false, error: 'Sin permisos para cerrar sesiones' },
+        { success: false, error: 'Solo el FACILITATOR de la sesión puede cerrarla' },
         { status: 403 }
       )
     }

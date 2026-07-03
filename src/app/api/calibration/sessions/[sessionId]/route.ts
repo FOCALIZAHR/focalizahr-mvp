@@ -132,6 +132,25 @@ export async function PUT(
     const body = await request.json()
     const { name, description, scheduledAt, status } = body
 
+    // ═══ PUERTA 2 (rol de sesión): INICIAR (transición → IN_PROGRESS) solo lo conduce
+    // el FACILITATOR inscrito en ESTA sesión. Se gatea la TRANSICIÓN real (no el valor
+    // reenviado): un renombre de una sesión ya IN_PROGRESS no dispara → la metadata
+    // (name/description/scheduledAt) sigue en Puerta 1 (calibration:manage, gate de
+    // arriba). Consistente con el `!session.startedAt` de abajo. Sin override RBAC: quien
+    // no es facilitador se inscribe primero vía el endpoint de invitar. Patrón = AJUSTAR.
+    if (status === 'IN_PROGRESS' && session.status !== 'IN_PROGRESS') {
+      const userEmail = request.headers.get('x-user-email') || ''
+      const participant = await prisma.calibrationParticipant.findUnique({
+        where: { sessionId_participantEmail: { sessionId, participantEmail: userEmail } }
+      })
+      if (!participant || participant.role !== 'FACILITATOR') {
+        return NextResponse.json(
+          { success: false, error: 'Solo el FACILITATOR de la sesión puede iniciarla' },
+          { status: 403 }
+        )
+      }
+    }
+
     const updated = await prisma.calibrationSession.update({
       where: { id: sessionId },
       data: {
