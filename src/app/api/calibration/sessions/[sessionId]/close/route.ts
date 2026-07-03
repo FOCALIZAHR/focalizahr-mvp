@@ -129,17 +129,21 @@ export async function POST(
           data: ratingUpdateData
         })
 
-        // Marcar ajuste como aplicado
-        await tx.calibrationAdjustment.update({
-          where: { id: adjustment.id },
-          data: {
-            status: 'APPLIED',
-            appliedAt: new Date()
-          }
-        })
-
         applied.push(adjustment.id)
       }
+
+      // Marcar TODOS los ajustes aplicados en UN solo updateMany (reduce round-trips:
+      // N update individuales → 1). Mismo efecto que el update por-id que reemplaza
+      // (status=APPLIED + appliedAt). `applied` = ids de los ajustes PENDING de esta
+      // sesión cuyos PerformanceRating se actualizaron arriba en el loop. appliedAt
+      // único para todo el batch = instante de commit consistente.
+      await tx.calibrationAdjustment.updateMany({
+        where: { id: { in: applied } },
+        data: {
+          status: 'APPLIED',
+          appliedAt: new Date()
+        }
+      })
 
       // Cerrar sesión
       await tx.calibrationSession.update({
@@ -151,7 +155,11 @@ export async function POST(
       })
 
       return { appliedCount: applied.length }
-    })
+      // timeout 30s = margen para la latencia variable de Supabase remoto. La
+      // transacción es SOLO writes de BD atómicos (ratings + ajustes + cierre); el
+      // I/O externo (PDF/upload) va fuera. El default de 5s no alcanza para N ratings
+      // en serie contra BD remota (era la causa del P2028).
+    }, { timeout: 30000 })
 
     // Audit log (fuera de la transacción)
     await prisma.auditLog.create({
