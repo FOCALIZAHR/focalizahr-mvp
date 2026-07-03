@@ -16,7 +16,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { Resend } from 'resend'
 import { prisma } from '@/lib/prisma'
 import {
   extractUserContext,
@@ -25,9 +24,7 @@ import {
 import { IntelligenceInsightService } from '@/lib/services/IntelligenceInsightService'
 import { renderTACMassActionEmail } from '@/lib/templates/tac-alert-template'
 import { formatDisplayName } from '@/lib/utils/formatName'
-import { FROM_EMAIL } from '@/lib/constants/email-sender'
-
-const resend = new Resend(process.env.RESEND_API_KEY)
+import { sendEmail } from '@/lib/services/email-service'
 
 const VALID_ACTIONS = [
   'RETENTION_ROUND', 'WORKLOAD_REVIEW', 'DIRECT_EVALUATION', 'TEAM_RECOGNITION'
@@ -185,60 +182,67 @@ export async function POST(request: NextRequest) {
 
       // Por cada gerencia: buscar AREA_MANAGER → fallback HR_ADMIN → fallback ACCOUNT_OWNER
       for (const [gerenciaId, group] of byGerencia) {
-        // Intento 1: AREA_MANAGER asignado a la gerencia
-        let recipient = await prisma.user.findFirst({
-          where: {
-            accountId: userContext.accountId,
-            departmentId: gerenciaId,
-            role: 'AREA_MANAGER',
-            isActive: true
-          },
-          select: { email: true, name: true, role: true }
-        })
-
-        // Fallback: HR_ADMIN o ACCOUNT_OWNER (alguien que pueda actuar)
-        if (!recipient?.email) {
-          recipient = await prisma.user.findFirst({
+        try {
+          // Intento 1: AREA_MANAGER asignado a la gerencia
+          let recipient = await prisma.user.findFirst({
             where: {
               accountId: userContext.accountId,
-              role: { in: ['HR_ADMIN', 'ACCOUNT_OWNER'] },
+              departmentId: gerenciaId,
+              role: 'AREA_MANAGER',
               isActive: true
             },
             select: { email: true, name: true, role: true }
           })
-        }
 
-        if (!recipient?.email) {
-          console.warn(`[TAC mass-action] No recipient for gerencia ${gerenciaId} (${group.gerenciaName})`)
-          continue
-        }
+          // Fallback: HR_ADMIN o ACCOUNT_OWNER (alguien que pueda actuar)
+          if (!recipient?.email) {
+            recipient = await prisma.user.findFirst({
+              where: {
+                accountId: userContext.accountId,
+                role: { in: ['HR_ADMIN', 'ACCOUNT_OWNER'] },
+                isActive: true
+              },
+              select: { email: true, name: true, role: true }
+            })
+          }
 
-        // Construir lista HTML de personas
-        const peopleListHtml = group.persons
-          .map(p => `<p style="margin: 4px 0; font-size: 14px; color: #334155;">${p.name} — <span style="color: #64748B;">${p.position}</span></p>`)
-          .join('')
+          if (!recipient?.email) {
+            console.warn(`[TAC mass-action] No recipient for gerencia ${gerenciaId} (${group.gerenciaName})`)
+            continue
+          }
 
-        const { subject, html } = renderTACMassActionEmail(emailQuadrant, {
-          ceo_name: ceoName,
-          manager_name: recipient.name || 'Gerente',
-          company_name: companyName,
-          department_name: group.gerenciaName,
-          people_count: group.persons.length,
-          people_list: peopleListHtml
-        })
+          // Construir lista HTML de personas
+          const peopleListHtml = group.persons
+            .map(p => `<p style="margin: 4px 0; font-size: 14px; color: #334155;">${p.name} — <span style="color: #64748B;">${p.position}</span></p>`)
+            .join('')
 
-        const { error: emailError } = await resend.emails.send({
-          from: FROM_EMAIL,
-          to: [recipient.email],
-          subject,
-          html
-        })
+          const { subject, html } = renderTACMassActionEmail(emailQuadrant, {
+            ceo_name: ceoName,
+            manager_name: recipient.name || 'Gerente',
+            company_name: companyName,
+            department_name: group.gerenciaName,
+            people_count: group.persons.length,
+            people_list: peopleListHtml
+          })
 
-        if (emailError) {
-          console.error(`[TAC mass-action] Email error for ${recipient.email}:`, emailError)
-        } else {
-          notifiedManagers.push(`${recipient.name || recipient.email} (${group.gerenciaName})`)
-          console.log(`[TAC mass-action] Email sent to ${recipient.email} for ${group.gerenciaName}`)
+          const sendResult = await sendEmail({
+            to: recipient.email,
+            subject,
+            html
+          })
+
+          if (!sendResult.success) {
+            console.error(`[TAC mass-action] Email error for ${recipient.email}:`, sendResult.error)
+          } else {
+            notifiedManagers.push(`${recipient.name || recipient.email} (${group.gerenciaName})`)
+            console.log(`[TAC mass-action] Email sent to ${recipient.email} for ${group.gerenciaName}`)
+          }
+
+          // Rate limit Resend: 550ms entre envios (mismo protocolo que publish/send-calibration)
+          await new Promise(resolve => setTimeout(resolve, 550))
+        } catch (gerenciaErr) {
+          // Un fallo en una gerencia (ej: quadrant desconocido en el template) NO aborta el resto del loop
+          console.error(`[TAC mass-action] Error procesando gerencia ${gerenciaId} (${group.gerenciaName}):`, gerenciaErr)
         }
       }
     } catch (emailErr) {

@@ -29,7 +29,7 @@ function getResend(): Resend {
 }
 
 export type EmailSendArgs = {
-  to: string;
+  to: string | string[];
   subject: string;
   html: string;
 };

@@ -28,7 +28,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { Resend } from 'resend'
 import { prisma } from '@/lib/prisma'
 import {
   extractUserContext,
@@ -36,9 +35,7 @@ import {
 } from '@/lib/services/AuthorizationService'
 import { IntelligenceInsightService } from '@/lib/services/IntelligenceInsightService'
 import { renderTACAlertEmail } from '@/lib/templates/tac-alert-template'
-import { FROM_EMAIL } from '@/lib/constants/email-sender'
-
-const resend = new Resend(process.env.RESEND_API_KEY)
+import { sendEmail } from '@/lib/services/email-service'
 
 const VALID_ACTIONS = ['NOTIFY_HRBP', 'SCHEDULE_COMMITTEE', 'FLAG_FOR_REVIEW']
 
@@ -132,6 +129,7 @@ export async function POST(request: NextRequest) {
 
       const recipients = hrManagers.map(h => h.email).filter(Boolean)
 
+      let emailDelivered = false
       if (recipients.length > 0) {
         try {
           const companyName = request.headers.get('x-company-name') || 'Empresa'
@@ -148,16 +146,16 @@ export async function POST(request: NextRequest) {
             action_code: action
           })
 
-          const { error: emailError } = await resend.emails.send({
-            from: FROM_EMAIL,
+          const sendResult = await sendEmail({
             to: recipients,
             subject,
             html
           })
 
-          if (emailError) {
-            console.error('[TAC Checkout] NOTIFY_HRBP email error:', emailError)
+          if (!sendResult.success) {
+            console.error('[TAC Checkout] NOTIFY_HRBP email error:', sendResult.error)
           } else {
+            emailDelivered = true
             console.log('[TAC Checkout] NOTIFY_HRBP email sent to:', recipients)
           }
         } catch (emailErr) {
@@ -165,9 +163,11 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      contextMessage = notifiedNames.length > 0
+      contextMessage = emailDelivered
         ? `Se alertó a ${notifiedNames.join(', ')}. FocalizaHR correlacionará esta intervención con la evolución del equipo.`
-        : 'No se encontraron responsables de HR activos. El insight quedó registrado para seguimiento.'
+        : recipients.length === 0
+          ? 'No se encontraron responsables de HR activos. El insight quedó registrado para seguimiento.'
+          : 'El insight quedó registrado. No se pudo enviar la notificación a HR en este momento.'
 
     } else if (action === 'SCHEDULE_COMMITTEE') {
       contextMessage = 'Comité registrado con CEO, CHRO y Gerente titular. FocalizaHR vinculará esta decisión con los indicadores futuros.'

@@ -6,10 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { Resend } from 'resend'
-import { FROM_EMAIL } from '@/lib/constants/email-sender'
-
-const resend = new Resend(process.env.RESEND_API_KEY)
+import { sendEmail } from '@/lib/services/email-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -70,8 +67,7 @@ export async function GET(request: NextRequest) {
 
       // Alerta si < 50%
       if (completionRate < 50) {
-        const { error } = await resend.emails.send({
-          from: FROM_EMAIL,
+        const sendResult = await sendEmail({
           to: cycle.account.adminEmail,
           subject: `🚨 Alerta: Baja Tasa de Respuesta en ${cycle.name}`,
           html: `
@@ -115,7 +111,7 @@ export async function GET(request: NextRequest) {
           `
         })
 
-        if (!error) {
+        if (sendResult.success) {
           alertsSent.push({
             cycleId: cycle.id,
             cycleName: cycle.name,

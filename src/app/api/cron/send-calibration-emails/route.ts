@@ -12,11 +12,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { Resend } from 'resend'
 import { renderCalibrationInviteTemplate } from '@/lib/templates/calibration-invite-template'
-import { FROM_EMAIL } from '@/lib/constants/email-sender'
-
-const resend = new Resend(process.env.RESEND_API_KEY)
+import { sendEmail } from '@/lib/services/email-service'
 
 export async function GET(request: NextRequest) {
   // Validar CRON_SECRET
@@ -74,15 +71,14 @@ export async function GET(request: NextRequest) {
             companyName: session.account.companyName
           })
 
-          const { error: resendError } = await resend.emails.send({
-            from: FROM_EMAIL,
+          const sendResult = await sendEmail({
             to: participant.participantEmail,
             subject,
             html
           })
 
-          if (resendError) {
-            sessionErrors.push(`${participant.participantEmail}: ${resendError.message}`)
+          if (!sendResult.success) {
+            sessionErrors.push(`${participant.participantEmail}: ${sendResult.error}`)
             continue
           }
 
