@@ -19,10 +19,13 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { Resend } from 'resend';
 import { renderEmailTemplate } from '@/lib/templates/email-templates';
 import { getLegalEmailLabels } from '@/config/compliance/legalBadgeConfig';
-import { FROM_EMAIL } from '@/lib/constants/email-sender';
+// GATE 1b (Arquitectura de Envío): transporte unificado. Los dos envíos de este cron
+// (recordatorio de encuesta en sendReminder + drenaje riel B en processAutomationQueue)
+// usan sendEmail() en vez de new Resend() propio. from=FROM_EMAIL y el header
+// Content-Type los aplica sendEmail internamente (mismo comportamiento observable).
+import { sendEmail } from '@/lib/services/email-service';
 // GATE D D3: escalación WhatsApp (vive como servicio; el route solo la invoca).
 import { processSurveyEscalations } from '@/lib/services/survey-escalation';
 // GATE E.1 ruta 3: recordatorio WhatsApp del phone-only (servicio aislado; el route
@@ -35,8 +38,6 @@ import { processWhatsAppReminders } from '@/lib/services/whatsapp-reminders';
 import { dispatchOnboardingTouch } from '@/lib/services/onboarding-touch-dispatch';
 import { WHATSAPP_ONBOARDING_TOUCH_SLUGS } from '@/lib/templates/whatsapp-templates';
 import { runDispatcherBatch } from '@/lib/services/message-dispatcher';
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 // ⏱️ Helper para respetar rate limit de Resend (2 requests/segundo)
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -272,29 +273,25 @@ async function sendReminder(
     }
   );
 
-  // 🔧 CAMBIO CRÍTICO 1: Capturar respuesta de Resend
-  const { data, error } = await resend.emails.send({
-    from: FROM_EMAIL,
+  // 🔧 CAMBIO CRÍTICO 1: Enviar vía transporte unificado (Gate 1b)
+  const result = await sendEmail({
     to: participant.email,
     subject: `${customSubject} - ${campaign.account.companyName}`,
     html,
-    headers: {
-      'Content-Type': 'text/html; charset=UTF-8'
-    }
   });
 
-  // 🔧 CAMBIO CRÍTICO 2: Validar error antes de continuar
-  if (error) {
+  // 🔧 CAMBIO CRÍTICO 2: Validar fallo antes de continuar.
+  // sendEmail ya colapsa el caso "sin data" en success=false (Gate 1b: deuda
+  // registrada — se pierde error.name/fullError, queda solo result.error string).
+  if (!result.success) {
     console.error('❌ Resend API error:', {
       participantEmail: participant.email,
       participantId: participant.id,
       reminderType,
       campaignId: campaign.id,
-      errorName: error.name,
-      errorMessage: error.message,
-      fullError: JSON.stringify(error)
+      errorMessage: result.error
     });
-    
+
     // ✅ MEJORA v4.2: Guardar fallo en BD usando bounceReason
     // ✅ MEJORA v4.2.1: Proteger con try-catch para no bloquear proceso principal
     try {
@@ -306,32 +303,21 @@ async function sendReminder(
           templateId: campaign.campaignType.slug,
           sentAt: new Date(),
           status: 'failed',
-          bounceReason: JSON.stringify(error)
+          bounceReason: result.error
         }
       });
     } catch (logError) {
       console.error('⚠️ No se pudo guardar log de fallo en BD:', logError);
       // Continuar y lanzar error original de Resend
     }
-    
-    // ✅ Fallo registrado en BD (o intentado), ahora lanzar error para detener proceso
-    throw new Error(`Resend API failed: ${error.message}`);
-  }
 
-  // 🔧 CAMBIO CRÍTICO 3: Verificar que data existe
-  if (!data) {
-    console.error('❌ Resend no devolvió data (caso edge):', {
-      participantEmail: participant.email,
-      participantId: participant.id,
-      reminderType,
-      campaignId: campaign.id
-    });
-    throw new Error('Resend API did not return data');
+    // ✅ Fallo registrado en BD (o intentado), ahora lanzar error para detener proceso
+    throw new Error(`Resend API failed: ${result.error}`);
   }
 
   // 🔧 CAMBIO CRÍTICO 4: Log de éxito con información útil
   console.log('✅ Email enviado exitosamente:', {
-    resendId: data.id,
+    resendId: result.providerId,
     participantEmail: participant.email,
     participantId: participant.id,
     reminderType,
@@ -529,18 +515,13 @@ async function processAutomationQueue(): Promise<{
           }
         );
 
-        // 4️⃣ ENVIAR: Resend API
-        const { data, error } = await resend.emails.send({
-          from: FROM_EMAIL,
-          to: toEmail,
-          subject,
-          html,
-          headers: { 'Content-Type': 'text/html; charset=UTF-8' }
-        });
+        // 4️⃣ ENVIAR: transporte unificado (Gate 1b)
+        const result = await sendEmail({ to: toEmail, subject, html });
 
-        // ⚠️ PROTOCOLO 1: Capturar {data, error}
-        if (error) throw new Error(JSON.stringify(error));
-        if (!data) throw new Error('Resend no devolvió data');
+        // ⚠️ PROTOCOLO 1: fallo (incl. "sin data") -> throw, lo agarra el catch de abajo.
+        // Gate 1b: cambio de string de error (result.error vs JSON.stringify(error)),
+        // comportamiento equivalente (sigue lanzando y consumiendo el job como fallido).
+        if (!result.success) throw new Error(result.error);
 
         // 5️⃣ LOGGING: EmailLog (auditoría)
         await prisma.emailLog.create({
