@@ -105,7 +105,7 @@ export class IndividualReportService {
         employee: {
           select: {
             id: true,
-            name: true
+            fullName: true
           }
         },
         cycle: {
@@ -150,7 +150,7 @@ export class IndividualReportService {
     return {
       reportId: confirmation.id,
       employeeId: confirmation.employee.id,
-      employeeName: confirmation.employee.name || results360.evaluateeName,
+      employeeName: confirmation.employee.fullName || results360.evaluateeName,
       cycleId: confirmation.cycle.id,
       cycleName: confirmation.cycle.name,
       generatedAt: confirmation.sentAt,

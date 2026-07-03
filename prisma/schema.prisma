@@ -445,9 +445,6 @@ model Participant {
   evaluationAssignmentId  String?  @unique @map("evaluation_assignment_id")
   evaluationAssignment    EvaluationAssignment? @relation(fields: [evaluationAssignmentId], references: [id])
 
-  // Feedback Delivery (reportes individuales Performance)
-  feedbackDeliveries FeedbackDeliveryConfirmation[] @relation("FeedbackDeliveryEmployee")
-
   @@unique([campaignId, nationalId, evaluationAssignmentId], map: "unique_participant_evaluation")
   @@index([campaignId], map: "idx_participants_campaign")
   @@index([uniqueToken], map: "idx_participants_token")
@@ -1701,6 +1698,10 @@ model Employee {
   // Gate E.1 v3.0 - log de eventos de consent (fuente unica de verdad)
   consentEvents          ConsentEvent[]
 
+  // Feedback Delivery (reportes individuales Performance) — FK repuntada desde
+  // Participant en Gate 3 Arquitectura Envío (el resto de la plataforma ya es Employee-based)
+  feedbackDeliveries     FeedbackDeliveryConfirmation[] @relation("FeedbackDeliveryEmployee")
+
   // Índices
   @@unique([accountId, nationalId], map: "idx_employees_account_national")
   @@index([accountId, status], map: "idx_employees_account_status")
@@ -2090,8 +2091,11 @@ model FeedbackDeliveryConfirmation {
   id               String    @id @default(cuid())
 
   // Relaciones
+  // Gate 3 Arquitectura Envío (jul-2026): FK repuntada Participant → Employee.
+  // La tabla se diseñó contra Participant cuando ese era el master de personas;
+  // nunca se activó (0 filas). Esto completa la migración Employee-based.
   employeeId       String
-  employee         Participant @relation("FeedbackDeliveryEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  employee         Employee @relation("FeedbackDeliveryEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
 
   cycleId          String
   cycle            PerformanceCycle @relation("FeedbackDeliveryCycle", fields: [cycleId], references: [id], onDelete: Cascade)

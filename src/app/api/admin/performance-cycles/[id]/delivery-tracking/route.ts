@@ -50,7 +50,7 @@ export async function GET(
         employee: {
           select: {
             id: true,
-            name: true,
+            fullName: true,
             email: true
           }
         }
@@ -78,7 +78,7 @@ export async function GET(
       return {
         id: c.id,
         employeeId: c.employeeId,
-        employeeName: c.employee.name || 'Sin nombre',
+        employeeName: c.employee.fullName || 'Sin nombre',
         employeeEmail: c.employee.email || '',
         sentAt: c.sentAt.toISOString(),
         confirmedAt: c.confirmedAt?.toISOString() || null,

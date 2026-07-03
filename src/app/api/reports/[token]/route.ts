@@ -22,7 +22,7 @@ export async function GET(
         employee: {
           select: {
             id: true,
-            name: true,
+            fullName: true,
             email: true
           }
         },
@@ -144,7 +144,7 @@ export async function GET(
       success: true,
       report: {
         token,
-        employeeName: confirmation.employee.name || 'Empleado',
+        employeeName: confirmation.employee.fullName || 'Empleado',
         cycleName: confirmation.cycle.name,
         companyName: confirmation.cycle.account!.companyName,
         sentAt: confirmation.sentAt.toISOString(),
