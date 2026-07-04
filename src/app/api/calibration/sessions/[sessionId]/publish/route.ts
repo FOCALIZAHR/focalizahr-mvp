@@ -16,6 +16,9 @@ import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationS
 import { renderCalibrationInviteTemplate } from '@/lib/templates/calibration-invite-template'
 import { sendEmail } from '@/lib/services/email-service'
 
+// Gate 4: Next 14 cachea fetch() en route handlers; defensivo para el POST a Resend.
+export const fetchCache = 'force-no-store'
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
@@ -85,6 +88,7 @@ export async function POST(
     const sendImmediately = scheduledFor <= now
 
     let emailsSent = 0
+    const sentEmails: string[] = []
     const emailErrors: string[] = []
 
     if (sendImmediately) {
@@ -113,6 +117,7 @@ export async function POST(
           }
 
           emailsSent++
+          sentEmails.push(participant.participantEmail)
 
           // Rate limit: 550ms entre emails (protocolo Resend)
           await new Promise(resolve => setTimeout(resolve, 550))
@@ -121,7 +126,10 @@ export async function POST(
         }
       }
 
-      // Registrar que emails fueron enviados
+      // Registrar el resultado POR PARTICIPANTE (Gate 4): sentEmails lleva solo
+      // los éxitos de esta corrida — los fallidos quedan fuera y el cron diario
+      // de send-calibration-emails los reintenta (dedup por participante, no
+      // por sesión; ver header de ese cron).
       await prisma.auditLog.create({
         data: {
           accountId: session.accountId,
@@ -132,6 +140,8 @@ export async function POST(
             sentBy: userEmail,
             emailsSent,
             emailErrors: emailErrors.length,
+            sentEmails,
+            errors: emailErrors.length > 0 ? emailErrors : undefined,
             sentAt: new Date().toISOString()
           }
         }
