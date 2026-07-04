@@ -20,6 +20,12 @@
 //   romper esta semantica (filtrar por canal infla la tasa de participacion).
 // ════════════════════════════════════════════════════════════════════════════
 
+// Next 14 cachea fetch() en Route Handlers (incluso POST a Resend/Twilio) y
+// force-dynamic NO lo evita. Sin esto, un reintento con body identico puede
+// servirse de .next/cache/fetch-cache: falso SENT sin envio real. Evidencia:
+// sello Gate 3 de Arquitectura de Envio (2026-07-04).
+export const fetchCache = 'force-no-store';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { waitUntil } from '@vercel/functions';
 import { prisma } from '@/lib/prisma';
