@@ -38,6 +38,11 @@ import { prisma } from '@/lib/prisma'
 import { IndividualReportService } from '@/lib/services/IndividualReportService'
 
 export const dynamic = 'force-dynamic'
+// Next 14 cachea fetches (incluso POST) hechos dentro de Route Handlers GET y
+// force-dynamic NO lo evita (verificado en smoke Gate 3: el GET de la cadena se
+// sirvió de .next/cache/fetch-cache). force-no-store lo desactiva para todo
+// fetch de este handler (el disparo de cadena de fireDispatcherChain).
+export const fetchCache = 'force-no-store'
 export const maxDuration = 300
 
 // Dedicado (no 'invitation'): sin chase de recordatorios ni espejo EmailLog,
