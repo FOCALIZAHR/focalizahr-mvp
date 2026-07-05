@@ -9,6 +9,7 @@ import { useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { GhostButton } from '@/components/ui/PremiumButton'
+import { useToast } from '@/components/ui/toast-system'
 import { useGoalDetail } from '@/hooks/useGoalDetail'
 import GoalDetailHeader from '@/components/goals/GoalDetailHeader'
 import GoalProgressTimeline from '@/components/goals/GoalProgressTimeline'
@@ -23,7 +24,8 @@ export default function GoalDetailPage() {
   const params = useParams()
   const goalId = params.id as string
 
-  const { goal, isLoading, isError, checkIn, refresh } = useGoalDetail(goalId)
+  const { goal, isLoading, isError, checkIn, requestClosure, refresh } = useGoalDetail(goalId)
+  const { addToast } = useToast()
   const [showCheckIn, setShowCheckIn] = useState(false)
 
   const handleCheckIn = useCallback(
@@ -32,6 +34,15 @@ export default function GoalDetailPage() {
     },
     [checkIn]
   )
+
+  const handleRequestClosure = useCallback(async () => {
+    try {
+      await requestClosure()
+      addToast({ type: 'success', message: 'Solicitud de cierre enviada. Queda pendiente de aprobación.' })
+    } catch (e) {
+      addToast({ type: 'error', message: e instanceof Error ? e.message : 'Error solicitando cierre' })
+    }
+  }, [requestClosure, addToast])
 
   const handleOpenCheckIn = useCallback(() => {
     setShowCheckIn(true)
@@ -103,7 +114,7 @@ export default function GoalDetailPage() {
     <div className="fhr-bg-main min-h-screen">
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
         {/* Header */}
-        <GoalDetailHeader goal={goal} onCheckIn={handleOpenCheckIn} />
+        <GoalDetailHeader goal={goal} onCheckIn={handleOpenCheckIn} onRequestClosure={handleRequestClosure} />
 
         {/* Grid de contenido */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

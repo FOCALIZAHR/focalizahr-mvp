@@ -117,14 +117,38 @@ export function useGoalDetail(id: string) {
     return res.json()
   }, [id, mutate])
 
+  const requestClosure = useCallback(async () => {
+    const token = typeof window !== 'undefined'
+      ? localStorage.getItem('focalizahr_token')
+      : null
+
+    const res = await fetch(`/api/goals/${id}/request-closure`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      credentials: 'include',
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error || 'Error solicitando cierre')
+    }
+
+    mutate()
+    return res.json()
+  }, [id, mutate])
+
   return useMemo(() => ({
     goal: data?.data ?? null,
     isLoading,
     isError: !!error,
     error,
     checkIn,
+    requestClosure,
     refresh: mutate,
-  }), [data?.data, isLoading, error, checkIn, mutate])
+  }), [data?.data, isLoading, error, checkIn, requestClosure, mutate])
 }
 
 // Re-export types
