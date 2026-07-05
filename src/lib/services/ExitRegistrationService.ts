@@ -200,28 +200,27 @@ export class ExitRegistrationService {
         return { participant, exitRecord };
       });
 
-      // 6. Programar email de invitación
-      await this.scheduleInvitationEmail(result.participant, data, campaign.id);
+      // 6. Despachar la invitación (bifurcación por canal, Gate E.2a)
+      const dispatch = await this.scheduleInvitationEmail(result.participant, data, campaign.id);
 
       console.log('[ExitRegistration] ✅ Registration completed successfully:', {
         exitRecordId: result.exitRecord.id,
         participantId: result.participant.id,
-        surveyToken: result.participant.uniqueToken
+        surveyToken: result.participant.uniqueToken,
+        channel: dispatch.channel
       });
 
-      // Calcular fecha email (misma lógica que scheduleInvitationEmail)
-      let emailScheduledFor: string | undefined;
-      if (data.email) {
-        const scheduledDate = new Date(data.exitDate);
-        scheduledDate.setDate(scheduledDate.getDate() + 1);
-        scheduledDate.setHours(9, 0, 0, 0);
-        const now = new Date();
-        if (scheduledDate < now) {
-          scheduledDate.setTime(now.getTime());
-          scheduledDate.setDate(scheduledDate.getDate() + 1);
-          scheduledDate.setHours(9, 0, 0, 0);
-        }
-        emailScheduledFor = scheduledDate.toISOString();
+      // Mensaje según el canal REALMENTE despachado (no según data.email): la
+      // derivación vive en scheduleInvitationEmail, que la reporta aquí.
+      const emailScheduledFor =
+        dispatch.channel === 'email' ? dispatch.scheduledFor : undefined;
+      let message: string;
+      if (dispatch.channel === 'email' && emailScheduledFor) {
+        message = `Salida registrada. Email programado para ${new Date(emailScheduledFor).toLocaleDateString('es-CL')}`;
+      } else if (dispatch.channel === 'whatsapp') {
+        message = 'Salida registrada. Invitación enviada por WhatsApp.';
+      } else {
+        message = 'Salida registrada exitosamente.';
       }
 
       return {
@@ -230,9 +229,7 @@ export class ExitRegistrationService {
         participantId: result.participant.id,
         surveyToken: result.participant.uniqueToken,
         emailScheduledFor,
-        message: emailScheduledFor
-          ? `Salida registrada. Email programado para ${new Date(emailScheduledFor).toLocaleDateString('es-CL')}`
-          : 'Salida registrada exitosamente.'
+        message
       };
 
     } catch (error: any) {
@@ -737,7 +734,7 @@ export class ExitRegistrationService {
     },
     data: ExitRegistrationData,
     campaignId: string
-  ): Promise<void> {
+  ): Promise<{ channel: 'email' | 'whatsapp' | 'none'; scheduledFor?: string }> {
     // Consent C1 derivado del log ConsentEvent (fuente única). Sin employeeId no se
     // puede derivar -> fail-closed (borde, no sistemático: el dato normalmente está).
     let canReceivePersonalContent = false;
@@ -797,7 +794,7 @@ export class ExitRegistrationService {
         email: participant.email,
         scheduledFor: scheduledDate.toISOString()
       });
-      return;
+      return { channel: 'email', scheduledFor: scheduledDate.toISOString() };
     }
 
     // ── Canal WHATSAPP: NUEVO, a la cola con messageType dedicado ────────────
@@ -847,7 +844,7 @@ export class ExitRegistrationService {
       } catch (dispatchErr) {
         console.error('[ExitRegistration] Dispatcher tras encolar exit invitation:', dispatchErr);
       }
-      return;
+      return { channel: 'whatsapp' };
     }
 
     // ── Sin canal / fail-closed ──────────────────────────────────────────────
@@ -855,6 +852,7 @@ export class ExitRegistrationService {
       participantId: participant.id,
       channel
     });
+    return { channel: 'none' };
   }
 }
 
