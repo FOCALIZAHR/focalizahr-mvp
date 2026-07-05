@@ -178,6 +178,9 @@ model Account {
   exitAlerts        ExitAlert[]
   exitInsights      DepartmentExitInsight[]
 
+  // Metas — insight mensual a nivel persona (inversa F1, requisito Prisma)
+  goalsInsights     EmployeeGoalsInsight[]
+
   // ═══════════════════════════════════════════════════
   // RELACIONES EMPLOYEE MASTER + PERFORMANCE
   // ═══════════════════════════════════════════════════
@@ -1550,6 +1553,55 @@ model DepartmentExitInsight {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// EMPLOYEE GOALS INSIGHT (agregación mensual LENTE 1) - NIVEL PERSONA
+// Primer insight a nivel employeeId de la plataforma.
+// Calcado de DepartmentExitInsight, granularidad PERSONA. Metas es soberano:
+// el ciclo (goalCycleId) es contexto opcional, no dueño.
+// ════════════════════════════════════════════════════════════════════════════
+model EmployeeGoalsInsight {
+  id            String   @id @default(cuid())
+  accountId     String   @map("account_id")
+  employeeId    String   @map("employee_id")
+
+  // PERÍODO (patrón FocalizaHR - idéntico a DepartmentExitInsight)
+  period        String   // "2026-01", "2026-Q1", "2026"
+  periodType    String   @default("monthly") @map("period_type") // monthly|quarterly|yearly
+  periodStart   DateTime @map("period_start") @db.Date
+  periodEnd     DateTime @map("period_end") @db.Date
+
+  // REFERENCIA OPCIONAL AL CICLO (NUEVO - no existe en Exit)
+  goalCycleId   String?  @map("goal_cycle_id")
+
+  // MÉTRICAS DE DOMINIO (de getEmployeeGoalsScore)
+  weightedScore    Float?  @map("weighted_score")    // score ponderado 0-100
+  goalsCount       Int     @default(0) @map("goals_count")       // metas weight>0 vigentes
+  completedCount   Int     @default(0) @map("completed_count")   // metas con progress>=100
+  totalWeight      Float   @default(0) @map("total_weight")      // Σ weight
+
+  // TREND (vs período anterior - patrón eisTrend de Exit)
+  scoreTrend       Float?  @map("score_trend")  // delta vs mes anterior, null si primer mes
+
+  // DETALLE JSON (patrón topExitFactors de Exit) - snapshot inmutable
+  goalsDetail      Json?   @map("goals_detail")
+  // Forma: [{ goalId, title, progress, weight, weightedScore }]
+
+  // TIMESTAMP
+  calculatedAt     DateTime @default(now()) @map("calculated_at")
+
+  // RELACIONES
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  employee  Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  // IDEMPOTENCIA + ÍNDICES
+  @@unique([accountId, employeeId, period, periodType], map: "unique_employee_goals_period")
+  @@index([accountId], map: "idx_employee_goals_insights_account")
+  @@index([employeeId], map: "idx_employee_goals_insights_employee")
+  @@index([period], map: "idx_employee_goals_insights_period")
+  @@index([goalCycleId], map: "idx_employee_goals_insights_cycle")
+  @@map("employee_goals_insights")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // EMPLOYEE MASTER + PERFORMANCE EVALUATION
 // Fecha: Enero 2025
 // ════════════════════════════════════════════════════════════════════════════
@@ -1658,6 +1710,14 @@ model Employee {
   // del EXCLUDED por exclusión manual (que NO se reactiva). Captura el episodio en curso.
   noShowExcludedAt     DateTime? @map("no_show_excluded_at")
 
+  // ═══════════════════════════════════════════════════
+  // 🆕 GOLD CACHE METAS (LENTE 2) - primer accumulated* en Employee
+  // Naming alineado al patrón Department (accumulated* + LastUpdated)
+  // ═══════════════════════════════════════════════════
+  accumulatedGoalsScore       Float?    @map("accumulated_goals_score")
+  accumulatedGoalsPeriods     Int?      @map("accumulated_goals_periods")
+  accumulatedGoalsLastUpdated DateTime? @map("accumulated_goals_last_updated")
+
   // Timestamps
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1684,6 +1744,9 @@ model Employee {
 
   // Metas (Business Goals Engine)
   goals                  Goal[]
+
+  // Metas — insight mensual a nivel persona (LENTE 1, relación inversa lazy)
+  goalsInsights          EmployeeGoalsInsight[]
 
   // Sucesion Inteligente
   incumbentOfPositions   CriticalPosition[]      @relation("PositionIncumbent")
