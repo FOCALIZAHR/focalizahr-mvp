@@ -21,8 +21,9 @@ interface GoalsAggregationResult {
 
 export class GoalsAggregationService {
 
-  // Vercel Hobby maxDuration 300s → lotes acotados
-  private static readonly BATCH_SIZE = 50
+  // CHUNK_SIZE=10: seguro bajo el pool pgbouncer (~15); calca el precedente vivo
+  // PerformanceRatingService.ts:434. Es el control real de concurrencia.
+  private static readonly CHUNK_SIZE = 10
 
   // ══════════════════════════════════════════════════════════════════════════
   // ORQUESTADOR PRINCIPAL (calca runMonthlyAggregation de Exit)
@@ -61,29 +62,49 @@ export class GoalsAggregationService {
     // ── Resolver ciclo activo del período (si GoalCycle existe) - NUEVO
     const activeCycleId = await this.resolveActiveCycle(accountId, periodStart, periodEnd)
 
-    // ── Procesar por lotes (Vercel Hobby maxDuration 300s)
-    for (let i = 0; i < employees.length; i += this.BATCH_SIZE) {
-      const batch = employees.slice(i, i + this.BATCH_SIZE)
+    // ── Chunks paralelos (calca PerformanceRatingService.ts:433-456)
+    // Promise.allSettled aísla fallos por empleado (no aborta el chunk).
+    // Cada empleado toca SOLO su fila (upsert unique + update by PK) → sin race.
+    for (let i = 0; i < employees.length; i += this.CHUNK_SIZE) {
+      const chunk = employees.slice(i, i + this.CHUNK_SIZE)
+      const settled = await Promise.allSettled(
+        chunk.map(emp =>
+          this.processEmployee(accountId, emp.id, period, periodStart, periodEnd, activeCycleId)
+        )
+      )
 
-      for (const emp of batch) {
-        try {
-          // LENTE 1: EmployeeGoalsInsight
-          await this.calculateEmployeeInsight(
-            accountId, emp.id, period, periodStart, periodEnd, activeCycleId
-          )
-
-          // LENTE 2: Gold Cache rolling 12 meses
-          await this.updateGoldCache(emp.id)
-
-          insightsUpserted++
+      for (let j = 0; j < settled.length; j++) {
+        if (settled[j].status === 'fulfilled') {
           employeesProcessed++
-        } catch (error: any) {
-          console.error(`[GoalsAggregation] Error emp ${emp.fullName}:`, error.message)
+          insightsUpserted++
+        } else {
+          const reason = (settled[j] as PromiseRejectedResult).reason
+          console.error(
+            `[GoalsAggregation] Error emp ${chunk[j].fullName}:`,
+            reason instanceof Error ? reason.message : 'Error desconocido'
+          )
         }
       }
     }
 
     return { employeesProcessed, insightsUpserted }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // UNIDAD DE TRABAJO PARALELA: LENTE 1 → LENTE 2 (en orden — LENTE 2 lee lo que
+  // LENTE 1 acaba de escribir para este empleado). Independiente entre empleados
+  // (filas distintas), por eso es seguro correr N en paralelo dentro del chunk.
+  // ══════════════════════════════════════════════════════════════════════════
+  private static async processEmployee(
+    accountId: string,
+    employeeId: string,
+    period: string,
+    periodStart: Date,
+    periodEnd: Date,
+    goalCycleId: string | null
+  ): Promise<void> {
+    await this.calculateEmployeeInsight(accountId, employeeId, period, periodStart, periodEnd, goalCycleId)
+    await this.updateGoldCache(employeeId)
   }
 
   // ══════════════════════════════════════════════════════════════════════════
