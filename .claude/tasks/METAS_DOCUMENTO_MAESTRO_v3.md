@@ -527,8 +527,9 @@ GATE D — EN CURSO (7 sub-pasos D.1–D.7, ver SPEC §Gate D):
     = PENDING_CLOSURE (mismo end-state que requestClosure, sin campo nuevo). Guard
     lockAfterClosure NO se agrega a approve/rejectClosure (decisión Victor D.5a).
     Smoke gateD5 (untracked) VERDE. tsc+build limpios.
-  D.5 UI + D.1/D.2/D.3/D.4/D.6/D.7 — PENDIENTES. GET liviano del ciclo activo SIN
-    RBAC estratega para el wizard de colaborador (anotado en spec §Gate D).
+  D.1 — c388f56 (SELLADO): GET /api/goals/cycles/active liviano {id,name,status},
+    RBAC goals:view (no estratega), para el wizard del colaborador. Lo consume D.6.
+  D.5 UI + D.2/D.3/D.4/D.6/D.7 — PENDIENTES.
 GATE E — PENDIENTE (último): bloqueo "sin ciclo → error".
 ```
 

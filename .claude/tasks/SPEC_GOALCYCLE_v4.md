@@ -582,13 +582,30 @@ SELLO: commit APIs
 
 ```yaml
 SUB-PASOS (acordados, verificables uno a uno como Gate B):
-  D.1 GET liviano "ciclo activo" (sin RBAC estratega, para wizard colaborador)
+  D.1 GET liviano "ciclo activo" (sin RBAC estratega)   ← SELLADO ✅ (c388f56)
   D.2 Página /admin/metas/ciclos (lista, read-only)
   D.3 Crear ciclo (fricción mínima)
   D.4 Activar (confirmación intencional + anti-doble-submit)
   D.5 Modal de cierre (Decisión #8)  ← BACKEND SELLADO ✅ · UI pendiente
   D.6 Wizard crear-meta: quitar selector de año, mostrar ciclo heredado
   D.7 Alerta closureWindow próxima
+```
+
+### GATE D.1 — GET ciclo activo (liviano) — ✅ SELLADO
+
+```yaml
+COMMIT: c388f56
+
+GET /api/goals/cycles/active — devuelve el ciclo ACTIVE de la cuenta (o null)
+con payload liviano {id, name, status}. RBAC goals:view (NO goals:cycles:manage
+— para que el wizard de crear-meta de un colaborador AREA_MANAGER/EVALUATOR
+muestre el ciclo heredado sin la superficie admin). Multi-tenant por contexto.
+Reusa GoalCycleService.getActiveCycle. Ruta estática hermana de [id]/ (Next da
+precedencia a 'active' sobre el dinámico → sin colisión).
+
+SMOKE (untracked, borrado al sello): 401 sin contexto · 403 HR_OPERATOR (sin
+goals:view) · 200 data null sin ACTIVE · 200 con ACTIVE payload liviano. VERDE.
+tsc + build limpios. Lo consumirá D.6 (wizard).
 ```
 
 ### GATE D.5 (BACKEND) — decisiones de cierre de ciclo — ✅ SELLADO
