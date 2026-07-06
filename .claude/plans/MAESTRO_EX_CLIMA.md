@@ -600,6 +600,17 @@ Archivos:
   prisma/scripts/recompute-clima-insights.ts         # npm run recompute:clima-insights
 
 Decisiones as-built (donde la realidad ajustó la spec):
+  - FUENTE DE DATOS = Response.rating CRUDO en TODOS los cálculos:
+    1-5 para drivers/EI (FavorabilityCalculator, top-2 = rating>=4),
+    0-10 para NPS (aggregateClimaNPS + eNPS del insight → calculateNPS,
+    promotor>=9 / pasivo 7-8 / detractor<=6). Response.normalizedScore
+    (la versión 0-5 de responseNormalizer) NO se usa en ningún punto de
+    Gate 2 — cero menciones en los tres archivos (verificado por grep).
+    ⚠️ Hallazgo upstream PENDIENTE DECISIÓN (no es código Gate 2):
+    survey/[token]/submit/route.ts:133 guarda rating solo si `rating > 0`
+    → un 0 de NPS (detractor extremo) se descarta al persistir y sesga el
+    eNPS al alza; afecta igual a Exit NPS (misma ruta). Fix toca ruta
+    compartida por todos los productos → decisión Victor.
   - TRIGGER REAL = PUT /api/campaigns/[id]/status (el cierre que usa el
     frontend vía useCampaignState/CampaignsList). NO hay endpoint dedicado
     de cierre clima. Síncrono en request (solo matemática, sin LLM);

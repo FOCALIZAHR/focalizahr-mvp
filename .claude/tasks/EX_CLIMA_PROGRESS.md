@@ -72,6 +72,13 @@
   'pulso', gold cache, AuditLog; segundo PUT (forceTransition) y recompute = idempotentes.
 
 **Gotchas descubiertos (para próximos gates):**
+- **Fuente de datos = Response.rating CRUDO** (1-5 drivers/EI, 0-10 NPS);
+  normalizedScore NO se usa en Gate 2 (confirmado por grep, 0 menciones).
+  ⚠️ **Hallazgo upstream reportado, PENDIENTE decisión Victor**: el submit
+  (`survey/[token]/submit/route.ts:133`) descarta `rating` si no es `> 0` →
+  un 0 de NPS (detractor extremo) nunca se persiste → sesga eNPS al alza
+  (clima Y exit, misma ruta compartida). NO se tocó — fix afecta todos los
+  productos.
 - **DepartmentMetric YA está poblada en dev** (12 filas, jun-2026) — el "(a confirmar
   por Code)" del MAESTRO quedó resuelto: campos reales `absenceRate` (no absenteeism)
   y `overtimeHoursAvg` (HORAS promedio, no rate — el insight lo guarda tal cual en
