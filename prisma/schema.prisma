@@ -178,6 +178,9 @@ model Account {
   exitAlerts        ExitAlert[]
   exitInsights      DepartmentExitInsight[]
 
+  // EX Clima — insights por departamento
+  climaInsights     DepartmentClimaInsight[]
+
   // Metas — insight mensual a nivel persona (inversa F1, requisito Prisma)
   goalsInsights     EmployeeGoalsInsight[]
 
@@ -332,6 +335,15 @@ model Campaign {
   // Gate D v3.0: offset escalación WhatsApp (días después del último reminder). Override puntual.
   whatsappEscalationDelayDays Int? @map("whatsapp_escalation_delay_days")
 
+  // EX Clima Gate 1: seguimiento focalizado (EXCLUSIVO Experiencia Full;
+  // Pulso Express nunca lo puebla). Shape: { "<deptId>": { low: [category...],
+  // high: [category...], thresholds: { low, high } } }
+  driverFocusByDepartment Json? @map("driver_focus_by_department")
+
+  // EX Clima Gate 1: estado del cierre enterprise (lo opera Gate 2)
+  // null | 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED'
+  climaAggregationStatus String? @map("clima_aggregation_status")
+
   // Metadatos:
   createdByName  String?   @map("created_by_name")
   activatedAt    DateTime? @map("activated_at")
@@ -361,6 +373,9 @@ model Campaign {
   complianceAnalyses    ComplianceAnalysis[]
   complianceAlerts      ComplianceAlert[]
   compliancePlanActions CompliancePlanAction[]
+
+  // EX Clima — insights por departamento (referencia, no clave)
+  climaInsights DepartmentClimaInsight[]
 
   @@index([accountId], map: "idx_campaigns_account")
   @@index([status], map: "idx_campaigns_status")
@@ -510,6 +525,15 @@ model Question {
   // {"minTrack": "MANAGER"} = Solo para evaluar managers+
   // {"minTrack": "EJECUTIVO"} = Solo para evaluar ejecutivos
 
+  // ═══════════════════════════════════════════════════
+  // TAXONOMÍA CLIMA (EX Clima Gate 1)
+  // ═══════════════════════════════════════════════════
+  questionTier    String? @map("question_tier")
+  // 'ENGAGEMENT_INDEX' | 'CORE' | 'CUSTOM'
+  isDriverCore    Boolean @default(false) @map("is_driver_core")
+  // RESERVADO: sin consumidor actual (el filtro de seguimiento no lo usa)
+  isBenchmarkable Boolean @default(true) @map("is_benchmarkable")
+
   // Relaciones
   campaignType CampaignType @relation(fields: [campaignTypeId], references: [id])
   responses    Response[]
@@ -519,6 +543,7 @@ model Question {
   @@index([questionOrder], map: "idx_questions_order")
   @@index([isActive], map: "idx_questions_active")
   @@index([competencyCode], map: "idx_questions_competency_code")
+  @@index([questionTier], map: "idx_questions_tier")
   @@map("questions")
 }
 
@@ -721,6 +746,14 @@ model Department {
   accumulatedExitENPS          Float?    @map("accumulated_exit_enps")
   accumulatedExitVoluntaryRate Float?    @map("accumulated_exit_voluntary_rate")
 
+  // ═══════════════════════════════════════════════════
+  // CLIMA - Gold Cache rolling 12 meses (EX Clima Gate 1)
+  // ═══════════════════════════════════════════════════
+  accumulatedClimaFavorability Float?    @map("accumulated_clima_favorability")
+  accumulatedClimaMean         Float?    @map("accumulated_clima_mean")
+  accumulatedClimaRiskZone     String?   @map("accumulated_clima_risk_zone")
+  accumulatedClimaLastUpdated  DateTime? @map("accumulated_clima_last_updated")
+
   // Jerarquía
   parentId      String?      @map("parent_id")
   parent        Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
@@ -751,6 +784,9 @@ model Department {
   exitRecords       ExitRecord[]
   exitInsights      DepartmentExitInsight[]
   exitAlerts        ExitAlert[]
+
+  // EX Clima — insights por departamento
+  climaInsights DepartmentClimaInsight[]
 
   // Compliance (Ambiente Sano) — análisis LLM por depto
   complianceAnalyses ComplianceAnalysis[]
@@ -1551,6 +1587,89 @@ model DepartmentExitInsight {
   @@index([avgEIS], map: "idx_dept_exit_insights_eis")
   @@index([avgSafety], map: "idx_dept_exit_insights_safety")
   @@map("department_exit_insights")
+}
+
+// EX CLIMA — Insight departamental persistido (Gate 1, MAESTRO v3.4 §1F)
+// Clave por período: isFollowUp EN la clave garantiza que medición completa
+// y seguimiento del mismo período coexistan sin pisarse.
+model DepartmentClimaInsight {
+  id           String  @id @default(cuid())
+  accountId    String  @map("account_id")
+  departmentId String  @map("department_id")
+  campaignId   String? @map("campaign_id") // referencia, NO clave
+
+  // Período (patrón DepartmentExitInsight)
+  period      String // "2026-Q1"
+  periodStart DateTime @map("period_start") @db.Date
+  periodEnd   DateTime @map("period_end") @db.Date
+  productType String   @map("product_type") // 'pulso-express' | 'experiencia-full'
+  isFollowUp  Boolean  @default(false) @map("is_follow_up")
+  // Medición completa Experiencia Full → false
+  // Seguimiento focalizado Experiencia Full → true
+  // Pulso Express → false (no tiene seguimiento)
+
+  // Engagement Index
+  engagementFavorability Float? @map("engagement_favorability") // % favorable EI (0-100)
+  engagementMean         Float? @map("engagement_mean")         // Mean EI (1.0-5.0)
+
+  // Scores por driver — Json, NO columnas nombradas (sellado v3.2)
+  // shape por driver: { fav, mean, n, carried, sourceDate? }
+  // carried=true → carry-forward desde la última medición completa (n=0)
+  driverScores Json? @map("driver_scores")
+
+  customDriverScores Json? @map("custom_driver_scores")
+
+  // Driver Analysis pre-calculado (lo escribe Gate 3)
+  driverAnalysis Json?   @map("driver_analysis") // DriverImpact[] (impact × gap)
+  topFocusArea   String? @map("top_focus_area")
+  topStrength    String? @map("top_strength")
+
+  // Participación
+  totalInvited      Int   @map("total_invited")
+  totalResponded    Int   @map("total_responded")
+  participationRate Float @map("participation_rate")
+
+  // eNPS
+  npsScore      Float? @map("nps_score")
+  promotersPct  Float? @map("promoters_pct")
+  detractorsPct Float? @map("detractors_pct")
+
+  // Scores por nivel de cargo (privacy threshold por celda)
+  acotadoGroupScores Json? @map("acotado_group_scores")
+
+  // Texto libre (output LLM Clima, lo escribe Gate 6)
+  commentSentiment Json?   @map("comment_sentiment")
+  commentTopics    Json?   @map("comment_topics")
+  commentSummary   String? @map("comment_summary")
+
+  // Cruce con datos duros (snapshot al momento de la medición)
+  turnoverRateAtMeasurement    Float? @map("turnover_rate_at_measurement")
+  absenteeismRateAtMeasurement Float? @map("absenteeism_rate_at_measurement")
+  overtimeRateAtMeasurement    Float? @map("overtime_rate_at_measurement")
+  incidentCountAtMeasurement   Int?   @map("incident_count_at_measurement")
+
+  // Señales cross-producto (snapshot)
+  exoScoreAtMeasurement Float? @map("exo_score_at_measurement") // Onboarding health
+  eisScoreAtMeasurement Float? @map("eis_score_at_measurement") // Exit intelligence
+  isaScoreAtMeasurement Float? @map("isa_score_at_measurement") // ComplianceAnalysis.isaScore
+
+  // Inteligencia calculada
+  riskZone         String? @map("risk_zone") // verde | amarilla | naranja | roja
+  momentum         Float? // delta fav vs anterior (solo drivers medidos)
+  benchmarkDelta   Float?  @map("benchmark_delta")
+  correlationFlags Json?   @map("correlation_flags") // theatreDetected, etc.
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  account    Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  campaign   Campaign?  @relation(fields: [campaignId], references: [id])
+
+  @@unique([accountId, departmentId, period, productType, isFollowUp])
+  @@index([accountId, departmentId], map: "idx_dept_clima_insights_account_dept")
+  @@index([accountId, period], map: "idx_dept_clima_insights_period")
+  @@map("department_clima_insights")
 }
 
 // ════════════════════════════════════════════════════════════════════════════
