@@ -4,8 +4,8 @@
 no solo el diseño de Gate 0)
 **Proyecto:** Módulo Metas — GoalCycle
 **Fecha:** Julio 2026
-**Estado:** Gate A ✅ · Gate A.5 ✅ · Gate B ✅ (vacíos cerrados/
-reconciliados, ver sección Gate B) · Gate C/D/E sin empezar
+**Estado:** Gate A ✅ · Gate A.5 ✅ · Gate B ✅ · Gate C ✅ (APIs REST) ·
+Gate D/E sin empezar
 **Fuente:** METAS_DOCUMENTO_MAESTRO_v3.md §6
 **Patrón de estados a calcar:** IMPLEMENTACION_POST_BACKEND_PERFORMANCE_v2.md
 (PerformanceCycle: mapa de transiciones + guard 400 — se calca la FORMA,
@@ -512,10 +512,52 @@ el candado):
      forma explícita para no arrastrar el error en versiones futuras de la spec.
 ```
 
-### GATE C — APIs
+### GATE C — APIs — ✅ SELLADO
 
 ```yaml
-ALCANCE:
+COMMIT: 874e4aa (código) + commit de este sello (spec + maestro)
+
+ALCANCE REAL IMPLEMENTADO:
+  5 endpoints REST bajo /api/goals/cycles (thin HTTP sobre GoalCycleService):
+    GET  /cycles            → lista PAGINADA (page/limit, pagination{}) scoped accountId
+    POST /cycles            → crear (PLANNING, sin singleton, accountId del contexto)
+    GET  /cycles/[id]       → detalle (scoped accountId)
+    PATCH /cycles/[id]      → updateClosureWindow (con auditoría)
+    POST /cycles/[id]/activate  → GoalCycleService.activate (candado advisory lock)
+    POST /cycles/[id]/close     → closeCycle (→ CLOSING)
+    POST /cycles/[id]/finalize  → finalizeCycle (→ CLOSED)  [SEPARADO de close]
+
+  DECISIÓN close vs finalize: SEPARADOS. El estado CLOSING es donde opera el modal
+  de cierre (Decisión #8, Gate D); combinarlos colapsaría CLOSING. La spec Gate C
+  original solo listó close — finalize se agrega acá (transición real, thin en C;
+  la lógica de decisiones sobre metas incompletas vive en Gate D).
+
+  RBAC: permiso NUEVO 'goals:cycles:manage' = [FOCALIZAHR_ADMIN, ACCOUNT_OWNER,
+  HR_ADMIN, CEO] (estrategas, Decisión #1; HR_MANAGER excluido). Aplica a las 7
+  operaciones (incluye GET — superficie admin). Ver nota en Gate D: el wizard de
+  colaborador necesitará un GET liviano sin este permiso.
+
+  MULTI-TENANT: accountId SIEMPRE del contexto (extractUserContext), nunca del
+  body/params. Los métodos del servicio NO filtran por accountId, así que cada
+  ruta [id] verifica ownership (findFirst id+accountId → 404) ANTES del servicio.
+  Un id de otra cuenta → 404 (ni 200 ni 403).
+
+  MAPEO errores de dominio → HTTP (src/lib/api/goalCycleErrorResponse.ts):
+    GoalCycleActiveError → 409 GOAL_CYCLE_ALREADY_ACTIVE ·
+    GoalCycleClosedError → 409 GOAL_CYCLE_CLOSED ·
+    GoalCycleValidationError → 400 GOAL_CYCLE_VALIDATION ·
+    P2002 → 409 GOAL_CYCLE_PERIOD_EXISTS
+
+SMOKE (prisma/scripts/smoke-goal-cycle-gateC.ts, UNTRACKED, handlers invocados
+directo con NextRequest mockeado, 2 cuentas sintéticas, cleanup por id) VERDE:
+  401 sin x-account-id · 403 no-estratega (HR_OPERATOR) · 201 crear/PLANNING ·
+  409 duplicado período · paginación { total, pages } · candado 409 (con ACTIVE
+  y con CLOSING) · close→finalize→activate · PATCH con closureWindowUpdatedBy ·
+  multi-tenant: GET/activate ciclo de otra cuenta → 404.
+  tsc --noEmit + npm run build OK.
+
+──────────────────────────────────────────────────────────────────────────────
+ALCANCE (diseño original, referencia):
   - /api/goals/cycles/route.ts (GET lista, POST crear — sin restricción)
   - /api/goals/cycles/[id]/route.ts (GET, PATCH estado/ventanas)
   - /api/goals/cycles/[id]/activate/route.ts (POST — pasa por el candado)
@@ -555,6 +597,13 @@ ALCANCE:
     Solo cuando todas las decisiones están aplicadas, dispara CLOSING→CLOSED
   - Modificar wizard crear-meta: quitar selector de año, mostrar
     "Ciclo: [nombre]" como contexto heredado
+  - ⚠️ PENDIENTE (anotado en Gate C): hace falta un endpoint de LECTURA
+    liviano del ciclo ACTIVE, SIN RBAC de estratega (solo sesión válida),
+    para que el wizard crear-meta muestre el nombre del ciclo heredado a
+    CUALQUIER empleado. Gate C dejó /api/goals/cycles gateado con
+    goals:cycles:manage (superficie admin /admin/metas/ciclos) — ese permiso
+    NO alcanza para el wizard de un colaborador (AREA_MANAGER/EVALUATOR/etc.).
+    NO se construyó en Gate C a propósito; queda escrito acá para no perderlo.
   - Alerta de closureWindow próxima
 
 DISEÑO (MANIFIESTO_v5): .fhr-* · narrativa protagonista · sin semáforo primario

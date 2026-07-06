@@ -1,7 +1,7 @@
 # 🎯 MÓDULO METAS — DOCUMENTO MAESTRO v3.0
 
 **Fecha:** Julio 2026
-**Estado:** POST-EmployeeGoalsInsight (Gates A/B/B.6 sellados) · GoalCycle Gate A (1246cd8) + A.5 (529353e) + B (efc693a) sellados
+**Estado:** POST-EmployeeGoalsInsight (Gates A/B/B.6 sellados) · GoalCycle Gates A (1246cd8) · A.5 (529353e) · B (efc693a+56527f4) · C (874e4aa) sellados
 **Propósito:** Fuente de verdad del módulo Metas para continuar desarrollo
 **Reemplaza:** METAS_DOCUMENTO_MAESTRO_v2.md (24 Feb 2026)
 
@@ -68,11 +68,10 @@ INCOMPLETO (deuda P0 — seguridad):
      (ver Sección 10 — deuda P0 antes de cliente real)
 
 EN CURSO (parcial):
-  🟡 GoalCycle (contenedor de período) — Gate A (schema) `1246cd8` + A.5
-     (migración retroactiva) `529353e` + B (GoalCycleService: candado singleton,
-     state machine, lockAfterClosure) `efc693a` SELLADOS. cmfgedx7b… tiene su
-     "Ciclo Vigente 2026" ACTIVE con 211 metas (0 huérfanas). Pendiente Gate C
-     (APIs) y Gate D (UI type-to-confirm). Ver Sección 6.
+  🟡 GoalCycle (contenedor de período) — Gates A `1246cd8` · A.5 `529353e` ·
+     B `efc693a`/`56527f4` · C (APIs REST) `874e4aa` SELLADOS. cmfgedx7b… tiene
+     su "Ciclo Vigente 2026" ACTIVE con 211 metas (0 huérfanas). Pendiente Gate D
+     (UI + type-to-confirm) y Gate E (bloqueo sin ciclo). Ver Sección 6.
 
 NO IMPLEMENTADO:
   ❌ Flujo de cierre y aprobaciones (UI)
@@ -507,8 +506,17 @@ CIERRE DE VACÍOS (auditoría posterior) — efc693a + 56527f4:
      en efc693a. La auditoría lo reportó mal. Sin código nuevo.
   Con ambos resueltos, Gate B queda COMPLETO. Spec versionada: SPEC_GOALCYCLE_v4.md.
 
-GATE C/D — PENDIENTE: APIs (Gate C, mapear errores de dominio a HTTP) +
-  confirmación intencional UI (type-to-confirm al Activar) + idempotency key (Gate D).
+GATE C — 874e4aa (APIs REST, SELLADO): 5 endpoints /api/goals/cycles (GET lista
+  paginada, POST crear, GET/PATCH [id], POST activate/close/finalize) + permiso
+  goals:cycles:manage (estrategas) + mapper de errores de dominio a HTTP (409
+  GOAL_CYCLE_ALREADY_ACTIVE/GOAL_CYCLE_CLOSED/GOAL_CYCLE_PERIOD_EXISTS, 400
+  validación). close/finalize SEPARADOS (CLOSING es donde opera el modal Gate D).
+  Guard multi-tenant por ruta (ownership → 404). Smoke gateC VERDE.
+
+GATE D/E — PENDIENTE: UI ciclos + modal de cierre + confirmación intencional
+  (type-to-confirm al Activar) + idempotency key (Gate D). GET liviano del ciclo
+  activo SIN RBAC estratega para el wizard de colaborador (anotado en spec §Gate D).
+  Bloqueo "sin ciclo → error" (Gate E, último).
 ```
 
 ### 6.1 Problema que resuelve
@@ -709,12 +717,12 @@ Falta: APIs request-closure/approve-closure/pending-closure + UI botón/página.
    Regla Enterprise #2: RBAC en cada endpoint vía AuthorizationService.
 
 🟡 P1 — Flujo de cierre UI (backend listo)
-🟡 P1 — GoalCycle: Gate A (schema) `1246cd8` + A.5 (migración retroactiva)
-        `529353e` + B (GoalCycleService: candado singleton advisory lock,
-        finalizeCycle, lockAfterClosure, elimina any F4) `efc693a` SELLADOS (sin
-        pushear). cmfgedx7b… migrada (1 ciclo ACTIVE, 211 metas, 0 huérfanas);
-        resto de cuentas DIFERIDO. Pendiente Gate C (APIs) + Gate D (UI). Ver
-        Sección 6.
+🟡 P1 — GoalCycle: Gates A `1246cd8` · A.5 `529353e` · B `efc693a`+`56527f4`
+        (candado singleton, finalizeCycle, lockAfterClosure, herencia, elimina
+        any F4) · C `874e4aa` (5 APIs REST, RBAC goals:cycles:manage, mapper de
+        errores) SELLADOS (sin pushear). cmfgedx7b… migrada (1 ciclo ACTIVE, 211
+        metas, 0 huérfanas); resto de cuentas DIFERIDO. Pendiente Gate D (UI) +
+        Gate E (bloqueo sin ciclo). Ver Sección 6.
 🟡 P1 — Panel personal (Sección 7)
 
 🟢 P2 — Router inteligente, wizard config unificado
@@ -775,4 +783,4 @@ victor@focalizahr.cl · vyanezb@gmail.com · claudia.palominos@gmail.com
 
 **FIN DEL DOCUMENTO MAESTRO v3.0**
 
-**Estado:** EmployeeGoalsInsight sellado (A/B/B.6). GoalCycle Gate A (schema, `1246cd8`) + A.5 (migración retroactiva, `529353e`) + B (GoalCycleService: candado singleton + lockAfterClosure, `efc693a`) sellados (sin pushear); cmfgedx7b… migrada, resto DIFERIDO. Pendiente Gate C (APIs) y Gate D (UI type-to-confirm). Panel UI diseñado, pendiente. Deuda P0 (RBAC 6 endpoints) vigente antes de cliente real.
+**Estado:** EmployeeGoalsInsight sellado (A/B/B.6). GoalCycle Gates A (`1246cd8`) · A.5 (`529353e`) · B (`efc693a`+`56527f4`) · C (APIs REST, `874e4aa`) sellados (sin pushear); cmfgedx7b… migrada, resto DIFERIDO. Pendiente Gate D (UI type-to-confirm) y Gate E (bloqueo sin ciclo). Panel UI diseñado, pendiente. Deuda P0 (RBAC 6 endpoints) vigente antes de cliente real.
