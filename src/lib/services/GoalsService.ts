@@ -13,7 +13,7 @@ import {
   GoalStatus,
   Prisma
 } from '@prisma/client'
-import { GoalCycleClosedError } from './GoalCycleService'
+import { GoalCycleClosedError, GoalCycleService } from './GoalCycleService'
 
 // ────────────────────────────────────────────────────────────────────────────
 // TIPOS
@@ -122,6 +122,7 @@ export class GoalsService {
     data.originType = 'STRATEGIC_CASCADE'
     data.isAligned = true
     data.isOrphan = false
+    data.goalCycleId = await this.resolveInheritedCycleId(input.accountId)
     return prisma.goal.create({ data })
   }
 
@@ -159,6 +160,7 @@ export class GoalsService {
     data.originType = 'STRATEGIC_CASCADE'
     data.isAligned = parent.isAligned
     data.isOrphan = false
+    data.goalCycleId = await this.resolveInheritedCycleId(input.accountId)
     return prisma.goal.create({ data })
   }
 
@@ -176,6 +178,7 @@ export class GoalsService {
     data.originType = 'MANAGER_CREATED'
     data.isAligned = false
     data.isOrphan = true
+    data.goalCycleId = await this.resolveInheritedCycleId(input.accountId)
     return prisma.goal.create({ data })
   }
 
@@ -693,7 +696,8 @@ export class GoalsService {
         periodYear: new Date().getFullYear(),
         weight: input.weight || 0,
         status: 'NOT_STARTED',
-        linkedDevGoalId: input.devGoalId
+        linkedDevGoalId: input.devGoalId,
+        goalCycleId: await this.resolveInheritedCycleId(accountId),
       }
     })
   }
@@ -856,6 +860,16 @@ export class GoalsService {
   // ══════════════════════════════════════════════════════════════════════════
   // HELPERS PRIVADOS
   // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Herencia automática de ciclo (Decisión de Negocio #4): toda meta nueva nace
+   * asociada al ciclo ACTIVE de la cuenta (o null si no hay ninguno activo).
+   * Se llama en los 4 puntos de creación de Goal (createCorporateGoal,
+   * cascadeGoal, createManagerGoal, createFromDevelopmentGoal).
+   */
+  private static async resolveInheritedCycleId(accountId: string): Promise<string | null> {
+    return (await GoalCycleService.getActiveCycle(accountId))?.id ?? null
+  }
 
   private static prepareGoalData(input: Partial<CreateGoalInput> & Pick<CreateGoalInput, 'accountId' | 'title' | 'createdById' | 'startDate' | 'dueDate' | 'periodYear' | 'targetValue'>): Prisma.GoalUncheckedCreateInput {
     return {
