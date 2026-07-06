@@ -625,6 +625,187 @@ export class NPSAggregationService {
   }
   
   // ============================================
+  // AGREGACIÓN CLIMA (Específico — EX Clima Gate 2)
+  // ============================================
+
+  /**
+   * Agrega eNPS de una campaña de clima (Pulso Express / Experiencia Full)
+   * al cerrarla. Clon del patrón aggregateExitNPS con fuente Response:
+   * el departmentId viene directo de Participant (no de ExitRecord ni
+   * JourneyOrchestration).
+   *
+   * Descompone en 3 NIVELES (patrón exit):
+   *   1. Gerencia (department.parentId || departmentId)
+   *   2. Departamento (solo si NO es ya una gerencia — guard anti-duplicado)
+   *   3. Global (departmentId = null)
+   *
+   * period = mes del cierre (YYYY-MM del endDate de la campaña) —
+   * upsertNPSInsight es monthly-hardcoded, encaja con snapshot mensual.
+   * Edge documentado: dos campañas del mismo productType cerradas el mismo
+   * mes → last-wins sobre el mismo NPSInsight (aceptable, snapshot mensual).
+   *
+   * Es el PRIMER writer de productType 'pulso' | 'experiencia'
+   * (EfficiencyDataResolver ya los consume y hoy recibe null).
+   *
+   * @param campaignId ID de la campaña de clima recién cerrada
+   */
+  static async aggregateClimaNPS(campaignId: string): Promise<void> {
+    // 1. Cargar campaña y mapear slug → productType NPS
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      select: {
+        id: true,
+        accountId: true,
+        campaignTypeId: true,
+        endDate: true,
+        campaignType: { select: { slug: true } },
+      },
+    });
+
+    if (!campaign) {
+      console.log(`[NPSAggregation] ⚠️ Campaña ${campaignId} no encontrada`);
+      return;
+    }
+
+    const productBySlug: Record<string, NPSProductType> = {
+      'pulso-express': 'pulso',
+      'experiencia-full': 'experiencia',
+    };
+    const productType = productBySlug[campaign.campaignType.slug];
+    if (!productType) {
+      console.log(
+        `[NPSAggregation] ⚠️ Slug ${campaign.campaignType.slug} no es de clima — skip`
+      );
+      return;
+    }
+
+    console.log(`[NPSAggregation] Iniciando Clima NPS (${productType}) para campaña ${campaignId}`);
+
+    // 2. Pregunta NPS del banco de clima (post-Gate 1 hay exactamente una: EI-2)
+    const npsQuestion = await prisma.question.findFirst({
+      where: {
+        campaignTypeId: campaign.campaignTypeId,
+        responseType: 'nps_scale',
+      }
+    });
+
+    if (!npsQuestion) {
+      console.log('[NPSAggregation] ⚠️ No se encontró pregunta NPS en el banco de clima');
+      return;
+    }
+
+    // 3. Respuestas NPS de ESA campaña con depto del participante
+    const npsResponses = await prisma.response.findMany({
+      where: {
+        questionId: npsQuestion.id,
+        rating: { not: null },
+        participant: { campaignId }
+      },
+      select: {
+        rating: true,
+        participantId: true,
+        participant: {
+          select: {
+            departmentId: true,
+            departmentRel: { select: { parentId: true } }
+          }
+        }
+      }
+    });
+
+    if (npsResponses.length === 0) {
+      console.log('[NPSAggregation] Sin respuestas NPS de Clima en la campaña');
+      return;
+    }
+
+    // 4. period = mes del cierre (YYYY-MM) con límites de mes calendario
+    const end = campaign.endDate;
+    const year = end.getUTCFullYear();
+    const monthIndex = end.getUTCMonth();
+    const period = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
+    const periodStart = new Date(Date.UTC(year, monthIndex, 1));
+    const periodEnd = new Date(Date.UTC(year, monthIndex + 1, 0));
+
+    // 5. Agrupar ratings por departamento y gerencia (parentId || departmentId)
+    const ratingsByDepartment = new Map<string, number[]>();
+    const ratingsByGerencia = new Map<string, number[]>();
+
+    for (const response of npsResponses) {
+      const departmentId = response.participant.departmentId;
+      if (response.rating === null || !departmentId) continue; // sin depto: solo global
+
+      const gerenciaId = response.participant.departmentRel?.parentId || departmentId;
+
+      if (!ratingsByDepartment.has(departmentId)) {
+        ratingsByDepartment.set(departmentId, []);
+      }
+      ratingsByDepartment.get(departmentId)!.push(response.rating);
+
+      if (!ratingsByGerencia.has(gerenciaId)) {
+        ratingsByGerencia.set(gerenciaId, []);
+      }
+      ratingsByGerencia.get(gerenciaId)!.push(response.rating);
+    }
+
+    // 6. Guardar NPS por gerencia (nivel 2) — en paralelo: claves independientes,
+    //    el cuello es latencia de red (S-PERF Gate 2)
+    await Promise.all(
+      Array.from(ratingsByGerencia.entries()).map(([gerenciaId, ratings]) =>
+        this.upsertNPSInsight(
+          campaign.accountId,
+          gerenciaId,
+          productType,
+          period,
+          periodStart,
+          periodEnd,
+          this.calculateNPS(ratings)
+        )
+      )
+    );
+
+    // 7. Guardar NPS por departamento (nivel 3+) — guard anti-duplicado:
+    //    si el departamento YA es una gerencia, no se repite
+    await Promise.all(
+      Array.from(ratingsByDepartment.entries())
+        .filter(([departmentId]) => !ratingsByGerencia.has(departmentId))
+        .map(([departmentId, ratings]) =>
+          this.upsertNPSInsight(
+            campaign.accountId,
+            departmentId,
+            productType,
+            period,
+            periodStart,
+            periodEnd,
+            this.calculateNPS(ratings)
+          )
+        )
+    );
+
+    // 8. Guardar NPS global (empresa — incluye participantes sin depto)
+    const allRatings = npsResponses
+      .map(r => r.rating)
+      .filter((r): r is number => r !== null);
+    const globalCalc = this.calculateNPS(allRatings);
+
+    await this.upsertNPSInsight(
+      campaign.accountId,
+      null,
+      productType,
+      period,
+      periodStart,
+      periodEnd,
+      globalCalc
+    );
+
+    console.log(
+      `[NPSAggregation] ✅ Clima completado (${productType}): ` +
+      `${ratingsByGerencia.size} gerencias, ` +
+      `${ratingsByDepartment.size} departamentos, ` +
+      `NPS global: ${globalCalc.npsScore} (${allRatings.length} respuestas)`
+    );
+  }
+
+  // ============================================
   // QUERIES DE CONSULTA
   // ============================================
   
