@@ -527,16 +527,18 @@ export const PERMISSIONS = {
   ],
 
   // ─────────────────────────────────────────────────────────────────────────
-  // GOAL CYCLES (contenedor de período de metas — gestión: estrategas)
-  // Decisión de Negocio #1 (SPEC_GOALCYCLE_v4): CEO/ACCOUNT_OWNER/HR_ADMIN.
-  // HR_MANAGER excluido (no es estratega, §4.1). Crear/activar/cerrar/finalizar
-  // ciclos + lectura de la superficie admin /admin/metas/ciclos.
+  // GOAL CYCLES (contenedor de período de metas — gestión operativa)
+  // Decisión de Negocio #1 CORREGIDA post-Gate C (SPEC_GOALCYCLE_v4): alineado
+  // al patrón performance:manage (mismo set de 4 roles). CEO removido: participa
+  // en el juicio humano de cierre por meta vía goals:approve (sin cambios), no
+  // en la administración operativa del ciclo completo. Crear/activar/cerrar/
+  // finalizar ciclos + lectura de la superficie de gestión de ciclos.
   // ─────────────────────────────────────────────────────────────────────────
   'goals:cycles:manage': [
     'FOCALIZAHR_ADMIN',
     'ACCOUNT_OWNER',
     'HR_ADMIN',
-    'CEO'
+    'HR_MANAGER'
   ],
 
   // GOALS CONFIGURATION (ya existía - NO modificar)

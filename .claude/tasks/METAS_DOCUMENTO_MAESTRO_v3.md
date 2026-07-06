@@ -229,6 +229,10 @@ const GLOBAL_ACCESS_ROLES = [
 ```yaml
 ESTRATEGA (CEO, ACCOUNT_OWNER, HR_ADMIN):
   Ve: salud de alineación, configurar ciclo, aprobar cierres, metas corporativas
+  # CORRECCIÓN post-Gate C (Decisión #1 SPEC_GOALCYCLE_v4): "configurar ciclo"
+  # (goals:cycles:manage) = OWNER/HR_ADMIN/HR_MANAGER (+ADMIN), espeja
+  # performance:manage. CEO NO configura ciclos — conserva goals:approve
+  # (juicio de cierre por meta) y lectura ejecutiva.
 
 TÁCTICO (AREA_MANAGER, líderes con equipo):
   Ve: Mission Control (gauge + CTA), su equipo, sus metas, metas del equipo filtradas
@@ -734,7 +738,9 @@ Falta: APIs request-closure/approve-closure/pending-closure + UI botón/página.
 🟡 P1 — GoalCycle: Gates A `1246cd8` · A.5 `529353e` · B `efc693a`+`56527f4`
         (candado singleton, finalizeCycle, lockAfterClosure, herencia, elimina
         any F4) · C `874e4aa` (5 APIs REST, RBAC goals:cycles:manage, mapper de
-        errores) SELLADOS (sin pushear). cmfgedx7b… migrada (1 ciclo ACTIVE, 211
+        errores; goals:cycles:manage CORREGIDO post-sello: CEO→HR_MANAGER,
+        espeja performance:manage — Decisión #1 corregida en spec §2)
+        SELLADOS (sin pushear). cmfgedx7b… migrada (1 ciclo ACTIVE, 211
         metas, 0 huérfanas); resto de cuentas DIFERIDO. Pendiente Gate D (UI) +
         Gate E (bloqueo sin ciclo). Ver Sección 6.
 🟡 P1 — Panel personal (Sección 7)

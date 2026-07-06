@@ -51,7 +51,7 @@ PRINCIPIO CREAR ≠ ACTIVAR (confirmado en Gate 0, estándar de industria):
 
 | # | Decisión | Valor |
 |---|----------|-------|
-| 1 | Quién crea el ciclo | Rol estratega (CEO / ACCOUNT_OWNER / HR_ADMIN) |
+| 1 | Quién crea el ciclo | ACCOUNT_OWNER / HR_ADMIN / HR_MANAGER (+FOCALIZAHR_ADMIN). **CORREGIDA post-Gate C**: alineada a `performance:manage` (mismo set de 4 roles); CEO removido — participa en el juicio de cierre por meta vía `goals:approve` (sin cambios), no en la administración operativa del ciclo |
 | 2 | Dónde | Página dedicada /admin/metas/ciclos |
 | 3 | Ciclos activos simultáneos | SOLO UNO por accountId (candado de aplicación, §3.1) |
 | 4 | Selección de ciclo al crear meta | Usuario HEREDA el ACTIVE (no selecciona) |
@@ -533,7 +533,8 @@ ALCANCE REAL IMPLEMENTADO:
   la lógica de decisiones sobre metas incompletas vive en Gate D).
 
   RBAC: permiso NUEVO 'goals:cycles:manage' = [FOCALIZAHR_ADMIN, ACCOUNT_OWNER,
-  HR_ADMIN, CEO] (estrategas, Decisión #1; HR_MANAGER excluido). Aplica a las 7
+  HR_ADMIN, HR_MANAGER] (Decisión #1 CORREGIDA post-Gate C: espeja
+  performance:manage; CEO removido — conserva goals:approve). Aplica a las 7
   operaciones (incluye GET — superficie admin). Ver nota en Gate D: el wizard de
   colaborador necesitará un GET liviano sin este permiso.
 
