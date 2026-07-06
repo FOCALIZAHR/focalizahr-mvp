@@ -513,10 +513,23 @@ GATE C — 874e4aa (APIs REST, SELLADO): 5 endpoints /api/goals/cycles (GET list
   validación). close/finalize SEPARADOS (CLOSING es donde opera el modal Gate D).
   Guard multi-tenant por ruta (ownership → 404). Smoke gateC VERDE.
 
-GATE D/E — PENDIENTE: UI ciclos + modal de cierre + confirmación intencional
-  (type-to-confirm al Activar) + idempotency key (Gate D). GET liviano del ciclo
-  activo SIN RBAC estratega para el wizard de colaborador (anotado en spec §Gate D).
-  Bloqueo "sin ciclo → error" (Gate E, último).
+GATE D — EN CURSO (7 sub-pasos D.1–D.7, ver SPEC §Gate D):
+  D.5 BACKEND — a90c051 (SELLADO): decisiones del modal de cierre (Decisión #8).
+    GoalsService.applyCycleClosureDecisions (bulk tx-aware: validación todo-o-nada
+    del set accionable + 3 baldes CLOSE_WITH_SCORE/MARK_REVIEW/LEAVE_AS_IS con
+    updateMany/createMany, accountId+goalCycleId en todo where, assert de carrera,
+    auditoría con accountId) + GoalCycleService.finalizeCycleWithDecisions
+    ($transaction única: decisiones + CLOSING→CLOSED). GET /api/goals filtro
+    goalCycleId. POST /finalize acepta decisions[] opcional (backward-compatible).
+    Dimensionado con dato real (182 metas incompletas en la piloto → bulk, no loop).
+    CLOSE_WITH_SCORE = escritura directa a COMPLETED (approveClosure exige
+    PENDING_CLOSURE; closureApprovedBy=null + nota de cierre forzado). MARK_REVIEW
+    = PENDING_CLOSURE (mismo end-state que requestClosure, sin campo nuevo). Guard
+    lockAfterClosure NO se agrega a approve/rejectClosure (decisión Victor D.5a).
+    Smoke gateD5 (untracked) VERDE. tsc+build limpios.
+  D.5 UI + D.1/D.2/D.3/D.4/D.6/D.7 — PENDIENTES. GET liviano del ciclo activo SIN
+    RBAC estratega para el wizard de colaborador (anotado en spec §Gate D).
+GATE E — PENDIENTE (último): bloqueo "sin ciclo → error".
 ```
 
 ### 6.1 Problema que resuelve

@@ -581,6 +581,105 @@ SELLO: commit APIs
 ### GATE D — UI + modal de cierre + confirmación de activar
 
 ```yaml
+SUB-PASOS (acordados, verificables uno a uno como Gate B):
+  D.1 GET liviano "ciclo activo" (sin RBAC estratega, para wizard colaborador)
+  D.2 Página /admin/metas/ciclos (lista, read-only)
+  D.3 Crear ciclo (fricción mínima)
+  D.4 Activar (confirmación intencional + anti-doble-submit)
+  D.5 Modal de cierre (Decisión #8)  ← BACKEND SELLADO ✅ · UI pendiente
+  D.6 Wizard crear-meta: quitar selector de año, mostrar ciclo heredado
+  D.7 Alerta closureWindow próxima
+```
+
+### GATE D.5 (BACKEND) — decisiones de cierre de ciclo — ✅ SELLADO
+
+```yaml
+COMMIT: a90c051 (código) + commit de este sello (spec + maestro)
+
+CONTEXTO (verificado con Code, file:line):
+  - "Solicitar Cierre" de producción va por la RUTA request-closure/route.ts
+    (lógica inline), NO por GoalsService.requestClosure (método paralelo).
+  - PENDING_CLOSURE es valor del enum GoalStatus (schema:3062) + columnas
+    closureRequestedAt/By en Goal. NO tabla/campo nuevo.
+  - pending-closure/route.ts filtra por status='PENDING_CLOSURE' + scope del
+    APROBADOR; closureRequestedBy NO entra en el WHERE → una meta marcada por
+    el estratega aparece igual en la bandeja del manager (verificado).
+  - approveClosure exige status='PENDING_CLOSURE' (:790) → NO sirve para cerrar
+    una meta no-pendiente. Por eso CLOSE_WITH_SCORE es escritura directa.
+  - approveClosure NO tiene efectos ocultos: 1 solo update, NO recalcula
+    accumulatedGoals (eso vive solo en GoalsAggregationService/cron).
+  - GET /api/goals NO filtraba por goalCycleId (params en route.ts:78-146).
+
+DECISIÓN #8 → 3 baldes (semántica confirmada por Victor, Gate D.5a):
+  CLOSE_WITH_SCORE → COMPLETED, escritura directa (NO approveClosure).
+    closureApprovedBy=null + closureNotes explícito de "cierre forzado por
+    cierre de ciclo" (no parece "el estratega se aprobó a sí mismo").
+  MARK_REVIEW     → PENDING_CLOSURE (mismo end-state que requestClosure, sin
+    campo nuevo; cae en la bandeja de aprobación existente).
+  LEAVE_AS_IS     → no-op (la meta es soberana; el lock se ata a GoalCycle).
+
+DECISIÓN DE ESCALA (dimensionada con dato real): la cuenta piloto tiene 182
+  metas incompletas hoy. Un loop per-meta (requestClosure ×182) revienta el
+  timeout de $transaction de Prisma (5s) y roza el maxDuration de Vercel Hobby.
+  → Se resuelve en BULK: buckets homogéneos con updateMany/createMany, ~5
+    statements totales sea con 182 o 2.000 metas. Una sola $transaction segura.
+  DESVIACIÓN vs Gate D.5a: MARK_REVIEW ya NO llama a requestClosure() per-meta;
+  usa updateMany masivo (mismo end-state). El guard per-meta de requestClosure
+  se reemplaza por la validación server-side del set accionable.
+
+IMPLEMENTADO:
+  - GoalsService.applyCycleClosureDecisions(tx, {...}) — tx-aware:
+    1. Set accionable REAL server-side (findMany accountId+goalCycleId,
+       status notIn COMPLETED/CANCELLED/PENDING_CLOSURE).
+    2. Validación TODO-O-NADA: cada goalId de decisions[] debe estar en el set;
+       un id fuera (cuenta/ciclo/estado) o duplicado → GoalCycleValidationError,
+       se rechaza TODA la operación (no filtrado silencioso).
+    3. updateMany por balde con accountId+goalCycleId SIEMPRE en el where
+       (defensa en profundidad) + assert count===bucket.length (corta carreras:
+       si una meta cambió de estado entremedio, aborta la transacción).
+    4. Auditoría createMany (CLOSE_WITH_SCORE ∪ MARK_REVIEW; LEAVE_AS_IS no) con
+       accountId poblado por fila (regla enterprise #1). previous*===new* (el
+       cierre congela el valor). timestamp único para todos los writes.
+  - GoalCycleService.finalizeCycleWithDecisions(cycleId, accountId, decisions,
+    actor) — pre-check CLOSING fuera de tx + $transaction única (decisiones +
+    transición CLOSING→CLOSED) + re-verificación de CLOSING dentro de la tx.
+    Devuelve { cycle, summary }. Si algo falla → rollback, ciclo sigue CLOSING
+    (reanudable). finalizeCycle puro (Gate C) queda intacto.
+  - GET /api/goals: filtro opcional goalCycleId (reusa RBAC/filtrado jerárquico).
+  - POST /finalize: parseo opcional decisions[] (zod). Sin body/vacío →
+    finalizeCycle puro (backward-compatible). Con decisiones → busca el fullName
+    del estratega (x-user-email) para la nota de auditoría y llama al servicio.
+
+SMOKE (prisma/scripts/smoke-goal-cycle-gateD5.ts — untracked, borrado al sello
+  full de D.5): T1 rechazo meta no-accionable + rollback (ciclo sigue CLOSING,
+  0 auditoría) · T2 duplicado · T3 cross-account · T4 happy 3 baldes (COMPLETED
+  closureApprovedBy null + nota forzado / PENDING_CLOSURE / sin cambio; 2 filas
+  de auditoría con accountId; summary 1/1/1) · T5 lock post-CLOSED
+  (updateProgress → GOAL_CYCLE_CLOSED) · T6 no re-finalize. VERDE.
+  tsc --noEmit + npm run build limpios.
+
+GUARD lockAfterClosure — decisión de negocio (Victor, Gate D.5a):
+  approveClosure/rejectClosure NO llevan el guard de GoalCycle.status===CLOSED
+  (a propósito, para que MARK_REVIEW funcione tras el cierre del ciclo). Si una
+  meta marcada se rechaza tras CLOSED, su status visible cambia por %, pero
+  updateProgress sigue bloqueado (guard Gate B intacto). No se agrega excepción.
+
+NOTAS PARA LA UI (Acto 3, pendientes en D.5-UI):
+  - Distinguir en el mensaje el rechazo por "metas cambiaron de estado con el
+    modal abierto" (código GOAL_CYCLE_VALIDATION) de un error genérico.
+  - Botón "Cerrar ciclo en firme" con deshabilitar-al-primer-clic (consistencia
+    con Activar), sobre todo en el caso extremo sin metas que decidir.
+
+BACKLOG SEPARADO (NO de GoalCycle, registrado aparte): 2 hallazgos del sistema
+  de rechazo de metas existente — (a) falta notificación activa al rechazar,
+  (b) inconsistencia de buckets de % al revertir estado entre
+  GoalsService.rejectClosure y approve-closure/route.ts.
+```
+
+──────────────────────────────────────────────────────────────────────────────
+ALCANCE (diseño original Gate D — referencia):
+
+```yaml
 ALCANCE:
   - Página /admin/metas/ciclos (lista, crear, activar, cerrar)
   - CREAR: fricción mínima (sin confirmación pesada — es reversible,
