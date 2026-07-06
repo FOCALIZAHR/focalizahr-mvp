@@ -1,9 +1,9 @@
 # MAESTRO: FocalizaHR EX — Inteligencia de Clima
 # Documento maestro ejecutable para Claude Code
 
-> **Versión:** 3.4 — AUTOCONTENIDO: ejecutable de punta a punta sin ningún otro documento
+> **Versión:** 3.5 — Gate 1 SELLADO (as-built) + taxonomía real de BD
 > **Fecha:** Julio 2026
-> **Estado:** Sellado — Para ejecución por Code, gate por gate
+> **Estado:** En ejecución — Gate 1 ✅ · Gate 2 siguiente
 
 | Versión | Qué consolidó |
 |---|---|
@@ -13,6 +13,7 @@
 | v3.2.1 | Frescura = visibilidad (no promesa de cadencia); `isFollowUp` EN la clave de unicidad; carry-forward de drivers no medidos |
 | v3.3 | Post-visión ejecutiva: theatreDetected, climaAggregationStatus, consent en Bajada, Smart Router, cruces Exit/Onb confirmados en schema |
 | v3.4 | Autocontenido: modelo DepartmentClimaInsight completo inline, referencias externas eliminadas (patrones = código real) |
+| v3.5 | Gate 1 sellado as-built: taxonomía real de BD (7-8 categorías, NO liderazgo/ambiente/desarrollo/bienestar), mecánica real de modify_text (SurveyConfiguration + textMapping por rating), decisiones Victor (preguntas al final, 1 follow-up por instrumento, categoría texto_libre) |
 
 ---
 
@@ -34,7 +35,7 @@
 
 | Gate | Nombre | Estado |
 |------|--------|--------|
-| 1 | Foundation (Taxonomía + Persistencia + Seguimiento Focalizado) | 🔲 SPEC LISTA |
+| 1 | Foundation (Taxonomía + Persistencia + Seguimiento Focalizado) | ✅ SELLADO `28c9369`+`ec2694e`+`7cc04e3` (2026-07-06, smoke 40/40 + E2E filtro vivo) |
 | 2 | Scoring + Aggregation (enterprise close pattern) | 🔲 SPEC LISTA |
 | 3 | PulseEngine (5 Algoritmos + absorbe RetentionEngine) | 🔲 PENDIENTE |
 | 4 | Frontend Cinema Mode | 🔲 PENDIENTE |
@@ -71,7 +72,7 @@ PULSO EXPRESS — Termómetro rápido SIN seguimiento:
      - Genera DepartmentClimaInsight (igual que Experiencia Full)
      - Alimenta gold cache (accumulatedClimaFavorability)
      - Sus resultados se comparan con Experiencia Full por dimensión
-       (mismas 4 categorías: liderazgo, ambiente, desarrollo, bienestar)
+       (mismas categorías del banco real — ver TAXONOMÍA REAL en Gate 1A)
      - Aparece en la Curva Vital del Talento
      - Si la empresa tiene Experiencia Full en Q1 y Pulso Express en Q3,
        el CEO ve UNA línea de tiempo alimentada por ambos
@@ -115,10 +116,22 @@ FRESCURA DEL DATO:
 
 ### 1A. Evolución modelo Question
 
-**`driverCode` NO se crea.** `Question.category` ya tiene los valores
-correctos (liderazgo, ambiente, desarrollo, bienestar) y es la taxonomía
-de drivers de todo el plan. Donde el plan v2 decía `driverCode`, se usa
+**`driverCode` NO se crea.** `Question.category` ES la taxonomía de
+drivers de todo el plan. Donde el plan v2 decía `driverCode`, se usa
 `category`.
+
+**TAXONOMÍA REAL (verificada en BD, jul-2026 — sellado v3.5):** las
+categorías vivas NO son las 4 asumidas originalmente. Son:
+- experiencia-full (35 core): satisfaccion(9), liderazgo(8), autonomia(5),
+  desarrollo(4), crecimiento(4), comunicacion(3), reconocimiento(1),
+  compensaciones(1)
+- pulso-express (12 core): liderazgo(3), autonomia(2), crecimiento(2),
+  satisfaccion(2), comunicacion(1), desarrollo(1), reconocimiento(1)
+- + `engagement_index` (5 EI) y `texto_libre` (3 text_open) creadas en Gate 1
+
+Todo el diseño (filtro, favorability, driverScores Json) es agnóstico al
+número de categorías. La decisión de CONSOLIDAR la taxonomía (7-8 → menos)
+es de negocio, pendiente en chat aparte — NO bloquea Gates 1-3.
 
 ```prisma
 # AGREGAR a Question (opcionales, aditivos, zero breaking change):
@@ -146,24 +159,39 @@ MAPEO DE LAS 47 EXISTENTES:
   CORE no significa "pocas" sino "validadas y comparables con benchmark".
   → updateMany: questionTier='CORE' (category se mantiene tal cual)
 
-SE AGREGAN COMO NUEVAS (seeds para pulso-express y experiencia-full):
+SE AGREGAN COMO NUEVAS — AS-BUILT Gate 1 (script idempotente
+prisma/scripts/seed-clima-gate1.ts, npm run migrate:clima-gate1;
+dry-run default, --apply, guard --allow-active por campañas activas):
+
+  Ubicación: AL FINAL del banco (decisión Victor — cero renumeración).
+  Orders: pulso 13-20 · experiencia 36-43.
 
   5 preguntas Engagement Index (questionTier='ENGAGEMENT_INDEX',
-  category='engagement_index'):
-    EI-1: "Me siento motivado/a por el trabajo que hago aquí"
+  category='engagement_index', al inicio del bloque nuevo):
+    EI-1: "Me siento motivado/a por el trabajo que hago aquí" (isDriverCore=true)
     EI-2: "Recomendaría esta empresa como buen lugar para trabajar"
+          → responseType='nps_scale', 0-10, labels "Nada probable" /
+            "Extremadamente probable". NPSAggregationService la detecta.
     EI-3: "Me siento orgulloso/a de trabajar aquí"
     EI-4: "Me veo trabajando aquí dentro de 2 años"
     EI-5: "Rara vez pienso en buscar trabajo en otra empresa"
-    EI-1 con: isDriverCore=true
 
-  EI-2 se crea como responseType='nps_scale', minValue=0, maxValue=10.
-  (Ninguna de las 47 existentes es nps_scale — todas rating 1-5.
-   NPSAggregationService la detecta automáticamente.)
+  1 follow-up text_open por instrumento (decisión Victor), anclado a EI-1:
+    category='texto_libre', questionTier='CORE', isBenchmarkable=false,
+    isRequired=false. Texto dinámico vía modify_text (ver 1E).
 
-  2 preguntas text_open (texto libre general)
+  2 text_open generales: category='texto_libre', questionTier='CORE',
+    isBenchmarkable=false, isRequired=false.
 
-  Preguntas de follow-up condicional (text_open con modify_text, ver 1E)
+  INVARIANTE: ninguna pregunta queda con questionTier null
+  (47→CORE, 5 EI→ENGAGEMENT_INDEX, 3 text→CORE).
+
+  CampaignType actualizado: questionCount 12→20 / 35→43;
+  estimatedDuration 5→8 / 15→18 min.
+
+  SurveyConfiguration (merge sin pisar): regla modify_text
+  (EI-1 → follow-up, textMapping por rating "1".."5") + categoryConfigs
+  para engagement_index y texto_libre (COPY PROVISIONAL, Victor edita en BD).
 ```
 
 ### 1C. Campo de seguimiento focalizado en Campaign
@@ -176,16 +204,16 @@ driverFocusByDepartment  Json?  @map("driver_focus_by_department")
 # EXCLUSIVO de campañas de seguimiento de Experiencia Full.
 # Pulso Express NUNCA lo puebla.
 #
-# Shape (los valores de low/high son valores de Question.category):
+# Shape (los valores de low/high son valores REALES de Question.category):
 # {
 #   "dept_finanzas_id": {
-#     "low": ["desarrollo", "bienestar"],
-#     "high": ["ambiente"],
+#     "low": ["desarrollo", "comunicacion"],
+#     "high": ["satisfaccion"],
 #     "thresholds": { "low": 3.0, "high": 4.0 }
 #   },
 #   "dept_rrhh_id": {
 #     "low": ["liderazgo"],
-#     "high": ["desarrollo"],
+#     "high": ["autonomia"],
 #     "thresholds": { "low": 3.0, "high": 4.0 }
 #   }
 # }
@@ -208,35 +236,39 @@ climaAggregationStatus  String?  @map("clima_aggregation_status")
 # Solo se activa para campañas con driverFocusByDepartment poblado
 # (seguimiento de Experiencia Full). Para el resto, no hace nada.
 
-if (campaign.driverFocusByDepartment && participant.departmentId) {
-  const focus = campaign.driverFocusByDepartment[participant.departmentId]
-  if (focus) {
-    const allowedDrivers = [...(focus.low || []), ...(focus.high || [])]
-    activeQuestions = questions.filter(q =>
-      q.category === 'engagement_index'          // TODAS las EI, siempre
-      || allowedDrivers.includes(q.category)     // TODAS las preguntas de los drivers del foco
-    )
-  }
-  // Si depto no está en mapa → recibe todas (fallback seguro)
-}
+# AS-BUILT: helper puro src/lib/utils/climaFocusFilter.ts
+# filterQuestionsByDriverFocus(questions, focusMap, departmentId)
+# aplicado en el route DESPUÉS del filtro por performance track.
+# Selects agregados: participant.departmentId + campaign.driverFocusByDepartment.
 
-# El filtro NO selecciona subset dentro de un driver: muestra todas las
-# preguntas de las categorías permitidas + todas las EI.
+Categorías SIEMPRE incluidas: 'engagement_index' Y 'texto_libre'.
++ TODAS las preguntas de los drivers del foco (low + high).
+Fallbacks seguros (todas las preguntas): focus null (Pulso Express),
+depto no mapeado, participante sin departmentId.
+
+# El filtro NO selecciona subset dentro de un driver.
+# Verificado E2E en vivo (2026-07-06): campaña con foco
+# {low:[liderazgo], high:[satisfaccion]} → 13/20 preguntas exactas.
 ```
 
-### 1E. Regla condicional: follow_up_if_low → modify_text existente
+### 1E. Follow-up condicional → modify_text (mecánica REAL, as-built)
 
 ```typescript
-# Se implementa con el mecanismo `modify_text` que YA existe en
-# useSurveyEngine.ts. NO se crea un tipo de regla nuevo.
+# MECÁNICA REAL (sellado v3.5 — corrige la asunción "ratingMapping con
+# threshold" que no existía):
 #
-# La pregunta text_open de follow-up está SIEMPRE presente.
-# Su texto cambia según el rating de la pregunta anterior
-# (ratingMapping con threshold):
-#   rating <= 2 → "¿Qué aspecto específico...?"
-#   rating >= 4 → texto neutro/positivo
+# - La regla vive en SurveyConfiguration.conditionalRules (Json por
+#   campaignType), NO en Question. Shape:
+#   { triggerQuestionOrder, targetQuestionOrder, type: 'modify_text',
+#     textMapping: { "1": "...", "2": "...", "3": "...", "4": "...", "5": "..." } }
 #
-# Cero cambio en navegación ni en getTotalSteps.
+# - Runtime en useSurveyEngine.ts: extendido en Gate 1 para aceptar el
+#   RATING como clave del textMapping (fallback retrocompatible —
+#   Ambiente Sano sigue mapeando por choice):
+#   key = choiceResponse[0] ?? String(rating)
+#
+# - La pregunta text_open de follow-up está SIEMPRE presente; solo cambia
+#   su texto. Cero cambio en navegación ni en getTotalSteps.
 ```
 
 ### 1F. Modelo DepartmentClimaInsight (spec completa — autocontenida)
@@ -740,7 +772,9 @@ Shape en ActionPlan.decisiones (Json):
   ceoNotes (editable)
   (responsible/deadline: mismo patrón ExitAlertEngine.actionPlan.steps)
 
-Diccionario: 4 drivers × 4 niveles = 16 combinaciones
+Diccionario: drivers × 4 niveles (nº de drivers según taxonomía REAL —
+  ver Gate 1A; si la consolidación de negocio reduce categorías, el
+  diccionario se dimensiona ahí, antes de Gate 5)
   Cada una: narrative + steps + suggestedProduct
   NARRATIVAS: Victor o Studio IA las escribe. Code copia EXACTO.
 ```
