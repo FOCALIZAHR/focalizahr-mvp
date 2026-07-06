@@ -58,6 +58,9 @@ Thumbs.dbnul
 # Excepcion quirurgica: el maestro de Metas SI se trackea (rastro de gates
 # sellados, mismo patron que el de Comunicaciones).
 !.claude/tasks/METAS_DOCUMENTO_MAESTRO_v3.md
+# Excepcion quirurgica: la spec del proyecto GoalCycle SI se trackea (fuente de
+# verdad del diseño por gates, mismo patron que los maestros).
+!.claude/tasks/SPEC_GOALCYCLE_v4.md
 # Excepcion quirurgica: el backlog enterprise (doc rector vivo, prioridades P0-P3
 # + plan de sesiones) SI se trackea para tener respaldo remoto e historial.
 !.claude/tasks/BACKLOG_ENTERPRISE.md

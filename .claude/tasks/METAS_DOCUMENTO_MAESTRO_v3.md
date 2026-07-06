@@ -496,6 +496,17 @@ GATE B — efc693a (GoalCycleService, sin pushear):
     activate(B) tras A CLOSED → ACTIVE .................... ✓ (getActiveCycle=B)
     lockAfterClosure: updateProgress en CLOSED bloqueado / en ACTIVE permitido  ✓
 
+CIERRE DE VACÍOS (auditoría posterior) — efc693a + 56527f4:
+  1. Herencia automática (Decisión #4) — CERRADO en 56527f4: helper
+     resolveInheritedCycleId cableado en los 4 creadores de Goal
+     (createCorporateGoal, cascadeGoal, createManagerGoal,
+     createFromDevelopmentGoal). El 4º incluido: sin goalCycleId bypasearía el
+     guard de lockAfterClosure. Smoke smoke-goal-cycle-inheritance.ts (cadena PDI
+     completa, 2 cuentas) VERDE: 4 métodos heredan el ACTIVE / null sin ciclo.
+  2. updateClosureWindow — corrección de auditoría: NO era un vacío, ya existía
+     en efc693a. La auditoría lo reportó mal. Sin código nuevo.
+  Con ambos resueltos, Gate B queda COMPLETO. Spec versionada: SPEC_GOALCYCLE_v4.md.
+
 GATE C/D — PENDIENTE: APIs (Gate C, mapear errores de dominio a HTTP) +
   confirmación intencional UI (type-to-confirm al Activar) + idempotency key (Gate D).
 ```
