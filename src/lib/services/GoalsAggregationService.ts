@@ -13,6 +13,7 @@
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { GoalsService } from './GoalsService'
+import { GoalCycleService } from './GoalCycleService'
 
 interface GoalsAggregationResult {
   employeesProcessed: number
@@ -59,8 +60,12 @@ export class GoalsAggregationService {
 
     console.log(`[GoalsAggregation] Account ${accountId}: ${employees.length} employees with active goals`)
 
-    // ── Resolver ciclo activo del período (si GoalCycle existe) - NUEVO
-    const activeCycleId = await this.resolveActiveCycle(accountId, periodStart, periodEnd)
+    // ── Ciclo ACTIVE de la cuenta (GoalCycle, Gate B). Invariante 1 ACTIVE por
+    // cuenta ⇒ es el ciclo vigente. NOTA: getActiveCycle no filtra por ventana;
+    // un backfill de un mes viejo (?period=) etiquetaría con el ACTIVE actual
+    // (limitación conocida, no ocurre en el cron mensual normal).
+    const activeCycle = await GoalCycleService.getActiveCycle(accountId)
+    const activeCycleId = activeCycle?.id ?? null
 
     // ── Chunks paralelos (calca PerformanceRatingService.ts:433-456)
     // Promise.allSettled aísla fallos por empleado (no aborta el chunk).
@@ -226,30 +231,4 @@ export class GoalsAggregationService {
     return `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // NUEVO: resolver ciclo activo (si GoalCycle existe en el schema)
-  // GoalCycle aún NO existe → este método retorna null y el insight se guarda
-  // sin ciclo (goalCycleId nullable). Cast justificado (F4): el modelo no está
-  // en el Prisma Client todavía.
-  // ══════════════════════════════════════════════════════════════════════════
-  private static async resolveActiveCycle(
-    accountId: string,
-    periodStart: Date,
-    periodEnd: Date
-  ): Promise<string | null> {
-    try {
-      const cycle = await (prisma as any).goalCycle?.findFirst({
-        where: {
-          accountId,
-          status: { in: ['ACTIVE', 'CLOSING'] },
-          assignmentWindow: { lte: periodEnd },
-          closureWindow: { gte: periodStart },
-        },
-        select: { id: true }
-      })
-      return cycle?.id ?? null
-    } catch {
-      return null // GoalCycle no existe todavía
-    }
-  }
 }

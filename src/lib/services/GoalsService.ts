@@ -13,6 +13,7 @@ import {
   GoalStatus,
   Prisma
 } from '@prisma/client'
+import { GoalCycleClosedError } from './GoalCycleService'
 
 // ────────────────────────────────────────────────────────────────────────────
 // TIPOS
@@ -196,6 +197,20 @@ export class GoalsService {
 
       if (!goal) {
         throw new Error(`Goal no encontrado: ${goalId}`)
+      }
+
+      // LOCK POST-CIERRE (Gate B): si la meta pertenece a un GoalCycle con
+      // lockAfterClosure y el ciclo está CLOSED, no se admite editar progreso.
+      // Atado a GoalCycle.status === 'CLOSED', NUNCA a CLOSING (el cierre escribe
+      // metas mientras el ciclo está CLOSING) ni a Goal.status.
+      if (goal.goalCycleId) {
+        const cycle = await tx.goalCycle.findUnique({
+          where: { id: goal.goalCycleId },
+          select: { status: true, lockAfterClosure: true },
+        })
+        if (cycle?.lockAfterClosure && cycle.status === 'CLOSED') {
+          throw new GoalCycleClosedError(goal.goalCycleId)
+        }
       }
 
       // 2. Calcular nuevo progreso
