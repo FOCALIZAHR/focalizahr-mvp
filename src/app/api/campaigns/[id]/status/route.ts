@@ -5,6 +5,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyJWT } from '@/lib/auth'
 import { campaignStateTransitionSchema } from '@/lib/validations'
+import {
+  ClimaAggregationService,
+  CLIMA_CAMPAIGN_SLUGS
+} from '@/lib/services/clima/ClimaAggregationService'
 
 // PUT /api/campaigns/[id]/status - Cambiar estado campaña
 export async function PUT(
@@ -231,6 +235,38 @@ export async function PUT(
 
     if (body.toStatus === 'completed') {
       sideEffects.push('Campaña lista para análisis de resultados')
+
+      // EX Clima Gate 2C: agregación al cierre (patrón enterprise Ambiente Sano).
+      // Síncrono en el request — solo matemática, presupuesto <10s.
+      // Fallo de agregación NUNCA revierte el cierre: la campaña ya quedó
+      // completed; el estado queda FAILED y es re-ejecutable vía
+      // `npm run recompute:clima-insights -- <campaignId>`.
+      const campaignSlug = campaign.campaignType?.slug
+      if (campaignSlug && (CLIMA_CAMPAIGN_SLUGS as readonly string[]).includes(campaignSlug)) {
+        await prisma.campaign.update({
+          where: { id: campaignId },
+          data: { climaAggregationStatus: 'PENDING' }
+        })
+
+        try {
+          const aggregation = await ClimaAggregationService.processClimaResults(campaignId)
+          if (aggregation.status === 'COMPLETED') {
+            sideEffects.push(
+              `Inteligencia de clima generada: ${aggregation.insightsGenerados} insights ` +
+              `en ${aggregation.deptosProcesados} departamentos (${aggregation.durationMs}ms)`
+            )
+          } else {
+            sideEffects.push(
+              `Agregación de clima FAILED (${aggregation.deptosFallidos.length} errores) — ` +
+              `re-ejecutable vía recompute:clima-insights`
+            )
+          }
+        } catch (aggregationError) {
+          // El servicio ya dejó climaAggregationStatus=FAILED + AuditLog
+          console.error('❌ Clima aggregation failed:', aggregationError)
+          sideEffects.push('Agregación de clima FAILED — re-ejecutable vía recompute:clima-insights')
+        }
+      }
     }
 
     // Calcular métricas actualizadas

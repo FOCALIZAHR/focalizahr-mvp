@@ -30,6 +30,7 @@
     "backfill:convergencia-subobjetos": "tsx prisma/scripts/backfill-convergencia-subobjetos.ts",
     "backfill:employee-phone-normalize": "tsx prisma/scripts/backfill-employee-phone-normalize.ts",
     "migrate:clima-gate1": "tsx prisma/scripts/seed-clima-gate1.ts",
+    "recompute:clima-insights": "tsx prisma/scripts/recompute-clima-insights.ts",
     "db:reset": "prisma migrate reset",
     "db:seed:departments": "tsx prisma/seedDepartments.ts",
     "db:seed:performance": "tsx prisma/seeds/performance-evaluation-seed.ts",
