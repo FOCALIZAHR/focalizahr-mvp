@@ -1,7 +1,7 @@
 # 🎯 MÓDULO METAS — DOCUMENTO MAESTRO v3.0
 
 **Fecha:** Julio 2026
-**Estado:** POST-EmployeeGoalsInsight (Gates A/B/B.6 sellados) · GoalCycle Gate A (1246cd8) + A.5 (529353e) sellados
+**Estado:** POST-EmployeeGoalsInsight (Gates A/B/B.6 sellados) · GoalCycle Gate A (1246cd8) + A.5 (529353e) + B (efc693a) sellados
 **Propósito:** Fuente de verdad del módulo Metas para continuar desarrollo
 **Reemplaza:** METAS_DOCUMENTO_MAESTRO_v2.md (24 Feb 2026)
 
@@ -18,7 +18,7 @@
 3. [Infraestructura Existente a USAR](#3-infraestructura-existente-a-usar)
 4. [Decisiones de Diseño Aprobadas](#4-decisiones-de-diseño-aprobadas)
 5. [ANEXO — EmployeeGoalsInsight (Seguimiento Mensual)](#5-anexo--employeegoalsinsight)
-6. [GoalCycle — Contenedor de Período (Gate A sellado, Gate B en curso)](#6-goalcycle--contenedor-de-período-gate-a-sellado-gate-b-en-curso)
+6. [GoalCycle — Contenedor de Período (Gates A · A.5 · B sellados; C/D pendientes)](#6-goalcycle--contenedor-de-período-gates-a--a5--b-sellados-cd-pendientes)
 7. [Panel Personal UI (pendiente)](#7-panel-personal-ui-pendiente)
 8. [Lo Que Falta Implementar](#8-lo-que-falta-implementar)
 9. [Anti-Patrones — NO HACER](#9-anti-patrones--no-hacer)
@@ -68,10 +68,11 @@ INCOMPLETO (deuda P0 — seguridad):
      (ver Sección 10 — deuda P0 antes de cliente real)
 
 EN CURSO (parcial):
-  🟡 GoalCycle (contenedor de período) — Gate A (schema) `1246cd8` + Gate A.5
-     (migración retroactiva) `529353e` SELLADOS. cmfgedx7b… ya tiene su "Ciclo
-     Vigente 2026" ACTIVE con 211 metas asociadas (0 huérfanas). Gate B
-     (GoalCycleService.activate + advisory lock) en curso. Ver Sección 6.
+  🟡 GoalCycle (contenedor de período) — Gate A (schema) `1246cd8` + A.5
+     (migración retroactiva) `529353e` + B (GoalCycleService: candado singleton,
+     state machine, lockAfterClosure) `efc693a` SELLADOS. cmfgedx7b… tiene su
+     "Ciclo Vigente 2026" ACTIVE con 211 metas (0 huérfanas). Pendiente Gate C
+     (APIs) y Gate D (UI type-to-confirm). Ver Sección 6.
 
 NO IMPLEMENTADO:
   ❌ Flujo de cierre y aprobaciones (UI)
@@ -398,7 +399,7 @@ en la tendencia y mostrar nota de "período con metas cerradas".
 
 ---
 
-## 6. GoalCycle — Contenedor de Período (Gate A sellado, Gate B en curso)
+## 6. GoalCycle — Contenedor de Período (Gates A · A.5 · B sellados; C/D pendientes)
 
 ### 6.0 GATE A — SELLADO
 
@@ -457,14 +458,46 @@ GATE A.5 — 529353e (migración retroactiva, sin pushear):
   VERDE: 2 ciclos separados, status/name/ventanas/tracking por año, auditoría
   CLOSED, idempotencia (2ª corrida 0/0), cleanup por id en $transaction.
 
-GATE B — EN CURSO:
-  GoalCycleService.activate() con advisory lock pg_advisory_xact_lock(
-  hashtext(accountId)) dentro de $transaction → 409 GOAL_CYCLE_ALREADY_ACTIVE
-  si ya hay un ciclo ACTIVE. Destapar resolveActiveCycle (quitar el cast
-  (prisma as any).goalCycle + try/catch, GoalsAggregationService.ts:241).
-  Confirmación intencional en UI (type-to-confirm al Activar) + idempotency key.
-  Smoke Gate B: activar A → OK; activar B con A en ACTIVE → 409; cerrar A
-  (→CLOSED) → activar B → OK; crear en PLANNING NUNCA dispara el candado.
+GATE B — efc693a (GoalCycleService, sin pushear):
+  GoalCycleService (src/lib/services/). State machine PLANNING→ASSIGNING→ACTIVE
+  →CLOSING→CLOSED. Métodos: createCycle (PLANNING, valida quarter/semester por
+  periodType, SIN singleton), activate (EL CANDADO), closeCycle (→CLOSING),
+  finalizeCycle (→CLOSED con closedAt/closedBy), getActiveCycle, updateClosureWindow.
+  Guardas de estado-fuente en activate/close/finalize. Errores de dominio:
+  GoalCycleActiveError (409 GOAL_CYCLE_ALREADY_ACTIVE) / GoalCycleClosedError /
+  GoalCycleValidationError (Gate C los mapea a HTTP).
+
+  finalizeCycle (CLOSING→CLOSED) agregado en este gate: sin él CLOSED es inalcanzable
+  y el smoke/lock no funcionan (decisión A del plan).
+
+  El candado: activate() en $transaction con advisory lock
+  pg_advisory_xact_lock(hashtext(accountId)) + check status IN ('ACTIVE','CLOSING').
+  DECISIÓN TÉCNICA: el lock usa $executeRaw, NO $queryRaw — pg_advisory_xact_lock
+  retorna void y $queryRaw no deserializa esa columna. El mecanismo del candado es
+  EXACTAMENTE el mismo (advisory lock por cuenta); solo cambia el verbo Prisma.
+
+  Conexión: GoalsAggregationService usa GoalCycleService.getActiveCycle(accountId).
+  Eliminado el ÚLTIMO any F4 (cast (prisma as any).goalCycle + try/catch borrados).
+  getActiveCycle NO filtra por ventana (limitación conocida solo en backfill manual
+  ?period= de mes viejo; el cron mensual normal no la toca).
+  Enforcement: GoalsService.updateProgress bloquea con GoalCycleClosedError si el
+  GoalCycle de la meta tiene lockAfterClosure && status===CLOSED (NUNCA CLOSING,
+  nunca Goal.status).
+
+  Verificado: tsc --noEmit + npm run build OK. Smoke
+  prisma/scripts/smoke-goal-cycle-gateB.ts (UNTRACKED, cuenta sintética, cleanup
+  por id) VERDE — tabla completa:
+    createCycle A/B en PLANNING ............................. ✓ (B se crea con A existente)
+    PLANNING no dispara candado (getActiveCycle null) ...... ✓
+    activate(A) → ACTIVE ................................... ✓ (getActiveCycle=A)
+    activate(B) con A ACTIVE → 409 GOAL_CYCLE_ALREADY_ACTIVE  ✓
+    closeCycle(A) → CLOSING; B sigue 409 (CLOSING cuenta) .. ✓
+    finalizeCycle(A) → CLOSED (closedAt/closedBy poblados) . ✓
+    activate(B) tras A CLOSED → ACTIVE .................... ✓ (getActiveCycle=B)
+    lockAfterClosure: updateProgress en CLOSED bloqueado / en ACTIVE permitido  ✓
+
+GATE C/D — PENDIENTE: APIs (Gate C, mapear errores de dominio a HTTP) +
+  confirmación intencional UI (type-to-confirm al Activar) + idempotency key (Gate D).
 ```
 
 ### 6.1 Problema que resuelve
@@ -665,11 +698,12 @@ Falta: APIs request-closure/approve-closure/pending-closure + UI botón/página.
    Regla Enterprise #2: RBAC en cada endpoint vía AuthorizationService.
 
 🟡 P1 — Flujo de cierre UI (backend listo)
-🟡 P1 — GoalCycle: Gate A (schema) `1246cd8` + Gate A.5 (migración retroactiva)
-        `529353e` SELLADOS (sin pushear). cmfgedx7b… migrada (1 ciclo ACTIVE, 211
-        metas, 0 huérfanas); resto de cuentas DIFERIDO. Gate B EN CURSO
-        (GoalCycleService.activate + advisory lock, 409 GOAL_CYCLE_ALREADY_ACTIVE,
-        destapar resolveActiveCycle). Ver Sección 6.
+🟡 P1 — GoalCycle: Gate A (schema) `1246cd8` + A.5 (migración retroactiva)
+        `529353e` + B (GoalCycleService: candado singleton advisory lock,
+        finalizeCycle, lockAfterClosure, elimina any F4) `efc693a` SELLADOS (sin
+        pushear). cmfgedx7b… migrada (1 ciclo ACTIVE, 211 metas, 0 huérfanas);
+        resto de cuentas DIFERIDO. Pendiente Gate C (APIs) + Gate D (UI). Ver
+        Sección 6.
 🟡 P1 — Panel personal (Sección 7)
 
 🟢 P2 — Router inteligente, wizard config unificado
@@ -730,4 +764,4 @@ victor@focalizahr.cl · vyanezb@gmail.com · claudia.palominos@gmail.com
 
 **FIN DEL DOCUMENTO MAESTRO v3.0**
 
-**Estado:** EmployeeGoalsInsight sellado (A/B/B.6). GoalCycle Gate A (schema, `1246cd8`) + Gate A.5 (migración retroactiva, `529353e`) sellados (sin pushear); cmfgedx7b… migrada, resto DIFERIDO. Gate B (activate + advisory lock) en curso. Panel UI diseñado, pendiente. Deuda P0 (RBAC 6 endpoints) vigente antes de cliente real.
+**Estado:** EmployeeGoalsInsight sellado (A/B/B.6). GoalCycle Gate A (schema, `1246cd8`) + A.5 (migración retroactiva, `529353e`) + B (GoalCycleService: candado singleton + lockAfterClosure, `efc693a`) sellados (sin pushear); cmfgedx7b… migrada, resto DIFERIDO. Pendiente Gate C (APIs) y Gate D (UI type-to-confirm). Panel UI diseñado, pendiente. Deuda P0 (RBAC 6 endpoints) vigente antes de cliente real.
