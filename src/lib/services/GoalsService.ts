@@ -13,7 +13,23 @@ import {
   GoalStatus,
   Prisma
 } from '@prisma/client'
-import { GoalCycleClosedError, GoalCycleService } from './GoalCycleService'
+import { GoalCycleClosedError, GoalCycleValidationError, GoalCycleService } from './GoalCycleService'
+
+// ────────────────────────────────────────────────────────────────────────────
+// CIERRE DE CICLO — decisiones sobre metas incompletas (Gate D.5, Decisión #8)
+// ────────────────────────────────────────────────────────────────────────────
+export type CycleClosureDecisionType = 'CLOSE_WITH_SCORE' | 'MARK_REVIEW' | 'LEAVE_AS_IS'
+
+export interface CycleClosureDecision {
+  goalId: string
+  decision: CycleClosureDecisionType
+}
+
+export interface CycleClosureSummary {
+  closedWithScore: number
+  markedReview: number
+  leftAsIs: number
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // TIPOS
@@ -855,6 +871,157 @@ export class GoalsService {
       },
       orderBy: { closureRequestedAt: 'asc' },
     })
+  }
+
+  /**
+   * Aplica las decisiones del modal de cierre de ciclo (Gate D.5, Decisión #8)
+   * sobre las metas INCOMPLETAS de un ciclo, en BULK (updateMany/createMany).
+   *
+   * tx-aware: corre DENTRO de la $transaction de finalizeCycleWithDecisions, para
+   * que decisiones + transición CLOSING→CLOSED sean atómicas.
+   *
+   * Escala: N metas se resuelven en ~4 statements (no un loop per-meta) — con 182
+   * metas reales de la cuenta piloto, una sola transacción aguanta cómoda.
+   *
+   * Semántica (confirmada Gate D.5a):
+   *   CLOSE_WITH_SCORE → COMPLETED con score congelado (escritura directa; NO
+   *     approveClosure, que exige PENDING_CLOSURE). closureApprovedBy=null +
+   *     nota explícita de cierre forzado (no "se aprobó a sí mismo").
+   *   MARK_REVIEW → PENDING_CLOSURE (mismo end-state que requestClosure, sin
+   *     campo nuevo; cae en la bandeja de aprobación existente).
+   *   LEAVE_AS_IS → no-op.
+   *
+   * Validación TODO-O-NADA: cada goalId de decisions[] DEBE pertenecer al set
+   * accionable real (cuenta+ciclo, status notIn COMPLETED/CANCELLED/PENDING_CLOSURE).
+   * Un id fuera de lugar → GoalCycleValidationError, se rechaza TODA la operación
+   * (no filtrado en silencio). Duplicados también se rechazan.
+   */
+  static async applyCycleClosureDecisions(
+    tx: Prisma.TransactionClient,
+    params: {
+      accountId: string
+      goalCycleId: string
+      decisions: CycleClosureDecision[]
+      actorId: string
+      actorName: string
+      cycleName: string
+      now: Date
+    }
+  ): Promise<CycleClosureSummary> {
+    const { accountId, goalCycleId, decisions, actorId, actorName, cycleName, now } = params
+
+    // Status accionables (los únicos que el modal puede decidir).
+    const ACTIONABLE = { notIn: ['COMPLETED', 'CANCELLED', 'PENDING_CLOSURE'] as GoalStatus[] }
+
+    // ── 1. Set accionable REAL server-side (fuente de verdad, no el cliente) ──
+    const actionable = await tx.goal.findMany({
+      where: { accountId, goalCycleId, status: ACTIONABLE },
+      select: { id: true, currentValue: true, progress: true },
+    })
+    const actionableMap = new Map(actionable.map((g) => [g.id, g]))
+
+    // ── 2. Validación TODO-O-NADA (antes de cualquier write) ──
+    const seen = new Set<string>()
+    const offending: string[] = []
+    for (const d of decisions) {
+      if (seen.has(d.goalId)) {
+        throw new GoalCycleValidationError(`goalId duplicado en decisions: ${d.goalId}`)
+      }
+      seen.add(d.goalId)
+      if (!actionableMap.has(d.goalId)) offending.push(d.goalId)
+    }
+    if (offending.length > 0) {
+      // Puede ser bug de front O una meta que salió del set accionable con el
+      // modal abierto (alguien la completó). La UI (Acto 3) distingue el mensaje.
+      throw new GoalCycleValidationError(
+        `Metas fuera del set accionable del ciclo (cambiaron de estado o no pertenecen): ${offending.join(', ')}`
+      )
+    }
+
+    // ── 3. Agrupar en baldes ──
+    const closeIds = decisions.filter((d) => d.decision === 'CLOSE_WITH_SCORE').map((d) => d.goalId)
+    const reviewIds = decisions.filter((d) => d.decision === 'MARK_REVIEW').map((d) => d.goalId)
+    const leaveIds = decisions.filter((d) => d.decision === 'LEAVE_AS_IS').map((d) => d.goalId)
+
+    const forcedNote =
+      `Cierre forzado al finalizar el ciclo "${cycleName}". Score congelado al valor vigente. ` +
+      `Ejecutado por ${actorName}. No pasó por flujo de aprobación estándar.`
+
+    // ── 4. updateMany por balde — SIEMPRE con accountId + goalCycleId en el where
+    //       (defensa en profundidad) + assert de conteo (protección de carrera) ──
+    if (closeIds.length > 0) {
+      const res = await tx.goal.updateMany({
+        where: { id: { in: closeIds }, accountId, goalCycleId, status: ACTIONABLE },
+        data: {
+          status: 'COMPLETED',
+          completedAt: now,
+          closedAt: now,
+          closedBy: actorName,
+          closureApprovedBy: null,
+          closureNotes: forcedNote,
+        },
+      })
+      if (res.count !== closeIds.length) {
+        throw new GoalCycleValidationError(
+          `Condición de carrera al cerrar metas: esperadas ${closeIds.length}, afectadas ${res.count}`
+        )
+      }
+    }
+
+    if (reviewIds.length > 0) {
+      const res = await tx.goal.updateMany({
+        where: { id: { in: reviewIds }, accountId, goalCycleId, status: ACTIONABLE },
+        data: {
+          status: 'PENDING_CLOSURE',
+          closureRequestedAt: now,
+          closureRequestedBy: actorName,
+        },
+      })
+      if (res.count !== reviewIds.length) {
+        throw new GoalCycleValidationError(
+          `Condición de carrera al enviar a revisión: esperadas ${reviewIds.length}, afectadas ${res.count}`
+        )
+      }
+    }
+
+    // ── 5. Auditoría createMany (CLOSE_WITH_SCORE ∪ MARK_REVIEW; LEAVE_AS_IS no) ──
+    //       accountId poblado en cada fila (regla enterprise #1, toda escritura).
+    const auditRows: Prisma.GoalProgressUpdateCreateManyInput[] = []
+    for (const id of closeIds) {
+      const g = actionableMap.get(id)!
+      auditRows.push({
+        goalId: id,
+        accountId,
+        previousValue: g.currentValue,
+        newValue: g.currentValue,
+        previousProgress: g.progress,
+        newProgress: g.progress,
+        comment: `Cierre forzado al finalizar el ciclo "${cycleName}" (score congelado al ${g.progress}%).`,
+        updatedById: actorId,
+      })
+    }
+    for (const id of reviewIds) {
+      const g = actionableMap.get(id)!
+      auditRows.push({
+        goalId: id,
+        accountId,
+        previousValue: g.currentValue,
+        newValue: g.currentValue,
+        previousProgress: g.progress,
+        newProgress: g.progress,
+        comment: `Enviada a revisión al finalizar el ciclo "${cycleName}" (progreso ${g.progress}%).`,
+        updatedById: actorId,
+      })
+    }
+    if (auditRows.length > 0) {
+      await tx.goalProgressUpdate.createMany({ data: auditRows })
+    }
+
+    return {
+      closedWithScore: closeIds.length,
+      markedReview: reviewIds.length,
+      leftAsIs: leaveIds.length,
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════

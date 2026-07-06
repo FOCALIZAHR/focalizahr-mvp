@@ -10,6 +10,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { GoalCycle, GoalPeriodType } from '@prisma/client'
+import { GoalsService, CycleClosureDecision, CycleClosureSummary } from './GoalsService'
 
 // ── Errores de dominio (Gate C los mapea a HTTP) ─────────────────────────────
 export class GoalCycleActiveError extends Error {
@@ -176,6 +177,57 @@ export class GoalCycleService {
         closedAt: new Date(),
         closedBy: closedBy ?? null,
       },
+    })
+  }
+
+  // finalizeCycleWithDecisions: CLOSING → CLOSED aplicando ANTES las decisiones del
+  // modal de cierre (Gate D.5, Decisión #8) sobre las metas incompletas, TODO en
+  // una sola $transaction atómica (decisiones + transición). Si cualquier decisión
+  // falla (id fuera del set accionable, carrera), se aborta entera y el ciclo sigue
+  // CLOSING (reanudable). Devuelve el ciclo actualizado + resumen para el toast.
+  static async finalizeCycleWithDecisions(
+    cycleId: string,
+    accountId: string,
+    decisions: CycleClosureDecision[],
+    actor: { id: string; name: string }
+  ): Promise<{ cycle: GoalCycle; summary: CycleClosureSummary }> {
+    // Pre-check de estado fuera de la tx (error limpio si no está CLOSING).
+    const cycle = await prisma.goalCycle.findFirst({
+      where: { id: cycleId, accountId },
+      select: { id: true, status: true, name: true },
+    })
+    if (!cycle) throw new GoalCycleValidationError(`GoalCycle no encontrado: ${cycleId}`)
+    if (cycle.status !== 'CLOSING') {
+      throw new GoalCycleValidationError(`Solo se finaliza un ciclo CLOSING (actual: ${cycle.status})`)
+    }
+
+    const now = new Date() // timestamp único para todos los writes de la transacción
+
+    return prisma.$transaction(async (tx) => {
+      const summary = await GoalsService.applyCycleClosureDecisions(tx, {
+        accountId,
+        goalCycleId: cycleId,
+        decisions,
+        actorId: actor.id,
+        actorName: actor.name,
+        cycleName: cycle.name,
+        now,
+      })
+
+      // Defensa: re-verificar CLOSING DENTRO de la tx antes de sellar.
+      const fresh = await tx.goalCycle.findUnique({
+        where: { id: cycleId },
+        select: { status: true },
+      })
+      if (fresh?.status !== 'CLOSING') {
+        throw new GoalCycleValidationError(`El ciclo dejó de estar CLOSING (actual: ${fresh?.status})`)
+      }
+
+      const updated = await tx.goalCycle.update({
+        where: { id: cycleId },
+        data: { status: 'CLOSED', closedAt: now, closedBy: actor.id },
+      })
+      return { cycle: updated, summary }
     })
   }
 

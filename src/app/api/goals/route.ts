@@ -79,6 +79,7 @@ export async function GET(request: NextRequest) {
     const departmentId = searchParams.get('departmentId')
     const level = searchParams.get('level') as 'COMPANY' | 'AREA' | 'INDIVIDUAL' | null
     const periodYear = searchParams.get('periodYear')
+    const goalCycleId = searchParams.get('goalCycleId')
     const status = searchParams.get('status')
     const includeCompleted = searchParams.get('includeCompleted') === 'true'
 
@@ -129,6 +130,7 @@ export async function GET(request: NextRequest) {
     if (departmentId) where.departmentId = departmentId
     if (level) where.level = level
     if (periodYear) where.periodYear = parseInt(periodYear)
+    if (goalCycleId) where.goalCycleId = goalCycleId
     if (status) {
       const statuses = status.split(',').map(s => s.trim()).filter(Boolean)
       where.status = statuses.length === 1 ? statuses[0] : { in: statuses }
