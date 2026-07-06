@@ -1,7 +1,7 @@
 # 🎯 MÓDULO METAS — DOCUMENTO MAESTRO v3.0
 
 **Fecha:** Julio 2026
-**Estado:** POST-EmployeeGoalsInsight (Gates A/B/B.6 sellados) · GoalCycle Gate A sellado (1246cd8)
+**Estado:** POST-EmployeeGoalsInsight (Gates A/B/B.6 sellados) · GoalCycle Gate A (1246cd8) + A.5 (529353e) sellados
 **Propósito:** Fuente de verdad del módulo Metas para continuar desarrollo
 **Reemplaza:** METAS_DOCUMENTO_MAESTRO_v2.md (24 Feb 2026)
 
@@ -68,9 +68,10 @@ INCOMPLETO (deuda P0 — seguridad):
      (ver Sección 10 — deuda P0 antes de cliente real)
 
 EN CURSO (parcial):
-  🟡 GoalCycle (contenedor de período) — Gate A (schema) SELLADO `1246cd8`.
-     Solo el schema está sellado; Gate B (GoalCycleService.activate + advisory
-     lock) en curso. Ver Sección 6.
+  🟡 GoalCycle (contenedor de período) — Gate A (schema) `1246cd8` + Gate A.5
+     (migración retroactiva) `529353e` SELLADOS. cmfgedx7b… ya tiene su "Ciclo
+     Vigente 2026" ACTIVE con 211 metas asociadas (0 huérfanas). Gate B
+     (GoalCycleService.activate + advisory lock) en curso. Ver Sección 6.
 
 NO IMPLEMENTADO:
   ❌ Flujo de cierre y aprobaciones (UI)
@@ -436,6 +437,26 @@ GATE A — 1246cd8 (schema, sin pushear):
     CLEANUP: goalCycleId→null (por id exacto) + delete del ciclo (por id), todo
              en un $transaction. Sin residuo.
 
+GATE A.5 — 529353e (migración retroactiva, sin pushear):
+  Script prisma/scripts/migrate-goal-cycle-retroactive.ts (versionado). Agrupa
+  metas huérfanas (goalCycleId=null) por (accountId, periodYear) → 1 GoalCycle
+  ANNUAL por año presente (cada año un ciclo separado).
+    status: en curso→ACTIVE, anterior→CLOSED (closedBy/closedAt), futuro→PLANNING.
+    name:   ACTIVE "Ciclo Vigente {year}" · CLOSED/PLANNING "Ciclo {year}".
+    ventanas: assignment=MIN(startDate), closure=MAX(dueDate) del año,
+              tracking=midpoint. closure NO se recorta al año calendario.
+    Idempotente (findFirst unique key + updateMany solo goalCycleId=null).
+    Guarda "1 ACTIVE": no crea un 2º ciclo ACTIVE (bypass del lock de Gate B).
+    Dry-run por default; --apply para escribir; --account/--years para acotar.
+
+  APPLY real acotado SOLO a cmfgedx7b… (resto de cuentas DIFERIDO, se decide
+  después de revisar): 1 ciclo "Ciclo Vigente 2026" ACTIVE (id cmr8qhxk…), 211
+  metas asociadas. Verificado: goals con goal_cycle_id NULL = 0; getActiveCycle
+  devuelve ese ciclo (1 solo ACTIVE en la cuenta).
+  Smoke multi-año sintético (2019/2020, referenceYear inyectado, UNTRACKED)
+  VERDE: 2 ciclos separados, status/name/ventanas/tracking por año, auditoría
+  CLOSED, idempotencia (2ª corrida 0/0), cleanup por id en $transaction.
+
 GATE B — EN CURSO:
   GoalCycleService.activate() con advisory lock pg_advisory_xact_lock(
   hashtext(accountId)) dentro de $transaction → 409 GOAL_CYCLE_ALREADY_ACTIVE
@@ -644,9 +665,11 @@ Falta: APIs request-closure/approve-closure/pending-closure + UI botón/página.
    Regla Enterprise #2: RBAC en cada endpoint vía AuthorizationService.
 
 🟡 P1 — Flujo de cierre UI (backend listo)
-🟡 P1 — GoalCycle: Gate A (schema) SELLADO `1246cd8` (sin pushear). Gate B
-        EN CURSO (GoalCycleService.activate + advisory lock, 409
-        GOAL_CYCLE_ALREADY_ACTIVE, destapar resolveActiveCycle). Ver Sección 6.
+🟡 P1 — GoalCycle: Gate A (schema) `1246cd8` + Gate A.5 (migración retroactiva)
+        `529353e` SELLADOS (sin pushear). cmfgedx7b… migrada (1 ciclo ACTIVE, 211
+        metas, 0 huérfanas); resto de cuentas DIFERIDO. Gate B EN CURSO
+        (GoalCycleService.activate + advisory lock, 409 GOAL_CYCLE_ALREADY_ACTIVE,
+        destapar resolveActiveCycle). Ver Sección 6.
 🟡 P1 — Panel personal (Sección 7)
 
 🟢 P2 — Router inteligente, wizard config unificado
@@ -707,4 +730,4 @@ victor@focalizahr.cl · vyanezb@gmail.com · claudia.palominos@gmail.com
 
 **FIN DEL DOCUMENTO MAESTRO v3.0**
 
-**Estado:** EmployeeGoalsInsight sellado (A/B/B.6). GoalCycle Gate A (schema) sellado (`1246cd8`, sin pushear), Gate B (activate + advisory lock) en curso. Panel UI diseñado, pendiente. Deuda P0 (RBAC 6 endpoints) vigente antes de cliente real.
+**Estado:** EmployeeGoalsInsight sellado (A/B/B.6). GoalCycle Gate A (schema, `1246cd8`) + Gate A.5 (migración retroactiva, `529353e`) sellados (sin pushear); cmfgedx7b… migrada, resto DIFERIDO. Gate B (activate + advisory lock) en curso. Panel UI diseñado, pendiente. Deuda P0 (RBAC 6 endpoints) vigente antes de cliente real.
