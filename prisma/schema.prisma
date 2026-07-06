@@ -224,6 +224,7 @@ model Account {
   goalJobConfigs           GoalJobConfig[]
   goalGroups               GoalGroup[]
   goalCascadeRules         GoalCascadeRule[]
+  goalCycles               GoalCycle[]
 
   // Sucesion Inteligente
   criticalPositions        CriticalPosition[]
@@ -2743,6 +2744,10 @@ model Goal {
   periodYear      Int      @map("period_year")  // Ej: 2026
   periodQuarter   Int?     @map("period_quarter") // 1-4 opcional
 
+  // Ciclo de metas (contexto temporal OPCIONAL). Nullable: las metas creadas
+  // antes de GoalCycle quedan sin asociar; nunca bloquea crear/editar una meta.
+  goalCycleId     String?  @map("goal_cycle_id")
+
   // ────────────────────────────────────────────────────────────────────────────
   // 5. MEDICIÓN (Motor Determinista)
   // ────────────────────────────────────────────────────────────────────────────
@@ -2785,6 +2790,7 @@ model Goal {
   owner           Employee?  @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   department      Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   linkedDevGoal   DevelopmentGoal? @relation(fields: [linkedDevGoalId], references: [id], onDelete: SetNull)
+  goalCycle       GoalCycle?       @relation(fields: [goalCycleId], references: [id], onDelete: SetNull)
 
   progressUpdates GoalProgressUpdate[]
   cascadeRules    GoalCascadeRule[]
@@ -2813,6 +2819,7 @@ model Goal {
   @@index([status])
   @@index([periodYear])
   @@index([dueDate])
+  @@index([goalCycleId])
   @@map("goals")
 }
 
@@ -2964,6 +2971,61 @@ model GoalCascadeRule {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// GOAL CYCLE — Contenedor temporal de metas
+// El ciclo es CONTEXTO opcional de la meta, no dueño (Goal.goalCycleId nullable).
+// Gate 0: GoalsAggregationService.resolveActiveCycle:241 ya esperaba este modelo.
+// NOTA: el @@unique de abajo garantiza 1 ciclo por PERÍODO (no dos ANNUAL 2026).
+// La garantía "1 ACTIVE por cuenta" NO vive aquí — es el lock de activación (Gate B).
+// ────────────────────────────────────────────────────────────────────────────
+model GoalCycle {
+  id         String @id @default(cuid())
+  accountId  String @map("account_id")
+
+  name       String
+  periodType GoalPeriodType @map("period_type")
+  year       Int
+
+  // Discriminadores de período — NO nullable a propósito: en Postgres NULL no
+  // colisiona en un UNIQUE, pero 0 sí. default 0 es lo que protege el constraint.
+  // ANNUAL => quarter 0, semester 0. QUARTERLY => quarter 1-4. SEMESTER => semester 1-2.
+  quarter    Int @default(0)
+  semester   Int @default(0)
+
+  // Ventanas del ciclo (asignación → seguimiento → cierre)
+  assignmentWindow DateTime @map("assignment_window")
+  trackingWindow   DateTime @map("tracking_window")
+  closureWindow    DateTime @map("closure_window")
+
+  status           GoalCycleStatus @default(PLANNING)
+  requiresClosure  Boolean         @default(true) @map("requires_closure")
+  lockAfterClosure Boolean         @default(true) @map("lock_after_closure")
+
+  // Vínculo opcional con ciclo de desempeño. Solo el campo: sin FK, sin UI, sin
+  // flujo (soft reference deliberada — no toca PerformanceCycle).
+  linkedPerformanceCycleId String? @map("linked_performance_cycle_id")
+
+  // Auditoría de cierre
+  closedAt DateTime? @map("closed_at")
+  closedBy String?   @map("closed_by")
+
+  // Auditoría de edición de la ventana de cierre
+  closureWindowUpdatedAt DateTime? @map("closure_window_updated_at")
+  closureWindowUpdatedBy String?   @map("closure_window_updated_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  goals   Goal[]
+
+  @@unique([accountId, year, periodType, quarter, semester], map: "unique_goal_cycle_period")
+  @@index([accountId])
+  @@index([status])
+  @@map("goal_cycles")
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // ENUMS - METAS
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -3000,6 +3062,20 @@ enum GoalStatus {
   PENDING_CLOSURE  // Pendiente de aprobación de cierre
   COMPLETED        // Completado
   CANCELLED        // Cancelado
+}
+
+enum GoalPeriodType {
+  QUARTERLY   // Trimestral — usa quarter 1-4, semester 0
+  SEMESTER    // Semestral  — usa semester 1-2, quarter 0
+  ANNUAL      // Anual       — quarter 0, semester 0
+}
+
+enum GoalCycleStatus {
+  PLANNING    // Configurando (default)
+  ASSIGNING   // Ventana de asignación abierta
+  ACTIVE      // En seguimiento
+  CLOSING     // Cierre en curso (metas AÚN editables — lock NO aplica)
+  CLOSED      // Cerrado (lockAfterClosure aplica aquí, nunca en CLOSING)
 }
 
 // ════════════════════════════════════════════════════════════════════════════
