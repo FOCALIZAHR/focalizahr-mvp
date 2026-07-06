@@ -37,10 +37,64 @@
 
 ---
 
-## Gate 2 — Scoring + Aggregation 🔜 SIGUIENTE
+## Gate 2 — Scoring + Aggregation ✅ SELLADO (2026-07-06)
 
-Al retomar: leer MAESTRO §Gate 2 completo + este doc. Plan Mode primero.
-Insumos listos: DepartmentClimaInsight en BD, climaAggregationStatus en Campaign,
-patrón `aggregateExitNPS` en `NPSAggregationService.ts:472` / `upsertNPSInsight:152`.
-Recordar: "(a confirmar por Code)" del MAESTRO — DepartmentMetric poblado con
-turnover/absenteeism reales — se verifica DENTRO de Gate 2 antes del paso 6.
+**Commits:** `708791d` (núcleo servicios) · `d2eee38` (trigger + recompute) · sello (ver git log)
+**Plan aprobado:** `~/.claude/plans/steady-sleeping-quiche.md` (dir global de plans, no el del repo)
+
+**Qué quedó construido:**
+- `clima/FavorabilityCalculator.ts` (puro): fav top-2 + mean por driver, dual track
+  full/core/custom, EI separado, guardia `responseType==='rating_scale'` (NPS 0-10 no
+  contamina), `PRIVACY_THRESHOLD` importado de SafetyScoreService, celda acotadoGroup
+  bajo threshold se OMITE (depto bajo threshold → fav/mean null, n preservado).
+- `clima/ClimaAggregationService.processClimaResults`: PENDING→RUNNING→COMPLETED/FAILED,
+  try/catch por depto, upsert idempotente clave 5 campos, carry-forward (carried:true +
+  sourceDate + n:0, data-driven sobre el baseline isFollowUp=false), momentum EI,
+  snapshots DepartmentMetric+EXO/EIS/ISA, benchmarkDelta (null hoy — sin MarketBenchmark
+  pulse_climate), gold cache rolling 12m, AuditLog SIEMPRE con metadata.
+  `suggestDriverFocus` exportado (top-2 low <3.0 + top-1 high >4.0, solo isFollowUp=false).
+- `NPSAggregationService.aggregateClimaNPS`: clon exit con fuente Response, 3 niveles,
+  primer writer de productType 'pulso'/'experiencia'.
+- Trigger en `PUT /api/campaigns/[id]/status` (bloque toStatus=completed, solo slugs
+  clima); fallo NUNCA revierte el cierre. Re-run: `npm run recompute:clima-insights`.
+
+**Evidencia de verificación:**
+- Smoke 72/72 PASS (borrado al sellar): S1 scores exactos a mano + guardia NPS,
+  S2 privacy (depto n=3 → nulls; celda n=1 → omitida), S3 snapshots con nombres reales,
+  S4 NPSInsight 3 niveles, S5 gold cache + suggestDriverFocus, S6 re-run idempotente +
+  AuditLog, S7 carry-forward + momentum -50, S8 S-PERF.
+- **S-PERF línea base: 17.340 responses / 1.020 participantes / 12 deptos → 9.070ms**
+  (presupuesto <10s; requirió paralelizar upserts por depto + niveles NPS + gold cache
+  y query madre con select mínimo — primera pasada secuencial daba 14.242ms).
+- `npx tsc --noEmit` EXIT 0 · `npm run build` EXIT 0.
+- E2E vivo: dev server + PUT /status con JWT (como el frontend) sobre campaña pulso
+  sintética → COMPLETED, insight 7 drivers reales + EI + eNPS, NPSInsight 3 niveles
+  'pulso', gold cache, AuditLog; segundo PUT (forceTransition) y recompute = idempotentes.
+
+**Gotchas descubiertos (para próximos gates):**
+- **DepartmentMetric YA está poblada en dev** (12 filas, jun-2026) — el "(a confirmar
+  por Code)" del MAESTRO quedó resuelto: campos reales `absenceRate` (no absenteeism)
+  y `overtimeHoursAvg` (HORAS promedio, no rate — el insight lo guarda tal cual en
+  overtimeRateAtMeasurement, semántica documentada en el service).
+- **Latencia de red domina, no cómputo**: dev machine→Supabase pooler ≈ 600ms/query
+  (recompute de 1 depto = ~17s por eso); conexión DIRECT_URL ≈ la mitad; las fases
+  paralelas son lo que mete el volumen enterprise bajo presupuesto. En Vercel
+  co-localizado esto colapsa a <1s.
+- durationMs del AuditLog en dev server incluye compile-on-demand de Next (no comparar
+  contra el smoke).
+- El objeto `campaign` que devuelve el PUT es el snapshot PREVIO al hook
+  (climaAggregationStatus se lee null ahí; los sideEffects sí informan el resultado real).
+
+**Pendientes NO bloqueantes que heredan gates siguientes:**
+- riskZone + accumulatedClimaRiskZone + driverAnalysis/topFocusArea/topStrength → Gate 3.
+- Wiring de suggestDriverFocus a la creación de campaña de seguimiento → Gate 4/7.
+- Escritura de MarketBenchmark pulse_climate → Gate 6C (benchmarkDelta null hasta entonces).
+
+---
+
+## Gate 3 — PulseEngine (5 algoritmos) 🔜 SIGUIENTE
+
+Al retomar: leer MAESTRO §Gate 3 completo + este doc. Plan Mode primero.
+Insumos listos: DepartmentClimaInsight poblado al cerrar campaña (Gate 2),
+riskZone/driverAnalysis son NULL esperando al motor; absorbe RetentionEngine
+(decisión sellada julio 2026).

@@ -1,9 +1,9 @@
 # MAESTRO: FocalizaHR EX — Inteligencia de Clima
 # Documento maestro ejecutable para Claude Code
 
-> **Versión:** 3.5 — Gate 1 SELLADO (as-built) + taxonomía real de BD
+> **Versión:** 3.6 — Gate 2 SELLADO (as-built)
 > **Fecha:** Julio 2026
-> **Estado:** En ejecución — Gate 1 ✅ · Gate 2 siguiente
+> **Estado:** En ejecución — Gate 1 ✅ · Gate 2 ✅ · Gate 3 siguiente
 
 | Versión | Qué consolidó |
 |---|---|
@@ -14,6 +14,7 @@
 | v3.3 | Post-visión ejecutiva: theatreDetected, climaAggregationStatus, consent en Bajada, Smart Router, cruces Exit/Onb confirmados en schema |
 | v3.4 | Autocontenido: modelo DepartmentClimaInsight completo inline, referencias externas eliminadas (patrones = código real) |
 | v3.5 | Gate 1 sellado as-built: taxonomía real de BD (7-8 categorías, NO liderazgo/ambiente/desarrollo/bienestar), mecánica real de modify_text (SurveyConfiguration + textMapping por rating), decisiones Victor (preguntas al final, 1 follow-up por instrumento, categoría texto_libre) |
+| v3.6 | Gate 2 sellado as-built: trigger real = PUT /status (no endpoint dedicado), DepartmentMetric confirmada (nombres reales absenceRate/overtimeHoursAvg), eNPS también dentro del insight, período = trimestre del endDate, S-PERF 17.340 responses en 9.070ms |
 
 ---
 
@@ -36,7 +37,7 @@
 | Gate | Nombre | Estado |
 |------|--------|--------|
 | 1 | Foundation (Taxonomía + Persistencia + Seguimiento Focalizado) | ✅ SELLADO `28c9369`+`ec2694e`+`7cc04e3` (2026-07-06, smoke 40/40 + E2E filtro vivo) |
-| 2 | Scoring + Aggregation (enterprise close pattern) | 🔲 SPEC LISTA |
+| 2 | Scoring + Aggregation (enterprise close pattern) | ✅ SELLADO `708791d`+`d2eee38` (2026-07-06, smoke 72/72 + S-PERF 17.340 responses en 9.070ms + E2E PUT /status vivo) |
 | 3 | PulseEngine (5 Algoritmos + absorbe RetentionEngine) | 🔲 PENDIENTE |
 | 4 | Frontend Cinema Mode | 🔲 PENDIENTE |
 | 5 | Planes de Acción (doble CTA + validación impacto) | 🔲 PENDIENTE |
@@ -473,9 +474,13 @@ clima:manage: FOCALIZAHR_ADMIN, ACCOUNT_OWNER, HR_ADMIN, HR_MANAGER,
 #    depto × acotadoGroup. Si alta_gerencia de Finanzas tiene 2 personas,
 #    NO se muestra su score separado (se incluye solo en el agregado
 #    del depto). Misma regla que el corte departamental.
-# 6. Snapshot datos duros: turnoverRate, absenteeismRate, etc.
-#    (a confirmar por Code: ¿DepartmentMetric está poblado con turnover/
-#     absenteeism por depto en cuentas reales?)
+# 6. Snapshot datos duros desde DepartmentMetric más reciente por depto
+#    (CONFIRMADO Gate 2: tabla poblada en dev — 12 filas jun-2026; carga
+#     manual Excel del cliente; snapshot null-safe si no hay filas).
+#    Nombres REALES de campos (as-built): turnoverRate→turnoverRateAtMeasurement,
+#    absenceRate→absenteeismRateAtMeasurement (NO "absenteeism"),
+#    overtimeHoursAvg→overtimeRateAtMeasurement (son HORAS promedio, no rate),
+#    issueCount→incidentCountAtMeasurement.
 # 7. Snapshot señales cross-producto: accumulatedExoScore, EIS.
 #    ISA: leer directo de ComplianceAnalysis.isaScore (scope DEPARTMENT),
 #    patrón loadPreviousDeptIsaScore() existente. Queda null si no hay
@@ -582,6 +587,48 @@ No se necesita script de backfill separado.
   lee solo insights con isFollowUp=false)
 □ Performance: <10s para 1000 respuestas
 □ CERO regresiones
+```
+
+### Gate 2 — AS-BUILT (sellado 2026-07-06, `708791d` + `d2eee38`)
+
+```yaml
+Archivos:
+  src/lib/services/clima/FavorabilityCalculator.ts   # puro, sin I/O
+  src/lib/services/clima/ClimaAggregationService.ts  # processClimaResults + suggestDriverFocus
+  src/lib/services/NPSAggregationService.ts          # + aggregateClimaNPS (3 niveles)
+  src/app/api/campaigns/[id]/status/route.ts         # trigger en toStatus=completed
+  prisma/scripts/recompute-clima-insights.ts         # npm run recompute:clima-insights
+
+Decisiones as-built (donde la realidad ajustó la spec):
+  - TRIGGER REAL = PUT /api/campaigns/[id]/status (el cierre que usa el
+    frontend vía useCampaignState/CampaignsList). NO hay endpoint dedicado
+    de cierre clima. Síncrono en request (solo matemática, sin LLM);
+    fallo de agregación NUNCA revierte el cierre (queda FAILED re-ejecutable).
+  - PERÍODO insight = trimestre del endDate de la campaña ("YYYY-Qn",
+    determinista → clave idempotente). NPSInsight = mes del endDate
+    ("YYYY-MM", monthly-hardcoded de upsertNPSInsight; 2 campañas mismo
+    productType mismo mes → last-wins, snapshot mensual aceptado).
+  - eNPS TAMBIÉN dentro de DepartmentClimaInsight (npsScore/promotersPct/
+    detractorsPct por depto, campos del schema Gate 1) CON privacy threshold;
+    los NPSInsight 3 niveles NO llevan threshold (paridad con exit).
+  - isFollowUp es POR CAMPAÑA (driverFocusByDepartment poblado, solo
+    experiencia-full); drivers carried = categorías del baseline sin filas
+    en esta campaña (data-driven, no solo el mapa de foco).
+  - productType del insight = slug ('pulso-express'/'experiencia-full');
+    productType NPS = 'pulso'/'experiencia'. Primer writer de esos enums
+    (EfficiencyDataResolver deja de recibir null).
+  - riskZone / driverAnalysis / topFocus* / comment* NO se escriben ni se
+    pisan en el update del upsert (Gate 3 y Gate 6 escriben ahí).
+  - S-PERF: fases paralelizadas (Promise.all en upserts por depto, niveles
+    NPS y gold cache) + query madre con select mínimo (questionId plano,
+    banco de preguntas aparte). Línea base: 17.340 responses / 1.020
+    participantes / 12 deptos → 9.070ms (conexión directa dev→Supabase;
+    en Vercel co-localizado la latencia por query baja ~10×).
+  - suggestDriverFocus exportado y probado; wiring a creación = Gate 4/7.
+
+Evidencia: smoke 72/72 PASS (borrado al sellar) + E2E vivo PUT /status
+(insight 7 drivers reales + EI + NPS 3 niveles + gold cache + AuditLog,
+re-run idempotente vía npm run recompute:clima-insights).
 ```
 
 ---
