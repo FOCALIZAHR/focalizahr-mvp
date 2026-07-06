@@ -526,6 +526,19 @@ export const PERMISSIONS = {
     'AREA_MANAGER'
   ],
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // GOAL CYCLES (contenedor de período de metas — gestión: estrategas)
+  // Decisión de Negocio #1 (SPEC_GOALCYCLE_v4): CEO/ACCOUNT_OWNER/HR_ADMIN.
+  // HR_MANAGER excluido (no es estratega, §4.1). Crear/activar/cerrar/finalizar
+  // ciclos + lectura de la superficie admin /admin/metas/ciclos.
+  // ─────────────────────────────────────────────────────────────────────────
+  'goals:cycles:manage': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'CEO'
+  ],
+
   // GOALS CONFIGURATION (ya existía - NO modificar)
   'goals:config': [
     'FOCALIZAHR_ADMIN',
