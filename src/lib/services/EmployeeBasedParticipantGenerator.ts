@@ -72,6 +72,9 @@ export async function generateEmployeeBasedParticipants(
       gender: true,
       dateOfBirth: true,
       location: true,
+      // Segmentación por nivel de cargo (EX Clima Gate 1 — scores por acotadoGroup)
+      standardJobLevel: true,
+      acotadoGroup: true,
     },
   });
 
@@ -126,6 +129,9 @@ export async function generateEmployeeBasedParticipants(
           gender: employee.gender ?? null,
           dateOfBirth: employee.dateOfBirth ?? null,
           location: employee.location ?? null,
+          // Segmentación por nivel de cargo (EX Clima Gate 1)
+          standardJobLevel: employee.standardJobLevel ?? null,
+          acotadoGroup: employee.acotadoGroup ?? null,
           uniqueToken: generateUniqueToken(),
           hasResponded: false,
         },

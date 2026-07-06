@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { CompetencyFilterService } from '@/lib/services/CompetencyFilterService'
+import { filterQuestionsByDriverFocus } from '@/lib/utils/climaFocusFilter'
 
 // GET /api/survey/[token] - OPTIMIZADO: Solo datos esenciales, NO todas las preguntas
 export async function GET(
@@ -28,6 +29,7 @@ export async function GET(
         lastReminderSent: true,
         responseDate: true,
         evaluationAssignmentId: true,
+        departmentId: true, // EX Clima Gate 1: filtro de seguimiento focalizado
         campaign: {
           select: {
             id: true,
@@ -36,6 +38,7 @@ export async function GET(
             status: true,
             startDate: true,
             endDate: true,
+            driverFocusByDepartment: true, // EX Clima Gate 1: seguimiento Experiencia Full
             account: {  // ✅ CAMBIO 1: AGREGADO - Relación con account para obtener companyName
               select: {
                 id: true,
@@ -190,6 +193,23 @@ export async function GET(
       )
 
       console.log(`[Survey] Filtrado por track ${evaluationContext.evaluateeTrack}: ${filteredQuestions.length}/${questions.length} preguntas`)
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // EX CLIMA GATE 1: SEGUIMIENTO FOCALIZADO (Experiencia Full)
+    // Solo actúa si la campaña tiene driverFocusByDepartment poblado
+    // y el participante tiene departmentId. Fallback seguro: todas.
+    // ═══════════════════════════════════════════════════════════════
+    if (participant.campaign.driverFocusByDepartment) {
+      const beforeCount = filteredQuestions.length
+      filteredQuestions = filterQuestionsByDriverFocus(
+        filteredQuestions,
+        participant.campaign.driverFocusByDepartment,
+        participant.departmentId
+      )
+      if (filteredQuestions.length !== beforeCount) {
+        console.log(`[Survey] Seguimiento focalizado depto ${participant.departmentId}: ${filteredQuestions.length}/${beforeCount} preguntas`)
+      }
     }
 
     const processingTime = Date.now() - startTime

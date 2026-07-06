@@ -713,6 +713,28 @@ export const PERMISSIONS = {
     'HR_MANAGER',
     'HR_OPERATOR'
   ],
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // EX CLIMA (Inteligencia de Clima — MAESTRO_EX_CLIMA §1H)
+  // Mismo patrón que compliance:view / compliance:manage.
+  // AREA_MANAGER con filtrado jerárquico (lo aplica la API, Gate 4).
+  // ─────────────────────────────────────────────────────────────────────────
+  'clima:view': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'HR_OPERATOR',
+    'CEO',
+    'AREA_MANAGER'
+  ],
+  'clima:manage': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'HR_OPERATOR'
+  ],
 } as const;
 
 // =============================================================================

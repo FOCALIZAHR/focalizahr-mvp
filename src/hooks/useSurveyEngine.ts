@@ -193,9 +193,16 @@ export function useSurveyEngine(
 
       // NUEVA LÓGICA: modify_text
       if (rule.type === 'modify_text') {
-        if (triggerResponse.choiceResponse && triggerResponse.choiceResponse.length > 0) {
-          const selectedChoice = triggerResponse.choiceResponse[0]; // Primera selección
-          
+        // Clave del mapping: primera choice seleccionada, o el rating como
+        // string si el trigger es rating_scale/nps (EX Clima Gate 1).
+        const selectedChoice =
+          triggerResponse.choiceResponse && triggerResponse.choiceResponse.length > 0
+            ? triggerResponse.choiceResponse[0]
+            : triggerResponse.rating != null
+              ? String(triggerResponse.rating)
+              : undefined;
+
+        if (selectedChoice !== undefined) {
           // Buscar textMapping en diferentes estructuras (compatibilidad)
           let textMapping = null;
           if (rule.textMapping) {
@@ -203,7 +210,7 @@ export function useSurveyEngine(
           } else if (rule.action?.textMapping) {
             textMapping = rule.action.textMapping;
           }
-          
+
           if (textMapping && textMapping[selectedChoice]) {
             const newText = textMapping[selectedChoice];
             setDynamicTexts(prev => ({
