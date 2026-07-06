@@ -202,3 +202,17 @@ cat src/types/index.ts | grep "Interface" -A 15   # ver tipos
 
 Project Knowledge es la fuente de verdad para arquitectura y decisiones.
 Buscar ahí antes de asumir cualquier cosa sobre el proyecto.
+
+---
+
+## Proyecto en curso: EX Clima (Inteligencia de Clima)
+
+- **Fuente de verdad ÚNICA:** `.claude/plans/MAESTRO_EX_CLIMA.md` (v3.4,
+  autocontenido — 7 gates con verificación, sellado gate por gate)
+- **Estado y bitácora:** `.claude/tasks/EX_CLIMA_PROGRESS.md` (se crea al
+  arrancar Gate 1; leerlo junto al MAESTRO al retomar el proyecto)
+- **Regla:** NO leer como vigentes PLAN_IMPLEMENTACION_EX_CLIMA_v2 ni los
+  docs ACTUALIZACIONES_*/CORRECCION*_MAESTRO_*/SELLADO_* de clima — son
+  historia ya consolidada en el MAESTRO (están marcados ⚠️ OBSOLETO).
+- Diagnóstico E2E del flujo actual (lectura opcional, file:line):
+  `.claude/tasks/DIAGNOSTICO_FLUJO_CLIMA_RESULTADO.md`
