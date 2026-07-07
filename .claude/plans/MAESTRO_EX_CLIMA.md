@@ -640,6 +640,23 @@ Decisiones as-built (donde la realidad ajustó la spec):
 Evidencia: smoke 72/72 PASS (borrado al sellar) + E2E vivo PUT /status
 (insight 7 drivers reales + EI + NPS 3 niveles + gold cache + AuditLog,
 re-run idempotente vía npm run recompute:clima-insights).
+
+FALLO PARCIAL — verificado empíricamente (2026-07-06, smoke 18/18, borrado):
+  Vector: fallo REAL de BD determinista — trigger Postgres RAISE EXCEPTION
+  en department_clima_insights SOLO para el depto víctima (un participant
+  con departmentId inexistente NO es inducible: la FK lo rechaza al insertar;
+  category corrupta no crashea, solo crea otra entrada de driver).
+  Confirmado con 3 deptos (1 víctima):
+  1. Depto víctima en deptosFallidos del AuditLog (clima_aggregation_failed)
+     con el error real de Postgres (P0001) capturado.
+  2. Los otros 2 deptos SÍ generaron su insight (el try/catch por depto
+     aísla el fallo; deptosProcesados=3, insightsGenerados=2).
+  3. climaAggregationStatus=FAILED y campaign.status siguió 'completed'
+     (el cierre NUNCA se revierte).
+  4. Recuperación: removida la causa, re-run → COMPLETED, 3/3 insights,
+     status recuperado (re-ejecutable e idempotente).
+  Con esto el checklist Gate 2 queda ejercitado ítem por ítem, sin
+  verificaciones "por diseño".
 ```
 
 ---

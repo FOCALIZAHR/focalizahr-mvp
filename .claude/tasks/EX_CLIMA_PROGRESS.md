@@ -63,6 +63,12 @@
   S2 privacy (depto n=3 → nulls; celda n=1 → omitida), S3 snapshots con nombres reales,
   S4 NPSInsight 3 niveles, S5 gold cache + suggestDriverFocus, S6 re-run idempotente +
   AuditLog, S7 carry-forward + momentum -50, S8 S-PERF.
+- **Fallo parcial verificado empíricamente** (smoke 18/18, post-sello 2026-07-06,
+  borrado): fallo real de BD inducido con trigger Postgres RAISE EXCEPTION solo para
+  el depto víctima → FAILED con depto+error en AuditLog, los otros 2 deptos con insight,
+  campaign.status intacto 'completed', y re-run tras remover la causa → COMPLETED 3/3.
+  (Vector "departmentId inexistente" NO inducible: FK en BD lo rechaza al insertar.)
+  Checklist Gate 2 completo ítem por ítem, sin verificaciones "por diseño".
 - **S-PERF línea base: 17.340 responses / 1.020 participantes / 12 deptos → 9.070ms**
   (presupuesto <10s; requirió paralelizar upserts por depto + niveles NPS + gold cache
   y query madre con select mínimo — primera pasada secuencial daba 14.242ms).
