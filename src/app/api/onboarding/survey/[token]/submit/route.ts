@@ -76,14 +76,19 @@ function determineCurrentStage(
 /**
  * Valida estructura de respuesta
  */
-function validateResponse(response: ResponseData): { valid: boolean; error?: string } {
+function validateResponse(
+  response: ResponseData,
+  question?: { minValue: number }
+): { valid: boolean; error?: string } {
   if (!response.questionId) {
     return { valid: false, error: 'questionId es requerido' };
   }
 
-  // Al menos uno de los campos de respuesta debe existir
-  const hasResponse = 
-    (response.rating !== undefined && response.rating > 0) ||
+  // Al menos uno de los campos de respuesta debe existir.
+  // Guard por minValue de la pregunta (nps_scale acepta 0 — Gate 0 NPS jul-2026)
+  const minRating = question?.minValue ?? 1;
+  const hasResponse =
+    (response.rating !== undefined && response.rating >= minRating) ||
     (response.textResponse && response.textResponse.trim().length > 0) ||
     (response.choiceResponse && response.choiceResponse.length > 0) ||
     (response.matrixResponses && Object.keys(response.matrixResponses).length > 0);
@@ -346,8 +351,8 @@ export async function POST(
     }> = [];
 
     for (const response of body.responses) {
-      // Validar estructura
-      const validation = validateResponse(response);
+      // Validar estructura (con minValue real de la pregunta — questionMap ya construido en 9.5)
+      const validation = validateResponse(response, questionMap.get(response.questionId));
       if (!validation.valid) {
         return NextResponse.json(
           {
@@ -371,8 +376,8 @@ export async function POST(
         questionId: response.questionId
       };
 
-      // ✅ Agregar solo campos con valores reales
-      if (response.rating !== undefined && response.rating > 0) {
+      // ✅ Agregar solo campos con valores reales (guard por minValue — nps_scale acepta 0)
+      if (response.rating !== undefined && response.rating >= (question.minValue ?? 1)) {
         data.rating = response.rating;
       }
 

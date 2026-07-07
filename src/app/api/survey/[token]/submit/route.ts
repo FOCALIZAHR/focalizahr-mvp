@@ -130,7 +130,11 @@ export async function POST(
       }
 
       // ✅ FIX CRÍTICO: Validar y agregar solo campos con valores reales
-      if (response.rating !== undefined && response.rating > 0) {
+      // Guard por minValue de la pregunta (nps_scale acepta 0 — Gate 0 NPS jul-2026)
+      const question = questionMap.get(response.questionId);
+      const minRating = question?.minValue ?? 1;
+
+      if (response.rating !== undefined && response.rating >= minRating) {
         data.rating = response.rating;
         console.log(`📊 [RATING] Q${response.questionId}: ${response.rating}`);
       }
@@ -152,7 +156,6 @@ export async function POST(
       }
 
       // ← CAMBIO 5: Calcular normalizedScore para Exit Intelligence
-      const question = questionMap.get(response.questionId);
       if (question) {
         const normalizedScore = calculateNormalizedScore(
           {
@@ -290,7 +293,7 @@ export async function POST(
         if (assignment && assignment.evaluationType === 'MANAGER_TO_EMPLOYEE') {
           // Calcular avgScore desde ratings 1-5 de las respuestas
           const ratings15 = responseData
-            .filter(r => r.rating != null && r.rating > 0)
+            .filter(r => r.rating != null && r.rating >= (questionMap.get(r.questionId)?.minValue ?? 1))
             .map(r => r.rating!)
 
           if (ratings15.length > 0) {
