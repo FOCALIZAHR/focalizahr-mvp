@@ -857,3 +857,61 @@ export function aggregateCompanyPulse(rows: CompanyPulseRow[]): CompanyPulseSumm
     businessCaseTotals: buildCompanyBusinessCases(rows.map((r) => r.correlationFlags)),
   };
 }
+
+export interface OrgFavorabilityRow {
+  engagementFavorability: number | null;
+  totalInvited: number;
+}
+
+export interface OrgFavorabilityResult {
+  favorability: number | null; // 0-100, ponderado por headcount; null si sin base
+  riskZone: RiskZone | null; // derivada con umbrales sellados (sin modulación momentum)
+}
+
+/**
+ * Favorability de compañía (o del scope visible de un AREA_MANAGER) para el
+ * EngagementGauge del Lobby — derivada read-time al leer DepartmentClimaInsight[].
+ * Ponderada por headcount, NO promedio simple: un depto de 5 personas no puede
+ * pesar igual que uno de 300 en el número que ve el CEO.
+ *
+ * // totalInvited se usa como proxy de headcount al momento de medición, no
+ * // headcount exacto en tiempo real. Aproximación aceptada — NO es deuda
+ * // técnica pendiente de resolver con un join a Employee/Department.
+ *
+ * Degradación explícita: solo ponderan deptos con engagementFavorability medida;
+ * si Σ(totalInvited de esos deptos) === 0 → favorability null (nunca NaN),
+ * riskZone null. Mismo patrón de degradación que Gate 2/3.
+ * riskZone sin modulación por momentum (es un agregado de compañía, no un delta).
+ */
+export function calcOrgFavorability(rows: OrgFavorabilityRow[]): OrgFavorabilityResult {
+  let weightedSum = 0;
+  let weightTotal = 0;
+  for (const row of rows) {
+    if (row.engagementFavorability === null) continue;
+    const weight = row.totalInvited;
+    if (weight <= 0) continue;
+    weightedSum += row.engagementFavorability * weight;
+    weightTotal += weight;
+  }
+  if (weightTotal === 0) {
+    return { favorability: null, riskZone: null };
+  }
+  const favorability = round1(weightedSum / weightTotal);
+  return { favorability, riskZone: calcRiskZone(favorability, null) };
+}
+
+/**
+ * Momentum organizacional para el footer del gauge — delta de orgFavorability
+ * actual vs. la campaña de clima anterior. Hermana de calcOrgFavorability.
+ * El caller resuelve la campaña anterior SAME-TIPO (mismo slug — unificado con
+ * el momentum per-depto sellado) y su orgFavorability con la MISMA función,
+ * respetando el scope RBAC en ambas.
+ * null si falta cualquiera de las dos (→ el footer cae a gap vs objetivo).
+ */
+export function calcOrgMomentum(
+  current: number | null,
+  previous: number | null
+): number | null {
+  if (current === null || previous === null) return null;
+  return round1(current - previous);
+}

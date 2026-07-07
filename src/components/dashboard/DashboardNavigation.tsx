@@ -10,6 +10,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, logout } from '@/lib/auth';
 import { canManageGoalCycles } from '@/lib/constants/goalCycleRoles';
+import { canViewClima } from '@/lib/constants/climaRoles';
 import { useSidebar } from '@/hooks/useSidebar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -132,6 +133,10 @@ export default function DashboardNavigation({
   ];
   const canSeeCompliance = user?.role && complianceViewRoles.includes(user.role);
 
+  // RBAC: Inteligencia de Clima. Constante compartida con /dashboard/clima,
+  // espejo de clima:view en AuthorizationService (feedback: sin arrays inline).
+  const canSeeClima = canViewClima(user?.role);
+
   // RBAC: Gestión de ciclos de metas — constante compartida con la página
   // /dashboard/metas/ciclos, alineada a goals:cycles:manage (Decisión #1
   // corregida, a2df312). Sub-usuarios traen userRole; legacy trae role.
@@ -151,6 +156,9 @@ export default function DashboardNavigation({
         { id: 'exit', label: 'Exit Intelligence', href: '/dashboard/exit/overview', icon: DoorOpen },
         ...(canSeeCompliance
           ? [{ id: 'compliance', label: 'Ambiente Sano', href: '/dashboard/compliance', icon: Shield }]
+          : []),
+        ...(canSeeClima
+          ? [{ id: 'clima', label: 'Inteligencia de Clima', href: '/dashboard/clima', icon: Activity }]
           : []),
       ],
     },

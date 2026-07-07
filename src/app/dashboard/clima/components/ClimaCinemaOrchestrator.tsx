@@ -1,0 +1,174 @@
+'use client';
+
+// src/app/dashboard/clima/components/ClimaCinemaOrchestrator.tsx
+// Orquestador del Cinema Mode de Clima. Clon estructural de
+// evaluaciones/CinemaModeOrchestrator (bg #0F172A, header, stage con
+// AnimatePresence, Rail fixed-bottom + backdrop, guards).
+//
+// Máquina de estados (entity-centric, departamentos):
+//   selectedDepartmentId → DepartmentSpotlightCard
+//   activeChapter        → Capítulo de compañía (contenido = Fase 3)
+//   ninguno              → Lobby (MissionControl)
+// El Rail de departamentos va SIEMPRE fijo abajo (incluido el Lobby).
+
+import { AnimatePresence, motion } from 'framer-motion';
+import { RefreshCw, AlertTriangle } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useClimaCinemaMode } from '@/hooks/useClimaCinemaMode';
+import { FHREmptyState } from '@/components/ui/FHREmptyState';
+import ClimaHeader from './ClimaHeader';
+import ClimaMissionControl from './ClimaMissionControl';
+import ClimaRail from './ClimaRail';
+import DepartmentSpotlightCard from './DepartmentSpotlightCard';
+import ClimaChapterView from './ClimaChapterView';
+
+interface ClimaCinemaOrchestratorProps {
+  initialCampaignId?: string;
+}
+
+function ClimaSkeleton() {
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div className="w-[200px] h-[200px] rounded-full bg-slate-800/50 animate-pulse" />
+      <div className="w-48 h-4 bg-slate-800/50 rounded animate-pulse" />
+      <div className="w-64 h-12 bg-slate-800/50 rounded-xl animate-pulse" />
+    </div>
+  );
+}
+
+function ClimaError({ error, onRetry }: { error: string; onRetry: () => void }) {
+  return (
+    <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 max-w-sm text-center">
+      <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-4" />
+      <h2 className="text-lg font-medium text-slate-200 mb-2">Error al cargar</h2>
+      <p className="text-sm text-slate-400 mb-6">{error}</p>
+      <button
+        onClick={onRetry}
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-all text-sm"
+      >
+        <RefreshCw className="w-4 h-4" />
+        Reintentar
+      </button>
+    </div>
+  );
+}
+
+export default function ClimaCinemaOrchestrator({
+  initialCampaignId,
+}: ClimaCinemaOrchestratorProps) {
+  const hook = useClimaCinemaMode(initialCampaignId);
+  const hasCampaigns = hook.campaigns.length > 0;
+  const isReady = hook.pageState === 'ready' && !!hook.results;
+
+  const selectedDepartment =
+    hook.results?.departments.find((d) => d.departmentId === hook.selectedDepartmentId) ?? null;
+  const isSpotlight = !!selectedDepartment;
+  const isChapter = !isSpotlight && hook.activeChapter !== null;
+
+  return (
+    <div className="h-screen w-full bg-[#0F172A] text-white flex flex-col font-sans overflow-hidden">
+      {hasCampaigns && (
+        <ClimaHeader
+          campaigns={hook.campaigns}
+          selectedCampaignId={hook.selectedCampaignId}
+          onSelectCampaign={hook.selectCampaign}
+        />
+      )}
+
+      {/* Stage */}
+      <div
+        className={cn(
+          'flex-1 relative flex items-center justify-center p-4 md:p-8 overflow-y-auto',
+          'transition-all duration-500 ease-in-out',
+          isReady ? (hook.isRailExpanded ? 'mb-[320px]' : 'mb-[50px]') : 'mb-0'
+        )}
+      >
+        <AnimatePresence mode="wait">
+          {hook.pageState === 'loading' && <ClimaSkeleton key="loading" />}
+
+          {hook.pageState === 'error' && (
+            <ClimaError key="error" error={hook.error ?? 'Error desconocido'} onRetry={hook.reload} />
+          )}
+
+          {hook.pageState === 'empty' && !hasCampaigns && (
+            <FHREmptyState
+              key="empty-none"
+              type="pending"
+              title="Sin mediciones de clima aún"
+              description="Los resultados de clima aparecen al cerrar la primera campaña de Pulso Express o Experiencia Full."
+              cta={{ label: 'Crear campaña', href: '/dashboard/campaigns/new' }}
+            />
+          )}
+
+          {hook.pageState === 'empty' && hasCampaigns && (
+            <FHREmptyState
+              key="empty-analysis"
+              type="pending"
+              title="Análisis en preparación"
+              description="Esta campaña todavía no tiene resultados de clima procesados. Elige otra campaña en el selector superior."
+            />
+          )}
+
+          {isReady && isSpotlight && (
+            <DepartmentSpotlightCard
+              key={`spotlight-${selectedDepartment!.departmentId}`}
+              department={selectedDepartment!}
+              onBack={hook.exitToLobby}
+            />
+          )}
+
+          {isReady && isChapter && (
+            <ClimaChapterView
+              key={`chapter-${hook.activeChapter}`}
+              chapter={hook.activeChapter!}
+              departments={hook.results!.departments}
+              businessCaseTotals={hook.results!.businessCaseTotals}
+              onBack={hook.exitToLobby}
+              onSelectDepartment={hook.selectDepartment}
+            />
+          )}
+
+          {isReady && !isSpotlight && !isChapter && (
+            <ClimaMissionControl
+              key="lobby"
+              scope={hook.scope}
+              orgFavorability={hook.orgFavorability}
+              orgRiskZone={hook.orgRiskZone}
+              orgMomentum={hook.orgMomentum}
+              stats={hook.stats}
+              nextDepartment={hook.nextDepartment}
+              onSelectDepartment={hook.selectDepartment}
+              onSelectChapter={hook.selectChapter}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Backdrop al expandir el Rail */}
+      <AnimatePresence>
+        {isReady && hook.isRailExpanded && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-30"
+            onClick={hook.toggleRail}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Rail de departamentos — SIEMPRE fijo abajo cuando hay datos */}
+      {isReady && hook.results && (
+        <ClimaRail
+          departments={hook.results.departments}
+          selectedId={hook.selectedDepartmentId}
+          isExpanded={hook.isRailExpanded}
+          activeFilter={hook.railFilter}
+          onToggle={hook.toggleRail}
+          onSelect={hook.selectDepartment}
+          onFilterChange={hook.setRailFilter}
+        />
+      )}
+    </div>
+  );
+}
