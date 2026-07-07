@@ -15,6 +15,7 @@
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { NPSAggregationService } from '@/lib/services/NPSAggregationService';
+import { SalaryConfigService } from '@/lib/services/SalaryConfigService';
 import {
   ClimaResponseRow,
   DriverScore,
@@ -23,6 +24,7 @@ import {
   calcEngagementIndex,
 } from './FavorabilityCalculator';
 import { PRIVACY_THRESHOLD } from '@/lib/services/SafetyScoreService';
+import { PulseDeptInput, calcRiskZone, computePulse } from './PulseEngine';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes de dominio
@@ -219,6 +221,7 @@ export class ClimaAggregationService {
               absenceRate: true,
               overtimeHoursAvg: true,
               issueCount: true,
+              headcountAvg: true, // Gate 3: base de peopleAtRisk + hotspot (ALG 2)
             },
           }),
           // ISA: réplica de loadPreviousDeptIsaScore (ComplianceAnalysisOrchestrator)
@@ -258,7 +261,8 @@ export class ClimaAggregationService {
               periodEnd: { lt: campaign.endDate },
             },
             orderBy: { periodEnd: 'desc' },
-            select: { departmentId: true, engagementFavorability: true },
+            // driverScores: Gate 3 ALG 3 (momentum per-driver vs período anterior)
+            select: { departmentId: true, engagementFavorability: true, driverScores: true },
           }),
           // Benchmark mercado pulse_climate — lookup mínimo GLOBAL (escritura = Gate 6C;
           // hoy no hay datos → benchmarkDelta null by design)
@@ -279,6 +283,11 @@ export class ClimaAggregationService {
       const isaByDept = firstPerKey(isaAnalyses, (a) => a.departmentId ?? '');
       const baselineByDept = firstPerKey(prevBaselines, (i) => i.departmentId);
       const prevInsightByDept = firstPerKey(prevInsights, (i) => i.departmentId);
+
+      // Insumos de PulseEngine (Gate 3) — se llenan DENTRO del closure per-dept
+      // con los artefactos YA calculados (cero re-queries; solo deptos con
+      // upsert exitoso entran al motor)
+      const pulseInputByDept = new Map<string, PulseDeptInput>();
 
       // 4. Por CADA departamento — fallo individual NO mata el resto.
       // En PARALELO (S-PERF): los upserts son independientes entre deptos y el
@@ -375,7 +384,8 @@ export class ClimaAggregationService {
             isaScoreAtMeasurement: isaByDept.get(deptId)?.isaScore ?? null,
             momentum,
             benchmarkDelta,
-            // riskZone / driverAnalysis / comment* NO se tocan (Gate 3 y Gate 6)
+            // driverAnalysis / topFocus* / riskZone / correlationFlags los escribe
+            // la fase 4c (PulseEngine, Gate 3) — comment* NO se toca (Gate 6)
           };
 
           await prisma.departmentClimaInsight.upsert({
@@ -399,6 +409,22 @@ export class ClimaAggregationService {
             update: insightData,
           });
 
+          // Gate 3: insumos del PulseEngine — reutiliza lo ya computado en memoria
+          pulseInputByDept.set(deptId, {
+            departmentId: deptId,
+            driverScores, // post carry-forward
+            ei,
+            momentum,
+            rows: deptRows,
+            prevDriverScores:
+              (prev?.driverScores as Record<string, DriverScore> | null) ?? null,
+            turnoverRate: metric?.turnoverRate ?? null,
+            headcountAvg: metric?.headcountAvg ?? null,
+            isaScore: isaByDept.get(deptId)?.isaScore ?? null,
+            totalResponded,
+            participationRate,
+          });
+
           deptosProcesados += 1;
           insightsGenerados += 1;
         } catch (deptError) {
@@ -409,6 +435,59 @@ export class ClimaAggregationService {
           });
         }
       }));
+
+      // 4b/4c. PulseEngine (Gate 3): 5 algoritmos + flag de teatro sobre los
+      // deptos con insight base exitoso. Fallo aquí DEGRADA (insight base queda,
+      // campos diagnóstico null, FAILED re-ejecutable) — nunca bloquea el cierre.
+      let pulseDurationMs: number | null = null;
+      if (pulseInputByDept.size > 0) {
+        try {
+          const pulseStart = Date.now();
+          // Única fuente de cifras CLP: SalaryConfigService (server-side, cuenta real)
+          const salary = await SalaryConfigService.getSalaryForAccount(accountId);
+          const pulseOutputs = computePulse({
+            depts: Array.from(pulseInputByDept.values()),
+            salary,
+          });
+
+          await Promise.all(
+            Array.from(pulseOutputs.entries()).map(async ([deptId, output]) => {
+              try {
+                await prisma.departmentClimaInsight.update({
+                  where: {
+                    accountId_departmentId_period_productType_isFollowUp: {
+                      accountId,
+                      departmentId: deptId,
+                      period,
+                      productType,
+                      isFollowUp,
+                    },
+                  },
+                  data: {
+                    driverAnalysis: output.driverAnalysis as unknown as Prisma.InputJsonValue,
+                    topFocusArea: output.topFocusArea,
+                    topStrength: output.topStrength,
+                    riskZone: output.riskZone,
+                    correlationFlags:
+                      output.correlationFlags as unknown as Prisma.InputJsonValue,
+                  },
+                });
+              } catch (updateError) {
+                errors.push({
+                  departmentId: deptId,
+                  error: updateError instanceof Error ? updateError.message : String(updateError),
+                });
+              }
+            })
+          );
+          pulseDurationMs = Date.now() - pulseStart;
+        } catch (pulseError) {
+          errors.push({
+            departmentId: 'PULSE_ENGINE',
+            error: pulseError instanceof Error ? pulseError.message : String(pulseError),
+          });
+        }
+      }
 
       // 5. eNPS 3 niveles (gerencia / depto / global) — NPSInsight
       try {
@@ -421,7 +500,7 @@ export class ClimaAggregationService {
       }
 
       // 6. Gold cache clima por depto (rolling 12 meses, cualquier isFollowUp —
-      //    el EI siempre se mide). accumulatedClimaRiskZone la escribe Gate 3.
+      //    el EI siempre se mide). Incluye accumulatedClimaRiskZone (Gate 3).
       try {
         await this.refreshGoldCache(accountId, deptIds, campaign.endDate);
       } catch (cacheError) {
@@ -454,6 +533,7 @@ export class ClimaAggregationService {
             insightsGenerados,
             deptosFallidos: errors,
             durationMs,
+            pulseDurationMs, // Gate 3 — presupuesto MAESTRO <5s para 10 deptos
           },
         },
       });
@@ -536,7 +616,10 @@ export class ClimaAggregationService {
               accumulatedClimaMean:
                 acc.means.length > 0 ? Math.round(avg(acc.means) * 100) / 100 : null,
               accumulatedClimaLastUpdated: now,
-              // accumulatedClimaRiskZone la escribe Gate 3
+              // Gate 3: zona sobre el fav rolling, SIN modulación por momentum
+              // (es promedio 12m — el momentum puntual no aplica al acumulado)
+              accumulatedClimaRiskZone:
+                acc.favs.length > 0 ? calcRiskZone(round1(avg(acc.favs)), null) : null,
             },
           })
         )

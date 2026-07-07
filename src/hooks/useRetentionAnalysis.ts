@@ -1,6 +1,12 @@
 // src/hooks/useRetentionAnalysis.ts
 // 🧠 FASE 2: AISLAR LA LÓGICA DE NEGOCIO - HOOK DEDICADO ARQUITECTURA V3.0
 // SEPARACIÓN LÓGICA Y PRESENTACIÓN (Anexo A)
+//
+// @deprecated — absorbido por PulseEngine (EX Clima Gate 3, jul-2026): el
+// diagnóstico + business cases de clima se persisten en
+// DepartmentClimaInsight (correlationFlags). Este hook client-side sigue vivo
+// SOLO para results/page.tsx — se elimina cuando Cinema Mode (Gate 4) la
+// reemplace. NO agregar nuevos consumidores.
 
 import { useState, useEffect } from 'react';
 import { RetentionEngine } from '@/engines/RetentionEngine';

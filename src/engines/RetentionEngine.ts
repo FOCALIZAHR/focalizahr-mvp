@@ -1,6 +1,14 @@
 // src/engines/RetentionEngine.ts
 // 🎯 FOCALIZAHR - CHAT 6C: RETENTION ENGINE + TRANSPARENCIA FINANCIERA INTEGRADA
 // Motor especialista con auditabilidad enterprise CEO/CFO ready
+//
+// @deprecated — absorbido por PulseEngine (EX Clima Gate 3, jul-2026):
+// los 3 business cases (ambiente→clima_critico / retención_riesgo / liderazgo_gap)
+// se calculan server-side en src/lib/services/clima/PulseEngine.ts con
+// SalaryConfigService real (accountId) y se PERSISTEN en
+// DepartmentClimaInsight.correlationFlags. Este motor client-side (efímero,
+// salario default) sigue vivo SOLO para la results page actual — se elimina
+// cuando Cinema Mode (Gate 4) la reemplace. NO agregar nuevos consumidores.
 
 import { 
   BusinessCase, 
