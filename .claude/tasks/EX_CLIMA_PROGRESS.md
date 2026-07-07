@@ -186,10 +186,46 @@ mapeando consumidores antes de cambiar el corte.
 
 ---
 
-## Gate 4 — Frontend Cinema Mode 🔜 SIGUIENTE
+## Gate 4 — Frontend Cinema Mode ✅ SELLADO (2026-07-07)
 
-Al retomar: leer MAESTRO §Gate 4 completo + este doc. Plan Mode primero.
-Insumos listos: DepartmentClimaInsight completo (Gate 2 + diagnóstico Gate 3),
-gold cache con riskZone, funciones read-time de PulseEngine
-(aggregateCompanyPulse / buildCompanyBusinessCases / rankMomentumMovers).
-Cargar skill focalizahr-design (Cinema Mode obligatorio) + focalizahr-api.
+**Commit:** `b653dc5` (implementación) · sello (este doc + MAESTRO v3.8)
+
+**Qué quedó construido:** página standalone `/dashboard/clima` en Cinema Mode
+entity-centric (departamentos). Lobby (MissionControl: gauge de compañía + Smart
+Router "tu foco" + leyenda de zonas + entradas a capítulos) → Rail fijo abajo de
+departamentos (filtros por zona) → DepartmentSpotlightCard (gauge + drivers +
+brecha por cargo + señales + business cases) ↔ 3 capítulos de compañía
+(Heatmap / Impact 2×2 / Correlación). Backend read-time: `GET /api/clima/campaigns`
++ `GET /api/clima/results` (RBAC clon compliance/report). `PulseEngine`
++calcOrgFavorability +calcOrgMomentum. Ítem de menú "Inteligencia de Clima".
+
+**Decisiones clave (detalle en MAESTRO v3.8 AS-BUILT):**
+- Referencia corregida: `evaluator/cinema/*` (NO compliance). Gauge = copia
+  literal de `SegmentedRing`, solo cambia dato/color/frase/footer.
+- Paleta anti-semáforo clonada de `IndicatorGauge` (`climaZonePalette.ts`):
+  cyan/slate/ámbar/ámbar+glow, nunca rojo. Número del gauge siempre blanco.
+- Momentum UNIFICADO same-tipo (org y per-depto). Cross-tipo descartado (Victor).
+- Cascada Ejecutiva → Gate 4.5 (este Lobby es el destino, no la entrada).
+  CurvaVital → Gate 7.
+
+**Evidencia:** `tsc --noEmit` + `next build` limpios (build completo solo falla
+en `prisma generate` por EPERM del dev server Windows). RBAC 3 capas verificado
+con funciones reales (global 6/6 · AREA_MANAGER scoped a subárbol · EVALUATOR
+403). Datos demo Q1+Q2 (momentum org +7 + per-depto variado, 6 zonas roja→verde
+incl. naranja, turnover para el scatter). Mobile 320px auditado (overflow
+corregido en FavorabilityBar/BusinessCaseCard).
+
+**Gotchas para gates siguientes:**
+- Dev NO reproduce el caso cross-tipo Pulso↔Experiencia (por eso se unificó
+  same-tipo ahora, no en producción con un cliente real).
+- `theatreDetected` sigue sin ejercitarse en vivo (cuenta dev sin ComplianceAnalysis
+  DEPARTMENT) — el gauge/panel lo maneja null.
+- Seeder de datos demo (`tmp-seed-clima-lobby.ts`) borrado al sellar; para re-ver
+  hay que re-seedear (contenido en el historial de la sesión de Gate 4).
+
+**Hereda Gate 4.5:** `ClimaSynthesisEngine` (reglas detect→score→priority, patrón
+`AmbienteSynthesisEngine`, DiagnosticType de clima) + `ClimaNarrativeDictionary`
+(4 Actos + Síntesis) + estados Portada→Ancla→Cascada→Síntesis ANTES del Lobby en
+`useClimaCinemaMode`. **Hereda Gate 5:** planes de acción (ActionPlan
+moduleType='clima', ya aceptado en la API desde Gate 1). **Hereda Gate 6C:** los
+3 modos del heatmap (hoy absolute) requieren MarketBenchmark pulse_climate.

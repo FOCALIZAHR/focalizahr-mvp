@@ -1,9 +1,9 @@
 # MAESTRO: FocalizaHR EX — Inteligencia de Clima
 # Documento maestro ejecutable para Claude Code
 
-> **Versión:** 3.7 — Gate 3 SELLADO (as-built)
+> **Versión:** 3.8 — Gate 4 SELLADO (as-built)
 > **Fecha:** Julio 2026
-> **Estado:** En ejecución — Gates 1-3 ✅ · Gate 4 siguiente
+> **Estado:** En ejecución — Gates 1-4 ✅ · Gate 4.5 (Cascada Ejecutiva) / Gate 5 siguiente
 
 | Versión | Qué consolidó |
 |---|---|
@@ -16,6 +16,7 @@
 | v3.5 | Gate 1 sellado as-built: taxonomía real de BD (7-8 categorías, NO liderazgo/ambiente/desarrollo/bienestar), mecánica real de modify_text (SurveyConfiguration + textMapping por rating), decisiones Victor (preguntas al final, 1 follow-up por instrumento, categoría texto_libre) |
 | v3.6 | Gate 2 sellado as-built: trigger real = PUT /status (no endpoint dedicado), DepartmentMetric confirmada (nombres reales absenceRate/overtimeHoursAvg), eNPS también dentro del insight, período = trimestre del endDate, S-PERF 17.340 responses en 9.070ms |
 | v3.7 | Gate 3 sellado as-built: riskZone 75/65/60 + modulación momentum (decisión Victor 2026-07-07), gap vs target fijo 75, impact Pearson a nivel compañía, business cases mapeados a taxonomía real (clima_critico generaliza 'ambiente') con exclusión mutua, PulseEngine puro + fases 4b/4c post-upserts |
+| v3.8 | Gate 4 sellado as-built (5 correcciones al plan): referencia Cinema Mode = `evaluator/cinema/*` (NO compliance/useComplianceData, deuda); navegación entity-centric (Rail=departamentos) + capítulos de compañía Cover→Content; ruta standalone `/dashboard/clima` + selector (NO `[id]/clima`); CurvaVital = Gate 7; **Cascada Ejecutiva diferida a Gate 4.5 nombrado** (Lobby directo como intermedio). Gauge = copia literal de `SegmentedRing` con paleta anti-semáforo de `IndicatorGauge` (safe cyan / observation slate / risk+critical ámbar, nunca rojo). `calcOrgFavorability` read-time ponderado por `totalInvited` (proxy headcount) + `calcOrgMomentum` **SAME-TIPO** (unificado con momentum per-depto sellado; cross-tipo descartado para que CEO cuadre gauge y Rail). Comparabilidad EI Pulso(12)↔Experiencia(35) = backlog chat dimensiones, no Gate 4 |
 
 ---
 
@@ -40,7 +41,8 @@
 | 1 | Foundation (Taxonomía + Persistencia + Seguimiento Focalizado) | ✅ SELLADO `28c9369`+`ec2694e`+`7cc04e3` (2026-07-06, smoke 40/40 + E2E filtro vivo) |
 | 2 | Scoring + Aggregation (enterprise close pattern) | ✅ SELLADO `708791d`+`d2eee38` (2026-07-06, smoke 72/72 + S-PERF 17.340 responses en 9.070ms + E2E PUT /status vivo) |
 | 3 | PulseEngine (5 Algoritmos + absorbe RetentionEngine) | ✅ SELLADO `3ea5f09` (2026-07-07, smoke 69/69 + E2E vivo 34/34 + S-PERF 10 deptos pulseDurationMs 2.127ms) |
-| 4 | Frontend Cinema Mode | 🔲 PENDIENTE |
+| 4 | Frontend Cinema Mode | ✅ SELLADO `b653dc5` (2026-07-07, tsc+next build limpios · datos demo Q1+Q2 · RBAC 3 capas verificado vía funciones reales · mobile 320px) |
+| 4.5 | Cascada Ejecutiva de Clima (Portada→Ancla→4 Actos→Síntesis, precede al Lobby) + `ClimaSynthesisEngine` (reglas, patrón `AmbienteSynthesisEngine`) + `ClimaNarrativeDictionary` | 🔲 PENDIENTE |
 | 5 | Planes de Acción (doble CTA + validación impacto) | 🔲 PENDIENTE |
 | 6 | Ecosistema + LLM Clima (Studio IA) | 🔲 PENDIENTE |
 | 7 | Sistema Vivo + Bajada de Clima + Curva Vital | 🔲 PENDIENTE |
@@ -916,6 +918,81 @@ REUTILIZAR existentes:
 □ Performance: <1s (lee de DepartmentClimaInsight)
 □ Mobile responsive (320px+)
 □ Componentes son genéricos (no acoplados a clima)
+```
+
+### AS-BUILT Gate 4 (sellado 2026-07-07)
+
+```
+ARCHIVOS NUEVOS:
+  src/lib/services/clima/PulseEngine.ts   # +calcOrgFavorability +calcOrgMomentum (read-time, puras)
+  src/types/clima.ts                      # tipos frontend (importa tipos de PulseEngine)
+  src/app/api/clima/campaigns/route.ts    # listado (clon compliance/campaigns, slug clima)
+  src/app/api/clima/results/route.ts      # resultados (clon RBAC compliance/report + derivación read-time)
+  src/hooks/useClimaCampaigns.ts · useClimaCinemaMode.ts
+  src/app/dashboard/clima/page.tsx (+ ?campaignId deep-link)
+  src/app/dashboard/clima/components/     # ClimaCinemaOrchestrator, ClimaHeader (+selector),
+    ClimaMissionControl, ClimaRail, DepartmentRailCard, DepartmentSpotlightCard, ClimaChapterView
+  src/components/clima/                    # EngagementGauge, FavorabilityBar, MomentumBadge,
+    BusinessCaseCard, AcotadoGapCard, CrossSignalPanel, HeatmapGrid, ImpactGapMatrix,
+    CorrelationScatter, climaZonePalette.ts
+  src/components/ui/FHREmptyState.tsx      # canónico (empty-states.md) — NO existía, creado
+  src/lib/constants/climaRoles.ts          # espejo clima:view (menú), feedback constante compartida
+MODIFICADO: src/components/dashboard/DashboardNavigation.tsx (ítem "Inteligencia de Clima")
+INTACTO (principio #6): campaigns/[id]/results/page.tsx + useRetentionAnalysis (retiro diferido).
+
+DECISIONES AS-BUILT (donde la realidad/Victor ajustó el plan):
+  - REFERENCIA CORREGIDA: el patrón canónico Cinema Mode es evaluator/cinema
+    (evaluaciones), NO compliance/useComplianceData (deuda que no implementa
+    bien Smart Router). Entity-centric: Rail itera DEPARTAMENTOS (no secciones).
+    Smart Router nextDepartment = peor zona (roja→verde, desempate menor EI).
+  - GAUGE = copia LITERAL de src/components/evaluator/cinema/SegmentedRing.tsx
+    (forma/estructura/comportamiento sin tocar); solo cambia el dato
+    (completed/total → favorability+riskZone), el color (getProgressColor →
+    zoneColor anti-semáforo), la frase (getInsightText → etiqueta de zona) y el
+    footer (completed/total → momentum / gap vs objetivo).
+  - PALETA anti-semáforo CLONADA de compliance/IndicatorGauge (Decisión #1 AS
+    v1.0) en src/components/clima/climaZonePalette.ts: verde→safe cyan #22D3EE ·
+    amarilla→observation slate #94A3B8 · naranja→risk ámbar #F59E0B ·
+    roja→critical ámbar+glow. NUNCA rojo. Número del gauge SIEMPRE blanco.
+    Propagada a Rail/cards/pills/legend/FavorabilityBar/MomentumBadge/BusinessCase.
+  - orgFavorability = read-time, ponderada por totalInvited (PROXY de headcount
+    al momento de medición — aproximación aceptada, NO deuda; comentario en la
+    función). null explícito si Σ(totalInvited)=0. orgRiskZone con umbrales
+    sellados, sin modulación momentum.
+  - MOMENTUM UNIFICADO SAME-TIPO (org y per-depto): calcOrgMomentum compara vs la
+    campaña anterior del MISMO slug (climaAggregationStatus=COMPLETED, endDate<actual,
+    scope RBAC en ambas). Cross-tipo DESCARTADO (decisión Victor): el gauge y el
+    Rail medirían contra bases distintas y el CEO no podría cuadrarlos. Sin anterior
+    same-tipo → footer cae a gap vs objetivo (75). Comparabilidad EI Pulso(12)↔
+    Experiencia(35) = backlog del chat de dimensiones, NO Gate 4.
+  - RUTA standalone /dashboard/clima + selector de campaña en el header
+    (default última COMPLETED); deep-link histórico vía ?campaignId (sin ruta nueva).
+  - RBAC (clon compliance/report): clima:view; AREA_MANAGER → getChildDepartmentIds
+    → visibleDeptIds; la vista de compañía (orgFav/momentum) se deriva SOLO sobre
+    el scope visible. scope ('organization'|'area') autoritativo en la respuesta →
+    el Lobby rotula "tu organización" vs "tu área". Endpoint batched (una findMany),
+    sin N+1 (la etiqueta "N+1" del comentario de compliance:8,136 es imprecisa).
+  - CAPÍTULOS de compañía Cover→Content (Heatmap drivers×deptos con carried en gris ·
+    Impact 2×2 · Correlación scatter EI×rotación + CLP), deep-link celda/punto →
+    SpotlightCard del depto. La PORTADA narrativa por capítulo la escribe Victor/
+    Studio IA (pendiente pase de narrativas, principio #4).
+  - DIFERIDOS EXPLÍCITOS: Cascada Ejecutiva → Gate 4.5 (este Lobby es el DESTINO de
+    ese recorrido, no la entrada — se ve como entrada solo porque 4.5 no existe aún).
+    CurvaVitalTalento → Gate 7 (placeholder en Lobby). Retiro RetentionEngine →
+    cuando Cinema Mode reemplace results/page.tsx.
+
+EVIDENCIA: npx tsc --noEmit + npx next build limpios (el build completo falla solo
+en `prisma generate` por EPERM del dev server en Windows — no el código). RBAC
+verificado ejercitando las funciones reales (hasPermission + getChildDepartmentIds
++ calcOrgFavorability): global 6/6 deptos orgFav 65; AREA_MANAGER scoped a su
+subárbol (1/6, orgFav de su scope); EVALUATOR/VIEWER 403. Datos demo Q1+Q2
+(momentum org +7 same-tipo + per-depto variado; 6 deptos en zonas roja→verde
+incl. naranja en 60; DepartmentMetric turnover para el scatter). Smokes/seeder
+temporales borrados al sellar (evidencia en el commit).
+
+PENDIENTES NO BLOQUEANTES: portada narrativa de capítulos (pase narrativas);
+benchmark 'delta/absolute/benchmark' del heatmap está en modo absolute (los 3
+modos completos requieren MarketBenchmark pulse_climate = Gate 6C).
 ```
 
 ---
