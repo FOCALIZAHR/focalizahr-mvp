@@ -1,6 +1,6 @@
 # EX CLIMA — Bitácora de ejecución (gate por gate)
 
-> Fuente de verdad del diseño: `.claude/plans/MAESTRO_EX_CLIMA.md` (v3.5)
+> Fuente de verdad del diseño: `.claude/plans/MAESTRO_EX_CLIMA.md` (v3.7)
 > Este doc registra SOLO ejecución: qué se hizo, commits, evidencia, gotchas, próximo paso.
 
 ---
@@ -105,9 +105,91 @@
 
 ---
 
-## Gate 3 — PulseEngine (5 algoritmos) 🔜 SIGUIENTE
+## Gate 3 — PulseEngine (5 algoritmos) ✅ SELLADO (2026-07-07)
 
-Al retomar: leer MAESTRO §Gate 3 completo + este doc. Plan Mode primero.
-Insumos listos: DepartmentClimaInsight poblado al cerrar campaña (Gate 2),
-riskZone/driverAnalysis son NULL esperando al motor; absorbe RetentionEngine
-(decisión sellada julio 2026).
+**Commit:** `3ea5f09` (implementación) · sello (ver git log)
+**Plan aprobado:** `~/.claude/plans/polymorphic-growing-peacock.md` (dir global)
+
+**Qué quedó construido:**
+- `clima/PulseEngine.ts` (puro, sin I/O): ALG1 Driver Analysis (impact =
+  Pearson driver×EI a nivel COMPAÑÍA por participante, gap = fav−75 target
+  fijo, priority = |r|×|gap|, cuadrantes focus_area/strength/monitor/maintain),
+  ALG2 Hotspot (eiFav<p25, mín 4 deptos, confidence por datos duros), ALG3
+  Momentum per-driver (carried excluido AMBOS lados), ALG4 Gap Transfer
+  (campeón por driver, ≥2 deptos midiendo), ALG5 Pearson eiFav×turnoverRate
+  → business cases CLP, theatreDetected (ISA>70 + eiFav<50, null si no
+  evaluable), calcRiskZone. Reutiliza calculatePearsonR (GoalsDiagnostic) y
+  filterRatingRows (FavorabilityCalculator).
+- **Decisiones Victor 2026-07-07**: riskZone 75/65/60 (estándar dashboard
+  diario Culture Amp; cuartiles 80/70/60 reservados a Gate 6C) + momentum
+  ≤−10pp degrada UNA zona; CLIMA_TARGET_FAVORABILITY=75 constante SEPARADA;
+  business cases a taxonomía real: clima_critico (peor driver <2.5,
+  generaliza 'ambiente' inexistente) / retencion_riesgo (EI<3.0) /
+  liderazgo_gap (<3.0) MUTUAMENTE EXCLUYENTES sobre el mismo driver (sin
+  doble CLP); umbrales editables por dev, NO por cliente.
+- Wiring: fases 4b/4c POST-upserts (Gate 2 intacto, fallo parcial sigue
+  válido; Pulse degrada sin revertir cierre); cero re-queries (insumos del
+  closure per-dept); update de SOLO 5 campos (driverAnalysis/topFocusArea/
+  topStrength/riskZone/correlationFlags); gold cache accumulatedClimaRiskZone
+  (sin modulación momentum); AuditLog +pulseDurationMs.
+- Read-time para Gate 4 (nada persistido): aggregateCompanyPulse,
+  buildCompanyBusinessCases, rankMomentumMovers (ranking mayor caída/mejora,
+  patrón TopMoversPanel — el panel visual es Gate 4).
+- RetentionEngine + useRetentionAnalysis @deprecated (cero cambio funcional,
+  results page intacta hasta Cinema Mode).
+
+**Evidencia de verificación:**
+- Smoke 69/69 PASS (borrado al sellar): Pearson a mano (r=1/0.8/null),
+  cuadrantes ALG1, 8 casos momentum, p25 interpolado a mano, gap transfer,
+  ALG5 r=−1 lineal, teatro true/false/null, business cases con CLP exacto
+  (salario 1M → turnoverCost 15M ×1.25, ROI/payback a mano) + exclusión
+  mutua liderazgo + carried no dispara, riskZone 10 casos, computePulse
+  end-to-end (impact 1, gap −25, priority 25, champion +35pp, privacy nulls).
+- E2E vivo 34/34 contra BD dev: campaña sintética 6 deptos con perfiles
+  EXACTOS (eiFav 0/100/62.5/68.75/75/privacy → roja/verde/naranja/amarilla/
+  verde/null), insights previos 2026-Q1 reales → momentum crisis(−40) y
+  growing(+45), hotspot p25=62.5 a mano, ALG5 r≤−0.9 con 5 pares,
+  3 business cases en D1 con exclusión mutua, gold cache riskZone (rolling
+  15→roja, 80→verde), idempotencia run 2. Fixtures cleanup por id exacto
+  en transacción (incl. NPSInsight 2026-06 'pulso' que escribe el pipeline).
+- **S-PERF: 10 deptos × 10 participantes → pulseDurationMs 2.127ms**
+  (presupuesto MAESTRO <5s; fase = 1 query salary + cómputo in-memory +
+  N updates paralelos; dev→Supabase ~600ms/query domina).
+- `npx tsc --noEmit` EXIT 0 · `npm run build` EXIT 0.
+
+**Gotchas descubiertos (para próximos gates):**
+- theatreDetected rama true NO ejercitable E2E en la cuenta dev (sin
+  ComplianceAnalysis scope DEPARTMENT de Ambiente Sano) — lógica verificada
+  en smoke; primer cliente con ambos productos la ejercita en vivo.
+- Campañas sintéticas de clima escriben NPSInsight mensual 'pulso' del
+  período (last-wins global por cuenta) → TODO cleanup de fixtures debe
+  incluir `nPSInsight` de ese período o pisa el snapshot real.
+- Dev quedó SIN campañas con agregación previa (fixtures Gate 2 se
+  limpiaron al sellar) — para probar Gate 4 habrá que re-seedear campaña
+  sintética o cerrar una real.
+- `npx tsx -e "..."` en PowerShell rompe con `$disconnect` (escape) —
+  scripts a archivo siempre.
+
+**Pendientes NO bloqueantes que heredan gates siguientes:**
+- Wiring de suggestDriverFocus a creación de campaña de seguimiento → Gate 4/7.
+- benchmarkDelta null + gapBasis 'fixed_target' → migran con MarketBenchmark
+  pulse_climate en Gate 6C.
+- Eliminar RetentionEngine + useRetentionAnalysis cuando Cinema Mode
+  reemplace results/page.tsx (Gate 4).
+
+**MEJORA PENDIENTE (backlog, NO toca Gate 3):** Clasificación de zonas eNPS
+(InsightEngine.ts, compartido Exit/Onboarding/Pulso/Experiencia) usa 3 zonas
+(≥50/0-49/<0), desalineada de convención de mercado 2026 (4 niveles:
+Excelente >+50, Muy Bueno +20-50, Bueno +1-20, Crítico <0). NO tocar en
+Gate 3 — es infraestructura cross-producto, requiere su propio Gate 0
+mapeando consumidores antes de cambiar el corte.
+
+---
+
+## Gate 4 — Frontend Cinema Mode 🔜 SIGUIENTE
+
+Al retomar: leer MAESTRO §Gate 4 completo + este doc. Plan Mode primero.
+Insumos listos: DepartmentClimaInsight completo (Gate 2 + diagnóstico Gate 3),
+gold cache con riskZone, funciones read-time de PulseEngine
+(aggregateCompanyPulse / buildCompanyBusinessCases / rankMomentumMovers).
+Cargar skill focalizahr-design (Cinema Mode obligatorio) + focalizahr-api.

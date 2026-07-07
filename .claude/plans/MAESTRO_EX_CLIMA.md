@@ -1,9 +1,9 @@
 # MAESTRO: FocalizaHR EX — Inteligencia de Clima
 # Documento maestro ejecutable para Claude Code
 
-> **Versión:** 3.6 — Gate 2 SELLADO (as-built)
+> **Versión:** 3.7 — Gate 3 SELLADO (as-built)
 > **Fecha:** Julio 2026
-> **Estado:** En ejecución — Gate 1 ✅ · Gate 2 ✅ · Gate 3 siguiente
+> **Estado:** En ejecución — Gates 1-3 ✅ · Gate 4 siguiente
 
 | Versión | Qué consolidó |
 |---|---|
@@ -15,6 +15,7 @@
 | v3.4 | Autocontenido: modelo DepartmentClimaInsight completo inline, referencias externas eliminadas (patrones = código real) |
 | v3.5 | Gate 1 sellado as-built: taxonomía real de BD (7-8 categorías, NO liderazgo/ambiente/desarrollo/bienestar), mecánica real de modify_text (SurveyConfiguration + textMapping por rating), decisiones Victor (preguntas al final, 1 follow-up por instrumento, categoría texto_libre) |
 | v3.6 | Gate 2 sellado as-built: trigger real = PUT /status (no endpoint dedicado), DepartmentMetric confirmada (nombres reales absenceRate/overtimeHoursAvg), eNPS también dentro del insight, período = trimestre del endDate, S-PERF 17.340 responses en 9.070ms |
+| v3.7 | Gate 3 sellado as-built: riskZone 75/65/60 + modulación momentum (decisión Victor 2026-07-07), gap vs target fijo 75, impact Pearson a nivel compañía, business cases mapeados a taxonomía real (clima_critico generaliza 'ambiente') con exclusión mutua, PulseEngine puro + fases 4b/4c post-upserts |
 
 ---
 
@@ -38,7 +39,7 @@
 |------|--------|--------|
 | 1 | Foundation (Taxonomía + Persistencia + Seguimiento Focalizado) | ✅ SELLADO `28c9369`+`ec2694e`+`7cc04e3` (2026-07-06, smoke 40/40 + E2E filtro vivo) |
 | 2 | Scoring + Aggregation (enterprise close pattern) | ✅ SELLADO `708791d`+`d2eee38` (2026-07-06, smoke 72/72 + S-PERF 17.340 responses en 9.070ms + E2E PUT /status vivo) |
-| 3 | PulseEngine (5 Algoritmos + absorbe RetentionEngine) | 🔲 PENDIENTE |
+| 3 | PulseEngine (5 Algoritmos + absorbe RetentionEngine) | ✅ SELLADO `3ea5f09` (2026-07-07, smoke 69/69 + E2E vivo 34/34 + S-PERF 10 deptos pulseDurationMs 2.127ms) |
 | 4 | Frontend Cinema Mode | 🔲 PENDIENTE |
 | 5 | Planes de Acción (doble CTA + validación impacto) | 🔲 PENDIENTE |
 | 6 | Ecosistema + LLM Clima (Studio IA) | 🔲 PENDIENTE |
@@ -723,19 +724,106 @@ Cinema Mode (Gate 4) la reemplace.
 # Se ejecuta como parte de ClimaAggregationService, NO en frontend
 ```
 
-### Verificación Gate 3
+### Verificación Gate 3 — ✅ COMPLETA (2026-07-07)
 ```yaml
-□ Driver Analysis calcula impact × gap correctamente
-□ Focus areas priorizadas por impact×|gap|
-□ Hotspots con headcount y correlación rotación
-□ Momentum vs anterior (solo drivers medidos en ambos períodos,
-  carried excluidos)
-□ Correlación Pearson genera business case en CLP
-□ theatreDetected en correlationFlags (ISA>70 + engagementFav<50)
-□ Los 3 business cases de RetentionEngine (ambiente/retención/liderazgo)
-  cubiertos por PulseEngine — sin doble fuente de cifras CLP
-□ Todo persiste en DepartmentClimaInsight
-□ Performance: <5s para 10 departamentos
+✅ Driver Analysis calcula impact × gap correctamente
+   (smoke: cuadrantes + priority=|r|×|gap| con cifras a mano; E2E vivo en BD)
+✅ Focus areas priorizadas por impact×|gap|
+   (smoke: topFocusArea por mayor priority, carried EXCLUIDO de top*)
+✅ Hotspots con headcount y correlación rotación
+   (E2E: p25=62.5 calculado a mano sobre 5 deptos, headcountAvg+turnover
+   con confidence degradada si faltan)
+✅ Momentum vs anterior (solo drivers medidos en ambos períodos,
+   carried excluidos) — smoke 8 casos + E2E crisis(-40)/growing(+45)
+   contra insight 2026-Q1 real en BD
+✅ Correlación Pearson genera business case en CLP
+   (smoke: r=-1 lineal perfecto; E2E: 5 deptos r≤-0.9; CLP a mano:
+   salario 1M → turnoverCost 15M ×1.25)
+✅ theatreDetected en correlationFlags (ISA>70 + engagementFav<50)
+   (smoke true/false/null; E2E ejercita la rama null — cuenta dev sin
+   ComplianceAnalysis DEPARTMENT; rama true verificada solo en smoke)
+✅ Los 3 business cases de RetentionEngine cubiertos por PulseEngine —
+   sin doble fuente de cifras CLP (SalaryConfigService único writer
+   persistido; RetentionEngine @deprecated, sigue client-side hasta Gate 4)
+✅ Todo persiste en DepartmentClimaInsight
+   (E2E lee de BD: driverAnalysis 7 drivers, topFocus*, riskZone,
+   correlationFlags v1) + Department.accumulatedClimaRiskZone
+✅ Performance: <5s para 10 departamentos
+   (S-PERF: 10 deptos × 10 participantes → pulseDurationMs 2.127ms,
+   dev→Supabase; en Vercel co-localizado colapsa ~10×)
+```
+
+### AS-BUILT Gate 3 (sellado 2026-07-07, commit `3ea5f09`)
+
+```
+ARCHIVOS:
+  src/lib/services/clima/PulseEngine.ts        # NUEVO — motor puro sin I/O
+  src/lib/services/clima/ClimaAggregationService.ts  # wiring fases 4b/4c
+  src/engines/RetentionEngine.ts               # solo @deprecated header
+  src/hooks/useRetentionAnalysis.ts            # solo @deprecated header
+
+Decisiones as-built (Victor 2026-07-07 vía plan aprobado):
+  - riskZone sobre engagementFavorability: verde ≥75 · amarilla 65-74 ·
+    naranja 60-64 · roja <60. Anclas 75/60 = estándar de DASHBOARD DIARIO
+    de la industria (Culture Amp: verde ≥75%, amarillo 60-74%, rojo <60%).
+    DISTINTO del modelo de cuartiles (80/70/60) que se reserva para el
+    benchmarking de mercado (Gate 6C, cuando pulse_climate tenga datos) —
+    coexisten sin contradicción: alerta operativa vs posicionamiento.
+    Momentum ≤ -10pp degrada UNA zona (solo degrada, nunca mejora).
+    Gold cache accumulatedClimaRiskZone SIN modulación (promedio rolling
+    12m, el momentum puntual no aplica).
+  - Gap (ALG 1) = fav − CLIMA_TARGET_FAVORABILITY (75). Constante SEPARADA
+    de la de riskZone aunque hoy compartan valor (riesgo ≠ priorización,
+    pueden divergir). gapBasis:'fixed_target' persistido → Gate 6C migra a
+    'market_benchmark'. Promedio interno DESCARTADO: en compañía
+    uniformemente en crisis neutraliza el gap (falla descalificante).
+  - Impact (ALG 1) = Pearson driver×EI a nivel COMPAÑÍA con pares por
+    participante (r por depto con n=8-20 es inestable y quedaría null).
+    Reutiliza GoalsDiagnosticService.calculatePearsonR (null si <5 pares).
+    Clasificación: |r|≥0.30 ∧ gap≤-10 → focus_area; |r|≥0.30 ∧ gap≥0 →
+    strength; gap≤-10 (impact bajo/null) → monitor; resto maintain.
+    topFocusArea/topStrength EXCLUYEN drivers carried (dato stale no
+    lidera el diagnóstico fresco; sí aparecen en driverAnalysis).
+  - theatreDetected: cortes 70/50 SELLADOS en este maestro desde v3.3.
+    El 50 es MÁS estricto que roja (60) a propósito: "teatro" acusa de
+    simular cumplimiento → umbral conservador; un depto puede estar en
+    roja sin sospecha de teatro. ISA o EI null → null (nunca false).
+  - Business cases (absorción RetentionEngine) mapeados a taxonomía REAL:
+    clima_critico = PEOR driver medido con mean < 2.5 (generaliza
+    'ambiente_crítico' — la categoría 'ambiente' NO existe en BD);
+    retencion_riesgo = EI mean < 3.0; liderazgo_gap = driver liderazgo
+    mean < 3.0. MUTUAMENTE EXCLUYENTES sobre el mismo driver: si liderazgo
+    disparó liderazgo_gap y es el peor <2.5, clima_critico toma el
+    SIGUIENTE peor (si no hay, no se emite) — nunca doble costo CLP.
+    Escala TURNOVER_RISK_BY_MEAN y costos/efectividades de programa
+    heredados de RetentionEngine (Gallup/HBR/McKinsey). peopleAtRisk =
+    ceil((headcountAvg ?? totalResponded) × risk). Umbrales = constantes
+    editables por dev, NO configurables por cliente (comparabilidad).
+  - Wiring: fases 4b/4c POST-upserts en processClimaResults — Gate 2 NO
+    se reestructuró (fallo parcial verificado sigue válido). Cero
+    re-queries: pulseInputByDept se llena en el closure per-dept con lo
+    ya computado (driverScores post-carry, ei, momentum, rowsByDept,
+    métricas/ISA/prev precargados). I/O nuevo total: 1 getSalaryForAccount
+    + 2 campos en selects existentes (prevInsights.driverScores,
+    metrics.headcountAvg) + N updates paralelos de SOLO los 5 campos Gate 3.
+    Fallo de Pulse DEGRADA (insight base queda, diagnóstico null, FAILED
+    re-ejecutable vía recompute) — nunca revierte el cierre.
+  - correlationFlags shape v1: theatre/hotspot/climaTurnover/businessCases/
+    computedAt; escalares cross-dept (pearsonR, p25) DUPLICADOS per-dept
+    (self-contained ~KB). Company-level NO se persiste: PulseEngine exporta
+    aggregateCompanyPulse / buildCompanyBusinessCases / rankMomentumMovers
+    (read-time) para que la API de Gate 4 derive la vista compañía al leer.
+    rankMomentumMovers = ranking "mayor caída/mejora" (patrón TopMoversPanel,
+    nota Victor) sobre el momentum ya persistido; el panel visual es Gate 4.
+  - RetentionEngine y useRetentionAnalysis quedan @deprecated SIN cambio
+    funcional (results page actual intacta, principio #6); se eliminan
+    cuando Cinema Mode (Gate 4) la reemplace.
+
+Evidencia: smoke 69/69 PASS (cifras a mano, borrado al sellar) + E2E vivo
+34/34 sobre campaña sintética (6 deptos con perfiles exactos: roja/verde/
+naranja/amarilla/verde-borde/privacy, insights previos 2026-Q1 para
+momentum, fixtures cleanup por id) + S-PERF 10 deptos → pulseDurationMs
+2.127ms (<5s presupuesto; AuditLog trae pulseDurationMs desde este gate).
 ```
 
 ---
