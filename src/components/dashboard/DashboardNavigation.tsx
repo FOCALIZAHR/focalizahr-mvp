@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, logout } from '@/lib/auth';
+import { canManageGoalCycles } from '@/lib/constants/goalCycleRoles';
 import { useSidebar } from '@/hooks/useSidebar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +43,7 @@ import {
   Brain,
   Wallet,
   Shield,
+  CalendarRange,
 } from 'lucide-react';
 
 // ============================================================================
@@ -130,6 +132,12 @@ export default function DashboardNavigation({
   ];
   const canSeeCompliance = user?.role && complianceViewRoles.includes(user.role);
 
+  // RBAC: Gestión de ciclos de metas — constante compartida con la página
+  // /dashboard/metas/ciclos, alineada a goals:cycles:manage (Decisión #1
+  // corregida, a2df312). Sub-usuarios traen userRole; legacy trae role.
+  // CLIENT legacy fuera a propósito: la API le responde 403 (rol null).
+  const canSeeGoalCycles = canManageGoalCycles(user?.userRole ?? user?.role);
+
   // Navigation Config con Dropdowns
   const navigationItems: NavigationItem[] = [
     {
@@ -204,6 +212,15 @@ export default function DashboardNavigation({
       icon: BarChart3,
       active: pathname.startsWith('/dashboard/campaigns'),
     },
+    // Ciclos de Metas - Ítem propio (producto Metas, NO Operaciones: sus
+    // roles no coinciden con goals:cycles:manage)
+    ...(canSeeGoalCycles ? [{
+      id: 'ciclos-metas',
+      label: 'Ciclos de Metas',
+      href: '/dashboard/metas/ciclos',
+      icon: CalendarRange,
+      active: pathname.startsWith('/dashboard/metas/ciclos'),
+    }] : []),
     {
       id: 'analytics',
       label: 'Analytics',
