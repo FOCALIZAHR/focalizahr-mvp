@@ -741,8 +741,12 @@ Falta: APIs request-closure/approve-closure/pending-closure + UI botón/página.
         errores; goals:cycles:manage CORREGIDO post-sello: CEO→HR_MANAGER,
         espeja performance:manage — Decisión #1 corregida en spec §2)
         SELLADOS (sin pushear). cmfgedx7b… migrada (1 ciclo ACTIVE, 211
-        metas, 0 huérfanas); resto de cuentas DIFERIDO. Pendiente Gate D (UI) +
-        Gate E (bloqueo sin ciclo). Ver Sección 6.
+        metas, 0 huérfanas); resto de cuentas DIFERIDO. Gate D EN CURSO:
+        D.1 `c388f56` (GET ciclo activo liviano) · D.5-backend `a90c051` ·
+        D.2 `c54d083` (página /dashboard/metas/ciclos read-only + ítem menú
+        "Ciclos de Metas"; ruta corregida: producto Metas, NO /dashboard/admin;
+        constante UI compartida GOAL_CYCLE_MANAGER_ROLES). Pendiente D.3/D.4/
+        D.5-UI/D.6/D.7 + Gate E (bloqueo sin ciclo). Ver Sección 6.
 🟡 P1 — Panel personal (Sección 7)
 
 🟢 P2 — Router inteligente, wizard config unificado

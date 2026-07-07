@@ -52,7 +52,7 @@ PRINCIPIO CREAR ≠ ACTIVAR (confirmado en Gate 0, estándar de industria):
 | # | Decisión | Valor |
 |---|----------|-------|
 | 1 | Quién crea el ciclo | ACCOUNT_OWNER / HR_ADMIN / HR_MANAGER (+FOCALIZAHR_ADMIN). **CORREGIDA post-Gate C**: alineada a `performance:manage` (mismo set de 4 roles); CEO removido — participa en el juicio de cierre por meta vía `goals:approve` (sin cambios), no en la administración operativa del ciclo |
-| 2 | Dónde | Página dedicada /admin/metas/ciclos |
+| 2 | Dónde | Página dedicada /dashboard/metas/ciclos. **CORREGIDA en D.2** (confirmado Victor): es parte del producto Metas, no configuración de cuenta ni panel FocalizaHR; además /dashboard/admin/* bloquea en middleware a HR_ADMIN, rol que SÍ tiene goals:cycles:manage |
 | 3 | Ciclos activos simultáneos | SOLO UNO por accountId (candado de aplicación, §3.1) |
 | 4 | Selección de ciclo al crear meta | Usuario HEREDA el ACTIVE (no selecciona) |
 | 5 | Sin ciclo activo | BLOQUEAR creación de meta (Gate E, al final del rollout) |
@@ -584,7 +584,7 @@ SELLO: commit APIs
 ```yaml
 SUB-PASOS (acordados, verificables uno a uno como Gate B):
   D.1 GET liviano "ciclo activo" (sin RBAC estratega)   ← SELLADO ✅ (c388f56)
-  D.2 Página /admin/metas/ciclos (lista, read-only)
+  D.2 Página /dashboard/metas/ciclos (lista, read-only) ← SELLADO ✅ (c54d083)
   D.3 Crear ciclo (fricción mínima)
   D.4 Activar (confirmación intencional + anti-doble-submit)
   D.5 Modal de cierre (Decisión #8)  ← BACKEND SELLADO ✅ · UI pendiente
@@ -607,6 +607,38 @@ precedencia a 'active' sobre el dinámico → sin colisión).
 SMOKE (untracked, borrado al sello): 401 sin contexto · 403 HR_OPERATOR (sin
 goals:view) · 200 data null sin ACTIVE · 200 con ACTIVE payload liviano. VERDE.
 tsc + build limpios. Lo consumirá D.6 (wizard).
+```
+
+### GATE D.2 — página lista de ciclos (read-only) — ✅ SELLADO
+
+```yaml
+COMMIT: c54d083 (código) + commit de este sello (spec + maestro)
+
+/dashboard/metas/ciclos — lista read-only de los GoalCycle de la cuenta
+(consume GET /api/goals/cycles de Gate C, limit=50). Sin mutaciones (D.3/D.4/
+D.5-UI). Ruta corregida vs spec original (Decisión #2): producto Metas, NO
+/dashboard/admin (middleware ahí bloquea a HR_ADMIN, que SÍ tiene el permiso).
+
+GUARD DE PÁGINA obligatorio: middleware permite a EVALUATOR todo
+startsWith('/dashboard/metas') → la página gatea sola ("sin acceso" + volver
+a Metas); la seguridad real sigue en la API (hasPermission). Rol del token
+con fallback userRole ?? role (gotcha sub-usuarios).
+
+GOAL_CYCLE_MANAGER_ROLES (src/lib/constants/goalCycleRoles.ts): constante
+ÚNICA de UI compartida por página y menú (ajuste Victor: no duplicar arrays),
+espejo de goals:cycles:manage post-corrección a2df312. CLIENT legacy fuera
+a propósito (API le responde 403 — middleware no inyecta x-user-role legacy).
+
+Menú: ítem propio "Ciclos de Metas" en DashboardNavigation (NO en dropdown
+Operaciones — sus roles incluyen CLIENT y no coinciden con el permiso).
+
+Badges por estado (.fhr-badge-*): PLANNING draft · ASSIGNING purple · ACTIVE
+cyan (protagonista) · CLOSING warning · CLOSED default. Chrome uniforme, sin
+semáforo por fila. Skeleton + empty state + error con retry. Mobile-first.
+
+VERIFICACIÓN (script untracked, borrado al sello): GET con cuenta real
+cmfgedx7b… + HR_MANAGER → 200, "Ciclo Vigente 2026" ANNUAL ACTIVE + 3
+ventanas. tsc + next build limpios. Visual browser (320px/roles): Victor.
 ```
 
 ### GATE D.5 (BACKEND) — decisiones de cierre de ciclo — ✅ SELLADO
@@ -699,7 +731,8 @@ ALCANCE (diseño original Gate D — referencia):
 
 ```yaml
 ALCANCE:
-  - Página /admin/metas/ciclos (lista, crear, activar, cerrar)
+  - Página /dashboard/metas/ciclos (lista, crear, activar, cerrar)
+    [ruta corregida en D.2 — Decisión #2]
   - CREAR: fricción mínima (sin confirmación pesada — es reversible,
     status PLANNING)
   - ACTIVAR: fricción proporcional a la consecuencia (Decisión 11/12):
