@@ -35,6 +35,7 @@ import { SecondaryButton, GhostButton, PrimaryButton } from '@/components/ui/Pre
 import CreateCycleModal from '@/components/goals/cycles/CreateCycleModal'
 import EditCycleWindowsModal from '@/components/goals/cycles/EditCycleWindowsModal'
 import ActivateCycleModal from '@/components/goals/cycles/ActivateCycleModal'
+import CloseCycleModal from '@/components/goals/cycles/CloseCycleModal'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -111,16 +112,20 @@ function CycleRow({
   cycle,
   onEdit,
   onActivate,
+  onStartClose,
 }: {
   cycle: GoalCycleRow
   onEdit: (cycle: GoalCycleRow) => void
   onActivate: (cycle: GoalCycleRow) => void
+  onStartClose: (cycle: GoalCycleRow) => void
 }) {
   const meta = STATUS_META[cycle.status]
   // Un ciclo CLOSED no admite cambios de fechas (guard server: GoalCycleClosedError).
   const canEditWindows = cycle.status !== 'CLOSED'
   // Solo se activa desde PLANNING/ASSIGNING (guard server + candado singleton).
   const canActivate = cycle.status === 'PLANNING' || cycle.status === 'ASSIGNING'
+  // Cerrar (ACTIVE) / continuar cierre (CLOSING resumible) — Gate D.5-UI.
+  const canClose = cycle.status === 'ACTIVE' || cycle.status === 'CLOSING'
 
   return (
     <div className="px-4 py-5 md:px-6 flex flex-col md:flex-row md:items-center gap-4">
@@ -156,8 +161,8 @@ function CycleRow({
         </div>
       </div>
 
-      {/* Acciones de fila — Activar (D.4, PLANNING/ASSIGNING) + Editar fechas (D.8) */}
-      {(canActivate || canEditWindows) && (
+      {/* Acciones de fila — Activar (D.4) / Cerrar (D.5) + Editar fechas (D.8) */}
+      {(canActivate || canClose || canEditWindows) && (
         <div className="shrink-0 md:pl-2 flex flex-col sm:flex-row gap-2">
           {canActivate && (
             <SecondaryButton
@@ -167,6 +172,16 @@ function CycleRow({
               fullWidth
             >
               Activar
+            </SecondaryButton>
+          )}
+          {canClose && (
+            <SecondaryButton
+              size="sm"
+              icon={Lock}
+              onClick={() => onStartClose(cycle)}
+              fullWidth
+            >
+              {cycle.status === 'ACTIVE' ? 'Cerrar ciclo' : 'Continuar cierre'}
             </SecondaryButton>
           )}
           {canEditWindows && (
@@ -198,6 +213,9 @@ export default function CiclosMetasPage() {
 
   // Modal de activación (Gate D.4) — el ciclo a activar, o null
   const [activating, setActivating] = useState<GoalCycleRow | null>(null)
+
+  // Modal de cierre (Gate D.5-UI) — el ciclo a cerrar/continuar cierre, o null
+  const [closing, setClosing] = useState<GoalCycleRow | null>(null)
 
   useEffect(() => {
     // Sub-usuarios (tabla users) traen userRole en el token; cuentas legacy
@@ -326,6 +344,7 @@ export default function CiclosMetasPage() {
                   cycle={cycle}
                   onEdit={setEditing}
                   onActivate={setActivating}
+                  onStartClose={setClosing}
                 />
               ))}
             </div>
@@ -352,6 +371,13 @@ export default function CiclosMetasPage() {
         cycle={activating}
         onClose={() => setActivating(null)}
         onActivated={() => mutate()}
+      />
+
+      {/* Modal de cierre (Gate D.5-UI) */}
+      <CloseCycleModal
+        cycle={closing}
+        onClose={() => setClosing(null)}
+        onClosed={() => mutate()}
       />
     </div>
   )
