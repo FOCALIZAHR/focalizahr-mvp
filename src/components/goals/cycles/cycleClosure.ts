@@ -44,3 +44,34 @@ export function splitClosureGoals(goals: ClosureGoal[]): {
     inReview: goals.filter((g) => g.status === IN_REVIEW_STATUS),
   }
 }
+
+// ── Decisiones del cierre (SP2) — espejo de GoalsService.CycleClosureDecisionType ──
+export type CycleClosureDecisionType =
+  | 'CLOSE_WITH_SCORE'
+  | 'MARK_REVIEW'
+  | 'LEAVE_AS_IS'
+
+export interface CycleClosureDecision {
+  goalId: string
+  decision: CycleClosureDecisionType
+}
+
+// Balde por defecto: soberanía de la meta — nada cambia salvo decisión explícita.
+export const DEFAULT_DECISION: CycleClosureDecisionType = 'LEAVE_AS_IS'
+
+// Labels de negocio (NO los nombres técnicos del enum).
+export const DECISION_OPTIONS: { value: CycleClosureDecisionType; label: string }[] = [
+  { value: 'CLOSE_WITH_SCORE', label: 'Cerrar con score actual' },
+  { value: 'MARK_REVIEW', label: 'Enviar a revisión' },
+  { value: 'LEAVE_AS_IS', label: 'Dejar como está' },
+]
+
+// Map<goalId, decision> → payload. Cubre EXACTAMENTE las N del map (= accionables),
+// sin duplicados (Map garantiza claves únicas). inReview nunca está en el map → nunca
+// en el payload. Incluye las LEAVE_AS_IS (el backend las cuenta en summary.leftAsIs y
+// el set enviado = set accionable completo → pasa la validación todo-o-nada).
+export function buildDecisionsPayload(
+  map: Map<string, CycleClosureDecisionType>
+): CycleClosureDecision[] {
+  return Array.from(map, ([goalId, decision]) => ({ goalId, decision }))
+}

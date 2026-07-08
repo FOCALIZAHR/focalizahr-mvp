@@ -25,6 +25,12 @@ import { Lock, X } from 'lucide-react'
 import { GhostButton, PrimaryButton } from '@/components/ui/PremiumButton'
 import { useToast } from '@/components/ui/toast-system'
 import { useCycleClosure } from './useCycleClosure'
+import CloseActDecisions from './CloseActDecisions'
+import {
+  buildDecisionsPayload,
+  DEFAULT_DECISION,
+  type CycleClosureDecisionType,
+} from './cycleClosure'
 
 // Ciclo objetivo del cierre (subset de GoalCycleRow).
 export interface CloseTargetCycle {
@@ -54,6 +60,26 @@ export default function CloseCycleModal({ cycle, onClose, onClosed }: CloseCycle
   useEffect(() => {
     if (cycle) setAct(cycle.status === 'CLOSING' ? 'decisiones' : 'briefing')
   }, [cycle])
+
+  // Decisiones por meta (Acto 2). Se inicializan en LEAVE_AS_IS para TODAS las
+  // accionables (soberanía). Se re-siembra al re-fetch (defaults frescos en resume).
+  const [decisions, setDecisions] = useState<Map<string, CycleClosureDecisionType>>(
+    new Map()
+  )
+  useEffect(() => {
+    setDecisions(new Map(actionable.map((g) => [g.id, DEFAULT_DECISION])))
+  }, [actionable])
+
+  function setDecision(goalId: string, decision: CycleClosureDecisionType) {
+    setDecisions((prev) => {
+      const next = new Map(prev)
+      next.set(goalId, decision)
+      return next
+    })
+  }
+  function applyToAll(decision: CycleClosureDecisionType) {
+    setDecisions(new Map(actionable.map((g) => [g.id, decision])))
+  }
 
   const n = actionable.length
   const m = inReview.length
@@ -285,7 +311,7 @@ export default function CloseCycleModal({ cycle, onClose, onClosed }: CloseCycle
                     </motion.div>
                   )}
 
-                  {/* ── ACTO 2: DECISIONES (STUB de SP1 — se reemplaza en SP2) ── */}
+                  {/* ── ACTO 2: DECISIONES ── */}
                   {act === 'decisiones' && (
                     <motion.div
                       key="decisiones"
@@ -295,37 +321,88 @@ export default function CloseCycleModal({ cycle, onClose, onClosed }: CloseCycle
                       transition={{ duration: 0.2 }}
                     >
                       {n === 0 ? (
-                        <p className="text-base font-light text-slate-400 leading-relaxed">
-                          Nada por decidir: no quedan metas accionables en este ciclo.
-                          Podés cerrarlo en firme.
-                        </p>
-                      ) : (
                         <>
-                          <p className="text-base font-light text-slate-300 leading-relaxed">
-                            {n} {n === 1 ? 'meta' : 'metas'} por decidir. El detalle de
-                            decisiones por meta llega en el próximo paso.
+                          <p className="text-base font-light text-slate-400 leading-relaxed">
+                            Nada por decidir: no quedan metas accionables en este ciclo.
+                            Podés cerrarlo en firme.
                           </p>
-                          {m > 0 && (
-                            <p className="text-sm font-light text-slate-500 mt-2">
-                              · {m} {m === 1 ? 'meta ya en revisión' : 'metas ya en revisión'}
-                            </p>
-                          )}
+                          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-8">
+                            <GhostButton onClick={handleClose} disabled={submitting} fullWidth>
+                              Cerrar más tarde
+                            </GhostButton>
+                            <PrimaryButton
+                              onClick={handleFinalizePure}
+                              isLoading={submitting}
+                              disabled={submitting}
+                              icon={Lock}
+                              fullWidth
+                            >
+                              Cerrar en firme
+                            </PrimaryButton>
+                          </div>
                         </>
+                      ) : (
+                        <CloseActDecisions
+                          actionable={actionable}
+                          inReview={inReview}
+                          decisions={decisions}
+                          onSetDecision={setDecision}
+                          onApplyToAll={applyToAll}
+                          onContinue={() => setAct('veredicto')}
+                          onCancel={handleClose}
+                        />
                       )}
+                    </motion.div>
+                  )}
 
-                      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-8">
-                        <GhostButton onClick={handleClose} disabled={submitting} fullWidth>
+                  {/* ── ACTO 3: VEREDICTO (STUB de SP2 — se reemplaza en SP3) ── */}
+                  {act === 'veredicto' && (
+                    <motion.div
+                      key="veredicto"
+                      initial={{ opacity: 0, x: 12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -12 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      {(() => {
+                        const payload = buildDecisionsPayload(decisions)
+                        const c = payload.filter((d) => d.decision === 'CLOSE_WITH_SCORE').length
+                        const r = payload.filter((d) => d.decision === 'MARK_REVIEW').length
+                        const l = payload.filter((d) => d.decision === 'LEAVE_AS_IS').length
+                        return (
+                          <div className="space-y-3">
+                            <p className="text-base font-light text-slate-300 leading-relaxed">
+                              Resumen de decisiones ({payload.length} metas):
+                            </p>
+                            <ul className="text-sm font-light text-slate-400 space-y-1">
+                              <li>
+                                <span className="text-white tabular-nums">{c}</span> a cerrar
+                                con score actual
+                              </li>
+                              <li>
+                                <span className="text-white tabular-nums">{r}</span> a enviar a
+                                revisión
+                              </li>
+                              <li>
+                                <span className="text-white tabular-nums">{l}</span> a dejar
+                                como están
+                              </li>
+                            </ul>
+                            <p className="text-sm font-light text-slate-500 leading-relaxed">
+                              El cierre en firme con estas decisiones se aplica en el próximo
+                              paso.
+                            </p>
+                          </div>
+                        )
+                      })()}
+
+                      <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-3 mt-8">
+                        <GhostButton onClick={() => setAct('decisiones')} fullWidth>
+                          Volver
+                        </GhostButton>
+                        <GhostButton onClick={handleClose} fullWidth>
                           Cerrar más tarde
                         </GhostButton>
-                        <PrimaryButton
-                          onClick={handleFinalizePure}
-                          isLoading={submitting}
-                          disabled={submitting}
-                          icon={Lock}
-                          fullWidth
-                        >
-                          Cerrar en firme
-                        </PrimaryButton>
                       </div>
                     </motion.div>
                   )}
