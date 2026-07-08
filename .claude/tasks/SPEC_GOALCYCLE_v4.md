@@ -586,7 +586,7 @@ SUB-PASOS (acordados, verificables uno a uno como Gate B):
   D.1 GET liviano "ciclo activo" (sin RBAC estratega)   ← SELLADO ✅ (c388f56)
   D.2 Página /dashboard/metas/ciclos (lista, read-only) ← SELLADO ✅ (c54d083)
   D.3 Crear ciclo (fricción mínima)                     ← SELLADO ✅ (f446bdc)
-  D.4 Activar (confirmación intencional + anti-doble-submit)
+  D.4 Activar (confirmación intencional + anti-doble-submit) ← SELLADO ✅ (9dcae54)
   D.5 Modal de cierre (Decisión #8)  ← BACKEND SELLADO ✅ · UI pendiente
   D.6 Wizard crear-meta: quitar selector de año, mostrar ciclo heredado
   D.7 Alerta closureWindow próxima
@@ -700,6 +700,45 @@ persistente para toda la familia Metas cuando se sume más superficie a ese hub.
 VERIFICACIÓN: tsc --noEmit + next build limpios (npm run build da EPERM en
 prisma generate por el dev server corriendo en Windows — lock de entorno, no de
 código). Visual browser (modal 320px, flujo de cotas, duplicado→toast): Victor.
+```
+
+### GATE D.4 — activar ciclo (confirmación intencional) — ✅ SELLADO
+
+```yaml
+COMMIT: 9dcae54 (código) + commit de este sello (spec + memoria)
+
+Cierra el ciclo de vida crear→activar en /dashboard/metas/ciclos. SOLO UI — el
+endpoint POST /cycles/[id]/activate + el candado singleton (advisory lock,
+§3.1) ya estaban sellados en Gate C, sin cambios.
+
+FRICCIÓN PROPORCIONAL (opuesto a D.3, que fue mínima): activar es irreversible y
+pasa por el candado (1 ACTIVE/CLOSING por cuenta) → paso de revisión explícito +
+confirmación + anti-doble-submit.
+
+  - ActivateCycleModal.tsx (NUEVO): modal de confirmación .fhr-* simétrico a
+    Edit/CreateCycleModal (fhr-card-static + Tesla line, AnimatePresence). Cuerpo
+    de revisión: "Vas a activar {name}. Será el único ciclo activo hasta su
+    cierre, y las metas nuevas quedarán ancladas a este período." PrimaryButton
+    "Activar ciclo" (icon Power) con guard submitting → isLoading/disabled
+    (anti-doble-submit; el candado server ya corta la carrera, esto es la capa
+    UI). POST activate (Bearer token). 200 → toast + onActivated()=mutate() +
+    cierra. 409 GOAL_CYCLE_ALREADY_ACTIVE → toast "Ya hay un ciclo activo.
+    Cerralo antes de activar otro." (modal queda abierto; el bloqueo es externo).
+    Otros → body.error/genérico. useToast() (NUNCA shadcn). NO reusa
+    confirmation-dialog.tsx (shadcn, design system equivocado).
+  - page.tsx: acción "Activar" (SecondaryButton size sm, icon Power) por fila,
+    visible SOLO si status PLANNING/ASSIGNING; convive con "Editar fechas" (D.8)
+    en el cluster de acciones. ACTIVE/CLOSING → solo Editar; CLOSED → ninguna.
+    Estado `activating` + modal. 1 Primary por vista respetado (el primary vive
+    en el modal; triggers de fila = Secondary/Ghost).
+
+RBAC sin cambios: la acción vive en la ruta canManage===true; la API impone
+goals:cycles:manage (403 si se saltea). Verificado en Gate C, no se re-testea.
+
+VERIFICACIÓN: tsc --noEmit + next build limpios (ciclos 10.8 kB). Funcional
+browser (Victor): activar PLANNING con "Ciclo Vigente 2026" ya ACTIVE → 409 toast
+claro, PLANNING sigue igual · doble clic no re-dispara · ACTIVE/CLOSING/CLOSED sin
+acción Activar · rol sin permiso no la ve · 320px.
 ```
 
 ### GATE D.8 — editar ventanas del ciclo (ampliación Decisión #7) — ✅ SELLADO
