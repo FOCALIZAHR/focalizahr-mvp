@@ -57,7 +57,7 @@ PRINCIPIO CREAR ≠ ACTIVAR (confirmado en Gate 0, estándar de industria):
 | 4 | Selección de ciclo al crear meta | Usuario HEREDA el ACTIVE (no selecciona) |
 | 5 | Sin ciclo activo | BLOQUEAR creación de meta (Gate E, al final del rollout) |
 | 6 | Cierre | MANUAL (acción del estratega, sin cron) |
-| 7 | closureWindow | Fecha SUGERIDA (recordatorio + Gate F), editable |
+| 7 | closureWindow | Fecha SUGERIDA (recordatorio + Gate F), editable. **AMPLIADA (Gate D.8):** las **3 ventanas** (assignment/tracking/closure) son editables mientras el ciclo NO esté CLOSED. Validación por `validateWindowOrder(year,…)` server compartido (cota de año + orden) en createCycle Y updateCycleWindows. Auditoría reusa closureWindowUpdatedAt/By |
 | 8 | Metas no completadas al cierre | Estratega decide al cerrar (modal, Gate D) |
 | 9 | Relación con Performance | NO toca (linkedPerformanceCycleId opcional, sin UI) |
 | 10 | Soberanía | goalCycleId nullable, metas independientes |
@@ -700,6 +700,60 @@ persistente para toda la familia Metas cuando se sume más superficie a ese hub.
 VERIFICACIÓN: tsc --noEmit + next build limpios (npm run build da EPERM en
 prisma generate por el dev server corriendo en Windows — lock de entorno, no de
 código). Visual browser (modal 320px, flujo de cotas, duplicado→toast): Victor.
+```
+
+### GATE D.8 — editar ventanas del ciclo (ampliación Decisión #7) — ✅ SELLADO
+
+```yaml
+COMMIT: 64dadec (código) + commit de este sello (spec + memoria)
+
+AMPLIACIÓN Decisión #7: las 3 ventanas (assignment/tracking/closure) editables
+mientras el ciclo NO esté CLOSED (antes solo closureWindow, blind update).
+
+BACKEND (GoalCycleService.ts):
+  - validateWindowOrder(year, assignment, tracking, closure) — validador PRIVADO
+    compartido, AUTORIDAD server: cota de año (assignment ∈ [{year}-01-01,
+    {year}-12-31], closure ≤ {year+1}-12-31) + orden (closure > assignment,
+    tracking inclusive entre ambas). Usado por createCycle Y updateCycleWindows
+    → misma regla en ambas rutas. Cierra el hueco latente de createCycle (antes
+    solo chequeaba closure > assignment server-side; tracking/cota-de-año eran
+    guard client-only de D.3). El guard client sigue como feedback, ya no como
+    única barrera.
+  - updateCycleWindows(cycleId, {assignmentWindow?,trackingWindow?,closureWindow?},
+    updatedBy) — REEMPLAZA updateClosureWindow (único caller era la ruta PATCH).
+    Fetch actual (status+year+3 ventanas) · guard CLOSED → GoalCycleClosedError
+    (CLOSING sí se permite) · merge (provista ?? actual) · validateWindowOrder
+    con el year FIJO del registro (year NO editable) · auditoría
+    closureWindowUpdatedAt/By ante cualquier cambio (reusa los 2 campos, sin
+    agregar nuevos).
+  - PATCH /api/goals/cycles/[id]: schema 3 ventanas opcionales + refine ≥1;
+    retro-compatible con {closureWindow}. RBAC/ownership/mapper sin cambios
+    (GoalCycleClosedError→409, GoalCycleValidationError→400).
+
+FRONTEND (reuse-first — fuente única de UX/validación de ventanas):
+  - cycleWindows.ts (validateCycleWindows + windowBounds, puros) +
+    CycleWindowsFields.tsx (3 date pickers .fhr-* + feedback inline). Espejan la
+    regla server. CreateCycleModal REFACTORIZADO para consumirlos (behavior-
+    preserving, D.3 intacto).
+  - EditCycleWindowsModal.tsx: modal .fhr-* simétrico (fhr-card-static + Tesla
+    line). Pre-carga las ventanas actuales, PATCH, toast éxito / 409
+    GOAL_CYCLE_CLOSED. year read-only (cabecera con el nombre del ciclo).
+  - page.tsx: acción "Editar fechas" (GhostButton icon Pencil) por fila, AUSENTE
+    si status===CLOSED (coherente con guard server); estado `editing` + modal.
+
+REGRESIÓN (verificada, no rompe nada sellado): el validador solo afecta a
+  createCycle. Único caller producción = POST route (el cliente D.3 ya bloqueaba).
+  smoke-inheritance (createCycle, year 2026, fechas en 2026) PASA. A.5 +
+  smoke-gateD5 usan create directo (bypass). "Ciclo Vigente 2026" (create directo
+  de A.5, no se re-evalúa) confirmado EXPLÍCITO contra BD real con la cota de año:
+  assign 2026-01-16 ∈ 2026 · closure 2027-12-10 ≤ 2027 → PASA.
+
+SMOKE (prisma/scripts/smoke-goal-cycle-editwindows.ts — untracked, borrado al
+  sello) VERDE 16 asserts: editar 3 ventanas PLANNING (+auditoría) · cota de año
+  (assignment 2028 / closure 2028 rechazados) · orden (closure≤assign / tracking
+  fuera rechazados) · editable ACTIVE+CLOSING · CLOSED → GOAL_CYCLE_CLOSED ·
+  regresión createCycle (tracking/assignment/closure inválidos rechazados). tsc +
+  next build limpios (ciclos 10.3 kB). Visual browser: Victor.
 ```
 
 ### GATE D.5 (BACKEND) — decisiones de cierre de ciclo — ✅ SELLADO
