@@ -229,3 +229,147 @@ corregido en FavorabilityBar/BusinessCaseCard).
 `useClimaCinemaMode`. **Hereda Gate 5:** planes de acción (ActionPlan
 moduleType='clima', ya aceptado en la API desde Gate 1). **Hereda Gate 6C:** los
 3 modos del heatmap (hoy absolute) requieren MarketBenchmark pulse_climate.
+
+---
+
+## Gate 4.5a — Cascada Ejecutiva ✅ SELLADO (2026-07-08)
+
+**Commits:** `23835e1` (implementación: motor + narrativa + enriquecimiento + cross-signal
++ climaThresholds + UI cascada + hook/orquestador) · `0c6ffaa` (retiro smoke/seeder al
+sellar). Sello (docs): este archivo + MAESTRO v3.9. **Push manual de Victor** (pendiente).
+
+**Evidencia:** `tsc --noEmit` + `next build` limpios (`/dashboard/clima` prerenderiza,
+bundle 25.8 kB sin prisma). Smoke motor **69/69** (jerarquía 2 capas, enriquecimiento
+Nota G, guards n≥5, DRIVER 3 combinaciones de flags con assert de texto exacto). Review
+en vivo por Victor sobre 4 perfiles demo (Teatro · Foco Concentrado+exit · Difuso/
+OBSERVACION · Patrón Sistémico DRIVER 2-flags+MOMENTUM) — Hotspot, Momentum y Driver A+B
+vistos renderizados en pantalla real.
+
+**Qué quedó construido (fundación de la capa narrativa):**
+- **`climaThresholds.ts` (FUENTE ÚNICA client-safe, sin prisma):** extracción PURA de
+  PulseEngine (Gate 3) de las constantes de dominio + `calcRiskZone` — `RiskZone`,
+  `RISK_ZONE_THRESHOLDS`, `MOMENTUM_*_PP`, `CLIMA_TARGET_FAVORABILITY`, `LEADERSHIP_DRIVER`,
+  `CLIMA_MIN_RESPONDENTS` (n≥5), `calcRiskZone`. PulseEngine las importa + **re-exporta**
+  (cero ruptura de importadores); ClimaSynthesisEngine, la ruta de resultados y
+  climaZonePalette importan de ahí. **Cero valores duplicados** (antes el motor y la
+  paleta los espejaban a mano — riesgo de divergencia eliminado). Comportamiento IDÉNTICO
+  verificado: smoke 42/42 sin cambios, mismas zonas del demo (roja/amarilla), build limpio.
+- `ClimaSynthesisEngine` (puro, isomórfico — client-safe, sin prisma): decide Actos
+  DINÁMICOS (1-2 sano / 4-5 crisis, reemplaza "4 Actos" fijos — semilla §9), dominante
+  + Síntesis. **7 tipos** (jerarquía de 2 capas — ver abajo): TEATRO_GENERALIZADO ·
+  HOTSPOT_CONCENTRADO · OBSERVACION_SIN_FOCO · DRIVER_SISTEMICO · MOMENTUM_NEGATIVO ·
+  BIEN_CON_FOCOS · SALUDABLE.
+- `ClimaNarrativeDictionary`: copy VERBATIM doc 2 (§0 Portada 4 zonas + Ancla 4
+  nodos + tooltip · §1-6 Actos · Síntesis · `[SI...]` §7.3/7.4). interpolate().
+- `ClimaSynthesisEngine` + UI cascada (`components/cascada/`: shared, ClimaPortada,
+  ActoClima, ClimaSintesis, ClimaCascada, ClimaIntroSequence). `AnclaInteligente`
+  reutilizado (Tipo 2, `buildClimaAnclaComponents`).
+- API: `/api/clima/results` +crossSignals por depto (exit topExitFactors +
+  onboarding abandono; 2 findMany batched, período-alineado periodEnd≤endDate).
+- Hook/orquestador: `introDismissed` gatea el Lobby; `ClimaIntroSequence`
+  (Portada→Ancla→Cascada) precede al Lobby; botón "Saltar al detalle".
+
+**Decisiones de alcance (Victor, esta sesión) — documentar al SELLAR:**
+- **Ampliación DELIBERADA vs semilla §6:** exit + onboarding cross-signal cableados
+  AHORA (señales confirmadas contra schema, core narrativo del gate). Sesgo del
+  evaluador (7.1/7.2) SIGUE DIFERIDO (clause `bias` escrita pero nunca insertada).
+- **MAESTRO al sellar:** "4 Actos" → **Actos dinámicos** (nueva fila de versión).
+- **Guard n≥5 en la ACTIVACIÓN** (Nota C): gerencia-level `totalResponded≥5`
+  (re-filtro read-time de hotspot/theatre — los flags Gate 3 NO gatean por n);
+  dimensión-level `driverScores[d].n≥5` (carried n:0 auto-excluido).
+
+**Verificado contra código sellado (condiciones de Victor):**
+- `detectHotspots`/`detectTheatre` (PulseEngine) NO filtran por n → el motor
+  re-filtra. `DepartmentExitInsight`/`DepartmentOnboardingInsight` son por
+  depto+período (join período-alineado). carried tiene n:0 (ClimaAggregationService:321).
+
+**JERARQUÍA DE DETECCIÓN — SELLADA esta sesión (decisión Victor). Documentar en MAESTRO.**
+Principio: **el NIVEL ABSOLUTO manda; el percentil solo describe la distribución
+dentro de un nivel absoluto ya establecido — nunca decide por sí solo si hay problema.**
+Motivada por: HOTSPOT disparaba con el p25 crudo (relativo puro) → contaba "foco
+aislado" aunque toda la empresa estuviera bajo el objetivo. Mapa auditado tipo-por-tipo:
+solo HOTSPOT usaba medida relativa pura; el resto ya anclaba en absoluto (75/bandas/ISA)
+o en eje ortogonal (confiabilidad/tendencia).
+- **Capa 0 · Confiabilidad (override, absoluto):** TEATRO (ISA>70 ∧ eiFav<50, ≥2 gerencias).
+- **Ejes ORTOGONALES (co-disparan, absolutos):** MOMENTUM (delta ≤−5pp) · DRIVER
+  (driver<75 en ≥2 gerencias). Anclados en umbral absoluto, co-disparan a cualquier nivel.
+- **Eje NIVEL+CONCENTRACIÓN (exactamente uno, o ninguno si un ortogonal ya explica el nivel):**
+  - `orgFav ≥ 75`: BIEN_CON_FOCOS (hay no-verde) · SALUDABLE (todo verde + sin ortogonal).
+  - `orgFav < 75`: **HOTSPOT** (concentrado) · **OBSERVACION_SIN_FOCO** (difuso). Mutuamente excluyentes.
+- **Resolución #1 (guard absoluto de HOTSPOT):** HOTSPOT queda estructuralmente
+  condicionado a `orgFav < 75` — guard EXPLÍCITO, no accidente. Un outlier severo en
+  org sana (`orgFav≥75`) → BIEN_CON_FOCOS, HOTSPOT no puede disparar (test 13).
+- **Resolución #2 (HOTSPOT = 3 condiciones):** `orgFav<75` **Y** outlier naranja/roja
+  (piso absoluto) **Y** mediana-del-resto ≥ 75 (fondo sano). Así la copy "caso aislado,
+  resto en rango razonable" es VERDADERA por construcción. Si la mediana-del-resto < 75
+  (problema amplio, el outlier es solo el peor punto) → NO HOTSPOT → cae en
+  OBSERVACION_SIN_FOCO (test 12). Sin copy condicional de HOTSPOT (se evitó redundancia
+  con OBSERVACION). El p25 sellado (`hotspotDepartmentIds`) YA NO decide — quedó como
+  descriptor de distribución subordinado al piso absoluto.
+- **OBSERVACION_SIN_FOCO (7º tipo, análogo Ambiente Sano):** cierra el hueco "org bajo
+  el objetivo pero difuso" que antes caía mal en SALUDABLE. Copy **PROVISIONAL marcada**
+  (adaptada del OBSERVACION_SIN_FOCO de Ambiente) — Victor escribe la final; nombra el
+  punto más bajo `{gerencia}` sin sonar a "foco aislado".
+
+**Enriquecimiento "momento de revelación" (Nota G del doc 2) — INTEGRADO.** Nombre +
+cifra + comparación al revelar, en HOTSPOT/DRIVER/MOMENTUM/BIEN_CON_FOCOS/SALUDABLE/
+OBSERVACION. Portada+Ancla (magnitud pura) NO se tocaron (anti-robo-de-trueno). TEATRO
+tampoco (nombrar gerencias en un diagnóstico de simulación es más sensible).
+- **Guard n≥5 en movers (Nota G #1):** `rankMomentumMovers` NO guardea n≥5 (Gate 3, no se
+  toca). El motor computa el mayor faller/riser y aplica el guard con `CLIMA_MIN_RESPONDENTS`:
+  nombra solo con `totalResponded≥5`, si no usa el bloque `[SI n<5]` (magnitud sin nombre).
+- **`interpolate()` (Nota G #2):** ya soporta las variables nuevas (regex `\w+`). Cero cambio
+  de contrato; el motor computa los valores y los agrega al context.
+- **DRIVER_SISTEMICO — 2 flags INDEPENDIENTES (decisión Victor):** la detección NO cambia
+  ("sistémico" = extendido en ≥2 gerencias, ya auditado). El enriquecimiento se compone:
+  - Flag A (top-impact): la dimensión detectada es la de mayor `driverAnalysis.impact` (|r|)
+    entre drivers medidos → incluye "el driver que más pesa en tu resultado general".
+  - Flag B (mayor caída, CALCULADO): la dimensión detectada es la de `momentumDelta` org
+    más negativo → incluye "el que más cayó… con una variación de {deltaDimension} puntos".
+  - Ninguna: el Acto se sostiene con la amplitud (garantizada por la detección). Solo una:
+    esa sola (sin el "Y"). Ambas: la frase completa con "Y" + cierre. Fragmentos verbatim
+    del doc 2 §3; la combinación es estructural (mismo patrón que los `[SI...]` de MOMENTUM).
+
+**Puntos de ajuste para el live review (Victor):**
+- Portada: título "Experiencia/Colaborador" + hero orgFav% + gancho (repite el %
+  en el texto). Tokens y tamaño de ancla de los Actos (text-6xl para frases).
+- CTAs de Acto/Síntesis → Lobby (deep-link a evidencia específica = 4.5b Cards).
+- DRIVER_SISTEMICO "sin relación jerárquica" no verificado (la respuesta no trae
+  parentId) — refinamiento diferido.
+- Umbrales de disparo (TEATRO_MIN=2, DRIVER_MIN=2, MOMENTUM=−5pp, HOTSPOT `detectable≥3`)
+  editables en `THRESHOLDS` — tuning en vivo.
+
+**Copy [SI...] cross-signal — RECONCILIADO (decisión Victor):** `CROSS_SIGNAL_CLAUSES`
+(§7 del doc 2) es la ÚNICA fuente, NO la versión embebida de los Actos §1-6. Captura la
+distinción LENIENCY/SEVERITY (7.1, diferida). Cada cláusula = convergencia (a la narrativa)
++ "O" enriquecido que REEMPLAZA al "O" base del Acto cuando el cruce dispara.
+
+**Smoke (retirado del árbol al sellar — evidencia en `23835e1`):**
+`smoke-clima-cascada-gate45a.ts` **69/69** — jerarquía tests 11-13, enriquecimiento Nota G
+tests 2/6/6b/7/8/11, DRIVER 3 combinaciones de flags (14 ambos · **14a solo-A** · **14b solo-B**,
+las 2 últimas con assert de TEXTO EXACTO), guard `noBraces` (ningún placeholder sin resolver).
+Seeder `seed-clima-cascada-demo.ts` (4 perfiles: A Teatro · B Foco+exit · C Difuso/OBSERVACION
+· D Patrón Sistémico DRIVER 2-flags+MOMENTUM). Gotcha: ninguna campaña real de la cuenta
+dispara DRIVER (todas detect=0 salvo el demo) — el motor NO miente cuando no enriquece, no
+había driver sistémico; D lo fuerza. Para re-sembrar: recuperar el seeder de `23835e1`.
+
+**PENDIENTES NO BLOQUEANTES / seguimiento (hereda 4.5b o futuro):**
+- **Variantes de un-solo-flag de DRIVER_SISTEMICO (flag A solo, flag B solo) — validadas
+  por texto, NO por render en pantalla.** Quedaron cubiertas por (a) auditoría de texto
+  completa (gramática + Reglas de Oro, aprobadas sin objeciones por el chat de contenido) y
+  (b) smoke con assert de texto exacto (tests 14a/14b). NO se vieron renderizadas en pantalla
+  real — a diferencia de Hotspot, Momentum y Driver A+B, que sí. Riesgo residual bajo (mismo
+  mecanismo de interpolación ya probado en los otros 4 casos), pero explícito: si en producción
+  aparece un problema de renderizado de DRIVER con un solo flag activo, revisar primero acá.
+  Truncamientos: A-solo = `prefix+impact+"."`; B-solo = `prefix+fall+"."` (el cierre A+B
+  "Cuando el factor más influyente…" nunca aparece con un solo flag). Frontera de oración
+  compuesta por Code sobre fragmentos verbatim §3.
+- DRIVER_SISTEMICO "sin relación jerárquica" no verificado (la respuesta no trae parentId).
+- Umbrales de disparo editables en `THRESHOLDS` (TEATRO_MIN=2, DRIVER_MIN=2, MOMENTUM=−5pp,
+  HOTSPOT `detectable≥3`) — tuning si un cliente real lo amerita.
+- Portada/tokens visuales y CTAs de Acto→Lobby (deep-link a evidencia = 4.5b Cards).
+
+**Sigue (4.5b):** `ClimaDimensionDetail` (3 capas) + Lobby Cards de hallazgo (Patrón G,
+auto-selección) + Card sana + `ClimaToolbar` (8 dims, modal clon AvatarInfoModal).
+Reutilizan el componente rico que nace validado en 4.5a. Detalle del plan 4.5b: resolución
+de esquema al arrancar (ver plan aprobado de la sesión).
