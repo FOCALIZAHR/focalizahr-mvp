@@ -28,18 +28,70 @@ import {
   type DriverImpact,
 } from '@/lib/services/clima/PulseEngine';
 import { CLIMA_CAMPAIGN_SLUGS } from '@/lib/services/clima/ClimaAggregationService';
+import { CLIMA_MIN_RESPONDENTS } from '@/lib/services/clima/climaThresholds';
 import type {
   ClimaDepartmentInsight,
   ClimaDriverScore,
   ClimaAcotadoGroupScore,
   ClimaProductType,
   ClimaResultsResponse,
+  ClimaCrossSignal,
+  ClimaExitTopFactor,
+  ClimaOnboardingAbandon,
 } from '@/types/clima';
 
 /** Trimestre del endDate → "YYYY-Qn" (misma convención que Gate 2). */
 function periodFromDate(date: Date): string {
   const q = Math.floor(date.getUTCMonth() / 3) + 1;
   return `${date.getUTCFullYear()}-Q${q}`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Cross-signal cross-módulo (Gate 4.5a) — helpers. Ampliación DELIBERADA vs
+// semilla §6: se cablean exit + onboarding (señales CONFIRMADAS contra schema).
+// El sesgo del evaluador (7.1/7.2) sigue diferido. Guard n≥5 del sistema.
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Umbral n≥5 (mismo que privacidad del sistema). Exit → surveysCompleted;
+ *  onboarding → totalJourneys. Fuente única en climaThresholds. */
+const MIN_CROSS_N = CLIMA_MIN_RESPONDENTS;
+
+/** El factor top de salida nombra jefe/manager (dispara el cruce §7.3). */
+const MANAGER_FACTOR_RE = /jefe|jefatura|manager|l[ií]der|supervis/i;
+
+/** Top factor de salida (mayor menciones) de un DepartmentExitInsight, si n≥5. */
+function buildExitTopFactor(
+  row: { surveysCompleted: number; topExitFactors: unknown } | undefined,
+): ClimaExitTopFactor | null {
+  if (!row || row.surveysCompleted < MIN_CROSS_N) return null;
+  if (!Array.isArray(row.topExitFactors) || row.topExitFactors.length === 0) return null;
+  const factors = row.topExitFactors as Array<Record<string, unknown>>;
+  const top = [...factors].sort(
+    (a, b) => Number(b?.mentions ?? 0) - Number(a?.mentions ?? 0),
+  )[0];
+  if (!top || typeof top.factor !== 'string') return null;
+  return {
+    factor: top.factor,
+    mentions: Number(top.mentions ?? 0),
+    mentionRate: Number(top.mentionRate ?? 0),
+    mentionsManager: MANAGER_FACTOR_RE.test(top.factor),
+  };
+}
+
+/** Abandono temprano de onboarding, si n≥5 Y la tasa supera la del resto de la
+ *  organización ("en una proporción mayor que el resto" — §7.4). */
+function buildOnboardingAbandon(
+  row: { totalJourneys: number; abandonedJourneys: number } | undefined,
+  orgAbandonRate: number,
+): ClimaOnboardingAbandon | null {
+  if (!row || row.totalJourneys < MIN_CROSS_N) return null;
+  const rate = row.abandonedJourneys / row.totalJourneys;
+  if (rate <= orgAbandonRate) return null;
+  return {
+    abandonRate: rate,
+    abandonedJourneys: row.abandonedJourneys,
+    totalJourneys: row.totalJourneys,
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -123,6 +175,59 @@ export async function GET(request: NextRequest) {
         })
       : [];
 
+    // ── Cross-signal cross-módulo (Gate 4.5a): exit + onboarding por depto ──
+    // 2 findMany batched, período-alineado (latest periodEnd ≤ campaign.endDate),
+    // scope = mismos deptos visibles. n≥5 aplicado en los helpers.
+    const crossByDept = new Map<string, ClimaCrossSignal>();
+    const visibleDeptIdList = visibleInsights.map((r) => r.departmentId);
+    if (visibleDeptIdList.length) {
+      const [exitRows, onbRows] = await Promise.all([
+        prisma.departmentExitInsight.findMany({
+          where: {
+            accountId: userContext.accountId,
+            departmentId: { in: visibleDeptIdList },
+            periodEnd: { lte: campaign.endDate },
+          },
+          orderBy: { periodEnd: 'desc' },
+          select: { departmentId: true, surveysCompleted: true, topExitFactors: true },
+        }),
+        prisma.departmentOnboardingInsight.findMany({
+          where: {
+            accountId: userContext.accountId,
+            departmentId: { in: visibleDeptIdList },
+            periodEnd: { lte: campaign.endDate },
+          },
+          orderBy: { periodEnd: 'desc' },
+          select: { departmentId: true, totalJourneys: true, abandonedJourneys: true },
+        }),
+      ]);
+
+      // Latest-per-dept (filas ya ordenadas periodEnd desc → la primera gana).
+      const latestExit = new Map<string, (typeof exitRows)[number]>();
+      for (const r of exitRows) if (!latestExit.has(r.departmentId)) latestExit.set(r.departmentId, r);
+      const latestOnb = new Map<string, (typeof onbRows)[number]>();
+      for (const r of onbRows) if (!latestOnb.has(r.departmentId)) latestOnb.set(r.departmentId, r);
+
+      // Tasa de abandono de la organización (deptos con n≥5) para decidir "elevado".
+      let orgAband = 0;
+      let orgTotal = 0;
+      for (const r of latestOnb.values()) {
+        if (r.totalJourneys >= MIN_CROSS_N) {
+          orgAband += r.abandonedJourneys;
+          orgTotal += r.totalJourneys;
+        }
+      }
+      const orgAbandonRate = orgTotal > 0 ? orgAband / orgTotal : 0;
+
+      for (const deptId of visibleDeptIdList) {
+        const exitTopFactor = buildExitTopFactor(latestExit.get(deptId));
+        const onboardingAbandon = buildOnboardingAbandon(latestOnb.get(deptId), orgAbandonRate);
+        if (exitTopFactor || onboardingAbandon) {
+          crossByDept.set(deptId, { exitTopFactor, onboardingAbandon });
+        }
+      }
+    }
+
     // ── Mapeo a shape renderable (Json → tipado) ──
     const departments: ClimaDepartmentInsight[] = visibleInsights.map((r) => ({
       departmentId: r.departmentId,
@@ -151,6 +256,7 @@ export async function GET(request: NextRequest) {
       absenteeismRateAtMeasurement: r.absenteeismRateAtMeasurement,
       overtimeRateAtMeasurement: r.overtimeRateAtMeasurement,
       incidentCountAtMeasurement: r.incidentCountAtMeasurement,
+      crossSignals: crossByDept.get(r.departmentId) ?? null,
     }));
 
     // ── Derivación read-time de compañía (scope visible) ──

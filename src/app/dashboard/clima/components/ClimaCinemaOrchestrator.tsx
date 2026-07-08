@@ -21,6 +21,7 @@ import ClimaMissionControl from './ClimaMissionControl';
 import ClimaRail from './ClimaRail';
 import DepartmentSpotlightCard from './DepartmentSpotlightCard';
 import ClimaChapterView from './ClimaChapterView';
+import ClimaIntroSequence from './cascada/ClimaIntroSequence';
 
 interface ClimaCinemaOrchestratorProps {
   initialCampaignId?: string;
@@ -66,6 +67,11 @@ export default function ClimaCinemaOrchestrator({
   const isChapter = !isSpotlight && hook.activeChapter !== null;
   const selectedCampaign = hook.campaigns.find((c) => c.id === hook.selectedCampaignId) ?? null;
 
+  // Cascada Ejecutiva (Gate 4.5a): precede al Lobby hasta que el CEO la
+  // termina/salta. El Lobby y el Rail solo aparecen tras descartarla.
+  const showIntro = isReady && !isSpotlight && !isChapter && !hook.introDismissed;
+  const showLobby = isReady && !isSpotlight && !isChapter && hook.introDismissed;
+
   return (
     <div className="h-screen w-full bg-[#0F172A] text-white flex flex-col font-sans overflow-hidden">
       {hasCampaigns && <ClimaHeader productType={selectedCampaign?.productType ?? null} />}
@@ -75,9 +81,13 @@ export default function ClimaCinemaOrchestrator({
       <div
         className={cn(
           'flex-1 relative flex justify-center p-4 md:p-8 overflow-y-auto',
-          isSpotlight || isChapter ? 'items-start' : 'items-center',
+          isSpotlight || isChapter || showIntro ? 'items-start' : 'items-center',
           'transition-all duration-500 ease-in-out',
-          isReady ? (hook.isRailExpanded ? 'mb-[320px]' : 'mb-[50px]') : 'mb-0'
+          showLobby || isSpotlight || isChapter
+            ? hook.isRailExpanded
+              ? 'mb-[320px]'
+              : 'mb-[50px]'
+            : 'mb-0'
         )}
       >
         <AnimatePresence mode="wait">
@@ -125,7 +135,15 @@ export default function ClimaCinemaOrchestrator({
             />
           )}
 
-          {isReady && !isSpotlight && !isChapter && (
+          {showIntro && (
+            <ClimaIntroSequence
+              key="intro"
+              results={hook.results!}
+              onDone={hook.dismissIntro}
+            />
+          )}
+
+          {showLobby && (
             <ClimaMissionControl
               key="lobby"
               scope={hook.scope}
@@ -154,8 +172,8 @@ export default function ClimaCinemaOrchestrator({
         )}
       </AnimatePresence>
 
-      {/* Rail de departamentos — SIEMPRE fijo abajo cuando hay datos */}
-      {isReady && hook.results && (
+      {/* Rail de departamentos — fijo abajo tras descartar la Cascada Ejecutiva */}
+      {isReady && hook.results && hook.introDismissed && (
         <ClimaRail
           departments={hook.results.departments}
           selectedId={hook.selectedDepartmentId}

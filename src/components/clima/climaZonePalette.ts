@@ -10,6 +10,10 @@
 //                                              nunca rojo)
 
 import type { RiskZone } from '@/types/clima';
+import { CLIMA_TARGET_FAVORABILITY, calcRiskZone } from '@/lib/services/clima/climaThresholds';
+
+// Re-export para consumidores que ya lo importan desde acá (client-safe).
+export { CLIMA_TARGET_FAVORABILITY };
 
 export type RiskLevel = 'safe' | 'observation' | 'risk' | 'critical';
 
@@ -42,10 +46,6 @@ export const BACKGROUND_GLOW_OPACITY: Record<RiskLevel, number> = {
   critical: 0.32,
 };
 
-// Objetivo de favorabilidad (espeja CLIMA_TARGET_FAVORABILITY sellado en
-// PulseEngine; duplicado client-safe para no bundlear el motor en el cliente).
-export const CLIMA_TARGET_FAVORABILITY = 75;
-
 // Etiquetas de banda canónicas (contrato "N · Label", alineadas a ISA).
 export const ZONE_LABEL: Record<RiskZone, string> = {
   verde: 'Saludable',
@@ -63,10 +63,8 @@ export function zoneLevel(zone: RiskZone | null): RiskLevel | null {
   return zone ? LEVEL_BY_ZONE[zone] : null;
 }
 
-/** riskZone a partir de una favorabilidad 0-100 (umbrales sellados). */
+/** riskZone a partir de una favorabilidad 0-100 (umbrales sellados, fuente única).
+ *  Sin modulación de momentum (v siempre no-null → calcRiskZone nunca da null). */
 export function zoneFromFavorability(v: number): RiskZone {
-  if (v >= 75) return 'verde';
-  if (v >= 65) return 'amarilla';
-  if (v >= 60) return 'naranja';
-  return 'roja';
+  return calcRiskZone(v, null) as RiskZone;
 }

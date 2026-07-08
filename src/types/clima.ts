@@ -62,6 +62,36 @@ export interface ClimaAcotadoGroupScore {
   n: number;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Cross-signal cross-módulo (Gate 4.5a) — señales confirmadas exit + onboarding
+// por departamento. Ampliación DELIBERADA de alcance vs semilla §6 (ver plan).
+// Contrato semilla §4B: nullable desde el día uno; bias/LLM quedan null para
+// gates futuros sin refactor. Ambas señales respetan el guard n≥5 del sistema.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Top factor de salida de un depto (DepartmentExitInsight.topExitFactors). */
+export interface ClimaExitTopFactor {
+  factor: string;
+  mentions: number;
+  mentionRate: number; // 0-1
+  /** El factor top nombra jefe/manager (dispara el cruce §7.3 de liderazgo). */
+  mentionsManager: boolean;
+}
+
+/** Abandono temprano de onboarding de un depto (DepartmentOnboardingInsight). */
+export interface ClimaOnboardingAbandon {
+  abandonRate: number; // abandonedJourneys / totalJourneys (0-1)
+  abandonedJourneys: number;
+  totalJourneys: number;
+}
+
+/** Señales cross-módulo confirmadas por depto. Cada campo `null` si no hay dato
+ *  o no pasa el guard n≥5 (exit → surveysCompleted≥5, onboarding → totalJourneys≥5). */
+export interface ClimaCrossSignal {
+  exitTopFactor: ClimaExitTopFactor | null;
+  onboardingAbandon: ClimaOnboardingAbandon | null;
+}
+
 /** Subset renderizable de una fila DepartmentClimaInsight. */
 export interface ClimaDepartmentInsight {
   departmentId: string;
@@ -98,6 +128,9 @@ export interface ClimaDepartmentInsight {
   absenteeismRateAtMeasurement: number | null;
   overtimeRateAtMeasurement: number | null;
   incidentCountAtMeasurement: number | null;
+
+  /** Señales cross-módulo confirmadas (Gate 4.5a). null si no cableado/sin dato. */
+  crossSignals?: ClimaCrossSignal | null;
 }
 
 /** Gold cache clima por depto (Department, rolling 12m). */

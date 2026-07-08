@@ -32,37 +32,35 @@ import {
   filterRatingRows,
 } from './FavorabilityCalculator';
 
+// Constantes de dominio + calcRiskZone: FUENTE ÚNICA en ./climaThresholds
+// (extraídas para que el motor client-side las comparta sin bundlear prisma).
+// Se importan para uso interno y se RE-EXPORTAN para no romper importadores.
+import {
+  RISK_ZONE_THRESHOLDS,
+  MOMENTUM_CRISIS_PP,
+  MOMENTUM_DECLINING_PP,
+  MOMENTUM_GROWING_PP,
+  CLIMA_TARGET_FAVORABILITY,
+  LEADERSHIP_DRIVER,
+  calcRiskZone,
+} from './climaThresholds';
+import type { RiskZone } from './climaThresholds';
+
+export {
+  RISK_ZONE_THRESHOLDS,
+  MOMENTUM_CRISIS_PP,
+  MOMENTUM_DECLINING_PP,
+  MOMENTUM_GROWING_PP,
+  CLIMA_TARGET_FAVORABILITY,
+  LEADERSHIP_DRIVER,
+  calcRiskZone,
+};
+export type { RiskZone };
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes de dominio (decisiones Victor 2026-07-07 — editables por dev,
 // NO configurables por cliente: comparabilidad del diagnóstico entre cuentas)
 // ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * riskZone sobre engagementFavorability (0-100). Anclas 75/60 = estándar de
- * dashboard diario de la industria (Culture Amp: verde ≥75%, amarillo 60-74%,
- * rojo <60%). DISTINTO del modelo de cuartiles (80/70/60) reservado para el
- * benchmarking de mercado (Gate 6C) — coexisten: alerta operativa diaria vs
- * posicionamiento contra el mercado.
- */
-export const RISK_ZONE_THRESHOLDS = {
-  VERDE_MIN_FAV: 75, // ≥75 verde
-  AMARILLA_MIN_FAV: 65, // 65-74.9 amarilla
-  NARANJA_MIN_FAV: 60, // 60-64.9 naranja → <60 roja
-} as const;
-
-/** Estados de momentum en pp de favorability (MAESTRO ALG 3). */
-export const MOMENTUM_CRISIS_PP = -10;
-export const MOMENTUM_DECLINING_PP = -5;
-export const MOMENTUM_GROWING_PP = 5;
-
-/**
- * Referencia de priorización de gaps (ALG 1): gap = fav − target.
- * Constante SEPARADA de RISK_ZONE_THRESHOLDS.VERDE_MIN_FAV aunque hoy compartan
- * valor — son conceptos distintos (clasificación de riesgo vs referencia de
- * priorización) y pueden divergir. Ancla: cuartil superior de mercado (Culture
- * Amp). Gate 6C migra gapBasis 'fixed_target' → benchmark real pulse_climate.
- */
-export const CLIMA_TARGET_FAVORABILITY = 75;
 
 /** Umbral de impact alto: |r| Pearson driver×EI (estándar effect size medio). */
 export const IMPACT_HIGH_R = 0.3;
@@ -86,8 +84,7 @@ export const THEATRE_ENGAGEMENT_MAX_FAV = 50;
 export const DRIVER_CRITICAL_MEAN = 2.5; // clima_critico: peor driver medido
 export const EI_RISK_MEAN = 3.0; // retencion_riesgo: engagement mean
 export const LEADERSHIP_GAP_MEAN = 3.0; // liderazgo_gap: driver liderazgo
-/** Driver de liderazgo en la taxonomía REAL del banco de preguntas. */
-export const LEADERSHIP_DRIVER = 'liderazgo';
+// LEADERSHIP_DRIVER movido a ./climaThresholds (re-exportado arriba).
 
 /**
  * Riesgo de rotación por mean del disparador — escala heredada de
@@ -123,7 +120,7 @@ const round1 = (x: number) => Math.round(x * 10) / 10;
 // Tipos — contrato persistido (driverAnalysis / correlationFlags)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type RiskZone = 'verde' | 'amarilla' | 'naranja' | 'roja';
+// RiskZone movido a ./climaThresholds (re-exportado arriba como type).
 export type DriverClassification = 'focus_area' | 'strength' | 'monitor' | 'maintain';
 export type MomentumState = 'crisis' | 'declining' | 'stable' | 'growing';
 export type PulseBusinessCaseType = 'clima_critico' | 'retencion_riesgo' | 'liderazgo_gap';
@@ -274,32 +271,8 @@ export function computePulse(input: PulseCompanyInput): Map<string, PulseDeptOut
   return outputs;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// riskZone
-// ─────────────────────────────────────────────────────────────────────────────
-
-const ZONE_ORDER: readonly RiskZone[] = ['verde', 'amarilla', 'naranja', 'roja'];
-
-/**
- * Zona de riesgo por engagementFavorability, modulada por momentum: caída en
- * crisis (≤ MOMENTUM_CRISIS_PP) degrada UNA zona — solo degrada, nunca mejora
- * (un 78% cayendo 12pp no es verde). Con momentum null (p.ej. gold cache
- * rolling 12m, sin momentum puntual) no modula.
- */
-export function calcRiskZone(fav: number | null, momentum: number | null): RiskZone | null {
-  if (fav === null) return null;
-  let zone: RiskZone;
-  if (fav >= RISK_ZONE_THRESHOLDS.VERDE_MIN_FAV) zone = 'verde';
-  else if (fav >= RISK_ZONE_THRESHOLDS.AMARILLA_MIN_FAV) zone = 'amarilla';
-  else if (fav >= RISK_ZONE_THRESHOLDS.NARANJA_MIN_FAV) zone = 'naranja';
-  else zone = 'roja';
-
-  if (momentum !== null && momentum <= MOMENTUM_CRISIS_PP) {
-    const idx = ZONE_ORDER.indexOf(zone);
-    zone = ZONE_ORDER[Math.min(idx + 1, ZONE_ORDER.length - 1)];
-  }
-  return zone;
-}
+// riskZone: calcRiskZone movido a ./climaThresholds (re-exportado arriba). Se usa
+// internamente (computePulse, calcOrgFavorability) vía el import.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ALG 1 — Driver Analysis (Impact × Gap)

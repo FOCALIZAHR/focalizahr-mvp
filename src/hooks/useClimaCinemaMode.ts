@@ -59,6 +59,11 @@ export interface UseClimaCinemaModeReturn {
   // Smart Router
   nextDepartment: ClimaNextDepartment | null;
 
+  // Cascada Ejecutiva (Gate 4.5a) — precede al Lobby. introDismissed=false hasta
+  // que el CEO termina/salta la secuencia; se resetea al cambiar de campaña.
+  introDismissed: boolean;
+  dismissIntro: () => void;
+
   // Navegación
   selectedDepartmentId: string | null;
   activeChapter: ClimaChapter | null;
@@ -89,6 +94,10 @@ export function useClimaCinemaMode(initialCampaignId?: string): UseClimaCinemaMo
   const [activeChapter, setActiveChapter] = useState<ClimaChapter | null>(null);
   const [isRailExpanded, setIsRailExpanded] = useState(false);
   const [railFilter, setRailFilter] = useState<ClimaRailFilter>('todos');
+
+  // Cascada Ejecutiva (Gate 4.5a): la intro se muestra ANTES del Lobby hasta que
+  // el CEO la termina o la salta. Sticky por campaña (se resetea abajo al cambiar).
+  const [introDismissed, setIntroDismissed] = useState(false);
 
   // Auto-seleccionar campaña al cargar la lista (primera con análisis, luego
   // primera activa, luego cualquiera) — respeta initialCampaignId.
@@ -144,6 +153,8 @@ export function useClimaCinemaMode(initialCampaignId?: string): UseClimaCinemaMo
     setSelectedDepartmentId(null);
     setActiveChapter(null);
     setRailFilter('todos');
+    // La Cascada Ejecutiva vuelve a mostrarse para la nueva campaña.
+    setIntroDismissed(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignCacheKey]);
 
@@ -213,6 +224,8 @@ export function useClimaCinemaMode(initialCampaignId?: string): UseClimaCinemaMo
 
   const toggleRail = useCallback(() => setIsRailExpanded((v) => !v), []);
 
+  const dismissIntro = useCallback(() => setIntroDismissed(true), []);
+
   const selectCampaign = useCallback((id: string) => setSelectedCampaignId(id), []);
 
   const reload = useCallback(async () => {
@@ -231,6 +244,8 @@ export function useClimaCinemaMode(initialCampaignId?: string): UseClimaCinemaMo
     orgRiskZone: results?.orgRiskZone ?? null,
     orgMomentum: results?.orgMomentum ?? null,
     scope: results?.scope ?? 'organization',
+    introDismissed,
+    dismissIntro,
     nextDepartment,
     selectedDepartmentId,
     activeChapter,
