@@ -165,24 +165,24 @@ function CycleRow({
       {(canActivate || canClose || canEditWindows) && (
         <div className="shrink-0 md:pl-2 flex flex-col sm:flex-row gap-2">
           {canActivate && (
-            <SecondaryButton
+            <PrimaryButton
               size="sm"
               icon={Power}
               onClick={() => onActivate(cycle)}
               fullWidth
             >
               Activar
-            </SecondaryButton>
+            </PrimaryButton>
           )}
           {canClose && (
-            <SecondaryButton
+            <PrimaryButton
               size="sm"
               icon={Lock}
               onClick={() => onStartClose(cycle)}
               fullWidth
             >
               {cycle.status === 'ACTIVE' ? 'Cerrar ciclo' : 'Continuar cierre'}
-            </SecondaryButton>
+            </PrimaryButton>
           )}
           {canEditWindows && (
             <GhostButton size="sm" icon={Pencil} onClick={() => onEdit(cycle)} fullWidth>
@@ -284,9 +284,9 @@ export default function CiclosMetasPage() {
 
             {/* CTA crear — solo con permiso confirmado (evita flash en null) */}
             {canManage === true && (
-              <PrimaryButton icon={Plus} onClick={() => setShowCreate(true)}>
+              <GhostButton icon={Plus} onClick={() => setShowCreate(true)}>
                 Crear ciclo
-              </PrimaryButton>
+              </GhostButton>
             )}
           </div>
         </div>
@@ -322,9 +322,9 @@ export default function CiclosMetasPage() {
               período, con sus ventanas y su estado.
             </p>
             <div className="flex justify-center">
-              <PrimaryButton icon={Plus} onClick={() => setShowCreate(true)}>
+              <GhostButton icon={Plus} onClick={() => setShowCreate(true)}>
                 Crear primer ciclo
-              </PrimaryButton>
+              </GhostButton>
             </div>
           </div>
         ) : (
