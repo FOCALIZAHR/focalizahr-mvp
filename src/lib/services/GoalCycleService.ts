@@ -76,6 +76,32 @@ export class GoalCycleService {
     return { quarter: 0, semester: 0 }
   }
 
+  // validateWindowOrder: AUTORIDAD server de las ventanas. Valida cota de año
+  // (assignment dentro del año, closure ≤ fin del año siguiente) + orden
+  // (closure > assignment, tracking inclusive entre ambas). Compartido por
+  // createCycle Y updateCycleWindows → misma regla en las dos rutas de escritura.
+  // El guard client (CreateCycleModal/CycleWindowsFields, D.3) queda como feedback
+  // inmediato, ya no como única barrera.
+  private static validateWindowOrder(
+    year: number,
+    assignment: Date,
+    tracking: Date,
+    closure: Date
+  ): void {
+    const yearStart = new Date(`${year}-01-01T00:00:00Z`)
+    const yearEnd = new Date(`${year}-12-31T23:59:59Z`)
+    const nextYearEnd = new Date(`${year + 1}-12-31T23:59:59Z`)
+
+    if (assignment < yearStart || assignment > yearEnd)
+      throw new GoalCycleValidationError(`assignmentWindow debe caer dentro del año ${year}`)
+    if (closure > nextYearEnd)
+      throw new GoalCycleValidationError(`closureWindow no puede exceder el 31 de diciembre de ${year + 1}`)
+    if (closure <= assignment)
+      throw new GoalCycleValidationError('closureWindow debe ser posterior a assignmentWindow')
+    if (tracking < assignment || tracking > closure)
+      throw new GoalCycleValidationError('trackingWindow debe quedar entre assignmentWindow y closureWindow')
+  }
+
   // createCycle: status PLANNING, SIN restricción de singleton (el candado es activate()).
   static async createCycle(input: CreateCycleInput): Promise<GoalCycle> {
     const { quarter, semester } = this.normalizePeriodFields(
@@ -83,9 +109,12 @@ export class GoalCycleService {
       input.quarter,
       input.semester
     )
-    if (input.closureWindow <= input.assignmentWindow) {
-      throw new GoalCycleValidationError('closureWindow debe ser posterior a assignmentWindow')
-    }
+    this.validateWindowOrder(
+      input.year,
+      input.assignmentWindow,
+      input.trackingWindow,
+      input.closureWindow
+    )
     // Colisión de período (dos del mismo año/tipo) → P2002 unique_goal_cycle_period (se propaga).
     return prisma.goalCycle.create({
       data: {
@@ -238,16 +267,44 @@ export class GoalCycleService {
     })
   }
 
-  // updateClosureWindow: mueve la ventana de cierre con auditoría.
-  static async updateClosureWindow(
+  // updateCycleWindows: edita 1, 2 o las 3 ventanas del ciclo con auditoría.
+  // (Ampliación Decisión #7, Gate D.8 — reemplaza el viejo updateClosureWindow.)
+  // - Guard CLOSED: un ciclo CLOSED no admite cambios (mismo criterio que
+  //   lockAfterClosure; CLOSING sí se permite — el estratega aún ajusta).
+  // - Merge: cada ventana final = provista ?? actual; se re-valida el trío con
+  //   validateWindowOrder usando el year FIJO del ciclo (year no es editable).
+  // - Auditoría: closureWindowUpdatedAt/By se sella ante cualquier cambio de las
+  //   3 (reusa esos 2 campos, no se agregan nuevos).
+  static async updateCycleWindows(
     cycleId: string,
-    newClosureWindow: Date,
+    windows: { assignmentWindow?: Date; trackingWindow?: Date; closureWindow?: Date },
     updatedBy: string
   ): Promise<GoalCycle> {
+    const current = await prisma.goalCycle.findUnique({
+      where: { id: cycleId },
+      select: {
+        status: true,
+        year: true,
+        assignmentWindow: true,
+        trackingWindow: true,
+        closureWindow: true,
+      },
+    })
+    if (!current) throw new GoalCycleValidationError(`GoalCycle no encontrado: ${cycleId}`)
+    if (current.status === 'CLOSED') throw new GoalCycleClosedError(cycleId)
+
+    const assignment = windows.assignmentWindow ?? current.assignmentWindow
+    const tracking = windows.trackingWindow ?? current.trackingWindow
+    const closure = windows.closureWindow ?? current.closureWindow
+
+    this.validateWindowOrder(current.year, assignment, tracking, closure)
+
     return prisma.goalCycle.update({
       where: { id: cycleId },
       data: {
-        closureWindow: newClosureWindow,
+        ...(windows.assignmentWindow ? { assignmentWindow: windows.assignmentWindow } : {}),
+        ...(windows.trackingWindow ? { trackingWindow: windows.trackingWindow } : {}),
+        ...(windows.closureWindow ? { closureWindow: windows.closureWindow } : {}),
         closureWindowUpdatedAt: new Date(),
         closureWindowUpdatedBy: updatedBy,
       },

@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   CalendarRange,
   Lock,
+  Pencil,
   Plus,
   RefreshCw,
 } from 'lucide-react'
@@ -31,6 +32,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { canManageGoalCycles } from '@/lib/constants/goalCycleRoles'
 import { SecondaryButton, GhostButton, PrimaryButton } from '@/components/ui/PremiumButton'
 import CreateCycleModal from '@/components/goals/cycles/CreateCycleModal'
+import EditCycleWindowsModal from '@/components/goals/cycles/EditCycleWindowsModal'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -103,8 +105,16 @@ const fetcher = async (url: string) => {
 // COMPONENTE: fila/card de ciclo (flex-col en 320px, fila en md:)
 // ════════════════════════════════════════════════════════════════════════════
 
-function CycleRow({ cycle }: { cycle: GoalCycleRow }) {
+function CycleRow({
+  cycle,
+  onEdit,
+}: {
+  cycle: GoalCycleRow
+  onEdit: (cycle: GoalCycleRow) => void
+}) {
   const meta = STATUS_META[cycle.status]
+  // Un ciclo CLOSED no admite cambios de fechas (guard server: GoalCycleClosedError).
+  const canEditWindows = cycle.status !== 'CLOSED'
 
   return (
     <div className="px-4 py-5 md:px-6 flex flex-col md:flex-row md:items-center gap-4">
@@ -139,6 +149,15 @@ function CycleRow({ cycle }: { cycle: GoalCycleRow }) {
           <p className="text-slate-300 tabular-nums">{formatWindow(cycle.closureWindow)}</p>
         </div>
       </div>
+
+      {/* Acción: editar fechas (Gate D.8) — ausente en ciclos cerrados */}
+      {canEditWindows && (
+        <div className="shrink-0 md:pl-2">
+          <GhostButton size="sm" icon={Pencil} onClick={() => onEdit(cycle)} fullWidth>
+            Editar fechas
+          </GhostButton>
+        </div>
+      )}
     </div>
   )
 }
@@ -155,6 +174,9 @@ export default function CiclosMetasPage() {
 
   // Modal de creación (Gate D.3) — solo se abre desde la ruta canManage===true
   const [showCreate, setShowCreate] = useState(false)
+
+  // Modal de edición de ventanas (Gate D.8) — el ciclo en edición, o null
+  const [editing, setEditing] = useState<GoalCycleRow | null>(null)
 
   useEffect(() => {
     // Sub-usuarios (tabla users) traen userRole en el token; cuentas legacy
@@ -278,7 +300,7 @@ export default function CiclosMetasPage() {
             />
             <div className="divide-y divide-slate-800/40">
               {cycles.map(cycle => (
-                <CycleRow key={cycle.id} cycle={cycle} />
+                <CycleRow key={cycle.id} cycle={cycle} onEdit={setEditing} />
               ))}
             </div>
           </div>
@@ -290,6 +312,13 @@ export default function CiclosMetasPage() {
         open={showCreate}
         onClose={() => setShowCreate(false)}
         onCreated={() => mutate()}
+      />
+
+      {/* Modal de edición de ventanas (Gate D.8) */}
+      <EditCycleWindowsModal
+        cycle={editing}
+        onClose={() => setEditing(null)}
+        onUpdated={() => mutate()}
       />
     </div>
   )

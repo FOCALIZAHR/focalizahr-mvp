@@ -16,12 +16,14 @@
 
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calendar, Clock, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GhostButton, PrimaryButton } from '@/components/ui/PremiumButton'
 import { useToast } from '@/components/ui/toast-system'
+import CycleWindowsFields from './CycleWindowsFields'
+import { validateCycleWindows, type CycleWindowValues } from './cycleWindows'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -126,41 +128,19 @@ export default function CreateCycleModal({
     if (next !== 'SEMESTER') setSemester(0)
   }
 
-  // ── Validación client-side (espeja normalizePeriodFields + createCycle) ──
-  const daysBetween = useMemo(() => {
-    if (!assignmentWindow || !closureWindow) return null
-    const start = new Date(assignmentWindow)
-    const end = new Date(closureWindow)
-    return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-  }, [assignmentWindow, closureWindow])
+  function handleWindowChange(field: keyof CycleWindowValues, value: string) {
+    if (field === 'assignmentWindow') setAssignmentWindow(value)
+    else if (field === 'trackingWindow') setTrackingWindow(value)
+    else setClosureWindow(value)
+  }
 
-  const closureAfterAssignment = daysBetween !== null && daysBetween > 0
-
-  // Guard SOLO de UX: el servidor NO valida el orden de trackingWindow hoy
-  // (Gate B: createCycle solo chequea closureWindow > assignmentWindow). Esto
-  // solo evita una fecha de seguimiento fuera del período. Bordes inclusivos.
-  const trackingInRange = useMemo(() => {
-    if (!assignmentWindow || !trackingWindow || !closureWindow) return false
-    const a = new Date(assignmentWindow).getTime()
-    const t = new Date(trackingWindow).getTime()
-    const c = new Date(closureWindow).getTime()
-    return a <= t && t <= c
-  }, [assignmentWindow, trackingWindow, closureWindow])
-
-  // Cotas de fecha respecto al año del ciclo (Doble cota, confirmada con Victor):
-  // el ciclo ARRANCA dentro de su año; el cierre puede extenderse hasta el fin
-  // del año siguiente (preserva el caso Gate A.5: ciclo 2026, cierre dic-2027).
-  // Bloquea el sinsentido "2027 con fechas en 2029". Comparación lexicográfica
-  // segura sobre strings ISO (yyyy-mm-dd) — evita saltos de timezone.
-  const assignMin = `${year}-01-01`
-  const assignMax = `${year}-12-31`
-  const closureMax = `${year + 1}-12-31`
-
-  const assignmentInYear =
-    !!assignmentWindow &&
-    assignmentWindow >= assignMin &&
-    assignmentWindow <= assignMax
-  const closureWithinBound = !!closureWindow && closureWindow <= closureMax
+  // ── Validación client-side de ventanas (fuente única: cycleWindows.ts) ──
+  // Feedback inmediato; el server (validateWindowOrder) es la barrera real.
+  const windowsV = validateCycleWindows(year, {
+    assignmentWindow,
+    trackingWindow,
+    closureWindow,
+  })
 
   const nameValid = name.trim().length > 0
   const periodValid =
@@ -169,16 +149,8 @@ export default function CreateCycleModal({
       : periodType === 'SEMESTER'
       ? semester >= 1 && semester <= 2
       : true
-  const datesPresent = !!assignmentWindow && !!trackingWindow && !!closureWindow
 
-  const isValid =
-    nameValid &&
-    periodValid &&
-    datesPresent &&
-    assignmentInYear &&
-    closureWithinBound &&
-    closureAfterAssignment &&
-    trackingInRange
+  const isValid = nameValid && periodValid && windowsV.isValid
 
   async function handleSubmit() {
     if (!isValid || submitting) return
@@ -396,100 +368,16 @@ export default function CreateCycleModal({
                   )}
                 </div>
 
-                {/* Ventanas del ciclo */}
+                {/* Ventanas del ciclo (componente compartido con edición D.8) */}
                 <div className="space-y-4 pt-4 border-t border-slate-700/50">
                   <h3 className="text-sm font-medium text-slate-300">
                     Ventanas del ciclo
                   </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm text-slate-400 flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-slate-500" />
-                        Asignación
-                      </label>
-                      <input
-                        type="date"
-                        value={assignmentWindow}
-                        min={assignMin}
-                        max={assignMax}
-                        onChange={(e) => setAssignmentWindow(e.target.value)}
-                        className="fhr-input w-full"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm text-slate-400 flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-slate-500" />
-                        Seguimiento
-                      </label>
-                      <input
-                        type="date"
-                        value={trackingWindow}
-                        min={assignmentWindow || undefined}
-                        max={closureWindow || undefined}
-                        onChange={(e) => setTrackingWindow(e.target.value)}
-                        className="fhr-input w-full"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm text-slate-400 flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-slate-500" />
-                        Cierre
-                      </label>
-                      <input
-                        type="date"
-                        value={closureWindow}
-                        min={assignmentWindow || assignMin}
-                        max={closureMax}
-                        onChange={(e) => setClosureWindow(e.target.value)}
-                        className="fhr-input w-full"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Indicador de rango asignación → cierre */}
-                  {daysBetween !== null && (
-                    <div
-                      className={cn(
-                        'flex items-center gap-2 p-3 rounded-lg text-sm',
-                        closureAfterAssignment
-                          ? 'bg-cyan-500/10 text-cyan-400'
-                          : 'bg-red-500/10 text-red-400'
-                      )}
-                    >
-                      <Clock className="w-4 h-4" />
-                      {closureAfterAssignment
-                        ? `${daysBetween} días de asignación a cierre`
-                        : 'El cierre debe ser posterior a la asignación'}
-                    </div>
-                  )}
-
-                  {/* Cota: la asignación arranca dentro del año del ciclo */}
-                  {assignmentWindow && !assignmentInYear && (
-                    <div className="flex items-center gap-2 p-3 rounded-lg text-sm bg-amber-500/10 text-amber-400">
-                      <Clock className="w-4 h-4" />
-                      La asignación debe caer dentro de {year} (entre el 1 de enero
-                      y el 31 de diciembre).
-                    </div>
-                  )}
-
-                  {/* Cota: el cierre no pasa del fin del año siguiente (caso A.5) */}
-                  {closureWindow && !closureWithinBound && (
-                    <div className="flex items-center gap-2 p-3 rounded-lg text-sm bg-amber-500/10 text-amber-400">
-                      <Clock className="w-4 h-4" />
-                      El cierre no puede pasar del 31 de diciembre de {year + 1}.
-                    </div>
-                  )}
-
-                  {/* Guard UX del seguimiento (fuera del período) */}
-                  {datesPresent && closureAfterAssignment && !trackingInRange && (
-                    <div className="flex items-center gap-2 p-3 rounded-lg text-sm bg-amber-500/10 text-amber-400">
-                      <Clock className="w-4 h-4" />
-                      El seguimiento debe quedar entre la asignación y el cierre.
-                    </div>
-                  )}
+                  <CycleWindowsFields
+                    year={year}
+                    values={{ assignmentWindow, trackingWindow, closureWindow }}
+                    onChange={handleWindowChange}
+                  />
                 </div>
               </div>
 

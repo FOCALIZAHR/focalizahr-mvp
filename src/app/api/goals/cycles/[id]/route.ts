@@ -2,7 +2,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // GOAL CYCLE — detalle. Gate C.
 //   GET   : detalle de un ciclo (scoped por accountId)
-//   PATCH : actualizar closureWindow (GoalCycleService.updateClosureWindow)
+//   PATCH : editar 1-3 ventanas del ciclo (GoalCycleService.updateCycleWindows)
 // RBAC: goals:cycles:manage. Guard multi-tenant: el ciclo debe ser de la cuenta.
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -13,7 +13,17 @@ import { extractUserContext, hasPermission } from '@/lib/services/AuthorizationS
 import { GoalCycleService } from '@/lib/services/GoalCycleService'
 import { goalCycleErrorResponse } from '@/lib/api/goalCycleErrorResponse'
 
-const patchSchema = z.object({ closureWindow: z.string().datetime() })
+// Gate D.8: las 3 ventanas son editables (antes solo closureWindow). Todas
+// opcionales; se exige al menos una. Retro-compatible con { closureWindow }.
+const patchSchema = z
+  .object({
+    assignmentWindow: z.string().datetime().optional(),
+    trackingWindow: z.string().datetime().optional(),
+    closureWindow: z.string().datetime().optional(),
+  })
+  .refine((w) => w.assignmentWindow || w.trackingWindow || w.closureWindow, {
+    message: 'Se requiere al menos una ventana',
+  })
 
 // Guard de ownership: el ciclo debe pertenecer a la cuenta. Evita que un id de
 // otra cuenta sea operado (los métodos del servicio NO filtran por accountId).
@@ -57,9 +67,14 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   try {
     const body = patchSchema.parse(await request.json())
-    const cycle = await GoalCycleService.updateClosureWindow(
+    const windows = {
+      ...(body.assignmentWindow ? { assignmentWindow: new Date(body.assignmentWindow) } : {}),
+      ...(body.trackingWindow ? { trackingWindow: new Date(body.trackingWindow) } : {}),
+      ...(body.closureWindow ? { closureWindow: new Date(body.closureWindow) } : {}),
+    }
+    const cycle = await GoalCycleService.updateCycleWindows(
       params.id,
-      new Date(body.closureWindow),
+      windows,
       ctx.userId ?? 'unknown'
     )
     return NextResponse.json({ success: true, data: cycle })
