@@ -24,11 +24,13 @@ import {
   AlertTriangle,
   CalendarRange,
   Lock,
+  Plus,
   RefreshCw,
 } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth'
 import { canManageGoalCycles } from '@/lib/constants/goalCycleRoles'
-import { SecondaryButton, GhostButton } from '@/components/ui/PremiumButton'
+import { SecondaryButton, GhostButton, PrimaryButton } from '@/components/ui/PremiumButton'
+import CreateCycleModal from '@/components/goals/cycles/CreateCycleModal'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -151,6 +153,9 @@ export default function CiclosMetasPage() {
   // Guard de rol: null = verificando (evita flash), luego boolean
   const [canManage, setCanManage] = useState<boolean | null>(null)
 
+  // Modal de creación (Gate D.3) — solo se abre desde la ruta canManage===true
+  const [showCreate, setShowCreate] = useState(false)
+
   useEffect(() => {
     // Sub-usuarios (tabla users) traen userRole en el token; cuentas legacy
     // traen role. Mismo fallback que /dashboard/metas/page.tsx:19.
@@ -177,8 +182,8 @@ export default function CiclosMetasPage() {
               La administración de ciclos de metas está reservada a los roles que
               gestionan el período. Tus metas y su ciclo vigente viven en Metas.
             </p>
-            <SecondaryButton icon={ArrowLeft} onClick={() => router.push('/dashboard/metas')}>
-              Ir a Metas
+            <SecondaryButton icon={ArrowLeft} onClick={() => router.push('/dashboard')}>
+              Volver al Dashboard
             </SecondaryButton>
           </div>
         </div>
@@ -193,26 +198,35 @@ export default function CiclosMetasPage() {
         {/* ── Header ── */}
         <div className="mb-8">
           <button
-            onClick={() => router.push('/dashboard/metas')}
+            onClick={() => router.push('/dashboard')}
             className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm">Volver a Metas</span>
+            <span className="text-sm">Volver al Dashboard</span>
           </button>
 
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/20">
-              <CalendarRange className="w-6 h-6 text-cyan-400" />
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/20">
+                <CalendarRange className="w-6 h-6 text-cyan-400" />
+              </div>
+              <div>
+                <h1 className="fhr-hero-title text-2xl md:text-3xl">
+                  Ciclos de{' '}
+                  <span className="fhr-title-gradient">Metas</span>
+                </h1>
+                <p className="text-slate-400 text-sm">
+                  Los períodos que ordenan las metas de la organización
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="fhr-hero-title text-2xl md:text-3xl">
-                Ciclos de{' '}
-                <span className="fhr-title-gradient">Metas</span>
-              </h1>
-              <p className="text-slate-400 text-sm">
-                Los períodos que ordenan las metas de la organización
-              </p>
-            </div>
+
+            {/* CTA crear — solo con permiso confirmado (evita flash en null) */}
+            {canManage === true && (
+              <PrimaryButton icon={Plus} onClick={() => setShowCreate(true)}>
+                Crear ciclo
+              </PrimaryButton>
+            )}
           </div>
         </div>
 
@@ -242,10 +256,15 @@ export default function CiclosMetasPage() {
             <h3 className="fhr-title-card text-slate-300 mb-2">
               Aún no hay ciclos de metas
             </h3>
-            <p className="fhr-text-sm text-slate-500 max-w-sm mx-auto">
-              Cuando la cuenta tenga su primer ciclo, acá vas a ver su período,
-              sus ventanas y su estado.
+            <p className="fhr-text-sm text-slate-500 max-w-sm mx-auto mb-6">
+              Creá el primer ciclo para ordenar las metas de la organización por
+              período, con sus ventanas y su estado.
             </p>
+            <div className="flex justify-center">
+              <PrimaryButton icon={Plus} onClick={() => setShowCreate(true)}>
+                Crear primer ciclo
+              </PrimaryButton>
+            </div>
           </div>
         ) : (
           <div className="fhr-card relative overflow-hidden p-0">
@@ -265,6 +284,13 @@ export default function CiclosMetasPage() {
           </div>
         )}
       </div>
+
+      {/* Modal de creación (Gate D.3) */}
+      <CreateCycleModal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        onCreated={() => mutate()}
+      />
     </div>
   )
 }
