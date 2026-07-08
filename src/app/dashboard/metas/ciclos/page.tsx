@@ -182,8 +182,8 @@ export default function CiclosMetasPage() {
               La administración de ciclos de metas está reservada a los roles que
               gestionan el período. Tus metas y su ciclo vigente viven en Metas.
             </p>
-            <SecondaryButton icon={ArrowLeft} onClick={() => router.push('/dashboard')}>
-              Volver al Dashboard
+            <SecondaryButton icon={ArrowLeft} onClick={() => router.push('/dashboard/metas')}>
+              Ir a Metas
             </SecondaryButton>
           </div>
         </div>
