@@ -7,11 +7,16 @@
 
 import { useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import DepartmentRailCard from './DepartmentRailCard';
 import { zoneColor } from '@/components/clima/climaZonePalette';
-import type { ClimaDepartmentInsight, ClimaRailFilter, RiskZone } from '@/types/clima';
+import type {
+  ClimaDepartmentInsight,
+  ClimaRailFilter,
+  RiskZone,
+  ClimaCampaignSummary,
+} from '@/types/clima';
 
 interface ClimaRailProps {
   departments: ClimaDepartmentInsight[];
@@ -21,6 +26,10 @@ interface ClimaRailProps {
   onToggle: () => void;
   onSelect: (id: string) => void;
   onFilterChange: (f: ClimaRailFilter) => void;
+  // Selector de campaña (movido acá desde el header para no cortar el título).
+  campaigns: ClimaCampaignSummary[];
+  selectedCampaignId: string | null;
+  onSelectCampaign: (id: string) => void;
 }
 
 const FILTER_ORDER: ClimaRailFilter[] = ['todos', 'roja', 'naranja', 'amarilla', 'verde'];
@@ -40,6 +49,9 @@ export default function ClimaRail({
   onToggle,
   onSelect,
   onFilterChange,
+  campaigns,
+  selectedCampaignId,
+  onSelectCampaign,
 }: ClimaRailProps) {
   const selectedDept = departments.find((d) => d.departmentId === selectedId);
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -103,15 +115,36 @@ export default function ClimaRail({
           </div>
         )}
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
-          className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all shadow-[0_2px_10px_rgba(34,211,238,0.3)]"
-        >
-          {isExpanded ? 'Ocultar' : 'Ver deptos'}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Selector de campaña (movido del header) */}
+          {campaigns.length > 0 && (
+            <div className="relative flex items-center" onClick={(e) => e.stopPropagation()}>
+              <select
+                value={selectedCampaignId ?? ''}
+                onChange={(e) => onSelectCampaign(e.target.value)}
+                className="appearance-none bg-slate-900/60 border border-slate-700/50 rounded-lg pl-3 pr-8 py-1.5 text-xs text-slate-200 font-medium hover:border-slate-500 focus:outline-none focus:border-cyan-500/50 transition-colors max-w-[150px] md:max-w-[240px] truncate cursor-pointer"
+              >
+                {campaigns.map((c) => (
+                  <option key={c.id} value={c.id} className="bg-slate-900 text-slate-200">
+                    {c.name}
+                    {c.hasCompletedAnalysis ? '' : ' (sin análisis)'}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2.5 pointer-events-none" />
+            </div>
+          )}
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all shadow-[0_2px_10px_rgba(34,211,238,0.3)]"
+          >
+            {isExpanded ? 'Ocultar' : 'Ver deptos'}
+          </button>
+        </div>
       </div>
 
       {/* Contenido expandible */}

@@ -44,6 +44,14 @@ const ZONE_FEM_PLURAL: Record<RiskZone, string> = {
 };
 const ZONE_ORDER: RiskZone[] = ['roja', 'naranja', 'amarilla', 'verde'];
 
+// Tooltip por zona (hover sobre el punto de la leyenda).
+const ZONE_TOOLTIP: Record<RiskZone, string> = {
+  roja: 'Zona crítica — engagement bajo 60% de favorabilidad',
+  naranja: 'Zona en riesgo — engagement 60-64%',
+  amarilla: 'Zona en observación — engagement 65-74%',
+  verde: 'Zona saludable — engagement 75% o más',
+};
+
 const CHAPTERS: { id: ClimaChapter; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'heatmap', label: 'Mapa de calor', icon: LayoutGrid },
   { id: 'impact', label: 'Impacto × Brecha', icon: Target },
@@ -63,7 +71,11 @@ function ZoneLegend({ stats, vertical }: { stats: ClimaCinemaStats; vertical?: b
       {ZONE_ORDER.filter((z) => stats.zoneCounts[z] > 0).map((z) => {
         const count = stats.zoneCounts[z];
         return (
-          <span key={z} className="flex items-center gap-1.5 text-[11px] text-slate-400 font-light">
+          <span
+            key={z}
+            title={ZONE_TOOLTIP[z]}
+            className="flex items-center gap-1.5 text-[11px] text-slate-400 font-light cursor-help"
+          >
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: zoneColor(z) }} />
             {count} {count === 1 ? ZONE_FEM[z] : ZONE_FEM_PLURAL[z]}
           </span>

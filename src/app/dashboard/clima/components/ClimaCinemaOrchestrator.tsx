@@ -64,21 +64,18 @@ export default function ClimaCinemaOrchestrator({
     hook.results?.departments.find((d) => d.departmentId === hook.selectedDepartmentId) ?? null;
   const isSpotlight = !!selectedDepartment;
   const isChapter = !isSpotlight && hook.activeChapter !== null;
+  const selectedCampaign = hook.campaigns.find((c) => c.id === hook.selectedCampaignId) ?? null;
 
   return (
     <div className="h-screen w-full bg-[#0F172A] text-white flex flex-col font-sans overflow-hidden">
-      {hasCampaigns && (
-        <ClimaHeader
-          campaigns={hook.campaigns}
-          selectedCampaignId={hook.selectedCampaignId}
-          onSelectCampaign={hook.selectCampaign}
-        />
-      )}
+      {hasCampaigns && <ClimaHeader productType={selectedCampaign?.productType ?? null} />}
 
-      {/* Stage */}
+      {/* Stage — spotlight/capítulo crecen al contenido (items-start) para no
+          cortar secciones largas; el Lobby se centra. */}
       <div
         className={cn(
-          'flex-1 relative flex items-center justify-center p-4 md:p-8 overflow-y-auto',
+          'flex-1 relative flex justify-center p-4 md:p-8 overflow-y-auto',
+          isSpotlight || isChapter ? 'items-start' : 'items-center',
           'transition-all duration-500 ease-in-out',
           isReady ? (hook.isRailExpanded ? 'mb-[320px]' : 'mb-[50px]') : 'mb-0'
         )}
@@ -105,7 +102,7 @@ export default function ClimaCinemaOrchestrator({
               key="empty-analysis"
               type="pending"
               title="Análisis en preparación"
-              description="Esta campaña todavía no tiene resultados de clima procesados. Elige otra campaña en el selector superior."
+              description="Esta campaña todavía no tiene resultados de clima procesados. Elige otra campaña en el selector del Rail (abajo)."
             />
           )}
 
@@ -167,6 +164,9 @@ export default function ClimaCinemaOrchestrator({
           onToggle={hook.toggleRail}
           onSelect={hook.selectDepartment}
           onFilterChange={hook.setRailFilter}
+          campaigns={hook.campaigns}
+          selectedCampaignId={hook.selectedCampaignId}
+          onSelectCampaign={hook.selectCampaign}
         />
       )}
     </div>

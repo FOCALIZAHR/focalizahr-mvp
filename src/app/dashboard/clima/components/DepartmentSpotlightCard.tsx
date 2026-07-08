@@ -95,8 +95,9 @@ export default function DepartmentSpotlightCard({
           </p>
         </div>
 
-        {/* COLUMNA DERECHA: detalle */}
-        <div className="flex-1 flex flex-col min-h-[500px] p-6 md:p-8 pt-16 md:pt-16 gap-6 bg-gradient-to-br from-[#0F172A] to-[#162032] overflow-y-auto">
+        {/* COLUMNA DERECHA: detalle — crece con el contenido (el stage scrollea).
+            SIN overflow-y-auto: el scroll-box anidado cortaba el último bloque. */}
+        <div className="flex-1 flex flex-col min-h-[400px] p-6 md:p-8 pt-16 md:pt-16 gap-6 bg-gradient-to-br from-[#0F172A] to-[#162032]">
           {/* Título */}
           <div>
             <span className="text-[10px] uppercase tracking-widest text-slate-500">
