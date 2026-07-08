@@ -585,7 +585,7 @@ SELLO: commit APIs
 SUB-PASOS (acordados, verificables uno a uno como Gate B):
   D.1 GET liviano "ciclo activo" (sin RBAC estratega)   ← SELLADO ✅ (c388f56)
   D.2 Página /dashboard/metas/ciclos (lista, read-only) ← SELLADO ✅ (c54d083)
-  D.3 Crear ciclo (fricción mínima)
+  D.3 Crear ciclo (fricción mínima)                     ← SELLADO ✅ (f446bdc)
   D.4 Activar (confirmación intencional + anti-doble-submit)
   D.5 Modal de cierre (Decisión #8)  ← BACKEND SELLADO ✅ · UI pendiente
   D.6 Wizard crear-meta: quitar selector de año, mostrar ciclo heredado
@@ -639,6 +639,67 @@ semáforo por fila. Skeleton + empty state + error con retry. Mobile-first.
 VERIFICACIÓN (script untracked, borrado al sello): GET con cuenta real
 cmfgedx7b… + HR_MANAGER → 200, "Ciclo Vigente 2026" ANNUAL ACTIVE + 3
 ventanas. tsc + next build limpios. Visual browser (320px/roles): Victor.
+```
+
+### GATE D.3 — crear ciclo (fricción mínima) — ✅ SELLADO
+
+```yaml
+COMMIT: f446bdc (código) + commit de este sello (spec + memoria)
+
+CreateCycleModal (src/components/goals/cycles/CreateCycleModal.tsx): modal
+overlay .fhr-* (fhr-card-static sin hover-lift + Línea Tesla inline calcada de
+la card de lista D.2 — consistencia, Mandamiento 7). AnimatePresence: cuando
+open=false NO renderiza nada (sin backdrop/overlay residual → no tapa nada).
+Fricción MÍNIMA: crear es reversible, el server pone status=PLANNING; la
+confirmación pesada se reserva para Activar (D.4).
+
+CAMPOS (patrones calcados de StepSetDates.tsx): name (auto-sugerido Q/S/Año
+{año} mientras no se edite manualmente, editable), periodType (button-group
+ANNUAL/SEMESTER/QUARTERLY — limpia el condicional que no aplica), year (select
+[año-1, año, año+1]), quarter/semester (condicional según tipo), 3 date pickers
+(assignment/tracking/closure). EXCLUIDOS a propósito (fricción mínima + spec):
+requiresClosure/lockAfterClosure (default server true) y linkedPerformanceCycleId
+(sin UI en ningún gate). El form NO envía accountId/createdBy (van del contexto).
+
+VALIDACIÓN client-side (espeja el server para feedback inline; la API sigue
+siendo la autoridad): name no vacío · quarter 1-4 / semester 1-2 según tipo ·
+closureWindow > assignmentWindow (regla real de createCycle, Gate B) ·
+assignmentWindow ≤ trackingWindow ≤ closureWindow (SOLO UX — el server NO valida
+el orden de tracking) · DOBLE COTA respecto al año (confirmada Victor):
+assignment ∈ [{year}-01-01, {year}-12-31] y closure ≤ {year+1}-12-31 — permite
+el caso A.5 legítimo (ciclo 2026, cierre real dic-2027) y bloquea el sinsentido
+"2027 con fechas en 2029". Comparación lexicográfica sobre strings ISO (sin
+saltos de timezone) + min/max nativos en los pickers (defensa en profundidad).
+Confirmado contra dato real: "Ciclo Vigente 2026" (assign 2026-01-16, tracking
+2026-12-28, cierre 2027-12-10) PASA las 4 validaciones.
+
+SUBMIT: POST /api/goals/cycles (Bearer token, mismo fetcher-pattern de la
+página). 201 → toast éxito + onCreated()=mutate() (lista se actualiza sin
+recargar) + cierra + reset. 409 GOAL_CYCLE_PERIOD_EXISTS → toast "período
+duplicado" (modal queda abierto). Otros no-2xx → body.error o genérico. Toast
+vía useToast() de toast-system (NUNCA shadcn). PrimaryButton isLoading +
+disabled=!isValid (anti doble-submit liviano; el pesado es D.4).
+
+PÁGINA (page.tsx): CTA "Crear ciclo" (PrimaryButton icon Plus) en header
+(gateado a canManage===true, evita flash en null) + "Crear primer ciclo" en el
+empty state. Modal montado en la rama autorizada; onCreated=()=>mutate().
+
+RBAC sin cambios: el CTA respeta canManageGoalCycles (misma constante que
+página/menú); la API impone goals:cycles:manage (403 si se saltea el guard).
+
+NOTA DE UX (Gate D.3, resuelta parcialmente): ciclos rompía la simetría
+entrada/salida de la familia Metas (se entraba desde el nav global — ítem
+"Ciclos de Metas" agregado en D.2 —, salía hacia el hub de Metas). Corregido:
+back-link (header + card sin-acceso) ahora apunta a /dashboard, donde realmente
+se originó la navegación. Queda como mejora futura más amplia: ninguna página de
+/dashboard/metas/* monta DashboardNavigation (solo back-link puntual; el nav se
+renderiza por-página, no en el layout compartido src/app/dashboard/layout.tsx,
+que solo aporta header + sidebar móvil hardcodeado) — evaluar navegación
+persistente para toda la familia Metas cuando se sume más superficie a ese hub.
+
+VERIFICACIÓN: tsc --noEmit + next build limpios (npm run build da EPERM en
+prisma generate por el dev server corriendo en Windows — lock de entorno, no de
+código). Visual browser (modal 320px, flujo de cotas, duplicado→toast): Victor.
 ```
 
 ### GATE D.5 (BACKEND) — decisiones de cierre de ciclo — ✅ SELLADO
