@@ -26,6 +26,7 @@ import {
   Lock,
   Pencil,
   Plus,
+  Power,
   RefreshCw,
 } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth'
@@ -33,6 +34,7 @@ import { canManageGoalCycles } from '@/lib/constants/goalCycleRoles'
 import { SecondaryButton, GhostButton, PrimaryButton } from '@/components/ui/PremiumButton'
 import CreateCycleModal from '@/components/goals/cycles/CreateCycleModal'
 import EditCycleWindowsModal from '@/components/goals/cycles/EditCycleWindowsModal'
+import ActivateCycleModal from '@/components/goals/cycles/ActivateCycleModal'
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -108,13 +110,17 @@ const fetcher = async (url: string) => {
 function CycleRow({
   cycle,
   onEdit,
+  onActivate,
 }: {
   cycle: GoalCycleRow
   onEdit: (cycle: GoalCycleRow) => void
+  onActivate: (cycle: GoalCycleRow) => void
 }) {
   const meta = STATUS_META[cycle.status]
   // Un ciclo CLOSED no admite cambios de fechas (guard server: GoalCycleClosedError).
   const canEditWindows = cycle.status !== 'CLOSED'
+  // Solo se activa desde PLANNING/ASSIGNING (guard server + candado singleton).
+  const canActivate = cycle.status === 'PLANNING' || cycle.status === 'ASSIGNING'
 
   return (
     <div className="px-4 py-5 md:px-6 flex flex-col md:flex-row md:items-center gap-4">
@@ -150,12 +156,24 @@ function CycleRow({
         </div>
       </div>
 
-      {/* Acción: editar fechas (Gate D.8) — ausente en ciclos cerrados */}
-      {canEditWindows && (
-        <div className="shrink-0 md:pl-2">
-          <GhostButton size="sm" icon={Pencil} onClick={() => onEdit(cycle)} fullWidth>
-            Editar fechas
-          </GhostButton>
+      {/* Acciones de fila — Activar (D.4, PLANNING/ASSIGNING) + Editar fechas (D.8) */}
+      {(canActivate || canEditWindows) && (
+        <div className="shrink-0 md:pl-2 flex flex-col sm:flex-row gap-2">
+          {canActivate && (
+            <SecondaryButton
+              size="sm"
+              icon={Power}
+              onClick={() => onActivate(cycle)}
+              fullWidth
+            >
+              Activar
+            </SecondaryButton>
+          )}
+          {canEditWindows && (
+            <GhostButton size="sm" icon={Pencil} onClick={() => onEdit(cycle)} fullWidth>
+              Editar fechas
+            </GhostButton>
+          )}
         </div>
       )}
     </div>
@@ -177,6 +195,9 @@ export default function CiclosMetasPage() {
 
   // Modal de edición de ventanas (Gate D.8) — el ciclo en edición, o null
   const [editing, setEditing] = useState<GoalCycleRow | null>(null)
+
+  // Modal de activación (Gate D.4) — el ciclo a activar, o null
+  const [activating, setActivating] = useState<GoalCycleRow | null>(null)
 
   useEffect(() => {
     // Sub-usuarios (tabla users) traen userRole en el token; cuentas legacy
@@ -300,7 +321,12 @@ export default function CiclosMetasPage() {
             />
             <div className="divide-y divide-slate-800/40">
               {cycles.map(cycle => (
-                <CycleRow key={cycle.id} cycle={cycle} onEdit={setEditing} />
+                <CycleRow
+                  key={cycle.id}
+                  cycle={cycle}
+                  onEdit={setEditing}
+                  onActivate={setActivating}
+                />
               ))}
             </div>
           </div>
@@ -319,6 +345,13 @@ export default function CiclosMetasPage() {
         cycle={editing}
         onClose={() => setEditing(null)}
         onUpdated={() => mutate()}
+      />
+
+      {/* Modal de activación (Gate D.4) */}
+      <ActivateCycleModal
+        cycle={activating}
+        onClose={() => setActivating(null)}
+        onActivated={() => mutate()}
       />
     </div>
   )
