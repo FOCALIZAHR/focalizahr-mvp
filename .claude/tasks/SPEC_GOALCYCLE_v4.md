@@ -587,7 +587,7 @@ SUB-PASOS (acordados, verificables uno a uno como Gate B):
   D.2 Página /dashboard/metas/ciclos (lista, read-only) ← SELLADO ✅ (c54d083)
   D.3 Crear ciclo (fricción mínima)                     ← SELLADO ✅ (f446bdc)
   D.4 Activar (confirmación intencional + anti-doble-submit) ← SELLADO ✅ (9dcae54)
-  D.5 Modal de cierre (Decisión #8)  ← BACKEND SELLADO ✅ · UI pendiente
+  D.5 Modal de cierre (Decisión #8)  ← COMPLETO ✅ · BACKEND a90c051 · UI SP1 a7c9c5b + SP2 75354fb + SP3 454ce29
   D.6 Wizard crear-meta: quitar selector de año, mostrar ciclo heredado
   D.7 Alerta closureWindow próxima
 ```
@@ -879,6 +879,73 @@ BACKLOG SEPARADO (NO de GoalCycle, registrado aparte): 2 hallazgos del sistema
   (b) inconsistencia de buckets de % al revertir estado entre
   GoalsService.rejectClosure y approve-closure/route.ts.
 ```
+
+### GATE D.5 (UI) — modal de cierre de 3 actos — ✅ SELLADO · Gate D.5 COMPLETO
+
+```yaml
+COMMITS: SP1 a7c9c5b + fix visual 5d4b856 + SP2 75354fb + SP3 454ce29
+  + commit de este sello (spec + memoria). SOLO UI — el backend (a90c051) no se tocó.
+
+Modal de cierre wizard de 3 actos (Briefing → Decisiones → Veredicto), patrón
+ClosingCeremonyModal (header + Paso X de 3 + progress bar + AnimatePresence),
+chrome .fhr-* de los modales hermanos. Se hizo en 3 sub-pasos verificables (criterio
+Gate B), cada uno con smoke y punto de parada.
+
+ARCHIVOS (src/components/goals/cycles/):
+  - cycleClosure.ts: helpers puros, fuente única con el server. isActionable
+    (notIn COMPLETED/CANCELLED/PENDING_CLOSURE), splitClosureGoals (accionable/
+    inReview), tipos CycleClosureDecision(Type), DEFAULT_DECISION=LEAVE_AS_IS,
+    DECISION_OPTIONS (labels de negocio, no el enum), buildDecisionsPayload(Map).
+  - useCycleClosure.ts: GET /api/goals?goalCycleId → split accionable/inReview.
+  - CloseCycleModal.tsx: orquestador (máquina de estados + los 3 actos).
+  - CloseActDecisions.tsx: Acto 2 presentacional (segmented por fila + aplicar-a-todas
+    + sección read-only "Ya en revisión").
+  - page.tsx: acción de fila "Cerrar ciclo" (ACTIVE) / "Continuar cierre" (CLOSING).
+
+SP1 (a7c9c5b) — esqueleto + Acto 1 (Briefing) + caso vacío:
+  Máquina de estados: fila ACTIVE → "Cerrar ciclo" → Acto 1 (N sin completar + "M ya
+  en revisión") → "Comenzar cierre" → POST /close (ACTIVE→CLOSING) → Acto 2; fila
+  CLOSING → "Continuar cierre" → Acto 2 directo (RESUMIBLE, re-fetch). Caso vacío / 0
+  accionables → "Cerrar en firme" → /finalize sin decisiones (finalizeCycle puro).
+  GOTCHA confirmado en código: decisions:[] === omitir el campo (finalize/route.ts:66
+  `if (decisions && decisions.length>0)`) → ambos = finalize puro.
+
+Fix visual (5d4b856) — jerarquía de botones por consecuencia (housekeeping, no del
+  ciclo de vida): cyan filled (PrimaryButton) = irreversible sobre el ciclo vigente
+  (Activar, Cerrar) · ghost = reversible (Crear header+empty, Editar). El purple sale
+  de la superficie. La regla de color del MANIFIESTO gobierna texto/dato, NO el chrome
+  de PremiumButton (variantes = jerarquía genérica).
+
+SP2 (75354fb) — Acto 2 (Decisiones): lista de accionables (title/owner/depto/progress)
+  con segmented de 3 baldes por fila (seleccionado en cyan) + "aplicar a todas"
+  (bulk-first, 182 metas en piloto) + sección read-only colapsable "Ya en revisión"
+  (inReview PENDING_CLOSURE, sin controles). Estado Map<goalId,decision> init en
+  LEAVE_AS_IS (soberanía). Balde default = LEAVE_AS_IS (confirmado Victor).
+
+SP3 (454ce29) — Acto 3 (Veredicto + finalize): resumen por balde
+  (buildDecisionsPayload) + "Cerrar ciclo en firme" (PrimaryButton, anti-doble-submit
+  submitting+isLoading, patrón Activar D.4) + "Volver" a Acto 2. Submit → POST
+  /finalize {decisions} → 200 {summary} → toast "{x} cerradas con score · {y} a
+  revisión · {z} sin cambio" + mutate + cierra. Error 400 GOAL_CYCLE_VALIDATION
+  (carrera: meta cambió de estado con el modal abierto) → mensaje ESPECÍFICO
+  "Algunas metas cambiaron de estado…" + refetch + vuelve a Acto 2. Init del Map
+  MERGE-PRESERVADOR (mejora sobre el plan): conserva las decisiones de las metas que
+  siguen accionables tras ese refetch; las nuevas caen a LEAVE_AS_IS.
+
+VERIFICACIÓN: tsc + next build limpios (236/236, ciclos 13.5 kB). Smokes (untracked,
+  borrados al sello de cada SP): SP1 (helpers puros + close→finalize puro + resumible),
+  SP2 (unit buildDecisionsPayload: init/aplicar-a-todas/override/sin-duplicados/inReview
+  fuera), SP3 (handler de ruta real POST /finalize: happy 3 baldes → summary+CLOSED ·
+  carrera → 400 sigue CLOSING · lock post-CLOSED). Todos verdes.
+
+NOTA DE BUILD (para no repetir el diagnóstico): en Windows, correr varios `next build`
+  + `rm -rf .next` en ráfaga produce flakes intermitentes de carga de chunk
+  ("Cannot read properties of undefined (reading 'call')") en páginas ajenas — NO es
+  interferencia externa ni el código; una corrida única y limpia da verde.
+
+PENDIENTE (Victor, coordinado): PRUEBA FINAL del flujo completo Acto 1→2→3→finalize
+  sobre "Ciclo Vigente 2026" (182 metas) — primera transición REAL ACTIVE→CLOSING→
+  CLOSED (irreversible). Se avisa antes.
 
 ──────────────────────────────────────────────────────────────────────────────
 ALCANCE (diseño original Gate D — referencia):
