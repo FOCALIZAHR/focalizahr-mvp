@@ -205,6 +205,11 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
   const [employeeData, setEmployeeData] = useState<EmployeeData | null>(null)
   const [isLoadingEmployee, setIsLoadingEmployee] = useState(!!initialEmployeeId)
 
+  // Ciclo heredado (Gate D.6, Decisión #4): la meta hereda el ciclo ACTIVE y
+  // periodYear se deriva de su year — el usuario no elige año.
+  const [activeCycle, setActiveCycle] = useState<{ id: string; name: string; year: number } | null>(null)
+  const [loadingCycle, setLoadingCycle] = useState(true)
+
   // Peso disponible
   const availableWeight = employeeData
     ? 100 - employeeData.assignmentStatus.totalWeight
@@ -246,6 +251,29 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
   const updateData = useCallback((updates: Partial<GoalWizardData>) => {
     setData((prev) => ({ ...prev, ...updates }))
   }, [])
+
+  // Cargar el ciclo ACTIVE heredado (Gate D.6) — mismo patrón de fetch del wizard.
+  // Al resolver: si hay ciclo, periodYear se deriva de su year; si no, queda en
+  // currentYear (default de initialData) y el step muestra "sin ciclo activo".
+  useEffect(() => {
+    const token = localStorage.getItem('focalizahr_token')
+    setLoadingCycle(true)
+    fetch('/api/goals/cycles/active', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'include',
+    })
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success && res.data) {
+          setActiveCycle(res.data)
+          updateData({ periodYear: res.data.year })
+        } else {
+          setActiveCycle(null)
+        }
+      })
+      .catch((err) => console.error('Error loading active cycle:', err))
+      .finally(() => setLoadingCycle(false))
+  }, [updateData])
 
   // Validacion por paso
   const canProceed = useMemo(() => {
@@ -442,7 +470,7 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
         case 3:
           return <StepConfigureMetric {...props} />
         case 4:
-          return <StepSetDates {...props} />
+          return <StepSetDates {...props} activeCycle={activeCycle} loadingCycle={loadingCycle} />
         case 5:
           return <StepLinkParent {...props} availableWeight={availableWeight} />
         case 6:
@@ -477,7 +505,7 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
         {stepContent}
       </div>
     )
-  }, [currentStep, data, updateData, availableWeight])
+  }, [currentStep, data, updateData, availableWeight, activeCycle, loadingCycle])
 
   const handleCancel = useCallback(() => {
     router.back()

@@ -6,7 +6,7 @@
 'use client'
 
 import { memo, useCallback, useMemo } from 'react'
-import { Calendar, Clock } from 'lucide-react'
+import { Calendar, CalendarRange, Clock, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { GoalWizardData } from './CreateGoalWizard'
 
@@ -17,6 +17,10 @@ import type { GoalWizardData } from './CreateGoalWizard'
 interface StepSetDatesProps {
   data: GoalWizardData
   updateData: (updates: Partial<GoalWizardData>) => void
+  // Ciclo heredado (Gate D.6): periodYear se deriva del year del ciclo activo,
+  // el usuario ya no elige año. Lo resuelve/setea el orquestador; acá solo se muestra.
+  activeCycle: { id: string; name: string; year: number } | null
+  loadingCycle: boolean
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -30,9 +34,6 @@ const QUARTERS = [
   { value: 4, label: 'Q4 (Oct-Dic)' },
 ]
 
-const currentYear = new Date().getFullYear()
-const YEARS = [currentYear - 1, currentYear, currentYear + 1]
-
 // ════════════════════════════════════════════════════════════════════════════
 // COMPONENTE
 // ════════════════════════════════════════════════════════════════════════════
@@ -40,6 +41,8 @@ const YEARS = [currentYear - 1, currentYear, currentYear + 1]
 export default memo(function StepSetDates({
   data,
   updateData,
+  activeCycle,
+  loadingCycle,
 }: StepSetDatesProps) {
   // Calcular dias entre fechas
   const daysBetween = useMemo(() => {
@@ -64,13 +67,6 @@ export default memo(function StepSetDates({
   const handleDueDateChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       updateData({ dueDate: e.target.value })
-    },
-    [updateData]
-  )
-
-  const handleYearChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      updateData({ periodYear: parseInt(e.target.value) })
     },
     [updateData]
   )
@@ -142,20 +138,29 @@ export default memo(function StepSetDates({
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Ano */}
+          {/* Ciclo heredado (read-only) — reemplaza el selector de año (Gate D.6) */}
           <div className="space-y-2">
-            <label className="text-sm text-slate-400">Ano</label>
-            <select
-              value={data.periodYear}
-              onChange={handleYearChange}
-              className="fhr-input w-full"
-            >
-              {YEARS.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
+            <label className="text-sm text-slate-400">Ciclo</label>
+            {loadingCycle ? (
+              <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 px-4 py-3 flex items-center gap-2 text-sm text-slate-500">
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                Cargando ciclo…
+              </div>
+            ) : activeCycle ? (
+              <>
+                <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 px-4 py-3 flex items-center gap-2 text-sm">
+                  <CalendarRange className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span className="text-slate-200 truncate">{activeCycle.name}</span>
+                </div>
+                <p className="text-[11px] font-light text-slate-500">
+                  Año de reporte {activeCycle.year}, heredado del ciclo.
+                </p>
+              </>
+            ) : (
+              <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 px-4 py-3 text-xs font-light text-slate-500">
+                Sin ciclo activo — esta meta no quedará anclada a ningún período.
+              </div>
+            )}
           </div>
 
           {/* Quarter */}

@@ -27,6 +27,10 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    data: cycle ? { id: cycle.id, name: cycle.name, status: cycle.status } : null,
+    // year lo consume el wizard de crear-meta (Gate D.6): periodYear se deriva del
+    // ciclo heredado, no lo elige el usuario (Decisión #4).
+    data: cycle
+      ? { id: cycle.id, name: cycle.name, status: cycle.status, year: cycle.year }
+      : null,
   })
 }
