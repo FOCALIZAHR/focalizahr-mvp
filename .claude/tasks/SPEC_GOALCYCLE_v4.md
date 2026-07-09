@@ -988,6 +988,41 @@ CONSUMIDOR FUTURO: Gate E (bloqueo "sin ciclo → error") usará este mismo GET
   /cycles/active para decidir si bloquear la creación.
 ```
 
+### GATE D.7b — fechas de la meta acotadas al rango del ciclo heredado — ✅ SELLADO
+
+```yaml
+COMMIT: ad127b1 (código) + commit de este sello (spec + memoria)
+ETIQUETA: D.7b (refuerzo de D.6/Decisión #4; NO es el D.7 "alerta closureWindow").
+
+REGLA (bloqueo duro, Victor): las fechas de la meta deben CABER en el rango del
+ciclo heredado (no llenarlo, solo caber; bordes INCLUSIVOS):
+  startDate ≥ assignmentWindow  ·  dueDate ≤ closureWindow
+Sin ciclo activo → sin límite (la meta se crea sin ancla, decisión D.6).
+
+FUENTE ÚNICA (puro, sin prisma, server+client): src/lib/utils/goalCycleDates.ts →
+  goalDatesWithinCycleError(cycle, startDate|null, dueDate). startDate=null NO
+  chequea el inicio (para PDI).
+
+IMPLEMENTADO:
+  - GET /cycles/active: agrega assignmentWindow + closureWindow a la respuesta
+    (junto a year de D.6). getActiveCycle ya los trae.
+  - POST /api/goals (wizard): valida startDate Y dueDate vs el ciclo activo →
+    400 con mensaje, ANTES de crear. Mismo getActiveCycle que resuelve la herencia.
+  - POST /api/goals/from-pdi (PDI): MISMO bloqueo pero SOLO dueDate. CONFIRMADO en
+    Code: createFromDevelopmentGoal fija startDate=new Date() (server, no lo elige el
+    usuario) y toma dueDate del body (el usuario SÍ la elige) heredando el ciclo. Se
+    pasa startDate=null → no se bloquea un inicio server-fijo/inarreglable; se cubre
+    el hueco de la fecha que el usuario SÍ elige. Decisión basada en el código real,
+    no en scope arbitrario.
+  - Wizard: activeCycle trae las ventanas (D.6 fetch); StepSetDates aplica min/max
+    nativos + aviso ámbar (reusa el helper); canProceed(step 4) bloquea el submit
+    hasta corregir. El servidor es la barrera real, el cliente da feedback.
+
+SMOKE (smoke-goal-dates-in-cycle.ts, untracked, borrado al sello): unit 7 casos
+  (dentro/antes-assign/después-closure/más-corta/bordes==/PDI-null-due-OK/PDI-null-
+  due>closure) · GET active incluye ventanas · POST /api/goals 400 fuera / 201 dentro ·
+  POST from-pdi 400 fuera. VERDE. tsc + next build limpios (crear 15.4 kB).
+
 ──────────────────────────────────────────────────────────────────────────────
 ALCANCE (diseño original Gate D — referencia):
 
