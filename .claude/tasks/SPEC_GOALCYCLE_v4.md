@@ -943,9 +943,10 @@ NOTA DE BUILD (para no repetir el diagnóstico): en Windows, correr varios `next
   ("Cannot read properties of undefined (reading 'call')") en páginas ajenas — NO es
   interferencia externa ni el código; una corrida única y limpia da verde.
 
-PENDIENTE (Victor, coordinado): PRUEBA FINAL del flujo completo Acto 1→2→3→finalize
-  sobre "Ciclo Vigente 2026" (182 metas) — primera transición REAL ACTIVE→CLOSING→
-  CLOSED (irreversible). Se avisa antes.
+PRUEBA REAL COMPLETADA (Victor): flujo completo Acto 1→2→3→finalize sobre "Ciclo
+  Vigente 2026" (182 metas) ejecutado y verificado por SQL. Primera transición real
+  ACTIVE→CLOSING→CLOSED OK. (El 500 diagnosticado en un turno fue sobre "Año 2027",
+  ciclo de prueba de 0 metas — finalize puro, timeout/infra transitorio, no el 2026.)
 
 ### GATE D.6 — wizard crear-meta hereda el ciclo (quita selector de año) — ✅ SELLADO
 
@@ -1064,22 +1065,34 @@ SMOKE:
 SELLO: commit UI
 ```
 
-### GATE E — Activar BLOQUEO sin ciclo (ÚLTIMO)
+### GATE E — Activar BLOQUEO sin ciclo (ÚLTIMO) — ✅ SELLADO · proyecto GoalCycle COMPLETO
 
 ```yaml
-ALCANCE:
-  - Activar "crear meta sin ciclo ACTIVE → error claro"
-  - Solo DESPUÉS de Gate D sellado + migración A.5 ejecutada
+COMMIT: 2cd20a1 (código) + commit de este sello (spec + memoria)
 
-SMOKE:
-  - Cuenta CON ciclo activo → crea meta OK
-  - Cuenta SIN ciclo activo → BLOQUEA con mensaje claro
-  - Cuentas migradas (A.5) → NO se bloquean
+PRECONDICIÓN — VERIFICADA con query read-only ANTES de bloquear:
+  Cuentas con ≥1 meta huérfana (goalCycleId null): 0.
+  Cuentas totales con metas: 1 (cmfgedx7b…, migrada A.5, ciclo ACTIVE).
+  → Ninguna cuenta con metas existentes queda atascada. NO hizo falta correr A.5
+    sobre otras cuentas (no tienen metas). Precondición limpia → se selló.
 
-SELLO: commit guard de bloqueo
+IMPLEMENTADO (Decisión #5):
+  - POST /api/goals y POST /api/goals/from-pdi: si getActiveCycle(accountId) === null
+    → 409 "No hay ciclo activo. Pide a tu administrador abrir uno." (guard temprano;
+    el getActiveCycle ya se resolvía en el bloque D.7b de cada ruta).
+  - CÓDIGO 409 (confirmado): consistente con goalCycleErrorResponse — estados de
+    conflicto (ActiveError/ClosedError/P2002) → 409; validación de valores → 400.
+    "No hay ciclo activo" = precondición de estado no cumplida → 409.
+  - Wizard (coherencia): el mensaje D.6 "sin ciclo → no quedará anclada" (ahora falso)
+    pasó a bloqueante ámbar; canProceed(step 4) bloquea el submit si
+    !loadingCycle && !activeCycle. El server 409 es la barrera real; UI de PDI sin tocar.
 
-⚠️ PRECONDICIÓN: Gate D sellado + migración A.5 ejecutada.
-   NO sellar si alguna cuenta con metas quedó sin ciclo.
+SMOKE (smoke-goal-block-no-cycle.ts, untracked, borrado al sello): con ciclo → POST
+  /api/goals 201 y from-pdi NO-409 (pasa el guard) · sin ciclo → 409 con mensaje exacto
+  en ambas rutas. VERDE. tsc + next build limpios (crear 15.5 kB).
+
+⚠️ PRECONDICIÓN (cumplida): Gate D sellado; migración A.5 no requerida sobre otras
+   cuentas (0 metas huérfanas). NINGUNA cuenta con metas quedó sin ciclo.
 ```
 
 ---
