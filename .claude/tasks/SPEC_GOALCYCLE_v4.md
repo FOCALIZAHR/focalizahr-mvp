@@ -588,7 +588,7 @@ SUB-PASOS (acordados, verificables uno a uno como Gate B):
   D.3 Crear ciclo (fricción mínima)                     ← SELLADO ✅ (f446bdc)
   D.4 Activar (confirmación intencional + anti-doble-submit) ← SELLADO ✅ (9dcae54)
   D.5 Modal de cierre (Decisión #8)  ← COMPLETO ✅ · BACKEND a90c051 · UI SP1 a7c9c5b + SP2 75354fb + SP3 454ce29
-  D.6 Wizard crear-meta: quitar selector de año, mostrar ciclo heredado
+  D.6 Wizard crear-meta: quitar selector de año, mostrar ciclo heredado ← SELLADO ✅ (ad538d4)
   D.7 Alerta closureWindow próxima
 ```
 
@@ -946,6 +946,47 @@ NOTA DE BUILD (para no repetir el diagnóstico): en Windows, correr varios `next
 PENDIENTE (Victor, coordinado): PRUEBA FINAL del flujo completo Acto 1→2→3→finalize
   sobre "Ciclo Vigente 2026" (182 metas) — primera transición REAL ACTIVE→CLOSING→
   CLOSED (irreversible). Se avisa antes.
+
+### GATE D.6 — wizard crear-meta hereda el ciclo (quita selector de año) — ✅ SELLADO
+
+```yaml
+COMMIT: ad538d4 (código) + commit de este sello (spec + memoria)
+
+Decisión de Negocio #4 en la UI: el usuario HEREDA el ciclo ACTIVE, no elige año.
+El backend ya resolvía la herencia (resolveInheritedCycleId) y el wizard NUNCA
+mandó goalCycleId → el payload no cambió. Sólo faltaba lo visual + la fuente de
+periodYear.
+
+DECISIÓN #1 (Victor) — periodYear = OPCIÓN A (derivado del ciclo): periodYear es
+  REQUERIDO en el POST (api/goals/route.ts:30). Se deriva del `year` del ciclo
+  heredado (no de currentYear) para evitar identidad dividida entre "reporte por
+  año" y "por ciclo" — mismo principio anti-doble-fuente que §3.3 aplica al cron,
+  acá para la coherencia de la meta. Esto obligó a extender el backend.
+DECISIÓN #2 (Victor) — periodQuarter SIGUE siendo MANUAL e independiente, INCLUSO
+  si el ciclo activo es QUARTERLY. Decisión CONSCIENTE (no descuido) para no
+  expandir el alcance: NO se deriva quarter del ciclo.
+
+IMPLEMENTADO:
+  - GET /api/goals/cycles/active (D.1): agrega `year` a la respuesta
+    ({id,name,status,year} o null). getActiveCycle ya lo trae; sólo se expone.
+    RBAC goals:view + multi-tenant sin cambios.
+  - CreateGoalWizard.tsx: fetch del ciclo activo al montar (patrón de fetch ya
+    usado en el wizard). Si hay ciclo → setea activeCycle + updateData({periodYear:
+    year}). Sin ciclo → activeCycle null, periodYear queda en currentYear (default).
+    Pasa activeCycle/loadingCycle a StepSetDates.
+  - StepSetDates.tsx: quita el <select> de año (+ YEARS/currentYear/handleYearChange).
+    Bloque read-only: loading "Cargando ciclo…" / "Ciclo: {name}" + caption "Año de
+    reporte {year}, heredado del ciclo" / "Sin ciclo activo — esta meta no quedará
+    anclada a ningún período" (informativo, no bloquea — Gate E aún no bloquea).
+    Trimestre (Q1-Q4) intacto.
+
+SMOKE (smoke-goal-cycle-active-year.ts, untracked, borrado al sello, cuentas
+  sintéticas): ciclo ACTIVE → data.year presente (===2026) · sin ciclo → data null ·
+  HR_OPERATOR (sin goals:view) → 403. VERDE. tsc + next build limpios (crear 15.3 kB).
+
+CONSUMIDOR FUTURO: Gate E (bloqueo "sin ciclo → error") usará este mismo GET
+  /cycles/active para decidir si bloquear la creación.
+```
 
 ──────────────────────────────────────────────────────────────────────────────
 ALCANCE (diseño original Gate D — referencia):
