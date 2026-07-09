@@ -184,8 +184,9 @@ export default memo(function StepSetDates({
                 </p>
               </>
             ) : (
-              <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 px-4 py-3 text-xs font-light text-slate-500">
-                Sin ciclo activo — esta meta no quedará anclada a ningún período.
+              // Gate E: sin ciclo activo la creación se bloquea (ya no "se crea sin ancla").
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs font-light text-amber-400">
+                No hay ciclo activo. Pedí a tu administrador abrir uno para poder crear la meta.
               </div>
             )}
           </div>

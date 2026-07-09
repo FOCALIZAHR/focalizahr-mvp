@@ -326,15 +326,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // ═══ Gate D.7b: fechas de la meta dentro del rango del ciclo heredado ═══
-    // El usuario elige startDate Y dueDate en el wizard → se chequean ambas.
-    // Sin ciclo activo → sin límite (la meta se crea sin ancla, decisión D.6).
+    // ═══ Gate E: sin ciclo ACTIVE → bloquear la creación (Decisión #5) ═══
     const activeCycle = await GoalCycleService.getActiveCycle(context.accountId)
-    if (activeCycle) {
-      const dateErr = goalDatesWithinCycleError(activeCycle, data.startDate, data.dueDate)
-      if (dateErr) {
-        return NextResponse.json({ error: dateErr, success: false }, { status: 400 })
-      }
+    if (!activeCycle) {
+      return NextResponse.json(
+        { error: 'No hay ciclo activo. Pide a tu administrador abrir uno.', success: false },
+        { status: 409 }
+      )
+    }
+
+    // ═══ Gate D.7b: fechas de la meta dentro del rango del ciclo (activeCycle != null) ═══
+    // El usuario elige startDate Y dueDate en el wizard → se chequean ambas.
+    const dateErr = goalDatesWithinCycleError(activeCycle, data.startDate, data.dueDate)
+    if (dateErr) {
+      return NextResponse.json({ error: dateErr, success: false }, { status: 400 })
     }
 
     const createdById = context.userId || context.accountId

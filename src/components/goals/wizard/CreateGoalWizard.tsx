@@ -296,6 +296,8 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
       case 3:
         return data.targetValue > data.startValue || data.metricType === 'BINARY'
       case 4:
+        // Gate E: sin ciclo activo (ya resuelto) la creación se bloquea.
+        if (!loadingCycle && !activeCycle) return false
         if (!data.startDate || !data.dueDate) return false
         if (new Date(data.dueDate) <= new Date(data.startDate)) return false
         // Gate D.7b: si hay ciclo heredado, las fechas deben caber en su rango.
@@ -313,7 +315,7 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
       default:
         return false
     }
-  }, [currentStep, data, activeCycle])
+  }, [currentStep, data, activeCycle, loadingCycle])
 
   // Navegacion con cover/form
   const goNext = useCallback(() => {

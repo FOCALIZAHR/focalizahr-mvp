@@ -37,15 +37,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // ═══ Gate D.7b: dueDate dentro del rango del ciclo heredado ═══
+    // ═══ Gate E: sin ciclo ACTIVE → bloquear la creación (Decisión #5) ═══
+    const activeCycle = await GoalCycleService.getActiveCycle(userContext.accountId)
+    if (!activeCycle) {
+      return NextResponse.json(
+        { success: false, error: 'No hay ciclo activo. Pide a tu administrador abrir uno.' },
+        { status: 409 }
+      )
+    }
+
+    // ═══ Gate D.7b: dueDate dentro del rango del ciclo (activeCycle != null) ═══
     // En PDI el usuario elige SOLO dueDate; startDate es server-fijo (new Date()
     // en createFromDevelopmentGoal) → se pasa null para NO chequear el inicio.
-    const activeCycle = await GoalCycleService.getActiveCycle(userContext.accountId)
-    if (activeCycle) {
-      const dateErr = goalDatesWithinCycleError(activeCycle, null, dueDate)
-      if (dateErr) {
-        return NextResponse.json({ success: false, error: dateErr }, { status: 400 })
-      }
+    const dateErr = goalDatesWithinCycleError(activeCycle, null, dueDate)
+    if (dateErr) {
+      return NextResponse.json({ success: false, error: dateErr }, { status: 400 })
     }
 
     const createdById = userContext.userId || userContext.accountId
