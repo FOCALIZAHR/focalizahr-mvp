@@ -67,7 +67,10 @@ export default function CloseCycleModal({ cycle, onClose, onClosed }: CloseCycle
     new Map()
   )
   useEffect(() => {
-    setDecisions(new Map(actionable.map((g) => [g.id, DEFAULT_DECISION])))
+    // Merge-preservador: conserva la decisión de las metas que siguen accionables
+    // tras un re-fetch (caso carrera de SP3); las nuevas caen a LEAVE_AS_IS. En la
+    // primera carga prev está vacío → todas default.
+    setDecisions((prev) => new Map(actionable.map((g) => [g.id, prev.get(g.id) ?? DEFAULT_DECISION])))
   }, [actionable])
 
   function setDecision(goalId: string, decision: CycleClosureDecisionType) {
@@ -166,6 +169,42 @@ export default function CloseCycleModal({ cycle, onClose, onClosed }: CloseCycle
           'El ciclo quedó en proceso de cierre; reabrí para finalizar.',
         'Error'
       )
+    } catch {
+      error('No pudimos conectar con el servidor. Intentá de nuevo.', 'Error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Acto 3 (SP3): CLOSING → CLOSED aplicando las decisiones del Acto 2.
+  async function handleFinalizeWithDecisions() {
+    if (!cycle || submitting) return
+    setSubmitting(true)
+    try {
+      const { res, body } = await apiPost('/finalize', {
+        decisions: buildDecisionsPayload(decisions),
+      })
+      if (res.ok) {
+        const s = body?.summary
+        const detail = s
+          ? ` ${s.closedWithScore} cerradas con score · ${s.markedReview} a revisión · ${s.leftAsIs} sin cambio.`
+          : ''
+        success(`El ciclo quedó cerrado.${detail}`, 'Ciclo cerrado')
+        onClosed()
+        onClose()
+        return
+      }
+      // Carrera: una meta cambió de estado con el modal abierto (todo-o-nada).
+      if (body?.code === 'GOAL_CYCLE_VALIDATION') {
+        error(
+          'Algunas metas cambiaron de estado. Actualizá la lista y volvé a decidir.',
+          'La lista cambió'
+        )
+        await refetch()
+        setAct('decisiones')
+        return
+      }
+      error(body?.error ?? 'No pudimos cerrar el ciclo.', 'Error')
     } catch {
       error('No pudimos conectar con el servidor. Intentá de nuevo.', 'Error')
     } finally {
@@ -355,7 +394,7 @@ export default function CloseCycleModal({ cycle, onClose, onClosed }: CloseCycle
                     </motion.div>
                   )}
 
-                  {/* ── ACTO 3: VEREDICTO (STUB de SP2 — se reemplaza en SP3) ── */}
+                  {/* ── ACTO 3: VEREDICTO ── */}
                   {act === 'veredicto' && (
                     <motion.div
                       key="veredicto"
@@ -389,20 +428,30 @@ export default function CloseCycleModal({ cycle, onClose, onClosed }: CloseCycle
                               </li>
                             </ul>
                             <p className="text-sm font-light text-slate-500 leading-relaxed">
-                              El cierre en firme con estas decisiones se aplica en el próximo
-                              paso.
+                              Al confirmar, el ciclo se cierra en firme y estas decisiones se
+                              aplican. No se puede deshacer.
                             </p>
                           </div>
                         )
                       })()}
 
                       <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-3 mt-8">
-                        <GhostButton onClick={() => setAct('decisiones')} fullWidth>
+                        <GhostButton
+                          onClick={() => setAct('decisiones')}
+                          disabled={submitting}
+                          fullWidth
+                        >
                           Volver
                         </GhostButton>
-                        <GhostButton onClick={handleClose} fullWidth>
-                          Cerrar más tarde
-                        </GhostButton>
+                        <PrimaryButton
+                          onClick={handleFinalizeWithDecisions}
+                          isLoading={submitting}
+                          disabled={submitting}
+                          icon={Lock}
+                          fullWidth
+                        >
+                          Cerrar ciclo en firme
+                        </PrimaryButton>
                       </div>
                     </motion.div>
                   )}
