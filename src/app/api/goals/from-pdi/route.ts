@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { GoalsService } from '@/lib/services/GoalsService'
+import { GoalCycleService } from '@/lib/services/GoalCycleService'
+import { goalDatesWithinCycleError } from '@/lib/utils/goalCycleDates'
 import { extractUserContext } from '@/lib/services/AuthorizationService'
 
 export async function POST(request: NextRequest) {
@@ -33,6 +35,17 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'employeeId es requerido' },
         { status: 400 }
       )
+    }
+
+    // ═══ Gate D.7b: dueDate dentro del rango del ciclo heredado ═══
+    // En PDI el usuario elige SOLO dueDate; startDate es server-fijo (new Date()
+    // en createFromDevelopmentGoal) → se pasa null para NO chequear el inicio.
+    const activeCycle = await GoalCycleService.getActiveCycle(userContext.accountId)
+    if (activeCycle) {
+      const dateErr = goalDatesWithinCycleError(activeCycle, null, dueDate)
+      if (dateErr) {
+        return NextResponse.json({ success: false, error: dateErr }, { status: 400 })
+      }
     }
 
     const createdById = userContext.userId || userContext.accountId

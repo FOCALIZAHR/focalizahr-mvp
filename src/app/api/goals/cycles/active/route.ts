@@ -27,10 +27,17 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    // year lo consume el wizard de crear-meta (Gate D.6): periodYear se deriva del
-    // ciclo heredado, no lo elige el usuario (Decisión #4).
+    // year → periodYear del wizard (Gate D.6). assignment/closureWindow → límite de
+    // fechas de la meta al rango del ciclo (Gate D.7b). No lo elige el usuario.
     data: cycle
-      ? { id: cycle.id, name: cycle.name, status: cycle.status, year: cycle.year }
+      ? {
+          id: cycle.id,
+          name: cycle.name,
+          status: cycle.status,
+          year: cycle.year,
+          assignmentWindow: cycle.assignmentWindow,
+          closureWindow: cycle.closureWindow,
+        }
       : null,
   })
 }

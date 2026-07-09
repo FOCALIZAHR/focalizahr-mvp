@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { GoalsService } from '@/lib/services/GoalsService'
+import { GoalCycleService } from '@/lib/services/GoalCycleService'
+import { goalDatesWithinCycleError } from '@/lib/utils/goalCycleDates'
 import {
   extractUserContext,
   hasPermission,
@@ -322,6 +324,17 @@ export async function POST(request: NextRequest) {
         { error: 'departmentId es requerido para metas de área', success: false },
         { status: 400 }
       )
+    }
+
+    // ═══ Gate D.7b: fechas de la meta dentro del rango del ciclo heredado ═══
+    // El usuario elige startDate Y dueDate en el wizard → se chequean ambas.
+    // Sin ciclo activo → sin límite (la meta se crea sin ancla, decisión D.6).
+    const activeCycle = await GoalCycleService.getActiveCycle(context.accountId)
+    if (activeCycle) {
+      const dateErr = goalDatesWithinCycleError(activeCycle, data.startDate, data.dueDate)
+      if (dateErr) {
+        return NextResponse.json({ error: dateErr, success: false }, { status: 400 })
+      }
     }
 
     const createdById = context.userId || context.accountId

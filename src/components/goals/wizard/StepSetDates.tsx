@@ -8,6 +8,7 @@
 import { memo, useCallback, useMemo } from 'react'
 import { Calendar, CalendarRange, Clock, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { goalDatesWithinCycleError } from '@/lib/utils/goalCycleDates'
 import type { GoalWizardData } from './CreateGoalWizard'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -17,9 +18,16 @@ import type { GoalWizardData } from './CreateGoalWizard'
 interface StepSetDatesProps {
   data: GoalWizardData
   updateData: (updates: Partial<GoalWizardData>) => void
-  // Ciclo heredado (Gate D.6): periodYear se deriva del year del ciclo activo,
-  // el usuario ya no elige año. Lo resuelve/setea el orquestador; acá solo se muestra.
-  activeCycle: { id: string; name: string; year: number } | null
+  // Ciclo heredado (Gate D.6): periodYear se deriva del year; el usuario ya no
+  // elige año. Ventanas (Gate D.7b): acotan startDate/dueDate al rango del ciclo.
+  // Lo resuelve/setea el orquestador; acá se muestra y se aplican min/max.
+  activeCycle: {
+    id: string
+    name: string
+    year: number
+    assignmentWindow: string
+    closureWindow: string
+  } | null
   loadingCycle: boolean
 }
 
@@ -57,6 +65,14 @@ export default memo(function StepSetDates({
 
   const isValidRange = daysBetween !== null && daysBetween > 0
 
+  // Gate D.7b: límites de fecha al rango del ciclo heredado (si hay).
+  const cycleMin = activeCycle ? activeCycle.assignmentWindow.slice(0, 10) : undefined
+  const cycleMax = activeCycle ? activeCycle.closureWindow.slice(0, 10) : undefined
+  const dateRangeError =
+    activeCycle && data.startDate && data.dueDate
+      ? goalDatesWithinCycleError(activeCycle, data.startDate, data.dueDate)
+      : null
+
   const handleStartDateChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       updateData({ startDate: e.target.value })
@@ -93,6 +109,8 @@ export default memo(function StepSetDates({
           <input
             type="date"
             value={data.startDate}
+            min={cycleMin}
+            max={cycleMax}
             onChange={handleStartDateChange}
             className="fhr-input w-full"
           />
@@ -107,8 +125,9 @@ export default memo(function StepSetDates({
           <input
             type="date"
             value={data.dueDate}
+            min={data.startDate || cycleMin}
+            max={cycleMax}
             onChange={handleDueDateChange}
-            min={data.startDate || undefined}
             className="fhr-input w-full"
           />
         </div>
@@ -128,6 +147,14 @@ export default memo(function StepSetDates({
           {isValidRange
             ? `${daysBetween} dias para completar la meta`
             : 'La fecha limite debe ser posterior a la fecha de inicio'}
+        </div>
+      )}
+
+      {/* Gate D.7b: fecha fuera del rango del ciclo heredado */}
+      {dateRangeError && (
+        <div className="flex items-center gap-2 p-3 rounded-lg text-sm bg-amber-500/10 text-amber-400">
+          <Clock className="w-4 h-4 shrink-0" />
+          {dateRangeError}
         </div>
       )}
 

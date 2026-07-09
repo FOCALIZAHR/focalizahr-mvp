@@ -12,6 +12,7 @@ import { ArrowLeft, ArrowRight, X, Target, HelpCircle } from 'lucide-react'
 import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton'
 import { formatDisplayName } from '@/lib/utils/formatName'
 
+import { goalDatesWithinCycleError } from '@/lib/utils/goalCycleDates'
 import { WizardProgress } from './WizardProgress'
 import StepSelectLevel from './StepSelectLevel'
 import StepDefineGoal from './StepDefineGoal'
@@ -206,8 +207,15 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
   const [isLoadingEmployee, setIsLoadingEmployee] = useState(!!initialEmployeeId)
 
   // Ciclo heredado (Gate D.6, Decisión #4): la meta hereda el ciclo ACTIVE y
-  // periodYear se deriva de su year — el usuario no elige año.
-  const [activeCycle, setActiveCycle] = useState<{ id: string; name: string; year: number } | null>(null)
+  // periodYear se deriva de su year — el usuario no elige año. Las ventanas
+  // (Gate D.7b) acotan startDate/dueDate de la meta al rango del ciclo.
+  const [activeCycle, setActiveCycle] = useState<{
+    id: string
+    name: string
+    year: number
+    assignmentWindow: string
+    closureWindow: string
+  } | null>(null)
   const [loadingCycle, setLoadingCycle] = useState(true)
 
   // Peso disponible
@@ -288,11 +296,16 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
       case 3:
         return data.targetValue > data.startValue || data.metricType === 'BINARY'
       case 4:
-        return (
-          !!data.startDate &&
-          !!data.dueDate &&
-          new Date(data.dueDate) > new Date(data.startDate)
-        )
+        if (!data.startDate || !data.dueDate) return false
+        if (new Date(data.dueDate) <= new Date(data.startDate)) return false
+        // Gate D.7b: si hay ciclo heredado, las fechas deben caber en su rango.
+        if (
+          activeCycle &&
+          goalDatesWithinCycleError(activeCycle, data.startDate, data.dueDate) !== null
+        ) {
+          return false
+        }
+        return true
       case 5:
         return true // Opcional
       case 6:
@@ -300,7 +313,7 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
       default:
         return false
     }
-  }, [currentStep, data])
+  }, [currentStep, data, activeCycle])
 
   // Navegacion con cover/form
   const goNext = useCallback(() => {
