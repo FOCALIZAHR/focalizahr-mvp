@@ -14,6 +14,7 @@ import {
   Prisma
 } from '@prisma/client'
 import { GoalCycleClosedError, GoalCycleValidationError, GoalCycleService } from './GoalCycleService'
+import { getChildDepartmentIds, GLOBAL_ACCESS_ROLES } from './AuthorizationService'
 
 // ────────────────────────────────────────────────────────────────────────────
 // CIERRE DE CICLO — decisiones sobre metas incompletas (Gate D.5, Decisión #8)
@@ -30,6 +31,55 @@ export interface CycleClosureSummary {
   markedReview: number
   leftAsIs: number
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// CIERRE DE METAS (request/approve/reject) — actor + error tipado + includes
+// ────────────────────────────────────────────────────────────────────────────
+
+/** Contexto del actor para las acciones de cierre. La RUTA lo arma (resuelve
+ *  currentEmployee por email); el servicio decide scope y el nombre a registrar. */
+export interface GoalClosureActor {
+  accountId: string
+  role: string | null
+  departmentId: string | null
+  userId: string | null
+  employeeId: string | null    // currentEmployee?.id ?? null
+  employeeName: string | null  // currentEmployee?.fullName ?? null
+}
+
+export type GoalClosureErrorCode =
+  | 'NOT_FOUND'         // 404
+  | 'INVALID_STATE'     // 400
+  | 'MIN_PROGRESS'      // 400
+  | 'REASON_REQUIRED'   // 400
+  | 'FORBIDDEN_SCOPE'   // 403
+
+/** Error de negocio de cierre. La ruta mapea `code` → HTTP status y reenvía
+ *  `message` textual (idéntico al que hoy devuelven las rutas). */
+export class GoalClosureError extends Error {
+  constructor(public code: GoalClosureErrorCode, message: string) {
+    super(message)
+    this.name = 'GoalClosureError'
+  }
+}
+
+// Include LEAN devuelto al frontend — IDÉNTICO al de las rutas de hoy
+// (owner {id, fullName} + department {id, displayName}). Contrato JSON: no crece.
+const GOAL_CLOSURE_RESPONSE_INCLUDE = {
+  owner: { select: { id: true, fullName: true } },
+  department: { select: { id: true, displayName: true } },
+} satisfies Prisma.GoalInclude
+
+// Include RICO — SOLO para el scope (interno). NUNCA se retorna al frontend.
+const GOAL_CLOSURE_SCOPE_INCLUDE = {
+  owner: { select: { id: true, fullName: true, departmentId: true, managerId: true } },
+  department: { select: { id: true, displayName: true } },
+} satisfies Prisma.GoalInclude
+
+export type GoalWithClosureRelations =
+  Prisma.GoalGetPayload<{ include: typeof GOAL_CLOSURE_RESPONSE_INCLUDE }>
+type GoalClosureScopeGoal =
+  Prisma.GoalGetPayload<{ include: typeof GOAL_CLOSURE_SCOPE_INCLUDE }>
 
 // ────────────────────────────────────────────────────────────────────────────
 // TIPOS
@@ -767,87 +817,257 @@ export class GoalsService {
   // CIERRE DE METAS (Flujo de aprobación CEO)
   // ══════════════════════════════════════════════════════════════════════════
 
+  // ── Helpers de scope (parametrizados por acción) ────────────────────────────
+  // Reproducen EXACTAMENTE el scope que hoy vive inline en las rutas y devuelven
+  // el nombre a registrar (mismos fallbacks), o lanzan FORBIDDEN_SCOPE con el
+  // mensaje idéntico al de la ruta.
+  //   - request: 4 ramas (global / AREA_MANAGER / EVALUATOR / dueño)
+  //   - approve+reject: 2 ramas (global / AREA_MANAGER, no COMPANY)
+
+  private static async resolveRequestClosureAuth(
+    goal: GoalClosureScopeGoal,
+    actor: GoalClosureActor
+  ): Promise<string> {
+    const hasGlobalAccess = (GLOBAL_ACCESS_ROLES as readonly string[]).includes(actor.role || '')
+    let canRequestClosure = false
+    let requestedByName = 'Sistema'
+
+    if (hasGlobalAccess) {
+      canRequestClosure = true
+      requestedByName = actor.employeeName || 'Administrador'
+    } else if (actor.role === 'AREA_MANAGER' && actor.departmentId) {
+      const childIds = await getChildDepartmentIds(actor.departmentId)
+      const allowedDepts = [actor.departmentId, ...childIds]
+      if (goal.level === 'COMPANY') {
+        canRequestClosure = false
+      } else if (goal.level === 'AREA' && goal.departmentId) {
+        canRequestClosure = allowedDepts.includes(goal.departmentId)
+      } else if (goal.level === 'INDIVIDUAL' && goal.owner?.departmentId) {
+        canRequestClosure = allowedDepts.includes(goal.owner.departmentId)
+      }
+      requestedByName = actor.employeeName || 'Gerente de Área'
+    } else if (actor.role === 'EVALUATOR' && actor.employeeId) {
+      if (goal.level === 'INDIVIDUAL' && goal.owner?.managerId === actor.employeeId) {
+        canRequestClosure = true
+      }
+      requestedByName = actor.employeeName || 'Sistema'
+    } else if (actor.employeeId) {
+      // Usuario regular: solo sus propias metas INDIVIDUAL
+      if (goal.level === 'INDIVIDUAL' && goal.employeeId === actor.employeeId) {
+        canRequestClosure = true
+      }
+      requestedByName = actor.employeeName || 'Sistema'
+    }
+
+    if (!canRequestClosure) {
+      throw new GoalClosureError('FORBIDDEN_SCOPE', 'No tiene permisos para solicitar cierre de esta meta')
+    }
+    return requestedByName
+  }
+
+  private static async resolveApproveClosureAuth(
+    goal: GoalClosureScopeGoal,
+    actor: GoalClosureActor
+  ): Promise<string> {
+    const hasGlobalAccess = (GLOBAL_ACCESS_ROLES as readonly string[]).includes(actor.role || '')
+    let canApprove = false
+    const approverName = actor.employeeName || 'Administrador'
+
+    if (hasGlobalAccess) {
+      canApprove = true
+    } else if (actor.role === 'AREA_MANAGER' && actor.departmentId) {
+      const childIds = await getChildDepartmentIds(actor.departmentId)
+      const allowedDepts = [actor.departmentId, ...childIds]
+      if (goal.level === 'COMPANY') {
+        canApprove = false
+      } else if (goal.level === 'AREA' && goal.departmentId) {
+        canApprove = allowedDepts.includes(goal.departmentId)
+      } else if (goal.level === 'INDIVIDUAL' && goal.owner?.departmentId) {
+        canApprove = allowedDepts.includes(goal.owner.departmentId)
+      }
+    }
+
+    if (!canApprove) {
+      throw new GoalClosureError('FORBIDDEN_SCOPE', 'No tiene permisos para aprobar esta meta')
+    }
+    return approverName
+  }
+
   /**
-   * Solicitar cierre de meta (Gerente)
+   * Solicitar cierre de meta.
+   * Único lugar con la lógica (antes inline en request-closure/route.ts).
+   * @param opts.enforceMinProgress gate ≥80% — default TRUE (flujo interactivo).
+   *   Un caller administrativo/forzado puede pasar false (p.ej. cierre de ciclo).
    */
   static async requestClosure(
     goalId: string,
-    accountId: string,
-    requestedBy: string
-  ): Promise<Goal> {
+    actor: GoalClosureActor,
+    opts?: { enforceMinProgress?: boolean }
+  ): Promise<GoalWithClosureRelations> {
+    const enforceMinProgress = opts?.enforceMinProgress ?? true
+
     const goal = await prisma.goal.findFirst({
-      where: { id: goalId, accountId }
+      where: { id: goalId, accountId: actor.accountId },
+      include: GOAL_CLOSURE_SCOPE_INCLUDE,
     })
+    if (!goal) throw new GoalClosureError('NOT_FOUND', 'Meta no encontrada')
 
-    if (!goal) throw new Error('Meta no encontrada')
-    if (goal.status === 'COMPLETED') throw new Error('Meta ya está cerrada')
-    if (goal.status === 'PENDING_CLOSURE') throw new Error('Ya hay una solicitud de cierre pendiente')
+    // Guards de estado (mismo orden que la ruta: la primera que aplica gana)
+    if (goal.status === 'COMPLETED') {
+      throw new GoalClosureError('INVALID_STATE', 'La meta ya está completada')
+    }
+    if (goal.status === 'CANCELLED') {
+      throw new GoalClosureError('INVALID_STATE', 'No se puede cerrar una meta cancelada')
+    }
+    if (goal.status === 'PENDING_CLOSURE') {
+      throw new GoalClosureError('INVALID_STATE', 'La meta ya tiene una solicitud de cierre pendiente')
+    }
 
-    return prisma.goal.update({
-      where: { id: goalId },
-      data: {
-        status: 'PENDING_CLOSURE',
-        closureRequestedAt: new Date(),
-        closureRequestedBy: requestedBy,
-      },
+    if (enforceMinProgress && goal.progress < 80) {
+      throw new GoalClosureError(
+        'MIN_PROGRESS',
+        `La meta debe tener al menos 80% de progreso para solicitar cierre. Progreso actual: ${goal.progress}%`
+      )
+    }
+
+    const requestedByName = await this.resolveRequestClosureAuth(goal, actor)
+    const updatedById = actor.employeeId || actor.userId || actor.accountId
+
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.goal.update({
+        where: { id: goalId },
+        data: {
+          status: 'PENDING_CLOSURE',
+          closureRequestedAt: new Date(),
+          closureRequestedBy: requestedByName,
+        },
+        include: GOAL_CLOSURE_RESPONSE_INCLUDE,
+      })
+      await tx.goalProgressUpdate.create({
+        data: {
+          goalId,
+          accountId: actor.accountId,
+          previousValue: goal.currentValue,
+          newValue: goal.currentValue,
+          previousProgress: goal.progress,
+          newProgress: goal.progress,
+          comment: `Solicitud de cierre enviada por ${requestedByName}`,
+          updatedById,
+        },
+      })
+      return updated
     })
   }
 
   /**
-   * Aprobar cierre de meta (CEO)
+   * Aprobar cierre de meta. Único lugar con la lógica (antes inline en la ruta).
    */
   static async approveClosure(
     goalId: string,
-    accountId: string,
-    approvedBy: string,
-    notes?: string
-  ): Promise<Goal> {
+    actor: GoalClosureActor,
+    opts?: { notes?: string }
+  ): Promise<GoalWithClosureRelations> {
+    const notes = opts?.notes
+
     const goal = await prisma.goal.findFirst({
-      where: { id: goalId, accountId, status: 'PENDING_CLOSURE' }
+      where: { id: goalId, accountId: actor.accountId },
+      include: GOAL_CLOSURE_SCOPE_INCLUDE,
     })
+    if (!goal) throw new GoalClosureError('NOT_FOUND', 'Meta no encontrada')
+    if (goal.status !== 'PENDING_CLOSURE') {
+      throw new GoalClosureError('INVALID_STATE', 'La meta no está pendiente de aprobación')
+    }
 
-    if (!goal) throw new Error('Meta no encontrada o no está pendiente de cierre')
+    const approverName = await this.resolveApproveClosureAuth(goal, actor)
+    const updatedById = actor.employeeId || actor.userId || actor.accountId
+    const now = new Date()
 
-    return prisma.goal.update({
-      where: { id: goalId },
-      data: {
-        status: 'COMPLETED',
-        completedAt: new Date(),
-        closedAt: new Date(),
-        closedBy: approvedBy,
-        closureApprovedBy: approvedBy,
-        closureNotes: notes,
-      },
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.goal.update({
+        where: { id: goalId },
+        data: {
+          status: 'COMPLETED',
+          closedAt: now,
+          closedBy: approverName,
+          closureApprovedBy: approverName,
+          closureNotes: notes || null,
+          completedAt: now,
+        },
+        include: GOAL_CLOSURE_RESPONSE_INCLUDE,
+      })
+      await tx.goalProgressUpdate.create({
+        data: {
+          goalId,
+          accountId: actor.accountId,
+          previousValue: goal.currentValue,
+          newValue: goal.currentValue,
+          previousProgress: goal.progress,
+          newProgress: goal.progress,
+          comment: `Meta aprobada y completada por ${approverName}${notes ? `. Notas: ${notes}` : ''}`,
+          updatedById,
+        },
+      })
+      return updated
     })
   }
 
   /**
-   * Rechazar cierre de meta (CEO)
+   * Rechazar cierre de meta. Único lugar con la lógica (antes inline en la ruta).
+   * closureNotes = motivo CRUDO (el "quién rechazó" vive en la auditoría).
    */
   static async rejectClosure(
     goalId: string,
-    accountId: string,
-    rejectedBy: string,
-    notes?: string
-  ): Promise<Goal> {
+    actor: GoalClosureActor,
+    opts: { reason: string }
+  ): Promise<GoalWithClosureRelations> {
+    const { reason } = opts
+    if (!reason) {
+      throw new GoalClosureError('REASON_REQUIRED', 'Debe proporcionar un motivo para rechazar')
+    }
+
     const goal = await prisma.goal.findFirst({
-      where: { id: goalId, accountId, status: 'PENDING_CLOSURE' }
+      where: { id: goalId, accountId: actor.accountId },
+      include: GOAL_CLOSURE_SCOPE_INCLUDE,
     })
+    if (!goal) throw new GoalClosureError('NOT_FOUND', 'Meta no encontrada')
+    if (goal.status !== 'PENDING_CLOSURE') {
+      throw new GoalClosureError('INVALID_STATE', 'La meta no está pendiente de aprobación')
+    }
 
-    if (!goal) throw new Error('Meta no encontrada o no está pendiente de cierre')
+    const approverName = await this.resolveApproveClosureAuth(goal, actor)
+    const updatedById = actor.employeeId || actor.userId || actor.accountId
 
-    // Determinar status basado en progreso
-    const newStatus: GoalStatus =
-      goal.progress >= 90 ? 'ON_TRACK' : goal.progress >= 70 ? 'AT_RISK' : 'BEHIND'
+    // Reversión de estado según progreso — 4 categorías (comportamiento de la ruta)
+    const previousStatus: GoalStatus =
+      goal.progress >= 90 ? 'ON_TRACK'
+        : goal.progress >= 70 ? 'AT_RISK'
+        : goal.progress > 0 ? 'BEHIND'
+        : 'NOT_STARTED'
 
-    return prisma.goal.update({
-      where: { id: goalId },
-      data: {
-        status: newStatus,
-        closureRequestedAt: null,
-        closureRequestedBy: null,
-        closureNotes: `Rechazado por ${rejectedBy}: ${notes || 'Sin comentarios'}`,
-      },
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.goal.update({
+        where: { id: goalId },
+        data: {
+          status: previousStatus,
+          closureRequestedAt: null,
+          closureRequestedBy: null,
+          closureNotes: reason || null,
+        },
+        include: GOAL_CLOSURE_RESPONSE_INCLUDE,
+      })
+      await tx.goalProgressUpdate.create({
+        data: {
+          goalId,
+          accountId: actor.accountId,
+          previousValue: goal.currentValue,
+          newValue: goal.currentValue,
+          previousProgress: goal.progress,
+          newProgress: goal.progress,
+          comment: `Solicitud de cierre rechazada por ${approverName}. Motivo: ${reason}`,
+          updatedById,
+        },
+      })
+      return updated
     })
   }
 
