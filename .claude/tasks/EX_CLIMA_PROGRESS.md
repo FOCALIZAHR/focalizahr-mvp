@@ -435,3 +435,47 @@ EXIT 0.
   business case. El business case solo aporta el CLP cuando existe.
 
 **Sigue (5B):** doble CTA — PDI aditivo (baseline primero) + Meta dura simple (POST a /goals).
+
+---
+
+## Gate 5B-i — PDIEngine extensión aditiva (el motor) ✅ SELLADO (2026-07-10)
+
+**Commit:** `49ba0be` (implementación, 5 archivos) · sello (docs): este archivo + MAESTRO
+v3.14. **Push manual de Victor** (pendiente). **Fasing:** 5B-i (el motor) primero, sellado,
+ANTES de 5B-ii (los 2 CTAs que lo consumen) — decisión Victor, mismo patrón que Gate 3.
+
+**Qué quedó construido (aditivo puro, sin `db push`):**
+- `src/lib/types/pdi-suggestion.ts`: `ClimaCrossEvidence` + `climaContext?` (input) +
+  `climaEvidence?` (output), **ambos OPCIONALES**. `GapAnalysisInput` es TS puro → no toca
+  schema (confirmado Gate 0).
+- `src/lib/data/clima-competency-mapping.ts`: mapeo **dimensión-clima → competencia 360°**
+  (opción B). **CONTENIDO PROVISIONAL: el mapeo específico lo define Victor/Studio IA, NO se
+  infiere** (mismo régimen que el diccionario 8×4 de 5A). Scaffold + fallback GENERIC + guard
+  `CLIMA_COMPETENCY_MAPPING_STATUS='PROVISIONAL'`.
+- `src/lib/services/PDISuggestionEngine.ts`: rama `climaEvidence` **GUARDADA por `climaContext`**
+  (sin climaContext la clave NO se agrega → objeto idéntico al flujo 360) + helper
+  `buildClimaGapInput(driver,fav,gap360?)` (puente de escala fav 0-100→mean 1-5 **también
+  PROVISIONAL**).
+
+**Hallazgo Gate 0 (documentado):** el motor NO es determinista — `selectCoachingTip` usa
+`Math.random()` (`PDISuggestionEngine.ts:145`). El snapshot lo FIJA (mismo valor en ambas
+corridas) para que la comparación antes/después sea válida — de otro modo fallaría por el RNG,
+no por el código.
+
+**Evidencia (requisito aditivo en 2 mitades):**
+- **Snapshot antes/después BYTE-IDÉNTICO** (`sha256 cf5f860b8ff93eaa…`, diff vacío) sobre los 3
+  consumidores × 4 gapTypes × 3 tracks (`generateSuggestions`) + `generateFromRoleFit` (RoleFit
+  precomputado, sin BD) + `generateExecutiveSummary` → **Performance 360 / Sucesión intactos**.
+- **Path clima smoke 10/10:** `buildClimaGapInput('liderazgo',45,-1.2)`→LEAD-TEAM, sugerencia
+  con `climaEvidence`; mapeo PROVISIONAL + fallback GENERIC; **gap 360 puro sin climaContext →
+  SIN clave `climaEvidence`** (aditividad probada in-situ).
+- Ambos smokes (`snapshot-pdi-baseline.ts` + `smoke-pdi-clima.ts`) retirados al sellar (evidencia
+  en `49ba0be`). `tsc --noEmit` + `next build` EXIT 0. Output real revisado por Victor.
+
+**Nota para 5B-ii (CTA2 Meta dura):** POST directo a `/api/goals` reusa el **409 sellado de
+Gate E** "sin ciclo ACTIVE → crear meta" (`goals/route.ts:329-336`, `2cd20a1`) — es
+comportamiento INTENCIONAL, no hueco de diseño. Un cliente real con Metas tendrá ciclo activo;
+la demo solo necesita sembrar un ciclo activo (fix de siembra). No requiere lógica nueva.
+
+**Sigue (5B-ii):** los 2 CTAs que consumen el motor — PDI suave (endpoint que llama
+`buildClimaGapInput` + persiste `climaEvidence`) + Meta dura simple (POST /goals). Luego 5C/5D.
