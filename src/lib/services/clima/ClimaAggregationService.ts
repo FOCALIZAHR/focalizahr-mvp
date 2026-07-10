@@ -15,7 +15,7 @@
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { NPSAggregationService } from '@/lib/services/NPSAggregationService';
-import { SalaryConfigService } from '@/lib/services/SalaryConfigService';
+import { SalaryConfigService, type SalaryResult } from '@/lib/services/SalaryConfigService';
 import {
   ClimaResponseRow,
   DriverScore,
@@ -73,6 +73,20 @@ export interface DriverFocusMap {
     high: string[];
     thresholds: { low: number; high: number };
   };
+}
+
+/** acotadoGroup dominante = el de mayor n (respondentes) en acotadoGroupScores.
+ *  null si vacío. Alimenta getSalaryForAccount por depto (Cambio 2 Gate 3). */
+function dominantAcotadoGroup(scores: Record<string, { n: number }>): string | null {
+  let best: string | null = null;
+  let bestN = -1;
+  for (const [key, value] of Object.entries(scores)) {
+    if (value.n > bestN) {
+      bestN = value.n;
+      best = key;
+    }
+  }
+  return best;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -287,7 +301,30 @@ export class ClimaAggregationService {
       // Insumos de PulseEngine (Gate 3) — se llenan DENTRO del closure per-dept
       // con los artefactos YA calculados (cero re-queries; solo deptos con
       // upsert exitoso entran al motor)
-      const pulseInputByDept = new Map<string, PulseDeptInput>();
+      // El salario se resuelve DESPUÉS del loop (por acotadoGroup dominante),
+      // así que acá el input va sin salary; el dominante se guarda aparte.
+      const pulseInputByDept = new Map<string, Omit<PulseDeptInput, 'salary'>>();
+      const dominantAcotadoByDept = new Map<string, string | null>();
+
+      // Cambio Gate 3 (ALG5, rama b): salidas VOLUNTARIAS por depto en ventana
+      // móvil de 12 meses desde campaign.endDate (FIJA → reproducible, mismo
+      // principio que gapBasis:'fixed_target'). Una sola groupBy para todos.
+      const voluntaryWindowStart = new Date(campaign.endDate);
+      voluntaryWindowStart.setUTCFullYear(voluntaryWindowStart.getUTCFullYear() - 1);
+      const voluntaryGroups = await prisma.exitRecord.groupBy({
+        by: ['departmentId'],
+        where: {
+          accountId,
+          departmentId: { in: deptIds },
+          exitReason: 'voluntary',
+          exitDate: { gte: voluntaryWindowStart, lte: campaign.endDate },
+        },
+        _count: { _all: true },
+      });
+      const voluntaryByDept = new Map<string, number>();
+      for (const g of voluntaryGroups) {
+        if (g.departmentId) voluntaryByDept.set(g.departmentId, g._count._all);
+      }
 
       // 4. Por CADA departamento — fallo individual NO mata el resto.
       // En PARALELO (S-PERF): los upserts son independientes entre deptos y el
@@ -410,6 +447,8 @@ export class ClimaAggregationService {
           });
 
           // Gate 3: insumos del PulseEngine — reutiliza lo ya computado en memoria
+          // acotadoGroup dominante (Cambio 2): el de mayor n en acotadoScores.
+          dominantAcotadoByDept.set(deptId, dominantAcotadoGroup(acotadoScores));
           pulseInputByDept.set(deptId, {
             departmentId: deptId,
             driverScores, // post carry-forward
@@ -423,6 +462,7 @@ export class ClimaAggregationService {
             isaScore: isaByDept.get(deptId)?.isaScore ?? null,
             totalResponded,
             participationRate,
+            voluntaryExits12mo: voluntaryByDept.get(deptId) ?? 0,
           });
 
           deptosProcesados += 1;
@@ -443,12 +483,22 @@ export class ClimaAggregationService {
       if (pulseInputByDept.size > 0) {
         try {
           const pulseStart = Date.now();
-          // Única fuente de cifras CLP: SalaryConfigService (server-side, cuenta real)
-          const salary = await SalaryConfigService.getSalaryForAccount(accountId);
-          const pulseOutputs = computePulse({
-            depts: Array.from(pulseInputByDept.values()),
-            salary,
-          });
+          // Cambio 2: salario POR DEPARTAMENTO vía acotadoGroup dominante. Config de
+          // cuenta cacheada por grupo distinto (memo) → NO N findUnique por depto;
+          // el loop de arriba es paralelo, por eso se resuelve acá secuencialmente.
+          const salaryByGroup = new Map<string, SalaryResult>();
+          const depts: PulseDeptInput[] = [];
+          for (const [deptId, base] of pulseInputByDept) {
+            const group = dominantAcotadoByDept.get(deptId) ?? null;
+            const groupKey = group ?? '__default__';
+            let salary = salaryByGroup.get(groupKey);
+            if (!salary) {
+              salary = await SalaryConfigService.getSalaryForAccount(accountId, group);
+              salaryByGroup.set(groupKey, salary);
+            }
+            depts.push({ ...base, salary });
+          }
+          const pulseOutputs = computePulse({ depts });
 
           await Promise.all(
             Array.from(pulseOutputs.entries()).map(async ([deptId, output]) => {

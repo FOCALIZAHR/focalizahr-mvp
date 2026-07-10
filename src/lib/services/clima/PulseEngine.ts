@@ -206,16 +206,22 @@ export interface PulseDeptInput {
   momentum: number | null; // escalar EI que persiste Gate 2 (NO se recalcula)
   rows: ClimaResponseRow[]; // crudo del depto — pares Pearson ALG 1
   prevDriverScores: Record<string, DriverScore> | null; // insight anterior (ALG 3)
-  turnoverRate: number | null; // DepartmentMetric (puede no estar cargada)
+  turnoverRate: number | null; // DepartmentMetric, en % (0-100); puede no estar cargada
   headcountAvg: number | null;
   isaScore: number | null; // ComplianceAnalysis scope DEPARTMENT
   totalResponded: number;
   participationRate: number; // 0-100
+  // Cambio Gate 3 (ALG5 costeo con rotación real): conteo de salidas VOLUNTARIAS
+  // del depto en ventana móvil de 12m desde campaign.endDate (rama b). null = sin
+  // dato de Exit. Lo computa el caller (ClimaAggregationService fase 4b).
+  voluntaryExits12mo: number | null;
+  // Salario resuelto POR DEPARTAMENTO vía acotadoGroup dominante (getSalaryForAccount,
+  // resuelto por el caller — el módulo queda puro). Antes era único de compañía.
+  salary: SalaryResult;
 }
 
 export interface PulseCompanyInput {
   depts: PulseDeptInput[];
-  salary: SalaryResult; // resuelto por el caller (getSalaryForAccount) — el módulo queda puro
 }
 
 export interface PulseDeptOutput {
@@ -235,7 +241,7 @@ export interface PulseDeptOutput {
  * Puro e in-memory: el caller persiste el output y maneja errores de I/O.
  */
 export function computePulse(input: PulseCompanyInput): Map<string, PulseDeptOutput> {
-  const { depts, salary } = input;
+  const { depts } = input;
 
   // Cross-dept una sola vez
   const impactByDriver = calcCompanyDriverImpacts(depts);
@@ -255,7 +261,7 @@ export function computePulse(input: PulseCompanyInput): Map<string, PulseDeptOut
       ...detectTheatre(dept),
       hotspot: detectHotspots(dept, hotspotContext),
       climaTurnover,
-      businessCases: buildBusinessCases(dept, salary),
+      businessCases: buildBusinessCases(dept),
       computedAt,
     };
 
@@ -595,10 +601,7 @@ export function turnoverRiskFromMean(mean: number): number {
  * liderazgo_gap y además es el peor <2.5, clima_critico toma el SIGUIENTE
  * peor <2.5 (si no hay otro, no se emite) — nunca doble costo CLP.
  */
-export function buildBusinessCases(
-  dept: PulseDeptInput,
-  salary: SalaryResult
-): PulseBusinessCase[] {
+export function buildBusinessCases(dept: PulseDeptInput): PulseBusinessCase[] {
   const cases: PulseBusinessCase[] = [];
 
   const measured = Object.entries(dept.driverScores)
@@ -610,7 +613,7 @@ export function buildBusinessCases(
   const leadershipFired = !!leadership && leadership.mean < LEADERSHIP_GAP_MEAN;
   if (leadership && leadershipFired) {
     cases.push(
-      buildCase('liderazgo_gap', LEADERSHIP_DRIVER, leadership.mean, dept, salary)
+      buildCase('liderazgo_gap', LEADERSHIP_DRIVER, leadership.mean, dept)
     );
   }
 
@@ -620,12 +623,12 @@ export function buildBusinessCases(
     .filter((d) => !(leadershipFired && d.driver === LEADERSHIP_DRIVER))
     .sort((a, b) => a.mean - b.mean)[0];
   if (critical) {
-    cases.push(buildCase('clima_critico', critical.driver, critical.mean, dept, salary));
+    cases.push(buildCase('clima_critico', critical.driver, critical.mean, dept));
   }
 
   // retencion_riesgo: engagement mean bajo umbral
   if (dept.ei.mean !== null && dept.ei.mean < EI_RISK_MEAN) {
-    cases.push(buildCase('retencion_riesgo', null, dept.ei.mean, dept, salary));
+    cases.push(buildCase('retencion_riesgo', null, dept.ei.mean, dept));
   }
 
   return cases;
@@ -653,12 +656,37 @@ function buildCase(
   type: PulseBusinessCaseType,
   driver: string | null,
   triggerScore: number,
-  dept: PulseDeptInput,
-  salary: SalaryResult
+  dept: PulseDeptInput
 ): PulseBusinessCase {
-  const risk = turnoverRiskFromMean(triggerScore);
+  const salary = dept.salary; // resuelto por acotadoGroup en el caller (Cambio 2)
   const base = dept.headcountAvg !== null ? Math.round(dept.headcountAvg) : dept.totalResponded;
-  const peopleAtRisk = Math.ceil(base * risk);
+
+  // Cambio 1 — jerarquía de rotación real para peopleAtRisk / % / supuesto:
+  //   (a) tasa de rotación real (DepartmentMetric, %) → (b) conteo de salidas
+  //   voluntarias 12m (Exit, ≥1, sin umbral) → (c) fallback score-derived (Gallup).
+  let peopleAtRisk: number;
+  let riskPct: number;
+  let turnoverAssumption: string;
+  if (dept.turnoverRate !== null) {
+    const rate = dept.turnoverRate / 100; // turnoverRate viene en % (0-100)
+    peopleAtRisk = Math.ceil(base * rate);
+    riskPct = Math.round(rate * 100);
+    turnoverAssumption =
+      `Riesgo de rotación ${riskPct}% por la tasa de rotación real registrada del departamento (DepartmentMetric)`;
+  } else if (dept.voluntaryExits12mo !== null && dept.voluntaryExits12mo > 0) {
+    const n = dept.voluntaryExits12mo;
+    peopleAtRisk = n;
+    riskPct = base > 0 ? Math.round((n / base) * 100) : 100;
+    turnoverAssumption =
+      `Basado en ${n} ${n === 1 ? 'salida voluntaria registrada' : 'salidas voluntarias registradas'}` +
+      ` en Exit Intelligence durante los últimos 12 meses para este departamento.`;
+  } else {
+    const risk = turnoverRiskFromMean(triggerScore);
+    peopleAtRisk = Math.ceil(base * risk);
+    riskPct = Math.round(risk * 100);
+    turnoverAssumption =
+      `Riesgo de rotación ${riskPct}% por score ${triggerScore} (escala heredada de RetentionEngine, fuente Gallup)`;
+  }
 
   // ÚNICA fuente de cifras CLP de la plataforma: SalaryConfigService
   const { turnoverCost, multiplier } = SalaryConfigService.calculateTurnoverCost(
@@ -693,7 +721,7 @@ function buildCase(
     driver,
     triggerScore,
     peopleAtRisk,
-    turnoverRiskPct: Math.round(risk * 100),
+    turnoverRiskPct: riskPct,
     potentialAnnualLossCLP,
     recommendedInvestmentCLP,
     estimatedROIPct,
@@ -704,7 +732,7 @@ function buildCase(
       `Base de personas: ${dept.headcountAvg !== null ? `headcountAvg ${base} (DepartmentMetric)` : `${base} respondentes (sin headcountAvg cargado)`}`,
       `Salario mensual $${salary.monthlySalary.toLocaleString('es-CL')} CLP (fuente: ${salary.source})`,
       `Costo de rotación ${multiplier}× salario anual (SalaryConfigService)`,
-      `Riesgo de rotación ${Math.round(risk * 100)}% por score ${triggerScore} (escala heredada de RetentionEngine, fuente Gallup)`,
+      turnoverAssumption,
       `Efectividad de programa ${Math.round(program.effectiveness * 100)}% (fuente HBR/McKinsey, heredada de RetentionEngine)`,
     ],
   };
