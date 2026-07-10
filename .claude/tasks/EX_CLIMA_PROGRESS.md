@@ -373,3 +373,65 @@ había driver sistémico; D lo fuerza. Para re-sembrar: recuperar el seeder de `
 auto-selección) + Card sana + `ClimaToolbar` (8 dims, modal clon AvatarInfoModal).
 Reutilizan el componente rico que nace validado en 4.5a. Detalle del plan 4.5b: resolución
 de esquema al arrancar (ver plan aprobado de la sesión).
+
+---
+
+## Gate 5A — Planes de Acción (capa de datos) ✅ SELLADO (2026-07-10)
+
+**Commit:** `ffce15f` (implementación código, 5 archivos) · sello (docs): este archivo +
+MAESTRO v3.13. **Push manual de Victor** (pendiente). Plan aprobado: `~/.claude/plans/
+shiny-coalescing-eagle.md` (Gate 5 completo, 4 sub-gates).
+
+**Decisiones de Gate 0 (verificadas contra código, no asumidas):**
+- Campo autorreporte del jefe → **entidad nueva `ClimaActionLog`** (5C): `ClimaFinding` no
+  existe (efímero), `ActionPlan` aprobado es inmutable → choca con autorreporte posterior.
+- Trigger del cruce de efectividad (5C) → **Seguimiento Focalizado = veredicto oficial**;
+  Pulso Express = señal direccional secundaria marcada aparte (nunca fusionada).
+- PDIEngine (5B) NO soporta clima → extensión **aditiva** (`climaContext?`, sin `db push`);
+  `GapAnalysisInput` es TS puro; smoke de línea base ANTES de tocar (3 consumidores intactos).
+- CTA2 Meta dura (5B) = **SIMPLE**: POST directo a `/api/goals` existente, sin fricción tipo
+  Calibración, sin cascada. Cascada auto ("¿es de clima?") → `SEMILLA_META_CORPORATIVA_
+  CLIMA_CASCADA.md`, fuera de Gate 5 (toca Metas/GoalCycle A–E).
+- `calculateTurnoverCost` acepta `acotadoGroup` pero en Clima sigue 1.25× único; sin
+  acoplamiento con Gate 5, no se activa.
+
+**Qué quedó construido (5A):**
+- `src/types/clima-planes.ts`: `ClimaDecisionItem` (shape MAESTRO 5A). **Severidad = las 4
+  `RiskZone` YA selladas** (verde/amarilla/naranja/roja ⇄ Sano/Atención/Riesgo/Crítico vía
+  `calcRiskZone`) — cero escala nueva. `ClimaDeptDecisionInput` deriva 1:1 de
+  `DepartmentClimaInsight` (driverAnalysis + correlationFlags.businessCases).
+- `src/lib/services/clima/ClimaInterventionDictionary.ts`: **32 celdas (8 dims Gate 1A × 4
+  zonas)**, patrón zone-keyed de `ClimaNarrativeDictionary`. **CONTENIDO PROVISIONAL: las 32
+  narrativas prefijadas `PROVISIONAL — ` (relleno estructural); el copy final lo escribe
+  Victor/Studio IA aparte — NO listo para cliente.** `getIntervention(cat,zone)` + guard
+  `isClimaDriverCategory`.
+- `src/lib/services/clima/ClimaActionPlanBuilder.ts`: pura, `buildDeptClimaDecisions` /
+  `buildClimaPlanDecisions`. 1 ítem por driver en zona de atención (verde excluido);
+  `businessCase` CLP adjunto solo si PulseEngine lo disparó (clima_critico/liderazgo_gap),
+  nunca inventado; responsable/plazo/validationMetric derivados por severidad; orden por
+  severidad. Persiste vía POST genérico `moduleType='clima'`.
+- **Fix RBAC:** `clima` en `PERMS_BY_MODULE` de `action-plans/[planId]/route.ts` (habilita
+  GET detalle + PUT autosave del plan de clima). **Fix RBAC clima aplicado; verificación de
+  los 3 roles (CEO/HR ven todo, AREA_MANAGER solo su gerencia, sin permiso→403) la valida
+  Victor manualmente en la app antes de cerrar Gate 5 completo.**
+
+**Evidencia:** smoke `smoke-clima-gate5a.ts` **24/24** — S1 diccionario 32 celdas sin vacíos +
+todas PROVISIONAL; S2 business cases REALES de `buildBusinessCases`→`SalaryConfigService`
+(rama rotación-real `peopleAtRisk=ceil(40·0.18)=8`, retencion_riesgo NO dispara con EI 3.5);
+S3 mapeo real 6 dims→5 decisiones en 4 severidades (liderazgo/reconocimiento CRÍTICO con CLP
+$144M; autonomia RIESGO; desarrollo amarilla→naranja por momentum −12pp; comunicacion
+ATENCIÓN; **satisfaccion verde EXCLUIDA**), celda correcta por dim×zona, responsable/plazo por
+severidad, orden por severidad, `triggerRef` estable. **Output real revisado por Victor** antes
+de commitear. Smoke retirado al sellar (evidencia en `ffce15f`). `tsc --noEmit` + `next build`
+EXIT 0.
+
+**Gotchas / notas para 5B–5D:**
+- El diccionario NO tiene copy final (32 PROVISIONAL) — bloquea "mostrar a cliente" hasta que
+  Victor/Studio IA lo escriba. Marcado en código (`DICTIONARY_CONTENT_STATUS='PROVISIONAL'`).
+- `ActionPlan` no tiene FK `departmentId` (usa `targetType`/`targetId`); el vínculo a depto de
+  cada decisión vive dentro de `decisiones[].departmentId` (Json).
+- Los business cases de PulseEngine son 3 tipos con severidad binaria (`critica|alta`); las 4
+  severidades del plan salen de `calcRiskZone` sobre la favorabilidad del driver, NO del
+  business case. El business case solo aporta el CLP cuando existe.
+
+**Sigue (5B):** doble CTA — PDI aditivo (baseline primero) + Meta dura simple (POST a /goals).
