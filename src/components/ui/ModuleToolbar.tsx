@@ -24,12 +24,19 @@ export interface ToolDefinition {
   color: string
   breakdown: ToolBreakdown[]
   narrative?: string
+  /** Deshabilitado (ej. sin base de datos suficiente). Ícono atenuado, no clickeable. */
+  disabled?: boolean
+  /** Razón del deshabilitado — se muestra en el tooltip en lugar del label. */
+  disabledReason?: string
 }
 
 interface ModuleToolbarProps {
   tools: ToolDefinition[]
   ctaLabel?: string
   onCTA?: () => void
+  /** Si se provee, el clic en un ícono llama a onSelect(id) (abre contenido
+   *  externo, ej. un Modal) en vez de togglear el panel inline. */
+  onSelect?: (id: string) => void
 }
 
 const GLASS_BG = 'rgba(15,23,42,0.60)'
@@ -37,7 +44,7 @@ const GLASS_BLUR = 'blur(24px)'
 const GLASS_BORDER = '0.5px solid rgba(255,255,255,0.08)'
 const GLASS_SHADOW = '0 0 30px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03)'
 
-export default function ModuleToolbar({ tools, ctaLabel, onCTA }: ModuleToolbarProps) {
+export default function ModuleToolbar({ tools, ctaLabel, onCTA, onSelect }: ModuleToolbarProps) {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
@@ -78,12 +85,21 @@ export default function ModuleToolbar({ tools, ctaLabel, onCTA }: ModuleToolbarP
             <div key={t.id} className="relative">
               <button
                 type="button"
-                onClick={() => handleToggle(t.id)}
+                disabled={t.disabled}
+                onClick={
+                  t.disabled
+                    ? undefined
+                    : onSelect
+                      ? () => onSelect(t.id)
+                      : () => handleToggle(t.id)
+                }
                 onMouseEnter={() => setHoveredId(t.id)}
                 onMouseLeave={() => setHoveredId(null)}
                 className="relative w-9 h-9 rounded-[9px] flex items-center justify-center transition-all duration-200"
                 style={{
                   background: isActive ? 'rgba(34,211,238,0.08)' : 'transparent',
+                  cursor: t.disabled ? 'not-allowed' : 'pointer',
+                  opacity: t.disabled ? 0.35 : 1,
                 }}
               >
                 {isActive && (
@@ -114,7 +130,7 @@ export default function ModuleToolbar({ tools, ctaLabel, onCTA }: ModuleToolbarP
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 6 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-full top-1/2 -translate-y-1/2 mr-2 pointer-events-none whitespace-nowrap px-2.5 py-1 rounded-lg text-xs font-light text-slate-300"
+                    className="absolute right-full top-1/2 -translate-y-1/2 mr-2 pointer-events-none px-2.5 py-1 rounded-lg text-xs font-light text-slate-300 max-w-[220px] text-right leading-snug"
                     style={{
                       background: GLASS_BG,
                       backdropFilter: GLASS_BLUR,
@@ -122,7 +138,7 @@ export default function ModuleToolbar({ tools, ctaLabel, onCTA }: ModuleToolbarP
                       border: GLASS_BORDER,
                     }}
                   >
-                    {t.label}
+                    {t.disabled ? (t.disabledReason ?? t.label) : t.label}
                   </motion.div>
                 )}
               </AnimatePresence>

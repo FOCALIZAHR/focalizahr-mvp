@@ -1,79 +1,45 @@
 'use client';
 
 // src/app/dashboard/clima/components/ClimaRail.tsx
-// Rail de departamentos. Clon de evaluator/cinema/Rail: fixed-bottom colapsable
-// (50px ↔ 320px), backdrop blur, carrusel horizontal. Filtros por riskZone.
-// Visible SIEMPRE (incluido el Lobby) — el Rail no es una pantalla aparte.
+// Rail de SUBPRODUCTOS de Clima (v3 §3A). Antes listaba departamentos (hasta 250
+// en un carrusel plano — inviable a escala e inconsistente con el patrón de Rail
+// del resto de módulos). Ahora es el MENÚ del producto: 4 cards fijas
+// [Cascada] [Análisis de Clima] [Ranking] [Dimensiones]. Cada una abre su propia
+// vista; el filtrado jerárquico se resuelve DENTRO de cada vista, nunca acá.
+//
+// Se reusa el shell (fixed-bottom colapsable 50px ↔ 320px, backdrop blur,
+// carrusel, selector de campaña) — solo cambia la card interna y se retiran los
+// filtros por zona (un subproducto no tiene zona de riesgo).
 
-import { useMemo, useRef } from 'react';
+import { useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import DepartmentRailCard from './DepartmentRailCard';
-import { zoneColor } from '@/components/clima/climaZonePalette';
-import type {
-  ClimaDepartmentInsight,
-  ClimaRailFilter,
-  RiskZone,
-  ClimaCampaignSummary,
-} from '@/types/clima';
+import ClimaSubproductoRailCard from './ClimaSubproductoRailCard';
+import { CLIMA_SUBPRODUCTOS, climaSubproductoLabel } from '@/lib/constants/climaSubproductos';
+import type { ClimaSubproducto, ClimaCampaignSummary } from '@/types/clima';
 
 interface ClimaRailProps {
-  departments: ClimaDepartmentInsight[];
-  selectedId: string | null;
+  activeSubproducto: ClimaSubproducto | null;
   isExpanded: boolean;
-  activeFilter: ClimaRailFilter;
   onToggle: () => void;
-  onSelect: (id: string) => void;
-  onFilterChange: (f: ClimaRailFilter) => void;
+  onSelectSubproducto: (s: ClimaSubproducto) => void;
   // Selector de campaña (movido acá desde el header para no cortar el título).
   campaigns: ClimaCampaignSummary[];
   selectedCampaignId: string | null;
   onSelectCampaign: (id: string) => void;
 }
 
-const FILTER_ORDER: ClimaRailFilter[] = ['todos', 'roja', 'naranja', 'amarilla', 'verde'];
-const FILTER_LABEL: Record<ClimaRailFilter, string> = {
-  todos: 'Todos',
-  roja: 'Críticos',
-  naranja: 'En riesgo',
-  amarilla: 'En observación',
-  verde: 'Saludables',
-};
-
 export default function ClimaRail({
-  departments,
-  selectedId,
+  activeSubproducto,
   isExpanded,
-  activeFilter,
   onToggle,
-  onSelect,
-  onFilterChange,
+  onSelectSubproducto,
   campaigns,
   selectedCampaignId,
   onSelectCampaign,
 }: ClimaRailProps) {
-  const selectedDept = departments.find((d) => d.departmentId === selectedId);
   const carouselRef = useRef<HTMLDivElement>(null);
-
-  const filtered = useMemo(() => {
-    if (activeFilter === 'todos') return departments;
-    return departments.filter((d) => d.riskZone === (activeFilter as RiskZone));
-  }, [departments, activeFilter]);
-
-  const counts = useMemo(() => {
-    const c: Record<ClimaRailFilter, number> = {
-      todos: departments.length,
-      roja: 0,
-      naranja: 0,
-      amarilla: 0,
-      verde: 0,
-    };
-    for (const d of departments) {
-      if (d.riskZone) c[d.riskZone] += 1;
-    }
-    return c;
-  }, [departments]);
 
   const scrollLeft = () => carouselRef.current?.scrollBy({ left: -200, behavior: 'smooth' });
   const scrollRight = () => carouselRef.current?.scrollBy({ left: 200, behavior: 'smooth' });
@@ -96,7 +62,7 @@ export default function ClimaRail({
       >
         <div className="flex items-center gap-3">
           <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">
-            Departamentos ({departments.length})
+            Explorar
           </h3>
           <ChevronUp
             className={cn(
@@ -106,11 +72,11 @@ export default function ClimaRail({
           />
         </div>
 
-        {!isExpanded && selectedId && selectedDept && (
+        {!isExpanded && activeSubproducto && (
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-slate-400 font-medium">Viendo:</span>
             <span className="text-[10px] text-cyan-400 font-mono font-bold uppercase truncate max-w-[160px]">
-              {selectedDept.departmentName}
+              {climaSubproductoLabel(activeSubproducto)}
             </span>
           </div>
         )}
@@ -142,7 +108,7 @@ export default function ClimaRail({
             }}
             className="bg-cyan-400 hover:bg-cyan-300 text-slate-950 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all shadow-[0_2px_10px_rgba(34,211,238,0.3)]"
           >
-            {isExpanded ? 'Ocultar' : 'Ver deptos'}
+            {isExpanded ? 'Ocultar' : 'Módulos'}
           </button>
         </div>
       </div>
@@ -150,44 +116,11 @@ export default function ClimaRail({
       {/* Contenido expandible */}
       <div
         className={cn(
-          'transition-opacity duration-200 flex-1 flex flex-col min-h-0',
+          'transition-opacity duration-200 flex-1 flex flex-col min-h-0 justify-center',
           isExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
       >
-        {/* Filtros por zona */}
-        <div className="px-4 md:px-8 pb-4 flex gap-2 flex-shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden">
-          {FILTER_ORDER.map((f) => {
-            const isActive = activeFilter === f;
-            const count = counts[f];
-            if (f !== 'todos' && count === 0) return null;
-            return (
-              <button
-                key={f}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onFilterChange(f);
-                }}
-                className={cn(
-                  'px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all whitespace-nowrap',
-                  isActive
-                    ? f === 'todos'
-                      ? 'bg-cyan-400 text-slate-950 shadow-[0_2px_10px_rgba(34,211,238,0.3)]'
-                      : 'text-slate-950'
-                    : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700'
-                )}
-                style={
-                  isActive && f !== 'todos'
-                    ? { backgroundColor: zoneColor(f as RiskZone) }
-                    : undefined
-                }
-              >
-                {FILTER_LABEL[f]} {count}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Carrusel */}
+        {/* Carrusel de subproductos */}
         <div className="relative group">
           <button
             onClick={scrollLeft}
@@ -198,15 +131,15 @@ export default function ClimaRail({
 
           <div
             ref={carouselRef}
-            className="flex overflow-x-auto gap-3 px-4 md:px-8 pb-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth"
+            className="flex overflow-x-auto gap-3 px-4 md:px-8 pb-6 justify-center [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth"
             style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
           >
-            {filtered.map((dept) => (
-              <DepartmentRailCard
-                key={dept.departmentId}
-                department={dept}
-                isSelected={selectedId === dept.departmentId}
-                onClick={() => onSelect(dept.departmentId)}
+            {CLIMA_SUBPRODUCTOS.map((sub) => (
+              <ClimaSubproductoRailCard
+                key={sub.id}
+                subproducto={sub}
+                isActive={activeSubproducto === sub.id}
+                onClick={() => onSelectSubproducto(sub.id)}
               />
             ))}
           </div>

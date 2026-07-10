@@ -13,10 +13,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useClimaCampaigns } from './useClimaCampaigns';
+import { CLIMA_DIMENSIONS } from '@/lib/constants/climaDimensions';
+import {
+  aggregateClimaDimension,
+  type ClimaDimensionAgg,
+} from '@/lib/utils/aggregateClimaDimension';
 import type {
   ClimaResultsResponse,
   ClimaChapter,
   ClimaRailFilter,
+  ClimaSubproducto,
   ClimaNextDepartment,
   ClimaCinemaStats,
   RiskZone,
@@ -51,6 +57,8 @@ export interface UseClimaCinemaModeReturn {
   // Resultados
   results: ClimaResultsResponse | null;
   stats: ClimaCinemaStats;
+  /** Agregado read-time de las 8 dimensiones (Cards + Toolbar del Lobby, 4.5b). */
+  dimensions: Record<string, ClimaDimensionAgg>;
   orgFavorability: number | null;
   orgRiskZone: RiskZone | null;
   orgMomentum: number | null;
@@ -67,10 +75,14 @@ export interface UseClimaCinemaModeReturn {
   // Navegación
   selectedDepartmentId: string | null;
   activeChapter: ClimaChapter | null;
+  /** Subproducto abierto desde el Rail (v3 §3A). null = Lobby. */
+  activeSubproducto: ClimaSubproducto | null;
   isRailExpanded: boolean;
   railFilter: ClimaRailFilter;
   selectDepartment: (id: string) => void;
   selectChapter: (chapter: ClimaChapter) => void;
+  selectSubproducto: (s: ClimaSubproducto) => void;
+  exitSubproducto: () => void;
   exitToLobby: () => void;
   toggleRail: () => void;
   setRailFilter: (f: ClimaRailFilter) => void;
@@ -92,6 +104,7 @@ export function useClimaCinemaMode(initialCampaignId?: string): UseClimaCinemaMo
   // Navegación
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null);
   const [activeChapter, setActiveChapter] = useState<ClimaChapter | null>(null);
+  const [activeSubproducto, setActiveSubproducto] = useState<ClimaSubproducto | null>(null);
   const [isRailExpanded, setIsRailExpanded] = useState(false);
   const [railFilter, setRailFilter] = useState<ClimaRailFilter>('todos');
 
@@ -152,6 +165,7 @@ export function useClimaCinemaMode(initialCampaignId?: string): UseClimaCinemaMo
     // Reset navegación al cambiar de campaña
     setSelectedDepartmentId(null);
     setActiveChapter(null);
+    setActiveSubproducto(null);
     setRailFilter('todos');
     // La Cascada Ejecutiva vuelve a mostrarse para la nueva campaña.
     setIntroDismissed(false);
@@ -186,6 +200,16 @@ export function useClimaCinemaMode(initialCampaignId?: string): UseClimaCinemaMo
     };
   }, [results]);
 
+  // Agregado por dimensión (las 8) para las Cards + el ClimaToolbar del Lobby.
+  const dimensions = useMemo<Record<string, ClimaDimensionAgg>>(() => {
+    if (!results) return {};
+    const out: Record<string, ClimaDimensionAgg> = {};
+    for (const dim of CLIMA_DIMENSIONS) {
+      out[dim.key] = aggregateClimaDimension(results, dim.key);
+    }
+    return out;
+  }, [results]);
+
   const pageState = useMemo<ClimaPageState>(() => {
     if (isLoadingCampaigns) return 'loading';
     if (campaignsError) return 'error';
@@ -209,17 +233,36 @@ export function useClimaCinemaMode(initialCampaignId?: string): UseClimaCinemaMo
   const selectDepartment = useCallback((id: string) => {
     setSelectedDepartmentId(id);
     setActiveChapter(null);
+    setActiveSubproducto(null);
     setIsRailExpanded(false);
   }, []);
 
   const selectChapter = useCallback((chapter: ClimaChapter) => {
     setActiveChapter(chapter);
     setSelectedDepartmentId(null);
+    setActiveSubproducto(null);
   }, []);
+
+  // Rail de subproductos (v3 §3A). Cascada no es una vista aparte: re-arma la
+  // secuencia intro sobre el Lobby (introDismissed=false). El resto abre su vista.
+  const selectSubproducto = useCallback((s: ClimaSubproducto) => {
+    setSelectedDepartmentId(null);
+    setActiveChapter(null);
+    setIsRailExpanded(false);
+    if (s === 'cascada') {
+      setActiveSubproducto(null);
+      setIntroDismissed(false);
+    } else {
+      setActiveSubproducto(s);
+    }
+  }, []);
+
+  const exitSubproducto = useCallback(() => setActiveSubproducto(null), []);
 
   const exitToLobby = useCallback(() => {
     setSelectedDepartmentId(null);
     setActiveChapter(null);
+    setActiveSubproducto(null);
   }, []);
 
   const toggleRail = useCallback(() => setIsRailExpanded((v) => !v), []);
@@ -240,6 +283,7 @@ export function useClimaCinemaMode(initialCampaignId?: string): UseClimaCinemaMo
     selectCampaign,
     results,
     stats,
+    dimensions,
     orgFavorability: results?.orgFavorability ?? null,
     orgRiskZone: results?.orgRiskZone ?? null,
     orgMomentum: results?.orgMomentum ?? null,
@@ -249,10 +293,13 @@ export function useClimaCinemaMode(initialCampaignId?: string): UseClimaCinemaMo
     nextDepartment,
     selectedDepartmentId,
     activeChapter,
+    activeSubproducto,
     isRailExpanded,
     railFilter,
     selectDepartment,
     selectChapter,
+    selectSubproducto,
+    exitSubproducto,
     exitToLobby,
     toggleRail,
     setRailFilter,

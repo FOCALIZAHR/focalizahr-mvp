@@ -7,14 +7,13 @@
 // "siguiente" es el departamento en peor zona (Smart Router).
 
 import { motion } from 'framer-motion';
-import { ArrowRight, LayoutGrid, Target, Activity } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import EngagementGauge from '@/components/clima/EngagementGauge';
 import { zoneColor } from '@/components/clima/climaZonePalette';
 import type {
   ClimaCinemaStats,
   ClimaNextDepartment,
-  ClimaChapter,
   RiskZone,
 } from '@/types/clima';
 
@@ -26,7 +25,6 @@ interface ClimaMissionControlProps {
   stats: ClimaCinemaStats;
   nextDepartment: ClimaNextDepartment | null;
   onSelectDepartment: (id: string) => void;
-  onSelectChapter: (chapter: ClimaChapter) => void;
 }
 
 // Etiquetas de zona (concordancia femenina con "zona"), alineadas a ZONE_LABEL.
@@ -51,12 +49,6 @@ const ZONE_TOOLTIP: Record<RiskZone, string> = {
   amarilla: 'Zona en observación — engagement 65-74%',
   verde: 'Zona saludable — engagement 75% o más',
 };
-
-const CHAPTERS: { id: ClimaChapter; label: string; icon: typeof LayoutGrid }[] = [
-  { id: 'heatmap', label: 'Mapa de calor', icon: LayoutGrid },
-  { id: 'impact', label: 'Impacto × Brecha', icon: Target },
-  { id: 'correlacion', label: 'Clima × Rotación', icon: Activity },
-];
 
 // Leyenda de distribución de zonas de la compañía. Severidad = color del punto
 // (anti-semáforo); texto neutro. `vertical` para el layout desktop (izquierda).
@@ -131,7 +123,6 @@ export default function ClimaMissionControl({
   stats,
   nextDepartment,
   onSelectDepartment,
-  onSelectChapter,
 }: ClimaMissionControlProps) {
   const scopeLabel = scope === 'area' ? 'tu área' : 'tu organización';
 
@@ -183,24 +174,6 @@ export default function ClimaMissionControl({
       {/* Distribución de zonas — mobile */}
       <div className="md:hidden">
         <ZoneLegend stats={stats} />
-      </div>
-
-      {/* Entradas a los capítulos analíticos de compañía */}
-      <div className="flex flex-wrap items-center justify-center gap-3">
-        {CHAPTERS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => onSelectChapter(id)}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-light',
-              'border border-slate-700/50 bg-slate-900/60 text-slate-300',
-              'hover:border-cyan-500/40 hover:text-white transition-colors'
-            )}
-          >
-            <Icon className="w-4 h-4 text-slate-400" />
-            {label}
-          </button>
-        ))}
       </div>
 
       {/* Capacidades del análisis completo (discretas, sin lenguaje "en construcción") */}

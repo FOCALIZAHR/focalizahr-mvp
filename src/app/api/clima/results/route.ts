@@ -29,6 +29,10 @@ import {
 } from '@/lib/services/clima/PulseEngine';
 import { CLIMA_CAMPAIGN_SLUGS } from '@/lib/services/clima/ClimaAggregationService';
 import { CLIMA_MIN_RESPONDENTS } from '@/lib/services/clima/climaThresholds';
+import {
+  rollupClimaHierarchy,
+  type ClimaHierarchyNodes,
+} from '@/lib/utils/rollupClimaGerencias';
 import type {
   ClimaDepartmentInsight,
   ClimaDriverScore,
@@ -259,6 +263,27 @@ export async function GET(request: NextRequest) {
       crossSignals: crossByDept.get(r.departmentId) ?? null,
     }));
 
+    // ── Rollup (A2): agregación RECURSIVA sobre la jerarquía (N≤4) ──
+    // Se cargan los nodos del scope para resolver la ascendencia por parentId:
+    // AREA_MANAGER solo su subárbol visible (no expone ancestros por encima de su
+    // scope); el resto, toda la cuenta (bounded). rollupClimaHierarchy poda a las
+    // ramas con hojas-insight y agrega nivel por nivel.
+    let gerencias = departments;
+    if (visibleDeptIdList.length) {
+      const nodeRows = await prisma.department.findMany({
+        where: {
+          accountId: userContext.accountId,
+          isActive: true,
+          ...(visibleDeptIds ? { id: { in: [...visibleDeptIds] } } : {}),
+        },
+        select: { id: true, parentId: true, displayName: true },
+      });
+      const nodes: ClimaHierarchyNodes = new Map(
+        nodeRows.map((n) => [n.id, { id: n.id, parentId: n.parentId, name: n.displayName }]),
+      );
+      gerencias = rollupClimaHierarchy(departments, nodes);
+    }
+
     // ── Derivación read-time de compañía (scope visible) ──
     const org = calcOrgFavorability(
       departments.map((d) => ({
@@ -343,6 +368,7 @@ export async function GET(request: NextRequest) {
       },
       company: { name: campaign.account.companyName, country: campaign.account.country },
       departments,
+      gerencias,
       companyPulse,
       orgFavorability: org.favorability,
       orgRiskZone: org.riskZone,

@@ -131,6 +131,11 @@ export interface ClimaDepartmentInsight {
 
   /** Señales cross-módulo confirmadas (Gate 4.5a). null si no cableado/sin dato. */
   crossSignals?: ClimaCrossSignal | null;
+
+  /** Departamentos hijos (nivel 3) cuando esta unidad es una gerencia agregada
+   *  (rollup A). Permite el drill-down navegable gerencia → departamentos, igual
+   *  que Onboarding/Exit/TAC. undefined en departamentos hoja. */
+  children?: ClimaDepartmentInsight[];
 }
 
 /** Gold cache clima por depto (Department, rolling 12m). */
@@ -164,6 +169,10 @@ export interface ClimaResultsResponse {
   };
   company: { name: string; country: string | null };
   departments: ClimaDepartmentInsight[];
+  /** Rollup (A) — mismas unidades agregadas a nivel GERENCIA (nivel 2), por
+   *  dimensión, ponderado por participantes. Fuente de la evidencia de la vista
+   *  Dimensiones (§3D). En orgs de un solo nivel coincide con `departments`. */
+  gerencias: ClimaDepartmentInsight[];
   companyPulse: CompanyPulseSummary;
   /** Favorability de compañía (o del scope visible) ponderada por headcount. */
   orgFavorability: number | null;
@@ -184,8 +193,15 @@ export interface ClimaResultsResponse {
 /** Capítulos analíticos de compañía (Cover→Content), accesibles desde el Lobby. */
 export type ClimaChapter = 'heatmap' | 'impact' | 'correlacion';
 
-/** Filtro de departamentos del Rail por zona de riesgo. */
+/** Filtro de departamentos del Rail por zona de riesgo.
+ *  @deprecated El Rail dejó de listar departamentos (Gate 4.5b — Rail de
+ *  subproductos, v3 §3A). Se conserva para el filtrado interno de vistas. */
 export type ClimaRailFilter = 'todos' | RiskZone;
+
+/** Subproductos de Clima — las 4 cards del Rail (v3 §3A). Cada una abre su
+ *  propia vista completa; el filtrado jerárquico se resuelve DENTRO de cada
+ *  vista (patrón `scope`), nunca en el Rail. */
+export type ClimaSubproducto = 'cascada' | 'analisis' | 'ranking' | 'dimensiones';
 
 export interface ClimaCinemaStats {
   deptCount: number;

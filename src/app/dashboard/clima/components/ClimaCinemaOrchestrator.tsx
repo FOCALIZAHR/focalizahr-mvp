@@ -18,7 +18,10 @@ import { useClimaCinemaMode } from '@/hooks/useClimaCinemaMode';
 import { FHREmptyState } from '@/components/ui/FHREmptyState';
 import ClimaHeader from './ClimaHeader';
 import ClimaMissionControl from './ClimaMissionControl';
+import ClimaToolbar from '@/components/clima/ClimaToolbar';
 import ClimaRail from './ClimaRail';
+import ClimaSubproductoScaffold from './ClimaSubproductoScaffold';
+import ClimaDimensionesView from './ClimaDimensionesView';
 import DepartmentSpotlightCard from './DepartmentSpotlightCard';
 import ClimaChapterView from './ClimaChapterView';
 import ClimaIntroSequence from './cascada/ClimaIntroSequence';
@@ -70,7 +73,11 @@ export default function ClimaCinemaOrchestrator({
   // Cascada Ejecutiva (Gate 4.5a): precede al Lobby hasta que el CEO la
   // termina/salta. El Lobby y el Rail solo aparecen tras descartarla.
   const showIntro = isReady && !isSpotlight && !isChapter && !hook.introDismissed;
-  const showLobby = isReady && !isSpotlight && !isChapter && hook.introDismissed;
+  // Tras descartar la intro: subproducto abierto (v3 §3A) o Lobby limpio.
+  const activeSubproducto = hook.activeSubproducto;
+  const baseAfterIntro = isReady && !isSpotlight && !isChapter && hook.introDismissed;
+  const showSubproducto = baseAfterIntro && activeSubproducto !== null;
+  const showLobby = baseAfterIntro && activeSubproducto === null;
 
   return (
     <div className="h-screen w-full bg-[#0F172A] text-white flex flex-col font-sans overflow-hidden">
@@ -81,9 +88,9 @@ export default function ClimaCinemaOrchestrator({
       <div
         className={cn(
           'flex-1 relative flex justify-center p-4 md:p-8 overflow-y-auto',
-          isSpotlight || isChapter || showIntro ? 'items-start' : 'items-center',
+          isSpotlight || isChapter || showIntro || showSubproducto ? 'items-start' : 'items-center',
           'transition-all duration-500 ease-in-out',
-          showLobby || isSpotlight || isChapter
+          showLobby || showSubproducto || isSpotlight || isChapter
             ? hook.isRailExpanded
               ? 'mb-[320px]'
               : 'mb-[50px]'
@@ -153,7 +160,25 @@ export default function ClimaCinemaOrchestrator({
               stats={hook.stats}
               nextDepartment={hook.nextDepartment}
               onSelectDepartment={hook.selectDepartment}
-              onSelectChapter={hook.selectChapter}
+            />
+          )}
+
+          {/* Vista de subproducto abierta desde el Rail (v3 §3A). Dimensiones (C)
+              ya tiene vista real; Análisis (D) y Ranking (E) usan el andamio. */}
+          {showSubproducto && activeSubproducto === 'dimensiones' && hook.results && (
+            <ClimaDimensionesView
+              key="subproducto-dimensiones"
+              dimensions={hook.dimensions}
+              gerencias={hook.results.gerencias}
+              onBack={hook.exitSubproducto}
+            />
+          )}
+
+          {showSubproducto && activeSubproducto && activeSubproducto !== 'dimensiones' && (
+            <ClimaSubproductoScaffold
+              key={`subproducto-${activeSubproducto}`}
+              subproducto={activeSubproducto}
+              onBack={hook.exitSubproducto}
             />
           )}
         </AnimatePresence>
@@ -172,20 +197,23 @@ export default function ClimaCinemaOrchestrator({
         )}
       </AnimatePresence>
 
-      {/* Rail de departamentos — fijo abajo tras descartar la Cascada Ejecutiva */}
+      {/* Rail de subproductos (v3 §3A) — fijo abajo tras descartar la Cascada. */}
       {isReady && hook.results && hook.introDismissed && (
         <ClimaRail
-          departments={hook.results.departments}
-          selectedId={hook.selectedDepartmentId}
+          activeSubproducto={hook.activeSubproducto}
           isExpanded={hook.isRailExpanded}
-          activeFilter={hook.railFilter}
           onToggle={hook.toggleRail}
-          onSelect={hook.selectDepartment}
-          onFilterChange={hook.setRailFilter}
+          onSelectSubproducto={hook.selectSubproducto}
           campaigns={hook.campaigns}
           selectedCampaignId={hook.selectedCampaignId}
           onSelectCampaign={hook.selectCampaign}
         />
+      )}
+
+      {/* ClimaToolbar — barra flotante de las 8 dimensiones, SOLO en el Lobby.
+          Anexo a demanda (§8.2); fijo right-center, se auto-oculta en mobile. */}
+      {showLobby && hook.results && (
+        <ClimaToolbar dimensions={hook.dimensions} departments={hook.results.departments} />
       )}
     </div>
   );
