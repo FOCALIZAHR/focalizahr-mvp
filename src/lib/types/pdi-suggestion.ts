@@ -61,6 +61,17 @@ export interface CompetencyTemplate {
   }
 }
 
+/**
+ * Evidencia cruzada de CLIMA (EX Clima Gate 5B). Cuando una brecha se origina o
+ * se corrobora con clima de equipo, viaja este contexto. Es ADITIVO: opcional en
+ * todo el pipeline — sin él, el motor se comporta EXACTAMENTE como antes.
+ */
+export interface ClimaCrossEvidence {
+  driver: string // dimensión de clima (taxonomía real: liderazgo, autonomia, …)
+  teamFavorability: number // 0-100
+  gap360?: number // brecha 360° que corrobora, si existe
+}
+
 // Input del motor
 export interface GapAnalysisInput {
   competencyCode: string
@@ -70,6 +81,8 @@ export interface GapAnalysisInput {
   peerAvgScore?: number
   gapType: DevelopmentGapType
   gapValue: number
+  /** Evidencia cruzada de clima (Gate 5B). Opcional — ausencia = comportamiento legacy. */
+  climaContext?: ClimaCrossEvidence
 }
 
 // Output del motor
@@ -81,4 +94,6 @@ export interface GeneratedSuggestion {
   suggestion: SuggestionGoal
   coachingTip: string
   priority: DevelopmentPriority
+  /** Presente SOLO si el gap traía climaContext (Gate 5B). Ausente en el flujo 360 puro. */
+  climaEvidence?: ClimaCrossEvidence
 }

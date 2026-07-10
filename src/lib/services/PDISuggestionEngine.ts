@@ -10,6 +10,8 @@ import {
   PDI_COMPETENCY_LIBRARY,
   GENERIC_COMPETENCY_TEMPLATE
 } from '@/lib/data/pdi-competency-library'
+import { mapClimaDimensionToCompetency } from '@/lib/data/clima-competency-mapping'
+import { CLIMA_TARGET_FAVORABILITY } from '@/lib/services/clima/climaThresholds'
 import { DevelopmentGapType, DevelopmentPriority } from '@prisma/client'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -43,7 +45,10 @@ export class PDISuggestionEngine {
           originalGap: gap.gapValue,
           suggestion: goal,
           coachingTip,
-          priority: this.calculatePriority(gap)
+          priority: this.calculatePriority(gap),
+          // ADITIVO (Gate 5B): climaEvidence SOLO si el gap trae climaContext.
+          // Sin climaContext la clave NO se agrega → objeto idéntico al flujo 360.
+          ...(gap.climaContext ? { climaEvidence: gap.climaContext } : {})
         })
       }
     }
@@ -216,6 +221,43 @@ export class PDISuggestionEngine {
     }))
 
     return this.generateSuggestions(gapInputs, performanceTrack)
+  }
+
+  /**
+   * EX Clima Gate 5B-i — construye un GapAnalysisInput desde una brecha de CLIMA
+   * (opción B: dimensión de clima → competencia 360° más cercana vía mapeo
+   * PROVISIONAL). El input resultante arrastra `climaContext`, de modo que la
+   * sugerencia generada lleva la evidencia cruzada (clima equipo + brecha 360°).
+   *
+   * ADITIVO: es un CONSTRUCTOR de input; no altera generateSuggestions para el
+   * flujo 360 puro. Lo consumirá el CTA de PDI en Gate 5B-ii.
+   *
+   * ⚠️ PROVISIONAL: tanto el mapeo dimensión→competencia (ver
+   * clima-competency-mapping.ts) como el PUENTE DE ESCALA favorabilidad(0-100)→
+   * mean(1-5) de abajo son relleno estructural — Victor/Studio IA los reemplaza.
+   */
+  static buildClimaGapInput(
+    driver: string,
+    teamFavorability: number,
+    gap360?: number
+  ): GapAnalysisInput {
+    const { competencyCode, competencyName } = mapClimaDimensionToCompetency(driver)
+
+    // PROVISIONAL — puente de escala favorabilidad (0-100) → mean 1-5.
+    const round2 = (x: number) => Math.round(x * 100) / 100
+    const selfScore = round2(teamFavorability / 20)
+    const managerScore = round2(CLIMA_TARGET_FAVORABILITY / 20)
+    const gapValue = round2((teamFavorability - CLIMA_TARGET_FAVORABILITY) / 20)
+
+    return {
+      competencyCode,
+      competencyName,
+      selfScore,
+      managerScore,
+      gapType: 'DEVELOPMENT_AREA' as DevelopmentGapType,
+      gapValue,
+      climaContext: { driver, teamFavorability, gap360 }
+    }
   }
 
   /**
