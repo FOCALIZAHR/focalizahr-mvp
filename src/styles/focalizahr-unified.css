@@ -647,6 +647,24 @@
   }
 }
 
+/* .fhr-glass-card — Card Premium (blur intenso, borde cyan, glow).
+   AGREGADA POR PRIMERA VEZ 2026-07-10 (Gate 4.5b-F): materializa la clase que
+   premium-components.md (skill focalizahr-design) documentaba pero que NUNCA
+   existió en código. Corrige de paso el bug latente de StickyFooter.tsx, que la
+   referenciaba sin efecto. Definición verbatim del skill doc (+ prefijo -webkit-
+   para paridad cross-browser con .fhr-card-glass). NO es un cambio arbitrario al
+   sistema — es cerrar una inconsistencia doc↔código ya documentada. */
+.fhr-glass-card {
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(34, 211, 238, 0.2);
+  border-radius: 20px;
+  box-shadow:
+    0 0 40px rgba(34, 211, 238, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
 /* Card para preguntas (survey) */
 .fhr-card-question {
   background: rgba(30, 41, 59, 0.5);

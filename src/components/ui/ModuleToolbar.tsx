@@ -28,6 +28,12 @@ export interface ToolDefinition {
   disabled?: boolean
   /** Razón del deshabilitado — se muestra en el tooltip en lugar del label. */
   disabledReason?: string
+  /** Banda/etiqueta de estado (ej. zona de clima "En riesgo"). Si se provee, el
+   *  hover muestra una card de vista previa (Capa 1): ícono + nombre, número
+   *  protagonista en blanco, banda como acento de color, Línea Tesla. */
+  band?: string
+  /** Línea de contexto bajo el número en la card de hover (ej. "vs. objetivo 75"). */
+  sublabel?: string
 }
 
 interface ModuleToolbarProps {
@@ -122,25 +128,70 @@ export default function ModuleToolbar({ tools, ctaLabel, onCTA, onSelect }: Modu
                 />
               </button>
 
-              {/* Custom tooltip — slide left on hover */}
+              {/* Hover: popover Capa 1 (§3E) con .fhr-glass-card cuando hay band;
+                  si no, el tooltip plano de label (comportamiento previo). */}
               <AnimatePresence>
-                {hoveredId === t.id && activeId !== t.id && (
-                  <motion.div
-                    initial={{ opacity: 0, x: 6 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 6 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-full top-1/2 -translate-y-1/2 mr-2 pointer-events-none px-2.5 py-1 rounded-lg text-xs font-light text-slate-300 max-w-[220px] text-right leading-snug"
-                    style={{
-                      background: GLASS_BG,
-                      backdropFilter: GLASS_BLUR,
-                      WebkitBackdropFilter: GLASS_BLUR,
-                      border: GLASS_BORDER,
-                    }}
-                  >
-                    {t.disabled ? (t.disabledReason ?? t.label) : t.label}
-                  </motion.div>
-                )}
+                {hoveredId === t.id && activeId !== t.id &&
+                  (!t.disabled && t.band ? (
+                    <motion.div
+                      initial={{ opacity: 0, x: 8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 8 }}
+                      transition={{ duration: 0.18, ease: 'easeOut' }}
+                      // Card de vista previa de la dimensión (Capa 1). Borde canónico
+                      // cyan de .fhr-glass-card (NO por zona). Ancho para que la
+                      // Línea Tesla luzca. Anti-semáforo: número blanco; el color de
+                      // zona vive SOLO en el acento de la banda.
+                      className="fhr-glass-card absolute right-full top-1/2 -translate-y-1/2 mr-2.5 pointer-events-none w-[190px] px-4 py-3.5 text-left overflow-hidden"
+                    >
+                      {/* Línea Tesla — un solo color (cyan), variante canónica
+                          para elementos chicos donde el gradiente 2-color no luce. */}
+                      <div
+                        className="absolute top-0 left-0 right-0 h-[2px]"
+                        style={{
+                          background: 'linear-gradient(90deg, transparent, #22D3EE, transparent)',
+                          boxShadow: '0 0 20px #22D3EE',
+                        }}
+                      />
+                      {/* Ícono + nombre de la dimensión */}
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Icon className="w-3 h-3" style={{ color: 'rgba(148,163,184,0.55)' }} />
+                        <span className="text-[9px] uppercase tracking-[0.15em] text-slate-500">
+                          {t.label}
+                        </span>
+                      </div>
+                      {/* Número protagonista (blanco) + banda como acento de zona */}
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-[30px] font-extralight tabular-nums text-white leading-none">
+                          {t.metric}
+                        </span>
+                        <span className="text-[11px] font-light" style={{ color: t.color }}>
+                          {t.band}
+                        </span>
+                      </div>
+                      {t.sublabel && (
+                        <span className="block text-[9px] font-light text-slate-500 mt-1.5">
+                          {t.sublabel}
+                        </span>
+                      )}
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0, x: 6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 6 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-full top-1/2 -translate-y-1/2 mr-2 pointer-events-none px-2.5 py-1 rounded-lg text-xs font-light text-slate-300 max-w-[220px] text-right leading-snug"
+                      style={{
+                        background: GLASS_BG,
+                        backdropFilter: GLASS_BLUR,
+                        WebkitBackdropFilter: GLASS_BLUR,
+                        border: GLASS_BORDER,
+                      }}
+                    >
+                      {t.disabled ? (t.disabledReason ?? t.label) : t.label}
+                    </motion.div>
+                  ))}
               </AnimatePresence>
             </div>
           )

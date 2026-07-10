@@ -77,12 +77,15 @@ export interface UseClimaCinemaModeReturn {
   activeChapter: ClimaChapter | null;
   /** Subproducto abierto desde el Rail (v3 §3A). null = Lobby. */
   activeSubproducto: ClimaSubproducto | null;
+  /** Dimensión de aterrizaje de la vista Dimensiones (Toolbar §3E). null = focus[0]. */
+  dimensionesInitialDriver: string | null;
   isRailExpanded: boolean;
   railFilter: ClimaRailFilter;
   selectDepartment: (id: string) => void;
   selectChapter: (chapter: ClimaChapter) => void;
   selectSubproducto: (s: ClimaSubproducto) => void;
   exitSubproducto: () => void;
+  openDimensionesAt: (driver: string) => void;
   exitToLobby: () => void;
   toggleRail: () => void;
   setRailFilter: (f: ClimaRailFilter) => void;
@@ -105,6 +108,9 @@ export function useClimaCinemaMode(initialCampaignId?: string): UseClimaCinemaMo
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null);
   const [activeChapter, setActiveChapter] = useState<ClimaChapter | null>(null);
   const [activeSubproducto, setActiveSubproducto] = useState<ClimaSubproducto | null>(null);
+  // Dimensión de aterrizaje al abrir Dimensiones desde el Toolbar (§3E). null =
+  // entrada por el Rail → aterriza en la peor dimensión (focus[0]).
+  const [dimensionesInitialDriver, setDimensionesInitialDriver] = useState<string | null>(null);
   const [isRailExpanded, setIsRailExpanded] = useState(false);
   const [railFilter, setRailFilter] = useState<ClimaRailFilter>('todos');
 
@@ -166,6 +172,7 @@ export function useClimaCinemaMode(initialCampaignId?: string): UseClimaCinemaMo
     setSelectedDepartmentId(null);
     setActiveChapter(null);
     setActiveSubproducto(null);
+    setDimensionesInitialDriver(null);
     setRailFilter('todos');
     // La Cascada Ejecutiva vuelve a mostrarse para la nueva campaña.
     setIntroDismissed(false);
@@ -253,11 +260,22 @@ export function useClimaCinemaMode(initialCampaignId?: string): UseClimaCinemaMo
       setActiveSubproducto(null);
       setIntroDismissed(false);
     } else {
+      // Entrada por el Rail → sin dimensión fija (aterriza en focus[0]).
+      if (s === 'dimensiones') setDimensionesInitialDriver(null);
       setActiveSubproducto(s);
     }
   }, []);
 
   const exitSubproducto = useCallback(() => setActiveSubproducto(null), []);
+
+  // Atajo del Toolbar (§3E): abre Dimensiones aterrizando en una dimensión.
+  const openDimensionesAt = useCallback((driver: string) => {
+    setSelectedDepartmentId(null);
+    setActiveChapter(null);
+    setIsRailExpanded(false);
+    setDimensionesInitialDriver(driver);
+    setActiveSubproducto('dimensiones');
+  }, []);
 
   const exitToLobby = useCallback(() => {
     setSelectedDepartmentId(null);
@@ -294,12 +312,14 @@ export function useClimaCinemaMode(initialCampaignId?: string): UseClimaCinemaMo
     selectedDepartmentId,
     activeChapter,
     activeSubproducto,
+    dimensionesInitialDriver,
     isRailExpanded,
     railFilter,
     selectDepartment,
     selectChapter,
     selectSubproducto,
     exitSubproducto,
+    openDimensionesAt,
     exitToLobby,
     toggleRail,
     setRailFilter,

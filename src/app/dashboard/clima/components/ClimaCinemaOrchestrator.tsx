@@ -170,6 +170,7 @@ export default function ClimaCinemaOrchestrator({
               key="subproducto-dimensiones"
               dimensions={hook.dimensions}
               gerencias={hook.results.gerencias}
+              initialDriver={hook.dimensionesInitialDriver}
               onBack={hook.exitSubproducto}
             />
           )}
@@ -213,7 +214,7 @@ export default function ClimaCinemaOrchestrator({
       {/* ClimaToolbar — barra flotante de las 8 dimensiones, SOLO en el Lobby.
           Anexo a demanda (§8.2); fijo right-center, se auto-oculta en mobile. */}
       {showLobby && hook.results && (
-        <ClimaToolbar dimensions={hook.dimensions} departments={hook.results.departments} />
+        <ClimaToolbar dimensions={hook.dimensions} onOpenDimension={hook.openDimensionesAt} />
       )}
     </div>
   );
