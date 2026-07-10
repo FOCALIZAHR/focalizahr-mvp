@@ -34,6 +34,7 @@ const PERMS_BY_MODULE: Record<
   { view: PermissionType; manage: PermissionType }
 > = {
   compliance: { view: 'compliance:view', manage: 'compliance:manage' },
+  clima: { view: 'clima:view', manage: 'clima:manage' },
 };
 
 // ════════════════════════════════════════════════════════════════════════════
