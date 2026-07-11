@@ -2698,6 +2698,11 @@ model DevelopmentGoal {
   suggestedResources Json?
   action            String?  @db.Text
 
+  // EX Clima Gate 5B-ii: evidencia cruzada de clima ({driver, teamFavorability, gap360?})
+  // cuando este goal se originó desde un hallazgo de clima (CTA1 PDI suave). null en los
+  // goals de origen 360/RoleFit → clima y Performance coexisten en el mismo DevelopmentPlan.
+  climaEvidence     Json?    @map("clima_evidence")
+
   linkedBusinessGoalId String?
 
   aiGenerated       Boolean  @default(false)
