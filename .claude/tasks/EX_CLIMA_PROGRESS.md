@@ -583,6 +583,31 @@ Encolar por `employeeId` (no participantId) lo deja doblemente fuera. → dedupK
 `DevelopmentGoal.climaEvidence Json?` (`schema.prisma:~2701`), no relacionado. ClimaActionLog =
 `db push` en 5C.
 
+**7 · Resolución del responsable del recordatorio (walk-up) = Gate 1 transversal ✅ SELLADO
+(2026-07-11).** Ya NO bloquea 5C. `Department.responsableId → Employee.id` (hecho de RRHH,
+no login) construido y verificado. Detalle + decisiones en
+**`.claude/tasks/ARQUITECTURA_RESPONSABLE_DEPARTAMENTO.md`** (Addendum + subsección backfill).
+As-built:
+- **Schema:** `Department.responsableId String?` + relación `responsable Employee?`
+  (`onDelete: SetNull`) + `@@index` + relaciones nombradas `DepartmentEmployees` /
+  `DepartmentResponsable`. `db push` aplicado (aditivo, nullable).
+- **Resolver:** `src/lib/services/DepartmentResponsableService.ts` →
+  `resolveDepartmentResponsable({departmentId, accountId})`. Evalúa el PROPIO `departmentId`
+  primero, sube por `parentId` (guard multi-tenant por salto, cap profundidad 6), tope en el
+  primer responsable **activo**; fallback final **`Account.adminEmail`** (NO HR_ADMIN/OWNER —
+  eso era el patrón viejo `mass-action`). NUNCA toca `Employee.managerId`.
+- **Verificación:** smoke 5/5 (directo · walk-up · cadena agotada→adminEmail · responsable
+  inactivo se salta · guard multi-tenant). `tsc` + `build` limpios. Smoke borrado al sellar.
+- **Backfill:** `prisma/scripts/backfill-department-responsable.ts` (best-effort, 1 líder claro
+  por depto; empate/cero → NULL). **Decisión NULL-only: NO se corrió `--commit`** — dry-run en
+  dev dio cobertura inmaterial y no representativa (fixtures: 2/106, `managerLevel` NULL 100%,
+  empates 87.5% "2+ jefes"). El `--commit` real se corre contra la 1ª cuenta con nómina real de
+  `EmployeeSyncService`, nunca fixtures (atado a la decisión pendiente "Participant loading
+  strategy").
+- **Para 5C:** el `${managerId}` del dedupKey (punto 5) pasa a ser el `employeeId`/target que
+  devuelve el resolver; 5C lo consume directo. Fase 2 (mantenedor UI + columna de carga) da la
+  fuente autoritativa del campo.
+
 **Recordatorio de estado:** 5A/5B(i+ii) sellados y pusheados; **v3.16 (correcciones doc) PENDIENTE
 de push**. Pendiente Victor: verificación manual RBAC endpoints clima. Diccionario 8×4 + mapeo
 clima→competencia + puente de escala = PROVISIONAL (contenido lo escribe Victor/Studio IA).
