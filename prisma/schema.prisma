@@ -756,6 +756,7 @@ model Department {
 
   // Jerarquía
   parentId      String?      @map("parent_id")
+  responsableId String?      @map("responsable_id") // EX Clima Gate 1 — FK a Employee.id (hecho RRHH)
   parent        Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   children      Department[] @relation("DepartmentHierarchy")
   unitType      String       @default("departamento") @map("unit_type")
@@ -795,7 +796,11 @@ model Department {
   // ═══════════════════════════════════════════════════
   // RELACIONES EMPLOYEE MASTER
   // ═══════════════════════════════════════════════════
-  employees Employee[]
+  employees Employee[] @relation("DepartmentEmployees")
+
+  // EX Clima Gate 1 — responsable del departamento (→ Employee.id). SetNull: si se
+  // borra el Employee, se limpia el puntero (no cascada al departamento).
+  responsable Employee? @relation("DepartmentResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
 
   // Metas (Business Goals Engine)
   goals     Goal[]
@@ -812,6 +817,7 @@ model Department {
   @@index([standardCategory], map: "idx_departments_category")
   @@index([isActive], map: "idx_departments_active")
   @@index([parentId], map: "idx_departments_parent")
+  @@index([responsableId], map: "idx_departments_responsable")
   @@index([costCenterCode], map: "idx_departments_cost_center") // ✅ NUEVO ÍNDICE CHAT 9
   @@map("departments")
 }
@@ -1844,7 +1850,8 @@ model Employee {
 
   // Relaciones
   account       Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  department    Department       @relation(fields: [departmentId], references: [id])
+  department    Department       @relation("DepartmentEmployees", fields: [departmentId], references: [id])
+  departmentsResponsibleFor Department[] @relation("DepartmentResponsable") // EX Clima Gate 1
   manager       Employee?        @relation("ManagerSubordinates", fields: [managerId], references: [id])
   directReports Employee[]       @relation("ManagerSubordinates")
   history       EmployeeHistory[]

@@ -29,6 +29,7 @@
     "recompute:compliance-safety": "tsx prisma/scripts/recompute-compliance-safety-score.ts",
     "backfill:convergencia-subobjetos": "tsx prisma/scripts/backfill-convergencia-subobjetos.ts",
     "backfill:employee-phone-normalize": "tsx prisma/scripts/backfill-employee-phone-normalize.ts",
+    "backfill:department-responsable": "tsx prisma/scripts/backfill-department-responsable.ts",
     "migrate:clima-gate1": "tsx prisma/scripts/seed-clima-gate1.ts",
     "recompute:clima-insights": "tsx prisma/scripts/recompute-clima-insights.ts",
     "db:reset": "prisma migrate reset",
