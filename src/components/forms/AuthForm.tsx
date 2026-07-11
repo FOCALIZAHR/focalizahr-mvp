@@ -112,20 +112,26 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, onSuccess }) => {
         localStorage.setItem('focalizahr_account', JSON.stringify(data.user || data.account))
         
         onSuccess?.()
-        
+
         const redirectTo = searchParams?.get('from') || '/dashboard'
-        
+
+        // Éxito: NO reseteamos loading. El componente se desmonta al navegar,
+        // así el botón queda deshabilitado hasta la redirección (evita el flicker
+        // de ~100ms en que quedaba habilitado antes de navegar).
         setTimeout(() => {
           router.push(redirectTo)
         }, 100)
-        
+
       } else {
+        // Fallo reportado por el servidor (ej. credenciales inválidas): no navega,
+        // hay que re-habilitar el botón para reintentar.
         setErrors({ general: data.error || 'Error en la autenticación' })
+        setLoading(false)
       }
     } catch (error) {
+      // Error de red/excepción: no navega, re-habilitar el botón.
       console.error('Error en autenticación:', error)
       setErrors({ general: 'Error de conexión. Intenta nuevamente.' })
-    } finally {
       setLoading(false)
     }
   }
