@@ -479,3 +479,53 @@ la demo solo necesita sembrar un ciclo activo (fix de siembra). No requiere lóg
 
 **Sigue (5B-ii):** los 2 CTAs que consumen el motor — PDI suave (endpoint que llama
 `buildClimaGapInput` + persiste `climaEvidence`) + Meta dura simple (POST /goals). Luego 5C/5D.
+
+---
+
+## Gate 5B-ii — los 2 CTAs (consumidores del motor) ✅ SELLADO (2026-07-10)
+
+**Commit:** `811c7dd` (implementación, 3 archivos) · sello (docs): este archivo + MAESTRO
+v3.15. **Push manual de Victor** (pendiente).
+
+**Gate 0 (verificado contra código):** el endpoint PDI existente `/api/pdi/generate-suggestion`
+descarta `climaEvidence` y tiene ownership de jefe directo; `DevelopmentGoal` no tiene Json
+libre; `POST /api/goals` exige ciclo ACTIVE (Gate E 409) y roles globales crean INDIVIDUAL a
+cualquier empleado sin ser jefe. Decisiones Victor: **CTA1 = endpoint nuevo** (no extender);
+**persistencia = campo de schema** (aplicando su marco: arquitectura correcta > agrupar en 5C).
+
+**DESVIACIÓN DE SCHEMA documentada (marco Victor):** se agregó `DevelopmentGoal.climaEvidence
+Json?` en 5B-ii (no en 5C). Justificación: aditivo + honesto (evidencia cruzada **por-goal**,
+consultable) + evita deuda; `originGapAnalysis` es plan-level y un mismo plan mezcla goals de
+clima y Performance → meterlo ahí sería forzar dato per-goal en Json ajeno. `db push` aplicado.
+
+**Qué quedó construido:**
+- **CTA1 — `POST /api/clima/pdi-suggestion` (nuevo):** RBAC `clima:manage`, **sin ownership de
+  jefe directo** (se dispara desde el ActionPlan por RRHH); body `{employeeId, cycleId, driver,
+  teamFavorability, gap360?}`; `buildClimaGapInput`→`generateSuggestions`→persiste
+  `DevelopmentPlan` DRAFT + `DevelopmentGoal[]` con `climaEvidence` por-goal. **Idempotente y
+  coexiste con Performance PDI** (borra solo goals de clima, `climaEvidence != null` filtrado en
+  app; preserva 360/RoleFit). `cycleId` = FK a `PerformanceCycle` (el PDI es cycle-scoped).
+- **CTA2 — SIN código nuevo:** reusa `POST /api/goals` tal cual (Gate E 409 intencional). Para
+  la demo se siembra un ciclo activo (`GoalCycleService.createCycle+activate`, respeta advisory
+  lock; ventanas assignment 2026-01-01 / closure 2026-12-31).
+
+**CERO regresión:** `git diff` de `/api/pdi/generate-suggestion/route.ts` = **vacío** (Performance
+PDI intacto, byte por byte — confirmado antes de sellar).
+
+**Evidencia E2E `smoke-clima-gate5bii.ts` 12/12** (retirada al sellar): ejercita los HANDLERS
+REALES vía `NextRequest` (headers x-user-*), **lee de vuelta de la BD** lo persistido y limpia
+TODO por id (`$transaction`, deja la cuenta como estaba). Cuenta demo: Test Company (sin ciclo
+activo → sembrado). CTA1 → PDI real, `DevelopmentGoal [LEAD-TEAM]` con `climaEvidence
+{driver:liderazgo, teamFavorability:45, gap360:-1.2}`. CTA2 → Meta INDIVIDUAL real (target 75,
+`originType MANAGER_CREATED`, `goalCycleId` = ciclo sembrado). `tsc` + `next build` EXIT 0.
+- **Gotcha (no es código de clima):** el build falló primero por `.next` stale — la sesión
+  paralela borró `goals/[id]/cascade/route.ts` en su refactor pero `.next/types/` conservaba el
+  checker viejo; se limpió con `rm -rf .next` + rebuild.
+
+**PENDIENTE de verificación manual de Victor (no cerrado por compilar):** RBAC del endpoint
+nuevo `/api/clima/pdi-suggestion` (CEO/HR ven todo, AREA_MANAGER solo su gerencia, sin
+permiso→403) — junto con el fix RBAC de `[planId]` (5A) y los gaps de RBAC del backlog, antes
+de cerrar Gate 5 completo.
+
+**Sigue (5C):** efectividad — `ClimaActionLog` (entidad nueva) + `ActionEffectivenessService`
+(cruce Seguimiento Focalizado) + recordatorio `clima_action_reminder`. Luego 5D (Cinema Mode).
