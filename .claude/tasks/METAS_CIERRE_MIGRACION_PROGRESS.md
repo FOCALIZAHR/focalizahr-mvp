@@ -13,7 +13,7 @@
 - [x] Fase B — assertions servicio migrado == prod (golden) — **49/49 VERDE**
 - [x] Fase C — regresión independencia MARK_REVIEW (smoke Gate D.5 20/20 VERDE)
 - [x] Fase D — `npx tsc --noEmit` (limpio) + `npm run build` (compiló, sin errores)
-- [ ] Fase E — meta real de bajo riesgo, coordinada con Victor (NO sin OK explícito)
+- [x] Fase E — E2E HTTP real sobre meta real (request→approve, 200/200), coordinada
 - [ ] Sellado (borrar smoke) + commit separado impl/sello + push manual Victor
 
 ## Decisiones confirmadas (Victor)
@@ -107,3 +107,15 @@ que la migración va a corregir.)
 - ESTADO: A–D cerradas. Pendiente: Fase E (meta real, congelada hasta coordinación
   explícita de Victor meta por meta) + sellado (borrar smoke + commit separado impl/sello,
   push manual Victor). NADA pusheado aún.
+- (Fase E ✅ 2026-07-10) E2E HTTP REAL sobre meta #4 (goalId cmnfnjb09…, "Ciclo Vigente
+  2026", owner VEGA TAMBURINI DANIELA) como vyanezb@gmail.com (HR_MANAGER global). Método:
+  next start (build Fase D) en puerto 3100 + token minteado con firma del app (contrato
+  /api/auth/user/login, sin password, JWT_SECRET no expuesto) + fetch real → middleware +
+  ruta thin + servicio migrado. request-closure HTTP 200 (ON_TRACK→PENDING_CLOSURE,
+  closureRequestedBy="Victor Yanez", +1 auditoría). approve HTTP 200 (→COMPLETED,
+  closedBy=closureApprovedBy="Victor Yanez", closedAt==completedAt, +1 auditoría).
+  Contrato JSON confirmado en respuesta real (owner lean {id,fullName}). Meta quedó
+  COMPLETED (decisión Victor: NO revertir). Server abajo, temporales borrados.
+- ESTADO FINAL: A–E COMPLETAS Y VERDES. Código `8f40ef4` + docs `d88447c`. SIN PUSHEAR
+  (push manual Victor). Migración lista; siguiente trabajo = Gate F (comms Metas) engancha
+  sobre esta superficie limpia.
