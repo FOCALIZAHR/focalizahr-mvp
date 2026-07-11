@@ -1132,3 +1132,14 @@ CON Panel Personal (SPEC_PANEL_PERSONAL_METAS_v2):
 *Spec v4 — Gate 0 cerrado con evidencia real de Code, sin decisiones
 pendientes. Lista para Gate A. Próxima actualización: al sellar cada gate,
 agregar commit hash + evidencia de smoke a esta misma sección de gates.*
+
+---
+
+## Nota de referencia — Migración de cierre de metas (fuera de alcance)
+
+La migración de las acciones de cierre de metas (request/approve/rejectClosure) de
+los route handlers inline a `GoalsService` se completó **fuera del alcance de este
+proyecto (GoalCycle)**, como preparación para **Gate F de Comunicaciones**: los
+disparadores de §6 (`requestClosure`, `approve/rejectClosure`) enganchan ahora sobre
+lógica centralizada en un solo lugar. Detalle y verificación (A–E):
+`METAS_CIERRE_MIGRACION_PROGRESS.md`. Commits: `8f40ef4` (código) + `d88447c` (docs).

@@ -63,9 +63,11 @@ FUNCIONA (sellado):
   ✅ Schema: campos de cierre + PENDING_CLOSURE
   ✅ EmployeeGoalsInsight — snapshot mensual por persona (Gates A/B/B.6) ← NUEVO
 
-INCOMPLETO (deuda P0 — seguridad):
-  ⚠️ 6 APIs de metas SIN hasPermission ni filtrado jerárquico (INSEGURO)
-     (ver Sección 10 — deuda P0 antes de cliente real)
+RESUELTO (verificación 2026-07-10 contra código real):
+  ✅ RBAC en las (antes) 6 APIs inseguras — hasPermission presente en las 6;
+     filtrado jerárquico en 5/6. Los permisos goals:view/create/approve SÍ
+     existen en AuthorizationService. Gap residual acotado a UN endpoint:
+     check-in sin filtrado jerárquico (ver Sección 10 — P0 reducido a check-in).
 
 EN CURSO (parcial):
   🟡 GoalCycle (contenedor de período) — Gates A `1246cd8` · A.5 `529353e` ·
@@ -101,14 +103,18 @@ src/app/dashboard/metas/
 
 ### 2.2 APIs — Estado de Seguridad
 
+> Verificado 2026-07-10 contra código real (grep hasPermission/getChildDepartmentIds/
+> GLOBAL_ACCESS_ROLES). Las (antes) 6 marcadas INSEGURO ya tienen hasPermission; 5/6
+> con filtrado jerárquico. Único gap residual: check-in (sin scope jerárquico).
+
 | API | Ubicación | hasPermission | Filtrado jerárquico | Estado |
 |-----|-----------|---------------|---------------------|--------|
-| GET/POST goals | `/api/goals/route.ts` | ❌ NO | ❌ NO | ⚠️ INSEGURO |
-| GET/PATCH/DELETE goal | `/api/goals/[id]/route.ts` | ❌ NO | ❌ NO | ⚠️ INSEGURO |
-| GET orphans | `/api/goals/orphans/route.ts` | ❌ NO | ❌ NO | ⚠️ INSEGURO |
-| GET alignment-report | `/api/goals/alignment-report/route.ts` | ❌ NO | ❌ NO | ⚠️ INSEGURO |
-| GET team | `/api/goals/team/route.ts` | ❌ NO | ❌ NO | ⚠️ INSEGURO |
-| PATCH check-in | `/api/goals/[id]/check-in/route.ts` | ❌ NO | ❌ NO | ⚠️ INSEGURO |
+| GET/POST goals | `/api/goals/route.ts` | ✅ view:72 create:203 | ✅ GLOBAL:94 + childDepts:99 :104-121 | ✅ OK |
+| GET/PATCH/DELETE goal | `/api/goals/[id]/route.ts` | ✅ view:36 create:206/284 | ✅ GLOBAL:99 + childDepts:105 :109-130 | ✅ OK |
+| GET orphans | `/api/goals/orphans/route.ts` | ✅ view:18 | ✅ solo GLOBAL_ACCESS_ROLES:26 | ✅ OK |
+| GET alignment-report | `/api/goals/alignment-report/route.ts` | ✅ view:18 | ✅ solo GLOBAL_ACCESS_ROLES:26 | ✅ OK |
+| GET team | `/api/goals/team/route.ts` | ✅ view:17 | ✅ SIEMPRE managerId:38-59 | ✅ OK |
+| PATCH check-in | `/api/goals/[id]/check-in/route.ts` | ✅ view:28 | ❌ NO (solo accountId:41) | ⚠️ P0 gap jerárquico |
 | goal-rules | `/api/config/goal-rules/route.ts` | ✅ SÍ | ❌ NO | ✅ OK |
 | goal-groups | `/api/config/goal-groups/route.ts` | ✅ SÍ | ❌ NO | ✅ OK |
 | goal-eligibility | `/api/config/goal-eligibility/route.ts` | ✅ SÍ | ❌ NO | ✅ OK |
@@ -206,10 +212,11 @@ import {
 // EXISTE:
 'goals:config': ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_ADMIN']
 
-// ❌ NO EXISTEN — deben agregarse (deuda P0):
+// ✅ YA EXISTEN en AuthorizationService (verificado 2026-07-10; el "deben
+//    agregarse" era stale). Además: goals:cycles:manage (GoalCycle).
 'goals:view':    [ADMIN, OWNER, HR_ADMIN, HR_MANAGER, CEO, AREA_MANAGER, EVALUATOR]
 'goals:create':  [ADMIN, OWNER, HR_ADMIN, HR_MANAGER, CEO, AREA_MANAGER, EVALUATOR]
-'goals:approve': [ADMIN, OWNER, CEO, AREA_MANAGER]
+'goals:approve': [ADMIN, OWNER, HR_ADMIN, HR_MANAGER, CEO, AREA_MANAGER]
 ```
 
 ### 3.3 GLOBAL_ACCESS_ROLES
@@ -688,10 +695,13 @@ Narrativa lidera, número es consecuencia (P8).
 ### 8.1 P0 — Seguridad APIs (antes de cliente real)
 
 ```yaml
-6 endpoints goals sin hasPermission ni filtrado jerárquico.
-Patrón a seguir: GUIA_MAESTRA_RBAC_SEGURIDAD_FILTRADO_JERARQUICO_v1_2.md
-Copiar de: src/app/api/admin/employees/route.ts
-Agregar permisos goals:view/create/approve a AuthorizationService PRIMERO.
+RESUELTO EN GRAN PARTE (verificación 2026-07-10 contra código real):
+  - Permisos goals:view/create/approve YA EXISTEN en AuthorizationService.
+  - hasPermission presente en las 6 APIs; filtrado jerárquico en 5/6.
+RESIDUAL (único P0 abierto): check-in (/api/goals/[id]/check-in) valida
+  hasPermission + accountId pero NO filtrado jerárquico → un usuario con
+  goals:view puede mutar progreso de cualquier meta de su cuenta.
+  Patrón a seguir: GUIA_MAESTRA_RBAC_SEGURIDAD_FILTRADO_JERARQUICO_v1_2.md
 ```
 
 ### 8.2 P1 — Cierre de Metas (UI)
@@ -728,11 +738,15 @@ Falta: APIs request-closure/approve-closure/pending-closure + UI botón/página.
 ## 10. DEUDAS P0/P1 PENDIENTES
 
 ```yaml
-🔴 P0 — RBAC en 6 endpoints goals (INSEGURO):
-   /api/goals, /api/goals/[id], orphans, alignment-report, team, check-in
-   Sin hasPermission ni filtrado jerárquico → leak multi-tenant potencial.
-   OBLIGATORIO antes del primer cliente real.
-   Regla Enterprise #2: RBAC en cada endpoint vía AuthorizationService.
+🟢 P0 — RBAC en endpoints goals: RESUELTO EN GRAN PARTE (verif 2026-07-10 vs código):
+   Las 6 antes marcadas (/api/goals, /api/goals/[id], orphans, alignment-report,
+   team, check-in) YA tienen hasPermission; 5/6 con filtrado jerárquico.
+   🔴 RESIDUAL P0 — check-in (/api/goals/[id]/check-in): hasPermission:28 + accountId:41
+      pero SIN filtrado jerárquico → cualquier goals:view muta progreso de cualquier
+      meta de su cuenta. Único gap antes de cliente real. Regla Enterprise #2.
+   NOTA: request-closure/approve-closure NO estaban en esta deuda (ya tenían
+   hasPermission); su migración ruta→servicio (commits 8f40ef4/d88447c) fue
+   reconciliación de lógica duplicada, distinta de esta deuda RBAC.
 
 🟡 P1 — Flujo de cierre UI (backend listo)
 🟡 P1 — GoalCycle: Gates A `1246cd8` · A.5 `529353e` · B `efc693a`+`56527f4`
@@ -807,4 +821,4 @@ victor@focalizahr.cl · vyanezb@gmail.com · claudia.palominos@gmail.com
 
 **FIN DEL DOCUMENTO MAESTRO v3.0**
 
-**Estado:** EmployeeGoalsInsight sellado (A/B/B.6). GoalCycle Gates A (`1246cd8`) · A.5 (`529353e`) · B (`efc693a`+`56527f4`) · C (APIs REST, `874e4aa`) sellados (sin pushear); cmfgedx7b… migrada, resto DIFERIDO. Pendiente Gate D (UI type-to-confirm) y Gate E (bloqueo sin ciclo). Panel UI diseñado, pendiente. Deuda P0 (RBAC 6 endpoints) vigente antes de cliente real.
+**Estado:** EmployeeGoalsInsight sellado (A/B/B.6). GoalCycle Gates A (`1246cd8`) · A.5 (`529353e`) · B (`efc693a`+`56527f4`) · C (APIs REST, `874e4aa`) sellados (sin pushear); cmfgedx7b… migrada, resto DIFERIDO. Pendiente Gate D (UI type-to-confirm) y Gate E (bloqueo sin ciclo). Panel UI diseñado, pendiente. Deuda P0 RBAC: RESUELTA EN GRAN PARTE (verif 2026-07-10 — las 6 tienen hasPermission, 5/6 filtrado jerárquico); residual acotado a check-in (sin filtrado jerárquico).
