@@ -30,6 +30,10 @@
 - **SEC-TEST / SEC-EMAIL siguen tal cual** — los 4 endpoints huérfanos existen, grep RBAC = 0 en todos. Nota: Gate 1a (`a3cf371`) tocó los de email solo en transporte (`sendEmail()`), el hueco RBAC es el mismo.
 - **P2-13 sin cambios** — `goals:config` sigue sin HR_MANAGER/CEO.
 
+**2026-07-10 — P0-1 Metas: `cascade` RESUELTO POR ELIMINACIÓN:**
+- ✅ `src/app/api/goals/[id]/cascade/route.ts` **eliminado** — endpoint muerto sin callers HTTP (grep exhaustivo del repo = 0). El flujo real "Cascadear" de la UI va por `POST /api/goals` con `parentId` (gateado), y `GoalRulesEngine.applyCascadeRule` usa `GoalsService.cascadeGoal` como llamada directa de servicio. La función real sigue protegida. tsc + build verdes.
+- **P0-1 baja de 5 a 4 pendientes:** `employee-score`, `from-pdi`, `link-pdi`, `team/coverage`.
+
 ---
 
 ## Modelo de priorización
@@ -123,13 +127,13 @@ Cada ítem lleva: **Tipo** · **Esfuerzo** · **Prioridad**.
 
 ## P0 — Bloqueadores de go-live / seguridad crítica
 
-### P0-1 · 🔒 Metas: endpoints sin `hasPermission` — ⏳ PARCIAL (1/6, quedan 5)
-**Módulo:** Metas. `src/app/api/goals/`. ✅ **`alignment-tree` gateado** (commit `8bd8d6c`, pusheado): `hasPermission('goals:view')` + `GLOBAL_ACCESS_ROLES`, patrón calcado de `alignment-report`/`orphans`. **PENDIENTES (5):** `employee-score`, `from-pdi`, `link-pdi`, `cascade`, `team/coverage`.
+### P0-1 · 🔒 Metas: endpoints sin `hasPermission` — ⏳ PARCIAL (1/6 gateado + 1/6 eliminado, quedan 4)
+**Módulo:** Metas. `src/app/api/goals/`. ✅ **`alignment-tree` gateado** (commit `8bd8d6c`, pusheado): `hasPermission('goals:view')` + `GLOBAL_ACCESS_ROLES`, patrón calcado de `alignment-report`/`orphans`. ✅ **`cascade` RESUELTO POR ELIMINACIÓN** (2026-07-10): endpoint muerto sin callers HTTP; la función real `GoalsService.cascadeGoal` sigue protegida vía `POST /api/goals` (`goals:create` + scope + Gate E) y `GoalRulesEngine.applyCascadeRule` (servicio directo). **PENDIENTES (4):** `employee-score`, `from-pdi`, `link-pdi`, `team/coverage`.
 **Qué:** Estos endpoints extraen `userContext` + `accountId` pero NO llaman `hasPermission`. Cualquier rol autenticado de la cuenta accede. `employee-score` acepta `?employeeId` arbitrario → puede exponer score de empleados fuera de scope.
-**Decisión de Arquitectura (aplicada en `alignment-tree`, replicar en los 5):** "la ruta determina el contexto" → **sin scope departamental** en el gate. `/estrategia` = vista del estratega (ve toda la cuenta); `AREA_MANAGER` usa `/equipo`, scoped por `managerId`. Por eso el fix es `hasPermission` + `GLOBAL_ACCESS_ROLES`, NO filtrado jerárquico en estos endpoints.
+**Decisión de Arquitectura (aplicada en `alignment-tree`, replicar en los 4):** "la ruta determina el contexto" → **sin scope departamental** en el gate. `/estrategia` = vista del estratega (ve toda la cuenta); `AREA_MANAGER` usa `/equipo`, scoped por `managerId`. Por eso el fix es `hasPermission` + `GLOBAL_ACCESS_ROLES`, NO filtrado jerárquico en estos endpoints.
 **⚠️ Ojo `employee-score`:** se usará para el snapshot mensual de metas → requiere la MISMA decisión de contexto que `alignment-tree`; no copiar ciegamente el patrón.
-**Fix (los 5 pendientes):** gate `hasPermission(role,'goals:view'|'goals:create')` con el principio "ruta = contexto". Esfuerzo S.
-**Por qué P0:** agujero multi-tenant real. **NO tachar hasta cerrar los 5.**
+**Fix (los 4 pendientes):** gate `hasPermission(role,'goals:view'|'goals:create')` con el principio "ruta = contexto". Esfuerzo S.
+**Por qué P0:** agujero multi-tenant real. **NO tachar hasta cerrar los 4.**
 **Deuda latente relacionada (Metas):** `GoalsService.getPendingClosures` (`GoalsService.ts:822-839`) NO tiene scope departamental. Huérfano hoy (el endpoint `pending-closure` usa su propia query scoped, `:45-63`). Trampa: si alguien lo cablea al endpoint de aprobaciones, un `AREA_MANAGER` vería solicitudes de toda la cuenta (fuga cross-depto invisible al build). NO usar en superficies scoped sin agregarle el filtro.
 
 ### P0-2 · 🏗️/⚡ Comunicaciones: Capa 3 scheduler no cableado en `vercel.json` (S)
@@ -369,7 +373,7 @@ La captura en BD es **completa**: cada `CalibrationAdjustment` guarda `adjustedB
 |---|---|
 | **Pulso/Experiencia + Torre Control** | P1-1 (perf hook), P1-4 (RBAC campaigns) |
 | **Performance/Calibración** | P1-7 (approvedBy), P2-6 (dept snapshot), P2-12 ✅ (send-reports → cola unificada, `dd44bf2`), P3-3 (estilo evaluador histórico), P3-4 (plan calibrador), P3-10 (PDF cifrado) |
-| **Metas** | P0-1 ⏳ (5 endpoints RBAC pendientes de 6), P1-2 ✅ (`380130f`) |
+| **Metas** | P0-1 ⏳ (4 endpoints RBAC pendientes de 6; `cascade` eliminado), P1-2 ✅ (`380130f`) |
 | **Sucesión** | P2-3 (RBAC + debug logs) |
 | **Workforce** | P3-6 (tabs placeholder), (Descriptores P2-11 lo habilita) |
 | **Efficiency** | P1-3 (L4 narrativa), P1-5 (RBAC AREA_MANAGER), P2-4 (L6 umbral) |
