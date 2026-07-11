@@ -529,3 +529,60 @@ de cerrar Gate 5 completo.
 
 **Sigue (5C):** efectividad — `ClimaActionLog` (entidad nueva) + `ActionEffectivenessService`
 (cruce Seguimiento Focalizado) + recordatorio `clima_action_reminder`. Luego 5D (Cinema Mode).
+
+---
+
+## Gate 5C — Gate 0 (VERIFICACIÓN pre-implementación, 2026-07-11) · NADA construido aún
+
+> Contexto en frío para arrancar 5C sin re-derivar. Verificado contra código real (file:line).
+> Fuentes vivas: MAESTRO §5C (corregido v3.16) + plan `~/.claude/plans/shiny-coalescing-eagle.md`.
+
+**1 · Campo "acción tomada" — NO existe.** `ActionPlan.decisiones` = `Json @default("[]")`
+(modelo `ActionPlan` ~`schema.prisma:3884`); cada item = `ClimaDecisionItem`
+(`src/types/clima-planes.ts:67-83`) con `ceoDecision?`/`ceoNotes?` pero SIN autorreporte del
+jefe. → tabla nueva `ClimaActionLog` (unique `(actionPlanId, triggerRef)`): el `ActionPlan`
+aprobado es INMUTABLE (`[planId]/route.ts:124-134`) y el autorreporte lo escribe otro actor
+(jefe) después de aprobado → no cabe en el Json.
+
+**2 · Fase 4d en `ClimaAggregationService` — engancha post-`:524`, CERO re-queries.**
+`processClimaResults(campaignId)` `:101`. Fases: `4` loop depto `:329` (upsert insight base
+`:428`) · **`4b/4c` PulseEngine `:479`** (`computePulse` `:501` + update post-upsert de
+driverAnalysis/riskZone/correlationFlags `:506-524`) · `5` eNPS `:542` · `6` gold cache `:552`
+· `8` estado+AuditLog `:563`. Al final de 4c en memoria: `pulseInputByDept` (`:306`),
+`pulseOutputs` (`:501`), `prevInsightByDept`, `deptById`, + escalares `accountId/productType/
+period/isFollowUp/campaign.endDate/focusMap`. Estado PENDING (caller `status/route.ts:248`)→
+RUNNING `:128`→COMPLETED|FAILED `:564-571`; degrada sin bloquear.
+
+**3 · `driverFocusByDepartment` + `isFollowUp` + cierre.** Campo `Json?` `schema.prisma:341`.
+`isFollowUp = slug==='experiencia-full' && driverFocusByDepartment!=null && keys>0`
+(`ClimaAggregationService.ts:141-146`; pulso→siempre false). Clave única insight
+`@@unique([accountId,departmentId,period,productType,isFollowUp])` `schema.prisma:1669`.
+**Puntos de entrada del cierre = 2:** PUT `/api/campaigns/[id]/status` (completed+slug clima)
+`status/route.ts:252` (guard `:245`) · script `recompute-clima-insights.ts:44`. **No hay cron.**
+
+**4 · Momentum SÍ cruza completo↔seguimiento.** `prevInsights` (fuente del momentum)
+`ClimaAggregationService.ts:270-280`: `where {accountId, departmentId in, productType,
+periodEnd < endDate}` orderBy periodEnd desc — **NO filtra isFollowUp** (comentario `:268-269`).
+Momentum EI `:374-378`, por-driver `PulseEngine.calcDriverMomentum:371-388`. OJO: la OTRA query
+`prevBaselines` (`:256-267`) SÍ filtra `isFollowUp:false` pero alimenta CARRY-FORWARD, no
+momentum. Ambas por `productType` (nunca cruzan pulso↔experiencia). → el insumo "subió/bajó"
+del veredicto ya existe y es correcto.
+
+**5 · Precedentes no-chase (replicar en `clima_action_reminder`).** `CommunicationMessage`
+`schema.prisma:4102-4149` (`messageType` libre, `dedupKey @unique :4131`):
+- exit_invitation `ExitRegistrationService.ts:817/:826` → `exit_invitation:${participant.id}`
+- onboarding_touch `onboarding-touch-dispatch.ts:87/:102` → `onboarding_touch:${pid}:${waSlug}`
+- **performance_report (el más cercano)** `cron/send-reports/route.ts:50/:63-65,:247` →
+  `performance_report:${cycleId}:${employeeId}` (email, cron, re-drive acotado 8).
+No-chase por construcción: dispatcher agnóstico `message-dispatcher.ts:75-82`; chase solo ancla
+en `messageType='invitation'` (`whatsapp-reminders.ts:120`, `send-reminders/route.ts:146`).
+Encolar por `employeeId` (no participantId) lo deja doblemente fuera. → dedupKey propuesto
+`clima_action_reminder:${planId}:${managerId}`.
+
+**6 · `ClimaActionLog` NO existe** (grep 0 en src+prisma). En 5B-ii solo se agregó
+`DevelopmentGoal.climaEvidence Json?` (`schema.prisma:~2701`), no relacionado. ClimaActionLog =
+`db push` en 5C.
+
+**Recordatorio de estado:** 5A/5B(i+ii) sellados y pusheados; **v3.16 (correcciones doc) PENDIENTE
+de push**. Pendiente Victor: verificación manual RBAC endpoints clima. Diccionario 8×4 + mapeo
+clima→competencia + puente de escala = PROVISIONAL (contenido lo escribe Victor/Studio IA).
