@@ -649,3 +649,79 @@ filas pendientes por depto (accountId explícito). **`impactDelta` = `momentumDe
 verificado a nivel servicio; el E2E de campaña completa no se smoke-eó (fixture pesado).
 
 **Commits:** implementación + sello separados, sin pushear (push manual Victor).
+
+---
+
+## Dynamic Impact Drivers (nivel reactivo) — SELLADO (2026-07-12) · Gate 0 = `ARQUITECTURA_DYNAMIC_IMPACT_DRIVERS.md`
+
+Rompe el techo de 32 recetas de 5A: dentro de una dimensión conviven reactivos
+(subcategory) distintos → se eleva el reactivo a métrica de primera clase, se calcula
+su **impacto dinámico** (Pearson reactivo×EI) local/compañía, y se selecciona el
+reactivo-palanca en el diccionario. Arquitectura **A-additive** (Gate 0): cero cambio
+de resultado en los 15+ consumidores de `driverScores`. Prerrequisito de las narrativas
+finales de 5D (NO se avanza a 5D hasta esto). Smoke E2E único 26/26, un solo sello.
+
+**2 decisiones de diseño aprobadas por Victor (al ver el plan):**
+- **Dos columnas** `reactiveScores` + `reactiveAnalysis` (extensión justificada del Gate 0
+  que nombró solo `reactiveScores`): el impacto se computa cross-dept al cierre y NO es
+  recalculable en read-time (las filas crudas no se persisten) → debe persistirse. Espeja
+  el par sellado `driverScores`/`driverAnalysis`.
+- **Diccionario en capas**, arrancando con 1-2 variantes de MUESTRA, sin comprometer las
+  ~140 celdas: se escribe una variante por reactivo SOLO donde el reactivo cambia
+  materialmente la acción (decisión caso por caso de Victor/Studio IA).
+
+**Pieza 1 — `reactiveScores` (columna aditiva).**
+- `schema.prisma` (`DepartmentClimaInsight`): +`reactiveScores Json?` +`reactiveAnalysis Json?`
+  (junto a `driverScores`). `db push` aplicado (Windows: `Stop-Process node` por EPERM).
+- `FavorabilityCalculator.ts`: +`subcategory: string|null` en `ClimaResponseRow`;
+  +`calcReactiveScores` (clon de `calcDriverScores` agrupando por subcategory, excluye
+  engagement + subcategory null, un solo track, SIN carry-forward — non-goal explícito).
+- `ClimaAggregationService.ts`: +`subcategory: true` al select de questions (INERTE) +
+  `subcategory` en el row; computa+persiste `reactiveScores` en `insightData` (vacío→JsonNull).
+- **Backfill gold cache:** `recompute-clima-insights.ts` ya llama `processClimaResults` →
+  re-ejecución puebla `reactiveScores`+`reactiveAnalysis`. Sin script nuevo.
+
+**Pieza 2 — Dynamic Impact en `PulseEngine.ts` (puro, in-memory).**
+- Constantes NOMBRADAS: **`REACTIVE_LOCAL_MIN_N = 25`** (ajustable; justificación triple:
+  crítico Pearson |r|≈0.396 a n=25 para efecto medio · mínimo de grupo Culture Amp ·
+  piso operativo 30-40 headcount con participación 60-80%) + `REACTIVE_WALKUP_MAX_DEPTH = 6`.
+- **2a** `reactiveImpactsForRows` (clon de `calcCompanyDriverImpacts` por subcategory,
+  reusa `calculatePearsonR` null<5) sobre TODAS las filas = impacto compañía, fallback final.
+- **2b** impacto local por depto gated N≥25 (respondentes únicos del subárbol).
+- **2c** walk-up por `parentId` al ancestro MÁS CERCANO con N≥25; empate → gana el más
+  cercano (primero subiendo, análogo a `DepartmentResponsableService`); tope = compañía.
+  Subárbol agregado vía `hierarchy` (jerarquía COMPLETA de la cuenta, incluye ancestros
+  sin participantes) — 1 query barata nueva en la batch; motor puro recibe `hierarchy?`
+  en `PulseCompanyInput` (ausente → degrada a "solo el propio depto", backward compatible).
+- `PulseDeptInput` +`reactiveScores`; `PulseDeptOutput` +`reactiveAnalysis` (`ReactiveImpact[]`:
+  reactive/category/fav/mean/n/impact/impactSource/impactLevelDeptId/gap/priority). Fallback
+  por-reactivo: si el nivel local califica pero el reactivo tiene r null ahí → compañía.
+  Persistido en la fase 4c junto a `driverAnalysis` (vacío→JsonNull).
+
+**Pieza 3 — Diccionario como selector (mecánica + placeholders PROVISIONAL).**
+- `ClimaInterventionDictionary.ts`: +`CLIMA_INTERVENTION_VARIANTS` (capa aditiva sobre las
+  32 celdas base = default; 1 muestra `liderazgo/roja/carga_trabajo` PROVISIONAL).
+  `getIntervention(category, zone, reactiveContext?)` ahora retorna
+  `{ cell, selectedReactive }`: elige el reactivo de mayor `|impact|×|gap|` (mismo priority
+  que `buildDriverAnalysis`) → variante si existe, si no default. Sin contexto → default
+  (retrocompatible).
+- `types/clima-planes.ts`: +`ReactiveContextEntry`; +`reactives` en `ClimaDriverForDecision`;
+  +`selectedReactive` en `ClimaDecisionItem`.
+- `ClimaActionPlanBuilder.ts` (único caller): consume el nuevo retorno, pasa
+  `driver.reactives`, guarda `selectedReactive`. **No hay sitio de ensamblado vivo**
+  (insight→builder es 5D futuro) → blast radius solo tipo + builder.
+
+**Evidencia:** smoke `smoke-dynamic-impact-drivers.ts` **26/26** — banco real experiencia-full
+(4 EI + 35 reactivos), jerarquía HOLDING→G1→{A,B,C(10)} + H(26) + ISO(6 aislado): H=local
+directo, A/B/C=local vía walk-up a G1 (**empate G1 vs HOLDING resuelto por cercanía → G1**),
+ISO=fallback compañía; Pieza 3 selección+variante+default+propagación; **regresión A-additive
+`driverAnalysis`+`riskZone` idénticos con/sin hierarchy**. Cleanup por id en `$transaction`
+(cascade Account + AuditLog explícito). `tsc --noEmit` + `next build` limpios. Smoke retirado
+al sellar (evidencia en el commit + este as-built).
+
+**Diferido (no bloqueante):** inventario de variantes narrativas por reactivo (Victor/Studio IA,
+caso por caso) · ensamblado insight→`ClimaDeptDecisionInput` con `reactives` (5D) · calibración
+de `REACTIVE_LOCAL_MIN_N` con la primera nómina densa real · fix compat `reactiveScores:{}` en
+`smoke-gate3-alg5-costeo.ts` (leftover trackeado de Gate 3).
+
+**Commits:** implementación + sello separados, sin pushear (push manual Victor).
