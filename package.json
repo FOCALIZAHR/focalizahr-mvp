@@ -32,6 +32,7 @@
     "backfill:department-responsable": "tsx prisma/scripts/backfill-department-responsable.ts",
     "migrate:clima-gate1": "tsx prisma/scripts/seed-clima-gate1.ts",
     "recompute:clima-insights": "tsx prisma/scripts/recompute-clima-insights.ts",
+    "reorder:experiencia-full-order": "tsx prisma/scripts/reorder-experiencia-full-question-order.ts",
     "db:reset": "prisma migrate reset",
     "db:seed:departments": "tsx prisma/seedDepartments.ts",
     "db:seed:performance": "tsx prisma/seeds/performance-evaluation-seed.ts",
