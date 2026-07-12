@@ -22,6 +22,7 @@ import {
   calcAcotadoGroupScores,
   calcDriverScores,
   calcEngagementIndex,
+  calcReactiveScores,
 } from './FavorabilityCalculator';
 import { PRIVACY_THRESHOLD } from '@/lib/services/SafetyScoreService';
 import { PulseDeptInput, calcRiskZone, computePulse } from './PulseEngine';
@@ -159,6 +160,7 @@ export class ClimaAggregationService {
           select: {
             id: true,
             category: true,
+            subcategory: true, // Dynamic Impact Drivers — reactivo (INERTE para el resto)
             questionTier: true,
             responseType: true,
             isBenchmarkable: true,
@@ -197,6 +199,7 @@ export class ClimaAggregationService {
           isBenchmarkable: question.isBenchmarkable,
           departmentId: p.departmentId,
           acotadoGroup: p.acotadoGroup,
+          subcategory: question.subcategory, // Dynamic Impact Drivers
         };
         const bucket = rowsByDept.get(p.departmentId);
         if (bucket) bucket.push(row);
@@ -219,8 +222,15 @@ export class ClimaAggregationService {
       );
 
       // Precarga batch de fuentes por depto (evita N+1 innecesario)
-      const [departments, deptMetrics, isaAnalyses, prevBaselines, prevInsights, benchmark] =
-        await Promise.all([
+      const [
+        departments,
+        deptMetrics,
+        isaAnalyses,
+        prevBaselines,
+        prevInsights,
+        benchmark,
+        accountHierarchy,
+      ] = await Promise.all([
           // Gold caches EXO/EIS (lectura directa, refresco por cron de cada producto)
           prisma.department.findMany({
             where: { id: { in: deptIds }, accountId },
@@ -291,6 +301,12 @@ export class ClimaAggregationService {
             orderBy: { period: 'desc' },
             select: { avgScore: true },
           }),
+          // Dynamic Impact Drivers — jerarquía COMPLETA de la cuenta (incluye ancestros
+          // sin participantes) para el walk-up del impacto local por reactivo (PulseEngine).
+          prisma.department.findMany({
+            where: { accountId },
+            select: { id: true, parentId: true },
+          }),
         ]);
 
       const deptById = new Map(departments.map((d) => [d.id, d]));
@@ -336,6 +352,7 @@ export class ClimaAggregationService {
           const deptParticipants = participants.filter((p) => p.departmentId === deptId);
 
           const { full: driverScores, custom: customScores } = calcDriverScores(deptRows);
+          const reactiveScores = calcReactiveScores(deptRows); // Dynamic Impact Drivers
           const ei = calcEngagementIndex(deptRows);
           const acotadoScores = calcAcotadoGroupScores(deptRows);
 
@@ -393,6 +410,7 @@ export class ClimaAggregationService {
 
           const hasCustom = Object.keys(customScores).length > 0;
           const hasAcotado = Object.keys(acotadoScores).length > 0;
+          const hasReactive = Object.keys(reactiveScores).length > 0;
 
           const insightData = {
             campaignId,
@@ -403,6 +421,10 @@ export class ClimaAggregationService {
             driverScores: driverScores as unknown as Prisma.InputJsonValue,
             customDriverScores: hasCustom
               ? (customScores as unknown as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+            // Dynamic Impact Drivers — crudo por reactivo (reactiveAnalysis lo escribe 4c)
+            reactiveScores: hasReactive
+              ? (reactiveScores as unknown as Prisma.InputJsonValue)
               : Prisma.JsonNull,
             totalInvited,
             totalResponded,
@@ -453,6 +475,7 @@ export class ClimaAggregationService {
           pulseInputByDept.set(deptId, {
             departmentId: deptId,
             driverScores, // post carry-forward
+            reactiveScores, // Dynamic Impact Drivers (nivel reactivo)
             ei,
             momentum,
             rows: deptRows,
@@ -499,7 +522,7 @@ export class ClimaAggregationService {
             }
             depts.push({ ...base, salary });
           }
-          const pulseOutputs = computePulse({ depts });
+          const pulseOutputs = computePulse({ depts, hierarchy: accountHierarchy });
 
           await Promise.all(
             Array.from(pulseOutputs.entries()).map(async ([deptId, output]) => {
@@ -516,6 +539,11 @@ export class ClimaAggregationService {
                   },
                   data: {
                     driverAnalysis: output.driverAnalysis as unknown as Prisma.InputJsonValue,
+                    // Dynamic Impact Drivers (nivel reactivo) — vacío → JsonNull
+                    reactiveAnalysis:
+                      output.reactiveAnalysis.length > 0
+                        ? (output.reactiveAnalysis as unknown as Prisma.InputJsonValue)
+                        : Prisma.JsonNull,
                     topFocusArea: output.topFocusArea,
                     topStrength: output.topStrength,
                     riskZone: output.riskZone,

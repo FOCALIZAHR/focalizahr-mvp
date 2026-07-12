@@ -1626,6 +1626,14 @@ model DepartmentClimaInsight {
 
   customDriverScores Json? @map("custom_driver_scores")
 
+  // Dynamic Impact Drivers (nivel REACTIVO) — A-additive, cero consumidores previos.
+  // Espeja el par driverScores/driverAnalysis a granularidad de reactivo (subcategory):
+  // - reactiveScores  = crudo por reactivo { fav, mean, n } (métrica durable, serie temporal)
+  // - reactiveAnalysis = diagnóstico ReactiveImpact[] (impact local-o-compañía + gap + fuente),
+  //   no recalculable en read-time (las filas crudas no se persisten) → lo lee el selector 5A.
+  reactiveScores   Json? @map("reactive_scores")
+  reactiveAnalysis Json? @map("reactive_analysis")
+
   // Driver Analysis pre-calculado (lo escribe Gate 3)
   driverAnalysis Json?   @map("driver_analysis") // DriverImpact[] (impact × gap)
   topFocusArea   String? @map("top_focus_area")

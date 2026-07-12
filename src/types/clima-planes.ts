@@ -43,6 +43,18 @@ export interface ClimaInterventionCell {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Dynamic Impact Drivers — contexto de reactivos para seleccionar la variante de
+// intervención (celda × reactivo-palanca). Lo arma el consumidor (5D) desde
+// DepartmentClimaInsight.reactiveAnalysis, filtrado a la dimensión del driver.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ReactiveContextEntry {
+  reactive: string; // subcategory (carga_trabajo, seguridad, ...)
+  impact: number | null; // Pearson reactivo×EI (local o compañía)
+  gap: number | null; // fav − target (pp, con signo)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ClimaDecisionItem — un ítem de decisión por dimensión-en-riesgo de un depto
 // (shape MAESTRO 5A). Es el elemento de `ActionPlan.decisiones[]`.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -78,6 +90,11 @@ export interface ClimaDecisionItem {
   responsible: string; // 'CEO' | 'Gerente de Área' | 'HRBP'
   deadline: string; // '2 semanas' | '30 días' | '90 días' | 'Sostener'
   validationMetric: string; // "Favorabilidad de liderazgo > 75% en el próximo Seguimiento Focalizado"
+  /**
+   * Dynamic Impact Drivers: reactivo-palanca elegido (mayor |impact|×|gap|) dentro de
+   * la dimensión. null = sin contexto de reactivos → intervención por defecto de la celda.
+   */
+  selectedReactive: string | null;
   ceoDecision?: CeoDecision; // decisión humana en 5D (undefined = pendiente)
   ceoNotes?: string;
 }
@@ -96,6 +113,12 @@ export interface ClimaDriverForDecision {
   impact: number | null;
   momentumDelta: number | null; // modula la zona (crisis degrada 1 zona)
   classification: DriverClassification | null;
+  /**
+   * Dynamic Impact Drivers: reactivos de ESTA dimensión en el depto (de
+   * reactiveAnalysis), para elegir el reactivo-palanca y su variante narrativa.
+   * Vacío → intervención por defecto de la celda (backward compatible).
+   */
+  reactives: ReactiveContextEntry[];
 }
 
 export interface ClimaDeptDecisionInput {

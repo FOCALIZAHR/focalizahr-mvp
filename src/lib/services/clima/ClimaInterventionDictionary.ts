@@ -19,7 +19,10 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import type { RiskZone } from '@/lib/services/clima/climaThresholds';
-import type { ClimaInterventionCell } from '@/types/clima-planes';
+import type {
+  ClimaInterventionCell,
+  ReactiveContextEntry,
+} from '@/types/clima-planes';
 
 /** Estado del contenido — guard explícito contra "esto ya está listo". */
 export const DICTIONARY_CONTENT_STATUS = 'PROVISIONAL' as const;
@@ -99,9 +102,44 @@ export const CLIMA_INTERVENTION_DICTIONARY: Record<
 };
 
 // ════════════════════════════════════════════════════════════════════════════
-// Lookup — devuelve la celda (dimensión × zona). null si la categoría no es una
-// de las 8 dimensiones del banco (el builder decide qué hacer; no revienta).
+// Dynamic Impact Drivers — variantes por REACTIVO-palanca (celda × reactivo).
+//
+// Capa ADITIVA sobre las 32 celdas base: cuando el reactivo de mayor impact×gap
+// dentro de la dimensión CAMBIA MATERIALMENTE la acción recomendada, se escribe
+// una variante acá; si no existe, getIntervention cae a la celda base (default).
+//
+// ⚠️ NO se pre-comprometen las 35×4 celdas (decisión Victor): el inventario de
+// narrativa crece caso por caso, sin tocar el motor. Hoy solo 1-2 MUESTRAS con
+// prefijo PROVISIONAL para ejercitar el path — las keys de reactivo son
+// ilustrativas (los nombres reales de subcategory los define el banco/Studio IA).
 // ════════════════════════════════════════════════════════════════════════════
+
+export const CLIMA_INTERVENTION_VARIANTS: Partial<
+  Record<ClimaDriverCategory, Partial<Record<RiskZone, Record<string, ClimaInterventionCell>>>>
+> = {
+  liderazgo: {
+    roja: {
+      // MUESTRA: cuando la palanca de un liderazgo crítico es la carga sobre el
+      // jefe (distinto de un conflicto de equipo) → la acción apunta al jefe.
+      carga_trabajo: {
+        narrative: `${P}Liderazgo crítico por sobrecarga del jefe: aliviar la carga antes que exigir más gestión.`,
+        steps: ['Revisar el span de control y las tareas del jefe', 'Redistribuir carga o reforzar el equipo antes de escalar'],
+        suggestedProduct: 'Meta dura + Rediseño de carga',
+      },
+    },
+  },
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// Lookup — selecciona la celda (dimensión × zona × reactivo-palanca). null si la
+// categoría no es una de las 8 dimensiones del banco (el builder decide; no revienta).
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface InterventionSelection {
+  cell: ClimaInterventionCell;
+  /** Reactivo-palanca elegido (null = sin contexto → celda por defecto). */
+  selectedReactive: string | null;
+}
 
 export function isClimaDriverCategory(
   category: string
@@ -109,10 +147,35 @@ export function isClimaDriverCategory(
   return (CLIMA_DRIVER_CATEGORIES as readonly string[]).includes(category);
 }
 
+/** Reactivo-palanca = mayor |impact|×|gap| (mismo priority que buildDriverAnalysis). */
+function pickLeverReactive(reactiveContext: ReactiveContextEntry[]): string | null {
+  let best: string | null = null;
+  let bestPriority = -1;
+  for (const r of reactiveContext) {
+    if (r.impact === null || r.gap === null) continue;
+    const priority = Math.abs(r.impact) * Math.abs(r.gap);
+    if (priority > bestPriority) {
+      bestPriority = priority;
+      best = r.reactive;
+    }
+  }
+  return best;
+}
+
 export function getIntervention(
   category: string,
-  zone: RiskZone
-): ClimaInterventionCell | null {
+  zone: RiskZone,
+  reactiveContext?: ReactiveContextEntry[]
+): InterventionSelection | null {
   if (!isClimaDriverCategory(category)) return null;
-  return CLIMA_INTERVENTION_DICTIONARY[category][zone];
+  const base = CLIMA_INTERVENTION_DICTIONARY[category][zone];
+  const selectedReactive =
+    reactiveContext && reactiveContext.length > 0
+      ? pickLeverReactive(reactiveContext)
+      : null;
+  const variant =
+    selectedReactive !== null
+      ? CLIMA_INTERVENTION_VARIANTS[category]?.[zone]?.[selectedReactive]
+      : undefined;
+  return { cell: variant ?? base, selectedReactive };
 }

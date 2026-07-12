@@ -82,8 +82,10 @@ export function buildDeptClimaDecisions(
     if (!needsAction(zone)) continue; // verde (Sano) → sin ítem de acción
     if (!isClimaDriverCategory(driver.category)) continue; // driver fuera de la taxonomía
 
-    const cell = getIntervention(driver.category, zone);
-    if (!cell) continue; // defensivo: no debería pasar tras isClimaDriverCategory
+    // Dynamic Impact Drivers: selecciona el reactivo-palanca y su variante narrativa.
+    const selection = getIntervention(driver.category, zone, driver.reactives);
+    if (!selection) continue; // defensivo: no debería pasar tras isClimaDriverCategory
+    const { cell, selectedReactive } = selection;
 
     const businessCase = findBusinessCase(driver.category, input.businessCases);
 
@@ -106,6 +108,7 @@ export function buildDeptClimaDecisions(
       responsible: RESPONSIBLE_BY_ZONE[zone],
       deadline: DEADLINE_BY_ZONE[zone],
       validationMetric: `Favorabilidad de ${driver.category} > ${CLIMA_TARGET_FAVORABILITY}% en el próximo Seguimiento Focalizado`,
+      selectedReactive,
     });
   }
 

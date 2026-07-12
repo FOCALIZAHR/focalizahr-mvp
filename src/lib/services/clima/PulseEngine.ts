@@ -71,6 +71,22 @@ export const GAP_FOCUS_PP = -10;
 export const MIN_DEPTS_FOR_PERCENTILE = 4;
 
 /**
+ * Dynamic Impact Drivers — mínimo de respondentes para computar el impacto de un
+ * reactivo a nivel LOCAL (depto o subárbol) en vez del impacto compañía (fallback).
+ * Punto de partida de literatura, AJUSTABLE (se calibra con la primera nómina real):
+ *  1) Significancia: con n=25 el crítico de Pearson (p<0.05, 2 colas) es |r|≈0.396 —
+ *     recién ahí un efecto medio (IMPACT_HIGH_R=0.3) se distingue del ruido muestral.
+ *  2) Mínimo de grupo documentado (Culture Amp key-driver analysis ≈25 respuestas).
+ *  3) Piso operativo: con participación 60-80%, ~25 respondentes ≈ 30-40 headcount
+ *     (una unidad clínica real: enfermería, pabellón).
+ * Editable por dev, NO configurable por cliente (comparabilidad entre cuentas).
+ */
+export const REACTIVE_LOCAL_MIN_N = 25;
+
+/** Cap anti-ciclo del walk-up de reactivos (espeja MAX_DEPTH de DepartmentResponsableService). */
+export const REACTIVE_WALKUP_MAX_DEPTH = 6;
+
+/**
  * Teatro de cumplimiento (MAESTRO §Gate 3 — cortes SELLADOS en el maestro):
  * ISA > 70 (compliance "sano") + engagementFav < 50 (clima bajo) mismo depto.
  * El corte 50 es MÁS estricto que roja (60) a propósito: "teatro" acusa de
@@ -150,6 +166,24 @@ export interface DriverImpact {
   } | null; // null si este depto ES el campeón o <2 deptos midieron el driver
 }
 
+/**
+ * Dynamic Impact Drivers — diagnóstico por REACTIVO (subcategory) de un depto.
+ * Espeja DriverImpact a granularidad de reactivo. Se persiste en
+ * DepartmentClimaInsight.reactiveAnalysis y lo lee el selector del diccionario 5A.
+ */
+export interface ReactiveImpact {
+  reactive: string; // subcategory real (carga_trabajo, seguridad, ...)
+  category: string; // dimensión padre (satisfaccion, liderazgo, ...) para agrupar en 5A
+  fav: number | null; // fav del reactivo en ESTE depto (de reactiveScores)
+  mean: number | null;
+  n: number;
+  impact: number | null; // Pearson reactivo×EI; local (subárbol N≥25) o compañía (fallback)
+  impactSource: 'local' | 'company'; // de dónde salió el impact efectivamente usado
+  impactLevelDeptId: string | null; // depto/ancestro cuyo subárbol dio el impact local; null = compañía
+  gap: number | null; // fav − CLIMA_TARGET_FAVORABILITY (pp, con signo)
+  priority: number | null; // |impact| × |gap| (1 dec) — criterio de selección del reactivo-palanca
+}
+
 export interface PulseBusinessCase {
   type: PulseBusinessCaseType;
   severity: 'critica' | 'alta';
@@ -202,6 +236,9 @@ export interface ClimaCorrelationFlags {
 export interface PulseDeptInput {
   departmentId: string;
   driverScores: Record<string, DriverScore>; // post carry-forward
+  // Dynamic Impact Drivers: scores crudos por reactivo (subcategory) de este depto,
+  // ya computados en Gate 2 (calcReactiveScores). Vacío → sin reactiveAnalysis.
+  reactiveScores: Record<string, DriverScore>;
   ei: FavorabilityScore;
   momentum: number | null; // escalar EI que persiste Gate 2 (NO se recalcula)
   rows: ClimaResponseRow[]; // crudo del depto — pares Pearson ALG 1
@@ -222,10 +259,19 @@ export interface PulseDeptInput {
 
 export interface PulseCompanyInput {
   depts: PulseDeptInput[];
+  /**
+   * Dynamic Impact Drivers — jerarquía COMPLETA de la cuenta (id→parentId), incluidos
+   * ancestros sin participantes (existen en el árbol pero no en depts[]). La usa el
+   * walk-up del impacto local por reactivo. Ausente → el walk-up se degrada a
+   * "solo el propio depto" (sin subir); el impacto local sigue disponible para
+   * deptos grandes, y el resto cae al fallback compañía. Fuente única del árbol.
+   */
+  hierarchy?: { id: string; parentId: string | null }[];
 }
 
 export interface PulseDeptOutput {
   driverAnalysis: DriverImpact[];
+  reactiveAnalysis: ReactiveImpact[]; // Dynamic Impact Drivers (nivel reactivo)
   topFocusArea: string | null;
   topStrength: string | null;
   riskZone: RiskZone | null;
@@ -241,13 +287,16 @@ export interface PulseDeptOutput {
  * Puro e in-memory: el caller persiste el output y maneja errores de I/O.
  */
 export function computePulse(input: PulseCompanyInput): Map<string, PulseDeptOutput> {
-  const { depts } = input;
+  const { depts, hierarchy } = input;
 
   // Cross-dept una sola vez
   const impactByDriver = calcCompanyDriverImpacts(depts);
   const championByDriver = calcGapTransfer(depts);
   const hotspotContext = buildHotspotContext(depts);
   const climaTurnover = calcClimaTurnoverCorrelation(depts);
+
+  // Dynamic Impact Drivers: contexto cross-dept de reactivos, una sola vez
+  const reactiveCtx = buildReactiveImpactContext(depts, hierarchy);
   const computedAt = new Date().toISOString();
 
   const outputs = new Map<string, PulseDeptOutput>();
@@ -255,6 +304,7 @@ export function computePulse(input: PulseCompanyInput): Map<string, PulseDeptOut
   for (const dept of depts) {
     const driverAnalysis = buildDriverAnalysis(dept, impactByDriver, championByDriver);
     const { topFocusArea, topStrength } = pickTopDrivers(driverAnalysis);
+    const reactiveAnalysis = buildReactiveAnalysis(dept, reactiveCtx);
 
     const flags: ClimaCorrelationFlags = {
       version: 1,
@@ -267,6 +317,7 @@ export function computePulse(input: PulseCompanyInput): Map<string, PulseDeptOut
 
     outputs.set(dept.departmentId, {
       driverAnalysis,
+      reactiveAnalysis,
       topFocusArea,
       topStrength,
       riskZone: calcRiskZone(dept.ei.fav, dept.momentum),
@@ -358,6 +409,221 @@ export function classifyDriver(
   if (highImpact && gap >= 0) return 'strength';
   if (bigGap) return 'monitor'; // impact bajo o no evaluable, pero gap grande
   return 'maintain';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dynamic Impact Drivers (nivel REACTIVO) — impacto compañía + local + walk-up
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Impacto por REACTIVO = Pearson r con pares por PARTICIPANTE (x = mean del
+ * participante en el reactivo, y = mean del participante en EI), sobre un conjunto
+ * de filas. Clon exacto de calcCompanyDriverImpacts agrupando por subcategory.
+ * Reutiliza GoalsDiagnosticService.calculatePearsonR (null si <5 pares).
+ */
+export function reactiveImpactsForRows(
+  rows: ClimaResponseRow[]
+): Map<string, number | null> {
+  interface Acc {
+    eiSum: number;
+    eiCount: number;
+    byReactive: Map<string, { sum: number; count: number }>;
+  }
+  const byParticipant = new Map<string, Acc>();
+
+  for (const row of filterRatingRows(rows)) {
+    let acc = byParticipant.get(row.participantId);
+    if (!acc) {
+      acc = { eiSum: 0, eiCount: 0, byReactive: new Map() };
+      byParticipant.set(row.participantId, acc);
+    }
+    if (row.questionCategory === ENGAGEMENT_CATEGORY) {
+      acc.eiSum += row.rating;
+      acc.eiCount += 1;
+    } else if (row.subcategory) {
+      let d = acc.byReactive.get(row.subcategory);
+      if (!d) {
+        d = { sum: 0, count: 0 };
+        acc.byReactive.set(row.subcategory, d);
+      }
+      d.sum += row.rating;
+      d.count += 1;
+    }
+  }
+
+  const pairsByReactive = new Map<string, { x: number; y: number }[]>();
+  for (const acc of byParticipant.values()) {
+    if (acc.eiCount === 0) continue; // sin EI no hay outcome
+    const eiMean = acc.eiSum / acc.eiCount;
+    for (const [reactive, d] of acc.byReactive) {
+      const pair = { x: d.sum / d.count, y: eiMean };
+      const bucket = pairsByReactive.get(reactive);
+      if (bucket) bucket.push(pair);
+      else pairsByReactive.set(reactive, [pair]);
+    }
+  }
+
+  const impacts = new Map<string, number | null>();
+  for (const [reactive, pairs] of pairsByReactive) {
+    impacts.set(reactive, GoalsDiagnosticService.calculatePearsonR(pairs));
+  }
+  return impacts;
+}
+
+interface ReactiveImpactContext {
+  companyImpacts: Map<string, number | null>; // fallback final, siempre resuelve
+  categoryByReactive: Map<string, string>; // subcategory → dimensión padre
+  /** Impactos locales del nivel más cercano con N≥REACTIVE_LOCAL_MIN_N; null → usar compañía. */
+  resolveLocal: (deptId: string) => {
+    impacts: Map<string, number | null>;
+    levelDeptId: string;
+  } | null;
+}
+
+/**
+ * Prepara, una sola vez por compañía, todo lo que necesita buildReactiveAnalysis:
+ * impacto compañía (2a), mapa reactivo→dimensión, y el resolvedor de impacto local
+ * con walk-up jerárquico memoizado (2b/2c). El walk-up sube por parentId buscando el
+ * ancestro MÁS CERCANO cuyo subárbol alcance N; empate → gana el más cercano (primero
+ * encontrado subiendo, idéntico al walk-up de responsable). Tope: impacto compañía.
+ */
+function buildReactiveImpactContext(
+  depts: PulseDeptInput[],
+  hierarchy?: { id: string; parentId: string | null }[]
+): ReactiveImpactContext {
+  const rowsByDeptId = new Map<string, ClimaResponseRow[]>();
+  const categoryByReactive = new Map<string, string>();
+  for (const dept of depts) {
+    rowsByDeptId.set(dept.departmentId, dept.rows);
+    for (const row of dept.rows) {
+      if (
+        row.subcategory &&
+        row.questionCategory !== ENGAGEMENT_CATEGORY &&
+        !categoryByReactive.has(row.subcategory)
+      ) {
+        categoryByReactive.set(row.subcategory, row.questionCategory);
+      }
+    }
+  }
+
+  const companyImpacts = reactiveImpactsForRows(depts.flatMap((d) => d.rows));
+
+  // Árbol de la cuenta completa (incluye ancestros sin participantes).
+  const parentOf = new Map<string, string | null>();
+  const childrenOf = new Map<string, string[]>();
+  for (const node of hierarchy ?? []) {
+    parentOf.set(node.id, node.parentId);
+    if (node.parentId) {
+      const arr = childrenOf.get(node.parentId);
+      if (arr) arr.push(node.id);
+      else childrenOf.set(node.parentId, [node.id]);
+    }
+  }
+
+  // Filas del subárbol (nodo + descendientes con filas), memoizado, con guard anti-ciclo.
+  const subtreeRowsMemo = new Map<string, ClimaResponseRow[]>();
+  function subtreeRows(nodeId: string): ClimaResponseRow[] {
+    const cached = subtreeRowsMemo.get(nodeId);
+    if (cached) return cached;
+    const acc: ClimaResponseRow[] = [];
+    const stack = [nodeId];
+    const visited = new Set<string>();
+    while (stack.length) {
+      const id = stack.pop()!;
+      if (visited.has(id)) continue;
+      visited.add(id);
+      const own = rowsByDeptId.get(id);
+      if (own) acc.push(...own);
+      for (const child of childrenOf.get(id) ?? []) stack.push(child);
+    }
+    subtreeRowsMemo.set(nodeId, acc);
+    return acc;
+  }
+
+  const uniqueParticipants = (rows: ClimaResponseRow[]): number =>
+    new Set(filterRatingRows(rows).map((r) => r.participantId)).size;
+
+  // Impactos locales memoizados por nodo resuelto (hermanos comparten ancestro).
+  const localImpactsMemo = new Map<string, Map<string, number | null>>();
+
+  const resolveLocal: ReactiveImpactContext['resolveLocal'] = (deptId) => {
+    let currentId: string | null = deptId;
+    let depth = 0;
+    const seen = new Set<string>();
+    while (currentId && depth < REACTIVE_WALKUP_MAX_DEPTH && !seen.has(currentId)) {
+      seen.add(currentId);
+      if (uniqueParticipants(subtreeRows(currentId)) >= REACTIVE_LOCAL_MIN_N) {
+        let impacts = localImpactsMemo.get(currentId);
+        if (!impacts) {
+          impacts = reactiveImpactsForRows(subtreeRows(currentId));
+          localImpactsMemo.set(currentId, impacts);
+        }
+        return { impacts, levelDeptId: currentId };
+      }
+      currentId = parentOf.get(currentId) ?? null;
+      depth += 1;
+    }
+    return null; // ningún nivel alcanzó N → fallback compañía
+  };
+
+  return { companyImpacts, categoryByReactive, resolveLocal };
+}
+
+/**
+ * ReactiveImpact[] de un depto: por cada reactivo medido (reactiveScores) compone
+ * fav/gap locales con el impact resuelto (local con walk-up, o compañía como fallback
+ * por-reactivo si el local es null). priority = |impact|×|gap| (criterio de selección
+ * del reactivo-palanca en el diccionario 5A).
+ */
+export function buildReactiveAnalysis(
+  dept: PulseDeptInput,
+  ctx: ReactiveImpactContext
+): ReactiveImpact[] {
+  const reactives = Object.entries(dept.reactiveScores);
+  if (reactives.length === 0) return [];
+
+  const local = ctx.resolveLocal(dept.departmentId);
+  const analysis: ReactiveImpact[] = [];
+
+  for (const [reactive, score] of reactives) {
+    const fav = score.fav;
+
+    // Preferir impacto local si el nivel calificó Y el reactivo tiene r no-null ahí;
+    // si no, caer al impacto compañía (fallback por-reactivo). La fuente refleja el
+    // impact efectivamente usado.
+    const localImpact = local ? local.impacts.get(reactive) ?? null : null;
+    let impact: number | null;
+    let impactSource: 'local' | 'company';
+    let impactLevelDeptId: string | null;
+    if (localImpact !== null) {
+      impact = localImpact;
+      impactSource = 'local';
+      impactLevelDeptId = local!.levelDeptId;
+    } else {
+      impact = ctx.companyImpacts.get(reactive) ?? null;
+      impactSource = 'company';
+      impactLevelDeptId = null;
+    }
+
+    const gap = fav !== null ? round1(fav - CLIMA_TARGET_FAVORABILITY) : null;
+    const priority =
+      impact !== null && gap !== null ? round1(Math.abs(impact) * Math.abs(gap)) : null;
+
+    analysis.push({
+      reactive,
+      category: ctx.categoryByReactive.get(reactive) ?? '',
+      fav,
+      mean: score.mean,
+      n: score.n,
+      impact,
+      impactSource,
+      impactLevelDeptId,
+      gap,
+      priority,
+    });
+  }
+
+  return analysis;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

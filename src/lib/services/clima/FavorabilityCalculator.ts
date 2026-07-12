@@ -26,6 +26,7 @@ export interface ClimaResponseRow {
   isBenchmarkable: boolean;
   departmentId: string | null;
   acotadoGroup: string | null;
+  subcategory: string | null; // reactivo (Dynamic Impact Drivers) — null = sin reactivo
 }
 
 export interface FavorabilityScore {
@@ -124,6 +125,29 @@ export function calcDriverScores(
     core: buildTrack(driverRows.filter((r) => r.questionTier === 'CORE')),
     custom: buildTrack(driverRows.filter((r) => r.questionTier === 'CUSTOM')),
   };
+}
+
+/**
+ * Scores por REACTIVO (subcategory) — Dynamic Impact Drivers.
+ * Mismo cálculo que calcDriverScores pero agrupando por subcategory en vez de
+ * questionCategory. Excluye engagement_index (es el outcome, no un reactivo) y las
+ * filas sin subcategory. Un solo track (los reactivos no tienen split core/custom).
+ * SIN carry-forward: reactiveScores guarda solo lo medido en esta campaña; la serie
+ * temporal se reconstruye consultando múltiples insights.
+ */
+export function calcReactiveScores(
+  rows: ClimaResponseRow[],
+  threshold: number = PRIVACY_THRESHOLD
+): Record<string, DriverScore> {
+  const reactiveRows = filterRatingRows(rows).filter(
+    (r) => r.questionCategory !== ENGAGEMENT_CATEGORY
+  );
+  const bySubcategory = groupBy(reactiveRows, (r) => r.subcategory);
+  const scores: Record<string, DriverScore> = {};
+  for (const [subcategory, subRows] of bySubcategory) {
+    scores[subcategory] = { ...calcFavorability(subRows, threshold), carried: false };
+  }
+  return scores;
 }
 
 /**

@@ -42,6 +42,7 @@ function mkDept(o: {
   const ei: FavorabilityScore = { fav: 60, mean: o.eiMean ?? 4.0, n: 10 };
   return {
     departmentId: 'd', driverScores: o.drivers ?? { satisfaccion: dS(2.0) },
+    reactiveScores: {}, // Dynamic Impact Drivers — no relevante para este smoke de ALG5
     ei, momentum: null, rows: [], prevDriverScores: null,
     turnoverRate: o.turnoverRate ?? null, headcountAvg: o.headcountAvg ?? 50,
     isaScore: null, totalResponded: 10, participationRate: 80,
