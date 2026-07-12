@@ -611,3 +611,41 @@ As-built:
 **Recordatorio de estado:** 5A/5B(i+ii) sellados y pusheados; **v3.16 (correcciones doc) PENDIENTE
 de push**. Pendiente Victor: verificación manual RBAC endpoints clima. Diccionario 8×4 + mapeo
 clima→competencia + puente de escala = PROVISIONAL (contenido lo escribe Victor/Studio IA).
+
+---
+
+## Gate 5C — SELLADO (2026-07-11) · efectividad de planes de acción
+
+As-built de las 4 piezas (smoke 15/15 a–g, tsc + build limpios; smoke borrado al sellar).
+2 decisiones de diseño previas (Gate 1 responsableId + Gate 0 5C) consumidas.
+
+**Pieza 1 — `ClimaActionLog`** (`schema.prisma`, `db push` aplicado). Tabla nueva, verbatim del
+contrato: `@@unique(actionPlanId, triggerRef)` POR PLAN (dos campañas reincidentes coexisten),
+`@@index(accountId, departmentId)`. Sin FK a responsable (se resuelve por query). `quadrant` =
+4 valores de §4; **vacío+plano → null**.
+
+**Pieza 2 — `ClimaActionLogService.onClimaPlanApproved`** + hook en
+`action-plans/[planId]/route.ts` (transición borrador→aprobado, `moduleType==='clima'`,
+degrade-safe). EAGER: 1 `ClimaActionLog` por decisión con `ceoDecision ∈ {aceptar, modificar}`
+(rechazada/undefined excluida), `createMany` skipDuplicates. Recordatorio: 1
+`CommunicationMessage` por depto, `messageType='clima_action_reminder'` (dedicado, no-chase),
+`dedupKey=clima_action_reminder:${planId}:${departmentId}`, `toEmail` = `resolveDepartmentResponsable`
+(Gate 1, fresco; email-less responsable → adminEmail), `scheduledAt = approvedAt + 30d`
+(`CLIMA_REMINDER_OFFSET_DAYS`, fallback §5). Template `clima-action-reminder` (copy §5.1;
+frase de reconocimiento compuesta `fortaleza_frase` que se omite limpia si no hay insight).
+
+**Pieza 3 — Fase 4d** en `ClimaAggregationService` (dentro del bloque pulse, tras persist,
+gated `isFollowUp===true`, cero re-queries: reusa `pulseOutputs` en memoria). Degrade-safe
+(`errors.push('ACTION_EFFECTIVENESS')`).
+
+**Pieza 4 — `ActionEffectivenessService.evaluateOnFollowUpClose`**. `findMany` sobre TODAS las
+filas pendientes por depto (accountId explícito). **`impactDelta` = `momentumDelta` sellado**
+(`DriverImpact`, NO recalcula); umbrales `climaThresholds` (mejoró ≥+5, bajó ≤−5). **Null-safe:**
+`momentumDelta===null` → salta uniforme (todas las filas del triggerRef). **Veredicto compartido
+(delta/measuredAt/verdictCampaignId), `quadrant` por fila** según su `actionText`.
+
+**Fuera de 5C (diferido):** `llmClassification` (pase LLM, Gate 6E) · UI Cinema Mode campo/matriz
++ deep-link `action_url` (Gate 5D) · badge señal Pulso Express (5D). Guard `isFollowUp`
+verificado a nivel servicio; el E2E de campaña completa no se smoke-eó (fixture pesado).
+
+**Commits:** implementación + sello separados, sin pushear (push manual Victor).
