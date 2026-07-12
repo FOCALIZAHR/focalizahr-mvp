@@ -36,12 +36,21 @@ export async function GET(request: NextRequest) {
       select: { id: true },
     })
 
-    // Sin empleado direccionable → sin bandeja (no error)
-    if (!currentEmployee) {
-      return NextResponse.json({ data: [], success: true })
-    }
+    const { searchParams } = request.nextUrl
+    const unreadOnly = searchParams.get('unread') === 'true'
+    const page = Math.max(parseInt(searchParams.get('page') || '1'), 1)
+    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '20'), 1), 50)
+    const skip = (page - 1) * limit
 
-    const unreadOnly = request.nextUrl.searchParams.get('unread') === 'true'
+    // Sin empleado direccionable → sin bandeja (no error, contrato consistente)
+    if (!currentEmployee) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        unreadCount: 0,
+        pagination: { page, limit, total: 0, pages: 0 },
+      })
+    }
 
     const where: any = {
       accountId: context.accountId,
@@ -51,18 +60,31 @@ export async function GET(request: NextRequest) {
       where.readAt = null
     }
 
-    const alerts = await prisma.goalAlert.findMany({
-      where,
-      include: {
-        goal: { select: { id: true, title: true, status: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+    // unreadCount = TODOS los no leídos del empleado (independiente de filtro/página)
+    const [alerts, total, unreadCount] = await Promise.all([
+      prisma.goalAlert.findMany({
+        where,
+        include: {
+          goal: { select: { id: true, title: true, status: true } },
+        },
+        orderBy: [
+          { readAt: { sort: 'asc', nulls: 'first' } }, // no leídos primero
+          { createdAt: 'desc' },
+        ],
+        skip,
+        take: limit,
+      }),
+      prisma.goalAlert.count({ where }),
+      prisma.goalAlert.count({
+        where: { accountId: context.accountId, recipientEmployeeId: currentEmployee.id, readAt: null },
+      }),
+    ])
 
     return NextResponse.json({
-      data: alerts,
-      unreadCount: alerts.filter(a => a.readAt === null).length,
       success: true,
+      data: alerts,
+      unreadCount,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     })
 
   } catch (error) {
