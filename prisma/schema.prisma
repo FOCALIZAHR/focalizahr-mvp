@@ -3974,6 +3974,35 @@ model ActionPlan {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// EX CLIMA — ClimaActionLog (Gate 5C: efectividad de planes de acción)
+// Autorreporte del jefe ("¿qué hiciste?") + veredicto de la matriz de 4 cuadrantes.
+// Una fila por decisión no-rechazada, creada EAGER al aprobar el ActionPlan.
+// @@unique es (actionPlanId, triggerRef) — POR PLAN: dos campañas que reincidan
+// en el mismo depto:driver coexisten. Sin FK a responsable: se resuelve por query
+// (resolveDepartmentResponsable), no se sincroniza. Ver plan Gate 5C.
+// ════════════════════════════════════════════════════════════════════════════
+model ClimaActionLog {
+  id                String    @id @default(cuid())
+  accountId         String    @map("account_id")
+  actionPlanId      String    @map("action_plan_id")
+  triggerRef        String    @map("trigger_ref")     // clima:${departmentId}:${category}
+  departmentId      String    @map("department_id")
+  actionText        String?   @db.VarChar(200) @map("action_text")  // null = no ejecutó
+  registeredAt      DateTime? @map("registered_at")
+  registeredBy      String?   @map("registered_by")
+  impactMeasured    Boolean?  @map("impact_measured") // null = pendiente de veredicto
+  impactDelta       Float?    @map("impact_delta")    // momentumDelta del driver (pp)
+  quadrant          String?                            // lider_modelo|palanca_no_efectiva|falso_positivo|riesgo_critico
+  measuredAt        DateTime? @map("measured_at")
+  verdictCampaignId String?   @map("verdict_campaign_id")
+  llmClassification Json?     @map("llm_classification")
+
+  @@unique([actionPlanId, triggerRef])
+  @@index([accountId, departmentId])
+  @@map("clima_action_logs")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // COMPLIANCE ANALYSIS — Ambiente Sano (Ley Karin)
 // Persistencia de outputs del LLM: un row por depto con n≥5 (scope DEPARTMENT)
 // más un row ORG con el meta-análisis cross-departamental. Los rows funcionan

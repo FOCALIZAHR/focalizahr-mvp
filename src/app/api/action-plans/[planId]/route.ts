@@ -18,6 +18,7 @@ import {
 } from '@/lib/services/AuthorizationService';
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
+import { ClimaActionLogService } from '@/lib/services/clima/ClimaActionLogService';
 
 interface RouteContext {
   params: Promise<{ planId: string }> | { planId: string };
@@ -163,6 +164,27 @@ export async function PUT(request: NextRequest, ctx: RouteContext) {
       where: { id: planId },
       data,
     });
+
+    // ── Gate 5C: al aprobar un plan de clima, crear los ClimaActionLog (eager) y
+    //    encolar el recordatorio único por depto. Degrade-safe: un fallo acá NO
+    //    revierte la aprobación (el plan ya quedó aprobado e inmutable).
+    const justApproved =
+      body.estado === 'aprobado' && existing.estado !== 'aprobado';
+    if (justApproved && existing.moduleType === 'clima') {
+      try {
+        await ClimaActionLogService.onClimaPlanApproved({
+          id: updated.id,
+          accountId: updated.accountId,
+          decisiones: updated.decisiones,
+          approvedAt: updated.approvedAt,
+        });
+      } catch (hookError) {
+        console.error(
+          '[action-plans/[planId]] onClimaPlanApproved error (no revierte aprobación):',
+          hookError instanceof Error ? hookError.message : hookError
+        );
+      }
+    }
 
     return NextResponse.json({ success: true, data: updated });
   } catch (error: unknown) {

@@ -869,6 +869,47 @@ export const PREMIUM_EMAIL_TEMPLATES: Record<string, EmailTemplate> = {
     `
   },
 
+  // EX Clima Gate 5C — recordatorio único de plan de acción (DISEÑO §5.1).
+  // Copy borrador; redacción final a confirmar por Studio IA. Reconocimiento
+  // primero, sin jerga de "seguimiento/cumplimiento", cero mención de plazos.
+  'clima-action-reminder': {
+    id: 'clima_action_reminder',
+    campaignTypeSlug: 'clima-action-reminder',
+    subject: '{gerencia} — un recordatorio breve',
+    previewText: 'La experiencia de tu equipo importa',
+    variables: ['gerencia', 'nombre', 'fortaleza_frase', 'dimensiones_focos', 'action_url'],
+    tone: 'Cálido, reconocimiento primero, cero burocracia',
+    estimatedTime: '1 minuto',
+    htmlContent: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #22D3EE, #A78BFA); padding: 30px; text-align: center; border-radius: 12px; margin-bottom: 30px;">
+          <h1 style="color: white; margin: 0; font-size: 22px;">La experiencia de tu equipo</h1>
+        </div>
+
+        <h2 style="color: #1E293B;">Hola {nombre},</h2>
+
+        <p style="color: #64748B; line-height: 1.6;">
+          La experiencia de tu equipo es parte de cómo esta empresa se construye día a día.
+        </p>
+
+        <p style="color: #64748B; line-height: 1.6;">{fortaleza_frase}</p>
+
+        <p style="color: #64748B; line-height: 1.6;">
+          También detectamos oportunidad en <strong>{dimensiones_focos}</strong>, y ya tienes un
+          plan de acción sugerido para trabajarlas.
+        </p>
+
+        <a href="{action_url}" style="display: inline-block; background: linear-gradient(90deg, #22D3EE, #06B6D4); color: #FFF; padding: 16px 32px; border-radius: 8px; text-decoration: none; margin: 20px 0; font-weight: 600; font-size: 16px;">
+          Contar novedades
+        </a>
+
+        <p style="color: #94A3B8; font-size: 12px; margin-top: 30px;">
+          ¿Nos cuentas qué has hecho? Un par de líneas basta.
+        </p>
+      </div>
+    `
+  },
+
   'general': {
     id: 'general_invitation',
     campaignTypeSlug: 'general',

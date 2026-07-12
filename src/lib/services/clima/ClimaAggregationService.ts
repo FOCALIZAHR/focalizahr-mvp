@@ -25,6 +25,7 @@ import {
 } from './FavorabilityCalculator';
 import { PRIVACY_THRESHOLD } from '@/lib/services/SafetyScoreService';
 import { PulseDeptInput, calcRiskZone, computePulse } from './PulseEngine';
+import { ActionEffectivenessService } from './ActionEffectivenessService';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes de dominio
@@ -531,6 +532,28 @@ export class ClimaAggregationService {
             })
           );
           pulseDurationMs = Date.now() - pulseStart;
+
+          // 4d. Efectividad de planes (Gate 5C) — SOLO en Seguimiento Focalizado
+          // (isFollowUp); el veredicto de la matriz lo emite solo esta campaña.
+          // Cero re-queries: reusa pulseOutputs (momentumDelta ya calculado) en memoria.
+          // Degrade-safe: fallo acá no bloquea el cierre.
+          if (isFollowUp) {
+            try {
+              const driverAnalysisByDept = new Map(
+                Array.from(pulseOutputs.entries()).map(([deptId, o]) => [deptId, o.driverAnalysis])
+              );
+              await ActionEffectivenessService.evaluateOnFollowUpClose({
+                accountId,
+                campaignId,
+                driverAnalysisByDept,
+              });
+            } catch (effError) {
+              errors.push({
+                departmentId: 'ACTION_EFFECTIVENESS',
+                error: effError instanceof Error ? effError.message : String(effError),
+              });
+            }
+          }
         } catch (pulseError) {
           errors.push({
             departmentId: 'PULSE_ENGINE',
