@@ -11,6 +11,7 @@ import {
   GoalType,
   GoalMetricType,
   GoalStatus,
+  GoalAlertType,
   Prisma
 } from '@prisma/client'
 import { GoalCycleClosedError, GoalCycleValidationError, GoalCycleService } from './GoalCycleService'
@@ -227,7 +228,9 @@ export class GoalsService {
     data.isAligned = parent.isAligned
     data.isOrphan = false
     data.goalCycleId = await this.resolveInheritedCycleId(input.accountId)
-    return prisma.goal.create({ data })
+    const created = await prisma.goal.create({ data })
+    await this.emitGoalAssignedAlert(created)
+    return created
   }
 
   /**
@@ -245,7 +248,9 @@ export class GoalsService {
     data.isAligned = false
     data.isOrphan = true
     data.goalCycleId = await this.resolveInheritedCycleId(input.accountId)
-    return prisma.goal.create({ data })
+    const created = await prisma.goal.create({ data })
+    await this.emitGoalAssignedAlert(created)
+    return created
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -742,7 +747,7 @@ export class GoalsService {
     }
 
     // 4. Crear la meta con la conexión
-    return prisma.goal.create({
+    const created = await prisma.goal.create({
       data: {
         accountId,
         employeeId,
@@ -766,6 +771,8 @@ export class GoalsService {
         goalCycleId: await this.resolveInheritedCycleId(accountId),
       }
     })
+    await this.emitGoalAssignedAlert(created)
+    return created
   }
 
   /**
@@ -893,6 +900,68 @@ export class GoalsService {
     return approverName
   }
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // AVISOS PERSONALES (GoalAlert) — bandeja slim / read receipt
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Emite un GoalAlert. Acepta el cliente de transacción (para emisión atómica
+   * dentro de un $transaction) o el prisma base. Si no hay destinatario
+   * direccionable → no emite (fail-open silencioso, edge documentado).
+   */
+  private static async emitGoalAlert(
+    client: Prisma.TransactionClient,
+    params: {
+      accountId: string
+      goalId: string
+      recipientEmployeeId: string | null | undefined
+      type: GoalAlertType
+      title: string
+      body?: string
+      context?: Prisma.InputJsonValue
+    }
+  ): Promise<void> {
+    if (!params.recipientEmployeeId) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`⏭️ GoalAlert ${params.type} sin destinatario para goal ${params.goalId} — skip`)
+      }
+      return
+    }
+    await client.goalAlert.create({
+      data: {
+        accountId: params.accountId,
+        goalId: params.goalId,
+        recipientEmployeeId: params.recipientEmployeeId,
+        type: params.type,
+        title: params.title,
+        body: params.body ?? null,
+        context: params.context ?? Prisma.JsonNull,
+      },
+    })
+  }
+
+  /**
+   * Aviso GOAL_ASSIGNED (best-effort, fuera de transacción). Solo si el goal
+   * tiene dueño (employeeId). Un fallo del aviso NO rompe la creación de la meta.
+   */
+  private static async emitGoalAssignedAlert(goal: Goal): Promise<void> {
+    if (!goal.employeeId) return
+    try {
+      await this.emitGoalAlert(prisma, {
+        accountId: goal.accountId,
+        goalId: goal.id,
+        recipientEmployeeId: goal.employeeId,
+        type: 'GOAL_ASSIGNED',
+        title: 'Nueva meta asignada',
+        body: goal.title,
+      })
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`⚠️ No se pudo emitir GoalAlert GOAL_ASSIGNED para goal ${goal.id}:`, err)
+      }
+    }
+  }
+
   /**
    * Solicitar cierre de meta.
    * Único lugar con la lógica (antes inline en request-closure/route.ts).
@@ -940,6 +1009,7 @@ export class GoalsService {
           status: 'PENDING_CLOSURE',
           closureRequestedAt: new Date(),
           closureRequestedBy: requestedByName,
+          closureRequestedById: actor.employeeId ?? null,
         },
         include: GOAL_CLOSURE_RESPONSE_INCLUDE,
       })
@@ -1007,6 +1077,16 @@ export class GoalsService {
           updatedById,
         },
       })
+      // Aviso al solicitante (recipient = quien pidió el cierre)
+      await this.emitGoalAlert(tx, {
+        accountId: actor.accountId,
+        goalId,
+        recipientEmployeeId: goal.closureRequestedById,
+        type: 'CLOSURE_APPROVED',
+        title: 'Cierre de meta aprobado',
+        body: goal.title,
+        context: { actorName: approverName, notes: notes ?? null },
+      })
       return updated
     })
   }
@@ -1051,6 +1131,7 @@ export class GoalsService {
           status: previousStatus,
           closureRequestedAt: null,
           closureRequestedBy: null,
+          closureRequestedById: null,
           closureNotes: reason || null,
         },
         include: GOAL_CLOSURE_RESPONSE_INCLUDE,
@@ -1066,6 +1147,16 @@ export class GoalsService {
           comment: `Solicitud de cierre rechazada por ${approverName}. Motivo: ${reason}`,
           updatedById,
         },
+      })
+      // Aviso al solicitante (recipient = quien pidió el cierre, capturado antes de limpiar)
+      await this.emitGoalAlert(tx, {
+        accountId: actor.accountId,
+        goalId,
+        recipientEmployeeId: goal.closureRequestedById,
+        type: 'CLOSURE_REJECTED',
+        title: 'Solicitud de cierre rechazada',
+        body: goal.title,
+        context: { actorName: approverName, reason },
       })
       return updated
     })

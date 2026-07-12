@@ -228,6 +228,7 @@ model Account {
   goalGroups               GoalGroup[]
   goalCascadeRules         GoalCascadeRule[]
   goalCycles               GoalCycle[]
+  goalAlerts               GoalAlert[]
 
   // Sucesion Inteligente
   criticalPositions        CriticalPosition[]
@@ -1872,6 +1873,9 @@ model Employee {
   // Metas (Business Goals Engine)
   goals                  Goal[]
 
+  // Metas — avisos personales (asignada / cierre aprobado / rechazado)
+  goalAlerts             GoalAlert[] @relation("EmployeeGoalAlerts")
+
   // Metas — insight mensual a nivel persona (LENTE 1, relación inversa lazy)
   goalsInsights          EmployeeGoalsInsight[]
 
@@ -2925,6 +2929,7 @@ model Goal {
 
   progressUpdates GoalProgressUpdate[]
   cascadeRules    GoalCascadeRule[]
+  alerts          GoalAlert[]
 
   // G4: Meta solo para líderes
   isLeaderGoal    Boolean  @default(false) @map("is_leader_goal")
@@ -2933,7 +2938,8 @@ model Goal {
   // CIERRE DE META (Flujo de aprobación)
   // ────────────────────────────────────────────────────────────────────────────
   closureRequestedAt  DateTime? @map("closure_requested_at")
-  closureRequestedBy  String?   @map("closure_requested_by")
+  closureRequestedBy  String?   @map("closure_requested_by")     // nombre para display
+  closureRequestedById String?  @map("closure_requested_by_id")  // Employee.id del solicitante (direccionable para GoalAlert)
   closedAt            DateTime? @map("closed_at")
   closedBy            String?   @map("closed_by")
   closureApprovedBy   String?   @map("closure_approved_by")
@@ -2985,6 +2991,44 @@ model GoalProgressUpdate {
   @@index([accountId])
   @@index([createdAt])  // VITAL para queries de rango de fecha (Time Travel)
   @@map("goal_progress_updates")
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// AVISOS PERSONALES DE METAS (GoalAlert — bandeja slim / read receipt)
+// ────────────────────────────────────────────────────────────────────────────
+// A diferencia de JourneyAlert/ExitAlert/ComplianceAlert (que capturan momentos-
+// umbral NO re-derivables), los eventos de GoalAlert SÍ son re-derivables del
+// estado del Goal. Lo único no-derivable — y la justificación de la tabla — es el
+// leído/no-leído por persona. Por eso es slim: sin SLA ni workflow de resolución.
+// readAt == null es la única señal de "no leído".
+
+enum GoalAlertType {
+  GOAL_ASSIGNED
+  CLOSURE_APPROVED
+  CLOSURE_REJECTED
+}
+
+model GoalAlert {
+  id                  String        @id @default(cuid())
+  accountId           String        @map("account_id")           // multi-tenant SIEMPRE
+  goalId              String        @map("goal_id")
+  recipientEmployeeId String        @map("recipient_employee_id") // destinatario (Employee.id)
+  type                GoalAlertType
+  title               String
+  body                String?
+  context             Json?         // p.ej. { actorName, reason, previousStatus } para render self-contained
+  readAt              DateTime?     @map("read_at")               // null = no leído (única señal de estado)
+  readBy              String?       @map("read_by")
+  createdAt           DateTime      @default(now()) @map("created_at") // auditoría de cuándo se generó
+
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  recipient Employee @relation("EmployeeGoalAlerts", fields: [recipientEmployeeId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([recipientEmployeeId, readAt]) // consulta "mis no leídos"
+  @@index([goalId])
+  @@map("goal_alerts")
 }
 
 // ────────────────────────────────────────────────────────────────────────────
