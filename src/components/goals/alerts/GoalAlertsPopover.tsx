@@ -40,7 +40,10 @@ export function GoalAlertsPopover({
 }: GoalAlertsPopoverProps) {
   return (
     <div
-      className="absolute right-0 top-full mt-2 w-[380px] max-w-[calc(100vw-2rem)] rounded-xl bg-slate-950/95 backdrop-blur-xl border border-slate-800 shadow-2xl z-50"
+      // Mobile: fixed al viewport (left-4/right-4 → ancho = 100vw-2rem, centrado,
+      // no depende del inset de la campana). Desktop (sm+): absolute anclado a la
+      // campana como antes (ahí hay margen de sobra, no desborda).
+      className="fixed left-4 right-4 top-16 z-50 rounded-xl bg-slate-950/95 backdrop-blur-xl border border-slate-800 shadow-2xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[380px] sm:max-w-[calc(100vw-2rem)]"
       style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }}
     >
       {/* Tesla line */}
