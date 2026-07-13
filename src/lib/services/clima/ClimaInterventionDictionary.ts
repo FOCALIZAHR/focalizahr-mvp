@@ -165,17 +165,48 @@ function pickLeverReactive(reactiveContext: ReactiveContextEntry[]): string | nu
 export function getIntervention(
   category: string,
   zone: RiskZone,
-  reactiveContext?: ReactiveContextEntry[]
+  reactiveContext?: ReactiveContextEntry[],
+  /**
+   * Reactivo-palanca pre-elegido por el caller (Cluster A lo elige por priorityMean =
+   * |impact|×|gapMean|). Si se pasa (aunque sea null) tiene precedencia sobre el
+   * `pickLeverReactive` fav-based interno → así la severidad que dispara y la variante
+   * narrativa hablan del MISMO reactivo. Ausente (undefined) = comportamiento legacy
+   * (elige por fav) — retrocompatible.
+   */
+  leverOverride?: string | null
 ): InterventionSelection | null {
   if (!isClimaDriverCategory(category)) return null;
   const base = CLIMA_INTERVENTION_DICTIONARY[category][zone];
   const selectedReactive =
-    reactiveContext && reactiveContext.length > 0
-      ? pickLeverReactive(reactiveContext)
-      : null;
+    leverOverride !== undefined
+      ? leverOverride
+      : reactiveContext && reactiveContext.length > 0
+        ? pickLeverReactive(reactiveContext)
+        : null;
   const variant =
     selectedReactive !== null
       ? CLIMA_INTERVENTION_VARIANTS[category]?.[zone]?.[selectedReactive]
       : undefined;
   return { cell: variant ?? base, selectedReactive };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Escalamiento sistémico — cuando ≥REACTIVE_SYSTEMIC_RATIO de los reactivos de una
+// dimensión caen bajo su tier, el problema deja de ser puntual. Celda por defecto
+// PROVISIONAL (mismo régimen que el diccionario). Interpola {n}/{total}/{categoría}.
+// ════════════════════════════════════════════════════════════════════════════
+
+export function getSystemicIntervention(
+  category: string,
+  nBelow: number,
+  totalMeasured: number
+): ClimaInterventionCell {
+  return {
+    narrative: `${P}${nBelow} de ${totalMeasured} reactivos de ${category} están bajo el umbral en tu equipo. Este no es un problema puntual — es un patrón que cruza varios frentes a la vez. Conversación recomendada: revisar con RRHH antes de actuar solo.`,
+    steps: [
+      'Revisar el patrón completo de la dimensión con RRHH antes de actuar reactivo por reactivo',
+      'Definir una intervención a nivel de dimensión, no parche por parche',
+    ],
+    suggestedProduct: 'Revisar con RRHH',
+  };
 }

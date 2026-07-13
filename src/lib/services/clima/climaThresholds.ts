@@ -76,3 +76,90 @@ export function calcRiskZone(fav: number | null, momentum: number | null): RiskZ
   }
   return zone;
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// SEVERIDAD/TRIGGER A NIVEL REACTIVO + MEAN SCORE (Gate 2026-07-12)
+// A-additive: NO toca riskZone / CLIMA_TARGET_FAVORABILITY / calcRiskZone.
+// Baja la CAPA DE ACCIÓN (disparo + severidad del plan) de dimensión+fav a
+// reactivo+mean. Todo PROVISIONAL — Victor calibra con datos reales apenas existan
+// (mismo régimen que el diccionario 5A). Ver AS_BUILT_SEVERIDAD_REACTIVO_MEAN.md.
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Vara de mean (escala 1-5) bajo la cual un reactivo entra en atención.
+ *
+ * ⚠️ BENCHMARK FIJO — NO el promedio interno de la propia encuesta. DECISIÓN
+ * DELIBERADA, la MISMA que Gate 3 (MAESTRO v3.7) tomó a nivel driver: si toda la
+ * empresa está mal, el promedio interno también cae y ESCONDE la crisis justo
+ * cuando es más grave. El camino alternativo (comparar contra el promedio interno)
+ * se descartó a propósito, no por descuido.
+ * PROVISIONAL — los valores los calibra Victor con datos reales.
+ */
+export const REACTIVE_MEAN_TARGET_TIERS = {
+  TIER_RECURSOS: 3.3, // higiénicos: beneficios, carga_trabajo, estres, herramientas, ambiente_fisico
+  TIER_ESTANDAR: 3.6, // default para todo el resto
+} as const;
+export type ReactiveMeanTier = keyof typeof REACTIVE_MEAN_TARGET_TIERS;
+
+/** subcategory (reactivo) → tier. No listada → TIER_ESTANDAR (fallback EXPLÍCITO, no silencioso). */
+export const REACTIVE_TIER_BY_SUBCATEGORY: Record<string, ReactiveMeanTier> = {
+  beneficios: 'TIER_RECURSOS',    // reactivo REAL de la dimensión compensaciones (NO "compensaciones")
+  carga_trabajo: 'TIER_RECURSOS',
+  estres: 'TIER_RECURSOS',
+  herramientas: 'TIER_RECURSOS',
+  ambiente_fisico: 'TIER_RECURSOS',
+};
+
+/** Vara de mean del reactivo (fallback explícito a TIER_ESTANDAR). */
+export function reactiveMeanTarget(subcategory: string): number {
+  const tier = REACTIVE_TIER_BY_SUBCATEGORY[subcategory] ?? 'TIER_ESTANDAR';
+  return REACTIVE_MEAN_TARGET_TIERS[tier];
+}
+
+/**
+ * Reactivos que miden el MISMO constructo que el Engagement Index (permanencia,
+ * recomendación, orgullo, experiencia global) → se EXCLUYEN del análisis de acción:
+ * su impacto Pearson×EI está inflado por solapamiento de constructo (circularidad).
+ * Confirmado con el texto real del banco 2026-07-12. PROVISIONAL.
+ */
+export const REACTIVE_CIRCULARITY_EXCLUDE = new Set<string>([
+  'retencion',           // "Planeo continuar trabajando aquí…" ≈ EI "me veo en 2 años" / "rara vez busco"
+  'recomendacion',       // "Recomendaría esta empresa…" ≈ EI NPS
+  'orgullo',             // "Me siento orgulloso de trabajar…" ≈ EI "me siento orgulloso/a"
+  'experiencia_general', // "Mi experiencia… ha sido positiva" — ítem global/summary, halo con EI
+]);
+
+/** Δmean mínimo para que un movimiento reactivo sea señal (Gallup Q12). PROVISIONAL. */
+export const REACTIVE_MOMENTUM_MIN_DELTA = 0.2;
+
+/** Fracción de reactivos medidos de una dimensión bajo su tier para marcarla sistémica. PROVISIONAL. */
+export const REACTIVE_SYSTEMIC_RATIO = 0.5;
+
+/**
+ * Estado de momentum de un reactivo por su Δmean raw (current.mean − prev.mean).
+ * null = sin período anterior medido. Umbral simétrico REACTIVE_MOMENTUM_MIN_DELTA.
+ */
+export type ReactiveMomentumState = 'declining' | 'stable' | 'improving';
+export function reactiveMomentumState(delta: number | null): ReactiveMomentumState | null {
+  if (delta === null) return null;
+  if (delta <= -REACTIVE_MOMENTUM_MIN_DELTA) return 'declining';
+  if (delta >= REACTIVE_MOMENTUM_MIN_DELTA) return 'improving';
+  return 'stable';
+}
+
+/**
+ * Severidad de un reactivo por la PROFUNDIDAD de su gapMean (mean − tier; negativo = bajo).
+ * Cortes INDEPENDIENTES del valor del tier: gapMean ya normaliza cada reactivo contra su
+ * propia vara → miden qué tan hondo es el fallo, no el nivel absoluto (dos ejes distintos).
+ * Interno a la capa de acción — NO es calcRiskZone, NO se expone a otros consumidores.
+ * PROVISIONAL — 1er candidato a recalibrar (gapMean −0.7 sobre TIER_ESTANDAR = mean 2.9).
+ */
+export const REACTIVE_SEVERITY_GAPMEAN_NARANJA = -0.3;
+export const REACTIVE_SEVERITY_GAPMEAN_ROJA = -0.7;
+
+export function reactiveSeverityZone(gapMean: number): RiskZone | null {
+  if (gapMean >= 0) return null; // en/sobre la vara → no dispara
+  if (gapMean < REACTIVE_SEVERITY_GAPMEAN_ROJA) return 'roja';
+  if (gapMean < REACTIVE_SEVERITY_GAPMEAN_NARANJA) return 'naranja';
+  return 'amarilla';
+}

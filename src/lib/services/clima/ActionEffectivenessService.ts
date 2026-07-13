@@ -4,13 +4,15 @@
 // Se ejecuta como Fase 4d del cierre de un Seguimiento Focalizado (isFollowUp),
 // llamado desde ClimaAggregationService con los datos ya en memoria (cero re-queries
 // de score). Cruza el autorreporte del jefe (ClimaActionLog.actionText: con texto /
-// vacío) contra el movimiento del driver (momentumDelta, ya sellado en PulseEngine)
-// y escribe el veredicto en ClimaActionLog. Ver plan Gate 5C + DISEÑO §4.
+// vacío) contra el movimiento del driver y escribe el veredicto en ClimaActionLog.
+// Ver plan Gate 5C + DISEÑO §4 + AS_BUILT_SEVERIDAD_REACTIVO_MEAN.md (fix mean).
 //
-// Reglas selladas (no reabrir):
-//  - impactDelta = momentumDelta del driver (NO se recalcula) — DriverImpact.momentumDelta.
-//  - Umbrales SELLADOS climaThresholds: mejoró ≥ +5 (GROWING) · bajó ≤ −5 (DECLINING).
-//  - null-safe: momentumDelta===null (carried / n<5) → SALTA la fila (queda pendiente).
+// Reglas (Gate severidad reactivo+mean 2026-07-12 — actualiza el sello 5C):
+//  - impactDelta = DriverImpact.meanMomentumDelta (delta de MEAN ×25 a pp), NO momentumDelta-fav:
+//    el % favorable es ciego al deterioro dentro de las cajas bajas (Glint/Culture Amp).
+//  - Umbrales SELLADOS climaThresholds: mejoró ≥ +5 (GROWING) · bajó ≤ −5 (DECLINING) — reusados
+//    tal cual porque meanMomentumDelta está escalado ×25 (±5pp ⇄ Δmean ±0.2, misma semántica).
+//  - null-safe: meanMomentumDelta===null (carried / n<5) → SALTA la fila (queda pendiente).
 //    Como todas las filas de un mismo triggerRef comparten (depto,driver), el salto es
 //    uniforme por construcción (nunca "una sí y otra no").
 //  - @@unique es (actionPlanId, triggerRef) POR PLAN → puede haber >1 fila pendiente por
@@ -100,7 +102,9 @@ export class ActionEffectivenessService {
       const category = categoryFromTriggerRef(log.triggerRef);
       const drivers = driverAnalysisByDept.get(log.departmentId);
       const driver = category ? drivers?.find((d) => d.driver === category) : undefined;
-      const delta = driver?.momentumDelta ?? null;
+      // Fix severidad mean: el veredicto corre sobre el delta de MEAN (escalado ×25 a pp,
+      // mismos umbrales ±5), NO sobre el delta de fav (ciego al deterioro en cajas bajas).
+      const delta = driver?.meanMomentumDelta ?? null;
 
       // null-safe: sin medición confiable (carried / n<5 / driver no medido) → pendiente.
       if (delta === null) {

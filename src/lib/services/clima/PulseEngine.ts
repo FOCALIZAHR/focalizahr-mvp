@@ -43,8 +43,10 @@ import {
   CLIMA_TARGET_FAVORABILITY,
   LEADERSHIP_DRIVER,
   calcRiskZone,
+  REACTIVE_MOMENTUM_MIN_DELTA,
+  reactiveMomentumState,
 } from './climaThresholds';
-import type { RiskZone } from './climaThresholds';
+import type { RiskZone, ReactiveMomentumState } from './climaThresholds';
 
 export {
   RISK_ZONE_THRESHOLDS,
@@ -54,8 +56,10 @@ export {
   CLIMA_TARGET_FAVORABILITY,
   LEADERSHIP_DRIVER,
   calcRiskZone,
+  REACTIVE_MOMENTUM_MIN_DELTA,
+  reactiveMomentumState,
 };
-export type { RiskZone };
+export type { RiskZone, ReactiveMomentumState };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constantes de dominio (decisiones Victor 2026-07-07 — editables por dev,
@@ -156,8 +160,12 @@ export interface DriverImpact {
   priority: number | null; // |impact| × |gap| (1 dec)
   classification: DriverClassification | null;
   // ALG 3
-  momentumDelta: number | null; // pp vs período anterior; null si carried en
+  momentumDelta: number | null; // pp de FAV vs período anterior; null si carried en
   momentumState: MomentumState | null; // cualquiera de los 2 lados o sin previo
+  // Fix 5C (severidad mean): delta de MEAN escalado ×25 a pp (0-100), mismos umbrales
+  // ±5 que momentumDelta-fav. Lo consume ActionEffectivenessService (veredicto 5C).
+  // NO reemplaza momentumDelta (que sigue alimentando riskZone/Cascada/aggregate).
+  meanMomentumDelta: number | null;
   // ALG 4
   champion: {
     departmentId: string;
@@ -182,6 +190,10 @@ export interface ReactiveImpact {
   impactLevelDeptId: string | null; // depto/ancestro cuyo subárbol dio el impact local; null = compañía
   gap: number | null; // fav − CLIMA_TARGET_FAVORABILITY (pp, con signo)
   priority: number | null; // |impact| × |gap| (1 dec) — criterio de selección del reactivo-palanca
+  // Severidad reactivo+mean (Gate 2026-07-12): momentum de MEAN raw (current−prev), sin
+  // transformar; null si no hay período anterior medido. Umbral REACTIVE_MOMENTUM_MIN_DELTA.
+  reactiveMomentumDelta: number | null;
+  reactiveMomentumState: ReactiveMomentumState | null;
 }
 
 export interface PulseBusinessCase {
@@ -243,6 +255,9 @@ export interface PulseDeptInput {
   momentum: number | null; // escalar EI que persiste Gate 2 (NO se recalcula)
   rows: ClimaResponseRow[]; // crudo del depto — pares Pearson ALG 1
   prevDriverScores: Record<string, DriverScore> | null; // insight anterior (ALG 3)
+  // Severidad reactivo+mean: reactiveScores del insight anterior (mismo período que
+  // prevDriverScores). null = sin medición previa → reactiveMomentumDelta null.
+  prevReactiveScores: Record<string, DriverScore> | null;
   turnoverRate: number | null; // DepartmentMetric, en % (0-100); puede no estar cargada
   headcountAvg: number | null;
   isaScore: number | null; // ComplianceAnalysis scope DEPARTMENT
@@ -609,6 +624,15 @@ export function buildReactiveAnalysis(
     const priority =
       impact !== null && gap !== null ? round1(Math.abs(impact) * Math.abs(gap)) : null;
 
+    // Momentum reactivo (mean raw, sin transformar) vs el mismo reactivo del período
+    // anterior. SIN carry-forward: si el reactivo no fue medido antes (o falta mean),
+    // el momentum queda null. No se compara con carried (prevReactiveScores nunca lo tiene).
+    const prevReactive = dept.prevReactiveScores?.[reactive];
+    const reactiveMomentumDelta =
+      score.mean !== null && prevReactive && prevReactive.mean !== null
+        ? round1(score.mean - prevReactive.mean)
+        : null;
+
     analysis.push({
       reactive,
       category: ctx.categoryByReactive.get(reactive) ?? '',
@@ -620,6 +644,8 @@ export function buildReactiveAnalysis(
       impactLevelDeptId,
       gap,
       priority,
+      reactiveMomentumDelta,
+      reactiveMomentumState: reactiveMomentumState(reactiveMomentumDelta),
     });
   }
 
@@ -631,18 +657,22 @@ export function buildReactiveAnalysis(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Delta fav vs período anterior, SOLO si el driver fue MEDIDO en ambos períodos
+ * Delta vs período anterior, SOLO si el driver fue MEDIDO en ambos períodos
  * (carried === false y fav no null en los 2 lados — un carried nunca entra).
+ * - momentumDelta / momentumState: sobre FAV (pp) — SIN CAMBIO (riskZone/Cascada/aggregate).
+ * - meanMomentumDelta (Fix 5C): delta de MEAN escalado ×25 a pp (0-100) para reutilizar los
+ *   umbrales ±5 sellados con la misma semántica (±5pp ⇄ Δmean ±0.2). Mismo guard: fav no-null
+ *   ⟺ mean no-null (calcFavorability), así que si el bloque pasa, ambos means existen.
  */
 export function calcDriverMomentum(
   current: DriverScore | undefined,
   prev: DriverScore | undefined
-): { momentumDelta: number | null; momentumState: MomentumState | null } {
+): { momentumDelta: number | null; momentumState: MomentumState | null; meanMomentumDelta: number | null } {
   if (
     !current || current.carried || current.fav === null ||
     !prev || prev.carried || prev.fav === null
   ) {
-    return { momentumDelta: null, momentumState: null };
+    return { momentumDelta: null, momentumState: null, meanMomentumDelta: null };
   }
   const delta = round1(current.fav - prev.fav);
   let state: MomentumState;
@@ -650,7 +680,11 @@ export function calcDriverMomentum(
   else if (delta <= MOMENTUM_DECLINING_PP) state = 'declining';
   else if (delta >= MOMENTUM_GROWING_PP) state = 'growing';
   else state = 'stable';
-  return { momentumDelta: delta, momentumState: state };
+  const meanMomentumDelta =
+    current.mean !== null && prev.mean !== null
+      ? round1((current.mean - prev.mean) * 25)
+      : null;
+  return { momentumDelta: delta, momentumState: state, meanMomentumDelta };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

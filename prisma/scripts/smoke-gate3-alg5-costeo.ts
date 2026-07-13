@@ -43,6 +43,7 @@ function mkDept(o: {
   return {
     departmentId: 'd', driverScores: o.drivers ?? { satisfaccion: dS(2.0) },
     reactiveScores: {}, // Dynamic Impact Drivers — no relevante para este smoke de ALG5
+    prevReactiveScores: null, // Severidad reactivo+mean — no relevante para este smoke
     ei, momentum: null, rows: [], prevDriverScores: null,
     turnoverRate: o.turnoverRate ?? null, headcountAvg: o.headcountAvg ?? 50,
     isaScore: null, totalResponded: 10, participationRate: 80,

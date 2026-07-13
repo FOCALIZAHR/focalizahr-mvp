@@ -51,7 +51,8 @@ export interface ClimaInterventionCell {
 export interface ReactiveContextEntry {
   reactive: string; // subcategory (carga_trabajo, seguridad, ...)
   impact: number | null; // Pearson reactivo×EI (local o compañía)
-  gap: number | null; // fav − target (pp, con signo)
+  gap: number | null; // fav − target (pp, con signo) — referencia (Dynamic Impact)
+  mean: number | null; // mean 1-5 del reactivo — base de gapMean/priorityMean (severidad mean)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,10 +92,16 @@ export interface ClimaDecisionItem {
   deadline: string; // '2 semanas' | '30 días' | '90 días' | 'Sostener'
   validationMetric: string; // "Favorabilidad de liderazgo > 75% en el próximo Seguimiento Focalizado"
   /**
-   * Dynamic Impact Drivers: reactivo-palanca elegido (mayor |impact|×|gap|) dentro de
-   * la dimensión. null = sin contexto de reactivos → intervención por defecto de la celda.
+   * Reactivo-palanca elegido (mayor priorityMean = |impact|×|gapMean|) dentro de la
+   * dimensión. null = sin contexto de reactivos → intervención por defecto de la celda.
    */
   selectedReactive: string | null;
+  /**
+   * Escalamiento sistémico: ≥REACTIVE_SYSTEMIC_RATIO de los reactivos medidos no-circulares
+   * de la dimensión están bajo su tier → patrón que cruza varios frentes (intervención de
+   * dimensión, no reactivo puntual). La narrativa usa REACTIVE_SYSTEMIC_NARRATIVE.
+   */
+  isSystemic: boolean;
   ceoDecision?: CeoDecision; // decisión humana en 5D (undefined = pendiente)
   ceoNotes?: string;
 }

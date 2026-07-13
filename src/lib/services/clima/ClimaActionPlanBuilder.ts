@@ -1,26 +1,34 @@
 // src/lib/services/clima/ClimaActionPlanBuilder.ts
 // ════════════════════════════════════════════════════════════════════════════
-// EX Clima Gate 5A — ClimaActionPlanBuilder.
+// EX Clima — ClimaActionPlanBuilder (capa de acción del plan).
 //
-// Función PURA (client-safe, sin prisma): mapea el diagnóstico ya sellado por
-// depto (DriverImpact[] + PulseBusinessCase[]) a ClimaDecisionItem[], listos
-// para persistir como ActionPlan.decisiones (moduleType='clima') vía el endpoint
-// genérico existente. NO recomputa nada de Gate 2/3: sólo lee zona (calcRiskZone,
-// sellado) y compone con el diccionario de intervenciones (PROVISIONAL).
+// Función PURA (client-safe, sin prisma): mapea el diagnóstico ya sellado por depto
+// a ClimaDecisionItem[], listos para persistir como ActionPlan.decisiones
+// (moduleType='clima') vía el endpoint genérico existente.
 //
-// Regla de generación: un ClimaDecisionItem por driver en zona de ATENCIÓN
-// (amarilla/naranja/roja). Los drivers verde (Sano) NO generan ítem de acción.
-// El businessCase (CLP/ROI) se adjunta SOLO si PulseEngine lo disparó para ese
-// driver (clima_critico / liderazgo_gap) — nunca se inventa una cifra.
+// SEVERIDAD/TRIGGER A NIVEL REACTIVO + MEAN (Gate 2026-07-12): el disparo y la
+// severidad YA NO dependen de la favorabilidad de la DIMENSIÓN (fav, ciega al
+// deterioro en cajas bajas). Ahora:
+//   - dispara si ≥1 reactivo (no-circular, medido) está bajo su tier de mean (gapMean<0),
+//   - el reactivo-palanca = mayor priorityMean (|impact|×|gapMean|),
+//   - la severidad de la celda = reactiveSeverityZone(palanca.gapMean) (mapeo interno,
+//     NO calcRiskZone — la señal que dispara es la que se narra),
+//   - si ≥REACTIVE_SYSTEMIC_RATIO de los reactivos medidos caen bajo su tier → isSystemic
+//     (narrativa de dimensión, no reactivo puntual).
+// riskZone/calcRiskZone siguen intactos para el resto de consumidores (fuera de scope).
+// El businessCase (CLP/ROI) se adjunta SOLO si PulseEngine lo disparó — nunca se inventa.
 // ════════════════════════════════════════════════════════════════════════════
 
 import {
-  calcRiskZone,
-  CLIMA_TARGET_FAVORABILITY,
+  reactiveMeanTarget,
+  reactiveSeverityZone,
+  REACTIVE_CIRCULARITY_EXCLUDE,
+  REACTIVE_SYSTEMIC_RATIO,
   type RiskZone,
 } from '@/lib/services/clima/climaThresholds';
 import {
   getIntervention,
+  getSystemicIntervention,
   isClimaDriverCategory,
 } from '@/lib/services/clima/ClimaInterventionDictionary';
 import {
@@ -29,6 +37,8 @@ import {
   type ClimaDeptDecisionInput,
 } from '@/types/clima-planes';
 import type { PulseBusinessCase } from '@/lib/services/clima/PulseEngine';
+
+const round1 = (x: number) => Math.round(x * 10) / 10;
 
 // ── Derivados Code-owned (no narrativa): responsable + plazo por severidad ──
 const RESPONSIBLE_BY_ZONE: Record<RiskZone, string> = {
@@ -53,11 +63,6 @@ const ZONE_SEVERITY_RANK: Record<RiskZone, number> = {
   verde: 0,
 };
 
-/** Zonas que ameritan un ítem de acción (todo lo que no es Sano). */
-function needsAction(zone: RiskZone): boolean {
-  return zone !== 'verde';
-}
-
 /** Business case de PulseEngine para este driver, si disparó. */
 function findBusinessCase(
   category: string,
@@ -67,7 +72,7 @@ function findBusinessCase(
 }
 
 /**
- * Genera las decisiones de un solo departamento.
+ * Genera las decisiones de un solo departamento (un ítem por dimensión que dispara).
  * Orden: severidad desc (roja→amarilla), y a igual zona, gap más negativo primero.
  */
 export function buildDeptClimaDecisions(
@@ -76,25 +81,70 @@ export function buildDeptClimaDecisions(
   const items: ClimaDecisionItem[] = [];
 
   for (const driver of input.drivers) {
-    // Zona = severidad (calcRiskZone sellado; modula por momentum en crisis).
-    const zone = calcRiskZone(driver.fav, driver.momentumDelta);
-    if (zone === null) continue; // fav null → no medible, no genera ítem
-    if (!needsAction(zone)) continue; // verde (Sano) → sin ítem de acción
-    if (!isClimaDriverCategory(driver.category)) continue; // driver fuera de la taxonomía
+    if (!isClimaDriverCategory(driver.category)) continue; // fuera de la taxonomía
 
-    // Dynamic Impact Drivers: selecciona el reactivo-palanca y su variante narrativa.
-    const selection = getIntervention(driver.category, zone, driver.reactives);
-    if (!selection) continue; // defensivo: no debería pasar tras isClimaDriverCategory
-    const { cell, selectedReactive } = selection;
+    // Excluir reactivos circulares (mismo constructo que EI) — una sola vez → cubre
+    // disparo, ratio ≥50% y la selección narrativa (getIntervention recibe esta lista).
+    const usable = driver.reactives.filter(
+      (r) => !REACTIVE_CIRCULARITY_EXCLUDE.has(r.reactive)
+    );
 
-    const businessCase = findBusinessCase(driver.category, input.businessCases);
+    // Medidos (mean no-null) + gapMean contra la vara del reactivo + priorityMean.
+    const measured = usable
+      .filter((r) => r.mean !== null)
+      .map((r) => {
+        const gapMean = round1((r.mean as number) - reactiveMeanTarget(r.reactive));
+        const priorityMean =
+          r.impact !== null && gapMean < 0
+            ? round1(Math.abs(r.impact) * Math.abs(gapMean))
+            : null;
+        return { ...r, gapMean, priorityMean };
+      });
+    if (measured.length === 0) continue; // sin base medida
+
+    const belowTier = measured.filter((r) => r.gapMean < 0);
+    if (belowTier.length === 0) continue; // ningún reactivo bajo su tier → no dispara
+
+    // Palanca = mayor priorityMean; si todas null (impact no evaluable), el gapMean más hondo.
+    const palanca = [...belowTier].sort((a, b) => {
+      const pa = a.priorityMean ?? -Infinity;
+      const pb = b.priorityMean ?? -Infinity;
+      if (pb !== pa) return pb - pa;
+      return a.gapMean - b.gapMean; // desempate: más hondo (más negativo) primero
+    })[0];
+
+    const zone = reactiveSeverityZone(palanca.gapMean);
+    if (zone === null) continue; // defensivo: palanca ya tiene gapMean<0
+
+    const isSystemic = belowTier.length / measured.length >= REACTIVE_SYSTEMIC_RATIO;
+
+    let cell;
+    let selectedReactive: string | null;
+    if (isSystemic) {
+      cell = getSystemicIntervention(driver.category, belowTier.length, measured.length);
+      selectedReactive = palanca.reactive; // referencia; la narrativa es sistémica
+    } else {
+      const selection = getIntervention(
+        driver.category,
+        zone,
+        usable,
+        palanca.reactive // leverOverride: la variante habla del MISMO reactivo que disparó
+      );
+      if (!selection) continue; // defensivo tras isClimaDriverCategory
+      cell = selection.cell;
+      selectedReactive = selection.selectedReactive;
+    }
+
+    const validationMetric = isSystemic
+      ? `Reducir los reactivos de ${driver.category} bajo umbral (${belowTier.length}/${measured.length}) en el próximo Seguimiento Focalizado`
+      : `Mean de ${palanca.reactive} ≥ ${reactiveMeanTarget(palanca.reactive)} en el próximo Seguimiento Focalizado`;
 
     items.push({
       triggerRef: `clima:${input.departmentId}:${driver.category}`,
       category: driver.category,
       departmentId: input.departmentId,
       departmentName: input.departmentName,
-      favorability: driver.fav,
+      favorability: driver.fav, // contexto de dimensión (referencia)
       gap: driver.gap,
       impact: driver.impact,
       intervention: {
@@ -103,12 +153,13 @@ export function buildDeptClimaDecisions(
         narrative: cell.narrative,
         steps: cell.steps,
         suggestedProduct: cell.suggestedProduct,
-        businessCase,
+        businessCase: findBusinessCase(driver.category, input.businessCases),
       },
       responsible: RESPONSIBLE_BY_ZONE[zone],
       deadline: DEADLINE_BY_ZONE[zone],
-      validationMetric: `Favorabilidad de ${driver.category} > ${CLIMA_TARGET_FAVORABILITY}% en el próximo Seguimiento Focalizado`,
+      validationMetric,
       selectedReactive,
+      isSystemic,
     });
   }
 
@@ -117,7 +168,7 @@ export function buildDeptClimaDecisions(
       ZONE_SEVERITY_RANK[b.intervention.level] -
       ZONE_SEVERITY_RANK[a.intervention.level];
     if (rankDiff !== 0) return rankDiff;
-    // a igual zona: gap más negativo (peor) primero
+    // a igual zona: gap (fav) más negativo (peor) primero — referencia estable
     return (a.gap ?? 0) - (b.gap ?? 0);
   });
 }

@@ -286,8 +286,14 @@ export class ClimaAggregationService {
               periodEnd: { lt: campaign.endDate },
             },
             orderBy: { periodEnd: 'desc' },
-            // driverScores: Gate 3 ALG 3 (momentum per-driver vs período anterior)
-            select: { departmentId: true, engagementFavorability: true, driverScores: true },
+            // driverScores: Gate 3 ALG 3 (momentum per-driver). reactiveScores: momentum
+            // reactivo (Gate severidad reactivo+mean) — mismo insight anterior, sin re-query.
+            select: {
+              departmentId: true,
+              engagementFavorability: true,
+              driverScores: true,
+              reactiveScores: true,
+            },
           }),
           // Benchmark mercado pulse_climate — lookup mínimo GLOBAL (escritura = Gate 6C;
           // hoy no hay datos → benchmarkDelta null by design)
@@ -481,6 +487,8 @@ export class ClimaAggregationService {
             rows: deptRows,
             prevDriverScores:
               (prev?.driverScores as Record<string, DriverScore> | null) ?? null,
+            prevReactiveScores:
+              (prev?.reactiveScores as Record<string, DriverScore> | null) ?? null,
             turnoverRate: metric?.turnoverRate ?? null,
             headcountAvg: metric?.headcountAvg ?? null,
             isaScore: isaByDept.get(deptId)?.isaScore ?? null,
