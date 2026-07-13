@@ -139,12 +139,16 @@ export function extractUserContext(request: Request): {
   role: string | null;
   departmentId: string | null;
   userId: string | null;
+  userName: string | null;
 } {
+  // x-user-name viaja codificado (encodeURIComponent) desde el middleware (ñ/tildes)
+  const rawUserName = request.headers.get('x-user-name');
   return {
     accountId: request.headers.get('x-account-id') || '',
     role: request.headers.get('x-user-role'),
     departmentId: request.headers.get('x-department-id'),
-    userId: request.headers.get('x-user-id')
+    userId: request.headers.get('x-user-id'),
+    userName: rawUserName ? decodeURIComponent(rawUserName) : null
   };
 }
 

@@ -117,10 +117,19 @@ async function main() {
   const actorA1: GoalClosureActor = {
     accountId: accountA, role: 'HR_MANAGER', departmentId: null,
     userId: 'user-a1', employeeId: empA1, employeeName: 'Empleado A1',
+    userName: 'Empleado A1', userEmail: 'smoke-ga-a1@fixture.local',
   }
   const actorApprover: GoalClosureActor = {
     accountId: accountA, role: 'ACCOUNT_OWNER', departmentId: null,
     userId: 'user-owner', employeeId: empA2, employeeName: 'Aprobador',
+    userName: 'Aprobador', userEmail: 'smoke-ga-a2@fixture.local',
+  }
+  // Actor EJECUTIVO sin fila Employee (caso CEO real del bug): employeeName null,
+  // el nombre debe resolverse desde userName (no caer a 'Administrador').
+  const actorCeo: GoalClosureActor = {
+    accountId: accountA, role: 'CEO', departmentId: null,
+    userId: 'user-ceo', employeeId: null, employeeName: null,
+    userName: 'Valentina CEO', userEmail: 'ceo@fixture.local',
   }
 
   // ── T1: GOAL_ASSIGNED al crear meta con dueño ───────────────────────────────
@@ -196,6 +205,34 @@ async function main() {
   const b1Unread = await getUnread(hB1)
   assert(b1Unread.length === 0, `empB1 ve 0 (obtuve ${b1Unread.length})`)
   assert(!b1Unread.some(a => a.recipientEmployeeId === empA1), 'ninguna alerta de la cuenta A aparece para empB1')
+
+  // ── T10: actor ejecutivo SIN Employee → nombre real (no 'Administrador') ─────
+  console.log('\n── T10: aprobación por CEO sin fila Employee ──')
+  const goalCeo = await createOwnedGoal(accountA, empA1, 'Meta A1 (CEO approve)')
+  await GoalsService.requestClosure(goalCeo, actorA1, { enforceMinProgress: false })
+  await GoalsService.approveClosure(goalCeo, actorCeo, { notes: 'visto bueno' })
+  const ceoAlert = await prisma.goalAlert.findFirst({ where: { goalId: goalCeo, type: 'CLOSURE_APPROVED' } })
+  assert(!!ceoAlert, 'CLOSURE_APPROVED emitida (CEO)')
+  assert((ceoAlert!.context as any)?.actorName === 'Valentina CEO', `actorName = nombre real del CEO, NO 'Administrador' (obtuve ${(ceoAlert!.context as any)?.actorName})`)
+  const ceoGoal = await prisma.goal.findUnique({ where: { id: goalCeo }, select: { closedBy: true, closureApprovedBy: true } })
+  assert(ceoGoal?.closedBy === 'Valentina CEO', `Goal.closedBy = CEO real (obtuve ${ceoGoal?.closedBy})`)
+  assert(ceoGoal?.closureApprovedBy === 'Valentina CEO', 'Goal.closureApprovedBy = CEO real')
+  const ceoAudit = await prisma.goalProgressUpdate.findFirst({
+    where: { goalId: goalCeo, comment: { contains: 'aprobada' } },
+    select: { comment: true },
+  })
+  assert(!!ceoAudit?.comment?.includes('Valentina CEO'), 'auditoría (GoalProgressUpdate) nombra al CEO real')
+
+  // ── T11: rechazo por CEO sin Employee → nombre real + motivo ────────────────
+  console.log('\n── T11: rechazo por CEO sin fila Employee ──')
+  const goalCeoReject = await createOwnedGoal(accountA, empA1, 'Meta A1 (CEO reject)')
+  await GoalsService.requestClosure(goalCeoReject, actorA1, { enforceMinProgress: false })
+  const ceoReason = 'Falta evidencia de impacto'
+  await GoalsService.rejectClosure(goalCeoReject, actorCeo, { reason: ceoReason })
+  const ceoRejAlert = await prisma.goalAlert.findFirst({ where: { goalId: goalCeoReject, type: 'CLOSURE_REJECTED' } })
+  assert(!!ceoRejAlert, 'CLOSURE_REJECTED emitida (CEO)')
+  assert((ceoRejAlert!.context as any)?.actorName === 'Valentina CEO', `actorName = CEO real (obtuve ${(ceoRejAlert!.context as any)?.actorName})`)
+  assert((ceoRejAlert!.context as any)?.reason === ceoReason, 'context.reason = motivo del rechazo')
 
   console.log('\n──────────────────────────────────────────────────────────────')
   console.log('  ✅ SMOKE GoalAlert VERDE')

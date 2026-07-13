@@ -70,7 +70,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         where: { accountId: ctx.accountId, email: userEmail, status: 'ACTIVE' },
         select: { fullName: true },
       })
-      const actorName = employee?.fullName || userEmail || 'Estratega'
+      const actorName = employee?.fullName || ctx.userName || userEmail || ''
 
       const result = await GoalCycleService.finalizeCycleWithDecisions(
         params.id,

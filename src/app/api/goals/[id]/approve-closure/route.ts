@@ -77,6 +77,8 @@ export async function POST(
       userId: context.userId,
       employeeId: currentEmployee?.id ?? null,
       employeeName: currentEmployee?.fullName ?? null,
+      userName: context.userName,
+      userEmail: userEmail || null,
     }
 
     const updatedGoal = action === 'approve'

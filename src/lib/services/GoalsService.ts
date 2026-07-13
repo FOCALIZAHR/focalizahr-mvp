@@ -46,6 +46,8 @@ export interface GoalClosureActor {
   userId: string | null
   employeeId: string | null    // currentEmployee?.id ?? null
   employeeName: string | null  // currentEmployee?.fullName ?? null
+  userName: string | null      // nombre del User logueado (sin fila Employee) — extractUserContext
+  userEmail: string | null     // último recurso de atribución (header x-user-email)
 }
 
 export type GoalClosureErrorCode =
@@ -837,11 +839,12 @@ export class GoalsService {
   ): Promise<string> {
     const hasGlobalAccess = (GLOBAL_ACCESS_ROLES as readonly string[]).includes(actor.role || '')
     let canRequestClosure = false
-    let requestedByName = 'Sistema'
+    // Nombre real del actor: Employee.fullName → nombre del User logueado → email.
+    // Sin literales genéricos (el usuario ejecutivo sin fila Employee ya no cae a 'Administrador').
+    const requestedByName = actor.employeeName || actor.userName || actor.userEmail || ''
 
     if (hasGlobalAccess) {
       canRequestClosure = true
-      requestedByName = actor.employeeName || 'Administrador'
     } else if (actor.role === 'AREA_MANAGER' && actor.departmentId) {
       const childIds = await getChildDepartmentIds(actor.departmentId)
       const allowedDepts = [actor.departmentId, ...childIds]
@@ -852,18 +855,15 @@ export class GoalsService {
       } else if (goal.level === 'INDIVIDUAL' && goal.owner?.departmentId) {
         canRequestClosure = allowedDepts.includes(goal.owner.departmentId)
       }
-      requestedByName = actor.employeeName || 'Gerente de Área'
     } else if (actor.role === 'EVALUATOR' && actor.employeeId) {
       if (goal.level === 'INDIVIDUAL' && goal.owner?.managerId === actor.employeeId) {
         canRequestClosure = true
       }
-      requestedByName = actor.employeeName || 'Sistema'
     } else if (actor.employeeId) {
       // Usuario regular: solo sus propias metas INDIVIDUAL
       if (goal.level === 'INDIVIDUAL' && goal.employeeId === actor.employeeId) {
         canRequestClosure = true
       }
-      requestedByName = actor.employeeName || 'Sistema'
     }
 
     if (!canRequestClosure) {
@@ -878,7 +878,8 @@ export class GoalsService {
   ): Promise<string> {
     const hasGlobalAccess = (GLOBAL_ACCESS_ROLES as readonly string[]).includes(actor.role || '')
     let canApprove = false
-    const approverName = actor.employeeName || 'Administrador'
+    // Nombre real: Employee.fullName → nombre del User logueado → email (sin literal genérico)
+    const approverName = actor.employeeName || actor.userName || actor.userEmail || ''
 
     if (hasGlobalAccess) {
       canApprove = true
