@@ -147,7 +147,17 @@ export function isClimaDriverCategory(
   return (CLIMA_DRIVER_CATEGORIES as readonly string[]).includes(category);
 }
 
-/** Reactivo-palanca = mayor |impact|×|gap| (mismo priority que buildDriverAnalysis). */
+/**
+ * ⚠️ LEGACY FAV-BASED — usa el gap de FAVORABILIDAD (r.gap = fav − 75), NO el mean.
+ * Reactivo-palanca = mayor |impact|×|gap-fav| (mismo priority que buildDriverAnalysis).
+ *
+ * NO usar en callers nuevos. La capa de acción decide por MEAN (priorityMean =
+ * |impact|×|gapMean|, ver ClimaActionPlanBuilder). Todo caller nuevo DEBE pasar
+ * `leverOverride` a getIntervention con el reactivo mean-based ya elegido — si no lo
+ * pasa, getIntervention cae acá y el reactivo que se NARRA puede diferir del que
+ * DISPARÓ (fav vs mean), reintroduciendo exactamente la divergencia que este gate
+ * (Severidad reactivo+mean, 2026-07-12) resolvió. Se conserva solo por retrocompatibilidad.
+ */
 function pickLeverReactive(reactiveContext: ReactiveContextEntry[]): string | null {
   let best: string | null = null;
   let bestPriority = -1;
