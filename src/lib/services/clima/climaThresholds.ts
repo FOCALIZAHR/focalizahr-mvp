@@ -136,13 +136,28 @@ export const REACTIVE_MOMENTUM_MIN_DELTA = 0.2;
 export const REACTIVE_SYSTEMIC_RATIO = 0.5;
 
 /**
- * Piso mínimo de impacto (|Pearson reactivo×EI|) para que un reactivo pueda COMPETIR como
- * palanca. Bajo este umbral el reactivo es ruido estadístico de impacto insignificante y se
- * retira de las recomendaciones de prioridad, sin importar qué tan bajo sea su mean
- * (Peakon/Culture Amp/Glint documentado). Se trata igual que `impact===null`: no gana por
- * priorityMean. PROVISIONAL — calibrar con datos reales.
+ * Piso mínimo de impacto (|coeficiente reactivo×EI|, hoy Kendall's Tau-c) para que un reactivo
+ * pueda COMPETIR como palanca. Bajo este umbral el reactivo es ruido estadístico de impacto
+ * insignificante y se retira de las recomendaciones de prioridad, sin importar qué tan bajo sea
+ * su mean (Peakon/Culture Amp/Glint documentado). Se trata igual que `impact===null`: no gana por
+ * priorityMean. PROVISIONAL — validado empíricamente: 0.20 vale igual en escala Tau-c que en
+ * Pearson (ratio Tau-c/Pearson ≈ 1.01 sobre los 36 insights de prueba). NO recalibrar al migrar a Tau-c.
  */
 export const REACTIVE_MIN_IMPACT = 0.20;
+
+/**
+ * Bandas de fuerza del impacto reactivo (escala Tau-c). PROVISIONAL — SOLO referencia de
+ * interpretación/narrativa (futura UI); NO se cablea a lógica activa (el disparo/palanca lo
+ * decide `REACTIVE_MIN_IMPACT` + priorityMean). `0.20` = frontera Medio/Bajo = el piso de palanca
+ * (los reactivos "Bajo"/"Ruido" no compiten). Calibrar con datos reales.
+ */
+export const REACTIVE_STRENGTH_BANDS = {
+  MUY_ALTO: 0.50, // ≥0.50
+  ALTO: 0.30,     // 0.30–0.50
+  MEDIO: 0.20,    // 0.20–0.30  (= REACTIVE_MIN_IMPACT, piso de palanca)
+  BAJO: 0.10,     // 0.10–0.20
+  // <0.10 → Ruido
+} as const;
 
 /**
  * Estado de momentum de un reactivo por su Δmean raw (current.mean − prev.mean).

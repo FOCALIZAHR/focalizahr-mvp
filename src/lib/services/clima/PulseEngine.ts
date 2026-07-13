@@ -135,6 +135,9 @@ export const CONFIDENCE_MEDIUM_PARTICIPATION = 50;
 export const MOVERS_TOP_N = 3;
 
 const round1 = (x: number) => Math.round(x * 10) / 10;
+const round2 = (x: number) => Math.round(x * 100) / 100;
+/** Ordinaliza una media 1-5 a categoría Likert entera 1-5 (para Tau-c). */
+const clamp15 = (x: number) => Math.min(5, Math.max(1, Math.round(x)));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos — contrato persistido (driverAnalysis / correlationFlags)
@@ -431,10 +434,48 @@ export function classifyDriver(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Impacto por REACTIVO = Pearson r con pares por PARTICIPANTE (x = mean del
- * participante en el reactivo, y = mean del participante en EI), sobre un conjunto
- * de filas. Clon exacto de calcCompanyDriverImpacts agrupando por subcategory.
- * Reutiliza GoalsDiagnosticService.calculatePearsonR (null si <5 pares).
+ * Correlación de impacto REACTIVO = Kendall's Tau-c (Stuart): `τ_c = 2·m·(P−Q) / (n²·(m−1))`,
+ * con `m = min(#categorías x, #categorías y)`, `P`/`Q` = pares concordantes/discordantes.
+ *
+ * El reactivo es un ítem Likert ORDINAL (5 categorías) → Tau-c evita el sesgo de Pearson a
+ * volúmenes < 3.000 (Culture Amp). Ordinaliza AMBAS variables a 1-5 (`clamp15`): es imprescindible
+ * — con medias continuas `m≈n` y degeneraría a Tau-a. Validado empíricamente: Tau-c ≈ Pearson
+ * (ratio ≈ 1.01) → el piso `REACTIVE_MIN_IMPACT=0.20` sigue válido en esta escala.
+ *
+ * n mínimo = `REACTIVE_LOCAL_MIN_N` (25, mismo archivo). null si < 25 pares.
+ * ⚠️ REVISAR con el 1er cliente: el umbral 25 SUBE desde el <5 de Pearson — un depto chico que antes
+ *    calculaba impacto ahora puede quedar `null`. Aceptado; revisar si es problema real con nómina real.
+ *
+ * SOLO para el impacto reactivo (consumido en `reactiveImpactsForRows`). NO se usa en
+ * `calcCompanyDriverImpacts` (ALG1) ni `calcClimaTurnoverCorrelation` (ALG5): ahí ambas variables
+ * son PROMEDIOS/continuos y Pearson (`GoalsDiagnosticService.calculatePearsonR`) es correcto.
+ */
+export function reactiveImpactCorrelation(pairs: { x: number; y: number }[]): number | null {
+  const n = pairs.length;
+  if (n < REACTIVE_LOCAL_MIN_N) return null;
+  const ord = pairs.map((p) => ({ x: clamp15(p.x), y: clamp15(p.y) }));
+  let P = 0;
+  let Q = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const d = (ord[i].x - ord[j].x) * (ord[i].y - ord[j].y);
+      if (d > 0) P++;
+      else if (d < 0) Q++;
+    }
+  }
+  const m = Math.min(
+    new Set(ord.map((p) => p.x)).size,
+    new Set(ord.map((p) => p.y)).size
+  );
+  if (m <= 1) return 0; // sin variación en algún eje → sin correlación evaluable
+  return round2((2 * m * (P - Q)) / (n * n * (m - 1)));
+}
+
+/**
+ * Impacto por REACTIVO con pares por PARTICIPANTE (x = mean del participante en el reactivo,
+ * y = mean del participante en EI), sobre un conjunto de filas. Agrupa por subcategory. Usa
+ * `reactiveImpactCorrelation` (Kendall's Tau-c, ordinal) — NO Pearson: el reactivo es un ítem
+ * Likert de 5 categorías. null si < REACTIVE_LOCAL_MIN_N (25) pares.
  */
 export function reactiveImpactsForRows(
   rows: ClimaResponseRow[]
@@ -480,7 +521,7 @@ export function reactiveImpactsForRows(
 
   const impacts = new Map<string, number | null>();
   for (const [reactive, pairs] of pairsByReactive) {
-    impacts.set(reactive, GoalsDiagnosticService.calculatePearsonR(pairs));
+    impacts.set(reactive, reactiveImpactCorrelation(pairs)); // Tau-c (ordinal), NO Pearson
   }
   return impacts;
 }
