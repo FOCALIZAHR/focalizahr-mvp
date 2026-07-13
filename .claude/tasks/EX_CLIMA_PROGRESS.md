@@ -725,3 +725,51 @@ de `REACTIVE_LOCAL_MIN_N` con la primera nómina densa real · fix compat `react
 `smoke-gate3-alg5-costeo.ts` (leftover trackeado de Gate 3).
 
 **Commits:** implementación + sello separados, sin pushear (push manual Victor).
+
+---
+
+## Severidad/Trigger reactivo + mean score — SELLADO (2026-07-12) · Gate 0 = `ARQUITECTURA_SEVERIDAD_REACTIVO_MEAN.md`
+
+Baja la CAPA DE ACCIÓN del plan (disparo + severidad + veredicto 5C) de dimensión+fav a
+reactivo+mean. El % favorable es ciego al deterioro dentro de las cajas bajas (Glint/Culture Amp).
+**A-additive puro** (cero cambio a riskZone/CLIMA_TARGET_FAVORABILITY/selectedReactive; todo Json +
+constantes NOMBRADAS PROVISIONAL). Detalle técnico completo: `AS_BUILT_SEVERIDAD_REACTIVO_MEAN.md`.
+
+**Decisiones Victor:** `compensaciones`→`beneficios` (bug: no es subcategory, la clave real del
+reactivo de compensaciones es beneficios) · circularidad EXCLUYE `retencion`+`recomendacion`+`orgullo`+
+`experiencia_general` (mismo constructo que EI → impacto Pearson×EI inflado) · severidad = gapMean
+directo (NO calcRiskZone) · benchmark FIJO no promedio interno (misma razón Gate 3 v3.7, documentado
+en la constante) · sistémico ≥50% se construye completo con narrativa PROVISIONAL.
+
+**Constantes (`climaThresholds.ts`, PROVISIONAL):** `REACTIVE_MEAN_TARGET_TIERS` (RECURSOS 3.3/ESTANDAR 3.6)
++ `REACTIVE_TIER_BY_SUBCATEGORY` (beneficios/carga_trabajo/estres/herramientas/ambiente_fisico→RECURSOS,
+fallback explícito) + `reactiveMeanTarget` · `REACTIVE_CIRCULARITY_EXCLUDE` (4) · `REACTIVE_MOMENTUM_MIN_DELTA`
+0.2 + `reactiveMomentumState` · `REACTIVE_SYSTEMIC_RATIO` 0.5 · `REACTIVE_SEVERITY_GAPMEAN_NARANJA/ROJA`
+(−0.3/−0.7) + `reactiveSeverityZone`.
+
+**Pieza 1 (momentum reactivo):** `ClimaAggregationService` — `reactiveScores` al select de `prevInsights`
++ `prevReactiveScores` a `pulseInputByDept` (sin re-query). `PulseEngine` — `PulseDeptInput.prevReactiveScores`,
+`ReactiveImpact.reactiveMomentumDelta/State` (Δmean raw, sin carry-forward), computados en `buildReactiveAnalysis`.
+Infraestructura persistida; el disparo usa gapMean estático (momentum queda para follow-on/5D).
+
+**Pieza 2 (Cluster A):** `ClimaActionPlanBuilder` reescrito — filtra circulares una vez; dispara si ≥1
+reactivo bajo su tier (gapMean<0); palanca = mayor `priorityMean=|impact|×|gapMean|`; zona =
+`reactiveSeverityZone(gapMean)`; `getIntervention` gana `leverOverride` (la variante habla del mismo
+reactivo que disparó; D3 intacto/retrocompatible). Ya NO usa calcRiskZone/needsAction para su disparo.
+`ClimaDecisionItem` +`isSystemic`; `ReactiveContextEntry` +`mean`.
+
+**Pieza 3 (fix 5C):** `PulseEngine.calcDriverMomentum` +`meanMomentumDelta=(current.mean−prev.mean)×25`
+(reutiliza umbrales ±5); `DriverImpact.meanMomentumDelta` (Json). `ActionEffectivenessService` lee
+`meanMomentumDelta` en vez de `momentumDelta`-fav (que queda intacto para riskZone/Cascada/aggregate).
+
+**Pieza 4 (sistémico ≥50%):** `getSystemicIntervention` — narrativa PROVISIONAL de dimensión
+({n}/{total}/{categoría}, "Revisar con RRHH"). Detección INDEPENDIENTE de N≥25 (usa gapMean/n≥5, no Pearson).
+
+**Evidencia:** smoke PURO `smoke-severidad-reactivo-mean.ts` **20/20** (sin DB → no toca producción):
+palanca por priorityMean vs priority-fav (estres mean-bajo/fav-sano gana), sistémico 3/3, circulares
+excluidos + denominador correcto, fallback tier, no-dispara-si-sano, momentum declining/stable, y el
+**veredicto 5C se invierte** (fav plano→"plano" vs mean −0.4→RIESGO_CRITICO). `tsc`+`build` limpios
+(gotcha: `Stop-Process node` antes del build por EPERM de prisma generate). Smoke retirado al sellar.
+Cableado de BD (2 campos ClimaAggregationService) cubierto por tsc; cierre real NO corrido (sería
+escritura a prod → se confirmaría con Victor). **Diferido:** riskZone fav (fuera de scope), recalibrar
+−0.3/−0.7 con datos reales, orden UI sistémicos (5D). **Commits:** implementación + sello separados, sin pushear.
