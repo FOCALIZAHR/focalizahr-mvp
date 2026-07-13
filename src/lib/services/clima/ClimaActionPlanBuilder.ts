@@ -24,6 +24,7 @@ import {
   reactiveSeverityZone,
   REACTIVE_CIRCULARITY_EXCLUDE,
   REACTIVE_SYSTEMIC_RATIO,
+  REACTIVE_MIN_IMPACT,
   type RiskZone,
 } from '@/lib/services/clima/climaThresholds';
 import {
@@ -94,8 +95,11 @@ export function buildDeptClimaDecisions(
       .filter((r) => r.mean !== null)
       .map((r) => {
         const gapMean = round1((r.mean as number) - reactiveMeanTarget(r.reactive));
+        // Piso de impacto (Peakon/Culture Amp/Glint): un reactivo con impacto por debajo de
+        // REACTIVE_MIN_IMPACT es ruido → se trata igual que impact===null, NO compite por palanca
+        // (por más bajo que sea su mean). Solo afecta la SELECCIÓN, no el disparo ni el impacto persistido.
         const priorityMean =
-          r.impact !== null && gapMean < 0
+          r.impact !== null && Math.abs(r.impact) >= REACTIVE_MIN_IMPACT && gapMean < 0
             ? round1(Math.abs(r.impact) * Math.abs(gapMean))
             : null;
         return { ...r, gapMean, priorityMean };
@@ -105,7 +109,8 @@ export function buildDeptClimaDecisions(
     const belowTier = measured.filter((r) => r.gapMean < 0);
     if (belowTier.length === 0) continue; // ningún reactivo bajo su tier → no dispara
 
-    // Palanca = mayor priorityMean; si todas null (impact no evaluable), el gapMean más hondo.
+    // Palanca = mayor priorityMean; si todas null (impact no evaluable o bajo el piso), el
+    // gapMean más hondo (para fijar la severidad/zona — el ítem igual dispara).
     const palanca = [...belowTier].sort((a, b) => {
       const pa = a.priorityMean ?? -Infinity;
       const pb = b.priorityMean ?? -Infinity;
@@ -116,19 +121,24 @@ export function buildDeptClimaDecisions(
     const zone = reactiveSeverityZone(palanca.gapMean);
     if (zone === null) continue; // defensivo: palanca ya tiene gapMean<0
 
+    // Reactivo-palanca NARRABLE: solo si superó el piso de impacto (priorityMean!==null).
+    // Si ningún reactivo de la dimensión es significativo → sin palanca nombrada → celda
+    // default (narrativa genérica de dimensión), aunque el ítem sí dispare por su severidad.
+    const narrativeLever = palanca.priorityMean !== null ? palanca.reactive : null;
+
     const isSystemic = belowTier.length / measured.length >= REACTIVE_SYSTEMIC_RATIO;
 
     let cell;
     let selectedReactive: string | null;
     if (isSystemic) {
       cell = getSystemicIntervention(driver.category, belowTier.length, measured.length);
-      selectedReactive = palanca.reactive; // referencia; la narrativa es sistémica
+      selectedReactive = narrativeLever; // referencia (null si ninguno superó el piso)
     } else {
       const selection = getIntervention(
         driver.category,
         zone,
         usable,
-        palanca.reactive // leverOverride: la variante habla del MISMO reactivo que disparó
+        narrativeLever // leverOverride: la variante habla del reactivo significativo; null → default
       );
       if (!selection) continue; // defensivo tras isClimaDriverCategory
       cell = selection.cell;

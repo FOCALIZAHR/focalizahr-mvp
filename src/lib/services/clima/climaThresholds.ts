@@ -136,6 +136,15 @@ export const REACTIVE_MOMENTUM_MIN_DELTA = 0.2;
 export const REACTIVE_SYSTEMIC_RATIO = 0.5;
 
 /**
+ * Piso mínimo de impacto (|Pearson reactivo×EI|) para que un reactivo pueda COMPETIR como
+ * palanca. Bajo este umbral el reactivo es ruido estadístico de impacto insignificante y se
+ * retira de las recomendaciones de prioridad, sin importar qué tan bajo sea su mean
+ * (Peakon/Culture Amp/Glint documentado). Se trata igual que `impact===null`: no gana por
+ * priorityMean. PROVISIONAL — calibrar con datos reales.
+ */
+export const REACTIVE_MIN_IMPACT = 0.20;
+
+/**
  * Estado de momentum de un reactivo por su Δmean raw (current.mean − prev.mean).
  * null = sin período anterior medido. Umbral simétrico REACTIVE_MOMENTUM_MIN_DELTA.
  */
