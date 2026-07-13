@@ -64,9 +64,6 @@ export async function GET(request: NextRequest) {
     const [alerts, total, unreadCount] = await Promise.all([
       prisma.goalAlert.findMany({
         where,
-        include: {
-          goal: { select: { id: true, title: true, status: true } },
-        },
         orderBy: [
           { readAt: { sort: 'asc', nulls: 'first' } }, // no leídos primero
           { createdAt: 'desc' },

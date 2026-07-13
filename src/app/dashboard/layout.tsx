@@ -6,6 +6,7 @@ import Logo from '@/components/common/Logo'
 import { Button } from '@/components/ui/button'
 import { CampaignsProvider } from '@/context/CampaignsContext'
 import { SidebarProvider } from '@/hooks/useSidebar'
+import { GoalAlertsBell } from '@/components/goals/alerts/GoalAlertsBell'
 import { LogOut, Menu, X } from 'lucide-react'
 
 interface Account {
@@ -106,7 +107,9 @@ export default function DashboardLayout({
                       {account.adminName}
                     </p>
                   </div>
-                  
+
+                  <GoalAlertsBell />
+
                   <Button
                     variant="ghost"
                     size="sm"
