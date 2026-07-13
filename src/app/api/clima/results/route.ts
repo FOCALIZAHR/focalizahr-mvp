@@ -20,6 +20,7 @@ import {
 } from '@/lib/services/AuthorizationService';
 import {
   calcOrgFavorability,
+  calcOrgMean,
   calcOrgMomentum,
   aggregateCompanyPulse,
   rankMomentumMovers,
@@ -285,12 +286,13 @@ export async function GET(request: NextRequest) {
     }
 
     // ── Derivación read-time de compañía (scope visible) ──
-    const org = calcOrgFavorability(
-      departments.map((d) => ({
-        engagementFavorability: d.engagementFavorability,
-        totalInvited: d.totalInvited,
-      }))
-    );
+    const orgRows = departments.map((d) => ({
+      engagementFavorability: d.engagementFavorability,
+      engagementMean: d.engagementMean, // Bloque A
+      totalInvited: d.totalInvited,
+    }));
+    const org = calcOrgFavorability(orgRows);
+    const orgMean = calcOrgMean(orgRows); // Bloque A: mean org al lado del fav
 
     const companyPulseRows: CompanyPulseRow[] = departments.map((d) => ({
       departmentId: d.departmentId,
@@ -332,21 +334,28 @@ export async function GET(request: NextRequest) {
         })
       : null;
     let orgMomentum: number | null = null;
+    let orgMeanMomentum: number | null = null; // Bloque A
     if (prevCampaign) {
       const prevInsights = await prisma.departmentClimaInsight.findMany({
         where: { accountId: userContext.accountId, campaignId: prevCampaign.id },
-        select: { departmentId: true, engagementFavorability: true, totalInvited: true },
+        select: {
+          departmentId: true,
+          engagementFavorability: true,
+          engagementMean: true, // Bloque A
+          totalInvited: true,
+        },
       });
       const prevVisible = prevInsights.filter((r) =>
         visibleDeptIds ? visibleDeptIds.has(r.departmentId) : true
       );
-      const prevOrg = calcOrgFavorability(
-        prevVisible.map((r) => ({
-          engagementFavorability: r.engagementFavorability,
-          totalInvited: r.totalInvited,
-        }))
-      );
-      orgMomentum = calcOrgMomentum(org.favorability, prevOrg.favorability);
+      const prevRows = prevVisible.map((r) => ({
+        engagementFavorability: r.engagementFavorability,
+        engagementMean: r.engagementMean,
+        totalInvited: r.totalInvited,
+      }));
+      // calcOrgFavorability devuelve objeto → .favorability; calcOrgMean devuelve number directo.
+      orgMomentum = calcOrgMomentum(org.favorability, calcOrgFavorability(prevRows).favorability);
+      orgMeanMomentum = calcOrgMomentum(orgMean, calcOrgMean(prevRows)); // Bloque A
     }
 
     const slug = campaign.campaignType?.slug ?? null;
@@ -373,6 +382,8 @@ export async function GET(request: NextRequest) {
       orgFavorability: org.favorability,
       orgRiskZone: org.riskZone,
       orgMomentum,
+      orgMean, // Bloque A (computado en la derivación read-time)
+      orgMeanMomentum, // Bloque A (delta media vs. campaña anterior SAME-TIPO)
       businessCaseTotals: companyPulse.businessCaseTotals,
       momentumMovers,
       goldCacheByDept: goldCacheRows.map((g) => ({

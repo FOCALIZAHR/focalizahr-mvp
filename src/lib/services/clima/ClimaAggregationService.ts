@@ -291,6 +291,7 @@ export class ClimaAggregationService {
             select: {
               departmentId: true,
               engagementFavorability: true,
+              engagementMean: true, // Bloque A: enabler del engagementMeanMomentum
               driverScores: true,
               reactiveScores: true,
             },
@@ -400,6 +401,11 @@ export class ClimaAggregationService {
             ei.fav !== null && prev?.engagementFavorability != null
               ? round1(ei.fav - prev.engagementFavorability)
               : null;
+          // Bloque A (sensibilidad-mean EI): delta del MEAN del EI vs anterior (espeja `momentum`)
+          const engagementMeanMomentum =
+            ei.mean !== null && prev?.engagementMean != null
+              ? round1(ei.mean - prev.engagementMean)
+              : null;
 
           // benchmarkDelta: vs mercado si existe benchmark pulse_climate
           const benchmarkDelta =
@@ -484,6 +490,7 @@ export class ClimaAggregationService {
             reactiveScores, // Dynamic Impact Drivers (nivel reactivo)
             ei,
             momentum,
+            engagementMeanMomentum, // Bloque A (sensibilidad-mean EI)
             rows: deptRows,
             prevDriverScores:
               (prev?.driverScores as Record<string, DriverScore> | null) ?? null,

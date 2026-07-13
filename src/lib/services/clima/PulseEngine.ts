@@ -99,6 +99,12 @@ export const REACTIVE_WALKUP_MAX_DEPTH = 6;
  */
 export const THEATRE_ISA_MIN = 70;
 export const THEATRE_ENGAGEMENT_MAX_FAV = 50;
+/**
+ * Bloque A (sensibilidad-mean del EI): corte de teatro por MEAN, aditivo al corte fav (50).
+ * Capta el "compliance sano + gente deslizándose a las cajas bajas" que el fav-50 no ve (Glint).
+ * PROVISIONAL — calibrar con datos reales. NO reemplaza el corte fav sellado.
+ */
+export const THEATRE_ENGAGEMENT_MAX_MEAN = 3.0;
 
 /** Umbrales de disparo de business cases (mean 1-5). Separados por caso. */
 export const DRIVER_CRITICAL_MEAN = 2.5; // clima_critico: peor driver medido
@@ -218,15 +224,22 @@ export interface PulseBusinessCase {
 export interface ClimaCorrelationFlags {
   version: 1; // Gate 6G agregará señales Fase 2A aquí
   theatreDetected: boolean | null; // null = ISA o EI no evaluable, NUNCA false
+  // Bloque A — teatro por MEAN, aditivo (null en insights viejos sin la señal)
+  theatreDetectedMean?: boolean | null;
   theatre: {
     isaScore: number | null;
     engagementFav: number | null;
+    engagementMean?: number | null; // Bloque A
     evaluable: boolean;
   };
   hotspot: {
     isHotspot: boolean | null; // null = <MIN_DEPTS_FOR_PERCENTILE deptos con EI
     eiFav: number | null;
     p25CompanyEiFav: number | null;
+    // Bloque A — hotspot por MEAN (eiMean < p25 de means); opcionales, aditivos
+    isHotspotMean?: boolean | null;
+    eiMean?: number | null;
+    p25CompanyEiMean?: number | null;
     deptsInSample: number;
     headcountAvg: number | null;
     turnoverRate: number | null;
@@ -238,6 +251,9 @@ export interface ClimaCorrelationFlags {
     nDepts: number;
     evaluable: boolean;
   };
+  // Bloque A — enabler: delta del MEAN del EI vs período anterior (mean analog de `momentum`).
+  // null = sin insight anterior medido. Opcional (aditivo, insights viejos no lo tienen).
+  engagementMeanMomentum?: number | null;
   businessCases: PulseBusinessCase[];
   computedAt: string; // ISO
 }
@@ -255,7 +271,10 @@ export interface PulseDeptInput {
   // ya computados en Gate 2 (calcReactiveScores). Vacío → sin reactiveAnalysis.
   reactiveScores: Record<string, DriverScore>;
   ei: FavorabilityScore;
-  momentum: number | null; // escalar EI que persiste Gate 2 (NO se recalcula)
+  momentum: number | null; // escalar EI (delta de FAV) que persiste Gate 2 (NO se recalcula)
+  // Bloque A (sensibilidad-mean EI): delta del MEAN del EI vs anterior (mean analog de `momentum`).
+  // null = sin insight anterior. Lo computa el caller (ClimaAggregationService) como el fav.
+  engagementMeanMomentum: number | null;
   rows: ClimaResponseRow[]; // crudo del depto — pares Pearson ALG 1
   prevDriverScores: Record<string, DriverScore> | null; // insight anterior (ALG 3)
   // Severidad reactivo+mean: reactiveScores del insight anterior (mismo período que
@@ -326,9 +345,10 @@ export function computePulse(input: PulseCompanyInput): Map<string, PulseDeptOut
 
     const flags: ClimaCorrelationFlags = {
       version: 1,
-      ...detectTheatre(dept),
+      ...detectTheatre(dept), // theatreDetected + theatreDetectedMean + theatre
       hotspot: detectHotspots(dept, hotspotContext),
       climaTurnover,
+      engagementMeanMomentum: dept.engagementMeanMomentum, // Bloque A (enabler)
       businessCases: buildBusinessCases(dept),
       computedAt,
     };
@@ -838,6 +858,7 @@ function pickTopDrivers(analysis: DriverImpact[]): {
 
 interface HotspotContext {
   p25: number | null; // null si <MIN_DEPTS_FOR_PERCENTILE deptos con EI
+  p25Mean: number | null; // Bloque A: p25 de means (mismo guard); null si insuficiente
   deptsInSample: number;
 }
 
@@ -846,10 +867,17 @@ function buildHotspotContext(depts: PulseDeptInput[]): HotspotContext {
     .map((d) => d.ei.fav)
     .filter((f): f is number => f !== null)
     .sort((a, b) => a - b);
+  // Bloque A: p25 de means (mismo umbral de muestra que el fav)
+  const means = depts
+    .map((d) => d.ei.mean)
+    .filter((m): m is number => m !== null)
+    .sort((a, b) => a - b);
+  const p25Mean =
+    means.length < MIN_DEPTS_FOR_PERCENTILE ? null : percentile(means, 0.25);
   if (favs.length < MIN_DEPTS_FOR_PERCENTILE) {
-    return { p25: null, deptsInSample: favs.length };
+    return { p25: null, p25Mean, deptsInSample: favs.length };
   }
-  return { p25: percentile(favs, 0.25), deptsInSample: favs.length };
+  return { p25: percentile(favs, 0.25), p25Mean, deptsInSample: favs.length };
 }
 
 /** Percentil por interpolación lineal sobre array YA ordenado ascendente. */
@@ -870,6 +898,12 @@ export function detectHotspots(
   const isHotspot =
     context.p25 === null || eiFav === null ? null : eiFav < context.p25;
 
+  // Bloque A: hotspot por MEAN (mismo p25, sobre means). Capta el depto cuyo MEAN cae en
+  // el cuartil inferior aunque su FAV no lo haga (fav sano / mean malo — ceguera de Glint).
+  const eiMean = dept.ei.mean;
+  const isHotspotMean =
+    context.p25Mean === null || eiMean === null ? null : eiMean < context.p25Mean;
+
   // Confianza degradada por datos duros faltantes (DepartmentMetric manual)
   const missing =
     (dept.turnoverRate === null ? 1 : 0) + (dept.headcountAvg === null ? 1 : 0);
@@ -879,6 +913,9 @@ export function detectHotspots(
     isHotspot,
     eiFav,
     p25CompanyEiFav: context.p25,
+    isHotspotMean,
+    eiMean,
+    p25CompanyEiMean: context.p25Mean,
     deptsInSample: context.deptsInSample,
     headcountAvg: dept.headcountAvg,
     turnoverRate: dept.turnoverRate,
@@ -907,15 +944,22 @@ export function calcClimaTurnoverCorrelation(
 
 export function detectTheatre(dept: PulseDeptInput): {
   theatreDetected: boolean | null;
+  theatreDetectedMean: boolean | null;
   theatre: ClimaCorrelationFlags['theatre'];
 } {
   const eiFav = dept.ei.fav;
+  const eiMean = dept.ei.mean;
   const evaluable = dept.isaScore !== null && eiFav !== null;
+  // Bloque A: teatro por MEAN, aditivo. Evaluable si ISA y EI-mean existen.
+  const evaluableMean = dept.isaScore !== null && eiMean !== null;
   return {
     theatreDetected: evaluable
       ? dept.isaScore! > THEATRE_ISA_MIN && eiFav! < THEATRE_ENGAGEMENT_MAX_FAV
       : null,
-    theatre: { isaScore: dept.isaScore, engagementFav: eiFav, evaluable },
+    theatreDetectedMean: evaluableMean
+      ? dept.isaScore! > THEATRE_ISA_MIN && eiMean! < THEATRE_ENGAGEMENT_MAX_MEAN
+      : null,
+    theatre: { isaScore: dept.isaScore, engagementFav: eiFav, engagementMean: eiMean, evaluable },
   };
 }
 
@@ -1159,6 +1203,9 @@ export interface CompanyPulseSummary {
   zoneCounts: Record<RiskZone, number>;
   hotspotDepartmentIds: string[];
   theatreDepartmentIds: string[];
+  // Bloque A — deptos que disparan la señal MEAN (aditivo, al lado de los fav)
+  hotspotMeanDepartmentIds: string[];
+  theatreMeanDepartmentIds: string[];
   climaTurnover: ClimaCorrelationFlags['climaTurnover'] | null;
   businessCaseTotals: CompanyBusinessCaseTotal[];
 }
@@ -1173,6 +1220,8 @@ export function aggregateCompanyPulse(rows: CompanyPulseRow[]): CompanyPulseSumm
   };
   const hotspotDepartmentIds: string[] = [];
   const theatreDepartmentIds: string[] = [];
+  const hotspotMeanDepartmentIds: string[] = [];
+  const theatreMeanDepartmentIds: string[] = [];
   let climaTurnover: ClimaCorrelationFlags['climaTurnover'] | null = null;
 
   for (const row of rows) {
@@ -1185,6 +1234,13 @@ export function aggregateCompanyPulse(rows: CompanyPulseRow[]): CompanyPulseSumm
     if (row.correlationFlags?.theatreDetected === true) {
       theatreDepartmentIds.push(row.departmentId);
     }
+    // Bloque A — señales MEAN (aditivas; insights viejos sin el campo → undefined, no cuentan)
+    if (row.correlationFlags?.hotspot?.isHotspotMean === true) {
+      hotspotMeanDepartmentIds.push(row.departmentId);
+    }
+    if (row.correlationFlags?.theatreDetectedMean === true) {
+      theatreMeanDepartmentIds.push(row.departmentId);
+    }
     if (!climaTurnover && row.correlationFlags?.climaTurnover) {
       climaTurnover = row.correlationFlags.climaTurnover; // escalar duplicado per-dept
     }
@@ -1195,6 +1251,8 @@ export function aggregateCompanyPulse(rows: CompanyPulseRow[]): CompanyPulseSumm
     zoneCounts,
     hotspotDepartmentIds,
     theatreDepartmentIds,
+    hotspotMeanDepartmentIds,
+    theatreMeanDepartmentIds,
     climaTurnover,
     businessCaseTotals: buildCompanyBusinessCases(rows.map((r) => r.correlationFlags)),
   };
@@ -1202,6 +1260,7 @@ export function aggregateCompanyPulse(rows: CompanyPulseRow[]): CompanyPulseSumm
 
 export interface OrgFavorabilityRow {
   engagementFavorability: number | null;
+  engagementMean?: number | null; // Bloque A: base de calcOrgMean
   totalInvited: number;
 }
 
@@ -1240,6 +1299,25 @@ export function calcOrgFavorability(rows: OrgFavorabilityRow[]): OrgFavorability
   }
   const favorability = round1(weightedSum / weightTotal);
   return { favorability, riskZone: calcRiskZone(favorability, null) };
+}
+
+/**
+ * Bloque A — MEAN de compañía para el gauge, al lado de calcOrgFavorability. Ponderado por
+ * totalInvited (mismo peso/degradación). NO deriva zona (riskZone es fav, sellado); el gauge
+ * usa este mean solo para el delta (calcOrgMomentum). null si Σ(totalInvited medidos) === 0.
+ */
+export function calcOrgMean(rows: OrgFavorabilityRow[]): number | null {
+  let weightedSum = 0;
+  let weightTotal = 0;
+  for (const row of rows) {
+    const mean = row.engagementMean ?? null;
+    if (mean === null) continue;
+    const weight = row.totalInvited;
+    if (weight <= 0) continue;
+    weightedSum += mean * weight;
+    weightTotal += weight;
+  }
+  return weightTotal === 0 ? null : Math.round((weightedSum / weightTotal) * 100) / 100;
 }
 
 /**

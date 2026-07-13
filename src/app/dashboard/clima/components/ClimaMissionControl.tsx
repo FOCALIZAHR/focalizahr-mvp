@@ -11,6 +11,7 @@ import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import EngagementGauge from '@/components/clima/EngagementGauge';
 import { zoneColor } from '@/components/clima/climaZonePalette';
+import { getEngagementDivergenceNarrative } from '@/lib/services/clima/engagementDivergenceNarrative';
 import type {
   ClimaCinemaStats,
   ClimaNextDepartment,
@@ -22,6 +23,7 @@ interface ClimaMissionControlProps {
   orgFavorability: number | null;
   orgRiskZone: RiskZone | null;
   orgMomentum: number | null;
+  orgMeanMomentum: number | null; // Bloque A — base narrativa divergencia fav↔mean
   stats: ClimaCinemaStats;
   nextDepartment: ClimaNextDepartment | null;
   onSelectDepartment: (id: string) => void;
@@ -120,11 +122,18 @@ export default function ClimaMissionControl({
   orgFavorability,
   orgRiskZone,
   orgMomentum,
+  orgMeanMomentum,
   stats,
   nextDepartment,
   onSelectDepartment,
 }: ClimaMissionControlProps) {
   const scopeLabel = scope === 'area' ? 'tu área' : 'tu organización';
+  // Bloque A — narrativa de divergencia fav↔mean; null si no hay divergencia
+  // significativa (→ el gauge muestra solo su línea de favorabilidad sellada).
+  const divergenceNarrative = getEngagementDivergenceNarrative({
+    favMomentum: orgMomentum,
+    meanMomentum: orgMeanMomentum,
+  });
 
   return (
     <motion.div
@@ -163,6 +172,14 @@ export default function ClimaMissionControl({
           </div>
         )}
       </div>
+
+      {/* Bloque A — narrativa de divergencia fav↔mean bajo el gauge. Solo aparece
+          cuando la media (más sensible) diverge del % que ve el CEO arriba. */}
+      {divergenceNarrative && (
+        <p className="text-sm font-light text-slate-400 leading-relaxed text-center max-w-md mx-auto -mt-2">
+          {divergenceNarrative}
+        </p>
+      )}
 
       {/* CTA — mobile */}
       {nextDepartment && (

@@ -157,6 +157,7 @@ export default function ClimaCinemaOrchestrator({
               orgFavorability={hook.orgFavorability}
               orgRiskZone={hook.orgRiskZone}
               orgMomentum={hook.orgMomentum}
+              orgMeanMomentum={hook.orgMeanMomentum}
               stats={hook.stats}
               nextDepartment={hook.nextDepartment}
               onSelectDepartment={hook.selectDepartment}

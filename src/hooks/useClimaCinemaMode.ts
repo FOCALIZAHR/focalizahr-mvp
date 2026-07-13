@@ -62,6 +62,7 @@ export interface UseClimaCinemaModeReturn {
   orgFavorability: number | null;
   orgRiskZone: RiskZone | null;
   orgMomentum: number | null;
+  orgMeanMomentum: number | null; // Bloque A — base narrativa divergencia fav↔mean
   scope: 'organization' | 'area';
 
   // Smart Router
@@ -305,6 +306,7 @@ export function useClimaCinemaMode(initialCampaignId?: string): UseClimaCinemaMo
     orgFavorability: results?.orgFavorability ?? null,
     orgRiskZone: results?.orgRiskZone ?? null,
     orgMomentum: results?.orgMomentum ?? null,
+    orgMeanMomentum: results?.orgMeanMomentum ?? null, // Bloque A
     scope: results?.scope ?? 'organization',
     introDismissed,
     dismissIntro,

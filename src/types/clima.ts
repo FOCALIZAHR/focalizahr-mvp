@@ -180,6 +180,11 @@ export interface ClimaResultsResponse {
   /** Delta de orgFavorability vs la campaña clima anterior SAME-TIPO (scope RBAC).
    *  null si no hay anterior del mismo tipo → el footer cae a gap vs objetivo. */
   orgMomentum: number | null;
+  /** Media EI de compañía ponderada por headcount (escala 1-5, 2 dec). Bloque A. */
+  orgMean: number | null;
+  /** Delta de orgMean vs la campaña clima anterior SAME-TIPO (escala 1-5). Bloque A.
+   *  Base de la narrativa de divergencia fav↔mean del gauge del Lobby. */
+  orgMeanMomentum: number | null;
   businessCaseTotals: CompanyBusinessCaseTotal[];
   momentumMovers: { gainers: ClimaMomentumMover[]; decliners: ClimaMomentumMover[] };
   goldCacheByDept: ClimaGoldCacheEntry[];

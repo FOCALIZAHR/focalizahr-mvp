@@ -132,6 +132,11 @@ export const REACTIVE_CIRCULARITY_EXCLUDE = new Set<string>([
 /** Δmean mínimo para que un movimiento reactivo sea señal (Gallup Q12). PROVISIONAL. */
 export const REACTIVE_MOMENTUM_MIN_DELTA = 0.2;
 
+/** Δmean mínimo (escala 1-5) para narrar divergencia fav↔mean en el gauge org.
+ *  Régimen 0.2 (mismo orden que REACTIVE_MOMENTUM_MIN_DELTA) pero desacoplado:
+ *  mide divergencia del gauge, no momentum del reactivo. PROVISIONAL. */
+export const CLIMA_DIVERGENCE_MEAN_MIN_DELTA = 0.2;
+
 /** Fracción de reactivos medidos de una dimensión bajo su tier para marcarla sistémica. PROVISIONAL. */
 export const REACTIVE_SYSTEMIC_RATIO = 0.5;
 
