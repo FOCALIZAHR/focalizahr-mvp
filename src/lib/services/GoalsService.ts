@@ -18,6 +18,50 @@ import { GoalCycleClosedError, GoalCycleValidationError, GoalCycleService } from
 import { getChildDepartmentIds, GLOBAL_ACCESS_ROLES } from './AuthorizationService'
 
 // ────────────────────────────────────────────────────────────────────────────
+// ERRORES DE DOMINIO (Gate A) — goalsErrorResponse los mapea a HTTP.
+// Espejo del patrón de GoalCycleService: clase + `code` estable + `name`.
+// Antes eran `new Error(...)` pelados y las rutas los aplanaban a un 500
+// opaco: el usuario veía "Error creando meta" en vez de "excede 100%".
+// ────────────────────────────────────────────────────────────────────────────
+export class GoalNoActiveCycleError extends Error {
+  readonly code = 'GOAL_NO_ACTIVE_CYCLE'
+  constructor() {
+    super('No hay ciclo activo; no se puede validar el presupuesto de metas')
+    this.name = 'GoalNoActiveCycleError'
+  }
+}
+export class GoalWeightExceededError extends Error {
+  readonly code = 'GOAL_WEIGHT_EXCEEDED'
+  constructor(public readonly current: number, public readonly attempted: number) {
+    super(
+      `Peso total excede 100%. Asignado: ${current}%, nuevo: ${attempted}%, total: ${current + attempted}%`
+    )
+    this.name = 'GoalWeightExceededError'
+  }
+}
+export class GoalLimitReachedError extends Error {
+  readonly code = 'GOAL_LIMIT_REACHED'
+  constructor(public readonly current: number, public readonly max: number) {
+    super(`Límite de metas alcanzado (${current}/${max})`)
+    this.name = 'GoalLimitReachedError'
+  }
+}
+export class GoalDuplicateError extends Error {
+  readonly code = 'GOAL_DUPLICATE'
+  constructor(message: string) {
+    super(message)
+    this.name = 'GoalDuplicateError'
+  }
+}
+export class GoalKpiRangeError extends Error {
+  readonly code = 'GOAL_KPI_RANGE'
+  constructor(public readonly startValue: number, public readonly targetValue: number) {
+    super(`El objetivo (${targetValue}) debe ser distinto del valor inicial (${startValue})`)
+    this.name = 'GoalKpiRangeError'
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // CIERRE DE CICLO — decisiones sobre metas incompletas (Gate D.5, Decisión #8)
 // ────────────────────────────────────────────────────────────────────────────
 export type CycleClosureDecisionType = 'CLOSE_WITH_SCORE' | 'MARK_REVIEW' | 'LEAVE_AS_IS'
@@ -633,21 +677,43 @@ export class GoalsService {
   ): Promise<void> {
     const check = await this.checkGoalLimit(accountId, employeeId)
     if (!check.canCreate) {
-      throw new Error(`Límite de metas alcanzado (${check.current}/${check.max})`)
+      throw new GoalLimitReachedError(check.current, check.max)
     }
   }
 
+  /**
+   * Gate A — el presupuesto de 100% es POR CICLO, no acumulado histórico.
+   *
+   * Consecuencia de la decisión de rollover: una meta de un ciclo ya cerrado es
+   * registro histórico congelado; no puede seguir gastando presupuesto del ciclo
+   * vigente. Solo cuentan las metas vivas ANCLADAS AL CICLO ACTIVO.
+   *
+   * FALLA CERRADO sin ciclo activo: Gate E (el 409 de "no hay ciclo") vive solo
+   * en las rutas, y al servicio se entra directo desde scripts (el seed lo hace).
+   * Una validación que solo existe en la ruta es una validación que un script
+   * futuro se saltea sin que nadie lo note.
+   *
+   * @param excludeGoalId  PATCH: la meta que se está editando no cuenta contra sí misma.
+   */
   private static async validateTotalWeight(
     accountId: string,
     employeeId: string,
-    newWeight: number
+    newWeight: number,
+    excludeGoalId?: string
   ): Promise<void> {
+    const activeCycle = await GoalCycleService.getActiveCycle(accountId)
+    if (!activeCycle) {
+      throw new GoalNoActiveCycleError()
+    }
+
     const currentGoals = await prisma.goal.findMany({
       where: {
         accountId,
         employeeId,
         level: 'INDIVIDUAL',
-        status: { in: ['NOT_STARTED', 'ON_TRACK', 'AT_RISK', 'BEHIND'] }
+        status: { in: ['NOT_STARTED', 'ON_TRACK', 'AT_RISK', 'BEHIND'] },
+        goalCycleId: activeCycle.id,
+        ...(excludeGoalId ? { id: { not: excludeGoalId } } : {}),
       },
       select: { weight: true }
     })
@@ -655,9 +721,43 @@ export class GoalsService {
     const currentTotalWeight = currentGoals.reduce((sum, g) => sum + (g.weight || 0), 0)
 
     if (currentTotalWeight + newWeight > 100) {
-      throw new Error(
-        `Peso total excede 100%. Actual: ${currentTotalWeight}%, Nuevo: ${newWeight}%, Total: ${currentTotalWeight + newWeight}%`
-      )
+      throw new GoalWeightExceededError(currentTotalWeight, newWeight)
+    }
+  }
+
+  /**
+   * Gate A — puerta pública para el PATCH de edición (BUG 1: hoy no revalidaba).
+   * El validador de fondo es privado; esto lo expone SOLO para el caso de update,
+   * donde hay que excluir a la propia meta de la suma.
+   */
+  static async validateWeightForUpdate(
+    accountId: string,
+    employeeId: string,
+    newWeight: number,
+    goalId: string
+  ): Promise<void> {
+    await this.validateTotalWeight(accountId, employeeId, newWeight, goalId)
+  }
+
+  /**
+   * Gate A (BUG 4) — el objetivo no puede ser igual al valor inicial.
+   *
+   * Sin esta regla, calculateProgress devuelve 100% cuando range === 0 (ver su
+   * guarda de división por cero): una meta con start = target = 0 nace "cumplida"
+   * con el primer check-in de valor 0, y arrastra su peso COMPLETO al hybridScore
+   * de la persona sin que haya hecho ningún trabajo real.
+   *
+   * BINARY queda fuera a propósito: se mide 0/1, no por rango.
+   */
+  private static validateKpiRange(
+    metricType: GoalMetricType | undefined,
+    startValue: number | undefined,
+    targetValue: number
+  ): void {
+    if ((metricType ?? 'PERCENTAGE') === 'BINARY') return
+    const start = startValue ?? 0
+    if (targetValue === start) {
+      throw new GoalKpiRangeError(start, targetValue)
     }
   }
 
@@ -676,7 +776,7 @@ export class GoalsService {
     })
 
     if (existing) {
-      throw new Error('Este empleado ya tiene asignada esta meta')
+      throw new GoalDuplicateError('Este empleado ya tiene asignada esta meta')
     }
   }
 
@@ -700,7 +800,9 @@ export class GoalsService {
 
     if (existing) {
       const levelLabel = level === 'COMPANY' ? 'corporativa' : 'de área'
-      throw new Error(`Ya existe una meta ${levelLabel} "${title}" para el período ${periodYear}`)
+      throw new GoalDuplicateError(
+        `Ya existe una meta ${levelLabel} "${title}" para el período ${periodYear}`
+      )
     }
   }
 
@@ -721,10 +823,15 @@ export class GoalsService {
       weight?: number
     }
   ): Promise<Goal> {
+    // 0. Gate A (BUG 4): este creador NO pasa por prepareGoalData (arma su propio
+    //    create abajo), así que la regla de KPI se aplica explícitamente acá.
+    //    startValue es fijo 0 y metricType fijo PERCENTAGE en este camino.
+    this.validateKpiRange('PERCENTAGE', 0, input.targetValue)
+
     // 1. Verificar límite
     const limitCheck = await this.checkGoalLimit(accountId, employeeId)
     if (!limitCheck.canCreate) {
-      throw new Error(`Límite de metas alcanzado (${limitCheck.current}/${limitCheck.max})`)
+      throw new GoalLimitReachedError(limitCheck.current, limitCheck.max)
     }
 
     // 1b. Verificar peso total
@@ -1351,6 +1458,11 @@ export class GoalsService {
   }
 
   private static prepareGoalData(input: Partial<CreateGoalInput> & Pick<CreateGoalInput, 'accountId' | 'title' | 'createdById' | 'startDate' | 'dueDate' | 'periodYear' | 'targetValue'>): Prisma.GoalUncheckedCreateInput {
+    // Gate A (BUG 4): puerta única de los 3 creadores que pasan por acá
+    // (createCorporateGoal, cascadeGoal, createManagerGoal). El 4to
+    // (createFromDevelopmentGoal) la llama por su cuenta.
+    this.validateKpiRange(input.metricType, input.startValue, input.targetValue)
+
     return {
       accountId: input.accountId,
       title: input.title,

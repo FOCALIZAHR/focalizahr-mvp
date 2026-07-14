@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoalsService } from '@/lib/services/GoalsService'
 import { GoalCycleService } from '@/lib/services/GoalCycleService'
+import { goalsErrorResponse } from '@/lib/api/goalsErrorResponse'
 import { goalDatesWithinCycleError } from '@/lib/utils/goalCycleDates'
 import { extractUserContext } from '@/lib/services/AuthorizationService'
 
@@ -78,13 +79,9 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('[API /goals/from-pdi] Error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Error creando meta'
-      },
-      { status: 500 }
-    )
+    // Gate A punto 3: antes cualquier error de negocio salía como 500 (aunque el
+    // mensaje viajara). Ahora el status es el correcto: 400 peso/límite/KPI,
+    // 409 sin-ciclo, 500 solo lo inesperado.
+    return goalsErrorResponse(error)
   }
 }

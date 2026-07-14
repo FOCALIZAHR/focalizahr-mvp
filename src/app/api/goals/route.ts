@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { GoalsService } from '@/lib/services/GoalsService'
 import { GoalCycleService } from '@/lib/services/GoalCycleService'
+import { goalsErrorResponse } from '@/lib/api/goalsErrorResponse'
 import { goalDatesWithinCycleError } from '@/lib/utils/goalCycleDates'
 import {
   extractUserContext,
@@ -219,6 +220,23 @@ export async function POST(request: NextRequest) {
 
     const data = validation.data
 
+    // ═══ Gate A / BUG 6: crear COMPANY o AREA es privilegio del Estratega ═══
+    // Hasta jul-2026 esto solo lo impedía la UI (StepSelectLevel.tsx oculta la
+    // opción a AREA_MANAGER) — el servidor aceptaba cualquier nivel de cualquier
+    // rol con 'goals:create'. El banco de metas definidas por el Estratega no es
+    // una garantía real si un jefe puede fabricarse su propia corporativa por API.
+    if (data.level === 'COMPANY' || data.level === 'AREA') {
+      if (!hasPermission(context.role, 'goals:create:strategic')) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Solo el Estratega puede crear metas corporativas o de área',
+          },
+          { status: 403 }
+        )
+      }
+    }
+
     // ═══ CHECK 6: Validación de escritura - Restricción EVALUATOR ═══
     if (context.role === 'EVALUATOR') {
       // EVALUATOR solo puede crear metas INDIVIDUAL
@@ -382,10 +400,9 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('[API Goals POST]:', error)
-    return NextResponse.json(
-      { error: 'Error creando meta', success: false },
-      { status: 500 }
-    )
+    // Gate A punto 3: los errores de negocio de GoalsService (peso, límite,
+    // duplicado, KPI, sin-ciclo) llegan al cliente con su mensaje real y su
+    // status correcto. Solo lo verdaderamente inesperado cae en 500.
+    return goalsErrorResponse(error)
   }
 }

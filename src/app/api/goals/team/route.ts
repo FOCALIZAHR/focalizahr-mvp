@@ -5,6 +5,7 @@ import {
   extractUserContext,
   hasPermission,
 } from '@/lib/services/AuthorizationService'
+import { GoalCycleService } from '@/lib/services/GoalCycleService'
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,6 +60,13 @@ export async function GET(request: NextRequest) {
       managerId: currentEmployee.id,
     }
 
+    // ═══ Gate A punto 1b: el presupuesto que ve la UI = el que valida el server ═══
+    // assignmentStatus.totalWeight lo consumen CreateGoalWizard (availableWeight) y
+    // StepWeightsConfirm (peso disponible por persona). Si la lectura no se scopea
+    // por ciclo igual que validateTotalWeight, la UI diría que no cabe algo que el
+    // servidor acepta (o al revés).
+    const activeCycle = await GoalCycleService.getActiveCycle(context.accountId)
+
     // Get employees with their goals count and avg progress
     const employees = await prisma.employee.findMany({
       where: employeeWhere,
@@ -81,6 +89,7 @@ export async function GET(request: NextRequest) {
             status: true,
             weight: true,
             isLeaderGoal: true,
+            goalCycleId: true, // Gate A 1b: para scopear el presupuesto al ciclo activo
           },
         },
       },
@@ -110,9 +119,17 @@ export async function GET(request: NextRequest) {
             : false
           : emp.acotadoGroup !== 'base_operativa'
 
-      // assignmentStatus: metas activas (no completadas ni canceladas)
+      // assignmentStatus: SOLO metas vivas DEL CICLO ACTIVO (Gate A 1b).
+      // Las de ciclos cerrados son histórico congelado y no gastan presupuesto.
+      // Sin ciclo activo → presupuesto vacío, coherente con el fail-closed del
+      // servidor (sin ciclo no se puede crear ninguna meta igual).
+      // NOTA: goalsCount y avgProgress (arriba) siguen contando TODAS las metas
+      // vivas — la lista del equipo no cambia, solo cambia el presupuesto.
       const activeGoals = visibleGoals.filter(
-        (g) => ['NOT_STARTED', 'ON_TRACK', 'AT_RISK', 'BEHIND'].includes(g.status)
+        (g) =>
+          ['NOT_STARTED', 'ON_TRACK', 'AT_RISK', 'BEHIND'].includes(g.status) &&
+          !!activeCycle &&
+          g.goalCycleId === activeCycle.id
       )
       const totalWeight = activeGoals.reduce((sum, g) => sum + (g.weight || 0), 0)
       const goalCount = activeGoals.length

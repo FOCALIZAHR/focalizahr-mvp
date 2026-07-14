@@ -7,6 +7,9 @@ import {
   getChildDepartmentIds,
   GLOBAL_ACCESS_ROLES
 } from '@/lib/services/AuthorizationService'
+import { GoalsService } from '@/lib/services/GoalsService'
+import { GoalCycleClosedError } from '@/lib/services/GoalCycleService'
+import { goalsErrorResponse } from '@/lib/api/goalsErrorResponse'
 import { z } from 'zod'
 
 const updateGoalSchema = z.object({
@@ -238,13 +241,47 @@ export async function PATCH(
 
     const data = validation.data
 
+    // ════════════════════════════════════════════════════════════════════════
+    // Gate A / BUG 1 — el PATCH nunca revalidaba el peso.
+    // Crear estaba protegido; editar no: se creaban 3 metas de 30% y después se
+    // editaban a 90% cada una sin que nada lo impidiera.
+    // ════════════════════════════════════════════════════════════════════════
+    if (data.weight !== undefined) {
+      // (c) Guard de ciclo cerrado. Se compara contra el ciclo de LA META, no
+      //     contra el activo de la cuenta: una meta de un ciclo cerrado es
+      //     histórico congelado (decisión de rollover). lockAfterClosure hoy solo
+      //     protegía updateProgress, no este update.
+      if (existing.goalCycleId) {
+        const cycle = await prisma.goalCycle.findFirst({
+          where: { id: existing.goalCycleId, accountId: context.accountId },
+          select: { id: true, status: true, lockAfterClosure: true },
+        })
+        if (cycle?.lockAfterClosure && cycle.status === 'CLOSED') {
+          return goalsErrorResponse(new GoalCycleClosedError(cycle.id))
+        }
+      }
+
+      // (a)+(b) Solo las metas INDIVIDUAL con dueño consumen presupuesto:
+      //         una COMPANY/AREA no le gasta el 100% a nadie.
+      if (existing.level === 'INDIVIDUAL' && existing.employeeId) {
+        await GoalsService.validateWeightForUpdate(
+          context.accountId,
+          existing.employeeId,
+          data.weight,
+          existing.id, // se excluye a sí misma de la suma
+        )
+      }
+    }
+
     const updateData: any = { ...data }
     if (data.status === 'COMPLETED' && !existing.completedAt) {
       updateData.completedAt = new Date()
     }
 
     const updated = await prisma.goal.update({
-      where: { id },
+      // accountId explícito (Regla Enterprise #2): el ownership ya se verificó en
+      // `existing`, pero el where del update no lo llevaba.
+      where: { id, accountId: context.accountId },
       data: updateData,
       include: {
         parent: { select: { id: true, title: true } },
@@ -258,11 +295,8 @@ export async function PATCH(
     })
 
   } catch (error) {
-    console.error('[API Goal PATCH]:', error)
-    return NextResponse.json(
-      { error: 'Error actualizando meta', success: false },
-      { status: 500 }
-    )
+    // Gate A punto 3: peso excedido / ciclo cerrado llegan con su mensaje real.
+    return goalsErrorResponse(error)
   }
 }
 

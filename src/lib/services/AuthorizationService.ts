@@ -511,6 +511,32 @@ export const PERMISSIONS = {
   ],
 
   /**
+   * goals:create:strategic - Crear metas de nivel COMPANY o AREA (el "Estratega")
+   *
+   * Gate A / BUG 6: hasta jul-2026 NADA en el servidor impedía que un
+   * AREA_MANAGER creara una meta corporativa por API directa — solo la UI lo
+   * ocultaba (StepSelectLevel.tsx). Eso invalidaba la gobernanza de "el KPI se
+   * congela en el origen": cualquier jefe podía inventarse su propia corporativa.
+   *
+   * NO se reutiliza 'goals:create': ese incluye AREA_MANAGER y EVALUATOR, que SÍ
+   * pueden crear metas INDIVIDUAL — son cosas distintas y merecen permisos distintos.
+   *
+   * Set = el mismo que goals:cycles:manage. CEO queda FUERA a propósito (mismo
+   * criterio ya tomado para los ciclos: participa del juicio de cierre por meta
+   * vía goals:approve, no de la administración estratégica).
+   *
+   * DEUDA CONOCIDA (Victor, jul-2026): FOCALIZAHR_ADMIN queda incluido por ahora,
+   * aunque implica que el equipo interno de FocalizaHR puede crear metas dentro de
+   * la cuenta de un cliente. A resolver después; no bloquea este gate.
+   */
+  'goals:create:strategic': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER'
+  ],
+
+  /**
    * goals:approve - Aprobar/rechazar solicitudes de cierre de metas
    *
    * Lógica de aprobación:
