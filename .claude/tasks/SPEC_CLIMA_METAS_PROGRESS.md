@@ -70,6 +70,14 @@ Smoke **24/24** (13 casos). `tsc` + `next build` limpios.
 - **GOTCHA de fixtures:** una corporativa con `GoalCascadeRule` ya le crea meta a los
   empleados elegibles → un POST posterior con el mismo `parentId` choca con
   `validateDuplicate` (400) antes de llegar a la categoría. En el smoke costó un caso rojo.
+- **Estilo visual (para Gate C):** el wizard actual tiene una piel que se cuida a
+  propósito — glassmorphism, Tesla line cyan, tipografía del sistema, botones con
+  gradiente. **Gate C reestructura el FLUJO** (bifurcación Meta Libre/Definida, banco de
+  una pantalla, slider de peso), **NO rediseña la piel**: reutiliza los mismos componentes
+  `.fhr-*` y el patrón de la skill `focalizahr-design`.
+
+**Smoke `smoke-gate-b-category.ts` borrado al sellar** (práctica del proyecto: la
+evidencia vive en el commit `8bf4cdf` y en el detalle de arriba).
 
 ### Fuera de alcance (confirmado en Gate 0, no se tocó)
 
