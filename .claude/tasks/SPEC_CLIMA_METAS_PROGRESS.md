@@ -15,9 +15,75 @@
 |---|---|
 | **Gate 0 de Gate A** (investigación read-only §2.2) | ✅ **CERRADO** (2026-07-14) |
 | **Gate A** (peso por ciclo + BUGs 1/3/4/6) | ✅ **SELLADO** (`937cdf8`, 2026-07-14, smoke 22/22) |
-| **Gate 0 de Gate B** (investigación §3.3) | 🟡 PARCIAL — 2 de 6 puntos ya respondidos |
-| **Gate B** (categoría familia/subfamilia) | 🔲 PENDIENTE — **desbloqueado**, Gate A ya está sellado |
-| **Gate C** (UX wizard) | 🔲 PENDIENTE (bloqueado por B) |
+| **Gate 0 de Gate B** (investigación §3.3) | ✅ **CERRADO** (8 hallazgos, 2026-07-14) |
+| **Gate B** (categoría familia/subfamilia) | ✅ **SELLADO** (`8bf4cdf`, 2026-07-14, smoke 24/24, **db push aplicado**) |
+| **Gate C** (UX wizard) | 🔲 PENDIENTE — **desbloqueado** |
+
+---
+
+## ✅ GATE B — SELLADO (`8bf4cdf`, 2026-07-14)
+
+**6 archivos** (1 nuevo). `db push` **aplicado a producción** (autorizado por Victor):
+2 columnas nullables + enum + índice; **96 metas existentes intactas, todas en `NULL`**.
+Smoke **24/24** (13 casos). `tsc` + `next build` limpios.
+
+### Decisiones que quedaron grabadas en el código
+
+- **`subfamily` = String, NO enum** (a propósito): hoy solo la lista de *Cultura y
+  Personas* está confirmada; un enum costaría **otro `db push` contra producción** por
+  cada lista de copy que se confirme. El precio —la base no impone integridad— lo paga
+  **`GoalsService.validateCategory`** como única puerta de escritura (evita variantes de
+  tipeo). `family` sí es enum: es taxonomía cerrada y de ella dependen queries de otros
+  módulos.
+- **La herencia de categoría (Camino A) vive en `GoalRulesEngine`, NUNCA en
+  `cascadeGoal`.** Los 4 caminos entran por esa misma función: si copiara la categoría
+  del padre, **pisaría la que el jefe eligió a mano en el Camino D**. `cascadeGoal` no se
+  tocó, y el smoke lo verifica (caso 6).
+- **`findActiveStrategicGoal`** implementa la decisión (a): **exige
+  `goalCycle.status === 'ACTIVE'`**. Una corporativa de ciclo cerrado es histórico, no
+  una meta a la que colgarse.
+- **`getClimaBaseline` devuelve el DATO REAL, no un promedio ni un mínimo.** Contrato de
+  3 campos (`value`, `isFallback`, `monthsAgo?`) porque *"75 porque no tengo datos"* no
+  es lo mismo que *"75 medido"*. **Bug corregido en revisión:** la primera versión hacía
+  `?? 0` + `Math.min(0, 75)` → devolvía **0** para un departamento sin mediciones, el
+  opuesto exacto de lo pedido.
+- **`CLIMA_TARGET_FAVORABILITY` se importa, no se duplica.** `climaThresholds.ts` es un
+  módulo de constantes **puro (cero imports)** → hoja del grafo, no puede generar ciclos.
+  El acoplamiento ya existía en la dirección contraria (`PulseEngine` → `GoalsDiagnosticService`).
+- **`GET /api/goals` acepta `level` como lista** (`COMPANY,AREA`) para el banco. Es capa
+  de datos; **la UI del banco es Gate C**.
+
+### Los 2 escenarios que NO hay que confundir (comentados en el código)
+
+| Situación | Qué pasa | Quién lo maneja |
+|---|---|---|
+| **Sin ciclo ACTIVO** | **No se crea NINGUNA meta**, con padre o sin él | Gate E (409) + `validateTotalWeight` fail-closed |
+| **Con ciclo activo, sin corporativa de Clima** | La individual **se crea igual**, con categoría y **sin `parentId`** | Gate B (fallback) |
+
+### Notas para Gate C
+
+- Las **3 familias no-Clima arrancan solo con `['Otros']`** — no se inventaron
+  subfamilias que Victor no confirmó. Completarlas es editar
+  `src/lib/constants/goalCategories.ts`, nada más (sin schema, sin push).
+- `FAMILY_CLIMA` / `SUBFAMILY_CLIMA` son **contrato con el módulo de Clima**, no copy
+  libre: renombrarlos rompe la búsqueda y exige migrar datos.
+- **GOTCHA de fixtures:** una corporativa con `GoalCascadeRule` ya le crea meta a los
+  empleados elegibles → un POST posterior con el mismo `parentId` choca con
+  `validateDuplicate` (400) antes de llegar a la categoría. En el smoke costó un caso rojo.
+
+### Fuera de alcance (confirmado en Gate 0, no se tocó)
+
+`createFromDevelopmentGoal` (el PDI es otro sistema; su `DevelopmentGoal.category` es
+otro concepto) · `/dashboard/metas/estrategia` (**hoy no crea nada**: es Torre de Control
+y su botón redirige al wizard — "Ambiente Estrategia" nunca se construyó) · el selector
+visual Familia→Subfamilia (Gate C §4.6).
+
+### ⚠️ Deuda reportada, NO arreglada
+
+`GET /api/goals:97` — el filtro jerárquico es
+`if (context.role === 'AREA_MANAGER' && context.departmentId)`. Un `AREA_MANAGER`
+**sin `departmentId`** no recibe ningún `OR` y **ve todas las metas de la cuenta**.
+Fail-open latente, mismo patrón que los bugs de Gate A. Espera decisión de Victor.
 
 ---
 
