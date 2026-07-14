@@ -17,7 +17,103 @@
 | **Gate A** (peso por ciclo + BUGs 1/3/4/6) | ✅ **SELLADO** (`937cdf8`, 2026-07-14, smoke 22/22) |
 | **Gate 0 de Gate B** (investigación §3.3) | ✅ **CERRADO** (8 hallazgos, 2026-07-14) |
 | **Gate B** (categoría familia/subfamilia) | ✅ **SELLADO** (`8bf4cdf`, 2026-07-14, smoke 24/24, **db push aplicado**) |
-| **Gate C** (UX wizard) | 🔲 PENDIENTE — **desbloqueado** |
+| **Gate C** (UX wizard) | 🟠 **EN CURSO — 1 de 7 puntos.** Cambios SIN COMMITEAR en el working tree. Ver auditoría abajo |
+
+---
+
+## 🔍 AUDITORÍA DE GATE C — 1 de 7 puntos (2026-07-14)
+
+Auditoría del trabajo real contra el prompt de Plan Mode de Gate C (7 puntos).
+**Nada de Gate C está commiteado**: los cambios viven sin sellar en el working tree.
+
+### 1. Qué se implementó y qué no
+
+| # | Punto del prompt | Estado | Evidencia |
+|---|---|---|---|
+| 1 | Catálogo `GOAL_MEASUREMENT_EXAMPLES` + placeholders derivados | ❌ **NO** | `goalCategories.ts` no contiene el símbolo (grep = 0) |
+| 2 | **Bifurcación Meta Libre / Meta Definida** | ✅ **SÍ** | `StepChooseFlow.tsx` (nuevo, 7.816 b) · cableado en `CreateGoalWizard.tsx:17` (import) y `:544` (`case 1`) |
+| 3 | Banco de una pantalla (mockup "Netflix") | ❌ **NO** | `src/components/goals/bank/` no existe |
+| 4 | Slider hero (`size="hero"` en `PercentageSlider`) | ❌ **NO** | `PercentageSlider.tsx` sin la prop (grep = 0) |
+| 5 | Campo obligatorio "¿Cómo se mide?" | ❌ **NO** | ningún `Step*.tsx` contiene el string |
+| 6 | Selector Familia → Subfamilia (píldoras) | ❌ **NO** | `FamilySubfamilyPicker.tsx` no existe |
+| 7 | Contexto del padre en `StepLinkParent` | ❌ **NO** | `StepLinkParent.tsx` no referencia `description` (grep = 0) |
+
+**Sí se hizo, además del punto 2** (era prerrequisito suyo, no un punto del prompt):
+navegación **índice-based** en `CreateGoalWizard.tsx` (`steps` :257-261 · `stepIndex` :265-268 ·
+`goNext`/`goBack` :375-403) + `WizardProgress.tsx` index-based. Corrige 5 lugares que comparaban
+`currentStep` contra números fijos (`< 6`) y habrían roto el recorrido al aparecer el paso de Peso.
+
+### 2. Por qué se detuvo en el punto 2
+
+**Fue una decisión explícita y acordada, no un bloqueo oculto.** Victor pidió textualmente:
+*"implementá SOLO StepChooseFlow (punto 2, la bifurcación) primero, y mostrame cómo queda
+visualmente… Recién con esa aprobación visual, continuás con el resto del plan"*.
+
+Los puntos 1 y 3-7 **nunca se empezaron**. No hubo nada que bloqueara: se frenó a propósito
+esperando el visto bueno visual, que **no llegó** porque apareció el defecto de la sección 4.
+
+**Errores propios cometidos en el camino (para no repetirlos):**
+- Se levantó `npm run dev` para verificar la ruta y **no se bajó** → quedó tomado el puerto 3000
+  de Victor. El proceso se mató después (PID 672).
+- Se reportó "listo para ver" apoyándose en `tsc --noEmit` + `next build`. **Compilar no es
+  funcionar**: ninguna de las dos cosas prueba que la navegación se comporte bien. La verificación
+  de comportamiento (simulación determinista de `goNext`/`goBack`: `1 → 9 → 2 → 3 → 4 → 5 → 6`,
+  sin volver nunca al paso 1) recién se corrió DESPUÉS de que Victor reportara el defecto.
+- Cuando Victor dijo "no veo ningún cambio", la causa real no era caché ni puerto: **la reversión
+  que él creía haber hecho no se aplicó a este working tree** (`git diff dfa5ee1` seguía mostrando
+  +106/−36). Verificado también que el bundle sí contenía el cambio
+  (`.next/static/chunks/app/dashboard/metas/crear/page.js` incluye el string "Meta Definida").
+
+### 3. `CreateGoalWizard` ES el componente compartido — arquitectura, no confusión
+
+Confirmado con file:line. **Un solo wizard sirve a los dos usuarios**:
+
+- `src/app/dashboard/metas/crear/page.tsx:16` → `<CreateGoalWizard employeeId={…} context={…} />`
+  es el **único** consumidor. No hay wizard separado para el Estratega.
+- `StepSelectLevel.tsx:76-81` decide los niveles ofrecidos **según el rol**: acceso global →
+  `COMPANY/AREA/INDIVIDUAL`; `AREA_MANAGER` → sin `COMPANY`; `EVALUATOR` → solo `INDIVIDUAL`.
+  Ahí es donde el **Estratega crea Corporativa/Área** y el **jefe crea la meta de su colaborador**.
+- La Torre de Control del Estratega no tiene creación propia: `metas/estrategia/page.tsx:456`
+  hace `router.push('/dashboard/metas/crear')` — **al mismo wizard**.
+
+**Consecuencia para el rediseño:** la pantalla de Alcance **no es redundante**. Es el único lugar
+donde se elige `COMPANY`/`AREA`. Fusionarla o eliminarla sin cuidado le saca al Estratega su
+capacidad de crear metas corporativas.
+
+### 4. El defecto reportado: la bifurcación "se siente repetida"
+
+**Diagnóstico:** no es un bug de navegación (la simulación descarta el ciclo). Es un defecto de
+**diseño introducido por mí**: al elegir "Meta Libre", el paso siguiente (Alcance, `case 9`) es una
+pantalla **con tres tarjetas visualmente idénticas** a las de la bifurcación — mismos tokens
+clonados de `StepSelectLevel` (`p-4 rounded-xl border-2 bg-slate-800/50` + Tesla line). Dos
+pantallas seguidas que piden "elegí una tarjeta" se leen como la misma pregunta repetida.
+
+**Propuesta de resolución — fusionar en UNA pantalla, con revelación progresiva:**
+
+Paso 1 único, "¿Cómo querés crear esta meta?", con el mismo patrón de despliegue que YA usa la
+bifurcación para su Nivel 2 (`AnimatePresence`, `height: 0 → auto`):
+
+```
+[ Meta Libre ]  ──elegida──▶ se despliega el selector de ALCANCE (los niveles de
+                             StepSelectLevel, filtrados por rol: el Estratega ve
+                             Corporativa/Área; el jefe solo Individual) + destinatario
+[ Meta Definida ] ─elegida─▶ se despliega el selector de BANCO (Corporativa / De Área)
+```
+
+Ventajas: elimina la repetición percibida (una sola pregunta, una sola pantalla), **preserva
+intacta la capacidad del Estratega** de crear COMPANY/AREA, y deja Meta Libre en **6 pasos** en vez
+de 7. `StepSelectLevel` se reutiliza como sub-componente del desplegable — no se borra ni se
+duplica su lógica de roles.
+
+**Alternativa descartada:** mantener las dos pantallas y diferenciarlas visualmente. Resuelve el
+síntoma, no la causa: seguirían siendo dos preguntas para una sola decisión.
+
+### 5. Veredicto
+
+**Gate C: 1 de 7 puntos completos. Error: se frenó (correctamente) para verificación visual, pero
+se reportó "listo para ver" con evidencia de compilación en vez de comportamiento, y el punto 2
+entregado tiene un defecto de diseño — la pantalla de Alcance queda como una repetición visual de
+la bifurcación, y la solución es fusionarlas en una sola con revelación progresiva.**
 
 ---
 
