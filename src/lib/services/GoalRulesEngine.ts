@@ -166,6 +166,15 @@ export class GoalRulesEngine {
           periodQuarter: rule.sourceGoal.periodQuarter ?? undefined,
           weight: rule.assignedWeight,
           isLeaderGoal: rule.isLeaderOnly,
+          // ═══ Gate B — Camino A: la categoría se HEREDA de la corporativa origen ═══
+          // Sin preguntar y sin excepción: este camino es 100% automático, el jefe no
+          // interviene en nada de esta meta.
+          //
+          // OJO: la herencia vive ACÁ (al armar el input), NUNCA dentro de cascadeGoal.
+          // Los 4 caminos entran por esa misma función: si copiara la categoría del
+          // padre, PISARÍA la que el jefe eligió a mano en el Camino D.
+          family: rule.sourceGoal.family ?? undefined,
+          subfamily: rule.sourceGoal.subfamily ?? undefined,
         })
         created++
       } catch (err) {

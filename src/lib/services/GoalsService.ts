@@ -12,10 +12,17 @@ import {
   GoalMetricType,
   GoalStatus,
   GoalAlertType,
+  GoalFamily,
   Prisma
 } from '@prisma/client'
 import { GoalCycleClosedError, GoalCycleValidationError, GoalCycleService } from './GoalCycleService'
 import { getChildDepartmentIds, GLOBAL_ACCESS_ROLES } from './AuthorizationService'
+import { GOAL_FAMILY_LABELS, isValidSubfamily } from '@/lib/constants/goalCategories'
+// Constante COMPARTIDA con Clima A PROPÓSITO — ver src/lib/services/clima/climaThresholds.ts.
+// Ese archivo es un módulo de constantes PURO (cero imports): es hoja del grafo de
+// dependencias, así que importarlo desde acá no puede generar ningún ciclo.
+// NO duplicar este número en Metas: una sola fuente de verdad para el objetivo de clima.
+import { CLIMA_TARGET_FAVORABILITY } from './clima/climaThresholds'
 
 // ────────────────────────────────────────────────────────────────────────────
 // ERRORES DE DOMINIO (Gate A) — goalsErrorResponse los mapea a HTTP.
@@ -58,6 +65,13 @@ export class GoalKpiRangeError extends Error {
   constructor(public readonly startValue: number, public readonly targetValue: number) {
     super(`El objetivo (${targetValue}) debe ser distinto del valor inicial (${startValue})`)
     this.name = 'GoalKpiRangeError'
+  }
+}
+export class GoalCategoryError extends Error {
+  readonly code = 'GOAL_CATEGORY_INVALID'
+  constructor(message: string) {
+    super(message)
+    this.name = 'GoalCategoryError'
   }
 }
 
@@ -168,6 +182,11 @@ interface CreateGoalInput {
 
   // Meta líder
   isLeaderGoal?: boolean
+
+  // Categoría de contenido (Gate B) — de QUÉ trata la meta.
+  // El par (family, subfamily) lo valida validateCategory en prepareGoalData.
+  family?: GoalFamily
+  subfamily?: string
 }
 
 interface UpdateProgressInput {
@@ -758,6 +777,30 @@ export class GoalsService {
     const start = startValue ?? 0
     if (targetValue === start) {
       throw new GoalKpiRangeError(start, targetValue)
+    }
+  }
+
+  /**
+   * Gate B — la subfamilia debe pertenecer a su familia.
+   *
+   * `subfamily` es String en la base (decisión consciente: las listas de 3 de las 4
+   * familias siguen sin confirmar, y un enum costaría un db push contra producción
+   * por cada confirmación de copy). El precio es que la base no impone integridad:
+   * esta función es la contraparte, y NINGÚN creador escribe categoría sin pasar por acá.
+   *
+   * Sin categoría es válido: las metas anteriores a Gate B (y las que nadie quiera
+   * etiquetar) viven perfectamente con family/subfamily en null.
+   */
+  private static validateCategory(family?: GoalFamily, subfamily?: string): void {
+    if (!family && !subfamily) return // sin categoría: válido
+
+    if (subfamily && !family) {
+      throw new GoalCategoryError('No se puede definir una subfamilia sin familia')
+    }
+    if (family && subfamily && !isValidSubfamily(family, subfamily)) {
+      throw new GoalCategoryError(
+        `"${subfamily}" no es una subfamilia válida de ${GOAL_FAMILY_LABELS[family]}`
+      )
     }
   }
 
@@ -1457,11 +1500,108 @@ export class GoalsService {
     return (await GoalCycleService.getActiveCycle(accountId))?.id ?? null
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // GATE B — PUENTE CON OTROS MÓDULOS (hoy: Clima)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * La meta corporativa VIVA de una categoría, en el ciclo ACTIVO.
+   *
+   * La consume Clima para saber si existe "la meta corporativa de Clima" SIN ningún
+   * mecanismo de asociación manual: es una búsqueda directa por etiqueta.
+   *
+   * "ACTIVA" = decisión (a) de Victor: EXIGE GoalCycle.status === 'ACTIVE'. No alcanza
+   * con que la meta no esté en estado terminal — una corporativa de un ciclo cerrado es
+   * histórico congelado, no una meta vigente a la que colgarse.
+   *
+   * ⚠️ NO CONFUNDIR LOS DOS ESCENARIOS (son distintos y se resuelven distinto):
+   *
+   *   · Devuelve null ACÁ  → HAY ciclo activo, pero nadie definió la corporativa de esa
+   *                          categoría. El llamador crea su meta individual IGUAL, con
+   *                          family/subfamily y SIN parentId (fallback acordado).
+   *
+   *   · NO hay ciclo activo → NO se crea NINGUNA meta, con padre o sin padre. Lo corta
+   *                          Gate E antes (409 en POST /api/goals) y validateTotalWeight
+   *                          falla cerrado en el servicio. Nunca llega hasta acá.
+   */
+  static async findActiveStrategicGoal(
+    accountId: string,
+    family: GoalFamily,
+    subfamily: string
+  ): Promise<Goal | null> {
+    return prisma.goal.findFirst({
+      where: {
+        accountId, // multi-tenant, siempre
+        level: 'COMPANY',
+        family,
+        subfamily,
+        status: { notIn: ['COMPLETED', 'CANCELLED'] },
+        goalCycle: { status: 'ACTIVE' }, // ← decisión (a)
+      },
+      orderBy: { createdAt: 'desc' }, // si hubiera más de una, la más reciente
+    })
+  }
+
+  /**
+   * Línea base de clima de un departamento, para sugerir el objetivo de una meta de
+   * subfamilia "Clima".
+   *
+   * Decisión de Victor — se muestra el DATO REAL, por viejo que sea:
+   *
+   *   · Con medición histórica (accumulatedClimaFavorability != null):
+   *       devuelve ese valor TAL CUAL + su antigüedad en meses. NO se combina, NO se
+   *       promedia, NO se topea contra el objetivo de mercado. El usuario ve su número
+   *       real y decide con la antigüedad a la vista.
+   *
+   *   · Sin ninguna medición (null):
+   *       recién ahí devuelve CLIMA_TARGET_FAVORABILITY (75), marcado como
+   *       isFallback=true → es una REFERENCIA DE MERCADO, no un resultado propio.
+   *       Quien lo muestre debe decirlo explícito.
+   *
+   * El contrato distingue los 2 casos a propósito: devolver un solo número los volvería
+   * indistinguibles, y "75 porque no tengo datos" no es lo mismo que "75 medido".
+   */
+  static async getClimaBaseline(
+    accountId: string,
+    departmentId: string
+  ): Promise<{ value: number; isFallback: boolean; monthsAgo?: number }> {
+    const dept = await prisma.department.findFirst({
+      where: { id: departmentId, accountId }, // multi-tenant
+      select: {
+        accumulatedClimaFavorability: true,
+        accumulatedClimaLastUpdated: true,
+      },
+    })
+
+    // Sin departamento o sin ninguna medición → referencia de mercado.
+    if (!dept || dept.accumulatedClimaFavorability == null) {
+      return { value: CLIMA_TARGET_FAVORABILITY, isFallback: true }
+    }
+
+    const lastUpdated = dept.accumulatedClimaLastUpdated
+    const monthsAgo = lastUpdated
+      ? Math.max(
+          0,
+          Math.floor((Date.now() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24 * 30.44))
+        )
+      : undefined
+
+    return {
+      value: dept.accumulatedClimaFavorability,
+      isFallback: false,
+      ...(monthsAgo !== undefined ? { monthsAgo } : {}),
+    }
+  }
+
   private static prepareGoalData(input: Partial<CreateGoalInput> & Pick<CreateGoalInput, 'accountId' | 'title' | 'createdById' | 'startDate' | 'dueDate' | 'periodYear' | 'targetValue'>): Prisma.GoalUncheckedCreateInput {
     // Gate A (BUG 4): puerta única de los 3 creadores que pasan por acá
     // (createCorporateGoal, cascadeGoal, createManagerGoal). El 4to
     // (createFromDevelopmentGoal) la llama por su cuenta.
     this.validateKpiRange(input.metricType, input.startValue, input.targetValue)
+
+    // Gate B: `subfamily` es String en la base (no enum) → ESTA es la única puerta
+    // que impide que entren valores sueltos o variantes de tipeo.
+    this.validateCategory(input.family, input.subfamily)
 
     return {
       accountId: input.accountId,
@@ -1497,6 +1637,11 @@ export class GoalsService {
 
       // Meta líder
       isLeaderGoal: input.isLeaderGoal || false,
+
+      // Categoría de contenido (Gate B). Nullable: una meta sin categorizar es
+      // legítima (todas las anteriores a este gate lo están).
+      family: input.family,
+      subfamily: input.subfamily,
     }
   }
 

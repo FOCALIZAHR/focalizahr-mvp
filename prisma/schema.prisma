@@ -2880,6 +2880,29 @@ model Goal {
   type            GoalType @default(KPI)
 
   // ────────────────────────────────────────────────────────────────────────────
+  // 3b. CATEGORÍA DE CONTENIDO (Gate B) — de QUÉ trata la meta.
+  //
+  // NO confundir con `type` (forma de medición: KPI/OBJECTIVE/...) ni con `level`
+  // (altura organizacional). NO confundir con GoalGroup (weightBusiness/Leader/
+  // NPS/Specific = ponderación de bono por cargo del jefe, otro concepto).
+  //
+  // Nullable: mismo patrón aditivo que goalCycleId (ver :2892) — las metas
+  // creadas antes de Gate B quedan sin categoría y nada se bloquea.
+  //
+  // family    = taxonomía CERRADA (enum): de ella dependen queries de OTROS
+  //             módulos (Clima busca su meta corporativa por acá).
+  // subfamily = String, NO enum, A PROPÓSITO: hoy solo la lista de
+  //             "Cultura y Personas" está confirmada; las otras 3 familias siguen
+  //             provisionales. Un enum obligaría a otro `db push` contra
+  //             producción cada vez que se confirme una lista.
+  //             El catálogo y la validación viven en
+  //             src/lib/constants/goalCategories.ts, y GoalsService.validateCategory
+  //             es la ÚNICA puerta de escritura (evita variantes de tipeo).
+  // ────────────────────────────────────────────────────────────────────────────
+  family          GoalFamily?
+  subfamily       String?
+
+  // ────────────────────────────────────────────────────────────────────────────
   // 4. TIEMPO (Vigencia de Negocio - Independiente de ciclos)
   // ────────────────────────────────────────────────────────────────────────────
   startDate       DateTime @map("start_date")
@@ -2965,6 +2988,7 @@ model Goal {
   @@index([periodYear])
   @@index([dueDate])
   @@index([goalCycleId])
+  @@index([accountId, family, subfamily]) // Gate B: el where de findActiveStrategicGoal
   @@map("goals")
 }
 
@@ -3228,6 +3252,17 @@ enum GoalType {
   OBJECTIVE     // El "O" de OKR (contenedor)
   KEY_RESULT    // El "KR" de OKR (medible)
   PROJECT       // Hito binario (completado/no completado)
+}
+
+// Gate B — categoría de contenido de la meta (de QUÉ trata).
+// Taxonomía CERRADA e igual para toda cuenta (inspirada en Balanced Scorecard,
+// sin jerga). Los labels de cara al usuario viven en
+// src/lib/constants/goalCategories.ts (copy provisional, cambiarlos no toca schema).
+enum GoalFamily {
+  NEGOCIO_E_INGRESOS      // "Negocio e Ingresos"
+  CLIENTES_Y_USUARIOS     // "Clientes y Usuarios"
+  OPERACION_Y_EFICIENCIA  // "Operación y Eficiencia"
+  CULTURA_Y_PERSONAS      // "Cultura y Personas" ← la familia que consume Clima
 }
 
 enum GoalMetricType {

@@ -18,6 +18,7 @@ import {
   GoalLimitReachedError,
   GoalDuplicateError,
   GoalKpiRangeError,
+  GoalCategoryError,
 } from '@/lib/services/GoalsService'
 import { GoalCycleClosedError } from '@/lib/services/GoalCycleService'
 
@@ -38,7 +39,8 @@ export function goalsErrorResponse(e: unknown): NextResponse {
     e instanceof GoalWeightExceededError ||
     e instanceof GoalLimitReachedError ||
     e instanceof GoalDuplicateError ||
-    e instanceof GoalKpiRangeError
+    e instanceof GoalKpiRangeError ||
+    e instanceof GoalCategoryError
   ) {
     return NextResponse.json({ success: false, error: e.message, code: e.code }, { status: 400 })
   }

@@ -50,6 +50,14 @@ const createGoalSchema = z.object({
 
   // Meta líder
   isLeaderGoal: z.boolean().default(false),
+
+  // Categoría de contenido (Gate B). El par (family, subfamily) lo valida el
+  // SERVICIO (GoalsService.validateCategory): la subfamilia debe pertenecer a su
+  // familia, y no puede haber subfamilia sin familia.
+  family: z
+    .enum(['NEGOCIO_E_INGRESOS', 'CLIENTES_Y_USUARIOS', 'OPERACION_Y_EFICIENCIA', 'CULTURA_Y_PERSONAS'])
+    .optional(),
+  subfamily: z.string().optional(),
 })
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -131,7 +139,13 @@ export async function GET(request: NextRequest) {
     // Filtros adicionales del query string
     if (employeeId) where.employeeId = employeeId
     if (departmentId) where.departmentId = departmentId
-    if (level) where.level = level
+    // Gate B: acepta lista ("COMPANY,AREA") para el banco de metas definidas, que
+    // ofrece corporativas y de área juntas. Mismo patrón que `status` (abajo).
+    // Retro-compatible: un solo valor sigue funcionando igual.
+    if (level) {
+      const levels = level.split(',').map((l) => l.trim()).filter(Boolean)
+      where.level = levels.length === 1 ? levels[0] : { in: levels }
+    }
     if (periodYear) where.periodYear = parseInt(periodYear)
     if (goalCycleId) where.goalCycleId = goalCycleId
     if (status) {
