@@ -13,11 +13,57 @@
 
 | Gate | Estado |
 |---|---|
-| **Gate 0 de Gate A** (investigación read-only §2.2) | ✅ **CERRADO** (2026-07-14, esta sesión) |
-| **Gate A** (peso por ciclo + BUGs 1-6) | 🔲 PENDIENTE — listo para implementar |
+| **Gate 0 de Gate A** (investigación read-only §2.2) | ✅ **CERRADO** (2026-07-14) |
+| **Gate A** (peso por ciclo + BUGs 1/3/4/6) | ✅ **SELLADO** (`937cdf8`, 2026-07-14, smoke 22/22) |
 | **Gate 0 de Gate B** (investigación §3.3) | 🟡 PARCIAL — 2 de 6 puntos ya respondidos |
-| **Gate B** (categoría familia/subfamilia) | 🔲 PENDIENTE (bloqueado por Gate A) |
-| **Gate C** (UX wizard) | 🔲 PENDIENTE (bloqueado por A + B) |
+| **Gate B** (categoría familia/subfamilia) | 🔲 PENDIENTE — **desbloqueado**, Gate A ya está sellado |
+| **Gate C** (UX wizard) | 🔲 PENDIENTE (bloqueado por B) |
+
+---
+
+## ✅ GATE A — SELLADO (`937cdf8`, 2026-07-14)
+
+**7 archivos.** `tsc --noEmit` + `next build` limpios. Smoke **22/22** (14 casos contra
+los handlers reales, cuenta sintética, cleanup por id en `$transaction`).
+
+### Qué quedó implementado
+
+| # | Cambio | Dónde |
+|---|---|---|
+| 1 | `validateTotalWeight` scopeado al **ciclo ACTIVO** + **falla cerrado** sin ciclo (`GoalNoActiveCycleError`) | `GoalsService.ts` |
+| 1b | `GET /api/goals/team` → `assignmentStatus.totalWeight` con el **mismo** scope (lectura = escritura) | `api/goals/team/route.ts` |
+| 2 | **BUG 1**: PATCH valida peso (solo si viene `weight`, solo INDIVIDUAL con dueño, excluyéndose a sí misma) + **guard de ciclo CLOSED** + `accountId` en el `where` del update | `api/goals/[id]/route.ts` |
+| 3b+3 | **BUG 3**: 5 clases de error de dominio + `goalsErrorResponse.ts`. Mapeo **por tipo, nunca por texto** | `GoalsService.ts`, `lib/api/goalsErrorResponse.ts`, 3 rutas |
+| 4 | **BUG 4**: `targetValue !== startValue` (no-BINARY) en el **servicio** — `prepareGoalData` cubre 3 creadores, `createFromDevelopmentGoal` la llama aparte | `GoalsService.ts` |
+| 5 | **BUG 6**: permiso `goals:create:strategic`; crear COMPANY/AREA exige rol Estratega (403 si no) | `AuthorizationService.ts`, `api/goals/route.ts` |
+
+**Contrato de status codes** (`goalsErrorResponse.ts`): **400** peso/límite/duplicado/KPI ·
+**409** sin-ciclo y ciclo-cerrado (mismo código que el 409 de Gate E, decisión Victor) ·
+**500** solo lo verdaderamente inesperado.
+
+### Notas de implementación (para quien siga)
+
+- **`from-pdi` no puede disparar `GOAL_KPI_RANGE` por la ruta:** su check de campos
+  requeridos rechaza `targetValue: 0` antes (`!targetValue` es falsy, `route.ts:26-31`).
+  La regla igual está en el servicio y se probó llamándolo directo (caso 11). Es
+  defensa en profundidad, no un hueco.
+- **BUG 5 NO se tocó** (Gate 0 confirmó que `validateDuplicate` por `parentId` ya era
+  correcto). El mapper sí lo expone mejor: ahora devuelve **400 `GOAL_DUPLICATE`** en
+  vez de un 500 opaco. El fix de fondo (excluir `COMPLETED` en el camino manual, e
+  idempotencia por ciclo en `GoalRulesEngine`) sigue pendiente, con criterios distintos
+  por camino — ver SPEC §1 BUG 5.
+- **Borde aceptado (decisión Victor, NO es bug):** un PATCH de peso sobre una meta de un
+  ciclo **PLANNING/CLOSING** se valida contra el presupuesto del ciclo **ACTIVO**, donde
+  esa meta no cuenta. Es raro y no rompe nada. Bloquearlo exigiría definir qué significa
+  "editar una meta de un ciclo PLANNING", que es una pregunta de diseño abierta.
+- **Deuda conocida:** `FOCALIZAHR_ADMIN` quedó dentro de `goals:create:strategic`, o sea
+  que el equipo interno puede crear metas dentro de la cuenta de un cliente. A resolver
+  después; no bloqueaba el gate.
+- **GOTCHAs de fixtures** (cuestan tiempo si se rehace el smoke): `Employee` exige
+  `nationalId` **y** `hireDate` **y** `department` (relación requerida); mezclar
+  `accountId` escalar con relaciones hace que Prisma resuelva el input *Checked* y exija
+  `connect` explícito. `Account` **no tiene** `companyEmail`.
+- Smoke borrado al sellar (práctica del proyecto: la evidencia vive en el commit).
 
 ---
 
@@ -152,10 +198,26 @@ pero parece un bug la primera vez que se ve. Ya advertido en la spec §4.2.
 | `52aa2d6` | Scripts de auditoría: `cleanup-seed-goals-demo.ts` + `fix-tp26-include-goals.ts` |
 | `59021a2` | Ficha de Metas (GoalCycle, cierre, peso, rollover, saneamiento) |
 | `fd679fd` | `seed-goals-demo.ts` reescrito vía `GoalsService` (**aprobado, NO ejecutar**) |
+| `f4246fa` | SPEC + este PROGRESS (Gate 0 sellado) |
+| **`937cdf8`** | **Gate A — código** (7 archivos) |
+
+---
+
+## ⚠️ Efecto en producción al desplegar Gate A
+
+El presupuesto disponible de ~47 empleados de la cuenta piloto **salta a ~100%**, porque
+sus metas vivas cuelgan del ciclo **CLOSED** *Ciclo Vigente 2026* y el ciclo ACTIVE es
+*Q4 2026* (que casi no tiene metas). **Es el comportamiento correcto** según la decisión
+de rollover — pero visualmente parece un bug. Avisar antes de cualquier demo.
+
+Los **3 empleados con >100%** (145/130/124, metas de feb-2026) dejan de estar en
+infracción automáticamente: sus metas son del ciclo cerrado y ya no cuentan.
 
 ---
 
 ## Próximo paso
 
-**Implementar Gate A** siguiendo §2.1 de la spec (5 ítems + 1a + 1b + 3b). Gate 0 ya está
-cerrado: no hace falta investigar nada más para empezar. El smoke de §2.3 tiene 12 casos.
+**Gate B (categoría familia/subfamilia)** — ya desbloqueado. Antes de tocar schema:
+cerrar los 4 puntos abiertos de §3.3 (aditividad de `family`/`subfamily`, PDI fuera de
+alcance, `/dashboard/metas/estrategia`, filtro departamental del banco) y **las 4
+decisiones de negocio de Victor** listadas arriba.
