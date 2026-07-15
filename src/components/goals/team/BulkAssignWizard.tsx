@@ -6,6 +6,7 @@
 'use client'
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
+import type { GoalFamily } from '@prisma/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ArrowLeft, ArrowRight, Target, Loader2, HelpCircle } from 'lucide-react'
 import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton'
@@ -106,6 +107,9 @@ export interface BulkAssignData {
   parentGoalTitle?: string
   newGoalTitle?: string
   newGoalDescription?: string
+  // Categoría (solo rama 'new' — Gate 3·A). La rama 'cascade' hereda del padre.
+  family?: GoalFamily
+  subfamily?: string
 
   // Step 3: targets individuales
   targets: Record<string, { targetValue: number; unit: string }>
@@ -192,11 +196,14 @@ export default function BulkAssignWizard({ employees, onClose, onComplete }: Bul
       case 2:
         if (data.goalSource === 'cascade') return !!data.parentGoalId
         // Rama 'new' (Punto 2): crea+asigna un KPI propio (OWN) → "¿Cómo se mide?"
-        // obligatorio, no vacío (espejo del servidor).
+        // obligatorio, no vacío (espejo del servidor). Gate 3·A: + Familia obligatoria
+        // (mismo criterio que Camino D en CreateGoalWizard).
         return (
           !!data.newGoalTitle &&
           data.newGoalTitle.length >= 3 &&
-          !!data.newGoalDescription?.trim()
+          !!data.newGoalDescription?.trim() &&
+          !!data.family &&
+          !!data.subfamily
         )
       case 3:
         return data.employeeIds.every(id =>
@@ -252,6 +259,9 @@ export default function BulkAssignWizard({ employees, onClose, onComplete }: Bul
           // Punto 2: 'cascade' hereda el KPI del padre (INHERITED); 'new' crea un KPI
           // propio en lote (OWN → exige description no vacía, validada en canProceed).
           kpiSource: data.goalSource === 'cascade' ? ('INHERITED' as const) : ('OWN' as const),
+          // Gate 3·A: la categoría solo viaja en 'new' (en 'cascade' se hereda del padre).
+          family: data.goalSource === 'new' ? (data.family || undefined) : undefined,
+          subfamily: data.goalSource === 'new' ? (data.subfamily || undefined) : undefined,
           targetValue: data.targets[employeeId]?.targetValue || 100,
           unit: data.targets[employeeId]?.unit || '%',
           weight: data.weights[employeeId] || 0,

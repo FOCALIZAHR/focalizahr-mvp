@@ -9,6 +9,7 @@ import { memo, useCallback } from 'react'
 import { Link2, Plus, Target } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useGoals } from '@/hooks/useGoals'
+import FamilySubfamilyPicker from '@/components/goals/wizard/FamilySubfamilyPicker'
 import type { BulkAssignData } from '../BulkAssignWizard'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -37,6 +38,10 @@ export default memo(function StepSelectGoal({
       parentGoalTitle: undefined,
       newGoalTitle: undefined,
       newGoalDescription: undefined,
+      // La categoría solo aplica a 'new'; limpiarla al cambiar de origen evita
+      // que una familia elegida quede pegada si el jefe vuelve a 'cascade'.
+      family: undefined,
+      subfamily: undefined,
     })
   }, [updateData])
 
@@ -152,6 +157,8 @@ export default memo(function StepSelectGoal({
               rows={3}
             />
           </div>
+          {/* Gate 3·A: categoría obligatoria para meta libre (mismo picker que Camino D). */}
+          <FamilySubfamilyPicker data={data} updateData={updateData} />
         </div>
       )}
     </div>

@@ -22,11 +22,17 @@ import {
   GOAL_SUBFAMILIES,
   GOAL_FAMILY_PAIN_POINTS,
 } from '@/lib/constants/goalCategories'
-import type { GoalWizardData } from './CreateGoalWizard'
+
+// Forma MÍNIMA que el picker necesita — desacoplado de cualquier wizard concreto
+// para reusarse en CreateGoalWizard (Camino D) y BulkAssignWizard (crear nueva).
+interface CategorizableData {
+  family?: GoalFamily
+  subfamily?: string
+}
 
 interface FamilySubfamilyPickerProps {
-  data: GoalWizardData
-  updateData: (updates: Partial<GoalWizardData>) => void
+  data: CategorizableData
+  updateData: (updates: Partial<CategorizableData>) => void
 }
 
 export default memo(function FamilySubfamilyPicker({ data, updateData }: FamilySubfamilyPickerProps) {
