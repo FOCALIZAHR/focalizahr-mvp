@@ -90,6 +90,7 @@ export async function GET(request: NextRequest) {
             weight: true,
             isLeaderGoal: true,
             goalCycleId: true, // Gate A 1b: para scopear el presupuesto al ciclo activo
+            parentId: true,    // Gate 3·B: para pre-excluir a quien ya tiene una meta-padre
           },
         },
       },
@@ -154,6 +155,10 @@ export async function GET(request: NextRequest) {
         avgProgress: Math.round(avgProgress * 10) / 10,
         hasGoalsConfigured,
         hasDirectReports,
+        // Gate 3·B: ids de metas-padre que esta persona ya tiene (para excluir duplicados).
+        // Usa TODAS las metas vivas (no visibleGoals): validateDuplicate no filtra por
+        // isLeaderGoal, así que una meta líder heredada del mismo padre igual es duplicado.
+        goalParentIds: emp.goals.map((g) => g.parentId).filter((p): p is string => !!p),
         assignmentStatus: {
           totalWeight,
           goalCount,

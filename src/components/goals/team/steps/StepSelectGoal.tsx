@@ -6,9 +6,8 @@
 'use client'
 
 import { memo, useCallback } from 'react'
-import { Link2, Plus, Target } from 'lucide-react'
+import { Link2, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useGoals } from '@/hooks/useGoals'
 import FamilySubfamilyPicker from '@/components/goals/wizard/FamilySubfamilyPicker'
 import type { BulkAssignData } from '../BulkAssignWizard'
 
@@ -29,8 +28,6 @@ export default memo(function StepSelectGoal({
   data,
   updateData,
 }: StepSelectGoalProps) {
-  const { goals: areaGoals, isLoading } = useGoals({ level: 'AREA' })
-
   const handleSourceChange = useCallback((source: 'cascade' | 'new') => {
     updateData({
       goalSource: source,
@@ -43,10 +40,6 @@ export default memo(function StepSelectGoal({
       family: undefined,
       subfamily: undefined,
     })
-  }, [updateData])
-
-  const handleSelectParent = useCallback((goalId: string, goalTitle: string) => {
-    updateData({ parentGoalId: goalId, parentGoalTitle: goalTitle })
   }, [updateData])
 
   return (
@@ -88,47 +81,14 @@ export default memo(function StepSelectGoal({
         </button>
       </div>
 
-      {/* Cascade: select parent */}
+      {/* Cascade (Gate 3·B): la meta del banco se elige en el paso siguiente
+          (GoalBankScreen, corporativas + de área). Acá solo se confirma el origen. */}
       {data.goalSource === 'cascade' && (
-        <div className="space-y-2">
-          <p className="text-sm text-slate-300">Metas de área disponibles:</p>
-          {isLoading ? (
-            <div className="space-y-2">
-              <div className="fhr-skeleton h-14 rounded-lg" />
-              <div className="fhr-skeleton h-14 rounded-lg" />
-            </div>
-          ) : areaGoals.length === 0 ? (
-            <div className="p-4 rounded-lg bg-slate-800/50 text-center">
-              <p className="text-sm text-slate-400">No hay metas de área disponibles</p>
-              <p className="text-xs text-slate-500 mt-1">Crea primero una meta de área para cascadear</p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {areaGoals.map(goal => (
-                <button
-                  key={goal.id}
-                  onClick={() => handleSelectParent(goal.id, goal.title)}
-                  className={cn(
-                    'w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left',
-                    data.parentGoalId === goal.id
-                      ? 'border-cyan-500 bg-cyan-500/10'
-                      : 'border-slate-700 bg-slate-800/30 hover:border-slate-600'
-                  )}
-                >
-                  <Target className={cn(
-                    'w-4 h-4 flex-shrink-0',
-                    data.parentGoalId === goal.id ? 'text-cyan-400' : 'text-purple-400'
-                  )} />
-                  <div className="min-w-0">
-                    <p className="text-sm text-white truncate">{goal.title}</p>
-                    <p className="text-xs text-slate-400">
-                      {Math.round(goal.progress)}% avance
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
+        <div className="p-4 rounded-lg bg-slate-800/40 border border-slate-700/50">
+          <p className="text-sm text-slate-400">
+            Elegirás la meta del banco (corporativa o de área) en el siguiente paso, con el
+            indicador ya consolidado. Solo definirás el peso por persona.
+          </p>
         </div>
       )}
 

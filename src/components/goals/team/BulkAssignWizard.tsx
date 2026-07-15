@@ -16,6 +16,7 @@ import StepConfirmSelection from './steps/StepConfirmSelection'
 import StepSelectGoal from './steps/StepSelectGoal'
 import StepSetTargets from './steps/StepSetTargets'
 import StepWeightsConfirm from './steps/StepWeightsConfirm'
+import GoalBankScreen from '@/components/goals/bank/GoalBankScreen'
 
 // ════════════════════════════════════════════════════════════════════════════
 // CONSTANTES
@@ -129,6 +130,9 @@ export default function BulkAssignWizard({ employees, onClose, onComplete }: Bul
   const [error, setError] = useState('')
   const [employeesWithStatus, setEmployeesWithStatus] = useState<EmployeeWithStatus[]>([])
   const [isLoadingStatus, setIsLoadingStatus] = useState(true)
+  // Gate 3·B: handoff — al confirmar 'cascade' en el Paso 2, la asignación heredada la
+  // maneja GoalBankScreen (misma fuente de verdad que el flujo individual).
+  const [showBank, setShowBank] = useState(false)
 
   const [data, setData] = useState<BulkAssignData>({
     employeeIds: employees.map(e => e.id),
@@ -194,7 +198,9 @@ export default function BulkAssignWizard({ employees, onClose, onComplete }: Bul
       case 1:
         return data.employeeIds.length > 0
       case 2:
-        if (data.goalSource === 'cascade') return !!data.parentGoalId
+        // Gate 3·B: 'cascade' ya no elige la meta acá (se elige en GoalBankScreen tras el
+        // handoff), así que basta con haber elegido el origen para continuar.
+        if (data.goalSource === 'cascade') return true
         // Rama 'new' (Punto 2): crea+asigna un KPI propio (OWN) → "¿Cómo se mide?"
         // obligatorio, no vacío (espejo del servidor). Gate 3·A: + Familia obligatoria
         // (mismo criterio que Camino D en CreateGoalWizard).
@@ -220,11 +226,19 @@ export default function BulkAssignWizard({ employees, onClose, onComplete }: Bul
   const goNext = useCallback(() => {
     if (stepPhase === 'cover') {
       setStepPhase('form')
-    } else if (canProceed && currentStep < STEPS.length) {
-      setCurrentStep(prev => prev + 1)
-      setStepPhase('cover')
+    } else if (canProceed) {
+      // Gate 3·B: 'cascade' confirmado en el Paso 2 → GoalBankScreen (elige meta del
+      // banco + personas precargadas + peso + submit con éxito parcial).
+      if (currentStep === 2 && data.goalSource === 'cascade') {
+        setShowBank(true)
+        return
+      }
+      if (currentStep < STEPS.length) {
+        setCurrentStep(prev => prev + 1)
+        setStepPhase('cover')
+      }
     }
-  }, [canProceed, currentStep, stepPhase])
+  }, [canProceed, currentStep, stepPhase, data.goalSource])
 
   const goBack = useCallback(() => {
     if (currentStep === 1 && stepPhase === 'cover') return
@@ -248,20 +262,16 @@ export default function BulkAssignWizard({ employees, onClose, onComplete }: Bul
         : null
 
       const promises = data.employeeIds.map(async (employeeId) => {
+        // Gate 3·B: handleSubmit ahora SOLO lo alcanza la rama 'new' (cascade se derivó a
+        // GoalBankScreen). Meta libre en lote = KPI propio (OWN) con su categoría.
         const payload = {
-          title: data.goalSource === 'cascade'
-            ? data.parentGoalTitle
-            : data.newGoalTitle,
+          title: data.newGoalTitle,
           description: data.newGoalDescription || undefined,
           level: 'INDIVIDUAL' as const,
           employeeId,
-          parentId: data.parentGoalId || undefined,
-          // Punto 2: 'cascade' hereda el KPI del padre (INHERITED); 'new' crea un KPI
-          // propio en lote (OWN → exige description no vacía, validada en canProceed).
-          kpiSource: data.goalSource === 'cascade' ? ('INHERITED' as const) : ('OWN' as const),
-          // Gate 3·A: la categoría solo viaja en 'new' (en 'cascade' se hereda del padre).
-          family: data.goalSource === 'new' ? (data.family || undefined) : undefined,
-          subfamily: data.goalSource === 'new' ? (data.subfamily || undefined) : undefined,
+          kpiSource: 'OWN' as const,
+          family: data.family || undefined,
+          subfamily: data.subfamily || undefined,
           targetValue: data.targets[employeeId]?.targetValue || 100,
           unit: data.targets[employeeId]?.unit || '%',
           weight: data.weights[employeeId] || 0,
@@ -370,6 +380,36 @@ export default function BulkAssignWizard({ employees, onClose, onComplete }: Bul
 
         {/* Contenido del step */}
         {renderStepContent()}
+      </div>
+    )
+  }
+
+  // Gate 3·B: rama cascade → GoalBankScreen dentro del mismo shell modal. Va DESPUÉS de
+  // todos los hooks (último = renderStepContent) → no viola la regla de hooks de React.
+  if (showBank) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full max-w-2xl max-h-[90vh] flex flex-col fhr-card"
+        >
+          <div className="flex items-center justify-between p-4 border-b border-slate-700">
+            <GhostButton icon={ArrowLeft} onClick={() => setShowBank(false)}>Atrás</GhostButton>
+            <button onClick={onClose} className="p-2 text-slate-400 hover:text-white transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+            <GoalBankScreen
+              bankLevel="COMPANY,AREA"
+              preselectedIds={data.employeeIds}
+              onDone={onComplete}
+              onCancel={() => setShowBank(false)}
+            />
+          </div>
+        </motion.div>
       </div>
     )
   }

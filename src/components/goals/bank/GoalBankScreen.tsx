@@ -34,12 +34,18 @@ interface TeamMember {
   fullName: string
   position?: string
   assignmentStatus?: AssignmentStatus
+  goalParentIds?: string[]   // Gate 3·B: metas-padre que ya tiene (para excluir duplicados)
 }
 
 interface GoalBankScreenProps {
-  bankLevel: 'COMPANY' | 'AREA'
-  /** Se llama al terminar (crear o cancelar) para que el orquestador redirija/cierre. */
+  bankLevel: 'COMPANY' | 'AREA' | 'COMPANY,AREA'   // masiva ve ambos niveles (Punto 1)
+  /** Personas precargadas (entrada masiva): filtra la lista a solo ellas. */
+  preselectedIds?: string[]
+  /** Se llama al terminar (crear) para que el orquestador redirija/cierre. */
   onDone: () => void
+  /** Opcional: si viene, el botón "Cancelar" lo llama en vez de onDone (masiva:
+   *  volver al Paso 2 sin cerrar todo). Individual no lo pasa → comportamiento actual. */
+  onCancel?: () => void
 }
 
 function authHeaders(): Record<string, string> {
@@ -47,7 +53,7 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-export default memo(function GoalBankScreen({ bankLevel, onDone }: GoalBankScreenProps) {
+export default memo(function GoalBankScreen({ bankLevel, preselectedIds, onDone, onCancel }: GoalBankScreenProps) {
   const { success, error } = useToast()
 
   const [bankGoals, setBankGoals] = useState<BankParentGoal[]>([])
@@ -75,10 +81,12 @@ export default memo(function GoalBankScreen({ bankLevel, onDone }: GoalBankScree
     ])
       .then(([goals, members]) => {
         setBankGoals(goals)
-        setTeam(members)
+        // Gate 3·B: en masiva mostramos SOLO las personas elegidas en el grid (misma UX
+        // de hoy). En individual (sin preselectedIds) mostramos el equipo completo — igual.
+        setTeam(preselectedIds ? members.filter((m) => preselectedIds.includes(m.id)) : members)
       })
       .finally(() => setLoading(false))
-  }, [bankLevel])
+  }, [bankLevel, preselectedIds])
 
   const filtered = useMemo(
     () => (search ? bankGoals.filter((g) => g.title.toLowerCase().includes(search.toLowerCase())) : bankGoals),
@@ -86,6 +94,24 @@ export default memo(function GoalBankScreen({ bankLevel, onDone }: GoalBankScree
   )
 
   const suggested = selected?.weight ?? 0
+
+  // Gate 3·B: al elegir la meta, auto-incluir a los precargados con el peso sugerido
+  // (respetando el disponible real y saltando a quien YA tiene esa meta). Solo aplica
+  // en masiva (preselectedIds presente); en individual no hace nada.
+  useEffect(() => {
+    if (!selected || !preselectedIds?.length) return
+    setWeights((prev) => {
+      const next = { ...prev }
+      for (const id of preselectedIds) {
+        if (id in next) continue
+        const m = team.find((t) => t.id === id)
+        if (!m || m.goalParentIds?.includes(selected.id)) continue // ya la tiene → excluir
+        const avail = getAvailableWeight(m.assignmentStatus)
+        next[id] = avail === null ? 0 : Math.min(suggested, avail)
+      }
+      return next
+    })
+  }, [selected, preselectedIds, team, suggested])
 
   const toggleMember = useCallback(
     (emp: TeamMember) => {
@@ -151,7 +177,7 @@ export default memo(function GoalBankScreen({ bankLevel, onDone }: GoalBankScree
         <h2 className="text-2xl font-extralight text-white tracking-tight">
           Distribuir{' '}
           <span className="fhr-title-gradient">
-            {bankLevel === 'COMPANY' ? 'meta corporativa' : 'meta de área'}
+            {bankLevel === 'COMPANY' ? 'meta corporativa' : bankLevel === 'AREA' ? 'meta de área' : 'meta del banco'}
           </span>
         </h2>
         <p className="text-sm text-slate-400 mt-1">
@@ -180,7 +206,7 @@ export default memo(function GoalBankScreen({ bankLevel, onDone }: GoalBankScree
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {filtered.length === 0 ? (
               <p className="text-center text-slate-500 text-sm py-6">
-                No hay metas {bankLevel === 'COMPANY' ? 'corporativas' : 'de área'} disponibles. Pedí al equipo estratégico que cree una.
+                No hay metas {bankLevel === 'COMPANY' ? 'corporativas' : bankLevel === 'AREA' ? 'de área' : 'del banco'} disponibles. Pedí al equipo estratégico que cree una.
               </p>
             ) : (
               filtered.map((g) => (
@@ -218,7 +244,7 @@ export default memo(function GoalBankScreen({ bankLevel, onDone }: GoalBankScree
                 <p className="text-sm text-slate-400">Mide: {selected.description || 'sin indicador registrado'}</p>
                 <p className="text-sm text-slate-400">Objetivo: {selected.targetValue}{selected.unit ? ` ${selected.unit}` : ''}</p>
               </div>
-              <button onClick={() => setSelected(null)} className="text-xs text-slate-500 hover:text-white shrink-0">
+              <button onClick={() => { setSelected(null); setWeights({}) }} className="text-xs text-slate-500 hover:text-white shrink-0">
                 Cambiar
               </button>
             </div>
@@ -238,12 +264,16 @@ export default memo(function GoalBankScreen({ bankLevel, onDone }: GoalBankScree
               const included = emp.id in weights
               const avail = getAvailableWeight(emp.assignmentStatus)
               const noData = avail === null
+              // Gate 3·B: quien YA tiene esta meta-padre se pre-excluye (aplica a los DOS
+              // flujos — individual y masiva). Evita el 400 de duplicado en el submit.
+              const alreadyHas = !!selected && !!emp.goalParentIds?.includes(selected.id)
+              const disabled = noData || alreadyHas
               return (
                 <div key={emp.id} className="p-3 bg-slate-800/40 rounded-lg border border-slate-700/40">
                   <div className="flex items-center justify-between gap-3">
                     <button
                       onClick={() => toggleMember(emp)}
-                      disabled={noData}
+                      disabled={disabled}
                       className="flex items-center gap-3 min-w-0 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <span
@@ -256,7 +286,9 @@ export default memo(function GoalBankScreen({ bankLevel, onDone }: GoalBankScree
                       </span>
                       <span className="text-sm text-white truncate">{emp.fullName}</span>
                     </button>
-                    {noData ? (
+                    {alreadyHas ? (
+                      <span className="text-xs text-slate-500 shrink-0">ya tiene esta meta</span>
+                    ) : noData ? (
                       <span className="text-xs text-amber-400 shrink-0">Sin datos de peso — no se puede asignar</span>
                     ) : (
                       <span className="text-xs text-slate-500 shrink-0">disp. {avail}%</span>
@@ -278,7 +310,7 @@ export default memo(function GoalBankScreen({ bankLevel, onDone }: GoalBankScree
           </div>
 
           <div className="flex justify-between pt-4 border-t border-slate-700/50">
-            <GhostButton onClick={onDone}>Cancelar</GhostButton>
+            <GhostButton onClick={onCancel ?? onDone}>Cancelar</GhostButton>
             <PrimaryButton icon={submitting ? Loader2 : Target} onClick={handleSubmit} disabled={!canSubmit}>
               {submitting ? 'Asignando...' : `Asignar a ${selectedIds.length || ''}`}
             </PrimaryButton>
