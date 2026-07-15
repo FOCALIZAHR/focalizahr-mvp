@@ -9,7 +9,10 @@ import { memo, useCallback, useState, useEffect, useMemo } from 'react'
 import { Building2, Users, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getCurrentUser } from '@/lib/auth'
-import { GLOBAL_ACCESS_ROLES } from '@/lib/services/AuthorizationService'
+// Gate C — la MISMA hasPermission que usa el servidor, desde el módulo PURO client-safe
+// (post-split de AuthorizationService, c3ca32d). Reemplaza el criterio viejo basado en
+// GLOBAL_ACCESS_ROLES, que NO coincidía con el gate real del servidor.
+import { hasPermission } from '@/lib/auth/permissions'
 import type { GoalWizardData } from './CreateGoalWizard'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -70,15 +73,25 @@ export default memo(function StepSelectLevel({
   // Obtener rol del usuario
   const user = getCurrentUser()
   const role = (user as any)?.userRole || user?.role || null
-  const hasGlobalAccess = role ? GLOBAL_ACCESS_ROLES.includes(role as any) : false
 
-  // Filtrar niveles según rol
+  // Filtrar niveles según el permiso REAL del servidor (Gate C / BUG 6).
+  // Solo el Estratega (goals:create:strategic) crea COMPANY/AREA. Cualquier otro
+  // rol — incluidos CEO y HR_OPERATOR, que NO están en ese permiso — solo crea metas
+  // INDIVIDUAL. Antes esto usaba GLOBAL_ACCESS_ROLES (que sí incluye CEO/HR_OPERATOR)
+  // y dejaba pasar niveles que el servidor rechaza con 403 al final del formulario.
+  const isEstratega = hasPermission(role, 'goals:create:strategic')
   const allowedLevels = useMemo(() => {
-    if (hasGlobalAccess) return LEVELS
-    if (role === 'AREA_MANAGER') return LEVELS.filter(l => l.value !== 'COMPANY')
-    if (role === 'EVALUATOR') return LEVELS.filter(l => l.value === 'INDIVIDUAL')
-    return LEVELS
-  }, [hasGlobalAccess, role])
+    if (isEstratega) return LEVELS
+    return LEVELS.filter(l => l.value === 'INDIVIDUAL') // jefe común: solo individual
+  }, [isEstratega])
+
+  // Si solo hay un nivel posible (jefe común → INDIVIDUAL), auto-seleccionarlo: la
+  // pantalla queda como "elegí al colaborador", no como una tarjeta redundante.
+  useEffect(() => {
+    if (allowedLevels.length === 1 && !data.level) {
+      updateData({ level: allowedLevels[0].value })
+    }
+  }, [allowedLevels, data.level, updateData])
 
   // Cargar departamentos cuando se selecciona AREA
   useEffect(() => {

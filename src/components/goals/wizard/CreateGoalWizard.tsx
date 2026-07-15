@@ -11,82 +11,154 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, ArrowRight, X, Target, HelpCircle } from 'lucide-react'
 import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton'
 import { formatDisplayName } from '@/lib/utils/formatName'
+import { getCurrentUser } from '@/lib/auth'
+// Gate C — misma hasPermission que el servidor (módulo puro client-safe, post-split c3ca32d)
+import { hasPermission } from '@/lib/auth/permissions'
 
 import { goalDatesWithinCycleError } from '@/lib/utils/goalCycleDates'
 import { WizardProgress } from './WizardProgress'
+import StepChooseFlow from './StepChooseFlow'
 import StepSelectLevel from './StepSelectLevel'
 import StepDefineGoal from './StepDefineGoal'
 import StepConfigureMetric from './StepConfigureMetric'
 import StepSetDates from './StepSetDates'
 import StepLinkParent from './StepLinkParent'
+import StepAssignWeight from './StepAssignWeight'
 import StepConfirm from './StepConfirm'
 import GoalStepCover from './GoalStepCover'
+import GoalBankScreen from '../bank/GoalBankScreen'
 
 // ════════════════════════════════════════════════════════════════════════════
 // CONSTANTES
 // ════════════════════════════════════════════════════════════════════════════
 
-const STEPS_FULL = [
-  { id: 1, name: 'Nivel' },
+// ════════════════════════════════════════════════════════════════════════════
+// RECORRIDOS (Gate C)
+// ────────────────────────────────────────────────────────────────────────────
+// Los `id` son IDENTIDAD DE PANTALLA (estables), NO orden. El orden lo define la
+// posición dentro del array de la rama activa.
+//
+// ⚠️ REGLA: toda comparación de avance va por ÍNDICE (stepIndex), NUNCA contra el id
+// crudo. Con recorridos no contiguos, `currentStep < 6` fallaría apenas aparezca un
+// paso con id mayor (el de Peso, id 7, llega en el resto del gate).
+// ════════════════════════════════════════════════════════════════════════════
+const STEP_FLOW = { id: 1, name: 'Tipo' } // bifurcación Meta Libre / Meta Definida
+const STEP_SCOPE = { id: 9, name: 'Alcance' } // nivel + destinatario (StepSelectLevel)
+const STEP_WEIGHT = { id: 7, name: 'Peso' } // slider hero, SOLO metas individuales
+
+/**
+ * Inserta el paso de Peso (7, slider hero) ANTES de Confirmar (6), solo si la meta
+ * es INDIVIDUAL. Una meta COMPANY/AREA tiene weight inerte (no cuenta para el 100% de
+ * nadie, hallazgo Gate B) → no le corresponde un paso de peso.
+ */
+function withWeightStep(base: { id: number; name: string }[], isIndividual: boolean) {
+  if (!isIndividual) return base
+  const i = base.findIndex((s) => s.id === 6)
+  if (i === -1) return base
+  return [...base.slice(0, i), STEP_WEIGHT, ...base.slice(i)]
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// RECORRIDO CONDICIONAL POR ROL (Gate C — arquitectura interina, ver PROGRESS).
+// El recorrido lo decide el ROL, no una elección del usuario:
+//
+//   ESTRATEGA (goals:create:strategic) → Alcance directo (crea COMPANY/AREA/
+//     INDIVIDUAL heredables). SIN bifurcación: no le corresponde asignar del banco.
+//
+//   JEFE COMÚN (no-Estratega) → bifurcación Meta Libre / Meta Definida. Su meta es
+//     siempre INDIVIDUAL. Meta Libre pasa por Alcance, que para él colapsa a "elegí
+//     al colaborador" (una sola opción, auto-seleccionada en StepSelectLevel) → NO se
+//     ve como una repetición de la bifurcación. Meta Definida → banco (paso 8, pendiente).
+//
+// Así se resuelve de raíz el defecto reportado (bifurcación + Alcance percibidas como
+// la misma pantalla): ningún rol ve las dos pantallas de "tarjetas" seguidas.
+// ────────────────────────────────────────────────────────────────────────────
+
+// Estratega: Alcance → resto. Sin bifurcación.
+const STEPS_ESTRATEGA = [
+  STEP_SCOPE,
   { id: 2, name: 'Definición' },
   { id: 3, name: 'Medición' },
   { id: 4, name: 'Tiempo' },
-  { id: 5, name: 'Cascada' },
+  { id: 5, name: 'Alineación' },
   { id: 6, name: 'Confirmar' },
 ]
 
+// Jefe común, Meta Libre: bifurcación → Alcance (solo picker de empleado) → resto.
+const STEPS_JEFE_LIBRE = [
+  STEP_FLOW,
+  STEP_SCOPE,
+  { id: 2, name: 'Definición' },
+  { id: 3, name: 'Medición' },
+  { id: 4, name: 'Tiempo' },
+  { id: 5, name: 'Alineación' },
+  { id: 6, name: 'Confirmar' },
+]
+
+// Jefe común, Meta Definida: bifurcación → banco (paso 8, llega en el resto de Gate C).
+const STEPS_JEFE_DEFINIDA = [STEP_FLOW, { id: 8, name: 'Banco' }]
+
+// Entrada directa con employeeId (desde la ficha): sin bifurcación ni alcance —
+// ya se sabe para quién es. Aplica a cualquier rol.
 const STEPS_INDIVIDUAL = [
   { id: 2, name: 'Definición' },
   { id: 3, name: 'Medición' },
   { id: 4, name: 'Tiempo' },
-  { id: 5, name: 'Cascada' },
+  { id: 5, name: 'Alineación' },
   { id: 6, name: 'Confirmar' },
 ]
 
+// El "Paso N de M" YA NO se escribe a mano acá: se deriva del array de la rama activa
+// (antes decía "de 6" en cada portada, y con Meta Definida —2 pasos— mentiría).
 const STEP_COVERS: Record<number, {
-  step: string
   title: string
   subtitle: string
   cta: string
   smartTip: string
 }> = {
   1: {
-    step: 'Paso 1 de 6',
+    title: '¿Cómo querés crear esta meta?',
+    subtitle: 'Escribí una meta propia, o asigná una que el equipo estratégico ya definió.',
+    cta: 'Elegir',
+    smartTip: 'Las metas definidas traen su indicador consolidado: solo elegís el peso.'
+  },
+  9: {
     title: '¿Dónde impacta esta meta?',
     subtitle: 'Define el alcance: ¿es para toda la empresa, un área, o una persona específica?',
     cta: 'Definir Alcance',
     smartTip: 'SMART: Empieza definiendo a quién aplica.'
   },
   2: {
-    step: 'Paso 2 de 6',
     title: 'Define el objetivo',
     subtitle: 'Tu misión: describir qué debe lograr. Sé claro y específico.',
     cta: 'Comenzar',
     smartTip: 'S: Específica. Evita "mejorar". Di exactamente qué.'
   },
   3: {
-    step: 'Paso 3 de 6',
     title: 'Define la medición',
     subtitle: 'Tu misión: establecer cómo sabrás que se logró. Sin número, no hay meta.',
     cta: 'Continuar',
     smartTip: 'M: Medible. Ejemplo: "Aumentar ventas 20%".'
   },
   4: {
-    step: 'Paso 4 de 6',
     title: 'Define el plazo',
     subtitle: 'Tu misión: establecer inicio y cierre. Sin fecha, las metas se postergan.',
     cta: 'Continuar',
     smartTip: 'T: Temporal. Una meta sin fecha no se cumple.'
   },
   5: {
-    step: 'Paso 5 de 6',
     title: 'Conecta con la estrategia',
     subtitle: 'Tu misión: vincular a un objetivo mayor. Una meta conectada tiene más impacto.',
     cta: 'Continuar',
     smartTip: 'R: Relevante. ¿Aporta a los objetivos del negocio?'
   },
+  7: {
+    title: 'Define el peso',
+    subtitle: 'Cuánto pesa esta meta en la evaluación del colaborador. El máximo es su peso libre en el ciclo.',
+    cta: 'Continuar',
+    smartTip: 'El total de metas de una persona no puede superar el 100%.'
+  },
   6: {
-    step: 'Último paso',
     title: 'Confirma y activa',
     subtitle: 'Revisa los datos. Al guardar, el colaborador será notificado.',
     cta: 'Crear Meta',
@@ -99,6 +171,12 @@ const STEP_COVERS: Record<number, {
 // ════════════════════════════════════════════════════════════════════════════
 
 export interface GoalWizardData {
+  // Paso 1 (Gate C): bifurcación Meta Libre / Meta Definida.
+  // `flow` decide el recorrido del JEFE COMÚN (ver STEPS_JEFE_LIBRE / STEPS_JEFE_DEFINIDA).
+  // `bankLevel` solo aplica si flow === 'DEFINIDA'.
+  flow?: 'LIBRE' | 'DEFINIDA'
+  bankLevel?: 'COMPANY' | 'AREA'
+
   // Paso 1: Tipo/Nivel
   level: 'COMPANY' | 'AREA' | 'INDIVIDUAL' | ''
   employeeId?: string
@@ -108,6 +186,10 @@ export interface GoalWizardData {
   title: string
   description: string
   type: 'KPI' | 'OBJECTIVE' | 'KEY_RESULT' | 'PROJECT'
+
+  // Categoría (Gate C / B). family = enum GoalFamily; subfamily = String validado.
+  family?: 'NEGOCIO_E_INGRESOS' | 'CLIENTES_Y_USUARIOS' | 'OPERACION_Y_EFICIENCIA' | 'CULTURA_Y_PERSONAS'
+  subfamily?: string
 
   // Paso 3: Medicion
   metricType: 'PERCENTAGE' | 'CURRENCY' | 'NUMBER' | 'BINARY'
@@ -186,7 +268,17 @@ interface CreateGoalWizardProps {
 
 export default function CreateGoalWizard({ employeeId: initialEmployeeId, context }: CreateGoalWizardProps) {
   const router = useRouter()
-  const [currentStep, setCurrentStep] = useState(initialEmployeeId ? 2 : 1)
+
+  // ── Rol del usuario (client-side) para decidir el recorrido ──
+  // isEstratega usa la MISMA hasPermission que el servidor (post-split): sin espejo.
+  const currentUser = getCurrentUser()
+  const currentRole = (currentUser as any)?.userRole || currentUser?.role || null
+  const isEstratega = hasPermission(currentRole, 'goals:create:strategic')
+
+  // Paso inicial = primer paso del recorrido de la rama activa:
+  //   con employeeId → 2 (Definición) · Estratega → 9 (Alcance) · jefe común → 1 (bifurcación)
+  const initialStepId = initialEmployeeId ? 2 : isEstratega ? 9 : 1
+  const [currentStep, setCurrentStep] = useState(initialStepId)
   const [data, setData] = useState<GoalWizardData>(() => {
     if (initialEmployeeId) {
       return { ...initialData, level: 'INDIVIDUAL', employeeId: initialEmployeeId }
@@ -218,18 +310,42 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
   } | null>(null)
   const [loadingCycle, setLoadingCycle] = useState(true)
 
-  // Peso disponible
-  const availableWeight = employeeData
+  // Peso disponible REAL del colaborador (post-Gate A). FAIL-CLOSED: null si aún no
+  // hay dato — StepAssignWeight muestra error, NUNCA asume 100 (mismo criterio Gate A).
+  const availableWeight: number | null = employeeData
     ? 100 - employeeData.assignmentStatus.totalWeight
-    : 100
+    : null
 
   // Steps dinámicos
-  const steps = initialEmployeeId ? STEPS_INDIVIDUAL : STEPS_FULL
-  const firstStepId = initialEmployeeId ? 2 : 1
+  // ── Recorrido de la RAMA ACTIVA: fuente de verdad de toda la navegación ──
+  const steps = useMemo(() => {
+    // ficha y jefe común crean SIEMPRE metas individuales → tienen paso de Peso.
+    if (initialEmployeeId) return withWeightStep(STEPS_INDIVIDUAL, true)
+    if (isEstratega) {
+      // el Estratega tiene Peso solo si eligió nivel INDIVIDUAL (COMPANY/AREA = peso inerte)
+      return withWeightStep(STEPS_ESTRATEGA, data.level === 'INDIVIDUAL')
+    }
+    // jefe común: la bifurcación decide Meta Libre vs Definida
+    if (data.flow === 'DEFINIDA') return STEPS_JEFE_DEFINIDA // banco maneja su propio peso
+    return withWeightStep(STEPS_JEFE_LIBRE, true) // Meta Libre → individual → con Peso
+  }, [initialEmployeeId, isEstratega, data.flow, data.level])
+
+  // Índice del paso actual DENTRO de la rama. TODO se compara contra esto, nunca
+  // contra el id crudo (los ids son identidad de pantalla, no orden).
+  const stepIndex = useMemo(() => {
+    const i = steps.findIndex((s) => s.id === currentStep)
+    return i === -1 ? 0 : i
+  }, [steps, currentStep])
+
+  const isFirstStep = stepIndex === 0
+  const isLastStep = stepIndex === steps.length - 1
+
+  // Empleado destino: ficha (initialEmployeeId) o el que el jefe elige en Alcance.
+  const targetEmployeeId = data.employeeId || initialEmployeeId
 
   // Cargar datos del empleado
   useEffect(() => {
-    if (!initialEmployeeId) return
+    if (!targetEmployeeId) return
 
     setIsLoadingEmployee(true)
     const token = localStorage.getItem('focalizahr_token')
@@ -241,7 +357,7 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
       .then(res => res.json())
       .then(res => {
         if (res.success && res.data) {
-          const employee = res.data.find((e: any) => e.id === initialEmployeeId)
+          const employee = res.data.find((e: any) => e.id === targetEmployeeId)
           if (employee) {
             setEmployeeData({
               id: employee.id,
@@ -253,7 +369,10 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
       })
       .catch(err => console.error('Error loading employee:', err))
       .finally(() => setIsLoadingEmployee(false))
-  }, [initialEmployeeId])
+    // targetEmployeeId cubre las 2 entradas: ficha (initialEmployeeId) y Meta Libre
+    // (el jefe elige al colaborador en Alcance → data.employeeId). Así el slider hero
+    // recibe el peso disponible REAL en ambas.
+  }, [targetEmployeeId])
 
   // Actualizar datos
   const updateData = useCallback((updates: Partial<GoalWizardData>) => {
@@ -287,14 +406,26 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
   const canProceed = useMemo(() => {
     switch (currentStep) {
       case 1:
+        // Bifurcación (Gate C). Meta Definida exige además elegir el banco (Corp/Área).
+        if (!data.flow) return false
+        if (data.flow === 'DEFINIDA' && !data.bankLevel) return false
+        return true
+      case 9:
+        // Alcance (el antiguo paso 1): nivel + destinatario. Lógica intacta.
         if (!data.level) return false
         if (data.level === 'INDIVIDUAL' && !data.employeeId) return false
         if (data.level === 'AREA' && !data.departmentId) return false
         return true
       case 2:
-        return data.title.trim().length >= 3
+        // Título + categoría (Gate C): la Familia es obligatoria (de ella sale el
+        // ejemplo del paso 3 y la meta debe ser visible en reportes agregados).
+        return data.title.trim().length >= 3 && !!data.family && !!data.subfamily
       case 3:
-        return data.targetValue > data.startValue || data.metricType === 'BINARY'
+        // Medición + "¿Cómo se mide?" obligatorio (mínimo 10, guardarraíl anti-vacío).
+        return (
+          (data.targetValue > data.startValue || data.metricType === 'BINARY') &&
+          data.description.trim().length >= 10
+        )
       case 4:
         // Gate E: sin ciclo activo (ya resuelto) la creación se bloquea.
         if (!loadingCycle && !activeCycle) return false
@@ -309,32 +440,51 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
         }
         return true
       case 5:
-        return true // Opcional
+        return true // Alineación: opcional
+      case 7:
+        // Peso: el slider ya topea en availableWeight; esto es el cinturón. Fail-closed
+        // si no hay dato de disponibilidad (no se puede asignar a ciegas).
+        return availableWeight !== null && data.weight <= availableWeight
       case 6:
         return true
       default:
         return false
     }
-  }, [currentStep, data, activeCycle, loadingCycle])
+  }, [currentStep, data, activeCycle, loadingCycle, availableWeight])
 
-  // Navegacion con cover/form
+  // ── Navegación con cover/form — SIEMPRE por índice, nunca por id crudo ──
   const goNext = useCallback(() => {
+    // Fase 1 → 2 del MISMO paso: portada → formulario
     if (stepPhase === 'cover') {
       setStepPhase('form')
-    } else if (canProceed && currentStep < 6) {
-      setCurrentStep(prev => prev + 1)
-      setStepPhase('cover')
+      return
     }
-  }, [canProceed, currentStep, stepPhase])
+    if (!canProceed) return
+    // El último paso NO avanza: su CTA es "Crear Meta" (handleSubmit), no "Continuar"
+    if (isLastStep) return
+
+    // Cuando el paso 1 setea data.flow, `steps` se recalcula y el siguiente índice ya
+    // apunta al recorrido correcto (Banco o Alcance) — la bifurcación no necesita
+    // ningún caso especial.
+    const next = steps[stepIndex + 1]
+    setCurrentStep(next.id)
+    // El banco (paso 8) es autocontenido (su propia portada/header y botones): se
+    // entra directo al form, sin la portada del wizard.
+    setStepPhase(next.id === 8 ? 'form' : 'cover')
+  }, [stepPhase, canProceed, isLastStep, steps, stepIndex])
 
   const goBack = useCallback(() => {
+    // Formulario → portada del mismo paso (comportamiento original, se preserva)
     if (stepPhase === 'form') {
       setStepPhase('cover')
-    } else if (currentStep > firstStepId) {
-      setCurrentStep(prev => prev - 1)
-      setStepPhase('form')
+      return
     }
-  }, [currentStep, firstStepId, stepPhase])
+    if (isFirstStep) return
+
+    const prev = steps[stepIndex - 1]
+    setCurrentStep(prev.id)
+    setStepPhase('form') // al volver se entra directo al formulario: la portada ya la vio
+  }, [stepPhase, isFirstStep, steps, stepIndex])
 
   // Entrar al wizard desde GoalStepCover (opción A: skip step cover)
   const handleEnterWizard = useCallback(() => {
@@ -368,6 +518,9 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
         parentId: data.parentId || undefined,
         weight: data.weight,
         isLeaderGoal: data.isLeaderGoal || false,
+        // Camino D: la categoría la ELIGE el jefe (FamilySubfamilyPicker), no se hereda.
+        family: data.family || undefined,
+        subfamily: data.subfamily || undefined,
       }
 
       const res = await fetch('/api/goals', {
@@ -406,7 +559,8 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
           animate={{ opacity: 1 }}
           className="text-sm font-semibold text-cyan-400 tracking-widest uppercase mb-4"
         >
-          {cover.step}
+          {/* Derivado, no hardcodeado: el último paso dice "Último paso". */}
+          {isLastStep ? 'Último paso' : `Paso ${stepIndex + 1} de ${steps.length}`}
         </motion.span>
 
         {/* Título */}
@@ -462,14 +616,8 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
   }, [currentStep, goNext])
 
   // Nombres de paso para header del form
-  const stepNames: Record<number, string> = {
-    1: 'Alcance',
-    2: 'Definición',
-    3: 'Medición',
-    4: 'Tiempo',
-    5: 'Cascada',
-    6: 'Confirmación'
-  }
+  // (stepNames eliminado: el nombre del paso ahora sale del array de la rama activa —
+  //  una sola fuente de verdad, en vez de un diccionario paralelo que podía divergir.)
 
   // Renderizar formulario del paso actual
   const renderStepForm = useCallback(() => {
@@ -479,7 +627,9 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
     const stepContent = (() => {
       switch (currentStep) {
         case 1:
-          return <StepSelectLevel {...props} />
+          return <StepChooseFlow {...props} /> // Gate C: bifurcación
+        case 9:
+          return <StepSelectLevel {...props} /> // el antiguo paso 1, intacto
         case 2:
           return <StepDefineGoal {...props} />
         case 3:
@@ -487,9 +637,21 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
         case 4:
           return <StepSetDates {...props} activeCycle={activeCycle} loadingCycle={loadingCycle} />
         case 5:
-          return <StepLinkParent {...props} availableWeight={availableWeight} />
+          // Alineación: solo el vínculo al padre (el peso se mudó al paso 7).
+          return <StepLinkParent {...props} />
+        case 7:
+          return <StepAssignWeight {...props} availableWeight={availableWeight} />
         case 6:
           return <StepConfirm {...props} />
+        case 8:
+          // Banco de metas definidas (Camino B/C). Pantalla autocontenida con su
+          // propio submit (crea 1..N metas individuales) y sus propios botones.
+          return (
+            <GoalBankScreen
+              bankLevel={data.bankLevel!}
+              onDone={() => router.push('/dashboard/metas/equipo')}
+            />
+          )
         default:
           return null
       }
@@ -499,8 +661,9 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
       <div className="flex flex-col">
         {/* Header minimalista del form */}
         <div className="flex items-center justify-between mb-6 px-2">
+          {/* Derivado de la rama activa: antes era "de 6" hardcodeado. */}
           <span className="text-sm font-semibold text-cyan-400">
-            Paso {currentStep} de 6 · {stepNames[currentStep]}
+            Paso {stepIndex + 1} de {steps.length} · {steps[stepIndex]?.name}
           </span>
 
           {/* Tooltip SMART */}
@@ -613,18 +776,18 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
             </div>
           )}
 
-          {/* Navigation - solo en form */}
-          {stepPhase === 'form' && (
+          {/* Navigation - solo en form. El banco (8) trae sus propios botones. */}
+          {stepPhase === 'form' && currentStep !== 8 && (
             <div className="flex justify-between mt-8 pt-6 border-t border-slate-700/50">
               <GhostButton
                 icon={ArrowLeft}
                 onClick={goBack}
-                disabled={currentStep === firstStepId && stepPhase === 'form'}
+                disabled={isFirstStep && stepPhase === 'form'}
               >
                 Atrás
               </GhostButton>
 
-              {currentStep < 6 ? (
+              {!isLastStep ? (
                 <PrimaryButton
                   icon={ArrowRight}
                   iconPosition="right"

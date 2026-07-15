@@ -7,6 +7,7 @@
 
 import { memo, useCallback } from 'react'
 import { cn } from '@/lib/utils'
+import FamilySubfamilyPicker from './FamilySubfamilyPicker'
 import type { GoalWizardData } from './CreateGoalWizard'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -56,13 +57,6 @@ export default memo(function StepDefineGoal({
     [updateData]
   )
 
-  const handleDescriptionChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      updateData({ description: e.target.value })
-    },
-    [updateData]
-  )
-
   const handleTypeSelect = useCallback(
     (value: GoalWizardData['type']) => {
       updateData({ type: value })
@@ -91,20 +85,8 @@ export default memo(function StepDefineGoal({
         </div>
       </div>
 
-      {/* Descripcion */}
-      <div className="space-y-2">
-        <label className="text-sm text-slate-300">
-          Descripcion <span className="text-slate-500">(opcional)</span>
-        </label>
-        <textarea
-          value={data.description}
-          onChange={handleDescriptionChange}
-          placeholder="Contexto adicional, criterios de exito, etc."
-          rows={3}
-          className="fhr-input w-full resize-none"
-          maxLength={500}
-        />
-      </div>
+      {/* Categoría (Gate C, punto 5). El campo "¿Cómo se mide?" se mudó a Medición. */}
+      <FamilySubfamilyPicker data={data} updateData={updateData} />
 
       {/* Tipo */}
       <div className="space-y-2">

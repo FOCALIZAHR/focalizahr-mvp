@@ -31,11 +31,16 @@ export const WizardProgress = memo(function WizardProgress({
   steps,
   currentStep,
 }: WizardProgressProps) {
+  // Gate C — INDEX-BASED: los `id` de los pasos son identidad de PANTALLA, no orden.
+  // Con recorridos no contiguos (…5, 7, 6) comparar ids pintaría el check en el
+  // círculo equivocado y mostraría "7" antes que "6" como número del paso.
+  const currentIndex = steps.findIndex((s) => s.id === currentStep)
+
   return (
     <div className="flex items-center justify-center gap-2 mb-8">
       {steps.map((step, index) => {
-        const isCompleted = step.id < currentStep
-        const isCurrent = step.id === currentStep
+        const isCompleted = index < currentIndex
+        const isCurrent = index === currentIndex
 
         return (
           <div key={step.id} className="flex items-center">
@@ -49,7 +54,7 @@ export const WizardProgress = memo(function WizardProgress({
                 !isCompleted && !isCurrent && 'bg-slate-800 text-slate-500'
               )}
             >
-              {isCompleted ? <Check className="w-4 h-4" /> : step.id}
+              {isCompleted ? <Check className="w-4 h-4" /> : index + 1}
             </div>
 
             {/* Step name (visible on md+) */}

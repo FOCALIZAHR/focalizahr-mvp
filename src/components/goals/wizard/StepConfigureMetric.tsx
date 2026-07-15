@@ -8,8 +8,16 @@
 import { memo, useCallback, useMemo } from 'react'
 import { Percent, DollarSign, Hash, ToggleLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Lightbulb } from 'lucide-react'
 import GoalProgressBar from '../GoalProgressBar'
 import PercentageSlider from '@/components/ui/PercentageSlider'
+import type { GoalFamily } from '@prisma/client'
+import {
+  getMeasurementPlaceholder,
+  getMeasurementExample,
+  isAmbiguous,
+  NEUTRAL_MEASUREMENT_PLACEHOLDER,
+} from '@/lib/constants/goalCategories'
 import type { GoalWizardData } from './CreateGoalWizard'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -227,6 +235,39 @@ export default memo(function StepConfigureMetric({
           status="NOT_STARTED"
           size="sm"
         />
+      </div>
+
+      {/* ¿Cómo se mide? (Gate C, punto 4) — reemplaza "Descripción (opcional)".
+          Vive acá porque el ejemplo depende del metricType, que se elige en este paso.
+          Persiste en Goal.description. Obligatorio (mínimo 10 en canProceed). */}
+      <div className="space-y-2">
+        <label className="text-sm text-slate-300">
+          ¿Cómo se mide el éxito de esta meta? <span className="text-red-400">*</span>
+        </label>
+        <textarea
+          value={data.description}
+          onChange={(e) => updateData({ description: e.target.value })}
+          placeholder={
+            data.family
+              ? getMeasurementPlaceholder(data.family as GoalFamily, data.metricType)
+              : NEUTRAL_MEASUREMENT_PLACEHOLDER
+          }
+          rows={2}
+          className="fhr-input w-full resize-none"
+          maxLength={280}
+        />
+        {data.family && (
+          <p className="text-xs text-slate-400 flex items-start gap-1.5">
+            <Lightbulb className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+            <span>{getMeasurementExample(data.family as GoalFamily, data.metricType)}</span>
+          </p>
+        )}
+        {isAmbiguous(data.description) && (
+          <p className="text-xs text-amber-400">
+            Escribe un indicador claro (ej: % de avance, CLP, N° de eventos) para que tu equipo sepa exactamente cómo se evaluará su trabajo.
+          </p>
+        )}
+        <p className="text-xs text-slate-500">Mínimo 10 caracteres.</p>
       </div>
     </div>
   )

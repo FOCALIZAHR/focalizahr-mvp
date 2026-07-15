@@ -18,6 +18,8 @@ interface PercentageSliderProps {
   showValue?: boolean
   disabled?: boolean
   className?: string
+  /** 'hero': track y thumb más grandes para el paso de peso (Gate C). Default 'default'. */
+  size?: 'default' | 'hero'
 }
 
 export default memo(function PercentageSlider({
@@ -30,6 +32,7 @@ export default memo(function PercentageSlider({
   showValue = true,
   disabled = false,
   className,
+  size = 'default',
 }: PercentageSliderProps) {
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -62,15 +65,16 @@ export default memo(function PercentageSlider({
         onChange={handleChange}
         disabled={disabled}
         className={cn(
-          'w-full h-3 cursor-pointer appearance-none rounded-full transition-all',
+          'w-full cursor-pointer appearance-none rounded-full transition-all',
           '[&::-webkit-slider-thumb]:appearance-none',
-          '[&::-webkit-slider-thumb]:w-5',
-          '[&::-webkit-slider-thumb]:h-5',
           '[&::-webkit-slider-thumb]:bg-cyan-500',
           '[&::-webkit-slider-thumb]:rounded-full',
           '[&::-webkit-slider-thumb]:cursor-pointer',
           '[&::-webkit-slider-thumb]:shadow-lg',
           '[&::-webkit-slider-thumb]:shadow-cyan-500/30',
+          size === 'hero'
+            ? 'h-4 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:h-7'
+            : 'h-3 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5',
           disabled && 'opacity-50 cursor-not-allowed'
         )}
         style={{
