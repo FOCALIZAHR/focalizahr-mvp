@@ -2,7 +2,7 @@
 
 **Fuente de verdad del plan:** `.claude/tasks/SPEC_CLIMA_METAS_INTEGRACION_v1.md`
 **Este doc:** bitácora de avance + resultados de Gate 0 sellados con evidencia.
-**Última actualización:** 2026-07-14
+**Última actualización:** 2026-07-15
 
 > Regla: lo que está acá **NO se re-investiga**. Si una sesión futura duda de un
 > dato, verifica el file:line contra el código — no vuelve a explorar desde cero.
@@ -14,10 +14,10 @@
 **Objetivo de la tarea:** conectar Clima con Metas (que una meta corporativa de categoría
 "Clima" sea encontrable automáticamente) + rediseñar la UX del wizard de creación de metas.
 
-**En curso ahora:** 🟠 **PUNTO 2 de la Auditoría 1 — "¿Cómo se mide?" obligatorio SERVER-SIDE.**
-Investigación hecha, DISEÑO PROPUESTO, esperando 2 decisiones de Victor. NADA de código/schema
-tocado. Sesión cortada por contexto — **retomar desde la sección "PUNTO 2" abajo, no desde el chat.**
-(Clima queda POSTERGADO hasta cerrar Puntos 2 y 3.)
+**En curso ahora:** 🟢 **PUNTO 2 SELLADO (2026-07-15)** — "¿Cómo se mide?" (description) obligatorio
+SERVER-SIDE para KPI de autoría propia, vía campo persistido `Goal.kpiSource`. `db push` aplicado,
+smoke 12/12 (5 casos). Cierra la deuda 4.4 client-only de Gate C. **Siguiente: PUNTO 3.**
+(Clima queda POSTERGADO hasta cerrar Punto 3.) **Commit pendiente de OK de Victor** (código sin commitear).
 
 **Qué queda como deuda anotada (no bloquea nada):**
 - Hallazgos abiertos de peso (PATCH sin revalidar en edición, 500 opacos) — ficha de Metas.
@@ -46,6 +46,7 @@ del wizard ya puede llamar `hasPermission(role, 'goals:create:strategic')` direc
 | **Gate 0 de Gate B** (investigación §3.3) | ✅ **CERRADO** (8 hallazgos, 2026-07-14) |
 | **Gate B** (categoría familia/subfamilia) | ✅ **SELLADO** (`8bf4cdf`, 2026-07-14, smoke 24/24, **db push aplicado**) |
 | **Gate C** (UX wizard) | ✅ **SELLADO** (`2ee07d2` + `f89f68f`, 2026-07-15, smoke 20/20 + 8/8). Recorrido por rol + banco + categoría + peso hero + narrativa 4.6 |
+| **Punto 2** (description obligatoria server-side + `Goal.kpiSource`) | ✅ **SELLADO** (2026-07-15, **db push aplicado**, smoke 12/12). Cierra deuda 4.4 client-only. Commit pend. OK Victor |
 
 ---
 
@@ -77,10 +78,10 @@ recorrido condicional por rol + los 6 puntos del plan §4.
 con 2 desviaciones documentadas como deuda (abajo).
 
 ### ⚠️ Deuda de Gate C (anotada, aprobada, NO arreglada)
-- **4.4 obligatoriedad de `description` es client-only.** El zod (`route.ts:22`) la tiene
-  `optional()`. No es server-side porque el servidor no distingue "Camino D" de "asignación del
-  banco" (ambos `POST /api/goals` `level:INDIVIDUAL`) sin un campo discriminador nuevo. Enforcement
-  server-side rompería el banco. Deuda con razón documentada (Victor aprobó client-only).
+- ~~**4.4 obligatoriedad de `description` es client-only.**~~ ✅ **RESUELTA por el Punto 2
+  (2026-07-15).** El campo discriminador nuevo es `Goal.kpiSource` (OWN/INHERITED): el enforcement
+  server-side vive en `prepareGoalData` gateado por `kpiSource==='OWN'`, así NO rompe el banco
+  (INHERITED no exige). Detalle en la sección "PUNTO 2 — SELLADO" abajo.
 - **4.7 `BulkAssignWizard` sigue editando `targetValue` por persona** (Opción C aprobada). La
   migración `BulkAssignWizard` → `GoalBankScreen` (unificar los 2 caminos de banco) queda como
   **gate futuro**, con 3 capacidades a preservar: subselección de empleados pre-cargada,
@@ -493,9 +494,37 @@ decisiones de negocio de Victor** listadas arriba.
 
 ---
 
-## 🟠 PUNTO 2 (Auditoría 1) — "¿Cómo se mide?" obligatorio SERVER-SIDE — INVESTIGACIÓN + DISEÑO (2026-07-15)
+## ✅ PUNTO 2 (Auditoría 1) — "¿Cómo se mide?" obligatorio SERVER-SIDE — SELLADO (2026-07-15)
 
-> **ESTADO: investigación completa, diseño propuesto, NADA implementado. Esperando 2 decisiones de Victor (abajo). Retomar desde acá, no desde el chat.**
+> **ESTADO: IMPLEMENTADO Y SELLADO. `db push` aplicado (columna `kpi_source` en prod), tsc + build
+> verdes, smoke 12/12 (5 casos). Commit PENDIENTE de OK de Victor (código sin commitear todavía).**
+>
+> **Decisiones de Victor tomadas:** (1) `kpiSource` como enum Prisma persistido + `db push` → SÍ.
+> (2) Ripple BulkAssign rama 'new' → tocarlo (opción a): manda `'OWN'` y exige description no vacía.
+> (3) Piso de longitud → ELIMINADO. Obligatorio = no vacío, sin mínimo de caracteres (los 16 ejemplos
+> por Familia×metricType ya guían la calidad).
+>
+> ### AS-BUILT (file:line reales)
+> - **Schema:** `enum GoalKpiSource { OWN INHERITED }` + `Goal.kpiSource GoalKpiSource?` nullable
+>   (`schema.prisma`, `@map("kpi_source")`). Aditivo: metas previas = null = no exige nada.
+> - **`CreateGoalInput.kpiSource: GoalKpiSource`** REQUERIDO sin default (`GoalsService.ts`) → cerrojo TS.
+> - `createCorporateGoal` / `createManagerGoal`: `Omit<…,'kpiSource'>` + inyectan `'OWN'`.
+> - `createFromDevelopmentGoal`: check explícito sobre la description RESUELTA + persiste `'OWN'`.
+> - `cascadeGoal`: mantiene `kpiSource` requerido en su input (el único ambiguo). Callers:
+>   `route.ts` (del request), `GoalRulesEngine.ts:152` (`'INHERITED'`, Camino A auto).
+> - **Validación:** `validateDescriptionForKpi(kpiSource, description)` en `prepareGoalData`
+>   (`if OWN && !description?.trim() → throw GoalDescriptionRequiredError`). Persiste `kpiSource`.
+> - **HTTP:** `GoalDescriptionRequiredError` (code `GOAL_DESCRIPTION_REQUIRED`) → 400 en
+>   `goalsErrorResponse.ts`. zod `POST /api/goals`: `kpiSource: z.enum(['OWN','INHERITED'])` requerido.
+> - **Clientes (3 POST a /api/goals):** `bankPayload.ts` → INHERITED; `CreateGoalWizard.tsx` (Camino D)
+>   → OWN + `canProceed` case 3 pasó de `≥10` a no-vacío; `BulkAssignWizard.tsx` → INHERITED/OWN por
+>   rama + `canProceed` rama 'new' exige no-vacío; `StepSelectGoal.tsx:144` label "¿Cómo se mide? *"
+>   (solo en rama 'new', confirmado). Smoke temporal: `prisma/scripts/smoke-punto2-kpisource.ts`
+>   (untracked, borrar al commitear el sello).
+> - **Consecuencia:** `createCorporateGoal`/`createManagerGoal` ahora exigen description no vacía en
+>   runtime (comportamiento correcto de spec 4.4). Sin regresión productiva (wizard + bank ya la mandan).
+>
+> ### Lo de abajo es el diseño previo (histórico) — YA implementado tal cual. No re-decidir.
 
 ### El problema exacto
 `POST /api/goals` recibe metas INDIVIDUAL de 2 caminos en el mismo endpoint. La regla:
