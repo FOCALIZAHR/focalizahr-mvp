@@ -45,6 +45,12 @@ const createGoalSchema = z.object({
   // Cascada (opcional)
   parentId: z.string().optional(),
 
+  // Autoría del KPI (Punto 2) — REQUERIDO, sin default. Cerrojo runtime que
+  // complementa el de TS: un request directo sin declarar autoría = 400.
+  // El servidor decide qué hacer con él: cascadeGoal lo usa; createCorporate/
+  // createManager lo re-inyectan como 'OWN' internamente.
+  kpiSource: z.enum(['OWN', 'INHERITED']),
+
   // PDI link (opcional)
   linkedDevGoalId: z.string().optional(),
 

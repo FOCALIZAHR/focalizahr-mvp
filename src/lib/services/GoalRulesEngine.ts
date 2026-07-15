@@ -166,6 +166,8 @@ export class GoalRulesEngine {
           periodQuarter: rule.sourceGoal.periodQuarter ?? undefined,
           weight: rule.assignedWeight,
           isLeaderGoal: rule.isLeaderOnly,
+          // Punto 2 — Camino A automático: el KPI se HEREDA de la corporativa origen.
+          kpiSource: 'INHERITED',
           // ═══ Gate B — Camino A: la categoría se HEREDA de la corporativa origen ═══
           // Sin preguntar y sin excepción: este camino es 100% automático, el jefe no
           // interviene en nada de esta meta.

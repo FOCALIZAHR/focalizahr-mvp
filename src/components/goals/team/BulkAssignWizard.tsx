@@ -191,7 +191,13 @@ export default function BulkAssignWizard({ employees, onClose, onComplete }: Bul
         return data.employeeIds.length > 0
       case 2:
         if (data.goalSource === 'cascade') return !!data.parentGoalId
-        return !!data.newGoalTitle && data.newGoalTitle.length >= 3
+        // Rama 'new' (Punto 2): crea+asigna un KPI propio (OWN) → "¿Cómo se mide?"
+        // obligatorio, no vacío (espejo del servidor).
+        return (
+          !!data.newGoalTitle &&
+          data.newGoalTitle.length >= 3 &&
+          !!data.newGoalDescription?.trim()
+        )
       case 3:
         return data.employeeIds.every(id =>
           data.targets[id]?.targetValue !== undefined &&
@@ -243,6 +249,9 @@ export default function BulkAssignWizard({ employees, onClose, onComplete }: Bul
           level: 'INDIVIDUAL' as const,
           employeeId,
           parentId: data.parentGoalId || undefined,
+          // Punto 2: 'cascade' hereda el KPI del padre (INHERITED); 'new' crea un KPI
+          // propio en lote (OWN → exige description no vacía, validada en canProceed).
+          kpiSource: data.goalSource === 'cascade' ? ('INHERITED' as const) : ('OWN' as const),
           targetValue: data.targets[employeeId]?.targetValue || 100,
           unit: data.targets[employeeId]?.unit || '%',
           weight: data.weights[employeeId] || 0,

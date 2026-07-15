@@ -2879,6 +2879,16 @@ model Goal {
   description     String?  @db.Text
   type            GoalType @default(KPI)
 
+  // Autoría del KPI (Punto 2). Responde "¿el creador escribió su propio KPI (OWN)
+  // o lo heredó de un padre ya existente (INHERITED)?" — eje ORTOGONAL a originType
+  // (que responde "¿tiene padre / cómo nació?"). Necesario porque el router de
+  // POST /api/goals enruta por presencia de parentId, y un Camino D que se ALINEA a
+  // un padre de referencia (spec 4.3) entra por cascadeGoal siendo autoría propia.
+  // Solo OWN exige description ("¿Cómo se mide?") en el servidor (GoalsService).
+  // Nullable: aditivo — las metas anteriores a este punto quedan null = autoría
+  // desconocida = no se les exige nada (mismo patrón que family/goalCycleId).
+  kpiSource       GoalKpiSource? @map("kpi_source")
+
   // ────────────────────────────────────────────────────────────────────────────
   // 3b. CATEGORÍA DE CONTENIDO (Gate B) — de QUÉ trata la meta.
   //
@@ -3245,6 +3255,11 @@ enum GoalLevel {
 enum GoalOriginType {
   STRATEGIC_CASCADE   // Viene de arriba (cascadeo)
   MANAGER_CREATED     // Nace localmente (jefe crea)
+}
+
+enum GoalKpiSource {
+  OWN         // El creador escribió su propio KPI → exige "¿Cómo se mide?"
+  INHERITED   // El KPI viene copiado/heredado de un padre → no exige description
 }
 
 enum GoalType {

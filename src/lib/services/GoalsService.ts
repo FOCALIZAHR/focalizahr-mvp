@@ -13,6 +13,7 @@ import {
   GoalStatus,
   GoalAlertType,
   GoalFamily,
+  GoalKpiSource,
   Prisma
 } from '@prisma/client'
 import { GoalCycleClosedError, GoalCycleValidationError, GoalCycleService } from './GoalCycleService'
@@ -65,6 +66,13 @@ export class GoalKpiRangeError extends Error {
   constructor(public readonly startValue: number, public readonly targetValue: number) {
     super(`El objetivo (${targetValue}) debe ser distinto del valor inicial (${startValue})`)
     this.name = 'GoalKpiRangeError'
+  }
+}
+export class GoalDescriptionRequiredError extends Error {
+  readonly code = 'GOAL_DESCRIPTION_REQUIRED'
+  constructor() {
+    super('Explica cómo se mide el éxito de esta meta antes de crearla')
+    this.name = 'GoalDescriptionRequiredError'
   }
 }
 export class GoalCategoryError extends Error {
@@ -153,6 +161,12 @@ interface CreateGoalInput {
   type?: GoalType
   level: GoalLevel
   originType: GoalOriginType
+
+  // Autoría del KPI (Punto 2). REQUERIDO sin default: fuerza a cada creador a
+  // declarar si el KPI es propio (OWN → exige description) o heredado (INHERITED).
+  // Mismo patrón de "campo required que los creadores auto-conscientes inyectan"
+  // que originType. cascadeGoal es el ÚNICO ambiguo → lo exige en su input.
+  kpiSource: GoalKpiSource
 
   // Propiedad
   employeeId?: string
@@ -245,11 +259,12 @@ export class GoalsService {
    * Crear meta corporativa (Nivel 0)
    * Siempre isAligned: true, isOrphan: false
    */
-  static async createCorporateGoal(input: Omit<CreateGoalInput, 'level' | 'originType' | 'parentId'>): Promise<Goal> {
+  static async createCorporateGoal(input: Omit<CreateGoalInput, 'level' | 'originType' | 'parentId' | 'kpiSource'>): Promise<Goal> {
     // Validar duplicado corporativo
     await this.validateCompanyAreaDuplicate(input.accountId, input.title, 'COMPANY', input.periodYear)
 
-    const data = this.prepareGoalData(input)
+    // El Estratega ESCRIBE su propio KPI corporativo → OWN (exige "¿Cómo se mide?").
+    const data = this.prepareGoalData({ ...input, kpiSource: 'OWN' })
     data.level = 'COMPANY'
     data.originType = 'STRATEGIC_CASCADE'
     data.isAligned = true
@@ -301,14 +316,15 @@ export class GoalsService {
   /**
    * Crear meta de jefe (sin padre, válida pero no alineada)
    */
-  static async createManagerGoal(input: Omit<CreateGoalInput, 'originType' | 'parentId'>): Promise<Goal> {
+  static async createManagerGoal(input: Omit<CreateGoalInput, 'originType' | 'parentId' | 'kpiSource'>): Promise<Goal> {
     // Validaciones si es meta individual (tiene employeeId)
     if (input.employeeId) {
       await this.validateGoalLimit(input.accountId, input.employeeId)
       await this.validateTotalWeight(input.accountId, input.employeeId, input.weight || 0)
     }
 
-    const data = this.prepareGoalData(input)
+    // El jefe ESCRIBE su propio KPI (Camino D sin padre) → OWN.
+    const data = this.prepareGoalData({ ...input, kpiSource: 'OWN' })
     data.originType = 'MANAGER_CREATED'
     data.isAligned = false
     data.isOrphan = true
@@ -898,14 +914,21 @@ export class GoalsService {
       throw new Error('Este objetivo ya tiene una meta vinculada')
     }
 
-    // 4. Crear la meta con la conexión
+    // 4. Crear la meta con la conexión.
+    // Punto 2: este creador NO pasa por prepareGoalData, así que replica el check.
+    // El KPI lo escribe la persona (deriva de su PDI) → OWN. La description RESUELTA
+    // (input o el default derivado del PDI) debe ser no vacía.
+    const resolvedDescription = input.description?.trim() || `Meta derivada de PDI: ${devGoal.title}`
+    this.validateDescriptionForKpi('OWN', resolvedDescription)
+
     const created = await prisma.goal.create({
       data: {
         accountId,
         employeeId,
         createdById,
         title: input.title,
-        description: input.description || `Meta derivada de PDI: ${devGoal.title}`,
+        description: resolvedDescription,
+        kpiSource: 'OWN',
         level: 'INDIVIDUAL',
         type: 'KPI',
         originType: 'MANAGER_CREATED',
@@ -1599,6 +1622,12 @@ export class GoalsService {
     // (createFromDevelopmentGoal) la llama por su cuenta.
     this.validateKpiRange(input.metricType, input.startValue, input.targetValue)
 
+    // Punto 2: "¿Cómo se mide?" obligatorio SOLO cuando el KPI es autoría propia
+    // (OWN). No exige mínimo de longitud — cualquier texto no vacío pasa; los
+    // ejemplos por Familia×metricType ya guían la calidad. INHERITED y null (metas
+    // sin provenance) no exigen: leen el KPI del padre.
+    this.validateDescriptionForKpi(input.kpiSource, input.description)
+
     // Gate B: `subfamily` es String en la base (no enum) → ESTA es la única puerta
     // que impide que entren valores sueltos o variantes de tipeo.
     this.validateCategory(input.family, input.subfamily)
@@ -1642,6 +1671,20 @@ export class GoalsService {
       // legítima (todas las anteriores a este gate lo están).
       family: input.family,
       subfamily: input.subfamily,
+
+      // Autoría del KPI (Punto 2). Persistido para auditoría posterior.
+      kpiSource: input.kpiSource ?? null,
+    }
+  }
+
+  /**
+   * Punto 2 — "¿Cómo se mide?" (description) obligatorio SOLO para KPI de autoría
+   * propia (OWN). Obligatorio = no vacío; SIN piso de longitud. INHERITED y
+   * undefined (provenance desconocida) no exigen.
+   */
+  private static validateDescriptionForKpi(kpiSource: GoalKpiSource | undefined, description?: string): void {
+    if (kpiSource === 'OWN' && !description?.trim()) {
+      throw new GoalDescriptionRequiredError()
     }
   }
 

@@ -69,6 +69,9 @@ export function buildBankPayload(
     level: 'INDIVIDUAL',
     employeeId,
     parentId: parent.id,
+    // Punto 2 — asignación desde el banco: el KPI se HEREDA del padre (no se le pide
+    // description al jefe). INHERITED = la obligatoriedad de "¿Cómo se mide?" no aplica.
+    kpiSource: 'INHERITED',
     // KPI copiado del padre — NO se le pide al jefe
     title: parent.title,
     type: parent.type,

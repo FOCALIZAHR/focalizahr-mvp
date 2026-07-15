@@ -141,11 +141,13 @@ export default memo(function StepSelectGoal({
             />
           </div>
           <div>
-            <label className="fhr-label mb-1.5 block">Descripción (opcional)</label>
+            <label className="fhr-label mb-1.5 block">
+              ¿Cómo se mide el éxito de esta meta? <span className="text-red-400">*</span>
+            </label>
             <textarea
               value={data.newGoalDescription || ''}
               onChange={e => updateData({ newGoalDescription: e.target.value })}
-              placeholder="Detalla el objetivo y cómo se medirá"
+              placeholder="Ej: % de vacantes críticas cerradas en menos de 15 días"
               className="fhr-input w-full min-h-[80px] resize-none"
               rows={3}
             />

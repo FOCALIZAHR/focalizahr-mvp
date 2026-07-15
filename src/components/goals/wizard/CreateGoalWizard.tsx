@@ -421,10 +421,11 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
         // ejemplo del paso 3 y la meta debe ser visible en reportes agregados).
         return data.title.trim().length >= 3 && !!data.family && !!data.subfamily
       case 3:
-        // Medición + "¿Cómo se mide?" obligatorio (mínimo 10, guardarraíl anti-vacío).
+        // Medición + "¿Cómo se mide?" obligatorio: NO vacío, sin piso de longitud
+        // (espejo del servidor, Punto 2). Los ejemplos por Familia×metricType guían.
         return (
           (data.targetValue > data.startValue || data.metricType === 'BINARY') &&
-          data.description.trim().length >= 10
+          data.description.trim().length > 0
         )
       case 4:
         // Gate E: sin ciclo activo (ya resuelto) la creación se bloquea.
@@ -518,6 +519,9 @@ export default function CreateGoalWizard({ employeeId: initialEmployeeId, contex
         parentId: data.parentId || undefined,
         weight: data.weight,
         isLeaderGoal: data.isLeaderGoal || false,
+        // Camino D (Meta Libre): el jefe ESCRIBE su propio KPI → OWN, aun cuando se
+        // ALINEE a un padre de referencia (que igual manda parentId → cascadeGoal).
+        kpiSource: 'OWN' as const,
         // Camino D: la categoría la ELIGE el jefe (FamilySubfamilyPicker), no se hereda.
         family: data.family || undefined,
         subfamily: data.subfamily || undefined,
