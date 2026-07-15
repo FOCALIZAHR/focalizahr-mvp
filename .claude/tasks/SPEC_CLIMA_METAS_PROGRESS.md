@@ -14,9 +14,10 @@
 **Objetivo de la tarea:** conectar Clima con Metas (que una meta corporativa de categoría
 "Clima" sea encontrable automáticamente) + rediseñar la UX del wizard de creación de metas.
 
-**En curso ahora:** ✅ **NADA — el proyecto Clima × Metas está COMPLETO (Gates A, B, C sellados).**
-Próximo paso posible: la integración real del lado de Clima (que el módulo de Clima consuma
-`findActiveStrategicGoal` / `getClimaBaseline` en su UI), que es otro proyecto.
+**En curso ahora:** 🟠 **PUNTO 2 de la Auditoría 1 — "¿Cómo se mide?" obligatorio SERVER-SIDE.**
+Investigación hecha, DISEÑO PROPUESTO, esperando 2 decisiones de Victor. NADA de código/schema
+tocado. Sesión cortada por contexto — **retomar desde la sección "PUNTO 2" abajo, no desde el chat.**
+(Clima queda POSTERGADO hasta cerrar Puntos 2 y 3.)
 
 **Qué queda como deuda anotada (no bloquea nada):**
 - Hallazgos abiertos de peso (PATCH sin revalidar en edición, 500 opacos) — ficha de Metas.
@@ -489,3 +490,79 @@ infracción automáticamente: sus metas son del ciclo cerrado y ya no cuentan.
 cerrar los 4 puntos abiertos de §3.3 (aditividad de `family`/`subfamily`, PDI fuera de
 alcance, `/dashboard/metas/estrategia`, filtro departamental del banco) y **las 4
 decisiones de negocio de Victor** listadas arriba.
+
+---
+
+## 🟠 PUNTO 2 (Auditoría 1) — "¿Cómo se mide?" obligatorio SERVER-SIDE — INVESTIGACIÓN + DISEÑO (2026-07-15)
+
+> **ESTADO: investigación completa, diseño propuesto, NADA implementado. Esperando 2 decisiones de Victor (abajo). Retomar desde acá, no desde el chat.**
+
+### El problema exacto
+`POST /api/goals` recibe metas INDIVIDUAL de 2 caminos en el mismo endpoint. La regla:
+exigir `description` (mín. 10, "¿Cómo se mide?") **SIEMPRE que el creador escribió su propio
+KPI**; NO exigirla cuando el KPI viene copiado/heredado de un padre (banco / cascada auto).
+Hoy la obligatoriedad es SOLO cliente (`canProceed`), no servidor (zod: `description: z.string().optional()`, `route.ts:22`).
+
+### Por qué `originType` NO alcanza (ya lo intentamos y falla)
+`originType` responde "¿tiene padre / cómo nació?" (STRATEGIC_CASCADE vs MANAGER_CREATED),
+NO "¿quién autoró el KPI?". Son 2 ejes ortogonales. El router (`route.ts:388`) decide SOLO
+por presencia de `parentId` → cualquier `parentId` cae en `cascadeGoal` → `STRATEGIC_CASCADE`.
+El caso que rompe: **Camino D con parentId de REFERENCIA** (`StepLinkParent.tsx:77`, spec 4.3
+"tu meta sigue siendo tuya") → `STRATEGIC_CASCADE` aunque el jefe SÍ escribió su KPI → la
+validación `if originType==='MANAGER_CREATED'` NO se dispararía = agujero.
+
+### Mapa COMPLETO de callers (grep verificado, no de memoria)
+| Caller | file:line | KPI propio/heredado |
+|---|---|---|
+| `createCorporateGoal` | `route.ts:383` | propio |
+| `cascadeGoal` (banco B/C) | `route.ts:389` ← `bankPayload.ts:71` manda parentId | **heredado** |
+| `cascadeGoal` (Camino D con ref) | `route.ts:389` ← `StepLinkParent.tsx:77` | **propio** ← COLISIÓN |
+| `cascadeGoal` (Camino A auto) | `GoalRulesEngine.ts:151` | heredado |
+| `createManagerGoal` (Camino D sin ref) | `route.ts:395` + `seed-goals-demo.ts:204` | propio |
+| `createFromDevelopmentGoal` (PDI) | `from-pdi/route.ts:60` | propio (description default larga) |
+| `prisma.goal.create` directo | solo `smoke-goal-cycle-gateD5.ts:82` (test) | n/a |
+
+`originType` se asigna en: `cascadeGoal` → `GoalsService.ts:292` (`STRATEGIC_CASCADE`);
+`createManagerGoal` → `:312` (`MANAGER_CREATED`); `createCorporateGoal` → `:254`.
+Ningún `prisma.goal.create` productivo fuera de `GoalsService`.
+
+### Conclusión: NINGÚN campo existente lo captura. Se necesita campo nuevo.
+- `originType`: conflaría 2 ejes (mismo error que arreglamos). Un 3er valor NO ayuda: `cascadeGoal`
+  igual no distingue banco de Camino-D-ref (ambos vienen como POST con parentId).
+- Inferir comparando KPI del hijo vs padre: frágil + fetch por validación + registra inferencia,
+  no intención. Descartado.
+
+### DISEÑO PROPUESTO (esperando OK de Victor)
+**Campo nuevo dedicado a la provenance del KPI:**
+- Prisma: `enum GoalKpiSource { OWN INHERITED }` + `Goal.kpiSource GoalKpiSource?` **nullable**
+  (96 metas existentes = null = provenance desconocida, no exige description; aditivo sin migrar).
+  Requiere `db push` (OK de Victor, como Gate B).
+- `CreateGoalInput.kpiSource: GoalKpiSource` **requerido (sin `?`, sin default)**.
+- Los 3 creadores que CONOCEN su provenance la fijan internos ('OWN'): `createCorporateGoal`,
+  `createManagerGoal`, `createFromDevelopmentGoal` (patrón idéntico al de `originType`/`level`).
+- **`cascadeGoal` es el ÚNICO ambiguo** → su input EXIGE `kpiSource` (no lo omite). Callers:
+  `route.ts:389` → `data.kpiSource` (del request); `GoalRulesEngine.ts:151` → `'INHERITED'`.
+- zod de `POST /api/goals` EXIGE `kpiSource` → clientes lo declaran: wizard `'OWN'`,
+  `bankPayload.ts` `'INHERITED'`. → doble cerrojo TS + zod: un 5º caller futuro NO compila /
+  request sin campo = 400.
+- Validación server (objetivo del punto 2): en `prepareGoalData`, clase `GoalDescriptionRequiredError`
+  → mapper → 400: `if (kpiSource==='OWN' && description.trim().length < 10) throw`. `INHERITED` no exige.
+  `createFromDevelopmentGoal` (no pasa por prepareGoalData) es OWN pero su description default > 10;
+  agregarle el chequeo por consistencia. `canProceed` cliente queda como feedback temprano.
+
+### ⚠️ RIPPLE a decidir (deuda, regla fija de "detener y preguntar")
+zod requerido toca `BulkAssignWizard` (`:256`, también hace POST /api/goals, NO migrado, Opción C):
+- rama `cascade` → `kpiSource:'INHERITED'` (trivial, correcto).
+- rama **`goalSource:'new'`** → es OWN → EMPEZARÍA a exigir description ≥ 10. Hoy manda
+  `newGoalDescription || undefined` sin exigirla → jefe con description vacía = **400**. Es la
+  aplicación CORRECTA de spec 4.4, pero implica cambio chico en BulkAssignWizard (fuera de Opción C).
+
+### DECISIONES PENDIENTES DE VICTOR (bloquean la implementación)
+1. ¿Confirmar `kpiSource` (enum Prisma, persistido, `db push`)? Es la pieza central.
+2. Ripple `BulkAssignWizard 'new'`: ¿tocarlo (chico: `kpiSource` + exigir description en rama `new`,
+   sale de Opción C) o que mande `'OWN'` sin exigir description por ahora (deuda anotada, incoherente)?
+
+### Al retomar
+Con esas 2 respuestas: implementar el diseño de arriba, smoke requerido (5 casos: OWN sin desc→400,
+OWN desc<10→400, OWN desc≥10→201, INHERITED sin desc→201, + el caso del ripple según decisión),
+sellar Punto 2, luego Punto 3.
