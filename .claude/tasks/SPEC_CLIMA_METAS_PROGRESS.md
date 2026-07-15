@@ -9,6 +9,29 @@
 
 ---
 
+## 📍 ESTADO ACTUAL — resumen de un vistazo (mantener SIEMPRE al día)
+
+**Objetivo de la tarea:** conectar Clima con Metas (que una meta corporativa de categoría
+"Clima" sea encontrable automáticamente) + rediseñar la UX del wizard de creación de metas.
+
+**En curso ahora:** Gate C (UX del wizard), **1 de 7 puntos**. El punto 2 (bifurcación) está
+implementado pero SIN COMMITEAR, y tiene un defecto de diseño a resolver (la pantalla de
+Alcance se percibe repetida con la bifurcación).
+
+**Qué falta para terminar Gate C:**
+1. Resolver el defecto vía **recorrido condicional por ROL** (ver arquitectura interina abajo):
+   Estratega → Alcance sin bifurcación; no-Estratega → bifurcación sin Alcance.
+2. Los 6 puntos restantes del plan: catálogo de ejemplos de medición, banco de una pantalla,
+   slider hero, campo obligatorio "¿Cómo se mide?", selector Familia→Subfamilia, contexto del
+   padre en `StepLinkParent`.
+3. Smoke con evidencia de EJECUCIÓN (navegación corrida, no solo `tsc`/`build`).
+
+**Flujo de trabajo vigente:** un solo `CreateGoalWizard`, dos recorridos por ROL (no por
+elección del usuario). Permiso `goals:create:strategic` verificado en 2 capas: servidor
+(garantía real, sellada) + cliente (conveniencia). Detalle en "Arquitectura interina" abajo.
+
+---
+
 ## Estado general
 
 | Gate | Estado |
@@ -18,6 +41,38 @@
 | **Gate 0 de Gate B** (investigación §3.3) | ✅ **CERRADO** (8 hallazgos, 2026-07-14) |
 | **Gate B** (categoría familia/subfamilia) | ✅ **SELLADO** (`8bf4cdf`, 2026-07-14, smoke 24/24, **db push aplicado**) |
 | **Gate C** (UX wizard) | 🟠 **EN CURSO — 1 de 7 puntos.** Cambios SIN COMMITEAR en el working tree. Ver auditoría abajo |
+
+---
+
+## 🏛️ ARQUITECTURA INTERINA — `CreateGoalWizard` compartido (decisión formal, 2026-07-14)
+
+**Un solo componente, DOS recorridos por ROL — no por elección del usuario.**
+
+`src/components/goals/wizard/CreateGoalWizard.tsx` es hoy el único wizard de creación de
+metas. Sirve a dos usuarios con permisos distintos, y el recorrido lo determina el **rol**,
+no un clic:
+
+- **Estratega** (`goals:create:strategic` = `[FOCALIZAHR_ADMIN, ACCOUNT_OWNER, HR_ADMIN,
+  HR_MANAGER]`): ve el paso **Alcance** (Corporativa / De Área / Individual) tal como existe
+  hoy. Es su camino para crear metas heredables desde cero. **Sin** bifurcación Meta
+  Libre/Definida.
+- **No-Estratega** (jefe común): **nunca** ve Alcance. Su meta nace directo a nivel
+  `INDIVIDUAL` y entra a la bifurcación Meta Libre / Meta Definida.
+
+**Permiso verificado en 2 CAPAS (defensa en profundidad):**
+1. **Servidor (la garantía real, ya sellada):** `POST /api/goals` rechaza con **403** si un
+   rol no-Estratega intenta crear `COMPANY`/`AREA` (Gate A / BUG 6, `route.ts` gate
+   `goals:create:strategic`). Verificado en el **smoke de Gate A, caso 12** (`AREA_MANAGER`
+   → 403; `HR_MANAGER` → 201).
+2. **Cliente (conveniencia, NO seguridad):** el wizard no le muestra a un no-Estratega un
+   camino que el servidor va a rechazar. Evita el callejón sin salida de llenar el formulario
+   y chocar con el 403 al final. Si esta capa fallara, el servidor sigue protegiendo.
+
+**Condición de salida (cuándo deja de ser interina):** se extrae a **dos componentes
+separados** cuando se construya **"Ambiente Estrategia"** como ruta propia del Estratega
+(gate futuro, sin planificar). Hasta entonces, un componente con recorrido condicional por
+rol es deuda reconocida y aceptada — documentada acá para que nadie la "corrija" pensando
+que es un descuido.
 
 ---
 
