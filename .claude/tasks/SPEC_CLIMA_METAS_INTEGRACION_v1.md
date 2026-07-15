@@ -575,6 +575,15 @@ construir ahora, solo dejar la puerta anotada".
 
 ## 4. GATE C — UX Premium del Wizard (depende de Gate A + Gate B)
 
+> ✅ **SECCIÓN 4 SELLADA** — `2ee07d2` (código) + `f89f68f` (cierre), 2026-07-15.
+> Smoke 20/20 + 8/8, tsc + build limpios. Implementada con **recorrido condicional por
+> ROL** (Estratega ve Alcance, jefe común la bifurcación) — resuelve de raíz el defecto de
+> "bifurcación repetida", desviación de 4.1 documentada. 2 deudas aprobadas: 4.4
+> (`description` obligatoria solo cliente — el servidor no distingue Camino D de asignación
+> del banco) y 4.7 (`BulkAssignWizard` sigue con target por persona — migración a
+> `GoalBankScreen` diferida como gate futuro, Opción C). Detalle en
+> `SPEC_CLIMA_METAS_PROGRESS.md` §"GATE C — SELLADO".
+
 ### 4.0 Principio guía — no es un rediseño visual, es separar 2 flujos forzados a compartir pasos
 
 ```yaml

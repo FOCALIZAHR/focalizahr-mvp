@@ -14,21 +14,19 @@
 **Objetivo de la tarea:** conectar Clima con Metas (que una meta corporativa de categoría
 "Clima" sea encontrable automáticamente) + rediseñar la UX del wizard de creación de metas.
 
-**En curso ahora:** Gate C (UX del wizard), **1 de 7 puntos**. El punto 2 (bifurcación) está
-implementado pero SIN COMMITEAR, y tiene un defecto de diseño a resolver (la pantalla de
-Alcance se percibe repetida con la bifurcación).
+**En curso ahora:** ✅ **NADA — el proyecto Clima × Metas está COMPLETO (Gates A, B, C sellados).**
+Próximo paso posible: la integración real del lado de Clima (que el módulo de Clima consuma
+`findActiveStrategicGoal` / `getClimaBaseline` en su UI), que es otro proyecto.
 
-**Qué falta para terminar Gate C:**
-1. Resolver el defecto vía **recorrido condicional por ROL** (ver arquitectura interina abajo):
-   Estratega → Alcance sin bifurcación; no-Estratega → bifurcación sin Alcance.
-2. Los 6 puntos restantes del plan: catálogo de ejemplos de medición, banco de una pantalla,
-   slider hero, campo obligatorio "¿Cómo se mide?", selector Familia→Subfamilia, contexto del
-   padre en `StepLinkParent`.
-3. Smoke con evidencia de EJECUCIÓN (navegación corrida, no solo `tsc`/`build`).
+**Qué queda como deuda anotada (no bloquea nada):**
+- Hallazgos abiertos de peso (PATCH sin revalidar en edición, 500 opacos) — ficha de Metas.
+- P1 `globalRoles` sin HR_ADMIN/HR_OPERATOR en `buildParticipantAccessFilter` — backlog.
+- Migrar `climaRoles.ts`/`goalCycleRoles.ts` al patrón `@/lib/auth/permissions` — backlog.
+- Fail-open `AREA_MANAGER` sin `departmentId` (`route.ts:97`) — backlog.
 
 **Flujo de trabajo vigente:** un solo `CreateGoalWizard`, dos recorridos por ROL (no por
-elección del usuario). Permiso `goals:create:strategic` verificado en 2 capas: servidor
-(garantía real, sellada) + cliente (conveniencia). Detalle en "Arquitectura interina" abajo.
+elección del usuario). Permiso `goals:create:strategic` en 2 capas: servidor (Gate A) +
+cliente (`@/lib/auth/permissions`, post-split). Detalle en "Arquitectura interina" abajo.
 
 **Prerrequisito RESUELTO (2026-07-15):** `AuthorizationService.ts` se dividió — `hasPermission`
 ahora vive en `src/lib/auth/permissions.ts` (PURO, client-safe), re-exportado para no romper
@@ -46,7 +44,46 @@ del wizard ya puede llamar `hasPermission(role, 'goals:create:strategic')` direc
 | **Gate A** (peso por ciclo + BUGs 1/3/4/6) | ✅ **SELLADO** (`937cdf8`, 2026-07-14, smoke 22/22) |
 | **Gate 0 de Gate B** (investigación §3.3) | ✅ **CERRADO** (8 hallazgos, 2026-07-14) |
 | **Gate B** (categoría familia/subfamilia) | ✅ **SELLADO** (`8bf4cdf`, 2026-07-14, smoke 24/24, **db push aplicado**) |
-| **Gate C** (UX wizard) | 🟠 **EN CURSO — 1 de 7 puntos.** Cambios SIN COMMITEAR en el working tree. Ver auditoría abajo |
+| **Gate C** (UX wizard) | ✅ **SELLADO** (`2ee07d2` + `f89f68f`, 2026-07-15, smoke 20/20 + 8/8). Recorrido por rol + banco + categoría + peso hero + narrativa 4.6 |
+
+---
+
+## ✅ GATE C — SELLADO (`2ee07d2` código + `f89f68f` cierre, 2026-07-15)
+
+**Objetivo del gate:** reestructurar el FLUJO del wizard (no la piel). Cerrado con
+recorrido condicional por rol + los 6 puntos del plan §4.
+
+**Los 6 puntos + el recorrido por rol:**
+- **Recorrido condicional por ROL** (resuelve el defecto "bifurcación repetida"): Estratega →
+  Alcance directo; jefe común → bifurcación Meta Libre/Definida. `StepSelectLevel` filtra por
+  `hasPermission(role,'goals:create:strategic')` (cierra el hueco UI del BUG 6). Navegación
+  index-based. Verificado por ejecución (6 escenarios).
+- **1 · Ejemplos de medición** (`goalCategories.ts`): `GOAL_MEASUREMENT_EXAMPLES` (16). El
+  placeholder usa el texto COMPLETO (truncado descontinuado por Victor) — una sola fuente.
+- **2 · Banco de una pantalla** (`GoalBankScreen.tsx` + `bankPayload.ts`): KPI bloqueado con
+  candado, peso editable, "Sugerido" = `parent.weight`. `buildBankPayload` hereda la categoría
+  y no manda `description`. Sirve a 1 o varios.
+- **3 · Slider hero** (`StepAssignWeight.tsx`, `PercentageSlider size="hero"`): dos números
+  gigantes, tope elástico = disponible REAL. `getAvailableWeight` fail-closed (null, no 100)
+  **unificado** entre banco y `StepWeightsConfirm`.
+- **4 · "¿Cómo se mide?"** obligatorio (mín. 10, movido a Medición, ejemplo Familia×metricType,
+  `isAmbiguous`). **Solo cliente** (ver deuda 4.4 abajo).
+- **5 · `FamilySubfamilyPicker`** (píldoras 2 niveles, animación) + **4.6 narrativa por familia**
+  (`GOAL_FAMILY_PAIN_POINTS`, verbatim de Victor).
+- **6 · `StepLinkParent`** contexto del padre ("Mide:", sin heredar, filtrado por familia).
+
+**3 auditorías de sello:** Enterprise ✅ limpia · Visual/funcional ✅ limpia · Spec §4 ✅ cumplida
+con 2 desviaciones documentadas como deuda (abajo).
+
+### ⚠️ Deuda de Gate C (anotada, aprobada, NO arreglada)
+- **4.4 obligatoriedad de `description` es client-only.** El zod (`route.ts:22`) la tiene
+  `optional()`. No es server-side porque el servidor no distingue "Camino D" de "asignación del
+  banco" (ambos `POST /api/goals` `level:INDIVIDUAL`) sin un campo discriminador nuevo. Enforcement
+  server-side rompería el banco. Deuda con razón documentada (Victor aprobó client-only).
+- **4.7 `BulkAssignWizard` sigue editando `targetValue` por persona** (Opción C aprobada). La
+  migración `BulkAssignWizard` → `GoalBankScreen` (unificar los 2 caminos de banco) queda como
+  **gate futuro**, con 3 capacidades a preservar: subselección de empleados pre-cargada,
+  `goalSource:'new'` (crear+asignar en lote), target por persona. Ver conversación de sello.
 
 ---
 
