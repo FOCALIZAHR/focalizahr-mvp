@@ -14,10 +14,16 @@
 **Objetivo de la tarea:** conectar Clima con Metas (que una meta corporativa de categoría
 "Clima" sea encontrable automáticamente) + rediseñar la UX del wizard de creación de metas.
 
-**En curso ahora:** 🟢 **PUNTO 2 SELLADO (2026-07-15)** — "¿Cómo se mide?" (description) obligatorio
-SERVER-SIDE para KPI de autoría propia, vía campo persistido `Goal.kpiSource`. `db push` aplicado,
-smoke 12/12 (5 casos). Cierra la deuda 4.4 client-only de Gate C. **Siguiente: PUNTO 3.**
-(Clima queda POSTERGADO hasta cerrar Punto 3.) **Commit pendiente de OK de Victor** (código sin commitear).
+**En curso ahora:** 🟢 **GATE 3·A SELLADO (2026-07-15)** — Punto 3 partido en dos por la decisión de
+migración acotada. **Gate 3·A = Familia obligatoria en la rama 'crear nueva' del asignador masivo**
+(reusa `FamilySubfamilyPicker` generalizado). Sin schema, smoke 7/7. **Siguiente: GATE 3·B** — migración
+acotada: la rama 'Cascadear' de BulkAssignWizard pasa a usar `GoalBankScreen` (personas precargadas +
+COMPANY,AREA + KPI heredado + éxito parcial + pre-excluir duplicados). Plan Mode con diff antes de tocar.
+(Clima queda POSTERGADO hasta cerrar Gate 3·B.)
+
+**Commits locales sin pushear (push manual de Victor):** Punto 2 = `b5f5a90` (impl) + `312adcc` (sello).
+Gate 3·A = ver commits de esta sesión. Los 4 archivos `.claude/skills/focalizahr-api/*` modificados por
+otra sesión quedaron FUERA de todos estos commits (pathspec explícito).
 
 **Qué queda como deuda anotada (no bloquea nada):**
 - Hallazgos abiertos de peso (PATCH sin revalidar en edición, 500 opacos) — ficha de Metas.
@@ -46,7 +52,9 @@ del wizard ya puede llamar `hasPermission(role, 'goals:create:strategic')` direc
 | **Gate 0 de Gate B** (investigación §3.3) | ✅ **CERRADO** (8 hallazgos, 2026-07-14) |
 | **Gate B** (categoría familia/subfamilia) | ✅ **SELLADO** (`8bf4cdf`, 2026-07-14, smoke 24/24, **db push aplicado**) |
 | **Gate C** (UX wizard) | ✅ **SELLADO** (`2ee07d2` + `f89f68f`, 2026-07-15, smoke 20/20 + 8/8). Recorrido por rol + banco + categoría + peso hero + narrativa 4.6 |
-| **Punto 2** (description obligatoria server-side + `Goal.kpiSource`) | ✅ **SELLADO** (2026-07-15, **db push aplicado**, smoke 12/12). Cierra deuda 4.4 client-only. Commit pend. OK Victor |
+| **Punto 2** (description obligatoria server-side + `Goal.kpiSource`) | ✅ **SELLADO** (`b5f5a90`+`312adcc`, 2026-07-15, **db push aplicado**, smoke 12/12→17/17 con casos 6-7). Cierra deuda 4.4 client-only |
+| **Gate 3·A** (Familia obligatoria en 'crear nueva' del asignador masivo) | ✅ **SELLADO** (2026-07-15, sin schema, smoke 7/7). `FamilySubfamilyPicker` generalizado + reutilizado |
+| **Gate 3·B** (migración acotada: rama 'Cascadear' → `GoalBankScreen`) | 📋 **PLANIFICADO** — 3 decisiones resueltas (handoff-Paso-2, preselectedIds filtra, `parentId` en /team). Falta diff + impl |
 
 ---
 
@@ -82,10 +90,22 @@ con 2 desviaciones documentadas como deuda (abajo).
   (2026-07-15).** El campo discriminador nuevo es `Goal.kpiSource` (OWN/INHERITED): el enforcement
   server-side vive en `prepareGoalData` gateado por `kpiSource==='OWN'`, así NO rompe el banco
   (INHERITED no exige). Detalle en la sección "PUNTO 2 — SELLADO" abajo.
-- **4.7 `BulkAssignWizard` sigue editando `targetValue` por persona** (Opción C aprobada). La
-  migración `BulkAssignWizard` → `GoalBankScreen` (unificar los 2 caminos de banco) queda como
-  **gate futuro**, con 3 capacidades a preservar: subselección de empleados pre-cargada,
-  `goalSource:'new'` (crear+asignar en lote), target por persona. Ver conversación de sello.
+- **4.7 `BulkAssignWizard` edita `targetValue` por persona en la rama heredada** → **ATACADO por
+  GATE 3·B** (migración ACOTADA, decidida 2026-07-15): solo la rama 'Cascadear' pasa a `GoalBankScreen`
+  (que congela el KPI por diseño), la rama 'Crear nueva' NO se toca. Corrección al encuadre viejo de
+  "3 capacidades a preservar": (1) subselección precargada → SÍ se porta (`preselectedIds`);
+  (2) `goalSource:'new'` → fuera de alcance, se queda en BulkAssign; (3) target por persona → NO se
+  preserva en heredadas, ES el defecto a eliminar. Ver plan Gate 3·B abajo.
+
+### ✅ GATE 3·A — SELLADO (2026-07-15, smoke 7/7, sin schema)
+Familia obligatoria en la rama 'crear nueva' del asignador masivo (paridad con Camino D):
+- `FamilySubfamilyPicker.tsx` **generalizado**: prop `CategorizableData` (`{family?,subfamily?}`) en vez
+  de `GoalWizardData` → reutilizable por los dos wizards sin duplicar.
+- `BulkAssignData` + `family?`/`subfamily?`; `StepSelectGoal` renderiza el picker en la rama 'new';
+  `handleSourceChange` limpia la categoría al cambiar de origen.
+- `canProceed` case 2 'new' exige `family`+`subfamily`; payload 'new' los manda (en 'cascade' NO —
+  se hereda del padre). Server sin cambios (`validateCategory` de Gate B ya valida el par).
+- NO rompe Punto 2: description (kpiSource OWN) y family (validateCategory) son ejes independientes.
 
 ---
 
