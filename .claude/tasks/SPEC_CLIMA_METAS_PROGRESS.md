@@ -30,6 +30,12 @@ Alcance se percibe repetida con la bifurcación).
 elección del usuario). Permiso `goals:create:strategic` verificado en 2 capas: servidor
 (garantía real, sellada) + cliente (conveniencia). Detalle en "Arquitectura interina" abajo.
 
+**Prerrequisito RESUELTO (2026-07-15):** `AuthorizationService.ts` se dividió — `hasPermission`
+ahora vive en `src/lib/auth/permissions.ts` (PURO, client-safe), re-exportado para no romper
+los 198 importadores. Verificado byte-idéntico + tsc/build verdes. Detalle y deuda en
+`BACKLOG_ENTERPRISE.md` (incl. hallazgo P1 `globalRoles` sin HR_ADMIN/HR_OPERATOR). El cliente
+del wizard ya puede llamar `hasPermission(role, 'goals:create:strategic')` directo.
+
 ---
 
 ## Estado general

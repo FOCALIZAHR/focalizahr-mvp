@@ -34,6 +34,15 @@
 - ✅ `src/app/api/goals/[id]/cascade/route.ts` **eliminado** — endpoint muerto sin callers HTTP (grep exhaustivo del repo = 0). El flujo real "Cascadear" de la UI va por `POST /api/goals` con `parentId` (gateado), y `GoalRulesEngine.applyCascadeRule` usa `GoalsService.cascadeGoal` como llamada directa de servicio. La función real sigue protegida. tsc + build verdes.
 - **P0-1 baja de 5 a 4 pendientes:** `employee-score`, `from-pdi`, `link-pdi`, `team/coverage`.
 
+**2026-07-15 — Split de `AuthorizationService.ts` en 2 (RBAC puro client-safe):**
+- **Qué cambió:** `AuthorizationService.ts` se dividió. Nuevo archivo **`src/lib/auth/permissions.ts`** (PURO, SIN Prisma) tiene `PERMISSIONS`, `hasPermission`, `checkPermissionOrFail`, `getPermissionsForRole`, `GLOBAL_ACCESS_ROLES`, `HIERARCHICAL_FILTER_ROLES`, `ALL_ROLES`, `PermissionType`, `RoleType`. `AuthorizationService.ts` quedó con lo que toca Prisma (`buildParticipantAccessFilter`, `getChildDepartmentIds`, `extractUserContext`, `invalidateDepartmentCache`) y **re-exporta** todo lo movido → los **198 importadores** siguen resolviendo sin tocar un solo import.
+- **Por qué:** que componentes de CLIENTE puedan usar `hasPermission()` directo sin arrastrar Prisma, reemplazando el patrón de archivos "espejo" (`climaRoles.ts`, `goalCycleRoles.ts`) que duplican arrays de roles a mano — riesgo de divergencia silenciosa (contra Regla Enterprise #2).
+- **Verificado:** bloque movido **byte-idéntico** al original (diff vacío vs `git show HEAD`); parte de BD (líneas 1-176) **byte-exacta** (0 cambios); diff del archivo = 19 inserciones / 751 borrados (solo el bloque movido). `tsc --noEmit` 0 errores · `next build` Compiled successfully · **198 importadores resuelven** (build falla si uno solo no resuelve). GOTCHA registrado: el original tenía 930 líneas de contenido pero 929 `\n` (última línea sin newline) → `sed '178,929p'` omitió el `] as const;` final; se detectó por tsc y se restauró.
+- **DEUDA PENDIENTE (no arreglada, anotar):**
+  - **(1) Migrar `climaRoles.ts` y `goalCycleRoles.ts`** al nuevo patrón — que importen de `src/lib/auth/permissions.ts` en vez de duplicar el array de roles a mano. 🔒/🏗️ · S · P2.
+  - **(2) 🔒 HALLAZGO NUEVO, NO relacionado (afecta OTRO módulo — participantes/campañas, no metas):** dentro de `buildParticipantAccessFilter` (`AuthorizationService.ts:80`) hay un array LOCAL `const globalRoles = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_MANAGER', 'CEO']` que **NO incluye `HR_ADMIN` ni `HR_OPERATOR`**, a diferencia de `GLOBAL_ACCESS_ROLES` (que sí). Consecuencia posible: `HR_ADMIN`/`HR_OPERATOR` caerían en "CASO 3: sin acceso" (0 resultados) en cualquier función que use `buildParticipantAccessFilter` → **podría estar bloqueando su acceso a participantes/campañas HOY, en producción.** Preexistente, requiere investigación aparte. **Misma prioridad que el residual de check-in de ciclo cerrado** (ver ficha de Metas, HALLAZGOS ABIERTOS). 🔒 · M · **P1**.
+- **Cómo revertir si algo falla:** `git checkout 937cdf8 -- src/lib/services/AuthorizationService.ts` y borrar `src/lib/auth/permissions.ts`.
+
 ---
 
 ## Modelo de priorización
