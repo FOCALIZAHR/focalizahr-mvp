@@ -8,6 +8,9 @@
 import { memo, useCallback, useMemo } from 'react'
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { formatDisplayName } from '@/lib/utils/formatName'
+// Fuente única del cálculo de peso disponible (fail-closed). Antes había una copia
+// local con `return 100` (fail-open) — unificada a este helper compartido con el banco.
+import { getAvailableWeight as computeAvailableWeight } from '../../bank/bankPayload'
 import type { BulkAssignData, EmployeeWithStatus } from '../BulkAssignWizard'
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -40,19 +43,19 @@ export default memo(function StepWeightsConfirm({
     })
   }, [data.weights, updateData])
 
-  // Calcular peso disponible por persona
-  const getAvailableWeight = useCallback((employeeId: string) => {
+  // Peso disponible por persona: lookup local + el helper COMPARTIDO (fail-closed: null
+  // si no hay assignmentStatus). Antes tenía su propia copia con `return 100` (fail-open).
+  const getAvailableWeight = useCallback((employeeId: string): number | null => {
     const emp = employeesWithStatus.find(e => e.id === employeeId)
-    if (!emp?.assignmentStatus) return 100
-    return 100 - emp.assignmentStatus.totalWeight
+    return computeAvailableWeight(emp?.assignmentStatus)
   }, [employeesWithStatus])
 
-  // Check if any weight exceeds available
+  // Check if any weight exceeds available (o si falta el dato → también es advertencia)
   const hasWeightWarning = useMemo(() => {
     return data.employeeIds.some(id => {
       const assigned = data.weights[id] || 0
       const available = getAvailableWeight(id)
-      return assigned > available
+      return available === null || assigned > available
     })
   }, [data.weights, data.employeeIds, getAvailableWeight])
 
@@ -95,7 +98,8 @@ export default memo(function StepWeightsConfirm({
           const weight = data.weights[emp.id] ?? 0
           const target = data.targets[emp.id]
           const available = getAvailableWeight(emp.id)
-          const exceeded = weight > available
+          const noData = available === null // sin dato de disponibilidad → fallar cerrado
+          const exceeded = noData || weight > available
 
           return (
             <div
@@ -115,7 +119,7 @@ export default memo(function StepWeightsConfirm({
                   </span>
                   {!isLoadingStatus && (
                     <p className={`text-xs ${exceeded ? 'text-red-400' : 'text-slate-500'}`}>
-                      Disponible: {available}%
+                      {noData ? 'Sin datos de peso' : `Disponible: ${available}%`}
                     </p>
                   )}
                 </div>

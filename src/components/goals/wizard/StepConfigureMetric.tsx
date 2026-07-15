@@ -13,7 +13,6 @@ import GoalProgressBar from '../GoalProgressBar'
 import PercentageSlider from '@/components/ui/PercentageSlider'
 import type { GoalFamily } from '@prisma/client'
 import {
-  getMeasurementPlaceholder,
   getMeasurementExample,
   isAmbiguous,
   NEUTRAL_MEASUREMENT_PLACEHOLDER,
@@ -249,14 +248,16 @@ export default memo(function StepConfigureMetric({
           onChange={(e) => updateData({ description: e.target.value })}
           placeholder={
             data.family
-              ? getMeasurementPlaceholder(data.family as GoalFamily, data.metricType)
+              ? getMeasurementExample(data.family as GoalFamily, data.metricType) // texto COMPLETO, una sola fuente
               : NEUTRAL_MEASUREMENT_PLACEHOLDER
           }
           rows={2}
           className="fhr-input w-full resize-none"
           maxLength={280}
         />
-        {data.family && (
+        {/* 💡 solo mientras el jefe escribe (el placeholder ya muestra el ejemplo
+            completo cuando está vacío) → nunca se duplica el mismo texto. */}
+        {data.family && data.description.trim().length > 0 && (
           <p className="text-xs text-slate-400 flex items-start gap-1.5">
             <Lightbulb className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
             <span>{getMeasurementExample(data.family as GoalFamily, data.metricType)}</span>

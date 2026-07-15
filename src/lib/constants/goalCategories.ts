@@ -63,12 +63,11 @@ export function isValidSubfamily(family: GoalFamily, subfamily: string): boolean
 // ════════════════════════════════════════════════════════════════════════════
 // EJEMPLOS DE MEDICIÓN (Gate C, punto 7) — contenido final (Gemini, aprobado Victor).
 //
-// Uso doble, del MISMO texto (una sola fuente de verdad):
-//   - TEXTO DE AYUDA (💡 debajo del input "¿Cómo se mide?"): el ejemplo COMPLETO.
-//   - PLACEHOLDER del input: derivado por truncado (getMeasurementPlaceholder), NO
-//     un segundo texto a mano.
+// UNA sola fuente, UN solo texto (sin versión corta): el ejemplo COMPLETO se usa como
+//   - PLACEHOLDER del input "¿Cómo se mide?" (gris, se borra al escribir), y
+//   - TEXTO DE AYUDA (💡) mientras el jefe escribe (para no duplicar con el placeholder).
 // Selección: Familia elegida × metricType elegido. Sin alguno de los dos ejes,
-// no se muestra ejemplo (el componente cae a un placeholder neutro).
+// el componente cae a un placeholder neutro.
 // ════════════════════════════════════════════════════════════════════════════
 export const GOAL_MEASUREMENT_EXAMPLES: Record<GoalFamily, Record<GoalMetricType, string>> = {
   NEGOCIO_E_INGRESOS: {
@@ -100,24 +99,25 @@ export const GOAL_MEASUREMENT_EXAMPLES: Record<GoalFamily, Record<GoalMetricType
 /** Placeholder neutro cuando aún no hay Familia o metricType elegido. */
 export const NEUTRAL_MEASUREMENT_PLACEHOLDER = 'Ej: % de avance sobre la meta trimestral'
 
-const PLACEHOLDER_MAX = 40
-
 /**
- * Placeholder del input (~40 chars), DERIVADO por truncado del ejemplo completo:
- * el texto vive en UN solo lugar (GOAL_MEASUREMENT_EXAMPLES). Corta en el último
- * espacio antes del límite para no partir palabras; sin puntos suspensivos.
+ * El ejemplo COMPLETO por Familia × metricType. Fuente única — se usa como placeholder
+ * del input Y como texto de ayuda. (El truncado a 40 chars se descontinuó por decisión
+ * de Victor: un solo texto, sin versión corta y larga.)
  */
-export function getMeasurementPlaceholder(family: GoalFamily, metric: GoalMetricType): string {
-  const full = GOAL_MEASUREMENT_EXAMPLES[family][metric]
-  if (full.length <= PLACEHOLDER_MAX) return full
-  const cut = full.slice(0, PLACEHOLDER_MAX)
-  const lastSpace = cut.lastIndexOf(' ')
-  return lastSpace > 0 ? cut.slice(0, lastSpace) : cut
-}
-
-/** El ejemplo completo, para el texto de ayuda (💡). */
 export function getMeasurementExample(family: GoalFamily, metric: GoalMetricType): string {
   return GOAL_MEASUREMENT_EXAMPLES[family][metric]
+}
+
+/**
+ * "Dolor" típico por familia — narrativa corta que se muestra al elegir la familia
+ * (Gate C, 4.6). Contenido final de Victor, VERBATIM. Ayuda al jefe a entender qué
+ * problemas cubre cada familia antes de elegir subfamilia.
+ */
+export const GOAL_FAMILY_PAIN_POINTS: Record<GoalFamily, string> = {
+  NEGOCIO_E_INGRESOS: 'Cuidar el margen de ganancia frente al aumento de costos, evitar gastos innecesarios en software duplicado y priorizar ingresos seguros.',
+  CLIENTES_Y_USUARIOS: 'Clientes que se van (churn), alto costo para conseguir clientes nuevos y fricción en los canales de atención digital.',
+  OPERACION_Y_EFICIENCIA: 'Proyectos que se retrasan, horas perdidas en tareas manuales que se pueden automatizar y burocracia interna.',
+  CULTURA_Y_PERSONAS: 'Fuga de personas clave en puestos críticos, jefaturas que no dan feedback y resguardar un ambiente laboral de respeto.',
 }
 
 /**

@@ -45,7 +45,10 @@ export interface AssignmentStatus {
  * NUNCA asume 100%. Antes StepWeightsConfirm hacía `return 100` y dejaba asignar peso
  * que el servidor iba a rechazar.
  */
-export function getAvailableWeight(status: AssignmentStatus | null | undefined): number | null {
+// Recibe la forma MÍNIMA necesaria ({ totalWeight }) para servir a los dos consumidores
+// sin acoplarse a la forma completa: GoalBankScreen (AssignmentStatus con isComplete) y
+// StepWeightsConfirm (su assignmentStatus SIN isComplete). Una sola fuente de verdad.
+export function getAvailableWeight(status: { totalWeight: number } | null | undefined): number | null {
   if (!status) return null
   return 100 - status.totalWeight
 }

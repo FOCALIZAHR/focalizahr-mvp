@@ -20,6 +20,7 @@ import {
   GOAL_FAMILY_ORDER,
   GOAL_FAMILY_LABELS,
   GOAL_SUBFAMILIES,
+  GOAL_FAMILY_PAIN_POINTS,
 } from '@/lib/constants/goalCategories'
 import type { GoalWizardData } from './CreateGoalWizard'
 
@@ -71,7 +72,7 @@ export default memo(function FamilySubfamilyPicker({ data, updateData }: FamilyS
         })}
       </div>
 
-      {/* Nivel 2 — Subfamilias de la familia elegida */}
+      {/* Nivel 2 — narrativa de la familia + subfamilias */}
       <AnimatePresence>
         {selectedFamily && (
           <motion.div
@@ -79,8 +80,13 @@ export default memo(function FamilySubfamilyPicker({ data, updateData }: FamilyS
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.25 }}
-            className="overflow-hidden"
+            className="overflow-hidden space-y-3"
           >
+            {/* Narrativa corta de la familia (4.6) */}
+            <p className="text-xs text-slate-400 font-light leading-relaxed">
+              {GOAL_FAMILY_PAIN_POINTS[selectedFamily]}
+            </p>
+
             <div className="flex flex-wrap gap-2 pt-1">
               {GOAL_SUBFAMILIES[selectedFamily].map((sub) => {
                 const isSelected = data.subfamily === sub
