@@ -16,12 +16,12 @@
 
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Lock, Target, Loader2, Check, ChevronDown } from 'lucide-react'
+import { Search, Lock, Target, Loader2, Check, ArrowLeft } from 'lucide-react'
 import type { GoalFamily } from '@prisma/client'
 import { cn } from '@/lib/utils'
 import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton'
 import { useToast } from '@/components/ui/toast-system'
-import { GOAL_FAMILY_LABELS, GOAL_FAMILY_ORDER } from '@/lib/constants/goalCategories'
+import { GOAL_FAMILY_LABELS, GOAL_FAMILY_ORDER, GOAL_FAMILY_CONTEXT, GOAL_SUBFAMILIES } from '@/lib/constants/goalCategories'
 import {
   buildBankPayload,
   getAvailableWeight,
@@ -94,37 +94,51 @@ export default memo(function GoalBankScreen({ bankLevel, preselectedIds, onDone,
     [bankGoals, search]
   )
 
-  // UX·B: catálogo agrupado por familia. O(N) memoizado sobre `filtered` → solo
-  // re-agrupa cuando cambian metas o búsqueda. N es chico (metas del banco) → sin
-  // debounce ni virtualización. "Sin categoría" al final; familias vacías se saltan.
-  const grouped = useMemo(() => {
-    const buckets = new Map<string, BankParentGoal[]>()
+  // Gate CAT·B: navegación del catálogo por Familia → Subfamilia → metas (reemplaza
+  // el agrupado/colapsable de UX·B, que escondía 10/11 metas tras un chevron). Estado
+  // LOCAL de filtro (no toca la categoría de ninguna meta).
+  const [filterFamily, setFilterFamily] = useState<GoalFamily | 'NONE' | null>(null)
+  const [filterSubfamily, setFilterSubfamily] = useState<string | null>(null)
+
+  // Conteo por familia (+ 'NONE' = sin categoría). O(N) memoizado sobre `filtered`.
+  const familyCounts = useMemo(() => {
+    const counts = new Map<string, number>()
     for (const g of filtered) {
       const k = g.family ?? 'NONE'
-      const arr = buckets.get(k)
-      if (arr) arr.push(g)
-      else buckets.set(k, [g])
+      counts.set(k, (counts.get(k) ?? 0) + 1)
     }
-    const out: { key: string; label: string; goals: BankParentGoal[] }[] = []
-    for (const f of GOAL_FAMILY_ORDER) {
-      const arr = buckets.get(f)
-      if (arr) out.push({ key: f, label: GOAL_FAMILY_LABELS[f as GoalFamily], goals: arr })
-    }
-    const none = buckets.get('NONE')
-    if (none) out.push({ key: 'NONE', label: 'Sin categoría', goals: none })
-    return out
+    return counts
   }, [filtered])
 
-  // Colapsado por defecto; buscar abre todo (isOpen automático) para no esconder matches.
-  const [expandedFamilies, setExpandedFamilies] = useState<Set<string>>(new Set())
-  const toggleFamily = useCallback((key: string) => {
-    setExpandedFamilies((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }, [])
+  // Metas visibles según el filtro actual. 'NONE' = sin familia; familia+subfamilia =
+  // match exacto (subfamily null cae en 'Otros' para no esconder metas familia-solo).
+  const visibleGoals = useMemo(() => {
+    if (filterFamily === 'NONE') return filtered.filter((g) => !g.family)
+    if (filterFamily && filterSubfamily) {
+      return filtered.filter((g) => g.family === filterFamily && (g.subfamily ?? 'Otros') === filterSubfamily)
+    }
+    return []
+  }, [filtered, filterFamily, filterSubfamily])
+
+  const resetCatalogNav = useCallback(() => { setFilterFamily(null); setFilterSubfamily(null) }, [])
+
+  // Fila de meta del catálogo: título + KPI/objetivo para entender sin adivinar por el
+  // nombre. Click → distribución sellada (Opción A: su cabecera candado ES el "ver KPI").
+  const renderGoalRow = useCallback((g: BankParentGoal) => (
+    <button
+      key={g.id}
+      onClick={() => setSelected(g)}
+      className="w-full p-4 bg-slate-800/50 hover:bg-slate-800 rounded-xl text-left transition-colors border border-slate-700/50"
+    >
+      <div className="flex items-center gap-2">
+        <Target className="w-4 h-4 text-cyan-400 shrink-0" />
+        <span className="text-sm text-white truncate">{g.title}</span>
+      </div>
+      <p className="text-[11px] text-slate-500 mt-1 truncate">
+        Mide: {g.description || 'sin indicador'} · Objetivo: {g.targetValue}{g.unit ? ` ${g.unit}` : ''}
+      </p>
+    </button>
+  ), [])
 
   const suggested = selected?.weight ?? 0
 
@@ -245,51 +259,81 @@ export default memo(function GoalBankScreen({ bankLevel, preselectedIds, onDone,
               <p className="text-center text-slate-500 text-sm py-6">
                 No hay metas {bankLevel === 'COMPANY' ? 'corporativas' : bankLevel === 'AREA' ? 'de área' : 'del banco'} disponibles. Pedí al equipo estratégico que cree una.
               </p>
-            ) : (
-              grouped.map((grp) => {
-                // Colapsado por defecto; con búsqueda activa se abre solo (no esconder matches).
-                const open = !!search || expandedFamilies.has(grp.key)
-                return (
-                  <div key={grp.key} className="space-y-2">
+            ) : search ? (
+              // Búsqueda por nombre → lista plana (no obliga a navegar por familia).
+              <div className="space-y-2">{filtered.map(renderGoalRow)}</div>
+            ) : filterFamily === null ? (
+              // Nivel 1 — Familias (tarjetas StepChooseFlow, línea Tesla UN color) + Sin categoría.
+              <div className="space-y-2">
+                {GOAL_FAMILY_ORDER.map((fam) => {
+                  const count = familyCounts.get(fam) ?? 0
+                  return (
                     <button
-                      onClick={() => toggleFamily(grp.key)}
-                      className="w-full flex items-center justify-between px-1 py-1 text-left"
+                      key={fam}
+                      onClick={() => { setFilterFamily(fam); setFilterSubfamily(null) }}
+                      className="relative w-full p-4 rounded-xl border-2 border-slate-700 hover:border-slate-600 bg-slate-800/50 text-left transition-all overflow-hidden"
                     >
-                      <span className="text-xs font-medium text-slate-300">
-                        {grp.label} <span className="text-slate-500 font-normal">· {grp.goals.length}</span>
-                      </span>
-                      <ChevronDown className={cn('w-4 h-4 text-slate-500 transition-transform', open && 'rotate-180')} />
+                      <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: 'linear-gradient(90deg, transparent, #22D3EE, transparent)' }} />
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-medium text-white">{GOAL_FAMILY_LABELS[fam]}</span>
+                        <span className="text-xs text-slate-500 shrink-0">{count}</span>
+                      </div>
                     </button>
-                    <AnimatePresence initial={false}>
-                      {open && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="space-y-2 overflow-hidden"
-                        >
-                          {grp.goals.map((g) => (
-                            <button
-                              key={g.id}
-                              onClick={() => setSelected(g)}
-                              className="w-full p-4 bg-slate-800/50 hover:bg-slate-800 rounded-xl text-left transition-colors border border-slate-700/50"
-                            >
-                              <div className="flex items-center gap-2">
-                                <Target className="w-4 h-4 text-cyan-400 shrink-0" />
-                                <span className="text-sm text-white truncate">{g.title}</span>
-                              </div>
-                              {g.subfamily && (
-                                <span className="text-[10px] text-slate-500 ml-6">{g.subfamily}</span>
-                              )}
-                            </button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                )
-              })
+                  )
+                })}
+                {(familyCounts.get('NONE') ?? 0) > 0 && (
+                  <button
+                    onClick={() => { setFilterFamily('NONE'); setFilterSubfamily(null) }}
+                    className="relative w-full p-4 rounded-xl border-2 border-slate-700 hover:border-slate-600 bg-slate-800/50 text-left transition-all overflow-hidden"
+                  >
+                    <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: 'linear-gradient(90deg, transparent, #22D3EE, transparent)' }} />
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-medium text-slate-300">Sin categoría</span>
+                      <span className="text-xs text-slate-500 shrink-0">{familyCounts.get('NONE')}</span>
+                    </div>
+                  </button>
+                )}
+              </div>
+            ) : filterFamily === 'NONE' ? (
+              // Metas sin categoría (decisión B: hogar prominente, no un chevron escondido).
+              <div className="space-y-2">
+                <button onClick={resetCatalogNav} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white mb-1">
+                  <ArrowLeft className="w-3.5 h-3.5" /> Familias
+                </button>
+                {visibleGoals.map(renderGoalRow)}
+              </div>
+            ) : filterSubfamily === null ? (
+              // Nivel 2 — Subfamilias (chips, tokens FamilySubfamilyPicker Nivel 2).
+              <div className="space-y-3">
+                <button onClick={resetCatalogNav} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white">
+                  <ArrowLeft className="w-3.5 h-3.5" /> Familias
+                </button>
+                <p className="text-sm text-slate-300">{GOAL_FAMILY_LABELS[filterFamily]}</p>
+                <div className="flex flex-wrap gap-2">
+                  {GOAL_SUBFAMILIES[filterFamily].map((sub) => (
+                    <button
+                      key={sub}
+                      onClick={() => setFilterSubfamily(sub)}
+                      className="px-3 py-1.5 rounded-full text-xs font-light border bg-slate-800/40 border-slate-700/60 text-slate-400 hover:border-slate-600 transition-all"
+                    >
+                      {sub}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              // Narrativa de contexto (una vez por familia) + metas de la subfamilia.
+              <div className="space-y-3">
+                <button onClick={() => setFilterSubfamily(null)} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white">
+                  <ArrowLeft className="w-3.5 h-3.5" /> {GOAL_FAMILY_LABELS[filterFamily]}
+                </button>
+                <p className="text-xs text-slate-400 font-light leading-relaxed">{GOAL_FAMILY_CONTEXT[filterFamily]}</p>
+                {visibleGoals.length === 0 ? (
+                  <p className="text-center text-slate-500 text-sm py-4">No hay metas en {filterSubfamily}.</p>
+                ) : (
+                  <div className="space-y-2">{visibleGoals.map(renderGoalRow)}</div>
+                )}
+              </div>
             )}
           </div>
           </motion.div>

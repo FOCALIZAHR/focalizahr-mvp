@@ -37,15 +37,15 @@ export const GOAL_FAMILY_ORDER: readonly GoalFamily[] = [
 /**
  * Subfamilias válidas por familia. "Otros" SIEMPRE al final del grupo.
  *
- * CULTURA_Y_PERSONAS está CONFIRMADA por Victor.
- * Las otras 3 son PROVISIONALES: arrancan solo con "Otros" — NO se inventan
- * subfamilias que nadie confirmó. Completarlas es editar este archivo, nada más.
+ * Las 4 familias están CONFIRMADAS por Victor (2026-07-16) — listo para producción.
+ * `'Otros'` queda en todas (fallback). `'Clima'` es contrato con el módulo de Clima
+ * (ver FAMILY_CLIMA/SUBFAMILY_CLIMA abajo): no renombrar.
  */
 export const GOAL_SUBFAMILIES: Record<GoalFamily, readonly string[]> = {
-  NEGOCIO_E_INGRESOS: ['Otros'], // PROVISIONAL
-  CLIENTES_Y_USUARIOS: ['Otros'], // PROVISIONAL
-  OPERACION_Y_EFICIENCIA: ['Otros'], // PROVISIONAL
-  CULTURA_Y_PERSONAS: ['Clima', 'Rotación', 'Desarrollo', 'Otros'], // CONFIRMADA
+  NEGOCIO_E_INGRESOS: ['Rentabilidad', 'Ventas y Crecimiento', 'Eficiencia de Costos', 'Riesgos y Cumplimiento', 'Otros'],
+  CLIENTES_Y_USUARIOS: ['Fidelización y NPS', 'Adquisición de Clientes', 'Calidad de Servicio', 'Posicionamiento de Marca', 'Otros'],
+  OPERACION_Y_EFICIENCIA: ['Productividad y SLAs', 'Calidad y Precisión', 'Digitalización y Procesos', 'Mejora Continua', 'Otros'],
+  CULTURA_Y_PERSONAS: ['Clima', 'Rotación', 'Desarrollo', 'Adquisición de Talento', 'Otros'],
 } as const
 
 // ── Contrato con el módulo de Clima ─────────────────────────────────────────
@@ -108,16 +108,32 @@ export function getMeasurementExample(family: GoalFamily, metric: GoalMetricType
   return GOAL_MEASUREMENT_EXAMPLES[family][metric]
 }
 
+// ⚠️ DOS narrativas de familia — NO confundir, tienen usos distintos:
+//
 /**
  * "Dolor" típico por familia — narrativa corta que se muestra al elegir la familia
  * (Gate C, 4.6). Contenido final de Victor, VERBATIM. Ayuda al jefe a entender qué
  * problemas cubre cada familia antes de elegir subfamilia.
+ * USO: `FamilySubfamilyPicker` (Camino D individual + 'crear nueva' masivo), al elegir FAMILIA.
  */
 export const GOAL_FAMILY_PAIN_POINTS: Record<GoalFamily, string> = {
   NEGOCIO_E_INGRESOS: 'Cuidar el margen de ganancia frente al aumento de costos, evitar gastos innecesarios en software duplicado y priorizar ingresos seguros.',
   CLIENTES_Y_USUARIOS: 'Clientes que se van (churn), alto costo para conseguir clientes nuevos y fricción en los canales de atención digital.',
   OPERACION_Y_EFICIENCIA: 'Proyectos que se retrasan, horas perdidas en tareas manuales que se pueden automatizar y burocracia interna.',
   CULTURA_Y_PERSONAS: 'Fuga de personas clave en puestos críticos, jefaturas que no dan feedback y resguardar un ambiente laboral de respeto.',
+}
+
+/**
+ * Contexto de negocio por familia — narrativa del CATÁLOGO DEL BANCO (Gate CAT·B),
+ * mostrada al elegir SUBFAMILIA. Una vez por familia (no hay narrativa por subfamilia).
+ * USO: nuevo catálogo de `GoalBankScreen`. DISTINTO de GOAL_FAMILY_PAIN_POINTS (arriba):
+ * aquel es el "dolor" en el picker de creación; éste es el contexto al asignar del banco.
+ */
+export const GOAL_FAMILY_CONTEXT: Record<GoalFamily, string> = {
+  NEGOCIO_E_INGRESOS: 'Asegurar el crecimiento sostenible, proteger la rentabilidad de las líneas de negocio y mitigar los riesgos financieros o de cumplimiento.',
+  CLIENTES_Y_USUARIOS: 'Mejorar la experiencia de nuestros usuarios, elevar los índices de satisfacción y fidelizar a la cartera de clientes para evitar fugas al competidor.',
+  OPERACION_Y_EFICIENCIA: 'Optimizar los tiempos de entrega de procesos críticos, reducir el porcentaje de errores o reprocesos y avanzar en la automatización del área.',
+  CULTURA_Y_PERSONAS: GOAL_FAMILY_PAIN_POINTS.CULTURA_Y_PERSONAS, // mismo texto, NO duplicar
 }
 
 /**
