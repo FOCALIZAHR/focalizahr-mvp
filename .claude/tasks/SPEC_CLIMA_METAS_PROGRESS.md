@@ -14,13 +14,15 @@
 **Objetivo de la tarea:** conectar Clima con Metas (que una meta corporativa de categoría
 "Clima" sea encontrable automáticamente) + rediseñar la UX del wizard de creación de metas.
 
-**En curso ahora:** 🟢 **GATE UX·A + UX·B SELLADO (2026-07-16)** — rediseño UX del catálogo del banco
-(camino cascade): catálogo agrupado/colapsable por familia (O(N) memoizado, colapsado por defecto,
-búsqueda abre solo), transición animada catálogo↔distribución, totalizador de peso POR PERSONA, copy
-Paso 1. Todo dentro de `GoalBankScreen` (compartido → individual también lo gana). Sin schema, sin tocar
-lógica; regresión de los 3 comportamientos de Gate 3·B **5/5 intactos**, build verde. **UI-driven pend.
-manual.** El **Paso 2 (bifurcación en tarjetas) + camino 'new' → GATE UX·C DIFERIDO** (entrelazado, ver
-entrada abajo). **Siguiente: retomar CLIMA** (postergado desde el Punto 2), o Gate UX·C cuando se decida.
+**En curso ahora:** 🟢 **GATE CAT·A + CAT·B SELLADO (2026-07-16)** — rediseño del catálogo del banco
+(corrige regresión UX·B: 10/11 metas caían en "Sin categoría" tras un chevron que nadie clickeaba,
+confirmado con 7 gerentes). El catálogo agrupado/colapsable de UX·B se REEMPLAZA por navegación
+Familia → Subfamilia → narrativa + metas (Patrón G), con 5ª tarjeta "Sin categoría" prominente y
+"search=lista plana". Contenido: subfamilias de las 4 familias a producción + `GOAL_FAMILY_CONTEXT`.
+Todo en `GoalBankScreen` + `goalCategories.ts`; distribución (estado `selected`) intacta → regresión
+3·B **4/4**, build verde. **CAT·C (backfill) DESCARTADO** (las 10 metas son data de prueba). **UI-driven
+pend. manual.** **Siguiente: handoff de CLIMA** (postergado desde el Punto 2). Gate UX·C (Paso 2 tarjetas
++ camino 'new' Typeform) sigue DIFERIDO.
 
 **Commits locales sin pushear (push manual de Victor):** Punto 2 = `b5f5a90` (impl) + `312adcc` (sello).
 Gate 3·A = ver commits de esta sesión. Los 4 archivos `.claude/skills/focalizahr-api/*` modificados por
@@ -56,7 +58,8 @@ del wizard ya puede llamar `hasPermission(role, 'goals:create:strategic')` direc
 | **Punto 2** (description obligatoria server-side + `Goal.kpiSource`) | ✅ **SELLADO** (`b5f5a90`+`312adcc`, 2026-07-15, **db push aplicado**, smoke 12/12→17/17 con casos 6-7). Cierra deuda 4.4 client-only |
 | **Gate 3·A** (Familia obligatoria en 'crear nueva' del asignador masivo) | ✅ **SELLADO** (2026-07-15, sin schema, smoke 7/7). `FamilySubfamilyPicker` generalizado + reutilizado |
 | **Gate 3·B** (migración acotada: rama 'Cascadear' → `GoalBankScreen`) | ✅ **SELLADO** (2026-07-15, sin schema, smoke headless 10/10, UI-driven pend. manual). Resuelve deuda 4.7 |
-| **Gate UX·A + UX·B** (rediseño catálogo del banco, camino cascade) | ✅ **SELLADO** (2026-07-16, sin schema, regresión 3·B 5/5). Agrupación por familia + transición + totalizador por persona. UI-driven pend. |
+| **Gate UX·A + UX·B** (banco: transición + totalizador + [agrupación]) | ✅ **SELLADO** (2026-07-16, regresión 3·B 5/5). ⚠️ La **agrupación/colapsable** de UX·B fue **REEMPLAZADA por CAT·B** (falló con 7 gerentes). Transición + totalizador siguen vigentes |
+| **Gate CAT·A + CAT·B** (catálogo del banco: navegación Familia→Subfamilia) | ✅ **SELLADO** (2026-07-16, sin schema, regresión 3·B 4/4). Reemplaza la agrupación de UX·B. Subfamilias a producción + `GOAL_FAMILY_CONTEXT` + 5ª tarjeta "Sin categoría". **CAT·C backfill DESCARTADO** |
 | **Gate UX·C** (Paso 2 tarjetas + rediseño camino 'crear nueva') | 📋 **DIFERIDO** — entrelazado con 'new' (reabre lógica sellada). Documentado, B1-lite anotado sin confirmar |
 
 ---
@@ -132,6 +135,29 @@ Rediseño UX del catálogo del banco (camino cascade), todo dentro de `GoalBankS
   transición + totalizador (mejora estricta). **Ninguna lógica tocada** (weights/pre-exclusión/`handleSubmit`
   intactos) → regresión headless de los 3 comportamientos de Gate 3·B **5/5**.
 - **UI-driven PENDIENTE de pase manual**: agrupación colapsable, transición, totalizador en vivo.
+
+### ✅ GATE CAT·A + CAT·B — SELLADO (2026-07-16, sin schema, regresión 3·B 4/4)
+Rediseño del catálogo del banco. **Reemplaza** la agrupación/colapsable de UX·B (falló con 7 gerentes:
+10/11 metas caían en "Sin categoría" tras un chevron que nadie clickeaba como interactivo).
+- **CAT·A (`goalCategories.ts`):** `GOAL_SUBFAMILIES` de las 3 familias PROVISIONAL → **producción**
+  (subfamilias confirmadas por Victor) + `'Adquisición de Talento'` en CULTURA. `'Otros'` y `'Clima'`
+  (contrato Clima) intactas. Nuevo `GOAL_FAMILY_CONTEXT` (narrativa del catálogo, al elegir subfamilia;
+  CULTURA referencia `GOAL_FAMILY_PAIN_POINTS`, no duplica) con comentario `⚠️ DOS narrativas — NO
+  confundir`. Chequeo read-only BD: solo 2 pares (family,subfamily) existentes, ambos `'Otros'`, 0 inválidos.
+  **Impacto compartido:** `FamilySubfamilyPicker` (Camino D individual + 'crear nueva' masivo) ahora muestra
+  las subfamilias nuevas — finalización consistente aprobada.
+- **CAT·B (`GoalBankScreen`, SOLO estado `!selected`):** navegación Familia (tarjetas `StepChooseFlow`,
+  **línea Tesla UN color cyan** solo en esta tarjeta chica) → Subfamilia (chips) → `GOAL_FAMILY_CONTEXT`
+  + lista de metas. **5ª tarjeta "Sin categoría · N"** prominente (decisión B: hogar visible para las
+  huérfanas). **"search = lista plana"** (buscar por nombre no obliga a navegar). Fila de meta: título +
+  "Mide/Objetivo" (entender sin adivinar). Click → distribución sellada (**Opción A**: su cabecera candado
+  ES el "ver KPI/target", sin pantalla nueva ni número hero). Estado local de filtro (`filterFamily`/
+  `filterSubfamily`), memos O(N). Se eliminó `grouped`/`expandedFamilies`/`ChevronDown` de UX·B.
+- **Distribución (estado `selected`) NO tocada** → los 3 comportamientos de Gate 3·B (pre-exclusión, éxito
+  parcial, `preselectedIds`) intactos: regresión headless **4/4**. **Individual** (`CreateGoalWizard`
+  step 8): props sin cambios → usa el catálogo nuevo, distribución intacta, no roto.
+- **CAT·C (backfill de categorías de metas viejas): DESCARTADO** — las 10 sin categoría son data de prueba.
+- **UI-driven PENDIENTE de pase manual**: navegación familia→subfamilia, 5ª tarjeta, search plano, narrativa.
 
 ### 📋 GATE UX·C — DIFERIDO (rediseño del camino 'crear nueva' masivo) — NO descartado
 Parte del rediseño UX del flujo masivo "Asignar Metas" (spec externa Gemini + prueba de Victor).

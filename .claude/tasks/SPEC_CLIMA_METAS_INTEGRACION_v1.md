@@ -598,6 +598,12 @@ construir ahora, solo dejar la puerta anotada".
 > `GoalBankScreen` (individual también lo gana), sin tocar la lógica de Gate 3·B (regresión 5/5). El
 > **Paso 2 en tarjetas + rediseño del camino 'crear nueva' (Typeform) quedó DIFERIDO como Gate UX·C**
 > (entrelazado con 'new', reabre lógica sellada). Detalle en `SPEC_CLIMA_METAS_PROGRESS.md`.
+>
+> ✅ **Catálogo del banco reconstruido (Gate CAT·A/CAT·B, 2026-07-16)** — la agrupación/colapsable de UX·B
+> falló con 7 gerentes (10/11 metas en "Sin categoría" tras un chevron no reconocido). Se REEMPLAZA por
+> navegación **Familia → Subfamilia → contexto + metas** (Patrón G), con 5ª tarjeta "Sin categoría"
+> prominente y "search=lista plana". Subfamilias de las 4 familias a producción + `GOAL_FAMILY_CONTEXT`.
+> Solo el estado `!selected`; distribución (3·B) intacta (regresión 4/4). Backfill de metas viejas descartado.
 
 ### 4.0 Principio guía — no es un rediseño visual, es separar 2 flujos forzados a compartir pasos
 
