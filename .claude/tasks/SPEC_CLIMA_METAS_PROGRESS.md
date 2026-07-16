@@ -20,9 +20,11 @@ confirmado con 7 gerentes). El catálogo agrupado/colapsable de UX·B se REEMPLA
 Familia → Subfamilia → narrativa + metas (Patrón G), con 5ª tarjeta "Sin categoría" prominente y
 "search=lista plana". Contenido: subfamilias de las 4 familias a producción + `GOAL_FAMILY_CONTEXT`.
 Todo en `GoalBankScreen` + `goalCategories.ts`; distribución (estado `selected`) intacta → regresión
-3·B **4/4**, build verde. **CAT·C (backfill) DESCARTADO** (las 10 metas son data de prueba). **UI-driven
-pend. manual.** **Siguiente: handoff de CLIMA** (postergado desde el Punto 2). Gate UX·C (Paso 2 tarjetas
-+ camino 'new' Typeform) sigue DIFERIDO.
+3·B **4/4**, build verde. **CAT·C (backfill) DESCARTADO** (las 10 metas son data de prueba).
+**+ Reestilizado Patrón G (2026-07-16, visual)**: catálogo con tarjetas de categoría + tabs underline +
+split narrativa/metas; `LockedKpiCard` con Objetivo como número hero blanco. JSX/clases only, regresión
+3·B **4/4**. **UI-driven pend. manual.** **Siguiente: handoff de CLIMA** (postergado desde el Punto 2).
+Gate UX·C (Paso 2 tarjetas + 'new' Typeform) y separar la distribución en 2 pantallas siguen DIFERIDOS.
 
 **Commits locales sin pushear (push manual de Victor):** Punto 2 = `b5f5a90` (impl) + `312adcc` (sello).
 Gate 3·A = ver commits de esta sesión. Los 4 archivos `.claude/skills/focalizahr-api/*` modificados por
@@ -158,6 +160,19 @@ Rediseño del catálogo del banco. **Reemplaza** la agrupación/colapsable de UX
   step 8): props sin cambios → usa el catálogo nuevo, distribución intacta, no roto.
 - **CAT·C (backfill de categorías de metas viejas): DESCARTADO** — las 10 sin categoría son data de prueba.
 - **UI-driven PENDIENTE de pase manual**: navegación familia→subfamilia, 5ª tarjeta, search plano, narrativa.
+- **Reestilizado Patrón G (2026-07-16, visual, regresión 3·B 4/4):** catálogo con header Guided
+  Intelligence (contexto 10px + título split + conteo al lado); Familias como **tarjetas de categoría**
+  (número grande extralight que auto-resalta las que tienen metas), "Sin categoría" = 5ª categoría en la
+  grilla; Subfamilias como **tabs underline** (no chips); narrativa+metas en **split 2 columnas**.
+  `LockedKpiCard`: "Mide" con label + texto completo a la izquierda, **"Objetivo" como número hero
+  BLANCO** (no cyan) con divisoria a la derecha, candado+"consolidada" abajo. **JSX/clases only** — no
+  toca la máquina de estados (`filterFamily`/`filterSubfamily`/`setSelected`) ni el estado `selected`.
+
+### 📋 DIFERIDO (anotado, sin decisión) — la distribución mezcla dos funciones
+La pantalla de distribución (estado `selected` de `GoalBankScreen`) hoy hace **dos cosas en una sola
+vista**: (1) mostrar la meta consolidada (`LockedKpiCard`) y (2) seleccionar personas + asignar peso.
+Separarlas en dos momentos queda **pendiente de diseño, sin decisión tomada**. No bloquea nada; se anota
+para una sesión futura (mismo espíritu que el Gate UX·C).
 
 ### 📋 GATE UX·C — DIFERIDO (rediseño del camino 'crear nueva' masivo) — NO descartado
 Parte del rediseño UX del flujo masivo "Asignar Metas" (spec externa Gemini + prueba de Victor).
