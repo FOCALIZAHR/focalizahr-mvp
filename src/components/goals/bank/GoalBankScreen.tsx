@@ -220,18 +220,6 @@ export default memo(function GoalBankScreen({ bankLevel, preselectedIds, onDone,
   // ── Render ──
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-extralight text-white tracking-tight">
-          Distribuir{' '}
-          <span className="fhr-title-gradient">
-            {bankLevel === 'COMPANY' ? 'meta corporativa' : bankLevel === 'AREA' ? 'meta de área' : 'meta del banco'}
-          </span>
-        </h2>
-        <p className="text-sm text-slate-400 mt-1">
-          Elegí una meta ya definida y asignala a tu equipo. El indicador viene consolidado: solo definís el peso.
-        </p>
-      </div>
-
       {loading ? (
         <div className="space-y-2">
           <div className="fhr-skeleton h-16 w-full rounded-lg" />
@@ -243,7 +231,20 @@ export default memo(function GoalBankScreen({ bankLevel, preselectedIds, onDone,
         <AnimatePresence mode="wait" initial={false}>
         {!selected ? (
           // ── Selección de la meta del banco ──
-          <motion.div key="catalog" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+          <motion.div key="catalog" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-5">
+          {/* Header estilo Guided Intelligence (Patrón G): contexto + título split + conteo al lado */}
+          <div>
+            <span className="text-[10px] uppercase tracking-widest text-slate-500">Banco de metas</span>
+            <div className="flex items-start justify-between gap-4 mt-1">
+              <h2 className="text-2xl font-extralight text-white tracking-tight">
+                Elegí una <span className="fhr-title-gradient">meta consolidada</span>
+              </h2>
+              <p className="text-sm text-slate-400 font-light shrink-0 mt-1">
+                {filtered.length} {filtered.length === 1 ? 'disponible' : 'disponibles'}
+              </p>
+            </div>
+          </div>
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
@@ -263,75 +264,73 @@ export default memo(function GoalBankScreen({ bankLevel, preselectedIds, onDone,
               // Búsqueda por nombre → lista plana (no obliga a navegar por familia).
               <div className="space-y-2">{filtered.map(renderGoalRow)}</div>
             ) : filterFamily === null ? (
-              // Nivel 1 — Familias (tarjetas StepChooseFlow, línea Tesla UN color) + Sin categoría.
-              <div className="space-y-2">
+              // Nivel 1 — Familias como TARJETAS DE CATEGORÍA (Guided Intelligence): número grande
+              // extralight que auto-resalta las que tienen metas. "Sin categoría" es una categoría
+              // más en la grilla, mismo tratamiento visual.
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {GOAL_FAMILY_ORDER.map((fam) => {
                   const count = familyCounts.get(fam) ?? 0
+                  const has = count > 0
                   return (
                     <button
                       key={fam}
                       onClick={() => { setFilterFamily(fam); setFilterSubfamily(null) }}
-                      className="relative w-full p-4 rounded-xl border-2 border-slate-700 hover:border-slate-600 bg-slate-800/50 text-left transition-all overflow-hidden"
+                      className={cn('p-4 rounded-lg text-center border transition-all', has ? 'bg-slate-800/80 border-cyan-500/30' : 'bg-slate-800/40 border-slate-700/50 hover:border-slate-600')}
                     >
-                      <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: 'linear-gradient(90deg, transparent, #22D3EE, transparent)' }} />
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-medium text-white">{GOAL_FAMILY_LABELS[fam]}</span>
-                        <span className="text-xs text-slate-500 shrink-0">{count}</span>
-                      </div>
+                      <span className={cn('text-3xl font-extralight tabular-nums', has ? 'text-cyan-400' : 'text-slate-600')}>{count}</span>
+                      <p className="text-xs text-slate-400 mt-1 leading-tight">{GOAL_FAMILY_LABELS[fam]}</p>
                     </button>
                   )
                 })}
                 {(familyCounts.get('NONE') ?? 0) > 0 && (
                   <button
                     onClick={() => { setFilterFamily('NONE'); setFilterSubfamily(null) }}
-                    className="relative w-full p-4 rounded-xl border-2 border-slate-700 hover:border-slate-600 bg-slate-800/50 text-left transition-all overflow-hidden"
+                    className="p-4 rounded-lg text-center border bg-slate-800/80 border-cyan-500/30 hover:border-cyan-500/50 transition-all"
                   >
-                    <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: 'linear-gradient(90deg, transparent, #22D3EE, transparent)' }} />
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-medium text-slate-300">Sin categoría</span>
-                      <span className="text-xs text-slate-500 shrink-0">{familyCounts.get('NONE')}</span>
-                    </div>
+                    <span className="text-3xl font-extralight tabular-nums text-cyan-400">{familyCounts.get('NONE')}</span>
+                    <p className="text-xs text-slate-400 mt-1 leading-tight">Sin categoría</p>
                   </button>
                 )}
               </div>
             ) : filterFamily === 'NONE' ? (
-              // Metas sin categoría (decisión B: hogar prominente, no un chevron escondido).
+              // Metas sin categoría (decisión B: hogar prominente).
               <div className="space-y-2">
                 <button onClick={resetCatalogNav} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white mb-1">
                   <ArrowLeft className="w-3.5 h-3.5" /> Familias
                 </button>
                 {visibleGoals.map(renderGoalRow)}
               </div>
-            ) : filterSubfamily === null ? (
-              // Nivel 2 — Subfamilias (chips, tokens FamilySubfamilyPicker Nivel 2).
-              <div className="space-y-3">
+            ) : (
+              // Familia real → subfamilias como TABS UNDERLINE (skill: "Tabs underline, no pills").
+              // Al elegir subfamilia → SPLIT narrativa izq / metas der ("narrativa antes de lista").
+              <div className="space-y-4">
                 <button onClick={resetCatalogNav} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white">
                   <ArrowLeft className="w-3.5 h-3.5" /> Familias
                 </button>
-                <p className="text-sm text-slate-300">{GOAL_FAMILY_LABELS[filterFamily]}</p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex gap-6 border-b border-slate-700/50 overflow-x-auto">
                   {GOAL_SUBFAMILIES[filterFamily].map((sub) => (
                     <button
                       key={sub}
                       onClick={() => setFilterSubfamily(sub)}
-                      className="px-3 py-1.5 rounded-full text-xs font-light border bg-slate-800/40 border-slate-700/60 text-slate-400 hover:border-slate-600 transition-all"
+                      className={cn('pb-2 text-sm whitespace-nowrap border-b-2 transition-colors', filterSubfamily === sub ? 'text-cyan-400 border-cyan-400' : 'text-slate-500 border-transparent hover:text-slate-300')}
                     >
                       {sub}
                     </button>
                   ))}
                 </div>
-              </div>
-            ) : (
-              // Narrativa de contexto (una vez por familia) + metas de la subfamilia.
-              <div className="space-y-3">
-                <button onClick={() => setFilterSubfamily(null)} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white">
-                  <ArrowLeft className="w-3.5 h-3.5" /> {GOAL_FAMILY_LABELS[filterFamily]}
-                </button>
-                <p className="text-xs text-slate-400 font-light leading-relaxed">{GOAL_FAMILY_CONTEXT[filterFamily]}</p>
-                {visibleGoals.length === 0 ? (
-                  <p className="text-center text-slate-500 text-sm py-4">No hay metas en {filterSubfamily}.</p>
+                {filterSubfamily === null ? (
+                  <p className="text-sm text-slate-500 py-4">Elegí una subfamilia para ver sus metas.</p>
                 ) : (
-                  <div className="space-y-2">{visibleGoals.map(renderGoalRow)}</div>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <p className="text-xs text-slate-400 font-light leading-relaxed">{GOAL_FAMILY_CONTEXT[filterFamily]}</p>
+                    <div className="space-y-2">
+                      {visibleGoals.length === 0 ? (
+                        <p className="text-sm text-slate-500">No hay metas en {filterSubfamily}.</p>
+                      ) : (
+                        visibleGoals.map(renderGoalRow)
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             )}
@@ -345,22 +344,34 @@ export default memo(function GoalBankScreen({ bankLevel, preselectedIds, onDone,
               className="absolute top-0 left-0 right-0 h-[2px]"
               style={{ background: 'linear-gradient(90deg, transparent, #22D3EE, #A78BFA, transparent)' }}
             />
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-start justify-between gap-5">
+              {/* Izquierda: título + "Mide" con su propio label, texto completo */}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-3">
                   <Target className="w-4 h-4 text-cyan-400 shrink-0" />
                   <span className="text-white font-medium truncate">{selected.title}</span>
                 </div>
-                <p className="text-sm text-slate-400">Mide: {selected.description || 'sin indicador registrado'}</p>
-                <p className="text-sm text-slate-400">Objetivo: {selected.targetValue}{selected.unit ? ` ${selected.unit}` : ''}</p>
+                <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">Mide</p>
+                <p className="text-sm text-slate-300 font-light leading-relaxed">
+                  {selected.description || 'sin indicador registrado'}
+                </p>
+              </div>
+              {/* Derecha: Objetivo como número HERO, BLANCO (no cyan), separado por divisoria */}
+              <div className="shrink-0 pl-5 border-l border-slate-700/50 text-right">
+                <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">Objetivo</p>
+                <p className="text-5xl font-extralight tabular-nums text-white leading-none">{selected.targetValue}</p>
+                {selected.unit && <p className="text-xs text-slate-500 mt-1.5">{selected.unit}</p>}
+              </div>
+            </div>
+            {/* Candado + "consolidada" abajo, sin competir; "Cambiar" al lado */}
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                <Lock className="w-3 h-3 shrink-0" />
+                Esta meta está consolidada. Los indicadores no son editables.
               </div>
               <button onClick={() => { setSelected(null); setWeights({}) }} className="text-xs text-slate-500 hover:text-white shrink-0">
                 Cambiar
               </button>
-            </div>
-            <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-500">
-              <Lock className="w-3 h-3" />
-              Esta meta está consolidada. Los indicadores no son editables.
             </div>
           </div>
 
