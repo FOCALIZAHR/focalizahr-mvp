@@ -14,12 +14,12 @@
 **Objetivo de la tarea:** conectar Clima con Metas (que una meta corporativa de categoría
 "Clima" sea encontrable automáticamente) + rediseñar la UX del wizard de creación de metas.
 
-**En curso ahora:** 🟢 **GATE 3·A SELLADO (2026-07-15)** — Punto 3 partido en dos por la decisión de
-migración acotada. **Gate 3·A = Familia obligatoria en la rama 'crear nueva' del asignador masivo**
-(reusa `FamilySubfamilyPicker` generalizado). Sin schema, smoke 7/7. **Siguiente: GATE 3·B** — migración
-acotada: la rama 'Cascadear' de BulkAssignWizard pasa a usar `GoalBankScreen` (personas precargadas +
-COMPANY,AREA + KPI heredado + éxito parcial + pre-excluir duplicados). Plan Mode con diff antes de tocar.
-(Clima queda POSTERGADO hasta cerrar Gate 3·B.)
+**En curso ahora:** 🟢 **GATE 3·B SELLADO (2026-07-15)** — migración ACOTADA: la rama 'Cascadear' del
+asignador masivo pasa a `GoalBankScreen` (personas precargadas + COMPANY,AREA + KPI heredado + éxito
+parcial + pre-excluir duplicados en ambos flujos). Una sola fuente de verdad para asignar meta heredada.
+Sin schema, smoke headless 10/10, build verde. **UI-driven pendiente de pase manual de Victor** (checklist
+abajo). **Con esto el Punto 3 queda COMPLETO (3·A + 3·B).** **Siguiente: retomar CLIMA** (postergado
+desde el Punto 2).
 
 **Commits locales sin pushear (push manual de Victor):** Punto 2 = `b5f5a90` (impl) + `312adcc` (sello).
 Gate 3·A = ver commits de esta sesión. Los 4 archivos `.claude/skills/focalizahr-api/*` modificados por
@@ -54,7 +54,7 @@ del wizard ya puede llamar `hasPermission(role, 'goals:create:strategic')` direc
 | **Gate C** (UX wizard) | ✅ **SELLADO** (`2ee07d2` + `f89f68f`, 2026-07-15, smoke 20/20 + 8/8). Recorrido por rol + banco + categoría + peso hero + narrativa 4.6 |
 | **Punto 2** (description obligatoria server-side + `Goal.kpiSource`) | ✅ **SELLADO** (`b5f5a90`+`312adcc`, 2026-07-15, **db push aplicado**, smoke 12/12→17/17 con casos 6-7). Cierra deuda 4.4 client-only |
 | **Gate 3·A** (Familia obligatoria en 'crear nueva' del asignador masivo) | ✅ **SELLADO** (2026-07-15, sin schema, smoke 7/7). `FamilySubfamilyPicker` generalizado + reutilizado |
-| **Gate 3·B** (migración acotada: rama 'Cascadear' → `GoalBankScreen`) | 📋 **PLANIFICADO** — 3 decisiones resueltas (handoff-Paso-2, preselectedIds filtra, `parentId` en /team). Falta diff + impl |
+| **Gate 3·B** (migración acotada: rama 'Cascadear' → `GoalBankScreen`) | ✅ **SELLADO** (2026-07-15, sin schema, smoke headless 10/10, UI-driven pend. manual). Resuelve deuda 4.7 |
 
 ---
 
@@ -90,12 +90,30 @@ con 2 desviaciones documentadas como deuda (abajo).
   (2026-07-15).** El campo discriminador nuevo es `Goal.kpiSource` (OWN/INHERITED): el enforcement
   server-side vive en `prepareGoalData` gateado por `kpiSource==='OWN'`, así NO rompe el banco
   (INHERITED no exige). Detalle en la sección "PUNTO 2 — SELLADO" abajo.
-- **4.7 `BulkAssignWizard` edita `targetValue` por persona en la rama heredada** → **ATACADO por
-  GATE 3·B** (migración ACOTADA, decidida 2026-07-15): solo la rama 'Cascadear' pasa a `GoalBankScreen`
-  (que congela el KPI por diseño), la rama 'Crear nueva' NO se toca. Corrección al encuadre viejo de
-  "3 capacidades a preservar": (1) subselección precargada → SÍ se porta (`preselectedIds`);
-  (2) `goalSource:'new'` → fuera de alcance, se queda en BulkAssign; (3) target por persona → NO se
-  preserva en heredadas, ES el defecto a eliminar. Ver plan Gate 3·B abajo.
+- ~~**4.7 `BulkAssignWizard` edita `targetValue` por persona en la rama heredada**~~ ✅ **RESUELTA por
+  GATE 3·B** (migración ACOTADA, 2026-07-15): la rama 'Cascadear' pasa a `GoalBankScreen` (congela el
+  KPI por diseño, sin input de target); 'Crear nueva' intacta. Las "3 capacidades": (1) subselección
+  precargada → portada (`preselectedIds`); (2) `goalSource:'new'` → fuera de alcance, sigue en
+  BulkAssign; (3) target por persona → ERA el defecto, eliminado en heredadas.
+
+### ✅ GATE 3·B — SELLADO (2026-07-15, sin schema, smoke headless 10/10)
+Migración acotada rama 'Cascadear' → `GoalBankScreen` (una sola fuente de verdad para asignar meta
+heredada, usada por individual y masiva):
+- **`GoalBankScreen`**: props `bankLevel` widened a `'COMPANY,AREA'` (Punto 1) + `preselectedIds?`
+  (filtra la lista a las personas del grid) + `onCancel?` (masiva vuelve al Paso 2). `useEffect` siembra
+  pesos sugeridos al elegir meta. Pre-excluir duplicados en **ambos** flujos (`alreadyHas` por
+  `goalParentIds`, sin gate de `preselectedIds`). "Cambiar" limpia pesos. Éxito parcial YA existía.
+- **`/api/goals/team`**: aditivo — `parentId` en el select + `goalParentIds: string[]` por persona
+  (todas las metas vivas, no solo visibleGoals). Consumidores previos lo ignoran.
+- **`BulkAssignWizard`**: `showBank` + handoff en `goNext` (Paso 2 'cascade' → banco); return temprano
+  DESPUÉS de todos los hooks (regla de hooks verificada: último = `renderStepContent`); `handleSubmit`
+  simplificado a solo 'new'; `canProceed` case 2 cascade → `true`.
+- **`StepSelectGoal`**: rama 'cascade' ya no lista metas (se eligen en el banco) — solo un hint; se
+  quitó `useGoals`/`handleSelectParent`/ícono `Target`. Rama 'new' intacta.
+- **Individual (`CreateGoalWizard` step 8): CERO cambio** — pasa `bankLevel` único, sin `preselectedIds`
+  ni `onCancel` → sin filtro/siembra/back; el único añadido visible es que ahora también pre-excluye
+  duplicados (mejora estricta, aprobada por Victor).
+- **UI-driven PENDIENTE de pase manual** (headless cubre la capa de datos): ver checklist en el sello.
 
 ### ✅ GATE 3·A — SELLADO (2026-07-15, smoke 7/7, sin schema)
 Familia obligatoria en la rama 'crear nueva' del asignador masivo (paridad con Camino D):

@@ -583,6 +583,14 @@ construir ahora, solo dejar la puerta anotada".
 > del banco) y 4.7 (`BulkAssignWizard` sigue con target por persona — migración a
 > `GoalBankScreen` diferida como gate futuro, Opción C). Detalle en
 > `SPEC_CLIMA_METAS_PROGRESS.md` §"GATE C — SELLADO".
+>
+> ✅ **ACTUALIZACIÓN post-Gate C — las 2 deudas quedaron RESUELTAS (2026-07-15):**
+> (1) La obligatoriedad server-side de "¿Cómo se mide?" (4.4) → **Punto 2** (`b5f5a90`+`312adcc`):
+> campo persistido `Goal.kpiSource` (OWN/INHERITED); el enforcement vive en `prepareGoalData` gateado
+> por OWN, así no rompe el banco. (2) `BulkAssignWizard` con target por persona en la rama heredada
+> (4.7) → **Gate 3·B** migración ACOTADA: la rama 'Cascadear' pasa a `GoalBankScreen` (congela el KPI),
+> 'Crear nueva' intacta. Además **Gate 3·A** sumó Familia obligatoria a 'crear nueva'. Detalle y
+> as-built en `SPEC_CLIMA_METAS_PROGRESS.md`.
 
 ### 4.0 Principio guía — no es un rediseño visual, es separar 2 flujos forzados a compartir pasos
 
