@@ -15,12 +15,13 @@
 'use client'
 
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
-import { Search, Lock, Target, Loader2, Check } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Search, Lock, Target, Loader2, Check, ChevronDown } from 'lucide-react'
+import type { GoalFamily } from '@prisma/client'
 import { cn } from '@/lib/utils'
 import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton'
 import { useToast } from '@/components/ui/toast-system'
-import { GOAL_FAMILY_LABELS } from '@/lib/constants/goalCategories'
+import { GOAL_FAMILY_LABELS, GOAL_FAMILY_ORDER } from '@/lib/constants/goalCategories'
 import {
   buildBankPayload,
   getAvailableWeight,
@@ -92,6 +93,38 @@ export default memo(function GoalBankScreen({ bankLevel, preselectedIds, onDone,
     () => (search ? bankGoals.filter((g) => g.title.toLowerCase().includes(search.toLowerCase())) : bankGoals),
     [bankGoals, search]
   )
+
+  // UX·B: catálogo agrupado por familia. O(N) memoizado sobre `filtered` → solo
+  // re-agrupa cuando cambian metas o búsqueda. N es chico (metas del banco) → sin
+  // debounce ni virtualización. "Sin categoría" al final; familias vacías se saltan.
+  const grouped = useMemo(() => {
+    const buckets = new Map<string, BankParentGoal[]>()
+    for (const g of filtered) {
+      const k = g.family ?? 'NONE'
+      const arr = buckets.get(k)
+      if (arr) arr.push(g)
+      else buckets.set(k, [g])
+    }
+    const out: { key: string; label: string; goals: BankParentGoal[] }[] = []
+    for (const f of GOAL_FAMILY_ORDER) {
+      const arr = buckets.get(f)
+      if (arr) out.push({ key: f, label: GOAL_FAMILY_LABELS[f as GoalFamily], goals: arr })
+    }
+    const none = buckets.get('NONE')
+    if (none) out.push({ key: 'NONE', label: 'Sin categoría', goals: none })
+    return out
+  }, [filtered])
+
+  // Colapsado por defecto; buscar abre todo (isOpen automático) para no esconder matches.
+  const [expandedFamilies, setExpandedFamilies] = useState<Set<string>>(new Set())
+  const toggleFamily = useCallback((key: string) => {
+    setExpandedFamilies((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
 
   const suggested = selected?.weight ?? 0
 
@@ -190,9 +223,13 @@ export default memo(function GoalBankScreen({ bankLevel, preselectedIds, onDone,
           <div className="fhr-skeleton h-16 w-full rounded-lg" />
           <div className="fhr-skeleton h-16 w-full rounded-lg" />
         </div>
-      ) : !selected ? (
-        // ── Selección de la meta del banco ──
-        <>
+      ) : (
+        // UX·A: transición suave catálogo ↔ distribución (mode="wait": el saliente
+        // termina su fade antes de que entre el nuevo). No toca la lógica de ninguno.
+        <AnimatePresence mode="wait" initial={false}>
+        {!selected ? (
+          // ── Selección de la meta del banco ──
+          <motion.div key="catalog" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
@@ -203,33 +240,62 @@ export default memo(function GoalBankScreen({ bankLevel, preselectedIds, onDone,
               className="fhr-input w-full pl-10"
             />
           </div>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div className="space-y-3 max-h-96 overflow-y-auto">
             {filtered.length === 0 ? (
               <p className="text-center text-slate-500 text-sm py-6">
                 No hay metas {bankLevel === 'COMPANY' ? 'corporativas' : bankLevel === 'AREA' ? 'de área' : 'del banco'} disponibles. Pedí al equipo estratégico que cree una.
               </p>
             ) : (
-              filtered.map((g) => (
-                <button
-                  key={g.id}
-                  onClick={() => setSelected(g)}
-                  className="w-full p-4 bg-slate-800/50 hover:bg-slate-800 rounded-xl text-left transition-colors border border-slate-700/50"
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Target className="w-4 h-4 text-cyan-400 shrink-0" />
-                    <span className="text-sm text-white truncate">{g.title}</span>
+              grouped.map((grp) => {
+                // Colapsado por defecto; con búsqueda activa se abre solo (no esconder matches).
+                const open = !!search || expandedFamilies.has(grp.key)
+                return (
+                  <div key={grp.key} className="space-y-2">
+                    <button
+                      onClick={() => toggleFamily(grp.key)}
+                      className="w-full flex items-center justify-between px-1 py-1 text-left"
+                    >
+                      <span className="text-xs font-medium text-slate-300">
+                        {grp.label} <span className="text-slate-500 font-normal">· {grp.goals.length}</span>
+                      </span>
+                      <ChevronDown className={cn('w-4 h-4 text-slate-500 transition-transform', open && 'rotate-180')} />
+                    </button>
+                    <AnimatePresence initial={false}>
+                      {open && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="space-y-2 overflow-hidden"
+                        >
+                          {grp.goals.map((g) => (
+                            <button
+                              key={g.id}
+                              onClick={() => setSelected(g)}
+                              className="w-full p-4 bg-slate-800/50 hover:bg-slate-800 rounded-xl text-left transition-colors border border-slate-700/50"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Target className="w-4 h-4 text-cyan-400 shrink-0" />
+                                <span className="text-sm text-white truncate">{g.title}</span>
+                              </div>
+                              {g.subfamily && (
+                                <span className="text-[10px] text-slate-500 ml-6">{g.subfamily}</span>
+                              )}
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                  {g.family && (
-                    <span className="text-[10px] text-slate-500">{GOAL_FAMILY_LABELS[g.family]}{g.subfamily ? ` · ${g.subfamily}` : ''}</span>
-                  )}
-                </button>
-              ))
+                )
+              })
             )}
           </div>
-        </>
-      ) : (
-        // ── KPI bloqueado + distribución por persona ──
-        <>
+          </motion.div>
+        ) : (
+          // ── KPI bloqueado + distribución por persona ──
+          <motion.div key="distribution" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
           <div className="relative overflow-hidden rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm p-5">
             <div
               className="absolute top-0 left-0 right-0 h-[2px]"
@@ -290,6 +356,9 @@ export default memo(function GoalBankScreen({ bankLevel, preselectedIds, onDone,
                       <span className="text-xs text-slate-500 shrink-0">ya tiene esta meta</span>
                     ) : noData ? (
                       <span className="text-xs text-amber-400 shrink-0">Sin datos de peso — no se puede asignar</span>
+                    ) : included ? (
+                      // UX·B: totalizador POR PERSONA (usado / disponible), en vivo con el slider.
+                      <span className="text-xs text-cyan-400 shrink-0">Asignado: {weights[emp.id]}% · Disp: {avail - weights[emp.id]}%</span>
                     ) : (
                       <span className="text-xs text-slate-500 shrink-0">disp. {avail}%</span>
                     )}
@@ -315,7 +384,9 @@ export default memo(function GoalBankScreen({ bankLevel, preselectedIds, onDone,
               {submitting ? 'Asignando...' : `Asignar a ${selectedIds.length || ''}`}
             </PrimaryButton>
           </div>
-        </>
+          </motion.div>
+        )}
+        </AnimatePresence>
       )}
     </div>
   )

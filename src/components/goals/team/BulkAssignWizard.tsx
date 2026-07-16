@@ -40,7 +40,7 @@ const STEP_COVERS: Record<number, {
     step: 'Paso 1 de 4',
     title: 'Define tu equipo',
     subtitle: 'Vas a asignar la misma meta a varias personas. Confirma quiénes participan.',
-    cta: 'Confirmar Equipo',
+    cta: 'Empezar',
     smartTip: 'Incluye solo a quienes tienen capacidad de peso disponible.'
   },
   2: {
