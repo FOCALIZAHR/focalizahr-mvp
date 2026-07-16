@@ -591,6 +591,13 @@ construir ahora, solo dejar la puerta anotada".
 > (4.7) → **Gate 3·B** migración ACOTADA: la rama 'Cascadear' pasa a `GoalBankScreen` (congela el KPI),
 > 'Crear nueva' intacta. Además **Gate 3·A** sumó Familia obligatoria a 'crear nueva'. Detalle y
 > as-built en `SPEC_CLIMA_METAS_PROGRESS.md`.
+>
+> ✅ **Rediseño UX del banco (Gate UX·A/UX·B, 2026-07-16)** — sobre el mockup 4.2 ("Netflix"): el catálogo
+> del banco pasó de lista plana a **agrupado/colapsable por familia** (colapsado por defecto, búsqueda abre
+> solo), con **transición animada** catálogo↔distribución y **totalizador de peso por persona**. Todo en
+> `GoalBankScreen` (individual también lo gana), sin tocar la lógica de Gate 3·B (regresión 5/5). El
+> **Paso 2 en tarjetas + rediseño del camino 'crear nueva' (Typeform) quedó DIFERIDO como Gate UX·C**
+> (entrelazado con 'new', reabre lógica sellada). Detalle en `SPEC_CLIMA_METAS_PROGRESS.md`.
 
 ### 4.0 Principio guía — no es un rediseño visual, es separar 2 flujos forzados a compartir pasos
 

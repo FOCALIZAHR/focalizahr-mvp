@@ -14,12 +14,13 @@
 **Objetivo de la tarea:** conectar Clima con Metas (que una meta corporativa de categoría
 "Clima" sea encontrable automáticamente) + rediseñar la UX del wizard de creación de metas.
 
-**En curso ahora:** 🟢 **GATE 3·B SELLADO (2026-07-15)** — migración ACOTADA: la rama 'Cascadear' del
-asignador masivo pasa a `GoalBankScreen` (personas precargadas + COMPANY,AREA + KPI heredado + éxito
-parcial + pre-excluir duplicados en ambos flujos). Una sola fuente de verdad para asignar meta heredada.
-Sin schema, smoke headless 10/10, build verde. **UI-driven pendiente de pase manual de Victor** (checklist
-abajo). **Con esto el Punto 3 queda COMPLETO (3·A + 3·B).** **Siguiente: retomar CLIMA** (postergado
-desde el Punto 2).
+**En curso ahora:** 🟢 **GATE UX·A + UX·B SELLADO (2026-07-16)** — rediseño UX del catálogo del banco
+(camino cascade): catálogo agrupado/colapsable por familia (O(N) memoizado, colapsado por defecto,
+búsqueda abre solo), transición animada catálogo↔distribución, totalizador de peso POR PERSONA, copy
+Paso 1. Todo dentro de `GoalBankScreen` (compartido → individual también lo gana). Sin schema, sin tocar
+lógica; regresión de los 3 comportamientos de Gate 3·B **5/5 intactos**, build verde. **UI-driven pend.
+manual.** El **Paso 2 (bifurcación en tarjetas) + camino 'new' → GATE UX·C DIFERIDO** (entrelazado, ver
+entrada abajo). **Siguiente: retomar CLIMA** (postergado desde el Punto 2), o Gate UX·C cuando se decida.
 
 **Commits locales sin pushear (push manual de Victor):** Punto 2 = `b5f5a90` (impl) + `312adcc` (sello).
 Gate 3·A = ver commits de esta sesión. Los 4 archivos `.claude/skills/focalizahr-api/*` modificados por
@@ -55,6 +56,8 @@ del wizard ya puede llamar `hasPermission(role, 'goals:create:strategic')` direc
 | **Punto 2** (description obligatoria server-side + `Goal.kpiSource`) | ✅ **SELLADO** (`b5f5a90`+`312adcc`, 2026-07-15, **db push aplicado**, smoke 12/12→17/17 con casos 6-7). Cierra deuda 4.4 client-only |
 | **Gate 3·A** (Familia obligatoria en 'crear nueva' del asignador masivo) | ✅ **SELLADO** (2026-07-15, sin schema, smoke 7/7). `FamilySubfamilyPicker` generalizado + reutilizado |
 | **Gate 3·B** (migración acotada: rama 'Cascadear' → `GoalBankScreen`) | ✅ **SELLADO** (2026-07-15, sin schema, smoke headless 10/10, UI-driven pend. manual). Resuelve deuda 4.7 |
+| **Gate UX·A + UX·B** (rediseño catálogo del banco, camino cascade) | ✅ **SELLADO** (2026-07-16, sin schema, regresión 3·B 5/5). Agrupación por familia + transición + totalizador por persona. UI-driven pend. |
+| **Gate UX·C** (Paso 2 tarjetas + rediseño camino 'crear nueva') | 📋 **DIFERIDO** — entrelazado con 'new' (reabre lógica sellada). Documentado, B1-lite anotado sin confirmar |
 
 ---
 
@@ -114,6 +117,21 @@ heredada, usada por individual y masiva):
   ni `onCancel` → sin filtro/siembra/back; el único añadido visible es que ahora también pre-excluye
   duplicados (mejora estricta, aprobada por Victor).
 - **UI-driven PENDIENTE de pase manual** (headless cubre la capa de datos): ver checklist en el sello.
+
+### ✅ GATE UX·A + UX·B — SELLADO (2026-07-16, sin schema, regresión 3·B 5/5)
+Rediseño UX del catálogo del banco (camino cascade), todo dentro de `GoalBankScreen`:
+- **UX·A** — transición animada catálogo↔distribución (`AnimatePresence mode="wait"`, fade); cabecera de
+  distribución ya era fija (lista de personas con su propio `overflow-y-auto`); copy Paso 1 cover → "Empezar".
+- **UX·B** — **catálogo agrupado por familia**: `grouped` = `useMemo` O(N) sobre `filtered` (memoizado),
+  orden `GOAL_FAMILY_ORDER` + "Sin categoría" al final, familias vacías se saltan. **Colapsado por
+  defecto** (`expandedFamilies: Set`); con búsqueda activa `isOpen` se fuerza a true (no esconder matches);
+  cuerpo montado solo si abierto (`AnimatePresence`). Header "Familia · N". N chico → sin debounce/virtual.
+  **Totalizador POR PERSONA** en la fila incluida: "Asignado: {w}% · Disp: {avail−w}%" (decisión (a);
+  NO agregado cruzado — no aplica al dominio de presupuesto por-persona).
+- **Compartido:** al vivir en `GoalBankScreen`, el flujo **individual** también gana catálogo agrupado +
+  transición + totalizador (mejora estricta). **Ninguna lógica tocada** (weights/pre-exclusión/`handleSubmit`
+  intactos) → regresión headless de los 3 comportamientos de Gate 3·B **5/5**.
+- **UI-driven PENDIENTE de pase manual**: agrupación colapsable, transición, totalizador en vivo.
 
 ### 📋 GATE UX·C — DIFERIDO (rediseño del camino 'crear nueva' masivo) — NO descartado
 Parte del rediseño UX del flujo masivo "Asignar Metas" (spec externa Gemini + prueba de Victor).
