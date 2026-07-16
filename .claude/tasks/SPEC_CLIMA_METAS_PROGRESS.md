@@ -115,6 +115,36 @@ heredada, usada por individual y masiva):
   duplicados (mejora estricta, aprobada por Victor).
 - **UI-driven PENDIENTE de pase manual** (headless cubre la capa de datos): ver checklist en el sello.
 
+### 📋 GATE UX·C — DIFERIDO (rediseño del camino 'crear nueva' masivo) — NO descartado
+Parte del rediseño UX del flujo masivo "Asignar Metas" (spec externa Gemini + prueba de Victor).
+Los gates **UX·A** (Paso 2 tarjetas click-para-avanzar + transición animada catálogo→distribución +
+cabecera fija) y **UX·B** (agrupación del catálogo por familia + totalizador de peso POR PERSONA) se
+hacen ahora sobre el camino **cascade**. El camino **'crear nueva'** queda **FUERA de esta tanda**.
+
+**Qué falta (pendiente):**
+- Camino 'new' con **revelación progresiva tipo Typeform** (nombre → "¿Cómo se mide?" → tarjetas de
+  categoría/`FamilySubfamilyPicker` → "Confirmar Meta"), reemplazando los campos apilados de hoy en
+  `StepSelectGoal`.
+- **Panel de distribución unificado** para 'new' (misma UI que `GoalBankScreen`: cabecera + sliders de
+  peso por persona; cabecera con Nombre + "¿Cómo se mide?" en vez del candado), reemplazando
+  `StepSetTargets` + `StepWeightsConfirm`.
+
+**Por qué se dejó fuera hoy:**
+- Reabre el camino 'new' que Gate 3·B mantuvo **explícitamente intacto**.
+- Unificar el panel de distribución **toca la lógica donde viven los 3 comportamientos sellados de
+  Gate 3·B** (pre-exclusión de duplicados, éxito parcial, `preselectedIds`) → exigiría re-verificar
+  con el smoke de 3·B.
+- Requiere **decidir si el 'new' masivo conserva target por persona** (`StepSetTargets`) — la spec
+  externa solo menciona slider de peso en su Paso 4, lo omite; ambiguo.
+
+**Decisión de patrón anotada, SIN confirmar:** preferencia **B1 "Typeform-lite"** (revelar por bloques
+con el primitivo `AnimatePresence height:auto` que ya usan `StepChooseFlow`/`FamilySubfamilyPicker`,
+en vez de un motor Typeform puro B3) — coherente con el disclosure-por-pasos del sistema. A confirmar
+en la sesión que retome este gate.
+
+**Regla mientras tanto:** el camino 'crear nueva' del asignador masivo se mantiene con la UI y el flujo
+EXACTOS de hoy. No tocar.
+
 ### ✅ GATE 3·A — SELLADO (2026-07-15, smoke 7/7, sin schema)
 Familia obligatoria en la rama 'crear nueva' del asignador masivo (paridad con Camino D):
 - `FamilySubfamilyPicker.tsx` **generalizado**: prop `CategorizableData` (`{family?,subfamily?}`) en vez
