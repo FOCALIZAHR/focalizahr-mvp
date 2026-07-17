@@ -21,10 +21,18 @@ Familia → Subfamilia → narrativa + metas (Patrón G), con 5ª tarjeta "Sin c
 "search=lista plana". Contenido: subfamilias de las 4 familias a producción + `GOAL_FAMILY_CONTEXT`.
 Todo en `GoalBankScreen` + `goalCategories.ts`; distribución (estado `selected`) intacta → regresión
 3·B **4/4**, build verde. **CAT·C (backfill) DESCARTADO** (las 10 metas son data de prueba).
-**+ Reestilizado Patrón G (2026-07-16, visual)**: catálogo con tarjetas de categoría + tabs underline +
-split narrativa/metas; `LockedKpiCard` con Objetivo como número hero blanco. JSX/clases only, regresión
-3·B **4/4**. **UI-driven pend. manual.** **Siguiente: handoff de CLIMA** (postergado desde el Punto 2).
-Gate UX·C (Paso 2 tarjetas + 'new' Typeform) y separar la distribución en 2 pantallas siguen DIFERIDOS.
+**+ Reestilizado Patrón G (2026-07-16, visual)**: catálogo con tarjetas de categoría + split narrativa/
+metas; `LockedKpiCard` con Objetivo como número hero blanco.
+**+ Rediseño VISTA ÚNICA (2026-07-16, ref. `muestra_code.jpeg`, validado con maqueta interactiva):** el
+catálogo pasó a una sola vista tipo explorador — dimensiones (nombres cortos `GOAL_FAMILY_LABELS_SHORT`)
+→ al elegir, **colapsan a breadcrumb "← Familias · X"** y aparece **lista vertical de subdimensiones**
+(fila a ras + **contador por subdimensión** + **chevron**, activa en cyan; aterriza en la 1ª CON metas)
+| "de qué se trata" + metas. **Scroll único** (sacados los `overflow-y` internos del catálogo). Buscador
+= lupa colapsable. JSX/clases + `GOAL_FAMILY_LABELS_SHORT`, sin tocar estado sellado → regresión 3·B **4/4**.
+**UI-driven pend. manual.** **Siguiente: handoff de CLIMA** (postergado desde el Punto 2).
+DIFERIDOS: Gate UX·C (Paso 2 tarjetas + 'new' Typeform); separar la distribución en 2 pantallas; y el
+**scroll interno de la pantalla de distribución** (`GoalBankScreen.tsx:429` `max-h-80`, mismo anti-patrón,
+otra pantalla, lógica 3·B) — anotado para follow-up.
 
 **Commits locales sin pushear (push manual de Victor):** Punto 2 = `b5f5a90` (impl) + `312adcc` (sello).
 Gate 3·A = ver commits de esta sesión. Los 4 archivos `.claude/skills/focalizahr-api/*` modificados por
