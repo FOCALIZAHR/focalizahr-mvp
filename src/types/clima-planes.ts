@@ -43,6 +43,47 @@ export interface ClimaInterventionCell {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Capa 2 — variante por reactivo × zona (CLIMA_INTERVENTION_VARIANTS_capa2_v1).
+// Tipo NUEVO que CONVIVE con ClimaInterventionCell (base 32, INTACTO). A-additive:
+// el tipo base y sus 32 celdas NO se tocan. La variante evoluciona suggestedProduct
+// a objeto (1 solo target clickable) y agrega esfuerzo/efectividad (ruteo lote vs
+// individual de 5D) + evidencia. Mismo régimen PROVISIONAL (prefijo `PROVISIONAL — `).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** El ÚNICO destino clickable de una intervención (1 CTA). Lo resuelve el dispatcher. */
+export type InterventionTarget = 'SIN_CTA' | 'PDI_CLIMA' | 'META_AREA' | 'META_DURA';
+
+/** Esfuerzo estimado — insumo de la regla de ruteo lote/individual de 5D. */
+export type Esfuerzo = 'BAJO' | 'MEDIO' | 'ALTO';
+
+/** Efectividad esperada de la intervención según evidencia. */
+export type Efectividad = 'ALTA' | 'MEDIA_ALTA' | 'MEDIA' | 'BAJA' | 'INCIERTA';
+
+/**
+ * Producto/CTA sugerido de la variante Capa 2. Solo `target` es clickable (1 CTA);
+ * `label` es el texto que lee el jefe; `qualifier` es descriptivo, NO clickable.
+ */
+export interface SuggestedProduct {
+  label: string;
+  target: InterventionTarget;
+  qualifier?: string;
+}
+
+/**
+ * Celda de variante (Capa 2). Convive con ClimaInterventionCell sin reemplazarlo:
+ * el diccionario base (32) sigue con `suggestedProduct: string`; la capa de variantes
+ * usa este shape rico. CONTENIDO PROVISIONAL — Victor/Studio IA ajustan antes de mostrar.
+ */
+export interface ClimaInterventionVariantCell {
+  narrative: string;
+  steps: [string, string];
+  suggestedProduct: SuggestedProduct;
+  esfuerzo: Esfuerzo;
+  efectividad: Efectividad;
+  evidencia?: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Dynamic Impact Drivers — contexto de reactivos para seleccionar la variante de
 // intervención (celda × reactivo-palanca). Lo arma el consumidor (5D) desde
 // DepartmentClimaInsight.reactiveAnalysis, filtrado a la dimensión del driver.
@@ -66,7 +107,14 @@ export interface ClimaDecisionIntervention {
   levelLabel: ClimaSeverityLabel;
   narrative: string; // del diccionario (PROVISIONAL)
   steps: string[]; // del diccionario (PROVISIONAL)
-  suggestedProduct: string; // del diccionario (PROVISIONAL)
+  /**
+   * Producto/CTA sugerido. `string` = celda base (32) o sistémica; `SuggestedProduct`
+   * = variante Capa 2 (con `target` clickable). La UI 5D lo resuelve vía el dispatcher.
+   */
+  suggestedProduct: string | SuggestedProduct; // del diccionario (PROVISIONAL)
+  /** Esfuerzo/efectividad de la variante Capa 2 (ausente en celda base 32 / sistémica). */
+  esfuerzo?: Esfuerzo;
+  efectividad?: Efectividad;
   /**
    * Business case CLP/ROI de PulseEngine (Gate 3) SI disparó para este driver
    * (clima_critico / liderazgo_gap). null cuando no hay caso financiero para la

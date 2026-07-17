@@ -36,6 +36,8 @@ import {
   SEVERITY_LABEL_BY_ZONE,
   type ClimaDecisionItem,
   type ClimaDeptDecisionInput,
+  type ClimaInterventionCell,
+  type ClimaInterventionVariantCell,
 } from '@/types/clima-planes';
 import type { PulseBusinessCase } from '@/lib/services/clima/PulseEngine';
 
@@ -128,7 +130,7 @@ export function buildDeptClimaDecisions(
 
     const isSystemic = belowTier.length / measured.length >= REACTIVE_SYSTEMIC_RATIO;
 
-    let cell;
+    let cell: ClimaInterventionCell | ClimaInterventionVariantCell;
     let selectedReactive: string | null;
     if (isSystemic) {
       cell = getSystemicIntervention(driver.category, belowTier.length, measured.length);
@@ -149,6 +151,14 @@ export function buildDeptClimaDecisions(
       ? `Reducir los reactivos de ${driver.category} bajo umbral (${belowTier.length}/${measured.length}) en el próximo Seguimiento Focalizado`
       : `Mean de ${palanca.reactive} ≥ ${reactiveMeanTarget(palanca.reactive)} en el próximo Seguimiento Focalizado`;
 
+    // Ramifica por shape: la variante Capa 2 aporta esfuerzo/efectividad (ruteo 5D);
+    // la celda base/sistémica (string) no los tiene. suggestedProduct fluye tal cual
+    // (string | SuggestedProduct) — el dispatcher lo resuelve en 5D.
+    const variantFields =
+      'esfuerzo' in cell
+        ? { esfuerzo: cell.esfuerzo, efectividad: cell.efectividad }
+        : {};
+
     items.push({
       triggerRef: `clima:${input.departmentId}:${driver.category}`,
       category: driver.category,
@@ -163,6 +173,7 @@ export function buildDeptClimaDecisions(
         narrative: cell.narrative,
         steps: cell.steps,
         suggestedProduct: cell.suggestedProduct,
+        ...variantFields,
         businessCase: findBusinessCase(driver.category, input.businessCases),
       },
       responsible: RESPONSIBLE_BY_ZONE[zone],
