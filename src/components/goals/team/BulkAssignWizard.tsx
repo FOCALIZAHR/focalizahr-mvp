@@ -401,7 +401,7 @@ export default function BulkAssignWizard({ employees, onClose, onComplete }: Bul
               <X className="w-5 h-5" />
             </button>
           </div>
-          <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+          <div className="px-6 pb-6 pt-3 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
             <GoalBankScreen
               bankLevel="COMPANY,AREA"
               preselectedIds={data.employeeIds}
