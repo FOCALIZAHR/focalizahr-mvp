@@ -16,12 +16,12 @@
 
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Lock, Target, Loader2, Check, ArrowLeft } from 'lucide-react'
+import { Search, Lock, Target, Loader2, Check, ArrowLeft, ChevronRight } from 'lucide-react'
 import type { GoalFamily } from '@prisma/client'
 import { cn } from '@/lib/utils'
 import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton'
 import { useToast } from '@/components/ui/toast-system'
-import { GOAL_FAMILY_LABELS, GOAL_FAMILY_ORDER, GOAL_FAMILY_CONTEXT, GOAL_SUBFAMILIES } from '@/lib/constants/goalCategories'
+import { GOAL_FAMILY_ORDER, GOAL_FAMILY_LABELS_SHORT, GOAL_FAMILY_CONTEXT, GOAL_SUBFAMILIES } from '@/lib/constants/goalCategories'
 import {
   buildBankPayload,
   getAvailableWeight,
@@ -99,6 +99,7 @@ export default memo(function GoalBankScreen({ bankLevel, preselectedIds, onDone,
   // LOCAL de filtro (no toca la categoría de ninguna meta).
   const [filterFamily, setFilterFamily] = useState<GoalFamily | 'NONE' | null>(null)
   const [filterSubfamily, setFilterSubfamily] = useState<string | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false) // buscador colapsable (lupa en el header)
 
   // Conteo por familia (+ 'NONE' = sin categoría). O(N) memoizado sobre `filtered`.
   const familyCounts = useMemo(() => {
@@ -120,7 +121,14 @@ export default memo(function GoalBankScreen({ bankLevel, preselectedIds, onDone,
     return []
   }, [filtered, filterFamily, filterSubfamily])
 
-  const resetCatalogNav = useCallback(() => { setFilterFamily(null); setFilterSubfamily(null) }, [])
+  // Cuántas metas hay en una subdimensión (para el contador de la lista) y cuál es la
+  // primera CON metas (para aterrizar en un resultado, no en un "0 metas"). N chico.
+  const countInSub = (fam: GoalFamily, sub: string) =>
+    filtered.filter((g) => g.family === fam && (g.subfamily ?? 'Otros') === sub).length
+  const firstSubWithGoals = (fam: GoalFamily): string | null => {
+    const subs = GOAL_SUBFAMILIES[fam]
+    return subs.find((s) => countInSub(fam, s) > 0) ?? subs[0] ?? null
+  }
 
   // Fila de meta del catálogo: título + KPI/objetivo para entender sin adivinar por el
   // nombre. Click → distribución sellada (Opción A: su cabecera candado ES el "ver KPI").
@@ -232,109 +240,148 @@ export default memo(function GoalBankScreen({ bankLevel, preselectedIds, onDone,
         {!selected ? (
           // ── Selección de la meta del banco ──
           <motion.div key="catalog" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-5">
-          {/* Header estilo Guided Intelligence (Patrón G): contexto + título split + conteo al lado */}
+          {/* Header (mockup muestra_code): BANCO DE METAS + lupa; "Elegí la categoría"; conteo */}
           <div>
-            <span className="text-[10px] uppercase tracking-widest text-slate-500">Banco de metas</span>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-widest text-slate-500">Banco de metas</span>
+              <button
+                onClick={() => { if (searchOpen) { setSearch(''); setSearchOpen(false) } else setSearchOpen(true) }}
+                className={cn('p-1 transition-colors', searchOpen ? 'text-cyan-400' : 'text-slate-400 hover:text-white')}
+                aria-label="Buscar meta"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+            </div>
             <div className="flex items-start justify-between gap-4 mt-1">
               <h2 className="text-2xl font-extralight text-white tracking-tight">
-                Elegí una <span className="fhr-title-gradient">meta consolidada</span>
+                Elegí la <span className="fhr-title-gradient">categoría</span>
               </h2>
               <p className="text-sm text-slate-400 font-light shrink-0 mt-1">
-                {filtered.length} {filtered.length === 1 ? 'disponible' : 'disponibles'}
+                {filtered.length} {filtered.length === 1 ? 'meta consolidada disponible' : 'metas consolidadas disponibles'}
               </p>
             </div>
           </div>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar meta..."
-              className="fhr-input w-full pl-10"
-            />
-          </div>
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {filtered.length === 0 ? (
-              <p className="text-center text-slate-500 text-sm py-6">
-                No hay metas {bankLevel === 'COMPANY' ? 'corporativas' : bankLevel === 'AREA' ? 'de área' : 'del banco'} disponibles. Pedí al equipo estratégico que cree una.
-              </p>
-            ) : search ? (
-              // Búsqueda por nombre → lista plana (no obliga a navegar por familia).
-              <div className="space-y-2">{filtered.map(renderGoalRow)}</div>
-            ) : filterFamily === null ? (
-              // Nivel 1 — Familias como TARJETAS DE CATEGORÍA (Guided Intelligence): número grande
-              // extralight que auto-resalta las que tienen metas. "Sin categoría" es una categoría
-              // más en la grilla, mismo tratamiento visual.
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {GOAL_FAMILY_ORDER.map((fam) => {
-                  const count = familyCounts.get(fam) ?? 0
-                  const has = count > 0
-                  return (
+          {searchOpen && (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                autoFocus
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar meta..."
+                className="fhr-input w-full pl-10"
+              />
+            </div>
+          )}
+
+          {filtered.length === 0 ? (
+            <p className="text-center text-slate-500 text-sm py-6">
+              No hay metas {bankLevel === 'COMPANY' ? 'corporativas' : bankLevel === 'AREA' ? 'de área' : 'del banco'} disponibles. Pedí al equipo estratégico que cree una.
+            </p>
+          ) : search ? (
+            // Búsqueda por nombre → lista plana (no obliga a navegar por categoría).
+            <div className="space-y-2">{filtered.map(renderGoalRow)}</div>
+          ) : (
+            // VISTA ÚNICA (mockup): dimensiones SIEMPRE visibles arriba; al elegir una, debajo
+            // (misma pantalla) aparecen subdimensiones + "de qué se trata" + la meta. Sin navegar.
+            <>
+              {/* Dimensiones: grilla completa HASTA elegir; luego colapsa a un breadcrumb
+                  compacto para liberar el alto (y que las subdimensiones envuelvan sin scroll). */}
+              {filterFamily === null ? (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  {GOAL_FAMILY_ORDER.map((fam) => {
+                    const count = familyCounts.get(fam) ?? 0
+                    const has = count > 0
+                    return (
+                      <button
+                        key={fam}
+                        onClick={() => { setFilterFamily(fam); setFilterSubfamily(firstSubWithGoals(fam)) }}
+                        className={cn('min-h-[96px] p-3 rounded-lg border flex flex-col items-center justify-center text-center transition-all',
+                          has ? 'bg-slate-800/60 border-slate-700/60 hover:border-slate-600' : 'bg-slate-800/30 border-slate-700/40 hover:border-slate-600')}
+                      >
+                        <span className={cn('text-3xl font-extralight tabular-nums leading-none', has ? 'text-cyan-400' : 'text-slate-600')}>{count}</span>
+                        <p className="text-xs mt-2 leading-tight text-slate-400">{GOAL_FAMILY_LABELS_SHORT[fam]}</p>
+                      </button>
+                    )
+                  })}
+                  {(familyCounts.get('NONE') ?? 0) > 0 && (
                     <button
-                      key={fam}
-                      onClick={() => { setFilterFamily(fam); setFilterSubfamily(null) }}
-                      className={cn('p-4 rounded-lg text-center border transition-all', has ? 'bg-slate-800/80 border-cyan-500/30' : 'bg-slate-800/40 border-slate-700/50 hover:border-slate-600')}
+                      onClick={() => { setFilterFamily('NONE'); setFilterSubfamily(null) }}
+                      className="min-h-[96px] p-3 rounded-lg border bg-slate-800/60 border-slate-700/60 hover:border-slate-600 flex flex-col items-center justify-center text-center transition-all"
                     >
-                      <span className={cn('text-3xl font-extralight tabular-nums', has ? 'text-cyan-400' : 'text-slate-600')}>{count}</span>
-                      <p className="text-xs text-slate-400 mt-1 leading-tight">{GOAL_FAMILY_LABELS[fam]}</p>
+                      <span className="text-3xl font-extralight tabular-nums text-cyan-400 leading-none">{familyCounts.get('NONE')}</span>
+                      <p className="text-xs mt-2 leading-tight text-slate-400">Sin categoría</p>
                     </button>
-                  )
-                })}
-                {(familyCounts.get('NONE') ?? 0) > 0 && (
-                  <button
-                    onClick={() => { setFilterFamily('NONE'); setFilterSubfamily(null) }}
-                    className="p-4 rounded-lg text-center border bg-slate-800/80 border-cyan-500/30 hover:border-cyan-500/50 transition-all"
-                  >
-                    <span className="text-3xl font-extralight tabular-nums text-cyan-400">{familyCounts.get('NONE')}</span>
-                    <p className="text-xs text-slate-400 mt-1 leading-tight">Sin categoría</p>
-                  </button>
-                )}
-              </div>
-            ) : filterFamily === 'NONE' ? (
-              // Metas sin categoría (decisión B: hogar prominente).
-              <div className="space-y-2">
-                <button onClick={resetCatalogNav} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white mb-1">
-                  <ArrowLeft className="w-3.5 h-3.5" /> Familias
-                </button>
-                {visibleGoals.map(renderGoalRow)}
-              </div>
-            ) : (
-              // Familia real → subfamilias como TABS UNDERLINE (skill: "Tabs underline, no pills").
-              // Al elegir subfamilia → SPLIT narrativa izq / metas der ("narrativa antes de lista").
-              <div className="space-y-4">
-                <button onClick={resetCatalogNav} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white">
-                  <ArrowLeft className="w-3.5 h-3.5" /> Familias
-                </button>
-                <div className="flex gap-6 border-b border-slate-700/50 overflow-x-auto">
-                  {GOAL_SUBFAMILIES[filterFamily].map((sub) => (
-                    <button
-                      key={sub}
-                      onClick={() => setFilterSubfamily(sub)}
-                      className={cn('pb-2 text-sm whitespace-nowrap border-b-2 transition-colors', filterSubfamily === sub ? 'text-cyan-400 border-cyan-400' : 'text-slate-500 border-transparent hover:text-slate-300')}
-                    >
-                      {sub}
-                    </button>
-                  ))}
+                  )}
                 </div>
-                {filterSubfamily === null ? (
-                  <p className="text-sm text-slate-500 py-4">Elegí una subfamilia para ver sus metas.</p>
-                ) : (
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <p className="text-xs text-slate-400 font-light leading-relaxed">{GOAL_FAMILY_CONTEXT[filterFamily]}</p>
-                    <div className="space-y-2">
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { setFilterFamily(null); setFilterSubfamily(null) }} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white">
+                    <ArrowLeft className="w-3.5 h-3.5" /> Familias
+                  </button>
+                  <span className="text-slate-600">·</span>
+                  <span className="text-sm text-white">{filterFamily === 'NONE' ? 'Sin categoría' : GOAL_FAMILY_LABELS_SHORT[filterFamily]}</span>
+                  <span className="text-xs text-slate-500">· {filterFamily === 'NONE' ? (familyCounts.get('NONE') ?? 0) : (familyCounts.get(filterFamily) ?? 0)}</span>
+                </div>
+              )}
+
+              {/* Familia real → LISTA VERTICAL de subdimensiones (menú, cada ítem su renglón,
+                  nombres largos envuelven natural; contador por subdimensión para ver de un
+                  vistazo dónde está la meta) | "de qué se trata" + metas. Un solo scroll. */}
+              {filterFamily && filterFamily !== 'NONE' && (
+                <div className="pt-4 border-t border-slate-700/40 grid md:grid-cols-3 gap-x-6 gap-y-4">
+                  {/* Menú de subdimensiones */}
+                  <div className="md:col-span-1 space-y-0.5">
+                    {GOAL_SUBFAMILIES[filterFamily].map((sub) => {
+                      const subCount = countInSub(filterFamily as GoalFamily, sub)
+                      const active = filterSubfamily === sub
+                      return (
+                        <button
+                          key={sub}
+                          onClick={() => setFilterSubfamily(sub)}
+                          className={cn('w-full text-left flex items-center gap-2 px-2 py-2.5 rounded-md transition-colors',
+                            active ? 'bg-slate-800/60 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30')}
+                        >
+                          <span className="flex-1 text-sm leading-snug">{sub}</span>
+                          <span className={cn('text-xs tabular-nums shrink-0', subCount > 0 ? 'text-cyan-400' : 'text-slate-600')}>{subCount}</span>
+                          <ChevronRight className={cn('w-4 h-4 shrink-0', active ? 'text-cyan-400' : 'text-slate-500')} />
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {/* Detalle: de qué se trata + metas */}
+                  <div className="md:col-span-2 space-y-4">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">— De qué se trata</p>
+                      <p className="text-sm text-slate-300 font-light leading-relaxed">{GOAL_FAMILY_CONTEXT[filterFamily]}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
+                        {visibleGoals.length} {visibleGoals.length === 1 ? 'meta encontrada' : 'metas encontradas'}
+                      </p>
                       {visibleGoals.length === 0 ? (
                         <p className="text-sm text-slate-500">No hay metas en {filterSubfamily}.</p>
                       ) : (
-                        visibleGoals.map(renderGoalRow)
+                        <div className="space-y-2">{visibleGoals.map(renderGoalRow)}</div>
                       )}
                     </div>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+
+              {/* "Sin categoría" → metas directas (sin subdimensiones) */}
+              {filterFamily === 'NONE' && (
+                <div className="pt-4 border-t border-slate-700/40 space-y-2">
+                  <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">
+                    {visibleGoals.length} {visibleGoals.length === 1 ? 'meta sin categoría' : 'metas sin categoría'}
+                  </p>
+                  <div className="space-y-2">{visibleGoals.map(renderGoalRow)}</div>
+                </div>
+              )}
+            </>
+          )}
           </motion.div>
         ) : (
           // ── KPI bloqueado + distribución por persona ──

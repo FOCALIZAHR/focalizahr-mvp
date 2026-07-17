@@ -26,6 +26,17 @@ export const GOAL_FAMILY_LABELS: Record<GoalFamily, string> = {
   CULTURA_Y_PERSONAS: 'Cultura y Personas',
 }
 
+/**
+ * Label CORTO por familia — para tarjetas/tabs donde el nombre completo no entra
+ * (catálogo del banco, Patrón G). Confirmado por Victor vía mockup muestra_code.jpeg.
+ */
+export const GOAL_FAMILY_LABELS_SHORT: Record<GoalFamily, string> = {
+  NEGOCIO_E_INGRESOS: 'Negocio',
+  CLIENTES_Y_USUARIOS: 'Clientes',
+  OPERACION_Y_EFICIENCIA: 'Operación',
+  CULTURA_Y_PERSONAS: 'Personas',
+}
+
 /** Orden de presentación de las familias (Gate C lo consume para las píldoras). */
 export const GOAL_FAMILY_ORDER: readonly GoalFamily[] = [
   'NEGOCIO_E_INGRESOS',
