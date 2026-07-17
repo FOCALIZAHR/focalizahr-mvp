@@ -28,7 +28,8 @@ catálogo pasó a una sola vista tipo explorador — dimensiones (nombres cortos
 → al elegir, **colapsan a breadcrumb "← Familias · X"** y aparece **lista vertical de subdimensiones**
 (fila a ras + **contador por subdimensión** + **chevron**, activa en cyan; aterriza en la 1ª CON metas)
 | "de qué se trata" + metas. **Scroll único** (sacados los `overflow-y` internos del catálogo). Buscador
-= lupa colapsable. JSX/clases + `GOAL_FAMILY_LABELS_SHORT`, sin tocar estado sellado → regresión 3·B **4/4**.
+= lupa colapsable. **+ padding superior del wrapper del banco reducido** (`BulkAssignWizard.tsx` handoff:
+`p-6`→`px-6 pb-6 pt-3`). JSX/clases + `GOAL_FAMILY_LABELS_SHORT`, sin tocar estado sellado → regresión 3·B **4/4**.
 **UI-driven pend. manual.** **Siguiente: handoff de CLIMA** (postergado desde el Punto 2).
 DIFERIDOS: Gate UX·C (Paso 2 tarjetas + 'new' Typeform); separar la distribución en 2 pantallas; y el
 **scroll interno de la pantalla de distribución** (`GoalBankScreen.tsx:429` `max-h-80`, mismo anti-patrón,
