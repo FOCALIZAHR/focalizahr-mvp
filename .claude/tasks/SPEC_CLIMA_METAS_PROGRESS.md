@@ -183,6 +183,22 @@ vista**: (1) mostrar la meta consolidada (`LockedKpiCard`) y (2) seleccionar per
 Separarlas en dos momentos queda **pendiente de diseño, sin decisión tomada**. No bloquea nada; se anota
 para una sesión futura (mismo espíritu que el Gate UX·C).
 
+### 📋 MINI-GATE PERFORMANCE — DIFERIDO (diagnóstico 2026-07-17, NO arreglar aún)
+Diagnóstico solicitado por Victor sobre lentitud en LOCAL (máquina lenta + Supabase remoto). **No hay
+N+1 ni falta el índice de `managerId`** (`idx_employees_manager` existe). Los 3 hallazgos reales, para
+atacar en otra sesión con su smoke:
+1. **Dep inestable en `GoalsCinemaOrchestrator.tsx:337`** — pasa `employees={... : team.filter(...)}`
+   (array nuevo por render) a `BulkAssignWizard`, cuyo `useEffect [employees]` (`:177`) re-dispara el
+   fetch de `/api/goals/team` en cada re-render del padre. Fix: `useMemo` para estabilizar el prop.
+2. **Fetches de `/api/goals/team` sin cache compartida** — 3+ componentes lo piden con `fetch` crudo
+   (`BulkAssignWizard:154`, `GoalBankScreen:78`, `CreateGoalWizard:353`, `StepSelectLevel:126`) y no ven
+   el cache de SWR de `useTeamGoals`. En un flujo de banco = 2-3 llamadas idénticas. Fix: consolidar en
+   una fuente cacheada compartida (`@tanstack/react-query`/`swr` ya están).
+3. **6 queries SECUENCIALES en `team/route.ts`** (account · goalJobConfig · currentEmployee · getActiveCycle
+   · employees+goals) — las 4 primeras son independientes pero corren en serie, cada una un round-trip a
+   Supabase remoto. Fix: `Promise.all` de las independientes → ~2 olas en vez de 6 saltos. Minor: `Employee.email`
+   sin índice (el `findFirst` de currentEmployee filtra email en memoria; índice opcional).
+
 ### 📋 GATE UX·C — DIFERIDO (rediseño del camino 'crear nueva' masivo) — NO descartado
 Parte del rediseño UX del flujo masivo "Asignar Metas" (spec externa Gemini + prueba de Victor).
 Los gates **UX·A** (Paso 2 tarjetas click-para-avanzar + transición animada catálogo→distribución +
