@@ -82,6 +82,13 @@ export class GoalCategoryError extends Error {
     this.name = 'GoalCategoryError'
   }
 }
+export class GoalOwnerLevelMismatchError extends Error {
+  readonly code = 'GOAL_OWNER_LEVEL_MISMATCH'
+  constructor(public readonly level: string) {
+    super('Las metas de nivel Área o Corporativa no pueden tener employeeId — deben crearse sin dueño')
+    this.name = 'GoalOwnerLevelMismatchError'
+  }
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // CIERRE DE CICLO — decisiones sobre metas incompletas (Gate D.5, Decisión #8)
@@ -1631,6 +1638,16 @@ export class GoalsService {
     // Gate B: `subfamily` es String en la base (no enum) → ESTA es la única puerta
     // que impide que entren valores sueltos o variantes de tipeo.
     this.validateCategory(input.family, input.subfamily)
+
+    // Integridad de propiedad: una meta AREA/COMPANY es un MOLDE — nunca tiene dueño
+    // individual. El peso-contra-persona vive SOLO en metas INDIVIDUAL (checkGoalLimit
+    // y validateTotalWeight filtran level:'INDIVIDUAL'); una AREA/COMPANY con employeeId
+    // quedaría colgada de una persona sin que ninguna de esas dos la cuente. Para asignar
+    // una meta de área a alguien existe el banco (Camino B/C): genera una COPIA INDIVIDUAL.
+    // employeeId TRUTHY (un '' no dispara: es "sin dueño", igual que undefined).
+    if ((input.level === 'AREA' || input.level === 'COMPANY') && input.employeeId) {
+      throw new GoalOwnerLevelMismatchError(input.level)
+    }
 
     return {
       accountId: input.accountId,
