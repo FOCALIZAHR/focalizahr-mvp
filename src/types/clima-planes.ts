@@ -83,6 +83,26 @@ export interface ClimaInterventionVariantCell {
   evidencia?: string;
 }
 
+/**
+ * Celda del caso SISTÉMICO (isSystemic=true) — 8 narrativas específicas por dimensión
+ * + fallback genérico. Tercer shape que convive con los otros dos:
+ *
+ *   - `suggestedProduct` es objeto (mismo shape que Capa 2), pero con `target: 'SIN_CTA'`
+ *     en las 8 y en el fallback: no hay mecanismo real de "activar conversación con
+ *     Personas" todavía, así que no se promete un CTA que no existe.
+ *   - NO lleva `esfuerzo`/`efectividad` a propósito: el caso sistémico siempre rutea a
+ *     revisión individual (climaPlanRouting corta en `isSystemic` antes de leer ese par),
+ *     así que esos campos no participan de ninguna decisión acá.
+ *
+ * `narrative` se guarda con placeholders `{n}` / `{total}` (y `{category}` en el
+ * fallback); los interpola getSystemicIntervention al momento de resolver.
+ */
+export interface ClimaSystemicCell {
+  narrative: string;
+  steps: [string, string];
+  suggestedProduct: SuggestedProduct;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Dynamic Impact Drivers — contexto de reactivos para seleccionar la variante de
 // intervención (celda × reactivo-palanca). Lo arma el consumidor (5D) desde

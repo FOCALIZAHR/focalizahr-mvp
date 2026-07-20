@@ -22,6 +22,7 @@ import type { RiskZone } from '@/lib/services/clima/climaThresholds';
 import type {
   ClimaInterventionCell,
   ClimaInterventionVariantCell,
+  ClimaSystemicCell,
   ReactiveContextEntry,
 } from '@/types/clima-planes';
 
@@ -930,21 +931,149 @@ export function getIntervention(
 
 // ════════════════════════════════════════════════════════════════════════════
 // Escalamiento sistémico — cuando ≥REACTIVE_SYSTEMIC_RATIO de los reactivos de una
-// dimensión caen bajo su tier, el problema deja de ser puntual. Celda por defecto
-// PROVISIONAL (mismo régimen que el diccionario). Interpola {n}/{total}/{categoría}.
+// dimensión caen bajo su tier, el problema deja de ser puntual.
+//
+// 8 narrativas ESPECÍFICAS por dimensión (el sistema ya sabe cuál disparó: `category`
+// llega como parámetro) + FALLBACK genérico obligatorio. El fallback no es cosmético:
+// garantiza que nunca falte narrativa cuando `category` no matchea ninguna de las 8
+// —hoy no puede pasar, pero un refactor del banco que renombre/divida/agregue una
+// dimensión lo haría posible sin tocar este archivo—.
+//
+// `target: 'SIN_CTA'` en las 9: no existe todavía un mecanismo real de "activar
+// conversación con Personas", así que no se pinta un CTA que no lleva a ninguna parte.
+// Mismo criterio que el resto de los casos sin mecanismo activable.
+//
+// Contenido PROVISIONAL (prefijo `P`) — mismo régimen que el resto del diccionario.
 // ════════════════════════════════════════════════════════════════════════════
 
-export function getSystemicIntervention(
+/** Placeholders de la narrativa sistémica: `{n}` → nBelow, `{total}` → totalMeasured. */
+const SYSTEMIC_INTERVENTIONS: Record<ClimaDriverCategory, ClimaSystemicCell> = {
+  liderazgo: {
+    narrative: `${P}Fallaron {n} de las {total} preguntas sobre la jefatura directa. Una charla aislada no funciona acá; la caída en confianza debilita al equipo y requiere armar un trabajo de fondo con tu equipo de Personas.`,
+    steps: [
+      'Diseño de un programa de coaching para el líder, con seguimiento en el tiempo.',
+      'Revisión de expectativas de trabajo conjunto, dejando de lado las soluciones de un clic.',
+    ],
+    suggestedProduct: { label: 'Programa de coaching continuo', target: 'SIN_CTA' },
+  },
+
+  // "Crecimiento Profesional / Proyección"
+  desarrollo: {
+    narrative: `${P}Hay {n} de {total} preguntas mal evaluadas sobre el futuro del equipo. La gente se queda casi el doble de tiempo si tiene un avance real; retenerlos requiere armar un plan medible con tu equipo de Personas, no un curso suelto.`,
+    steps: [
+      'Creación de un sistema de desarrollo con hitos medibles.',
+      'Definición de un camino de ascenso claro y tangible junto a la jefatura.',
+    ],
+    suggestedProduct: { label: 'Sistema de desarrollo medible', target: 'SIN_CTA' },
+  },
+
+  // "Aprender Cosas Nuevas"
+  crecimiento: {
+    narrative: `${P}El equipo evaluó mal {n} de {total} preguntas sobre sus oportunidades de aprendizaje. Como pasa con la proyección, la retención cae a la mitad sin evolución real; esto pide definir desafíos nuevos aplicables, más allá de asignar una capacitación rápida.`,
+    steps: [
+      'Estructuración de desafíos reales dentro del puesto actual.',
+      'Integración de mentores o metas de aprendizaje en la rutina de trabajo.',
+    ],
+    suggestedProduct: { label: 'Plan de desafíos reales', target: 'SIN_CTA' },
+  },
+
+  comunicacion: {
+    narrative: `${P}Cayeron {n} de las {total} preguntas sobre cómo se colabora. Pedirles que 'se comuniquen mejor' casi nunca funciona; la fricción suele nacer porque cada área compite por metas distintas, lo que requiere definir un norte común.`,
+    steps: [
+      'Análisis de los indicadores actuales para detectar si los equipos compiten entre sí.',
+      'Creación de una meta compartida y medible entre las áreas con fricción.',
+    ],
+    suggestedProduct: { label: 'Meta compartida entre áreas', target: 'SIN_CTA' },
+  },
+
+  autonomia: {
+    narrative: `${P}Se evaluaron mal {n} de {total} preguntas sobre la autonomía del equipo. Cuando hay tanto exceso de control, rara vez es solo estilo personal; o hay presión desde arriba por metas rígidas, o la estructura empuja a todos a controlar de más. Destrabarlo requiere revisar la jerarquía de fondo.`,
+    steps: [
+      'Revisión de las metas estrictas que empujan el exceso de control diario.',
+      'Conversación para devolver capacidad de decisión al equipo, revisando la presión superior.',
+    ],
+    suggestedProduct: { label: 'Revisión de metas y autonomía', target: 'SIN_CTA' },
+  },
+
+  // "Bienestar General"
+  satisfaccion: {
+    narrative: `${P}El desgaste es general: {n} de {total} preguntas sobre carga y estrés están mal. La evidencia demuestra que intentar aliviar a una sola persona tiene muy poco impacto real; frenar el agotamiento pide un cambio a nivel de todo el equipo junto a tu equipo de Personas.`,
+    steps: [
+      'Análisis de la carga de trabajo y el desgaste a nivel de grupo, no individual.',
+      'Ajuste estructural en las rutinas de trabajo para el equipo completo.',
+    ],
+    suggestedProduct: { label: 'Cambio de rutina a nivel equipo', target: 'SIN_CTA' },
+  },
+
+  // Hoy inalcanzable: 1 solo reactivo (`mejora`), no llega al piso de 3 medidos.
+  // Se deja escrito para no repetir el trabajo cuando el banco se rediseñe.
+  reconocimiento: {
+    narrative: `${P}Hay {n} de {total} preguntas mal evaluadas sobre cómo se valora el trabajo. Cuando esto falla de forma amplia, rara vez es por mala intención; pasa porque depende del hábito de cada jefe, generando diferencias. Nivelar esta percepción pide estructurar un sistema con criterios claros junto a tu equipo de Personas, no solo pedir que feliciten más seguido.`,
+    steps: [
+      'Definición de criterios transparentes y consistentes para valorar el buen desempeño.',
+      'Creación de un sistema de reconocimiento oficial, evitando el uso de rankings públicos que puedan generar fricción.',
+    ],
+    suggestedProduct: { label: 'Sistema de reconocimiento estructurado', target: 'SIN_CTA' },
+  },
+
+  // Hoy inalcanzable: 1 solo reactivo (`beneficios`), no llega al piso de 3 medidos.
+  // Se deja escrito para no repetir el trabajo cuando el banco se rediseñe.
+  compensaciones: {
+    narrative: `${P}El equipo evaluó mal {n} de las {total} preguntas sobre su sueldo. La evidencia confirma que explicar claramente cómo se define el pago impacta tanto o más en la satisfacción que el monto mismo; mejorar esto requiere transparentar las políticas con tu equipo de Personas, no prometer aumentos inmediatos.`,
+    steps: [
+      'Revisión y consolidación de las bandas salariales y los criterios de compensación actuales.',
+      'Comunicación clara al equipo sobre cómo y bajo qué políticas se toman las decisiones de sueldo.',
+    ],
+    suggestedProduct: { label: 'Transparencia en política salarial', target: 'SIN_CTA' },
+  },
+};
+
+/**
+ * Red de seguridad: `category` fuera de las 8 (renombre/split/alta futura del banco).
+ * Conserva TAL CUAL el texto genérico que servía a todas las dimensiones antes de este
+ * gate — no se borra, se degrada a último recurso.
+ */
+function getSystemicFallback(
   category: string,
   nBelow: number,
   totalMeasured: number
-): ClimaInterventionCell {
+): ClimaSystemicCell {
   return {
     narrative: `${P}${nBelow} de ${totalMeasured} reactivos de ${category} están bajo el umbral en tu equipo. Este no es un problema puntual — es un patrón que cruza varios frentes a la vez. Conversación recomendada: revisar con RRHH antes de actuar solo.`,
     steps: [
       'Revisar el patrón completo de la dimensión con RRHH antes de actuar reactivo por reactivo',
       'Definir una intervención a nivel de dimensión, no parche por parche',
     ],
-    suggestedProduct: 'Revisar con RRHH',
+    suggestedProduct: { label: 'Revisar con RRHH', target: 'SIN_CTA' },
+  };
+}
+
+/** Interpola los placeholders de la narrativa sistémica. */
+function interpolateSystemic(
+  narrative: string,
+  nBelow: number,
+  totalMeasured: number
+): string {
+  return narrative
+    .replace(/\{n\}/g, String(nBelow))
+    .replace(/\{total\}/g, String(totalMeasured));
+}
+
+/**
+ * Celda del caso sistémico. `category` de las 8 → narrativa específica; cualquier otra
+ * → fallback genérico. NUNCA retorna undefined ni lanza.
+ */
+export function getSystemicIntervention(
+  category: string,
+  nBelow: number,
+  totalMeasured: number
+): ClimaSystemicCell {
+  if (!isClimaDriverCategory(category)) {
+    return getSystemicFallback(category, nBelow, totalMeasured);
+  }
+  const cell = SYSTEMIC_INTERVENTIONS[category];
+  return {
+    ...cell,
+    narrative: interpolateSystemic(cell.narrative, nBelow, totalMeasured),
   };
 }
