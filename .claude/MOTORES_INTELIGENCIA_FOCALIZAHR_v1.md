@@ -75,6 +75,20 @@ Documento construido en dos fases:
 
 ---
 
+## Estado de verificación (v1.2 — 2026-07-19)
+
+Pasada **aditiva**: nada de v1.1 se modificó ni reordenó. Se agregó al final del documento:
+
+- **§XIII EX CLIMA** — 17 motores (módulo completo ausente en v1.1).
+- **§XIV Ambiente Sano · Capa Cascada** — 18 motores construidos sobre los 10 de §I.
+- **§XV Motores transversales adicionales** — 12 motores (orquestador de ratings, ciclo de metas, occupation mapping, fórmulas financieras legales, consent y multicanal).
+- **§Ampliaciones v1.2** — 11 motores ya documentados cuyo código superó la descripción de v1.1. **Las correcciones de conteo son las que más impactan una propuesta comercial con números** (InterventionEngine 8→11, ComplianceAlertService 5→7, InsightEngine ~15→31, SpanIntelligence 8→12, GoalsService CRUD→motor de ciclo, RetentionEngine ahora `@deprecated`).
+- **§Por qué importa** — línea de negocio por motor, tomada de la ficha de producto correspondiente.
+
+Los 47 motores nuevos se verificaron abriendo cada archivo y contando entradas literales de catálogos, diccionarios y arrays de casos (no por resumen de agente). **Brecha de dossier conocida: el módulo EX Clima no tiene ficha de producto**, por lo que sus 17 motores quedan sin línea de negocio (`[confirmar]`).
+
+---
+
 ---
 
 ## TABLA RESUMEN EJECUTIVO
@@ -855,6 +869,491 @@ Documento construido en dos fases:
 ### 64. EmployeeSyncService
 
 - Sync HRIS → `Employee` master.
+
+---
+
+## XIII. EX CLIMA (módulo completo — ausente en v1.1)
+
+> **Nota de cobertura:** el módulo Clima no existía cuando se escribió v1.1. Los 17 motores de esta sección se verificaron contra código directo (2026-07-19). **Sin ficha de producto** en `.claude/FICHA_PRODUCTOS/` → todas las líneas de negocio quedan `[confirmar — sin diferenciador documentado]`.
+
+### 65. PulseEngine — 5 algoritmos + flag teatro (1.337 líneas)
+
+- **Archivo:** `src/lib/services/clima/PulseEngine.ts`
+- **Input:** `PulseCompanyInput` (driverScores post carry-forward, reactiveScores, EI, momentum, rows, prev*, turnoverRate, headcountAvg, isaScore, salary). **100% puro, sin I/O.**
+- **ALG 1 — Driver Analysis:** `impact` = Pearson r driver×EI a nivel compañía, pares por participante (delega en `GoalsDiagnosticService.calculatePearsonR`), null si <5 pares. `gap = fav − CLIMA_TARGET_FAVORABILITY (75)`. `priority = |impact| × |gap|`.
+  - `classifyDriver` (4 valores): `focus_area` (impact≥0.3 ∧ gap≤−10) / `strength` (impact≥0.3 ∧ gap≥0) / `monitor` (gap≤−10) / `maintain`. `IMPACT_HIGH_R = 0.3`, `GAP_FOCUS_PP = -10`.
+- **Dynamic Impact a nivel REACTIVO:** **Kendall's Tau-c (Stuart)** — `τ_c = 2·m·(P−Q)/(n²·(m−1))`, null si `n < REACTIVE_LOCAL_MIN_N = 25`. Rompe el techo de 32 recetas de la capa dimensión.
+  - **Walk-up jerárquico:** sube por `parentId` buscando el ancestro más cercano con N≥25 respondentes únicos; cap `REACTIVE_WALKUP_MAX_DEPTH = 6` + guard anti-ciclo. Fallback a impacto compañía → `impactSource: 'local' | 'company'`.
+- **ALG 3 — Momentum/driver:** solo si el driver fue MEDIDO en ambos períodos. `MomentumState` (4): `crisis ≤ −10` / `declining ≤ −5` / `growing ≥ +5` / `stable`. `meanMomentumDelta = (current.mean − prev.mean) × 25` (escalado para reusar umbrales ±5pp ⇄ Δmean ±0.2).
+- **ALG 2 — Hotspot:** `eiFav < p25` compañía (p25 null si <4 deptos). Eje mean aditivo. `confidence` high/medium/low por datos duros faltantes.
+- **ALG 4 — Gap Transfer:** campeón por driver = mayor fav medido (mínimo 2 deptos). `transferGapPp = championFav − deptFav`.
+- **ALG 5 — Clima×Rotación:** Pearson {eiFav, turnoverRate} entre deptos, null si <5 pares.
+- **FLAG teatro:** `THEATRE_ISA_MIN = 70` ∧ `THEATRE_ENGAGEMENT_MAX_FAV = 50` (corte deliberadamente más estricto que roja=60). No evaluable → `null`, **nunca `false`**.
+- **Business cases (absorción de RetentionEngine):** 3 tipos mutuamente excluyentes — `liderazgo_gap` (mean liderazgo < 3.0), `clima_critico` (peor driver < 2.5), `retencion_riesgo` (EI mean < 3.0). Costeo CLP: `CLIMA_PROGRAM_COST_PER_PERSON_CLP = 75.000` / `RETENTION = 75.000` / `LEADERSHIP = 100.000`, efectividades 0.6/0.6/0.8. Jerarquía de rotación en 3 ramas: turnoverRate real → voluntaryExits12mo → fallback `TURNOVER_RISK_BY_MEAN` (4 bandas Gallup: <2.0→0.6, <2.5→0.45, <3.0→0.3, <3.5→0.2, floor 0.1).
+- **Output:** `Map<departmentId, PulseDeptOutput>` + `ClimaCorrelationFlags` (version 1, sub-objetos theatre/hotspot/climaTurnover + businessCases + computedAt).
+- **Por qué importa:** `[confirmar — sin diferenciador documentado]`
+
+### 66. climaThresholds — tabla de umbrales de dominio
+
+- **Archivo:** `src/lib/services/clima/climaThresholds.ts` (client-safe por diseño)
+- **`RISK_ZONE_THRESHOLDS`:** verde ≥75 / amarilla ≥65 / naranja ≥60 / roja <60 (ancla Culture Amp, explícitamente distinto de los cuartiles 80/70/60 del benchmarking de mercado).
+- **`calcRiskZone`:** momentum crisis (≤−10pp) **degrada una zona, nunca mejora**.
+- **Tiers de mean por reactivo:** `TIER_RECURSOS = 3.3` (5 subcategorías: beneficios, carga_trabajo, estres, herramientas, ambiente_fisico) / `TIER_ESTANDAR = 3.6`. Benchmark FIJO deliberado — el promedio interno esconde la crisis si toda la empresa está mal.
+- **`REACTIVE_CIRCULARITY_EXCLUDE` (4):** retencion, recomendacion, orgullo, experiencia_general — solapan constructo con el EI, inflarían el impacto.
+- **`reactiveSeverityZone(gapMean)`:** ≥0 → null / <−0.7 → roja / <−0.3 → naranja / resto amarilla.
+- **`REACTIVE_MIN_IMPACT = 0.20`** (piso de palanca). `REACTIVE_SYSTEMIC_RATIO = 0.5` + guardas duras `MIN_MEASURED = 3` / `MIN_BELOW = 2` (anti-artefacto de denominador chico). `CLIMA_MIN_RESPONDENTS = 5` (Gallup).
+- **`REACTIVE_STRENGTH_BANDS` (5):** MUY_ALTO ≥0.50 / ALTO 0.30 / MEDIO 0.20 / BAJO 0.10 / Ruido. Solo narrativa, no cableadas.
+- **Estado:** casi todas las constantes marcadas **PROVISIONAL**, pendientes de calibración con datos de cliente real.
+- **Por qué importa:** `[confirmar — sin diferenciador documentado]`
+
+### 67. ClimaSynthesisEngine — Actos dinámicos (7 diagnósticos)
+
+- **Archivo:** `src/lib/services/clima/ClimaSynthesisEngine.ts` (783 líneas, pura, client-safe)
+- **Decide dinámicamente cuántos Actos mostrar** (1-2 en clima sano, 4-5 en crisis) — no 4 fijos.
+- **`DIAGNOSTIC_PRIORITY` (7):** TEATRO_GENERALIZADO · HOTSPOT_CONCENTRADO · OBSERVACION_SIN_FOCO · DRIVER_SISTEMICO · MOMENTUM_NEGATIVO · BIEN_CON_FOCOS · SALUDABLE.
+- **Arquitectura de disparo en 2 capas:** el nivel absoluto (orgFav vs 75) manda; percentil/mediana solo describen. **3 ejes ortogonales co-disparan** (TEATRO / MOMENTUM / DRIVER) + 1 eje NIVEL+CONCENTRACIÓN que emite exactamente uno o ninguno.
+- **HOTSPOT = 3 condiciones simultáneas:** orgFav<75 ∧ ≥3 detectables ∧ peor depto naranja|roja ∧ **mediana del resto ≥75** (fondo sano → "caso aislado" cierto por construcción).
+- **DRIVER_SISTEMICO:** misma dimensión con fav<75, n≥5, no carried, en ≥2 gerencias.
+- **Enriquecimiento "momento de revelación":** `EnrichmentDecision` con 5 flags; variante `named` con n≥5, `magnitude` con n<5. DRIVER compone 2 flags independientes en 3 combinaciones.
+- **Acto Ancla:** 4 nodos. Nodo 2 (Concentración) = `(worstRisk / totalRisk) × 100` con `risk = max(0, 75 − fav)`.
+- **Umbrales:** `MIN_RESPONDENTS=5`, `TEATRO_MIN_DEPTS=2`, `DRIVER_MIN_DEPTS=2`, `MOMENTUM_DECLINE_PP=−5`.
+- **Por qué importa:** `[confirmar — sin diferenciador documentado]`
+
+### 68. ClimaNarrativeDictionary — copy verbatim de la cascada
+
+- **Archivo:** `src/lib/services/clima/ClimaNarrativeDictionary.ts` (479 líneas)
+- `PORTADA_BY_ZONE`: 4 entradas. `ACT_DICTIONARY`: **7 entradas** (una por diagnóstico), cada una con `synthesis` de 4 sub-campos → **28 líneas de síntesis**.
+- 4 funciones de narrativa del Acto Ancla con cortes por rango (4 / 3 / 4 / 2 casos).
+- `CROSS_SIGNAL_CLAUSES`: **6 entradas** — 3 cableadas (`exit`, `onboarding`, `onboardingParejo`) + **3 diferidas** que el motor nunca selecciona en 4.5a (`biasLeniency`, `biasSeverity`, `evaluadorProtege`).
+- **Por qué importa:** `[confirmar — sin diferenciador documentado]`
+
+### 69. ClimaInterventionDictionary — 127 narrativas (Capa 1 + Capa 2)
+
+- **Archivo:** `src/lib/services/clima/ClimaInterventionDictionary.ts` (950 líneas — el más grande del módulo)
+- **Capa base:** **32 celdas** = 8 dimensiones (satisfaccion, liderazgo, autonomia, desarrollo, crecimiento, comunicacion, reconocimiento, compensaciones) × 4 RiskZone.
+- **Capa 2 (variantes por reactivo × zona):** el header declara 93 celdas (31 reactivos × 3 zonas); **el conteo literal del código da 94** — las 93 del doc fuente + la muestra migrada `liderazgo.roja.carga_trabajo`. Desglose real: liderazgo 22 · desarrollo 15 · autonomia 15 · satisfaccion 15 · crecimiento 12 · comunicacion 9 · reconocimiento 3 · compensaciones 3. Zona verde no tiene variantes.
+- **Escalera severidad → naturaleza del producto:** amarilla → `PDI_CLIMA` (hábito blando) · naranja → `META_AREA` (medible de área) · roja → `META_DURA` (barrera de fondo, con `qualifier`).
+- Cada variante añade `esfuerzo` (BAJO/MEDIO/ALTO), `efectividad` (ALTA/MEDIA_ALTA), `evidencia` (Gallup Q12, Project Oxygen, Project Aristotle, Culture Amp, Lattice).
+- **Guard anti-fuga:** toda narrativa arranca con el prefijo literal `'PROVISIONAL — '` embebido en el string; `DICTIONARY_CONTENT_STATUS = 'PROVISIONAL'` exportado.
+- **`pickLeverReactive` marcada ⚠️ LEGACY FAV-BASED** — todo caller nuevo DEBE pasar `leverOverride` mean-based o reintroduce la divergencia entre el reactivo que dispara y el que se narra.
+- **Por qué importa:** `[confirmar — sin diferenciador documentado]`
+
+### 70. ClimaActionPlanBuilder — severidad reactivo+mean
+
+- **Archivo:** `src/lib/services/clima/ClimaActionPlanBuilder.ts`
+- **Aquí vive el cambio de eje (gate 2026-07-12):** el disparo y la severidad ya NO dependen de la favorabilidad de la dimensión (ciega al deterioro dentro de las cajas bajas, hallazgo Glint), sino del **mean del reactivo**.
+- Pipeline: descartar categorías fuera de las 8 → filtrar los 4 reactivos circulares → `gapMean = mean − reactiveMeanTarget(reactive)` → `priorityMean = |impact| × |gapMean|` solo si `|impact| ≥ 0.20` ∧ `gapMean < 0` → sin reactivos bajo tier, **no dispara**.
+- **Palanca** = mayor `priorityMean`; si todas null, desempate por `gapMean` más hondo. `narrativeLever` = null si no superó el piso de impacto → celda default genérica aunque el ítem sí dispare.
+- **`isSystemic` = 3 condiciones conjuntas:** `measured ≥ 3` ∧ `belowTier ≥ 2` ∧ `belowTier/measured ≥ 0.5`.
+- **Derivados code-owned:** `RESPONSIBLE_BY_ZONE` (roja→CEO, naranja→Gerente de Área, amarilla→HRBP) · `DEADLINE_BY_ZONE` (roja→2 semanas, naranja→30 días, amarilla→90 días, verde→Sostener).
+- `businessCase` se adjunta **solo si PulseEngine lo disparó** para esa dimensión — nunca se inventa.
+- **Output:** `ClimaDecisionItem[]` con `triggerRef: 'clima:{departmentId}:{category}'`.
+- **Por qué importa:** `[confirmar — sin diferenciador documentado]`
+
+### 71. ClimaAggregationService — orquestador de cierre (820 líneas)
+
+- **Archivo:** `src/lib/services/clima/ClimaAggregationService.ts`
+- Máquina de estados `PENDING → RUNNING → COMPLETED | FAILED`, idempotente por `[accountId, departmentId, period, productType, isFollowUp]`. Presupuesto declarado: **<10s para ~1.000 respondentes**.
+- **8 fuentes precargadas en batch** (un solo `Promise.all`): departments (gold caches EXO/EIS), DepartmentMetric, ComplianceAnalysis (ISA), prevBaselines, prevInsights, MarketBenchmark `pulse_climate`, jerarquía completa.
+- **Carry-forward:** solo en seguimiento; drivers no medidos copian fav/mean de la última medición completa con `carried: true`, `n: 0`.
+- **Salidas voluntarias:** ventana móvil FIJA de 12 meses hacia atrás desde `campaign.endDate`.
+- **Fases:** 4 (upsert + por depto en paralelo, fallo individual no mata el resto) → 4b/4c (computePulse) → **4d `ActionEffectivenessService` solo si isFollowUp** → 5 (NPS 3 niveles) → 6 (gold cache rolling 12m) → 8 (AuditLog SIEMPRE).
+- **`suggestDriverFocus`:** top 2 drivers con `mean < 3.0` + top 1 con `mean > 4.0`.
+- **Por qué importa:** `[confirmar — sin diferenciador documentado]`
+
+### 72. FavorabilityCalculator
+
+- **Archivo:** `src/lib/services/clima/FavorabilityCalculator.ts`
+- `FAVORABLE_MIN_RATING = 4` — favorability = % top-2 en escala 1-5. `n` = **respondentes ÚNICOS**, no cantidad de respuestas. Threshold importado de `SafetyScoreService` (no se duplica el 5).
+- **Guardia NPS/texto:** toda función filtra `responseType === 'rating_scale'` primero — el top-2 se rompería con un rating 0-10.
+- **Dual track:** `full` (CORE+CUSTOM) / `core` / `custom`.
+- **Privacidad POR CELDA** en `calcAcotadoGroupScores`: celda con `fav === null` se **omite** del resultado (su gente sigue contando en el agregado del depto), a diferencia del resto que devuelve null conservando n.
+- **Por qué importa:** `[confirmar — sin diferenciador documentado]`
+
+### 73. ActionEffectivenessService — 4 cuadrantes de EFECTIVIDAD
+
+- **Archivo:** `src/lib/services/clima/ActionEffectivenessService.ts`
+- Cruza el autorreporte del jefe (`ClimaActionLog.actionText` con texto / vacío) contra el movimiento real del driver. **Mide efectividad, no cumplimiento.**
+
+| Cuadrante | Texto | Movimiento |
+|---|---|---|
+| `lider_modelo` | sí | mejoró (≥+5) |
+| `palanca_no_efectiva` | sí | no mejoró |
+| `falso_positivo` | vacío | mejoró |
+| `riesgo_critico` | vacío | cayó (≤−5) |
+| `null` | vacío | plano (medido pero no etiquetado) |
+
+- **El delta es `meanMomentumDelta`, NO el de favorabilidad** — el % favorable es ciego al deterioro dentro de las cajas bajas.
+- `delta === null` (carried / n<5) → `skipped`, la fila queda pendiente. Idempotente (solo toca `impactMeasured: null`), multi-tenant explícito.
+- **Por qué importa:** `[confirmar — sin diferenciador documentado]`
+
+### 74. ClimaActionLogService — cierre del lazo de accountability
+
+- **Archivo:** `src/lib/services/clima/ClimaActionLogService.ts`
+- **Creación EAGER** de un `ClimaActionLog` por decisión aceptada (`ceoDecision ∈ {aceptar, modificar}`) con `actionText: null` — la fila vacía es **requisito** del cuadrante Riesgo crítico ("vacío = no ejecutó" tiene que ser una fila real).
+- **1 recordatorio por departamento** a `CLIMA_REMINDER_OFFSET_DAYS = 30`, canal EMAIL, dedupKey `{messageType}:{planId}:{deptId}`. Destinatario resuelto fresco vía `resolveDepartmentResponsable`; sin email → no encola (degrade-safe).
+- **Reconocimiento primero:** `fortalezaFrase` solo se compone si hay `topStrength` **y** fav con dato.
+- **Por qué importa:** `[confirmar — sin diferenciador documentado]`
+
+### 75. climaPlanRouting — ergonomía de decisión del CEO
+
+- **Archivo:** `src/lib/services/clima/climaPlanRouting.ts`
+- `classifyDecisionBlock` — **4 bloques en cascada:** `sistemico` (siempre individual, arriba) → `critico` (roja/naranja) → `gestion_corriente` (amarilla ∧ esfuerzo BAJO ∧ efectividad ALTA|MEDIA_ALTA — **único bloque de lote**) → `generico`.
+- `groupLoteByReactive`: sub-batches con clave `{category}::{reactive}::{zone}`. Decisión explícita: **un botón por reactivo, no un batch combinado**, para preservar trazabilidad en la matriz de efectividad.
+- Traduce el output analítico en dónde el ejecutivo gasta atención: hace aprobable un plan de 40 decisiones en una sesión.
+- **Por qué importa:** `[confirmar — sin diferenciador documentado]`
+
+### 76. rollupClimaGerencias — rollup recursivo de N niveles
+
+- **Archivo:** `src/lib/utils/rollupClimaGerencias.ts`
+- Reemplaza la agregación de 2 niveles previa. Promedio ponderado `SUM(fav·n)/SUM(n)` por driver, excluyendo carried / fav null / n≤0. Mean con acumulador propio (no se pierde el fav si algún miembro tiene mean null).
+- N-genérico en dimensiones (unión de drivers vía Set, sin lista fija). `rollupCrossSignal` = OR sobre miembros (exitTopFactor con más menciones, onboardingAbandon con mayor tasa).
+- Algoritmo en 5 pasos con build post-order; hijos ordenados por **peor EI primero**. Si hay un único root (la organización, ya en el header) devuelve sus hijos como primer nivel.
+- Privacidad: agregar hijos con n<5 dentro de un padre es privacy-safe; el guard n≥5 lo aplica el consumidor sobre la n agregada.
+- **Por qué importa:** `[confirmar — sin diferenciador documentado]`
+
+### 77. aggregateClimaDimension
+
+- **Archivo:** `src/lib/utils/aggregateClimaDimension.ts`
+- `orgFav` **ponderado por n** medido (guard: no carried ∧ n≥5 ∧ fav≠null); `momentum` = promedio **simple** de los deltas medidos (asimetría deliberada). `zone = calcRiskZone(orgFav, momentum)` → hereda la degradación por crisis.
+- `businessCase` = el **más severo** (mayor `potentialAnnualLossCLP`) entre todos los deptos de esa dimensión. `worstDepts` = peores 3 por fav.
+- **Por qué importa:** `[confirmar — sin diferenciador documentado]`
+
+### 78. engagementDivergenceNarrative — la defensa contra la ceguera del % favorable
+
+- **Archivo:** `src/lib/services/clima/engagementDivergenceNarrative.ts`
+- 2 casos + fallback. **Caso A:** fav sube ∧ mean ≤ −0.2 → "Sube el porcentaje de aprobación, pero el grupo insatisfecho se volvió más crítico." **Caso B:** fav baja ∧ mean ≥ +0.2 → inverso.
+- Gate de favorabilidad usa `Math.round(favMomentum)` — **el mismo redondeo que la línea 1 del gauge**, deliberadamente, para que la dirección narrada nunca contradiga el entero que el CEO lee arriba. Acoplamiento frágil no registrado en otro lado.
+- **Por qué importa:** `[confirmar — sin diferenciador documentado]`
+
+### 79. climaProductDispatcher
+
+- **Archivo:** `src/lib/services/clima/climaProductDispatcher.ts`
+- Único punto de mapeo target → acción real, para que las 94 variantes de Capa 2 + las 32 base activen sin tocarse una por una. 4 entradas / `DispatchKind` 3 valores:
+  - `SIN_CTA` → none · `PDI_CLIMA` → `POST /api/clima/pdi-suggestion` (**VIVO**, sellado Gate 5B-ii) · `META_AREA` → `/api/goals` (**pending**) · `META_DURA` → `/api/goals` (**pending**).
+- Alcance actual: solo el mapa declarativo; el handler runtime se construye en Gate 5D.
+- **Por qué importa:** `[confirmar — sin diferenciador documentado]`
+
+### 80. assembleClimaDecisionInputs + climaFocusFilter
+
+- **`assembleClimaDecisionInputs.ts`** — el **conector faltante** entre el diagnóstico persistido (Gates 2/3) y el builder puro. Sin él, `ClimaActionPlanBuilder` solo era ejercitable por un smoke manual. Reshape 1:1 estricto; no deriva `gapMean`/`priorityMean`/`isSystemic` (eso es del builder). Declara su shape de input localmente (no importa Prisma) para mantenerse puro y testeable sin BD.
+- **`climaFocusFilter.ts`** — filtro de seguimiento focalizado, exclusivo de Experiencia Full. `ALWAYS_INCLUDED_CATEGORIES` (2): `engagement_index`, `texto_libre`. El depto con foco recibe TODAS las preguntas de sus drivers (low + high). **4 fallbacks seguros** que devuelven todas las preguntas. Pulso Express nunca puebla el campo → nunca filtra.
+- **Por qué importa:** `[confirmar — sin diferenciador documentado]`
+
+---
+
+## XIV. AMBIENTE SANO — CAPA CASCADA (Gate 5+, ausente en v1.1)
+
+> 18 motores construidos sobre los 10 de la sección I. Verificados contra código directo (2026-07-19).
+> **Línea de negocio (todos):** compliance que predice en vez de solo cumplir — la convergencia multi-instrumento detecta el riesgo antes de la denuncia, y la voz libre desenmascara el teatro de cumplimiento que el Likert solo no ve.
+
+### 81. AmbienteRiskOrchestrator
+
+- **Archivo:** `src/lib/services/compliance/AmbienteRiskOrchestrator.ts` (327 líneas, puro)
+- Orquesta 3 pasos: `buildData` → `buildBeat1Seed` → `buildNarratives`. Invoca `buildGerenciaRollup` una sola vez.
+- `coverageGapPct = 100 − pctCobertura`. `gerenciasMudasCount`: `deptosConIsa = totalChildren − deptosSubThreshold − deptosNoInvitados`; muda si `deptosConIsa === 0 ∧ (deptosSubThreshold > 0 ∨ coverageRate === 0)`.
+- `buildFactoresTitulares`: **orgISA ≥ 80** → top-2 como fortalezas; **< 80** → bottom-2 como debilidades + `fortalezaRelativa` solo si hay ≥3 dimensiones.
+- `buildExtremosTitulares`: requiere ≥2 gerencias con ISA.
+- **Output:** `AmbienteRiskPayload` — `AmbienteRiskData` con 22 campos + `Beat1Seed`.
+
+### 82. AmbienteSynthesisEngine — 8 diagnósticos con scoring competitivo
+
+- **Archivo:** `src/lib/services/compliance/AmbienteSynthesisEngine.ts` (843 líneas)
+- **Pipeline de 7 pasos.** A diferencia de los synthesis engines de prioridad fija, este **compite por score numérico** y solo usa prioridad para desempatar.
+- **`DIAGNOSTIC_PRIORITY` (8):** FUEGO_LEGAL · SILENCIO_SIN_VOZ · CONTRADICCION_TEATRO · CONCENTRACION_MANDO · SISTEMICO_SIN_MANDO · OBSERVACION_SIN_FOCO · BIEN_CON_FOCOS · TODO_BIEN (+ `GENERIC` fuera de prioridad).
+
+| Diagnóstico | Trigger | Score |
+|---|---|---|
+| FUEGO_LEGAL | ≥1 dept con `piso_denuncia > 0` | `100 + nFuego×10` |
+| SILENCIO_SIN_VOZ | `coverageGapPct ≥ 50` ∨ gerencia muda con voz externa | `coverageGapPct + mudasConExterna×5` |
+| CONTRADICCION_TEATRO | `teatroCount ≥ 1` ∧ `orgISA ≥ 60` | `teatroCount×20 + (orgISA − 60)` |
+| CONCENTRACION_MANDO | `criticalByManager > 0` ∧ concentración ≥ 0.30 | `round(conc×100) + deltaIsa` |
+| SISTEMICO_SIN_MANDO | `riesgoDeptos ≥ 3` ∧ `criticalByManager === 0` | `riesgoDeptos×10` |
+| BIEN_CON_FOCOS | `orgISA ≥ 80` ∧ `riesgoDeptos ≥ 1` | `riesgoDeptos×5` |
+| TODO_BIEN | `orgISA ≥ 80` ∧ riesgo 0 ∧ teatro 0 | `orgISA` |
+| OBSERVACION_SIN_FOCO | solo si nada disparó ∧ 60 ≤ orgISA < 80 | `80 − orgISA` |
+
+- **Modificadores:** `AFFINITY_BOOST = +10` a los tipos afines al `mundoDominante` (5 mundos mapeados). Convergencia `confirma` → score del top **×1.3**; `contradice` → +20 a CONTRADICCION_TEATRO, y **lo crea si no existe**.
+- **Desempate:** `TIE_GAP = 5`; entre empatados ganan los afines, luego prioridad; anota `· override: beat1=…, engine=…` en el trigger cuando difiere.
+- **6 amplificadores:** TEATRO_EN_DEPTO · CONVERGENCIA_AMBOS/EXIT/ONBOARDING · SEXTA_ALERTA · OTRO_MUNDO. Composición de cláusulas en orden fijo AMBOS → EXIT → ONBOARDING → TEATRO → SEXTA → OTRO_MUNDO.
+- **Pick de señal dominante:** Ley Karin con `pesoEfectivo > 0` primero, si no el de mayor peso.
+- `deriveConvergenciaSignal` **nunca emite `'contradice'`** por esa vía — solo por override de input.
+
+### 83. AmbienteSynthesisDictionary
+
+- **Archivo:** `src/lib/services/compliance/AmbienteSynthesisDictionary.ts` (386 líneas)
+- `SYNTHESIS_DICTIONARY`: **9 entradas** (8 tipos + GENERIC), cada una con classification / implicationBase / path / accountability. GENERIC no narra (classification y accountability vacíos).
+- **`risks` solo en 2 entradas**, 3 items cada una: FUEGO_LEGAL ("Rara vez se queda en uno" / "Lo de adentro termina afuera" / "Quedó el registro") y CONCENTRACION_MANDO.
+- `ORIGEN_LABELS` (5) traduce el origen a lenguaje llano ("viene de quien tiene autoridad", "es de diseño, no de personas"…).
+- `SIGNAL_FRAGMENTS`: **9 entradas** (5 EXIT + 4 ONBOARDING). Tipos muertos sin entrada: `department_exit_pattern`, `DESENGANCHE_CULTURAL`.
+- `AMPLIFIER_CLAUSES`: 6 funciones, todas retornan `''` con 0 deptos. `formatDeptList`: 0/1/2/≥3 casos.
+
+### 84. CoverageAnalysisService — el motor del silencio
+
+- **Archivo:** `src/lib/services/compliance/CoverageAnalysisService.ts` (520 líneas, async con Prisma)
+- **`CoverageAnalyzedStatus` (4):** completed / skipped_privacy / no_response / not_invited.
+- `pctCobertura = deptosConVoz/totalDeptos`. `tipoSenal`: exit (dominante por `EXIT_SEVERITY_ORDER` critical4/high3/medium2/low1) → onboarding (`accumulatedExoScore < EXO_LOW_THRESHOLD = 50`) → otra.
+- **Decisión de rama A/B/C:** overlap requiere ≥2 deptos con score en CADA lado (`OVERLAP_MIN = 2`), preferencia EXO sobre EIS, margen `BRANCH_MARGIN = 5`. `exoNP < exoP − 5` → **A** (los que callaron están peor) · `> exoP + 5` → **B** · si no → **C**.
+- **`computeOtroMundo`:** setdiff company-scope − campaign-scope; emite solo deptos con alertas, todos `analyzed: 'not_invited'`. **No aplica RBAC** — el gate vive en el caller (CEO/admin-only).
+
+### 85. DepartmentRiskScoreService — score de riesgo 0-100 sin encuesta
+
+- **Archivo:** `src/lib/services/compliance/DepartmentRiskScoreService.ts` (352 líneas)
+- **Fórmula exacta:**
+  ```
+  C = 50 · (1 − participationRate/100)²          // confiabilidad, W_C = 50
+  A_norm = pesoAlertas / (pesoAlertas + K_A)     // K_A = 3, saturación
+  A = 50 · A_norm                                // W_A = 50
+  inferido = min(C + A, 100)
+  piso = (denuncias12m !== null ∧ ≥1) ? 75 : 0   // PISO_DENUNCIA
+  score = round(max(inferido, piso))
+  reason = piso > inferido ? 'piso_aplicado' : 'suma'
+  ```
+- **`null ≠ 0` en denuncias:** inicializa TODOS a `null`; solo flipea a número si hay ≥1 row de `DepartmentMetric` con `issueCount != null` en la ventana de 12 meses. Tres estados reales: sin dato cargado / cargado en cero / con denuncias.
+- Alertas cargadas por **FECHA (12m), no por status ni alertType** — 2 queries base (exitAlert, journeyAlert vía journey.departmentId) + 1 query de bump 90d solo si hay tipos bumpables (`BUMP_90D_THRESHOLD = 2`).
+- **Es el motor que permite puntuar el riesgo de un área que NO respondió la encuesta.**
+
+### 86. DepartmentRiskNarrativeDictionary — cascada FUEGO / HUMO / PUNTO CIEGO
+
+- **Archivo:** `src/lib/services/compliance/DepartmentRiskNarrativeDictionary.ts` (197 líneas, sin LLM)
+- **5 reglas, primera que matchea gana:**
+  1. **FUEGO** — `denuncias_12m ≥ 1`.
+  2. **HUMO** — silencio interno ∧ `pesoAlertas > 0`, con 3 ramas: **`A-legal`** (alguna alerta `ley_karin` con peso > 0 — **priority absoluto**, gana antes del split por producto) · `A` (Σexit ≥ Σonboarding) · `B` (Σonboarding > Σexit).
+  3. **PUNTO_CIEGO** — silencio interno ∧ `pesoAlertas === 0`.
+  4. **CONFIABLE** — `con_isa` ∧ sin alertas.
+  5. **`null`** — `con_isa` ∧ con alertas (sin string en este motor).
+- Header documenta una **excepción de vocabulario autorizada**: "denuncia" / "Ley Karin" permitidos solo en FUEGO y HUMO-A-legal.
+
+### 87. buildGerenciaRollup — 11 reducers por eje
+
+- **Archivo:** `src/lib/services/compliance/buildGerenciaRollup.ts` (607 líneas, puro)
+- Agrupación en **3 ramas**: (a) con gerencia padre → groupId = gerencia · (b) **merge de ancestro** (sin gerencia pero es ancestro de otro) → groupId = su propio deptId · (c) standalone → prefijo `__dept__:`.
+- **11 reducers:** `computeIsa` (ponderado por respondentCount) · `computeSilencio` (participationRate como **fracción 0-1, no %**) · `computeExit` · `computeDenuncias` (**3-estado**) · `computeTeatro` (**3-estado**, `undefined` se salta por payload legacy) · `computeSilencioVE` · `computeConvergencia` (peor nivelFinal por `NIVEL_FINAL_PRIORITY` de 6 entradas) · `computeDeptosEnRiesgo` · `computeGenero` · `computeLeyKarin` · `computeSenalesAmbiente` (superset: Karin + toxic_exit + liderazgo_concentracion) · `computeRiesgo`.
+- **Output:** `GerenciaRollup[]` con 16 campos top-level.
+
+### 88. deriveBeat1Slots + classifyD4 — los 5 mundos
+
+- **Archivo:** `src/lib/services/compliance/deriveBeat1Slots.ts` (600 líneas)
+- **`classifyD4` — cascada de 5 mundos, primera gana:**
+  1. `coverageGapPct ≥ 50` → **`silencio`**
+  2. `teatroCount ≥ 1` → **`contradiccion`**
+  3. `orgISA ≥ 80` ∧ riesgo 0 ∧ gap < 30 → **`todo-bien`**
+  4. `orgISA ≥ 80` ∧ (riesgo ≥ 1 ∨ 30 ≤ gap < 50) → **`bien-con-focos`**
+  5. else → **`numero-bajo`**
+- `intensidadFromISA` (4 bandas): ≥80 leve / ≥60 medio / ≥40 alto / crítico. `bumpIntensidad` sube 1 saturando, solo si `hasDenunciaFormal` (ortogonal — no cambia el mundo).
+- **`Beat1Slots` = 10 agregados + 12 slots single.** `exit_alerts_count` hace **de-dup de Ley Karin** con clamp a 0 (`Σ max(0, alertsCount − leyKarinCount)`).
+- **10 pickers** (filter+sort+first). `pickMuda` tiene PRIMARY (sin voz, ordenado por señales de ambiente → riesgo → alfabético, `reason: 'low_participation'`) y FALLBACK (`coverageRate === 0`, `reason: 'no_invitada'`). `pickTeatro` usa `find(anyTeatro === true)` — descarta `null` (sin medir) y `false`. `pickDenuncia` respeta el 3-estado.
+
+### 89. buildAnatomia — las 6 dimensiones narradas
+
+- **Archivo:** `src/lib/services/compliance/buildAnatomia.ts` (339 líneas)
+- **Selector de forma (4 casos):** `TODO_SANO` / `TODO_BAJO` / `DESPAREJO_SINGULAR` (1 no sana) / `DESPAREJO`. Cada forma fija titular, párrafos, focoParrafo y cierre; DESPAREJO interpola las 2 dimensiones más bajas.
+- `DIM_LLANA` (6): P2→'la seguridad para hablar', P3→'el espacio para no estar de acuerdo', P4→'el trato del día a día', P5→'la equidad de reglas', P7→'la calidad del liderazgo', P8→'el desgaste de convivir'.
+- `CAUSA_RAIZ` (6 párrafos largos) · `LEVEL_KICKER` (4) · escala declarada `'Escala 0–100 · un ambiente sano parte en 75'`.
+- `hero.color = dimsEnSano === total ? 'cyan' : 'amber'`.
+
+### 90. orgDimensions — precedencia causal del foco
+
+- **Archivo:** `src/lib/services/compliance/orgDimensions.ts`
+- **`ORG_DIMENSION_KEYS` (6):** P2_seguridad, P3_disenso, P4_microagresiones, P5_equidad, P7_liderazgo, P8_agotamiento. P6 (router condicional) y P1 (texto abierto) **no son dimensiones**.
+- Promedio ponderado por `respondentCount`; **si el peso total es 0 la dimensión se OMITE** — no se afirma "sin dato" ni se asume 0.
+- **`dimFoco` — doble filtro:** descarta sanas → toma el nivel más grave presente → entre esas, la de menor índice en `DIM_FOCO_PRECEDENCE` (orden causal: **1. seguridad → 2. liderazgo → 3. disenso → 4. equidad → 5. microagresiones → 6. agotamiento**). **La gravedad manda sobre la precedencia.**
+- `toDisplay100(s) = round(((s − 1)/4) × 100)` — Likert 1-5 → 0-100. `DISPLAY_THRESHOLDS` (sano 75 / atencion 50 / riesgo 25) espejo exacto de 4.0/3.0/2.0.
+
+### 91. buildElNombre — la regla de las TRES LLAVES
+
+- **Archivo:** `src/lib/services/compliance/buildElNombre.ts` (217 líneas)
+- Selecciona la línea de mando protagonista con un **sort de 4 niveles**: `legalRank` desc → tamaño del grupo desc → `avgIsa` asc → `managerId` (desempate estable).
+- **`legalRankOf`:** 2 si algún dept tiene denuncia formal · 1 si alguna alerta exit es Ley Karin · 0 si ninguna. **Denuncia gana sobre indicio.** Grupos con <2 deptos se descartan (espejo del filtro del motor).
+- `avgIsa = Infinity` si ningún dept tiene ISA → quedan últimos.
+- **Postura declarada (§2.4):** "Este informe no nombra personas: señala la estructura…". Factorización con `NUM_ES` (11 entradas). Cierre: *"{N} equipos distintos no inventan el mismo problema por separado."*
+
+### 92. buildLaVoz — las citas literales
+
+- **Archivo:** `src/lib/services/compliance/buildLaVoz.ts` (177 líneas)
+- `MAX_CITAS = 6`, dedup case-insensitive, `stripWrappingQuotes`.
+- **`SILENCIO_FAMILY` (3):** silencio_organizacional, resignacion_aprendida, miedo_represalias. Los otros dos patrones (hostilidad, favoritismo) NO están → forman la variante **neutra**.
+- `forma = 'silencio'` solo si **todos** los dominantes están en la familia; si no, neutra.
+- **Guard de omisión:** sin citas y sin alertas de género → el acto entero devuelve `null`.
+- Cierre: *"Lo que el equipo no dice en la encuesta, lo termina diciendo de otra forma."*
+
+### 93. buildTriageGroups + buildTriageModal — el triage de gerencias
+
+- **Archivos:** `buildTriageGroups.ts` (405 líneas) + `buildTriageModal.ts` (286 líneas), ambos puros
+- **`TriageLecturaKey` (6):** FUEGO · HUMO/A-legal · HUMO/A · HUMO/B · PUNTO_CIEGO · CONFIABLE, con `FAMILY_LABEL` (4), `LECTURA_ORDER` (6), `LECTURA_KICKER` (6: 'Denuncia formal registrada', 'Señal legal tras el silencio', 'Fuga de talento en gestación', 'Fricción en la entrada', 'Gestión sin radar', 'Métrica validada') y `NARRATIVA_PLURAL` (6).
+- **Modelo:** la gerencia se representa por su **PEOR departamento**. `viaWorstDept` solo si `totalChildren > 1` ∧ el peor no es la gerencia misma (evita "vía sí misma" en el merge de ancestro).
+- **Factorización:** grupos homogéneos (mismo score) se colapsan en una línea `{kicker} · {count} gerencias · riesgo {score} de 100 cada una`.
+- **Dedupe Sexta/OTRO MUNDO:** se filtran los deptos ya nombrados en las instancias.
+- **Modal:** `mode = count > 1 ? 'grupo' : 'individual'`; en modo grupo los bloques drivers/declararon/senales quedan `null` (compacto). `buildSenalesText` es una **cascada de 4 ramas donde denuncia e indicio jamás se suman**: denuncia formal → indicio Ley Karin ("Es un indicio, no una denuncia") → señales de salida/entrada → null.
+
+### 94. detectSilencioConVozExterna + CoverageNarrativeDictionary + CascadaNarrativeDictionary + buckets
+
+- **`detectSilencioConVozExterna.ts`** — motor puro. **Dos invocaciones, dos colecciones que no se fusionan:** `sub_threshold` → SEXTA (dentro del estudio) · `no_invitado` → OTRO MUNDO. `con_isa` siempre excluido. Pick de dominante: Ley Karin con peso>0 primero (espejo de la regla 2a del narrativo). `saborSubFromAnalyzed`: skipped_privacy→'A', no_response→'B', resto null; solo aplica en SEXTA.
+- **`CoverageNarrativeDictionary.ts`** (436 líneas) — `NarrativeToken` (5 variantes: text/pct/bold/tooltip/legal). **`LEGAL_BADGE_CONFIG` por país:** `CL` → 'riesgo Ley Karin'; default → 'riesgo de cumplimiento'. `EXIT_PHRASE_BY_ALERTTYPE` (6 entradas). `numWord` femenino 1-9. `buildNarrativaPrincipal` con 3 ramas (silencio dominante / todas hablaron / voz dominante).
+- **`CascadaNarrativeDictionary.ts`** — 3 funciones de umbral con 3 ramas cada una; la de convergencia usa cortes distintos (**≥100 / ≥75**) de las otras dos (≥80 / ≥60). `buildWeightNote` omite componentes en 0. `PREDICTOR_TOOLTIP` cita MIT Sloan 2022 (500 empresas, 170 factores culturales).
+- **`buckets.ts`** — fuente ÚNICA de la derivación de estado, importada por 4 consumidores (`CoverageAnalysisService`, `ComplianceAlertService`, `DepartmentRiskScoreService`, `detectSilencioConVozExterna`). `deriveAnalyzed` en 4 ramas de orden significativo (`COMPLETED` → `invited===0` → `responded===0` → resto). `bucketFromAnalyzed` colapsa 4 estados en 3 buckets.
+
+---
+
+## XV. MOTORES TRANSVERSALES ADICIONALES (ausentes en v1.1)
+
+### 95. PerformanceRatingService — el orquestador central del talento (2.094 líneas)
+
+- **Archivo:** `src/lib/services/PerformanceRatingService.ts`
+- Fusiona 4 motores en una sola transacción de rating. **Es el nodo que el árbol de dependencias de v1.1 no mostraba.**
+- **Hybrid Score:** sin metas → `hybridScore = competenciesScore`, peso 100. Con metas: normaliza el % a escala 1-5 con `goalsNormalized = 1 + (goalsPercent/100) × 4` (0%→1.0, 50%→3.0, 100%→5.0) y pondera por `competenciesWeight/goalsWeight`. Time Travel a `cycleEndDate`.
+- **Trigger 1 — Role Fit post-360:** `RoleFitAnalyzer` + `getRoleFitLevel`. Error → warn, **NO bloqueante**.
+- **Trigger 2 — Potencial AAE + matrices:** `calculatePotentialScore` → `scoreToNineBoxLevel` sobre potencial y performance → `calculate9BoxPosition`. Si hay roleFit → `TalentIntelligenceService.analyze` produce mobilityQuadrant / riskQuadrant / riskAlertLevel.
+- **Sync de sucesión (3 puntos distintos):** `SuccessionService.deriveFlightRisk(riskQuadrant, riskAlertLevel)` → `updateMany` de `CriticalPosition.incumbentFlightRisk` para todas las posiciones donde el empleado es incumbente activo.
+- Bulk con `CHUNK_SIZE = 10` (calibrado bajo el pool pgbouncer ~15). AuditLog `PERFORMANCE_RATING_GENERATED` con `newValues.trigger`.
+- **Por qué importa:** no es un 360 más — es la máquina que encadena evaluación → 9-box → RoleFit → movilidad/riesgo → sucesión → compensación en una sola pasada auditable.
+
+### 96. GoalCycleService — ciclo de metas con candado distribuido
+
+- **Archivo:** `src/lib/services/GoalCycleService.ts`
+- **Máquina de 5 estados:** `PLANNING → ASSIGNING → ACTIVE → CLOSING → CLOSED`. Nunca hay salto directo `ACTIVE → CLOSED`.
+- **Candado singleton:** `pg_advisory_xact_lock(hashtext(accountId))` dentro de `$transaction`, luego check de otro ciclo en `['ACTIVE','CLOSING']` → `GoalCycleActiveError`. **Mata el doble clic** a nivel de base de datos.
+- `normalizePeriodFields`: QUARTERLY exige `quarter ∈ [1,4]` ∧ `semester === 0`; SEMESTER inverso; ANNUAL ambos 0.
+- `validateWindowOrder`: `assignment ≤ tracking ≤ closure`, closure ≤ 31-dic-(year+1).
+- `finalizeCycleWithDecisions`: aplica decisiones + transición en UNA transacción y **re-verifica `CLOSING` DENTRO de la tx** antes de sellar (defensa contra carrera). Si falla, el ciclo queda `CLOSING` y es reanudable.
+- Errores de dominio tipados: `GOAL_CYCLE_ALREADY_ACTIVE` / `GOAL_CYCLE_CLOSED` / `GOAL_CYCLE_VALIDATION`.
+- **Por qué importa:** convierte las metas en un ciclo gobernado con cierre auditable — un candado de 1-ACTIVE por cuenta y lock post-cierre, no un tracker de OKR que cualquiera reabre.
+
+### 97. GoalsAggregationService — 2 lentes por CRON mensual
+
+- **Archivo:** `src/lib/services/GoalsAggregationService.ts`
+- **LENTE 1 — `EmployeeGoalsInsight`:** NO recalcula cumplimiento; consume `GoalsService.getEmployeeGoalsScore(employeeId, periodEnd)` (Time Travel a fin de mes). `scoreTrend` = delta contra el período anterior, `null` si falta cualquiera de los dos. Upsert idempotente.
+- **LENTE 2 — Gold cache rolling 12 meses:** promedio de los últimos 12 insights → `Employee.accumulatedGoalsScore / Periods / LastUpdated`.
+- `CHUNK_SIZE = 10` + `Promise.allSettled` por chunk (un empleado que falla no mata la corrida).
+- **Limitación documentada en código:** `getActiveCycle` no filtra por ventana — un backfill de mes viejo etiqueta con el ciclo ACTIVE actual.
+- **Por qué importa:** integridad auditable por gerencia — el cumplimiento queda congelado al cierre de cada mes, no recalculado con los datos de hoy.
+
+### 98. OccupationMapper — cascada de 5 niveles con LLM al final
+
+- **Archivo:** `src/lib/services/OccupationMapper.ts`
+- **Pesos:** `STRONG_KEYWORD = 10`, `ALIAS_KEYWORD = 2`, `AMBIGUITY_MULTIPLIER = 2`. Cuota `LLM_MONTHLY_LIMIT = 50` por accountId por mes calendario.
+- **Nivel 0 cache** (`OccupationMapping` unique por accountId+positionText) → **1 exact phrase** (HIGH) → **2 keyword scoring** (ambigüedad si `best ≥ second × 2`; HIGH si score ≥10, si no MEDIUM) → **3 context disambiguation** (`CONTEXT_HINTS[standardCategory][acotadoGroup]`, LOW) → **4 context only** (LOW) → **5 LLM** (`claude-haiku-4-5-20251001`, max_tokens 200, prompt restringido a los primeros 100 SOC activos, **valida que el SOC devuelto exista o lo descarta**).
+- `jobLevelToAcotado`: 7 niveles → 4 grupos (alta_gerencia / mandos_medios / profesionales / base_operativa).
+- **Por qué importa:** resolver híbrido económico — heurística primero, LLM solo donde hace falta y con cuota controlada; clasifica una vez y sirve a Workforce, Efficiency y benchmarks.
+
+### 99. CompetencyFilterService — qué pregunta ve cada track
+
+- **Archivo:** `src/lib/services/CompetencyFilterService.ts`
+- Jerarquía numérica de tracks: `COLABORADOR 1 / MANAGER 2 / EJECUTIVO 3`; track desconocido → fallback 1.
+- Pregunta sin `audienceRule` → visible para todos (Core). Con `rule.minTrack` → `evaluateeLevel >= minLevel`.
+- Feedback abierto (`competencyCode: null` + `responseType: 'text_open'`) se muestra a **todos** los tracks.
+- Conteo acumulativo: colaborador = core · manager = core + leadership · ejecutivo = core + leadership + strategic.
+- **Por qué importa:** el mismo instrumento se adapta al nivel evaluado sin duplicar cuestionarios — un motor, muchos productos.
+
+### 100. PerformanceTrackValidator — human-in-the-loop en anomalías de estructura
+
+- **Archivo:** `src/lib/services/PerformanceTrackValidator.ts`
+- **3 reglas de cuarentena, ninguna auto-corrige** (decisión explícita):
+  - **A:** track MANAGER/EJECUTIVO ∧ `directReportsCount === 0` → CRITICAL si EJECUTIVO, WARNING si MANAGER.
+  - **B:** track COLABORADOR ∧ `directReportsCount > 0` → siempre CRITICAL.
+  - **C:** `standardJobLevel === null` (PositionAdapter no clasificó) → WARNING.
+- **Por qué importa:** human-in-the-loop en anomalías de estructura — el sistema señala la incoherencia del organigrama y espera decisión humana en vez de "arreglarla" en silencio.
+
+### 101. TalentFinancialFormulas — el fundamento legal chileno
+
+- **Archivo:** `src/lib/utils/TalentFinancialFormulas.ts`
+- Constantes legales: `ROLEFIT_THRESHOLD = 75`, `FINIQUITO_YEARS_CAP = 11`, `UF_VALUE_CLP = 38.800`, `FINIQUITO_UF_CAP = 90` (Art. 172).
+- `calculateMonthlyGap`: 0 si roleFit ≥75; si no `salary × ((75 − roleFit)/100)`.
+- `calculateFiniquito`: <12 meses → solo preaviso. Si no: `fullYears = floor(m/12)`, fracción ≥6 suma un año, cap 11 → `salary × yearsCapped + preaviso`. `calculateFiniquitoConTope` capea el salario a **90 UF = 3.492.000 CLP**.
+- `calculateMonthsUntilNextYear` / `didRecentlyAddYear` — el reloj del pasivo: cuándo un mes más de antigüedad agrega una anualidad completa.
+- `calculateBreakevenMonths = finiquito / monthlyGap`.
+- **Por qué importa:** fundamento legal chileno real (Art. 163/172, topes UF, anualidades) — pone el desempeño en CLP auditables, no en scores.
+
+### 102. FinancialCalculationsService — 3 escenarios CFO-ready + Onboarding
+
+- **Archivo:** `src/lib/financialCalculations.ts`
+- **Turnover crítico:** riesgo default 25%, target ambiente 3.5/5.0, estado mejorado = costo × 0.4 (60% reducción), confidence 0.85 si score <2.5. Niveles: <2.0 critical, <2.5 high, <3.0 medium.
+- **Leadership gap:** target 4.0, `performance_increase = min(gap × 8, 20)` (cap 20% McKinsey), `productivity_value = payroll × 1.5`, recuperable 80%.
+- **Champion replication:** `min(avg_gap × 10, 25)` (cap 25%), `productivity_value = payroll × 1.4` (conservador).
+- **Agregación:** `payback_months = ceil((total_at_risk × 0.1) / (annual_savings/12))`. `confidence_level`: ≥0.8 high / ≥0.7 medium / low.
+- **Onboarding:** `turnoverMultiplier = 0.5` (6 sueldos, SHRM 2024), `interventionSuccessRate = 0.75` (Bauer); los 5 `interventionCosts` en 0 (tiempo interno) → ROI `Infinity` y payback 0 cuando la inversión es $0.
+- `getSourceCredibility`: mapa de 6 organizaciones tier-1, default "Tier 2".
+- **Por qué importa:** demuestra el ROI de actuar con cifras que un CFO puede auditar paso a paso, no con un score abstracto.
+
+### 103. potential-assessment (AAE) + management-insights
+
+- **`src/lib/potential-assessment.ts`** — fórmula única del potencial: `avg = (aspiration + ability + engagement)/3`; `score = 1 + (avg − 1) × 2` (avg 1→1.0, 2→3.0, 3→5.0). Consumido por `PerformanceRatingService.ratePotential` para derivar `potentialLevel` y `nineBoxPosition`.
+- **`src/lib/management-insights.ts`** — umbrales `CRITICAL 2.5 / MONITOR 3.5 / STRENGTH 4.5`; scores <1.0 se descartan (texto abierto sin nota). Rango [3.5, 4.5) → `null` (HEALTHY, sin alerta visible). **Banco de 14 competencias** con mensaje crítico + mensaje de fortaleza personalizados (feedback, cambio, liderazgo, delegacion, estrategica, cliente, equipo, comunicacion, decisiones, resultados, innovacion, desarrollo, adaptabilidad, conflictos) + fallback genérico. Orden de salida: CRITICAL → STRENGTH → MONITOR → HEALTHY.
+- **Por qué importa:** cero datos crudos al gerente — cada competencia baja llega con su conversación ya redactada.
+
+### 104. consent-derivation — la regla legal (Ley 21.719)
+
+- **Archivo:** `src/lib/services/consent-derivation.ts`
+- **Sin cache persistente por diseño** — se deriva del log inmutable `ConsentEvent` cada vez.
+- **PASO 1 — veto terminal:** cualquier evento `REVOCACION` (STOP) → `false`, **sin importar fecha, aunque existan autorizaciones posteriores**. El orden de eventos no altera el resultado.
+- **PASO 2 — habilita:** al menos una `AUTORIZACION` cuyo `metodo` pase `isRealOptIn` (`whatsapp_button` / `whatsapp_text` / `self_service`). Proxy (`admin_loaded`, `imported`, `null`) **NO habilita**.
+- **Fail-closed:** sin eventos o solo proxy → `false`. Ausencia NO es STOP (por eso `isConsentRevoked` es una función distinta: un employee sin opt-in aún puede recibir la solicitud de consent).
+- Batch sin N+1. TODA query filtra por `accountId` además de `employeeId`.
+- **Por qué importa:** consent operable y auditado (opt-in por botón de WhatsApp) — vendible y defendible ante la ley de datos personales.
+
+### 105. channel-selector — Regla Cero del multicanal
+
+- **Archivo:** `src/lib/services/channel-selector.ts`
+- **Contrato crítico: NUNCA lanza throw** — retorna `'none'`. Un throw en el encolado de 500 participantes corta el flujo (anti-patrón corregido).
+- `purpose` default `'content'` = **fail-closed**: todo caller no actualizado queda del lado seguro. `'solicitation'` solo para el template que PIDE el consent.
+- Gate: `whatsappAllowed = hasPhone ∧ (purpose === 'solicitation' ∨ canReceivePersonalContent === true)`. **El email corporativo NO pasa por gate** (es herramienta de trabajo).
+- Orden de 4 pasos: preferredChannel válido → cualquier email válido → whatsapp permitido → `'none'`.
+- **Por qué importa:** multicanal real con fallback automático — correo o WhatsApp según contacto y consent, sin decisión manual, y el mismo carril sirve a todos los productos.
+
+### 106. survey-escalation — 6 puertas de elegibilidad
+
+- **Archivo:** `src/lib/services/survey-escalation.ts`
+- Offset por cascada de 3 niveles (`EscalationConfigService`), default 2 días. **Ventana:** `cutoff = min(now − offset, endDate − offset)` — cadencia relativa hacia adelante desde `lastReminderSent`, NO desde el cierre.
+- **Puertas:** `hasResponded: false` → `reminderCount ≥ 1` → `lastReminderSent ≤ cutoff` → teléfono resuelto → **Performance excluido** (fail-closed: el consent del evaluador no está en contexto) → **doble puerta de consent** (`preferredChannel === 'whatsapp'` ∧ opt-in REAL derivado del log; `admin_loaded` ya NO basta).
+- Idempotencia: `dedupKey = 'survey-escalation:{participantId}'` + `skipDuplicates`.
+- **Por qué importa:** resiliencia de cola — no pierde ni duplica, y el mismo motor de escalación sirve a cualquier producto de la suite.
+
+---
+
+## 🔺 AMPLIACIONES v1.2 — motores documentados que el código superó
+
+> Verificación quirúrgica 2026-07-19. **Estas correcciones son las que más impactan una propuesta comercial con números.**
+
+| Motor | v1.1 decía | Código real | Nota |
+|---|---|---|---|
+| **InterventionEngine** | 8 intervenciones | **11** | +`LEADERSHIP_ACCOUNTABILITY`, `OPPORTUNITY_GOVERNANCE`, `BEHAVIORAL_TRIANGULATION`. Además **4 matrices de ruteo** no documentadas: `DIMENSION_INTERVENTIONS`, `PATRON_INTERVENTIONS`, `ALERT_INTERVENTIONS`, `CONVERGENCIA_INTERVENTIONS` (5 niveles). Modo individual devuelve 3 opciones. |
+| **ComplianceAlertService** | 5 alertas | **7** | +`silencio_con_voz_externa` (sexta) y +`participacion_anomala` (séptima). `liderazgo_toxico` tiene **dos productores** distintos (`createDepartmentAlerts` y `createLiderazgoToxicoAlerts`). |
+| **InsightEngine** | ~15 reglas (11 RoleFit + 4 EXO×JobLevel) | **31 reglas** | Desglose: 8 universales · 4 onboarding · 3 exit · 3 NPS · 2 pulse · 4 RoleFit base · 3 RoleFit×JobLevel · 4 EXO×JobLevel. **16 reglas invisibles en v1.1**, cubriendo 3 métricas enteras (`exit_retention_risk`, `nps_score`, `pulse_climate`). Doble sistema de prioridad (item 1-10 / regla 10-97) y aislamiento de fallos por regla (`try/catch` individual). |
+| **SpanIntelligenceService** | 8 narrativas | **12 ramas de retorno** | Las 8 del spec §7 son solo el **Modo Completo**. Las 4 adicionales cubren el **Modo Estructural** (sin ciclo activo). MICRO gana siempre sobre cualquier combinación. `accionSugerida` es condicional a antigüedad en 3 ramas (`esNuevo = tenureMeses < 6`). Umbrales: `metasBajas < 65`, `metasAltas ≥ 85`. ⚠️ Los comentarios internos del propio archivo también dicen 8. |
+| **GoalsService** | "CRUD metas + cálculo cumplimiento" | **Motor de ciclo, cierre y gobierno** (1.755 líneas, 35 métodos) | `applyCycleClosureDecisions` con 3 decisiones enum, **validación TODO-O-NADA** (cualquier goalId fuera del set accionable rechaza la operación entera) y **assert de conteo anti-carrera**. Flujo request/approve/reject closure con resolución de autoridad propia. **Herencia automática de ciclo** en los 4 puntos de creación. Time Travel `getEmployeeGoalsScore(employeeId, atDate)`. Motor de alineación (cascade, detectOrphans, alignmentTree). 8 validadores de dominio. |
+| **WorkforceIntelligenceService** | 10 detectores | 10 detectores ✅ **+ capa no documentada** | Sobre los 10 corre una capa de **6 alertas priorizadas** filtradas por `financialImpact > 0` y recortadas a **top 5**, más `netROI = (liberatedFTEs.totalMonthlySavings × 12) − severanceLiability.totalSeverance` y `confidence` por cobertura de `socCode` (≥0.7 high / ≥0.3 medium / low). |
+| **RetentionEngine** | motor vivo | **`@deprecated`** | Absorbido por `PulseEngine` (EX Clima Gate 3, jul-2026). Los 3 business cases se calculan server-side con `SalaryConfigService` real y se **persisten** en `DepartmentClimaInsight.correlationFlags`. El motor client-side sigue vivo SOLO para la results page actual. **"NO agregar nuevos consumidores"** (literal en cabecera). |
+| **BenchmarkAggregationService** | solo `onboarding_exo` + `performance_rolefit` | ✅ correcto | **Asimetría no documentada:** `InsightEngine` ya tiene 8 reglas vivas para métricas que el agregador todavía no produce (`exit_retention_risk` ×3, `nps_score` ×3, `pulse_climate` ×2). El comentario de cabecera del propio servicio está desactualizado (dice "Fase 1: solo onboarding_exo"). |
+| **SafetyScoreService** | scores per-dept | + `computePooledOrgScore(rows)` | Agregación pooled org-level, no solo per-departamento. Exporta `PRIVACY_THRESHOLD = 5` reutilizado por el módulo Clima. |
+| **ConvergenciaEngine v2** | Motor A + Motor B + memoria | **11 exports públicos** (1.198 líneas) | `loadDepartmentExternalSignals`, `buildDepartmentConvergencia`, `detectCasosMotorA`, `computeConvergenciaExterna`, `resolveExternalAlertMode`, `buildExternalAlertModeWhere`, `loadDepartmentExternalAlerts`, `computeNivelFinal`, `applyA4ToDepartments`, `buildGlobalConvergencia`, `runConvergencia`. |
+| **ISAService** | cálculo ISA | **7 exports** | + `resolveOrgIsa`, `aggregateOrgIsaComponents`, `calculateISAWithComponents`, `ISA_LABELS`. |
+| **Higiene de repo** | — | — | `src/engines/ExitAlertEngine - copia.ts` (1.569 líneas) convive versionado junto a `ExitAlertEngine.ts` (1.589 líneas). `src/lib/adapters/onboarding-participant-adapter.ts` está **vacío (0 líneas)**. |
+
+---
+
+## 💼 POR QUÉ IMPORTA — línea de negocio por motor
+
+> Una línea de negocio por motor, tomada de la sección **DIFERENCIADORES** de la ficha de producto correspondiente (`.claude/FICHA_PRODUCTOS/`). Los motores de las secciones XIII-XV llevan su línea inline en su propia entrada.
+
+| Motores | Ficha fuente | Qué resuelve / por qué importa |
+|---|---|---|
+| 1-10 (Ambiente Sano) · 81-94 (Cascada AS) | `ambientesano` | Compliance que **predice** en vez de solo cumplir: ISA + convergencia detectan el riesgo antes de la denuncia, y la voz libre desenmascara el teatro de cumplimiento que el Likert solo no ve. Intervenciones con respaldo científico citado. |
+| 11-13, 20, 21, 95, 99, 100 (Performance 360°) | `performance` | No es un 360 más: es una **máquina de decisiones en cadena** (eval → 9-box → RoleFit → movilidad/riesgo → sucesión → compensación). Self 0% combate la inflación de la autoevaluación. |
+| 15-19, 61 (Calibración) | `performance` | Calibración **auditable** (PDF + QR) con detección de sesgo del evaluador — el comité deja rastro, no acta de papel. |
+| 14, 15, 16, 17, 23, 24 (Talent / TAC) | `tac` | Diagnóstico → acción **en un click**: dispara comités y emails desde la pantalla, con dos altitudes en un flujo (gerencia y persona) y rastro auditable medido a 180 días. |
+| 22, 25-28 (Sucesión) | `succession` | **Radar de continuidad con urgencia**, no organigrama: sugerencias con rigor (RoleFit + 9-box + aspiración), efecto dominó que simula la cascada completa, y lo discrecional queda marcado. |
+| 29-33 (Exit) | `exit` | **Correlación onboarding → exit única**: la salida era predecible y el costo de haber ignorado la alerta es calculable. Ley Karin integrada. |
+| 34-38 (Onboarding) | `onboarding` | **Predictivo, no descriptivo**: riesgo de fuga el día 1, no el día de la renuncia. EXO sobre framework Bauer 4C y tabla managed-vs-ignored para el CFO. |
+| 39-42, 46 (Workforce / IA) | `workforce` | Traduce el riesgo de IA a **pesos**: inercia de capital y FTEs liberables, no un score abstracto. Los detectores corren en una sola pasada sobre el mismo dataset. |
+| 43, 44, 51-54 (Efficiency) | `efficiency` | Diagnóstico → **decisiones operables**: carrito con ahorro/mes, inversión y payback, más un business case exportable al directorio sin nombres. Nueve ángulos financieros de la misma dotación. |
+| 45, 55 (P&L Talent) | `pltalent` | El **único módulo que pone el desempeño en el P&L** (brecha + pasivo legal en CLP), con diagnóstico diferencial de causa raíz y fundamento legal chileno real. |
+| 48-50, 96, 97 (Goals / Metas) | `metas` | No es un tracker de OKR: es un **detector de incoherencias organizacionales** (evaluación ≠ resultado), con Time Travel real y ciclo de cierre gobernado. |
+| 50-52, 98 (Descriptores) | `descriptores` | Estándar O*NET aterrizado a Chile/LATAM y **resolver híbrido económico**: heurística primero, LLM solo donde hace falta. Clasifica una vez, sirve a toda la suite. |
+| 56-58 (Narrativas ejecutivas) | `pltalent` | **Cero datos crudos al CEO**: narrativa con respaldo científico, no un dashboard que hay que interpretar. |
+| 59, 60 (Benchmarks) | `benchmark` | **Compara sin exponer** (threshold de 3 empresas, vendible y legal) y nunca dice "sin datos" si existe un nivel más general. Entrega insights, no números. |
+| 61-64 (Survey / soporte) | `pulso_experiencia` | **Un motor, muchos productos**: el mismo framework sirve clima, onboarding, exit, performance y compliance, con normalización unificada que habilita analytics y benchmarks sin re-implementar. |
+| 104-106 (Comunicaciones) | `comunicaciones` | **Multicanal real con fallback automático** y consent operable por WhatsApp — el mismo carril resiliente sirve a todos los productos. |
+| 65-80 (EX Clima) | *sin ficha* | `[confirmar — sin diferenciador documentado]` |
 
 ---
 
