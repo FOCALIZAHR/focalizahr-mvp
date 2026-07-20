@@ -17,6 +17,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { FHREmptyState } from '@/components/ui/FHREmptyState';
 import { hasPermission } from '@/lib/services/AuthorizationService';
 import { buildVitalsNarrative } from '@/lib/narratives/vitalsNarratives';
@@ -30,8 +31,25 @@ export const metadata = {
   description: 'Estado de la organización en una lectura.',
 };
 
+/**
+ * Router por rol (spec seccion 4, Gate C): la casa de HR_OPERATOR es la vista
+ * operativa, donde si puede actuar sobre campanas y participantes. No tiene
+ * 'vitals:view' por diseno, asi que sin este redirect aterrizaria en el estado
+ * de acceso denegado en vez de en su superficie de trabajo.
+ *
+ * EVALUATOR NO se lista: el middleware (:252) ya lo redirige a evaluaciones.
+ * Duplicarlo aca crearia dos fuentes para la misma decision.
+ */
+const ROLES_A_VISTA_OPERATIVA: readonly string[] = ['HR_OPERATOR'];
+
 export default async function InicioPage() {
   const h = headers();
+
+  // Antes de resolver acceso: si no es su superficie, se va a la suya.
+  if (ROLES_A_VISTA_OPERATIVA.includes(h.get('x-user-role') ?? '')) {
+    redirect('/dashboard');
+  }
+
   const access = await resolveVitalsAccess((name) => h.get(name));
 
   // x-company-name viaja codificado (middleware.ts:218) por ñ/tildes.
