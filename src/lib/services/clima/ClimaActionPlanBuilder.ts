@@ -24,6 +24,8 @@ import {
   reactiveSeverityZone,
   REACTIVE_CIRCULARITY_EXCLUDE,
   REACTIVE_SYSTEMIC_RATIO,
+  REACTIVE_SYSTEMIC_MIN_MEASURED,
+  REACTIVE_SYSTEMIC_MIN_BELOW,
   REACTIVE_MIN_IMPACT,
   type RiskZone,
 } from '@/lib/services/clima/climaThresholds';
@@ -38,6 +40,7 @@ import {
   type ClimaDeptDecisionInput,
   type ClimaInterventionCell,
   type ClimaInterventionVariantCell,
+  type ClimaSystemicCell,
 } from '@/types/clima-planes';
 import type { PulseBusinessCase } from '@/lib/services/clima/PulseEngine';
 
@@ -128,9 +131,17 @@ export function buildDeptClimaDecisions(
     // default (narrativa genérica de dimensión), aunque el ítem sí dispare por su severidad.
     const narrativeLever = palanca.priorityMean !== null ? palanca.reactive : null;
 
-    const isSystemic = belowTier.length / measured.length >= REACTIVE_SYSTEMIC_RATIO;
+    // Sistémico = ratio ≥0.5 Y guardas duras de denominador/numerador (evitan que una
+    // dimensión de 1-2 reactivos medidos salga sistémica por pura aritmética del denominador).
+    const isSystemic =
+      measured.length >= REACTIVE_SYSTEMIC_MIN_MEASURED &&
+      belowTier.length >= REACTIVE_SYSTEMIC_MIN_BELOW &&
+      belowTier.length / measured.length >= REACTIVE_SYSTEMIC_RATIO;
 
-    let cell: ClimaInterventionCell | ClimaInterventionVariantCell;
+    let cell:
+      | ClimaInterventionCell
+      | ClimaInterventionVariantCell
+      | ClimaSystemicCell;
     let selectedReactive: string | null;
     if (isSystemic) {
       cell = getSystemicIntervention(driver.category, belowTier.length, measured.length);

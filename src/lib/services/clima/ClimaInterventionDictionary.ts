@@ -130,6 +130,18 @@ export const CLIMA_INTERVENTION_VARIANTS: Partial<
 > = {
   liderazgo: {
     amarilla: {
+      desarrollo: {
+        narrative: `${P}El equipo entrega pero no crece: la conversación de desarrollo no está ocurriendo.`,
+        steps: [
+          'Dedicar un 1:1 al mes solo a desarrollo, sin hablar de tareas',
+          'Acordar una habilidad concreta a trabajar en el trimestre',
+        ],
+        suggestedProduct: { label: 'Ajustar tu 1:1', target: 'PDI_CLIMA' },
+        esfuerzo: 'BAJO',
+        efectividad: 'MEDIA_ALTA',
+        evidencia:
+          'Q12 ("alguien en el trabajo estimula mi desarrollo"); Project Oxygen ubica el apoyo al desarrollo de carrera entre los comportamientos top de gerentes efectivos.',
+      },
       expectativas: {
         narrative: `${P}Se avanza en el día a día pero las prioridades de fondo no están claras: instalar un norte simple y visible.`,
         steps: ['Escribir el top 3 de prioridades del rol y dejarlo a la vista', 'Confirmarlas en un 1:1 corto y frecuente'],
@@ -570,6 +582,18 @@ export const CLIMA_INTERVENTION_VARIANTS: Partial<
   },
   autonomia: {
     amarilla: {
+      colaboracion: {
+        narrative: `${P}El trabajo cruza equipos pero cada uno resuelve por su lado: falta un punto de contacto fijo.`,
+        steps: [
+          'Nombrar un referente por equipo para los temas que cruzan',
+          'Cerrar cada entrega cruzada con quién sigue y para cuándo',
+        ],
+        suggestedProduct: { label: 'Ajustar rituales de equipo', target: 'PDI_CLIMA' },
+        esfuerzo: 'BAJO',
+        efectividad: 'ALTA',
+        evidencia:
+          'Q12 ("mis compañeros están comprometidos con hacer un trabajo de calidad"); la claridad de interfaz entre equipos es el predictor más citado de fricción interdepartamental.',
+      },
       autonomia: {
         narrative: `${P}Dar el "qué" y soltar el "cómo": empezar a delegar sin controlar el método.`,
         steps: ['Definir el resultado esperado, no el método', 'Delegar una decisión sin pedir revisión previa'],

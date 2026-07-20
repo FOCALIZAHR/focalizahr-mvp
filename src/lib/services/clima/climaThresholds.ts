@@ -141,6 +141,20 @@ export const CLIMA_DIVERGENCE_MEAN_MIN_DELTA = 0.2;
 export const REACTIVE_SYSTEMIC_RATIO = 0.5;
 
 /**
+ * Guardas DURAS de "sistémico" (además del ratio) — evitan que el ratio ≥0.5 marque sistémica
+ * a una dimensión con denominador chico: con 1 reactivo medido 1/1=100% y con 2 reactivos 1/2=50%
+ * dispararían sistémico por construcción (aritmética del denominador, no severidad real —
+ * verificado en GATE4_LOBBY_DEMO, pulso-express). Ambas deben cumplirse:
+ *   - REACTIVE_SYSTEMIC_MIN_MEASURED: piso de reactivos medidos (denominador) para que "sistémico"
+ *     sea siquiera evaluable; con menos → tratamiento INDIVIDUAL.
+ *   - REACTIVE_SYSTEMIC_MIN_BELOW: piso de reactivos bajo tier (numerador) — un solo reactivo bajo
+ *     nunca es un patrón sistémico.
+ * NO recalibra el 0.5 (que sigue rigiendo la fracción). PROVISIONAL.
+ */
+export const REACTIVE_SYSTEMIC_MIN_MEASURED = 3;
+export const REACTIVE_SYSTEMIC_MIN_BELOW = 2;
+
+/**
  * Piso mínimo de impacto (|coeficiente reactivo×EI|, hoy Kendall's Tau-c) para que un reactivo
  * pueda COMPETIR como palanca. Bajo este umbral el reactivo es ruido estadístico de impacto
  * insignificante y se retira de las recomendaciones de prioridad, sin importar qué tan bajo sea

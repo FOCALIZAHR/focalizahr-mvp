@@ -36,8 +36,14 @@ export default memo(function ClimaIntroSequence({ results, onDone }: ClimaIntroS
   const [step, setStep] = useState<IntroStep>('portada')
   const result = useMemo(() => ClimaSynthesisEngine.generate(results), [results])
 
+  // Wrapper de los 3 pasos (portada · ancla · cascada). Su padding SE APILA sobre el
+  // padding propio de cada paso — por eso está bajo (`py-2 md:py-4`): con `md:py-10`
+  // la card arrancaba ~165px abajo del breadcrumb y cortaba el CTA.
+  // Ancho `max-w-5xl` → card de ~960px (antes 832 = 63% del stage).
+  // NOTA: éste es el único lugar donde se puede dar aire/ancho al paso `ancla` SIN
+  // tocar `AnclaInteligente`, que es COMPARTIDA con Goals y P&L Talent.
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 md:px-8 md:py-10">
+    <div className="max-w-5xl mx-auto px-4 py-2 md:px-8 md:py-4">
       {/* Saltar la intro → Lobby directo */}
       <div className="flex justify-end mb-2">
         <button

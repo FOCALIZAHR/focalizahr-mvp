@@ -203,10 +203,10 @@ export type ClimaChapter = 'heatmap' | 'impact' | 'correlacion';
  *  subproductos, v3 §3A). Se conserva para el filtrado interno de vistas. */
 export type ClimaRailFilter = 'todos' | RiskZone;
 
-/** Subproductos de Clima — las 4 cards del Rail (v3 §3A). Cada una abre su
+/** Subproductos de Clima — las cards del Rail (v3 §3A). Cada una abre su
  *  propia vista completa; el filtrado jerárquico se resuelve DENTRO de cada
- *  vista (patrón `scope`), nunca en el Rail. */
-export type ClimaSubproducto = 'cascada' | 'analisis' | 'ranking' | 'dimensiones';
+ *  vista (patrón `scope`), nunca en el Rail. `planes` = 5ª card (Gate 5D). */
+export type ClimaSubproducto = 'cascada' | 'analisis' | 'ranking' | 'dimensiones' | 'planes';
 
 export interface ClimaCinemaStats {
   deptCount: number;

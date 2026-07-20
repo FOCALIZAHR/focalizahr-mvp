@@ -8,7 +8,7 @@
 // (son estructura de navegación, no narrativa). Los íconos son estructurales.
 // ════════════════════════════════════════════════════════════════════════════
 
-import { Film, Radar, Trophy, LayoutGrid, type LucideIcon } from 'lucide-react';
+import { Film, Radar, Trophy, LayoutGrid, ClipboardCheck, type LucideIcon } from 'lucide-react';
 import type { ClimaSubproducto } from '@/types/clima';
 
 export interface ClimaSubproductoDef {
@@ -24,6 +24,7 @@ export const CLIMA_SUBPRODUCTOS: ClimaSubproductoDef[] = [
   { id: 'analisis', label: 'Análisis de Clima', icon: Radar },
   { id: 'ranking', label: 'Ranking', icon: Trophy },
   { id: 'dimensiones', label: 'Dimensiones', icon: LayoutGrid },
+  { id: 'planes', label: 'Planes de Acción', icon: ClipboardCheck },
 ];
 
 export function climaSubproductoLabel(id: ClimaSubproducto): string {
