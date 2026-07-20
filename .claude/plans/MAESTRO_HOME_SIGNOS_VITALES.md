@@ -12,7 +12,7 @@ Spec: `.claude/tasks/SPEC_HOME_SIGNOS_VITALES_v1.1.md`
 
 - [x] Gate A - backend (servicio + endpoint + permiso)
 - [x] Gate B - UI portada
-- [ ] Gate C - router server-side por rol
+- [x] Gate C - router server-side por rol
 - [ ] Gate D - cambio de puerta (AuthForm.tsx:116)
 
 ---
@@ -114,6 +114,44 @@ y 4b, incluido el header como string vacio). Falta solo el round-trip HTTP.
 
 ---
 
+## Gate C - SELLADO 2026-07-20
+
+**Commits:** `a602df4` (redirect + smoke)
+
+**Entregado:**
+- `src/app/dashboard/inicio/page.tsx`: constante local `ROLES_A_VISTA_OPERATIVA`
+  y redirect a `/dashboard` antes de resolver acceso. 18 lineas.
+- `prisma/scripts/smoke-vitals-gateC.ts`: 8 escenarios, round-trip HTTP real.
+
+`middleware.ts` NO se toco, por regla firme de Victor.
+
+**Evidencia: 23 PASS.** Regresion verificada: Gate A 42, Gate B 32, paridad 15,
+todos en verde. `tsc` limpio y `next build` compilado correctamente
+(ClimaIntroSequence.tsx ya fue arreglado por la sesion paralela).
+
+| # | Rol | Objetivo | Resultado |
+|---|-----|----------|-----------|
+| 1-5 | FOCALIZAHR_ADMIN, ACCOUNT_OWNER, HR_ADMIN, HR_MANAGER, CEO | `/api/vitals/summary` | 200, scope organization, 57 deptos |
+| 6 | AREA_MANAGER con depto | `/api/vitals/summary` | 200, scope area, 1/57 deptos |
+| 7 | AREA_MANAGER sin depto | `/api/vitals/summary` | 403 + code, sin datos |
+| 8 | HR_OPERATOR | `/dashboard/inicio` | digest `NEXT_REDIRECT;replace;/dashboard;307;` |
+| 8d-e | CEO (paridad) | `/dashboard/inicio` | 200, sin digest de redirect |
+
+Escenario 6 lleva **tres asserts explicitos** contra fail-open silencioso:
+devueltos > 0, devueltos < universo de la cuenta, y todos dentro del territorio
+(depto + descendientes, resuelto con el mismo CTE recursivo que usa la API).
+
+**EVALUATOR: NO ejecutado.** Cubierto por `middleware.ts:252`, que ya lo
+redirige a `/dashboard/evaluaciones`. Validar el middleware no es
+responsabilidad de este gate.
+
+**Tokens sinteticos:** no existen usuarios FOCALIZAHR_ADMIN, HR_ADMIN ni
+HR_OPERATOR en la cuenta de prueba. Para esos tres el token se acuna con
+`userId` sintetico y `accountId` real, que es lo que produciria un login real de
+un usuario asi. Declarado en el propio smoke.
+
+---
+
 ## Proximo gate - B (UI portada) [COMPLETADO, ver arriba]
 
 **Skills OBLIGATORIAS antes de escribir una linea de JSX:**
@@ -140,11 +178,16 @@ es un caso de borde: es el estado que se va a ver. Diseñarlo primero.
 
 ```
 Lee .claude/tasks/SPEC_HOME_SIGNOS_VITALES_v1.1.md y
-.claude/plans/MAESTRO_HOME_SIGNOS_VITALES.md. Gates A y B sellados.
-Estamos en Gate C: router por rol server-side, redirect de HR_OPERATOR
-a /dashboard, y prueba de los 6 roles navegando directo a
-/dashboard/inicio. Presenta plan en Plan Mode. No implementes.
+.claude/plans/MAESTRO_HOME_SIGNOS_VITALES.md. Gates A, B y C sellados.
+Estamos en Gate D: cambiar la puerta post-login en
+src/components/forms/AuthForm.tsx:116, de '/dashboard' a
+'/dashboard/inicio'. Commit propio, de lineas contadas, revertible con
+un solo git revert. Presenta plan en Plan Mode. No implementes.
 ```
+
+**Pendiente que Gate D hereda:** verificacion visual y de pulgar en 375px de la
+portada. No se pudo hacer en Gate B ni C (requiere navegador y ojo humano). Ver
+la leccion sobre aserciones server-side mas abajo.
 
 ---
 
@@ -174,24 +217,91 @@ Gate B siguio `SKILL.md` + spec seccion 5 (un CTA). **La proxima portada va a
 tropezar con la misma ambiguedad** si no se corrige la skill. No se toco: es
 deuda de la skill, no del proyecto.
 
-### RIESGO PARA GATE C - auth vieja heredada del layout
+### DEUDA FUNCIONAL (reclasificada en Gate C) - layout client bloquea children
 
 `/dashboard/inicio` cuelga de `src/app/dashboard/layout.tsx`, que es
 `'use client'` y **no renderiza children hasta validar `localStorage`**
 (`layout.tsx:29-61`), mostrando un spinner propio.
 
-Consecuencia: aunque `page.tsx` es server component y el rol llega correcto en
-el primer render (sin flash de rol equivocado), **el primer pintado visible
-sigue siendo el spinner del layout**. La spec seccion 4 exige "rol confiable en
-primer render, sin segundo paint" — el rol si lo esta, el paint no.
+**En Gate B se registro como deuda cosmetica ("spinner <300ms"). Gate C
+demostro que es FUNCIONAL:**
 
-**Aceptado para v1, NO como definitivo.** Gate C tiene que resolverlo. Ademas
-ese layout tiene un guard de auth duplicado y divergente con el del home legacy
-(`page.tsx:132` redirige a `/`, `layout.tsx:34-37` a `/login`).
+> Degrada **todo redirect server-side del arbol `/dashboard`** a redirect de
+> cliente. Afecta a cualquier pagina futura del arbol que necesite redirect
+> server-side, no solo a Signos Vitales. Se resuelve en el proyecto de
+> auth-modernizacion.
+
+Evidencia (Gate C): un `redirect()` desde el server component se emite
+correctamente — el flight payload contiene
+`"digest":"NEXT_REDIRECT;replace;/dashboard;307;"` — pero Next no puede
+promoverlo a un redirect de nivel documento porque ocurre al renderizar los
+children serializados dentro del boundary de un client component. El navegador
+recibe 200 y el router de cliente ejecuta la navegacion tras hidratar.
+
+Consecuencia adicional ya conocida: el rol llega correcto en el primer render
+(sin flash de rol equivocado), pero el primer pintado visible es el spinner del
+layout. La spec seccion 4 exige "rol confiable en primer render, sin segundo
+paint" — el rol si lo esta, el paint no.
+
+Ese layout tiene ademas un guard de auth duplicado y divergente con el del home
+legacy (`page.tsx:132` redirige a `/`, `layout.tsx:34-37` a `/login`).
 
 El header del layout (logo, GoalAlertsBell, Salir) SI se acepta como definitivo
 para la portada: en una pantalla de entrada tener salida y alertas a mano es
 correcto.
+
+### Redirect de HR_OPERATOR - estado real y regla para roles futuros
+
+El redirect server-side de HR_OPERATOR desde `/dashboard/inicio` se emite
+correctamente (evidencia: digest `NEXT_REDIRECT;replace;/dashboard;307;` en el
+flight payload) pero se degrada a redirect de cliente por la deuda del layout.
+La linea de defensa efectiva es el fail-closed del endpoint
+`/api/vitals/summary` (HR_OPERATOR no tiene `vitals:view`). En navegador real el
+HR_OPERATOR termina en `/dashboard` tras hidratacion del cliente, no por HTTP.
+
+Cuando la deuda del layout se resuelva, el redirect pasa a HTTP 307 real y la
+doble proteccion (router + endpoint) queda cerrada correctamente.
+
+**Regla para roles futuros:** si se agrega un rol al permiso `vitals:view`,
+evaluar si tambien corresponde agregarlo o quitarlo de
+`ROLES_A_VISTA_OPERATIVA` — hoy la coherencia entre ambos existe por
+convencion, no esta enforced.
+
+### Leccion - aserciones en smokes server-side
+
+Aserciones sobre HTML renderizado server-side del arbol `/dashboard` son
+**inverificables con curl** mientras el layout bloquee children con spinner de
+localStorage. La verificacion valida en ese contexto es sobre el **payload RSC**
+(digests, presencia de componentes en el flight), no sobre el HTML del `<body>`.
+La verificacion de HTML se traslada a test visual en navegador o a smoke
+instrumentado con Playwright, fuera del alcance de estos gates.
+
+Caso concreto: el assert "la pagina rendereo la portada" de Gate C pasaba por
+**falso positivo** — el HTML contiene "Signos" por el `<title>`, no por el
+contenido. Es el segundo falso positivo de la serie (el primero fue un
+`.replace()` no-op en el smoke de Gate B). Patron a vigilar: una asercion que
+pasa siempre no es una asercion.
+
+### Metodo correcto de smoke por rol - endpoints del sistema nuevo
+
+Para endpoints que usan el patron moderno (`extractUserContext` /
+`resolveVitalsAccess`), la unica forma valida de simular un rol es **acunar un
+token con `generateJWT`** (`src/lib/auth.ts:71`) con payload identico al de
+`api/auth/user/login/route.ts:132-150`, cambiando solo `userId`, `userEmail`,
+`userRole` y `departmentId`.
+
+**NO headers forjados.** Descubierto empiricamente en Gate C, tras una falsa
+alarma sobre `middleware.ts:300`: con un token moderno el middleware
+**sobrescribe** cualquier `x-user-role` que mande el cliente
+(`middleware.ts:208`), asi que un smoke por headers mediria la sobrescritura del
+middleware, no el rol bajo prueba.
+
+(La falsa alarma tambien dejo un hallazgo real de seguridad, fuera del alcance
+de estos gates: con un token **legacy** sin `userId`, el middleware no setea los
+`x-user-*` y un header forjado por el cliente sobrevive. Queda en
+`SPEC_MIDDLEWARE_LEGACY_ROLE_HARDENING_v1`, coordinado por Victor: el fix debe
+cubrir `x-user-id`, `x-department-id` y `x-user-role`, y la auditoria debe
+contemplar EVALUATOR-por-ciclo, que no tiene `userId` a proposito.)
 
 ---
 
