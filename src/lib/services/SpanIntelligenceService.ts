@@ -498,7 +498,7 @@ export class SpanIntelligenceService {
       metasPromises.push(
         (async () => {
           const scores = await Promise.all(
-            directs.map(id => GoalsService.getEmployeeGoalsScore(id, asOf))
+            directs.map(id => GoalsService.getEmployeeGoalsScore(accountId, id, asOf))
           )
           const conMetas = scores.filter(s => s.goalsCount > 0)
           if (conMetas.length === 0) return

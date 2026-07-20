@@ -424,11 +424,20 @@ export class GoalsService {
    * Obtener score de metas de un empleado en una fecha específica
    * Performance llama esto al cierre de ciclo
    *
+   * `accountId` es OBLIGATORIO y va primero: sin él esta consulta filtraba solo
+   * por employeeId, y el endpoint que la expone (api/goals/employee-score) recibe
+   * ese id por query param — un token válido de cualquier cuenta leía las metas
+   * (título, progreso, peso) de un empleado de otra. Verificado en 2026-07-20.
+   * El filtro multi-tenant vive acá, en el servicio, para que ninguna superficie
+   * futura pueda volver a llamarlo sin acotar por cuenta.
+   *
+   * @param accountId - Cuenta dueña de las metas (filtro multi-tenant, obligatorio)
    * @param employeeId - ID del empleado
    * @param asOfDate - Fecha para reconstruir estado (ej: fecha cierre ciclo)
    * @returns Score 0-100 promedio ponderado
    */
   static async getEmployeeGoalsScore(
+    accountId: string,
     employeeId: string,
     asOfDate: Date
   ): Promise<EmployeeGoalsScore> {
@@ -436,6 +445,7 @@ export class GoalsService {
     // 1. Buscar metas activas del empleado en esa fecha
     const goals = await prisma.goal.findMany({
       where: {
+        accountId, // NIVEL 1: multi-tenant — Goal.accountId (schema.prisma:2856)
         employeeId,
         startDate: { lte: asOfDate },
         dueDate: { gte: asOfDate },

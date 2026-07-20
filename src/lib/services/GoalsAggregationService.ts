@@ -125,7 +125,7 @@ export class GoalsAggregationService {
   ): Promise<void> {
 
     // ── REUTILIZA cálculo existente (Time Travel a fin de mes)
-    const scoreData = await GoalsService.getEmployeeGoalsScore(employeeId, periodEnd)
+    const scoreData = await GoalsService.getEmployeeGoalsScore(accountId, employeeId, periodEnd)
 
     // ── Trend vs período anterior (patrón eisTrend)
     const previousInsight = await prisma.employeeGoalsInsight.findFirst({

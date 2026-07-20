@@ -162,6 +162,7 @@ export class PerformanceRatingService {
    * Si no hay metas o el ciclo no las incluye, retorna solo competencias.
    */
   static async calculateHybridScore(
+    accountId: string,
     employeeId: string,
     competenciesScore: number,
     cycleEndDate: Date,
@@ -195,7 +196,7 @@ export class PerformanceRatingService {
     // Obtener score de metas con Time Travel (a la fecha del ciclo)
     let goalsData: { score: number; goalsCount: number } | null = null
     try {
-      goalsData = await GoalsService.getEmployeeGoalsScore(employeeId, cycleEndDate)
+      goalsData = await GoalsService.getEmployeeGoalsScore(accountId, employeeId, cycleEndDate)
     } catch (err) {
       console.warn(`[calculateHybridScore] Error obteniendo metas para ${employeeId}:`, err)
     }
@@ -278,6 +279,7 @@ export class PerformanceRatingService {
 
     // 5b. Calcular hybrid score (Competencias + Metas)
     const hybridResult = await this.calculateHybridScore(
+      accountId,
       employeeId,
       weightedScore,
       cycle?.endDate ?? new Date(),
@@ -495,6 +497,7 @@ export class PerformanceRatingService {
     // Calcular hybrid score si hay config de ciclo
     const hybridResult = cycleHybridConfig
       ? await this.calculateHybridScore(
+          accountId,
           employeeId,
           weightedScore,
           cycleHybridConfig.endDate,

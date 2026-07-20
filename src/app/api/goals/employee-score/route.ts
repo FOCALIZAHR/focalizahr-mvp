@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     const date = asOfDate ? new Date(asOfDate) : new Date()
 
-    const result = await GoalsService.getEmployeeGoalsScore(employeeId, date)
+    const result = await GoalsService.getEmployeeGoalsScore(context.accountId, employeeId, date)
 
     return NextResponse.json({
       data: result,
