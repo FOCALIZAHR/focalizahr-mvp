@@ -618,6 +618,23 @@ export const PERMISSIONS = {
     'HR_MANAGER',
     'HR_OPERATOR'
   ],
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // VITALS (portada de entrada "Signos Vitales" — SPEC_HOME_SIGNOS_VITALES_v1 §4)
+  // AREA_MANAGER incluido CON filtrado jerárquico fail-CLOSED (lo aplica la API:
+  // sin departmentId → 403 explícito, nunca datos de toda la cuenta).
+  // HR_OPERATOR excluido a propósito: Gate C lo redirige a la vista operativa
+  // (/dashboard), que es su superficie de trabajo.
+  // EVALUATOR excluido: el middleware (:252) ya lo manda a evaluaciones.
+  // ─────────────────────────────────────────────────────────────────────────
+  'vitals:view': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN',
+    'HR_MANAGER',
+    'CEO',
+    'AREA_MANAGER'
+  ],
 } as const;
 
 // =============================================================================
