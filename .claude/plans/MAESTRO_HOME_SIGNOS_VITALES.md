@@ -11,7 +11,7 @@ Spec: `.claude/tasks/SPEC_HOME_SIGNOS_VITALES_v1.1.md`
 ## Estado de gates
 
 - [x] Gate A - backend (servicio + endpoint + permiso)
-- [ ] Gate B - UI portada
+- [x] Gate B - UI portada
 - [ ] Gate C - router server-side por rol
 - [ ] Gate D - cambio de puerta (AuthForm.tsx:116)
 
@@ -64,7 +64,57 @@ legitimamente vacia en la cuenta de prueba.
 
 ---
 
-## Proximo gate - B (UI portada)
+## Gate B - SELLADO 2026-07-20
+
+**Commits:** `f6328e7` (refactor helper) + `870b52e` (portada)
+
+**Ruta:** `/dashboard/inicio`. Patron Portada universal, ceremonia
+`focalizahr-design` completa (Gate 0 producto to Gate 3 tokens) cumplida antes
+de escribir JSX.
+
+**Archivos entregados:**
+- `src/lib/services/vitals/resolveVitalsAccess.ts` (fuente unica fail-closed)
+- `src/app/api/vitals/summary/route.ts` (delega en el helper, sin cambio de
+  comportamiento)
+- `src/lib/narratives/vitalsNarratives.ts` (funciones puras, fuente unica de
+  textos)
+- `src/app/dashboard/inicio/page.tsx` (server component)
+- `src/components/vitals/VitalSignsPortada.tsx`
+- `src/components/vitals/VitalsBelowFold.tsx`
+- `src/components/vitals/VitalsCTA.tsx` (unico client component)
+- `prisma/scripts/smoke-vitals-access-parity.ts`, `smoke-vitals-gateB.ts`
+
+**Decisiones de producto selladas (Victor, 2026-07-20):**
+- Estado degradado disenado PRIMERO: es el estado real de la cuenta hoy.
+- Hero sin veredicto = FRASE, no numero. Un cero de 72px seria la regla
+  null != 0 violada en tipografia.
+- CTA dependiente de permiso: con `campaigns:manage` "Activar medicion
+  completa"; sin el (CEO, AREA_MANAGER) "Ver la operacion".
+- Top 3 areas SIN enlaces individuales: no existe drill-down por departamento.
+- Hallazgo del dia SOLO clima (sellado en Gate A).
+
+**Evidencia:** 32 PASS (Gate B) + 15 PASS (paridad del refactor) + 42 PASS
+(Gate A re-corrido sin cambios, cleanup 0 residuo). `npx tsc --noEmit` limpio.
+La auditoria de narrativas es automatica: falla el smoke si aparece jerga del
+sistema, instruccion prescriptiva, plazo, o una cima Minto de mas de 8 palabras.
+
+**Ganancia colateral:** el 403 `AREA_MANAGER_SIN_DEPARTAMENTO`, que en Gate A
+quedo escrito pero sin ejecutar, ahora SI se ejecuta y se verifica (paridad 4a
+y 4b, incluido el header como string vacio). Falta solo el round-trip HTTP.
+
+**NO verificado en Gate B:**
+1. **Visual y de pulgar en 375px.** Requiere dev server y ojo humano. Es de
+   Victor o de Gate C. No se reporta mobile-first como cumplido sin haberlo visto.
+2. **`npx next build` completo.** BLOQUEADO por un error de sintaxis en
+   `src/app/dashboard/clima/components/cascada/ClimaIntroSequence.tsx`, archivo
+   MODIFICADO SIN COMMITEAR por la sesion paralela de Clima (bloque `{/* */}`
+   mal ubicado, linea 43-46). En HEAD ese archivo esta sano. La rotura vive
+   solo en el working tree local: el estado commiteado del repo compila. Volver
+   a correr `npx next build` cuando esa sesion cierre su edicion.
+
+---
+
+## Proximo gate - B (UI portada) [COMPLETADO, ver arriba]
 
 **Skills OBLIGATORIAS antes de escribir una linea de JSX:**
 
@@ -90,10 +140,58 @@ es un caso de borde: es el estado que se va a ver. Diseñarlo primero.
 
 ```
 Lee .claude/tasks/SPEC_HOME_SIGNOS_VITALES_v1.1.md y
-.claude/plans/MAESTRO_HOME_SIGNOS_VITALES.md. Estamos en Gate B.
-Cumple ceremonia focalizahr-design completa desde Gate 0.
-Presenta plan en Plan Mode. No implementes.
+.claude/plans/MAESTRO_HOME_SIGNOS_VITALES.md. Gates A y B sellados.
+Estamos en Gate C: router por rol server-side, redirect de HR_OPERATOR
+a /dashboard, y prueba de los 6 roles navegando directo a
+/dashboard/inicio. Presenta plan en Plan Mode. No implementes.
 ```
+
+---
+
+## Deudas y riesgos conocidos
+
+### RESUELTA en Gate B - fail-closed AREA_MANAGER
+
+La regla "AREA_MANAGER sin departamento no ve nada" vive ahora en UN solo lugar:
+`resolveVitalsAccess.ts`. El endpoint y la portada server-side la comparten.
+
+**Esto es el modelo a replicar cuando se ataque `DEUDA_FAIL_OPEN_AREA_MANAGER`**
+(los 16 endpoints que repiten el filtro jerarquico inline y fallan ABIERTO si el
+AREA_MANAGER no tiene departamento: admin/employees, admin/employees/[id],
+admin/performance-ratings, analytics/nps, performance/role-fit,
+calibration/sessions, 4x pdi/*, goals/[id], 4x workforce/presupuesto/*).
+El patron: un resolver compartido que devuelve acceso o denegacion tipada, en
+vez de un `if (role === 'AREA_MANAGER' && departmentId)` copiado.
+
+### DEUDA DE SKILL (no del proyecto) - focalizahr-design
+
+`SKILL.md` define el patron Portada como "mensaje corto + 1 CTA". Pero
+`references/page-patterns.md:267-268` dibuja el Patron 5 con una fila final
+"EXPLORAR INTELIGENCIA [Vista Ejecutiva][Pipeline][Alertas][Dashboard]": cuatro
+CTAs secundarios que contradicen el Mandamiento 3 (un solo CTA principal).
+
+Gate B siguio `SKILL.md` + spec seccion 5 (un CTA). **La proxima portada va a
+tropezar con la misma ambiguedad** si no se corrige la skill. No se toco: es
+deuda de la skill, no del proyecto.
+
+### RIESGO PARA GATE C - auth vieja heredada del layout
+
+`/dashboard/inicio` cuelga de `src/app/dashboard/layout.tsx`, que es
+`'use client'` y **no renderiza children hasta validar `localStorage`**
+(`layout.tsx:29-61`), mostrando un spinner propio.
+
+Consecuencia: aunque `page.tsx` es server component y el rol llega correcto en
+el primer render (sin flash de rol equivocado), **el primer pintado visible
+sigue siendo el spinner del layout**. La spec seccion 4 exige "rol confiable en
+primer render, sin segundo paint" — el rol si lo esta, el paint no.
+
+**Aceptado para v1, NO como definitivo.** Gate C tiene que resolverlo. Ademas
+ese layout tiene un guard de auth duplicado y divergente con el del home legacy
+(`page.tsx:132` redirige a `/`, `layout.tsx:34-37` a `/login`).
+
+El header del layout (logo, GoalAlertsBell, Salir) SI se acepta como definitivo
+para la portada: en una pantalla de entrada tener salida y alertas a mano es
+correcto.
 
 ---
 
