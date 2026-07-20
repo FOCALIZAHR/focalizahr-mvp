@@ -27,3 +27,11 @@ Módulo Benchmark System v2.0 mapeado como producto, 2026-06-25. Read-only, file
 **DEUDAS VERIFICADAS:** GET /api/benchmarks SIN hasPermission (valida x-account-id no rol, falta benchmark:view). CRON NO cableado en vercel.json (comentado, NO corre en prod). 4 componentes onboarding huérfanos. exit_retention/nps/pulse/exposure_ia STUB (TabBenchmarks placeholder). OnboardingBenchmarkService deprecado. RoleFit lee directo PerformanceRating (no employee-based aún).
 
 Consumido por [[project_onboarding_inventario_producto]] (onboarding_exo), [[project_exit_inventario_producto]] (exit_retention stub), [[project_performance_inventario_producto]] (performance_rolefit), [[project_workforce_inventario_producto]] (exposure_ia placeholder). Ver [[project-benchmark-masa-n1]] (no reactivar sin auditar privacy).
+
+## Por qué importa (vista comercial)
+
+- **Qué resuelve:** permite **comparar sin exponer** — el umbral mínimo de empresas por celda hace que la comparación de mercado sea vendible y legalmente defendible, que es lo que frena a la mayoría de los competidores.
+- **A quién le importa:** al **CEO** (¿estamos bien o mal respecto del mercado?) y a **RRHH**, que necesita el dato externo para sostener una decisión interna.
+- **Qué ofrece que el mercado no:** la **cascada de especificidad** evita el "sin datos suficientes" — si no hay muestra para tu cargo en tu industria, baja de nivel hasta encontrar una comparación válida en vez de dejar la pantalla vacía.
+- **Entrega insights, no números:** un motor de reglas convierte el percentil en una recomendación con contexto, en vez de dejar al usuario interpretando un gráfico de barras.
+- **Infraestructura reutilizable:** un solo agregador alimenta a todos los módulos — el benchmark no se re-implementa por producto.

@@ -28,3 +28,10 @@ TalentTreemap bloques proporcionales por cuadrante riesgo (FUGA_CEREBROS rojo>BU
 **DEUDAS:** cross-cycle comparison mencionado en roadmap pero NO implementado (mira ciclo activo, no N vs N-1). TAC read-only sobre ratings (notas viven en Performance), solo escribe IntelligenceInsight.
 
 Consumidor de [[project_performance_inventario_producto]] (cuadrantes) + [[project_succession_inventario_producto]] (sucesores). Relacionado con P&L Talent/Cascada de la Verdad (módulo aparte). Ver [[project_cross_cycle_comparison]], [[project_tac_top_talent]] (pendientes).
+
+## Por qué importa (vista comercial)
+
+- **Qué resuelve:** el salto de diagnóstico a acción **en un click** — agenda comités y dispara emails a gerentes desde la misma pantalla donde se ve el problema, en vez de terminar en un PDF que nadie ejecuta.
+- **A quién le importa:** al **CEO y a RRHH**, que ven dos altitudes en un solo flujo (patrón de gerencia con su P&L arriba, persona y cuadrante abajo) sin cambiar de herramienta.
+- **Qué ofrece que el mercado no:** las acciones son **auditables** — quedan registradas con deduplicación y con medición programada a 180 días, así que se puede responder "¿qué pasó con lo que decidimos el trimestre pasado?".
+- **El diferencial de aprendizaje:** el cruce Exit × Riesgo hace que el sistema **aprenda de quién ya se fue**, en vez de repetir el mismo diagnóstico cada ciclo.

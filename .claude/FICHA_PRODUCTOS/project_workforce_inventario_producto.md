@@ -28,3 +28,10 @@ Módulo Workforce Intelligence mapeado como producto, 2026-06-25. Read-only, fil
 **DEUDAS/SEÑALES LATENTES VIGENTES:** TabBenchmarks + TabSimulador son PLACEHOLDERS (UI shell sin datos). L6 SeniorityCompression usa augmentationShare>0.6 que nunca dispara (máx real ~0.167; migrar a focalizaScore>0.5 como L7). exposure_ia SIN benchmark mercado (absolutos, no percentil). Ratings N=1 → pendientesEvaluacion. Ver [[project-workforce-efficiency-datos-n1]], [[project-benchmark-masa-n1]], [[project-automation-eloundou-latente]].
 
 Hermano de [[project_performance_inventario_producto]] (lee roleFit/9box/AAE), [[project_succession_inventario_producto]] (incumbentes). Productor para Efficiency Hub (capa narrativa). Ver [[project_workforce_roadmap_corregido]] (roadmap vigente, nómina retención CERRADA).
+
+## Por qué importa (vista comercial)
+
+- **Qué resuelve:** traduce el riesgo de IA sobre los cargos a **pesos** — inercia de capital atrapado y FTEs liberables — en vez de entregar un score de exposición abstracto que nadie sabe accionar.
+- **A quién le importa:** al **CEO y al CFO**, porque el output es dinero y dotación, no un índice; y al **gerente de línea**, que puede rediseñar el cargo en vivo y ver el efecto.
+- **Qué ofrece que el mercado no:** los detectores corren **en una sola pasada** sobre el mismo dataset enriquecido, así que el diagnóstico es coherente entre sí y no una suma de reportes aislados.
+- **El cierre de la conversación:** el presupuesto de dotación usa **finiquitos reales**, no estimaciones — la decisión llega al directorio con la cifra que efectivamente se va a pagar.

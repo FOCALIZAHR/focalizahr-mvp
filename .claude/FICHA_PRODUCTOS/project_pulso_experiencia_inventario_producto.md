@@ -28,3 +28,11 @@ Módulo Pulso/Experiencia (encuestas core) + Torre de Control mapeado como produ
 **NOTAS:** NO hay PulseEngine monolítico — análisis es composición de servicios (Analytics/Normalization/Benchmark/narrativas), momentum inline (delta vs período anterior). process-results duplicado con analytics (no usado). Activate=Gate A Comunicaciones (encola CommunicationMessage).
 
 CIMIENTO de todos los módulos survey-based. Ver [[feedback_reuse_normalization_system]] (no duplicar normalizedScore), [[project_employee_based_migration_pulso_experiencia]] (migración employee-based). Encola vía [[project_comunicaciones_inventario_producto]]. Alimenta [[project_exit_inventario_producto]], [[project_onboarding_inventario_producto]], [[project_performance_inventario_producto]], [[project_ambientesano_inventario_producto]].
+
+## Por qué importa (vista comercial)
+
+- **Qué resuelve:** es el motor fundacional — **un mismo framework de campañas y preguntas sirve clima, onboarding, exit, performance y compliance**, lo que convierte cada producto nuevo en una configuración y no en un desarrollo desde cero.
+- **A quién le importa:** al **CEO** (economía de plataforma: el costo marginal del siguiente instrumento es bajo) y a **RRHH**, que administra un solo sistema en vez de cinco proveedores.
+- **Qué ofrece que el mercado no:** la **normalización unificada** hace que cualquier escala sea comparable, habilitando analytics y benchmarks sin re-implementar la métrica en cada módulo.
+- **Torre de Control predictiva:** proyecta la participación final y detecta anomalías **en vivo**, no se limita a contar respuestas cuando ya es tarde para corregir.
+- **Sin carga manual:** las campañas se generan **desde la nómina** (employee-based), eliminando el ciclo de planillas que rompe cualquier despliegue enterprise.

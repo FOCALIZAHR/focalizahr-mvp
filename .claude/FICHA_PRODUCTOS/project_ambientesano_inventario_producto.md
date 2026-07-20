@@ -31,3 +31,11 @@ Módulo Ambiente Sano (Compliance/Ley Karin) mapeado como producto, 2026-06-25. 
 **NOTAS:** LLM async límite 45s sync + CRON (campañas grandes dependen CRON). deterioro_sostenido depende Pulso. SLA estático (deuda reconocida).
 
 Cruza [[project_exit_inventario_producto]] + [[project_onboarding_inventario_producto]] (Motor B convergencia externa). Ver memoria histórica Ambiente Sano: [[project_cascada_as_arquitectura]] (Gates 1-8), [[project_compliance_plan_global_decision]] (ActionPlan vs CompliancePlanAction), [[project_motor1_motor6_orden_casos_inconsistencia]], [[project_intervention_catalog_deuda]], [[project_ambiente_sano_diagnostico_jun2026]].
+
+## Por qué importa (vista comercial)
+
+- **Qué resuelve:** es **compliance que predice, no que solo cumple** — el ISA y la convergencia levantan la señal antes de que exista la denuncia, que es el único momento en que la intervención todavía es barata.
+- **A quién le importa:** al **CEO y al directorio** (exposición legal y reputacional anticipada) y a **RRHH**, que deja de administrar un trámite y pasa a administrar un riesgo.
+- **Qué ofrece que el mercado no:** el cruce de **voz libre y voz estructurada** — el análisis del texto abierto desenmascara el teatro de cumplimiento: ese departamento que puntúa 4.5 en la encuesta mientras el lenguaje dice lo contrario.
+- **Convergencia multi-instrumento:** una señal débil en Onboarding + un patrón en Exit + un score bajo en Ambiente se combinan en **una alerta crítica** que ninguna de las tres fuentes habría generado por separado.
+- **Accionabilidad:** las intervenciones sugeridas llevan **respaldo científico citado**, no recomendaciones genéricas de manual.

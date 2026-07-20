@@ -32,3 +32,10 @@ COSTO ESPERAR (amber): L3 Riesgo adopción (exposición×bajo clima, jerarquía 
 **DEUDAS:** L6 congelada (motor sin UI), L8 sin componente propio (fusionada L7, LenteCard legacy sin migrar molde). L3 clima fallback engagement_aae (no clima medido). L4 narrativa↔datos parcial descableada (template espera placeholders Jaccard viejo no Span). AREA_MANAGER permiso diferido. Tokens UI rounded-[20px]/bg-[#0F172A]/90 (deuda diseño). L6 SeniorityCompression augmentationShare>0.6 no dispara (heredado de Workforce).
 
 Capa narrativa sobre [[project_workforce_inventario_producto]] (productor). Hermano de [[project_metas_inventario_producto]], [[project_performance_inventario_producto]], [[project_succession_inventario_producto]]. Ver [[project_efficiency_lentes_layout]] (molde 4 actos detalle).
+
+## Por qué importa (vista comercial)
+
+- **Qué resuelve:** cierra la brecha entre diagnóstico y decisión — el carrito entrega **ahorro por mes, inversión requerida y payback**, que es la forma en que un comité ejecutivo realmente aprueba algo.
+- **A quién le importa:** al **CEO y al CFO**, porque el output es un business case exportable al directorio, sin nombres y agrupado por familia de cargos (presentable sin exponer personas).
+- **Qué ofrece que el mercado no:** el **molde narrativo de 4 actos** (del shock al quirófano) simula la captura del ahorro en vivo, en lugar de dejar al ejecutivo interpretando un dashboard.
+- **Profundidad:** nueve ángulos financieros distintos **sobre la misma dotación** — cada lente es una decisión posible, no una vista más del mismo gráfico.

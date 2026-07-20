@@ -28,3 +28,11 @@ Módulo Performance mapeado como producto, 2026-06-25. Read-only, file:line abaj
 **DEUDAS verificadas (no vender sin matiz):** calibración SIN approvedBy ni gate aprobación obligatorio (ajustes se aplican al cerrar sin firma); PDF seguro Supabase pero NO encriptado app; estilo evaluador intra-ciclo sin histórico cross-ciclo. Detalle: [[project_gate0_dossier_calibracion_performance]], [[project_gate0_base_madre_desempeno_metas]].
 
 Hermano de [[project_metas_inventario_producto]] (Metas se enchufa aquí vía hybrid score). Estilo evaluador transversal a Efficiency L4+Goals.
+
+## Por qué importa (vista comercial)
+
+- **Qué resuelve:** no es "un 360 más" — es una **máquina de decisiones de talento en cadena**: la evaluación alimenta el 9-box, que alimenta el RoleFit, que alimenta movilidad y riesgo, que alimentan sucesión y compensación. Una sola captura de datos, seis decisiones.
+- **A quién le importa:** al **CEO** (la cadena completa), a **RRHH** (calibración defendible) y al **gerente de línea**, que recibe alertas de fuga con SLA en vez de enterarse cuando llega la carta de renuncia.
+- **Qué ofrece que el mercado no:** **self al 0%** — la autoevaluación se usa para detectar brechas de percepción, nunca para la nota, lo que ataca de raíz la inflación de la autoevaluación.
+- **Defendibilidad:** la calibración es **auditable con PDF + QR** y el sistema detecta el sesgo del evaluador; cuando alguien impugna una nota, hay rastro.
+- **Human-in-the-loop:** las anomalías de estructura (un "manager" sin reportes, un colaborador con equipo) se ponen en cuarentena para decisión humana, no se corrigen en silencio.

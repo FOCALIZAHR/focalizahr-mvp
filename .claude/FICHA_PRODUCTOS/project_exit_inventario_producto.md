@@ -28,3 +28,10 @@ Módulo Exit Intelligence mapeado como producto, 2026-06-25. Read-only, file:lin
 **DEUDAS:** 2 tipos alerta diferidos (department_exit_pattern, onboarding_exit_correlation). SLA estático/sugerido no obligatorio. Algunos endpoints métricas/causas validan rol por código sin permiso en PERMISSIONS (gap menor RBAC). CRON aggregation y alerts-generation.
 
 Consumidor de [[project_performance_inventario_producto]] (exit-cross con cuadrantes vía TAC). Alimenta [[project_tac_inventario_producto]] (RetentionEngine) y [[project_pltalent_inventario_producto]]. Correlaciona con Onboarding (módulo #6). Ver [[feedback_ia_es_componente_ambiente_sano]] (LLM segunda lectura mismo estudio).
+
+## Por qué importa (vista comercial)
+
+- **Qué resuelve:** demuestra que la salida **era predecible** — la correlación onboarding → exit conecta la señal temprana ignorada con la renuncia que costó, y pone precio a haberla ignorado.
+- **A quién le importa:** al **CEO y al CFO** (costo de rotación con benchmark de mercado) y a **RRHH**, que deja de justificar salidas con anécdotas y pasa a un termómetro de salud de la salida.
+- **Qué ofrece que el mercado no:** esa correlación onboarding → exit **no existe en las plataformas comparables**, que miden ambos momentos por separado y nunca los cruzan.
+- **Cumplimiento:** Ley Karin integrada en el flujo (señal crítica con SLA de 24h), no como un módulo legal aparte que nadie abre.

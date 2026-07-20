@@ -145,3 +145,11 @@ Mismo tratamiento que el error de check-in de ciclo cerrado: quedan anotados, se
 - ✅ CERRADAS desde la ficha vieja: "Solicitar Cierre" sin wiring (ya cableado) · `alignment-tree` sin hasPermission.
 
 Relacionado: [[project_goalcycle_gates]] (gates A–E, commits) · [[project_goal_alerts]] · [[project_metas_cierre_migracion_servicio]] · [[project_gate0_metas_estado_vivo]] · [[project_gate0_base_madre_desempeno_metas]] · [[project_gate0_dossier_calibracion_performance]].
+
+## Por qué importa (vista comercial)
+
+- **Qué resuelve:** no es un tracker de OKR — es un **detector de incoherencias organizacionales**: dónde la evaluación de desempeño no coincide con el resultado real entregado, que es la contradicción más cara y menos visible de una empresa.
+- **A quién le importa:** al **CEO** (bonos sin respaldo, talento invisible) y a **RRHH**, que obtiene integridad auditable por gerencia en vez de un promedio que no distingue nada.
+- **Qué ofrece que el mercado no:** **Time Travel real** — el cumplimiento se calcula al cierre del período, no con los datos de hoy, así que un ciclo cerrado no cambia retroactivamente cuando alguien actualiza una meta vieja.
+- **Alineación sin trabajo manual:** la cascada de metas se genera **por reglas de cargo**, no copiando y pegando objetivos hacia abajo del organigrama.
+- **Gobierno del ciclo:** cierre gobernado con candado de un solo ciclo activo por cuenta, decisiones de cierre en baldes explícitos y bloqueo posterior — nadie reabre un período cerrado sin dejar rastro.

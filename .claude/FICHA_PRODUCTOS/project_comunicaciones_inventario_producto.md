@@ -31,3 +31,11 @@ Módulo Comunicaciones 3.0 mapeado como producto, 2026-06-25. Read-only, file:li
 **BLOQUEADORES GO-LIVE VERIFICADOS:** TWILIO_MODE=simulation default (no envía real hasta production+credenciales Twilio). Aprobación Meta pendiente (survey-escalation contentSid placeholder HX_PENDING). Capa3 scheduler NO cableado (no en vercel.json, retries inertes tras 15 encadenamientos). Copy request-email pendiente Studio IA.
 
 Backbone de [[project_onboarding_inventario_producto]], [[project_exit_inventario_producto]], [[project_performance_inventario_producto]], [[project_metas_inventario_producto]] (encolan invitaciones/recordatorios). Ver [[project_gate_d_implementado]], [[project_gate_e1_spec]], [[project_gate_c_comunicaciones]], [[project_gate_b_comunicaciones]], [[ARQUITECTURA_WHATSAPP_CHANNEL_SELECTOR]]. Skill focalizahr-whatsapp-templates.
+
+## Por qué importa (vista comercial)
+
+- **Qué resuelve:** entrega **multicanal real con fallback automático** — correo o WhatsApp según el contacto disponible y el consentimiento vigente, decidido por el sistema y no por alguien revisando una planilla.
+- **A quién le importa:** a **RRHH** (la operación de envío deja de ser manual) y al **CEO**, porque la tasa de respuesta de todos los instrumentos depende de que el mensaje efectivamente llegue.
+- **Qué ofrece que el mercado no:** la cola es **resiliente de verdad** — recuperación ante caídas, idempotencia y reintentos: no pierde mensajes ni los duplica, que es donde fallan las integraciones caseras.
+- **Cumplimiento operable:** el consentimiento se captura y audita **por el propio WhatsApp** (opt-in por botón), no con una casilla en un contrato que nadie puede demostrar después.
+- **Economía de plataforma:** el mismo carril sirve a Pulso, Experiencia, Onboarding, Exit, Performance y Metas — se construye una vez y lo usan todos.

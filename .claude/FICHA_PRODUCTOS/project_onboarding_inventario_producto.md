@@ -30,3 +30,10 @@ Módulo Onboarding Intelligence mapeado como producto, 2026-06-25. Read-only, fi
 **DEUDAS:** NO tiene Cinema Mode/5 actos (insights panels, no storytelling editorial; a diferencia de Exit/TAC/Compliance). Narrativas 4C existen pero NO se renderizan. Selector gerencia dashboard principal=TODO sin opciones. journeys/[id]+alerts/[id] RBAC hardcoded.
 
 Gemelo de [[project_exit_inventario_producto]] (correlación bidireccional por RUT). Alimenta predicción retención. Hermano del ciclo de vida del empleado. Ver [[project_benchmark_masa_n1]] (onboarding_exo benchmark).
+
+## Por qué importa (vista comercial)
+
+- **Qué resuelve:** es **predictivo, no descriptivo** — estima el riesgo de fuga desde el día 1, no el día de la renuncia, que es cuando el resto de los sistemas se entera.
+- **A quién le importa:** al **gerente de línea** (puede intervenir mientras aún sirve) y al **CFO**, que recibe la tabla managed-vs-ignored: cuánto cuesta actuar versus cuánto costó no actuar.
+- **Qué ofrece que el mercado no:** el score EXO se apoya en un **framework científico** (Bauer 4C), no en un índice propietario sin respaldo que el cliente deba aceptar por fe.
+- **Cierra el lazo:** la alerta ignorada hoy es la autopsia de Exit mañana — los dos módulos comparten la evidencia, así que el costo de ignorar queda demostrado, no argumentado.

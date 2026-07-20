@@ -5,12 +5,12 @@
 > Cada archivo `project_*_inventario_producto.md` = una ficha de módulo. Los `project_gate0_*.md` = verificaciones de estado vivo que sustentan el dossier.
 
 ## Cadena de valor (cómo encajan los módulos)
-Pulso/Experiencia (motor de encuestas, FUNDACIONAL) → módulos de inteligencia (Performance / Metas / Onboarding / Exit / Ambiente Sano) → capas derivadas que consumen lo anterior (Workforce / Efficiency / Sucesión / TAC / P&L Talent) + infraestructura transversal (Comunicaciones / Benchmark / Descriptores). **Encima de todo:** la Capa de Estrategia (cockpit ejecutivo) que los funde para el C-level.
+Pulso/Experiencia (motor de encuestas, FUNDACIONAL) → módulos de inteligencia (Performance / Metas / Onboarding / Exit / Ambiente Sano / EX Clima) → capas derivadas que consumen lo anterior (Workforce / Efficiency / Sucesión / TAC / P&L Talent) + infraestructura transversal (Comunicaciones / Benchmark / Descriptores). **Encima de todo:** la Capa de Estrategia (cockpit ejecutivo) que los funde para el C-level.
 
 ## Meta-producto
 - [⭐ Capa de Estrategia (Cockpit Ejecutivo)](producto_capa_estrategia_cockpit.md) — funde Workforce+Efficiency+Metas+Executive Hub en un tablero único para CEO, filtrado por jerarquía para cada gerente (accountability en cascada). 70% packaging+glue, 30% síntesis nueva. Dependencia dura: cerrar auditoría RBAC del backlog antes de vender "acceso filtrado".
 
-## Los 11 inventarios de producto
+## Los 15 inventarios de producto
 - [Pulso/Experiencia](project_pulso_experiencia_inventario_producto.md) — FUNDACIONAL: motor campañas/preguntas/Response.normalizedScore + Torre de Control 3 niveles IA predictiva (useCampaignMonitor 1214l, ~27 paneles monitor). Diferenciador: un motor, muchos productos.
 - [Performance](project_performance_inventario_producto.md) — el más grande del talento: 360 pesos Self0/Mgr60/Peer25/Up15, hybrid score+Time Travel, RoleFit capped, 9-box, TalentIntelligence (movilidad/riesgo SLA), calibración PDF+QR+sesgo. Deudas: sin approvedBy, PDF no encriptado app, estilo evaluador intra-ciclo.
 - [Metas](project_metas_inventario_producto.md) — detector de incoherencias eval≠resultado, Time Travel, cascada por reglas, 4 cuadrantes. Deudas: "Solicitar Cierre" UI rota (1 prop), 6 endpoints aux sin hasPermission.
@@ -25,6 +25,7 @@ Pulso/Experiencia (motor de encuestas, FUNDACIONAL) → módulos de inteligencia
 - [Benchmark System v2.0](project_benchmark_inventario_producto.md) — infra comparación mercado, SIN página propia (embebido). MarketBenchmark, cascada especificidad 4 niveles, privacy ≥3 empresas, InsightEngine ~11 reglas. Diferenciador: compara sin exponer. Deudas: sin hasPermission, CRON no en vercel.json, exposure_ia/exit/nps/pulse stub.
 - [Comunicaciones 3.0](project_comunicaciones_inventario_producto.md) — backbone multicanal email/WhatsApp headless: cola CommunicationMessage + dispatcher resiliente, channel-selector, resolvePhone 4 estrategias, consent híbrido. Gates A/B/C SELLADOS. Bloqueadores go-live: TWILIO_MODE=simulation, Meta pendiente, Capa3 no en vercel.json.
 - [Descriptores (Occupation/RoleFit)](project_descriptores_inventario_producto.md) — identidad ocupacional, cimiento de Workforce. OccupationResolver v3 (heurística+LLM Haiku), JobDescriptor editable, exposición IA por tarea (IPI). O*NET. Deudas: RoleCardBento sin resolver visual, ~17 UNCLASSIFIED, sin hooks.
+- [EX Clima (Pulso Express / Experiencia Full)](project_exclima_inventario_producto.md) — clima y engagement con veredicto: Engagement Index + 8 drivers, impacto a nivel de REACTIVO (Kendall Tau-c + walk-up jerárquico), severidad por mean (no por % favorable), cascada dinámica 1-5 actos, 127 narrativas de intervención, matriz de efectividad 4 cuadrantes. 2 modelos propios, agregación event-driven. Diferenciador: audita si la acción del jefe funcionó. **Gate 5D en curso** — deudas: contenido PROVISIONAL, 2/4 del dispatcher pending.
 
 ## Gate 0 — Verificaciones de estado vivo (sustento del dossier, file:line vs código real)
 - [Gate 0 calibración+performance](project_gate0_dossier_calibracion_performance.md) — nineBox SÍ recalcula; híbrido+TimeTravel+pesos OK; plan-acción calibrador no-jefe latente; estilo evaluador en Efficiency L4 intra-ciclo.

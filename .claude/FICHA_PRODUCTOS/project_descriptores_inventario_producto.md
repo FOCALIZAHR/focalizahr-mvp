@@ -27,3 +27,11 @@ Módulo Descriptores (Occupation/Job Descriptors) mapeado como producto, 2026-06
 **DEUDAS VERIFICADAS:** RoleCardBento SIN resolver visualmente (carga datos, diseño vs prototipo Victor pendiente). ~17 cargos UNCLASSIFIED (ANTHROPIC_API_KEY operativa para resolver). Cobertura Anthropic premium ~18% tareas (resto Eloundou discreto). Sin hooks centralizados (useDescriptor no existe). Secondary SOC campo presente lógica no activada. Descripción LLM refinada (purpose) no impl. O*NET refresh anual manual (2024 data).
 
 Cimiento de [[project_workforce_inventario_producto]] (exposición IA), [[project_efficiency_inventario_producto]], [[project_benchmark_inventario_producto]] (performance_rolefit). Usa LLM Claude Haiku. Ver [[project_session_descriptores_abril2026]], [[feedback_wizard_neutral]] (zero betaScore colors Phase4).
+
+## Por qué importa (vista comercial)
+
+- **Qué resuelve:** aterriza el estándar O*NET a Chile y LATAM — traduce los nombres de cargo locales, que nunca calzan con una taxonomía global, a una identidad ocupacional con exposición a IA asociada.
+- **A quién le importa:** a **RRHH** (deja de mantener descriptores en Word) y al **CEO**, porque sin esta capa no existen ni Workforce ni Efficiency: es el cimiento de toda la suite de talento.
+- **Qué ofrece que el mercado no:** un **resolver híbrido económico** — heurística primero y LLM solo donde realmente hace falta, con cuota mensual controlada, en vez de pagar una llamada de IA por cada cargo de la nómina.
+- **El descriptor es dato, no documento:** cada responsabilidad lleva su score de exposición, así que el descriptor alimenta análisis en vez de quedar archivado.
+- **Se clasifica una vez:** el mismo trabajo de clasificación sirve a Workforce, Efficiency y a los benchmarks — no se repite por módulo.

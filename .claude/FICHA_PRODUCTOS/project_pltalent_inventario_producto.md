@@ -26,3 +26,11 @@ Módulo P&L Talent / Cascada de la Verdad mapeado como producto, 2026-06-25. Rea
 **NOTAS:** capa 100% derivada (depende ciclo con roleFit + SalaryConfigService, pre-fetch O(1) crítico). salarySource auditado (configured vs default_chile, advierte en UI). AnclaInteligente reutilizado de [[project_metas_inventario_producto]] (Goals usa "Composición Ponderada").
 
 Consumidor de [[project_performance_inventario_producto]] (roleFit/cuadrantes) + [[project_succession_inventario_producto]] (sucesores). Hermano operacional de [[project_tac_inventario_producto]] (TAC consume pl-summary). Habilitará P&L financiero completo cuando entre proyecto salario.
+
+## Por qué importa (vista comercial)
+
+- **Qué resuelve:** es el **único módulo que pone el desempeño en el estado de resultados** — brecha productiva y pasivo legal expresados en CLP, no en scores de 1 a 5 que no entran en ninguna conversación financiera.
+- **A quién le importa:** al **CEO y al CFO**, que por primera vez pueden discutir talento en el mismo lenguaje que el resto del negocio.
+- **Qué ofrece que el mercado no:** **diagnóstico diferencial, no descriptivo** — identifica la causa raíz (el líder, una gerencia concreta, la antigüedad, la selección) en vez de reportar que "hay un problema de cultura".
+- **Defendibilidad legal:** fundamento chileno real (Art. 163/172, topes en UF, anualidades), así que la cifra del pasivo resiste la revisión de un abogado laboral.
+- **Presentación:** cero datos crudos al CEO — llega la narrativa con su respaldo científico, no la planilla.

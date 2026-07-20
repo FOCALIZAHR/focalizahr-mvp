@@ -28,3 +28,11 @@ Módulo Sucesión mapeado como producto, 2026-06-25. Read-only, file:line abajo.
 **DEUDAS:** create-pdi DEPRECATED (legacy, usar development-plan); debug console.log en critical-positions/[id]/route.ts ~88-105 (REMOVER, ya en memoria); executive-hub/succession sin hasPermission explícito.
 
 Hermano de [[project_metas_inventario_producto]] y [[project_performance_inventario_producto]] (lee RoleFit/9-box/talent quadrants de Performance). Estado del módulo en memoria histórica: Succession Intelligence ya completado (CriticalPosition+SuccessionCandidate, successionConstants ROLEFIT_THRESHOLD=75).
+
+## Por qué importa (vista comercial)
+
+- **Qué resuelve:** convierte el plan de sucesión en un **radar de continuidad con urgencia** — quién no tiene reemplazo y en qué plazo — en vez de un organigrama con cajas de colores que se actualiza una vez al año.
+- **A quién le importa:** al **CEO y al directorio** (riesgo de continuidad del negocio) y al **gerente de línea**, que recibe el diagnóstico narrativo con la acción concreta: la conversación que corresponde tener esta semana.
+- **Qué ofrece que el mercado no:** las sugerencias de sucesor tienen **rigor verificable** (RoleFit + posición 9-box + aspiración declarada), no la intuición de quien llena la planilla.
+- **El efecto dominó:** simula la cascada completa — mover a una persona destapa el hueco siguiente, y el sistema lo muestra antes de que ocurra.
+- **Accountability:** lo discrecional queda **marcado como discrecional** y los overrides quedan auditados; nadie puede después decir que "el sistema lo recomendó".
