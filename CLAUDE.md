@@ -13,11 +13,32 @@ Ver @package.json para scripts disponibles.
 ## Comandos y Entorno
 
 ```bash
-npm run dev && npm run build   # dev / build (build DEBE pasar antes de terminar)
-npx tsc --noEmit               # verificar TypeScript
-npx prisma studio              # explorar BD real
-npx prisma db push             # SOLO desarrollo — nunca producción
+npm run dev && npm run build              # dev / build (build DEBE pasar antes de terminar)
+npx --no-install tsc --noEmit             # verificar TypeScript
+npx --no-install prisma studio            # explorar BD real
+npx --no-install prisma db push           # SOLO desarrollo — nunca producción
 ```
+
+### Regla `npx` — obligatoria
+
+**Nunca ejecutar `npx <comando>` a secas.** Siempre `npx --no-install <comando>`
+o la ruta explícita al binario local:
+
+```bash
+node node_modules/typescript/bin/tsc --noEmit    # ruta explícita
+npx --no-install next build                      # falla si no está local
+```
+
+**Por qué:** si el binario local no se resuelve (por ejemplo si
+`node_modules/.bin/` falta o se corre desde otro directorio), `npx` va al
+registro público de npm y **ejecuta el paquete que encuentre con ese nombre**.
+Ocurrió en este repo: `npx tsc` descargó y ejecutó `tsc@2.0.4`, un paquete
+abandonado que no es el compilador de TypeScript (el compilador vive en el
+paquete `typescript`). Ese era inofensivo, pero el mismo mecanismo ejecutaría
+un typosquat malicioso con los permisos del usuario.
+
+`--no-install` falla en vez de descargar. Es la diferencia entre un error claro
+y ejecutar código arbitrario de internet.
 
 Variables requeridas: `DATABASE_URL · NEXTAUTH_SECRET · RESEND_API_KEY · NEXT_PUBLIC_SUPABASE_URL · NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
