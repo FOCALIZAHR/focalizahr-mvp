@@ -13,7 +13,10 @@ Spec: `.claude/tasks/SPEC_HOME_SIGNOS_VITALES_v1.1.md`
 - [x] Gate A - backend (servicio + endpoint + permiso)
 - [x] Gate B - UI portada
 - [x] Gate C - router server-side por rol
-- [ ] Gate D - cambio de puerta (AuthForm.tsx:116)
+- [x] Gate D - cambio de puerta (AuthForm.tsx:116)
+
+**PROYECTO COMPLETO.** Los 4 gates sellados. 100% aditivo excepto 1 linea
+(`AuthForm.tsx:116`). Pendiente unico: push, que corre Victor con criterio propio.
 
 ---
 
@@ -152,6 +155,97 @@ un usuario asi. Declarado en el propio smoke.
 
 ---
 
+## Gate D - SELLADO 2026-07-21
+
+**Commits:** `ea53f0a` (la linea) + este commit de docs.
+
+**Cambio unico** (`src/components/forms/AuthForm.tsx:116`):
+```
+- const redirectTo = searchParams?.get('from') || '/dashboard'
++ const redirectTo = searchParams?.get('from') || '/dashboard/inicio'
+```
+
+El home operativo (`/dashboard`) queda intacto con todos sus flujos. Solo cambia
+el aterrizaje del login frio; los deep-links con `?from=` conservan prioridad.
+
+**Reversible:** `git revert ea53f0a` (una sola linea).
+
+**Verificacion visual (Victor, 2026-07-21):** 4 estados alcanzables validados en
+desktop y mobile 375px:
+- S1 sin_veredicto (estado real de la cuenta hoy)
+- S2 con_criticos (via fixture temporal)
+- S3 sin_riesgo (via fixture, modo --estado=sin-riesgo)
+- S5 sin_departamentos (cuenta sin deptos, sin escritura)
+
+S4 sin_acceso: logica verificada por HTTP (escenario 7 del smoke de Gate C, 403 +
+code) pero render visual PENDIENTE — no existe AREA_MANAGER sin departamento en
+la BD y crearlo tocaria la tabla User, fuera del alcance de Gate D.
+
+**Scripts de fixture visual:** `fixture-vitals-visual-check.ts` y
+`cleanup-vitals-visual-check.ts` se usaron para la verificacion (patron probado:
+insertar 3 filas -> navegar -> cleanup por id en $transaction) y se descartaron
+sin versionar. Nunca entraron al repo.
+
+**Smokes finales (todos en verde tras el incidente de entorno):** Gate A 42 PASS
+(cleanup 0 residuo), Gate B 32 PASS, Gate C 23 PASS (round-trip HTTP real contra
+:3000, re-corrido despues del commit RBAC `72bab31` de la sesion paralela para
+confirmar cero regresion en el router por rol).
+
+---
+
+## INCIDENTE DE ENTORNO (2026-07-20/21) - causa raiz y reparacion
+
+Durante Gate D, al verificar que HEAD typechequeaba de forma aislada, se daño el
+entorno local. Registrado aca porque la causa raiz era una instruccion del propio
+repo y la leccion es transversal.
+
+**Causa raiz:** `CLAUDE.md` instruia `npx tsc --noEmit` (y `npx prisma ...`) sin
+`--no-install`. Cuando `npx <comando>` no resuelve un binario local, va al
+registro publico de npm y ejecuta el paquete que encuentre con ese nombre. Al
+correr `npx tsc` desde un worktree temporal sin `node_modules`, npx descargo y
+ejecuto `tsc@2.0.4` — un paquete abandonado que NO es el compilador de
+TypeScript (el compilador vive en el paquete `typescript`). Inofensivo en si,
+pero el mismo mecanismo ejecutaria un typosquat malicioso con permisos del
+usuario.
+
+**Que se rompio:** para verificar HEAD se creo un git worktree temporal con
+`node_modules` enlazado por junction. Al desmontarlo, un `git worktree remove
+--force` siguio el junction y entro al `node_modules` REAL, borrando
+`node_modules/.bin/` (los ~90 lanzadores de binarios) y `.package-lock.json`
+antes de abortar. Consecuencia: `npm run dev` / `build` / `npx <x>` dejaron de
+resolver comandos. Los paquetes en si quedaron intactos; solo se perdieron los
+enlaces y el inventario.
+
+**Que NO se toco:** codigo fuente, commits, git, `package-lock.json` del repo,
+base de datos. Daño acotado a `node_modules`.
+
+**Reparacion (con dev server bajo, para evitar EPERM de Windows):**
+1. `npm install` real — reconstruyo `.bin/` (volvio a 198 entradas) y
+   `.package-lock.json` desde el `package-lock.json` intacto. Cero descargas
+   nuevas, cero cambios en package-lock (verificado con git status).
+2. `npm install` borro de paso el cliente Prisma generado (`.prisma/client/`,
+   artefacto de `prisma generate`, no un paquete npm). Regenerado con
+   `node node_modules/prisma/build/index.js generate` — v5.22.0, sin EPERM.
+3. Reinicio del dev server (lo hizo Victor) para reconstruir la cache `.next`,
+   que habia quedado con un chunk huerfano (`Cannot find module './38948.js'`)
+   por el cambio de `node_modules` bajo un server corriendo.
+4. Re-corrida de los 3 smokes: 42 / 32 / 23, todos verdes.
+
+**Regla nueva, YA APLICADA** (commit `9f38db5`, `CLAUDE.md`): nunca `npx <x>` a
+secas. Siempre `npx --no-install <x>` o ruta explicita al binario local
+(`node node_modules/typescript/bin/tsc`). `--no-install` falla con error claro
+en vez de descargar y ejecutar codigo de internet. Se corrigieron ademas las 3
+lineas de `CLAUDE.md` que enseñaban el patron inseguro.
+
+**Leccion de proceso:** el daño no vino de la verificacion (que salio bien: HEAD
+typechequea limpio) sino del desmontaje. Un junction hacia una carpeta real debe
+desmontarse (rmdir del enlace) ANTES de invocar `git worktree remove --force`;
+cuando el primer intento de rmdir fallo por escape de rutas, se debio parar en
+vez de seguir. Se suma a la regla transversal del proyecto: cuando una operacion
+de limpieza falla, parar y reportar, no continuar.
+
+---
+
 ## Proximo gate - B (UI portada) [COMPLETADO, ver arriba]
 
 **Skills OBLIGATORIAS antes de escribir una linea de JSX:**
@@ -176,18 +270,13 @@ es un caso de borde: es el estado que se va a ver. Diseñarlo primero.
 
 **Prompt de arranque para retomar en otro chat si este cae:**
 
-```
-Lee .claude/tasks/SPEC_HOME_SIGNOS_VITALES_v1.1.md y
-.claude/plans/MAESTRO_HOME_SIGNOS_VITALES.md. Gates A, B y C sellados.
-Estamos en Gate D: cambiar la puerta post-login en
-src/components/forms/AuthForm.tsx:116, de '/dashboard' a
-'/dashboard/inicio'. Commit propio, de lineas contadas, revertible con
-un solo git revert. Presenta plan en Plan Mode. No implementes.
-```
+**PROYECTO COMPLETO — los 4 gates sellados.** No queda gate por abrir. Lo unico
+pendiente es el push (Victor). Si se retoma para trabajo NUEVO sobre la portada,
+arrancar leyendo la spec v1.1 + este MAESTRO completo.
 
-**Pendiente que Gate D hereda:** verificacion visual y de pulgar en 375px de la
-portada. No se pudo hacer en Gate B ni C (requiere navegador y ojo humano). Ver
-la leccion sobre aserciones server-side mas abajo.
+Verificacion visual de S4 (render del estado sin_acceso) queda pendiente hasta que
+exista un AREA_MANAGER sin departamento en el sistema; su logica ya esta
+verificada por HTTP (smoke Gate C, escenario 7).
 
 ---
 
