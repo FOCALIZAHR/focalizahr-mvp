@@ -113,7 +113,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, onSuccess }) => {
         
         onSuccess?.()
 
-        const redirectTo = searchParams?.get('from') || '/dashboard'
+        const redirectTo = searchParams?.get('from') || '/dashboard/inicio'
 
         // Éxito: NO reseteamos loading. El componente se desmonta al navegar,
         // así el botón queda deshabilitado hasta la redirección (evita el flicker
