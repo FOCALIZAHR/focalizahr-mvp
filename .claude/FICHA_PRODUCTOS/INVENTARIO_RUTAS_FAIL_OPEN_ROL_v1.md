@@ -52,10 +52,10 @@ No son "fail-open por omisión de rol". Son **fugas cross-tenant**, y el
 `accountId` del token no las contiene. Severidad distinta, probablemente
 prioridad distinta.
 
-**Estado:** §2.2 (lectura) **cerrada**. §2.1 (escritura) **sigue abierta y es la
-de mayor severidad pendiente en todo este inventario** — ver su nota.
+**Estado:** §2.2 (lectura) **cerrada**. §2.1 (escritura) **confirmada en ejecución
+2026-07-21, fix en curso** — ver su nota.
 
-### 2.1 `src/app/api/admin/job-mapping-review/route.ts:152` — POST — ESCRITURA CROSS-TENANT — 🔴 ABIERTA
+### 2.1 `src/app/api/admin/job-mapping-review/route.ts:152` — POST — ESCRITURA CROSS-TENANT — 🟠 CONFIRMADA EN EJECUCIÓN (fix en curso)
 
 El `accountId` del update **se toma del body del request**, no del token:
 
@@ -68,14 +68,21 @@ Cualquier token válido de cualquier cuenta puede reescribir `standardJobLevel` 
 `acotadoGroup` de **todos los participantes** que matcheen un string de posición,
 **en la cuenta que elija**. Único gate del handler: `if (!userContext.accountId) → 401`.
 
-**Confirmada solo por CÓDIGO, no ejecutada** — es un `updateMany` destructivo sobre
-`participant` en la base de producción; probarlo corrompía datos reales. Matiz de
-explotabilidad: el atacante necesita conocer el `accountId` destino, y el GET del
-mismo archivo NO se lo da (`:52-53` sí acota por cuenta). No es una cadena
-autocontenida; hay que conseguir el `accountId` (cuid, no enumerable) por otra vía.
-Sigue siendo una primitiva de escritura cross-tenant confirmada en código.
-**Próximo paso: confirmarla en un entorno donde escribir no cueste (no hay dev DB
-separada) antes de diseñar el fix.**
+**CONFIRMADA EN EJECUCIÓN — `2026-07-21T03:48Z`, cuentas 100% sintéticas** (fixtures
+`__XT_` con cleanup por id en `$transaction`, residual verificado 0). Token
+`ACCOUNT_OWNER` legítimo de la Cuenta A + `accountId` de la Cuenta B en el body →
+`HTTP 200`, `"updated":3`: los 3 participantes de B quedaron reescritos a
+`standardJobLevel: 'jefe'`, `jobLevelMethod: 'manual'`. Un token de una cuenta
+mutó datos de otra.
+
+Matiz de explotabilidad (sin cambio): el atacante necesita conocer el `accountId`
+destino, y el GET del mismo archivo NO se lo da (`:52-53` sí acota por cuenta). No
+es cadena autocontenida; hay que conseguir el `accountId` (cuid, no enumerable) por
+otra vía. Pero la primitiva de escritura está confirmada.
+
+**Peor que §2.2:** aquella era lectura; esta es escritura — corrompe la
+clasificación de nivel de cargo de la víctima, lo que downstream afecta RoleFit,
+brechas y toda la analítica que segmenta por `acotadoGroup`.
 
 ### 2.2 `src/app/api/goals/employee-score/route.ts:8` — GET — LECTURA CROSS-TENANT — ✅ CERRADA (commit `72bab31`, 2026-07-20)
 
