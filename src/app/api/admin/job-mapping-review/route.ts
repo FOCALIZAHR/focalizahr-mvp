@@ -160,11 +160,22 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { position, accountId, standardJobLevel } = body;
+    const { position, accountId: bodyAccountId, standardJobLevel } = body;
 
-    if (!position || !accountId || !standardJobLevel) {
+    // SEGURIDAD multi-tenant: el accountId destino NO se toma del body salvo que
+    // el que llama sea FOCALIZAHR_ADMIN (soporte, opera cross-cuenta — igual que
+    // el GET de este mismo archivo, :52-53, y que job-classification/assign:66-68).
+    // Para cualquier otro rol se ignora bodyAccountId y se usa el del token.
+    // Sin esto, un token válido de una cuenta reescribía standardJobLevel de los
+    // participantes de OTRA cuenta pasando su accountId en el body — escritura
+    // cross-tenant confirmada en ejecución 2026-07-21 (updated:3 sobre cuenta ajena).
+    const targetAccountId = (userContext.role === 'FOCALIZAHR_ADMIN' && bodyAccountId)
+      ? bodyAccountId
+      : userContext.accountId;
+
+    if (!position || !standardJobLevel) {
       return NextResponse.json(
-        { success: false, error: 'Faltan campos requeridos: position, accountId, standardJobLevel' },
+        { success: false, error: 'Faltan campos requeridos: position, standardJobLevel' },
         { status: 400 }
       );
     }
@@ -183,7 +194,7 @@ export async function POST(request: NextRequest) {
 
     // 1. Guardar en histórico (feedback loop)
     await PositionAdapter.saveToHistory(
-      accountId,
+      targetAccountId,
       position,
       standardJobLevel,
       userEmail
@@ -193,7 +204,7 @@ export async function POST(request: NextRequest) {
     const updated = await prisma.participant.updateMany({
       where: {
         position: { equals: position, mode: 'insensitive' },
-        campaign: { accountId }
+        campaign: { accountId: targetAccountId }
       },
       data: {
         standardJobLevel,
@@ -207,7 +218,7 @@ export async function POST(request: NextRequest) {
     try {
       await prisma.auditLog.create({
         data: {
-          accountId,
+          accountId: targetAccountId,
           action: 'job_level_manual_assignment',
           entityType: 'participant',
           newValues: {
