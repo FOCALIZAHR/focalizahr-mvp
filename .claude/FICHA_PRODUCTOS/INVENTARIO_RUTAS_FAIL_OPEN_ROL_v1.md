@@ -134,6 +134,14 @@ Con `role = null`: `!includes` da `true`, pero `departmentId` también es `null`
 la condición completa es `false` → `departmentIds` queda `undefined` → **toda
 query downstream corre sin filtro sobre la cuenta entera.**
 
+> **Referencia cruzada:** estos 7 son **los mismos 7** endpoints que
+> `DEUDA_RBAC_ARRAYS_HARDCODEADOS_v1.md` marca como "sin gate de autorización"
+> (§2.3+§2.4, hallazgo estructural del hub ejecutivo). Coinciden en archivo; las
+> líneas difieren porque este doc cita el **uso** en el guard (`talent:34`) y aquel
+> la **declaración** del array `GLOBAL_ROLES` (`talent:14`). Mismo bug, dos ejes:
+> acá "ruta que no valida rol (fail-open)", allá "array hardcodeado divergente de
+> `PERMISSIONS`". Verificado 2026-07-21: las 7 líneas de guard de abajo siguen exactas.
+
 | file:line | Método | Exposición |
 |---|---|---|
 | `src/app/api/executive-hub/summary/route.ts:46` | GET | El briefing ejecutivo completo en una llamada: 9-box, concentración de estrellas, varianza de jefaturas, cobertura de sucesión, brecha productiva, semáforo legal, exposición IA, diagnóstico workforce — todo account-wide. Además el response ecoa `userRole: userContext.role \|\| 'VIEWER'` (`:151`) |
