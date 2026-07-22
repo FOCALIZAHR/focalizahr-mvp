@@ -84,6 +84,25 @@ pass.** Probado end-to-end contra prod y luego limpiado por id exacto en
 (Paso 2 abajo); este smoke prueba que el path escribe correctamente y no deja
 rastro.
 
+### ✅ CONFIRMACIÓN REAL EN USO DE LA APP (2026-07-22) — no smoke
+
+Victor aprobó por UI el plan de GATE4_LOBBY_DEMO → primera evidencia del path
+`onClimaPlanApproved` en producción real. Verificado read-only en BD:
+- **Plan `cmruvpmzx000110lephf8fma6`** · `aprobado` por `maria@empresa.cl` (HR_MANAGER)
+  · `approvedAt` 2026-07-22 11:52 · 17 decisiones, todas `aceptar`.
+- **`ClimaActionLog` = 17** (una por decisión aceptada), todas con `actionText`/`registeredAt`
+  null (fila lista, sin ejecutar) e `impactMeasured` null (pendiente de veredicto Tab 3).
+- **`CommunicationMessage clima_action_reminder` = 4** (deptos aceptados distintos: Comercial,
+  Desarrollo Software, Atención a Clientes, COBRANZA PRE-JUDICIAL). Las 4 con `toEmail =
+  victor@focalizahr.cl` (**walk-up fallback account_admin, 0 terceros**), `scheduledAt =
+  aprobación +30d` (2026-08-21), `channel EMAIL`, `status PENDING` (espera el cron dispatcher).
+
+El path endpoint→hook→BD queda confirmado en uso real, no solo por smoke. (Dato colateral:
+este plan quedó `aprobado`/inmutable → para re-probar el flujo editable hace falta un borrador
+nuevo. El Smart Road mostraba "Aprobar plan" activo sobre este plan ya aprobado — bug
+readOnly-aware RESUELTO en `5e33dad` (Opción B: el Lote en plan aprobado cae a la vista
+read-only de sus sub-batches, no al Smart Road).)
+
 ### Estados de borde scriptables — VERIFICADOS en el mismo smoke
 
 - **read-only tras aprobar** → `PUT` sobre aprobado = **403 inmutable** ✓
