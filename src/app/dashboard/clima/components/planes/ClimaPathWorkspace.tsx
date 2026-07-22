@@ -23,7 +23,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
-import { PrimaryButton } from '@/components/ui/PremiumButton';
+import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton';
 import { CLIMA_PLAN_PATHS } from '@/lib/constants/climaPlanPaths';
 import type { ClimaPlanBlock } from '@/lib/services/clima/climaPlanRouting';
 import type { ClimaDecisionItem, CeoDecision } from '@/types/clima-planes';
@@ -32,7 +32,7 @@ import ClimaCaseReview from './ClimaCaseReview';
 import ClimaPathChaining, { type RemainingPath } from './ClimaPathChaining';
 import ClimaLoteView from './ClimaLoteView';
 
-type IndividualSub = 'intro' | 'review' | 'done';
+type IndividualSub = 'intro' | 'review' | 'done' | 'reviewAll';
 
 /** Escapa metacaracteres para armar el regex de resaltado. */
 function escapeRegExp(s: string): string {
@@ -106,7 +106,12 @@ export default function ClimaPathWorkspace({
   const def = CLIMA_PLAN_PATHS[block];
   const Icon = def.icon;
   const isLote = block === 'gestion_corriente';
-  const [sub, setSub] = useState<IndividualSub>(readOnly ? 'review' : 'intro');
+  // Entrar a un bloque YA 100% decidido (borrador) no reabre el flujo lineal: cae
+  // directo en el cierre, desde donde se audita ("Revisar lo decidido").
+  const allDecided = items.length > 0 && items.every((i) => i.ceoDecision);
+  const [sub, setSub] = useState<IndividualSub>(
+    readOnly ? 'review' : allDecided ? 'done' : 'intro'
+  );
 
   const decided = items.filter((i) => i.ceoDecision).length;
   const ctaLabel = items.length === 1 ? 'Resolver el foco' : `Resolver los ${items.length} focos`;
@@ -209,6 +214,25 @@ export default function ClimaPathWorkspace({
               onDecision={onDecision}
               onAllDone={() => setSub('done')}
             />
+          ) : sub === 'reviewAll' ? (
+            <div className="flex-1">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h3 className="text-lg font-light text-white">
+                  Revisión de{' '}
+                  <span style={{ color: def.color }}>{def.label.toLowerCase()}</span>
+                </h3>
+                <GhostButton size="sm" icon={ArrowLeft} onClick={() => setSub('done')}>
+                  Volver
+                </GhostButton>
+              </div>
+              <ClimaCaseReview
+                items={items}
+                readOnly={readOnly}
+                reviewMode
+                onDecision={onDecision}
+                onAllDone={() => {}}
+              />
+            </div>
           ) : (
             <ClimaPathChaining
               block={block}
@@ -219,6 +243,7 @@ export default function ClimaPathWorkspace({
               onApprove={onApprove}
               onGoToPath={onGoToPath}
               onBackToCarousel={onBackToCarousel}
+              onReview={() => setSub('reviewAll')}
             />
           )}
         </div>

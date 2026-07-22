@@ -21,6 +21,7 @@ import {
   groupDecisionsByBlock,
   type ClimaPlanBlock,
 } from '@/lib/services/clima/climaPlanRouting';
+import { CLIMA_PLAN_PATH_ORDER } from '@/lib/constants/climaPlanPaths';
 import type { ClimaDecisionItem, CeoDecision } from '@/types/clima-planes';
 import ClimaPlanPortada from './ClimaPlanPortada';
 import ClimaPathCarousel from './ClimaPathCarousel';
@@ -28,7 +29,6 @@ import ClimaPathWorkspace from './ClimaPathWorkspace';
 import type { RemainingPath } from './ClimaPathChaining';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' } as const;
-const INDIVIDUAL_PATHS: ClimaPlanBlock[] = ['sistemico', 'critico', 'generico'];
 
 interface DeptSinDatos {
   departmentId: string;
@@ -255,9 +255,12 @@ export default function ClimaPlanDeptTab({ campaignId, onViewChange }: ClimaPlan
     [groups]
   );
 
+  // Caminos con casos pendientes — INCLUYE gestion_corriente (el lote). El gate de
+  // aprobación cuenta el lote, así que "Caminos que faltan" debe listarlo o el usuario
+  // queda trabado sin saber qué falta. onGoToPath rutea a cualquier bloque (incl. lote).
   const remaining: RemainingPath[] = useMemo(
     () =>
-      INDIVIDUAL_PATHS.filter((b) => b !== selectedPath)
+      CLIMA_PLAN_PATH_ORDER.filter((b) => b !== selectedPath)
         .map((b) => ({ block: b, pending: groups[b].filter((i) => !i.ceoDecision).length }))
         .filter((r) => r.pending > 0),
     [groups, selectedPath]
@@ -293,7 +296,7 @@ export default function ClimaPlanDeptTab({ campaignId, onViewChange }: ClimaPlan
       <FHREmptyState
         type="clear"
         title="Sin focos de acción"
-        description="Ningún reactivo de esta campaña cayó bajo su umbral — no hay decisiones de plan que tomar."
+        description="Ningún reactivo de esta campaña cayó bajo su umbral. No hay decisiones de plan que tomar."
       />
     );
   }

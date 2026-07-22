@@ -13,7 +13,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap } from 'lucide-react';
+import { Zap, ChevronDown, ChevronUp } from 'lucide-react';
 import { PrimaryButton, GhostButton } from '@/components/ui/PremiumButton';
 import type { ClimaDecisionItem } from '@/types/clima-planes';
 
@@ -36,7 +36,9 @@ export default function ClimaLoteBar({
 
   const pending = items.filter((i) => i.ceoDecision !== 'aceptar');
   const allAccepted = pending.length === 0;
-  const nombre = reactive ?? 'este grupo';
+  // La acción es idéntica en todo el sub-batch (agrupado por reactivo×zona → misma
+  // celda variante) → un representante alcanza para mostrar qué se va a aplicar.
+  const preview = items[0]?.intervention ?? null;
 
   return (
     <div className="rounded-xl border border-slate-800/40 bg-slate-900/40 p-4 relative overflow-hidden">
@@ -51,15 +53,22 @@ export default function ClimaLoteBar({
               <span className="text-slate-500"> · {items.length} depto{items.length !== 1 ? 's' : ''}</span>
             </p>
             <p className="text-[11px] font-light text-slate-500">
-              Mismo reactivo en lote — se mide su efectividad por separado
+              El mismo foco en varios equipos. Una acción los cubre a todos.
             </p>
           </div>
         </div>
 
         {!readOnly && !allAccepted && (
-          <PrimaryButton size="sm" icon={Zap} onClick={() => setConfirming((v) => !v)}>
-            Aceptar {pending.length} de {nombre}
-          </PrimaryButton>
+          // Reposo: sin verbo de decisión — solo abre/cierra el detalle (mismo patrón de
+          // 2 pasos que los otros 3 bloques). La aprobación vive UNA sola vez, al pie.
+          <GhostButton
+            size="sm"
+            icon={confirming ? ChevronUp : ChevronDown}
+            iconPosition="right"
+            onClick={() => setConfirming((v) => !v)}
+          >
+            Revisar plan
+          </GhostButton>
         )}
         {allAccepted && (
           <span className="text-[11px] font-light text-emerald-300/80">Aceptado</span>
@@ -76,8 +85,32 @@ export default function ClimaLoteBar({
             className="overflow-hidden"
           >
             <div className="mt-4 pt-3 border-t border-slate-800/40">
+              {/* Vista previa de la acción concreta — el jefe decide sabiendo qué se crea,
+                  sin abrir caso por caso (eso anularía el lote). Progressive disclosure. */}
+              {preview && (
+                <div className="mb-3 rounded-lg border border-slate-800/40 bg-slate-900/30 p-3">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1.5">
+                    La acción
+                  </p>
+                  <p className="text-[12px] font-light text-slate-400 leading-relaxed">
+                    {preview.narrative}
+                  </p>
+                  {preview.steps.length > 0 && (
+                    <ul className="mt-2 space-y-1 pl-4">
+                      {preview.steps.map((step, i) => (
+                        <li
+                          key={i}
+                          className="text-[11px] font-light text-slate-500 leading-relaxed list-disc"
+                        >
+                          {step}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
               <p className="text-[11px] font-light text-slate-400 mb-2">
-                Se aceptarán {pending.length} decisiones de <span className="text-emerald-300/80">{nombre}</span> en:
+                Se aplicará a {pending.length} equipo{pending.length !== 1 ? 's' : ''}:
               </p>
               <ul className="space-y-1 mb-4 max-h-40 overflow-y-auto">
                 {pending.map((i) => (
@@ -86,20 +119,17 @@ export default function ClimaLoteBar({
                   </li>
                 ))}
               </ul>
-              <div className="flex items-center gap-2">
-                <PrimaryButton
-                  size="sm"
-                  onClick={() => {
-                    onAcceptBatch(pending.map((i) => i.triggerRef));
-                    setConfirming(false);
-                  }}
-                >
-                  Confirmar
-                </PrimaryButton>
-                <GhostButton size="sm" onClick={() => setConfirming(false)}>
-                  Cancelar
-                </GhostButton>
-              </div>
+              {/* Un solo CTA que aprueba y despacha. Cerrar sin aprobar = colapsar el
+                  panel (toggle "Revisar plan") — no necesita botón dedicado. */}
+              <PrimaryButton
+                size="sm"
+                onClick={() => {
+                  onAcceptBatch(pending.map((i) => i.triggerRef));
+                  setConfirming(false);
+                }}
+              >
+                Aprobar {pending.length}
+              </PrimaryButton>
             </div>
           </motion.div>
         )}

@@ -47,7 +47,7 @@ for (const cat of CLIMA_DRIVER_CATEGORIES) {
   const cell = getSystemicIntervention(cat, 3, 5);
   const ok =
     !cell.narrative.includes(GENERIC_MARKER) &&
-    cell.narrative.startsWith('PROVISIONAL — ') &&
+    cell.narrative.startsWith('PROVISIONAL: ') &&
     cell.steps.length === 2 &&
     typeof cell.suggestedProduct === 'object' &&
     cell.suggestedProduct.target === 'SIN_CTA' &&

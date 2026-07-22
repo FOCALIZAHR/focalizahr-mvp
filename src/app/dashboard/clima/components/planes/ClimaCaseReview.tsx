@@ -29,6 +29,12 @@ const SAVED_FEEDBACK_MS = 900;
 interface ClimaCaseReviewProps {
   items: ClimaDecisionItem[];
   readOnly?: boolean;
+  /**
+   * Modo auditoría: renderiza TODOS los casos (decididos + pendientes) como lista,
+   * en vez del flujo lineal uno-a-uno. Editable si !readOnly (borrador). No dispara
+   * onAllDone (no es un flujo de cierre, es consulta de lo ya decidido).
+   */
+  reviewMode?: boolean;
   onDecision: (
     triggerRef: string,
     decision: CeoDecision,
@@ -40,6 +46,7 @@ interface ClimaCaseReviewProps {
 export default function ClimaCaseReview({
   items,
   readOnly = false,
+  reviewMode = false,
   onDecision,
   onAllDone,
 }: ClimaCaseReviewProps) {
@@ -57,8 +64,8 @@ export default function ClimaCaseReview({
   // Solo cierra el camino cuando no queda nada pendiente Y no hay una escritura en
   // curso — si no, el cierre se dispararía en medio del "Guardado ✓".
   useEffect(() => {
-    if (!readOnly && pending.length === 0 && phase === 'idle') onAllDone();
-  }, [pending.length, readOnly, onAllDone, phase]);
+    if (!readOnly && !reviewMode && pending.length === 0 && phase === 'idle') onAllDone();
+  }, [pending.length, readOnly, reviewMode, onAllDone, phase]);
 
   const attempt = async (triggerRef: string, decision: CeoDecision, notes?: string) => {
     if (phase === 'saving' || phase === 'saved') return; // blinda el doble clic
@@ -87,11 +94,24 @@ export default function ClimaCaseReview({
     if (lastAttempt) attempt(lastAttempt.triggerRef, lastAttempt.decision, lastAttempt.notes);
   };
 
-  if (readOnly) {
+  // Lista completa: plan aprobado (readOnly) o modo auditoría en borrador (reviewMode,
+  // editable). Muestra la decisión tomada (botón activo) + narrativa/steps/business case.
+  if (readOnly || reviewMode) {
     return (
       <div className="space-y-3">
         {items.map((i) => (
-          <ClimaDecisionCard key={i.triggerRef} item={i} readOnly onDecision={async () => {}} />
+          <ClimaDecisionCard
+            key={i.triggerRef}
+            item={i}
+            readOnly={readOnly}
+            onDecision={
+              readOnly
+                ? async () => {}
+                : (ref, dec, notes) => {
+                    void onDecision(ref, dec, notes);
+                  }
+            }
+          />
         ))}
       </div>
     );

@@ -8,7 +8,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { motion } from 'framer-motion';
-import { CheckCircle2, ArrowRight } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Eye } from 'lucide-react';
 import { PrimaryButton, SecondaryButton, GhostButton } from '@/components/ui/PremiumButton';
 import { CLIMA_PLAN_PATHS } from '@/lib/constants/climaPlanPaths';
 import type { ClimaPlanBlock } from '@/lib/services/clima/climaPlanRouting';
@@ -28,6 +28,8 @@ interface ClimaPathChainingProps {
   onApprove: () => void;
   onGoToPath: (block: ClimaPlanBlock) => void;
   onBackToCarousel: () => void;
+  /** Abre la vista de auditoría de este bloque (lo ya decidido). */
+  onReview: () => void;
 }
 
 export default function ClimaPathChaining({
@@ -39,6 +41,7 @@ export default function ClimaPathChaining({
   onApprove,
   onGoToPath,
   onBackToCarousel,
+  onReview,
 }: ClimaPathChainingProps) {
   const def = CLIMA_PLAN_PATHS[block];
 
@@ -62,6 +65,15 @@ export default function ClimaPathChaining({
       <p className="text-sm font-light text-slate-500 mt-1">
         {caseCount} caso{caseCount !== 1 ? 's' : ''} revisado{caseCount !== 1 ? 's' : ''}.
       </p>
+
+      {caseCount > 0 && (
+        <button
+          onClick={onReview}
+          className="mt-3 flex items-center gap-1.5 text-[11px] font-light text-slate-500 hover:text-slate-300 transition-colors"
+        >
+          <Eye className="w-3 h-3" /> Revisar lo decidido
+        </button>
+      )}
 
       {remaining.length > 0 && (
         <div className="w-full max-w-sm mt-8 space-y-2">

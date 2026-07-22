@@ -25,6 +25,7 @@ import { PrimaryButton, SecondaryButton, GhostButton } from '@/components/ui/Pre
 import BusinessCaseCard from '@/components/clima/BusinessCaseCard';
 import { zoneColor, ZONE_LABEL } from '@/components/clima/climaZonePalette';
 import { dimensionLabel } from '@/lib/constants/climaDimensions';
+import { classifyDecisionBlock } from '@/lib/services/clima/climaPlanRouting';
 import type { ClimaDecisionItem, CeoDecision } from '@/types/clima-planes';
 
 const DECISION_LABELS: Record<CeoDecision, string> = {
@@ -70,6 +71,10 @@ export default function ClimaDecisionCard({
   //  error de criterio; dejaba a los sistémicos sin forma de rechazarse y trababa el
   //  gate de aprobación, que exige decididas === total.)
   const isSystemic = item.isSystemic;
+  // Bloque 4 (A tu criterio): señal amarilla sin variante Capa 2 escrita → NO hay
+  // receta probada, solo una sugerencia general. Se marca con un tag neutro aditivo
+  // (el badge de zona NO se toca: la severidad la sigue cantando solo el badge).
+  const isGeneric = classifyDecisionBlock(item) === 'generico';
   const productText = productLabel(item.intervention.suggestedProduct);
   // Durante guardado/confirmación los botones se bloquean. En 'error' NO: hay que
   // poder reintentar o elegir otra decisión.
@@ -128,6 +133,11 @@ export default function ClimaDecisionCard({
                 patrón sistémico
               </span>
             )}
+            {isGeneric && (
+              <span className="text-[9px] px-2 py-0.5 rounded-full text-slate-400/60 border border-slate-700/30 font-light">
+                sugerencia general · sin receta probada
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -141,7 +151,7 @@ export default function ClimaDecisionCard({
       <p className="text-[11px] text-slate-600 font-light leading-relaxed mt-2">
         {item.isSystemic
           ? 'Este foco entra acá porque es parte de un problema extendido del área. El color marca, además, qué tan grave es este punto en particular.'
-          : 'Foco puntual detectado a nivel de reactivo — puede convivir con una salud general del departamento estable.'}
+          : 'Foco puntual detectado a nivel de reactivo. Puede convivir con una salud general del departamento estable.'}
       </p>
 
       {/* Micro-steps colapsables */}
@@ -197,7 +207,15 @@ export default function ClimaDecisionCard({
             {item.responsible} · {item.deadline}
           </span>
           {!isSystemic && (
-            <span className="text-[9px] px-2 py-0.5 rounded-full text-slate-400/60 border border-slate-700/30 font-light">
+            <span
+              className={cn(
+                'text-[9px] px-2 py-0.5 rounded-full border font-light',
+                // B4: producto atenuado (es genérico, no una receta probada).
+                isGeneric
+                  ? 'text-slate-500/50 border-slate-700/20'
+                  : 'text-slate-400/60 border-slate-700/30'
+              )}
+            >
               {productText}
             </span>
           )}

@@ -32,8 +32,8 @@ export default function ClimaLoteView({
   if (subBatches.length === 0) {
     return (
       <p className="text-sm font-light text-slate-500 py-10 text-center">
-        No hay victorias rápidas de gestión corriente en esta campaña — ningún reactivo cayó en
-        zona de lote con una acción de bajo esfuerzo escrita.
+        No hay victorias rápidas en esta campaña. Ningún foco leve tiene todavía una acción
+        lista para aplicar de una vez.
       </p>
     );
   }
@@ -41,8 +41,8 @@ export default function ClimaLoteView({
   return (
     <div className="space-y-3">
       <p className="text-[11px] font-light text-slate-500">
-        {subBatches.length} reactivo{subBatches.length !== 1 ? 's' : ''} en lote — cada uno se
-        aprueba y se mide por separado.
+        {subBatches.length} foco{subBatches.length !== 1 ? 's' : ''} listo{subBatches.length !== 1 ? 's' : ''} para
+        resolver. Cada uno se aprueba de una vez para todos sus equipos.
       </p>
 
       {errorMsg && (

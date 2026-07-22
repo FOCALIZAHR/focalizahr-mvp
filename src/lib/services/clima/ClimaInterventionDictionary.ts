@@ -10,7 +10,7 @@
 // ⚠️ CONTENIDO PROVISIONAL — Principio 4 del MAESTRO ("Narrativas las escribe
 //    Victor o Studio IA. Code las copia EXACTO."). Code SÓLO scaffoldea la
 //    ESTRUCTURA (8×4, dónde va cada slot). El copy final NO está escrito: cada
-//    narrativa arranca con "PROVISIONAL — " para que sea imposible mostrarla a
+//    narrativa arranca con "PROVISIONAL: " para que sea imposible mostrarla a
 //    cliente por accidente. No asumir que el diccionario está listo.
 //
 // Patrón: `Record<categoria, Record<RiskZone, …>>` — mismo molde zone-keyed que
@@ -43,7 +43,7 @@ export const CLIMA_DRIVER_CATEGORIES = [
 
 export type ClimaDriverCategory = (typeof CLIMA_DRIVER_CATEGORIES)[number];
 
-const P = 'PROVISIONAL — '; // prefijo obligatorio de toda narrativa scaffold
+const P = 'PROVISIONAL: '; // prefijo obligatorio de toda narrativa scaffold (sin em-dash: regla de texto visible)
 
 // ════════════════════════════════════════════════════════════════════════════
 // 32 celdas (8 × 4). Contenido de relleno estructural — Studio IA lo reemplaza.
@@ -117,7 +117,7 @@ export const CLIMA_INTERVENTION_DICTIONARY: Record<
 // zonas = 93 celdas, COPIADAS EXACTO (narrativa/steps/esfuerzo/efectividad/evidencia).
 // Reactivos con advertencia de auditoría (efectividad/mejora/seguridad/autonomia/
 // energia/doble-barril) quedan con su copy + nota intacta hasta que el banco los
-// resuelva. Prefijo `PROVISIONAL — ` se mantiene. El doc está organizado
+// resuelva. Prefijo `PROVISIONAL: ` se mantiene. El doc está organizado
 // dimensión→reactivo→zona (revisión humana); acá se TRANSPONE a zona→reactivo.
 //
 // La muestra v3.18 `liderazgo.roja.carga_trabajo` se MIGRÓ al shape rico (decisión
@@ -1063,7 +1063,7 @@ function getSystemicFallback(
   totalMeasured: number
 ): ClimaSystemicCell {
   return {
-    narrative: `${P}${nBelow} de ${totalMeasured} reactivos de ${category} están bajo el umbral en tu equipo. Este no es un problema puntual — es un patrón que cruza varios frentes a la vez. Conversación recomendada: revisar con RRHH antes de actuar solo.`,
+    narrative: `${P}${nBelow} de ${totalMeasured} reactivos de ${category} están bajo el umbral en tu equipo. Este no es un problema puntual. Es un patrón que cruza varios frentes a la vez. Conversación recomendada: revisar con RRHH antes de actuar solo.`,
     steps: [
       'Revisar el patrón completo de la dimensión con RRHH antes de actuar reactivo por reactivo',
       'Definir una intervención a nivel de dimensión, no parche por parche',
