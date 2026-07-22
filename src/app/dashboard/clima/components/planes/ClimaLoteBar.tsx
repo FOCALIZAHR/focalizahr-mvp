@@ -47,6 +47,9 @@ export default function ClimaLoteBar({
   // La acción es idéntica en todo el sub-batch (agrupado por reactivo×zona → misma
   // celda variante) → un representante alcanza para mostrar qué se va a aplicar.
   const preview = items[0]?.intervention ?? null;
+  // readOnly (consulta/auditoría): se listan TODOS los equipos con lo ya decidido.
+  // Borrador: solo los pendientes a decidir.
+  const teamList = readOnly ? items : undecided;
 
   return (
     <div className="rounded-xl border border-slate-800/40 bg-slate-900/40 p-4 relative overflow-hidden">
@@ -90,7 +93,7 @@ export default function ClimaLoteBar({
       </div>
 
       <AnimatePresence>
-        {confirming && !readOnly && (
+        {(confirming || readOnly) && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -100,7 +103,8 @@ export default function ClimaLoteBar({
           >
             <div className="mt-4 pt-3 border-t border-slate-800/40">
               {/* Vista previa de la acción concreta — el jefe decide sabiendo qué se crea,
-                  sin abrir caso por caso (eso anularía el lote). Progressive disclosure. */}
+                  sin abrir caso por caso (eso anularía el lote). Progressive disclosure.
+                  En readOnly es la consulta de auditoría de lo ya decidido. */}
               {preview && (
                 <div className="mb-3 rounded-lg border border-slate-800/40 bg-slate-900/30 p-3">
                   <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1.5">
@@ -124,37 +128,41 @@ export default function ClimaLoteBar({
                 </div>
               )}
               <p className="text-[11px] font-light text-slate-400 mb-2">
-                Se aplicará a {undecided.length} equipo{undecided.length !== 1 ? 's' : ''}:
+                {readOnly
+                  ? `${stateLabel === 'Pospuesto' ? 'Pospuesto en' : 'Aplicado a'} ${teamList.length} equipo${teamList.length !== 1 ? 's' : ''}:`
+                  : `Se aplicará a ${teamList.length} equipo${teamList.length !== 1 ? 's' : ''}:`}
               </p>
               <ul className="space-y-1 mb-4 max-h-40 overflow-y-auto">
-                {undecided.map((i) => (
+                {teamList.map((i) => (
                   <li key={i.triggerRef} className="text-[12px] font-light text-slate-500">
                     · {i.departmentName ?? 'Departamento'}
                   </li>
                 ))}
               </ul>
-              {/* "Aprobar" despacha; "No ahora" pospone (no genera acción — se revisa en otro
-                  ciclo, distinguible de rechazar en el snapshot). Cerrar sin decidir = colapsar. */}
-              <div className="flex items-center gap-2">
-                <PrimaryButton
-                  size="sm"
-                  onClick={() => {
-                    onBatchDecision(undecided.map((i) => i.triggerRef), 'aceptar');
-                    setConfirming(false);
-                  }}
-                >
-                  Aprobar {undecided.length}
-                </PrimaryButton>
-                <GhostButton
-                  size="sm"
-                  onClick={() => {
-                    onBatchDecision(undecided.map((i) => i.triggerRef), 'pospuesto');
-                    setConfirming(false);
-                  }}
-                >
-                  No ahora
-                </GhostButton>
-              </div>
+              {/* Botones solo en borrador. "Aprobar" despacha; "No ahora" pospone (no genera
+                  acción — se revisa en otro ciclo, distinguible de rechazar). En readOnly: consulta. */}
+              {!readOnly && (
+                <div className="flex items-center gap-2">
+                  <PrimaryButton
+                    size="sm"
+                    onClick={() => {
+                      onBatchDecision(teamList.map((i) => i.triggerRef), 'aceptar');
+                      setConfirming(false);
+                    }}
+                  >
+                    Aprobar {teamList.length}
+                  </PrimaryButton>
+                  <GhostButton
+                    size="sm"
+                    onClick={() => {
+                      onBatchDecision(teamList.map((i) => i.triggerRef), 'pospuesto');
+                      setConfirming(false);
+                    }}
+                  >
+                    No ahora
+                  </GhostButton>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

@@ -26,7 +26,7 @@ import type { ClimaDecisionItem, CeoDecision } from '@/types/clima-planes';
 import ClimaPlanPortada from './ClimaPlanPortada';
 import ClimaPathCarousel from './ClimaPathCarousel';
 import ClimaPathWorkspace from './ClimaPathWorkspace';
-import type { RemainingPath } from './ClimaPathChaining';
+import type { BlockStatus } from './ClimaPathChaining';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' } as const;
 
@@ -257,15 +257,16 @@ export default function ClimaPlanDeptTab({ campaignId, onViewChange }: ClimaPlan
     [groups]
   );
 
-  // Caminos con casos pendientes — INCLUYE gestion_corriente (el lote). El gate de
-  // aprobación cuenta el lote, así que "Caminos que faltan" debe listarlo o el usuario
-  // queda trabado sin saber qué falta. onGoToPath rutea a cualquier bloque (incl. lote).
-  const remaining: RemainingPath[] = useMemo(
+  // Estado de los 4 bloques (orden de prioridad canónico) para el indicador de etapas
+  // de la pantalla de cierre. INCLUYE gestion_corriente (el lote), que el gate cuenta.
+  const blockStatuses: BlockStatus[] = useMemo(
     () =>
-      CLIMA_PLAN_PATH_ORDER.filter((b) => b !== selectedPath)
-        .map((b) => ({ block: b, pending: groups[b].filter((i) => !i.ceoDecision).length }))
-        .filter((r) => r.pending > 0),
-    [groups, selectedPath]
+      CLIMA_PLAN_PATH_ORDER.map((b) => ({
+        block: b,
+        total: groups[b].length,
+        pending: groups[b].filter((i) => !i.ceoDecision).length,
+      })),
+    [groups]
   );
 
   // Vista interna actual — reportada al shell para que oculte sus tabs fuera del carrusel.
@@ -351,7 +352,7 @@ export default function ClimaPlanDeptTab({ campaignId, onViewChange }: ClimaPlan
             onBatchDecision={handleBatchDecision}
             batchError={batchError}
             onBackToCarousel={() => setSelectedPath(null)}
-            remaining={remaining}
+            blockStatuses={blockStatuses}
             onGoToPath={setSelectedPath}
             canApprove={planId !== null && decidedCount === decisiones.length}
             saving={saving}

@@ -29,7 +29,7 @@ import type { ClimaPlanBlock } from '@/lib/services/clima/climaPlanRouting';
 import type { ClimaDecisionItem, CeoDecision } from '@/types/clima-planes';
 import type { PersistResult } from './ClimaPlanDeptTab';
 import ClimaCaseReview from './ClimaCaseReview';
-import ClimaPathChaining, { type RemainingPath } from './ClimaPathChaining';
+import ClimaPathChaining, { type BlockStatus } from './ClimaPathChaining';
 import ClimaLoteView from './ClimaLoteView';
 
 type IndividualSub = 'intro' | 'review' | 'done' | 'reviewAll';
@@ -81,7 +81,7 @@ interface ClimaPathWorkspaceProps {
   /** Error de la última aprobación en lote (se muestra en la vista de lote). */
   batchError?: string | null;
   onBackToCarousel: () => void;
-  remaining: RemainingPath[];
+  blockStatuses: BlockStatus[];
   onGoToPath: (block: ClimaPlanBlock) => void;
   /** Gate duro del plan (decididas === total) — habilita el cierre del flujo. */
   canApprove: boolean;
@@ -97,7 +97,7 @@ export default function ClimaPathWorkspace({
   onBatchDecision,
   batchError = null,
   onBackToCarousel,
-  remaining,
+  blockStatuses,
   onGoToPath,
   canApprove,
   saving,
@@ -114,7 +114,12 @@ export default function ClimaPathWorkspace({
   );
 
   const decided = items.filter((i) => i.ceoDecision).length;
-  const ctaLabel = items.length === 1 ? 'Resolver el foco' : `Resolver los ${items.length} focos`;
+  // Botón de intro: los pendientes REALES a decidir, no el total del bloque (que ya
+  // canta el panel izquierdo "{decided} de {total} resueltos"). Al re-entrar un bloque
+  // parcial, "Resolver los N focos" prometía el total; ahora dice lo que falta.
+  const pendingCount = items.length - decided;
+  const ctaLabel =
+    pendingCount === 1 ? 'Resolver el foco' : `Resolver los ${pendingCount} focos`;
 
   return (
     <motion.div
@@ -174,20 +179,49 @@ export default function ClimaPathWorkspace({
         {/* DERECHA — flujo lineal (donde el molde pone StorytellingGuide) */}
         <div className="flex-1 min-w-0 flex flex-col min-h-[420px] p-6 md:p-8 pt-6 md:pt-14 bg-gradient-to-br from-[#0F172A] to-[#162032]">
           {isLote ? (
-            <>
-              <h3 className="text-2xl md:text-3xl font-extralight text-white tracking-tight leading-tight mb-4">
-                {def.label}
-              </h3>
-              <p className="text-base font-light text-slate-300 leading-relaxed mb-6">
-                <MissionText text={def.mission} highlights={def.highlights} color={def.color} />
-              </p>
-              <ClimaLoteView
-                items={items}
-                readOnly={readOnly}
-                errorMsg={batchError}
-                onBatchDecision={onBatchDecision}
+            // Auditoría del lote (Path A): ClimaLoteView readOnly muestra el detalle de
+            // cada sub-batch ya decidido, en vez del <span> estático.
+            sub === 'reviewAll' ? (
+              <div className="flex-1">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <h3 className="text-lg font-light text-white">
+                    Revisión de{' '}
+                    <span style={{ color: def.color }}>{def.label.toLowerCase()}</span>
+                  </h3>
+                  <GhostButton size="sm" icon={ArrowLeft} onClick={() => setSub('done')}>
+                    Volver
+                  </GhostButton>
+                </div>
+                <ClimaLoteView items={items} readOnly errorMsg={null} onBatchDecision={() => {}} />
+              </div>
+            ) : allDecided ? (
+              // Lote resuelto → mismo Smart Road de cierre que los otros 3 bloques.
+              <ClimaPathChaining
+                block={block}
+                caseCount={items.length}
+                blockStatuses={blockStatuses}
+                canApprove={canApprove}
+                saving={saving}
+                onApprove={onApprove}
+                onGoToPath={onGoToPath}
+                onReview={() => setSub('reviewAll')}
               />
-            </>
+            ) : (
+              <>
+                <h3 className="text-2xl md:text-3xl font-extralight text-white tracking-tight leading-tight mb-4">
+                  {def.label}
+                </h3>
+                <p className="text-base font-light text-slate-300 leading-relaxed mb-6">
+                  <MissionText text={def.mission} highlights={def.highlights} color={def.color} />
+                </p>
+                <ClimaLoteView
+                  items={items}
+                  readOnly={readOnly}
+                  errorMsg={batchError}
+                  onBatchDecision={onBatchDecision}
+                />
+              </>
+            )
           ) : sub === 'intro' ? (
             <div className="flex-1 flex flex-col justify-center">
               <h3 className="text-2xl md:text-3xl font-extralight text-white tracking-tight leading-tight mb-4">
@@ -237,12 +271,11 @@ export default function ClimaPathWorkspace({
             <ClimaPathChaining
               block={block}
               caseCount={items.length}
-              remaining={remaining}
+              blockStatuses={blockStatuses}
               canApprove={canApprove}
               saving={saving}
               onApprove={onApprove}
               onGoToPath={onGoToPath}
-              onBackToCarousel={onBackToCarousel}
               onReview={() => setSub('reviewAll')}
             />
           )}
