@@ -179,8 +179,12 @@ export default function ClimaPathWorkspace({
         {/* DERECHA — flujo lineal (donde el molde pone StorytellingGuide) */}
         <div className="flex-1 min-w-0 flex flex-col min-h-[420px] p-6 md:p-8 pt-6 md:pt-14 bg-gradient-to-br from-[#0F172A] to-[#162032]">
           {isLote ? (
-            // Auditoría del lote (Path A): ClimaLoteView readOnly muestra el detalle de
-            // cada sub-batch ya decidido, en vez del <span> estático.
+            // (B) Plan aprobado (readOnly): el Lote muestra su contenido read-only (sub-batches
+            // con detalle), como los otros 3 bloques (ClimaCaseReview readOnly). NO pasa por el
+            // Smart Road → elimina de raíz el CTA "Aprobar plan" engañoso sobre un plan inmutable.
+            readOnly ? (
+              <ClimaLoteView items={items} readOnly errorMsg={null} onBatchDecision={() => {}} />
+            ) : // Auditoría del lote en borrador (Path A): detalle de cada sub-batch ya decidido.
             sub === 'reviewAll' ? (
               <div className="flex-1">
                 <div className="flex items-center justify-between gap-3 mb-4">

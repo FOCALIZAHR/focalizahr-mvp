@@ -41,8 +41,13 @@ export default function ClimaLoteView({
   return (
     <div className="space-y-3">
       <p className="text-[11px] font-light text-slate-500">
-        {subBatches.length} foco{subBatches.length !== 1 ? 's' : ''} listo{subBatches.length !== 1 ? 's' : ''} para
-        resolver. Cada uno se aprueba de una vez para todos sus equipos.
+        {readOnly
+          ? `${subBatches.length} foco${subBatches.length !== 1 ? 's' : ''} resuelto${
+              subBatches.length !== 1 ? 's' : ''
+            }. El detalle de lo decidido por equipo, abajo.`
+          : `${subBatches.length} foco${subBatches.length !== 1 ? 's' : ''} listo${
+              subBatches.length !== 1 ? 's' : ''
+            } para resolver. Cada uno se aprueba de una vez para todos sus equipos.`}
       </p>
 
       {errorMsg && (
