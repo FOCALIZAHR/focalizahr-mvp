@@ -46,6 +46,10 @@ import type { PulseBusinessCase } from '@/lib/services/clima/PulseEngine';
 
 const round1 = (x: number) => Math.round(x * 10) / 10;
 
+// Versión del catálogo de intervenciones vigente (hoy en código = 1). Cuando Capa 0
+// migre a BD (Gate 6), la fila trae su propia `version`. Ver §5D-x / §6①.
+const CATALOG_VERSION = 1;
+
 // ── Derivados Code-owned (no narrativa): responsable + plazo por severidad ──
 const RESPONSIBLE_BY_ZONE: Record<RiskZone, string> = {
   roja: 'CEO',
@@ -158,6 +162,19 @@ export function buildDeptClimaDecisions(
       selectedReactive = selection.selectedReactive;
     }
 
+    // Procedencia (§5D-x, Camino B): clave de celda del catálogo de la que salió la
+    // decisión + versión. La sistémica se identifica por su propia clave (dimension:
+    // sistemica), NO por el reactivo-palanca (que es solo referencia narrativa).
+    const templateId = isSystemic
+      ? `${driver.category}:sistemica:∅`
+      : `${driver.category}:${zone}:${selectedReactive ?? '∅'}`;
+
+    // Clon defensivo (§3): la celda del diccionario (o su spread shallow sistémico) alias
+    // `steps`/`suggestedProduct` por referencia al módulo. Cachear el catálogo (Gate 6)
+    // volvería el aliasing cross-cliente. Clonar acá cubre las 3 ramas de una sola vez y
+    // sobrevive a la migración a BD. structuredClone: Node ≥18 (engines). Output byte-idéntico.
+    const cloned = structuredClone(cell);
+
     const validationMetric = isSystemic
       ? `Reducir los reactivos de ${driver.category} bajo umbral (${belowTier.length}/${measured.length}) en el próximo Seguimiento Focalizado`
       : `Mean de ${palanca.reactive} ≥ ${reactiveMeanTarget(palanca.reactive)} en el próximo Seguimiento Focalizado`;
@@ -166,8 +183,8 @@ export function buildDeptClimaDecisions(
     // la celda base/sistémica (string) no los tiene. suggestedProduct fluye tal cual
     // (string | SuggestedProduct) — el dispatcher lo resuelve en 5D.
     const variantFields =
-      'esfuerzo' in cell
-        ? { esfuerzo: cell.esfuerzo, efectividad: cell.efectividad }
+      'esfuerzo' in cloned
+        ? { esfuerzo: cloned.esfuerzo, efectividad: cloned.efectividad }
         : {};
 
     items.push({
@@ -178,12 +195,13 @@ export function buildDeptClimaDecisions(
       favorability: driver.fav, // contexto de dimensión (referencia)
       gap: driver.gap,
       impact: driver.impact,
+      templateRef: { id: templateId, version: CATALOG_VERSION },
       intervention: {
         level: zone,
         levelLabel: SEVERITY_LABEL_BY_ZONE[zone],
-        narrative: cell.narrative,
-        steps: cell.steps,
-        suggestedProduct: cell.suggestedProduct,
+        narrative: cloned.narrative,
+        steps: cloned.steps,
+        suggestedProduct: cloned.suggestedProduct,
         ...variantFields,
         businessCase: findBusinessCase(driver.category, input.businessCases),
       },

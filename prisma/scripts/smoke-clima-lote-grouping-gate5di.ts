@@ -30,6 +30,7 @@ function item(p: {
     favorability: 60,
     gap: -15,
     impact: 0.4,
+    templateRef: { id: `${p.category}:${zone}:${p.reactive ?? '∅'}`, version: 1 },
     intervention: {
       level: zone,
       levelLabel: 'Atención',

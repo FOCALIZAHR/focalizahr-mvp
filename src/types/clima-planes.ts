@@ -145,6 +145,21 @@ export interface ClimaDecisionIntervention {
 
 export type CeoDecision = 'aceptar' | 'modificar' | 'rechazar';
 
+/**
+ * Procedencia de la decisión: de qué celda del catálogo de intervenciones salió y de
+ * qué versión. Se estampa al CONSTRUIR (builder), no se edita. Habilita Fase 2
+ * ("¿la v3 de comunicacion/amarilla/feedback rindió mejor que la v2?" — un booleano no
+ * lo permite). Necesario AHORA porque los planes aprobados son inmutables: sin esto, un
+ * plan aprobado antes de la migración a BD queda sin procedencia para siempre.
+ * Ver GATE0_CAPA0_CONTENIDO_EDITABLE_CLIMA_PROPUESTA.md §2 (Camino B) + §5D-x.
+ */
+export interface ClimaTemplateRef {
+  /** Clave de celda del catálogo `${dimension}:${zone}:${reactivo ?? '∅'}` (sistémica: zone='sistemica'). Mapea 1:1 al futuro @@unique([dimension,zone,reactivo]). */
+  id: string;
+  /** Versión del catálogo de la que salió (el catálogo en código = 1). */
+  version: number;
+}
+
 export interface ClimaDecisionItem {
   /** Id estable de la decisión dentro del plan: `clima:${departmentId}:${category}`. */
   triggerRef: string;
@@ -172,6 +187,14 @@ export interface ClimaDecisionItem {
   isSystemic: boolean;
   ceoDecision?: CeoDecision; // decisión humana en 5D (undefined = pendiente)
   ceoNotes?: string;
+  /** Procedencia: celda + versión del catálogo de la que salió. Estampado por el builder. */
+  templateRef: ClimaTemplateRef;
+  /**
+   * Campos del template que el cliente sobrescribió (p.ej. ['narrative','steps']). Hoy
+   * Clima NO edita el texto del template (solo `ceoNotes`, campo aparte) → queda ausente.
+   * Reservado para edición libre estilo Compliance si algún día se habilita.
+   */
+  templateEdited?: string[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
