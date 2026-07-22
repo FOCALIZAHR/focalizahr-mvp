@@ -35,7 +35,9 @@ export interface OnClimaPlanApprovedResult {
   remindersEnqueued: number;
 }
 
-function isAccepted(item: ClimaDecisionItem): boolean {
+// Exportada para regresión (smoke): SOLO 'aceptar'/'modificar' generan ClimaActionLog +
+// recordatorio. 'rechazar' y 'pospuesto' (Ruta B1) quedan fuera — sin log, sin recordatorio.
+export function isAccepted(item: ClimaDecisionItem): boolean {
   return item.ceoDecision === 'aceptar' || item.ceoDecision === 'modificar';
 }
 

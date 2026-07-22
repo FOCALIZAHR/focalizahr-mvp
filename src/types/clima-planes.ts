@@ -143,7 +143,11 @@ export interface ClimaDecisionIntervention {
   businessCase: PulseBusinessCase | null;
 }
 
-export type CeoDecision = 'aceptar' | 'modificar' | 'rechazar';
+// 'pospuesto' (Ruta B1): "No ahora" del lote (Bloque 3). Cuenta como DECIDIDO (gate +
+// remaining) pero NO genera ClimaActionLog ni recordatorio (igual que 'rechazar' —
+// isAccepted solo acepta aceptar/modificar). Distinguible de 'rechazar' en el snapshot
+// para reporting. Ruta B2 (medible en Tab 3, con schema) diferida a GROUP C.
+export type CeoDecision = 'aceptar' | 'modificar' | 'rechazar' | 'pospuesto';
 
 /**
  * Procedencia de la decisión: de qué celda del catálogo de intervenciones salió y de

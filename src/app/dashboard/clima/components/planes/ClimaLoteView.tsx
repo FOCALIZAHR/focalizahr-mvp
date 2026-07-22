@@ -18,14 +18,14 @@ interface ClimaLoteViewProps {
   readOnly?: boolean;
   /** Error de la última aprobación en lote — nunca se falla en silencio. */
   errorMsg?: string | null;
-  onAcceptBatch: (triggerRefs: string[]) => void;
+  onBatchDecision: (triggerRefs: string[], decision: 'aceptar' | 'pospuesto') => void;
 }
 
 export default function ClimaLoteView({
   items,
   readOnly = false,
   errorMsg = null,
-  onAcceptBatch,
+  onBatchDecision,
 }: ClimaLoteViewProps) {
   const subBatches = groupLoteByReactive(items);
 
@@ -63,7 +63,7 @@ export default function ClimaLoteView({
           items={b.items}
           reactive={b.reactive}
           readOnly={readOnly}
-          onAcceptBatch={onAcceptBatch}
+          onBatchDecision={onBatchDecision}
         />
       ))}
     </div>

@@ -28,7 +28,10 @@ import { dimensionLabel } from '@/lib/constants/climaDimensions';
 import { classifyDecisionBlock } from '@/lib/services/clima/climaPlanRouting';
 import type { ClimaDecisionItem, CeoDecision } from '@/types/clima-planes';
 
-const DECISION_LABELS: Record<CeoDecision, string> = {
+// Decisiones ofrecidas como botón en las cards individuales (Sistémico/Crítico/Genérico).
+// 'pospuesto' NO va acá: es exclusivo del lote (Bloque 3), vía el botón "No ahora".
+const INDIVIDUAL_DECISIONS = ['aceptar', 'modificar', 'rechazar'] as const;
+const DECISION_LABELS: Record<(typeof INDIVIDUAL_DECISIONS)[number], string> = {
   aceptar: 'Aceptar',
   modificar: 'Modificar',
   rechazar: 'Rechazar',
@@ -237,7 +240,7 @@ export default function ClimaDecisionCard({
               <Check className="w-3.5 h-3.5" /> Guardado
             </motion.span>
           )}
-          {(Object.keys(DECISION_LABELS) as CeoDecision[]).map((d) => {
+          {INDIVIDUAL_DECISIONS.map((d) => {
             const active = item.ceoDecision === d;
             return (
               <button

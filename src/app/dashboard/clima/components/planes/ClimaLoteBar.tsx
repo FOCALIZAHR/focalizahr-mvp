@@ -22,20 +22,28 @@ interface ClimaLoteBarProps {
   /** Reactivo común del sub-batch (título/trazabilidad). null = sin reactivo nombrado. */
   reactive?: string | null;
   readOnly?: boolean;
-  onAcceptBatch: (triggerRefs: string[]) => void;
+  onBatchDecision: (triggerRefs: string[], decision: 'aceptar' | 'pospuesto') => void;
 }
 
 export default function ClimaLoteBar({
   items,
   reactive,
   readOnly = false,
-  onAcceptBatch,
+  onBatchDecision,
 }: ClimaLoteBarProps) {
   const [confirming, setConfirming] = useState(false);
   if (items.length === 0) return null;
 
-  const pending = items.filter((i) => i.ceoDecision !== 'aceptar');
-  const allAccepted = pending.length === 0;
+  const undecided = items.filter((i) => !i.ceoDecision);
+  const resolved = undecided.length === 0;
+  // Los batch actions son uniformes → el sub-batch entero queda 'aceptar' o 'pospuesto'.
+  const stateLabel = !resolved
+    ? null
+    : items.every((i) => i.ceoDecision === 'aceptar')
+      ? 'Aprobado'
+      : items.every((i) => i.ceoDecision === 'pospuesto')
+        ? 'Pospuesto'
+        : 'Resuelto';
   // La acción es idéntica en todo el sub-batch (agrupado por reactivo×zona → misma
   // celda variante) → un representante alcanza para mostrar qué se va a aplicar.
   const preview = items[0]?.intervention ?? null;
@@ -58,9 +66,9 @@ export default function ClimaLoteBar({
           </div>
         </div>
 
-        {!readOnly && !allAccepted && (
+        {!readOnly && !resolved && (
           // Reposo: sin verbo de decisión — solo abre/cierra el detalle (mismo patrón de
-          // 2 pasos que los otros 3 bloques). La aprobación vive UNA sola vez, al pie.
+          // 2 pasos que los otros 3 bloques). La decisión vive UNA sola vez, al pie.
           <GhostButton
             size="sm"
             icon={confirming ? ChevronUp : ChevronDown}
@@ -70,8 +78,14 @@ export default function ClimaLoteBar({
             Revisar plan
           </GhostButton>
         )}
-        {allAccepted && (
-          <span className="text-[11px] font-light text-emerald-300/80">Aceptado</span>
+        {resolved && (
+          <span
+            className={`text-[11px] font-light ${
+              stateLabel === 'Aprobado' ? 'text-emerald-300/80' : 'text-slate-400/80'
+            }`}
+          >
+            {stateLabel}
+          </span>
         )}
       </div>
 
@@ -110,26 +124,37 @@ export default function ClimaLoteBar({
                 </div>
               )}
               <p className="text-[11px] font-light text-slate-400 mb-2">
-                Se aplicará a {pending.length} equipo{pending.length !== 1 ? 's' : ''}:
+                Se aplicará a {undecided.length} equipo{undecided.length !== 1 ? 's' : ''}:
               </p>
               <ul className="space-y-1 mb-4 max-h-40 overflow-y-auto">
-                {pending.map((i) => (
+                {undecided.map((i) => (
                   <li key={i.triggerRef} className="text-[12px] font-light text-slate-500">
                     · {i.departmentName ?? 'Departamento'}
                   </li>
                 ))}
               </ul>
-              {/* Un solo CTA que aprueba y despacha. Cerrar sin aprobar = colapsar el
-                  panel (toggle "Revisar plan") — no necesita botón dedicado. */}
-              <PrimaryButton
-                size="sm"
-                onClick={() => {
-                  onAcceptBatch(pending.map((i) => i.triggerRef));
-                  setConfirming(false);
-                }}
-              >
-                Aprobar {pending.length}
-              </PrimaryButton>
+              {/* "Aprobar" despacha; "No ahora" pospone (no genera acción — se revisa en otro
+                  ciclo, distinguible de rechazar en el snapshot). Cerrar sin decidir = colapsar. */}
+              <div className="flex items-center gap-2">
+                <PrimaryButton
+                  size="sm"
+                  onClick={() => {
+                    onBatchDecision(undecided.map((i) => i.triggerRef), 'aceptar');
+                    setConfirming(false);
+                  }}
+                >
+                  Aprobar {undecided.length}
+                </PrimaryButton>
+                <GhostButton
+                  size="sm"
+                  onClick={() => {
+                    onBatchDecision(undecided.map((i) => i.triggerRef), 'pospuesto');
+                    setConfirming(false);
+                  }}
+                >
+                  No ahora
+                </GhostButton>
+              </div>
             </div>
           </motion.div>
         )}

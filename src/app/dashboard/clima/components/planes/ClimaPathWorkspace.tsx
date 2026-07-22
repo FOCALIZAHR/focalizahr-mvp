@@ -77,7 +77,7 @@ interface ClimaPathWorkspaceProps {
   items: ClimaDecisionItem[];
   readOnly?: boolean;
   onDecision: (triggerRef: string, decision: CeoDecision) => Promise<PersistResult>;
-  onAcceptBatch: (triggerRefs: string[]) => void;
+  onBatchDecision: (triggerRefs: string[], decision: 'aceptar' | 'pospuesto') => void;
   /** Error de la última aprobación en lote (se muestra en la vista de lote). */
   batchError?: string | null;
   onBackToCarousel: () => void;
@@ -94,7 +94,7 @@ export default function ClimaPathWorkspace({
   items,
   readOnly = false,
   onDecision,
-  onAcceptBatch,
+  onBatchDecision,
   batchError = null,
   onBackToCarousel,
   remaining,
@@ -185,7 +185,7 @@ export default function ClimaPathWorkspace({
                 items={items}
                 readOnly={readOnly}
                 errorMsg={batchError}
-                onAcceptBatch={onAcceptBatch}
+                onBatchDecision={onBatchDecision}
               />
             </>
           ) : sub === 'intro' ? (

@@ -212,13 +212,15 @@ export default function ClimaPlanDeptTab({ campaignId, onViewChange }: ClimaPlan
     [decisiones, persist]
   );
 
-  const handleAcceptBatch = useCallback(
-    async (triggerRefs: string[]) => {
+  // Lote (Bloque 3): aprueba ('aceptar') o pospone ('pospuesto') un sub-batch entero en
+  // un autosave atómico. 'pospuesto' cuenta como decidido (gate) pero no genera log/recordatorio.
+  const handleBatchDecision = useCallback(
+    async (triggerRefs: string[], decision: 'aceptar' | 'pospuesto') => {
       const set = new Set(triggerRefs);
       setBatchError(null);
       const res = await persist(
         decisiones.map((d) =>
-          set.has(d.triggerRef) ? { ...d, ceoDecision: 'aceptar' as CeoDecision } : d
+          set.has(d.triggerRef) ? { ...d, ceoDecision: decision } : d
         )
       );
       if (!res.ok) setBatchError(res.error);
@@ -346,7 +348,7 @@ export default function ClimaPlanDeptTab({ campaignId, onViewChange }: ClimaPlan
             items={groups[selectedPath]}
             readOnly={readOnly}
             onDecision={handleDecision}
-            onAcceptBatch={handleAcceptBatch}
+            onBatchDecision={handleBatchDecision}
             batchError={batchError}
             onBackToCarousel={() => setSelectedPath(null)}
             remaining={remaining}
