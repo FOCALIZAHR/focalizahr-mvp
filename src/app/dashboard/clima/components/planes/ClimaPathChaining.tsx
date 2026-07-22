@@ -67,12 +67,13 @@ export default function ClimaPathChaining({
       </p>
 
       {caseCount > 0 && (
-        <button
-          onClick={onReview}
-          className="mt-3 flex items-center gap-1.5 text-[11px] font-light text-slate-500 hover:text-slate-300 transition-colors"
-        >
-          <Eye className="w-3 h-3" /> Revisar lo decidido
-        </button>
+        // Auditar lo recien decidido es una accion de primer nivel en esta pantalla:
+        // boton real (Opcion A), no un micro-link gris que se pierde.
+        <div className="mt-5">
+          <SecondaryButton size="sm" icon={Eye} onClick={onReview}>
+            Revisar lo decidido
+          </SecondaryButton>
+        </div>
       )}
 
       {remaining.length > 0 && (
