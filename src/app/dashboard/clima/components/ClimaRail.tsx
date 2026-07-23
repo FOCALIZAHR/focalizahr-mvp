@@ -50,8 +50,8 @@ export default function ClimaRail({
       initial={false}
       animate={{
         height: isExpanded ? 320 : 50,
-        backgroundColor: isExpanded ? 'rgba(15, 23, 42, 0.95)' : 'transparent',
-        borderColor: isExpanded ? 'rgba(255,255,255,0.05)' : 'transparent',
+        backgroundColor: isExpanded ? 'rgba(15, 23, 42, 0.95)' : 'rgba(15, 23, 42, 0)',
+        borderColor: isExpanded ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0)',
       }}
       transition={{ type: 'spring', stiffness: 250, damping: 30 }}
     >
