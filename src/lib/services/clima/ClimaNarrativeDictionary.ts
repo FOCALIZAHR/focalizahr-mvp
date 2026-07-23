@@ -27,13 +27,13 @@ import type { RiskZone } from '@/lib/services/clima/climaThresholds';
 
 export const PORTADA_BY_ZONE: Record<RiskZone, string> = {
   roja:
-    'Tu organización opera al {n}%. No es solo un número — es lo que tu gente está viviendo hoy.',
+    'Tu organización opera al {n}%. No es solo un número. Es lo que tu gente está viviendo hoy.',
   naranja:
-    'Tu organización opera al {n}%, bajo el estándar. No es solo un número — es lo que tu gente está viviendo hoy.',
+    'Tu organización opera al {n}%, bajo el estándar. No es solo un número. Es lo que tu gente está viviendo hoy.',
   amarilla:
-    'Tu organización opera al {n}%, a {gap} puntos de tu objetivo. No es solo un número — es lo que tu gente está viviendo hoy.',
+    'Tu organización opera al {n}%, a {gap} puntos de tu objetivo. No es solo un número. Es lo que tu gente está viviendo hoy.',
   verde:
-    'Tu organización opera al {n}%. No es solo un número — es lo que tu gente está viviendo hoy.',
+    'Tu organización opera al {n}%. No es solo un número. Es lo que tu gente está viviendo hoy.',
 };
 
 export const PORTADA_CTA = 'Ver evidencia →';
