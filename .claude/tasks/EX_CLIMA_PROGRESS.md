@@ -773,3 +773,36 @@ excluidos + denominador correcto, fallback tier, no-dispara-si-sano, momentum de
 Cableado de BD (2 campos ClimaAggregationService) cubierto por tsc; cierre real NO corrido (sería
 escritura a prod → se confirmaría con Victor). **Diferido:** riskZone fav (fuera de scope), recalibrar
 −0.3/−0.7 con datos reales, orden UI sistémicos (5D). **Commits:** implementación + sello separados, sin pushear.
+
+---
+
+## Gate 5D-i — Empty-state "Sin focos" (Tab 1) + CAS de aprobación · 2026-07-23
+
+Dos entregables sobre el flujo de Planes de Acción de clima. **Commits (locales, sin pushear):**
+`545d5a0` CAS aprobación · `4ad3302` empty-state v1 · `1cc16ab` layout fix + línea de fortaleza (copy scope-safe incluido por amend).
+
+### 1. CAS atómico en aprobación de ActionPlan (TOCTOU) — `545d5a0`
+`PUT /api/action-plans/[planId]` hacía read-check-write NO atómico (findFirst + guard `estado==='aprobado'` :127, luego `update` con WHERE solo `{id}`). 2 requests casi simultáneas (2 pestañas / doble-clic / refresh+reintento) podían superar el guard y ambas escribir.
+- **Fix:** `update` → `updateMany` compare-and-swap con `where:{ id, accountId, estado:{not:'aprobado'} }`; `count===0` → **409**; `findFirstOrThrow` re-lee para respuesta+hook; `justApproved` sobre `res.count===1` → el hook `onClimaPlanApproved` corre 1 sola vez. Cierra también la ventana donde un autosave de `decisiones` mutaba un plan recién aprobado por otra sesión (el guard :127 sigue intacto para el 403 secuencial).
+- **Peor caso real:** NO era doble `ClimaActionLog`/`CommunicationMessage` (ya protegidos por `@@unique` + `skipDuplicates`); era desincronización `decisiones` (JSONB) ↔ logs materializados (Caso 2, severidad media).
+- **Evidencia:** smoke `smoke-clima-actionplan-cas.ts` **24/24** (handler PUT REAL + cuenta sintética, cleanup por accountId): Caso 1a concurrencia real (`Promise.all` → 1×200 + otro rechazado), Caso 1b path 409 CAS determinista (perdedor NO corre hook, logs siguen en 3), Caso 2 autosave vs aprobación (→409, decisiones intactas), Caso 3 regresión + re-aprobar 403. tsc+build limpios. Smoke untracked.
+
+### 2. Empty-state "Sin focos de acción" (Tab 1, `!hasAnyContent`) — `4ad3302` + `1cc16ab`
+Reemplaza el `FHREmptyState` genérico por una Portada positiva `ClimaSinFocosState` **solo** en el caso `decisiones=0 && sinDatos=0`; el componente compartido queda intacto (lo usan Metas `GoalAlertsPopover` y Vitals).
+- **Trigger:** `ClimaPlanDeptTab.tsx:309` `!hasAnyContent` (decisiones=0 **Y** sinDatos=0), scope-relativo por RBAC. Es AND: `sinDatos>0` → flujo normal (deptos "sin datos"); `decisiones>0` → carrusel.
+- **Layout (fix `1cc16ab`):** la v1 armó card propia + Tesla line = card-in-card dentro del shell (`ClimaPlanesView` no-bare) → columna angosta + scroll. Fix Opción A: contenido directo en la card del shell (patrón `ClimaPathCarousel`), padding `py-6/8`, panel `max-w-xl`. NO se tocó la lógica de `view` (top bar Volver/tabs se mantiene).
+- **Línea de fortaleza (reconocimiento cualitativo, SIN cifra):** `generate` devuelve `topStrength` de scope = la de mayor `priority` entre deptos visibles (métrica de `pickTopDrivers`, sin fetch nuevo ni schema — las filas ya venían con `include`). Label vía `dimensionLabel()` (`climaDimensions.ts`), nunca la key cruda.
+  - **Desempate determinista:** `priority` desc → `dimension` asc → `departmentName` asc (`localeCompare`).
+  - **Transversal vs destaque:** set de deptos con esa dimensión == set completo visible → transversal, copy scope-safe **"— transversal en todos los equipos medidos"** (sin nombre); subconjunto propio + scope>1 → **"— {depto}"**; scope=1 → solo la dimensión.
+  - **null** (ningún driver de alto impacto sobre su vara — caso real frecuente: sano sin standout) → fallback a 2 bullets genéricos, nunca se fabrica fortaleza.
+- **Reglas visuales:** anti-semáforo (emerald solo en el ícono `ShieldCheck`, card neutra); Regla del "O" (cero cifras — la favorabilidad vive en el gauge del Lobby); Lucide real (`ShieldCheck`, `Zap`), sin emoji. CTA único "Volver al Lobby" reutiliza `onExitToLobby` (= `hook.exitSubproducto`, misma salida del Checkout).
+- **Evidencia:** tsc+build EXIT 0. Layout + línea **verificados en pantalla por Victor**. Salida real de `generate` sobre la demo: Campaña A → `{dimension:"liderazgo", departmentName:null, transversal:true}`. Path null (fallback) verificado por código, no presente visualmente en la demo.
+
+### Cuenta demo PERSISTENTE (verificación — escritura a prod, NO limpiar sin avisar)
+Creada vía flujo REAL (submit handler + `ClimaAggregationService` + generate), 2 campañas Experiencia Full, deptos separados por campaña (evita colisión de clave de insight):
+- **adminEmail:** `demo-emptystates-5di@fixture.local` · **password:** `Demo5Di2026!` · **accountId:** `cmrx7lkg800009ay7zrbwmwac`
+- **Campaña A** (empty-state, todo sano): `cmrx7ll3200029ay7s89tiuyn` → `/dashboard/clima?campaignId=…` → Rail "Planes de Acción" → tab "Por departamento".
+- **Campaña B** (mixto: focos→carrusel; lote `gestion_corriente`=0 y bloque `generico`=0 vacíos de forma natural): `cmrx7psja01fe9ay72qxrinkz`.
+- Regenerable idempotente: `prisma/scripts/seed-clima-empty-states-demo.ts` (untracked; borra+recrea la cuenta). **NO tocar** `cmruvpmzx…` (aprobado real) ni `cmrq30aue…` (borrador Corp Enterprise).
+
+**Próximo paso:** push (Victor). Empty-states #3 (lote vacío) y #4 (bloque genérico) confirmados alcanzables por data en Campaña B, pero SIN diseño dedicado aún — hoy son la card deshabilitada del carrusel.
