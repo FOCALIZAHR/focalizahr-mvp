@@ -16,7 +16,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
-import { FHREmptyState } from '@/components/ui/FHREmptyState';
 import {
   groupDecisionsByBlock,
   type ClimaPlanBlock,
@@ -27,6 +26,7 @@ import ClimaPlanPortada from './ClimaPlanPortada';
 import ClimaPathCarousel from './ClimaPathCarousel';
 import ClimaPathWorkspace from './ClimaPathWorkspace';
 import ClimaCheckout from './ClimaCheckout';
+import ClimaSinFocosState from './ClimaSinFocosState';
 import type { BlockStatus } from './ClimaPathChaining';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' } as const;
@@ -308,13 +308,7 @@ export default function ClimaPlanDeptTab({
 
   const hasAnyContent = decisiones.length > 0 || sinDatos.length > 0;
   if (!hasAnyContent) {
-    return (
-      <FHREmptyState
-        type="clear"
-        title="Sin focos de acción"
-        description="Ningún reactivo de esta campaña cayó bajo su umbral. No hay decisiones de plan que tomar."
-      />
-    );
+    return <ClimaSinFocosState onExitToLobby={onExitToLobby} />;
   }
 
   return (
