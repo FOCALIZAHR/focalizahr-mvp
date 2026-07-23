@@ -206,6 +206,7 @@ export default function ClimaPathWorkspace({
                 blockStatuses={blockStatuses}
                 canApprove={canApprove}
                 saving={saving}
+                readOnly={readOnly}
                 onApprove={onApprove}
                 onGoToPath={onGoToPath}
                 onReview={() => setSub('reviewAll')}
@@ -278,6 +279,7 @@ export default function ClimaPathWorkspace({
               blockStatuses={blockStatuses}
               canApprove={canApprove}
               saving={saving}
+              readOnly={readOnly}
               onApprove={onApprove}
               onGoToPath={onGoToPath}
               onReview={() => setSub('reviewAll')}

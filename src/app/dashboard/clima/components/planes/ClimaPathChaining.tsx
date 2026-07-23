@@ -44,6 +44,8 @@ interface ClimaPathChainingProps {
   /** true = todas las decisiones del plan están tomadas (gate duro cumplido). */
   canApprove: boolean;
   saving: boolean;
+  /** true = plan aprobado (inmutable): oculta el CTA de aprobar y muestra "Plan aprobado". */
+  readOnly?: boolean;
   onApprove: () => void;
   onGoToPath: (block: ClimaPlanBlock) => void;
   /** Abre la vista de auditoría de este bloque (lo ya decidido). */
@@ -98,6 +100,7 @@ export default function ClimaPathChaining({
   blockStatuses,
   canApprove,
   saving,
+  readOnly = false,
   onApprove,
   onGoToPath,
   onReview,
@@ -181,7 +184,13 @@ export default function ClimaPathChaining({
       {/* 3 · Un solo CTA dominante (Smart Road). Con pendientes: continuar al de mayor
              prioridad (nombre REAL). Sin pendientes: aprobar el plan. */}
       <div className="mt-8">
-        {nextPending ? (
+        {readOnly ? (
+          // Plan aprobado (inmutable): sin CTA colgado. Mismo patrón que ClimaPathCarousel:63-65.
+          // Arregla el staleness del boton "Aprobar plan" tras aprobar en el propio bloque.
+          <span className="flex items-center gap-2 text-sm font-light text-cyan-300/80">
+            <CheckCircle2 className="w-4 h-4" /> Plan aprobado
+          </span>
+        ) : nextPending ? (
           <SmartRoadCTA
             eyebrow="Continuar"
             main={`${CLIMA_PLAN_PATHS[nextPending.block].label} · ${nextPending.pending} pendiente${
