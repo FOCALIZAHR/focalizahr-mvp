@@ -150,7 +150,7 @@ export default function ClimaLoteBar({
                       setConfirming(false);
                     }}
                   >
-                    Aprobar {teamList.length}
+                    Aprobar para {teamList.length} equipo{teamList.length !== 1 ? 's' : ''}
                   </PrimaryButton>
                   <GhostButton
                     size="sm"
