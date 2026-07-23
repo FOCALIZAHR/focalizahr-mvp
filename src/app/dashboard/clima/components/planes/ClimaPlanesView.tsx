@@ -102,7 +102,11 @@ export default function ClimaPlanesView({ campaignId, onBack }: ClimaPlanesViewP
 
           {/* Cuerpo del tab */}
           {tab === 'departamento' ? (
-            <ClimaPlanDeptTab campaignId={campaignId} onViewChange={setDeptView} />
+            <ClimaPlanDeptTab
+              campaignId={campaignId}
+              onViewChange={setDeptView}
+              onExitToLobby={onBack}
+            />
           ) : (
             <FHREmptyState
               type="pending"

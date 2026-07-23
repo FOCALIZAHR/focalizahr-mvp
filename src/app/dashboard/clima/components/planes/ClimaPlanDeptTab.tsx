@@ -26,6 +26,7 @@ import type { ClimaDecisionItem, CeoDecision } from '@/types/clima-planes';
 import ClimaPlanPortada from './ClimaPlanPortada';
 import ClimaPathCarousel from './ClimaPathCarousel';
 import ClimaPathWorkspace from './ClimaPathWorkspace';
+import ClimaCheckout from './ClimaCheckout';
 import type { BlockStatus } from './ClimaPathChaining';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' } as const;
@@ -57,9 +58,16 @@ interface ClimaPlanDeptTabProps {
   campaignId: string | null;
   /** Reporta la vista interna al shell (para que oculte sus tabs fuera del carrusel). */
   onViewChange?: (view: ClimaPlanDeptView) => void;
+  /** Salida al Lobby (gauge + Zona Crítica). = `hook.exitSubproducto` del orquestador,
+   *  el mismo destino que el "Volver" del breadcrumb. Lo usa el CTA del Checkout. */
+  onExitToLobby?: () => void;
 }
 
-export default function ClimaPlanDeptTab({ campaignId, onViewChange }: ClimaPlanDeptTabProps) {
+export default function ClimaPlanDeptTab({
+  campaignId,
+  onViewChange,
+  onExitToLobby,
+}: ClimaPlanDeptTabProps) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const [decisiones, setDecisiones] = useState<ClimaDecisionItem[]>([]);
@@ -70,6 +78,8 @@ export default function ClimaPlanDeptTab({ campaignId, onViewChange }: ClimaPlan
   const [batchError, setBatchError] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<ClimaPlanBlock | null>(null);
   const [entered, setEntered] = useState(false);
+  // Acto 4 (Checkout Ejecutivo): se abre al aprobar el plan; su CTA vuelve al carrusel.
+  const [showCheckout, setShowCheckout] = useState(false);
 
   const readOnly = estado === 'aprobado';
 
@@ -238,7 +248,10 @@ export default function ClimaPlanDeptTab({ campaignId, onViewChange }: ClimaPlan
         body: JSON.stringify({ estado: 'aprobado' }),
       });
       const json = await res.json();
-      if (json.success) setEstado('aprobado');
+      if (json.success) {
+        setEstado('aprobado');
+        setShowCheckout(true); // Acto 4: Checkout Ejecutivo
+      }
     } catch {
       /* noop */
     } finally {
@@ -305,6 +318,7 @@ export default function ClimaPlanDeptTab({ campaignId, onViewChange }: ClimaPlan
   }
 
   return (
+    <>
     <AnimatePresence mode="wait">
       {!entered && decisiones.length > 0 ? (
         <motion.div
@@ -361,5 +375,17 @@ export default function ClimaPlanDeptTab({ campaignId, onViewChange }: ClimaPlan
         </motion.div>
       )}
     </AnimatePresence>
+
+    <ClimaCheckout
+      open={showCheckout}
+      decisiones={decisiones}
+      onExit={() => {
+        setShowCheckout(false);
+        // El plan quedó 100% aprobado (read-only): volver al carrusel sería un callejón.
+        // El destino real es el Lobby (gauge + Zona Crítica) vía exitSubproducto.
+        onExitToLobby?.();
+      }}
+    />
+    </>
   );
 }
