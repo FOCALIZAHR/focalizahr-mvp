@@ -160,16 +160,47 @@ export async function PUT(request: NextRequest, ctx: RouteContext) {
       }
     }
 
-    const updated = await prisma.actionPlan.update({
-      where: { id: planId },
+    // ── Escritura condicional (compare-and-swap atómico) ──
+    // El guard :127 y esta escritura NO eran atómicos entre sí: dos requests
+    // concurrentes (2 pestañas, doble clic, refresh+reintento) podían superar el
+    // check con estado='borrador' y ambos escribir. Reincluir estado:{not:'aprobado'}
+    // en el WHERE hace que Postgres resuelva la carrera a nivel de fila — solo UNA
+    // request muta el plan; la que pierde obtiene count=0 → 409. Cierra también la
+    // ventana donde un autosave de `decisiones` mutaba un plan recién aprobado por
+    // otra sesión (violando la inmutabilidad del :127).
+    const res = await prisma.actionPlan.updateMany({
+      where: {
+        id: planId,
+        accountId: userContext.accountId,
+        estado: { not: 'aprobado' },
+      },
       data,
+    });
+    if (res.count === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Plan ya fue aprobado por otra sesión. Recargá para ver el estado actual.',
+        },
+        { status: 409 }
+      );
+    }
+
+    // updateMany no devuelve el registro; re-leemos para la respuesta y el hook.
+    const updated = await prisma.actionPlan.findFirstOrThrow({
+      where: { id: planId, accountId: userContext.accountId },
     });
 
     // ── Gate 5C: al aprobar un plan de clima, crear los ClimaActionLog (eager) y
     //    encolar el recordatorio único por depto. Degrade-safe: un fallo acá NO
     //    revierte la aprobación (el plan ya quedó aprobado e inmutable).
+    // justApproved se recalcula sobre res.count===1: garantiza que ESTA request hizo
+    // la transición (no otra que ganó la carrera), así el hook corre exactamente una vez.
     const justApproved =
-      body.estado === 'aprobado' && existing.estado !== 'aprobado';
+      body.estado === 'aprobado' &&
+      existing.estado !== 'aprobado' &&
+      res.count === 1;
     if (justApproved && existing.moduleType === 'clima') {
       try {
         await ClimaActionLogService.onClimaPlanApproved({
