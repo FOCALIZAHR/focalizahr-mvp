@@ -300,6 +300,17 @@ la BD única de producción). Costo B1 ≈ ~20 LOC (union + `DECISION_LABELS` + 
    no existe `ClimaPlanTrackingTab.tsx` ni endpoint de tracking. Decidir si se sella
    "5D-i sin Tab 3" o se construye antes.
 
+   > **Caso de referencia real para el alcance de Tab 3 (Victor, 2026-07-22):**
+   > GATE4_LOBBY_DEMO es **Pulso Express, no Experiencia Full**. Por eso sus
+   > `ClimaActionLog` (los 17 del plan aprobado `cmruvpmzx…` + los que genere la prueba
+   > de hoy) **nunca recibirán veredicto de Tab 3 a través de ESTA misma campaña**:
+   > `ActionEffectivenessService.evaluateOnFollowUpClose` corre al cerrar un **Seguimiento
+   > Focalizado** (Experiencia Full, `isFollowUp`), midiendo el delta de mean de los mismos
+   > deptos. Un Pulso Express no dispara ese cierre. Para que estos logs se midan haría
+   > falta una **Experiencia Full futura sobre los mismos departamentos** actuando como
+   > Seguimiento. Dato a considerar al decidir el alcance de Tab 3 (qué tipos de campaña
+   > habilitan la matriz de efectividad).
+
 ### Deudas abiertas relacionadas (NO tocar sin decisión)
 
 | Qué | Dónde | Por qué no se tocó |
