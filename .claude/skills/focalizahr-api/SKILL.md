@@ -28,6 +28,14 @@ description: |
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 ```
 
+> ⚠️ **NUNCA escribir un array de roles a mano** (`const globalRoles = [...]`,
+> `const allowedRoles = [...]`, `['HR_ADMIN', 'HR_MANAGER'].includes(role)`), ni
+> siquiera para un endpoint pequeño o interno. Una auditoría de jul 2026 encontró
+> 14 casos de este patrón en el proyecto, 5 de ellos bugs de acceso reales
+> (roles con acceso incorrecto), causados por arrays clonados que quedaron
+> desactualizados frente a `permissions.ts`. Siempre importar `GLOBAL_ACCESS_ROLES`
+> o llamar `hasPermission()` — ver `references/anti-patterns.md`, Anti-Patrón 1.
+
 ---
 
 ## 📚 ARCHIVOS DE REFERENCIA
@@ -45,13 +53,23 @@ description: |
 ### Imports Obligatorios
 
 ```typescript
+// Para APIs (server-side, necesita Prisma vía AuthorizationService):
 import { 
   extractUserContext, 
   hasPermission,
   getChildDepartmentIds,
   GLOBAL_ACCESS_ROLES
 } from '@/lib/services/AuthorizationService'
+
+// Para componentes client-side (sin Prisma, RBAC puro):
+import { hasPermission, PERMISSIONS, GLOBAL_ACCESS_ROLES } from '@/lib/auth/permissions'
 ```
+
+> Desde jul 2026, `permissions.ts` (`src/lib/auth/permissions.ts`) es la fuente
+> RBAC pura, client-safe. `AuthorizationService.ts` la re-exporta completa para
+> APIs server-side — los imports existentes desde `AuthorizationService` siguen
+> funcionando sin cambios. Usar `permissions.ts` directo solo cuando el
+> consumidor es un client component que no puede cargar Prisma.
 
 ### Patrón API Estándar
 
@@ -167,6 +185,29 @@ if (hasGlobalAccess) {
 
 ---
 
+## 🔗 VÍNCULO Employee↔User — regla para código nuevo
+
+> **Ningún endpoint nuevo agrega `prisma.employee.findFirst({email: userEmail})`.**
+> Usar `userContext.employeeId` (extractUserContext). Si aún no existe el
+> vínculo o el usuario cae en el caso ejecutivo/holding sin Employee, manejar
+> el `null` explícito — no agregar otro lookup por email.
+
+`Employee` (nómina) y `User` (login) son tablas disjuntas sin FK. 35 sitios
+existentes resuelven "¿cuál es el Employee de este usuario?" buscando por email
+(`findFirst({accountId, email: userEmail, status:'ACTIVE'})`) — frágil, porque
+`User.email` y `Employee.email` pueden no coincidir y `Employee.email` es nullable
+y no único. El ejemplo de la **CAPA 3 (DIRECT REPORTS)** de arriba usa ese patrón
+legacy: es código canónico existente, no lo repliques en endpoints nuevos.
+
+**Estado: Etapa 1 no iniciada — no tratar como resuelto.** `userContext.employeeId`
+aún no está expuesto por `extractUserContext`; hasta que se selle la Etapa 1, un
+endpoint nuevo que necesite el Employee del usuario **detiene y consulta**, no
+agrega un lookup por email "mientras tanto".
+
+Detalle completo y etapas: `.claude/tasks/ARQUITECTURA_VINCULO_EMPLOYEE_USER_v1.md`.
+
+---
+
 ## 🚨 ANTI-PATRONES CRÍTICOS
 
 ```typescript
@@ -215,6 +256,8 @@ await prisma.model.findMany({ where, skip, take: 20 })
 ## 📖 DOCUMENTACIÓN COMPLETA
 
 Para casos complejos, consultar en Project Knowledge:
-- `GUIA_MAESTRA_RBAC_SEGURIDAD_FILTRADO_JERARQUICO_v1_2.md`
+- `GUIA_MAESTRA_RBAC_SEGURIDAD_FILTRADO_JERARQUICO_v1_3.md`
+- `DEUDA_RBAC_ARRAYS_HARDCODEADOS_v1.md`
 - `SEGURIDAD_APIS_QUICK_REFERENCE.md`
+- `src/lib/auth/permissions.ts`
 - `src/lib/services/AuthorizationService.ts`
