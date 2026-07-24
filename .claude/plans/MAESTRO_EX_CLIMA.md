@@ -1,12 +1,13 @@
 # MAESTRO: FocalizaHR EX — Inteligencia de Clima
 # Documento maestro ejecutable para Claude Code
 
-> **Versión:** 3.22 — 8 narrativas sistémicas por dimensión + fallback obligatorio (`SYSTEMIC_INTERVENTIONS`) SELLADO as-built
+> **Versión:** 3.23 — Gate 5D-i (Tab 1 · Planes de Acción) SELLADO — CAS de concurrencia + empty-state "Sin focos" + fix copy Portada; Tab 3 diferido a gate propio
 > **Fecha:** Julio 2026
-> **Estado:** En ejecución — Gates 1-4 ✅ (Gate 3 ALG5 costeo CORREGIDO) · Gate 4.5a + 4.5b (+ F) ✅ · **Gate 5A + 5B + 5C ✅ SELLADOS** · **Dynamic Impact Drivers ✅ SELLADO** · **Severidad/Trigger reactivo+mean ✅ SELLADO** (Cluster A + momentum reactivo + fix 5C + sistémico ≥50%) · **Bloque A sensibilidad-mean del gauge ✅ SELLADO** · **Capa 2 variantes (93 celdas) ✅ INTEGRADA** (dispatcher declarativo; META wiring pend. 5D Tab 2) · **Narrativas sistémicas (8 + fallback) ✅ SELLADO** · 5D siguiente · 4.5b-ii / D / E pendientes
+> **Estado:** En ejecución — Gates 1-4 ✅ (Gate 3 ALG5 costeo CORREGIDO) · Gate 4.5a + 4.5b (+ F) ✅ · **Gate 5A + 5B + 5C ✅ SELLADOS** · **Dynamic Impact Drivers ✅ SELLADO** · **Severidad/Trigger reactivo+mean ✅ SELLADO** (Cluster A + momentum reactivo + fix 5C + sistémico ≥50%) · **Bloque A sensibilidad-mean del gauge ✅ SELLADO** · **Capa 2 variantes (93 celdas) ✅ INTEGRADA** (dispatcher declarativo; META wiring pend. 5D Tab 2) · **Narrativas sistémicas (8 + fallback) ✅ SELLADO** · **Gate 5D-i (Tab 1) ✅ SELLADO** · 5D Tab 2 (POR PERSONA) + Tab 3 (Seguimiento → gate propio) pendientes · 4.5b-ii / D / E pendientes
 
 | Versión | Qué consolidó |
 |---|---|
+| v3.23 | **Gate 5D-i (Tab 1 · POR DEPARTAMENTO) SELLADO** (2026-07-23). Cierra la capa de decisión del plan por departamento. Incluye: **CAS de concurrencia** en la aprobación de ActionPlan (`updateMany` con guard de estado → 409, hook 1×; `545d5a0`); **empty-state "Sin focos de acción"** con fix de layout (card-in-card resuelto: el contenido va directo en la card del shell) y copy final alineado a tono FocalizaHR (`4ad3302`+`5a90794`+`6915ba2`); **fix de copy en la Portada de Cascada** (raya→coma en el gancho de las 4 zonas, impl + maestro §0.1; `b0eb170`+`075a716`). **Sin Tab 3 (Seguimiento):** diferido a gate propio, con caso real documentado (GATE4_LOBBY_DEMO es Pulso Express → nunca recibe veredicto de Tab 3 vía sí misma). Bordes verificados con evidencia real: 409 (código+smoke 24/24), 6 empty-states (código + #1 visto en pantalla), mobile 320px (dispositivo). Detalle en `EX_CLIMA_PROGRESS.md`; pendientes (UX "Plan aprobado" + demo) en `PENDIENTES_ACTIVOS_EX_CLIMA.md`. |
 | v3.22 | **8 narrativas sistémicas por dimensión + fallback obligatorio** SELLADO as-built (2026-07-20, `7e96821`, ancestro de `origin/main`). **Reemplaza la celda ÚNICA genérica** de `getSystemicIntervention` (v3.19 pieza 4: la MISMA frase para las 8 dimensiones) por **8 entradas específicas + 1 fallback genérico que conserva TAL CUAL el texto anterior** como red de seguridad (no se borra, se degrada a último recurso). **Tipo = TERCER shape `ClimaSystemicCell`** (`clima-planes.ts:100-104`: `narrative` + `steps: [string,string]` + `suggestedProduct: SuggestedProduct`) — necesario porque `ClimaInterventionCell.suggestedProduct` está tipado `string` y la migración a objeto `{label,target}` no cabía ahí; **base 32 y Capa 2 (93) INTACTAS** → conviven tres shapes, el builder ramifica por presencia de campo. **NO lleva `esfuerzo`/`efectividad` a propósito:** el caso sistémico SIEMPRE rutea a revisión individual (`climaPlanRouting.classifyDecisionBlock` corta en `isSystemic` antes de leer ese par) → esos campos no participarían de ninguna decisión. **`target: 'SIN_CTA'` en las 9:** no existe mecanismo real de "activar conversación con Personas" — no se pinta un CTA que no lleva a ninguna parte. **Resolución:** interpolación `{n}`/`{total}` en las 8 (`interpolateSystemic`) + `{category}` en el fallback; `getSystemicIntervention` **nunca lanza ni devuelve `undefined`** (degradación explícita vía `isClimaDriverCategory` → `getSystemicFallback`, que construye literal fresco). **Hallazgo verificado contra BD:** `reconocimiento` y `compensaciones` quedan **escritas pero INERTES** — el banco real (experiencia-full) les da 1 reactivo cada una, bajo `REACTIVE_SYSTEMIC_MIN_MEASURED=3`, así que hoy no pueden disparar el camino sistémico. **Evidencia:** smoke **36/36** (`smoke-clima-systemic-narrativas.ts`), 3 archivos / +334 −5. **Secuencia real (del propio commit):** `ClimaActionPlanBuilder.ts` quedó FUERA de `7e96821` porque su diff mezclaba el ensanche de la unión de `cell` (este gate) con las guardas duras de `isSystemic` (Gate 5D-i, otra sesión) → HEAD no typechequeó hasta que entró `fed4663`; **hoy ambos en `origin/main` y HEAD compila limpio**. **Ajuste posterior (2026-07-22, working tree SIN COMMITEAR):** barrido em-dash — `P` pasó de `'PROVISIONAL — '` a `'PROVISIONAL: '` (`ClimaInterventionDictionary.ts:46`, arregla 32+93+sistémicas de un solo cambio) + em-dash interno del fallback (`:1066`, partido en dos frases) + guard del smoke (`:50`); detalle en `PENDIENTES_ACTIVOS_EX_CLIMA.md`. **Diferido:** las 9 narrativas siguen **PROVISIONAL** (pase editorial de Victor antes de exponer a cliente, Principio 4); `reconocimiento`/`compensaciones` inertes hasta que el banco les dé ≥3 reactivos medidos; orden UI de ítems sistémicos (5D). **Gate 5D-i committeado (`fed4663`) pero NO SELLADO** (`76f9f97` lo registra en PENDIENTES). |
 | v3.21 | **Capa 2 — variantes de intervención por reactivo × zona (93 celdas)** INTEGRADA as-built (2026-07-17). Fuente de contenido: `CLIMA_INTERVENTION_VARIANTS_capa2_v1.md` (marcado **INTEGRADO**, no borrado — queda como fuente legible por humano). **Rompe el techo narrativo:** dentro de una dimensión, la variante habla del reactivo-palanca real (31 reactivos × 3 zonas amarilla/naranja/roja; verde usa "Sostener práctica" genérico). **2 decisiones tomadas (Gate 0 → Victor):** (1) **Tipo = Opción B** — tipo NUEVO `ClimaInterventionVariantCell` (narrative + steps `[string,string]` + `suggestedProduct: SuggestedProduct{label,target,qualifier?}` + esfuerzo/efectividad + evidencia?) que **CONVIVE** con `ClimaInterventionCell` base (32, INTACTO, sigue `suggestedProduct: string`); `getIntervention` retorna la unión y el builder (único caller) ramifica por shape (`'esfuerzo' in cell`). `ClimaDecisionIntervention.suggestedProduct` ampliado a `string | SuggestedProduct` + `esfuerzo?`/`efectividad?` opcionales (ambas opciones lo requerían; no diferenciador). (2) **Dispatcher = solo mapa declarativo** `climaProductDispatcher.ts` (`CLIMA_PRODUCT_DISPATCH: Record<InterventionTarget, {kind,endpoint,requires,pending?}>`) — el ÚNICO punto de wiring `target → CTA real`; el handler runtime `activateProduct(target,ctx)` se construye en 5D (su contrato de contexto lo define la UI 5D, aún inexistente → sin código muerto). **Sub-decisión:** la muestra v3.18 `liderazgo.roja.carga_trabajo` **MIGRADA** al shape rico (mapa de variantes uniforme; convive con `satisfaccion.roja.carga_trabajo`, sin colisión). **Estado targets:** `PDI_CLIMA` → `POST /api/clima/pdi-suggestion` VIVO (5B-ii); `META_AREA`/`META_DURA` → `POST /api/goals` existe pero **wiring desde clima pendiente de 5D Tab 2** (POR PERSONA, no construido) → marcados `pending` en el dispatcher; `SIN_CTA` no-op. **A-additive puro:** cero cambio a las 32 base / `selectedReactive` / Dynamic Impact Drivers; contenido copiado EXACTO (incl. reactivos con advertencia de auditoría: efectividad/mejora/seguridad/autonomia/energia/doble-barril, con su nota intacta); prefijo `PROVISIONAL — ` conservado. **31 keys de reactivo verificadas 1:1 contra `prisma/seed.ts:179-389`** (matchean `subcategory` → variantes resuelven, no caen a default). Transposición dimensión→reactivo→zona (doc, revisión humana) → zona→reactivo (motor). **Evidencia:** smoke PURO **35/35** (sin DB → no toca prod: base 32 intacta, 93+muestra transpuestas, invariante zona→target, selección variante/base, dispatcher, builder E2E variante vs fallback), `tsc`+`build` limpios, smoke retirado al sellar. **Diferido (deuda de seguimiento):** `activateProduct` runtime + META wiring (5D Tab 2 — ver precondiciones duras en §5D); **resolución de reactivos con advertencia (banco de preguntas):** `seguridad` (constructo ambiguo — lectura laboral/estabilidad del empleo vs física/psicológica; la acción correcta depende de cuál mida, auditoría §5), `autonomia` (posible reubicación a **Liderazgo** por patrón de redacción "Mi supervisor…", auditoría §3), reactivos **doble-barril** (`comunicacion_interna`, `cohesion_equipo`, `carga_trabajo`, `energia` — si el banco divide la pregunta, la variante se reescribe, auditoría §6); **93 narrativas PROVISIONAL — pase editorial de Victor pendiente antes de exponer a cliente (Principio 4).** **Pendiente 5D.** |
 | v2.0 | Plan original 7 gates (sesión arquitectura junio 2026) |
@@ -1121,6 +1122,44 @@ Tab 3: TRACKING
 >   `retencion`/`recomendacion`/`orgullo`/`experiencia_general`), por lo que sus **3 celdas
 >   Capa 2** (amarilla/naranja/roja) **se generan y se muestran**. Si antes de 5D se sella
 >   su exclusión circular, **retirar sus 3 celdas** (no deben disparar card propia).
+
+### 5D-i (Tab 1 · POR DEPARTAMENTO) — ✅ SELLADO (2026-07-23)
+
+Cierra la capa de decisión del plan por departamento. **Tab 2 (POR PERSONA) y Tab 3
+(TRACKING) NO entran** — 5D-i es Tab 1.
+
+**Qué quedó sellado (commits en local — push de Victor):**
+- **CAS de concurrencia en aprobación de ActionPlan** (`545d5a0`): `PUT /api/action-plans/[planId]`
+  pasó de read-check-write no atómico a `updateMany` compare-and-swap (`where estado != 'aprobado'`);
+  carrera → **409**, el hook `onClimaPlanApproved` corre **exactamente 1 vez**. Cierra también la
+  ventana donde un autosave de `decisiones` mutaba un plan recién aprobado por otra sesión.
+- **Empty-state "Sin focos de acción"** (Tab 1, `decisiones=0 && sinDatos=0`): componente
+  `ClimaSinFocosState` (Portada positiva; NO toca el `FHREmptyState` compartido de Metas/Vitals).
+  **Fix de layout** (card-in-card resuelto: contenido directo en la card del shell, sin card/Tesla
+  propias; `4ad3302`+`5a90794`). **Copy final alineado a tono FocalizaHR** (`6915ba2`): título +
+  1 cuerpo + 1 cierre + CTA; se descartó la "línea de fortaleza" (topStrength) y su plumbing.
+- **Fix de copy en la Portada de Cascada** (`b0eb170`+`075a716`): raya → coma en el gancho de las
+  4 zonas de `PORTADA_BY_ZONE`, en impl y en el maestro `CASCADA_CLIMA_CONTENIDO.md` §0.1.
+
+**Recorrido de bordes — evidencia real (nivel indicado):**
+- **409 de concurrencia:** código + smoke (`smoke-clima-actionplan-cas.ts`, 24/24; retirado al sellar).
+- **6 escenarios de empty-state:** código + salida real de `generate`; #1 "Sin focos" además **visto
+  en pantalla** (Victor). (#2 "100% rechazado" y #5 "checkout N/Y/Z=0" confirmados como NO empty-states
+  reales; #3 lote y #4 genérico = cards deshabilitadas del carrusel.)
+- **Mobile 320px:** verificado **en dispositivo** (Victor).
+
+**Sin Tab 3 (Seguimiento) — diferido a gate propio futuro.** Caso real ya documentado: GATE4_LOBBY_DEMO
+es **Pulso Express, no Experiencia Full** → sus `ClimaActionLog` **nunca reciben veredicto de Tab 3 vía
+esta misma campaña** (`ActionEffectivenessService.evaluateOnFollowUpClose` corre al cerrar un Seguimiento
+Focalizado / Experiencia Full `isFollowUp`; un Pulso Express no lo dispara). Define el alcance del gate
+de Tab 3: qué tipos de campaña habilitan la matriz de efectividad.
+
+**Pendientes explícitos (NO bloquean el sello — en `PENDIENTES_ACTIVOS_EX_CLIMA.md`):**
+- **(a) Deuda de UX:** el indicador "Plan aprobado" es poco visible (texto chico en la esquina); no
+  comunica con claridad que el usuario está en modo revisión de un plan ya cerrado. Propuesta a evaluar:
+  estado más prominente + botón "Revisar decisiones" explícito.
+- **(b) Cuenta demo "EmptyState A/B"** (`demo-emptystates-5di@fixture.local`) — decidir si se limpia o
+  se conserva para uso futuro.
 
 ### Verificación Gate 5
 ```yaml
