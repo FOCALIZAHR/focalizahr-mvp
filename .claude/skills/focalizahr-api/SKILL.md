@@ -256,7 +256,7 @@ await prisma.model.findMany({ where, skip, take: 20 })
 ## 📖 DOCUMENTACIÓN COMPLETA
 
 Para casos complejos, consultar en Project Knowledge:
-- `GUIA_MAESTRA_RBAC_SEGURIDAD_FILTRADO_JERARQUICO_v1_3.md`
+- `GUIA_MAESTRA_RBAC_SEGURIDAD_FILTRADO_JERARQUICO_v1_1.md`
 - `DEUDA_RBAC_ARRAYS_HARDCODEADOS_v1.md`
 - `SEGURIDAD_APIS_QUICK_REFERENCE.md`
 - `src/lib/auth/permissions.ts`
