@@ -800,7 +800,7 @@ Reemplaza el `FHREmptyState` genérico por una Portada positiva `ClimaSinFocosSt
 
 ### Cuenta demo PERSISTENTE (verificación — escritura a prod, NO limpiar sin avisar)
 Creada vía flujo REAL (submit handler + `ClimaAggregationService` + generate), 2 campañas Experiencia Full, deptos separados por campaña (evita colisión de clave de insight):
-- **adminEmail:** `demo-emptystates-5di@fixture.local` · **password:** `Demo5Di2026!` · **accountId:** `cmrx7lkg800009ay7zrbwmwac`
+- **adminEmail:** `demo-emptystates-5di@fixture.local` · **accountId:** `cmrx7lkg800009ay7zrbwmwac` · contraseña NO versionada (regenerable con el seed; ver nota en `PENDIENTES_ACTIVOS_EX_CLIMA.md`)
 - **Campaña A** (empty-state, todo sano): `cmrx7ll3200029ay7s89tiuyn` → `/dashboard/clima?campaignId=…` → Rail "Planes de Acción" → tab "Por departamento".
 - **Campaña B** (mixto: focos→carrusel; lote `gestion_corriente`=0 y bloque `generico`=0 vacíos de forma natural): `cmrx7psja01fe9ay72qxrinkz`.
 - Regenerable idempotente: `prisma/scripts/seed-clima-empty-states-demo.ts` (untracked; borra+recrea la cuenta). **NO tocar** `cmruvpmzx…` (aprobado real) ni `cmrq30aue…` (borrador Corp Enterprise).

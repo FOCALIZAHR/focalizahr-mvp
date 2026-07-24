@@ -1146,7 +1146,8 @@ Cierra la capa de decisión del plan por departamento. **Tab 2 (POR PERSONA) y T
 - **6 escenarios de empty-state:** código + salida real de `generate`; #1 "Sin focos" además **visto
   en pantalla** (Victor). (#2 "100% rechazado" y #5 "checkout N/Y/Z=0" confirmados como NO empty-states
   reales; #3 lote y #4 genérico = cards deshabilitadas del carrusel.)
-- **Mobile 320px:** verificado **en dispositivo** (Victor).
+- **Mobile 320px:** verificado **en pantalla** por Victor con Chrome DevTools (Device Toolbar,
+  perfiles Samsung Galaxy + iPhone/iPod) — dots, tooltip, CTA, cards y Checkout OK, sin hallazgos.
 
 **Sin Tab 3 (Seguimiento) — diferido a gate propio futuro.** Caso real ya documentado: GATE4_LOBBY_DEMO
 es **Pulso Express, no Experiencia Full** → sus `ClimaActionLog` **nunca reciben veredicto de Tab 3 vía

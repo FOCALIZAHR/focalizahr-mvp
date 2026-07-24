@@ -40,9 +40,10 @@ plan ya cerrado** (inmutable). Propuesta a evaluar (NO decidida): estado más pr
 **(b) Cuenta demo "EmptyState A/B" — decidir si se limpia o se conserva.**
 Creada esta sesión vía flujo real (submit + agregación + generate) para verificar los empty-states en
 pantalla. Persistente en la BD de producción:
-- `adminEmail = demo-emptystates-5di@fixture.local` · password `Demo5Di2026!` · `accountId = cmrx7lkg800009ay7zrbwmwac`
+- `adminEmail = demo-emptystates-5di@fixture.local` · `accountId = cmrx7lkg800009ay7zrbwmwac`
 - Campaña A (empty-state, todo sano): `cmrx7ll3200029ay7s89tiuyn` · Campaña B (mixto, lote/genérico vacíos): `cmrx7psja01fe9ay72qxrinkz`
 - Regenerable idempotente: `prisma/scripts/seed-clima-empty-states-demo.ts` (untracked; borra+recrea).
+- **Contraseña: NO se versiona.** La cuenta es regenerable, así que la contraseña no es preciosa. Debe vivir fuera del repo — recomendado: env var `DEMO_CLIMA_PASSWORD` en `.env` local (gitignored) que el seed lea al setear el hash; o pasarla out-of-band. La expuesta previamente en git plano conviene **rotarla** (setear una nueva sin commitear → la vieja queda inerte).
 Pendiente decidir: **limpiar** (borrar la cuenta) o **conservar** para uso futuro. NO tocar `cmruvpmzx…`
 (aprobado real) ni `cmrq30aue…` (borrador Corp Enterprise).
 
