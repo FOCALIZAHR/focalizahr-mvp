@@ -85,3 +85,4 @@ documentada, NO bloqueante.**
 | `dangerouslySetInnerHTML` en toast | `toast-system.tsx:169` | XSS latente si un mensaje llega a incluir texto de usuario (ahora existe `ceoNotes`, escrito por el usuario). |
 | `AnclaInteligente` posible corte de CTA | `src/components/executive/AnclaInteligente.tsx:140,204` | **COMPARTIDA con Goals y P&L.** Solución si se aborda: prop `compact?` aditivo (default false = cero cambio). Se le dio aire desde el wrapper de clima sin tocarla. |
 | MAESTRO §3A/§8 dicen "4 cards" del Rail | `MAESTRO_EX_CLIMA.md` | Ahora son 5 (se agregó "Planes de Acción"). Consistencia de doc, no bloqueante. |
+| 5 smokes trackeados de gates previos (5A / 5B-ii / 5C / 5D-x) | `prisma/scripts/smoke-clima-*.ts` | Evaluar en su propia sesión cuál es verificación puntual vs. regresión permanente. No urgente. |
