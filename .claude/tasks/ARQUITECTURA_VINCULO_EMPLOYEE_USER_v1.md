@@ -1,6 +1,6 @@
 # ARQUITECTURA_VINCULO_EMPLOYEE_USER_v1.md
 
-> **Estado:** Proyecto abierto, en etapas. Etapa 1 aún no iniciada.
+> **Estado:** Proyecto abierto, en etapas. Etapa 1 ✅ SELLADA (c1e08e6).
 > **Fecha creación:** 2026-07-24 · **Decide:** Victor
 > **Origen:** dos hilos independientes (Metas/Notificaciones, 2026-07-15; Clima
 > Tab 2, 2026-07-24) llegaron por separado a la misma conclusión — valida la
@@ -31,7 +31,7 @@ existente en la nómina con su eventual acceso a la plataforma.
 ## 1. Etapas
 
 ### Etapa 1 — Fundación
-**Estado: ESPECIFICADA E IMPLEMENTADA** — plan y diff en
+**Estado: ✅ SELLADO — c1e08e6 (+ dd7bc39, f9033e8 como fundación documental previa)** — plan y diff en
 `.claude/tasks/PLAN_ETAPA1_VINCULO_EMPLOYEE_USER.md` (6 archivos, aditivo puro).
 
 Decisiones selladas (ver plan para razonamiento):
