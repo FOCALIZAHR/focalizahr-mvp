@@ -10,58 +10,21 @@
 // LAYOUT: renderiza SOLO su contenido, SIN card/Tesla/padding pesado propios. En el
 // caso vacío el shell (ClimaPlanesView) está en modo NO-bare y ya provee card +
 // Tesla line + top bar + padding (ClimaPlanesView.tsx:56-72). Traer una card propia
-// daría card-in-card — el mismo patrón que ClimaPathCarousel, que también dibuja su
-// contenido directo dentro del shell. El ancho lo fija el shell (max-w-4xl).
+// daría card-in-card. El ancho lo fija el shell (max-w-4xl).
 //
-// Reglas respetadas:
-//   · Anti-semáforo (MANIFIESTO v5): color (emerald) SOLO en el ícono/su borde.
-//   · Regla del "O": cero cifras — no hay número de favorabilidad limpio en este
-//     contexto (el gauge del Lobby ya lo muestra). Copy 100% cualitativo.
-//   · Copy scope-neutral ("esta medición") — respeta el filtrado RBAC del Tab 1.
-//   · Un solo CTA → Lobby (misma salida que el Checkout: onExitToLobby).
+// Reglas: anti-semáforo (emerald SOLO en el ícono); cero cifras; un solo CTA → Lobby
+// (misma salida que el Checkout: onExitToLobby). Copy aprobado por Victor.
 // ════════════════════════════════════════════════════════════════════════════
 
 import { ShieldCheck, Zap } from 'lucide-react';
 import { PrimaryButton } from '@/components/ui/PremiumButton';
-import { dimensionLabel } from '@/lib/constants/climaDimensions';
-
-/** Fortaleza de mayor priority del scope (de generate). `null` si no hay ninguna
- *  de alto impacto. `transversal`=true si TODOS los deptos visibles la comparten.
- *  `departmentName` solo viene si es un destaque de un subconjunto (scope>1). */
-export interface ScopeTopStrength {
-  dimension: string;
-  departmentName: string | null;
-  transversal: boolean;
-}
 
 interface ClimaSinFocosStateProps {
   /** Salida al Lobby (gauge + Zona Crítica) = hook.exitSubproducto. */
   onExitToLobby?: () => void;
-  /** Reconocimiento cualitativo (sin cifra). Fallback a copy genérico si es null. */
-  topStrength?: ScopeTopStrength | null;
 }
 
-export default function ClimaSinFocosState({
-  onExitToLobby,
-  topStrength,
-}: ClimaSinFocosStateProps) {
-  // Reconocimiento primero cuando hay fortaleza; si no, dos líneas genéricas.
-  // Sufijo: transversal (todos comparten) → sin nombre; destaque → nombre del depto.
-  const sufijoFortaleza = topStrength?.transversal
-    ? ' — transversal en todos los equipos medidos'
-    : topStrength?.departmentName
-      ? ` — ${topStrength.departmentName}`
-      : '';
-  const lineas = topStrength
-    ? [
-        `Lo más sólido esta medición: ${dimensionLabel(topStrength.dimension)}${sufijoFortaleza}.`,
-        'Ningún foco superó el umbral de atención.',
-      ]
-    : [
-        'Ningún foco superó el umbral de atención.',
-        'Los equipos con datos quedaron sobre su vara.',
-      ];
-
+export default function ClimaSinFocosState({ onExitToLobby }: ClimaSinFocosStateProps) {
   return (
     <div className="py-6 md:py-8 flex flex-col items-center text-center">
       {/* Ícono — emerald SOLO acá (anti-semáforo) */}
@@ -77,32 +40,15 @@ export default function ClimaSinFocosState({
         de acción
       </p>
 
-      {/* Subtítulo */}
+      {/* Cuerpo */}
       <p className="text-base font-light text-slate-400 leading-relaxed mt-5 max-w-lg">
-        Ningún reactivo cruzó su umbral de atención en esta medición.
+        Tu organización está en buen estado. Ningún equipo con datos suficientes
+        requirió atención en este ciclo.
       </p>
 
-      {/* Panel — Lectura del ciclo (cualitativo, sin cifras) */}
-      <div className="mt-8 w-full max-w-xl rounded-xl border border-slate-800/40 bg-slate-900/40 px-5 py-5 text-left">
-        <span className="text-[10px] uppercase tracking-widest text-slate-500">
-          Lectura del ciclo
-        </span>
-        <ul className="mt-3 space-y-2">
-          {lineas.map((linea) => (
-            <li
-              key={linea}
-              className="flex gap-2 text-sm font-light text-slate-400 leading-relaxed"
-            >
-              <span className="text-slate-600 mt-[2px]">·</span>
-              {linea}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Cierre — consecuencia sin instrucción (narrativas Regla 6) */}
-      <p className="text-sm font-light text-slate-500 leading-relaxed mt-6 max-w-lg">
-        El sistema sigue midiendo. Si algo cambia en la próxima medición, aparecerá acá.
+      {/* Cierre */}
+      <p className="text-sm font-light text-slate-500 leading-relaxed mt-4 max-w-lg">
+        El próximo ciclo confirmará si las condiciones se sostienen.
       </p>
 
       {/* CTA único → Lobby */}

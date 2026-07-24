@@ -26,7 +26,7 @@ import ClimaPlanPortada from './ClimaPlanPortada';
 import ClimaPathCarousel from './ClimaPathCarousel';
 import ClimaPathWorkspace from './ClimaPathWorkspace';
 import ClimaCheckout from './ClimaCheckout';
-import ClimaSinFocosState, { type ScopeTopStrength } from './ClimaSinFocosState';
+import ClimaSinFocosState from './ClimaSinFocosState';
 import type { BlockStatus } from './ClimaPathChaining';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' } as const;
@@ -72,7 +72,6 @@ export default function ClimaPlanDeptTab({
   const [error, setError] = useState<string | null>(null);
   const [decisiones, setDecisiones] = useState<ClimaDecisionItem[]>([]);
   const [sinDatos, setSinDatos] = useState<DeptSinDatos[]>([]);
-  const [topStrength, setTopStrength] = useState<ScopeTopStrength | null>(null);
   const [planId, setPlanId] = useState<string | null>(null);
   const [estado, setEstado] = useState<'borrador' | 'aprobado' | null>(null);
   const [saving, setSaving] = useState(false);
@@ -110,7 +109,6 @@ export default function ClimaPlanDeptTab({
         }
         const preview: ClimaDecisionItem[] = genJson.data.decisiones ?? [];
         setSinDatos(genJson.data.departamentosSinDatos ?? []);
-        setTopStrength(genJson.data.topStrength ?? null);
 
         const planes: ActionPlanRow[] = listJson.success ? listJson.data ?? [] : [];
         const borrador = planes.find((p) => p.estado === 'borrador');
@@ -310,7 +308,7 @@ export default function ClimaPlanDeptTab({
 
   const hasAnyContent = decisiones.length > 0 || sinDatos.length > 0;
   if (!hasAnyContent) {
-    return <ClimaSinFocosState onExitToLobby={onExitToLobby} topStrength={topStrength} />;
+    return <ClimaSinFocosState onExitToLobby={onExitToLobby} />;
   }
 
   return (

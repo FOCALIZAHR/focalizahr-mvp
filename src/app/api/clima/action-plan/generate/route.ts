@@ -110,61 +110,9 @@ export async function GET(request: NextRequest) {
       .filter((r) => !r.reactiveAnalysis || r.reactiveAnalysis.length === 0)
       .map((r) => ({ departmentId: r.departmentId, departmentName: r.departmentName }));
 
-    // Fortaleza de scope (reconocimiento en el empty-state "Sin focos", Tab 1).
-    // topStrength es por-depto (DepartmentClimaInsight); acá se elige UNA: la de mayor
-    // `priority` entre los deptos visibles. La priority sale del driverAnalysis del
-    // propio topStrength de cada depto (misma métrica de pickTopDrivers, sin criterio
-    // nuevo). Empate de priority → desempate determinista: dimension asc, luego
-    // departmentName asc. `null` si ningún depto visible tiene una fortaleza de alto
-    // impacto (caso real frecuente: sano sin standout). departmentName solo si el
-    // scope visible tiene >1 depto (en un único equipo el nombre es redundante).
-    const strengthCandidates = visibleInsights
-      .map((r) => {
-        const dimension = r.topStrength;
-        if (!dimension) return null;
-        const da = (r.driverAnalysis as unknown as DriverImpact[] | null) ?? [];
-        const priority = da.find((d) => d.driver === dimension)?.priority ?? null;
-        if (priority === null) return null;
-        return {
-          dimension,
-          departmentName: r.department?.displayName ?? 'Departamento',
-          priority,
-        };
-      })
-      .filter(
-        (x): x is { dimension: string; departmentName: string; priority: number } =>
-          x !== null
-      )
-      .sort(
-        (a, b) =>
-          b.priority - a.priority ||
-          a.dimension.localeCompare(b.dimension) ||
-          a.departmentName.localeCompare(b.departmentName)
-      );
-
-    // Transversal vs destaque: si TODOS los deptos visibles comparten esa dimensión
-    // como su topStrength, no es un destaque de un equipo → transversal (sin nombre).
-    // Si es un subconjunto propio, es un destaque real → se nombra el depto (solo con
-    // scope>1; en un único equipo el nombre es redundante).
-    const best = strengthCandidates[0] ?? null;
-    let topStrength:
-      | { dimension: string; departmentName: string | null; transversal: boolean }
-      | null = null;
-    if (best) {
-      const visibleCount = visibleInsights.length;
-      const sharing = visibleInsights.filter((r) => r.topStrength === best.dimension).length;
-      const transversal = visibleCount > 1 && sharing === visibleCount;
-      const showName = visibleCount > 1 && !transversal;
-      topStrength = {
-        dimension: best.dimension,
-        departmentName: showName ? best.departmentName : null,
-        transversal,
-      };
-    }
-
     return NextResponse.json({
       success: true,
-      data: { decisiones, departamentosSinDatos, topStrength },
+      data: { decisiones, departamentosSinDatos },
     });
   } catch (error) {
     return NextResponse.json(
