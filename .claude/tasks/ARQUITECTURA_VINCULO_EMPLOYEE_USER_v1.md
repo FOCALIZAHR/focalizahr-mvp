@@ -31,16 +31,22 @@ existente en la nómina con su eventual acceso a la plataforma.
 ## 1. Etapas
 
 ### Etapa 1 — Fundación
-**Estado: PENDIENTE**
+**Estado: ESPECIFICADA E IMPLEMENTADA** — plan y diff en
+`.claude/tasks/PLAN_ETAPA1_VINCULO_EMPLOYEE_USER.md` (6 archivos, aditivo puro).
 
-- Agregar `nationalId` a `User` (nullable)
-- Agregar `Employee.userId` / `User.employeeId` (nullable, FK, `db push`,
-  mismo patrón que `Department.responsableId`)
-- Extender `extractUserContext` para exponer `employeeId` — mismo lugar donde
-  ya se agregó `userName` (`AuthorizationService.ts:142-151`)
-- Pedir RUT en el único punto de alta manual de `User` hoy
-  (`admin/users/route.ts:247`), reusando `validateRut()`/`normalizeRut()`
-  ya existentes
+Decisiones selladas (ver plan para razonamiento):
+- **FK = `User.employeeId String? @unique` → `Employee.id`, `onDelete: SetNull`**
+  (no `Employee.userId`): la dirección de consulta dominante es User→Employee y así
+  el login carga `employeeId` como columna, sin query extra.
+- **`User.nationalId String?` con `@@unique([accountId, nationalId])`** — espejo de
+  Employee (RUT único por cuenta, no global).
+- **`employeeId` se cachea en el JWT al login** y viaja como header `x-employee-id`;
+  `extractUserContext` lo expone (síncrono, sin BD). Trade-off = staleness (ventana =
+  TTL token), aceptable porque nace todo NULL y los consumidores manejan null explícito.
+- **`admin/users` captura+valida RUT, NO auto-linkea** (el match es Etapa 4, policy única).
+
+Archivos: `schema.prisma` (User+Employee), `AuthorizationService.ts` (extractUserContext),
+`middleware.ts` (header), `auth/user/login/route.ts` (claim JWT), `admin/users/route.ts` (RUT).
 
 ### Etapa 2 — Reframe de scope ejecutivo-tier
 **Estado: PENDIENTE — no depende de la Etapa 1**
@@ -52,12 +58,17 @@ Cubre también el caso "ejecutivo/holding sin Employee en esta cuenta" (persona
 paga por otra entidad legal, nunca va a tener fila en este `Employee`).
 
 ### Etapa 3 — Recableo de los 35 sitios
-**Estado: PENDIENTE — depende de Etapa 1**
+**Estado: BLOQUEADA — depende de Etapa 1 Y del cierre del minting legacy (ver §2bis R2).**
 
 Reemplazar `findFirst({email})` por `userContext.employeeId` en cada sitio.
 Orden de prioridad: primero los 10 "silenciosos" (grupo B del Gate 0), empezando
 por el portal EVALUATOR (3 de sus 4 sitios). Un gate por módulo (Metas, PDI,
 Performance, Evaluator, Succession, Auth), smoke test real por gate.
+
+> ⛔ **NO arrancar hasta cerrar el minting legacy de JWT** (`§2bis R2`). Cualquier sitio
+> que use `userContext.employeeId` para **decidir autorización** ("¿es mi subordinado?",
+> "¿esta meta es mía?") hereda el vector de escalada de token legacy + header forjado
+> mientras `/api/auth/login` y `/api/auth/register` sigan acuñando tokens sin `userId`.
 
 ### Etapa 4 — Aprovisionamiento en el resto de los puntos de creación
 **Estado: PENDIENTE — depende de Etapa 1**
@@ -67,6 +78,11 @@ U2 (`auth/user/login/route.ts:82`, lazy-create ejecutivo), E1
 Decidir si vale pedir/chequear RUT en cada uno, sabiendo que U2 legítimamente
 no va a matchear en el caso ejecutivo/holding (Etapa 2 ya lo cubre, no es un
 fallo ahí).
+
+> 🔒 **NO NEGOCIABLE (ver §2bis R1):** todo auto-match/escritura de `User.employeeId`
+> debe verificar que el `Employee` candidato tenga el **mismo `accountId`** que el `User`
+> **antes** de enlazar. El FK no lo garantiza (referencia `Employee.id` global). Match sin
+> ese chequeo = puente cross-tenant.
 
 ### Etapa 5 — Backfill selectivo
 **Estado: DIFERIDO, sin fecha**
@@ -90,6 +106,43 @@ Reforzada en: `GUIA_MAESTRA_RBAC_SEGURIDAD_FILTRADO_JERARQUICO_v1_1.md`
 
 ---
 
+## 2bis. Restricciones NO NEGOCIABLES
+
+### R1 — `accountId` igual antes de escribir `User.employeeId` (Etapa 3 y 4)
+
+El FK `User.employeeId → Employee.id` referencia el `id` **global** de Employee; **no**
+garantiza que el Employee sea de la misma cuenta que el User. Todo código que **escriba**
+el vínculo (auto-match en Etapa 4, o cualquier reparación manual) **debe verificar en capa
+de aplicación** que `employee.accountId === user.accountId` **antes** de enlazar. Sin ese
+chequeo explícito, un User y un Employee de cuentas distintas podrían quedar enlazados →
+puente cross-tenant (rompe el aislamiento multi-tenant, regla enterprise #2). Reflejado como
+comentario en `schema.prisma` (`User.employeeId`), mismo estilo que `Department.responsableId`.
+
+### R2 — Etapa 3 BLOQUEADA hasta cerrar el minting legacy de JWT
+
+**Fuente:** investigación "Auth Legacy vs Nuevo" (chat *Migración y Unificación de
+Autenticación*, jul 2026) + `SPEC_MIDDLEWARE_LEGACY_ROLE_HARDENING_v1.md` §4bis, caso 5.
+
+`login/route.ts` **no** es el único lugar que acuña JWT. También acuñan, **sin `userId`**:
+`/api/auth/login` (legacy), `/api/auth/register:118`, `lib/auth.ts:352`. El mecanismo de
+Etapa 1 (setear `x-employee-id` en `middleware.ts` dentro de `if (payload.userId)`, igual que
+`x-user-role`/`x-user-id`) **hereda el mismo vector ya confirmado**: token legacy + header
+forjado → pasa sin que el middleware lo pise (SPEC §4bis caso 5).
+
+- **No es explotable HOY:** nada confía todavía en `employeeId` para autorizar. Etapa 1
+  (agregar el header) **no crea riesgo nuevo mientras nada lo consuma para decisiones de
+  acceso** → Etapa 1 **puede** implementarse ya.
+- **Etapa 3 SÍ queda BLOQUEADA:** el momento en que un endpoint use `userContext.employeeId`
+  para **decidir autorización** (ej. "¿es mi subordinado?", "¿esta meta es mía?"), el vector
+  pasa a ser explotable. Etapa 3 (y cualquier código con esa forma) **no arranca** hasta que
+  se cierre el minting legacy de `/api/auth/login` y `/api/auth/register` — pendiente #2 de la
+  investigación auth, ya marcado "máxima prioridad" como proyecto independiente.
+- **Por qué se documenta acá y ahora (lección 6ter de la propia investigación auth):** las
+  conexiones entre proyectos que no quedan escritas se pierden entre sesiones. Esta dependencia
+  cruzada queda anclada para que ninguna sesión futura arranque Etapa 3 sin verla.
+
+---
+
 ## 3. Casos que esto NO resuelve, a propósito
 
 - Ejecutivo/holding sin `Employee` en esta cuenta → lo cubre la Etapa 2, no el
@@ -100,3 +153,8 @@ Reforzada en: `GUIA_MAESTRA_RBAC_SEGURIDAD_FILTRADO_JERARQUICO_v1_1.md`
 ## Changelog
 - v1 (2026-07-24): creación. Gate 0 (Anexo A) sellado. Etapas 1-5 definidas,
   ninguna iniciada.
+- v1.1 (2026-07-24): Etapa 1 especificada e implementada (plan
+  `PLAN_ETAPA1_VINCULO_EMPLOYEE_USER.md`). Agregada §2bis con 2 restricciones NO
+  NEGOCIABLES: R1 (chequeo `accountId` antes de escribir el vínculo) y R2 (Etapa 3
+  bloqueada hasta cerrar el minting legacy de JWT — SPEC_MIDDLEWARE_LEGACY_ROLE_
+  HARDENING_v1 §4bis caso 5). Etapa 3 marcada BLOQUEADA; Etapa 4 con nota R1.

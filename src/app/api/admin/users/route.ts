@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserFromHeaders, isAdmin, hashPassword } from '@/lib/auth';
 import { ALL_ROLES } from '@/lib/services/AuthorizationService';
+import { validateRut, normalizeRut } from '@/lib/services/EmployeeSyncService';
 import { Prisma } from '@prisma/client';
 
 // Roles que pueden gestionar usuarios
@@ -161,7 +162,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { email, name, password, role, departmentId, targetAccountId } = body;
+    const { email, name, password, role, departmentId, targetAccountId, nationalId } = body;
 
     // Validaciones
     if (!email || !name || !password || !role) {
@@ -199,6 +200,21 @@ export async function POST(request: NextRequest) {
         { error: 'El rol AREA_MANAGER requiere un departamento asignado' },
         { status: 400 }
       );
+    }
+
+    // 🆕 RUT opcional del titular del login (Etapa 1 — vínculo Employee↔User).
+    // Si viene, se valida y normaliza (mismo validateRut/normalizeRut que
+    // EmployeeSyncService). NO se auto-linkea a Employee todavía: el aprovisionamiento
+    // (match por RUT) es Etapa 4, policy única sobre los 4 puntos de creación.
+    let normalizedNationalId: string | null = null;
+    if (nationalId != null && String(nationalId).trim() !== '') {
+      if (!validateRut(String(nationalId))) {
+        return NextResponse.json(
+          { error: 'RUT inválido' },
+          { status: 400 }
+        );
+      }
+      normalizedNationalId = normalizeRut(String(nationalId));
     }
 
     // Solo FOCALIZAHR_ADMIN puede usar targetAccountId
@@ -253,6 +269,8 @@ export async function POST(request: NextRequest) {
         departmentId: departmentId || null,
         accountId: effectiveAccountId,
         isActive: true,
+        // Etapa 1: se captura el RUT; employeeId queda NULL (auto-match = Etapa 4).
+        nationalId: normalizedNationalId,
       },
       select: {
         id: true,

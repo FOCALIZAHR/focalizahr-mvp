@@ -140,6 +140,7 @@ export function extractUserContext(request: Request): {
   departmentId: string | null;
   userId: string | null;
   userName: string | null;
+  employeeId: string | null;
 } {
   // x-user-name viaja codificado (encodeURIComponent) desde el middleware (ñ/tildes)
   const rawUserName = request.headers.get('x-user-name');
@@ -148,7 +149,10 @@ export function extractUserContext(request: Request): {
     role: request.headers.get('x-user-role'),
     departmentId: request.headers.get('x-department-id'),
     userId: request.headers.get('x-user-id'),
-    userName: rawUserName ? decodeURIComponent(rawUserName) : null
+    userName: rawUserName ? decodeURIComponent(rawUserName) : null,
+    // Vínculo Employee↔User (Etapa 1): viaja en el JWT, reinyectado por el middleware
+    // como x-employee-id. '' (sin claim / sin vínculo) → null: contrato "null explícito".
+    employeeId: request.headers.get('x-employee-id') || null
   };
 }
 

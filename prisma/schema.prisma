@@ -848,6 +848,14 @@ model User {
   passwordHash String    @map("password_hash")
   role         String    @default("VIEWER")
   departmentId String?   @map("department_id")
+  // 🆕 Vínculo Employee↔User (Etapa 1 — Fundación). Aditivo, nace NULL.
+  // nationalId: RUT del titular del login. Único por cuenta, igual que Employee
+  // (schema:1908). Habilita el match fuerte User(accountId,rut)==Employee(accountId,rut).
+  nationalId   String?   @map("national_id")
+  // User.employeeId: SIEMPRE verificar accountId igual antes de escribir
+  // — el FK no lo garantiza (User y Employee de cuentas distintas podrían
+  // enlazarse sin este chequeo explícito en capa de aplicación)
+  employeeId   String?   @unique @map("employee_id")
   isActive     Boolean   @default(true) @map("is_active")
   lastLoginAt  DateTime? @map("last_login_at")
   createdAt    DateTime  @default(now()) @map("created_at")
@@ -856,9 +864,13 @@ model User {
   // Relaciones
   account    Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
   department Department? @relation(fields: [departmentId], references: [id])
+  // Vínculo Employee↔User (Etapa 1) — FK 1:1 opcional. SetNull: borrar el Employee
+  // no mata el login. @unique en employeeId ⇒ un Employee no lo reclaman dos Users.
+  employee   Employee?   @relation("EmployeeUser", fields: [employeeId], references: [id], onDelete: SetNull)
 
   @@index([accountId])
   @@index([email])
+  @@unique([accountId, nationalId], map: "idx_users_account_national")
   @@map("users")
 }
 
@@ -1866,6 +1878,9 @@ model Employee {
   history       EmployeeHistory[]
   participants  Participant[]
   exitRecords   ExitRecord[]
+
+  // Vínculo Employee↔User (Etapa 1) — inversa 1:1 opcional. La FK vive en User.
+  user          User?             @relation("EmployeeUser")
 
   // Evaluaciones (se usarán en Performance)
   evaluationsAsEvaluatee EvaluationAssignment[] @relation("Evaluatee")

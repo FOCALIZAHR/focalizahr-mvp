@@ -136,7 +136,11 @@ export async function POST(request: NextRequest) {
       userName: user.name,
       userRole: user.role,
       departmentId: user.departmentId,
-      
+      // Vínculo Employee↔User (Etapa 1). Columna ya presente en el row cargado por
+      // findUnique (arriba) — cero query extra. null para ejecutivo/holding y para
+      // todo User hasta que Etapa 4/5 pueble el vínculo.
+      employeeId: user.employeeId ?? null,
+
       // Campos de Account para compatibilidad con APIs existentes
       id: user.accountId,
       accountId: user.accountId,

@@ -210,6 +210,9 @@ export function middleware(request: NextRequest) {
     headers.set('x-user-email', payload.userEmail || '');
     // ✅ FIX: encodeURIComponent para caracteres no-ASCII (ñ, tildes, etc.)
     headers.set('x-user-name', encodeURIComponent(payload.userName || ''));
+    // Vínculo Employee↔User (Etapa 1). '' si el token no lo trae (login previo al
+    // cambio, o User sin Employee). extractUserContext lo normaliza a null.
+    headers.set('x-employee-id', payload.employeeId || '');
   }
   
   // Siempre inyectar accountId (para multi-tenant isolation)
