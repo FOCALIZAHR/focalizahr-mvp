@@ -9,6 +9,9 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import type { GoalFamily, GoalMetricType, GoalType } from '@prisma/client'
+// El techo 100 y la resta viven en la fuente única (compartida con el server). Acá NO
+// se re-hardcodea el 100: si cambia el presupuesto, cambia en weightBudget.ts.
+import { availableWeightFrom } from '@/lib/goals/weightBudget'
 
 /** Forma mínima de la meta del banco (subconjunto de lo que devuelve GET /api/goals). */
 export interface BankParentGoal {
@@ -50,7 +53,7 @@ export interface AssignmentStatus {
 // StepWeightsConfirm (su assignmentStatus SIN isComplete). Una sola fuente de verdad.
 export function getAvailableWeight(status: { totalWeight: number } | null | undefined): number | null {
   if (!status) return null
-  return 100 - status.totalWeight
+  return availableWeightFrom(status.totalWeight)
 }
 
 /**

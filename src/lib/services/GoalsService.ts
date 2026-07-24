@@ -24,6 +24,13 @@ import { GOAL_FAMILY_LABELS, isValidSubfamily } from '@/lib/constants/goalCatego
 // dependencias, así que importarlo desde acá no puede generar ningún ciclo.
 // NO duplicar este número en Metas: una sola fuente de verdad para el objetivo de clima.
 import { CLIMA_TARGET_FAVORABILITY } from './clima/climaThresholds'
+// Presupuesto de peso: aritmética + constante 100 + filtro personal-only, fuente única
+// compartida con /api/goals/team y el cliente (bankPayload). Módulo PURO (sin Prisma).
+import {
+  GOAL_WEIGHT_BUDGET,
+  sumBudgetWeight,
+  availableWeightFrom,
+} from '@/lib/goals/weightBudget'
 
 // ────────────────────────────────────────────────────────────────────────────
 // ERRORES DE DOMINIO (Gate A) — goalsErrorResponse los mapea a HTTP.
@@ -734,6 +741,66 @@ export class GoalsService {
   }
 
   /**
+   * Solo lectura — peso disponible ANTES de crear/editar. Espejo de checkGoalLimit pero
+   * para peso: la validación de escritura (validateTotalWeight) consume ESTA función para
+   * el número, así consulta y validación nunca divergen.
+   *
+   * Misma fuente de verdad que /api/goals/team y el cliente: sumBudgetWeight
+   * (weightBudget.ts) — INDIVIDUAL ∧ viva ∧ ciclo activo.
+   *
+   * Sin ciclo activo: devuelve presupuesto vacío (used 0 / available lleno), coherente
+   * con /team. El bloqueo real de escritura lo hace validateTotalWeight (GoalNoActiveCycleError);
+   * un consumidor read-only NO debe explotar por no haber ciclo.
+   *
+   * @param opts.activeCycle  Si el llamador ya resolvió el ciclo (validateTotalWeight),
+   *                          lo pasa y NO se vuelve a consultar getActiveCycle.
+   * @param opts.excludeGoalId  PATCH: la meta que se edita no cuenta contra sí misma.
+   */
+  static async checkGoalWeight(
+    accountId: string,
+    employeeId: string,
+    opts?: { activeCycle?: { id: string } | null; excludeGoalId?: string }
+  ): Promise<{ used: number; available: number; max: number; hasActiveCycle: boolean }> {
+    const activeCycle =
+      opts?.activeCycle ?? (await GoalCycleService.getActiveCycle(accountId))
+
+    if (!activeCycle) {
+      return {
+        used: 0,
+        available: GOAL_WEIGHT_BUDGET,
+        max: GOAL_WEIGHT_BUDGET,
+        hasActiveCycle: false,
+      }
+    }
+
+    // WHERE mínimo: accountId + employeeId + level (eficiencia + defensa; una AREA/COMPANY
+    // nunca tiene employeeId igual). El filtro vivas+ciclo(+exclusión) lo aplica
+    // sumBudgetWeight, MISMA función que usa /team con sus metas pre-cargadas.
+    const goals = await prisma.goal.findMany({
+      where: {
+        accountId,
+        employeeId,
+        level: 'INDIVIDUAL',
+      },
+      select: {
+        id: true,
+        level: true,
+        weight: true,
+        status: true,
+        goalCycleId: true,
+      },
+    })
+
+    const used = sumBudgetWeight(goals, activeCycle.id, opts?.excludeGoalId)
+    return {
+      used,
+      available: availableWeightFrom(used),
+      max: GOAL_WEIGHT_BUDGET,
+      hasActiveCycle: true,
+    }
+  }
+
+  /**
    * Gate A — el presupuesto de 100% es POR CICLO, no acumulado histórico.
    *
    * Consecuencia de la decisión de rollover: una meta de un ciclo ya cerrado es
@@ -753,27 +820,22 @@ export class GoalsService {
     newWeight: number,
     excludeGoalId?: string
   ): Promise<void> {
+    // ÚNICA resolución del ciclo: se resuelve acá para poder fallar cerrado sin ciclo, y
+    // se REUSA en checkGoalWeight (no se consulta getActiveCycle dos veces).
     const activeCycle = await GoalCycleService.getActiveCycle(accountId)
     if (!activeCycle) {
       throw new GoalNoActiveCycleError()
     }
 
-    const currentGoals = await prisma.goal.findMany({
-      where: {
-        accountId,
-        employeeId,
-        level: 'INDIVIDUAL',
-        status: { in: ['NOT_STARTED', 'ON_TRACK', 'AT_RISK', 'BEHIND'] },
-        goalCycleId: activeCycle.id,
-        ...(excludeGoalId ? { id: { not: excludeGoalId } } : {}),
-      },
-      select: { weight: true }
+    // El número sale de checkGoalWeight (misma función que la consulta de solo lectura);
+    // acá solo se compara contra el techo y se lanza el error de escritura.
+    const { used } = await this.checkGoalWeight(accountId, employeeId, {
+      activeCycle,
+      excludeGoalId,
     })
 
-    const currentTotalWeight = currentGoals.reduce((sum, g) => sum + (g.weight || 0), 0)
-
-    if (currentTotalWeight + newWeight > 100) {
-      throw new GoalWeightExceededError(currentTotalWeight, newWeight)
+    if (used + newWeight > GOAL_WEIGHT_BUDGET) {
+      throw new GoalWeightExceededError(used, newWeight)
     }
   }
 

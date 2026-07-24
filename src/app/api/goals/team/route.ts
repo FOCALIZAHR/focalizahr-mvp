@@ -6,6 +6,8 @@ import {
   hasPermission,
 } from '@/lib/services/AuthorizationService'
 import { GoalCycleService } from '@/lib/services/GoalCycleService'
+// Presupuesto de peso: MISMA aritmética/filtro que valida el server (GoalsService).
+import { filterBudgetGoals, sumBudgetWeight } from '@/lib/goals/weightBudget'
 
 export async function GET(request: NextRequest) {
   try {
@@ -85,6 +87,7 @@ export async function GET(request: NextRequest) {
           },
           select: {
             id: true,
+            level: true,       // requerido por filterBudgetGoals (garantía personal-only)
             progress: true,
             status: true,
             weight: true,
@@ -126,13 +129,11 @@ export async function GET(request: NextRequest) {
       // servidor (sin ciclo no se puede crear ninguna meta igual).
       // NOTA: goalsCount y avgProgress (arriba) siguen contando TODAS las metas
       // vivas — la lista del equipo no cambia, solo cambia el presupuesto.
-      const activeGoals = visibleGoals.filter(
-        (g) =>
-          ['NOT_STARTED', 'ON_TRACK', 'AT_RISK', 'BEHIND'].includes(g.status) &&
-          !!activeCycle &&
-          g.goalCycleId === activeCycle.id
-      )
-      const totalWeight = activeGoals.reduce((sum, g) => sum + (g.weight || 0), 0)
+      // MISMA fuente de verdad que validateTotalWeight: INDIVIDUAL ∧ viva ∧ ciclo activo.
+      // visibleGoals ya aplica la política de /team (excluye leader-goals de quien no
+      // tiene reportes) — filterBudgetGoals solo aplica el filtro de presupuesto encima.
+      const activeGoals = filterBudgetGoals(visibleGoals, activeCycle?.id)
+      const totalWeight = sumBudgetWeight(visibleGoals, activeCycle?.id)
       const goalCount = activeGoals.length
 
       let assignmentStatusValue: 'EMPTY' | 'INCOMPLETE' | 'READY' | 'EXCEEDED'
