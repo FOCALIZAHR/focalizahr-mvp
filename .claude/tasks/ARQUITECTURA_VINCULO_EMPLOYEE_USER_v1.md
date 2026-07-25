@@ -49,7 +49,17 @@ Archivos: `schema.prisma` (User+Employee), `AuthorizationService.ts` (extractUse
 `middleware.ts` (header), `auth/user/login/route.ts` (claim JWT), `admin/users/route.ts` (RUT).
 
 ### Etapa 2 — Orden de validación invertido en 7 sitios PDI/Sucesión
-**Estado: ✅ SELLADO — e5e3b82 (6 sitios) + 3c76f55 (sitio 5).**
+**Estado: ✅ SELLADO — e5e3b82 (6 sitios) + 3c76f55 (sitio 5) + 38ccc64 (corrección post-sello).**
+
+> **Corrección post-sello (38ccc64):** la verificación de comportamiento encontró 4 hallazgos
+> del "saltar la búsqueda de Employee para globales": rompía los campos de RELACIÓN
+> (`isManager`/`isOwner`/`canEditProgress`) para un rol global que además es el jefe directo.
+> Fix: restaurar la búsqueda única (el `null` solo bloquea la ENTRADA de no-globales; la
+> relación usa la ficha real). Además — **decisión de producto de Victor** — HR_MANAGER **VE**
+> todos los planes de sucesión pero **EDITA solo su equipo** (`canEditAllPlans` = global excepto
+> HR_MANAGER; los otros 5 globales editan cualquiera). Afecta `pdi/by-employee`,
+> `succession-plan` GET y `.../progress` PUT. Sitios 1,2,3,5 no exponen campos de relación → no
+> se tocaron.
 Gate 0: `.claude/GATE0/GATE0_ETAPA2_REFRAME_EJECUTIVO_TIER.md` · Plan: `PLAN_ETAPA2_VINCULO_EMPLOYEE_USER.md`
 
 **NO es "reframe ejecutivo en varios módulos".** Son **7 sitios concretos de PDI/Sucesión**
@@ -100,6 +110,11 @@ rama por-`employeeId` no tiene filtro departamental (over-permission de AREA_MAN
 **Backlog aparte (no bloqueante, no Etapa 2):** evaluar **deprecar `pdi/route.ts` (GET bare)**
 dado que no tiene consumidor confirmado; al hacerlo, revisar de paso la over-permission
 pre-existente de AREA_MANAGER (rama isHR por-`employeeId` sin filtro departamental).
+
+**Nota Metas (no tocado en esta sesión):** `goals/route.ts:271` — la lectura de código
+sugiere un posible problema con EVALUATOR cuando el email de login no calza con su Employee,
+pero **NO fue verificado en vivo y NO fue tocado en esta sesión**. Queda pendiente de
+verificación futura, **no de fix**.
 
 ### Etapa 3 — Recableo de los 35 sitios
 **Estado: BLOQUEADA — depende de Etapa 1 Y del cierre del minting legacy (ver §2bis R2).**
