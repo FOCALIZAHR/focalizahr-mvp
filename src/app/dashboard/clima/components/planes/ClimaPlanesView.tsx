@@ -3,10 +3,10 @@
 // src/app/dashboard/clima/components/planes/ClimaPlanesView.tsx
 // ════════════════════════════════════════════════════════════════════════════
 // Subproducto "Planes de Acción" (5ª card del Rail, Gate 5D). Shell Cinema Mode
-// con 2 tabs internos:
-//   - departamento (Tab 1): portada → carrusel de 4 caminos → workspace de camino.
-//   - seguimiento  (Tab 3): tracking + matriz de efectividad (GROUP C).
-// Tab 2 (por persona / doble CTA) es 5D-ii, fuera de este componente.
+// con 3 tabs internos:
+//   - departamento (Tab 1, 5D-i): portada → carrusel de 4 caminos → workspace.
+//   - persona      (Tab 2, 5D-ii): responsables con equipos en riesgo, doble CTA.
+//   - seguimiento  (Tab 3): tracking + matriz de efectividad (GROUP C, diferido).
 //
 // El shell SE CORRE (modo `bare`) cuando el usuario está dentro de un camino: ese
 // workspace trae su propio card (Split de Contexto de Categoría, clon de
@@ -20,11 +20,13 @@ import { ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FHREmptyState } from '@/components/ui/FHREmptyState';
 import ClimaPlanDeptTab, { type ClimaPlanDeptView } from './ClimaPlanDeptTab';
+import ClimaPlanPersonaTab, { type ClimaPlanPersonaView } from './ClimaPlanPersonaTab';
 
-type PlanesTab = 'departamento' | 'seguimiento';
+type PlanesTab = 'departamento' | 'persona' | 'seguimiento';
 
 const TABS: { id: PlanesTab; label: string }[] = [
   { id: 'departamento', label: 'Por departamento' },
+  { id: 'persona', label: 'Por persona' },
   { id: 'seguimiento', label: 'Seguimiento' },
 ];
 
@@ -36,12 +38,16 @@ interface ClimaPlanesViewProps {
 export default function ClimaPlanesView({ campaignId, onBack }: ClimaPlanesViewProps) {
   const [tab, setTab] = useState<PlanesTab>('departamento');
   const [deptView, setDeptView] = useState<ClimaPlanDeptView>('carrusel');
+  const [personaView, setPersonaView] = useState<ClimaPlanPersonaView>('portada');
 
   // Dentro de la portada o de un camino, la vista interna trae su PROPIO container
   // (portada = molde CompensationPortada; workspace = Split de Contexto de Categoría)
   // → el shell se corre para no anidar card dentro de card. Equivale a `!showTabs`.
   // La salida de esas pantallas es el Rail fijo de abajo (un solo control por vista).
-  const bare = tab === 'departamento' && deptView !== 'carrusel';
+  // Tab 2: su Workspace también trae su propio contenedor (split) → mismo modo bare.
+  const bare =
+    (tab === 'departamento' && deptView !== 'carrusel') ||
+    (tab === 'persona' && personaView === 'workspace');
 
   return (
     <div
@@ -107,6 +113,11 @@ export default function ClimaPlanesView({ campaignId, onBack }: ClimaPlanesViewP
               onViewChange={setDeptView}
               onExitToLobby={onBack}
             />
+          ) : tab === 'persona' ? (
+            // onAction (destino real del CTA) es Fase 3 → hoy no se pasa: los CTA quedan
+            // inertes salvo el gating, que ya viaja resuelto del endpoint. onViewChange
+            // reporta la vista interna para que el shell corra el chrome en el Workspace.
+            <ClimaPlanPersonaTab campaignId={campaignId} onViewChange={setPersonaView} />
           ) : (
             <FHREmptyState
               type="pending"
