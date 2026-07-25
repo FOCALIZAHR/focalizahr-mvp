@@ -61,15 +61,23 @@ export const TAB2_BELOW_TIER_PDI_THRESHOLD = 3;
 /** Forma mínima que necesita el ruteo (subconjunto de ReactiveImpact). */
 export interface Tab2ReactiveRow {
   reactive: string;
+  /** Dimensión padre (satisfaccion, liderazgo, …) — el único naming que Tab 2 expone. */
+  category: string;
   mean: number | null;
 }
 
 export type Tab2Route = 'ESTADO_B_PDI' | 'ESTADO_A_CHOICE' | 'NONE';
 
 export interface Tab2RoutingResult {
-  /** Reactivos bajo su tier tras filtro estricto (los que alimentan las cards de Estado A). */
-  belowTierReactives: string[];
+  /** Cantidad de reactivos bajo tier (dispara el umbral >3). Es el conteo, no el naming. */
   belowTierCount: number;
+  /**
+   * Dimensiones DISTINTAS con ≥1 reactivo bajo tier, en orden de aparición. Tab 2 es
+   * dimensión-only (SPEC_UI §1): nunca expone el slug del reactivo — el texto de la
+   * pregunta no está resuelto en el pipeline de clima (verificado 2026-07-25). El
+   * cliente humaniza con dimensionLabel().
+   */
+  belowTierDimensions: string[];
   /** Reusado del builder (isSystemic por dimensión), NO recomputado acá. */
   hasSystemicDimension: boolean;
   route: Tab2Route;
@@ -88,12 +96,13 @@ export function routeDepartmentTab2(
   reactives: Tab2ReactiveRow[],
   hasSystemicDimension: boolean
 ): Tab2RoutingResult {
-  const belowTierReactives = reactives
+  const belowTier = reactives
     .filter((r) => r.mean !== null && countsForTab2(r.reactive))
-    .filter((r) => round1((r.mean as number) - reactiveMeanTarget(r.reactive)) < 0)
-    .map((r) => r.reactive);
+    .filter((r) => round1((r.mean as number) - reactiveMeanTarget(r.reactive)) < 0);
 
-  const belowTierCount = belowTierReactives.length;
+  const belowTierCount = belowTier.length;
+  // Dimensiones distintas (Set preserva orden de inserción → orden de aparición estable).
+  const belowTierDimensions = [...new Set(belowTier.map((r) => r.category))];
 
   let route: Tab2Route;
   if (belowTierCount > TAB2_BELOW_TIER_PDI_THRESHOLD || hasSystemicDimension) {
@@ -104,5 +113,5 @@ export function routeDepartmentTab2(
     route = 'NONE';
   }
 
-  return { belowTierReactives, belowTierCount, hasSystemicDimension, route };
+  return { belowTierCount, belowTierDimensions, hasSystemicDimension, route };
 }

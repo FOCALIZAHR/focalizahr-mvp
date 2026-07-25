@@ -65,7 +65,7 @@ async function main() {
   for (const r of insightRows) {
     const reactives: Tab2ReactiveRow[] = (
       (r.reactiveAnalysis as unknown as ReactiveImpact[] | null) ?? []
-    ).map((x) => ({ reactive: x.reactive, mean: x.mean }));
+    ).map((x) => ({ reactive: x.reactive, category: x.category, mean: x.mean }));
 
     const hasSystemic = systemicByDept.get(r.departmentId) ?? false;
     const res = routeDepartmentTab2(reactives, hasSystemic);
@@ -77,7 +77,7 @@ async function main() {
     console.log('');
     console.log(`▸ ${r.department?.displayName ?? r.departmentId}`);
     console.log(`    reactivos medidos (crudo): ${rawMeasured}`);
-    console.log(`    below-tier tras filtro   : ${res.belowTierCount}  [${res.belowTierReactives.join(', ') || '—'}]`);
+    console.log(`    below-tier tras filtro   : ${res.belowTierCount} foco(s)  ·  dimensiones: [${res.belowTierDimensions.join(', ') || '—'}]`);
     console.log(`    isSystemic (builder)     : ${res.hasSystemicDimension}`);
     console.log(`    → RUTA                   : ${res.route}`);
   }

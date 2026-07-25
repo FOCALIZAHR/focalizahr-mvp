@@ -46,7 +46,9 @@ interface DeptFinding {
   departmentName: string;
   route: Tab2Route; // ESTADO_A_CHOICE | ESTADO_B_PDI (NONE se excluye antes de agrupar)
   belowTierCount: number;
-  belowTierReactives: string[];
+  // Dimensión-only (SPEC_UI §1): slugs de reactivo NUNCA viajan al cliente. El texto de
+  // la pregunta no está resuelto en el pipeline de clima (verificado 2026-07-25).
+  belowTierDimensions: string[];
 }
 
 interface ResponsableGroup {
@@ -129,7 +131,7 @@ export async function GET(request: NextRequest) {
     for (const r of visibleInsights) {
       const reactives: Tab2ReactiveRow[] = (
         (r.reactiveAnalysis as unknown as ReactiveImpact[] | null) ?? []
-      ).map((x) => ({ reactive: x.reactive, mean: x.mean }));
+      ).map((x) => ({ reactive: x.reactive, category: x.category, mean: x.mean }));
 
       const routing = routeDepartmentTab2(reactives, systemicByDept.has(r.departmentId));
       if (routing.route === 'NONE') continue; // sin hallazgo → no entra a Tab 2
@@ -164,7 +166,7 @@ export async function GET(request: NextRequest) {
         departmentName: r.department?.displayName ?? 'Departamento',
         route: routing.route,
         belowTierCount: routing.belowTierCount,
-        belowTierReactives: routing.belowTierReactives,
+        belowTierDimensions: routing.belowTierDimensions,
       });
     }
 
