@@ -17,38 +17,46 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
-    // 2. Resolver Employee del usuario logueado
-    const currentEmployee = await prisma.employee.findFirst({
-      where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' }
-    })
-
-    if (!currentEmployee) {
-      return NextResponse.json({ success: true, data: [], count: 0 })
-    }
-
-    // 3. Parse query params
+    // 2. Parse query params (antes del lookup: HR consultando por employeeId no
+    //    necesita su propia fila Employee)
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')
     const cycleId = searchParams.get('cycleId')
     const status = searchParams.get('status')
     const role = searchParams.get('role') // 'manager' | 'employee' — qué PDIs quiero ver
 
+    const isHR = hasPermission(userContext.role, 'employees:read')
+
+    // 3. Resolver Employee del usuario logueado
+    const currentEmployee = await prisma.employee.findFirst({
+      where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' }
+    })
+
+    // Sin fila Employee propia: solo HR consultando por employeeId EXPLÍCITO puede
+    // continuar (ese filtro no depende de la identidad del solicitante). La vista
+    // propia y la de manager sí la necesitan → lista vacía. NO se da cuenta completa:
+    // la rama isHR de este endpoint siempre exigió employeeId (a diferencia del resto
+    // del módulo), así que esto restaura identidad, no agrega alcance.
+    if (!currentEmployee && !(isHR && employeeId)) {
+      return NextResponse.json({ success: true, data: [], count: 0 })
+    }
+
     // 4. Construir filtro según rol
     const where: any = { accountId: userContext.accountId }
 
-    const isHR = hasPermission(userContext.role, 'employees:read')
-
     if (isHR && employeeId) {
-      // HR puede buscar por cualquier empleado
+      // HR puede buscar por cualquier empleado (sin depender de su propia fila Employee)
       where.employeeId = employeeId
-    } else if (role === 'employee') {
-      // Ver mis propios PDIs como empleado
-      where.employeeId = currentEmployee.id
-    } else {
-      // Por defecto: ver PDIs donde soy manager
-      where.managerId = currentEmployee.id
-      // Si se especifica employeeId, filtrar también por ese empleado
-      if (employeeId) where.employeeId = employeeId
+    } else if (currentEmployee) {
+      if (role === 'employee') {
+        // Ver mis propios PDIs como empleado
+        where.employeeId = currentEmployee.id
+      } else {
+        // Por defecto: ver PDIs donde soy manager
+        where.managerId = currentEmployee.id
+        // Si se especifica employeeId, filtrar también por ese empleado
+        if (employeeId) where.employeeId = employeeId
+      }
     }
 
     if (cycleId) where.cycleId = cycleId
