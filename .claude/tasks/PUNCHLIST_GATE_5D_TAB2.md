@@ -111,13 +111,19 @@ NO bloquea 1.2/2.1 (conteo por-centro es independiente de quién sea la persona)
 
 ## Fase 3 — Contrato `CLIMA_TRIGGERED` (rama Meta)  (FRENADO)
 
+> **✅ SCHEMA APLICADO a prod (`db push`, 2026-07-25, `--skip-generate` + `--accept-data-loss`):**
+> enum `GoalOriginType +CLIMA_TRIGGERED` · `Goal.sourceReferenceId String?` ·
+> `@@unique unique_goal_clima_source`. Verificado con SQL crudo contra la BD real (los 3 existen).
+> **Falta regenerar el Prisma client** (se usó `--skip-generate` para no matar el dev de Victor;
+> ningún código usa los campos nuevos todavía) — corre solo en el próximo `prisma generate`/build.
+
 | # | Qué | Reusar / file:line | Tipo |
 |---|-----|--------------------|------|
-| 3.1 | `originType: 'CLIMA_TRIGGERED'` — 3er valor del enum `GoalOriginType` | Verificar `switch(originType)` exhaustivos → TS los marca (`RESOLUCION:288-294`) | Schema + barrido |
+| 3.1 | `originType: 'CLIMA_TRIGGERED'` — enum ✅ aplicado. **NO hay `switch(originType)` en el código** (grep 2026-07-25) → TS NO marca nada al agregar el valor; la premisa de RESOLUCION §3.5 era falsa. Único update MANUAL pendiente: `useGoals.ts:33` (union local client-side `'STRATEGIC_CASCADE'\|'MANAGER_CREATED'`, desacoplada de Prisma; no da error de compilación, agregarle `CLIMA_TRIGGERED` a mano) | — | Manual: 1 línea |
 | 3.2 | Contrato de creación: `level:INDIVIDUAL`, `employeeId=responsable`, `metricType:NUMBER`, `startValue=mean`, `targetValue=mean+delta`, `weight:100/N` | `validateTotalWeight`/`checkGoalWeight` ya cubren peso (`RESOLUCION:191-215`); solo `kpiSource:OWN` (`:152-158`) | Mecánico |
 | 3.3 | Constante `CLIMA_GOAL_TARGET_MIN_DELTA=0.2` (propia, no reusar `REACTIVE_MOMENTUM_MIN_DELTA`) | `RESOLUCION:279-284` | Const nueva |
 | 3.4 | `sourceReferenceId` → ActionPlan **aprobado** (nunca borrador); walk-up `parentPlanId` | `RESOLUCION:296-320` | Mecánico + regla dura |
-| 3.5 | Idempotencia: unique `(accountId, employeeId, sourceReferenceId)` + catch P2002 → `GoalDuplicateError` vía `goalsErrorResponse.ts` | `RESOLUCION:329-353` | Schema + servicio |
+| 3.5 | Idempotencia: unique constraint ✅ aplicado (`unique_goal_clima_source`). Falta el catch P2002 → `GoalDuplicateError` vía `goalsErrorResponse.ts` en el servicio | `RESOLUCION:329-353` | Servicio (schema ✅) |
 | 3.6 | Presentación % de avance (no mean crudo): `"68% · Vas bien"` + referencia técnica chica | `calculateProgress` (existe, `GoalMetricType.NUMBER`) — no construir | Reuso + UI |
 | VERIF 3.a | Grep fresco del string exacto `'Cultura y Personas'`/`'Clima'` contra la BD antes de usarlo | `RESOLUCION:362-365` | Verificación |
 
@@ -126,7 +132,7 @@ NO bloquea 1.2/2.1 (conteo por-centro es independiente de quién sea la persona)
 ## Orden de dependencia
 
 1.2 alimenta 2.1 (el conteo); Fase 2 cierra antes de Fase 3 (la rama Meta solo se construye
-para el caso no-sistémico + elección). **Fase 3.5 (unique constraint) toca schema en la BD
-única de producción → requiere OK explícito de Victor antes de `db push`.**
+para el caso no-sistémico + elección). **Schema de Fase 3 (enum + campo + constraint) YA
+aplicado a prod (`db push` 2026-07-25, aprobado por Victor). Falta el runtime + regen del client.**
 
 **Bloqueadores activos:** (1) Decisión 1.a de Victor. (2) OK de Victor para arrancar 1.2+.
