@@ -31,15 +31,13 @@ export async function PUT(
       return NextResponse.json({ success: false, error: 'goalId requerido' }, { status: 400 })
     }
 
-    // Roles con acceso global (HR/ejecutivo) no dependen de tener fila Employee.
-    // Se evalúan antes del lookup y lo saltan (fix del array isHR que omitía HR_MANAGER).
+    // isHR (rol global) accede; la búsqueda se hace SIEMPRE para calcular isManager,
+    // el null solo bloquea la entrada a los no-globales.
     const isHR = GLOBAL_ACCESS_ROLES.includes(userContext.role as any)
-    const currentUser = isHR
-      ? null
-      : await prisma.employee.findFirst({
-          where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' },
-          select: { id: true },
-        })
+    const currentUser = await prisma.employee.findFirst({
+      where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' },
+      select: { id: true },
+    })
 
     if (!isHR && !currentUser) {
       return NextResponse.json({ success: false, error: 'Usuario no encontrado' }, { status: 404 })
@@ -51,6 +49,8 @@ export async function PUT(
     })
 
     const isManager = !!currentUser && employee?.managerId === currentUser.id
+    // Editar toda la empresa: globales EXCEPTO HR_MANAGER (ve todo, edita solo su equipo).
+    const canEditAllPlans = isHR && userContext.role !== 'HR_MANAGER'
 
     if (!isManager && !isHR) {
       return NextResponse.json({ success: false, error: 'Sin permisos para editar progreso' }, { status: 403 })
@@ -75,8 +75,9 @@ export async function PUT(
       return NextResponse.json({ success: false, error: 'Goal no encontrado' }, { status: 404 })
     }
 
-    // HR can always edit; managers need explicit permission
-    if (!isHR && (!goal.plan.visibleToDirectManager || !goal.plan.managerCanEditProgress)) {
+    // Editores de toda la empresa (globales menos HR_MANAGER) editan cualquiera; el resto
+    // (managers y HR_MANAGER) solo si son el jefe directo y el plan lo permite.
+    if (!canEditAllPlans && (!isManager || !goal.plan.visibleToDirectManager || !goal.plan.managerCanEditProgress)) {
       return NextResponse.json({ success: false, error: 'No tienes permiso para editar progreso' }, { status: 403 })
     }
 

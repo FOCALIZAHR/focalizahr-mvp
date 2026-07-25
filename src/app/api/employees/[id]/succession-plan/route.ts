@@ -20,15 +20,14 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
-    // Roles con acceso global (HR/ejecutivo) no dependen de tener fila Employee.
-    // Se evalúan antes del lookup y lo saltan (fix del array isHR que omitía HR_MANAGER).
+    // isHR (rol global, incl. HR_MANAGER) puede VER cualquier plan. La búsqueda de ficha
+    // se hace SIEMPRE para calcular la relación (isManager); el null solo bloquea la
+    // entrada a los no-globales.
     const isHR = GLOBAL_ACCESS_ROLES.includes(userContext.role as any)
-    const currentUser = isHR
-      ? null
-      : await prisma.employee.findFirst({
-          where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' },
-          select: { id: true },
-        })
+    const currentUser = await prisma.employee.findFirst({
+      where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' },
+      select: { id: true },
+    })
 
     if (!isHR && !currentUser) {
       return NextResponse.json({ success: false, error: 'Usuario no encontrado' }, { status: 404 })
@@ -45,6 +44,9 @@ export async function GET(
 
     // Only direct manager or HR/global roles can access (isHR ya calculado arriba)
     const isManager = !!currentUser && employee.managerId === currentUser.id
+    // Editar planes de TODA la empresa: roles globales EXCEPTO HR_MANAGER (que VE todo
+    // pero EDITA solo su equipo). Reproduce el set que editaba antes de Etapa 2.
+    const canEditAllPlans = isHR && userContext.role !== 'HR_MANAGER'
 
     if (!isManager && !isHR) {
       return NextResponse.json({ success: false, error: 'Sin permisos para ver este plan' }, { status: 403 })
@@ -91,7 +93,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: plans,
-      canEditProgress: plans.length > 0 && (isManager ? plans[0].managerCanEditProgress : isHR),
+      canEditProgress: plans.length > 0 && (canEditAllPlans || (isManager ? plans[0].managerCanEditProgress : false)),
     })
   } catch (error: any) {
     console.error('[Employee SuccessionPlan GET] Error:', error)

@@ -90,17 +90,17 @@ export async function GET(request: NextRequest) {
     // Verificar acceso según rol
     // ════════════════════════════════════════════════════════════════════════
     const userEmail = request.headers.get('x-user-email') || ''
-    // Los roles con acceso global (HR/ejecutivo) no dependen de tener fila Employee.
     const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(userContext.role as any)
-    const currentEmployee = hasGlobalAccess
-      ? null
-      : await prisma.employee.findFirst({
-          where: {
-            accountId: userContext.accountId,
-            email: userEmail,
-            status: 'ACTIVE'
-          }
-        })
+    // La búsqueda tiene DOS usos: puerta de entrada (un rol global no depende de tener
+    // ficha) y relación con este PDI (isManager/isEmployee para el bloque meta). Por eso
+    // se busca SIEMPRE; el null solo bloquea la entrada a los no-globales.
+    const currentEmployee = await prisma.employee.findFirst({
+      where: {
+        accountId: userContext.accountId,
+        email: userEmail,
+        status: 'ACTIVE'
+      }
+    })
 
     if (!hasGlobalAccess && !currentEmployee) {
       return NextResponse.json(
