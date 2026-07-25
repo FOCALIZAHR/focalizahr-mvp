@@ -1,6 +1,6 @@
 # ARQUITECTURA_VINCULO_EMPLOYEE_USER_v1.md
 
-> **Estado:** Proyecto abierto, en etapas. Etapa 1 ✅ SELLADA (c1e08e6).
+> **Estado:** Proyecto abierto, en etapas. Etapa 1 ✅ SELLADA (c1e08e6) · Etapa 2 ✅ SELLADA (e5e3b82 + 3c76f55).
 > **Fecha creación:** 2026-07-24 · **Decide:** Victor
 > **Origen:** dos hilos independientes (Metas/Notificaciones, 2026-07-15; Clima
 > Tab 2, 2026-07-24) llegaron por separado a la misma conclusión — valida la
@@ -48,14 +48,58 @@ Decisiones selladas (ver plan para razonamiento):
 Archivos: `schema.prisma` (User+Employee), `AuthorizationService.ts` (extractUserContext),
 `middleware.ts` (header), `auth/user/login/route.ts` (claim JWT), `admin/users/route.ts` (RUT).
 
-### Etapa 2 — Reframe de scope ejecutivo-tier
-**Estado: PENDIENTE — no depende de la Etapa 1**
+### Etapa 2 — Orden de validación invertido en 7 sitios PDI/Sucesión
+**Estado: ✅ SELLADO — e5e3b82 (6 sitios) + 3c76f55 (sitio 5).**
+Gate 0: `.claude/GATE0/GATE0_ETAPA2_REFRAME_EJECUTIVO_TIER.md` · Plan: `PLAN_ETAPA2_VINCULO_EMPLOYEE_USER.md`
 
-Los sitios de los 35 que solo tocan roles ejecutivo-tier (CEO, ACCOUNT_OWNER,
-HR_ADMIN, HR_MANAGER, HR_OPERATOR, FOCALIZAHR_ADMIN) dejan de intentar resolver
-`Employee` para su scope — usan `GLOBAL_ACCESS_ROLES`, patrón ya existente.
-Cubre también el caso "ejecutivo/holding sin Employee en esta cuenta" (persona
-paga por otra entidad legal, nunca va a tener fila en este `Employee`).
+**NO es "reframe ejecutivo en varios módulos".** Son **7 sitios concretos de PDI/Sucesión**
+donde el `employee.findFirst({email})` corría ANTES del chequeo de acceso global que ya
+existía más abajo — bloqueando a un exec-tier (sin fila Employee) por un acceso que el propio
+código le concedía. Fix = anteponer el chequeo global y saltar el lookup para roles globales.
+
+Sitios (Gate 0 = 7 M de 35):
+- **PDI (5):** `pdi/[id]` GET+PATCH, `pdi/goals/[goalId]` PATCH, `pdi/by-employee` GET —
+  `hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(role)` se computa antes, el lookup se salta
+  para roles globales, usos de `currentEmployee` vueltos null-safe (`?.id`).
+- **Sucesión (2):** `employees/[id]/succession-plan` GET + `.../progress` PUT — además
+  reemplaza el array `isHR` hardcodeado (omitía **HR_MANAGER**) por `GLOBAL_ACCESS_ROLES`.
+  `AREA_MANAGER` sigue denegado; `HR_MANAGER` ahora incluido.
+- **Sitio 5:** `pdi/route.ts` GET list — ver nota abajo (reframe conservador, opción a).
+
+Verificado con smoke que **invoca los handlers reales** (email fantasma sin Employee): CEO/
+HR_MANAGER → 200; AREA_MANAGER → 404 denegado; HR+employeeId (list) → count≥1; HR sin
+employeeId → vacío (no account-wide).
+
+**Nota sitio 5 (`pdi/route.ts`):** sin consumidor cliente confirmado hoy (toda la UI real usa
+`/api/pdi/by-employee` y `/api/pdi/[id]`). Su rama `isHR` **nunca dio `{accountId}`** — siempre
+exigió `employeeId` explícito, a diferencia de los otros 6 (que tenían la rama de cuenta completa
+ya escrita, solo bloqueada por el orden). El fix restaura identidad (HR sin Employee propia que
+pasa `?employeeId=X` deja de fallar), **NO agrega alcance**; el default sin employeeId
+(manager-scoped) queda intacto. ⚠️ **Matiz encontrado:** el `isHR` de este endpoint es el permiso
+`employees:read`, que **incluye AREA_MANAGER y excluye CEO** — NO es `GLOBAL_ACCESS_ROLES`; y su
+rama por-`employeeId` no tiene filtro departamental (over-permission de AREA_MANAGER
+**PRE-EXISTENTE**, no introducida por Etapa 2). Ver backlog abajo.
+
+**Fuera de alcance de Etapa 2 (documentado, no tocado):**
+1. `goals/team:43` + `goals/team/coverage:16` — decisión de **producto** sin resolver: qué
+   significa "team" para un exec-tier sin reportes directos. `/team` hace 404 duro, `coverage`
+   degrada a `{total:0}`. Pendiente de decisión de producto, NO de Etapa 2.
+2. `isSystemAdmin` incompleto en `admin/performance-ratings:111` (y `ratings-for-potential:61`)
+   — cubre 3 de 6 GLOBAL; HR_MANAGER/HR_OPERATOR/CEO degradan a vacío/`canAssignPotential=false`.
+   **Política de rol deliberada, no bug.** Backlog de gobernanza, separado.
+3. **Calibración — CONFIRMADO tercer mecanismo, no reabrir.** Autoriza vía `CalibrationParticipant`
+   (`schema.prisma:2582`), match por `participantEmail` (`:2589`) + rol de sesión
+   FACILITATOR/REVIEWER/OBSERVER (`:2516-2518`). Nunca pasa por `Employee.findFirst({email})` ni
+   `GLOBAL_ACCESS_ROLES` → el bug de Etapa 2 jamás lo tocó.
+4. **Nota futura (no accionable hoy):** "calibrador no-jefe inyecta un PDI desde la sala de
+   calibración" está documentado como base lista pero **NO construido**
+   (`.claude/FICHA_PRODUCTOS/project_gate0_base_madre_desempeno_metas.md`, sección D.1 s/ Victor).
+   Al construirlo, autorizar vía `CalibrationParticipant` de esa sesión, **NO** `managerId`/
+   `GLOBAL_ACCESS_ROLES`.
+
+**Backlog aparte (no bloqueante, no Etapa 2):** evaluar **deprecar `pdi/route.ts` (GET bare)**
+dado que no tiene consumidor confirmado; al hacerlo, revisar de paso la over-permission
+pre-existente de AREA_MANAGER (rama isHR por-`employeeId` sin filtro departamental).
 
 ### Etapa 3 — Recableo de los 35 sitios
 **Estado: BLOQUEADA — depende de Etapa 1 Y del cierre del minting legacy (ver §2bis R2).**
@@ -89,6 +133,11 @@ fallo ahí).
 
 No se corre contra data de prueba. Se corre el primer día que entre un cliente
 real, contra su nómina real — mismo criterio que `Department.responsableId`.
+
+> **Dato encontrado (Gate 0 Etapa 2):** el Employee `cmr1w27fn` coincide por email con
+> `victor@focalizahr.cl` (User CEO), **sin vínculo formal** — candidato natural para el
+> backfill de Etapa 5 cuando corra (evidencia de que el match por email/RUT existe en la
+> cuenta de prueba, aunque el backfill real solo se dispara con nómina productiva).
 
 ---
 
@@ -158,3 +207,9 @@ forjado → pasa sin que el middleware lo pise (SPEC §4bis caso 5).
   NEGOCIABLES: R1 (chequeo `accountId` antes de escribir el vínculo) y R2 (Etapa 3
   bloqueada hasta cerrar el minting legacy de JWT — SPEC_MIDDLEWARE_LEGACY_ROLE_
   HARDENING_v1 §4bis caso 5). Etapa 3 marcada BLOQUEADA; Etapa 4 con nota R1.
+- v1.2 (2026-07-25): Etapa 2 SELLADA (e5e3b82 6 sitios + 3c76f55 sitio 5). Redefinida
+  como "7 sitios PDI/Sucesión con orden de validación invertido" (no reframe multi-módulo).
+  Documentado fuera-de-alcance (goals/team, isSystemAdmin Performance, Calibración=tercer
+  mecanismo, PDI-desde-calibración futuro), nota sitio 5 (sin consumidor, isHR=employees:read
+  ≠ GLOBAL, matiz AREA_MANAGER pre-existente), backlog deprecación pdi/route bare, y dato de
+  backfill Etapa 5 (Employee cmr1w27fn ↔ victor@ sin vínculo formal).
