@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { extractUserContext } from '@/lib/services/AuthorizationService'
+import { extractUserContext, GLOBAL_ACCESS_ROLES } from '@/lib/services/AuthorizationService'
 
 export async function PUT(
   request: NextRequest,
@@ -31,13 +31,17 @@ export async function PUT(
       return NextResponse.json({ success: false, error: 'goalId requerido' }, { status: 400 })
     }
 
-    // Verify requesting user is the direct manager
-    const currentUser = await prisma.employee.findFirst({
-      where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' },
-      select: { id: true },
-    })
+    // Roles con acceso global (HR/ejecutivo) no dependen de tener fila Employee.
+    // Se evalúan antes del lookup y lo saltan (fix del array isHR que omitía HR_MANAGER).
+    const isHR = GLOBAL_ACCESS_ROLES.includes(userContext.role as any)
+    const currentUser = isHR
+      ? null
+      : await prisma.employee.findFirst({
+          where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' },
+          select: { id: true },
+        })
 
-    if (!currentUser) {
+    if (!isHR && !currentUser) {
       return NextResponse.json({ success: false, error: 'Usuario no encontrado' }, { status: 404 })
     }
 
@@ -46,8 +50,7 @@ export async function PUT(
       select: { managerId: true },
     })
 
-    const isManager = employee?.managerId === currentUser.id
-    const isHR = !!userContext.role && ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_ADMIN', 'HR_OPERATOR', 'CEO'].includes(userContext.role)
+    const isManager = !!currentUser && employee?.managerId === currentUser.id
 
     if (!isManager && !isHR) {
       return NextResponse.json({ success: false, error: 'Sin permisos para editar progreso' }, { status: 403 })

@@ -28,11 +28,16 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: 'Sin permisos' }, { status: 403 })
     }
 
-    const currentEmployee = await prisma.employee.findFirst({
-      where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' }
-    })
+    // Los roles con acceso global (HR/ejecutivo) no dependen de tener fila Employee.
+    const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(userContext.role as any)
 
-    if (!currentEmployee) {
+    const currentEmployee = hasGlobalAccess
+      ? null
+      : await prisma.employee.findFirst({
+          where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' }
+        })
+
+    if (!hasGlobalAccess && !currentEmployee) {
       return NextResponse.json({ success: false, error: 'Empleado no encontrado' }, { status: 404 })
     }
 
@@ -54,8 +59,7 @@ export async function PATCH(
     // ════════════════════════════════════════════════════════════════════════
     // Capa 1: GLOBAL_ACCESS_ROLES - Acceso total a la empresa
     // ════════════════════════════════════════════════════════════════════════
-    const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(userContext.role as any)
-    const isDirectManager = goal.plan.managerId === currentEmployee.id
+    const isDirectManager = goal.plan.managerId === currentEmployee?.id
 
     // ════════════════════════════════════════════════════════════════════════
     // Capa 2: AREA_MANAGER - Filtro jerárquico

@@ -34,11 +34,17 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'Sin permisos' }, { status: 403 })
     }
 
-    const currentEmployee = await prisma.employee.findFirst({
-      where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' }
-    })
+    // Los roles con acceso global (HR/ejecutivo) no dependen de tener fila Employee
+    // (caso ejecutivo/holding): se evalúan antes del lookup y lo saltan.
+    const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(userContext.role as any)
 
-    if (!currentEmployee) {
+    const currentEmployee = hasGlobalAccess
+      ? null
+      : await prisma.employee.findFirst({
+          where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' }
+        })
+
+    if (!hasGlobalAccess && !currentEmployee) {
       return NextResponse.json({ success: false, error: 'Empleado no encontrado' }, { status: 404 })
     }
 
@@ -72,9 +78,8 @@ export async function GET(
     // ════════════════════════════════════════════════════════════════════════
     // Verificar acceso según rol
     // ════════════════════════════════════════════════════════════════════════
-    const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(userContext.role as any)
-    const isDirectManager = pdi.managerId === currentEmployee.id
-    const isEmployee = pdi.employeeId === currentEmployee.id
+    const isDirectManager = pdi.managerId === currentEmployee?.id
+    const isEmployee = pdi.employeeId === currentEmployee?.id
 
     let hasHierarchicalAccess = false
     if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
@@ -134,11 +139,15 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: 'Sin permisos' }, { status: 403 })
     }
 
-    const currentEmployee = await prisma.employee.findFirst({
-      where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' }
-    })
+    const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(userContext.role as any)
 
-    if (!currentEmployee) {
+    const currentEmployee = hasGlobalAccess
+      ? null
+      : await prisma.employee.findFirst({
+          where: { accountId: userContext.accountId, email: userEmail, status: 'ACTIVE' }
+        })
+
+    if (!hasGlobalAccess && !currentEmployee) {
       return NextResponse.json({ success: false, error: 'Empleado no encontrado' }, { status: 404 })
     }
 
@@ -158,8 +167,7 @@ export async function PATCH(
     // ════════════════════════════════════════════════════════════════════════
     // Verificar acceso de escritura
     // ════════════════════════════════════════════════════════════════════════
-    const hasGlobalAccess = GLOBAL_ACCESS_ROLES.includes(userContext.role as any)
-    const isDirectManager = pdi.managerId === currentEmployee.id
+    const isDirectManager = pdi.managerId === currentEmployee?.id
 
     let hasHierarchicalAccess = false
     if (userContext.role === 'AREA_MANAGER' && userContext.departmentId) {
