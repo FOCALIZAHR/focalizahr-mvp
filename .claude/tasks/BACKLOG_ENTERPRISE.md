@@ -43,6 +43,12 @@
   - **(2) 🔒 HALLAZGO NUEVO, NO relacionado (afecta OTRO módulo — participantes/campañas, no metas):** dentro de `buildParticipantAccessFilter` (`AuthorizationService.ts:80`) hay un array LOCAL `const globalRoles = ['FOCALIZAHR_ADMIN', 'ACCOUNT_OWNER', 'HR_MANAGER', 'CEO']` que **NO incluye `HR_ADMIN` ni `HR_OPERATOR`**, a diferencia de `GLOBAL_ACCESS_ROLES` (que sí). Consecuencia posible: `HR_ADMIN`/`HR_OPERATOR` caerían en "CASO 3: sin acceso" (0 resultados) en cualquier función que use `buildParticipantAccessFilter` → **podría estar bloqueando su acceso a participantes/campañas HOY, en producción.** Preexistente, requiere investigación aparte. **Misma prioridad que el residual de check-in de ciclo cerrado** (ver ficha de Metas, HALLAZGOS ABIERTOS). 🔒 · M · **P1**.
 - **Cómo revertir si algo falla:** `git checkout 937cdf8 -- src/lib/services/AuthorizationService.ts` y borrar `src/lib/auth/permissions.ts`.
 
+**2026-07-27 — Deuda de idioma: voseo en copy user-facing (CROSS-MÓDULO, DIFERIDO con OK propio):**
+- Auditoría (grep app-wide) encontró **28 ocurrencias de voseo en 14 archivos** de copy — Goals (`wizard/`, `cycles/`, `bank/`), Efficiency (`plan/[planId]`, `MisPlanesBtn`), Clima (incl. **Tab 1 sellado** `ClimaPlanDeptTab.tsx:51,54` + `ClimaPlanPersonaTab.tsx:88` + comentario `ClimaDimensionesView.tsx:7`), `DD_PREV/narrativas.ts`. Formas: imperativos `-á` (`Asigná`, `Arrastrá`, `Elegí`, `Intentá`, `Seleccioná`) + presente `-és/-ís` (`podés`, `tenés`, `querés`, `elegís`) + `vos` literal.
+- **Causa raíz:** la regla "tuteo, sin voseo" existía SOLO en `focalizahr-whatsapp-templates` (scopeada a WhatsApp); nunca estuvo en la skill central de copy → toda copy nueva free-generaba la variante e imitaba el módulo de al lado (ya voseo). **Corregido en la fuente esta sesión:** regla promovida a `focalizahr-narrativas` (§"Regla de idioma") → previene recurrencia.
+- **Ya corregido esta sesión:** `climaTab2Content.ts` completo (Fase 3 Tab 2, 9 strings) + `create-meta/route.ts` ("Asigná"→"Asigna").
+- **PENDIENTE — barrido de los ~13 archivos restantes** (Goals/Efficiency/DD_PREV/Clima Tab 1). Toca copy **sellada** de varios módulos → su propia sesión con **OK explícito**. NO tocar sin ese OK. 🎨 · M · **P3**.
+
 ---
 
 ## Modelo de priorización

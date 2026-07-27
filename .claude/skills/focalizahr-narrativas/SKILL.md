@@ -22,6 +22,27 @@ tensión con precisión quirúrgica.
 
 ---
 
+## Regla de idioma — español neutro, tuteo (NUNCA voseo)
+
+Toda la copy ejecutiva de FocalizaHR — dashboards, modales, tooltips,
+síntesis, botones, mensajes de estado y de error — va en **español neutro
+con tuteo** (`tú` y `te`), **nunca voseo**. Esta regla vivía antes solo en
+`focalizahr-whatsapp-templates` (scopeada a mensajes de WhatsApp); acá se
+promueve a TODA la copy, no solo mensajes.
+
+```
+✅ "Asigna un responsable" · "Elige una opción" · "Puedes cerrar la meta" · "Inténtalo de nuevo"
+❌ "Asigná un responsable" · "Elegí una opción" · "Podés cerrar la meta" · "Intentá de nuevo" · "vos sabés"
+```
+
+**Qué es voseo (para detectarlo):** las formas `-á`/`-és`/`-ís` de
+imperativo/presente de 2ª persona (`asigná`, `elegí`, `arrastrá`, `intentá`,
+`seleccioná`, `podés`, `tenés`, `querés`, `elegís`) y el `vos` literal. En la
+duda, preferir la forma **impersonal** ("el plan debe aprobarse", "hay que
+identificar") o el **tuteo neutro** ("asigna", "elige", "puedes").
+
+---
+
 ## Las 6 Reglas de Oro
 
 > La Regla 0 es el cimiento estructural sobre el que descansan las 6
