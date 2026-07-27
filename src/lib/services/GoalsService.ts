@@ -18,7 +18,7 @@ import {
 } from '@prisma/client'
 import { GoalCycleClosedError, GoalCycleValidationError, GoalCycleService } from './GoalCycleService'
 import { getChildDepartmentIds, GLOBAL_ACCESS_ROLES } from './AuthorizationService'
-import { GOAL_FAMILY_LABELS, isValidSubfamily } from '@/lib/constants/goalCategories'
+import { GOAL_FAMILY_LABELS, isValidSubfamily, FAMILY_CLIMA, SUBFAMILY_CLIMA } from '@/lib/constants/goalCategories'
 // Constante COMPARTIDA con Clima A PROPÓSITO — ver src/lib/services/clima/climaThresholds.ts.
 // Ese archivo es un módulo de constantes PURO (cero imports): es hoja del grafo de
 // dependencias, así que importarlo desde acá no puede generar ningún ciclo.
@@ -215,6 +215,12 @@ interface CreateGoalInput {
   // El par (family, subfamily) lo valida validateCategory en prepareGoalData.
   family?: GoalFamily
   subfamily?: string
+
+  // Trazabilidad de origen CLIMA_TRIGGERED (Gate 5D Fase 3): dos columnas separadas (no un
+  // string compuesto) — sourceActionPlanId = ActionPlan aprobado, sourceTriggerRef = reactivo
+  // puntual. prepareGoalData NO las mapea (como parentId) → el creador las asigna a mano.
+  sourceActionPlanId?: string
+  sourceTriggerRef?: string
 }
 
 interface UpdateProgressInput {
@@ -344,6 +350,61 @@ export class GoalsService {
     data.isOrphan = true
     data.goalCycleId = await this.resolveInheritedCycleId(input.accountId)
     const created = await prisma.goal.create({ data })
+    await this.emitGoalAssignedAlert(created)
+    return created
+  }
+
+  /**
+   * Crear meta INDIVIDUAL nacida de una decisión de clima (Gate 5D Fase 3). 4º creador,
+   * hermano de createCorporate/Manager/FromDevelopment. Contrato: RESOLUCION_GATE_5D_TAB2 §3.
+   *
+   * - Campos fijos del origen clima: originType CLIMA_TRIGGERED · level INDIVIDUAL · kpiSource
+   *   OWN · metricType NUMBER · family/subfamily del contrato de Clima (FAMILY_CLIMA/SUBFAMILY_CLIMA).
+   * - isAligned=false / isOrphan=true: individual libre, SIN parent (RESOLUCION §3.1 — la
+   *   corporativa de Clima es display-only, NO cascadea). La alineación-por-categoría quedó como
+   *   decisión aparte (rompe el invariante sellado de isAligned — ver Gate 0 §B0).
+   * - (sourceActionPlanId, sourceTriggerRef) + @@unique(accountId, employeeId, +estas dos):
+   *   idempotencia — una decisión de clima crea a lo sumo UNA meta por (persona, plan, reactivo)
+   *   (catch P2002 → GoalDuplicateError).
+   * - weight lo calcula el caller (100/N); validateTotalWeight solo valida ≤100.
+   */
+  static async createClimaTriggeredGoal(
+    input: Omit<CreateGoalInput, 'level' | 'originType' | 'parentId' | 'kpiSource'> & {
+      employeeId: string
+      sourceActionPlanId: string
+      sourceTriggerRef: string
+    }
+  ): Promise<Goal> {
+    await this.validateGoalLimit(input.accountId, input.employeeId)
+    await this.validateTotalWeight(input.accountId, input.employeeId, input.weight || 0)
+
+    const data = this.prepareGoalData({
+      ...input,
+      level: 'INDIVIDUAL',
+      kpiSource: 'OWN',
+      metricType: 'NUMBER',
+      originType: 'CLIMA_TRIGGERED',
+      family: FAMILY_CLIMA,
+      subfamily: SUBFAMILY_CLIMA,
+    })
+    // prepareGoalData no mapea estas dos (como parentId en cascadeGoal) → a mano.
+    data.sourceActionPlanId = input.sourceActionPlanId
+    data.sourceTriggerRef = input.sourceTriggerRef
+    data.isAligned = false
+    data.isOrphan = true
+    data.goalCycleId = await this.resolveInheritedCycleId(input.accountId)
+
+    let created: Goal
+    try {
+      created = await prisma.goal.create({ data })
+    } catch (e) {
+      // Idempotencia: el unique (accountId, employeeId, sourceActionPlanId, sourceTriggerRef)
+      // rebota el 2º intento con el mismo (plan, reactivo) → dominio (goalsErrorResponse → 400).
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        throw new GoalDuplicateError('Ya existe una meta para esta decisión de clima')
+      }
+      throw e
+    }
     await this.emitGoalAssignedAlert(created)
     return created
   }

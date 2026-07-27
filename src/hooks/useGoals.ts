@@ -30,7 +30,7 @@ const fetcher = (url: string) => {
 type GoalLevel = 'COMPANY' | 'AREA' | 'INDIVIDUAL'
 type GoalStatus = 'NOT_STARTED' | 'ON_TRACK' | 'AT_RISK' | 'BEHIND' | 'PENDING_CLOSURE' | 'COMPLETED' | 'CANCELLED'
 
-type GoalOriginType = 'STRATEGIC_CASCADE' | 'MANAGER_CREATED'
+type GoalOriginType = 'STRATEGIC_CASCADE' | 'MANAGER_CREATED' | 'CLIMA_TRIGGERED'
 
 interface GoalData {
   id: string

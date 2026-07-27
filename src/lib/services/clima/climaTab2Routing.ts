@@ -92,13 +92,23 @@ export interface Tab2RoutingResult {
  * gapMean = round1(mean − reactiveMeanTarget(reactive)) < 0, sobre reactivos medidos
  * (mean !== null), PERO con el filtro estricto de Tab 2 (circular+doble-barril+energia).
  */
+/**
+ * Reactivos BAJO TIER de un depto — fuente ÚNICA de esa definición (medido ∧ cuenta-para-Tab2
+ * ∧ gapMean<0). La consumen `routeDepartmentTab2` (conteo/ruteo, dimensión-only) y el endpoint
+ * reactivo de Fase 3 (que sí expone el detalle: slug + mean + tier + questionText). Genérico en
+ * `T` para preservar cualquier campo extra del caller.
+ */
+export function belowTierReactives<T extends Tab2ReactiveRow>(reactives: T[]): T[] {
+  return reactives
+    .filter((r) => r.mean !== null && countsForTab2(r.reactive))
+    .filter((r) => round1((r.mean as number) - reactiveMeanTarget(r.reactive)) < 0);
+}
+
 export function routeDepartmentTab2(
   reactives: Tab2ReactiveRow[],
   hasSystemicDimension: boolean
 ): Tab2RoutingResult {
-  const belowTier = reactives
-    .filter((r) => r.mean !== null && countsForTab2(r.reactive))
-    .filter((r) => round1((r.mean as number) - reactiveMeanTarget(r.reactive)) < 0);
+  const belowTier = belowTierReactives(reactives);
 
   const belowTierCount = belowTier.length;
   // Dimensiones distintas (Set preserva orden de inserción → orden de aparición estable).

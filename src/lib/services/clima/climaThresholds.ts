@@ -137,6 +137,11 @@ export const REACTIVE_MOMENTUM_MIN_DELTA = 0.2;
  *  mide divergencia del gauge, no momentum del reactivo. PROVISIONAL. */
 export const CLIMA_DIVERGENCE_MEAN_MIN_DELTA = 0.2;
 
+/** Delta mínimo del slider al fijar una meta sobre un reactivo de clima (Gate 5D Fase 3,
+ *  SPEC_UI §2). Constante PROPIA (mismo criterio que CLIMA_DIVERGENCE_MEAN_MIN_DELTA): 0.2
+ *  hoy pero desacoplada, para no arrastrar ajustes de otras reglas si cambian. */
+export const CLIMA_GOAL_TARGET_MIN_DELTA = 0.2;
+
 /** Fracción de reactivos medidos de una dimensión bajo su tier para marcarla sistémica. PROVISIONAL. */
 export const REACTIVE_SYSTEMIC_RATIO = 0.5;
 
