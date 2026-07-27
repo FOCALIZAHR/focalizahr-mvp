@@ -2887,10 +2887,14 @@ model Goal {
   departmentId    String?  @map("department_id")  // Para metas de área (Nivel 1)
   createdById     String   @map("created_by_id")  // Auditoría de creación
 
-  // Trazabilidad CLIMA_TRIGGERED (Gate 5D Tab 2): apunta a la decisión de clima que
-  // originó la meta (actionPlanId:triggerRef de un ActionPlan APROBADO). Nullable/aditivo:
-  // solo las metas nacidas de clima lo setean; el resto queda null.
-  sourceReferenceId String? @map("source_reference_id")
+  // Trazabilidad CLIMA_TRIGGERED (Gate 5D Tab 2): apunta a la decisión de clima que originó
+  // la meta. DOS columnas separadas (patrón CompliancePlanAction), no un string compuesto:
+  // habilita queries directas para la notificación futura de enmienda (§3.5) y evita depender
+  // de un separador que falle en silencio. Nullable/aditivo: solo las metas de clima las setean.
+  //   - sourceActionPlanId: el ActionPlan APROBADO de origen (walk-up a vigente vía parentPlanId).
+  //   - sourceTriggerRef:   el reactivo/trigger puntual dentro de ese plan.
+  sourceActionPlanId String? @map("source_action_plan_id")
+  sourceTriggerRef   String? @map("source_trigger_ref")
 
   // ────────────────────────────────────────────────────────────────────────────
   // 3. DEFINICIÓN
@@ -3019,9 +3023,10 @@ model Goal {
   @@index([dueDate])
   @@index([goalCycleId])
   @@index([accountId, family, subfamily]) // Gate B: el where de findActiveStrategicGoal
-  // Idempotencia clima→meta (Gate 5D Tab 2): una decisión de clima crea a lo sumo UNA
-  // meta por persona. NULL distinto en Postgres → no afecta metas sin este origen.
-  @@unique([accountId, employeeId, sourceReferenceId], map: "unique_goal_clima_source")
+  // Idempotencia clima→meta (Gate 5D Tab 2): una decisión de clima crea a lo sumo UNA meta
+  // por (persona, plan, reactivo). 4 columnas → cada reactivo del mismo plan es una meta
+  // distinta. NULL distinto en Postgres → no afecta metas sin este origen.
+  @@unique([accountId, employeeId, sourceActionPlanId, sourceTriggerRef], map: "unique_goal_clima_source")
   @@map("goals")
 }
 
