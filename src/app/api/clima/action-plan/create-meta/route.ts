@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error:
-            'El departamento no tiene un responsable asignado en la nómina. Asigná un responsable antes de fijar metas.',
+            'El departamento no tiene un responsable asignado en la nómina. Asigna un responsable antes de fijar metas.',
         },
         { status: 409 }
       );
