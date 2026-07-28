@@ -1,9 +1,9 @@
 # MAESTRO: FocalizaHR EX — Inteligencia de Clima
 # Documento maestro ejecutable para Claude Code
 
-> **Versión:** 3.23 — Gate 5D-i (Tab 1 · Planes de Acción) SELLADO — CAS de concurrencia + empty-state "Sin focos" + fix copy Portada; Tab 3 diferido a gate propio
+> **Versión:** 3.24 — Gate 5D-ii (Tab 2 · Por persona) SELLADO — pantalla de fijar meta + wiring del CTA (A `f9b1b3b` / B `6fa7cb4` / C `f0db046`); camino PDI gated (Blocker 2, sin pantalla); Tab 3 diferido a gate propio
 > **Fecha:** Julio 2026
-> **Estado:** En ejecución — Gates 1-4 ✅ (Gate 3 ALG5 costeo CORREGIDO) · Gate 4.5a + 4.5b (+ F) ✅ · **Gate 5A + 5B + 5C ✅ SELLADOS** · **Dynamic Impact Drivers ✅ SELLADO** · **Severidad/Trigger reactivo+mean ✅ SELLADO** (Cluster A + momentum reactivo + fix 5C + sistémico ≥50%) · **Bloque A sensibilidad-mean del gauge ✅ SELLADO** · **Capa 2 variantes (93 celdas) ✅ INTEGRADA** (dispatcher declarativo; META wiring pend. 5D Tab 2) · **Narrativas sistémicas (8 + fallback) ✅ SELLADO** · **Gate 5D-i (Tab 1) ✅ SELLADO** · 5D Tab 2 (POR PERSONA) + Tab 3 (Seguimiento → gate propio) pendientes · 4.5b-ii / D / E pendientes
+> **Estado:** En ejecución — Gates 1-4 ✅ (Gate 3 ALG5 costeo CORREGIDO) · Gate 4.5a + 4.5b (+ F) ✅ · **Gate 5A + 5B + 5C ✅ SELLADOS** · **Dynamic Impact Drivers ✅ SELLADO** · **Severidad/Trigger reactivo+mean ✅ SELLADO** (Cluster A + momentum reactivo + fix 5C + sistémico ≥50%) · **Bloque A sensibilidad-mean del gauge ✅ SELLADO** · **Capa 2 variantes (93 celdas) ✅ INTEGRADA** (dispatcher declarativo; META wiring ✅ 5D-ii) · **Narrativas sistémicas (8 + fallback) ✅ SELLADO** · **Gate 5D-i (Tab 1) ✅ SELLADO** · **Gate 5D-ii (Tab 2 · Por persona) ✅ SELLADO** · Tab 3 (Seguimiento → gate propio) pendiente · 4.5b-ii / D / E pendientes
 
 | Versión | Qué consolidó |
 |---|---|
@@ -1161,6 +1161,50 @@ de Tab 3: qué tipos de campaña habilitan la matriz de efectividad.
   estado más prominente + botón "Revisar decisiones" explícito.
 - **(b) Cuenta demo "EmptyState A/B"** (`demo-emptystates-5di@fixture.local`) — decidir si se limpia o
   se conserva para uso futuro.
+
+### 5D-ii (Tab 2 · POR PERSONA) — ✅ SELLADO (2026-07-28)
+
+Cierra el camino de la **META de clima end-to-end**: de un foco reactivo bajo tier a una meta
+INDIVIDUAL asignada al responsable del centro. El camino **PDI queda gated** (Blocker 2, sin
+pantalla en clima). **Tab 3 (Tracking) NO entra.**
+
+**Qué quedó sellado (commits en local — push de Victor):**
+- **Backend (Fase 3):** trazabilidad en 2 columnas `sourceActionPlanId`+`sourceTriggerRef` +
+  `@@unique` de 4 columnas (`1ee3d37`, db push a prod); endpoint reactivo `GET
+  /api/clima/action-plan/reactives` + `POST /create-meta` + 4º creador
+  `GoalsService.createClimaTriggeredGoal` (`e52f180`); fix voseo del gate 409 (`07e5b7f`). Reparto de
+  peso entero por resto mayor (100/N exacto, sin error Float). Idempotencia por (persona, plan,
+  reactivo) vía P2002→`GoalDuplicateError`. Regla de idioma español-neutro promovida a
+  `focalizahr-narrativas` (`f2db891`).
+- **Primitivas UI aditivas** (`f9b1b3b`): `PremiumButton.disabledCursor` ('help') + `TooltipContext`
+  modo `plain` + variant `neutral` (slate). Defaults preservan el comportamiento previo (sin blast radius).
+- **Pantalla + wiring (Grupos C/D)** (`6fa7cb4`): `ClimaFixMetaScreen` + `ClimaMetaSliderCard` (Wizard
+  Aislado, tokens `CompensationPortada`, clon del slider de `NPSScaleRenderer`, anti-semáforo, acordeón
+  single-open, resumen colapsado con banda corta). `ClimaPlanPersonaTab` lee el `ActionPlan` aprobado de
+  la campaña (`GET /api/action-plans?moduleType=clima&estado=aprobado`) y monta la pantalla cuando
+  `kind='meta'`; gates por-CTA (`metaEnabled`=plan aprobado / `pdiEnabled=false` Blocker 2) con
+  GhostButton neutro + cursor `?` + tooltip con la razón puntual; dispatcher META_* apunta a create-meta.
+  Banda "Nivel saludable" = **cercanía** (primer paso que alcanza el tier), no igualdad exacta.
+- **Docs (deudas + estado)** (`f0db046`): PENDIENTES + banco + Gate 0.
+
+**Recorrido de bordes — evidencia real (nivel indicado):**
+- **Happy path + idempotencia:** smoke 22/22 contra el handler real de create-meta (2 metas, weight 50/50,
+  trazabilidad; carrera concurrente → P2002→400). Retirado al sellar.
+- **Click-through end-to-end VISTO EN PANTALLA (Victor):** fixture Corp Enterprise (Comercial → TORRES,
+  plan aprobado real `cmruvpmzx…`, ciclo Q4 2026) → Portada→carrusel→wizard→"Fijar meta"→pantalla→crear.
+  2 metas `CLIMA_TRIGGERED` verificadas por query (originType, sourceActionPlanId + 2 triggerRef distintos,
+  weight 50/50=100, goalCycleId=Q4, isAligned=false/isOrphan=true). **Fixture desarmado — cuenta como estaba.**
+- **Gating + slider (banda "Nivel saludable" en 3.7, resumen colapsado con banda):** confirmados en pantalla por Victor.
+- **tsc + next build limpios** en cada iteración.
+
+**Pendientes explícitos (NO bloquean el sello — en `PENDIENTES_ACTIVOS_EX_CLIMA.md`):**
+- **PDI sin pantalla (Blocker 2)** — PERMANENTE, prioridad alta: el CTA de desarrollo queda gated en toda
+  cuenta hasta que exista una pantalla de PDI en clima (backend `pdi-suggestion` ya existe, Gate 5B-ii).
+- **"Asignar responsable" inerte** (companion del carrusel, `ClimaPlanPersonaTab:319`) — pendiente de wiring
+  a org/nómina (setear `Department.responsableId` vive fuera de clima). Es la salida del estado 100% gateado.
+- **Título auto-generado de la meta** (pregunta truncada) — provisional, prioridad alta (user-facing en Metas).
+- **Slider "Buena mejora"** ausente cuando `tier−mean < 0.4` — diferido (ausencia de paso, no de etiqueta).
+- **Taxonomía banco:** `colaboracion`→`autonomia` confirmado con query real (a `PLAN_REDISENO_BANCO_ENCUESTA`).
 
 ### Verificación Gate 5
 ```yaml
