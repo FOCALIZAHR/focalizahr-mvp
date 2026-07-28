@@ -19,8 +19,11 @@ interface TooltipContextProps {
   details?: string[];
   actionable?: string;
   position?: 'top' | 'bottom' | 'left' | 'right';
-  variant?: 'momentum' | 'projection' | 'action' | 'risk' | 'pattern';
+  variant?: 'momentum' | 'projection' | 'action' | 'risk' | 'pattern' | 'neutral';
   showIcon?: boolean;
+  // Modo compacto: renderiza SOLO el texto de `explanation` (sin ícono/título/card completa).
+  // Para hints cortos de "por qué está deshabilitado" — prioriza texto puntual sobre tamaño.
+  plain?: boolean;
   // Cuando el trigger vive dentro de un contenedor con overflow-hidden
   // (ej. cards con Tesla line), pasar usePortal para que el tooltip
   // se renderice en document.body con position fixed y no se corte.
@@ -61,9 +64,17 @@ const getVariantStyles = (variant: string) => {
       bg: 'bg-blue-900/20',
       titleColor: 'text-blue-300',
       icon: Info
+    },
+    // Neutro/slate — sin acento de color. Para hints "por qué está deshabilitado" y otros
+    // usos donde el color semántico no aplica (un gate no es momentum ni riesgo).
+    neutral: {
+      border: 'border-slate-700/50',
+      bg: 'bg-slate-900/60',
+      titleColor: 'text-slate-300',
+      icon: Info
     }
   };
-  
+
   return variants[variant as keyof typeof variants] || variants.momentum;
 };
 
@@ -78,6 +89,7 @@ export function TooltipContext({
   variant = 'momentum',
   showIcon = false,
   usePortal = false,
+  plain = false,
   onActionableClick
 }: TooltipContextProps) {
   const [isVisible, setIsVisible] = useState(false);
@@ -137,9 +149,9 @@ export function TooltipContext({
       onMouseLeave={usePortal ? scheduleHide : undefined}
       className={`
         ${usePortal ? 'fixed' : `absolute ${positionClasses[position]}`} z-[60]
-        ${isMobile ? 'w-80' : 'w-96'} max-w-screen-sm
+        ${isMobile ? 'w-80' : plain ? 'w-auto max-w-xs' : 'w-96'} max-w-screen-sm
         ${styles.bg} ${styles.border} backdrop-blur-xl
-        rounded-xl p-4 shadow-2xl
+        rounded-xl ${plain ? 'px-3 py-2' : 'p-4'} shadow-2xl
         ${usePortal ? '' : 'left-1/2 transform -translate-x-1/2'}
       `}
       style={
@@ -154,20 +166,24 @@ export function TooltipContext({
           : undefined
       }
     >
-      {/* Header con icono */}
-      <div className="flex items-start gap-3 mb-3">
-        <div className={`p-2 rounded-lg ${styles.bg} ${styles.border}`}>
-          <IconComponent className={`h-4 w-4 ${styles.titleColor}`} />
+      {/* Header con icono — o, en modo plain, solo el texto de la razón */}
+      {plain ? (
+        <p className="text-white/90 text-xs leading-relaxed">{explanation}</p>
+      ) : (
+        <div className="flex items-start gap-3 mb-3">
+          <div className={`p-2 rounded-lg ${styles.bg} ${styles.border}`}>
+            <IconComponent className={`h-4 w-4 ${styles.titleColor}`} />
+          </div>
+          <div className="flex-1">
+            <h4 className={`font-semibold text-sm ${styles.titleColor} mb-1`}>
+              {title}
+            </h4>
+            <p className="text-white/90 text-xs leading-relaxed">
+              {explanation}
+            </p>
+          </div>
         </div>
-        <div className="flex-1">
-          <h4 className={`font-semibold text-sm ${styles.titleColor} mb-1`}>
-            {title}
-          </h4>
-          <p className="text-white/90 text-xs leading-relaxed">
-            {explanation}
-          </p>
-        </div>
-      </div>
+      )}
 
       {/* Details List */}
       {details.length > 0 && (

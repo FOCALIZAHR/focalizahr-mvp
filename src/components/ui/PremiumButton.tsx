@@ -1,6 +1,11 @@
 // ====================================================================
 // FOCALIZAHR PREMIUM BUTTONS SYSTEM
-// Inspirado en BimodalToggle.tsx - Tesla/Apple Level Design
+// Tesla/Apple Level Design
+// ====================================================================
+// ⚠️ NOTA HISTÓRICA: el linaje visual (línea de luz superior) viene de
+// cockpit/BimodalToggle.tsx, hoy HUÉRFANO (0 consumidores). NO usarlo como
+// referencia para código nuevo. El canónico de chrome/tokens es
+// CompensationPortada.tsx (ver .claude/rules/frontend-design.md).
 // ====================================================================
 // 
 // 🎯 FILOSOFÍA DE DISEÑO:
@@ -40,6 +45,9 @@ interface PremiumButtonProps extends Omit<HTMLMotionProps<"button">, 'size'> {
   isLoading?: boolean;
   fullWidth?: boolean;
   glow?: boolean;  // Efecto glow en hover
+  // Cursor cuando el botón está disabled. Default 'not-allowed' (comportamiento histórico).
+  // 'help'/'default' comunican "todavía no, falta un paso" en vez de "prohibido para siempre".
+  disabledCursor?: 'not-allowed' | 'help' | 'default';
   children: React.ReactNode;
 }
 
@@ -135,6 +143,7 @@ export const PremiumButton = React.forwardRef<HTMLButtonElement, PremiumButtonPr
       isLoading = false,
       fullWidth = false,
       glow = true,
+      disabledCursor = 'not-allowed',
       children,
       disabled,
       className = '',
@@ -165,7 +174,7 @@ export const PremiumButton = React.forwardRef<HTMLButtonElement, PremiumButtonPr
           border: variantConfig.border,
           borderRadius: '12px',
           backdropFilter: 'blur(20px)',
-          cursor: disabled || isLoading ? 'not-allowed' : 'pointer',
+          cursor: isLoading ? 'not-allowed' : disabled ? disabledCursor : 'pointer',
           opacity: disabled || isLoading ? 0.5 : 1,
           overflow: 'hidden',
           width: fullWidth ? '100%' : 'auto',
