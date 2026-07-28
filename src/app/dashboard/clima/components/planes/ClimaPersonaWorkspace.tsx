@@ -21,7 +21,8 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Users, UserX, Target, Compass } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { PrimaryButton, SecondaryButton } from '@/components/ui/PremiumButton';
+import { PrimaryButton, SecondaryButton, GhostButton } from '@/components/ui/PremiumButton';
+import { TooltipContext } from '@/components/ui/TooltipContext';
 import {
   TAB2_CTA,
   TAB2_CARD,
@@ -29,6 +30,7 @@ import {
   TAB2_STATE_COPY,
   TAB2_ROUTE_COPY,
   TAB2_CHOICE,
+  TAB2_META_GATE,
   tab2DeptHeadline,
   tab2ResponsableIntro,
   tab2ReviewCta,
@@ -63,11 +65,27 @@ interface Props {
   group: ResponsableGroup;
   onBack: () => void;
   onAction?: Tab2Action;
+  /** Fase 3: la meta necesita un plan aprobado (§3.5). Ausente/true = habilitada. */
+  metaEnabled?: boolean;
+  /** Fase 3: PDI desde clima aún sin pantalla destino (Blocker 2) → false = gated. */
+  pdiEnabled?: boolean;
+  /** Motivo visible junto al CTA meta cuando está gateado por falta de plan aprobado. */
+  metaGateReason?: string;
+  /** Motivo visible junto al CTA pdi cuando está gateado (Blocker 2: sin pantalla). */
+  pdiGateReason?: string;
 }
 
 type Sub = 'intro' | 'decisiones';
 
-export default function ClimaPersonaWorkspace({ group, onBack, onAction }: Props) {
+export default function ClimaPersonaWorkspace({
+  group,
+  onBack,
+  onAction,
+  metaEnabled = true,
+  pdiEnabled = true,
+  metaGateReason,
+  pdiGateReason,
+}: Props) {
   const [sub, setSub] = useState<Sub>('intro');
   const [step, setStep] = useState(0);
   const { name, ctaEnabled, departamentos } = group;
@@ -174,7 +192,15 @@ export default function ClimaPersonaWorkspace({ group, onBack, onAction }: Props
                   exit={{ opacity: 0, x: -12 }}
                   transition={{ duration: 0.18 }}
                 >
-                  <DeptRow dept={departamentos[step]} ctaEnabled={ctaEnabled} onAction={onAction} />
+                  <DeptRow
+                    dept={departamentos[step]}
+                    ctaEnabled={ctaEnabled}
+                    onAction={onAction}
+                    metaEnabled={metaEnabled}
+                    pdiEnabled={pdiEnabled}
+                    metaGateReason={metaGateReason}
+                    pdiGateReason={pdiGateReason}
+                  />
                 </motion.div>
               </AnimatePresence>
 
@@ -210,8 +236,36 @@ export default function ClimaPersonaWorkspace({ group, onBack, onAction }: Props
 }
 
 // ── Fila de un departamento (una ruta) ──
-function DeptRow({ dept, ctaEnabled, onAction }: { dept: DeptFinding; ctaEnabled: boolean; onAction?: Tab2Action }) {
-  const actionable = ctaEnabled && !!onAction;
+function DeptRow({
+  dept,
+  ctaEnabled,
+  onAction,
+  metaEnabled,
+  pdiEnabled,
+  metaGateReason,
+  pdiGateReason,
+}: {
+  dept: DeptFinding;
+  ctaEnabled: boolean;
+  onAction?: Tab2Action;
+  metaEnabled: boolean;
+  pdiEnabled: boolean;
+  metaGateReason?: string;
+  pdiGateReason?: string;
+}) {
+  const metaActionable = ctaEnabled && !!onAction && metaEnabled;
+  const pdiActionable = ctaEnabled && !!onAction && pdiEnabled;
+  // Razón visible solo cuando el bloqueo es por su propio motivo (no por falta de responsable,
+  // que ya tiene su propio aviso arriba). Consistencia entre los 2 gates.
+  const showMetaGate = ctaEnabled && !metaEnabled && !!metaGateReason;
+  const showPdiGate = ctaEnabled && !pdiEnabled && !!pdiGateReason;
+  // Hint puntual del tooltip por botón (razón exacta de ESE CTA en el hover).
+  const metaHint = !metaActionable
+    ? !ctaEnabled
+      ? TAB2_META_GATE.needsResponsable // sin responsable
+      : metaGateReason // con responsable, sin plan aprobado
+    : undefined;
+  const pdiHint = !pdiActionable ? pdiGateReason : undefined;
   const routeCopy = TAB2_ROUTE_COPY[dept.route];
 
   return (
@@ -228,10 +282,26 @@ function DeptRow({ dept, ctaEnabled, onAction }: { dept: DeptFinding; ctaEnabled
       <p className="text-[12px] font-light text-slate-400 leading-relaxed mt-2">{routeCopy.explanation}</p>
 
       {dept.route === 'ESTADO_B_PDI' ? (
-        <div className="flex justify-end mt-3">
-          <SecondaryButton size="sm" disabled={!actionable} onClick={() => onAction?.(dept.departmentId, dept.route, 'pdi')}>
-            {TAB2_CTA.pdiMandatory}
-          </SecondaryButton>
+        <div className="mt-3">
+          <div className="flex justify-end">
+            {/* Gateado = GhostButton neutro (no violeta tenue): el disabled se lee inequívoco. */}
+            {(() => {
+              const PdiBtn = pdiActionable ? SecondaryButton : GhostButton;
+              const el = (
+                <PdiBtn size="sm" disabled={!pdiActionable} disabledCursor="help" onClick={() => onAction?.(dept.departmentId, dept.route, 'pdi')}>
+                  {TAB2_CTA.pdiMandatory}
+                </PdiBtn>
+              );
+              return !pdiActionable && pdiHint ? (
+                <TooltipContext title="" explanation={pdiHint} position="top" plain usePortal variant="neutral">
+                  {el}
+                </TooltipContext>
+              ) : el;
+            })()}
+          </div>
+          {showPdiGate && (
+            <p className="text-[11px] font-light text-slate-500 leading-relaxed mt-2 text-right">{pdiGateReason}</p>
+          )}
         </div>
       ) : (
         <div className="mt-3">
@@ -242,7 +312,8 @@ function DeptRow({ dept, ctaEnabled, onAction }: { dept: DeptFinding; ctaEnabled
               title={TAB2_CHOICE.pdi.title}
               body={TAB2_CHOICE.pdi.body}
               cta={TAB2_CTA.pdi}
-              disabled={!actionable}
+              disabled={!pdiActionable}
+              disabledHint={pdiHint}
               onClick={() => onAction?.(dept.departmentId, dept.route, 'pdi')}
             />
             <ChoicePath
@@ -250,10 +321,17 @@ function DeptRow({ dept, ctaEnabled, onAction }: { dept: DeptFinding; ctaEnabled
               title={TAB2_CHOICE.meta.title}
               body={TAB2_CHOICE.meta.body}
               cta={TAB2_CTA.meta}
-              disabled={!actionable}
+              disabled={!metaActionable}
+              disabledHint={metaHint}
               onClick={() => onAction?.(dept.departmentId, dept.route, 'meta')}
             />
           </div>
+          {showMetaGate && (
+            <p className="text-[11px] font-light text-slate-500 leading-relaxed mt-2">{metaGateReason}</p>
+          )}
+          {showPdiGate && (
+            <p className="text-[11px] font-light text-slate-500 leading-relaxed mt-2">{pdiGateReason}</p>
+          )}
         </div>
       )}
     </div>
@@ -267,6 +345,7 @@ function ChoicePath({
   body,
   cta,
   disabled,
+  disabledHint,
   onClick,
 }: {
   icon: typeof Target;
@@ -274,8 +353,16 @@ function ChoicePath({
   body: string;
   cta: string;
   disabled: boolean;
+  disabledHint?: string;
   onClick: () => void;
 }) {
+  // Gateado = GhostButton neutro (no violeta tenue): el disabled se lee inequívoco.
+  const Btn = disabled ? GhostButton : SecondaryButton;
+  const btnEl = (
+    <Btn size="sm" disabled={disabled} disabledCursor="help" onClick={onClick}>
+      {cta}
+    </Btn>
+  );
   return (
     <div className="flex-1 rounded-lg border border-slate-800/30 bg-slate-900/30 p-3 flex flex-col">
       <div className="flex items-center gap-1.5">
@@ -284,9 +371,14 @@ function ChoicePath({
       </div>
       <p className="text-[11px] font-light text-slate-500 leading-relaxed mt-1 flex-1">{body}</p>
       <div className="mt-2.5">
-        <SecondaryButton size="sm" disabled={disabled} onClick={onClick}>
-          {cta}
-        </SecondaryButton>
+        {/* Tooltip plain con la razon puntual: funciona sobre disabled (hover en el wrapper). */}
+        {disabled && disabledHint ? (
+          <TooltipContext title="" explanation={disabledHint} position="top" plain usePortal variant="neutral">
+            {btnEl}
+          </TooltipContext>
+        ) : (
+          btnEl
+        )}
       </div>
     </div>
   );

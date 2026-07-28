@@ -47,7 +47,7 @@ export default function ClimaPlanesView({ campaignId, onBack }: ClimaPlanesViewP
   // Tab 2: su Workspace también trae su propio contenedor (split) → mismo modo bare.
   const bare =
     (tab === 'departamento' && deptView !== 'carrusel') ||
-    (tab === 'persona' && personaView === 'workspace');
+    (tab === 'persona' && (personaView === 'workspace' || personaView === 'fixmeta'));
 
   return (
     <div
@@ -114,9 +114,9 @@ export default function ClimaPlanesView({ campaignId, onBack }: ClimaPlanesViewP
               onExitToLobby={onBack}
             />
           ) : tab === 'persona' ? (
-            // onAction (destino real del CTA) es Fase 3 → hoy no se pasa: los CTA quedan
-            // inertes salvo el gating, que ya viaja resuelto del endpoint. onViewChange
-            // reporta la vista interna para que el shell corra el chrome en el Workspace.
+            // Fase 3: el CTA "meta" está wireado DENTRO del tab (lee el plan aprobado → monta
+            // ClimaFixMetaScreen). El CTA "pdi" sigue gated (Blocker 2, sin pantalla destino).
+            // onViewChange reporta la vista interna (workspace/fixmeta traen su propio chrome).
             <ClimaPlanPersonaTab campaignId={campaignId} onViewChange={setPersonaView} />
           ) : (
             <FHREmptyState

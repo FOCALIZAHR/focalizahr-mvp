@@ -38,9 +38,13 @@ export interface DispatchDescriptor {
 /**
  * ÚNICO punto de mapeo target → acción real.
  *
- * - PDI_CLIMA → `POST /api/clima/pdi-suggestion` (VIVO, sellado Gate 5B-ii).
- * - META_AREA / META_DURA → `POST /api/goals` existe, pero el wiring desde clima
- *   vive en 5D Tab 2 (POR PERSONA), aún no construido → `pending`.
+ * - PDI_CLIMA → `POST /api/clima/pdi-suggestion` (VIVO, sellado Gate 5B-ii). Wiring de UI en
+ *   clima aún PENDIENTE (no hay pantalla de PDI en el dashboard de clima — Gate 5D Fase 3
+ *   Blocker 2, ver PENDIENTES_ACTIVOS_EX_CLIMA).
+ * - META_AREA / META_DURA → `POST /api/clima/action-plan/create-meta` (VIVO, Gate 5D Fase 3).
+ *   El wiring runtime NO pasa por este mapa: vive directo en ClimaPlanPersonaTab (lee el
+ *   ActionPlan aprobado → monta ClimaFixMetaScreen → create-meta). PRERREQUISITO: un ActionPlan
+ *   de clima `estado='aprobado'` debe existir (§3.5, la meta nace de un plan aprobado, no borrador).
  * - SIN_CTA → sin acción (celda base/sistémica sin CTA de variante).
  */
 export const CLIMA_PRODUCT_DISPATCH: Record<InterventionTarget, DispatchDescriptor> = {
@@ -53,18 +57,17 @@ export const CLIMA_PRODUCT_DISPATCH: Record<InterventionTarget, DispatchDescript
     kind: 'pdi',
     endpoint: '/api/clima/pdi-suggestion',
     requires: ['employeeId', 'cycleId', 'driver', 'teamFavorability'],
+    pending: 'Sin pantalla de PDI en el dashboard de clima (Fase 3 Blocker 2) — CTA gated',
   },
   META_AREA: {
     kind: 'meta',
-    endpoint: '/api/goals',
-    requires: ['departmentId', 'title', 'target'],
-    pending: '5D Tab 2 (POR PERSONA) — wiring clima→/api/goals aún no construido',
+    endpoint: '/api/clima/action-plan/create-meta',
+    requires: ['departmentId', 'sourceActionPlanId', 'reactive', 'target'],
   },
   META_DURA: {
     kind: 'meta',
-    endpoint: '/api/goals',
-    requires: ['employeeId', 'cycleId', 'title', 'target'],
-    pending: '5D Tab 2 (POR PERSONA) — wiring clima→/api/goals aún no construido',
+    endpoint: '/api/clima/action-plan/create-meta',
+    requires: ['departmentId', 'sourceActionPlanId', 'reactive', 'target'],
   },
 };
 

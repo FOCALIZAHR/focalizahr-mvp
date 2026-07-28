@@ -25,6 +25,8 @@ import {
   TAB2_CARD,
   TAB2_CAROUSEL_COMPANION,
   TAB2_STATE_COPY,
+  TAB2_META_GATE,
+  TAB2_PDI_GATE,
   tab2DeptHeadline,
   tab2Synthesis,
   tab2TeamsSuffix,
@@ -34,20 +36,19 @@ import ClimaPersonaWorkspace, {
   type DeptFinding,
   type Tab2Action,
 } from './ClimaPersonaWorkspace';
+import ClimaFixMetaScreen from './ClimaFixMetaScreen';
 
 interface ByPersonData {
   responsables: ResponsableGroup[];
   stats: { responsablesConHallazgos: number; conCtaHabilitado: number; gateadosSinEmployee: number };
 }
 
-export type ClimaPlanPersonaView = 'portada' | 'carrusel' | 'workspace';
+export type ClimaPlanPersonaView = 'portada' | 'carrusel' | 'workspace' | 'fixmeta';
 
 interface Props {
   campaignId: string | null;
-  /** Reporta la vista interna al shell (para ocultar su chrome en el Workspace). */
+  /** Reporta la vista interna al shell (para ocultar su chrome en el Workspace/pantalla meta). */
   onViewChange?: (view: ClimaPlanPersonaView) => void;
-  /** Fase 3: destino real del CTA. Ausente hoy → CTA inerte. */
-  onAction?: Tab2Action;
 }
 
 const groupKeyOf = (g: ResponsableGroup) =>
@@ -60,12 +61,26 @@ const groupPriority = (g: ResponsableGroup) => {
 };
 const deptPriority = (d: DeptFinding) => (d.route === 'ESTADO_B_PDI' ? 1_000_000 : 0) + d.belowTierCount;
 
-export default function ClimaPlanPersonaTab({ campaignId, onViewChange, onAction }: Props) {
+export default function ClimaPlanPersonaTab({ campaignId, onViewChange }: Props) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ByPersonData | null>(null);
   const [view, setView] = useState<ClimaPlanPersonaView>('portada');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // Fase 3 (Grupo D): plan de clima APROBADO de la campaña (§3.5) → sourceActionPlanId de la
+  // meta. Su ausencia gatea el CTA meta (no rompe la vista). metaCtx = depto en curso; reloadKey
+  // refresca by-person tras crear metas.
+  const [approvedPlanId, setApprovedPlanId] = useState<string | null>(null);
+  const [metaCtx, setMetaCtx] = useState<{ departmentId: string } | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const handleAction: Tab2Action = (departmentId, _route, kind) => {
+    // pdi queda gated (Blocker 2, sin pantalla destino) → nunca llega acá con 'pdi'.
+    if (kind === 'meta' && approvedPlanId) {
+      setMetaCtx({ departmentId });
+      setView('fixmeta');
+    }
+  };
 
   useEffect(() => {
     if (!campaignId) {
@@ -78,8 +93,12 @@ export default function ClimaPlanPersonaTab({ campaignId, onViewChange, onAction
       setStatus('loading');
       setError(null);
       try {
-        const res = await fetch(`/api/clima/action-plan/by-person?campaignId=${campaignId}`);
-        const json = await res.json();
+        // by-person (hallazgos) + plan aprobado (sourceActionPlanId) en paralelo.
+        const [bpRes, planRes] = await Promise.all([
+          fetch(`/api/clima/action-plan/by-person?campaignId=${campaignId}`),
+          fetch(`/api/action-plans?moduleType=clima&campaignId=${campaignId}&estado=aprobado`),
+        ]);
+        const json = await bpRes.json();
         if (cancelled) return;
         if (!json.success) {
           setStatus('error');
@@ -87,6 +106,13 @@ export default function ClimaPlanPersonaTab({ campaignId, onViewChange, onAction
           return;
         }
         setData(json.data as ByPersonData);
+        // El plan aprobado es opcional para la VISTA (solo gatea el CTA meta): su fallo no rompe.
+        try {
+          const planJson = await planRes.json();
+          setApprovedPlanId(planJson?.success && planJson.data?.[0]?.id ? planJson.data[0].id : null);
+        } catch {
+          setApprovedPlanId(null);
+        }
         setStatus('ready');
       } catch {
         if (!cancelled) {
@@ -98,7 +124,7 @@ export default function ClimaPlanPersonaTab({ campaignId, onViewChange, onAction
     return () => {
       cancelled = true;
     };
-  }, [campaignId]);
+  }, [campaignId, reloadKey]);
 
   const ordered = useMemo(() => {
     const list = [...(data?.responsables ?? [])];
@@ -142,12 +168,32 @@ export default function ClimaPlanPersonaTab({ campaignId, onViewChange, onAction
 
   const selected = ordered.find((g) => groupKeyOf(g) === selectedKey) ?? null;
 
+  // ── Pantalla de fijar meta (bare: trae su propio contenedor) — Fase 3 Grupo C/D ──
+  if (view === 'fixmeta' && metaCtx && campaignId && approvedPlanId) {
+    return (
+      <ClimaFixMetaScreen
+        campaignId={campaignId}
+        departmentId={metaCtx.departmentId}
+        sourceActionPlanId={approvedPlanId}
+        onClose={() => {
+          setMetaCtx(null);
+          setView('workspace');
+        }}
+        onSuccess={() => setReloadKey((k) => k + 1)}
+      />
+    );
+  }
+
   // ── Workspace (bare: trae su propio contenedor) ──
   if (view === 'workspace' && selected) {
     return (
       <ClimaPersonaWorkspace
         group={selected}
-        onAction={onAction}
+        onAction={handleAction}
+        metaEnabled={!!approvedPlanId}
+        pdiEnabled={false}
+        metaGateReason={approvedPlanId ? undefined : TAB2_META_GATE.needsApprovedPlan}
+        pdiGateReason={TAB2_PDI_GATE.noScreen}
         onBack={() => {
           setSelectedKey(null);
           setView('carrusel');
