@@ -116,10 +116,10 @@ export const TAB2_PDI_GATE = {
 
 /** Elección Meta / PDI (Estado A) — dos caminos con contexto, no dos botones sueltos. */
 export const TAB2_CHOICE = {
-  prompt: '¿Cómo lo abordás?',
+  prompt: '¿Cómo lo abordas?',
   meta: {
     title: 'Comprometer un resultado',
-    body: 'El equipo fija un número y lo mide en la próxima encuesta. Va cuando ya sabés qué hacer y solo falta ponerle meta y plazo.',
+    body: 'El equipo fija un número y lo mide en la próxima encuesta. Va cuando ya sabes qué hacer y solo falta ponerle meta y plazo.',
   },
   pdi: {
     title: 'Atacar la causa',
