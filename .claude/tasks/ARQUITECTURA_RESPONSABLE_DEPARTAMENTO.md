@@ -328,6 +328,51 @@ siempre dejaría ese departamento ineditable. Verificado por smoke: editar su no
 devuelve 200. Qué hacer con violadores heredados (limpiar / reasignar / dejar) es
 decisión pendiente de Victor.
 
+---
+
+## As-built Piezas C y D — el cliente mantiene su propio responsable (2026-07-31)
+
+Cierra el objetivo original de todo el trabajo: hasta acá solo el concierge podía asignar
+responsables. Replica el precedente de **Métricas Departamentales** (un backend, dos
+pantallas; `api/department-metrics/upload/route.ts:101-165`).
+
+**`bed97bb` — permiso + servicio.** `'departments:responsable:manage'` =
+`FOCALIZAHR_ADMIN, ACCOUNT_OWNER, HR_ADMIN` (espeja `metrics:upload` + HR_ADMIN;
+HR_MANAGER fuera, coherente con Sucesión). `setDepartmentResponsable()` en
+`DepartmentResponsableService` concentra R1 + cadena + auditoría con resultado tipado
+(`DEPARTMENT_NOT_FOUND`/`EMPLOYEE_NOT_FOUND`/`OUT_OF_CHAIN`), porque ahora hay **dos**
+superficies escribiendo el campo.
+
+**`d201563` — endpoints neutros.** `PATCH /api/departments/[id]/responsable` (única vía de
+escritura) y `GET /api/departments/[id]/responsable-candidates` (**reemplaza** a
+`GET /api/admin/accounts/[id]/employees`, eliminado). Cuenta efectiva del JWT;
+`targetAccountId` reservado a `FOCALIZAHR_ADMIN`. `GET /api/departments` suma
+`?include=responsable` **gateado por el permiso** — ese endpoint no tiene gate de rol para
+su payload base, así que exponer nombres de responsables sin gatear ampliaría su audiencia.
+El PUT de estructura **ya no escribe `responsableId`** y la pantalla concierge quedó
+repuntada al endpoint nuevo (commits 2 y 3 del plan fusionados: separarlos dejaba un commit
+con la concierge rota).
+
+**`ee70a95` — pantalla de cliente + menú.** `/dashboard/organizacion/responsables`, sin
+`AccountSelector`, sin crear/mover/editar estructura. Grupo de menú nuevo
+**"Organización" ▾** gateado con `hasPermission` importado de `@/lib/auth/permissions`
+(**sin** constante espejo: `climaRoles`/`goalCycleRoles` son deuda P2,
+`BACKLOG_ENTERPRISE.md:42`).
+
+### Por qué grupo propio y no dentro de "Operaciones"
+
+`operationsAllowedRoles` (`DashboardNavigation.tsx:104-113`) es
+`FOCALIZAHR_ADMIN, ACCOUNT_OWNER, HR_MANAGER, CLIENT` — **no incluye HR_ADMIN**, justo el
+rol que este trabajo habilita. Colgarlo ahí lo habría escondido de su destinatario. El grupo
+nuevo además deja lugar para "Departamentos" si mañana se construye el editor de estructura
+cara al cliente.
+
+### Nota de verificación (trampa de PowerShell)
+
+`Remove-Item "src/app/api/admin/accounts/[id]/employees"` **no borra nada**: PowerShell
+interpreta `[id]` como clase de caracteres. `Test-Path` falla igual y devuelve un falso
+"eliminado". Usar siempre `-LiteralPath` con rutas que tengan corchetes de Next.js.
+
 ### Deuda abierta (reportada, NO tocada en este gate)
 
 - 🟠 Los 4 handlers de `accounts/[id]/structure/**` gatean por **`Account.role`**
