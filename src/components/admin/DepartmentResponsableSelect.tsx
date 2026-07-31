@@ -18,6 +18,8 @@ interface EmployeeOption {
   position: string | null;
   standardJobLevel: string | null;
   department: { id: string; displayName: string } | null;
+  /** Empleados activos con managerId = este candidato. Informativo: no ordena ni filtra. */
+  directReportsCount: number;
 }
 
 export interface SelectedResponsable {
@@ -223,7 +225,19 @@ export default function DepartmentResponsableSelect({
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm text-white">{emp.fullName}</p>
                     <p className="truncate text-[10px] text-gray-500">
-                      {[emp.position, emp.department?.displayName]
+                      {[
+                        emp.position,
+                        emp.department?.displayName,
+                        // Se omite en 0 a propósito: managerId está concentrado en pocos
+                        // jefes (6 de 50 en la cuenta de prueba), así que "0 reportan"
+                        // aparecería en ~90% de las filas. Mostrarlo solo cuando hay
+                        // reportes lo convierte en señal en vez de ruido.
+                        emp.directReportsCount > 0
+                          ? `${emp.directReportsCount} ${
+                              emp.directReportsCount === 1 ? 'reporta' : 'reportan'
+                            }`
+                          : null,
+                      ]
                         .filter(Boolean)
                         .join(' · ') || 'Sin cargo'}
                     </p>

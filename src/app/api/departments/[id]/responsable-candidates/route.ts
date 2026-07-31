@@ -129,9 +129,39 @@ export async function GET(
       })
       .slice(0, MAX_RESULTS);
 
+    // Pista informativa: cuántos empleados activos le reportan directamente a cada
+    // candidato. NO ordena, NO preselecciona, NO filtra — solo da contexto a quien elige.
+    //
+    // Corre DESPUÉS del ranking, sobre los ≤20 que se van a mostrar: el IN queda mínimo y
+    // no se cuenta a nadie que el usuario no vaya a ver. Una sola query, sin N+1.
+    //
+    // groupBy y no `_count: { select: { directReports: true } }` (patrón de
+    // admin/employees/route.ts:86-88): Prisma 5 no soporta `where` dentro del _count de
+    // relación, así que ese camino contaría inactivos y PENDING_ONBOARDING y no podría
+    // scopear por accountId — las tres condiciones que el resto de este módulo respeta.
+    const reportCounts = employees.length
+      ? await prisma.employee.groupBy({
+          by: ['managerId'],
+          where: {
+            accountId: effectiveAccountId,
+            isActive: true,
+            status: { not: 'PENDING_ONBOARDING' },
+            managerId: { in: employees.map((e) => e.id) },
+          },
+          _count: { _all: true },
+        })
+      : [];
+
+    const directReportsBy = new Map(
+      reportCounts.map((r) => [r.managerId as string, r._count._all])
+    );
+
     return NextResponse.json({
       success: true,
-      data: employees,
+      data: employees.map((e) => ({
+        ...e,
+        directReportsCount: directReportsBy.get(e.id) ?? 0,
+      })),
       meta: {
         total,                        // candidatos que calzan, sin truncar
         shown: employees.length,      // lo que efectivamente se devuelve
