@@ -2,6 +2,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner'; // ✅ Usa sonner, no @/components/ui/use-toast
 
+// Responsable del departamento (EX Clima Gate 1 — Department.responsableId → Employee.id)
+export interface DepartmentResponsable {
+  id: string;
+  fullName: string;
+  position: string | null;
+}
+
 interface Department {
   id: string;
   displayName: string;
@@ -11,6 +18,8 @@ interface Department {
   standardCategory: string;
   isActive: boolean;
   participantCount: number;
+  responsableId: string | null;
+  responsable?: DepartmentResponsable | null;
   departments?: Department[];
   children: Department[];  // ✅ EL API LO DEVUELVE
 }
@@ -27,6 +36,9 @@ interface FormData {
   displayName: string;
   parentId: string | null;
   unitType: 'gerencia' | 'departamento';
+  responsableId: string | null;
+  // Nombre del responsable actual — solo para pintar el chip sin re-consultar la API
+  responsableName: string | null;
 }
 
 export function useStructureManager(accountId: string) {
@@ -39,9 +51,11 @@ export function useStructureManager(accountId: string) {
   const [formData, setFormData] = useState<FormData>({
     displayName: '',
     parentId: null,
-    unitType: 'gerencia'
+    unitType: 'gerencia',
+    responsableId: null,
+    responsableName: null
   });
-  
+
   // Obtener token para todas las llamadas
   const token = typeof window !== 'undefined' ? localStorage.getItem('focalizahr_token') : null;
 
@@ -119,7 +133,10 @@ export function useStructureManager(accountId: string) {
         body: JSON.stringify({
           displayName: formData.displayName,
           parentId: formData.parentId,
-          unitType: formData.unitType
+          unitType: formData.unitType,
+          // Solo en edición: el POST de creación no acepta responsableId (se asigna
+          // editando la unidad, que es el flujo real del concierge).
+          ...(isUpdate && { responsableId: formData.responsableId })
         })
       });
 
@@ -144,7 +161,9 @@ export function useStructureManager(accountId: string) {
       setFormData({
         displayName: '',
         parentId: null,
-        unitType: 'gerencia'
+        unitType: 'gerencia',
+        responsableId: null,
+        responsableName: null
       });
 
     } catch (error) {
@@ -208,7 +227,9 @@ export function useStructureManager(accountId: string) {
     setFormData({
       displayName: '',
       parentId: parentId || null,
-      unitType: type
+      unitType: type,
+      responsableId: null,
+      responsableName: null
     });
     setIsModalOpen(true);
   }, []);
@@ -219,7 +240,9 @@ export function useStructureManager(accountId: string) {
     setFormData({
       displayName: unit.displayName,
       parentId: unit.parentId,
-      unitType: unit.unitType
+      unitType: unit.unitType,
+      responsableId: unit.responsableId ?? null,
+      responsableName: unit.responsable?.fullName ?? null
     });
     setIsModalOpen(true);
   }, []);
@@ -231,6 +254,18 @@ export function useStructureManager(accountId: string) {
       [field]: value
     }));
   }, []);
+
+  // Seleccionar/desasignar el responsable del departamento (id + nombre van juntos)
+  const updateResponsable = useCallback(
+    (responsable: DepartmentResponsable | null) => {
+      setFormData(prev => ({
+        ...prev,
+        responsableId: responsable?.id ?? null,
+        responsableName: responsable?.fullName ?? null
+      }));
+    },
+    []
+  );
 
   // Función para crear Gerencia General
   const handleCreateGeneralManager = useCallback(async () => {
@@ -321,6 +356,7 @@ export function useStructureManager(accountId: string) {
     handleOpenCreate,
     handleOpenEdit,
     updateFormField,
+    updateResponsable,
     setIsModalOpen,
     handleCreateGeneralManager,      // ← AGREGAR ESTA LÍNEA
     handleApplyStandardTemplate,     // ← AGREGAR ESTA LÍNEA

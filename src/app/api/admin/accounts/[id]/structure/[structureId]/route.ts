@@ -30,7 +30,7 @@ export async function PUT(
     const accountId = params.id;
     const unitId = params.structureId;
     const body = await request.json();
-    const { displayName, parentId } = body;
+    const { displayName, parentId, responsableId } = body;
 
     console.log('🔍 PUT - Actualizando unidad:', {
       unitId,
@@ -146,12 +146,52 @@ export async function PUT(
       updateData.standardCategory = standardCategory;
     }
 
+    // ────────────────────────────────────────────────────────────────────────
+    // Responsable del departamento (EX Clima Gate 1 — FK a Employee.id)
+    //
+    // R1 NO NEGOCIABLE (ARQUITECTURA_VINCULO_EMPLOYEE_USER_v1.md §2bis): el FK
+    // referencia el id GLOBAL de Employee y NO garantiza misma cuenta. Verificar
+    // en capa de aplicación que employee.accountId === department.accountId antes
+    // de enlazar; sin este chequeo el vínculo sería un puente cross-tenant.
+    // ────────────────────────────────────────────────────────────────────────
+    if (Object.prototype.hasOwnProperty.call(body, 'responsableId')) {
+      if (responsableId) {
+        const responsableEmployee = await prisma.employee.findFirst({
+          where: {
+            id: responsableId,
+            accountId,          // ← R1: mismo accountId que el departamento
+            isActive: true
+          },
+          select: { id: true, fullName: true }
+        });
+
+        if (!responsableEmployee) {
+          return NextResponse.json(
+            { error: 'El responsable indicado no existe, está inactivo o no pertenece a esta cuenta' },
+            { status: 400 }
+          );
+        }
+
+        updateData.responsableId = responsableId;
+        console.log(`✅ Responsable validado: ${responsableEmployee.fullName}`);
+      } else {
+        // null / '' → desasignar explícito (el resolver cae a Account.adminEmail)
+        updateData.responsableId = null;
+        console.log('🔄 Responsable desasignado');
+      }
+    }
+
     // Actualizar la unidad
+    // where incluye accountId (defensa multi-tenant en la mutación misma, no solo
+    // en el findFirst previo). Patrón ya usado en DepartmentService.ts:180-183.
     const updatedUnit = await prisma.department.update({
-      where: { id: unitId },
+      where: { id: unitId, accountId },
       data: updateData,
       include: {
         parent: true,
+        responsable: {
+          select: { id: true, fullName: true, position: true }
+        },
         children: {
           where: { isActive: true },
           orderBy: { displayName: 'asc' }
@@ -165,6 +205,33 @@ export async function PUT(
     });
 
     console.log('✅ Unidad actualizada exitosamente');
+
+    // Auditoría del cambio de responsable (solo si efectivamente cambió).
+    // Patrón: admin/mapping-review/route.ts:276-290 (entityType 'department').
+    // try/catch silencioso: auditar nunca debe voltear la mutación ya persistida.
+    if (
+      Object.prototype.hasOwnProperty.call(updateData, 'responsableId') &&
+      updateData.responsableId !== existingUnit.responsableId
+    ) {
+      try {
+        await prisma.auditLog.create({
+          data: {
+            accountId,
+            action: 'DEPARTMENT_RESPONSABLE_UPDATED',
+            entityType: 'department',
+            entityId: unitId,
+            oldValues: { responsableId: existingUnit.responsableId },
+            newValues: { responsableId: updateData.responsableId },
+            userInfo: {
+              performedBy: validation.account.adminEmail || validation.account.id,
+              performedByRole: validation.account.role || 'UNKNOWN'
+            }
+          }
+        });
+      } catch (auditError) {
+        console.error('⚠️ No se pudo registrar el AuditLog del responsable:', auditError);
+      }
+    }
 
     return NextResponse.json({
       success: true,

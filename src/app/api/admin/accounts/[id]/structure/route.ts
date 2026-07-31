@@ -37,9 +37,19 @@ export async function GET(
         isActive: true
       },
       include: {
+        // Responsable del departamento (EX Clima Gate 1) — se expone para el
+        // mantenedor de /dashboard/admin/accounts/[id]/structure.
+        responsable: {
+          select: { id: true, fullName: true, position: true }
+        },
         children: {
           where: { isActive: true },
-          orderBy: { displayName: 'asc' }
+          orderBy: { displayName: 'asc' },
+          include: {
+            responsable: {
+              select: { id: true, fullName: true, position: true }
+            }
+          }
         },
         _count: {
           select: {

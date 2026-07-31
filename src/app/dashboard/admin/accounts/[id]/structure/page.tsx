@@ -20,8 +20,10 @@ import {
   AlertCircle,
   Briefcase,
   FolderTree,
-  ArrowLeft
+  ArrowLeft,
+  UserCheck
 } from 'lucide-react';
+import DepartmentResponsableSelect from '@/components/admin/DepartmentResponsableSelect';
 
 import '@/styles/focalizahr-design-system.css';
 import '@/app/dashboard/dashboard.css';
@@ -43,6 +45,29 @@ import {
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
+// Tag neutro del responsable del departamento (Department.responsableId → Employee).
+// Sin semáforo de color: la ausencia de responsable no es una alarma, es un estado.
+function ResponsableTag({
+  responsable,
+}: {
+  responsable?: { id: string; fullName: string; position: string | null } | null;
+}) {
+  if (!responsable) {
+    return (
+      <span className="text-[10px] text-slate-600 font-light">
+        Sin responsable
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 font-light">
+      <UserCheck className="h-3 w-3" />
+      {responsable.fullName}
+    </span>
+  );
+}
+
 export default function StructurePage() {
   const params = useParams();
   const router = useRouter();
@@ -60,6 +85,7 @@ export default function StructurePage() {
     handleOpenCreate,
     handleOpenEdit,
     updateFormField,
+    updateResponsable,
     setIsModalOpen,
     fetchStructure, // Necesitamos exponer esta función desde el hook
     handleCreateGeneralManager,    // ← AGREGAR SI NO ESTÁ
@@ -373,7 +399,7 @@ export default function StructurePage() {
                       <h3 className="text-lg font-semibold text-white">
                         {gerencia.displayName}
                       </h3>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <Badge className="bg-slate-700/50 text-slate-300 border-slate-600/50">
                           {gerencia.standardCategory}
                         </Badge>
@@ -382,6 +408,7 @@ export default function StructurePage() {
                             {gerencia.participantCount} participantes
                           </span>
                         )}
+                        <ResponsableTag responsable={gerencia.responsable} />
                       </div>
                     </div>
                   </div>
@@ -416,29 +443,40 @@ export default function StructurePage() {
                         index !== gerencia.children.length - 1 ? 'border-b border-slate-700/30' : ''
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <ChevronRight className="h-4 w-4 text-cyan-400/50" />
-                          <div className="p-1.5 bg-slate-800/50 rounded-lg">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <ChevronRight className="h-4 w-4 text-cyan-400/50 flex-shrink-0" />
+                          <div className="p-1.5 bg-slate-800/50 rounded-lg flex-shrink-0">
                             <Users className="h-4 w-4 text-purple-400/70" />
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 flex-wrap min-w-0">
                             <span className="text-white/90 font-medium">
                               {dept.displayName}
                             </span>
                             <Badge variant="outline" className="text-xs border-slate-600 text-gray-400">
                               {dept.standardCategory}
                             </Badge>
+                            <ResponsableTag responsable={dept.responsable} />
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleToggleActive(dept.id, !dept.isActive)}
-                          className="h-7 w-7 hover:bg-slate-700/50"
-                        >
-                          <Power className={`h-3 w-3 ${dept.isActive ? 'text-green-400' : 'text-gray-500'}`} />
-                        </Button>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenEdit(dept)}
+                            className="h-7 w-7 hover:bg-slate-700/50 text-gray-400 hover:text-white"
+                          >
+                            <Edit2 className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleToggleActive(dept.id, !dept.isActive)}
+                            className="h-7 w-7 hover:bg-slate-700/50"
+                          >
+                            <Power className={`h-3 w-3 ${dept.isActive ? 'text-green-400' : 'text-gray-500'}`} />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -546,6 +584,24 @@ export default function StructurePage() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              )}
+
+              {/* Responsable del departamento (EX Clima Gate 1) — solo en edición:
+                  el POST de creación no persiste responsableId. */}
+              {editingUnit && (
+                <div className="space-y-2">
+                  <Label className="text-gray-300">Responsable</Label>
+                  <DepartmentResponsableSelect
+                    accountId={accountId}
+                    value={formData.responsableId}
+                    currentName={formData.responsableName}
+                    onChange={updateResponsable}
+                  />
+                  <p className="text-xs text-gray-500">
+                    Sin responsable asignado, los avisos de esta unidad se envían al
+                    administrador de la cuenta.
+                  </p>
                 </div>
               )}
             </div>

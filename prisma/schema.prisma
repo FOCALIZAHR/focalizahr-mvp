@@ -757,7 +757,11 @@ model Department {
 
   // Jerarquía
   parentId      String?      @map("parent_id")
-  responsableId String?      @map("responsable_id") // EX Clima Gate 1 — FK a Employee.id (hecho RRHH)
+  // EX Clima Gate 1 — FK a Employee.id (hecho RRHH). R1 NO NEGOCIABLE
+  // (ARQUITECTURA_VINCULO_EMPLOYEE_USER_v1.md §2bis): referencia el id GLOBAL de
+  // Employee; el FK no garantiza misma cuenta. Todo código que ESCRIBA este vínculo
+  // debe verificar employee.accountId === department.accountId en capa de aplicación.
+  responsableId String?      @map("responsable_id")
   parent        Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   children      Department[] @relation("DepartmentHierarchy")
   unitType      String       @default("departamento") @map("unit_type")
