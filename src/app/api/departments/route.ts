@@ -5,7 +5,9 @@
 // ====================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 import { validateAuthToken } from '@/lib/auth';
+import { hasPermission } from '@/lib/services/AuthorizationService';
 import { DepartmentService, CreateDepartmentData } from '@/lib/services/DepartmentService';
 
 export const dynamic = 'force-dynamic';
@@ -25,11 +27,51 @@ export async function GET(request: NextRequest) {
 
     console.log(`📊 Fetching departments for account: ${authResult.account.companyName}`);
 
+    // ── Opt-in: jerarquía + responsable (pantalla /dashboard/organizacion/responsables) ──
+    // Va detrás de un parámetro Y de un permiso a propósito: este endpoint NO tiene gate
+    // de rol para su payload base (cualquier usuario autenticado lista departamentos), y
+    // el nombre del responsable no debe ampliarse a esa audiencia sin querer. Sin el
+    // parámetro, la respuesta es idéntica a la de siempre para sus consumidores actuales.
+    const includeResponsable =
+      new URL(request.url).searchParams.get('include') === 'responsable' &&
+      hasPermission(
+        request.headers.get('x-user-role'),
+        'departments:responsable:manage'
+      );
+
+    if (includeResponsable) {
+      const departments = await prisma.department.findMany({
+        where: { accountId: authResult.account.id, isActive: true },
+        select: {
+          id: true,
+          displayName: true,
+          standardCategory: true,
+          isActive: true,
+          accountId: true,
+          level: true,
+          parentId: true,
+          responsableId: true,
+          responsable: { select: { id: true, fullName: true, position: true } },
+          _count: { select: { participants: true } },
+        },
+        orderBy: [{ level: 'asc' }, { displayName: 'asc' }],
+      });
+
+      return NextResponse.json({
+        success: true,
+        departments: departments.map(({ _count, ...d }) => ({
+          ...d,
+          participantCount: _count.participants,
+        })),
+        total: departments.length,
+      });
+    }
+
     const departments = await DepartmentService.getDepartmentsByAccount(authResult.account.id);
-    
+
     console.log(`✅ Found ${departments.length} departments`);
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       departments,
       total: departments.length,

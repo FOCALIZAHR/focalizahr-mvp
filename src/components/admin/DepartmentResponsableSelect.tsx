@@ -27,8 +27,12 @@ export interface SelectedResponsable {
 }
 
 interface DepartmentResponsableSelectProps {
-  /** Cuenta CLIENTE cuya nómina se busca (params.id de la ruta, no la del admin) */
-  accountId: string;
+  /**
+   * Cuenta destino. Solo la manda la pantalla CONCIERGE, que opera sobre la cuenta de
+   * un cliente; la API la acepta únicamente de FOCALIZAHR_ADMIN. Desde la pantalla del
+   * cliente se omite y la cuenta sale del JWT.
+   */
+  targetAccountId?: string;
   /** Departamento que se está editando — acota la búsqueda a su cadena jerárquica */
   forDepartmentId: string;
   /** responsableId actual del formulario (null = sin asignar) */
@@ -42,7 +46,7 @@ const MIN_QUERY_LENGTH = 2;
 const DEBOUNCE_MS = 300;
 
 export default function DepartmentResponsableSelect({
-  accountId,
+  targetAccountId,
   forDepartmentId,
   value,
   currentName,
@@ -72,11 +76,12 @@ export default function DepartmentResponsableSelect({
 
       if (!silent) setIsLoading(true);
       try {
-        const qs = new URLSearchParams({ forDepartmentId });
+        const qs = new URLSearchParams();
         if (q.length >= MIN_QUERY_LENGTH) qs.set('search', q);
+        if (targetAccountId) qs.set('targetAccountId', targetAccountId);
 
         const response = await fetch(
-          `/api/admin/accounts/${accountId}/employees?${qs.toString()}`,
+          `/api/departments/${forDepartmentId}/responsable-candidates?${qs.toString()}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const result = await response.json();
@@ -100,7 +105,7 @@ export default function DepartmentResponsableSelect({
         if (!silent) setIsLoading(false);
       }
     },
-    [accountId, forDepartmentId]
+    [targetAccountId, forDepartmentId]
   );
 
   // Corre también al montar con query vacío: la cadena suele ser corta (promedio ~4

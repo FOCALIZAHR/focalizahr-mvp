@@ -133,10 +133,7 @@ export function useStructureManager(accountId: string) {
         body: JSON.stringify({
           displayName: formData.displayName,
           parentId: formData.parentId,
-          unitType: formData.unitType,
-          // Solo en edición: el POST de creación no acepta responsableId (se asigna
-          // editando la unidad, que es el flujo real del concierge).
-          ...(isUpdate && { responsableId: formData.responsableId })
+          unitType: formData.unitType
         })
       });
 
@@ -144,6 +141,36 @@ export function useStructureManager(accountId: string) {
 
       if (!response.ok) {
         throw new Error(result.error || 'Error al guardar');
+      }
+
+      // El responsable NO viaja en el PUT de estructura: tiene su propia vía, que es la
+      // misma que usa la pantalla del cliente (una sola fuente de la regla R1 + cadena).
+      // Solo se llama si el valor cambió, y se manda targetAccountId porque el concierge
+      // opera sobre la cuenta de un cliente.
+      if (isUpdate && formData.responsableId !== (editingUnit?.responsableId ?? null)) {
+        const resResponsable = await fetch(
+          `/api/departments/${editingUnit!.id}/responsable`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              responsableId: formData.responsableId,
+              targetAccountId: accountId
+            })
+          }
+        );
+
+        const resultResponsable = await resResponsable.json();
+
+        if (!resResponsable.ok) {
+          // La unidad ya se guardó; se informa qué parte falló para no dar un éxito falso.
+          throw new Error(
+            resultResponsable.error || 'La unidad se guardó, pero falló el responsable'
+          );
+        }
       }
 
       toast.success('Éxito', {

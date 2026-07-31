@@ -593,7 +593,7 @@ export default function StructurePage() {
                 <div className="space-y-2">
                   <Label className="text-gray-300">Responsable</Label>
                   <DepartmentResponsableSelect
-                    accountId={accountId}
+                    targetAccountId={accountId}
                     forDepartmentId={editingUnit.id}
                     value={formData.responsableId}
                     currentName={formData.responsableName}

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateAuthToken } from '@/lib/auth';
 import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter';
-import { getResponsableChainDepartmentIds } from '@/lib/services/DepartmentResponsableService';
 import { invalidateDepartmentCache } from '@/lib/services/AuthorizationService';
 
 // PUT: Actualizar gerencia o departamento
@@ -32,7 +31,7 @@ export async function PUT(
     const accountId = params.id;
     const unitId = params.structureId;
     const body = await request.json();
-    const { displayName, parentId, responsableId } = body;
+    const { displayName, parentId } = body;
 
     console.log('🔍 PUT - Actualizando unidad:', {
       unitId,
@@ -148,65 +147,11 @@ export async function PUT(
       updateData.standardCategory = standardCategory;
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // Responsable del departamento (EX Clima Gate 1 — FK a Employee.id)
-    //
-    // R1 NO NEGOCIABLE (ARQUITECTURA_VINCULO_EMPLOYEE_USER_v1.md §2bis): el FK
-    // referencia el id GLOBAL de Employee y NO garantiza misma cuenta. Verificar
-    // en capa de aplicación que employee.accountId === department.accountId antes
-    // de enlazar; sin este chequeo el vínculo sería un puente cross-tenant.
-    // ────────────────────────────────────────────────────────────────────────
-    if (Object.prototype.hasOwnProperty.call(body, 'responsableId')) {
-      if (responsableId) {
-        const responsableEmployee = await prisma.employee.findFirst({
-          where: {
-            id: responsableId,
-            accountId,          // ← R1: mismo accountId que el departamento
-            isActive: true
-          },
-          select: { id: true, fullName: true, departmentId: true }
-        });
-
-        if (!responsableEmployee) {
-          return NextResponse.json(
-            { error: 'El responsable indicado no existe, está inactivo o no pertenece a esta cuenta' },
-            { status: 400 }
-          );
-        }
-
-        // ── Cadena jerárquica (regla de producto, 2026-07-31) ──
-        // El responsable debe pertenecer a la rama vertical del departamento: él mismo,
-        // un ancestro, o un descendiente. Nunca una rama sin relación — Clima notifica
-        // planes de acción a esta persona.
-        //
-        // Solo se valida cuando el valor CAMBIA: hay filas heredadas anteriores a esta
-        // regla (el selector reenvía el responsableId actual en cada update, así que
-        // validar siempre dejaría esos departamentos ineditables hasta desasignarlos).
-        if (responsableId !== existingUnit.responsableId) {
-          const chainIds = await getResponsableChainDepartmentIds({
-            departmentId: unitId,
-            accountId
-          });
-
-          if (!chainIds.includes(responsableEmployee.departmentId)) {
-            return NextResponse.json(
-              {
-                error:
-                  'El responsable debe pertenecer al departamento, a una unidad superior o a una que dependa de él'
-              },
-              { status: 400 }
-            );
-          }
-        }
-
-        updateData.responsableId = responsableId;
-        console.log(`✅ Responsable validado: ${responsableEmployee.fullName}`);
-      } else {
-        // null / '' → desasignar explícito (el resolver cae a Account.adminEmail)
-        updateData.responsableId = null;
-        console.log('🔄 Responsable desasignado');
-      }
-    }
+    // NOTA: este handler ya NO escribe responsableId. Ese campo tiene su propia vía,
+    // PATCH /api/departments/[id]/responsable, porque lo mantienen DOS superficies
+    // (concierge y cliente) con permisos distintos: acá la edición de ESTRUCTURA sigue
+    // siendo FOCALIZAHR_ADMIN-only, mientras que el responsable se gobierna con
+    // 'departments:responsable:manage'. Si llega responsableId en el body, se ignora.
 
     // Actualizar la unidad
     // where incluye accountId (defensa multi-tenant en la mutación misma, no solo
@@ -239,33 +184,6 @@ export async function PUT(
     // del padre viejo y del nuevo, así que limpiar una sola clave no alcanza.
     if (Object.prototype.hasOwnProperty.call(updateData, 'parentId')) {
       invalidateDepartmentCache();
-    }
-
-    // Auditoría del cambio de responsable (solo si efectivamente cambió).
-    // Patrón: admin/mapping-review/route.ts:276-290 (entityType 'department').
-    // try/catch silencioso: auditar nunca debe voltear la mutación ya persistida.
-    if (
-      Object.prototype.hasOwnProperty.call(updateData, 'responsableId') &&
-      updateData.responsableId !== existingUnit.responsableId
-    ) {
-      try {
-        await prisma.auditLog.create({
-          data: {
-            accountId,
-            action: 'DEPARTMENT_RESPONSABLE_UPDATED',
-            entityType: 'department',
-            entityId: unitId,
-            oldValues: { responsableId: existingUnit.responsableId },
-            newValues: { responsableId: updateData.responsableId },
-            userInfo: {
-              performedBy: validation.account.adminEmail || validation.account.id,
-              performedByRole: validation.account.role || 'UNKNOWN'
-            }
-          }
-        });
-      } catch (auditError) {
-        console.error('⚠️ No se pudo registrar el AuditLog del responsable:', auditError);
-      }
     }
 
     return NextResponse.json({

@@ -1,19 +1,16 @@
-// src/app/api/admin/accounts/[id]/employees/route.ts
-// Búsqueda de Employees de UNA cuenta cliente, para el concierge FocalizaHR.
+// src/app/api/departments/[id]/responsable-candidates/route.ts
+// Candidatos elegibles como responsable de un departamento: empleados activos de su
+// CADENA JERÁRQUICA (el propio + ancestros + descendientes; hermanos NO).
 //
-// ¿Por qué no se reusa GET /api/admin/employees? Ese endpoint filtra por
-// userContext.accountId (header x-account-id), que el middleware puebla con la cuenta
-// del ADMIN logueado — no con la cuenta cliente que el concierge está editando
-// (params.id). Además, con token legacy de Account el middleware no inyecta
-// x-user-role, así que hasPermission(null, 'employees:read') devuelve false.
-// Ver .claude/plans/ (Gate 0 responsableId, punto 6).
-//
-// Auth: MISMO patrón que las rutas hermanas de accounts/[id]/structure —
-// validateAuthToken + Account.role === 'FOCALIZAHR_ADMIN'.
+// Reemplaza a GET /api/admin/accounts/[id]/employees (eliminado). URL neutra: la
+// consumen las dos superficies, concierge (con targetAccountId) y cliente (cuenta del JWT).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { validateAuthToken } from '@/lib/auth';
+import {
+  extractUserContext,
+  hasPermission,
+} from '@/lib/services/AuthorizationService';
 import { getResponsableChainDepartmentIds } from '@/lib/services/DepartmentResponsableService';
 import type { StandardJobLevel } from '@/types/job-classification';
 
@@ -22,7 +19,6 @@ const SCAN_LIMIT = 200;   // techo de filas leídas antes de rankear (se reporta
 
 // Prioridad de liderazgo para el ORDEN de la lista. NO filtra ni bloquea a nadie:
 // un profesional_analista sigue siendo elegible, solo aparece más abajo.
-// Los slugs son los del type canónico StandardJobLevel (src/types/job-classification.ts).
 const JOB_LEVEL_RANK: Record<StandardJobLevel, number> = {
   gerente_director: 0,
   subgerente_subdirector: 1,
@@ -39,41 +35,41 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // SEGURIDAD: Validar token y rol admin
-    const authHeader = request.headers.get('authorization');
-    const validation = await validateAuthToken(authHeader, undefined);
+    const userContext = extractUserContext(request);
 
-    if (!validation.success || !validation.account) {
+    if (!userContext.accountId) {
       return NextResponse.json(
-        { success: false, error: validation.error || 'No autorizado' },
+        { success: false, error: 'No autorizado' },
         { status: 401 }
       );
     }
 
-    if (validation.account.role !== 'FOCALIZAHR_ADMIN') {
+    if (!hasPermission(userContext.role, 'departments:responsable:manage')) {
       return NextResponse.json(
-        { success: false, error: 'Acceso denegado - Se requiere rol FOCALIZAHR_ADMIN' },
+        { success: false, error: 'Sin permisos' },
         { status: 403 }
       );
     }
 
-    const accountId = params.id;
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search')?.trim() || '';
-    const forDepartmentId = searchParams.get('forDepartmentId')?.trim() || '';
+    const targetAccountId = searchParams.get('targetAccountId')?.trim() || '';
 
-    // OBLIGATORIO y fail-closed: sin el departamento que se está editando no hay
-    // cadena jerárquica que aplicar, y devolver la nómina completa sería justamente
-    // lo que este filtro viene a impedir.
-    if (!forDepartmentId) {
-      return NextResponse.json(
-        { success: false, error: 'forDepartmentId es requerido' },
-        { status: 400 }
-      );
+    // Cuenta efectiva: la propia salvo override de concierge (solo FOCALIZAHR_ADMIN).
+    let effectiveAccountId = userContext.accountId;
+
+    if (targetAccountId && targetAccountId !== userContext.accountId) {
+      if (userContext.role !== 'FOCALIZAHR_ADMIN') {
+        return NextResponse.json(
+          { success: false, error: 'Solo FOCALIZAHR_ADMIN puede consultar otras cuentas' },
+          { status: 403 }
+        );
+      }
+      effectiveAccountId = targetAccountId;
     }
 
     const targetDept = await prisma.department.findFirst({
-      where: { id: forDepartmentId, accountId },
+      where: { id: params.id, accountId: effectiveAccountId },
       select: { id: true },
     });
 
@@ -84,17 +80,15 @@ export async function GET(
       );
     }
 
-    // Cadena jerárquica: propio + ancestros + descendientes. Hermanos NO.
     const chainIds = await getResponsableChainDepartmentIds({
-      departmentId: forDepartmentId,
-      accountId,
+      departmentId: params.id,
+      accountId: effectiveAccountId,
     });
 
-    // isActive:true es el mismo criterio que exige el resolver
-    // (DepartmentResponsableService: un responsable inactivo se ignora y sigue el
-    // walk-up). Solo se ofrecen candidatos que el resolver aceptaría.
+    // isActive:true es el mismo criterio que exige el resolver (un responsable inactivo
+    // se ignora y sigue el walk-up). Solo se ofrecen candidatos que el resolver aceptaría.
     const where: any = {
-      accountId,
+      accountId: effectiveAccountId,
       isActive: true,
       status: { not: 'PENDING_ONBOARDING' },
       departmentId: { in: chainIds },
@@ -115,9 +109,7 @@ export async function GET(
           fullName: true,
           position: true,
           standardJobLevel: true,
-          department: {
-            select: { id: true, displayName: true },
-          },
+          department: { select: { id: true, displayName: true } },
         },
         orderBy: { fullName: 'asc' },
         take: SCAN_LIMIT,
@@ -149,9 +141,9 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Error buscando employees de la cuenta:', error);
+    console.error('Error buscando candidatos a responsable:', error);
     return NextResponse.json(
-      { success: false, error: 'Error al buscar empleados' },
+      { success: false, error: 'Error al buscar candidatos' },
       { status: 500 }
     );
   }
