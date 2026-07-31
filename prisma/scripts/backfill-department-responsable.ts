@@ -9,8 +9,19 @@
 // Idempotente: en --commit solo escribe donde responsableId está NULL (nunca pisa
 // una asignación existente). Dry-run por defecto: NO toca la BD, solo reporta.
 //
-// Uso: npx tsx prisma/scripts/backfill-department-responsable.ts            (dry-run)
-//      npx tsx prisma/scripts/backfill-department-responsable.ts --commit   (persiste)
+// SCOPE POR CUENTA: --account=<accountId> acota TODAS las consultas (departamentos,
+// líderes y contadores de contexto) a una sola cuenta. Es OBLIGATORIO junto con
+// --commit: la regla sellada (ARQUITECTURA_RESPONSABLE_DEPARTAMENTO.md, Addendum §
+// "Ejecución del backfill") es correr el --commit real cuenta por cuenta, contra la
+// nómina verdadera de cada cliente, nunca global ni sobre fixtures. El dry-run sí
+// admite correr global, para diagnóstico.
+//
+// Uso: npx --no-install tsx prisma/scripts/backfill-department-responsable.ts
+//        (dry-run global — diagnóstico)
+//      npx --no-install tsx prisma/scripts/backfill-department-responsable.ts --account=<id>
+//        (dry-run de una cuenta)
+//      npx --no-install tsx prisma/scripts/backfill-department-responsable.ts --account=<id> --commit
+//        (persiste, solo esa cuenta)
 
 import 'dotenv/config';
 import { prisma } from '../../src/lib/prisma';
@@ -20,6 +31,15 @@ import { prisma } from '../../src/lib/prisma';
 const LEADER_JOB_LEVELS = ['gerente_director', 'subgerente_subdirector', 'jefe'] as const;
 
 const COMMIT = process.argv.includes('--commit');
+
+// --account=<accountId> — acota el alcance de la corrida a una sola cuenta.
+const ACCOUNT_ID =
+  process.argv.find((a) => a.startsWith('--account='))?.split('=')[1]?.trim() || null;
+
+// Filtro de cuenta reusado por TODAS las consultas. Sin él el script barre las
+// ~10 cuentas de la base de una sola pasada, y los contadores de contexto reportan
+// cifras globales que no describen a ningún cliente en particular.
+const accountScope = ACCOUNT_ID ? { accountId: ACCOUNT_ID } : {};
 
 type Candidate = {
   id: string;
@@ -34,15 +54,40 @@ function fmtCandidate(c: Candidate): string {
 }
 
 async function main() {
-  console.log(`\n🔎 Backfill Department.responsableId — modo ${COMMIT ? 'COMMIT' : 'DRY-RUN'}\n`);
+  console.log(`\n🔎 Backfill Department.responsableId — modo ${COMMIT ? 'COMMIT' : 'DRY-RUN'}`);
+
+  // El --commit real se corre cuenta por cuenta contra nómina verdadera. Sin
+  // --account barrería todas las cuentas de la base en una sola pasada.
+  if (COMMIT && !ACCOUNT_ID) {
+    throw new Error(
+      '--commit requiere --account=<accountId>. La regla sellada es correr el backfill ' +
+        'real cuenta por cuenta, contra la nómina verdadera del cliente. ' +
+        'Para diagnóstico global, corré sin --commit.'
+    );
+  }
+
+  if (ACCOUNT_ID) {
+    const account = await prisma.account.findUnique({
+      where: { id: ACCOUNT_ID },
+      select: { id: true, companyName: true },
+    });
+    if (!account) {
+      throw new Error(`La cuenta ${ACCOUNT_ID} no existe.`);
+    }
+    console.log(`   Alcance: ${account.companyName} (${account.id})\n`);
+  } else {
+    console.log('   Alcance: TODAS las cuentas (solo diagnóstico)\n');
+  }
 
   // Contexto: ¿qué tan poblado está standardJobLevel? (interpreta la cobertura)
-  const totalActiveEmployees = await prisma.employee.count({ where: { isActive: true } });
+  const totalActiveEmployees = await prisma.employee.count({
+    where: { isActive: true, ...accountScope },
+  });
   const withJobLevel = await prisma.employee.count({
-    where: { isActive: true, standardJobLevel: { not: null } },
+    where: { isActive: true, ...accountScope, standardJobLevel: { not: null } },
   });
   const leaderEmployees = await prisma.employee.count({
-    where: { isActive: true, standardJobLevel: { in: [...LEADER_JOB_LEVELS] } },
+    where: { isActive: true, ...accountScope, standardJobLevel: { in: [...LEADER_JOB_LEVELS] } },
   });
   console.log('── Contexto de datos ──');
   console.log(`  Employees activos:                  ${totalActiveEmployees}`);
@@ -51,13 +96,13 @@ async function main() {
 
   // Departamentos activos
   const departments = await prisma.department.findMany({
-    where: { isActive: true },
+    where: { isActive: true, ...accountScope },
     select: { id: true, displayName: true, accountId: true, parentId: true, level: true },
   });
 
   // Todos los empleados-líder activos, agrupados por departmentId
   const leaders = await prisma.employee.findMany({
-    where: { isActive: true, standardJobLevel: { in: [...LEADER_JOB_LEVELS] } },
+    where: { isActive: true, ...accountScope, standardJobLevel: { in: [...LEADER_JOB_LEVELS] } },
     select: {
       id: true,
       fullName: true,
@@ -154,7 +199,9 @@ async function main() {
   let written = 0;
   for (const u of unique) {
     const res = await prisma.department.updateMany({
-      where: { id: u.dept.id, responsableId: null } as any,
+      // accountId explícito: defensa en profundidad multi-tenant en la escritura
+      // misma, además del guard de candidatos de arriba.
+      where: { id: u.dept.id, accountId: u.dept.accountId, responsableId: null } as any,
       data: { responsableId: u.c.id } as any,
     });
     written += res.count;
