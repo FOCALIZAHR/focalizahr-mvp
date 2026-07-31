@@ -9,6 +9,21 @@
 
 ---
 
+## Principio rector (instrucción directa de Victor, julio 2026)
+
+Este proyecto cambia la columna por la que se busca a una persona
+(de email a RUT). Nada más. Es como cambiar la columna de búsqueda
+en un Excel: se encuentra a la misma persona, por un dato más
+confiable, y todo lo demás sigue exactamente igual.
+
+Ningún cambio de este proyecto debe alterar el comportamiento del
+sistema. No cambia quién puede ver qué. No cambia qué botones
+aparecen. No cambia permisos. No cambia flujos. Si al hacer el
+cambio de columna algo se ve distinto, PARAR y preguntar a Victor
+— sin asumir que el comportamiento anterior era un problema.
+
+---
+
 ## 0. Contexto
 
 `Employee` (nómina) y `User` (login) son tablas disjuntas, sin FK entre sí.
@@ -181,6 +196,18 @@ de aplicación** que `employee.accountId === user.accountId` **antes** de enlaza
 chequeo explícito, un User y un Employee de cuentas distintas podrían quedar enlazados →
 puente cross-tenant (rompe el aislamiento multi-tenant, regla enterprise #2). Reflejado como
 comentario en `schema.prisma` (`User.employeeId`), mismo estilo que `Department.responsableId`.
+
+> **⚠️ Corrección de cita (2026-07-31).** La frase "mismo estilo que
+> `Department.responsableId`" era **falsa al momento de escribirse**. Verificado línea por
+> línea durante el Gate 0 del mantenedor de responsables: `schema.prisma:760` solo tenía el
+> comentario de origen (`// EX Clima Gate 1 — FK a Employee.id (hecho RRHH)`), sin una
+> palabra sobre R1 ni sobre `accountId`. Ese precedente no existía.
+>
+> Hoy la frase **sí es cierta**, pero por la razón inversa a la que el texto sugiere: el
+> comentario R1 completo se agregó a `Department.responsableId` como **Paso 0 de ese mismo
+> gate** (`97bef30`, 2026-07-31), *en respuesta* a descubrir que faltaba. Es **consecuencia**
+> del gate del mantenedor, no precedente previo suyo. Ver
+> `ARQUITECTURA_RESPONSABLE_DEPARTAMENTO.md` §As-built Fase 2.
 
 ### R2 — Etapa 3 BLOQUEADA hasta cerrar el minting legacy de JWT
 
