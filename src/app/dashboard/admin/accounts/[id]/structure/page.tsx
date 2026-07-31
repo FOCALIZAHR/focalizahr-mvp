@@ -594,13 +594,15 @@ export default function StructurePage() {
                   <Label className="text-gray-300">Responsable</Label>
                   <DepartmentResponsableSelect
                     accountId={accountId}
+                    forDepartmentId={editingUnit.id}
                     value={formData.responsableId}
                     currentName={formData.responsableName}
                     onChange={updateResponsable}
                   />
                   <p className="text-xs text-gray-500">
-                    Sin responsable asignado, los avisos de esta unidad se envían al
-                    administrador de la cuenta.
+                    Debe pertenecer a esta unidad, a una superior o a una que dependa de
+                    ella. Sin responsable asignado, los avisos se envían al administrador
+                    de la cuenta.
                   </p>
                 </div>
               )}

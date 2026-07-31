@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateAuthToken } from '@/lib/auth';
 import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter';
+import { getResponsableChainDepartmentIds } from '@/lib/services/DepartmentResponsableService';
 
 // PUT: Actualizar gerencia o departamento
 export async function PUT(
@@ -162,7 +163,7 @@ export async function PUT(
             accountId,          // ← R1: mismo accountId que el departamento
             isActive: true
           },
-          select: { id: true, fullName: true }
+          select: { id: true, fullName: true, departmentId: true }
         });
 
         if (!responsableEmployee) {
@@ -170,6 +171,31 @@ export async function PUT(
             { error: 'El responsable indicado no existe, está inactivo o no pertenece a esta cuenta' },
             { status: 400 }
           );
+        }
+
+        // ── Cadena jerárquica (regla de producto, 2026-07-31) ──
+        // El responsable debe pertenecer a la rama vertical del departamento: él mismo,
+        // un ancestro, o un descendiente. Nunca una rama sin relación — Clima notifica
+        // planes de acción a esta persona.
+        //
+        // Solo se valida cuando el valor CAMBIA: hay filas heredadas anteriores a esta
+        // regla (el selector reenvía el responsableId actual en cada update, así que
+        // validar siempre dejaría esos departamentos ineditables hasta desasignarlos).
+        if (responsableId !== existingUnit.responsableId) {
+          const chainIds = await getResponsableChainDepartmentIds({
+            departmentId: unitId,
+            accountId
+          });
+
+          if (!chainIds.includes(responsableEmployee.departmentId)) {
+            return NextResponse.json(
+              {
+                error:
+                  'El responsable debe pertenecer al departamento, a una unidad superior o a una que dependa de él'
+              },
+              { status: 400 }
+            );
+          }
         }
 
         updateData.responsableId = responsableId;

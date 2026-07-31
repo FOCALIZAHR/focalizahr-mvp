@@ -12,6 +12,7 @@
 // Pura: no envía nada. El canal (email/otro) del responsable lo decide su consumidor (5C).
 
 import { prisma } from '@/lib/prisma';
+import { getChildDepartmentIds } from '@/lib/services/AuthorizationService';
 
 const MAX_DEPTH = 6; // holding(1) → gerencia(2) → depto(3) + margen; corta ciclos
 
@@ -84,4 +85,64 @@ export async function resolveDepartmentResponsable(params: {
     email: account?.adminEmail ?? '',
     name: account?.adminName ?? 'Administrador',
   };
+}
+
+/**
+ * Ids de departamento cuyos empleados pueden ser RESPONSABLES de `departmentId`:
+ * el propio departamento + sus ancestros hasta la raíz + todos sus descendientes.
+ * Los departamentos HERMANOS quedan fuera a propósito.
+ *
+ * Regla de producto (Victor, 2026-07-31): el responsable de un departamento debe tener
+ * relación jerárquica real con el equipo. Clima notifica planes de acción a esta
+ * persona; alguien de otra rama recibiría un aviso que no le corresponde.
+ *
+ * Por qué "propio + arriba + abajo" y no solo "arriba": una gerencia nivel 2 casi nunca
+ * tiene empleados registrados en sí misma — su jefe figura en un departamento hijo. Con
+ * la cadena solo ascendente, 6 gerencias reales quedaban sin ningún candidato elegible.
+ *
+ * Multi-tenant: cada salto ascendente valida accountId, y los descendientes se
+ * intersectan contra departamentos de la cuenta (getChildDepartmentIds no filtra por
+ * accountId — se apoya en que parentId no cruza cuentas, garantía implícita).
+ */
+export async function getResponsableChainDepartmentIds(params: {
+  departmentId: string;
+  accountId: string;
+}): Promise<string[]> {
+  const { departmentId, accountId } = params;
+
+  // Fail-closed: arranca vacío. Cada id entra SOLO después de confirmarse que pertenece
+  // a la cuenta; un departmentId ajeno devuelve [] y el consumidor no ofrece candidatos.
+  const chain = new Set<string>();
+
+  // ── Ascendente: subir por parentId hasta la raíz (mismo patrón que el walk-up) ──
+  let currentId: string | null = departmentId;
+  let depth = 0;
+
+  while (currentId && depth < MAX_DEPTH) {
+    const dept: { id: string; parentId: string | null } | null =
+      await prisma.department.findFirst({
+        where: { id: currentId, accountId },
+        select: { id: true, parentId: true },
+      });
+
+    if (!dept) break; // depto ajeno/inexistente → corta la cadena acá
+
+    chain.add(dept.id); // confirmado de la cuenta
+    currentId = dept.parentId;
+    depth += 1;
+  }
+
+  // ── Descendente: todo el subárbol bajo el propio departamento ──
+  const descendantIds = await getChildDepartmentIds(departmentId);
+
+  if (descendantIds.length > 0) {
+    // Guard multi-tenant explícito sobre el CTE (que no filtra por cuenta).
+    const ownDescendants = await prisma.department.findMany({
+      where: { id: { in: descendantIds }, accountId },
+      select: { id: true },
+    });
+    for (const d of ownDescendants) chain.add(d.id);
+  }
+
+  return [...chain];
 }

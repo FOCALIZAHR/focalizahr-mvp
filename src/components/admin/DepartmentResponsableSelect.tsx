@@ -29,6 +29,8 @@ export interface SelectedResponsable {
 interface DepartmentResponsableSelectProps {
   /** Cuenta CLIENTE cuya nómina se busca (params.id de la ruta, no la del admin) */
   accountId: string;
+  /** Departamento que se está editando — acota la búsqueda a su cadena jerárquica */
+  forDepartmentId: string;
   /** responsableId actual del formulario (null = sin asignar) */
   value: string | null;
   /** Nombre del responsable actual, para pintar el chip sin re-consultar */
@@ -41,26 +43,23 @@ const DEBOUNCE_MS = 300;
 
 export default function DepartmentResponsableSelect({
   accountId,
+  forDepartmentId,
   value,
   currentName,
   onChange,
 }: DepartmentResponsableSelectProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<EmployeeOption[]>([]);
+  const [total, setTotal] = useState(0);
+  const [chainIsEmpty, setChainIsEmpty] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Búsqueda con debounce ──
-  const searchEmployees = useCallback(
-    async (q: string) => {
-      if (q.length < MIN_QUERY_LENGTH) {
-        setResults([]);
-        setShowDropdown(false);
-        return;
-      }
-
+  // ── Consulta acotada a la cadena jerárquica del departamento ──
+  const fetchCandidates = useCallback(
+    async (q: string, { silent }: { silent?: boolean } = {}) => {
       const token =
         typeof window !== 'undefined'
           ? localStorage.getItem('focalizahr_token')
@@ -71,41 +70,52 @@ export default function DepartmentResponsableSelect({
         return;
       }
 
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       try {
+        const qs = new URLSearchParams({ forDepartmentId });
+        if (q.length >= MIN_QUERY_LENGTH) qs.set('search', q);
+
         const response = await fetch(
-          `/api/admin/accounts/${accountId}/employees?search=${encodeURIComponent(q)}`,
+          `/api/admin/accounts/${accountId}/employees?${qs.toString()}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const result = await response.json();
 
         if (response.ok && result.success) {
           setResults(result.data);
-          setShowDropdown(true);
+          setTotal(result.meta?.total ?? result.data.length);
+          // Sin término de búsqueda y cero resultados = la rama jerárquica no tiene
+          // a nadie. Es distinto de "no hay match para lo que escribiste".
+          if (q.length < MIN_QUERY_LENGTH) {
+            setChainIsEmpty((result.meta?.total ?? 0) === 0);
+          }
         } else {
           setResults([]);
-          setShowDropdown(true);
+          setTotal(0);
         }
       } catch {
         setResults([]);
+        setTotal(0);
       } finally {
-        setIsLoading(false);
+        if (!silent) setIsLoading(false);
       }
     },
-    [accountId]
+    [accountId, forDepartmentId]
   );
 
+  // Corre también al montar con query vacío: la cadena suele ser corta (promedio ~4
+  // personas), así que se precargan los candidatos en vez de obligar a escribir.
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     debounceRef.current = setTimeout(() => {
-      searchEmployees(query);
+      fetchCandidates(query);
     }, DEBOUNCE_MS);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, searchEmployees]);
+  }, [query, fetchCandidates]);
 
   // ── Cerrar dropdown al hacer click fuera ──
   useEffect(() => {
@@ -156,6 +166,22 @@ export default function DepartmentResponsableSelect({
     );
   }
 
+  // ── Sin nadie en la línea jerárquica: no hay nada que buscar ──
+  // Distinto de "no hay match": acá el departamento y toda su rama están vacíos.
+  if (chainIsEmpty) {
+    return (
+      <div className="rounded-md border border-slate-700 bg-slate-800/50 px-3 py-3">
+        <p className="text-xs text-gray-400">
+          No hay personas en la línea jerárquica de esta unidad.
+        </p>
+        <p className="mt-1 text-[10px] text-gray-500">
+          El responsable debe pertenecer a esta unidad, a una superior o a una que dependa
+          de ella. Cargá empleados en alguna de ellas para poder asignarlo.
+        </p>
+      </div>
+    );
+  }
+
   // ── Estado de búsqueda ──
   return (
     <div ref={containerRef} className="relative">
@@ -165,9 +191,7 @@ export default function DepartmentResponsableSelect({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => {
-            if (results.length > 0) setShowDropdown(true);
-          }}
+          onFocus={() => setShowDropdown(true)}
           placeholder="Buscar por nombre o email..."
           className="w-full rounded-md border border-slate-700 bg-slate-800 py-2 pl-9 pr-9 text-sm text-white placeholder:text-gray-500 focus:border-cyan-500/50 focus:outline-none"
         />
@@ -180,34 +204,35 @@ export default function DepartmentResponsableSelect({
         <div className="absolute z-50 mt-1 max-h-[240px] w-full overflow-y-auto rounded-md border border-slate-700 bg-slate-900 shadow-2xl">
           {results.length === 0 && !isLoading ? (
             <p className="px-3 py-3 text-xs text-gray-500">
-              Sin empleados que coincidan con &quot;{query}&quot;
+              Sin coincidencias para &quot;{query}&quot; en la línea jerárquica de esta unidad
             </p>
           ) : (
-            results.map((emp) => (
-              <button
-                key={emp.id}
-                type="button"
-                onClick={() => handleSelect(emp)}
-                className="flex w-full min-h-[44px] items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-slate-800"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm text-white">{emp.fullName}</p>
-                  <p className="truncate text-[10px] text-gray-500">
-                    {[emp.position, emp.department?.displayName]
-                      .filter(Boolean)
-                      .join(' · ') || 'Sin cargo'}
-                  </p>
-                </div>
-              </button>
-            ))
+            <>
+              {results.map((emp) => (
+                <button
+                  key={emp.id}
+                  type="button"
+                  onClick={() => handleSelect(emp)}
+                  className="flex w-full min-h-[44px] items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-slate-800"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm text-white">{emp.fullName}</p>
+                    <p className="truncate text-[10px] text-gray-500">
+                      {[emp.position, emp.department?.displayName]
+                        .filter(Boolean)
+                        .join(' · ') || 'Sin cargo'}
+                    </p>
+                  </div>
+                </button>
+              ))}
+              {total > results.length && (
+                <p className="border-t border-slate-700/50 px-3 py-2 text-[10px] text-gray-500">
+                  Mostrando {results.length} de {total} — refiná la búsqueda
+                </p>
+              )}
+            </>
           )}
         </div>
-      )}
-
-      {query.length > 0 && query.length < MIN_QUERY_LENGTH && (
-        <p className="mt-1 text-[10px] text-gray-500">
-          Escribe al menos {MIN_QUERY_LENGTH} caracteres
-        </p>
       )}
     </div>
   );
