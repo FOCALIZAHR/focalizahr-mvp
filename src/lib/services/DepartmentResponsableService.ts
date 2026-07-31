@@ -147,6 +147,84 @@ export async function getResponsableChainDepartmentIds(params: {
   return [...chain];
 }
 
+/**
+ * Cuántos candidatos elegibles tiene CADA departamento activo de una cuenta.
+ * Versión bulk de getResponsableChainDepartmentIds: misma regla de cadena
+ * (propio + ancestros + descendientes, hermanos NO), resuelta en memoria con 2
+ * queries en vez de 2 por departamento.
+ *
+ * ⚠️ Si cambia la regla de cadena, hay que cambiarla en LAS DOS funciones. Existen
+ * separadas porque los costos son opuestos: la de arriba resuelve UN departamento
+ * y se apoya en el CTE recursivo cacheado; ésta resuelve los ~57 de una pantalla,
+ * donde 114 queries serían inaceptables.
+ *
+ * Sirve para distinguir "sin responsable pero asignable" de "sin responsable y
+ * bloqueado porque su rama no tiene a nadie cargado" — sin ese dato, la pantalla
+ * de mantenimiento ofrece decenas de filas que abren un selector vacío.
+ */
+export async function computeResponsableCandidateCounts(
+  accountId: string
+): Promise<Map<string, number>> {
+  const [departments, employees] = await Promise.all([
+    prisma.department.findMany({
+      where: { accountId, isActive: true },
+      select: { id: true, parentId: true },
+    }),
+    prisma.employee.groupBy({
+      by: ['departmentId'],
+      where: { accountId, isActive: true, status: { not: 'PENDING_ONBOARDING' } },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const parentOf = new Map(departments.map((d) => [d.id, d.parentId]));
+  const childrenOf = new Map<string, string[]>();
+  for (const d of departments) {
+    if (!d.parentId) continue;
+    const arr = childrenOf.get(d.parentId) ?? [];
+    arr.push(d.id);
+    childrenOf.set(d.parentId, arr);
+  }
+
+  const employeesIn = new Map<string, number>();
+  for (const row of employees) {
+    employeesIn.set(row.departmentId, row._count._all);
+  }
+
+  const counts = new Map<string, number>();
+
+  for (const dept of departments) {
+    const chain = new Set<string>([dept.id]);
+
+    // Ascendente, con el mismo cap de profundidad que el walk-up.
+    let currentId = parentOf.get(dept.id) ?? null;
+    let depth = 0;
+    while (currentId && depth < MAX_DEPTH) {
+      if (chain.has(currentId)) break; // ciclo de parentId
+      chain.add(currentId);
+      currentId = parentOf.get(currentId) ?? null;
+      depth += 1;
+    }
+
+    // Descendente: todo el subárbol propio.
+    const stack = [...(childrenOf.get(dept.id) ?? [])];
+    let guard = 0;
+    while (stack.length && guard < departments.length + 1) {
+      const id = stack.pop()!;
+      guard += 1;
+      if (chain.has(id)) continue;
+      chain.add(id);
+      stack.push(...(childrenOf.get(id) ?? []));
+    }
+
+    let total = 0;
+    for (const id of chain) total += employeesIn.get(id) ?? 0;
+    counts.set(dept.id, total);
+  }
+
+  return counts;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // ESCRITURA — única vía para persistir Department.responsableId
 //

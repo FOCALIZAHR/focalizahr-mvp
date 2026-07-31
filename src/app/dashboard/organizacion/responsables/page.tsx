@@ -4,18 +4,23 @@
 // Mantenimiento del responsable de cada departamento, CARA AL CLIENTE.
 //
 // Contraparte de /dashboard/admin/accounts/[id]/structure (concierge). Mismo backend,
-// dos superficies — patrón de Métricas Departamentales. Acá NO hay AccountSelector: la
-// cuenta sale del JWT. Tampoco se crea/mueve/edita estructura, eso sigue Concierge-only.
+// dos superficies. Acá NO hay AccountSelector: la cuenta sale del JWT. Tampoco se
+// crea/mueve/edita estructura, eso sigue Concierge-only.
+//
+// Gate 0 (2026-07-31): el trabajo del usuario NO es "ver 57 departamentos", es vaciar
+// la cola de los que HOY puede cubrir. Por eso los pills segmentan por trabajo
+// (asignable / asignado / bloqueado) y no por el dato crudo con/sin responsable: de 57
+// deptos, 34 no tienen a nadie en su rama y abrirían un selector vacío.
 
-import { useState, useEffect, useCallback } from 'react';
-import { Users2, Loader2, UserCheck } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Users2, Loader2, UserCheck, ChevronDown, Building2 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { hasPermission } from '@/lib/auth/permissions';
+import { useToast } from '@/components/ui/toast-system';
 import { FHREmptyState } from '@/components/ui/FHREmptyState';
 import DepartmentResponsableSelect, {
   type SelectedResponsable,
 } from '@/components/admin/DepartmentResponsableSelect';
-import { toast } from 'sonner';
 
 interface DepartmentRow {
   id: string;
@@ -25,13 +30,50 @@ interface DepartmentRow {
   standardCategory: string | null;
   responsableId: string | null;
   responsable: { id: string; fullName: string; position: string | null } | null;
+  candidateCount: number;
+}
+
+type Filtro = 'porAsignar' | 'asignados' | 'sinCandidatos';
+
+const FILTRO_LABEL: Record<Filtro, string> = {
+  porAsignar: 'Por asignar',
+  asignados: 'Asignados',
+  sinCandidatos: 'Sin candidatos',
+};
+
+// Estilos de pill del Rail canónico (src/components/evaluator/cinema/Rail.tsx:10-27).
+// El color distingue naturaleza de la cola, NO severidad: cyan = trabajo pendiente,
+// emerald = resuelto, slate = fuera del alcance del usuario en esta pantalla.
+const FILTRO_STYLES: Record<Filtro, { active: string; inactive: string }> = {
+  porAsignar: {
+    active: 'bg-cyan-400 text-slate-950 shadow-[0_2px_10px_rgba(34,211,238,0.3)]',
+    inactive: 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700',
+  },
+  asignados: {
+    active: 'bg-emerald-400 text-slate-950 shadow-[0_2px_10px_rgba(16,185,129,0.3)]',
+    inactive: 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700',
+  },
+  sinCandidatos: {
+    active: 'bg-slate-400 text-slate-950 shadow-[0_2px_10px_rgba(148,163,184,0.25)]',
+    inactive: 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700',
+  },
+};
+
+const FILTRO_ORDER: Filtro[] = ['porAsignar', 'asignados', 'sinCandidatos'];
+
+function clasificar(d: DepartmentRow): Filtro {
+  if (d.responsableId) return 'asignados';
+  return d.candidateCount > 0 ? 'porAsignar' : 'sinCandidatos';
 }
 
 export default function ResponsablesPage() {
+  const { success, error } = useToast();
   const [departments, setDepartments] = useState<DepartmentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState<Filtro>('porAsignar');
+  const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const user = getCurrentUser();
@@ -52,24 +94,69 @@ export default function ResponsablesPage() {
       if (res.ok && json.success) {
         setDepartments(json.departments ?? []);
       } else {
-        toast.error('Error', { description: json.error || 'No se pudo cargar la estructura' });
+        error(json.error || 'No se pudo cargar la estructura organizacional.', 'Error');
       }
     } catch {
-      toast.error('Error', { description: 'No se pudo cargar la estructura' });
+      error('No se pudo cargar la estructura organizacional.', 'Error');
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, error]);
 
   useEffect(() => {
     loadDepartments();
   }, [loadDepartments]);
 
-  async function handleChange(deptId: string, responsable: SelectedResponsable | null) {
+  const conteos = useMemo(
+    () => ({
+      porAsignar: departments.filter((d) => clasificar(d) === 'porAsignar').length,
+      asignados: departments.filter((d) => clasificar(d) === 'asignados').length,
+      sinCandidatos: departments.filter((d) => clasificar(d) === 'sinCandidatos').length,
+    }),
+    [departments]
+  );
+
+  // Grupos = gerencia (nivel ≤2) + sus hijos. La gerencia es una fila más dentro de su
+  // propio grupo: también puede tener responsable.
+  const grupos = useMemo(() => {
+    const visibles = departments.filter((d) => clasificar(d) === filtro);
+    const visiblesIds = new Set(visibles.map((d) => d.id));
+
+    const gerencias = departments.filter((d) => d.level <= 2);
+    const armados = gerencias
+      .map((g) => ({
+        id: g.id,
+        titulo: g.displayName,
+        filas: [g, ...departments.filter((d) => d.parentId === g.id)].filter((d) =>
+          visiblesIds.has(d.id)
+        ),
+      }))
+      .filter((g) => g.filas.length > 0);
+
+    const huerfanas = visibles.filter(
+      (d) => d.level > 2 && (!d.parentId || !gerencias.some((g) => g.id === d.parentId))
+    );
+    if (huerfanas.length > 0) {
+      armados.push({ id: '__sin_gerencia__', titulo: 'Sin gerencia asignada', filas: huerfanas });
+    }
+
+    return armados;
+  }, [departments, filtro]);
+
+  function toggle(id: string) {
+    setAbiertos((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleChange(dept: DepartmentRow, responsable: SelectedResponsable | null) {
     if (!token) return;
-    setSavingId(deptId);
+    setSavingId(dept.id);
     try {
-      const res = await fetch(`/api/departments/${deptId}/responsable`, {
+      const res = await fetch(`/api/departments/${dept.id}/responsable`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ responsableId: responsable?.id ?? null }),
@@ -77,16 +164,18 @@ export default function ResponsablesPage() {
       const json = await res.json();
 
       if (!res.ok) {
-        toast.error('No se pudo guardar', { description: json.error });
+        error(json.error || 'No se pudo guardar el responsable.', 'Error');
         return;
       }
 
-      toast.success(responsable ? 'Responsable asignado' : 'Responsable desasignado', {
-        description: responsable?.fullName,
-      });
+      if (responsable) {
+        success(`Responsable de "${dept.displayName}" actualizado`, '¡Éxito!');
+      } else {
+        success(`"${dept.displayName}" quedó sin responsable`, 'Actualizado');
+      }
       await loadDepartments();
     } catch {
-      toast.error('Error', { description: 'No se pudo guardar el responsable' });
+      error('No se pudo guardar el responsable. Intenta nuevamente.', 'Error');
     } finally {
       setSavingId(null);
     }
@@ -107,17 +196,11 @@ export default function ResponsablesPage() {
     );
   }
 
-  const gerencias = departments.filter((d) => d.level <= 2);
-  const hijosDe = (id: string) => departments.filter((d) => d.parentId === id);
-  const huerfanos = departments.filter((d) => d.level > 2 && !d.parentId);
-
-  const sinResponsable = departments.filter((d) => !d.responsableId).length;
-
   return (
     <div className="fhr-bg-main min-h-screen px-4 py-6 md:px-8 md:py-10">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/30">
               <Users2 className="w-5 h-5 text-cyan-400" />
@@ -131,11 +214,6 @@ export default function ResponsablesPage() {
             Quien figure acá recibe los planes de acción y avisos de su equipo. Sin
             responsable asignado, esos avisos llegan al administrador de la cuenta.
           </p>
-          {!loading && departments.length > 0 && sinResponsable > 0 && (
-            <p className="text-[11px] text-slate-500 font-light mt-2">
-              {sinResponsable} de {departments.length} unidades sin responsable
-            </p>
-          )}
         </div>
 
         {loading ? (
@@ -153,51 +231,89 @@ export default function ResponsablesPage() {
             insight="Escribinos si necesitás ajustarla."
           />
         ) : (
-          <div className="space-y-4">
-            {gerencias.map((ger) => (
-              <DeptCard
-                key={ger.id}
-                dept={ger}
-                hijos={hijosDe(ger.id)}
-                savingId={savingId}
-                onChange={handleChange}
-              />
-            ))}
+          <>
+            {/* Pills de cola de trabajo */}
+            <div className="flex gap-2 mb-6 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+              {FILTRO_ORDER.map((f) => {
+                const activo = filtro === f;
+                const styles = FILTRO_STYLES[f];
+                return (
+                  <button
+                    key={f}
+                    onClick={() => setFiltro(f)}
+                    className={`px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all whitespace-nowrap min-h-[44px] ${
+                      activo ? styles.active : styles.inactive
+                    }`}
+                  >
+                    {FILTRO_LABEL[f]} {conteos[f]}
+                  </button>
+                );
+              })}
+            </div>
 
-            {huerfanos.length > 0 && (
-              <div className="space-y-4 pt-2">
-                <p className="text-[10px] uppercase tracking-widest text-slate-500">
-                  Sin gerencia asignada
-                </p>
-                {huerfanos.map((d) => (
-                  <DeptCard
-                    key={d.id}
-                    dept={d}
-                    hijos={[]}
+            {/* Contenido del filtro activo */}
+            {grupos.length === 0 ? (
+              <FHREmptyState
+                type={filtro === 'porAsignar' ? 'clear' : 'pending'}
+                title={
+                  filtro === 'porAsignar'
+                    ? 'No queda nada por asignar'
+                    : `Sin unidades en "${FILTRO_LABEL[filtro]}"`
+                }
+                description={
+                  filtro === 'porAsignar'
+                    ? 'Todas las unidades que hoy tienen personas en su línea jerárquica ya tienen responsable.'
+                    : 'No hay unidades en esta categoría.'
+                }
+              />
+            ) : (
+              <div className="space-y-4">
+                {filtro === 'sinCandidatos' && (
+                  <p className="text-xs text-slate-500 font-light leading-relaxed max-w-2xl">
+                    Estas unidades no tienen personas cargadas ni en sí mismas, ni en su
+                    gerencia, ni en las que dependen de ellas. El responsable debe pertenecer
+                    a esa línea jerárquica, así que todavía no hay a quién asignar.
+                  </p>
+                )}
+
+                {grupos.map((g) => (
+                  <GrupoCard
+                    key={g.id}
+                    titulo={g.titulo}
+                    filas={g.filas}
+                    abierto={abiertos.has(g.id)}
+                    onToggle={() => toggle(g.id)}
+                    filtro={filtro}
                     savingId={savingId}
                     onChange={handleChange}
                   />
                 ))}
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
     </div>
   );
 }
 
-// ── Card de unidad + sus departamentos hijos ──
-function DeptCard({
-  dept,
-  hijos,
+// ── Grupo colapsable por gerencia ──
+function GrupoCard({
+  titulo,
+  filas,
+  abierto,
+  onToggle,
+  filtro,
   savingId,
   onChange,
 }: {
-  dept: DepartmentRow;
-  hijos: DepartmentRow[];
+  titulo: string;
+  filas: DepartmentRow[];
+  abierto: boolean;
+  onToggle: () => void;
+  filtro: Filtro;
   savingId: string | null;
-  onChange: (id: string, r: SelectedResponsable | null) => void;
+  onChange: (d: DepartmentRow, r: SelectedResponsable | null) => void;
 }) {
   return (
     <div className="relative overflow-hidden rounded-2xl border border-slate-800/40 bg-slate-900/60 backdrop-blur-sm">
@@ -211,17 +327,38 @@ function DeptCard({
         }}
       />
 
-      <div className="px-4 py-5 md:px-6 md:py-6">
-        <DeptRow dept={dept} savingId={savingId} onChange={onChange} destacado />
+      <button
+        onClick={onToggle}
+        aria-expanded={abierto}
+        className="w-full min-h-[44px] px-4 py-4 md:px-6 md:py-5 flex items-center gap-3 text-left transition-colors hover:bg-slate-800/30"
+      >
+        <Building2 className="h-4 w-4 text-cyan-400/70 flex-shrink-0" />
+        <span className="flex-1 min-w-0 truncate text-white font-light text-base">
+          {titulo}
+        </span>
+        <span className="text-[11px] text-slate-500 font-light flex-shrink-0">
+          {filas.length}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 text-slate-500 flex-shrink-0 transition-transform ${
+            abierto ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
 
-        {hijos.length > 0 && (
-          <div className="mt-5 space-y-5 border-t border-slate-800/40 pt-5">
-            {hijos.map((h) => (
-              <DeptRow key={h.id} dept={h} savingId={savingId} onChange={onChange} />
-            ))}
-          </div>
-        )}
-      </div>
+      {abierto && (
+        <div className="px-4 pb-5 md:px-6 md:pb-6 space-y-5 border-t border-slate-800/40 pt-5">
+          {filas.map((d) => (
+            <DeptRow
+              key={d.id}
+              dept={d}
+              filtro={filtro}
+              savingId={savingId}
+              onChange={onChange}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -229,29 +366,22 @@ function DeptCard({
 // ── Fila: nombre + responsable actual + selector ──
 function DeptRow({
   dept,
+  filtro,
   savingId,
   onChange,
-  destacado = false,
 }: {
   dept: DepartmentRow;
+  filtro: Filtro;
   savingId: string | null;
-  onChange: (id: string, r: SelectedResponsable | null) => void;
-  destacado?: boolean;
+  onChange: (d: DepartmentRow, r: SelectedResponsable | null) => void;
 }) {
   const guardando = savingId === dept.id;
+  const bloqueado = filtro === 'sinCandidatos';
 
   return (
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6">
       <div className="min-w-0 md:flex-1">
-        <p
-          className={
-            destacado
-              ? 'text-white font-light text-base truncate'
-              : 'text-slate-300 font-light text-sm truncate'
-          }
-        >
-          {dept.displayName}
-        </p>
+        <p className="text-slate-300 font-light text-sm truncate">{dept.displayName}</p>
         <p className="text-[11px] text-slate-500 font-light mt-0.5 flex items-center gap-1.5">
           {dept.responsable ? (
             <>
@@ -261,27 +391,31 @@ function DeptRow({
                 {dept.responsable.position ? ` · ${dept.responsable.position}` : ''}
               </span>
             </>
+          ) : bloqueado ? (
+            <span className="text-slate-600">Sin personas en su línea jerárquica</span>
           ) : (
             <span className="text-slate-600">Sin responsable</span>
           )}
         </p>
       </div>
 
-      <div className="w-full md:w-72 md:flex-shrink-0">
-        {guardando ? (
-          <div className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-2">
-            <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
-            <span className="text-sm text-slate-400">Guardando…</span>
-          </div>
-        ) : (
-          <DepartmentResponsableSelect
-            forDepartmentId={dept.id}
-            value={dept.responsableId}
-            currentName={dept.responsable?.fullName ?? null}
-            onChange={(r) => onChange(dept.id, r)}
-          />
-        )}
-      </div>
+      {!bloqueado && (
+        <div className="w-full md:w-72 md:flex-shrink-0">
+          {guardando ? (
+            <div className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-2">
+              <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+              <span className="text-sm text-slate-400">Guardando…</span>
+            </div>
+          ) : (
+            <DepartmentResponsableSelect
+              forDepartmentId={dept.id}
+              value={dept.responsableId}
+              currentName={dept.responsable?.fullName ?? null}
+              onChange={(r) => onChange(dept, r)}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

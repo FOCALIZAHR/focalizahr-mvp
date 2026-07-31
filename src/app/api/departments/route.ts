@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateAuthToken } from '@/lib/auth';
 import { hasPermission } from '@/lib/services/AuthorizationService';
+import { computeResponsableCandidateCounts } from '@/lib/services/DepartmentResponsableService';
 import { DepartmentService, CreateDepartmentData } from '@/lib/services/DepartmentService';
 
 export const dynamic = 'force-dynamic';
@@ -40,28 +41,35 @@ export async function GET(request: NextRequest) {
       );
 
     if (includeResponsable) {
-      const departments = await prisma.department.findMany({
-        where: { accountId: authResult.account.id, isActive: true },
-        select: {
-          id: true,
-          displayName: true,
-          standardCategory: true,
-          isActive: true,
-          accountId: true,
-          level: true,
-          parentId: true,
-          responsableId: true,
-          responsable: { select: { id: true, fullName: true, position: true } },
-          _count: { select: { participants: true } },
-        },
-        orderBy: [{ level: 'asc' }, { displayName: 'asc' }],
-      });
+      const [departments, candidateCounts] = await Promise.all([
+        prisma.department.findMany({
+          where: { accountId: authResult.account.id, isActive: true },
+          select: {
+            id: true,
+            displayName: true,
+            standardCategory: true,
+            isActive: true,
+            accountId: true,
+            level: true,
+            parentId: true,
+            responsableId: true,
+            responsable: { select: { id: true, fullName: true, position: true } },
+            _count: { select: { participants: true } },
+          },
+          orderBy: [{ level: 'asc' }, { displayName: 'asc' }],
+        }),
+        // Sin esto la pantalla no puede distinguir "sin responsable pero asignable"
+        // de "sin responsable y bloqueado porque su rama no tiene a nadie cargado",
+        // y ofrecería decenas de filas que abren un selector vacío.
+        computeResponsableCandidateCounts(authResult.account.id),
+      ]);
 
       return NextResponse.json({
         success: true,
         departments: departments.map(({ _count, ...d }) => ({
           ...d,
           participantCount: _count.participants,
+          candidateCount: candidateCounts.get(d.id) ?? 0,
         })),
         total: departments.length,
       });
