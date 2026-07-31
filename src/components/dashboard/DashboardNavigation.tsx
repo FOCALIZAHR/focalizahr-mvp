@@ -11,6 +11,10 @@ import Link from 'next/link';
 import { getCurrentUser, logout } from '@/lib/auth';
 import { canManageGoalCycles } from '@/lib/constants/goalCycleRoles';
 import { canViewClima } from '@/lib/constants/climaRoles';
+// RBAC directo del módulo puro client-safe. NO se crea una constante espejo nueva:
+// climaRoles/goalCycleRoles duplican arrays a mano y están marcados como deuda a
+// migrar (BACKLOG_ENTERPRISE.md:42). Para código nuevo, hasPermission() directo.
+import { hasPermission } from '@/lib/auth/permissions';
 import { useSidebar } from '@/hooks/useSidebar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +47,8 @@ import {
   FileText,
   Brain,
   Wallet,
+  Users2,
+  UserCheck,
   Shield,
   CalendarRange,
 } from 'lucide-react';
@@ -142,6 +148,13 @@ export default function DashboardNavigation({
   // corregida, a2df312). Sub-usuarios traen userRole; legacy trae role.
   // CLIENT legacy fuera a propósito: la API le responde 403 (rol null).
   const canSeeGoalCycles = canManageGoalCycles(user?.userRole ?? user?.role);
+
+  // RBAC: mantenimiento de responsables de departamento. Sin constante espejo — se
+  // consulta el permiso mismo, que es la fuente de verdad que también usa la API.
+  const canManageResponsables = hasPermission(
+    user?.userRole ?? user?.role ?? null,
+    'departments:responsable:manage'
+  );
 
   // Navigation Config con Dropdowns
   const navigationItems: NavigationItem[] = [
@@ -250,6 +263,21 @@ export default function DashboardNavigation({
         { id: 'inscribir', label: 'Inscribir Colaboradores', href: '/dashboard/hub-inscripcion-permanentes', icon: Users },
         { id: 'metricas', label: 'Métricas Empresa', href: '/dashboard/department-metrics/upload', icon: FileSpreadsheet },
         { id: 'nueva-campana', label: 'Nueva Campaña', href: '/dashboard/campaigns/new', icon: Plus },
+      ],
+    }] : []),
+    // ══════════════════════════════════════════════════════════════
+    // SECCIÓN ORGANIZACIÓN — datos maestros de la estructura
+    // Separada de "Operaciones" (día a día) a propósito: su audiencia es distinta
+    // (operationsAllowedRoles NO incluye HR_ADMIN) y acá van a colgar las vistas de
+    // estructura cara al cliente si mañana se construye el editor.
+    // ══════════════════════════════════════════════════════════════
+    ...(canManageResponsables ? [{
+      id: 'organizacion',
+      label: 'Organización',
+      icon: Users2,
+      isDropdown: true,
+      subItems: [
+        { id: 'responsables', label: 'Responsables', href: '/dashboard/organizacion/responsables', icon: UserCheck },
       ],
     }] : []),
     {
