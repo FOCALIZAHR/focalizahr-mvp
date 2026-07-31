@@ -146,3 +146,117 @@ export async function getResponsableChainDepartmentIds(params: {
 
   return [...chain];
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// ESCRITURA — única vía para persistir Department.responsableId
+//
+// Vive acá (y no inline en un route handler) porque hay DOS superficies que lo
+// escriben: la pantalla concierge (/dashboard/admin/accounts/[id]/structure) y la
+// del cliente (/dashboard/organizacion/responsables). Con la regla duplicada en dos
+// handlers, R1 y la cadena jerárquica podrían divergir en silencio.
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Motivo de rechazo. El handler lo traduce a HTTP; el servicio no conoce status codes. */
+export type SetResponsableFailure =
+  | 'DEPARTMENT_NOT_FOUND'   // depto inexistente o de otra cuenta
+  | 'EMPLOYEE_NOT_FOUND'     // employee inexistente, inactivo, o de otra cuenta (R1)
+  | 'OUT_OF_CHAIN';          // employee fuera de la rama vertical del departamento
+
+export type SetResponsableResult =
+  | { ok: true; changed: boolean; responsableId: string | null; responsableName: string | null }
+  | { ok: false; reason: SetResponsableFailure };
+
+/**
+ * Asigna o desasigna el responsable de un departamento.
+ *
+ * - `responsableId: null` DESASIGNA y no valida nada: limpiar un estado inválido siempre
+ *   debe poder hacerse (hay filas heredadas anteriores a la regla de cadena).
+ * - R1 NO NEGOCIABLE: el FK referencia el id GLOBAL de Employee y no garantiza misma
+ *   cuenta → se verifica en capa de aplicación antes de enlazar.
+ * - La cadena jerárquica se valida SOLO si el valor cambia, por la misma razón de arriba:
+ *   una fila heredada que la viola no debe bloquear ediciones ajenas del departamento.
+ *
+ * `actor` solo alimenta la auditoría. Cuando `actor.accountId !== accountId` se registra
+ * como operación de admin sobre otra cuenta (actingAdminId vs targetAccountId), mismo
+ * patrón que api/department-metrics/upload.
+ */
+export async function setDepartmentResponsable(params: {
+  departmentId: string;
+  accountId: string;
+  responsableId: string | null;
+  actor: { accountId: string; email: string | null; role: string | null };
+}): Promise<SetResponsableResult> {
+  const { departmentId, accountId, responsableId, actor } = params;
+
+  const department = await prisma.department.findFirst({
+    where: { id: departmentId, accountId },
+    select: { id: true, responsableId: true },
+  });
+
+  if (!department) return { ok: false, reason: 'DEPARTMENT_NOT_FOUND' };
+
+  const previousId = department.responsableId;
+  const changed = previousId !== responsableId;
+
+  let responsableName: string | null = null;
+
+  if (responsableId) {
+    const employee = await prisma.employee.findFirst({
+      where: {
+        id: responsableId,
+        accountId,        // ← R1: mismo accountId que el departamento
+        isActive: true,
+      },
+      select: { id: true, fullName: true, departmentId: true },
+    });
+
+    if (!employee) return { ok: false, reason: 'EMPLOYEE_NOT_FOUND' };
+
+    if (changed) {
+      const chainIds = await getResponsableChainDepartmentIds({ departmentId, accountId });
+      if (!chainIds.includes(employee.departmentId)) {
+        return { ok: false, reason: 'OUT_OF_CHAIN' };
+      }
+    }
+
+    responsableName = employee.fullName;
+  }
+
+  if (!changed) {
+    // Nada que persistir ni que auditar.
+    return { ok: true, changed: false, responsableId, responsableName };
+  }
+
+  await prisma.department.update({
+    where: { id: departmentId, accountId },   // defensa multi-tenant en la mutación misma
+    data: { responsableId },
+  });
+
+  // Auditoría. try/catch silencioso: nunca debe voltear la mutación ya persistida.
+  const actingOnAnotherAccount = actor.accountId !== accountId;
+  try {
+    await prisma.auditLog.create({
+      data: {
+        accountId,
+        action: 'DEPARTMENT_RESPONSABLE_UPDATED',
+        entityType: 'department',
+        entityId: departmentId,
+        oldValues: { responsableId: previousId },
+        newValues: { responsableId },
+        userInfo: {
+          performedBy: actor.email,
+          performedByRole: actor.role,
+          // Solo cuando el actor opera sobre una cuenta ajena (concierge).
+          ...(actingOnAnotherAccount && {
+            actingAdminId: actor.accountId,
+            targetAccountId: accountId,
+          }),
+        },
+      },
+    });
+  } catch (auditError) {
+    console.error('⚠️ No se pudo registrar el AuditLog del responsable:', auditError);
+  }
+
+  return { ok: true, changed: true, responsableId, responsableName };
+}

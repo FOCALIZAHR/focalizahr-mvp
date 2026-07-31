@@ -179,6 +179,26 @@ export const PERMISSIONS = {
   ],
 
   // ─────────────────────────────────────────────────────────────────────────
+  // RESPONSABLE DE DEPARTAMENTO (Department.responsableId → Employee.id)
+  //
+  // Hecho de RRHH que Clima usa para notificar planes de acción: quien tiene este
+  // permiso decide a qué persona llegan esos avisos. Set restrictivo, espejo de
+  // 'metrics:upload' (el permiso del precedente Métricas Departamentales) + HR_ADMIN.
+  //
+  // HR_MANAGER queda FUERA a propósito: coherente con la decisión ya tomada en
+  // Sucesión (VE todos los planes pero EDITA solo su equipo). Si se quiere sumar,
+  // es una línea acá — no hay arrays de roles duplicados en la UI.
+  //
+  // NO cubre crear/mover/editar estructura: eso sigue siendo Concierge-only y vive
+  // en api/admin/accounts/[id]/structure/**.
+  // ─────────────────────────────────────────────────────────────────────────
+  'departments:responsable:manage': [
+    'FOCALIZAHR_ADMIN',
+    'ACCOUNT_OWNER',
+    'HR_ADMIN'
+  ],
+
+  // ─────────────────────────────────────────────────────────────────────────
   // SISTEMA
   // ─────────────────────────────────────────────────────────────────────────
   'system:full': [
