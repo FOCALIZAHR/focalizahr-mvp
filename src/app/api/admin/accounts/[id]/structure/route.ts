@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateAuthToken } from '@/lib/auth';
 import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter';
+import { invalidateDepartmentCache } from '@/lib/services/AuthorizationService';
 
 // GET: Obtener toda la estructura organizacional
 export async function GET(
@@ -247,6 +248,13 @@ export async function POST(
         }
       }
     });
+
+    // La nueva unidad se suma al subárbol de su padre → el cache LRU de
+    // getChildDepartmentIds (TTL 15 min) queda obsoleto. Afecta al filtrado jerárquico
+    // RBAC de AREA_MANAGER, no solo a esta pantalla. Sin padre no cambia ningún subárbol.
+    if (newUnit.parentId) {
+      invalidateDepartmentCache();
+    }
 
     // ========================================
     // RESPUESTA CON METADATOS ENRIQUECIDOS

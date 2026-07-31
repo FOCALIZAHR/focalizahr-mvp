@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { validateAuthToken } from '@/lib/auth';
+import { invalidateDepartmentCache } from '@/lib/services/AuthorizationService';
 
 export async function POST(
   request: NextRequest,
@@ -56,6 +57,12 @@ export async function POST(
         parentId: gerenciaId
       }
     });
+
+    // Se reasignó parentId en masa → el cache LRU de getChildDepartmentIds (TTL 15 min)
+    // queda obsoleto. Afecta al filtrado jerárquico RBAC, no solo a esta pantalla.
+    if (updated.count > 0) {
+      invalidateDepartmentCache();
+    }
 
     return NextResponse.json({
       success: true,

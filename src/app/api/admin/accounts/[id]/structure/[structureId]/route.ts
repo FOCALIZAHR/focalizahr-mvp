@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { validateAuthToken } from '@/lib/auth';
 import { DepartmentAdapter } from '@/lib/services/DepartmentAdapter';
 import { getResponsableChainDepartmentIds } from '@/lib/services/DepartmentResponsableService';
+import { invalidateDepartmentCache } from '@/lib/services/AuthorizationService';
 
 // PUT: Actualizar gerencia o departamento
 export async function PUT(
@@ -231,6 +232,14 @@ export async function PUT(
     });
 
     console.log('✅ Unidad actualizada exitosamente');
+
+    // Reparentar invalida el árbol: getChildDepartmentIds cachea en LRU (TTL 15 min) y
+    // nadie lo invalidaba. Afecta al filtrado jerárquico RBAC de AREA_MANAGER, no solo
+    // a la cadena del responsable. Invalidación GLOBAL: mover un nodo cambia el subárbol
+    // del padre viejo y del nuevo, así que limpiar una sola clave no alcanza.
+    if (Object.prototype.hasOwnProperty.call(updateData, 'parentId')) {
+      invalidateDepartmentCache();
+    }
 
     // Auditoría del cambio de responsable (solo si efectivamente cambió).
     // Patrón: admin/mapping-review/route.ts:276-290 (entityType 'department').
