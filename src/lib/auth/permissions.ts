@@ -644,7 +644,7 @@ export const PERMISSIONS = {
   // /api/clima/action-log): resolveDepartmentResponsable + comparar employeeId.
   // Un rol global con este permiso igual recibe 403 si no es el responsable
   // resuelto del departamento. No se toca clima:manage (aprobar planes es otra
-  // capacidad, solo RRHH). Ver SPEC_CLIMA_AUTORREPORTE_JEFE_v1.md §P3.
+  // capacidad, solo RRHH). Ver SPEC_ATACAR_CAUSA_TAB2_v2.md §1.
   'clima:action-log:write': [
     'FOCALIZAHR_ADMIN',
     'ACCOUNT_OWNER',

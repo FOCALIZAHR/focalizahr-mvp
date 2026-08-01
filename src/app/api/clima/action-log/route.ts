@@ -11,7 +11,7 @@
 // la protección real es el GUARD DE PROPIEDAD — solo el responsable resuelto del
 // departamento (resolveDepartmentResponsable + comparación de employeeId) puede
 // escribir. Nunca se resuelve identidad por email (regla vigente del proyecto).
-// Ver .claude/tasks/SPEC_CLIMA_AUTORREPORTE_JEFE_v1.md §P2.
+// Ver .claude/tasks/SPEC_ATACAR_CAUSA_TAB2_v2.md §1 (Fase A) y §V1 (el GET).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -36,25 +36,70 @@ const ENTRIES_PAGE_DEFAULT = 20; // modo entradas
 const ENTRIES_PAGE_MAX = 50;
 
 /**
- * Guard de lectura por departamento (V1). Roles GLOBALES (GLOBAL_ACCESS_ROLES) sin
- * restricción; TODO el resto queda acotado a {propio ∪ descendientes}, fail-closed sin
- * departmentId propio. Invertido a propósito (global-vs-resto, no AREA_MANAGER-específico):
- * si clima:view suma otro rol no-global, queda acotado automáticamente. Devuelve true si
- * el acceso al departamento pedido debe negarse.
+ * ¿El viewer es el responsable RESUELTO (walk-up) del departamento pedido? Es la MISMA
+ * condición que decide `canWrite` en el POST — fuente única para que leer y escribir no
+ * diverjan. false sin `employeeId` (vínculo Employee↔User no poblado → no hay identidad
+ * que comparar; nunca se resuelve por email). Resuelve con `resolveDepartmentResponsable`,
+ * que NO está cacheado.
  */
-async function isDepartmentReadDenied(
-  userContext: { role: string | null; departmentId: string | null },
+async function isViewerDeptResponsable(
+  userContext: { accountId: string; employeeId: string | null },
   departmentId: string
 ): Promise<boolean> {
+  if (!userContext.employeeId) return false;
+  const responsable = await resolveDepartmentResponsable({
+    departmentId,
+    accountId: userContext.accountId,
+  });
+  return (
+    responsable.source === 'responsable' && responsable.employeeId === userContext.employeeId
+  );
+}
+
+/**
+ * Guard de lectura por departamento (V1). Tres puertas, en orden de costo creciente:
+ *   1. Rol GLOBAL (GLOBAL_ACCESS_ROLES): ve toda la cuenta.
+ *   2. Subárbol del JWT: {departmentId propio ∪ descendientes} (getChildDepartmentIds, cacheado).
+ *   3. Responsable resuelto del depto pedido: el walk-up (resolveDepartmentResponsable) puede
+ *      hacer a alguien responsable de un depto FUERA de su subárbol JWT — p.ej. el responsable
+ *      de una gerencia responde por un hijo sin responsable propio sin tenerlo en su token.
+ *      `canWrite ⟹ read`: si puede ESCRIBIR el autorreporte, tiene que poder LEER el plan; sin
+ *      esta puerta el jefe que llega por el correo de los 30 días se lleva un 403.
+ *
+ * La resolución del responsable (query walk-up, NO cacheada) se paga SOLO si 1 y 2 fallan.
+ * Si el caller ya la calculó (el `canWrite` del modo lista), la pasa en `viewerIsResponsable`
+ * y no se vuelve a resolver — nunca se resuelve dos veces en un mismo request.
+ *
+ * Devuelve true si el acceso debe NEGARSE. Fail-closed: quien no cae en ninguna puerta, fuera
+ * (incluye al no-global sin departmentId propio que tampoco es responsable).
+ */
+async function isDepartmentReadDenied(
+  userContext: {
+    accountId: string;
+    role: string | null;
+    departmentId: string | null;
+    employeeId: string | null;
+  },
+  departmentId: string,
+  viewerIsResponsable?: boolean
+): Promise<boolean> {
+  // 1. Global: ve toda la cuenta.
   if ((GLOBAL_ACCESS_ROLES as readonly string[]).includes(userContext.role ?? '')) {
-    return false; // global: ve toda la cuenta
+    return false;
   }
-  if (!userContext.departmentId) return true; // fail-closed
-  const allowed = new Set([
-    userContext.departmentId,
-    ...(await getChildDepartmentIds(userContext.departmentId)),
-  ]);
-  return !allowed.has(departmentId);
+  // 2. Subárbol del JWT. Sin departmentId propio se SALTA (no corta): un responsable por
+  //    walk-up puede no tener departmentId en el token y aún así pasar por la puerta 3.
+  if (userContext.departmentId) {
+    const allowed = new Set([
+      userContext.departmentId,
+      ...(await getChildDepartmentIds(userContext.departmentId)),
+    ]);
+    if (allowed.has(departmentId)) return false;
+  }
+  // 3. Responsable resuelto (walk-up). Reusa el cálculo de canWrite si vino; si no, resuelve.
+  const isResponsable =
+    viewerIsResponsable ?? (await isViewerDeptResponsable(userContext, departmentId));
+  return !isResponsable;
 }
 
 // Shape del body. El CONTENIDO de `text` (trim > 0, <= 200) se valida DESPUÉS del
@@ -134,7 +179,13 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (await isDepartmentReadDenied(userContext, departmentId)) {
+    // canWrite (¿el viewer es el responsable resuelto de este depto?) y la 3ª puerta del
+    // guard de lectura comparten la MISMA resolución (mismo departmentId) → se calcula UNA
+    // vez y se reusa. En modo lista canWrite siempre se necesita para la respuesta, así que
+    // la resolución no es "de más"; la puerta 3 solo la aprovecha. (En modo entradas, sin
+    // canWrite, el guard la resuelve lazy: solo si global y subárbol fallan.)
+    const canWrite = await isViewerDeptResponsable(userContext, departmentId);
+    if (await isDepartmentReadDenied(userContext, departmentId, canWrite)) {
       return NextResponse.json({ success: false, error: 'Sin acceso a este departamento' }, { status: 403 });
     }
 
@@ -172,18 +223,7 @@ export async function GET(request: NextRequest) {
       select: { id: true, triggerRef: true },
     });
 
-    // canWrite: mismo departamento para todos → se resuelve UNA vez.
-    let canWrite = false;
-    if (userContext.employeeId) {
-      const responsable = await resolveDepartmentResponsable({
-        departmentId,
-        accountId: userContext.accountId,
-      });
-      canWrite =
-        responsable.source === 'responsable' &&
-        responsable.employeeId === userContext.employeeId;
-    }
-
+    // canWrite ya resuelto arriba (compartido con la 3ª puerta del guard).
     let logs: ClimaAtacarCausaLogDTO[] = [];
     if (logRows.length > 0) {
       const allEntries = await prisma.climaActionLogEntry.findMany({
