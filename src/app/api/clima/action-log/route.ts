@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     });
     if (responsable.source !== 'responsable') {
       return NextResponse.json(
-        { success: false, error: 'No sos el responsable de este departamento' },
+        { success: false, error: 'No eres el responsable de este departamento' },
         { status: 403 }
       );
     }
@@ -77,14 +77,14 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error:
-            'Tu usuario aún no está vinculado a tu ficha de empleado. Avisá a RRHH para completar el vínculo.',
+            'Tu usuario aún no está vinculado a tu ficha de empleado. Avisa a RRHH para completar el vínculo.',
         },
         { status: 403 }
       );
     }
     if (responsable.employeeId !== userContext.employeeId) {
       return NextResponse.json(
-        { success: false, error: 'No sos el responsable de este departamento' },
+        { success: false, error: 'No eres el responsable de este departamento' },
         { status: 403 }
       );
     }
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     const trimmed = text.trim();
     if (trimmed.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Escribí lo que hiciste antes de registrar.' },
+        { success: false, error: 'Escribe lo que hiciste antes de registrar.' },
         { status: 400 }
       );
     }
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: { entry, entriesCount } });
   } catch {
     return NextResponse.json(
-      { success: false, error: 'No se pudo registrar. Intentá de nuevo.' },
+      { success: false, error: 'No se pudo registrar. Inténtalo de nuevo.' },
       { status: 500 }
     );
   }
